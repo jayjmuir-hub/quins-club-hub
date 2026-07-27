@@ -152,3 +152,60 @@ describe('RequireAuth auth error capture (failure path, no session ever exists)'
     expect(window.location.hash).toBe('#access_token=abc123')
   })
 })
+
+describe('RequireAuth stale auth error cleanup (carried defect, Task 8 decision 3)', () => {
+  it('clears a previously captured auth error once the session goes away, e.g. after sign-out', () => {
+    window.history.pushState(
+      {},
+      '',
+      '/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid',
+    )
+    useAuthMock.mockReturnValue({ session: null, loading: false })
+
+    const { rerender } = render(
+      <RequireAuth>
+        <div>Protected content</div>
+      </RequireAuth>,
+    )
+
+    // Sanity: the error was captured as before.
+    expect(screen.getByTestId('passed-auth-error')).toBeInTheDocument()
+
+    // The user signs in (e.g. via a fresh, successful attempt).
+    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
+    rerender(
+      <RequireAuth>
+        <div>Protected content</div>
+      </RequireAuth>,
+    )
+    expect(screen.getByText('Protected content')).toBeInTheDocument()
+
+    // The user signs out from within the app: session goes away again.
+    useAuthMock.mockReturnValue({ session: null, loading: false })
+    rerender(
+      <RequireAuth>
+        <div>Protected content</div>
+      </RequireAuth>,
+    )
+
+    expect(screen.getByText('Login screen stub')).toBeInTheDocument()
+    expect(screen.queryByTestId('passed-auth-error')).not.toBeInTheDocument()
+  })
+
+  it('does not clear a freshly captured auth error on first mount (no prior session)', () => {
+    window.history.pushState(
+      {},
+      '',
+      '/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid',
+    )
+    useAuthMock.mockReturnValue({ session: null, loading: false })
+
+    render(
+      <RequireAuth>
+        <div>Protected content</div>
+      </RequireAuth>,
+    )
+
+    expect(screen.getByTestId('passed-auth-error')).toBeInTheDocument()
+  })
+})
