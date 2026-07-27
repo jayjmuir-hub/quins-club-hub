@@ -71,7 +71,10 @@ describe('Chip', () => {
     render(<Chip type="not-a-real-type">MYSTERY</Chip>)
     const el = screen.getByText('MYSTERY')
     expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
-    expect(hasClassToken(el, 'text-[#77726e]')).toBe(true)
+    // The design system's literal --muted text (#77726e) on this bg
+    // measures 4.07:1 and falls short of AA at this size — see Chip.jsx's
+    // contrast note. This asserts the darkened, AA-passing foreground.
+    expect(hasClassToken(el, 'text-[#5c5854]')).toBe(true)
   })
 
   it('falls back to the neutral variant when no type is given at all', () => {
@@ -97,9 +100,11 @@ describe('Badge', () => {
     expect(hasClassToken(el, 'rounded-[6px]')).toBe(true)
   })
 
-  it('falls back to a neutral tone for an unrecognised tone', () => {
+  it('falls back to a neutral tone for an unrecognised tone, using the darkened AA-passing muted text', () => {
     render(<Badge tone="not-a-real-tone">Mystery</Badge>)
-    expect(screen.getByText('Mystery')).toBeInTheDocument()
+    const el = screen.getByText('Mystery')
+    expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
+    expect(hasClassToken(el, 'text-[#5c5854]')).toBe(true)
   })
 })
 
@@ -351,5 +356,52 @@ describe('Sheet', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(document.activeElement).toBe(trigger)
+  })
+
+  it('renders the mobile drag-handle grip, hidden at the desktop breakpoint', () => {
+    render(
+      <Sheet open onClose={() => {}} title="Event details">
+        <p>Body content</p>
+      </Sheet>,
+    )
+    const dialog = screen.getByRole('dialog')
+    // The grip is decorative (aria-hidden) so it isn't reachable via an
+    // accessible query — assert on the structure/class tokens instead.
+    const grip = dialog.querySelector('[aria-hidden="true"] > span')
+    expect(grip).not.toBeNull()
+    expect(hasClassToken(grip, 'w-[38px]')).toBe(true)
+    expect(hasClassToken(grip.parentElement, 'desktop:hidden')).toBe(true)
+  })
+
+  // Regression test for a real bug caught in review: a controlled field
+  // inside an open Sheet, with the (very common) pattern of an inline
+  // onClose={() => setOpen(false)} on the parent. Every keystroke re-renders
+  // the parent, which recreates onClose with a new identity. Before the
+  // fix, that new identity was a dependency of Sheet's internal effect, so
+  // the effect re-ran on every keystroke — its cleanup fired
+  // triggerRef.current?.focus?.(), yanking focus out of the input mid-word.
+  // Typing "Tom" produced "T". This is exactly the shape Tasks 14/15's
+  // add/edit forms will use, so it isn't a hypothetical.
+  function ControlledFieldHarness() {
+    const [open, setOpen] = useState(true)
+    const [name, setName] = useState('')
+    return (
+      <Sheet open={open} onClose={() => setOpen(false)} title="Add a player">
+        <label htmlFor="player-name">Full name</label>
+        <input id="player-name" value={name} onChange={(event) => setName(event.target.value)} />
+      </Sheet>
+    )
+  }
+
+  it('does not lose focus or drop keystrokes when the parent passes an inline onClose and the field it controls re-renders on every keystroke', async () => {
+    const user = userEvent.setup()
+    render(<ControlledFieldHarness />)
+
+    const input = screen.getByLabelText('Full name')
+    await user.click(input)
+    await user.keyboard('Tom')
+
+    expect(input).toHaveValue('Tom')
+    expect(document.activeElement).toBe(input)
   })
 })

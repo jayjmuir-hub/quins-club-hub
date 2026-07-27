@@ -47,6 +47,20 @@ export function Sheet({ open, onClose, title, children }) {
   const panelRef = useRef(null)
   const triggerRef = useRef(null)
 
+  // Latest-ref pattern: any screen consuming Sheet with a controlled form
+  // field (Sheet's own header comment names event/player add-edit forms as
+  // the primary use case — Tasks 14/15) re-renders its parent on every
+  // keystroke, which recreates an inline `onClose={() => setOpen(false)}`
+  // with a fresh identity each time. If `onClose` were in the effect's
+  // dependency array below, that fresh identity would re-run the whole
+  // effect on every keystroke — re-running its cleanup mid-typing, which
+  // calls `triggerRef.current?.focus?.()` and yanks focus out of the input
+  // after every character. Reading the callback through a ref instead means
+  // the effect only depends on `open`, so it runs exactly once per
+  // open/close transition regardless of the caller's callback identity.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     if (!open) return undefined
 
@@ -62,7 +76,7 @@ export function Sheet({ open, onClose, title, children }) {
     function handleKeyDown(event) {
       if (event.key === 'Escape') {
         event.stopPropagation()
-        onClose()
+        onCloseRef.current()
         return
       }
 
@@ -98,7 +112,10 @@ export function Sheet({ open, onClose, title, children }) {
       document.body.style.overflow = previousOverflow
       triggerRef.current?.focus?.()
     }
-  }, [open, onClose])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onClose is
+    // read through onCloseRef (see comment above); it must NOT be a
+    // dependency here, that's the fix, not an oversight.
+  }, [open])
 
   if (!open) return null
 
@@ -116,6 +133,14 @@ export function Sheet({ open, onClose, title, children }) {
         onClick={(event) => event.stopPropagation()}
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] bg-white shadow-[0_6px_24px_rgba(20,20,20,0.10)] animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] desktop:w-[min(520px,94vw)] desktop:animate-sheet-scale-in desktop:rounded-[20px]"
       >
+        {/* Drag-handle bar (design-system.md §4.16 .sheet-grip): mobile
+            only, visual affordance only — there is no swipe-to-dismiss
+            gesture wired up, matching the prototype (dismissal is tap-scrim
+            or tap-close only). Hidden at the desktop breakpoint, where the
+            sheet becomes a centered dialog with no grip. */}
+        <div className="flex justify-center pb-1 pt-2.5 desktop:hidden" aria-hidden="true">
+          <span className="h-1 w-[38px] rounded-full bg-[#dcd4e0]" />
+        </div>
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[#e6e3e1] bg-white px-[18px] py-4">
           <h3 id={titleId} className="text-[18px] font-extrabold text-[#221f1d]">
             {title}

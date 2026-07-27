@@ -24,7 +24,11 @@ export function Empty({ message, action }) {
         <button
           type="button"
           onClick={action.onClick}
-          className="rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-quinsRedDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+          // Hover is --magenta (#D62A3D, design-system.md §1: "Primary
+          // button hover background"), not quinsRedDark (#8E1526, which the
+          // design system uses elsewhere as the darker gradient-start
+          // colour, not a button hover state).
+          className="rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
         >
           {action.label}
         </button>

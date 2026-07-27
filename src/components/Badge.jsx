@@ -19,9 +19,14 @@
 // being semantically different — captain status and parent role are simply
 // not visually distinguished from each other in the source design).
 //
-// Contrast note: the literal --warn/--warn-bg pair (#c9861a on #fbf1dd)
-// measures ~2.71:1 — fails AA. Background kept as specified; foreground
-// darkened to #8a5a12 (~5.3:1), same treatment as Chip's social variant.
+// Contrast notes (component-scoped literal overrides, same treatment as
+// Chip — see task-9-report.md for the numbers):
+//   - parent/captain tones: the literal --warn/--warn-bg pair (#c9861a on
+//     #fbf1dd) measures ~2.71:1 — fails AA. Background kept as specified;
+//     foreground darkened to #8a5a12 (~5.3:1).
+//   - neutral fallback tone: the literal --muted/#f0ecf2 pair (#77726e on
+//     #f0ecf2) measures 4.07:1, under the 4.5:1 AA text threshold at this
+//     10px bold size. Foreground darkened to #5c5854 (~6.0:1).
 
 const TONES = {
   admin: 'bg-quinsRed text-white',
@@ -30,7 +35,7 @@ const TONES = {
   captain: 'bg-[#fbf1dd] text-[#8a5a12]',
 }
 
-const NEUTRAL_TONE = 'bg-[#f0ecf2] text-[#77726e]'
+const NEUTRAL_TONE = 'bg-[#f0ecf2] text-[#5c5854]'
 
 export function Badge({ tone, children, className = '' }) {
   const toneClasses = TONES[tone] ?? NEUTRAL_TONE

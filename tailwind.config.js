@@ -30,9 +30,18 @@ export default {
           from: { transform: 'translateY(100%)' },
           to: { transform: 'translateY(0)' },
         },
+        // Ports design-system.md §4.16's desktop entrance exactly:
+        // `translate(-50%,-46%) scale(.98) opacity:0` -> `translate(-50%,
+        // -50%) scale(1) opacity:1` — a fade + scale-up + slight vertical
+        // "settle". The -46%/-50% pair is a translateY *relative to the
+        // panel's own height* (CSS transform percentages are relative to
+        // the element's own box), so translating that literally onto a
+        // flex-centered layout (no translate(-50%,-50%) needed for
+        // centering here) means the settle is just the -4% delta between
+        // them: translateY(-4%) -> translateY(0).
         sheetScaleIn: {
-          from: { transform: 'scale(.98)', opacity: '0' },
-          to: { transform: 'scale(1)', opacity: '1' },
+          from: { transform: 'scale(.98) translateY(-4%)', opacity: '0' },
+          to: { transform: 'scale(1) translateY(0)', opacity: '1' },
         },
         scrimFadeIn: {
           from: { opacity: '0' },
