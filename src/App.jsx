@@ -1,13 +1,39 @@
-import crest from './assets/crest.png'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import RequireAuth from './components/RequireAuth.jsx'
+
+// Route placeholders only. Task 8 replaces these with the real app shell and
+// navigation; Tasks 11-17 replace them again with the real screens. They live
+// here (not in src/screens/) so those later tasks create their screen files
+// without fighting a stub of the same name.
+
+function Home() {
+  return <h1>Home</h1>
+}
+
+function Schedule() {
+  return <h1>Schedule</h1>
+}
+
+function Roster() {
+  return <h1>Roster</h1>
+}
+
+function More() {
+  return <h1>More</h1>
+}
 
 export default function App() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_100%)] px-6 text-center text-white">
-      <img src={crest} alt="Abu Dhabi Harlequins crest" className="h-24 w-24 drop-shadow-lg" />
-      <h1 className="text-2xl font-extrabold tracking-tight">Abu Dhabi Harlequins</h1>
-      <p className="text-sm font-semibold uppercase tracking-widest opacity-80">
-        Quins Club Hub
-      </p>
-    </div>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <RequireAuth>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/schedule" element={<Schedule />} />
+          <Route path="/roster" element={<Roster />} />
+          <Route path="/more" element={<More />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </RequireAuth>
+    </BrowserRouter>
   )
 }
