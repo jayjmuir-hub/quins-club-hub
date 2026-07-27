@@ -72,7 +72,14 @@ export default function Login({ authError = null }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_100%)] px-4 py-10">
       <div className="w-full max-w-[380px] rounded-2xl border border-[#e6e3e1] bg-white p-6 shadow-[0_6px_24px_rgba(20,20,20,0.10)] sm:p-8">
-        <img src={crest} alt="Abu Dhabi Harlequins crest" className="mx-auto h-20 w-20" />
+        {/* crest.png is 369x400 (portrait) — object-contain keeps its native
+            aspect ratio inside the square box instead of stretching to fill
+            it (see AppShell's header badge for the same fix/reasoning). */}
+        <img
+          src={crest}
+          alt="Abu Dhabi Harlequins crest"
+          className="mx-auto h-20 w-20 object-contain"
+        />
         <h1 className="mt-4 text-center text-xl font-extrabold tracking-tight text-[#221f1d]">
           Abu Dhabi Harlequins
         </h1>

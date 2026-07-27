@@ -120,10 +120,15 @@ export default function AppShell({ children }) {
     <div className="flex min-h-screen flex-col bg-[#f5f4f3] text-[#221f1d]">
       <header className="sticky top-0 z-40 bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_100%)] text-white shadow-[0_2px_16px_rgba(20,20,20,0.28)]">
         <div className="mx-auto flex max-w-[1120px] items-center gap-3 px-4 py-3">
+          {/* crest.png is 369x400 (portrait) — object-contain keeps its native
+              aspect ratio inside the 46x46 badge box (matching the
+              prototype's background:contain treatment) instead of the
+              default object-fit:fill, which stretched it to fill the square
+              and visually flattened the shield's pointed base. */}
           <img
             src={crest}
             alt="Abu Dhabi Harlequins crest"
-            className="h-[46px] w-[46px] shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
+            className="h-[46px] w-[46px] shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
           />
           <div className="min-w-0">
             <h1 className="text-base font-extrabold leading-[1.1] tracking-[0.2px]">

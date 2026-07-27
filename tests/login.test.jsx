@@ -44,6 +44,20 @@ describe('Login screen', () => {
     expect(screen.getByText(/invite-only/i)).toBeInTheDocument()
   })
 
+  it('renders the crest with a meaningful alt and without a cropping object-fit class', () => {
+    // Regression: crest.png is 369x400 (portrait) inside a square box.
+    // object-cover (or the default object-fit:fill with no override) either
+    // crops or visually flattens the shield's pointed base — see Task 8
+    // review. object-contain preserves the native aspect ratio instead.
+    render(<Login />)
+
+    const crestImg = screen.getByRole('img', { name: /crest/i })
+    expect(crestImg).toHaveAttribute('alt', expect.not.stringMatching(/^$/))
+    const classes = crestImg.className.split(/\s+/)
+    expect(classes).toContain('object-contain')
+    expect(classes).not.toContain('object-cover')
+  })
+
   it('entering an email and submitting calls signInWithEmail with that email', async () => {
     signInWithEmail.mockResolvedValue(undefined)
     const user = userEvent.setup()

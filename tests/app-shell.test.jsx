@@ -79,6 +79,23 @@ describe('AppShell', () => {
     expect(screen.getByRole('link', { name: 'More' })).toBeInTheDocument()
   })
 
+  it('renders the crest with a meaningful alt and without a cropping object-fit class', () => {
+    // Regression: crest.png is 369x400 (portrait) inside a square badge box.
+    // object-cover (or the unstyled default object-fit:fill) either crops or
+    // visually flattens the shield's pointed base — confirmed by rendering
+    // the real components in Chromium (Task 8 review). object-contain keeps
+    // the native aspect ratio instead.
+    useMembershipsMock.mockReturnValue(loaded())
+
+    renderShell()
+
+    const crestImg = screen.getByRole('img', { name: /crest/i })
+    expect(crestImg).toHaveAttribute('alt', expect.not.stringMatching(/^$/))
+    const classes = crestImg.className.split(/\s+/)
+    expect(classes).toContain('object-contain')
+    expect(classes).not.toContain('object-cover')
+  })
+
   it('the tagline steps up to 12px at the desktop breakpoint (design-system.md §2)', () => {
     useMembershipsMock.mockReturnValue(loaded())
 
