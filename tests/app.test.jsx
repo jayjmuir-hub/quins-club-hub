@@ -1,32 +1,60 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
-// Unit tests for src/App.jsx (Task 6: auth gate + routing). useAuth is
-// mocked so this exercises App's routing/gating wiring only — not the real
-// AuthProvider (tests/auth.test.jsx) or the real Login screen's own behaviour
-// (tests/login.test.jsx) — and no network is ever reachable from this file.
+// Unit tests for src/App.jsx (Task 6: auth gate + routing; Task 8: shell
+// composition). useAuth and useMemberships are both mocked so this exercises
+// App's routing/gating/composition wiring only — not the real AuthProvider
+// (tests/auth.test.jsx), the real Login screen (tests/login.test.jsx), the
+// real MembershipProvider (tests/memberships.test.jsx), or AppShell's own
+// loading/error/zero-membership rendering (tests/app-shell.test.jsx) — and no
+// network is ever reachable from this file.
 //
 // This replaces the Task 1 test that asserted on App's static placeholder
 // (crest + brand name + tagline centred on the gradient). That placeholder no
-// longer lives in App.jsx — App now renders routes behind RequireAuth, and
-// Task 8 will replace today's route placeholders with the real app shell.
-// The signed-out case below still covers the brand name/tagline, because
-// RequireAuth renders the real Login screen (which carries that copy) when
-// there is no session.
+// longer lives in App.jsx — App now renders routes behind RequireAuth, wrapped
+// in the Task 8 shell. The signed-out case below still covers the brand
+// name/tagline, because RequireAuth renders the real Login screen (which
+// carries that copy) when there is no session.
 
 const useAuthMock = vi.fn()
+const useMembershipsMock = vi.fn()
 
 vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => useAuthMock(),
 }))
 
-// Import after vi.mock so this binds to the mocked module.
+// MembershipProvider is mocked to a pass-through so App's composition
+// (RequireAuth -> MembershipProvider -> AppShell -> Routes) is exercised
+// without touching Supabase; useMemberships is stubbed with an already-loaded
+// membership so the routed placeholders are reachable through AppShell's
+// loading/error/zero-membership gate (that gate's own behaviour is covered by
+// tests/app-shell.test.jsx).
+vi.mock('../src/lib/memberships.jsx', () => ({
+  MembershipProvider: ({ children }) => children,
+  useMemberships: () => useMembershipsMock(),
+}))
+
+// Import after vi.mock so this binds to the mocked modules.
 import App from '../src/App.jsx'
 
-const signedIn = { session: { user: { id: 'u1' } }, loading: false }
+const signedIn = {
+  session: { user: { id: 'u1' } },
+  user: { id: 'u1', email: 'jay@example.com' },
+  loading: false,
+  signOut: vi.fn(),
+}
+const membershipsLoaded = {
+  memberships: [{ role: 'admin', team_id: null }],
+  teams: [],
+  loading: false,
+  error: null,
+  reload: vi.fn(),
+}
 
 beforeEach(() => {
   useAuthMock.mockReset()
+  useMembershipsMock.mockReset()
+  useMembershipsMock.mockReturnValue(membershipsLoaded)
   window.history.pushState({}, '', '/')
 })
 
