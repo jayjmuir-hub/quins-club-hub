@@ -82,6 +82,34 @@ describe('Chip', () => {
     const el = screen.getByText('NO TYPE')
     expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
   })
+
+  // Result variants, added in Task 11 for the Schedule's Results rows. They
+  // are part of the same design-system.md §4.7 variant list, so they belong
+  // on Chip rather than in a near-identical screen-local component.
+  it('renders the win variant (good-bg, sky-deep text for AA contrast)', () => {
+    render(<Chip type="win">Won</Chip>)
+    const el = screen.getByText('Won')
+    expect(hasClassToken(el, 'bg-[#e7f6ea]')).toBe(true)
+    // The literal --good text (#2F9E4F) on --good-bg measures 3.06:1 and
+    // fails AA — see Chip.jsx's contrast note for the substitution.
+    expect(hasClassToken(el, 'text-[#2F7D3D]')).toBe(true)
+  })
+
+  it('renders the loss variant (bad-bg, darkened text for AA contrast)', () => {
+    render(<Chip type="loss">Lost</Chip>)
+    const el = screen.getByText('Lost')
+    expect(hasClassToken(el, 'bg-[#fbeae8]')).toBe(true)
+    // The literal --bad text (#d1483b) on --bad-bg measures 3.84:1.
+    expect(hasClassToken(el, 'text-quinsRedDark')).toBe(true)
+  })
+
+  it('renders the draw variant with the design system colours verbatim', () => {
+    render(<Chip type="draw">Drew</Chip>)
+    const el = screen.getByText('Drew')
+    expect(hasClassToken(el, 'bg-[#eef0f2]')).toBe(true)
+    // This pair already measures ~5.3:1, so no substitution was needed.
+    expect(hasClassToken(el, 'text-[#5a6470]')).toBe(true)
+  })
 })
 
 describe('Badge', () => {

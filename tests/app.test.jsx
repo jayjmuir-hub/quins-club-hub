@@ -34,6 +34,19 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+// The /schedule route renders the real Schedule screen as of Task 11, and
+// that screen queries Supabase on mount. Its data module is mocked here so
+// this file stays network-free (a plan-level constraint) and keeps testing
+// only App's routing. listEvents deliberately never settles: these tests
+// assert synchronously straight after render, so a resolving promise would
+// land its setState after the test body had finished and produce act()
+// warnings for a state change no assertion here cares about. Schedule's own
+// loading/loaded/error behaviour is covered by tests/schedule.test.jsx.
+vi.mock('../src/data/events.js', () => ({
+  listEvents: () => new Promise(() => {}),
+  subscribeEvents: () => () => {},
+}))
+
 // Import after vi.mock so this binds to the mocked modules.
 import App from '../src/App.jsx'
 

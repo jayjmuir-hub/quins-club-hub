@@ -34,6 +34,21 @@ const VARIANTS = {
   match: 'bg-quinsRed text-white',
   training: 'bg-[#eef7e6] text-[#2F7D3D]',
   social: 'bg-[#fbf1dd] text-[#8a5a12]',
+  // Result variants (win/loss/draw) come from the same design-system.md
+  // §4.7 variant list as match/training/social — the same chip, used on the
+  // Schedule's Results rows, not a second component. Same contrast
+  // treatment as the social/neutral variants: the specified background is
+  // kept, the foreground darkened to the nearest existing palette value
+  // that clears AA at this 11.5px bold size.
+  //   - win:  --good (#2F9E4F) on --good-bg (#e7f6ea) measures 3.06:1.
+  //           Text swapped to --sky-deep (#2F7D3D), already the training
+  //           chip's foreground, for ~4.6:1.
+  //   - loss: --bad (#d1483b) on --bad-bg (#fbeae8) measures 3.84:1. Text
+  //           swapped to --plum/quinsRedDark (#8E1526) for ~7.9:1.
+  //   - draw: #5a6470 on #eef0f2 already measures ~5.3:1 — used verbatim.
+  win: 'bg-[#e7f6ea] text-[#2F7D3D]',
+  loss: 'bg-[#fbeae8] text-quinsRedDark',
+  draw: 'bg-[#eef0f2] text-[#5a6470]',
 }
 
 const NEUTRAL_VARIANT = 'bg-[#f0ecf2] text-[#5c5854]'

@@ -20,7 +20,13 @@
 
 export const ALL_TEAMS_ID = 'all'
 
-function PillButton({ active, onClick, children }) {
+// Exported so the Schedule's Upcoming/Results/Calendar sub-tab row reuses
+// this styling instead of re-declaring it — design-system.md §4.8 is
+// explicit that the same .pill component serves both rows. It stays a plain
+// toggle button with aria-pressed rather than an ARIA tablist: a tablist
+// owes the user roving tabindex and arrow-key navigation, and a half-built
+// tablist is worse for screen-reader users than an honest toggle button.
+export function PillButton({ active, onClick, children }) {
   const classes = [
     'shrink-0 whitespace-nowrap rounded-[20px] px-[14px] py-[7px] text-[13px] font-bold outline-none transition',
     'focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2',

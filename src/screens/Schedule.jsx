@@ -1,0 +1,431 @@
+import { useEffect, useMemo, useState } from 'react'
+import Card from '../components/Card.jsx'
+import Chip from '../components/Chip.jsx'
+import Empty from '../components/Empty.jsx'
+import ScopeNote from '../components/ScopeNote.jsx'
+import Spinner from '../components/Spinner.jsx'
+import TeamPills, { ALL_TEAMS_ID, PillButton } from '../components/TeamPills.jsx'
+import EventDetail from './EventDetail.jsx'
+import { listEvents, subscribeEvents } from '../data/events.js'
+import { useMemberships } from '../lib/memberships.jsx'
+import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import {
+  dateBoxParts,
+  eventDate,
+  eventTitle,
+  formatTime,
+  hasResult,
+  resultLabel,
+  resultOutcome,
+  resultScore,
+  sortByStart,
+} from '../lib/eventFormat.js'
+
+// Schedule & fixtures (design-system.md §5.2): scope note, section head,
+// Upcoming/Results/Calendar sub-tabs, a team filter, then the list or the
+// month grid. Reads events once for the whole visible scope and filters in
+// memory — the scope is at most 15 teams' worth of fixtures, so refetching
+// on every pill tap would add latency and flicker for nothing.
+//
+// Access control is not enforced here. RLS decides which rows come back;
+// visibleTeams() only tells the UI which pills to draw and which team ids
+// to ask for, so a mistake here can narrow what a user sees but can never
+// widen it.
+
+const TABS = [
+  { id: 'upcoming', label: 'Upcoming' },
+  { id: 'results', label: 'Results' },
+  { id: 'calendar', label: 'Calendar' },
+]
+
+const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+// design-system.md §4.14: match = maroon, training = --sky, social = --warn.
+const DOT_COLOURS = {
+  match: 'bg-quinsRed',
+  training: 'bg-[#3E9C4F]',
+  social: 'bg-[#c9861a]',
+}
+
+function ClockIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  )
+}
+
+function PinIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  )
+}
+
+function ChevronIcon({ direction = 'left', ...props }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d={direction === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'} />
+    </svg>
+  )
+}
+
+function startOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+function isSameDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  )
+}
+
+function FixtureRow({ event, teamName, onSelect }) {
+  const date = eventDate(event)
+  const { month, day, weekday } = dateBoxParts(date)
+  const played = hasResult(event)
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(event.id)}
+      className="flex w-full items-center gap-[13px] border-b border-[#e6e3e1] p-[14px] text-left transition last:border-b-0 hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-quinsRed"
+    >
+      <span className="w-[52px] shrink-0 rounded-[11px] bg-[#f3eef5] px-1 py-2 text-center">
+        <span className="block text-[10.5px] font-extrabold uppercase tracking-[.5px] text-quinsRed">{month}</span>
+        <span className="block text-[21px] font-extrabold leading-none text-[#221f1d]">{day}</span>
+        <span className="block text-[10px] font-semibold text-[#77726e]">{weekday}</span>
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="mb-1 flex flex-wrap items-center gap-1.5">
+          <Chip type={event.type}>{TYPE_LABELS[event.type] ?? 'Event'}</Chip>
+          {teamName && <Chip>{teamName}</Chip>}
+        </span>
+        <span className="block text-[15.5px] font-extrabold text-[#221f1d]">{eventTitle(event)}</span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12.5px] text-[#77726e]">
+          <span className="flex items-center gap-1">
+            <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            {formatTime(date)}
+          </span>
+          {event.venue && (
+            <span className="flex items-center gap-1">
+              <PinIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              {event.venue}
+            </span>
+          )}
+        </span>
+      </span>
+
+      {played && (
+        <span className="shrink-0 text-right">
+          <Chip type={resultOutcome(event)}>{resultLabel(event)}</Chip>
+          <span className="mt-1 block text-base font-extrabold text-[#221f1d]">{resultScore(event)}</span>
+        </span>
+      )}
+    </button>
+  )
+}
+
+function FixtureList({ events, teamsById, onSelect, emptyMessage }) {
+  if (events.length === 0) {
+    return (
+      <Card>
+        <Empty message={emptyMessage} />
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      {events.map((event) => (
+        <FixtureRow
+          key={event.id}
+          event={event}
+          teamName={teamsById.get(event.team_id)?.name}
+          onSelect={onSelect}
+        />
+      ))}
+    </Card>
+  )
+}
+
+function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
+  const year = month.getFullYear()
+  const monthIndex = month.getMonth()
+  const leadingBlanks = new Date(year, monthIndex, 1).getDay()
+  const dayCount = new Date(year, monthIndex + 1, 0).getDate()
+  const today = new Date()
+
+  // Only this month's events, bucketed by day-of-month. The prototype
+  // renders leading blanks only (no trailing ones) — design-system.md §4.14.
+  const byDay = new Map()
+  const monthEvents = []
+  events.forEach((event) => {
+    const date = eventDate(event)
+    if (!date || date.getFullYear() !== year || date.getMonth() !== monthIndex) return
+    monthEvents.push(event)
+    const bucket = byDay.get(date.getDate()) ?? []
+    bucket.push(event)
+    byDay.set(date.getDate(), bucket)
+  })
+
+  const shiftMonth = (delta) => onMonthChange(new Date(year, monthIndex + delta, 1))
+
+  return (
+    <>
+      <Card className="p-[14px]">
+        <div className="mb-3 flex items-center justify-between">
+          <b className="text-base font-extrabold text-[#221f1d]">
+            {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+          </b>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              aria-label="Previous month"
+              onClick={() => shiftMonth(-1)}
+              className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-[#f2edf4] text-[#221f1d] transition hover:bg-[#e6e3e1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed"
+            >
+              <ChevronIcon direction="left" className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label="Next month"
+              onClick={() => shiftMonth(1)}
+              className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-[#f2edf4] text-[#221f1d] transition hover:bg-[#e6e3e1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed"
+            >
+              <ChevronIcon direction="right" className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-[5px]">
+          {WEEKDAYS.map((weekday) => (
+            <div key={weekday} className="text-center text-[10.5px] font-extrabold uppercase text-[#77726e]">
+              {weekday}
+            </div>
+          ))}
+
+          {Array.from({ length: leadingBlanks }, (_, index) => (
+            <div key={`blank-${index}`} aria-hidden="true" />
+          ))}
+
+          {Array.from({ length: dayCount }, (_, index) => {
+            const dayNumber = index + 1
+            const dayEvents = byDay.get(dayNumber) ?? []
+            const isToday = isSameDay(new Date(year, monthIndex, dayNumber), today)
+            const cellClasses = [
+              'relative aspect-square rounded-[9px] border p-[5px] text-left text-[12.5px] font-semibold text-[#221f1d]',
+              isToday ? 'border-quinsRed shadow-[inset_0_0_0_1px_theme(colors.quinsRed)]' : 'border-[#e6e3e1]',
+            ].join(' ')
+
+            if (dayEvents.length === 0) {
+              return (
+                <div key={dayNumber} className={cellClasses}>
+                  {dayNumber}
+                </div>
+              )
+            }
+
+            return (
+              <button
+                key={dayNumber}
+                type="button"
+                onClick={() => onSelect(dayEvents[0].id)}
+                aria-label={`${dayNumber} ${month.toLocaleDateString(undefined, { month: 'long' })}, ${dayEvents.length} ${dayEvents.length === 1 ? 'event' : 'events'}`}
+                className={`${cellClasses} transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed`}
+              >
+                {dayNumber}
+                <span className="absolute bottom-1 left-1 flex gap-0.5" aria-hidden="true">
+                  {dayEvents.slice(0, 4).map((event) => (
+                    <span
+                      key={event.id}
+                      className={['h-1.5 w-1.5 rounded-full', DOT_COLOURS[event.type] ?? 'bg-[#77726e]'].join(' ')}
+                    />
+                  ))}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+          {Object.entries(TYPE_LABELS).map(([type, label]) => (
+            <span key={type} className="flex items-center gap-1.5 text-xs font-bold text-[#5c5854]">
+              <span className={['h-1.5 w-1.5 rounded-full', DOT_COLOURS[type]].join(' ')} aria-hidden="true" />
+              {label}
+            </span>
+          ))}
+        </div>
+      </Card>
+
+      <div className="mt-4">
+        <FixtureList
+          events={sortByStart(monthEvents, 'asc')}
+          teamsById={teamsById}
+          onSelect={onSelect}
+          emptyMessage="Nothing is scheduled this month."
+        />
+      </div>
+    </>
+  )
+}
+
+export default function Schedule() {
+  const { memberships, teams } = useMemberships()
+
+  const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
+  const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
+  const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
+
+  const [tab, setTab] = useState('upcoming')
+  const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
+  const [selectedEventId, setSelectedEventId] = useState(null)
+  const [month, setMonth] = useState(() => startOfMonth(new Date()))
+
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [reloadToken, setReloadToken] = useState(0)
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    setError(null)
+
+    listEvents({ teamIds })
+      .then((rows) => {
+        if (mounted) setEvents(rows)
+      })
+      .catch((err) => {
+        if (!mounted) return
+        setError(err)
+        setEvents([])
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [teamIds, reloadToken])
+
+  // Realtime: bump the token and let the effect above refetch. The callback
+  // closes over nothing but setReloadToken (a stable state setter), so this
+  // subscribes exactly once for the life of the screen, and its cleanup only
+  // unsubscribes — it never touches focus.
+  useEffect(() => subscribeEvents(() => setReloadToken((token) => token + 1)), [])
+
+  const admin = isAdmin(memberships)
+  const canEditAnything = admin || memberships.some((membership) => membership.role === 'coach')
+  const teamNames = scopedTeams.map((team) => team.name).join(', ')
+
+  const visible = teamFilter === ALL_TEAMS_ID ? events : events.filter((event) => event.team_id === teamFilter)
+  const upcoming = sortByStart(visible.filter((event) => !hasResult(event)), 'asc')
+  const results = sortByStart(visible.filter(hasResult), 'desc')
+
+  // Derive the open event from the live list rather than storing the row
+  // itself, so a realtime update keeps the sheet's contents fresh and a
+  // deleted fixture closes it instead of stranding a stale copy on screen.
+  const selectedEvent = events.find((event) => event.id === selectedEventId) ?? null
+
+  return (
+    <section>
+      {!admin && (
+        <ScopeNote tone={canEditAnything ? 'coach' : 'parent'}>
+          <b>
+            {roleLabel(memberships)} view{canEditAnything ? '' : ' · read-only'}.
+          </b>{' '}
+          You&apos;re seeing {teamNames || 'no squads'} — every other age group is hidden.
+        </ScopeNote>
+      )}
+
+      <div className="mb-3.5 mt-1">
+        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Schedule &amp; fixtures</h2>
+        <p className="text-[13px] font-medium text-[#77726e]">{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
+      </div>
+
+      <div className="mb-3 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {TABS.map(({ id, label }) => (
+          <PillButton key={id} active={tab === id} onClick={() => setTab(id)}>
+            {label}
+          </PillButton>
+        ))}
+      </div>
+
+      {/* The calendar always shows the user's whole visible scope, so the
+          team filter is hidden there (design-system.md §5.2). Below two
+          teams there is nothing to filter between, and TeamPills already
+          renders nothing for an empty list. */}
+      {tab !== 'calendar' && scopedTeams.length > 1 && (
+        <div className="mb-4">
+          <TeamPills teams={scopedTeams} selected={teamFilter} onChange={setTeamFilter} />
+        </div>
+      )}
+
+      {loading && (
+        <Card className="flex justify-center py-10">
+          <Spinner />
+        </Card>
+      )}
+
+      {!loading && error && (
+        <Card role="alert" className="p-6 text-center">
+          <h3 className="text-base font-extrabold text-quinsRedDark">We couldn&apos;t load the schedule</h3>
+          <p className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+            {error.message || 'Something went wrong. Try again.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => setReloadToken((token) => token + 1)}
+            className="mt-4 rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+          >
+            Try again
+          </button>
+        </Card>
+      )}
+
+      {!loading && !error && tab === 'upcoming' && (
+        <FixtureList
+          events={upcoming}
+          teamsById={teamsById}
+          onSelect={setSelectedEventId}
+          emptyMessage="No upcoming fixtures yet."
+        />
+      )}
+
+      {!loading && !error && tab === 'results' && (
+        <FixtureList
+          events={results}
+          teamsById={teamsById}
+          onSelect={setSelectedEventId}
+          emptyMessage="No results yet. Scores show here once someone adds them."
+        />
+      )}
+
+      {!loading && !error && tab === 'calendar' && (
+        <CalendarMonth
+          month={month}
+          onMonthChange={setMonth}
+          events={events}
+          teamsById={teamsById}
+          onSelect={setSelectedEventId}
+        />
+      )}
+
+      {selectedEvent && (
+        <EventDetail
+          event={selectedEvent}
+          team={teamsById.get(selectedEvent.team_id)}
+          onClose={() => setSelectedEventId(null)}
+        />
+      )}
+    </section>
+  )
+}
