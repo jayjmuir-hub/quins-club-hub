@@ -3,7 +3,7 @@
 **Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
 Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
 
-**10 of 22 tasks complete, 167 tests passing, build clean.**
+**12 of 22 tasks complete, 271 tests passing, build clean.**
 
 ---
 
@@ -33,7 +33,7 @@ Never put the `sb_secret_…` key in this repo or in a chat.
 Verify:
 
 ```bash
-npm test        # expect 167 passing across 11 files
+npm test        # expect 271 passing across 14 files
 npm run build   # expect clean
 ```
 
@@ -74,8 +74,8 @@ does.
 | **A — Scaffold** | 1 scaffold, 2 Supabase client | done |
 | **B — Auth & scope** | 3+4 auth context, 5 login screen, 6 auth gate + router, 7 scope helpers | done |
 | **C — Shell & design system** | 8 app shell + nav, 9 shared UI primitives | done |
-| **D — Read features** | 10 data-access modules | done |
-| | 11 schedule, 12 roster, 13 dashboard | next |
+| **D — Read features** | 10 data-access modules, 11 schedule, 12 roster | done |
+| | 13 dashboard | next |
 | **E — Write features** | 14 event form, 15 player form, 16 availability RSVPs | todo |
 | **F — Admin** | 17 admin overview, 18 invite flow, 19 first-admin doc | todo |
 | **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | todo |
@@ -93,15 +93,22 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Resume at Task 11 — Schedule screen
+## Resume at Task 13 — Dashboard
 
-Its brief is already generated at `.superpowers/sdd/quins-v1-mvp/task-11-brief.md`, as are
-briefs 12 and 13. The plan is `docs/plans/quins-v1-mvp.md`; the visual spec is
+Its brief is already generated at `.superpowers/sdd/quins-v1-mvp/task-13-brief.md`. The plan is `docs/plans/quins-v1-mvp.md`; the visual spec is
 `docs/design-system.md` (597 lines, extracted from the approved prototype — implementers
 build from it without reading the prototype HTML).
 
 Execution method: `superpowers:subagent-driven-development` — one implementer subagent per
 task, then a spec+quality review, then a scoped re-review of any fixes, then a ledger entry.
+Tasks 11 and 12 added a further gate that has earned its place: an **independent
+controller-side browser pass**, rendering the real components in Chromium at 375px and
+1280px via `harness/`. It has caught a defect on both screens that no jsdom test could see.
+Screenshots are git-ignored — regenerate them, don't commit them.
+
+**`.superpowers/sdd/.gitignore` gets reset to `*` by tooling, repeatedly.** It silently
+untracks the whole ledger. Do not fight it — stage the workspace with
+`git add -f .superpowers/sdd/quins-v1-mvp/` every time.
 
 ---
 
@@ -131,6 +138,27 @@ consequence: a user with no squads would otherwise see the whole club.
 **A fixture is a "result" when a score is present, not when its date has passed.** The
 prototype used this rule. A match played last week with no score entered is still Upcoming.
 
+**A selected team pill must be reconciled against live scope.** Both Schedule and Roster
+derive `activeFilter = teamIds.includes(teamFilter) ? teamFilter : ALL_TEAMS_ID`. Without it,
+a membership reload that drops the selected team leaves the list filtered to nothing — and
+below two teams both screens hide the pill row entirely, so there is no "All" pill to click
+as a manual recovery.
+
+**Pill counts come from the search-only set, never the team-filtered set.** Otherwise every
+unselected pill reads "· 0" the moment any pill is clicked.
+
+**Never render a loading state for `getPlayerContact`.** Render nothing until a row arrives.
+A spinner there put an aria-live "Loading contact details…" announcement in front of a parent
+who is not permitted to see them.
+
+**Distinguish first load from refresh.** `setLoading(true)` on every refetch flashes a
+spinner over already-rendered content — Schedule uses a derived `isFirstLoad`, EventDetail a
+`settledForEvent` ref (an empty availability list is a legitimate steady state there).
+
+**A `<button>` used as a layout box inherits Chromium's UA content-centring**, which no jsdom
+test can see. Task 11's calendar shipped with populated day cells floating 66px below their
+empty neighbours at desktop width. Set layout explicitly on any interactive non-text element.
+
 **`getPlayerContact` uses `.maybeSingle()`, not `.single()`.** Zero rows is the normal
 outcome for a parent — RLS hides contacts from them. `.single()` throws on zero rows, which
 would turn a safeguarding feature into a crash.
@@ -141,7 +169,9 @@ which creates the `profiles` row. No app-side profile creation needed.
 **Contrast:** `quinsGreen #7DC351` on white is ~1.9:1 and fails AA for text — gradient stop
 or block fill only. Error text uses `quinsRedDark #8E1526` (~7.9:1). The neutral chip's text
 was darkened to `#5c5854` (6.04:1) because the design system's `--muted` on the chip
-background was 4.07:1, under the threshold.
+background was 4.07:1, under the threshold. `--muted #77726e` also fails on the **paper**
+background `#f5f4f3` (4.33:1) while passing on white inside a card (4.75:1) — on-paper text
+uses `#5c5854` (6.42:1).
 
 **Conventions set by earlier tasks:** data-access functions **throw** on error, never return
 `{data, error}` tuples, and return `[]` not `null`. `src/lib/scope.js` holds only pure
