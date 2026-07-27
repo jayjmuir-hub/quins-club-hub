@@ -20,6 +20,11 @@ export async function listAvailability(eventId) {
   return data ?? []
 }
 
+// Suffixed so concurrent subscriptions to the same event (e.g. a list view
+// and a detail view both watching it) get distinct realtime channel topics
+// rather than colliding.
+let channelSeq = 0
+
 /**
  * Subscribes to realtime changes on the availability table, filtered
  * server-side to one event id (not filtered client-side in the callback).
@@ -28,7 +33,7 @@ export async function listAvailability(eventId) {
  */
 export function subscribeAvailability(eventId, callback) {
   const channel = supabase
-    .channel(`availability-changes-${eventId}`)
+    .channel(`availability-changes-${eventId}-${++channelSeq}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'availability', filter: `event_id=eq.${eventId}` },

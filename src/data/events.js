@@ -32,13 +32,17 @@ export async function listEvents({ teamIds, from, to } = {}) {
   return data ?? []
 }
 
+// Suffixed so concurrent subscriptions (e.g. dashboard + schedule screens
+// both mounted) get distinct realtime channel topics rather than colliding.
+let channelSeq = 0
+
 /**
  * Subscribes to realtime changes on the events table. Returns an unsubscribe
  * function — call it from a useEffect cleanup. Safe to call more than once.
  */
 export function subscribeEvents(callback) {
   const channel = supabase
-    .channel('events-changes')
+    .channel(`events-changes-${++channelSeq}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, callback)
     .subscribe()
 

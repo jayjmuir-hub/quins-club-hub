@@ -169,6 +169,19 @@ describe('subscribeEvents', () => {
     expect(supabase.removeChannel).toHaveBeenCalledTimes(1)
     expect(supabase.removeChannel).toHaveBeenCalledWith(channel)
   })
+
+  it('uses a distinct channel per call so two concurrent subscribers do not collide', () => {
+    const channelA = createChannel()
+    const channelB = createChannel()
+    supabase.channel.mockReturnValueOnce(channelA).mockReturnValueOnce(channelB)
+
+    subscribeEvents(vi.fn())
+    subscribeEvents(vi.fn())
+
+    const [nameA] = supabase.channel.mock.calls[0]
+    const [nameB] = supabase.channel.mock.calls[1]
+    expect(nameA).not.toEqual(nameB)
+  })
 })
 
 // --- listPlayers ----------------------------------------------------------
