@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Chip from '../components/Chip.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -81,9 +81,16 @@ function AvailabilitySummary({ eventId }) {
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
 
+  // The event id a first attempt has already settled for. Only that first
+  // attempt shows the spinner: this effect also re-runs on every realtime
+  // RSVP, and spinning then would blank the availability bar the user is
+  // reading each time a squad-mate tapped "in". A refresh leaves the bar up
+  // and swaps the numbers when the new counts land.
+  const settledForEvent = useRef(null)
+
   useEffect(() => {
     let mounted = true
-    setLoading(true)
+    if (settledForEvent.current !== eventId) setLoading(true)
     setError(null)
 
     listAvailability(eventId)
@@ -96,7 +103,9 @@ function AvailabilitySummary({ eventId }) {
         setRows([])
       })
       .finally(() => {
-        if (mounted) setLoading(false)
+        if (!mounted) return
+        setLoading(false)
+        settledForEvent.current = eventId
       })
 
     return () => {

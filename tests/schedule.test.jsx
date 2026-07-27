@@ -450,6 +450,80 @@ describe('Schedule — realtime', () => {
     expect(unsubscribeEvents).toHaveBeenCalledTimes(1)
   })
 
+  // A realtime change fires for every insert/update/delete anywhere in
+  // scope, from any user. If the refetch swapped the list for a spinner, the
+  // rows would be torn out of the DOM and the page height would collapse
+  // every time somebody else touched a fixture. The "refetches when a change
+  // arrives" test above passes either way, because both promises have
+  // settled by the time it asserts — so this one holds the refetch open and
+  // looks at what is on screen mid-flight.
+  it('keeps the current rows on screen while a realtime refresh is in flight', async () => {
+    setup()
+
+    await screen.findByText('Quins vs Dubai Exiles')
+
+    let resolveRefresh
+    listEventsMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRefresh = resolve
+      }),
+    )
+
+    const [onChange] = subscribeEventsMock.mock.calls[0]
+    act(() => {
+      onChange({ eventType: 'UPDATE' })
+    })
+
+    expect(screen.getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+    expect(screen.getByText('Senior squad training')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveRefresh([UPCOMING_TRAINING])
+    })
+
+    expect(screen.queryByText('Quins vs Dubai Exiles')).not.toBeInTheDocument()
+    expect(screen.getByText('Senior squad training')).toBeInTheDocument()
+  })
+
+  it('keeps the availability bar on screen while an RSVP refresh is in flight', async () => {
+    listAvailabilityMock.mockResolvedValue([
+      { id: 'a1', player_id: 'p1', status: 'in' },
+      { id: 'a2', player_id: 'p2', status: 'out' },
+    ])
+
+    const { user } = setup()
+
+    await user.click(await screen.findByRole('button', { name: /Dubai Exiles/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(await within(dialog).findByText('1 in')).toBeInTheDocument()
+
+    let resolveRefresh
+    listAvailabilityMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRefresh = resolve
+      }),
+    )
+
+    const [, onAvailabilityChange] = subscribeAvailabilityMock.mock.calls[0]
+    act(() => {
+      onAvailabilityChange({ eventType: 'INSERT' })
+    })
+
+    expect(within(dialog).getByText('1 in')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('status')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveRefresh([
+        { id: 'a1', player_id: 'p1', status: 'in' },
+        { id: 'a2', player_id: 'p2', status: 'out' },
+        { id: 'a3', player_id: 'p3', status: 'in' },
+      ])
+    })
+
+    expect(within(dialog).getByText('2 in')).toBeInTheDocument()
+  })
+
   it('subscribes once, not once per re-render', async () => {
     const { user } = setup()
 

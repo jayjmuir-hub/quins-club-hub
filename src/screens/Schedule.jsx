@@ -293,6 +293,9 @@ export default function Schedule() {
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
 
+  // `loading` means "a fetch is in flight", which is true of a background
+  // realtime refresh as much as of the first load. What must NOT be true of
+  // a refresh is blanking the screen — see isFirstLoad below.
   useEffect(() => {
     let mounted = true
     setLoading(true)
@@ -315,12 +318,20 @@ export default function Schedule() {
       mounted = false
     }
   }, [teamIds, reloadToken])
-
   // Realtime: bump the token and let the effect above refetch. The callback
   // closes over nothing but setReloadToken (a stable state setter), so this
   // subscribes exactly once for the life of the screen, and its cleanup only
   // unsubscribes — it never touches focus.
   useEffect(() => subscribeEvents(() => setReloadToken((token) => token + 1)), [])
+
+  // Only the first load (or a load with nothing to show, e.g. retrying after
+  // an error) replaces the content with a spinner. A realtime refresh fires
+  // on every insert/update/delete anywhere in scope — from any user, on any
+  // team — so spinning on those would tear the list out of the DOM and
+  // collapse the page height each time somebody else touched a fixture. A
+  // refresh keeps the current rows on screen and swaps them in place when
+  // the new data lands.
+  const isFirstLoad = loading && events.length === 0
 
   const admin = isAdmin(memberships)
   const canEditAnything = admin || memberships.some((membership) => membership.role === 'coach')
@@ -369,13 +380,13 @@ export default function Schedule() {
         </div>
       )}
 
-      {loading && (
+      {isFirstLoad && (
         <Card className="flex justify-center py-10">
           <Spinner />
         </Card>
       )}
 
-      {!loading && error && (
+      {!isFirstLoad && error && (
         <Card role="alert" className="p-6 text-center">
           <h3 className="text-base font-extrabold text-quinsRedDark">We couldn&apos;t load the schedule</h3>
           <p className="mt-2 text-sm leading-relaxed text-quinsRedDark">
@@ -391,7 +402,7 @@ export default function Schedule() {
         </Card>
       )}
 
-      {!loading && !error && tab === 'upcoming' && (
+      {!isFirstLoad && !error && tab === 'upcoming' && (
         <FixtureList
           events={upcoming}
           teamsById={teamsById}
@@ -400,7 +411,7 @@ export default function Schedule() {
         />
       )}
 
-      {!loading && !error && tab === 'results' && (
+      {!isFirstLoad && !error && tab === 'results' && (
         <FixtureList
           events={results}
           teamsById={teamsById}
@@ -409,7 +420,7 @@ export default function Schedule() {
         />
       )}
 
-      {!loading && !error && tab === 'calendar' && (
+      {!isFirstLoad && !error && tab === 'calendar' && (
         <CalendarMonth
           month={month}
           onMonthChange={setMonth}
