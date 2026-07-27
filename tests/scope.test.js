@@ -1,0 +1,311 @@
+import { describe, it, expect, vi } from 'vitest'
+import {
+  visibleTeams,
+  canEditTeam,
+  isAdmin,
+  roleLabel,
+  childPlayerIds,
+} from '../src/lib/scope.js'
+
+// Unit tests for src/lib/scope.js (Task 7: pure membership/scope helpers) and
+// src/data/members.js (loadMyMemberships()). scope.js must stay pure — no
+// supabase, react, or auth imports — so these run with fixture membership
+// arrays only. loadMyMemberships() is tested separately below with a mocked
+// supabase client; no network is touched anywhere in this file.
+
+// --- Fixture teams: 15 real age groups, unsorted on purpose so tests prove
+// visibleTeams sorts rather than merely passing through insertion order.
+const U6 = { id: 'team-u6', club_id: 'club-1', name: 'U6', sort_order: 1 }
+const U8 = { id: 'team-u8', club_id: 'club-1', name: 'U8', sort_order: 3 }
+const U12 = { id: 'team-u12', club_id: 'club-1', name: 'U12', sort_order: 7 }
+const U16 = { id: 'team-u16', club_id: 'club-1', name: 'U16', sort_order: 11 }
+const SENIOR_1XV = {
+  id: 'team-senior-1xv',
+  club_id: 'club-1',
+  name: 'Senior Men 1st XV',
+  sort_order: 13,
+}
+const ALL_TEAMS = [SENIOR_1XV, U16, U8, U12, U6] // deliberately unsorted
+
+function membership(overrides) {
+  return {
+    id: `m-${Math.random()}`,
+    profile_id: 'profile-1',
+    club_id: 'club-1',
+    team_id: null,
+    role: 'player',
+    player_id: null,
+    created_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+describe('visibleTeams', () => {
+  it('returns every team for an admin, even though the admin membership has team_id null', () => {
+    const memberships = [membership({ role: 'admin', team_id: null })]
+
+    const result = visibleTeams(memberships, ALL_TEAMS)
+
+    expect(result.map((t) => t.id)).toEqual([U6.id, U8.id, U12.id, U16.id, SENIOR_1XV.id])
+  })
+
+  it('returns only the teams a coach with two squads coaches, sorted by sort_order', () => {
+    const memberships = [
+      membership({ role: 'coach', team_id: U12.id }),
+      membership({ role: 'coach', team_id: U6.id }),
+    ]
+
+    const result = visibleTeams(memberships, ALL_TEAMS)
+
+    expect(result.map((t) => t.id)).toEqual([U6.id, U12.id])
+  })
+
+  it('returns only the parent\'s child team', () => {
+    const memberships = [
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1' }),
+    ]
+
+    const result = visibleTeams(memberships, ALL_TEAMS)
+
+    expect(result.map((t) => t.id)).toEqual([U8.id])
+  })
+
+  it('unions teams for a person holding both coach and parent roles', () => {
+    const memberships = [
+      membership({ role: 'coach', team_id: U12.id }),
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1' }),
+    ]
+
+    const result = visibleTeams(memberships, ALL_TEAMS)
+
+    expect(result.map((t) => t.id)).toEqual([U8.id, U12.id])
+  })
+
+  it('does not mutate the allTeams array passed in', () => {
+    const original = [...ALL_TEAMS]
+    const memberships = [membership({ role: 'admin', team_id: null })]
+
+    visibleTeams(memberships, ALL_TEAMS)
+
+    expect(ALL_TEAMS).toEqual(original)
+    expect(ALL_TEAMS.map((t) => t.id)).toEqual(original.map((t) => t.id))
+  })
+
+  it('returns an empty array for empty, null, or undefined memberships', () => {
+    expect(visibleTeams([], ALL_TEAMS)).toEqual([])
+    expect(visibleTeams(null, ALL_TEAMS)).toEqual([])
+    expect(visibleTeams(undefined, ALL_TEAMS)).toEqual([])
+  })
+
+  it('handles a null or undefined allTeams without throwing', () => {
+    const memberships = [membership({ role: 'admin', team_id: null })]
+
+    expect(visibleTeams(memberships, null)).toEqual([])
+    expect(visibleTeams(memberships, undefined)).toEqual([])
+  })
+})
+
+describe('canEditTeam', () => {
+  it('is true for an admin on any team', () => {
+    const memberships = [membership({ role: 'admin', team_id: null })]
+
+    expect(canEditTeam(memberships, U6.id)).toBe(true)
+    expect(canEditTeam(memberships, SENIOR_1XV.id)).toBe(true)
+  })
+
+  it('is true for a coach only on their own coached teams', () => {
+    const memberships = [
+      membership({ role: 'coach', team_id: U12.id }),
+      membership({ role: 'coach', team_id: U6.id }),
+    ]
+
+    expect(canEditTeam(memberships, U12.id)).toBe(true)
+    expect(canEditTeam(memberships, U6.id)).toBe(true)
+    expect(canEditTeam(memberships, U8.id)).toBe(false)
+  })
+
+  it('is false for a parent, even on their child\'s team', () => {
+    const memberships = [
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1' }),
+    ]
+
+    expect(canEditTeam(memberships, U8.id)).toBe(false)
+  })
+
+  it('is false for a player on their own team', () => {
+    const memberships = [membership({ role: 'player', team_id: U8.id, player_id: 'player-1' })]
+
+    expect(canEditTeam(memberships, U8.id)).toBe(false)
+  })
+
+  it('is true for a coach+parent holder only on the coached team', () => {
+    const memberships = [
+      membership({ role: 'coach', team_id: U12.id }),
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1' }),
+    ]
+
+    expect(canEditTeam(memberships, U12.id)).toBe(true)
+    expect(canEditTeam(memberships, U8.id)).toBe(false)
+  })
+
+  it('is false for empty, null, or undefined memberships', () => {
+    expect(canEditTeam([], U6.id)).toBe(false)
+    expect(canEditTeam(null, U6.id)).toBe(false)
+    expect(canEditTeam(undefined, U6.id)).toBe(false)
+  })
+})
+
+describe('isAdmin', () => {
+  it('is true when any membership row has role admin', () => {
+    const memberships = [
+      membership({ role: 'coach', team_id: U12.id }),
+      membership({ role: 'admin', team_id: null }),
+    ]
+
+    expect(isAdmin(memberships)).toBe(true)
+  })
+
+  it('is false when no row has role admin', () => {
+    const memberships = [membership({ role: 'coach', team_id: U12.id })]
+
+    expect(isAdmin(memberships)).toBe(false)
+  })
+
+  it('is false for empty, null, or undefined memberships', () => {
+    expect(isAdmin([])).toBe(false)
+    expect(isAdmin(null)).toBe(false)
+    expect(isAdmin(undefined)).toBe(false)
+  })
+})
+
+describe('roleLabel', () => {
+  it('returns Admin when an admin row is present, regardless of other roles', () => {
+    const memberships = [
+      membership({ role: 'coach', team_id: U12.id }),
+      membership({ role: 'admin', team_id: null }),
+    ]
+
+    expect(roleLabel(memberships)).toBe('Admin')
+  })
+
+  it('returns Coach for a coach+parent holder (coach outranks parent)', () => {
+    const memberships = [
+      membership({ role: 'coach', team_id: U12.id }),
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1' }),
+    ]
+
+    expect(roleLabel(memberships)).toBe('Coach')
+  })
+
+  it('returns Parent for a parent-only holder', () => {
+    const memberships = [
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1' }),
+    ]
+
+    expect(roleLabel(memberships)).toBe('Parent')
+  })
+
+  it('returns Player for a player-only holder', () => {
+    const memberships = [membership({ role: 'player', team_id: U8.id, player_id: 'player-1' })]
+
+    expect(roleLabel(memberships)).toBe('Player')
+  })
+
+  it('returns "No access yet" for empty, null, or undefined memberships', () => {
+    expect(roleLabel([])).toBe('No access yet')
+    expect(roleLabel(null)).toBe('No access yet')
+    expect(roleLabel(undefined)).toBe('No access yet')
+  })
+})
+
+describe('childPlayerIds', () => {
+  it('returns the linked player_id for a parent membership', () => {
+    const memberships = [
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1' }),
+    ]
+
+    expect(childPlayerIds(memberships)).toEqual(['player-child-1'])
+  })
+
+  it('includes player-role player_ids alongside parent-role ones', () => {
+    const memberships = [
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1' }),
+      membership({ role: 'player', team_id: U16.id, player_id: 'player-self-1' }),
+    ]
+
+    expect(childPlayerIds(memberships).sort()).toEqual(['player-child-1', 'player-self-1'])
+  })
+
+  it('deduplicates repeated player_ids', () => {
+    const memberships = [
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1' }),
+      membership({ role: 'parent', team_id: U12.id, player_id: 'player-child-1' }),
+    ]
+
+    expect(childPlayerIds(memberships)).toEqual(['player-child-1'])
+  })
+
+  it('ignores admin/coach rows and null player_ids', () => {
+    const memberships = [
+      membership({ role: 'admin', team_id: null, player_id: null }),
+      membership({ role: 'coach', team_id: U12.id, player_id: null }),
+    ]
+
+    expect(childPlayerIds(memberships)).toEqual([])
+  })
+
+  it('returns an empty array for empty, null, or undefined memberships', () => {
+    expect(childPlayerIds([])).toEqual([])
+    expect(childPlayerIds(null)).toEqual([])
+    expect(childPlayerIds(undefined)).toEqual([])
+  })
+})
+
+// --- loadMyMemberships() (src/data/members.js) -----------------------------
+// RLS already restricts rows to the caller, so this takes no user id
+// argument. The convention set by supabase.js/auth.jsx is throw-on-error,
+// not {data, error} tuples — verified below.
+
+vi.mock('../src/lib/supabase.js', () => ({
+  supabase: {
+    from: vi.fn(),
+  },
+}))
+
+import { supabase } from '../src/lib/supabase.js'
+import { loadMyMemberships } from '../src/data/members.js'
+
+describe('loadMyMemberships', () => {
+  it('returns the rows from the memberships table joined to teams', async () => {
+    const rows = [
+      { id: 'm-1', role: 'coach', team_id: U12.id, player_id: null, teams: U12 },
+    ]
+    const select = vi.fn().mockResolvedValue({ data: rows, error: null })
+    supabase.from.mockReturnValue({ select })
+
+    const result = await loadMyMemberships()
+
+    expect(supabase.from).toHaveBeenCalledWith('memberships')
+    expect(select).toHaveBeenCalled()
+    expect(result).toEqual(rows)
+  })
+
+  it('returns an empty array, never null, when there are no rows', async () => {
+    const select = vi.fn().mockResolvedValue({ data: null, error: null })
+    supabase.from.mockReturnValue({ select })
+
+    const result = await loadMyMemberships()
+
+    expect(result).toEqual([])
+  })
+
+  it('throws rather than swallowing a Supabase error', async () => {
+    const select = vi.fn().mockResolvedValue({
+      data: null,
+      error: new Error('permission denied'),
+    })
+    supabase.from.mockReturnValue({ select })
+
+    await expect(loadMyMemberships()).rejects.toThrow('permission denied')
+  })
+})
