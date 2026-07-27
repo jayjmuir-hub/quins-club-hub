@@ -285,6 +285,62 @@ describe('Roster — grouping', () => {
   })
 })
 
+describe('Roster — team filter pill counts', () => {
+  // The counts answer "how many matches are in each squad", which is a
+  // question about the search, not about whichever pill is selected. Deriving
+  // them from the already-team-filtered list made every unselected pill read
+  // "· 0" the moment any pill was clicked — the row then asserted the rest of
+  // the club was empty, and "All" misstated what clicking it would show.
+  it('counts every squad, not just the selected one', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Tom Fletcher')
+    expect(screen.getByRole('button', { name: 'All · 7' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'U10 · 6' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^U10/ }))
+
+    // Selecting U10 must not zero out the squads it hides, nor shrink "All"
+    // to the size of the current selection.
+    expect(screen.getByRole('button', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'All · 7' })).toBeInTheDocument()
+  })
+
+  it('narrows the counts to the search', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Tom Fletcher')
+    await user.type(screen.getByRole('searchbox'), 'craig')
+
+    expect(screen.getByRole('button', { name: 'All · 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'U10 · 0' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
+  })
+})
+
+describe('Roster — a team filter that outlives its team', () => {
+  // Memberships can reload and shrink a user's scope while a pill is
+  // selected; the stored filter then names a squad that is gone. The worst
+  // sub-case is a shrink to ONE team, because the pill row hides itself below
+  // two teams — so there is no "All" pill left to click, and without this
+  // reconciliation the list would stay empty until the user navigated away.
+  it('falls back to all squads when the selected team leaves the scope', async () => {
+    const { user, rerender } = setup()
+
+    await screen.findByText('Tom Fletcher')
+    await user.click(screen.getByRole('button', { name: /^U10/ }))
+    expect(screen.queryByText('Craig Muir')).not.toBeInTheDocument()
+
+    useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', team_id: 'team-1xv' }]))
+    listPlayersMock.mockResolvedValue([SENIOR])
+    rerender(<Roster />)
+
+    expect(await screen.findByText('Craig Muir')).toBeInTheDocument()
+    expect(screen.queryByText(/no players/i)).not.toBeInTheDocument()
+  })
+})
+
 describe('Roster — search', () => {
   it('filters by name, case-insensitively', async () => {
     const { user } = setup()

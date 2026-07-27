@@ -256,6 +256,27 @@ describe('Schedule — team filter', () => {
     await screen.findByText('Quins vs Dubai Exiles')
     expect(screen.queryByRole('button', { name: 'All' })).not.toBeInTheDocument()
   })
+
+  // Memberships can reload and shrink a user's scope while a pill is
+  // selected; the stored filter then names a team that is gone. The worst
+  // sub-case is a shrink to ONE team, because the pill row hides itself below
+  // two teams — so there is no "All" pill left to click, and without the
+  // reconciliation in Schedule.jsx the list would stay empty until the user
+  // navigated away. Roster.jsx carries the identical guard and test.
+  it('falls back to all teams when the selected team leaves the scope', async () => {
+    const { user, rerender } = setup()
+
+    await screen.findByText('Quins vs Dubai Exiles')
+    await user.click(screen.getByRole('button', { name: 'U10' }))
+    expect(screen.queryByText('Senior squad training')).not.toBeInTheDocument()
+
+    useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', team_id: 'team-1xv' }]))
+    listEventsMock.mockResolvedValue([UPCOMING_TRAINING])
+    rerender(<Schedule />)
+
+    expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
+    expect(screen.queryByText(/no upcoming fixtures/i)).not.toBeInTheDocument()
+  })
 })
 
 describe('Schedule — scope note', () => {

@@ -40,17 +40,31 @@ export function PillButton({ active, onClick, children }) {
   )
 }
 
-export function TeamPills({ teams, selected, onChange, allLabel = 'All' }) {
+// `counts`, when given, is a Map from team id (plus ALL_TEAMS_ID for the All
+// pill) to a number, and suffixes each label with it — "U10 · 9", the live
+// count design-system.md §4.8 specifies for the roster filter. It is its own
+// prop rather than something the caller bakes into `team.name`, because a
+// team's name is domain data: overwriting it to smuggle a count through also
+// rewrites the pill's accessible name via a field whose job is to say what
+// the squad is called. A team with no entry in the map renders its bare name,
+// so callers with no counts to show (the Schedule's filter) pass nothing and
+// are unaffected.
+export function TeamPills({ teams, selected, onChange, allLabel = 'All', counts }) {
   if (!teams || teams.length === 0) return null
+
+  const label = (text, key) => {
+    const count = counts?.get(key)
+    return count == null ? text : `${text} · ${count}`
+  }
 
   return (
     <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <PillButton active={selected === ALL_TEAMS_ID} onClick={() => onChange(ALL_TEAMS_ID)}>
-        {allLabel}
+        {label(allLabel, ALL_TEAMS_ID)}
       </PillButton>
       {teams.map((team) => (
         <PillButton key={team.id} active={selected === team.id} onClick={() => onChange(team.id)}>
-          {team.name}
+          {label(team.name, team.id)}
         </PillButton>
       ))}
     </div>

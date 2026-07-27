@@ -1,0 +1,683 @@
+# Review package: a6fb3e6..HEAD
+
+## Commits
+448f374 chore: append the Task 11 fix report to the build ledger
+e2cc1c7 fix: keep the schedule and availability on screen during realtime refreshes
+
+## Files changed
+ .superpowers/sdd/quins-v1-mvp/task-11-report.md | 162 ++++++++++++++++++++
+ src/screens/EventDetail.jsx                     |  15 +-
+ src/screens/Schedule.jsx                        |  23 ++-
+ tests/event-format.test.js                      | 189 ++++++++++++++++++++++++
+ tests/schedule.test.jsx                         |  74 ++++++++++
+ 5 files changed, 454 insertions(+), 9 deletions(-)
+
+## Diff
+diff --git a/.superpowers/sdd/quins-v1-mvp/task-11-report.md b/.superpowers/sdd/quins-v1-mvp/task-11-report.md
+index c2c8032..2b174d0 100644
+--- a/.superpowers/sdd/quins-v1-mvp/task-11-report.md
++++ b/.superpowers/sdd/quins-v1-mvp/task-11-report.md
+@@ -226,10 +226,172 @@ $ npm test
+    Zayed Sports City"). Complete but wordy. An `aria-label` would shorten it at the
+    cost of diverging from the visible text; I left it faithful.
+ 6. **`teamFilter` isn't reconciled against a shrinking team list.** If a user's
+    memberships changed mid-session such that the selected team is no longer visible,
+    the list would show nothing until they tap another pill. Not reachable today
+    (memberships load once per session) and not worth pre-solving.
+ 7. **Nothing on this screen is verified in a real browser.** jsdom applies no CSS, so
+    the class-token guard is the strongest automated statement I can make about
+    layout. The calendar grid and the detail hero's negative-margin bleed in
+    particular are worth one look on a phone before sign-off.
++
++---
++
++# Fix report — Task 11 review round 1
++
++**Commit:** `e2cc1c7` fix: keep the schedule and availability on screen during realtime refreshes
++
++Both Important findings addressed. The two controller rulings (deferred "✓ N
++available" count, timezone as a product question for Jay) were not touched, and I
++did not act on the deferred Minor findings.
++
++## Finding 1 — every realtime refresh replaced the content with a spinner
++
++Correct, and worse than cosmetic: the flicker fired on *other people's* actions,
++not the user's own. Any insert/update/delete on `events` anywhere in scope tore the
++list out of the DOM and collapsed the page height for a round trip; `EventDetail`
++did the same on every single RSVP, blanking the availability bar the user was
++reading.
++
++**`src/screens/Schedule.jsx`** — `loading` still means "a fetch is in flight" (it
++is, on a refresh), but the render now keys off a derived
++`isFirstLoad = loading && events.length === 0`. The spinner card and the `!loading`
++guards around the error card and the three tab bodies all moved to `isFirstLoad`.
++A refresh therefore leaves the current rows mounted and swaps them in place when
++the new data lands. The retry-after-error path still shows a spinner for free,
++because the catch clears `events` — so `events.length === 0` is true again and no
++extra state was needed.
++
++**`src/screens/EventDetail.jsx`** — the availability effect re-runs on every RSVP,
++and there `rows.length === 0` is a legitimate steady state ("No one has responded
++yet"), so the derived form would still have flickered empty → spinner → empty.
++Used a `settledForEvent` ref instead: `setLoading(true)` fires only when a first
++attempt for *this* event id hasn't settled yet. The ref is set in `.finally`, so it
++covers the error path too. (`useRef` added to the React import.)
++
++Neither change puts a callback in an effect dependency array, so the `Sheet`
++stale-`onClose` trap is not reintroduced.
++
++## Finding 2 — `src/lib/eventFormat.js` had no direct test file
++
++Correct, and the half-score gap was the real risk. Added
++**`tests/event-format.test.js`** — 28 cases, plain fixture objects, no mocks or
++rendering, following `tests/scope.test.js`'s shape. Covers every documented
++behaviour the reviewer named, plus the rest of the module's surface:
++
++- `hasResult`: both halves present; **only `result_us`**; **only `result_them`**;
++  neither; a 0–0 draw (a truthiness check would misfile it as unplayed);
++  null/undefined event.
++- `resultOutcome`/`resultLabel`/`resultScore`: win/loss/draw, the
++  null-without-a-full-score case, and the en-dash format.
++- `eventTitle`: match with opponent, training/social titles, title-when-no-opponent,
++  and both fallbacks (`'Quins match'`, `'Club event'`).
++- `eventDate`: parses; null for missing; null (not `Invalid Date`) for garbage.
++- `dateBoxParts`: real date, and the exact `{ month: '—', day: '–', weekday: '' }`
++  placeholder for null.
++- `formatTime`/`formatLongDate`: real date, and the exact fallback copy for null.
++- `sortByStart`: ascending, descending, **undated-sorts-last in both directions**,
++  two undated events, and non-mutation of the input.
++
++Locale/timezone note recorded at the top of that file: these helpers format with
++the runtime's default locale on purpose, so the suite asserts the fallback strings
++exactly (locale-independent) and asserts the formatted paths only on parts that
++hold in any locale (`String(getDate())`, the year, "not the fallback"). Fixture
++dates are built from local components rather than ISO strings, so nothing depends
++on the machine's timezone either.
++
++## Tests covering the amended code
++
++Amended/added: `tests/schedule.test.jsx` (+2 cases, now 29) and
++`tests/event-format.test.js` (new, 28).
++
++The two new schedule cases hold the refetch promise open and assert mid-flight,
++because the pre-existing realtime test passes either way — both promises have
++settled by the time it asserts, which is exactly why it missed this:
++
++- "keeps the current rows on screen while a realtime refresh is in flight" — both
++  fixtures still rendered and `queryByRole('status')` null while the refetch is
++  pending, then the rows swap when it resolves.
++- "keeps the availability bar on screen while an RSVP refresh is in flight" —
++  "1 in" still rendered and no spinner inside the dialog mid-flight, then "2 in"
++  once the new rows land.
++
++### Mutation checks (proving the new tests bite)
++| Mutation | Result |
++|---|---|
++| `isFirstLoad` reverted to `loading` in Schedule | 1 failure — "keeps the current rows on screen…" |
++| `settledForEvent` guard removed from EventDetail | 1 failure — "keeps the availability bar on screen…" |
++| `hasResult`'s `&&` changed to `\|\|` | 3 failures — both half-score cases + "has no outcome, label or score without a full score" |
++| `sortByStart`'s null-date guards deleted | 1 failure — "puts an undated event last in both directions" |
++
++### Command and output
++
++```
++$ npx vitest run tests/event-format.test.js tests/schedule.test.jsx
++
++ RUN  v2.1.9 /root/quins-club-hub
++
++ ✓ tests/schedule.test.jsx (29 tests) 1922ms
++ ✓ tests/event-format.test.js (28 tests) 30ms
++
++ Test Files  2 passed (2)
++      Tests  57 passed (57)
++   Start at  16:45:57
++   Duration  4.63s (transform 329ms, setup 121ms, collect 592ms, tests 1.95s, environment 998ms, prepare 151ms)
++```
++
++```
++$ npm test
++
++ RUN  v2.1.9 /root/quins-club-hub
++
++ ✓ tests/schedule.test.jsx (29 tests) 1949ms
++ ✓ tests/components.test.jsx (38 tests) 520ms
++ ✓ tests/data.test.js (25 tests) 39ms
++ ✓ tests/scope.test.js (35 tests) 16ms
++ ✓ tests/login.test.jsx (16 tests) 1195ms
++ ✓ tests/app-shell.test.jsx (12 tests) 396ms
++ ✓ tests/auth.test.jsx (12 tests) 360ms
++ ✓ tests/require-auth.test.jsx (9 tests) 162ms
++ ✓ tests/event-format.test.js (28 tests) 31ms
++ ✓ tests/memberships.test.jsx (7 tests) 199ms
++ ✓ tests/app.test.jsx (6 tests) 229ms
++ ✓ tests/nav.test.jsx (6 tests) 340ms
++ ✓ tests/supabase.test.js (4 tests) 72ms
++
++ Test Files  13 passed (13)
++      Tests  227 passed (227)
++   Start at  16:46:42
++   Duration  21.11s (transform 697ms, setup 924ms, collect 2.59s, tests 5.51s, environment 7.37s, prepare 1.05s)
++```
++
++```
++$ npm run build
++dist/index.html                   0.83 kB │ gzip:   0.41 kB
++dist/assets/crest-BPS7q37W.png  148.21 kB
++dist/assets/index-B35NBhwP.css   23.12 kB │ gzip:   5.41 kB
++dist/assets/index-BYz07q7w.js   419.22 kB │ gzip: 119.66 kB
++✓ built in 3.61s
++```
++
++227 passed / 13 files, up from 197 / 12 at first submission (+2 schedule,
+++28 event-format). Nothing regressed; output is clean — no warnings, no `act()`
++noise.
++
++## Files changed in this round
++- `src/screens/Schedule.jsx` — `isFirstLoad` derived; spinner/error/tab guards use it
++- `src/screens/EventDetail.jsx` — `settledForEvent` ref gates the first-load spinner; `useRef` imported
++- `tests/schedule.test.jsx` — 2 in-flight realtime assertions
++- `tests/event-format.test.js` — new, 28 cases
++
++## Concerns
++None new. One note for the re-reviewer: `Schedule` and `EventDetail` now use two
++different first-load idioms (a derived `loading && events.length === 0` vs a
++`settledForEvent` ref). That is deliberate, not drift — an empty list is a
++transient state on the schedule but a legitimate steady state for availability, so
++the derived form would still flicker there. Both are commented in place with that
++reasoning.
++
++Housekeeping: `.superpowers/sdd/.gitignore` was reset to `*` by tooling twice
++during this task (the regression its own comment warns about, which silently
++untracks the whole ledger). Restored from HEAD both times; not part of either
++commit.
+diff --git a/src/screens/EventDetail.jsx b/src/screens/EventDetail.jsx
+index 89839d5..bce0665 100644
+--- a/src/screens/EventDetail.jsx
++++ b/src/screens/EventDetail.jsx
+@@ -1,11 +1,11 @@
+-import { useEffect, useState } from 'react'
++import { useEffect, useRef, useState } from 'react'
+ import Sheet from '../components/Sheet.jsx'
+ import Chip from '../components/Chip.jsx'
+ import Spinner from '../components/Spinner.jsx'
+ import { listAvailability, subscribeAvailability } from '../data/availability.js'
+ import {
+   eventDate,
+   eventTitle,
+   formatLongDate,
+   formatTime,
+   hasResult,
+@@ -74,36 +74,45 @@ const AVAILABILITY_TONES = {
+ }
+ 
+ const STATUSES = ['in', 'maybe', 'out']
+ 
+ function AvailabilitySummary({ eventId }) {
+   const [rows, setRows] = useState([])
+   const [loading, setLoading] = useState(true)
+   const [error, setError] = useState(null)
+   const [reloadToken, setReloadToken] = useState(0)
+ 
++  // The event id a first attempt has already settled for. Only that first
++  // attempt shows the spinner: this effect also re-runs on every realtime
++  // RSVP, and spinning then would blank the availability bar the user is
++  // reading each time a squad-mate tapped "in". A refresh leaves the bar up
++  // and swaps the numbers when the new counts land.
++  const settledForEvent = useRef(null)
++
+   useEffect(() => {
+     let mounted = true
+-    setLoading(true)
++    if (settledForEvent.current !== eventId) setLoading(true)
+     setError(null)
+ 
+     listAvailability(eventId)
+       .then((data) => {
+         if (mounted) setRows(data)
+       })
+       .catch((err) => {
+         if (!mounted) return
+         setError(err)
+         setRows([])
+       })
+       .finally(() => {
+-        if (mounted) setLoading(false)
++        if (!mounted) return
++        setLoading(false)
++        settledForEvent.current = eventId
+       })
+ 
+     return () => {
+       mounted = false
+     }
+   }, [eventId, reloadToken])
+ 
+   // setReloadToken is a stable state setter, so the subscription is created
+   // once per event id and its cleanup only unsubscribes — it never touches
+   // focus, and no caller-supplied callback is in this dependency array.
+diff --git a/src/screens/Schedule.jsx b/src/screens/Schedule.jsx
+index 7019471..c455667 100644
+--- a/src/screens/Schedule.jsx
++++ b/src/screens/Schedule.jsx
+@@ -286,20 +286,23 @@ export default function Schedule() {
+   const [tab, setTab] = useState('upcoming')
+   const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
+   const [selectedEventId, setSelectedEventId] = useState(null)
+   const [month, setMonth] = useState(() => startOfMonth(new Date()))
+ 
+   const [events, setEvents] = useState([])
+   const [loading, setLoading] = useState(true)
+   const [error, setError] = useState(null)
+   const [reloadToken, setReloadToken] = useState(0)
+ 
++  // `loading` means "a fetch is in flight", which is true of a background
++  // realtime refresh as much as of the first load. What must NOT be true of
++  // a refresh is blanking the screen — see isFirstLoad below.
+   useEffect(() => {
+     let mounted = true
+     setLoading(true)
+     setError(null)
+ 
+     listEvents({ teamIds })
+       .then((rows) => {
+         if (mounted) setEvents(rows)
+       })
+       .catch((err) => {
+@@ -308,27 +311,35 @@ export default function Schedule() {
+         setEvents([])
+       })
+       .finally(() => {
+         if (mounted) setLoading(false)
+       })
+ 
+     return () => {
+       mounted = false
+     }
+   }, [teamIds, reloadToken])
+-
+   // Realtime: bump the token and let the effect above refetch. The callback
+   // closes over nothing but setReloadToken (a stable state setter), so this
+   // subscribes exactly once for the life of the screen, and its cleanup only
+   // unsubscribes — it never touches focus.
+   useEffect(() => subscribeEvents(() => setReloadToken((token) => token + 1)), [])
+ 
++  // Only the first load (or a load with nothing to show, e.g. retrying after
++  // an error) replaces the content with a spinner. A realtime refresh fires
++  // on every insert/update/delete anywhere in scope — from any user, on any
++  // team — so spinning on those would tear the list out of the DOM and
++  // collapse the page height each time somebody else touched a fixture. A
++  // refresh keeps the current rows on screen and swaps them in place when
++  // the new data lands.
++  const isFirstLoad = loading && events.length === 0
++
+   const admin = isAdmin(memberships)
+   const canEditAnything = admin || memberships.some((membership) => membership.role === 'coach')
+   const teamNames = scopedTeams.map((team) => team.name).join(', ')
+ 
+   const visible = teamFilter === ALL_TEAMS_ID ? events : events.filter((event) => event.team_id === teamFilter)
+   const upcoming = sortByStart(visible.filter((event) => !hasResult(event)), 'asc')
+   const results = sortByStart(visible.filter(hasResult), 'desc')
+ 
+   // Derive the open event from the live list rather than storing the row
+   // itself, so a realtime update keeps the sheet's contents fresh and a
+@@ -362,61 +373,61 @@ export default function Schedule() {
+       {/* The calendar always shows the user's whole visible scope, so the
+           team filter is hidden there (design-system.md §5.2). Below two
+           teams there is nothing to filter between, and TeamPills already
+           renders nothing for an empty list. */}
+       {tab !== 'calendar' && scopedTeams.length > 1 && (
+         <div className="mb-4">
+           <TeamPills teams={scopedTeams} selected={teamFilter} onChange={setTeamFilter} />
+         </div>
+       )}
+ 
+-      {loading && (
++      {isFirstLoad && (
+         <Card className="flex justify-center py-10">
+           <Spinner />
+         </Card>
+       )}
+ 
+-      {!loading && error && (
++      {!isFirstLoad && error && (
+         <Card role="alert" className="p-6 text-center">
+           <h3 className="text-base font-extrabold text-quinsRedDark">We couldn&apos;t load the schedule</h3>
+           <p className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+             {error.message || 'Something went wrong. Try again.'}
+           </p>
+           <button
+             type="button"
+             onClick={() => setReloadToken((token) => token + 1)}
+             className="mt-4 rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+           >
+             Try again
+           </button>
+         </Card>
+       )}
+ 
+-      {!loading && !error && tab === 'upcoming' && (
++      {!isFirstLoad && !error && tab === 'upcoming' && (
+         <FixtureList
+           events={upcoming}
+           teamsById={teamsById}
+           onSelect={setSelectedEventId}
+           emptyMessage="No upcoming fixtures yet."
+         />
+       )}
+ 
+-      {!loading && !error && tab === 'results' && (
++      {!isFirstLoad && !error && tab === 'results' && (
+         <FixtureList
+           events={results}
+           teamsById={teamsById}
+           onSelect={setSelectedEventId}
+           emptyMessage="No results yet. Scores show here once someone adds them."
+         />
+       )}
+ 
+-      {!loading && !error && tab === 'calendar' && (
++      {!isFirstLoad && !error && tab === 'calendar' && (
+         <CalendarMonth
+           month={month}
+           onMonthChange={setMonth}
+           events={events}
+           teamsById={teamsById}
+           onSelect={setSelectedEventId}
+         />
+       )}
+ 
+       {selectedEvent && (
+diff --git a/tests/event-format.test.js b/tests/event-format.test.js
+new file mode 100644
+index 0000000..1f708bb
+--- /dev/null
++++ b/tests/event-format.test.js
+@@ -0,0 +1,189 @@
++import { describe, it, expect } from 'vitest'
++import {
++  dateBoxParts,
++  eventDate,
++  eventTitle,
++  formatLongDate,
++  formatTime,
++  hasResult,
++  resultLabel,
++  resultOutcome,
++  resultScore,
++  sortByStart,
++} from '../src/lib/eventFormat.js'
++
++// Direct tests for src/lib/eventFormat.js — pure, import-free helpers, so
++// this follows the same shape as tests/scope.test.js: plain fixture objects,
++// no rendering, no mocks, no network.
++//
++// Locale caution: these helpers deliberately format with the runtime's
++// default locale (`undefined`), so asserting "5:00 PM" or "Jul" would bind
++// the suite to whichever ICU locale the machine happens to resolve. The
++// fallback strings are locale-independent and asserted exactly; the
++// formatted paths are asserted on the parts that hold in any locale (the
++// day-of-month, which is String(getDate()) and not localised at all, plus
++// "did it produce something other than the fallback"). Dates are built from
++// local components (new Date(y, m, d, h, min)) rather than ISO strings, so
++// no assertion depends on the machine's timezone either.
++
++const scored = (us, them) => ({ id: 'e', type: 'match', opponent: 'Exiles', result_us: us, result_them: them })
++
++describe('hasResult', () => {
++  it('is true when both halves of the score are present', () => {
++    expect(hasResult(scored(31, 19))).toBe(true)
++  })
++
++  it('is true for a nil-all draw', () => {
++    // 0 is a real score. A truthiness check here would misfile a 0–0 draw
++    // as an unplayed fixture.
++    expect(hasResult(scored(0, 0))).toBe(true)
++  })
++
++  it('is false when neither half is present', () => {
++    expect(hasResult(scored(null, null))).toBe(false)
++  })
++
++  it('is false when only our score has been entered', () => {
++    // The case that matters: a coach who saves a half-entered score must not
++    // knock the fixture out of Upcoming. An || here instead of && would.
++    expect(hasResult(scored(31, null))).toBe(false)
++  })
++
++  it('is false when only the opposition score has been entered', () => {
++    expect(hasResult(scored(null, 19))).toBe(false)
++  })
++
++  it('is false for a missing event', () => {
++    expect(hasResult(undefined)).toBe(false)
++    expect(hasResult(null)).toBe(false)
++  })
++})
++
++describe('resultOutcome / resultLabel / resultScore', () => {
++  it('reads a higher Quins score as a win', () => {
++    expect(resultOutcome(scored(31, 19))).toBe('win')
++    expect(resultLabel(scored(31, 19))).toBe('Won')
++  })
++
++  it('reads a lower Quins score as a loss', () => {
++    expect(resultOutcome(scored(12, 40))).toBe('loss')
++    expect(resultLabel(scored(12, 40))).toBe('Lost')
++  })
++
++  it('reads equal scores as a draw', () => {
++    expect(resultOutcome(scored(17, 17))).toBe('draw')
++    expect(resultLabel(scored(17, 17))).toBe('Drew')
++  })
++
++  it('has no outcome, label or score without a full score', () => {
++    expect(resultOutcome(scored(31, null))).toBeNull()
++    expect(resultLabel(scored(31, null))).toBeNull()
++    expect(resultScore(scored(31, null))).toBeNull()
++  })
++
++  it('formats the score with an en dash, matching the prototype', () => {
++    expect(resultScore(scored(31, 19))).toBe('31–19')
++  })
++})
++
++describe('eventTitle', () => {
++  it('renders a match as "Quins vs <opponent>"', () => {
++    expect(eventTitle({ type: 'match', opponent: 'Dubai Exiles' })).toBe('Quins vs Dubai Exiles')
++  })
++
++  it('uses the stored title for training and social events', () => {
++    expect(eventTitle({ type: 'training', title: 'Senior squad training' })).toBe('Senior squad training')
++    expect(eventTitle({ type: 'social', title: 'End of season dinner' })).toBe('End of season dinner')
++  })
++
++  it('prefers the title over "Quins vs" only when there is no opponent', () => {
++    expect(eventTitle({ type: 'match', opponent: null, title: 'Friendly' })).toBe('Friendly')
++  })
++
++  it('falls back to "Quins match" for a match with neither opponent nor title', () => {
++    expect(eventTitle({ type: 'match', opponent: null, title: null })).toBe('Quins match')
++  })
++
++  it('falls back to "Club event" for anything else with no title', () => {
++    expect(eventTitle({ type: 'training', title: null })).toBe('Club event')
++    expect(eventTitle(undefined)).toBe('Club event')
++  })
++})
++
++describe('eventDate', () => {
++  it('parses a timestamp into a Date', () => {
++    const date = eventDate({ starts_at: '2026-07-24T13:00:00+00:00' })
++    expect(date).toBeInstanceOf(Date)
++    expect(date.getTime()).toBe(Date.parse('2026-07-24T13:00:00+00:00'))
++  })
++
++  it('is null when there is no timestamp', () => {
++    expect(eventDate({})).toBeNull()
++    expect(eventDate(undefined)).toBeNull()
++  })
++
++  it('is null for an unparseable timestamp rather than an Invalid Date', () => {
++    expect(eventDate({ starts_at: 'not a date' })).toBeNull()
++  })
++})
++
++describe('dateBoxParts', () => {
++  it('splits a date into month, day and weekday', () => {
++    const parts = dateBoxParts(new Date(2026, 6, 24, 17, 0))
++    expect(parts.day).toBe('24')
++    expect(parts.month).not.toBe('—')
++    expect(parts.weekday).not.toBe('')
++  })
++
++  it('renders placeholders instead of "Invalid Date" for a null date', () => {
++    expect(dateBoxParts(null)).toEqual({ month: '—', day: '–', weekday: '' })
++  })
++})
++
++describe('formatTime / formatLongDate', () => {
++  it('formats a real date without leaking "Invalid Date"', () => {
++    const date = new Date(2026, 6, 24, 17, 0)
++    expect(formatTime(date)).toContain('00')
++    expect(formatTime(date)).not.toMatch(/invalid/i)
++    expect(formatLongDate(date)).toContain('2026')
++    expect(formatLongDate(date)).toContain('24')
++  })
++
++  it('falls back to plain copy for a null date', () => {
++    expect(formatTime(null)).toBe('Time to be confirmed')
++    expect(formatLongDate(null)).toBe('Date to be confirmed')
++  })
++})
++
++describe('sortByStart', () => {
++  const a = { id: 'a', starts_at: '2026-07-01T10:00:00Z' }
++  const b = { id: 'b', starts_at: '2026-07-15T10:00:00Z' }
++  const c = { id: 'c', starts_at: '2026-08-01T10:00:00Z' }
++  const undated = { id: 'undated', starts_at: null }
++
++  it('sorts ascending by default', () => {
++    expect(sortByStart([c, a, b]).map((e) => e.id)).toEqual(['a', 'b', 'c'])
++  })
++
++  it('sorts descending on request, for newest-first results', () => {
++    expect(sortByStart([a, c, b], 'desc').map((e) => e.id)).toEqual(['c', 'b', 'a'])
++  })
++
++  it('puts an undated event last in both directions', () => {
++    // A row with no usable date must never displace real fixtures from the
++    // top of either list — and a NaN comparison would sort unpredictably.
++    expect(sortByStart([undated, b, a]).map((e) => e.id)).toEqual(['a', 'b', 'undated'])
++    expect(sortByStart([undated, a, b], 'desc').map((e) => e.id)).toEqual(['b', 'a', 'undated'])
++  })
++
++  it('keeps two undated events together rather than throwing', () => {
++    const other = { id: 'other', starts_at: null }
++    expect(sortByStart([undated, other]).map((e) => e.id)).toEqual(['undated', 'other'])
++  })
++
++  it('does not mutate the array it was given', () => {
++    const input = [c, a, b]
++    sortByStart(input)
++    expect(input.map((e) => e.id)).toEqual(['c', 'a', 'b'])
++  })
++})
+diff --git a/tests/schedule.test.jsx b/tests/schedule.test.jsx
+index 43d706e..a4c260e 100644
+--- a/tests/schedule.test.jsx
++++ b/tests/schedule.test.jsx
+@@ -443,20 +443,94 @@ describe('Schedule — realtime', () => {
+       onChange({ eventType: 'INSERT' })
+     })
+ 
+     expect(listEventsMock).toHaveBeenCalledTimes(2)
+     expect(screen.queryByText('Quins vs Dubai Exiles')).not.toBeInTheDocument()
+ 
+     unmount()
+     expect(unsubscribeEvents).toHaveBeenCalledTimes(1)
+   })
+ 
++  // A realtime change fires for every insert/update/delete anywhere in
++  // scope, from any user. If the refetch swapped the list for a spinner, the
++  // rows would be torn out of the DOM and the page height would collapse
++  // every time somebody else touched a fixture. The "refetches when a change
++  // arrives" test above passes either way, because both promises have
++  // settled by the time it asserts — so this one holds the refetch open and
++  // looks at what is on screen mid-flight.
++  it('keeps the current rows on screen while a realtime refresh is in flight', async () => {
++    setup()
++
++    await screen.findByText('Quins vs Dubai Exiles')
++
++    let resolveRefresh
++    listEventsMock.mockReturnValue(
++      new Promise((resolve) => {
++        resolveRefresh = resolve
++      }),
++    )
++
++    const [onChange] = subscribeEventsMock.mock.calls[0]
++    act(() => {
++      onChange({ eventType: 'UPDATE' })
++    })
++
++    expect(screen.getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
++    expect(screen.getByText('Senior squad training')).toBeInTheDocument()
++    expect(screen.queryByRole('status')).not.toBeInTheDocument()
++
++    await act(async () => {
++      resolveRefresh([UPCOMING_TRAINING])
++    })
++
++    expect(screen.queryByText('Quins vs Dubai Exiles')).not.toBeInTheDocument()
++    expect(screen.getByText('Senior squad training')).toBeInTheDocument()
++  })
++
++  it('keeps the availability bar on screen while an RSVP refresh is in flight', async () => {
++    listAvailabilityMock.mockResolvedValue([
++      { id: 'a1', player_id: 'p1', status: 'in' },
++      { id: 'a2', player_id: 'p2', status: 'out' },
++    ])
++
++    const { user } = setup()
++
++    await user.click(await screen.findByRole('button', { name: /Dubai Exiles/ }))
++    const dialog = screen.getByRole('dialog')
++    expect(await within(dialog).findByText('1 in')).toBeInTheDocument()
++
++    let resolveRefresh
++    listAvailabilityMock.mockReturnValue(
++      new Promise((resolve) => {
++        resolveRefresh = resolve
++      }),
++    )
++
++    const [, onAvailabilityChange] = subscribeAvailabilityMock.mock.calls[0]
++    act(() => {
++      onAvailabilityChange({ eventType: 'INSERT' })
++    })
++
++    expect(within(dialog).getByText('1 in')).toBeInTheDocument()
++    expect(within(dialog).queryByRole('status')).not.toBeInTheDocument()
++
++    await act(async () => {
++      resolveRefresh([
++        { id: 'a1', player_id: 'p1', status: 'in' },
++        { id: 'a2', player_id: 'p2', status: 'out' },
++        { id: 'a3', player_id: 'p3', status: 'in' },
++      ])
++    })
++
++    expect(within(dialog).getByText('2 in')).toBeInTheDocument()
++  })
++
+   it('subscribes once, not once per re-render', async () => {
+     const { user } = setup()
+ 
+     await screen.findByText('Quins vs Dubai Exiles')
+     await user.click(screen.getByRole('button', { name: 'Results' }))
+     await user.click(screen.getByRole('button', { name: 'Upcoming' }))
+ 
+     expect(subscribeEventsMock).toHaveBeenCalledTimes(1)
+   })
+ })

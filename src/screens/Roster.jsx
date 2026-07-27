@@ -200,11 +200,39 @@ export default function Roster() {
   const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
   const normalisedQuery = query.trim().toLowerCase()
-  const inTeam =
-    teamFilter === ALL_TEAMS_ID ? players : players.filter((player) => player.team_id === teamFilter)
-  const visible = inTeam.filter((player) =>
+
+  // A stored team filter can outlive the team it names: memberships reload,
+  // the user's scope shrinks, and `teamFilter` still points at a squad that
+  // is no longer in it. Reconciling against the live scope on every render —
+  // rather than trusting the stored value — is what stops that becoming a
+  // dead end. It matters most in the worst sub-case: if the scope shrinks to
+  // a single team the pill row is hidden entirely, so there would be no
+  // "All" pill left to click and the list would stay empty until the user
+  // navigated away and back. Schedule.jsx does the same, for the same reason.
+  const activeFilter = teamIds.includes(teamFilter) ? teamFilter : ALL_TEAMS_ID
+
+  // The search-only set. The pill counts have to answer "how many matches are
+  // in each squad", which is a question about the search — not about whichever
+  // pill happens to be selected. Deriving them from `visible` (team filter
+  // already applied) made every unselected pill read "· 0" the moment any pill
+  // was clicked, so the row asserted the rest of the club was empty, and "All"
+  // misstated what clicking it would show.
+  const matchingSearch = players.filter((player) =>
     matchesQuery(player, teamsById.get(player.team_id)?.name ?? '', normalisedQuery),
   )
+
+  const visible =
+    activeFilter === ALL_TEAMS_ID
+      ? matchingSearch
+      : matchingSearch.filter((player) => player.team_id === activeFilter)
+
+  const pillCounts = new Map(scopedTeams.map((team) => [team.id, 0]))
+  pillCounts.set(ALL_TEAMS_ID, matchingSearch.length)
+  matchingSearch.forEach((player) => {
+    if (pillCounts.has(player.team_id)) {
+      pillCounts.set(player.team_id, pillCounts.get(player.team_id) + 1)
+    }
+  })
 
   // The grouping rule (design-system.md §5.3): one team in view — because a
   // pill is selected, or because the user only sees one — groups by position;
@@ -212,7 +240,7 @@ export default function Roster() {
   // age-group branch, which then produces no groups at all and renders the
   // empty state; that is the right answer, since with no squad there are no
   // positions to organise and nothing to organise them from.
-  const groupByPosition = teamFilter !== ALL_TEAMS_ID || scopedTeams.length === 1
+  const groupByPosition = activeFilter !== ALL_TEAMS_ID || scopedTeams.length === 1
 
   // Not memoised: `visible` is rebuilt on every render anyway (it depends on
   // the search box), so a useMemo here would never hit its cache and would
@@ -285,19 +313,14 @@ export default function Roster() {
 
       {scopedTeams.length > 1 && (
         <div className="mb-4">
-          {/* The pill labels carry a live count (design-system.md §4.8, e.g.
-              "U10 · 9"). TeamPills renders `team.name`, so the count is baked
-              into a display-only copy of each team rather than teaching the
-              shared component about players. Counts follow the search, so the
-              row doubles as a "where did my matches land" readout. */}
+          {/* Live counts per pill (design-system.md §4.8, e.g. "U10 · 9"),
+              computed from the search alone so the row reads as "where did my
+              matches land" whichever pill is selected. */}
           <TeamPills
-            teams={scopedTeams.map((team) => ({
-              ...team,
-              name: `${team.name} · ${visible.filter((player) => player.team_id === team.id).length}`,
-            }))}
-            selected={teamFilter}
+            teams={scopedTeams}
+            counts={pillCounts}
+            selected={activeFilter}
             onChange={setTeamFilter}
-            allLabel={`All · ${visible.length}`}
           />
         </div>
       )}

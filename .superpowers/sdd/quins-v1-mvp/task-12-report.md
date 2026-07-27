@@ -216,3 +216,145 @@ Also considered and deliberately *not* done:
    per-pill counts are the live ones. I think this is right — the sub-line
    answers "what am I looking at", not "what did my search find" — but it is a
    judgement call a reviewer may read differently.
+
+---
+
+# Task 12 fix report — review round 1
+
+Three items: one Important review finding and two controller rulings. All
+three are fixed, each covered by a test, and each mutation-checked to confirm
+the test actually bites.
+
+## 1. Important — pill counts were computed from the already-filtered list
+
+`Roster.jsx` derived the pill counts from `visible`, which had the team filter
+applied before the count was taken. Selecting any pill therefore made every
+*other* pill read "· 0" and shrank "All" to the size of the current selection —
+so with U10 selected, an admin's other 14 age groups all claimed to be empty
+and the "All" pill misstated what clicking it would do. That inverted the whole
+point of the counts.
+
+**Fix.** Split the derivation in two: `matchingSearch` applies the search only
+and feeds the counts; `visible` applies the team filter on top of it and feeds
+the list. The counts now answer "how many matches are in each squad", which is
+a question about the search, not about whichever pill happens to be selected.
+
+**Also done, as directed:** the count is no longer smuggled through
+`team.name`. `TeamPills` takes a `counts` prop (a `Map` from team id, plus
+`ALL_TEAMS_ID` for the All pill, to a number) and builds the label itself.
+Callers with nothing to count — the Schedule's filter — pass nothing and are
+unaffected. A team absent from the map renders a bare name; a team mapped to
+`0` renders "· 0", which is the distinction the old code could not express.
+
+Confirmed in the browser: with U14 Boys selected the row now reads
+`All · 20 / U12 Boys · 12 / U14 Boys · 8` (screenshot
+`screenshots/task12/team-selected-desktop.png`).
+
+## 2. Ruling A — the stale team pill, fixed in both screens
+
+Applied `const activeFilter = teamIds.includes(teamFilter) ? teamFilter : ALL_TEAMS_ID`
+to **both** `Roster.jsx` and `Schedule.jsx`, and routed the list filter, the
+grouping rule and `TeamPills`' `selected` through it in each.
+
+The controller is right that my original mitigation note was wrong in the worst
+sub-case, and this is worth recording: I claimed the user could click "All" to
+recover. They cannot. Both screens hide the entire pill row below two visible
+teams, so a scope that shrinks *to a single team* leaves no "All" pill to click
+— the list stays empty until the user navigates away and back. The guard is
+what makes that unreachable, not a convenience.
+
+## 3. Ruling B — Playwright resolved portably
+
+`harness/shoot-roster.mjs` and `harness/shoot-schedule.mjs` both imported
+Playwright from the absolute path `/opt/node-tools/node_modules/playwright/index.mjs`
+— one machine's layout, committed to a repo that gets cloned onto other PCs and
+into fresh sandboxes.
+
+Both now import a shared `harness/playwright.mjs`, which resolves at runtime:
+`$PLAYWRIGHT_MODULE` if set, then the bare specifier `playwright` (local
+devDependency, global install, or `NODE_PATH`). Playwright stays out of
+`package.json` deliberately — it is a ~300MB browser download that the app
+build, the unit tests and Netlify have no use for, and only the by-hand shoot
+scripts need it. Failure to resolve raises a named, actionable error rather
+than a stack trace about a missing file.
+
+Both paths verified:
+
+```
+$ node harness/shoot-roster.mjs
+Error: Could not load Playwright (tried: playwright).
+Either install it in this repo:
+  npm i -D playwright && npx playwright install chromium
+or point PLAYWRIGHT_MODULE at an existing installation:
+  PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node harness/shoot-roster.mjs
+
+$ PLAYWRIGHT_MODULE=/opt/node-tools/node_modules/playwright/index.mjs node harness/shoot-roster.mjs
+exit=0   # 16 screenshots, layout metrics unchanged: tileOffsetTop 13px on
+         # every row in every scenario at both widths, zero overflow
+```
+
+## Covering tests
+
+| File | Tests added | Covers |
+|---|---|---|
+| `tests/roster.test.jsx` | `counts every squad, not just the selected one`; `narrows the counts to the search` | Finding 1 — counts survive a pill selection, and still follow the search |
+| `tests/roster.test.jsx` | `falls back to all squads when the selected team leaves the scope` | Ruling A (Roster), incl. the shrink-to-one-team sub-case |
+| `tests/schedule.test.jsx` | `falls back to all teams when the selected team leaves the scope` | Ruling A (Schedule) |
+| `tests/components.test.jsx` | `suffixes each label with its count…`; `shows a zero count rather than treating it as absent`; `leaves every label bare when no counts are given` | the new `counts` prop, including 0-vs-absent |
+
+## Command and output
+
+Files amended in this round: `src/screens/Roster.jsx`, `src/screens/Schedule.jsx`,
+`src/components/TeamPills.jsx`, `tests/roster.test.jsx`,
+`tests/schedule.test.jsx`, `tests/components.test.jsx`,
+`harness/playwright.mjs` (new), `harness/shoot-roster.mjs`,
+`harness/shoot-schedule.mjs`.
+
+```
+$ npx vitest run tests/roster.test.jsx tests/schedule.test.jsx tests/components.test.jsx
+ ✓ tests/schedule.test.jsx (31 tests) 2025ms
+ ✓ tests/roster.test.jsx (34 tests) 1912ms
+ ✓ tests/components.test.jsx (41 tests) 521ms
+ Test Files  3 passed (3)
+      Tests  106 passed (106)
+```
+
+Full suite and build:
+
+```
+$ npm test
+ Test Files  14 passed (14)
+      Tests  266 passed (266)
+
+$ npm run build
+✓ built in 3.42s
+```
+
+266 = 259 before this round + 7 new (3 Roster, 1 Schedule, 3 TeamPills).
+Nothing regressed; output stayed pristine (no act() warnings, no stderr).
+
+## Mutation checks on the new tests
+
+Same discipline as the first round — a new test that has never failed has not
+been shown to work:
+
+| Mutation | Result |
+|---|---|
+| counts derived from `visible` again (restores the exact reported bug) | `counts every squad…` fails ✓ |
+| `activeFilter = teamFilter` in `Roster.jsx` | Roster fallback test fails ✓ |
+| `activeFilter = teamFilter` in `Schedule.jsx` | Schedule fallback test fails ✓ |
+
+All mutations reverted; suite re-verified green afterwards.
+
+Worth noting: under mutation 1 only *one* of the two count tests failed. The
+`narrows the counts to the search` test passes either way, because it selects
+no pill — with no team filter applied, `visible` and `matchingSearch` are the
+same set. That's expected: it is the search-tracking test, and the
+selected-pill test is the one that pins the bug.
+
+## Not acted on (ruled deferred)
+
+The jersey number's `aria-hidden` (Task 22 accessibility pass), the
+section-head denominator, the "No players match" copy when a pill rather than
+the search caused the zero, and the missing test for the
+removed-player-closes-the-sheet guarantee.

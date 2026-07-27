@@ -1,0 +1,951 @@
+# Review package: 448f374..HEAD
+
+## Commits
+8baba41 chore: append the Task 11 round-2 fix report to the build ledger
+bf60a0d fix: align populated and empty calendar day cells
+
+## Files changed
+ .gitignore                                      |   4 +
+ .superpowers/sdd/quins-v1-mvp/task-11-report.md | 161 +++++++++++++++++++
+ harness/main.jsx                                |  28 +++-
+ harness/shoot-schedule.mjs                      | 145 +++++++++++++++++
+ harness/stubs/availability.js                   |  21 +++
+ harness/stubs/events.js                         | 199 ++++++++++++++++++++++++
+ harness/vite.config.js                          |   8 +
+ screenshots/login-desktop.png                   | Bin 430787 -> 0 bytes
+ screenshots/login-mobile.png                    | Bin 105713 -> 0 bytes
+ screenshots/shell-coach-desktop.png             | Bin 62167 -> 0 bytes
+ screenshots/shell-coach-mobile.png              | Bin 33539 -> 0 bytes
+ screenshots/shell-error-desktop.png             | Bin 73073 -> 0 bytes
+ screenshots/shell-error-mobile.png              | Bin 44027 -> 0 bytes
+ screenshots/shell-loading-desktop.png           | Bin 61210 -> 0 bytes
+ screenshots/shell-loading-mobile.png            | Bin 33364 -> 0 bytes
+ screenshots/shell-no-membership-desktop.png     | Bin 82486 -> 0 bytes
+ screenshots/shell-no-membership-mobile.png      | Bin 50437 -> 0 bytes
+ src/screens/Schedule.jsx                        |  23 ++-
+ tests/schedule.test.jsx                         |  49 ++++++
+ 19 files changed, 631 insertions(+), 7 deletions(-)
+
+## Diff
+diff --git a/.gitignore b/.gitignore
+index 66cdaee..4ee1b05 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,6 +1,10 @@
+ node_modules
+ dist
+ .env
+ .env.local
+ .DS_Store
+ coverage
++
++# Visual-verification output. Regenerable from harness/ (which stays tracked);
++# ~2.6 MB per task would bloat the repo across 22 tasks.
++screenshots
+diff --git a/.superpowers/sdd/quins-v1-mvp/task-11-report.md b/.superpowers/sdd/quins-v1-mvp/task-11-report.md
+index 2b174d0..cd2f644 100644
+--- a/.superpowers/sdd/quins-v1-mvp/task-11-report.md
++++ b/.superpowers/sdd/quins-v1-mvp/task-11-report.md
+@@ -388,10 +388,171 @@ None new. One note for the re-reviewer: `Schedule` and `EventDetail` now use two
+ different first-load idioms (a derived `loading && events.length === 0` vs a
+ `settledForEvent` ref). That is deliberate, not drift — an empty list is a
+ transient state on the schedule but a legitimate steady state for availability, so
+ the derived form would still flicker there. Both are commented in place with that
+ reasoning.
+ 
+ Housekeeping: `.superpowers/sdd/.gitignore` was reset to `*` by tooling twice
+ during this task (the regression its own comment warns about, which silently
+ untracks the whole ledger). Restored from HEAD both times; not part of either
+ commit.
++
++---
++
++# Fix report — Task 11 review round 2 (visual verification)
++
++**Commit:** `bf60a0d` fix: align populated and empty calendar day cells
++
++One Important defect, fixed. The three deferred rulings (Sheet's
++`env(safe-area-inset-bottom)`, the "✓ N available" count, the desktop month
++grid's 775px height) were not touched.
++
++## The defect — calendar day numbers sat at two different heights
++
++Confirmed and reproduced. A day with events has to be a `<button>` for keyboard
++access; a day without one stays a `<div>`. Chromium's UA stylesheet lays a
++button's content out centred inside its box, and the shared cell classes only set
++`p-[5px]` — nothing that overrode it. So the number dropped in populated cells
++while empty ones sat top-left. Worse at desktop, because the defect scales with
++cell height: the offset is half the leftover vertical space.
++
++The prototype used a `<div>` for every cell
++(`assets/prototype-downloads.html:597`), so this arrived with the interactive-cell
++markup rather than being inherited — my change, my regression.
++
++**Fix (`src/screens/Schedule.jsx`).** Both variants now render from a single
++module-level `CELL_LAYOUT` string that makes every cell an explicit flex
++container with `items-start justify-start`. That replaces the UA's button layout
++with one I control, so the number lands in the same place regardless of which
++element the cell is. Nothing was removed: the cell is still a real `<button>`
++with its `aria-label` and click handler when it has events. Both variants also
++carry `data-testid="calendar-day"` so the invariant is assertable.
++
++### Measured in Chromium, after the fix
++Re-ran the harness dev server and measured the day number's offset from its own
++cell's top-left, plus the dots and keyboard focus:
++
++| Width | Cell size | Populated (`<button>`) | Empty (`<div>`) | Before (reported) |
++|---|---|---|---|---|
++| 375px | 40px | top 8px, left 6px | top 8px, left 6px | 13px vs 8px |
++| 1280px | 147px | top 8px, left 6px | top 8px, left 6px | 66px vs 8px |
++
++8 populated and 23 empty cells measured in the default month at each width — all
++identical. The event dots still sit 5px from the cell's bottom-left at both widths
++(absolutely positioned children are out of flow, so the flex container doesn't
++move them), and `cell.focus()` still lands on the cell at both widths, so the
++keyboard semantics survived the fix.
++
++## The test that would have caught it
++
++`tests/schedule.test.jsx` → "aligns populated and empty day cells identically".
++
++jsdom applies no UA stylesheet and computes no layout, so no rendering or
++geometry assertion in this suite could ever have caught this — which is exactly
++why it reached visual verification. The testable invariant is the one the
++codebase already uses for responsive concerns: assert the literal class tokens.
++The test renders a month containing at least one event, splits the cells by tag,
++and asserts every cell of **both** variants carries `relative`, `flex`,
++`items-start`, `justify-start`, `text-left` and `p-[5px]`. It also asserts both
++variants are actually present first, so it can't pass vacuously on a month that
++happened to render only one kind.
++
++`hasClassToken` was added to this file, matching the helper already in
++`tests/app-shell.test.jsx` and `tests/components.test.jsx`.
++
++### Mutation checks (proving the new test bites)
++| Mutation | Result |
++|---|---|
++| `CELL_LAYOUT` reverted to the pre-fix classes (no flex/alignment) | 1 failure — "aligns populated and empty day cells identically" |
++| Alignment tokens applied to the `<button>` branch only (i.e. the two variants diverge again, silently) | 1 failure — same test |
++
++The second mutation is the important one: it is the shape a future edit would most
++plausibly take, and the test catches the divergence rather than just the absence.
++
++## Tests covering the amended code
++
++`tests/schedule.test.jsx` — 30 cases (was 29; +1 for the alignment invariant). No
++other test file's behaviour changed.
++
++### Command and output
++
++```
++$ npx vitest run tests/schedule.test.jsx
++
++ RUN  v2.1.9 /root/quins-club-hub
++
++ ✓ tests/schedule.test.jsx (30 tests) 1916ms
++
++ Test Files  1 passed (1)
++      Tests  30 passed (30)
++   Start at  17:05:27
++   Duration  3.60s (transform 273ms, setup 74ms, collect 457ms, tests 1.92s, environment 505ms, prepare 85ms)
++```
++
++```
++$ npm test
++
++ RUN  v2.1.9 /root/quins-club-hub
++
++ ✓ tests/schedule.test.jsx (30 tests) 2485ms
++ ✓ tests/components.test.jsx (38 tests) 584ms
++ ✓ tests/data.test.js (25 tests) 27ms
++ ✓ tests/scope.test.js (35 tests) 27ms
++ ✓ tests/login.test.jsx (16 tests) 1298ms
++ ✓ tests/app-shell.test.jsx (12 tests) 402ms
++ ✓ tests/auth.test.jsx (12 tests) 316ms
++ ✓ tests/require-auth.test.jsx (9 tests) 129ms
++ ✓ tests/event-format.test.js (28 tests) 47ms
++ ✓ tests/memberships.test.jsx (7 tests) 186ms
++ ✓ tests/app.test.jsx (6 tests) 224ms
++ ✓ tests/nav.test.jsx (6 tests) 254ms
++ ✓ tests/supabase.test.js (4 tests) 66ms
++
++ Test Files  13 passed (13)
++      Tests  228 passed (228)
++   Start at  17:07:20
++   Duration  21.89s (transform 677ms, setup 933ms, collect 2.56s, tests 6.04s, environment 7.34s, prepare 1.11s)
++```
++
++```
++$ npm run build
++dist/assets/crest-BPS7q37W.png  148.21 kB
++dist/assets/index-BNf3XKmG.css   23.17 kB │ gzip:   5.41 kB
++dist/assets/index-BKPtMCMi.js   419.32 kB │ gzip: 119.69 kB
++✓ built in 3.57s
++```
++
++228 passed / 13 files, up from 227. Nothing regressed; output clean, no warnings
++and no `act()` noise.
++
++## Housekeeping (same commit)
++- `screenshots` added to `.gitignore`; `git rm -r --cached screenshots` removed the
++  10 previously-tracked PNGs (~1 MB) from the index. Files remain on disk.
++- Harness kept tracked and committed, including the additions that produced this
++  finding: `harness/shoot-schedule.mjs`, `harness/stubs/events.js`,
++  `harness/stubs/availability.js`, and the `harness/main.jsx` /
++  `harness/vite.config.js` modifications. The next task re-runs the same check
++  with `npx vite --config harness/vite.config.js` then
++  `node harness/shoot-schedule.mjs`.
++
++## Files changed in this round
++- `src/screens/Schedule.jsx` — shared `CELL_LAYOUT`; `data-testid` on both cell variants
++- `tests/schedule.test.jsx` — alignment invariant test + `hasClassToken` helper
++- `.gitignore` — ignore `screenshots`
++- `harness/*` — committed as-is (coordinator's visual-check tooling)
++- `screenshots/*.png` — untracked (files kept on disk)
++
++## Concerns
++None outstanding on the code. Two process notes:
++
++1. **This class is of defect is invisible to the whole test suite.** The fix and its
++   test pin one specific instance; the general risk — a `<button>` used as a layout
++   box inheriting UA centring — applies anywhere else the app makes a non-text
++   element interactive. The fixture rows in this screen are also `<button>`s, but
++   they set `flex items-center` explicitly, so they are fine. Worth watching in
++   Tasks 12/13, which will follow this screen's patterns.
++2. **`.superpowers/sdd/.gitignore` has now been reset to `*` by tooling three times**
++   across this task (twice during my work, once during the visual check). Each reset
++   silently untracks the entire build ledger. I restored it from HEAD again before
++   committing and confirmed the `*` version is not in any of my commits, but
++   something is rewriting it repeatedly and it will eventually land in someone's
++   commit unnoticed.
+diff --git a/harness/main.jsx b/harness/main.jsx
+index 705a2eb..d19fe1c 100644
+--- a/harness/main.jsx
++++ b/harness/main.jsx
+@@ -1,15 +1,16 @@
+ import React from 'react'
+ import ReactDOM from 'react-dom/client'
+ import { MemoryRouter } from 'react-router-dom'
+ import AppShell from '../src/components/AppShell.jsx'
+ import Login from '../src/screens/Login.jsx'
++import Schedule from '../src/screens/Schedule.jsx'
+ import { AuthProvider } from './stubs/auth.jsx'
+ import { MembershipProvider } from './stubs/memberships.jsx'
+ import '../src/index.css'
+ 
+ // Throwaway visual-verification harness. Renders the REAL AppShell/Nav/Login
+ // components (imported straight from src/) with stubbed auth + membership
+ // context values selected via ?scenario=<name>, so Playwright can screenshot
+ // real Tailwind-rendered layout without a Supabase session or any network
+ // access. Not part of the app build; not committed.
+ 
+@@ -36,34 +37,46 @@ const JAY_EMAIL = 'jayjmuir@gmail.com'
+ 
+ const COACH_MEMBERSHIPS = [
+   { id: 'm1', role: 'coach', team_id: 't1', player_id: null },
+   { id: 'm2', role: 'coach', team_id: 't2', player_id: null },
+ ]
+ const TEAMS = [
+   { id: 't1', name: 'U12 Boys', sort_order: 4 },
+   { id: 't2', name: 'U14 Boys', sort_order: 6 },
+ ]
+ 
+-function Shell({ authValue, membershipValue }) {
++function Shell({ authValue, membershipValue, route = '/', children }) {
+   return (
+-    <MemoryRouter initialEntries={['/']}>
++    <MemoryRouter initialEntries={[route]}>
+       <AuthProvider value={authValue}>
+         <MembershipProvider value={membershipValue}>
+-          <AppShell>
+-            <Home />
+-          </AppShell>
++          <AppShell>{children ?? <Home />}</AppShell>
+         </MembershipProvider>
+       </AuthProvider>
+     </MemoryRouter>
+   )
+ }
+ 
++const ADMIN_MEMBERSHIPS = [{ id: 'm0', role: 'admin', team_id: null, player_id: null }]
++
++function scheduleScenario(memberships) {
++  return () => (
++    <Shell
++      route="/schedule"
++      authValue={baseAuth(COACH_EMAIL)}
++      membershipValue={{ memberships, teams: TEAMS, loading: false, error: null, reload: noop }}
++    >
++      <Schedule />
++    </Shell>
++  )
++}
++
+ const scenarios = {
+   login: () => (
+     <AuthProvider value={baseAuth('')}>
+       <Login />
+     </AuthProvider>
+   ),
+ 
+   'shell-coach': () => (
+     <Shell
+       authValue={baseAuth(COACH_EMAIL)}
+@@ -90,20 +103,25 @@ const scenarios = {
+       membershipValue={{
+         memberships: [],
+         teams: [],
+         loading: false,
+         error: new Error('Network request failed while loading your account.'),
+         reload: noop,
+       }}
+     />
+   ),
+ 
++  // Task 11 Schedule screens. Sub-tab selection and sheet opening are real
++  // component state, so Playwright drives them by clicking (see shoot.mjs).
++  schedule: scheduleScenario(COACH_MEMBERSHIPS),
++  'schedule-admin': scheduleScenario(ADMIN_MEMBERSHIPS),
++
+   'shell-loading': () => (
+     <Shell
+       authValue={baseAuth(JAY_EMAIL)}
+       membershipValue={{ memberships: [], teams: [], loading: true, error: null, reload: noop }}
+     />
+   ),
+ }
+ 
+ const params = new URLSearchParams(window.location.search)
+ const scenario = params.get('scenario') || 'login'
+diff --git a/harness/shoot-schedule.mjs b/harness/shoot-schedule.mjs
+new file mode 100644
+index 0000000..7686ae9
+--- /dev/null
++++ b/harness/shoot-schedule.mjs
+@@ -0,0 +1,145 @@
++import { chromium } from '/opt/node-tools/node_modules/playwright/index.mjs'
++import path from 'node:path'
++import { fileURLToPath } from 'node:url'
++import fs from 'node:fs'
++
++// Task 11 visual verification. Same pattern as shoot.mjs, but each shot can
++// drive real component state first (the Upcoming/Results/Calendar sub-tabs
++// and the EventDetail sheet are useState inside Schedule, not props), and
++// each records document scrollWidth vs innerWidth so horizontal overflow at
++// 375px is measured rather than eyeballed.
++
++const __dirname = path.dirname(fileURLToPath(import.meta.url))
++const outDir = path.resolve(__dirname, '../screenshots/task11')
++fs.mkdirSync(outDir, { recursive: true })
++
++const BASE = 'http://localhost:5199'
++
++const shots = [
++  { file: 'upcoming', scenario: 'schedule', steps: async () => {} },
++  {
++    file: 'results',
++    scenario: 'schedule',
++    steps: async (page) => {
++      await page.getByRole('button', { name: 'Results' }).click()
++    },
++  },
++  {
++    file: 'calendar',
++    scenario: 'schedule',
++    steps: async (page) => {
++      await page.getByRole('button', { name: 'Calendar' }).click()
++    },
++  },
++  {
++    file: 'detail',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      // First unscored fixture in the Upcoming list -> opens EventDetail.
++      await page.locator('button', { hasText: 'U12 Squad Training' }).first().click()
++      await page.getByRole('dialog').waitFor()
++      await page.waitForTimeout(400)
++    },
++  },
++  {
++    file: 'detail-scrolled',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await page.locator('button', { hasText: 'U12 Squad Training' }).first().click()
++      await page.getByRole('dialog').waitFor()
++      await page.waitForTimeout(400)
++      await page.getByRole('dialog').evaluate((el) => el.scrollTo(0, el.scrollHeight))
++      await page.waitForTimeout(150)
++    },
++  },
++  {
++    file: 'detail-result',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await page.getByRole('button', { name: 'Results' }).click()
++      await page.locator('button', { hasText: 'Dubai Exiles' }).first().click()
++      await page.getByRole('dialog').waitFor()
++      await page.waitForTimeout(400)
++    },
++  },
++  { file: 'upcoming-admin', scenario: 'schedule-admin', steps: async () => {} },
++  {
++    file: 'upcoming-bottom',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
++      await page.waitForTimeout(200)
++    },
++  },
++]
++
++const viewports = [
++  { name: 'mobile', width: 375, height: 812 },
++  { name: 'desktop', width: 1280, height: 900 },
++]
++
++const results = []
++const browser = await chromium.launch()
++
++for (const shot of shots) {
++  for (const vp of viewports) {
++    const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } })
++    const consoleErrors = []
++    const consoleWarnings = []
++    const pageErrors = []
++    page.on('console', (msg) => {
++      if (msg.type() === 'error') consoleErrors.push(msg.text())
++      if (msg.type() === 'warning') consoleWarnings.push(msg.text())
++    })
++    page.on('pageerror', (err) => pageErrors.push(err.message))
++
++    await page.goto(`${BASE}/?scenario=${shot.scenario}`, { waitUntil: 'networkidle' })
++    await page.waitForTimeout(250)
++    await shot.steps(page)
++    await page.waitForTimeout(200)
++
++    const metrics = await page.evaluate(() => {
++      const docWidth = document.documentElement.scrollWidth
++      const wide = [...document.querySelectorAll('*')]
++        .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1)
++        .slice(0, 6)
++        .map((el) => `${el.tagName}.${el.className?.toString?.().slice(0, 60)} right=${Math.round(el.getBoundingClientRect().right)}`)
++      const nav = document.querySelector('nav[aria-label="Primary"]')
++      const navRect = nav ? nav.getBoundingClientRect() : null
++      const cells = [...document.querySelectorAll('.grid-cols-7 > *')].slice(7, 12).map((el) => {
++        const r = el.getBoundingClientRect()
++        return `${Math.round(r.width)}x${Math.round(r.height)}`
++      })
++      const hero = document.querySelector('[role="dialog"] > div:nth-child(3) > div:first-child')
++      const panel = document.querySelector('[role="dialog"]')
++      return {
++        docWidth,
++        innerWidth: window.innerWidth,
++        overflowing: wide,
++        navRect: navRect && { top: Math.round(navRect.top), height: Math.round(navRect.height) },
++        calCellSizes: cells,
++        heroRect: hero && {
++          left: Math.round(hero.getBoundingClientRect().left),
++          right: Math.round(hero.getBoundingClientRect().right),
++        },
++        panelRect: panel && {
++          left: Math.round(panel.getBoundingClientRect().left),
++          right: Math.round(panel.getBoundingClientRect().right),
++        },
++      }
++    })
++
++    const outPath = path.join(outDir, `${shot.file}-${vp.name}.png`)
++    await page.screenshot({ path: outPath, fullPage: !shot.viewportOnly })
++
++    results.push({ shot: shot.file, viewport: vp.name, file: outPath, metrics, consoleErrors, consoleWarnings, pageErrors })
++    await page.close()
++  }
++}
++
++await browser.close()
++console.log(JSON.stringify(results, null, 2))
+diff --git a/harness/stubs/availability.js b/harness/stubs/availability.js
+new file mode 100644
+index 0000000..b804087
+--- /dev/null
++++ b/harness/stubs/availability.js
+@@ -0,0 +1,21 @@
++// Harness stub replacing src/data/availability.js via a Vite alias. Same
++// public shape (listAvailability, subscribeAvailability), fixed rows instead
++// of a Supabase query, so the EventDetail availability summary renders a
++// realistic three-segment bar.
++
++const MIX = { in: 18, maybe: 4, out: 3 }
++
++export async function listAvailability(eventId) {
++  const rows = []
++  let n = 0
++  Object.entries(MIX).forEach(([status, count]) => {
++    for (let i = 0; i < count; i += 1) {
++      rows.push({ id: `${eventId}-a${n++}`, event_id: eventId, player_id: `p${n}`, status })
++    }
++  })
++  return rows
++}
++
++export function subscribeAvailability() {
++  return () => {}
++}
+diff --git a/harness/stubs/events.js b/harness/stubs/events.js
+new file mode 100644
+index 0000000..f50b471
+--- /dev/null
++++ b/harness/stubs/events.js
+@@ -0,0 +1,199 @@
++// Harness stub replacing src/data/events.js via a Vite alias. Same public
++// shape (listEvents, subscribeEvents) as the real module, but returns a fixed
++// fixture set instead of querying Supabase. Fixtures are pinned to July 2026
++// (the repo's "today" is 2026-07-27) so the Calendar tab's default month is
++// densely populated, and cover both teams, all three event types, and a mix
++// of scored (Results) and unscored (Upcoming) rows.
++
++const T1 = 't1' // U12 Boys
++const T2 = 't2' // U14 Boys
++
++const VENUE = 'Zayed Sports City'
++
++export const EVENTS = [
++  // --- Scored (Results) -------------------------------------------------
++  {
++    id: 'e1',
++    team_id: T1,
++    type: 'match',
++    opponent: 'Dubai Exiles',
++    title: null,
++    venue: VENUE,
++    home: true,
++    competition: 'UAE Youth League',
++    starts_at: '2026-07-03T15:00:00Z',
++    result_us: 31,
++    result_them: 19,
++  },
++  {
++    id: 'e2',
++    team_id: T2,
++    type: 'match',
++    opponent: 'Jebel Ali Dragons',
++    title: null,
++    venue: 'The Sevens, Dubai',
++    home: false,
++    competition: 'UAE Youth League',
++    starts_at: '2026-07-05T13:30:00Z',
++    result_us: 12,
++    result_them: 24,
++  },
++  {
++    id: 'e3',
++    team_id: T1,
++    type: 'match',
++    opponent: 'Abu Dhabi Saracens',
++    title: null,
++    venue: VENUE,
++    home: true,
++    competition: 'Capital Cup',
++    starts_at: '2026-07-11T16:00:00Z',
++    result_us: 17,
++    result_them: 17,
++  },
++  {
++    id: 'e4',
++    team_id: T2,
++    type: 'match',
++    opponent: 'Al Ain Amblers',
++    title: null,
++    venue: 'Al Ain Sports Club',
++    home: false,
++    competition: 'UAE Youth League',
++    starts_at: '2026-07-18T14:00:00Z',
++    result_us: 45,
++    result_them: 5,
++  },
++  {
++    id: 'e5',
++    team_id: T1,
++    type: 'match',
++    opponent: 'Bahrain RFC Colts',
++    title: null,
++    venue: VENUE,
++    home: true,
++    competition: 'Gulf Invitational',
++    starts_at: '2026-07-24T15:30:00Z',
++    result_us: 8,
++    result_them: 21,
++  },
++
++  // --- Unscored (Upcoming) ----------------------------------------------
++  {
++    id: 'e6',
++    team_id: T1,
++    type: 'training',
++    opponent: null,
++    title: 'U12 Squad Training',
++    venue: VENUE,
++    home: null,
++    competition: null,
++    starts_at: '2026-07-28T15:30:00Z',
++    result_us: null,
++    result_them: null,
++  },
++  {
++    id: 'e7',
++    team_id: T2,
++    type: 'training',
++    opponent: null,
++    title: 'U14 Contact & Conditioning',
++    venue: 'Zayed Sports City — Pitch 3',
++    home: null,
++    competition: null,
++    starts_at: '2026-07-28T17:00:00Z',
++    result_us: null,
++    result_them: null,
++  },
++  {
++    id: 'e8',
++    team_id: T1,
++    type: 'match',
++    opponent: 'Sharjah Wanderers',
++    title: null,
++    venue: VENUE,
++    home: true,
++    competition: 'UAE Youth League',
++    starts_at: '2026-07-30T15:00:00Z',
++    result_us: null,
++    result_them: null,
++  },
++  {
++    id: 'e9',
++    team_id: T2,
++    type: 'social',
++    opponent: null,
++    title: 'End of Season Family BBQ',
++    venue: 'Quins Clubhouse',
++    home: null,
++    competition: null,
++    starts_at: '2026-07-31T14:00:00Z',
++    result_us: null,
++    result_them: null,
++  },
++  {
++    id: 'e10',
++    team_id: T1,
++    type: 'social',
++    opponent: null,
++    title: 'Presentation Night',
++    venue: 'Zayed Sports City Function Room',
++    home: null,
++    competition: null,
++    starts_at: '2026-07-31T16:30:00Z',
++    result_us: null,
++    result_them: null,
++  },
++  {
++    id: 'e11',
++    team_id: T2,
++    type: 'match',
++    opponent: 'Doha Dhows Under-14 Development Squad',
++    title: null,
++    venue: 'Doha, Qatar',
++    home: false,
++    competition: 'Gulf Invitational Tournament',
++    starts_at: '2026-08-02T12:00:00Z',
++    result_us: null,
++    result_them: null,
++  },
++  {
++    id: 'e12',
++    team_id: T1,
++    type: 'training',
++    opponent: null,
++    title: 'Pre-season Fitness',
++    venue: VENUE,
++    home: null,
++    competition: null,
++    starts_at: '2026-08-06T15:30:00Z',
++    result_us: null,
++    result_them: null,
++  },
++  // Same day as e6/e7 to exercise the calendar's multi-dot cell.
++  {
++    id: 'e13',
++    team_id: T2,
++    type: 'social',
++    opponent: null,
++    title: 'Committee Meeting',
++    venue: 'Quins Clubhouse',
++    home: null,
++    competition: null,
++    starts_at: '2026-07-28T18:30:00Z',
++    result_us: null,
++    result_them: null,
++  },
++]
++
++export async function listEvents({ teamIds } = {}) {
++  if (Array.isArray(teamIds) && teamIds.length === 0) return []
++  if (Array.isArray(teamIds) && teamIds.length > 0) {
++    return EVENTS.filter((event) => teamIds.includes(event.team_id))
++  }
++  return EVENTS
++}
++
++export function subscribeEvents() {
++  return () => {}
++}
+diff --git a/harness/vite.config.js b/harness/vite.config.js
+index 4abccc5..9e917e7 100644
+--- a/harness/vite.config.js
++++ b/harness/vite.config.js
+@@ -22,17 +22,25 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
+ export default defineConfig({
+   root: __dirname,
+   plugins: [react()],
+   resolve: {
+     alias: [
+       { find: /^\.\.\/lib\/auth\.jsx$/, replacement: path.resolve(__dirname, 'stubs/auth.jsx') },
+       {
+         find: /^\.\.\/lib\/memberships\.jsx$/,
+         replacement: path.resolve(__dirname, 'stubs/memberships.jsx'),
+       },
++      // Same trick for the two data modules Schedule/EventDetail reach
++      // Supabase through. Both screens live in src/screens/, one level below
++      // src/, so the specifier text is identical from both call sites.
++      { find: /^\.\.\/data\/events\.js$/, replacement: path.resolve(__dirname, 'stubs/events.js') },
++      {
++        find: /^\.\.\/data\/availability\.js$/,
++        replacement: path.resolve(__dirname, 'stubs/availability.js'),
++      },
+     ],
+   },
+   server: {
+     port: 5199,
+     strictPort: true,
+   },
+ })
+diff --git a/screenshots/login-desktop.png b/screenshots/login-desktop.png
+deleted file mode 100644
+index 6412a49..0000000
+Binary files a/screenshots/login-desktop.png and /dev/null differ
+diff --git a/screenshots/login-mobile.png b/screenshots/login-mobile.png
+deleted file mode 100644
+index 18d4eca..0000000
+Binary files a/screenshots/login-mobile.png and /dev/null differ
+diff --git a/screenshots/shell-coach-desktop.png b/screenshots/shell-coach-desktop.png
+deleted file mode 100644
+index 5b3c07b..0000000
+Binary files a/screenshots/shell-coach-desktop.png and /dev/null differ
+diff --git a/screenshots/shell-coach-mobile.png b/screenshots/shell-coach-mobile.png
+deleted file mode 100644
+index dbed93c..0000000
+Binary files a/screenshots/shell-coach-mobile.png and /dev/null differ
+diff --git a/screenshots/shell-error-desktop.png b/screenshots/shell-error-desktop.png
+deleted file mode 100644
+index 06595f7..0000000
+Binary files a/screenshots/shell-error-desktop.png and /dev/null differ
+diff --git a/screenshots/shell-error-mobile.png b/screenshots/shell-error-mobile.png
+deleted file mode 100644
+index c40c12b..0000000
+Binary files a/screenshots/shell-error-mobile.png and /dev/null differ
+diff --git a/screenshots/shell-loading-desktop.png b/screenshots/shell-loading-desktop.png
+deleted file mode 100644
+index cd0ed05..0000000
+Binary files a/screenshots/shell-loading-desktop.png and /dev/null differ
+diff --git a/screenshots/shell-loading-mobile.png b/screenshots/shell-loading-mobile.png
+deleted file mode 100644
+index 7942349..0000000
+Binary files a/screenshots/shell-loading-mobile.png and /dev/null differ
+diff --git a/screenshots/shell-no-membership-desktop.png b/screenshots/shell-no-membership-desktop.png
+deleted file mode 100644
+index b6ea440..0000000
+Binary files a/screenshots/shell-no-membership-desktop.png and /dev/null differ
+diff --git a/screenshots/shell-no-membership-mobile.png b/screenshots/shell-no-membership-mobile.png
+deleted file mode 100644
+index 0a76ae9..0000000
+Binary files a/screenshots/shell-no-membership-mobile.png and /dev/null differ
+diff --git a/src/screens/Schedule.jsx b/src/screens/Schedule.jsx
+index c455667..66c287a 100644
+--- a/src/screens/Schedule.jsx
++++ b/src/screens/Schedule.jsx
+@@ -35,20 +35,26 @@ import {
+ const TABS = [
+   { id: 'upcoming', label: 'Upcoming' },
+   { id: 'results', label: 'Results' },
+   { id: 'calendar', label: 'Calendar' },
+ ]
+ 
+ const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
+ 
+ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+ 
++// Every calendar day cell carries these, whether it renders as a <div> (no
++// events) or a <button> (has events). The flex + start-alignment tokens are
++// load-bearing, not decorative — see the comment at the cell markup.
++const CELL_LAYOUT =
++  'relative flex aspect-square items-start justify-start rounded-[9px] border p-[5px] text-left text-[12.5px] font-semibold text-[#221f1d]'
++
+ // design-system.md §4.14: match = maroon, training = --sky, social = --warn.
+ const DOT_COLOURS = {
+   match: 'bg-quinsRed',
+   training: 'bg-[#3E9C4F]',
+   social: 'bg-[#c9861a]',
+ }
+ 
+ function ClockIcon(props) {
+   return (
+     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+@@ -212,37 +218,50 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
+           ))}
+ 
+           {Array.from({ length: leadingBlanks }, (_, index) => (
+             <div key={`blank-${index}`} aria-hidden="true" />
+           ))}
+ 
+           {Array.from({ length: dayCount }, (_, index) => {
+             const dayNumber = index + 1
+             const dayEvents = byDay.get(dayNumber) ?? []
+             const isToday = isSameDay(new Date(year, monthIndex, dayNumber), today)
++            // CELL_LAYOUT is shared verbatim by both variants, and it is what
++            // keeps them aligned. A day with events must be a <button> for
++            // keyboard access, and Chromium's UA stylesheet lays a button's
++            // content out centred inside its box — so with only `p-[5px]` the
++            // number floated in the middle of a populated cell while its empty
++            // <div> neighbours sat top-left (measured 66px vs 8px from the top
++            // at 1280px, where the cells are 147px tall: the grid read as
++            // broken). Making every cell an explicit flex container with
++            // start alignment overrides that UA layout, so both variants place
++            // the number identically at any cell size. Do not move any of
++            // these tokens onto one branch only — tests/schedule.test.jsx
++            // asserts both variants carry all of them.
+             const cellClasses = [
+-              'relative aspect-square rounded-[9px] border p-[5px] text-left text-[12.5px] font-semibold text-[#221f1d]',
++              CELL_LAYOUT,
+               isToday ? 'border-quinsRed shadow-[inset_0_0_0_1px_theme(colors.quinsRed)]' : 'border-[#e6e3e1]',
+             ].join(' ')
+ 
+             if (dayEvents.length === 0) {
+               return (
+-                <div key={dayNumber} className={cellClasses}>
++                <div key={dayNumber} data-testid="calendar-day" className={cellClasses}>
+                   {dayNumber}
+                 </div>
+               )
+             }
+ 
+             return (
+               <button
+                 key={dayNumber}
+                 type="button"
++                data-testid="calendar-day"
+                 onClick={() => onSelect(dayEvents[0].id)}
+                 aria-label={`${dayNumber} ${month.toLocaleDateString(undefined, { month: 'long' })}, ${dayEvents.length} ${dayEvents.length === 1 ? 'event' : 'events'}`}
+                 className={`${cellClasses} transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed`}
+               >
+                 {dayNumber}
+                 <span className="absolute bottom-1 left-1 flex gap-0.5" aria-hidden="true">
+                   {dayEvents.slice(0, 4).map((event) => (
+                     <span
+                       key={event.id}
+                       className={['h-1.5 w-1.5 rounded-full', DOT_COLOURS[event.type] ?? 'bg-[#77726e]'].join(' ')}
+diff --git a/tests/schedule.test.jsx b/tests/schedule.test.jsx
+index a4c260e..66ae9db 100644
+--- a/tests/schedule.test.jsx
++++ b/tests/schedule.test.jsx
+@@ -104,20 +104,28 @@ const RESULT_WIN = {
+   home: true,
+   venue: 'Zayed Sports City',
+   competition: null,
+   starts_at: days(-11),
+   result_us: 31,
+   result_them: 19,
+ }
+ 
+ const ALL_EVENTS = [RESULT_WIN, PLAYED_NO_SCORE, UPCOMING_MATCH, UPCOMING_TRAINING]
+ 
++// jsdom applies no CSS at all — no Tailwind, and no UA stylesheet layout
++// either — so asserting on the literal class token is the only way to make a
++// statement about how something will actually be laid out. Same helper, same
++// reasoning as tests/app-shell.test.jsx and tests/components.test.jsx.
++function hasClassToken(element, token) {
++  return element.className.split(/\s+/).includes(token)
++}
++
+ function memberships(rows, teams = TEAMS) {
+   return { memberships: rows, teams, loading: false, error: null, reload: vi.fn() }
+ }
+ 
+ const unsubscribeEvents = vi.fn()
+ 
+ beforeEach(() => {
+   vi.clearAllMocks()
+   useMembershipsMock.mockReturnValue(memberships(ADMIN))
+   listEventsMock.mockResolvedValue(ALL_EVENTS)
+@@ -281,20 +289,61 @@ describe('Schedule — scope note', () => {
+ describe('Schedule — calendar tab', () => {
+   const monthLabel = (offset = 0) => {
+     const d = new Date()
+     // Anchor to the 1st before shifting, so a 31st never rolls past a
+     // 30-day month the way `setMonth` on the 31st would.
+     d.setDate(1)
+     d.setMonth(d.getMonth() + offset)
+     return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+   }
+ 
++  // A day with events has to be a <button> for keyboard access; a day
++  // without one stays a <div>. Chromium's UA stylesheet lays a button's
++  // content out centred inside its box, so the two variants silently drifted
++  // apart vertically — populated days floated mid-cell while their empty
++  // neighbours sat top-left (measured 66px vs 8px from the cell top at
++  // 1280px). jsdom applies no UA stylesheet and computes no layout, so no
++  // rendering assertion here could ever catch that. The testable invariant
++  // is that both variants carry the same alignment classes, which is what
++  // pins the number to the same place in either.
++  it('aligns populated and empty day cells identically', async () => {
++    const today = new Date()
++    listEventsMock.mockResolvedValue([
++      {
++        ...UPCOMING_MATCH,
++        starts_at: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 17, 0).toISOString(),
++      },
++    ])
++
++    const { user } = setup()
++
++    await screen.findByText('Quins vs Dubai Exiles')
++    await user.click(screen.getByRole('button', { name: 'Calendar' }))
++
++    const cells = screen.getAllByTestId('calendar-day')
++    const populated = cells.filter((cell) => cell.tagName === 'BUTTON')
++    const empty = cells.filter((cell) => cell.tagName === 'DIV')
++
++    // Guard the guard: if the month ever rendered only one variant, the
++    // comparison below would pass vacuously.
++    expect(populated.length).toBeGreaterThan(0)
++    expect(empty.length).toBeGreaterThan(0)
++
++    // `flex` overrides the UA's centred button layout; `items-start` and
++    // `justify-start` then place the number top-left in both variants.
++    const alignmentTokens = ['relative', 'flex', 'items-start', 'justify-start', 'text-left', 'p-[5px]']
++    alignmentTokens.forEach((token) => {
++      expect(populated.every((cell) => hasClassToken(cell, token))).toBe(true)
++      expect(empty.every((cell) => hasClassToken(cell, token))).toBe(true)
++    })
++  })
++
+   // The weekday-header assertions use an empty event list on purpose: a
+   // fixture row's date box also renders a short weekday ("Sun"), and which
+   // weekday that is depends on the day the suite runs, so a populated list
+   // would make getByText('Sun') intermittently ambiguous.
+   it('renders a month grid for the current month', async () => {
+     listEventsMock.mockResolvedValue([])
+ 
+     const { user } = setup()
+ 
+     await screen.findByText(/no upcoming fixtures/i)

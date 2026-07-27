@@ -222,6 +222,35 @@ describe('TeamPills', () => {
     expect(onChange).toHaveBeenCalledWith(ALL_TEAMS_ID)
   })
 
+  it('suffixes each label with its count when a counts map is given', () => {
+    const counts = new Map([
+      [ALL_TEAMS_ID, 12],
+      ['u10', 9],
+      ['u12', 3],
+    ])
+    render(<TeamPills teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} counts={counts} />)
+
+    expect(screen.getByRole('button', { name: 'All · 12' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'U10 · 9' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'U12 · 3' })).toBeInTheDocument()
+  })
+
+  it('shows a zero count rather than treating it as absent', () => {
+    render(<TeamPills teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} counts={new Map([['u10', 0]])} />)
+
+    expect(screen.getByRole('button', { name: 'U10 · 0' })).toBeInTheDocument()
+    // No entry in the map at all means a bare label — not "· 0".
+    expect(screen.getByRole('button', { name: 'U12' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
+  })
+
+  it('leaves every label bare when no counts are given', () => {
+    render(<TeamPills teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} />)
+
+    expect(screen.getByRole('button', { name: 'U10' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
+  })
+
   it('renders no broken control for an empty teams array', () => {
     const { container } = render(<TeamPills teams={[]} selected={ALL_TEAMS_ID} onChange={() => {}} />)
     expect(container).toBeEmptyDOMElement()

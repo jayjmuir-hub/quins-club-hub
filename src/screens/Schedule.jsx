@@ -356,7 +356,18 @@ export default function Schedule() {
   const canEditAnything = admin || memberships.some((membership) => membership.role === 'coach')
   const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
-  const visible = teamFilter === ALL_TEAMS_ID ? events : events.filter((event) => event.team_id === teamFilter)
+  // A stored team filter can outlive the team it names: memberships reload,
+  // the user's scope shrinks, and `teamFilter` still points at a squad that is
+  // no longer in it — leaving an empty list with no pill selected. Worse, if
+  // the scope shrinks to a single team the whole pill row is hidden (below),
+  // so there is no "All" pill left to click and the list stays empty until the
+  // user navigates away and back. Reconciling against the live scope on every
+  // render, rather than trusting the stored value, prevents that.
+  // Roster.jsx does the same, for the same reason.
+  const activeFilter = teamIds.includes(teamFilter) ? teamFilter : ALL_TEAMS_ID
+
+  const visible =
+    activeFilter === ALL_TEAMS_ID ? events : events.filter((event) => event.team_id === activeFilter)
   const upcoming = sortByStart(visible.filter((event) => !hasResult(event)), 'asc')
   const results = sortByStart(visible.filter(hasResult), 'desc')
 
@@ -395,7 +406,7 @@ export default function Schedule() {
           renders nothing for an empty list. */}
       {tab !== 'calendar' && scopedTeams.length > 1 && (
         <div className="mb-4">
-          <TeamPills teams={scopedTeams} selected={teamFilter} onChange={setTeamFilter} />
+          <TeamPills teams={scopedTeams} selected={activeFilter} onChange={setTeamFilter} />
         </div>
       )}
 

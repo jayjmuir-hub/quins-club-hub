@@ -1,4 +1,4 @@
-import { chromium } from '/opt/node-tools/node_modules/playwright/index.mjs'
+import { loadChromium } from './playwright.mjs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
@@ -83,6 +83,7 @@ const viewports = [
 ]
 
 const results = []
+const chromium = await loadChromium()
 const browser = await chromium.launch()
 
 for (const shot of shots) {
