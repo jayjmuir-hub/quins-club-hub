@@ -29,6 +29,14 @@ export default defineConfig({
         find: /^\.\.\/lib\/memberships\.jsx$/,
         replacement: path.resolve(__dirname, 'stubs/memberships.jsx'),
       },
+      // Same trick for the two data modules Schedule/EventDetail reach
+      // Supabase through. Both screens live in src/screens/, one level below
+      // src/, so the specifier text is identical from both call sites.
+      { find: /^\.\.\/data\/events\.js$/, replacement: path.resolve(__dirname, 'stubs/events.js') },
+      {
+        find: /^\.\.\/data\/availability\.js$/,
+        replacement: path.resolve(__dirname, 'stubs/availability.js'),
+      },
     ],
   },
   server: {

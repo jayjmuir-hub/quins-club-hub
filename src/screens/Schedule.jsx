@@ -42,6 +42,12 @@ const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+// Every calendar day cell carries these, whether it renders as a <div> (no
+// events) or a <button> (has events). The flex + start-alignment tokens are
+// load-bearing, not decorative — see the comment at the cell markup.
+const CELL_LAYOUT =
+  'relative flex aspect-square items-start justify-start rounded-[9px] border p-[5px] text-left text-[12.5px] font-semibold text-[#221f1d]'
+
 // design-system.md §4.14: match = maroon, training = --sky, social = --warn.
 const DOT_COLOURS = {
   match: 'bg-quinsRed',
@@ -219,14 +225,26 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
             const dayNumber = index + 1
             const dayEvents = byDay.get(dayNumber) ?? []
             const isToday = isSameDay(new Date(year, monthIndex, dayNumber), today)
+            // CELL_LAYOUT is shared verbatim by both variants, and it is what
+            // keeps them aligned. A day with events must be a <button> for
+            // keyboard access, and Chromium's UA stylesheet lays a button's
+            // content out centred inside its box — so with only `p-[5px]` the
+            // number floated in the middle of a populated cell while its empty
+            // <div> neighbours sat top-left (measured 66px vs 8px from the top
+            // at 1280px, where the cells are 147px tall: the grid read as
+            // broken). Making every cell an explicit flex container with
+            // start alignment overrides that UA layout, so both variants place
+            // the number identically at any cell size. Do not move any of
+            // these tokens onto one branch only — tests/schedule.test.jsx
+            // asserts both variants carry all of them.
             const cellClasses = [
-              'relative aspect-square rounded-[9px] border p-[5px] text-left text-[12.5px] font-semibold text-[#221f1d]',
+              CELL_LAYOUT,
               isToday ? 'border-quinsRed shadow-[inset_0_0_0_1px_theme(colors.quinsRed)]' : 'border-[#e6e3e1]',
             ].join(' ')
 
             if (dayEvents.length === 0) {
               return (
-                <div key={dayNumber} className={cellClasses}>
+                <div key={dayNumber} data-testid="calendar-day" className={cellClasses}>
                   {dayNumber}
                 </div>
               )
@@ -236,6 +254,7 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
               <button
                 key={dayNumber}
                 type="button"
+                data-testid="calendar-day"
                 onClick={() => onSelect(dayEvents[0].id)}
                 aria-label={`${dayNumber} ${month.toLocaleDateString(undefined, { month: 'long' })}, ${dayEvents.length} ${dayEvents.length === 1 ? 'event' : 'events'}`}
                 className={`${cellClasses} transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed`}

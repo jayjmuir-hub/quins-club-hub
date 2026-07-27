@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
 import AppShell from '../src/components/AppShell.jsx'
 import Login from '../src/screens/Login.jsx'
+import Schedule from '../src/screens/Schedule.jsx'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
 import '../src/index.css'
@@ -43,17 +44,29 @@ const TEAMS = [
   { id: 't2', name: 'U14 Boys', sort_order: 6 },
 ]
 
-function Shell({ authValue, membershipValue }) {
+function Shell({ authValue, membershipValue, route = '/', children }) {
   return (
-    <MemoryRouter initialEntries={['/']}>
+    <MemoryRouter initialEntries={[route]}>
       <AuthProvider value={authValue}>
         <MembershipProvider value={membershipValue}>
-          <AppShell>
-            <Home />
-          </AppShell>
+          <AppShell>{children ?? <Home />}</AppShell>
         </MembershipProvider>
       </AuthProvider>
     </MemoryRouter>
+  )
+}
+
+const ADMIN_MEMBERSHIPS = [{ id: 'm0', role: 'admin', team_id: null, player_id: null }]
+
+function scheduleScenario(memberships) {
+  return () => (
+    <Shell
+      route="/schedule"
+      authValue={baseAuth(COACH_EMAIL)}
+      membershipValue={{ memberships, teams: TEAMS, loading: false, error: null, reload: noop }}
+    >
+      <Schedule />
+    </Shell>
   )
 }
 
@@ -96,6 +109,11 @@ const scenarios = {
       }}
     />
   ),
+
+  // Task 11 Schedule screens. Sub-tab selection and sheet opening are real
+  // component state, so Playwright drives them by clicking (see shoot.mjs).
+  schedule: scheduleScenario(COACH_MEMBERSHIPS),
+  'schedule-admin': scheduleScenario(ADMIN_MEMBERSHIPS),
 
   'shell-loading': () => (
     <Shell

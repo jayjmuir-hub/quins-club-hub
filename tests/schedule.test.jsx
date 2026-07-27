@@ -111,6 +111,14 @@ const RESULT_WIN = {
 
 const ALL_EVENTS = [RESULT_WIN, PLAYED_NO_SCORE, UPCOMING_MATCH, UPCOMING_TRAINING]
 
+// jsdom applies no CSS at all — no Tailwind, and no UA stylesheet layout
+// either — so asserting on the literal class token is the only way to make a
+// statement about how something will actually be laid out. Same helper, same
+// reasoning as tests/app-shell.test.jsx and tests/components.test.jsx.
+function hasClassToken(element, token) {
+  return element.className.split(/\s+/).includes(token)
+}
+
 function memberships(rows, teams = TEAMS) {
   return { memberships: rows, teams, loading: false, error: null, reload: vi.fn() }
 }
@@ -287,6 +295,47 @@ describe('Schedule — calendar tab', () => {
     d.setMonth(d.getMonth() + offset)
     return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
   }
+
+  // A day with events has to be a <button> for keyboard access; a day
+  // without one stays a <div>. Chromium's UA stylesheet lays a button's
+  // content out centred inside its box, so the two variants silently drifted
+  // apart vertically — populated days floated mid-cell while their empty
+  // neighbours sat top-left (measured 66px vs 8px from the cell top at
+  // 1280px). jsdom applies no UA stylesheet and computes no layout, so no
+  // rendering assertion here could ever catch that. The testable invariant
+  // is that both variants carry the same alignment classes, which is what
+  // pins the number to the same place in either.
+  it('aligns populated and empty day cells identically', async () => {
+    const today = new Date()
+    listEventsMock.mockResolvedValue([
+      {
+        ...UPCOMING_MATCH,
+        starts_at: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 17, 0).toISOString(),
+      },
+    ])
+
+    const { user } = setup()
+
+    await screen.findByText('Quins vs Dubai Exiles')
+    await user.click(screen.getByRole('button', { name: 'Calendar' }))
+
+    const cells = screen.getAllByTestId('calendar-day')
+    const populated = cells.filter((cell) => cell.tagName === 'BUTTON')
+    const empty = cells.filter((cell) => cell.tagName === 'DIV')
+
+    // Guard the guard: if the month ever rendered only one variant, the
+    // comparison below would pass vacuously.
+    expect(populated.length).toBeGreaterThan(0)
+    expect(empty.length).toBeGreaterThan(0)
+
+    // `flex` overrides the UA's centred button layout; `items-start` and
+    // `justify-start` then place the number top-left in both variants.
+    const alignmentTokens = ['relative', 'flex', 'items-start', 'justify-start', 'text-left', 'p-[5px]']
+    alignmentTokens.forEach((token) => {
+      expect(populated.every((cell) => hasClassToken(cell, token))).toBe(true)
+      expect(empty.every((cell) => hasClassToken(cell, token))).toBe(true)
+    })
+  })
 
   // The weekday-header assertions use an empty event list on purpose: a
   // fixture row's date box also renders a short weekday ("Sun"), and which
