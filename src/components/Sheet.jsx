@@ -1,0 +1,140 @@
+import { useEffect, useId, useRef } from 'react'
+
+// The single generic modal (design-system.md §4.16 .sheet + .scrim): a
+// bottom-anchored sheet on mobile, a centered dialog at the `desktop:`
+// breakpoint. Used for event detail, event add/edit, player detail, player
+// add/edit — every overlay in the app.
+//
+// No portal: this renders in place (no createPortal). The sheet is
+// `position:fixed`, which positions against the viewport regardless of
+// where it sits in the DOM tree, as long as no ancestor sets a CSS
+// `transform`/`filter`/`perspective` (any of which would turn that ancestor
+// into the fixed-positioning containing block instead). AppShell (Task 8)
+// sets none of those on any ancestor today, so a portal buys no correctness
+// here — it would only add indirection. If a future ancestor ever adopts a
+// transform (e.g. a page-transition wrapper), this assumption breaks and a
+// portal becomes necessary; flagged here so that's not a surprise.
+//
+// Accessibility (design-system.md §8 lists these as the prototype's gaps —
+// this is the "fix in the rewrite" the doc calls for):
+//   - role="dialog" aria-modal="true", labelled by the visible title
+//   - closes on Escape and on backdrop click
+//   - traps Tab/Shift+Tab focus inside the panel while open
+//   - moves focus into the panel on open, restores it to whatever had focus
+//     before opening (the trigger element) on close
+//   - renders nothing at all when closed (no hidden-but-present DOM)
+//
+// Motion: the mobile slide-up / desktop scale-fade entrance (design-
+// system.md §4.16) is implemented via the `animate-sheet-slide-up` /
+// `animate-sheet-scale-in` / `animate-scrim-fade-in` keyframes registered in
+// tailwind.config.js, each paired with `motion-reduce:animate-none`. There
+// is deliberately no matching exit animation — since the panel unmounts to
+// nothing the instant `open` goes false, an exit animation would need to
+// delay that unmount, which conflicts with the "renders nothing at all when
+// closed" requirement above. Closing is instant; opening animates.
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+export function Sheet({ open, onClose, title, children }) {
+  const titleId = useId()
+  const panelRef = useRef(null)
+  const triggerRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    // Capture whatever had focus before the sheet opened, so it can be
+    // restored on close (design-system.md §8 gap: "no focus return to the
+    // trigger element on close").
+    triggerRef.current = document.activeElement
+
+    const panel = panelRef.current
+    const focusables = panel ? Array.from(panel.querySelectorAll(FOCUSABLE_SELECTOR)) : []
+    ;(focusables[0] ?? panel)?.focus()
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        onClose()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+
+      const nodes = panel ? Array.from(panel.querySelectorAll(FOCUSABLE_SELECTOR)) : []
+      if (nodes.length === 0) {
+        event.preventDefault()
+        return
+      }
+
+      const first = nodes[0]
+      const last = nodes[nodes.length - 1]
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown, true)
+
+    // Prevent background scroll while the sheet is open (matches the
+    // prototype's body.style.overflow="hidden" behaviour).
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true)
+      document.body.style.overflow = previousOverflow
+      triggerRef.current?.focus?.()
+    }
+  }, [open, onClose])
+
+  if (!open) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(24,10,20,0.5)] backdrop-blur-[2px] animate-scrim-fade-in motion-reduce:animate-none desktop:items-center"
+      onClick={onClose}
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={(event) => event.stopPropagation()}
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] bg-white shadow-[0_6px_24px_rgba(20,20,20,0.10)] animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] desktop:w-[min(520px,94vw)] desktop:animate-sheet-scale-in desktop:rounded-[20px]"
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[#e6e3e1] bg-white px-[18px] py-4">
+          <h3 id={titleId} className="text-[18px] font-extrabold text-[#221f1d]">
+            {title}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f2edf4] text-[#221f1d] outline-none transition focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <div className="px-[18px] py-4">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+export default Sheet
