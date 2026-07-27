@@ -7,7 +7,7 @@
 **Tech Stack:** Vite · React 18 · React Router · Tailwind CSS · @supabase/supabase-js v2 · Vitest + React Testing Library (tests) · Netlify (hosting/CI).
 
 ## Global Constraints
-- **Supabase project:** ref `lusmshimxdcxpnrktlgz`, URL `https://lusmshimxdcxpnrktlgz.supabase.co`. Publishable (anon) key `sb_publishable_grr3_ko7nK-7EM6COlaFoA_opaOTa71`. Env vars only; NEVER commit the secret key. `.env` is git-ignored; `.env.example` documents the names.
+- **Supabase project:** ref `lusmshimxdcxpnrktlgz`, URL `https://lusmshimxdcxpnrktlgz.supabase.co`. Publishable (anon) key: from Supabase → Settings → API (safe to expose, but keep it in `.env`, not in tracked files). Env vars only; NEVER commit the secret key. `.env` is git-ignored; `.env.example` documents the names.
 - **Repo:** private GitHub `jayjmuir-hub/quins-club-hub`. Frequent small commits (conventional commits: `feat:`, `fix:`, `chore:`, `test:`).
 - **Brand (exact):** app name "Abu Dhabi Harlequins", tagline "Quins Club Hub", icon label "Quins". Colours: primary red `#C21F32`, green `#7DC351`, soft green `#87C97F`, dark red `#8E1526`, black `#141414`, white. Header = red→green gradient. Crest = `src/assets/crest.png` (transparent PNG built from the real club crest).
 - **Age groups (15):** U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U18 Colts, Senior Men 1st XV, Senior Men 2nd XV, Women's XV. Club id `00000000-0000-0000-0000-0000000000ad`.
