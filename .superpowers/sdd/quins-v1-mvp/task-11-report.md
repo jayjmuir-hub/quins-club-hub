@@ -395,3 +395,164 @@ Housekeeping: `.superpowers/sdd/.gitignore` was reset to `*` by tooling twice
 during this task (the regression its own comment warns about, which silently
 untracks the whole ledger). Restored from HEAD both times; not part of either
 commit.
+
+---
+
+# Fix report — Task 11 review round 2 (visual verification)
+
+**Commit:** `bf60a0d` fix: align populated and empty calendar day cells
+
+One Important defect, fixed. The three deferred rulings (Sheet's
+`env(safe-area-inset-bottom)`, the "✓ N available" count, the desktop month
+grid's 775px height) were not touched.
+
+## The defect — calendar day numbers sat at two different heights
+
+Confirmed and reproduced. A day with events has to be a `<button>` for keyboard
+access; a day without one stays a `<div>`. Chromium's UA stylesheet lays a
+button's content out centred inside its box, and the shared cell classes only set
+`p-[5px]` — nothing that overrode it. So the number dropped in populated cells
+while empty ones sat top-left. Worse at desktop, because the defect scales with
+cell height: the offset is half the leftover vertical space.
+
+The prototype used a `<div>` for every cell
+(`assets/prototype-downloads.html:597`), so this arrived with the interactive-cell
+markup rather than being inherited — my change, my regression.
+
+**Fix (`src/screens/Schedule.jsx`).** Both variants now render from a single
+module-level `CELL_LAYOUT` string that makes every cell an explicit flex
+container with `items-start justify-start`. That replaces the UA's button layout
+with one I control, so the number lands in the same place regardless of which
+element the cell is. Nothing was removed: the cell is still a real `<button>`
+with its `aria-label` and click handler when it has events. Both variants also
+carry `data-testid="calendar-day"` so the invariant is assertable.
+
+### Measured in Chromium, after the fix
+Re-ran the harness dev server and measured the day number's offset from its own
+cell's top-left, plus the dots and keyboard focus:
+
+| Width | Cell size | Populated (`<button>`) | Empty (`<div>`) | Before (reported) |
+|---|---|---|---|---|
+| 375px | 40px | top 8px, left 6px | top 8px, left 6px | 13px vs 8px |
+| 1280px | 147px | top 8px, left 6px | top 8px, left 6px | 66px vs 8px |
+
+8 populated and 23 empty cells measured in the default month at each width — all
+identical. The event dots still sit 5px from the cell's bottom-left at both widths
+(absolutely positioned children are out of flow, so the flex container doesn't
+move them), and `cell.focus()` still lands on the cell at both widths, so the
+keyboard semantics survived the fix.
+
+## The test that would have caught it
+
+`tests/schedule.test.jsx` → "aligns populated and empty day cells identically".
+
+jsdom applies no UA stylesheet and computes no layout, so no rendering or
+geometry assertion in this suite could ever have caught this — which is exactly
+why it reached visual verification. The testable invariant is the one the
+codebase already uses for responsive concerns: assert the literal class tokens.
+The test renders a month containing at least one event, splits the cells by tag,
+and asserts every cell of **both** variants carries `relative`, `flex`,
+`items-start`, `justify-start`, `text-left` and `p-[5px]`. It also asserts both
+variants are actually present first, so it can't pass vacuously on a month that
+happened to render only one kind.
+
+`hasClassToken` was added to this file, matching the helper already in
+`tests/app-shell.test.jsx` and `tests/components.test.jsx`.
+
+### Mutation checks (proving the new test bites)
+| Mutation | Result |
+|---|---|
+| `CELL_LAYOUT` reverted to the pre-fix classes (no flex/alignment) | 1 failure — "aligns populated and empty day cells identically" |
+| Alignment tokens applied to the `<button>` branch only (i.e. the two variants diverge again, silently) | 1 failure — same test |
+
+The second mutation is the important one: it is the shape a future edit would most
+plausibly take, and the test catches the divergence rather than just the absence.
+
+## Tests covering the amended code
+
+`tests/schedule.test.jsx` — 30 cases (was 29; +1 for the alignment invariant). No
+other test file's behaviour changed.
+
+### Command and output
+
+```
+$ npx vitest run tests/schedule.test.jsx
+
+ RUN  v2.1.9 /root/quins-club-hub
+
+ ✓ tests/schedule.test.jsx (30 tests) 1916ms
+
+ Test Files  1 passed (1)
+      Tests  30 passed (30)
+   Start at  17:05:27
+   Duration  3.60s (transform 273ms, setup 74ms, collect 457ms, tests 1.92s, environment 505ms, prepare 85ms)
+```
+
+```
+$ npm test
+
+ RUN  v2.1.9 /root/quins-club-hub
+
+ ✓ tests/schedule.test.jsx (30 tests) 2485ms
+ ✓ tests/components.test.jsx (38 tests) 584ms
+ ✓ tests/data.test.js (25 tests) 27ms
+ ✓ tests/scope.test.js (35 tests) 27ms
+ ✓ tests/login.test.jsx (16 tests) 1298ms
+ ✓ tests/app-shell.test.jsx (12 tests) 402ms
+ ✓ tests/auth.test.jsx (12 tests) 316ms
+ ✓ tests/require-auth.test.jsx (9 tests) 129ms
+ ✓ tests/event-format.test.js (28 tests) 47ms
+ ✓ tests/memberships.test.jsx (7 tests) 186ms
+ ✓ tests/app.test.jsx (6 tests) 224ms
+ ✓ tests/nav.test.jsx (6 tests) 254ms
+ ✓ tests/supabase.test.js (4 tests) 66ms
+
+ Test Files  13 passed (13)
+      Tests  228 passed (228)
+   Start at  17:07:20
+   Duration  21.89s (transform 677ms, setup 933ms, collect 2.56s, tests 6.04s, environment 7.34s, prepare 1.11s)
+```
+
+```
+$ npm run build
+dist/assets/crest-BPS7q37W.png  148.21 kB
+dist/assets/index-BNf3XKmG.css   23.17 kB │ gzip:   5.41 kB
+dist/assets/index-BKPtMCMi.js   419.32 kB │ gzip: 119.69 kB
+✓ built in 3.57s
+```
+
+228 passed / 13 files, up from 227. Nothing regressed; output clean, no warnings
+and no `act()` noise.
+
+## Housekeeping (same commit)
+- `screenshots` added to `.gitignore`; `git rm -r --cached screenshots` removed the
+  10 previously-tracked PNGs (~1 MB) from the index. Files remain on disk.
+- Harness kept tracked and committed, including the additions that produced this
+  finding: `harness/shoot-schedule.mjs`, `harness/stubs/events.js`,
+  `harness/stubs/availability.js`, and the `harness/main.jsx` /
+  `harness/vite.config.js` modifications. The next task re-runs the same check
+  with `npx vite --config harness/vite.config.js` then
+  `node harness/shoot-schedule.mjs`.
+
+## Files changed in this round
+- `src/screens/Schedule.jsx` — shared `CELL_LAYOUT`; `data-testid` on both cell variants
+- `tests/schedule.test.jsx` — alignment invariant test + `hasClassToken` helper
+- `.gitignore` — ignore `screenshots`
+- `harness/*` — committed as-is (coordinator's visual-check tooling)
+- `screenshots/*.png` — untracked (files kept on disk)
+
+## Concerns
+None outstanding on the code. Two process notes:
+
+1. **This class is of defect is invisible to the whole test suite.** The fix and its
+   test pin one specific instance; the general risk — a `<button>` used as a layout
+   box inheriting UA centring — applies anywhere else the app makes a non-text
+   element interactive. The fixture rows in this screen are also `<button>`s, but
+   they set `flex items-center` explicitly, so they are fine. Worth watching in
+   Tasks 12/13, which will follow this screen's patterns.
+2. **`.superpowers/sdd/.gitignore` has now been reset to `*` by tooling three times**
+   across this task (twice during my work, once during the visual check). Each reset
+   silently untracks the entire build ledger. I restored it from HEAD again before
+   committing and confirmed the `*` version is not in any of my commits, but
+   something is rewriting it repeatedly and it will eventually land in someone's
+   commit unnoticed.
