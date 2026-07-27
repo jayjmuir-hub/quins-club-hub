@@ -103,6 +103,20 @@ describe('visibleTeams', () => {
     expect(visibleTeams(memberships, null)).toEqual([])
     expect(visibleTeams(memberships, undefined)).toEqual([])
   })
+
+  it('sorts deterministically even when a team is missing sort_order', () => {
+    // Regression: a.sort_order - b.sort_order is NaN if either side is
+    // null/undefined, which comparator functions handle inconsistently.
+    // (a.sort_order ?? 0) - (b.sort_order ?? 0) keeps the result numeric.
+    const teamWithoutOrder = { id: 'team-no-order', club_id: 'club-1', name: 'Mystery XV' }
+    const teams = [U12, teamWithoutOrder, U6]
+    const memberships = [membership({ role: 'admin', team_id: null })]
+
+    const result = visibleTeams(memberships, teams)
+
+    // teamWithoutOrder falls back to sort_order 0, before U6 (1) and U12 (7).
+    expect(result.map((t) => t.id)).toEqual([teamWithoutOrder.id, U6.id, U12.id])
+  })
 })
 
 describe('canEditTeam', () => {
@@ -152,6 +166,32 @@ describe('canEditTeam', () => {
     expect(canEditTeam([], U6.id)).toBe(false)
     expect(canEditTeam(null, U6.id)).toBe(false)
     expect(canEditTeam(undefined, U6.id)).toBe(false)
+  })
+
+  it('is true for an admin on a real team id, but false for an admin on a null teamId', () => {
+    const memberships = [membership({ role: 'admin', team_id: null })]
+
+    expect(canEditTeam(memberships, U12.id)).toBe(true)
+    expect(canEditTeam(memberships, null)).toBe(false)
+  })
+
+  it('is false for a null or undefined teamId even for an admin or coach', () => {
+    const adminMemberships = [membership({ role: 'admin', team_id: null })]
+    const coachMemberships = [membership({ role: 'coach', team_id: U12.id })]
+
+    expect(canEditTeam(adminMemberships, null)).toBe(false)
+    expect(canEditTeam(adminMemberships, undefined)).toBe(false)
+    expect(canEditTeam(coachMemberships, null)).toBe(false)
+    expect(canEditTeam(coachMemberships, undefined)).toBe(false)
+  })
+
+  it('does not let a malformed coach row with team_id null match a null teamId', () => {
+    // Regression: m.team_id === teamId would be true if both sides were
+    // null. Coach rows always carry a real team_id in production, but the
+    // helper must not rely on that — the null-teamId guard closes this off.
+    const memberships = [membership({ role: 'coach', team_id: null })]
+
+    expect(canEditTeam(memberships, null)).toBe(false)
   })
 })
 
@@ -209,6 +249,21 @@ describe('roleLabel', () => {
     const memberships = [membership({ role: 'player', team_id: U8.id, player_id: 'player-1' })]
 
     expect(roleLabel(memberships)).toBe('Player')
+  })
+
+  it('returns Parent for a parent+player holder (parent outranks player)', () => {
+    const memberships = [
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1' }),
+      membership({ role: 'player', team_id: U16.id, player_id: 'player-self-1' }),
+    ]
+
+    expect(roleLabel(memberships)).toBe('Parent')
+  })
+
+  it('falls back to "No access yet" when the only role value is unrecognised', () => {
+    const memberships = [membership({ role: 'treasurer', team_id: null, player_id: null })]
+
+    expect(roleLabel(memberships)).toBe('No access yet')
   })
 
   it('returns "No access yet" for empty, null, or undefined memberships', () => {

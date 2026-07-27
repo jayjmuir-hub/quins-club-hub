@@ -37,7 +37,11 @@ export function visibleTeams(memberships, allTeams) {
 
   const sorted = (teams) =>
     [...teams].sort((a, b) => {
-      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order
+      // Defensive: sort_order is NOT NULL in the schema, but a bad/partial
+      // team record would otherwise turn this into NaN, which comparator
+      // functions handle inconsistently across engines.
+      const orderDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      if (orderDiff !== 0) return orderDiff
       return a.name.localeCompare(b.name)
     })
 
@@ -52,9 +56,19 @@ export function visibleTeams(memberships, allTeams) {
 /**
  * True if the given memberships grant edit rights on teamId: admins can edit
  * any team, coaches can edit only the teams they coach. Parents and players
- * can never edit.
+ * can never edit. A null/undefined teamId always returns false, even for an
+ * admin — see the guard comment below for why.
  */
 export function canEditTeam(memberships, teamId) {
+  // Guard first, before the admin short-circuit: a null/undefined teamId
+  // means "we don't know which team" (an unresolved or not-yet-loaded id),
+  // and the safe answer to "may I edit an unknown team?" is no — even for
+  // an admin. This also blocks m.team_id === teamId from matching when both
+  // sides happen to be null (e.g. a malformed coach row with no team_id).
+  // events.team_id and players.team_id are both NOT NULL in the schema, so
+  // no real record can reach this path — only a bug or a partial load can,
+  // and denying is the right call in both cases. Do not remove this guard.
+  if (teamId == null) return false
   if (!memberships) return false
   if (isAdmin(memberships)) return true
   return memberships.some((m) => m.role === 'coach' && m.team_id === teamId)
