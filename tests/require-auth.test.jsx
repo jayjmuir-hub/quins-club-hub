@@ -14,7 +14,12 @@ vi.mock('../src/lib/auth.jsx', () => ({
 }))
 
 vi.mock('../src/screens/Login.jsx', () => ({
-  default: () => <div>Login screen stub</div>,
+  default: ({ authError }) => (
+    <div>
+      Login screen stub
+      {authError && <div data-testid="passed-auth-error">{authError}</div>}
+    </div>
+  ),
 }))
 
 // Import after vi.mock so this binds to the mocked modules.
@@ -51,6 +56,7 @@ describe('RequireAuth', () => {
 
     expect(screen.getByText('Login screen stub')).toBeInTheDocument()
     expect(screen.queryByText('Protected content')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('passed-auth-error')).not.toBeInTheDocument()
   })
 
   it('renders children when a session is present', () => {
@@ -67,7 +73,7 @@ describe('RequireAuth', () => {
   })
 })
 
-describe('RequireAuth fragment cleanup', () => {
+describe('RequireAuth access_token cleanup (success path, needs a session)', () => {
   it('strips an #access_token fragment once a session is present, preserving path and query', () => {
     window.history.pushState({}, '', '/schedule?foo=bar#access_token=abc123&type=magiclink')
     useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
@@ -80,20 +86,6 @@ describe('RequireAuth fragment cleanup', () => {
 
     expect(window.location.pathname).toBe('/schedule')
     expect(window.location.search).toBe('?foo=bar')
-    expect(window.location.hash).toBe('')
-  })
-
-  it('strips an #error_description fragment once a session is present, preserving path', () => {
-    window.history.pushState({}, '', '/?error_description=denied')
-    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
-
-    render(
-      <RequireAuth>
-        <div>Protected content</div>
-      </RequireAuth>,
-    )
-
-    expect(window.location.pathname).toBe('/')
     expect(window.location.hash).toBe('')
   })
 
@@ -110,8 +102,44 @@ describe('RequireAuth fragment cleanup', () => {
     expect(window.location.pathname).toBe('/roster')
     expect(window.location.hash).toBe('#section-2')
   })
+})
 
-  it('does not touch the hash while there is no session yet', () => {
+describe('RequireAuth auth error capture (failure path, no session ever exists)', () => {
+  it('captures and decodes an error_description fragment with no session, passes it to Login, and strips the hash', () => {
+    window.history.pushState(
+      {},
+      '',
+      '/?redirect=1#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid%20or+has+expired',
+    )
+    useAuthMock.mockReturnValue({ session: null, loading: false })
+
+    render(
+      <RequireAuth>
+        <div>Protected content</div>
+      </RequireAuth>,
+    )
+
+    // Asserts both '+' and '%20' decode to spaces (URLSearchParams handles
+    // form-encoding correctly; manual decodeURIComponent would leave '+' as
+    // a literal plus sign).
+    expect(screen.getByTestId('passed-auth-error')).toHaveTextContent(
+      'Email link is invalid or has expired',
+    )
+    expect(window.location.pathname).toBe('/')
+    expect(window.location.search).toBe('?redirect=1')
+    expect(window.location.hash).toBe('')
+  })
+
+  it('leaves an access_token-only hash alone when there is no error and no session yet', () => {
+    // This replaces a pre-fix version of this test that asserted the same
+    // outcome for a different, now-incorrect reason: "nothing is ever
+    // cleared without a session". That's no longer true — error fragments
+    // ARE captured and cleared with no session, by design (see the describe
+    // block above). This test now exists to confirm a *different* fragment
+    // shape, one with no error_description at all, is correctly left alone
+    // by both effects: the error-capture effect finds no error_description
+    // to act on, and the access_token cleanup effect requires a session,
+    // which doesn't exist yet.
     window.history.pushState({}, '', '/#access_token=abc123')
     useAuthMock.mockReturnValue({ session: null, loading: false })
 

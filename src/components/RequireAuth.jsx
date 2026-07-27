@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
 import Login from '../screens/Login.jsx'
 
@@ -8,22 +8,47 @@ import Login from '../screens/Login.jsx'
 // place rather than redirecting to a /login route, so a magic-link recipient
 // landing on any deep URL still lands correctly after sign-in.
 //
-// It also does the one piece of URL cleanup this app needs: supabase-js
+// It also does the URL cleanup this app needs. supabase-js
 // (detectSessionInUrl: true) consumes the magic-link/OAuth token from the URL
 // fragment itself and fires onAuthStateChange — this component never parses
-// or exchanges tokens. Once a session is established, if a leftover
-// #access_token=... or #error_description=... fragment is still in the
-// address bar, it's stripped with replaceState (not pushState, so no extra
-// history entry) so it isn't left visible or bookmarkable.
+// or exchanges tokens. Two distinct fragment shapes need handling, and they
+// can't share one condition because one requires a session and the other
+// requires the *absence* of one:
+//
+// - Success: a #access_token=... fragment, cleared once a session exists
+//   (supabase-js needed it to still be there to consume).
+// - Failure: an expired/invalid magic link or a declined OAuth attempt never
+//   produces a session, so Supabase instead leaves an
+//   #error=...&error_description=... fragment. That has to be read
+//   regardless of session state (there will never be one), captured so
+//   Login can explain what happened, and then cleared.
 
 export default function RequireAuth({ children }) {
   const { session, loading } = useAuth()
+  const [authError, setAuthError] = useState(null)
 
+  // Capture and clear a failed-attempt error from the URL fragment. Runs
+  // once on mount rather than depending on session, since a failed attempt
+  // never establishes one.
+  useEffect(() => {
+    const hash = window.location.hash
+    if (!hash) return
+
+    const params = new URLSearchParams(hash.slice(1))
+    const description = params.get('error_description')
+    if (!description) return
+
+    setAuthError(description)
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+  }, [])
+
+  // Clear the successful-attempt token fragment once supabase-js has
+  // consumed it and a session exists.
   useEffect(() => {
     if (!session) return
 
     const hash = window.location.hash
-    if (hash.includes('access_token') || hash.includes('error_description')) {
+    if (hash.includes('access_token')) {
       window.history.replaceState(
         null,
         '',
@@ -44,7 +69,7 @@ export default function RequireAuth({ children }) {
   }
 
   if (!session) {
-    return <Login />
+    return <Login authError={authError} />
   }
 
   return children

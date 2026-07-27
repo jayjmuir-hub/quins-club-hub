@@ -147,3 +147,62 @@ describe('Login screen', () => {
     expect(alert).toHaveTextContent('oauth misconfigured')
   })
 })
+
+describe('Login screen authError prop', () => {
+  // authError is what RequireAuth passes in when the visitor arrived via a
+  // failed magic-link/OAuth redirect (e.g. an expired link). It shares the
+  // same alert region as the screen's own errors rather than a second one.
+
+  it('renders a passed-in authError in the alert region, prefixed for clarity', () => {
+    render(<Login authError="Email link is invalid or has expired" />)
+
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent("That sign-in link didn't work")
+    expect(alert).toHaveTextContent('Email link is invalid or has expired')
+  })
+
+  it('does not render an alert when there is no authError and no local error', () => {
+    render(<Login />)
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('clears the passed-in authError once the user requests a new link by email', async () => {
+    signInWithEmail.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<Login authError="Email link is invalid or has expired" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent("didn't work")
+
+    await user.type(screen.getByLabelText(/email/i), 'jay@example.com')
+    await user.click(screen.getByRole('button', { name: /email me a link/i }))
+
+    expect(await screen.findByText(/check your email/i)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('clears the passed-in authError once the user retries with Google', async () => {
+    signInWithGoogle.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<Login authError="Email link is invalid or has expired" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent("didn't work")
+
+    await user.click(screen.getByRole('button', { name: /continue with google/i }))
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  })
+
+  it('does not resurrect the passed-in authError alongside a fresh error from a failed retry', async () => {
+    signInWithEmail.mockRejectedValue(new Error('rate limited'))
+    const user = userEvent.setup()
+    render(<Login authError="Email link is invalid or has expired" />)
+
+    await user.type(screen.getByLabelText(/email/i), 'jay@example.com')
+    await user.click(screen.getByRole('button', { name: /email me a link/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('rate limited')
+    expect(alert).not.toHaveTextContent("didn't work")
+  })
+})

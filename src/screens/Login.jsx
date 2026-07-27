@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
 import crest from '../assets/crest.png'
 
@@ -6,19 +6,34 @@ import crest from '../assets/crest.png'
 // No router dependency (renders standalone) and no sign-up, password,
 // "remember me", extra social providers, or membership/role logic — those
 // are explicitly out of scope for this screen.
+//
+// `authError` is optional: RequireAuth passes it in when the visitor arrived
+// via a failed magic-link/OAuth redirect (e.g. an expired link), so this
+// screen can explain why they're back here instead of showing a blank form.
+// It shares the same alert region as this screen's own errors, and is
+// cleared the moment the user starts a fresh attempt so it can't reappear
+// alongside (or instead of) a new error.
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export default function Login() {
+export default function Login({ authError = null }) {
   const { signInWithEmail, signInWithGoogle } = useAuth()
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState('idle') // 'idle' | 'sending' | 'sent'
   const [error, setError] = useState(null)
+  const [staleAuthError, setStaleAuthError] = useState(authError)
+
+  useEffect(() => {
+    setStaleAuthError(authError)
+  }, [authError])
 
   const sending = status === 'sending'
+  const displayedError =
+    error ?? (staleAuthError ? `That sign-in link didn't work: ${staleAuthError}` : null)
 
   async function handleEmailSubmit(event) {
     event.preventDefault()
+    setStaleAuthError(null)
 
     const trimmed = email.trim()
     if (!trimmed || !EMAIL_PATTERN.test(trimmed)) {
@@ -38,6 +53,7 @@ export default function Login() {
   }
 
   async function handleGoogleClick() {
+    setStaleAuthError(null)
     setError(null)
     setStatus('sending')
     try {
@@ -86,12 +102,12 @@ export default function Login() {
           </div>
         ) : (
           <form className="mt-6" onSubmit={handleEmailSubmit} noValidate>
-            {error && (
+            {displayedError && (
               <p
                 role="alert"
                 className="mb-4 rounded-[11px] bg-[#fbeae8] px-3 py-2 text-sm font-semibold text-quinsRedDark"
               >
-                {error}
+                {displayedError}
               </p>
             )}
 
