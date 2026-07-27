@@ -12,6 +12,10 @@
 
 const T1 = 't1' // U12 Boys
 const T2 = 't2' // U14 Boys
+// Third age group, added for the independent controller-side verification
+// pass: the age-group grouping needs more than two groups on screen to be
+// judged fairly, and a third pill exercises the pill row's overflow at 375px.
+const T3 = 't3' // U16 Boys
 
 const P = (id, team_id, full_name, jersey_num, position, is_captain = false) => ({
   id,
@@ -46,6 +50,15 @@ export const PLAYERS = [
   P('p18', T2, 'Rohan Chatterjee', 11, 'Wing'),
   P('p19', T2, 'Samuel Adeyemi-Johnson', 13, 'Centre'),
   P('p20', T2, 'Tariq Hussein', null, 'Utility'),
+
+  // U16 Boys — third age group. Includes a captain, a numberless player, and
+  // a deliberately long name/position pair to stress the 375px row.
+  P('p21', T3, 'Alexander Vandenberg-Whitmore', 2, 'Hooker'),
+  P('p22', T3, 'Yusuf Abdurrahman', 4, 'Lock'),
+  P('p23', T3, 'Zane Kowalczyk', 8, 'Number 8', true),
+  P('p24', T3, 'Christopher Oyelaran', 10, 'Fly-half'),
+  P('p25', T3, 'Devan Sivaraman', 14, 'Wing'),
+  P('p26', T3, 'Emre Yıldırım', null, 'Utility back / hooker cover'),
 ]
 
 export async function listPlayers({ teamIds } = {}) {
@@ -57,7 +70,17 @@ export async function listPlayers({ teamIds } = {}) {
   return [...rows].sort((a, b) => a.full_name.localeCompare(b.full_name))
 }
 
+// Real Supabase latency (UAE -> ap-northeast-1 Tokyo) is a few hundred ms;
+// the stub resolving on a microtask hides whatever the loading leg renders.
+// ?contactDelay=<ms> makes that leg screenshot-able — which is how the
+// "contact block announces itself and then collapses" defect was confirmed
+// fixed rather than only asserted in jsdom.
+const CONTACT_DELAY = Number(new URLSearchParams(window.location.search).get('contactDelay') || 0)
+
 export async function getPlayerContact(playerId) {
+  if (CONTACT_DELAY > 0) {
+    await new Promise((resolve) => setTimeout(resolve, CONTACT_DELAY))
+  }
   // p4 stands in for the RLS-withheld case: a parent asking about a player
   // they aren't linked to gets no row back, and the sheet must show nothing
   // at all about contact details.

@@ -431,6 +431,22 @@ describe('Roster — player rows', () => {
   })
 })
 
+describe('Roster — contrast', () => {
+  // --muted (#77726e) is specified against a card, where it clears AA. The
+  // group headers and the section-head sub-line sit on --paper (#f5f4f3),
+  // where that pair measures 4.329:1 and fails. jsdom applies no CSS, so the
+  // class token is the only thing that can be asserted here; the ratio itself
+  // was computed separately (see the note in Roster.jsx).
+  it('darkens muted text that sits on the page background, not on a card', async () => {
+    setup()
+
+    await screen.findByText('Tom Fletcher')
+    const header = screen.getAllByTestId('group-label')[0].parentElement
+    expect(hasClassToken(header, 'text-[#5c5854]')).toBe(true)
+    expect(hasClassToken(header, 'text-[#77726e]')).toBe(false)
+  })
+})
+
 describe('Roster — scope note', () => {
   it('tells a coach which squads they are seeing', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
@@ -525,6 +541,11 @@ describe('PlayerDetail — contact details', () => {
     expect(await within(dialog).findByText('Captain')).toBeInTheDocument()
     expect(within(dialog).queryByText(/contact/i)).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/hidden/i)).not.toBeInTheDocument()
+    // The Call/Email row lives inside the contact block, so it must go with
+    // it — offering to phone a player whose contact row RLS withheld would be
+    // the leak this screen exists to prevent.
+    expect(within(dialog).queryByRole('link', { name: 'Call' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/phone/i)).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/email/i)).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
@@ -538,6 +559,54 @@ describe('PlayerDetail — contact details', () => {
 
     expect(await within(dialog).findByRole('link', { name: 'a@example.com' })).toBeInTheDocument()
     expect(within(dialog).queryByText('Phone')).not.toBeInTheDocument()
+  })
+
+  // While the query is in flight the block must render NOTHING. A spinner
+  // here drew a box exactly where contact details go and then collapsed on a
+  // null row, and Spinner is role="status" in an aria-live region — so a
+  // parent heard "Loading contact details…" and then silence.
+  it('renders nothing at all while the contact query is in flight', async () => {
+    getPlayerContactMock.mockReturnValue(new Promise(() => {}))
+
+    const { user } = setup()
+    const dialog = await openTom(user)
+
+    // The rest of the sheet is already on screen...
+    expect(within(dialog).getByText('Captain')).toBeInTheDocument()
+    // ...but the contact block announces nothing while it waits.
+    expect(within(dialog).queryByRole('status')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/contact/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/loading/i)).not.toBeInTheDocument()
+  })
+
+  it('offers Call and Email actions for the values that exist', async () => {
+    getPlayerContactMock.mockResolvedValue({
+      player_id: 'p-flanker',
+      phone: '+971 50 200 1000',
+      email: 'tom.fletcher@example.com',
+    })
+
+    const { user } = setup()
+    const dialog = await openTom(user)
+
+    expect(await within(dialog).findByRole('link', { name: 'Call' })).toHaveAttribute(
+      'href',
+      'tel:+971502001000',
+    )
+    expect(within(dialog).getByRole('link', { name: 'Email' })).toHaveAttribute(
+      'href',
+      'mailto:tom.fletcher@example.com',
+    )
+  })
+
+  it('omits the Call action when there is no phone number', async () => {
+    getPlayerContactMock.mockResolvedValue({ player_id: 'p-flanker', phone: null, email: 'a@example.com' })
+
+    const { user } = setup()
+    const dialog = await openTom(user)
+
+    expect(await within(dialog).findByRole('link', { name: 'Email' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('link', { name: 'Call' })).not.toBeInTheDocument()
   })
 
   it('reports a failed contact query in an alert', async () => {

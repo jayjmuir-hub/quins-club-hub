@@ -45,6 +45,17 @@ const TEAMS = [
   { id: 't2', name: 'U14 Boys', sort_order: 6 },
 ]
 
+// Three-age-group variants, added for the independent controller-side
+// verification pass. Two groups is the minimum that makes the age-group
+// branch fire at all; three is what it actually looks like in the club, and
+// it is what puts enough pills in the row to test the 375px overflow.
+const COACH_THREE_MEMBERSHIPS = [
+  { id: 'm1', role: 'coach', team_id: 't1', player_id: null },
+  { id: 'm2', role: 'coach', team_id: 't2', player_id: null },
+  { id: 'm3', role: 'coach', team_id: 't3', player_id: null },
+]
+const TEAMS_THREE = [...TEAMS, { id: 't3', name: 'U16 Boys', sort_order: 8 }]
+
 function Shell({ authValue, membershipValue, route = '/', children }) {
   return (
     <MemoryRouter initialEntries={[route]}>
@@ -71,12 +82,12 @@ function scheduleScenario(memberships) {
   )
 }
 
-function rosterScenario(memberships) {
+function rosterScenario(memberships, teams = TEAMS) {
   return () => (
     <Shell
       route="/roster"
       authValue={baseAuth(COACH_EMAIL)}
-      membershipValue={{ memberships, teams: TEAMS, loading: false, error: null, reload: noop }}
+      membershipValue={{ memberships, teams, loading: false, error: null, reload: noop }}
     >
       <Roster />
     </Shell>
@@ -139,6 +150,9 @@ const scenarios = {
   roster: rosterScenario(COACH_MEMBERSHIPS),
   'roster-one-team': rosterScenario(COACH_ONE_TEAM),
   'roster-admin': rosterScenario(ADMIN_MEMBERSHIPS),
+
+  // Independent verification pass: three age groups in scope.
+  'roster-three': rosterScenario(COACH_THREE_MEMBERSHIPS, TEAMS_THREE),
 
   'shell-loading': () => (
     <Shell

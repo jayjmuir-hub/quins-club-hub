@@ -49,6 +49,16 @@ const CELL_LAYOUT =
   'relative flex aspect-square items-start justify-start rounded-[9px] border p-[5px] text-left text-[12.5px] font-semibold text-[#221f1d]'
 
 // design-system.md §4.14: match = maroon, training = --sky, social = --warn.
+// design-system.md's --muted (#77726e) is specified against a card, where it
+// measures 4.755:1 on white and clears AA. This screen's section-head
+// sub-line sits OUTSIDE any card, on --paper (#f5f4f3), where the same pair
+// measures 4.329:1 and fails the 4.5:1 threshold. Darkened to #5c5854
+// (6.417:1 on paper) — the same value Roster.jsx uses for the same reason,
+// and the one Chip/Badge already use for --muted on a light fill. --muted
+// inside a card (the fixture rows, the calendar weekday headers) is
+// untouched.
+const MUTED_ON_PAPER = 'text-[#5c5854]'
+
 const DOT_COLOURS = {
   match: 'bg-quinsRed',
   training: 'bg-[#3E9C4F]',
@@ -389,7 +399,7 @@ export default function Schedule() {
 
       <div className="mb-3.5 mt-1">
         <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Schedule &amp; fixtures</h2>
-        <p className="text-[13px] font-medium text-[#77726e]">{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
+        <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
       </div>
 
       <div className="mb-3 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

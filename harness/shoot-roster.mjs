@@ -54,6 +54,20 @@ const shots = [
   { file: 'admin', scenario: 'roster-admin', steps: async () => {} },
   // p7 Gabriel Santos has a contact row -> full contact block.
   { file: 'detail-contact', scenario: 'roster', viewportOnly: true, steps: openPlayer('Gabriel Santos') },
+  // The in-flight state, held open by a 3s stub delay: the contact block must
+  // render NOTHING while it waits — no spinner, no heading, no reserved box —
+  // rather than announcing itself and then collapsing on a null row.
+  {
+    file: 'detail-contact-inflight',
+    scenario: 'roster',
+    query: '&contactDelay=3000',
+    viewportOnly: true,
+    steps: async (page) => {
+      await page.locator('[data-testid="player-row"]', { hasText: 'Gabriel Santos' }).first().click()
+      await page.getByRole('dialog').waitFor()
+      await page.waitForTimeout(500)
+    },
+  },
   // p4 Dhruv Ramachandran is the captain AND the RLS-withheld contact case:
   // the sheet must show the Role row and absolutely nothing about contact.
   { file: 'detail-no-contact', scenario: 'roster', viewportOnly: true, steps: openPlayer('Dhruv Ramachandran') },
@@ -80,7 +94,7 @@ for (const shot of shots) {
     })
     page.on('pageerror', (err) => pageErrors.push(err.message))
 
-    await page.goto(`${BASE}/?scenario=${shot.scenario}`, { waitUntil: 'networkidle' })
+    await page.goto(`${BASE}/?scenario=${shot.scenario}${shot.query ?? ''}`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(250)
     await shot.steps(page)
     await page.waitForTimeout(200)
@@ -117,6 +131,23 @@ for (const shot of shots) {
         rowCount: document.querySelectorAll('[data-testid="player-row"]').length,
         rows,
         dialogText: dialog ? dialog.innerText.replace(/\n+/g, ' | ') : null,
+        dialogHeight: dialog ? Math.round(dialog.getBoundingClientRect().height) : null,
+        dialogBottomGap: dialog
+          ? Math.round(window.innerHeight - dialog.getBoundingClientRect().bottom)
+          : null,
+        liveRegions: dialog
+          ? [...dialog.querySelectorAll('[role="status"],[role="alert"]')].map(
+              (el) => el.getAttribute('aria-label') || el.textContent,
+            )
+          : [],
+        lastLinkGap: dialog
+          ? (() => {
+              const links = [...dialog.querySelectorAll('a')]
+              if (!links.length) return null
+              const last = links[links.length - 1].getBoundingClientRect()
+              return Math.round(window.innerHeight - last.bottom)
+            })()
+          : null,
       }
     })
 

@@ -156,7 +156,17 @@ export function Sheet({ open, onClose, title, children }) {
             </svg>
           </button>
         </div>
-        <div className="px-[18px] py-4">{children}</div>
+        {/* Bottom padding adds env(safe-area-inset-bottom) on top of the
+            base 16px (design-system.md §3: "tab bar and FAB bottom offsets
+            add env(safe-area-inset-bottom)" — the same treatment AppShell's
+            <main> and Nav's tab bar already use). On a mobile sheet the
+            panel's bottom edge sits flush with the viewport bottom, so
+            without this the last row of content — a contact link, or the
+            Save button on every add/edit form from Task 14 onward — lands
+            inside an iPhone's home-indicator zone, where it is both hard to
+            read and hard to tap. The inset resolves to 0 on every device
+            that has no such zone, so this costs nothing elsewhere. */}
+        <div className="px-[18px] pb-[calc(16px+env(safe-area-inset-bottom))] pt-4">{children}</div>
       </div>
     </div>
   )

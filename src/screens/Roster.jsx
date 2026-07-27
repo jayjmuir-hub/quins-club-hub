@@ -34,6 +34,17 @@ const FORWARDS = ['Prop', 'Hooker', 'Lock', 'Flanker', 'Number 8']
 const BACKS = ['Scrum-half', 'Fly-half', 'Centre', 'Wing', 'Fullback']
 const POSITION_GROUP_ORDER = ['Forwards', 'Backs', 'Other']
 
+// design-system.md's --muted (#77726e) is specified against a card, where it
+// measures 4.755:1 on white and clears AA. The section head and the group
+// headers sit OUTSIDE any card, on --paper (#f5f4f3), where the same pair
+// measures 4.329:1 and fails the 4.5:1 threshold (both ratios recomputed for
+// this change rather than taken on trust). Darkened here to #5c5854 —
+// 6.417:1 on paper — which is already this project's answer wherever --muted
+// lands on a light fill (Chip's and Badge's neutral variants use exactly this
+// value), so it introduces no new colour. --muted inside a card is untouched:
+// the player row's "Flanker · U10" meta line still uses it.
+const MUTED_ON_PAPER = 'text-[#5c5854]'
+
 function positionGroup(position) {
   if (FORWARDS.includes(position)) return 'Forwards'
   if (BACKS.includes(position)) return 'Backs'
@@ -126,7 +137,7 @@ function PlayerRow({ player, teamName, onSelect }) {
 function RosterGroup({ label, players, teamsById, onSelect }) {
   return (
     <div className="mb-4 last:mb-0">
-      <h3 className="mb-2 flex items-center gap-2 text-[12.5px] font-extrabold uppercase tracking-[.5px] text-[#77726e]">
+      <h3 className={`mb-2 flex items-center gap-2 text-[12.5px] font-extrabold uppercase tracking-[.5px] ${MUTED_ON_PAPER}`}>
         <span data-testid="group-label">{label}</span>
         <span
           data-testid="group-count"
@@ -287,7 +298,7 @@ export default function Roster() {
         <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Roster &amp; members</h2>
         {/* Describes the scope, not the current filter — the per-group counts
             below already report what the search and pills leave. */}
-        <p className="text-[13px] font-medium text-[#77726e]">
+        <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
           {players.length} {players.length === 1 ? 'player' : 'players'} · {scopeSummary}
         </p>
       </div>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
-import Spinner from '../components/Spinner.jsx'
 import { getPlayerContact } from '../data/players.js'
 
 // The player detail sheet (design-system.md §5.7): a branded hero carrying
@@ -40,6 +39,33 @@ function telHref(phone) {
   return `tel:${String(phone).replace(/\s+/g, '')}`
 }
 
+// design-system.md §3: .btn is padding 10px 15px, radius 11px, 14px/700 —
+// filled maroon for the primary action, --maroon text on white for the ghost
+// variant (#C21F32 on white measures 5.94:1, clearing AA). Hover on the
+// filled variant is --magenta #D62A3D, the same pairing Empty and the retry
+// buttons already use.
+const ACTION_BASE =
+  'flex flex-1 items-center justify-center gap-2 rounded-[11px] px-[15px] py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2'
+const PRIMARY_ACTION = `${ACTION_BASE} bg-quinsRed text-white hover:bg-[#D62A3D]`
+const GHOST_ACTION = `${ACTION_BASE} border border-[#e6e3e1] bg-white text-quinsRed hover:bg-[#faf8fb]`
+
+function PhoneIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 5.5 5.5L16 12l4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 6.2 2 2 0 0 1 6 4Z" />
+    </svg>
+  )
+}
+
+function MailIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3.5 6.5 8.5 6 8.5-6" />
+    </svg>
+  )
+}
+
 function ContactBlock({ playerId }) {
   const [contact, setContact] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -74,13 +100,15 @@ function ContactBlock({ playerId }) {
     }
   }, [playerId])
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-6">
-        <Spinner label="Loading contact details…" />
-      </div>
-    )
-  }
+  // Nothing at all while the query is in flight — the block simply appears
+  // late rather than announcing itself and then collapsing. A spinner here
+  // drew a ~68px box exactly where contact details belong and then vanished
+  // on a null row; worse, Spinner is role="status" inside an aria-live
+  // region, so a parent heard "Loading contact details…" followed by silence.
+  // (It was never a leak — this renders before the outcome is known, so it
+  // looked identical for a player with details and one without — but it
+  // contradicted this file's own "renders nothing" contract.)
+  if (loading) return null
 
   if (error) {
     return (
@@ -110,6 +138,27 @@ function ContactBlock({ playerId }) {
           </a>
         </KeyValue>
       )}
+
+      {/* The Call/Email action row (design-system.md §5.7), under the contact
+          rows. Deliberately inside this block and not below it, so it cannot
+          survive the early return above — an action row offering to phone a
+          player whose contact row RLS withheld would be exactly the leak this
+          file exists to prevent. Each button appears only if its value does.
+          Anchors, not buttons: these navigate to a tel:/mailto: URL. */}
+      <div className="mt-3.5 flex gap-2">
+        {contact.phone && (
+          <a href={telHref(contact.phone)} className={PRIMARY_ACTION}>
+            <PhoneIcon className="h-4 w-4" aria-hidden="true" />
+            Call
+          </a>
+        )}
+        {contact.email && (
+          <a href={`mailto:${contact.email}`} className={GHOST_ACTION}>
+            <MailIcon className="h-4 w-4" aria-hidden="true" />
+            Email
+          </a>
+        )}
+      </div>
     </div>
   )
 }

@@ -358,3 +358,164 @@ The jersey number's `aria-hidden` (Task 22 accessibility pass), the
 section-head denominator, the "No players match" copy when a pill rather than
 the search caused the zero, and the missing test for the
 removed-player-closes-the-sheet guarantee.
+
+---
+
+# Task 12 fix report — review round 2
+
+Four ruled items plus the one-file-over housekeeping catch. All fixed, each
+covered by a test, each mutation-checked, and the two that were found in a
+browser re-verified in a browser.
+
+## 1. Important — the contact block announced itself while loading
+
+`PlayerDetail.jsx` rendered a `Spinner` in a ~68px block while
+`getPlayerContact` was in flight, then collapsed to nothing on a null row.
+`Spinner` is `role="status"` with `aria-label="Loading contact details…"` in an
+aria-live region, so a screen-reader user heard that string followed by
+silence. The harness stub resolved on a microtask, which is why my own browser
+pass missed it.
+
+**Fix.** `if (loading) return null` — the block appears late rather than
+announcing itself and collapsing. I accept the adjudication that this was not
+a leak (the spinner rendered *before* the outcome was known, so it looked
+identical for a player with details and one without), but it contradicted the
+"renders nothing" contract stated in that file's own header comment, which is
+exactly the kind of drift between comment and code worth removing.
+
+The harness now carries a latency knob so this state stays reproducible:
+`?contactDelay=3000` makes the stub take 3s. That is what let me verify the
+fix where the defect was found rather than only in jsdom. (The controller's
+verification pass had added the same knob independently; I had written a
+duplicate constant applying the delay twice, and collapsed the two onto the
+controller's `CONTACT_DELAY`.)
+
+**Browser confirmation** — the in-flight sheet is now byte-identical to the
+no-contact sheet:
+
+| Shot | height | live regions | text |
+|---|---|---|---|
+| `detail-contact-inflight` (3s delay) | 481px | `[]` | `… Role \| Player` |
+| `detail-no-contact` | 481px | `[]` | `… Role \| Captain` |
+| `detail-contact` (settled) | 658px | `[]` | `… CONTACT \| Phone \| …` |
+
+No `role="status"` or `role="alert"` node exists in the dialog at any point in
+the happy path, and the block simply grows the sheet when the row lands.
+
+## 2. Ruling — muted text on the page background
+
+I recomputed both ratios rather than trusting the reported figures, and they
+check out:
+
+| Pair | Ratio | Verdict |
+|---|---|---|
+| `#77726e` on `--paper #f5f4f3` | **4.329:1** | fails AA (4.5:1) |
+| `#77726e` on card white | 4.755:1 | passes |
+| `#5c5854` on `--paper` | **6.417:1** | passes |
+
+Darkened to `#5c5854` at the three on-paper sites: `Roster.jsx` group headers
+and section-head sub-line, `Schedule.jsx` section-head sub-line — via a named
+`MUTED_ON_PAPER` constant in each file so the on-paper-vs-on-card distinction
+is stated at the point of use, which is the actual hazard.
+
+`#5c5854` is not a new colour: it is already this project's answer wherever
+`--muted` lands on a light fill (Chip's and Badge's neutral variants). Picking
+it over a minimal darkening keeps the palette at one darkened-muted value
+instead of three near-identical greys.
+
+I audited every other `#77726e` in the touched files to confirm the ruling's
+three sites were the complete set — the rest (player row meta, fixture rows,
+calendar weekday headers, `Empty`, `KeyValue`, the search placeholder) all sit
+on white and measure 4.755:1. Left untouched.
+
+## 3. Ruling — `Sheet` bottom safe-area inset
+
+`px-[18px] py-4` → `px-[18px] pb-[calc(16px+env(safe-area-inset-bottom))] pt-4`
+on the sheet body, matching what `AppShell`'s `<main>` and `Nav`'s tab bar
+already do.
+
+Verified it compiles to valid CSS rather than assuming — CSS `calc()` requires
+whitespace around `+`, and Tailwind's operator normalisation supplies it:
+
+```
+$ grep -o "padding-bottom:calc([^)]*)[^;}]*" dist/assets/*.css
+padding-bottom:calc(100px + env(safe-area-inset-bottom))
+padding-bottom:calc(16px + env(safe-area-inset-bottom))
+```
+
+## 4. Ruling — the Call/Email action row (§5.7)
+
+Added under the contact KV rows: `tel:` and `mailto:` anchors styled as
+design-system.md §3 buttons (`padding:10px 15px`, `radius:11px`, 14px/700),
+Call filled `--maroon`, Email ghost with `--maroon` text — `#C21F32` on white
+measures 5.94:1, clearing AA. Each renders only if its value is present.
+
+It lives **inside** the contact block, above the `!contact` early return, so it
+cannot outlive the row it describes — an action row offering to phone a player
+whose contact RLS withheld would be precisely the leak this screen exists to
+prevent. The test asserts that directly, and mutation M2 below proves the
+placement is load-bearing rather than incidental.
+
+## 5. Housekeeping — `harness/shoot.mjs`
+
+Now imports `harness/playwright.mjs` like the other two scripts. No hardcoded
+install path remains anywhere in `harness/` outside one illustrative
+`PLAYWRIGHT_MODULE=…` line in the loader's own usage comment.
+
+## Covering tests
+
+| File | Tests | Covers |
+|---|---|---|
+| `tests/roster.test.jsx` | `renders nothing at all while the contact query is in flight` | item 1 — no `role="status"`, no "contact"/"loading" text while pending |
+| `tests/roster.test.jsx` | `offers Call and Email actions for the values that exist`; `omits the Call action when there is no phone number` | item 4 |
+| `tests/roster.test.jsx` | extended `renders no contact block…when RLS returns no row` | item 4 — the action row goes with the block |
+| `tests/roster.test.jsx` | `darkens muted text that sits on the page background, not on a card` | item 2 |
+| `tests/components.test.jsx` | `pads its body clear of the mobile home-indicator zone` | item 3 |
+
+## Command and output
+
+Files amended: `src/screens/PlayerDetail.jsx`, `src/screens/Roster.jsx`,
+`src/screens/Schedule.jsx`, `src/components/Sheet.jsx`,
+`tests/roster.test.jsx`, `tests/components.test.jsx`, `harness/shoot.mjs`,
+`harness/shoot-roster.mjs`, `harness/stubs/players.js`.
+
+```
+$ npx vitest run tests/roster.test.jsx tests/schedule.test.jsx tests/components.test.jsx
+ ✓ tests/schedule.test.jsx (31 tests) 2210ms
+ ✓ tests/roster.test.jsx (38 tests) 2223ms
+ ✓ tests/components.test.jsx (42 tests) 520ms
+ Test Files  3 passed (3)
+      Tests  111 passed (111)
+```
+
+`tests/schedule.test.jsx` is in scope for the `MUTED_ON_PAPER` change and is
+unchanged at 31 passing — Task 11's pinned tests are undisturbed.
+
+```
+$ npm test
+ Test Files  14 passed (14)
+      Tests  271 passed (271)
+
+$ npm run build
+✓ built in 3.32s
+```
+
+271 = 266 + 5 new. Nothing regressed; output pristine (no act() warnings, no
+stderr).
+
+## Mutation checks
+
+| Mutation | Result |
+|---|---|
+| restore the in-flight spinner | `renders nothing…in flight` fails ✓ |
+| let the action row survive a null contact row (`if (false) return null`) | 3 tests fail, incl. the RLS-withheld one ✓ |
+| drop the `Sheet` safe-area inset | `pads its body clear…` fails ✓ |
+| revert `MUTED_ON_PAPER` to `#77726e` | contrast test fails ✓ |
+
+All reverted; suite re-verified green.
+
+## Not acted on (ruled deferred)
+
+The age-group branch keeping name order rather than jersey order (faithful to
+§5.3; raised as a product question for Jay), and the roster row's `aria-hidden`
+jersey number (Task 22's accessibility pass).

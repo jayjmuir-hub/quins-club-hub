@@ -294,6 +294,22 @@ describe('Sheet', () => {
     expect(dialog).toHaveAttribute('aria-modal', 'true')
   })
 
+  // On mobile the panel's bottom edge is flush with the viewport bottom, so
+  // without the inset the last row of content — a contact link, or the Save
+  // button on every add/edit form from Task 14 on — lands in an iPhone's
+  // home-indicator zone. jsdom resolves no env() and applies no CSS, so the
+  // class token is the only assertable thing; the real spacing was checked in
+  // a browser.
+  it('pads its body clear of the mobile home-indicator zone', () => {
+    render(
+      <Sheet open onClose={() => {}} title="Event details">
+        <p>Body content</p>
+      </Sheet>,
+    )
+    const body = screen.getByText('Body content').parentElement
+    expect(hasClassToken(body, 'pb-[calc(16px+env(safe-area-inset-bottom))]')).toBe(true)
+  })
+
   it('is styled as a mobile bottom sheet with a desktop centred-dialog variant (class tokens only — real rendering verified in-browser)', () => {
     render(
       <Sheet open onClose={() => {}} title="Event details">
