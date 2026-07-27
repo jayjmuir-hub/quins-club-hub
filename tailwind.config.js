@@ -10,6 +10,12 @@ export default {
         quinsRedDark: '#8E1526',
         quinsBlack: '#141414',
       },
+      screens: {
+        // The prototype's single responsive breakpoint (design-system.md
+        // §5): below it is mobile (bottom tab bar, FAB, bottom sheet), at/
+        // above it is desktop (top nav, no FAB, centered dialog).
+        desktop: '820px',
+      },
     },
   },
   plugins: [],

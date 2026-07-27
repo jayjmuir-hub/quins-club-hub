@@ -7,3 +7,18 @@ body {
     Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Global prefers-reduced-motion handling (design-system.md accessibility
+   requirement): every transition/animation in the app is suppressed for
+   users who've asked for reduced motion, rather than each component having
+   to opt in individually. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
