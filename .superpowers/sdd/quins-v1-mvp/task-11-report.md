@@ -233,3 +233,165 @@ $ npm test
    the class-token guard is the strongest automated statement I can make about
    layout. The calendar grid and the detail hero's negative-margin bleed in
    particular are worth one look on a phone before sign-off.
+
+---
+
+# Fix report — Task 11 review round 1
+
+**Commit:** `e2cc1c7` fix: keep the schedule and availability on screen during realtime refreshes
+
+Both Important findings addressed. The two controller rulings (deferred "✓ N
+available" count, timezone as a product question for Jay) were not touched, and I
+did not act on the deferred Minor findings.
+
+## Finding 1 — every realtime refresh replaced the content with a spinner
+
+Correct, and worse than cosmetic: the flicker fired on *other people's* actions,
+not the user's own. Any insert/update/delete on `events` anywhere in scope tore the
+list out of the DOM and collapsed the page height for a round trip; `EventDetail`
+did the same on every single RSVP, blanking the availability bar the user was
+reading.
+
+**`src/screens/Schedule.jsx`** — `loading` still means "a fetch is in flight" (it
+is, on a refresh), but the render now keys off a derived
+`isFirstLoad = loading && events.length === 0`. The spinner card and the `!loading`
+guards around the error card and the three tab bodies all moved to `isFirstLoad`.
+A refresh therefore leaves the current rows mounted and swaps them in place when
+the new data lands. The retry-after-error path still shows a spinner for free,
+because the catch clears `events` — so `events.length === 0` is true again and no
+extra state was needed.
+
+**`src/screens/EventDetail.jsx`** — the availability effect re-runs on every RSVP,
+and there `rows.length === 0` is a legitimate steady state ("No one has responded
+yet"), so the derived form would still have flickered empty → spinner → empty.
+Used a `settledForEvent` ref instead: `setLoading(true)` fires only when a first
+attempt for *this* event id hasn't settled yet. The ref is set in `.finally`, so it
+covers the error path too. (`useRef` added to the React import.)
+
+Neither change puts a callback in an effect dependency array, so the `Sheet`
+stale-`onClose` trap is not reintroduced.
+
+## Finding 2 — `src/lib/eventFormat.js` had no direct test file
+
+Correct, and the half-score gap was the real risk. Added
+**`tests/event-format.test.js`** — 28 cases, plain fixture objects, no mocks or
+rendering, following `tests/scope.test.js`'s shape. Covers every documented
+behaviour the reviewer named, plus the rest of the module's surface:
+
+- `hasResult`: both halves present; **only `result_us`**; **only `result_them`**;
+  neither; a 0–0 draw (a truthiness check would misfile it as unplayed);
+  null/undefined event.
+- `resultOutcome`/`resultLabel`/`resultScore`: win/loss/draw, the
+  null-without-a-full-score case, and the en-dash format.
+- `eventTitle`: match with opponent, training/social titles, title-when-no-opponent,
+  and both fallbacks (`'Quins match'`, `'Club event'`).
+- `eventDate`: parses; null for missing; null (not `Invalid Date`) for garbage.
+- `dateBoxParts`: real date, and the exact `{ month: '—', day: '–', weekday: '' }`
+  placeholder for null.
+- `formatTime`/`formatLongDate`: real date, and the exact fallback copy for null.
+- `sortByStart`: ascending, descending, **undated-sorts-last in both directions**,
+  two undated events, and non-mutation of the input.
+
+Locale/timezone note recorded at the top of that file: these helpers format with
+the runtime's default locale on purpose, so the suite asserts the fallback strings
+exactly (locale-independent) and asserts the formatted paths only on parts that
+hold in any locale (`String(getDate())`, the year, "not the fallback"). Fixture
+dates are built from local components rather than ISO strings, so nothing depends
+on the machine's timezone either.
+
+## Tests covering the amended code
+
+Amended/added: `tests/schedule.test.jsx` (+2 cases, now 29) and
+`tests/event-format.test.js` (new, 28).
+
+The two new schedule cases hold the refetch promise open and assert mid-flight,
+because the pre-existing realtime test passes either way — both promises have
+settled by the time it asserts, which is exactly why it missed this:
+
+- "keeps the current rows on screen while a realtime refresh is in flight" — both
+  fixtures still rendered and `queryByRole('status')` null while the refetch is
+  pending, then the rows swap when it resolves.
+- "keeps the availability bar on screen while an RSVP refresh is in flight" —
+  "1 in" still rendered and no spinner inside the dialog mid-flight, then "2 in"
+  once the new rows land.
+
+### Mutation checks (proving the new tests bite)
+| Mutation | Result |
+|---|---|
+| `isFirstLoad` reverted to `loading` in Schedule | 1 failure — "keeps the current rows on screen…" |
+| `settledForEvent` guard removed from EventDetail | 1 failure — "keeps the availability bar on screen…" |
+| `hasResult`'s `&&` changed to `\|\|` | 3 failures — both half-score cases + "has no outcome, label or score without a full score" |
+| `sortByStart`'s null-date guards deleted | 1 failure — "puts an undated event last in both directions" |
+
+### Command and output
+
+```
+$ npx vitest run tests/event-format.test.js tests/schedule.test.jsx
+
+ RUN  v2.1.9 /root/quins-club-hub
+
+ ✓ tests/schedule.test.jsx (29 tests) 1922ms
+ ✓ tests/event-format.test.js (28 tests) 30ms
+
+ Test Files  2 passed (2)
+      Tests  57 passed (57)
+   Start at  16:45:57
+   Duration  4.63s (transform 329ms, setup 121ms, collect 592ms, tests 1.95s, environment 998ms, prepare 151ms)
+```
+
+```
+$ npm test
+
+ RUN  v2.1.9 /root/quins-club-hub
+
+ ✓ tests/schedule.test.jsx (29 tests) 1949ms
+ ✓ tests/components.test.jsx (38 tests) 520ms
+ ✓ tests/data.test.js (25 tests) 39ms
+ ✓ tests/scope.test.js (35 tests) 16ms
+ ✓ tests/login.test.jsx (16 tests) 1195ms
+ ✓ tests/app-shell.test.jsx (12 tests) 396ms
+ ✓ tests/auth.test.jsx (12 tests) 360ms
+ ✓ tests/require-auth.test.jsx (9 tests) 162ms
+ ✓ tests/event-format.test.js (28 tests) 31ms
+ ✓ tests/memberships.test.jsx (7 tests) 199ms
+ ✓ tests/app.test.jsx (6 tests) 229ms
+ ✓ tests/nav.test.jsx (6 tests) 340ms
+ ✓ tests/supabase.test.js (4 tests) 72ms
+
+ Test Files  13 passed (13)
+      Tests  227 passed (227)
+   Start at  16:46:42
+   Duration  21.11s (transform 697ms, setup 924ms, collect 2.59s, tests 5.51s, environment 7.37s, prepare 1.05s)
+```
+
+```
+$ npm run build
+dist/index.html                   0.83 kB │ gzip:   0.41 kB
+dist/assets/crest-BPS7q37W.png  148.21 kB
+dist/assets/index-B35NBhwP.css   23.12 kB │ gzip:   5.41 kB
+dist/assets/index-BYz07q7w.js   419.22 kB │ gzip: 119.66 kB
+✓ built in 3.61s
+```
+
+227 passed / 13 files, up from 197 / 12 at first submission (+2 schedule,
++28 event-format). Nothing regressed; output is clean — no warnings, no `act()`
+noise.
+
+## Files changed in this round
+- `src/screens/Schedule.jsx` — `isFirstLoad` derived; spinner/error/tab guards use it
+- `src/screens/EventDetail.jsx` — `settledForEvent` ref gates the first-load spinner; `useRef` imported
+- `tests/schedule.test.jsx` — 2 in-flight realtime assertions
+- `tests/event-format.test.js` — new, 28 cases
+
+## Concerns
+None new. One note for the re-reviewer: `Schedule` and `EventDetail` now use two
+different first-load idioms (a derived `loading && events.length === 0` vs a
+`settledForEvent` ref). That is deliberate, not drift — an empty list is a
+transient state on the schedule but a legitimate steady state for availability, so
+the derived form would still flicker there. Both are commented in place with that
+reasoning.
+
+Housekeeping: `.superpowers/sdd/.gitignore` was reset to `*` by tooling twice
+during this task (the regression its own comment warns about, which silently
+untracks the whole ledger). Restored from HEAD both times; not part of either
+commit.
