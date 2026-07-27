@@ -73,7 +73,7 @@ function ErrorState({ error, reload }) {
       className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-[#e6e3e1] bg-white p-6 text-center shadow-[0_6px_24px_rgba(20,20,20,0.10)]"
     >
       <h2 className="text-lg font-extrabold text-quinsRedDark">Couldn&apos;t load your account</h2>
-      <p className="mt-2 text-sm leading-relaxed text-[#77726e]">
+      <p data-testid="error-message" className="mt-2 text-sm leading-relaxed text-quinsRedDark">
         {error.message || 'Something went wrong. Try again.'}
       </p>
       <button
@@ -113,6 +113,8 @@ export default function AppShell({ children }) {
 
   const isMoreRoute = location.pathname === '/more'
   const ready = !loading && !error && memberships.length > 0
+  const showRole = !loading && !error
+  const currentRoleLabel = roleLabel(memberships)
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f4f3] text-[#221f1d]">
@@ -123,20 +125,33 @@ export default function AppShell({ children }) {
             alt="Abu Dhabi Harlequins crest"
             className="h-[46px] w-[46px] shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
           />
-          <div>
+          <div className="min-w-0">
             <h1 className="text-base font-extrabold leading-[1.1] tracking-[0.2px]">
               Abu Dhabi Harlequins
             </h1>
-            <p className="text-[11.5px] font-semibold uppercase tracking-[1.3px] text-white/[.82]">
-              Quins Club Hub
+            <p className="flex items-baseline gap-1 text-[11.5px] font-semibold uppercase tracking-[1.3px] text-white/[.82] desktop:text-[12px]">
+              <span>Quins Club Hub</span>
+              {/* Mobile-only compact role indicator (decision 6: the role
+                  label has no breakpoint qualifier, and mobile is the
+                  primary case for a pitch-side club app). The desktop badge
+                  below covers >=820px; this covers below it, so the role is
+                  never CSS-hidden at any width. */}
+              {showRole && (
+                <span data-testid="role-label-mobile" className="truncate desktop:hidden">
+                  · {currentRoleLabel}
+                </span>
+              )}
             </p>
           </div>
 
           <div className="flex-1" />
 
-          {!loading && !error && (
-            <span className="hidden shrink-0 rounded-full bg-white/[.16] px-3 py-1 text-xs font-bold uppercase tracking-wide desktop:inline-block">
-              {roleLabel(memberships)}
+          {showRole && (
+            <span
+              data-testid="role-label-desktop"
+              className="hidden shrink-0 rounded-full bg-white/[.16] px-3 py-1 text-xs font-bold uppercase tracking-wide desktop:inline-block"
+            >
+              {currentRoleLabel}
             </span>
           )}
 
