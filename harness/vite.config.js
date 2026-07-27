@@ -37,6 +37,8 @@ export default defineConfig({
         find: /^\.\.\/data\/availability\.js$/,
         replacement: path.resolve(__dirname, 'stubs/availability.js'),
       },
+      // Roster/PlayerDetail (Task 12) reach Supabase through this one.
+      { find: /^\.\.\/data\/players\.js$/, replacement: path.resolve(__dirname, 'stubs/players.js') },
     ],
   },
   server: {

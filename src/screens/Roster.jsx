@@ -1,0 +1,360 @@
+import { useEffect, useMemo, useState } from 'react'
+import Badge from '../components/Badge.jsx'
+import Card from '../components/Card.jsx'
+import Empty from '../components/Empty.jsx'
+import ScopeNote from '../components/ScopeNote.jsx'
+import Spinner from '../components/Spinner.jsx'
+import TeamPills, { ALL_TEAMS_ID } from '../components/TeamPills.jsx'
+import PlayerDetail from './PlayerDetail.jsx'
+import { listPlayers } from '../data/players.js'
+import { useMemberships } from '../lib/memberships.jsx'
+import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+
+// Roster & members (design-system.md §5.3): scope note, section head, search
+// bar, a team filter, then the grouped player list. Reads players once for
+// the whole visible scope and filters/groups in memory — the scope is at
+// most 15 squads' worth of players, so refetching on every keystroke or pill
+// tap would add latency and flicker for nothing.
+//
+// Access control is not enforced here. RLS decides which rows come back;
+// visibleTeams() only tells the UI which pills to draw and which team ids to
+// ask for, so a mistake here can narrow what a user sees but can never widen
+// it. In particular an empty teamIds array means "no teams, show nothing"
+// (see src/data/players.js) — never "no filter, show everything".
+//
+// The helpers below stay local rather than moving to a src/lib module: only
+// this screen needs them (PlayerDetail receives everything as props), and
+// src/lib/eventFormat.js was extracted only because two screens genuinely
+// shared it. Add-player actions are deliberately absent — Task 15 owns
+// player writes.
+
+// Ported verbatim from the prototype's posGroup() (design-system.md §7), so
+// the grouped-by-position view matches the approved design exactly.
+const FORWARDS = ['Prop', 'Hooker', 'Lock', 'Flanker', 'Number 8']
+const BACKS = ['Scrum-half', 'Fly-half', 'Centre', 'Wing', 'Fullback']
+const POSITION_GROUP_ORDER = ['Forwards', 'Backs', 'Other']
+
+function positionGroup(position) {
+  if (FORWARDS.includes(position)) return 'Forwards'
+  if (BACKS.includes(position)) return 'Backs'
+  return 'Other'
+}
+
+// Numberless players sort last, matching the prototype's `num || 99`
+// fallback — but via an explicit Infinity so a real jersey 99 can't tie with
+// "has no number at all". Ties (two 99s, or two numberless players) fall
+// back to name, which keeps the order stable whatever the fetch returned.
+function byJersey(a, b) {
+  const left = a.jersey_num == null ? Infinity : a.jersey_num
+  const right = b.jersey_num == null ? Infinity : b.jersey_num
+  if (left !== right) return left - right
+  return a.full_name.localeCompare(b.full_name)
+}
+
+// Case-insensitive substring match across name, position, age group and
+// jersey number — the four things printed on a roster row, so anything a
+// user can see, they can search for (design-system.md §4.9).
+function matchesQuery(player, teamName, query) {
+  if (!query) return true
+  const haystack = [player.full_name, player.position, teamName, player.jersey_num]
+    .filter((part) => part != null && part !== '')
+    .join(' ')
+    .toLowerCase()
+  return haystack.includes(query)
+}
+
+function SearchIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  )
+}
+
+function ChevronRightIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m9 5 7 7-7 7" />
+    </svg>
+  )
+}
+
+function PlayerRow({ player, teamName, onSelect }) {
+  const numbered = player.jersey_num != null
+
+  return (
+    <button
+      type="button"
+      data-testid="player-row"
+      onClick={() => onSelect(player.id)}
+      // `flex` and `items-center` are load-bearing, not decorative:
+      // Chromium's UA stylesheet centres a <button>'s content inside its box,
+      // which would push this row's contents around once it is wider or
+      // taller than its text. Setting the layout explicitly overrides that.
+      className="flex w-full items-center gap-3 border-b border-[#e6e3e1] px-[14px] py-[11px] text-left transition last:border-b-0 hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-quinsRed"
+    >
+      <span
+        className={[
+          'grid h-10 w-10 shrink-0 place-items-center rounded-[11px] text-[15px] font-extrabold',
+          numbered
+            ? 'bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] text-white'
+            : 'bg-[#ece6f0] text-[#5c5854]',
+        ].join(' ')}
+        aria-hidden="true"
+      >
+        {numbered ? player.jersey_num : '–'}
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span data-testid="player-name" className="text-[15px] font-bold text-[#221f1d]">
+            {player.full_name}
+          </span>
+          {player.is_captain && <Badge tone="captain">Capt</Badge>}
+        </span>
+        <span className="mt-0.5 block text-[12.5px] text-[#77726e]">
+          {player.position || 'Position not set'} · {teamName}
+        </span>
+      </span>
+
+      <ChevronRightIcon className="h-5 w-5 shrink-0 text-[#cfc7d5]" aria-hidden="true" />
+    </button>
+  )
+}
+
+function RosterGroup({ label, players, teamsById, onSelect }) {
+  return (
+    <div className="mb-4 last:mb-0">
+      <h3 className="mb-2 flex items-center gap-2 text-[12.5px] font-extrabold uppercase tracking-[.5px] text-[#77726e]">
+        <span data-testid="group-label">{label}</span>
+        <span
+          data-testid="group-count"
+          className="rounded-[20px] bg-[#ece6f0] px-2 py-0.5 text-[11px] font-extrabold text-[#5c5854]"
+        >
+          {players.length}
+        </span>
+      </h3>
+      <Card className="overflow-hidden">
+        {players.map((player) => (
+          <PlayerRow
+            key={player.id}
+            player={player}
+            teamName={teamsById.get(player.team_id)?.name ?? 'No age group'}
+            onSelect={onSelect}
+          />
+        ))}
+      </Card>
+    </div>
+  )
+}
+
+export default function Roster() {
+  const { memberships, teams } = useMemberships()
+
+  const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
+  const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
+  const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
+
+  const [query, setQuery] = useState('')
+  const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
+  const [selectedPlayerId, setSelectedPlayerId] = useState(null)
+
+  const [players, setPlayers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [reloadToken, setReloadToken] = useState(0)
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    setError(null)
+
+    listPlayers({ teamIds })
+      .then((rows) => {
+        if (mounted) setPlayers(rows)
+      })
+      .catch((err) => {
+        if (!mounted) return
+        setError(err)
+        setPlayers([])
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [teamIds, reloadToken])
+
+  // Only a load with nothing on screen replaces the content with a spinner.
+  // There is no realtime subscription on players today, so this and `loading`
+  // currently coincide — but keeping the distinction means adding one later
+  // can't silently reintroduce the "spinner flashes over already-rendered
+  // content on every refresh" bug that Task 11 was sent back for.
+  const isFirstLoad = loading && players.length === 0
+
+  const admin = isAdmin(memberships)
+  const canEditAnything = admin || memberships.some((membership) => membership.role === 'coach')
+  const teamNames = scopedTeams.map((team) => team.name).join(', ')
+
+  const normalisedQuery = query.trim().toLowerCase()
+  const inTeam =
+    teamFilter === ALL_TEAMS_ID ? players : players.filter((player) => player.team_id === teamFilter)
+  const visible = inTeam.filter((player) =>
+    matchesQuery(player, teamsById.get(player.team_id)?.name ?? '', normalisedQuery),
+  )
+
+  // The grouping rule (design-system.md §5.3): one team in view — because a
+  // pill is selected, or because the user only sees one — groups by position;
+  // several teams group by age group. Zero visible teams falls to the
+  // age-group branch, which then produces no groups at all and renders the
+  // empty state; that is the right answer, since with no squad there are no
+  // positions to organise and nothing to organise them from.
+  const groupByPosition = teamFilter !== ALL_TEAMS_ID || scopedTeams.length === 1
+
+  // Not memoised: `visible` is rebuilt on every render anyway (it depends on
+  // the search box), so a useMemo here would never hit its cache and would
+  // only advertise a saving it doesn't make. The whole scope is at most a few
+  // hundred players.
+  const bucket = new Map()
+  visible.forEach((player) => {
+    const key = groupByPosition ? positionGroup(player.position) : player.team_id
+    if (!bucket.has(key)) bucket.set(key, [])
+    bucket.get(key).push(player)
+  })
+
+  const groups = (groupByPosition ? POSITION_GROUP_ORDER : scopedTeams.map((team) => team.id))
+    .filter((key) => bucket.has(key))
+    .map((key) => ({
+      key,
+      label: groupByPosition ? key : (teamsById.get(key)?.name ?? 'No age group'),
+      // Position groups sort by jersey number (design-system.md §5.3);
+      // age-group listings keep listPlayers' full_name ordering.
+      players: groupByPosition ? [...bucket.get(key)].sort(byJersey) : bucket.get(key),
+    }))
+
+  // Derive the open player from the live list rather than storing the row
+  // itself, so the sheet's contents stay in step with a reload and a removed
+  // player closes it instead of stranding a stale copy on screen.
+  const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null
+
+  // One squad is more useful named than counted; several are more useful
+  // counted than listed (an admin sees all 15).
+  const scopeSummary = scopedTeams.length === 1 ? teamNames : `${scopedTeams.length} age groups`
+
+  return (
+    <section>
+      {!admin && (
+        <ScopeNote tone={canEditAnything ? 'coach' : 'parent'}>
+          <b>
+            {roleLabel(memberships)} view{canEditAnything ? '' : ' · read-only'}.
+          </b>{' '}
+          You&apos;re seeing {teamNames || 'no squads'} — every other age group is hidden.
+        </ScopeNote>
+      )}
+
+      <div className="mb-3.5 mt-1">
+        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Roster &amp; members</h2>
+        {/* Describes the scope, not the current filter — the per-group counts
+            below already report what the search and pills leave. */}
+        <p className="text-[13px] font-medium text-[#77726e]">
+          {players.length} {players.length === 1 ? 'player' : 'players'} · {scopeSummary}
+        </p>
+      </div>
+
+      <div className="mb-3 flex items-center gap-2.5 rounded-[20px] bg-white px-3.5 py-2.5 shadow-[inset_0_0_0_1.5px_#e6e3e1,0_2px_8px_rgba(20,20,20,0.08)]">
+        <SearchIcon className="h-[18px] w-[18px] shrink-0 text-[#77726e]" aria-hidden="true" />
+        {/* type="search" is what gives this the `searchbox` role. Its
+            trade-off is Chromium's UA clear glyph, which paints itself
+            #365A99 (measured in the browser check) — a blue with no business
+            on a red/green brand page, and one that -webkit- pseudo-elements
+            won't let us recolour. The design system's .search (§4.9) has no
+            clear control at all, so the glyph is suppressed rather than
+            restyled. */}
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          aria-label="Search players"
+          placeholder="Search name, position, age group"
+          className="w-full border-0 bg-transparent text-[15px] text-[#221f1d] outline-none placeholder:text-[#77726e] [&::-webkit-search-cancel-button]:appearance-none"
+        />
+      </div>
+
+      {scopedTeams.length > 1 && (
+        <div className="mb-4">
+          {/* The pill labels carry a live count (design-system.md §4.8, e.g.
+              "U10 · 9"). TeamPills renders `team.name`, so the count is baked
+              into a display-only copy of each team rather than teaching the
+              shared component about players. Counts follow the search, so the
+              row doubles as a "where did my matches land" readout. */}
+          <TeamPills
+            teams={scopedTeams.map((team) => ({
+              ...team,
+              name: `${team.name} · ${visible.filter((player) => player.team_id === team.id).length}`,
+            }))}
+            selected={teamFilter}
+            onChange={setTeamFilter}
+            allLabel={`All · ${visible.length}`}
+          />
+        </div>
+      )}
+
+      {isFirstLoad && (
+        <Card className="flex justify-center py-10">
+          <Spinner />
+        </Card>
+      )}
+
+      {!isFirstLoad && error && (
+        <Card role="alert" className="p-6 text-center">
+          <h3 className="text-base font-extrabold text-quinsRedDark">We couldn&apos;t load the roster</h3>
+          <p className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+            {error.message || 'Something went wrong. Try again.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => setReloadToken((token) => token + 1)}
+            className="mt-4 rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+          >
+            Try again
+          </button>
+        </Card>
+      )}
+
+      {!isFirstLoad && !error && groups.length === 0 && (
+        <Card>
+          <Empty
+            message={
+              players.length === 0
+                ? 'No players yet. They show here once someone adds them.'
+                : 'No players match. Try a different name, position or age group.'
+            }
+          />
+        </Card>
+      )}
+
+      {!isFirstLoad &&
+        !error &&
+        groups.map((group) => (
+          <RosterGroup
+            key={group.key}
+            label={group.label}
+            players={group.players}
+            teamsById={teamsById}
+            onSelect={setSelectedPlayerId}
+          />
+        ))}
+
+      {selectedPlayer && (
+        <PlayerDetail
+          player={selectedPlayer}
+          team={teamsById.get(selectedPlayer.team_id)}
+          onClose={() => setSelectedPlayerId(null)}
+        />
+      )}
+    </section>
+  )
+}

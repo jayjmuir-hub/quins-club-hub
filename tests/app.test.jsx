@@ -47,6 +47,13 @@ vi.mock('../src/data/events.js', () => ({
   subscribeEvents: () => () => {},
 }))
 
+// Same treatment for the /roster route, which renders the real Roster screen
+// as of Task 12. Roster's own behaviour is covered by tests/roster.test.jsx.
+vi.mock('../src/data/players.js', () => ({
+  listPlayers: () => new Promise(() => {}),
+  getPlayerContact: () => new Promise(() => {}),
+}))
+
 // Import after vi.mock so this binds to the mocked modules.
 import App from '../src/App.jsx'
 
@@ -99,7 +106,7 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: /schedule/i })).toBeInTheDocument()
   })
 
-  it('renders the roster placeholder at /roster when signed in', () => {
+  it('renders the roster screen at /roster when signed in', () => {
     window.history.pushState({}, '', '/roster')
     useAuthMock.mockReturnValue(signedIn)
 

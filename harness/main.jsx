@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import AppShell from '../src/components/AppShell.jsx'
 import Login from '../src/screens/Login.jsx'
 import Schedule from '../src/screens/Schedule.jsx'
+import Roster from '../src/screens/Roster.jsx'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
 import '../src/index.css'
@@ -70,6 +71,23 @@ function scheduleScenario(memberships) {
   )
 }
 
+function rosterScenario(memberships) {
+  return () => (
+    <Shell
+      route="/roster"
+      authValue={baseAuth(COACH_EMAIL)}
+      membershipValue={{ memberships, teams: TEAMS, loading: false, error: null, reload: noop }}
+    >
+      <Roster />
+    </Shell>
+  )
+}
+
+// A coach of one squad: the team filter is hidden and the list groups by
+// position. Task 12's grouping rule turns on team count, so this is the
+// scenario that renders the Forwards/Backs/Other headings.
+const COACH_ONE_TEAM = [{ id: 'm1', role: 'coach', team_id: 't1', player_id: null }]
+
 const scenarios = {
   login: () => (
     <AuthProvider value={baseAuth('')}>
@@ -114,6 +132,13 @@ const scenarios = {
   // component state, so Playwright drives them by clicking (see shoot.mjs).
   schedule: scheduleScenario(COACH_MEMBERSHIPS),
   'schedule-admin': scheduleScenario(ADMIN_MEMBERSHIPS),
+
+  // Task 12 Roster screens. Search text, pill selection and the PlayerDetail
+  // sheet are real component state, so Playwright drives them by typing and
+  // clicking (see shoot-roster.mjs).
+  roster: rosterScenario(COACH_MEMBERSHIPS),
+  'roster-one-team': rosterScenario(COACH_ONE_TEAM),
+  'roster-admin': rosterScenario(ADMIN_MEMBERSHIPS),
 
   'shell-loading': () => (
     <Shell

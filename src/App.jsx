@@ -3,18 +3,15 @@ import RequireAuth from './components/RequireAuth.jsx'
 import { MembershipProvider } from './lib/memberships.jsx'
 import AppShell from './components/AppShell.jsx'
 import Schedule from './screens/Schedule.jsx'
+import Roster from './screens/Roster.jsx'
 
-// Home/Roster/More are route placeholders still — Task 12 replaces Roster,
-// Task 13 replaces Home, and a later task replaces More. They live here (not
-// in src/screens/) so those tasks create their screen files without fighting
-// a stub of the same name. Schedule is real as of Task 11.
+// Home/More are route placeholders still — Task 13 replaces Home and a later
+// task replaces More. They live here (not in src/screens/) so those tasks
+// create their screen files without fighting a stub of the same name.
+// Schedule is real as of Task 11, Roster as of Task 12.
 
 function Home() {
   return <h1>Home</h1>
-}
-
-function Roster() {
-  return <h1>Roster</h1>
 }
 
 function More() {
