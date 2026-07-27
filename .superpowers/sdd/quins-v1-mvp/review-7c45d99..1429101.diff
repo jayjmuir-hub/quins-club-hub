@@ -1,0 +1,1208 @@
+# Review package: 7c45d99..HEAD
+
+## Commits
+1429101 feat: add AppShell wrapping routed screens in branded header + nav
+b0099cd feat: add responsive primary Nav component
+ccab9d1 feat: add MembershipProvider and useMemberships context
+74f7fd6 fix: clear stale magic-link error from RequireAuth after sign-out
+
+## Files changed
+ index.html                     |   2 +-
+ src/App.jsx                    |  28 +++---
+ src/components/AppShell.jsx    | 166 +++++++++++++++++++++++++++++++++
+ src/components/Nav.jsx         |  93 ++++++++++++++++++
+ src/components/RequireAuth.jsx |  26 +++++-
+ src/index.css                  |  15 +++
+ src/lib/memberships.jsx        |  83 +++++++++++++++++
+ tailwind.config.js             |   6 ++
+ tests/app-shell.test.jsx       | 148 +++++++++++++++++++++++++++++
+ tests/app.test.jsx             |  50 +++++++---
+ tests/memberships.test.jsx     | 207 +++++++++++++++++++++++++++++++++++++++++
+ tests/nav.test.jsx             |  72 ++++++++++++++
+ tests/require-auth.test.jsx    |  57 ++++++++++++
+ 13 files changed, 929 insertions(+), 24 deletions(-)
+
+## Diff
+diff --git a/index.html b/index.html
+index a232be8..22a2784 100644
+--- a/index.html
++++ b/index.html
+@@ -1,15 +1,15 @@
+ <!doctype html>
+ <html lang="en">
+   <head>
+     <meta charset="UTF-8" />
+-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+     <meta name="theme-color" content="#C21F32" />
+     <meta name="apple-mobile-web-app-capable" content="yes" />
+     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+     <meta name="apple-mobile-web-app-title" content="Quins" />
+     <link rel="icon" type="image/png" href="/icons/favicon-32.png" />
+     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+     <title>Abu Dhabi Harlequins</title>
+   </head>
+   <body>
+     <div id="root"></div>
+diff --git a/src/App.jsx b/src/App.jsx
+index 2b4adad..19f8042 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -1,17 +1,19 @@
+ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+ import RequireAuth from './components/RequireAuth.jsx'
++import { MembershipProvider } from './lib/memberships.jsx'
++import AppShell from './components/AppShell.jsx'
+ 
+-// Route placeholders only. Task 8 replaces these with the real app shell and
+-// navigation; Tasks 11-17 replace them again with the real screens. They live
+-// here (not in src/screens/) so those later tasks create their screen files
+-// without fighting a stub of the same name.
++// Route placeholders only. Task 8 wraps these in the real app shell and
++// navigation (AppShell/Nav); Tasks 11-17 replace the placeholders themselves
++// with the real screens. They live here (not in src/screens/) so those later
++// tasks create their screen files without fighting a stub of the same name.
+ 
+ function Home() {
+   return <h1>Home</h1>
+ }
+ 
+ function Schedule() {
+   return <h1>Schedule</h1>
+ }
+ 
+ function Roster() {
+@@ -19,21 +21,25 @@ function Roster() {
+ }
+ 
+ function More() {
+   return <h1>More</h1>
+ }
+ 
+ export default function App() {
+   return (
+     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+       <RequireAuth>
+-        <Routes>
+-          <Route path="/" element={<Home />} />
+-          <Route path="/schedule" element={<Schedule />} />
+-          <Route path="/roster" element={<Roster />} />
+-          <Route path="/more" element={<More />} />
+-          <Route path="*" element={<Navigate to="/" replace />} />
+-        </Routes>
++        <MembershipProvider>
++          <AppShell>
++            <Routes>
++              <Route path="/" element={<Home />} />
++              <Route path="/schedule" element={<Schedule />} />
++              <Route path="/roster" element={<Roster />} />
++              <Route path="/more" element={<More />} />
++              <Route path="*" element={<Navigate to="/" replace />} />
++            </Routes>
++          </AppShell>
++        </MembershipProvider>
+       </RequireAuth>
+     </BrowserRouter>
+   )
+ }
+diff --git a/src/components/AppShell.jsx b/src/components/AppShell.jsx
+new file mode 100644
+index 0000000..54b7753
+--- /dev/null
++++ b/src/components/AppShell.jsx
+@@ -0,0 +1,166 @@
++import { useState } from 'react'
++import { useLocation } from 'react-router-dom'
++import { useAuth } from '../lib/auth.jsx'
++import { useMemberships } from '../lib/memberships.jsx'
++import { roleLabel } from '../lib/scope.js'
++import Nav from './Nav.jsx'
++import crest from '../assets/crest.png'
++
++// The frame every screen lives inside: branded header (crest, name, tagline,
++// role label, nav) plus the membership-loading gate that decides whether the
++// routed content, a loading indicator, an error, or the zero-membership
++// message is what actually shows below it. Task 9 owns shared UI primitives
++// (Card/Chip/Sheet); Tasks 11-17 own the real screens — this file only wraps
++// them, it does not build them (see App.jsx's Home/Schedule/Roster/More
++// placeholders, still stubs until those tasks land).
++//
++// Sign-out lives here, not in the More placeholder: it renders in two
++// places — the zero-membership message (decision 2) and, once memberships
++// have loaded, alongside the routed content on the /more route (decision 7)
++// — both driven by this component reading useLocation(), so the More screen
++// itself doesn't need to know about auth at all yet.
++
++function SignOutControl({ signOut, className = '' }) {
++  const [pending, setPending] = useState(false)
++  const [error, setError] = useState(null)
++
++  async function handleClick() {
++    setPending(true)
++    setError(null)
++    try {
++      await signOut()
++    } catch (err) {
++      setError(err.message || 'Something went wrong signing out. Try again.')
++    } finally {
++      setPending(false)
++    }
++  }
++
++  return (
++    <div className={className}>
++      {error && (
++        <p
++          role="alert"
++          className="mb-3 rounded-[11px] bg-[#fbeae8] px-3 py-2 text-sm font-semibold text-quinsRedDark"
++        >
++          {error}
++        </p>
++      )}
++      <button
++        type="button"
++        onClick={handleClick}
++        disabled={pending}
++        className="w-full rounded-[11px] border-[1.5px] border-[#e6e3e1] bg-white px-4 py-2.5 text-sm font-bold text-quinsRed transition hover:border-quinsRed disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 desktop:w-auto"
++      >
++        {pending ? 'Signing out…' : 'Sign out'}
++      </button>
++    </div>
++  )
++}
++
++function LoadingState() {
++  return (
++    <div role="status" className="flex flex-1 items-center justify-center py-20">
++      <p className="text-sm font-semibold uppercase tracking-widest text-[#77726e]">Loading…</p>
++    </div>
++  )
++}
++
++function ErrorState({ error, reload }) {
++  return (
++    <div
++      role="alert"
++      className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-[#e6e3e1] bg-white p-6 text-center shadow-[0_6px_24px_rgba(20,20,20,0.10)]"
++    >
++      <h2 className="text-lg font-extrabold text-quinsRedDark">Couldn&apos;t load your account</h2>
++      <p className="mt-2 text-sm leading-relaxed text-[#77726e]">
++        {error.message || 'Something went wrong. Try again.'}
++      </p>
++      <button
++        type="button"
++        onClick={reload}
++        className="mt-4 rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-quinsRedDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
++      >
++        Try again
++      </button>
++    </div>
++  )
++}
++
++// A signed-in user with zero membership rows reads zero rows from every
++// RLS-scoped table, including teams — so with no explicit handling here the
++// app would otherwise just look blank. This is the first thing Jay himself
++// sees after his first sign-in, before the make-me-admin SQL runs, so the
++// tone is "you're in, hang tight" rather than an error.
++function NoMembershipState({ email, signOut }) {
++  return (
++    <div className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-[#e6e3e1] bg-white p-6 text-center shadow-[0_6px_24px_rgba(20,20,20,0.10)]">
++      <h2 className="text-lg font-extrabold text-[#221f1d]">You&apos;re signed in</h2>
++      <p className="mt-2 text-sm leading-relaxed text-[#77726e]">
++        Your account isn&apos;t linked to a squad yet. Ask a club admin to send
++        you an invite for <strong className="text-[#221f1d]">{email}</strong>,
++        then sign in again to get access.
++      </p>
++      <SignOutControl signOut={signOut} className="mt-5" />
++    </div>
++  )
++}
++
++export default function AppShell({ children }) {
++  const { user, signOut } = useAuth()
++  const { memberships, loading, error, reload } = useMemberships()
++  const location = useLocation()
++
++  const isMoreRoute = location.pathname === '/more'
++  const ready = !loading && !error && memberships.length > 0
++
++  return (
++    <div className="flex min-h-screen flex-col bg-[#f5f4f3] text-[#221f1d]">
++      <header className="sticky top-0 z-40 bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_100%)] text-white shadow-[0_2px_16px_rgba(20,20,20,0.28)]">
++        <div className="mx-auto flex max-w-[1120px] items-center gap-3 px-4 py-3">
++          <img
++            src={crest}
++            alt="Abu Dhabi Harlequins crest"
++            className="h-[46px] w-[46px] shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
++          />
++          <div>
++            <h1 className="text-base font-extrabold leading-[1.1] tracking-[0.2px]">
++              Abu Dhabi Harlequins
++            </h1>
++            <p className="text-[11.5px] font-semibold uppercase tracking-[1.3px] text-white/[.82]">
++              Quins Club Hub
++            </p>
++          </div>
++
++          <div className="flex-1" />
++
++          {!loading && !error && (
++            <span className="hidden shrink-0 rounded-full bg-white/[.16] px-3 py-1 text-xs font-bold uppercase tracking-wide desktop:inline-block">
++              {roleLabel(memberships)}
++            </span>
++          )}
++
++          <Nav />
++        </div>
++      </header>
++
++      <main className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16">
++        {loading && <LoadingState />}
++        {!loading && error && <ErrorState error={error} reload={reload} />}
++        {!loading && !error && memberships.length === 0 && (
++          <NoMembershipState email={user?.email} signOut={signOut} />
++        )}
++        {ready && (
++          <>
++            {children}
++            {isMoreRoute && (
++              <div className="mt-6 border-t border-[#e6e3e1] pt-6">
++                <SignOutControl signOut={signOut} />
++              </div>
++            )}
++          </>
++        )}
++      </main>
++    </div>
++  )
++}
+diff --git a/src/components/Nav.jsx b/src/components/Nav.jsx
+new file mode 100644
+index 0000000..fdf0ac3
+--- /dev/null
++++ b/src/components/Nav.jsx
+@@ -0,0 +1,93 @@
++import { NavLink } from 'react-router-dom'
++
++// Primary navigation: one component rendered once, styled entirely by CSS
++// to be the fixed bottom tab bar below the 820px breakpoint and the
++// in-header top nav at/above it (design-system.md §4.3, §5). It is meant to
++// be rendered as a child of AppShell's header: below 820px it detaches to
++// the viewport bottom via `fixed`, at/above 820px it sits inline in the
++// header's flex row via `desktop:static`. There is deliberately only one
++// list of items and one <nav> in the DOM — no duplicated mobile/desktop
++// trees and no JS width check.
++
++// icon components: inline SVG, stroke="currentColor" so they inherit the
++// surrounding text colour (muted/maroon on the mobile tab bar), matching
++// design-system.md §8. Hidden entirely at the desktop breakpoint, where the
++// nav is text-only pills (design-system.md §4.1).
++function HomeIcon(props) {
++  return (
++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++      <path d="M3 11.5 12 4l9 7.5" />
++      <path d="M5.5 10v9a1 1 0 0 0 1 1H9.5a1 1 0 0 0 1-1v-4.5a1 1 0 0 1 1-1H12.5a1 1 0 0 1 1 1V19a1 1 0 0 0 1 1H17.5a1 1 0 0 0 1-1v-9" />
++    </svg>
++  )
++}
++
++function ScheduleIcon(props) {
++  return (
++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++      <rect x="4" y="5" width="16" height="15" rx="2" />
++      <path d="M8 3v4M16 3v4M4 10h16" />
++    </svg>
++  )
++}
++
++function RosterIcon(props) {
++  return (
++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++      <circle cx="9" cy="8" r="3" />
++      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
++      <path d="M16.5 8.5a2.5 2.5 0 1 1 0 5" />
++      <path d="M15 12.5c2.4.3 4.5 1.7 4.5 4.5" />
++    </svg>
++  )
++}
++
++function MoreIcon(props) {
++  return (
++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++      <rect x="4" y="5" width="16" height="3.2" rx="1.2" />
++      <rect x="4" y="10.4" width="16" height="3.2" rx="1.2" />
++      <rect x="4" y="15.8" width="16" height="3.2" rx="1.2" />
++    </svg>
++  )
++}
++
++// Single source of truth for the nav items, so nothing (AppShell, Nav
++// itself, any future breadcrumb-style consumer) duplicates this list.
++export const NAV_ITEMS = [
++  { to: '/', label: 'Home', end: true, icon: HomeIcon },
++  { to: '/schedule', label: 'Schedule', icon: ScheduleIcon },
++  { to: '/roster', label: 'Roster', icon: RosterIcon },
++  { to: '/more', label: 'More', icon: MoreIcon },
++]
++
++function linkClassName({ isActive }) {
++  return [
++    // Mobile (tab bar item): icon above label, muted/active colour swap.
++    'flex flex-col items-center justify-center gap-1 rounded-lg py-2 text-[10.5px] font-bold outline-none transition',
++    'focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2',
++    isActive ? 'text-quinsRed' : 'text-[#77726e] hover:text-quinsBlack',
++    // Desktop (in-header top nav): text-only pill on the gradient, per
++    // design-system.md §4.1 (.nav-desktop button styling).
++    'desktop:flex-row desktop:gap-0 desktop:rounded-[10px] desktop:px-3.5 desktop:py-2 desktop:text-sm desktop:font-semibold desktop:text-white',
++    isActive
++      ? 'desktop:bg-white/[.16] desktop:opacity-100'
++      : 'desktop:opacity-[.82] desktop:hover:opacity-100',
++  ].join(' ')
++}
++
++export default function Nav() {
++  return (
++    <nav
++      aria-label="Primary"
++      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-[#e6e3e1] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md desktop:static desktop:z-auto desktop:flex desktop:w-auto desktop:grid-cols-none desktop:gap-1 desktop:border-0 desktop:bg-transparent desktop:p-0 desktop:backdrop-blur-none"
++    >
++      {NAV_ITEMS.map(({ to, label, end, icon: Icon }) => (
++        <NavLink key={to} to={to} end={end} className={linkClassName}>
++          <Icon className="h-[23px] w-[23px] desktop:hidden" aria-hidden="true" />
++          <span>{label}</span>
++        </NavLink>
++      ))}
++    </nav>
++  )
++}
+diff --git a/src/components/RequireAuth.jsx b/src/components/RequireAuth.jsx
+index 093bfd3..267d3b3 100644
+--- a/src/components/RequireAuth.jsx
++++ b/src/components/RequireAuth.jsx
+@@ -1,11 +1,11 @@
+-import { useEffect, useState } from 'react'
++import { useEffect, useRef, useState } from 'react'
+ import { useAuth } from '../lib/auth.jsx'
+ import Login from '../screens/Login.jsx'
+ 
+ // Gates its children behind an authenticated session: shows a loading
+ // indicator while the initial session check is in flight, the Login screen
+ // when there is none, and the children once a session exists. It renders in
+ // place rather than redirecting to a /login route, so a magic-link recipient
+ // landing on any deep URL still lands correctly after sign-in.
+ //
+ // It also does the URL cleanup this app needs. supabase-js
+@@ -15,24 +15,34 @@ import Login from '../screens/Login.jsx'
+ // can't share one condition because one requires a session and the other
+ // requires the *absence* of one:
+ //
+ // - Success: a #access_token=... fragment, cleared once a session exists
+ //   (supabase-js needed it to still be there to consume).
+ // - Failure: an expired/invalid magic link or a declined OAuth attempt never
+ //   produces a session, so Supabase instead leaves an
+ //   #error=...&error_description=... fragment. That has to be read
+ //   regardless of session state (there will never be one), captured so
+ //   Login can explain what happened, and then cleared.
++//
++// A captured authError otherwise lives for the app's whole lifetime, since
++// this component never unmounts across sign-in/sign-out — Task 8 adds
++// in-SPA sign-out, so without the cleanup effect below, a stale "that
++// sign-in link didn't work" message from an earlier failed attempt could
++// resurface on the Login screen after a later, unrelated sign-out. The
++// effect clears it only on a real session-goes-away transition (tracked via
++// a ref), not on first mount, so a freshly captured error from this load's
++// own URL fragment is left alone.
+ 
+ export default function RequireAuth({ children }) {
+   const { session, loading } = useAuth()
+   const [authError, setAuthError] = useState(null)
++  const hadSessionRef = useRef(false)
+ 
+   // Capture and clear a failed-attempt error from the URL fragment. Runs
+   // once on mount rather than depending on session, since a failed attempt
+   // never establishes one.
+   useEffect(() => {
+     const hash = window.location.hash
+     if (!hash) return
+ 
+     const params = new URLSearchParams(hash.slice(1))
+     const description = params.get('error_description')
+@@ -50,20 +60,34 @@ export default function RequireAuth({ children }) {
+     const hash = window.location.hash
+     if (hash.includes('access_token')) {
+       window.history.replaceState(
+         null,
+         '',
+         window.location.pathname + window.location.search,
+       )
+     }
+   }, [session])
+ 
++  // Clear a captured authError once the session goes away — but only on a
++  // genuine transition (had a session, now don't, e.g. sign-out), never on
++  // first mount. hadSessionRef starts false, so the very first run here
++  // never clears whatever the effect above just captured from this load's
++  // own URL fragment.
++  useEffect(() => {
++    const hadSession = hadSessionRef.current
++    hadSessionRef.current = Boolean(session)
++
++    if (hadSession && !session) {
++      setAuthError(null)
++    }
++  }, [session])
++
+   if (loading) {
+     return (
+       <div
+         role="status"
+         className="flex min-h-screen items-center justify-center bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_100%)] text-white"
+       >
+         <p className="text-sm font-semibold uppercase tracking-widest opacity-80">Loading…</p>
+       </div>
+     )
+   }
+diff --git a/src/index.css b/src/index.css
+index c0d4e02..6b9dd06 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -1,9 +1,24 @@
+ @tailwind base;
+ @tailwind components;
+ @tailwind utilities;
+ 
+ body {
+   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
+     Arial, sans-serif;
+   -webkit-font-smoothing: antialiased;
+ }
++
++/* Global prefers-reduced-motion handling (design-system.md accessibility
++   requirement): every transition/animation in the app is suppressed for
++   users who've asked for reduced motion, rather than each component having
++   to opt in individually. */
++@media (prefers-reduced-motion: reduce) {
++  *,
++  *::before,
++  *::after {
++    animation-duration: 0.01ms !important;
++    animation-iteration-count: 1 !important;
++    transition-duration: 0.01ms !important;
++    scroll-behavior: auto !important;
++  }
++}
+diff --git a/src/lib/memberships.jsx b/src/lib/memberships.jsx
+new file mode 100644
+index 0000000..7725bfc
+--- /dev/null
++++ b/src/lib/memberships.jsx
+@@ -0,0 +1,83 @@
++import { createContext, useCallback, useContext, useEffect, useState } from 'react'
++import { useAuth } from './auth.jsx'
++import { supabase } from './supabase'
++import { loadMyMemberships } from '../data/members.js'
++
++// Membership/teams context: loads the current user's membership rows and the
++// club's teams once a session exists, so the rest of the app can read "who
++// is this person and what can they see" (via src/lib/scope.js's pure
++// functions) without every screen re-querying. scope.js deliberately stays
++// pure and provider-free (Task 7) — this is where that decision's provider
++// lives. Meant to be mounted inside RequireAuth only, so a session is
++// guaranteed whenever this actually queries; the no-session branch below is
++// a defensive fallback, not the expected steady state.
++//
++// RLS already scopes both queries to what the calling user is allowed to
++// see (admins get every row, coaches/parents/players get only their own) —
++// there is no user id or team id argument to pass here.
++
++const MembershipContext = createContext(undefined)
++
++async function loadTeams() {
++  const { data, error } = await supabase.from('teams').select('*')
++  if (error) throw error
++  return data ?? []
++}
++
++export function MembershipProvider({ children }) {
++  const { session } = useAuth()
++  const [memberships, setMemberships] = useState([])
++  const [teams, setTeams] = useState([])
++  const [loading, setLoading] = useState(true)
++  const [error, setError] = useState(null)
++  const [reloadToken, setReloadToken] = useState(0)
++
++  useEffect(() => {
++    let mounted = true
++
++    if (!session) {
++      setMemberships([])
++      setTeams([])
++      setError(null)
++      setLoading(false)
++      return () => {
++        mounted = false
++      }
++    }
++
++    setLoading(true)
++    setError(null)
++
++    Promise.all([loadMyMemberships(), loadTeams()])
++      .then(([membershipRows, teamRows]) => {
++        if (!mounted) return
++        setMemberships(membershipRows)
++        setTeams(teamRows)
++      })
++      .catch((err) => {
++        if (!mounted) return
++        setError(err)
++      })
++      .finally(() => {
++        if (mounted) setLoading(false)
++      })
++
++    return () => {
++      mounted = false
++    }
++  }, [session, reloadToken])
++
++  const reload = useCallback(() => setReloadToken((token) => token + 1), [])
++
++  const value = { memberships, teams, loading, error, reload }
++
++  return <MembershipContext.Provider value={value}>{children}</MembershipContext.Provider>
++}
++
++export function useMemberships() {
++  const context = useContext(MembershipContext)
++  if (context === undefined) {
++    throw new Error('useMemberships must be used within a MembershipProvider')
++  }
++  return context
++}
+diff --git a/tailwind.config.js b/tailwind.config.js
+index 398c523..02227de 100644
+--- a/tailwind.config.js
++++ b/tailwind.config.js
+@@ -3,14 +3,20 @@ export default {
+   content: ['./index.html', './src/**/*.{js,jsx}'],
+   theme: {
+     extend: {
+       colors: {
+         quinsRed: '#C21F32',
+         quinsGreen: '#7DC351',
+         quinsGreenSoft: '#87C97F',
+         quinsRedDark: '#8E1526',
+         quinsBlack: '#141414',
+       },
++      screens: {
++        // The prototype's single responsive breakpoint (design-system.md
++        // §5): below it is mobile (bottom tab bar, FAB, bottom sheet), at/
++        // above it is desktop (top nav, no FAB, centered dialog).
++        desktop: '820px',
++      },
+     },
+   },
+   plugins: [],
+ }
+diff --git a/tests/app-shell.test.jsx b/tests/app-shell.test.jsx
+new file mode 100644
+index 0000000..2a56b3a
+--- /dev/null
++++ b/tests/app-shell.test.jsx
+@@ -0,0 +1,148 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest'
++import { render, screen } from '@testing-library/react'
++import userEvent from '@testing-library/user-event'
++import { MemoryRouter } from 'react-router-dom'
++
++// Unit tests for src/components/AppShell.jsx (Task 8). useAuth and
++// useMemberships are both mocked so this exercises only AppShell's own
++// rendering logic (header, nav placement, loading/error/zero-membership
++// states, and where-sign-out-lives) — not the real MembershipProvider
++// (tests/memberships.test.jsx) or AuthProvider (tests/auth.test.jsx). No
++// network is ever reachable from this file.
++
++const useAuthMock = vi.fn()
++const useMembershipsMock = vi.fn()
++
++vi.mock('../src/lib/auth.jsx', () => ({
++  useAuth: () => useAuthMock(),
++}))
++
++vi.mock('../src/lib/memberships.jsx', () => ({
++  useMemberships: () => useMembershipsMock(),
++}))
++
++// Import after vi.mock so this binds to the mocked modules.
++import AppShell from '../src/components/AppShell.jsx'
++
++const signOutMock = vi.fn()
++
++const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
++
++function renderShell(path = '/', children = <div>Routed content</div>) {
++  return render(
++    <MemoryRouter initialEntries={[path]} future={routerFuture}>
++      <AppShell>{children}</AppShell>
++    </MemoryRouter>,
++  )
++}
++
++function loaded(overrides = {}) {
++  return {
++    memberships: [{ role: 'admin', team_id: null }],
++    teams: [],
++    loading: false,
++    error: null,
++    reload: vi.fn(),
++    ...overrides,
++  }
++}
++
++beforeEach(() => {
++  useAuthMock.mockReset()
++  useMembershipsMock.mockReset()
++  signOutMock.mockReset()
++  useAuthMock.mockReturnValue({ user: { email: 'jay@example.com' }, signOut: signOutMock })
++})
++
++describe('AppShell', () => {
++  it('renders the brand name, tagline, and all four nav items', () => {
++    useMembershipsMock.mockReturnValue(loaded())
++
++    renderShell()
++
++    expect(screen.getByText('Abu Dhabi Harlequins')).toBeInTheDocument()
++    expect(screen.getByText('Quins Club Hub')).toBeInTheDocument()
++    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
++    expect(screen.getByRole('link', { name: 'Schedule' })).toBeInTheDocument()
++    expect(screen.getByRole('link', { name: 'Roster' })).toBeInTheDocument()
++    expect(screen.getByRole('link', { name: 'More' })).toBeInTheDocument()
++  })
++
++  it('renders the routed content and a role label once memberships have loaded', () => {
++    useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'coach', team_id: 't1' }] }))
++
++    renderShell('/', <div>Routed content</div>)
++
++    expect(screen.getByText('Routed content')).toBeInTheDocument()
++    expect(screen.getByText('Coach')).toBeInTheDocument()
++  })
++
++  it('renders a loading state, and not the routed content, while memberships load', () => {
++    useMembershipsMock.mockReturnValue(loaded({ memberships: [], loading: true }))
++
++    renderShell()
++
++    expect(screen.getByRole('status')).toBeInTheDocument()
++    expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
++  })
++
++  it('renders an error state, not a blank screen, when membership loading fails', () => {
++    useMembershipsMock.mockReturnValue(
++      loaded({ memberships: [], error: new Error('permission denied') }),
++    )
++
++    renderShell()
++
++    expect(screen.getByRole('alert')).toHaveTextContent(/permission denied/i)
++    expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
++  })
++
++  it('renders a zero-membership message with the signed-in email instead of routed content', () => {
++    useMembershipsMock.mockReturnValue(loaded({ memberships: [] }))
++
++    renderShell()
++
++    expect(screen.getByText(/jay@example.com/)).toBeInTheDocument()
++    expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
++    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
++  })
++
++  it('sign-out from the zero-membership state calls signOut', async () => {
++    useMembershipsMock.mockReturnValue(loaded({ memberships: [] }))
++    signOutMock.mockResolvedValue(undefined)
++    const user = userEvent.setup()
++
++    renderShell()
++    await user.click(screen.getByRole('button', { name: /sign out/i }))
++
++    expect(signOutMock).toHaveBeenCalledTimes(1)
++  })
++
++  it('surfaces a sign-out failure instead of throwing', async () => {
++    useMembershipsMock.mockReturnValue(loaded({ memberships: [] }))
++    signOutMock.mockRejectedValue(new Error('network unreachable'))
++    const user = userEvent.setup()
++
++    renderShell()
++    await user.click(screen.getByRole('button', { name: /sign out/i }))
++
++    expect(await screen.findByText(/network unreachable/i)).toBeInTheDocument()
++  })
++
++  it('offers sign-out on the More route once memberships have loaded', () => {
++    useMembershipsMock.mockReturnValue(loaded())
++
++    renderShell('/more', <h1>More</h1>)
++
++    expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument()
++    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
++  })
++
++  it('does not show a More sign-out control on other routes', () => {
++    useMembershipsMock.mockReturnValue(loaded())
++
++    renderShell('/', <h1>Home</h1>)
++
++    expect(screen.queryByRole('button', { name: /sign out/i })).not.toBeInTheDocument()
++  })
++})
+diff --git a/tests/app.test.jsx b/tests/app.test.jsx
+index 285ddeb..6f6ae6a 100644
+--- a/tests/app.test.jsx
++++ b/tests/app.test.jsx
+@@ -1,39 +1,67 @@
+ import { describe, it, expect, vi, beforeEach } from 'vitest'
+ import { render, screen } from '@testing-library/react'
+ 
+-// Unit tests for src/App.jsx (Task 6: auth gate + routing). useAuth is
+-// mocked so this exercises App's routing/gating wiring only — not the real
+-// AuthProvider (tests/auth.test.jsx) or the real Login screen's own behaviour
+-// (tests/login.test.jsx) — and no network is ever reachable from this file.
++// Unit tests for src/App.jsx (Task 6: auth gate + routing; Task 8: shell
++// composition). useAuth and useMemberships are both mocked so this exercises
++// App's routing/gating/composition wiring only — not the real AuthProvider
++// (tests/auth.test.jsx), the real Login screen (tests/login.test.jsx), the
++// real MembershipProvider (tests/memberships.test.jsx), or AppShell's own
++// loading/error/zero-membership rendering (tests/app-shell.test.jsx) — and no
++// network is ever reachable from this file.
+ //
+ // This replaces the Task 1 test that asserted on App's static placeholder
+ // (crest + brand name + tagline centred on the gradient). That placeholder no
+-// longer lives in App.jsx — App now renders routes behind RequireAuth, and
+-// Task 8 will replace today's route placeholders with the real app shell.
+-// The signed-out case below still covers the brand name/tagline, because
+-// RequireAuth renders the real Login screen (which carries that copy) when
+-// there is no session.
++// longer lives in App.jsx — App now renders routes behind RequireAuth, wrapped
++// in the Task 8 shell. The signed-out case below still covers the brand
++// name/tagline, because RequireAuth renders the real Login screen (which
++// carries that copy) when there is no session.
+ 
+ const useAuthMock = vi.fn()
++const useMembershipsMock = vi.fn()
+ 
+ vi.mock('../src/lib/auth.jsx', () => ({
+   useAuth: () => useAuthMock(),
+ }))
+ 
+-// Import after vi.mock so this binds to the mocked module.
++// MembershipProvider is mocked to a pass-through so App's composition
++// (RequireAuth -> MembershipProvider -> AppShell -> Routes) is exercised
++// without touching Supabase; useMemberships is stubbed with an already-loaded
++// membership so the routed placeholders are reachable through AppShell's
++// loading/error/zero-membership gate (that gate's own behaviour is covered by
++// tests/app-shell.test.jsx).
++vi.mock('../src/lib/memberships.jsx', () => ({
++  MembershipProvider: ({ children }) => children,
++  useMemberships: () => useMembershipsMock(),
++}))
++
++// Import after vi.mock so this binds to the mocked modules.
+ import App from '../src/App.jsx'
+ 
+-const signedIn = { session: { user: { id: 'u1' } }, loading: false }
++const signedIn = {
++  session: { user: { id: 'u1' } },
++  user: { id: 'u1', email: 'jay@example.com' },
++  loading: false,
++  signOut: vi.fn(),
++}
++const membershipsLoaded = {
++  memberships: [{ role: 'admin', team_id: null }],
++  teams: [],
++  loading: false,
++  error: null,
++  reload: vi.fn(),
++}
+ 
+ beforeEach(() => {
+   useAuthMock.mockReset()
++  useMembershipsMock.mockReset()
++  useMembershipsMock.mockReturnValue(membershipsLoaded)
+   window.history.pushState({}, '', '/')
+ })
+ 
+ describe('App', () => {
+   it('renders the Login screen when there is no session', () => {
+     useAuthMock.mockReturnValue({ session: null, loading: false })
+ 
+     render(<App />)
+ 
+     expect(screen.getByText('Abu Dhabi Harlequins')).toBeInTheDocument()
+diff --git a/tests/memberships.test.jsx b/tests/memberships.test.jsx
+new file mode 100644
+index 0000000..9da6fbb
+--- /dev/null
++++ b/tests/memberships.test.jsx
+@@ -0,0 +1,207 @@
++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
++import { render, screen, waitFor } from '@testing-library/react'
++import userEvent from '@testing-library/user-event'
++
++// Unit tests for src/lib/memberships.jsx (Task 8: MembershipProvider /
++// useMemberships). scope.js (Task 7) stays pure and provider-free by design;
++// this is the provider that decision requires. Both useAuth and the Supabase
++// client are mocked so this never touches the network and exercises only
++// this file's loading/error/reload/cleanup wiring.
++
++const useAuthMock = vi.fn()
++
++vi.mock('../src/lib/auth.jsx', () => ({
++  useAuth: () => useAuthMock(),
++}))
++
++vi.mock('../src/lib/supabase.js', () => ({
++  supabase: {
++    from: vi.fn(),
++  },
++}))
++
++// Import after vi.mock so these bind to the mocked modules.
++import { supabase } from '../src/lib/supabase.js'
++import { MembershipProvider, useMemberships } from '../src/lib/memberships.jsx'
++
++const MEMBERSHIP_ROW = { id: 'm-1', role: 'coach', team_id: 'team-1', player_id: null }
++const TEAM_ROW = { id: 'team-1', name: 'U12', sort_order: 7 }
++
++function Harness() {
++  const { memberships, teams, loading, error, reload } = useMemberships()
++  return (
++    <div>
++      <div data-testid="loading">{String(loading)}</div>
++      <div data-testid="error">{error ? error.message : 'none'}</div>
++      <div data-testid="memberships">{JSON.stringify(memberships)}</div>
++      <div data-testid="teams">{JSON.stringify(teams)}</div>
++      <button onClick={reload}>Reload</button>
++    </div>
++  )
++}
++
++function mockFrom({ memberships, membershipsError, teams, teamsError } = {}) {
++  supabase.from.mockImplementation((table) => {
++    if (table === 'memberships') {
++      return {
++        select: vi.fn().mockResolvedValue({
++          data: membershipsError ? null : (memberships ?? [MEMBERSHIP_ROW]),
++          error: membershipsError ?? null,
++        }),
++      }
++    }
++    if (table === 'teams') {
++      return {
++        select: vi.fn().mockResolvedValue({
++          data: teamsError ? null : (teams ?? [TEAM_ROW]),
++          error: teamsError ?? null,
++        }),
++      }
++    }
++    throw new Error(`Unexpected table in test: ${table}`)
++  })
++}
++
++beforeEach(() => {
++  useAuthMock.mockReset()
++  supabase.from.mockReset()
++})
++
++afterEach(() => {
++  vi.clearAllMocks()
++})
++
++describe('MembershipProvider / useMemberships', () => {
++  it('does not query at all with no session, and resolves loading to false immediately with empty arrays', () => {
++    useAuthMock.mockReturnValue({ session: null })
++
++    render(
++      <MembershipProvider>
++        <Harness />
++      </MembershipProvider>,
++    )
++
++    expect(screen.getByTestId('loading')).toHaveTextContent('false')
++    expect(screen.getByTestId('memberships')).toHaveTextContent('[]')
++    expect(screen.getByTestId('teams')).toHaveTextContent('[]')
++    expect(screen.getByTestId('error')).toHaveTextContent('none')
++    expect(supabase.from).not.toHaveBeenCalled()
++  })
++
++  it('starts loading true, then loads memberships and teams once a session exists', async () => {
++    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
++    mockFrom()
++
++    render(
++      <MembershipProvider>
++        <Harness />
++      </MembershipProvider>,
++    )
++
++    expect(screen.getByTestId('loading')).toHaveTextContent('true')
++
++    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
++
++    expect(screen.getByTestId('memberships')).toHaveTextContent('coach')
++    expect(screen.getByTestId('teams')).toHaveTextContent('U12')
++    expect(screen.getByTestId('error')).toHaveTextContent('none')
++    expect(supabase.from).toHaveBeenCalledWith('memberships')
++    expect(supabase.from).toHaveBeenCalledWith('teams')
++  })
++
++  it('resolves loading to false and sets error when the memberships query fails', async () => {
++    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
++    mockFrom({ membershipsError: new Error('permission denied') })
++
++    render(
++      <MembershipProvider>
++        <Harness />
++      </MembershipProvider>,
++    )
++
++    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
++
++    expect(screen.getByTestId('error')).toHaveTextContent('permission denied')
++    expect(screen.getByTestId('memberships')).toHaveTextContent('[]')
++  })
++
++  it('resolves loading to false and sets error when the teams query fails', async () => {
++    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
++    mockFrom({ teamsError: new Error('teams unavailable') })
++
++    render(
++      <MembershipProvider>
++        <Harness />
++      </MembershipProvider>,
++    )
++
++    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
++
++    expect(screen.getByTestId('error')).toHaveTextContent('teams unavailable')
++  })
++
++  it('reload() re-runs both queries', async () => {
++    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
++    mockFrom()
++    const user = userEvent.setup()
++
++    render(
++      <MembershipProvider>
++        <Harness />
++      </MembershipProvider>,
++    )
++    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
++
++    supabase.from.mockClear()
++
++    await user.click(screen.getByRole('button', { name: 'Reload' }))
++
++    await waitFor(() => expect(supabase.from).toHaveBeenCalledWith('memberships'))
++    expect(supabase.from).toHaveBeenCalledWith('teams')
++  })
++
++  it('does not update state after unmount', async () => {
++    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
++    let resolveSelect
++    supabase.from.mockImplementation(() => ({
++      select: vi.fn(
++        () =>
++          new Promise((resolve) => {
++            resolveSelect = resolve
++          }),
++      ),
++    }))
++    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
++
++    const { unmount } = render(
++      <MembershipProvider>
++        <Harness />
++      </MembershipProvider>,
++    )
++
++    unmount()
++    resolveSelect?.({ data: [MEMBERSHIP_ROW], error: null })
++    await Promise.resolve()
++    await Promise.resolve()
++
++    expect(consoleError).not.toHaveBeenCalledWith(
++      expect.stringContaining('a test was not wrapped in act'),
++    )
++    consoleError.mockRestore()
++  })
++
++  it('throws a clear error when useMemberships is used outside MembershipProvider', () => {
++    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
++
++    function BareHarness() {
++      useMemberships()
++      return null
++    }
++
++    expect(() => render(<BareHarness />)).toThrow(
++      /useMemberships must be used within a MembershipProvider/,
++    )
++
++    consoleError.mockRestore()
++  })
++})
+diff --git a/tests/nav.test.jsx b/tests/nav.test.jsx
+new file mode 100644
+index 0000000..26f9709
+--- /dev/null
++++ b/tests/nav.test.jsx
+@@ -0,0 +1,72 @@
++import { describe, it, expect } from 'vitest'
++import { render, screen } from '@testing-library/react'
++import userEvent from '@testing-library/user-event'
++import { MemoryRouter } from 'react-router-dom'
++import Nav, { NAV_ITEMS } from '../src/components/Nav.jsx'
++
++// Unit tests for src/components/Nav.jsx (Task 8). Nav renders one tree used
++// for both the mobile tab bar and the desktop top nav (CSS-responsive, see
++// AppShell) — these tests only cover the shared behaviour: the four items,
++// their routes, and NavLink's active-route wiring. No network involved.
++
++const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
++
++function renderNav(initialEntry = '/') {
++  return render(
++    <MemoryRouter initialEntries={[initialEntry]} future={routerFuture}>
++      <Nav />
++    </MemoryRouter>,
++  )
++}
++
++describe('NAV_ITEMS', () => {
++  it('is exactly Home, Schedule, Roster, More, in that order', () => {
++    expect(NAV_ITEMS.map((item) => item.label)).toEqual(['Home', 'Schedule', 'Roster', 'More'])
++    expect(NAV_ITEMS.map((item) => item.to)).toEqual(['/', '/schedule', '/roster', '/more'])
++  })
++})
++
++describe('Nav', () => {
++  it('renders all four nav items as links', () => {
++    renderNav()
++
++    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
++    expect(screen.getByRole('link', { name: 'Schedule' })).toBeInTheDocument()
++    expect(screen.getByRole('link', { name: 'Roster' })).toBeInTheDocument()
++    expect(screen.getByRole('link', { name: 'More' })).toBeInTheDocument()
++  })
++
++  it('marks Home active with aria-current="page" at the root route', () => {
++    renderNav('/')
++
++    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
++    expect(screen.getByRole('link', { name: 'Schedule' })).not.toHaveAttribute('aria-current')
++  })
++
++  it('does not mark Home active on other routes (end matching on /)', () => {
++    renderNav('/roster')
++
++    expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current', 'page')
++    expect(screen.getByRole('link', { name: 'Roster' })).toHaveAttribute('aria-current', 'page')
++  })
++
++  it('clicking a nav item moves aria-current to the clicked item', async () => {
++    const user = userEvent.setup()
++    renderNav('/')
++
++    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
++
++    await user.click(screen.getByRole('link', { name: 'More' }))
++
++    expect(screen.getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page')
++    expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
++  })
++
++  it('links point at the correct hrefs', () => {
++    renderNav()
++
++    expect(screen.getByRole('link', { name: 'Schedule' })).toHaveAttribute('href', '/schedule')
++    expect(screen.getByRole('link', { name: 'Roster' })).toHaveAttribute('href', '/roster')
++    expect(screen.getByRole('link', { name: 'More' })).toHaveAttribute('href', '/more')
++  })
++})
+diff --git a/tests/require-auth.test.jsx b/tests/require-auth.test.jsx
+index 7ef7a8b..c01e072 100644
+--- a/tests/require-auth.test.jsx
++++ b/tests/require-auth.test.jsx
+@@ -145,10 +145,67 @@ describe('RequireAuth auth error capture (failure path, no session ever exists)'
+ 
+     render(
+       <RequireAuth>
+         <div>Protected content</div>
+       </RequireAuth>,
+     )
+ 
+     expect(window.location.hash).toBe('#access_token=abc123')
+   })
+ })
++
++describe('RequireAuth stale auth error cleanup (carried defect, Task 8 decision 3)', () => {
++  it('clears a previously captured auth error once the session goes away, e.g. after sign-out', () => {
++    window.history.pushState(
++      {},
++      '',
++      '/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid',
++    )
++    useAuthMock.mockReturnValue({ session: null, loading: false })
++
++    const { rerender } = render(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++
++    // Sanity: the error was captured as before.
++    expect(screen.getByTestId('passed-auth-error')).toBeInTheDocument()
++
++    // The user signs in (e.g. via a fresh, successful attempt).
++    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
++    rerender(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++    expect(screen.getByText('Protected content')).toBeInTheDocument()
++
++    // The user signs out from within the app: session goes away again.
++    useAuthMock.mockReturnValue({ session: null, loading: false })
++    rerender(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++
++    expect(screen.getByText('Login screen stub')).toBeInTheDocument()
++    expect(screen.queryByTestId('passed-auth-error')).not.toBeInTheDocument()
++  })
++
++  it('does not clear a freshly captured auth error on first mount (no prior session)', () => {
++    window.history.pushState(
++      {},
++      '',
++      '/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid',
++    )
++    useAuthMock.mockReturnValue({ session: null, loading: false })
++
++    render(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++
++    expect(screen.getByTestId('passed-auth-error')).toBeInTheDocument()
++  })
++})

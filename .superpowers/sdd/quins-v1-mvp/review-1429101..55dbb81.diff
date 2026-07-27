@@ -1,0 +1,222 @@
+# Review package: 1429101..HEAD
+
+## Commits
+55dbb81 fix: address Task 8 review findings in AppShell
+
+## Files changed
+ src/components/AppShell.jsx | 29 +++++++++++++++++++++-------
+ tests/app-shell.test.jsx    | 46 ++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 67 insertions(+), 8 deletions(-)
+
+## Diff
+diff --git a/src/components/AppShell.jsx b/src/components/AppShell.jsx
+index 54b7753..8075731 100644
+--- a/src/components/AppShell.jsx
++++ b/src/components/AppShell.jsx
+@@ -66,21 +66,21 @@ function LoadingState() {
+   )
+ }
+ 
+ function ErrorState({ error, reload }) {
+   return (
+     <div
+       role="alert"
+       className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-[#e6e3e1] bg-white p-6 text-center shadow-[0_6px_24px_rgba(20,20,20,0.10)]"
+     >
+       <h2 className="text-lg font-extrabold text-quinsRedDark">Couldn&apos;t load your account</h2>
+-      <p className="mt-2 text-sm leading-relaxed text-[#77726e]">
++      <p data-testid="error-message" className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+         {error.message || 'Something went wrong. Try again.'}
+       </p>
+       <button
+         type="button"
+         onClick={reload}
+         className="mt-4 rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-quinsRedDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+       >
+         Try again
+       </button>
+     </div>
+@@ -106,44 +106,59 @@ function NoMembershipState({ email, signOut }) {
+   )
+ }
+ 
+ export default function AppShell({ children }) {
+   const { user, signOut } = useAuth()
+   const { memberships, loading, error, reload } = useMemberships()
+   const location = useLocation()
+ 
+   const isMoreRoute = location.pathname === '/more'
+   const ready = !loading && !error && memberships.length > 0
++  const showRole = !loading && !error
++  const currentRoleLabel = roleLabel(memberships)
+ 
+   return (
+     <div className="flex min-h-screen flex-col bg-[#f5f4f3] text-[#221f1d]">
+       <header className="sticky top-0 z-40 bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_100%)] text-white shadow-[0_2px_16px_rgba(20,20,20,0.28)]">
+         <div className="mx-auto flex max-w-[1120px] items-center gap-3 px-4 py-3">
+           <img
+             src={crest}
+             alt="Abu Dhabi Harlequins crest"
+             className="h-[46px] w-[46px] shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
+           />
+-          <div>
++          <div className="min-w-0">
+             <h1 className="text-base font-extrabold leading-[1.1] tracking-[0.2px]">
+               Abu Dhabi Harlequins
+             </h1>
+-            <p className="text-[11.5px] font-semibold uppercase tracking-[1.3px] text-white/[.82]">
+-              Quins Club Hub
++            <p className="flex items-baseline gap-1 text-[11.5px] font-semibold uppercase tracking-[1.3px] text-white/[.82] desktop:text-[12px]">
++              <span>Quins Club Hub</span>
++              {/* Mobile-only compact role indicator (decision 6: the role
++                  label has no breakpoint qualifier, and mobile is the
++                  primary case for a pitch-side club app). The desktop badge
++                  below covers >=820px; this covers below it, so the role is
++                  never CSS-hidden at any width. */}
++              {showRole && (
++                <span data-testid="role-label-mobile" className="truncate desktop:hidden">
++                  · {currentRoleLabel}
++                </span>
++              )}
+             </p>
+           </div>
+ 
+           <div className="flex-1" />
+ 
+-          {!loading && !error && (
+-            <span className="hidden shrink-0 rounded-full bg-white/[.16] px-3 py-1 text-xs font-bold uppercase tracking-wide desktop:inline-block">
+-              {roleLabel(memberships)}
++          {showRole && (
++            <span
++              data-testid="role-label-desktop"
++              className="hidden shrink-0 rounded-full bg-white/[.16] px-3 py-1 text-xs font-bold uppercase tracking-wide desktop:inline-block"
++            >
++              {currentRoleLabel}
+             </span>
+           )}
+ 
+           <Nav />
+         </div>
+       </header>
+ 
+       <main className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16">
+         {loading && <LoadingState />}
+         {!loading && error && <ErrorState error={error} reload={reload} />}
+diff --git a/tests/app-shell.test.jsx b/tests/app-shell.test.jsx
+index 2a56b3a..53e87d9 100644
+--- a/tests/app-shell.test.jsx
++++ b/tests/app-shell.test.jsx
+@@ -40,20 +40,31 @@ function loaded(overrides = {}) {
+   return {
+     memberships: [{ role: 'admin', team_id: null }],
+     teams: [],
+     loading: false,
+     error: null,
+     reload: vi.fn(),
+     ...overrides,
+   }
+ }
+ 
++// jsdom never applies real CSS, so `getByText(...).toBeInTheDocument()` alone
++// cannot tell a genuinely-visible element from one Tailwind's bare `hidden`
++// utility removes at this width — that gap is exactly how the mobile role
++// label shipped invisible in the first Task 8 pass (review finding). This
++// checks the literal class token instead, which is what's actually testable
++// in jsdom and is what determines real visibility once real CSS applies.
++// (`desktop:hidden` is a distinct token, so it won't false-match here.)
++function hasClassToken(element, token) {
++  return element.className.split(/\s+/).includes(token)
++}
++
+ beforeEach(() => {
+   useAuthMock.mockReset()
+   useMembershipsMock.mockReset()
+   signOutMock.mockReset()
+   useAuthMock.mockReturnValue({ user: { email: 'jay@example.com' }, signOut: signOutMock })
+ })
+ 
+ describe('AppShell', () => {
+   it('renders the brand name, tagline, and all four nav items', () => {
+     useMembershipsMock.mockReturnValue(loaded())
+@@ -61,47 +72,80 @@ describe('AppShell', () => {
+     renderShell()
+ 
+     expect(screen.getByText('Abu Dhabi Harlequins')).toBeInTheDocument()
+     expect(screen.getByText('Quins Club Hub')).toBeInTheDocument()
+     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
+     expect(screen.getByRole('link', { name: 'Schedule' })).toBeInTheDocument()
+     expect(screen.getByRole('link', { name: 'Roster' })).toBeInTheDocument()
+     expect(screen.getByRole('link', { name: 'More' })).toBeInTheDocument()
+   })
+ 
++  it('the tagline steps up to 12px at the desktop breakpoint (design-system.md §2)', () => {
++    useMembershipsMock.mockReturnValue(loaded())
++
++    renderShell()
++
++    const tagline = screen.getByText('Quins Club Hub').parentElement
++    expect(hasClassToken(tagline, 'desktop:text-[12px]')).toBe(true)
++  })
++
+   it('renders the routed content and a role label once memberships have loaded', () => {
+     useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'coach', team_id: 't1' }] }))
+ 
+     renderShell('/', <div>Routed content</div>)
+ 
+     expect(screen.getByText('Routed content')).toBeInTheDocument()
+-    expect(screen.getByText('Coach')).toBeInTheDocument()
++    expect(screen.getByTestId('role-label-mobile')).toHaveTextContent('Coach')
++    expect(screen.getByTestId('role-label-desktop')).toHaveTextContent('Coach')
++  })
++
++  it('the role label is not CSS-hidden on mobile (only the desktop copy is), and both copies carry the same role', () => {
++    // Regression for the Task 8 review finding: the role badge was
++    // `hidden ... desktop:inline-block`, which is correct for the desktop
++    // copy but meant NO copy rendered visibly below 820px. There must be a
++    // second, mobile-visible copy whose class list never includes a bare
++    // `hidden` token.
++    useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'coach', team_id: 't1' }] }))
++
++    renderShell()
++
++    const mobileRole = screen.getByTestId('role-label-mobile')
++    const desktopRole = screen.getByTestId('role-label-desktop')
++
++    expect(mobileRole).toHaveTextContent('Coach')
++    expect(desktopRole).toHaveTextContent('Coach')
++    expect(hasClassToken(mobileRole, 'hidden')).toBe(false)
++    expect(hasClassToken(desktopRole, 'hidden')).toBe(true)
+   })
+ 
+   it('renders a loading state, and not the routed content, while memberships load', () => {
+     useMembershipsMock.mockReturnValue(loaded({ memberships: [], loading: true }))
+ 
+     renderShell()
+ 
+     expect(screen.getByRole('status')).toBeInTheDocument()
+     expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
+   })
+ 
+   it('renders an error state, not a blank screen, when membership loading fails', () => {
+     useMembershipsMock.mockReturnValue(
+       loaded({ memberships: [], error: new Error('permission denied') }),
+     )
+ 
+     renderShell()
+ 
+     expect(screen.getByRole('alert')).toHaveTextContent(/permission denied/i)
+     expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
++
++    // Regression: error text must use the quinsRedDark token (binding
++    // global constraint), not a muted grey — see Task 8 review finding.
++    expect(hasClassToken(screen.getByTestId('error-message'), 'text-quinsRedDark')).toBe(true)
+   })
+ 
+   it('renders a zero-membership message with the signed-in email instead of routed content', () => {
+     useMembershipsMock.mockReturnValue(loaded({ memberships: [] }))
+ 
+     renderShell()
+ 
+     expect(screen.getByText(/jay@example.com/)).toBeInTheDocument()
+     expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
+     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()

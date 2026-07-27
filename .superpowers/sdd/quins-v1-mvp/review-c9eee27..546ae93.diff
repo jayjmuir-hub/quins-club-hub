@@ -1,0 +1,426 @@
+# Review package: c9eee27..HEAD
+
+## Commits
+546ae93 fix: surface failed magic-link/OAuth errors on the login screen
+
+## Files changed
+ src/components/RequireAuth.jsx | 41 +++++++++++++++++++++++------
+ src/screens/Login.jsx          | 24 ++++++++++++++---
+ tests/login.test.jsx           | 59 ++++++++++++++++++++++++++++++++++++++++++
+ tests/require-auth.test.jsx    | 52 ++++++++++++++++++++++++++++---------
+ 4 files changed, 152 insertions(+), 24 deletions(-)
+
+## Diff
+diff --git a/src/components/RequireAuth.jsx b/src/components/RequireAuth.jsx
+index 5486440..093bfd3 100644
+--- a/src/components/RequireAuth.jsx
++++ b/src/components/RequireAuth.jsx
+@@ -1,51 +1,76 @@
+-import { useEffect } from 'react'
++import { useEffect, useState } from 'react'
+ import { useAuth } from '../lib/auth.jsx'
+ import Login from '../screens/Login.jsx'
+ 
+ // Gates its children behind an authenticated session: shows a loading
+ // indicator while the initial session check is in flight, the Login screen
+ // when there is none, and the children once a session exists. It renders in
+ // place rather than redirecting to a /login route, so a magic-link recipient
+ // landing on any deep URL still lands correctly after sign-in.
+ //
+-// It also does the one piece of URL cleanup this app needs: supabase-js
++// It also does the URL cleanup this app needs. supabase-js
+ // (detectSessionInUrl: true) consumes the magic-link/OAuth token from the URL
+ // fragment itself and fires onAuthStateChange — this component never parses
+-// or exchanges tokens. Once a session is established, if a leftover
+-// #access_token=... or #error_description=... fragment is still in the
+-// address bar, it's stripped with replaceState (not pushState, so no extra
+-// history entry) so it isn't left visible or bookmarkable.
++// or exchanges tokens. Two distinct fragment shapes need handling, and they
++// can't share one condition because one requires a session and the other
++// requires the *absence* of one:
++//
++// - Success: a #access_token=... fragment, cleared once a session exists
++//   (supabase-js needed it to still be there to consume).
++// - Failure: an expired/invalid magic link or a declined OAuth attempt never
++//   produces a session, so Supabase instead leaves an
++//   #error=...&error_description=... fragment. That has to be read
++//   regardless of session state (there will never be one), captured so
++//   Login can explain what happened, and then cleared.
+ 
+ export default function RequireAuth({ children }) {
+   const { session, loading } = useAuth()
++  const [authError, setAuthError] = useState(null)
++
++  // Capture and clear a failed-attempt error from the URL fragment. Runs
++  // once on mount rather than depending on session, since a failed attempt
++  // never establishes one.
++  useEffect(() => {
++    const hash = window.location.hash
++    if (!hash) return
++
++    const params = new URLSearchParams(hash.slice(1))
++    const description = params.get('error_description')
++    if (!description) return
++
++    setAuthError(description)
++    window.history.replaceState(null, '', window.location.pathname + window.location.search)
++  }, [])
+ 
++  // Clear the successful-attempt token fragment once supabase-js has
++  // consumed it and a session exists.
+   useEffect(() => {
+     if (!session) return
+ 
+     const hash = window.location.hash
+-    if (hash.includes('access_token') || hash.includes('error_description')) {
++    if (hash.includes('access_token')) {
+       window.history.replaceState(
+         null,
+         '',
+         window.location.pathname + window.location.search,
+       )
+     }
+   }, [session])
+ 
+   if (loading) {
+     return (
+       <div
+         role="status"
+         className="flex min-h-screen items-center justify-center bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_100%)] text-white"
+       >
+         <p className="text-sm font-semibold uppercase tracking-widest opacity-80">Loading…</p>
+       </div>
+     )
+   }
+ 
+   if (!session) {
+-    return <Login />
++    return <Login authError={authError} />
+   }
+ 
+   return children
+ }
+diff --git a/src/screens/Login.jsx b/src/screens/Login.jsx
+index 892cb96..fc1d7fe 100644
+--- a/src/screens/Login.jsx
++++ b/src/screens/Login.jsx
+@@ -1,50 +1,66 @@
+-import { useState } from 'react'
++import { useEffect, useState } from 'react'
+ import { useAuth } from '../lib/auth.jsx'
+ import crest from '../assets/crest.png'
+ 
+ // Login screen: the first thing an uninvited or signed-out visitor sees.
+ // No router dependency (renders standalone) and no sign-up, password,
+ // "remember me", extra social providers, or membership/role logic — those
+ // are explicitly out of scope for this screen.
++//
++// `authError` is optional: RequireAuth passes it in when the visitor arrived
++// via a failed magic-link/OAuth redirect (e.g. an expired link), so this
++// screen can explain why they're back here instead of showing a blank form.
++// It shares the same alert region as this screen's own errors, and is
++// cleared the moment the user starts a fresh attempt so it can't reappear
++// alongside (or instead of) a new error.
+ 
+ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+ 
+-export default function Login() {
++export default function Login({ authError = null }) {
+   const { signInWithEmail, signInWithGoogle } = useAuth()
+   const [email, setEmail] = useState('')
+   const [status, setStatus] = useState('idle') // 'idle' | 'sending' | 'sent'
+   const [error, setError] = useState(null)
++  const [staleAuthError, setStaleAuthError] = useState(authError)
++
++  useEffect(() => {
++    setStaleAuthError(authError)
++  }, [authError])
+ 
+   const sending = status === 'sending'
++  const displayedError =
++    error ?? (staleAuthError ? `That sign-in link didn't work: ${staleAuthError}` : null)
+ 
+   async function handleEmailSubmit(event) {
+     event.preventDefault()
++    setStaleAuthError(null)
+ 
+     const trimmed = email.trim()
+     if (!trimmed || !EMAIL_PATTERN.test(trimmed)) {
+       setError('Enter a valid email address.')
+       return
+     }
+ 
+     setError(null)
+     setStatus('sending')
+     try {
+       await signInWithEmail(trimmed)
+       setStatus('sent')
+     } catch (err) {
+       setError(err.message || 'Something went wrong sending the link. Try again.')
+       setStatus('idle')
+     }
+   }
+ 
+   async function handleGoogleClick() {
++    setStaleAuthError(null)
+     setError(null)
+     setStatus('sending')
+     try {
+       await signInWithGoogle()
+     } catch (err) {
+       setError(err.message || 'Something went wrong signing in with Google. Try again.')
+       setStatus('idle')
+     }
+   }
+ 
+@@ -79,26 +95,26 @@ export default function Login() {
+             <button
+               type="button"
+               onClick={handleUseDifferentEmail}
+               className="mt-5 w-full rounded-[11px] border-[1.5px] border-[#e6e3e1] bg-white px-4 py-2.5 text-sm font-bold text-quinsRed transition hover:border-quinsRed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+             >
+               Use a different email
+             </button>
+           </div>
+         ) : (
+           <form className="mt-6" onSubmit={handleEmailSubmit} noValidate>
+-            {error && (
++            {displayedError && (
+               <p
+                 role="alert"
+                 className="mb-4 rounded-[11px] bg-[#fbeae8] px-3 py-2 text-sm font-semibold text-quinsRedDark"
+               >
+-                {error}
++                {displayedError}
+               </p>
+             )}
+ 
+             <label
+               htmlFor="login-email"
+               className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#77726e]"
+             >
+               Email address
+             </label>
+             <input
+diff --git a/tests/login.test.jsx b/tests/login.test.jsx
+index 557e8e6..97101b3 100644
+--- a/tests/login.test.jsx
++++ b/tests/login.test.jsx
+@@ -140,10 +140,69 @@ describe('Login screen', () => {
+     signInWithGoogle.mockRejectedValue(new Error('oauth misconfigured'))
+     const user = userEvent.setup()
+     render(<Login />)
+ 
+     await user.click(screen.getByRole('button', { name: /continue with google/i }))
+ 
+     const alert = await screen.findByRole('alert')
+     expect(alert).toHaveTextContent('oauth misconfigured')
+   })
+ })
++
++describe('Login screen authError prop', () => {
++  // authError is what RequireAuth passes in when the visitor arrived via a
++  // failed magic-link/OAuth redirect (e.g. an expired link). It shares the
++  // same alert region as the screen's own errors rather than a second one.
++
++  it('renders a passed-in authError in the alert region, prefixed for clarity', () => {
++    render(<Login authError="Email link is invalid or has expired" />)
++
++    const alert = screen.getByRole('alert')
++    expect(alert).toHaveTextContent("That sign-in link didn't work")
++    expect(alert).toHaveTextContent('Email link is invalid or has expired')
++  })
++
++  it('does not render an alert when there is no authError and no local error', () => {
++    render(<Login />)
++
++    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
++  })
++
++  it('clears the passed-in authError once the user requests a new link by email', async () => {
++    signInWithEmail.mockResolvedValue(undefined)
++    const user = userEvent.setup()
++    render(<Login authError="Email link is invalid or has expired" />)
++
++    expect(screen.getByRole('alert')).toHaveTextContent("didn't work")
++
++    await user.type(screen.getByLabelText(/email/i), 'jay@example.com')
++    await user.click(screen.getByRole('button', { name: /email me a link/i }))
++
++    expect(await screen.findByText(/check your email/i)).toBeInTheDocument()
++    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
++  })
++
++  it('clears the passed-in authError once the user retries with Google', async () => {
++    signInWithGoogle.mockResolvedValue(undefined)
++    const user = userEvent.setup()
++    render(<Login authError="Email link is invalid or has expired" />)
++
++    expect(screen.getByRole('alert')).toHaveTextContent("didn't work")
++
++    await user.click(screen.getByRole('button', { name: /continue with google/i }))
++
++    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
++  })
++
++  it('does not resurrect the passed-in authError alongside a fresh error from a failed retry', async () => {
++    signInWithEmail.mockRejectedValue(new Error('rate limited'))
++    const user = userEvent.setup()
++    render(<Login authError="Email link is invalid or has expired" />)
++
++    await user.type(screen.getByLabelText(/email/i), 'jay@example.com')
++    await user.click(screen.getByRole('button', { name: /email me a link/i }))
++
++    const alert = await screen.findByRole('alert')
++    expect(alert).toHaveTextContent('rate limited')
++    expect(alert).not.toHaveTextContent("didn't work")
++  })
++})
+diff --git a/tests/require-auth.test.jsx b/tests/require-auth.test.jsx
+index 437d8d2..7ef7a8b 100644
+--- a/tests/require-auth.test.jsx
++++ b/tests/require-auth.test.jsx
+@@ -7,21 +7,26 @@ import { render, screen } from '@testing-library/react'
+ // or the real Login screen (tests/login.test.jsx) — and no network is ever
+ // reachable from this file.
+ 
+ const useAuthMock = vi.fn()
+ 
+ vi.mock('../src/lib/auth.jsx', () => ({
+   useAuth: () => useAuthMock(),
+ }))
+ 
+ vi.mock('../src/screens/Login.jsx', () => ({
+-  default: () => <div>Login screen stub</div>,
++  default: ({ authError }) => (
++    <div>
++      Login screen stub
++      {authError && <div data-testid="passed-auth-error">{authError}</div>}
++    </div>
++  ),
+ }))
+ 
+ // Import after vi.mock so this binds to the mocked modules.
+ import RequireAuth from '../src/components/RequireAuth.jsx'
+ 
+ beforeEach(() => {
+   useAuthMock.mockReset()
+   window.history.pushState({}, '', '/')
+ })
+ 
+@@ -44,81 +49,104 @@ describe('RequireAuth', () => {
+     useAuthMock.mockReturnValue({ session: null, loading: false })
+ 
+     render(
+       <RequireAuth>
+         <div>Protected content</div>
+       </RequireAuth>,
+     )
+ 
+     expect(screen.getByText('Login screen stub')).toBeInTheDocument()
+     expect(screen.queryByText('Protected content')).not.toBeInTheDocument()
++    expect(screen.queryByTestId('passed-auth-error')).not.toBeInTheDocument()
+   })
+ 
+   it('renders children when a session is present', () => {
+     useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
+ 
+     render(
+       <RequireAuth>
+         <div>Protected content</div>
+       </RequireAuth>,
+     )
+ 
+     expect(screen.getByText('Protected content')).toBeInTheDocument()
+     expect(screen.queryByText('Login screen stub')).not.toBeInTheDocument()
+   })
+ })
+ 
+-describe('RequireAuth fragment cleanup', () => {
++describe('RequireAuth access_token cleanup (success path, needs a session)', () => {
+   it('strips an #access_token fragment once a session is present, preserving path and query', () => {
+     window.history.pushState({}, '', '/schedule?foo=bar#access_token=abc123&type=magiclink')
+     useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
+ 
+     render(
+       <RequireAuth>
+         <div>Protected content</div>
+       </RequireAuth>,
+     )
+ 
+     expect(window.location.pathname).toBe('/schedule')
+     expect(window.location.search).toBe('?foo=bar')
+     expect(window.location.hash).toBe('')
+   })
+ 
+-  it('strips an #error_description fragment once a session is present, preserving path', () => {
+-    window.history.pushState({}, '', '/?error_description=denied')
++  it('leaves an unrelated hash alone', () => {
++    window.history.pushState({}, '', '/roster#section-2')
+     useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
+ 
+     render(
+       <RequireAuth>
+         <div>Protected content</div>
+       </RequireAuth>,
+     )
+ 
+-    expect(window.location.pathname).toBe('/')
+-    expect(window.location.hash).toBe('')
++    expect(window.location.pathname).toBe('/roster')
++    expect(window.location.hash).toBe('#section-2')
+   })
++})
+ 
+-  it('leaves an unrelated hash alone', () => {
+-    window.history.pushState({}, '', '/roster#section-2')
+-    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
++describe('RequireAuth auth error capture (failure path, no session ever exists)', () => {
++  it('captures and decodes an error_description fragment with no session, passes it to Login, and strips the hash', () => {
++    window.history.pushState(
++      {},
++      '',
++      '/?redirect=1#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid%20or+has+expired',
++    )
++    useAuthMock.mockReturnValue({ session: null, loading: false })
+ 
+     render(
+       <RequireAuth>
+         <div>Protected content</div>
+       </RequireAuth>,
+     )
+ 
+-    expect(window.location.pathname).toBe('/roster')
+-    expect(window.location.hash).toBe('#section-2')
++    // Asserts both '+' and '%20' decode to spaces (URLSearchParams handles
++    // form-encoding correctly; manual decodeURIComponent would leave '+' as
++    // a literal plus sign).
++    expect(screen.getByTestId('passed-auth-error')).toHaveTextContent(
++      'Email link is invalid or has expired',
++    )
++    expect(window.location.pathname).toBe('/')
++    expect(window.location.search).toBe('?redirect=1')
++    expect(window.location.hash).toBe('')
+   })
+ 
+-  it('does not touch the hash while there is no session yet', () => {
++  it('leaves an access_token-only hash alone when there is no error and no session yet', () => {
++    // This replaces a pre-fix version of this test that asserted the same
++    // outcome for a different, now-incorrect reason: "nothing is ever
++    // cleared without a session". That's no longer true — error fragments
++    // ARE captured and cleared with no session, by design (see the describe
++    // block above). This test now exists to confirm a *different* fragment
++    // shape, one with no error_description at all, is correctly left alone
++    // by both effects: the error-capture effect finds no error_description
++    // to act on, and the access_token cleanup effect requires a session,
++    // which doesn't exist yet.
+     window.history.pushState({}, '', '/#access_token=abc123')
+     useAuthMock.mockReturnValue({ session: null, loading: false })
+ 
+     render(
+       <RequireAuth>
+         <div>Protected content</div>
+       </RequireAuth>,
+     )
+ 
+     expect(window.location.hash).toBe('#access_token=abc123')

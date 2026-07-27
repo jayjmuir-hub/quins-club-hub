@@ -1,0 +1,417 @@
+# Review package: 5e4b444..HEAD
+
+## Commits
+8b834ad fix: address Task 9 review findings in Sheet, Chip and Badge
+
+## Files changed
+ src/components/Badge.jsx  | 13 +++++++----
+ src/components/Chip.jsx   | 30 ++++++++++++++++--------
+ src/components/Empty.jsx  |  6 ++++-
+ src/components/Sheet.jsx  | 29 ++++++++++++++++++++++--
+ tailwind.config.js        | 13 +++++++++--
+ tests/components.test.jsx | 58 ++++++++++++++++++++++++++++++++++++++++++++---
+ 6 files changed, 127 insertions(+), 22 deletions(-)
+
+## Diff
+diff --git a/src/components/Badge.jsx b/src/components/Badge.jsx
+index 1bd9229..d486d93 100644
+--- a/src/components/Badge.jsx
++++ b/src/components/Badge.jsx
+@@ -12,32 +12,37 @@
+ // meaning would mean approximating rather than porting the design system —
+ // see the task-9 report for the full ruling.
+ //
+ // Tones map 1:1 onto the prototype's role-tag/captain-badge colour pairs:
+ // role-admin reuses --maroon/white, role-coach uses #eaf4fb/sky-deep,
+ // role-parent and the captain badge both use the warn bg/text pair (the
+ // design system notes these intentionally share the --warn tokens, despite
+ // being semantically different — captain status and parent role are simply
+ // not visually distinguished from each other in the source design).
+ //
+-// Contrast note: the literal --warn/--warn-bg pair (#c9861a on #fbf1dd)
+-// measures ~2.71:1 — fails AA. Background kept as specified; foreground
+-// darkened to #8a5a12 (~5.3:1), same treatment as Chip's social variant.
++// Contrast notes (component-scoped literal overrides, same treatment as
++// Chip — see task-9-report.md for the numbers):
++//   - parent/captain tones: the literal --warn/--warn-bg pair (#c9861a on
++//     #fbf1dd) measures ~2.71:1 — fails AA. Background kept as specified;
++//     foreground darkened to #8a5a12 (~5.3:1).
++//   - neutral fallback tone: the literal --muted/#f0ecf2 pair (#77726e on
++//     #f0ecf2) measures 4.07:1, under the 4.5:1 AA text threshold at this
++//     10px bold size. Foreground darkened to #5c5854 (~6.0:1).
+ 
+ const TONES = {
+   admin: 'bg-quinsRed text-white',
+   coach: 'bg-[#eaf4fb] text-[#2F7D3D]',
+   parent: 'bg-[#fbf1dd] text-[#8a5a12]',
+   captain: 'bg-[#fbf1dd] text-[#8a5a12]',
+ }
+ 
+-const NEUTRAL_TONE = 'bg-[#f0ecf2] text-[#77726e]'
++const NEUTRAL_TONE = 'bg-[#f0ecf2] text-[#5c5854]'
+ 
+ export function Badge({ tone, children, className = '' }) {
+   const toneClasses = TONES[tone] ?? NEUTRAL_TONE
+ 
+   const classes = [
+     'inline-flex',
+     'items-center',
+     'rounded-[6px]',
+     'px-[7px]',
+     'py-[2px]',
+diff --git a/src/components/Chip.jsx b/src/components/Chip.jsx
+index 31a68c0..4689d19 100644
+--- a/src/components/Chip.jsx
++++ b/src/components/Chip.jsx
+@@ -2,38 +2,48 @@
+ // label used on fixture/event rows to mark whether an event is a match,
+ // training, or social. Colours are ported verbatim from the prototype's
+ // .chip.match / .chip.training / .chip.social CSS, not from the Tailwind
+ // brand tokens — quinsGreen (#7DC351) is never used here, because the
+ // prototype's own training-chip pairing is light green-bg (#eef7e6) with
+ // dark sky-deep text (#2F7D3D), which is what actually meets AA contrast;
+ // quinsGreen itself is a gradient/block-fill colour only (~1.9:1 on white,
+ // fails AA for text — see design-system.md §1 and the task-9 brief).
+ //
+ // An unrecognised (or missing) `type` renders the prototype's default
+-// neutral chip styling (#f0ecf2 bg / --muted text) rather than crashing or
+-// rendering nothing — screens should never be able to produce a blank chip
+-// just because an event's type value is unexpected.
++// neutral chip styling (#f0ecf2 bg / darkened --muted text, see contrast
++// note below) rather than crashing or rendering nothing — screens should
++// never be able to produce a blank chip just because an event's type value
++// is unexpected. This neutral variant is also, per design-system.md §4.7,
++// the chip used everywhere for age-group labels ("Senior Men 1st XV"), so
++// it appears on nearly every screen.
+ //
+-// Contrast note (social variant): the design system's literal --warn/
+-// --warn-bg pair (#c9861a text on #fbf1dd bg) measures ~2.71:1, which fails
+-// AA even for the 3:1 non-text minimum, let alone 4.5:1 for text. The
+-// background is kept as specified; the foreground is darkened (same hue,
+-// #8a5a12) to ~5.3:1, following the same "darken it for text use" rule the
+-// task-9 brief applies to quinsGreen. See task-9-report.md for the numbers.
++// Contrast notes (component-scoped literal overrides, not token changes —
++// see task-9-report.md for the full numbers and rationale for each):
++//   - social variant: the design system's literal --warn/--warn-bg pair
++//     (#c9861a text on #fbf1dd bg) measures ~2.71:1, failing AA even at the
++//     3:1 non-text minimum. Background kept as specified; foreground
++//     darkened (same hue) to #8a5a12, ~5.3:1.
++//   - neutral/default variant: the literal --muted/#f0ecf2 pair (#77726e on
++//     #f0ecf2) measures 4.07:1, just under the 4.5:1 AA text threshold (this
++//     chip text is 11.5px bold, which does not qualify as "large text").
++//     Background kept as specified; foreground darkened to #5c5854, ~6.0:1.
++//     This is scoped to Chip/Badge only — the shared --muted token used
++//     elsewhere in the app (e.g. on white, where it already clears 4.5:1)
++//     is untouched.
+ 
+ const VARIANTS = {
+   match: 'bg-quinsRed text-white',
+   training: 'bg-[#eef7e6] text-[#2F7D3D]',
+   social: 'bg-[#fbf1dd] text-[#8a5a12]',
+ }
+ 
+-const NEUTRAL_VARIANT = 'bg-[#f0ecf2] text-[#77726e]'
++const NEUTRAL_VARIANT = 'bg-[#f0ecf2] text-[#5c5854]'
+ 
+ export function Chip({ type, children, className = '' }) {
+   const variantClasses = VARIANTS[type] ?? NEUTRAL_VARIANT
+ 
+   const classes = [
+     'inline-flex',
+     'items-center',
+     'rounded-[20px]',
+     'px-[9px]',
+     'py-[3px]',
+diff --git a/src/components/Empty.jsx b/src/components/Empty.jsx
+index 2cd6dec..f613666 100644
+--- a/src/components/Empty.jsx
++++ b/src/components/Empty.jsx
+@@ -17,20 +17,24 @@ function InboxIcon(props) {
+ 
+ export function Empty({ message, action }) {
+   return (
+     <div className="flex flex-col items-center gap-3 px-5 py-11 text-center">
+       <InboxIcon className="h-[42px] w-[42px] text-[#77726e] opacity-40" aria-hidden="true" />
+       <p className="text-sm text-[#77726e]">{message}</p>
+       {action && (
+         <button
+           type="button"
+           onClick={action.onClick}
+-          className="rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-quinsRedDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
++          // Hover is --magenta (#D62A3D, design-system.md §1: "Primary
++          // button hover background"), not quinsRedDark (#8E1526, which the
++          // design system uses elsewhere as the darker gradient-start
++          // colour, not a button hover state).
++          className="rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+         >
+           {action.label}
+         </button>
+       )}
+     </div>
+   )
+ }
+ 
+ export default Empty
+diff --git a/src/components/Sheet.jsx b/src/components/Sheet.jsx
+index ac47653..45a067b 100644
+--- a/src/components/Sheet.jsx
++++ b/src/components/Sheet.jsx
+@@ -40,36 +40,50 @@ const FOCUSABLE_SELECTOR = [
+   'input:not([disabled])',
+   'select:not([disabled])',
+   '[tabindex]:not([tabindex="-1"])',
+ ].join(',')
+ 
+ export function Sheet({ open, onClose, title, children }) {
+   const titleId = useId()
+   const panelRef = useRef(null)
+   const triggerRef = useRef(null)
+ 
++  // Latest-ref pattern: any screen consuming Sheet with a controlled form
++  // field (Sheet's own header comment names event/player add-edit forms as
++  // the primary use case — Tasks 14/15) re-renders its parent on every
++  // keystroke, which recreates an inline `onClose={() => setOpen(false)}`
++  // with a fresh identity each time. If `onClose` were in the effect's
++  // dependency array below, that fresh identity would re-run the whole
++  // effect on every keystroke — re-running its cleanup mid-typing, which
++  // calls `triggerRef.current?.focus?.()` and yanks focus out of the input
++  // after every character. Reading the callback through a ref instead means
++  // the effect only depends on `open`, so it runs exactly once per
++  // open/close transition regardless of the caller's callback identity.
++  const onCloseRef = useRef(onClose)
++  onCloseRef.current = onClose
++
+   useEffect(() => {
+     if (!open) return undefined
+ 
+     // Capture whatever had focus before the sheet opened, so it can be
+     // restored on close (design-system.md §8 gap: "no focus return to the
+     // trigger element on close").
+     triggerRef.current = document.activeElement
+ 
+     const panel = panelRef.current
+     const focusables = panel ? Array.from(panel.querySelectorAll(FOCUSABLE_SELECTOR)) : []
+     ;(focusables[0] ?? panel)?.focus()
+ 
+     function handleKeyDown(event) {
+       if (event.key === 'Escape') {
+         event.stopPropagation()
+-        onClose()
++        onCloseRef.current()
+         return
+       }
+ 
+       if (event.key !== 'Tab') return
+ 
+       const nodes = panel ? Array.from(panel.querySelectorAll(FOCUSABLE_SELECTOR)) : []
+       if (nodes.length === 0) {
+         event.preventDefault()
+         return
+       }
+@@ -91,38 +105,49 @@ export function Sheet({ open, onClose, title, children }) {
+     // Prevent background scroll while the sheet is open (matches the
+     // prototype's body.style.overflow="hidden" behaviour).
+     const previousOverflow = document.body.style.overflow
+     document.body.style.overflow = 'hidden'
+ 
+     return () => {
+       document.removeEventListener('keydown', handleKeyDown, true)
+       document.body.style.overflow = previousOverflow
+       triggerRef.current?.focus?.()
+     }
+-  }, [open, onClose])
++    // eslint-disable-next-line react-hooks/exhaustive-deps -- onClose is
++    // read through onCloseRef (see comment above); it must NOT be a
++    // dependency here, that's the fix, not an oversight.
++  }, [open])
+ 
+   if (!open) return null
+ 
+   return (
+     <div
+       className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(24,10,20,0.5)] backdrop-blur-[2px] animate-scrim-fade-in motion-reduce:animate-none desktop:items-center"
+       onClick={onClose}
+     >
+       <div
+         ref={panelRef}
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby={titleId}
+         tabIndex={-1}
+         onClick={(event) => event.stopPropagation()}
+         className="max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] bg-white shadow-[0_6px_24px_rgba(20,20,20,0.10)] animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] desktop:w-[min(520px,94vw)] desktop:animate-sheet-scale-in desktop:rounded-[20px]"
+       >
++        {/* Drag-handle bar (design-system.md §4.16 .sheet-grip): mobile
++            only, visual affordance only — there is no swipe-to-dismiss
++            gesture wired up, matching the prototype (dismissal is tap-scrim
++            or tap-close only). Hidden at the desktop breakpoint, where the
++            sheet becomes a centered dialog with no grip. */}
++        <div className="flex justify-center pb-1 pt-2.5 desktop:hidden" aria-hidden="true">
++          <span className="h-1 w-[38px] rounded-full bg-[#dcd4e0]" />
++        </div>
+         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[#e6e3e1] bg-white px-[18px] py-4">
+           <h3 id={titleId} className="text-[18px] font-extrabold text-[#221f1d]">
+             {title}
+           </h3>
+           <button
+             type="button"
+             onClick={onClose}
+             aria-label="Close"
+             className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f2edf4] text-[#221f1d] outline-none transition focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+           >
+diff --git a/tailwind.config.js b/tailwind.config.js
+index 6b8fc19..2515cc8 100644
+--- a/tailwind.config.js
++++ b/tailwind.config.js
+@@ -23,23 +23,32 @@ export default {
+       // event. A CSS animation plays automatically on element insertion,
+       // same technique the prototype itself uses for its view fade-in (see
+       // design-system.md §6: "the .25s ease fade-in keyframe plays
+       // automatically because the newly-active section re-triggers its CSS
+       // animation").
+       keyframes: {
+         sheetSlideUp: {
+           from: { transform: 'translateY(100%)' },
+           to: { transform: 'translateY(0)' },
+         },
++        // Ports design-system.md §4.16's desktop entrance exactly:
++        // `translate(-50%,-46%) scale(.98) opacity:0` -> `translate(-50%,
++        // -50%) scale(1) opacity:1` — a fade + scale-up + slight vertical
++        // "settle". The -46%/-50% pair is a translateY *relative to the
++        // panel's own height* (CSS transform percentages are relative to
++        // the element's own box), so translating that literally onto a
++        // flex-centered layout (no translate(-50%,-50%) needed for
++        // centering here) means the settle is just the -4% delta between
++        // them: translateY(-4%) -> translateY(0).
+         sheetScaleIn: {
+-          from: { transform: 'scale(.98)', opacity: '0' },
+-          to: { transform: 'scale(1)', opacity: '1' },
++          from: { transform: 'scale(.98) translateY(-4%)', opacity: '0' },
++          to: { transform: 'scale(1) translateY(0)', opacity: '1' },
+         },
+         scrimFadeIn: {
+           from: { opacity: '0' },
+           to: { opacity: '1' },
+         },
+       },
+       animation: {
+         'sheet-slide-up': 'sheetSlideUp .28s cubic-bezier(.32,.72,0,1)',
+         'sheet-scale-in': 'sheetScaleIn .2s ease-out',
+         'scrim-fade-in': 'scrimFadeIn .2s ease',
+diff --git a/tests/components.test.jsx b/tests/components.test.jsx
+index 6ff6172..7b141c9 100644
+--- a/tests/components.test.jsx
++++ b/tests/components.test.jsx
+@@ -64,21 +64,24 @@ describe('Chip', () => {
+     // The design system's literal --warn text (#c9861a) on --warn-bg
+     // measures ~2.71:1 and fails AA — see Chip.jsx's contrast note. This
+     // asserts the darkened, AA-passing foreground actually ships.
+     expect(hasClassToken(el, 'text-[#8a5a12]')).toBe(true)
+   })
+ 
+   it('falls back to the neutral variant for an unknown type instead of crashing or rendering nothing', () => {
+     render(<Chip type="not-a-real-type">MYSTERY</Chip>)
+     const el = screen.getByText('MYSTERY')
+     expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
+-    expect(hasClassToken(el, 'text-[#77726e]')).toBe(true)
++    // The design system's literal --muted text (#77726e) on this bg
++    // measures 4.07:1 and falls short of AA at this size — see Chip.jsx's
++    // contrast note. This asserts the darkened, AA-passing foreground.
++    expect(hasClassToken(el, 'text-[#5c5854]')).toBe(true)
+   })
+ 
+   it('falls back to the neutral variant when no type is given at all', () => {
+     render(<Chip>NO TYPE</Chip>)
+     const el = screen.getByText('NO TYPE')
+     expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
+   })
+ })
+ 
+ describe('Badge', () => {
+@@ -90,23 +93,25 @@ describe('Badge', () => {
+   })
+ 
+   it('renders the captain tone (darkened warn colours) distinctly from Chip — smaller radius token', () => {
+     render(<Badge tone="captain">Capt</Badge>)
+     const el = screen.getByText('Capt')
+     expect(hasClassToken(el, 'bg-[#fbf1dd]')).toBe(true)
+     expect(hasClassToken(el, 'text-[#8a5a12]')).toBe(true)
+     expect(hasClassToken(el, 'rounded-[6px]')).toBe(true)
+   })
+ 
+-  it('falls back to a neutral tone for an unrecognised tone', () => {
++  it('falls back to a neutral tone for an unrecognised tone, using the darkened AA-passing muted text', () => {
+     render(<Badge tone="not-a-real-tone">Mystery</Badge>)
+-    expect(screen.getByText('Mystery')).toBeInTheDocument()
++    const el = screen.getByText('Mystery')
++    expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
++    expect(hasClassToken(el, 'text-[#5c5854]')).toBe(true)
+   })
+ })
+ 
+ describe('Empty', () => {
+   it('renders the message', () => {
+     render(<Empty message="No players match." />)
+     expect(screen.getByText('No players match.')).toBeInTheDocument()
+   })
+ 
+   it('renders no button when no action is given', () => {
+@@ -345,11 +350,58 @@ describe('Sheet', () => {
+     const trigger = screen.getByRole('button', { name: 'Open sheet' })
+     await user.click(trigger)
+ 
+     expect(screen.getByRole('dialog')).toBeInTheDocument()
+ 
+     await user.keyboard('{Escape}')
+ 
+     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+     expect(document.activeElement).toBe(trigger)
+   })
++
++  it('renders the mobile drag-handle grip, hidden at the desktop breakpoint', () => {
++    render(
++      <Sheet open onClose={() => {}} title="Event details">
++        <p>Body content</p>
++      </Sheet>,
++    )
++    const dialog = screen.getByRole('dialog')
++    // The grip is decorative (aria-hidden) so it isn't reachable via an
++    // accessible query — assert on the structure/class tokens instead.
++    const grip = dialog.querySelector('[aria-hidden="true"] > span')
++    expect(grip).not.toBeNull()
++    expect(hasClassToken(grip, 'w-[38px]')).toBe(true)
++    expect(hasClassToken(grip.parentElement, 'desktop:hidden')).toBe(true)
++  })
++
++  // Regression test for a real bug caught in review: a controlled field
++  // inside an open Sheet, with the (very common) pattern of an inline
++  // onClose={() => setOpen(false)} on the parent. Every keystroke re-renders
++  // the parent, which recreates onClose with a new identity. Before the
++  // fix, that new identity was a dependency of Sheet's internal effect, so
++  // the effect re-ran on every keystroke — its cleanup fired
++  // triggerRef.current?.focus?.(), yanking focus out of the input mid-word.
++  // Typing "Tom" produced "T". This is exactly the shape Tasks 14/15's
++  // add/edit forms will use, so it isn't a hypothetical.
++  function ControlledFieldHarness() {
++    const [open, setOpen] = useState(true)
++    const [name, setName] = useState('')
++    return (
++      <Sheet open={open} onClose={() => setOpen(false)} title="Add a player">
++        <label htmlFor="player-name">Full name</label>
++        <input id="player-name" value={name} onChange={(event) => setName(event.target.value)} />
++      </Sheet>
++    )
++  }
++
++  it('does not lose focus or drop keystrokes when the parent passes an inline onClose and the field it controls re-renders on every keystroke', async () => {
++    const user = userEvent.setup()
++    render(<ControlledFieldHarness />)
++
++    const input = screen.getByLabelText('Full name')
++    await user.click(input)
++    await user.keyboard('Tom')
++
++    expect(input).toHaveValue('Tom')
++    expect(document.activeElement).toBe(input)
++  })
+ })

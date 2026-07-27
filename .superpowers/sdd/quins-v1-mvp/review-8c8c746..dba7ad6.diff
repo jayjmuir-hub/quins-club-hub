@@ -1,0 +1,133 @@
+# Review package: 8c8c746..HEAD
+
+## Commits
+dba7ad6 feat: add Supabase client with env-var validation and connection smoke test
+
+## Files changed
+ src/lib/supabase.js                | 26 +++++++++++++++++++
+ tests/supabase.integration.test.js | 26 +++++++++++++++++++
+ tests/supabase.test.js             | 51 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 103 insertions(+)
+
+## Diff
+diff --git a/src/lib/supabase.js b/src/lib/supabase.js
+new file mode 100644
+index 0000000..19d6f4a
+--- /dev/null
++++ b/src/lib/supabase.js
+@@ -0,0 +1,26 @@
++import { createClient } from '@supabase/supabase-js'
++
++// Single-responsibility Supabase client for the app. No auth helpers, no
++// query helpers, no retry logic — those belong to later tasks.
++
++const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
++const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
++
++const missing = []
++if (!supabaseUrl) missing.push('VITE_SUPABASE_URL')
++if (!supabaseAnonKey) missing.push('VITE_SUPABASE_ANON_KEY')
++
++if (missing.length > 0) {
++  throw new Error(
++    `Missing required Supabase env var(s): ${missing.join(', ')}. ` +
++      'Copy .env.example to .env and fill in the values from Supabase → Settings → API.',
++  )
++}
++
++export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
++  auth: {
++    persistSession: true,
++    autoRefreshToken: true,
++    detectSessionInUrl: true,
++  },
++})
+diff --git a/tests/supabase.integration.test.js b/tests/supabase.integration.test.js
+new file mode 100644
+index 0000000..0b43788
+--- /dev/null
++++ b/tests/supabase.integration.test.js
+@@ -0,0 +1,26 @@
++import { describe, it, expect } from 'vitest'
++import { supabase } from '../src/lib/supabase.js'
++
++// Real network call against the live Supabase project. Run with:
++//   npm run test:integration
++// Requires a local .env with VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY set
++// (see .env.example). Excluded from the default `npm test` run.
++//
++// FINDING (2026-07-27): RLS on `teams` ("team read" policy) requires a
++// matching `memberships` row for auth.uid(). An anonymous client has no
++// auth.uid(), so the query succeeds (no error) but every row is filtered out
++// by RLS — count is 0, not the 15 seeded age groups. This is a real behaviour
++// of the live database, not a test bug: the anon/publishable key can connect,
++// but cannot read team data until Task 3/6 wires up authenticated sessions
++// (or a policy change makes `teams` readable to any authenticated user, or to
++// anon, is deliberately added). See task-2-report.md for detail.
++describe('Supabase connection (integration)', () => {
++  it('connects successfully but sees zero teams as an unauthenticated client (RLS)', async () => {
++    const { count, error } = await supabase
++      .from('teams')
++      .select('*', { count: 'exact', head: true })
++
++    expect(error).toBeNull()
++    expect(count).toBe(0)
++  })
++})
+diff --git a/tests/supabase.test.js b/tests/supabase.test.js
+new file mode 100644
+index 0000000..eb5a53b
+--- /dev/null
++++ b/tests/supabase.test.js
+@@ -0,0 +1,51 @@
++import { describe, it, expect, afterEach, vi } from 'vitest'
++
++// Unit tests for src/lib/supabase.js.
++// The module reads import.meta.env at import time, so each scenario needs a
++// fresh module instance with env vars stubbed beforehand. vi.stubEnv +
++// vi.resetModules() + dynamic import() is the reliable way to do this in
++// Vitest (see vite.config.js comment / task notes).
++
++const MODULE_PATH = '../src/lib/supabase.js'
++
++describe('src/lib/supabase.js', () => {
++  afterEach(() => {
++    vi.unstubAllEnvs()
++    vi.resetModules()
++  })
++
++  it('throws a clear, actionable error when VITE_SUPABASE_URL is missing', async () => {
++    vi.stubEnv('VITE_SUPABASE_URL', '')
++    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test-anon-key')
++
++    await expect(import(MODULE_PATH)).rejects.toThrow(/VITE_SUPABASE_URL/)
++  })
++
++  it('throws a clear, actionable error when VITE_SUPABASE_ANON_KEY is missing', async () => {
++    vi.stubEnv('VITE_SUPABASE_URL', 'https://example.supabase.co')
++    vi.stubEnv('VITE_SUPABASE_ANON_KEY', '')
++
++    await expect(import(MODULE_PATH)).rejects.toThrow(/VITE_SUPABASE_ANON_KEY/)
++  })
++
++  it('throws a clear, actionable error when both env vars are missing', async () => {
++    vi.stubEnv('VITE_SUPABASE_URL', '')
++    vi.stubEnv('VITE_SUPABASE_ANON_KEY', '')
++
++    await expect(import(MODULE_PATH)).rejects.toThrow(
++      /VITE_SUPABASE_URL.*VITE_SUPABASE_ANON_KEY|VITE_SUPABASE_ANON_KEY.*VITE_SUPABASE_URL/s,
++    )
++  })
++
++  it('exports a working supabase client when both env vars are present', async () => {
++    vi.stubEnv('VITE_SUPABASE_URL', 'https://example.supabase.co')
++    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test-anon-key')
++
++    const { supabase } = await import(MODULE_PATH)
++
++    expect(supabase).toBeDefined()
++    // Confirms a real @supabase/supabase-js client was constructed, not a stub.
++    expect(typeof supabase.from).toBe('function')
++    expect(typeof supabase.auth.getSession).toBe('function')
++  })
++})

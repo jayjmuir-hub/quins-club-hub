@@ -1,0 +1,10 @@
+# Deliberately empty.
+#
+# The superpowers tooling ships this file containing "*", which keeps the SDD
+# ledger out of git. For this project that is wrong: the repo is the single
+# source of truth across two PCs and every Cowork session, so the build paper
+# trail (progress ledger, task briefs, implementer reports, review diffs) is
+# committed on purpose.
+#
+# If tooling ever rewrites this file back to "*", empty it again or the ledger
+# will silently stop being tracked.

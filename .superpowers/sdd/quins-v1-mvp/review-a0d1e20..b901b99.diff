@@ -1,0 +1,331 @@
+# Review package: a0d1e20..HEAD
+
+## Commits
+b901b99 feat: add auth context with magic link, Google OAuth and sign-out
+
+## Files changed
+ src/lib/auth.jsx    |  83 +++++++++++++++++++
+ tests/auth.test.jsx | 225 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 308 insertions(+)
+
+## Diff
+diff --git a/src/lib/auth.jsx b/src/lib/auth.jsx
+new file mode 100644
+index 0000000..dfd16dd
+--- /dev/null
++++ b/src/lib/auth.jsx
+@@ -0,0 +1,83 @@
++import { createContext, useContext, useEffect, useState } from 'react'
++import { supabase } from './supabase'
++
++// Auth context for the app: current session/user, loading state, and the
++// three sign-in/sign-out actions. No sign-up, password auth, profile
++// loading, or membership loading here — those belong to other tasks.
++
++const AuthContext = createContext(undefined)
++
++export function AuthProvider({ children }) {
++  const [session, setSession] = useState(null)
++  const [loading, setLoading] = useState(true)
++
++  useEffect(() => {
++    let mounted = true
++
++    supabase.auth
++      .getSession()
++      .then(({ data }) => {
++        if (!mounted) return
++        setSession(data?.session ?? null)
++      })
++      .catch(() => {
++        // Swallow here only: loading still resolves to false below so the
++        // app doesn't hang. The user simply starts signed out.
++      })
++      .finally(() => {
++        if (mounted) setLoading(false)
++      })
++
++    const {
++      data: { subscription },
++    } = supabase.auth.onAuthStateChange((_event, newSession) => {
++      if (!mounted) return
++      setSession(newSession)
++    })
++
++    return () => {
++      mounted = false
++      subscription.unsubscribe()
++    }
++  }, [])
++
++  async function signInWithEmail(email) {
++    const { error } = await supabase.auth.signInWithOtp({
++      email,
++      options: { emailRedirectTo: window.location.origin },
++    })
++    if (error) throw error
++  }
++
++  async function signInWithGoogle() {
++    const { error } = await supabase.auth.signInWithOAuth({
++      provider: 'google',
++      options: { redirectTo: window.location.origin },
++    })
++    if (error) throw error
++  }
++
++  async function signOut() {
++    const { error } = await supabase.auth.signOut()
++    if (error) throw error
++  }
++
++  const value = {
++    session,
++    user: session?.user ?? null,
++    loading,
++    signInWithEmail,
++    signInWithGoogle,
++    signOut,
++  }
++
++  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
++}
++
++export function useAuth() {
++  const context = useContext(AuthContext)
++  if (context === undefined) {
++    throw new Error('useAuth must be used within an AuthProvider')
++  }
++  return context
++}
+diff --git a/tests/auth.test.jsx b/tests/auth.test.jsx
+new file mode 100644
+index 0000000..7c53c95
+--- /dev/null
++++ b/tests/auth.test.jsx
+@@ -0,0 +1,225 @@
++import { useState } from 'react'
++import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
++import { render, screen, waitFor, act } from '@testing-library/react'
++import userEvent from '@testing-library/user-event'
++import { AuthProvider, useAuth } from '../src/lib/auth.jsx'
++
++// Unit tests for src/lib/auth.jsx (Task 3: session + magic link + sign-out,
++// Task 4: Google OAuth). The real @supabase/supabase-js client is never
++// constructed here — src/lib/supabase.js is mocked so no network is touched.
++
++vi.mock('../src/lib/supabase.js', () => ({
++  supabase: {
++    auth: {
++      getSession: vi.fn(),
++      onAuthStateChange: vi.fn(),
++      signInWithOtp: vi.fn(),
++      signInWithOAuth: vi.fn(),
++      signOut: vi.fn(),
++    },
++  },
++}))
++
++// Import after vi.mock so this binds to the mocked module.
++import { supabase } from '../src/lib/supabase.js'
++
++// Small harness that consumes useAuth and renders its values, plus buttons
++// that exercise the real functions the way the Task 5 login screen will:
++// call, catch, render the error. This lets tests assert on real rendered
++// output rather than only on mock call history.
++function Harness() {
++  const auth = useAuth()
++  const [error, setError] = useState(null)
++
++  const handle = (fn) => async () => {
++    setError(null)
++    try {
++      await fn()
++    } catch (err) {
++      setError(err.message)
++    }
++  }
++
++  return (
++    <div>
++      <div data-testid="loading">{String(auth.loading)}</div>
++      <div data-testid="session-email">{auth.session?.user?.email ?? 'none'}</div>
++      <div data-testid="user-email">{auth.user?.email ?? 'none'}</div>
++      <div data-testid="error">{error ?? 'none'}</div>
++      <button onClick={handle(() => auth.signInWithEmail('jay@example.com'))}>
++        Send magic link
++      </button>
++      <button onClick={handle(() => auth.signInWithGoogle())}>Sign in with Google</button>
++      <button onClick={handle(() => auth.signOut())}>Sign out</button>
++    </div>
++  )
++}
++
++async function renderHarness() {
++  render(
++    <AuthProvider>
++      <Harness />
++    </AuthProvider>,
++  )
++  await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
++}
++
++let unsubscribeMock
++
++beforeEach(() => {
++  unsubscribeMock = vi.fn()
++  supabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
++  supabase.auth.onAuthStateChange.mockReturnValue({
++    data: { subscription: { unsubscribe: unsubscribeMock } },
++  })
++  supabase.auth.signInWithOtp.mockResolvedValue({ data: {}, error: null })
++  supabase.auth.signInWithOAuth.mockResolvedValue({ data: {}, error: null })
++  supabase.auth.signOut.mockResolvedValue({ error: null })
++})
++
++afterEach(() => {
++  vi.clearAllMocks()
++})
++
++describe('AuthProvider / useAuth', () => {
++  it('starts with loading true, then resolves to loading false with a null session', async () => {
++    render(
++      <AuthProvider>
++        <Harness />
++      </AuthProvider>,
++    )
++
++    expect(screen.getByTestId('loading')).toHaveTextContent('true')
++
++    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
++    expect(screen.getByTestId('session-email')).toHaveTextContent('none')
++    expect(screen.getByTestId('user-email')).toHaveTextContent('none')
++  })
++
++  it('exposes the session and user once getSession resolves with an existing session', async () => {
++    supabase.auth.getSession.mockResolvedValue({
++      data: { session: { user: { email: 'jay@example.com' } } },
++      error: null,
++    })
++
++    await renderHarness()
++
++    expect(screen.getByTestId('session-email')).toHaveTextContent('jay@example.com')
++    expect(screen.getByTestId('user-email')).toHaveTextContent('jay@example.com')
++  })
++
++  it('still resolves loading to false when getSession rejects', async () => {
++    supabase.auth.getSession.mockRejectedValue(new Error('network down'))
++
++    await renderHarness()
++
++    expect(screen.getByTestId('session-email')).toHaveTextContent('none')
++  })
++
++  it('updates the session when onAuthStateChange fires', async () => {
++    await renderHarness()
++
++    const onChange = supabase.auth.onAuthStateChange.mock.calls[0][0]
++    act(() => {
++      onChange('SIGNED_IN', { user: { email: 'new@example.com' } })
++    })
++
++    expect(screen.getByTestId('session-email')).toHaveTextContent('new@example.com')
++    expect(screen.getByTestId('user-email')).toHaveTextContent('new@example.com')
++  })
++
++  it('unsubscribes from onAuthStateChange when the provider unmounts', async () => {
++    const { unmount } = render(
++      <AuthProvider>
++        <Harness />
++      </AuthProvider>,
++    )
++    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
++
++    expect(unsubscribeMock).not.toHaveBeenCalled()
++    unmount()
++    expect(unsubscribeMock).toHaveBeenCalledTimes(1)
++  })
++
++  it('signInWithEmail calls signInWithOtp with the email and the app origin as emailRedirectTo', async () => {
++    const user = userEvent.setup()
++    await renderHarness()
++
++    await user.click(screen.getByRole('button', { name: /send magic link/i }))
++
++    expect(supabase.auth.signInWithOtp).toHaveBeenCalledWith({
++      email: 'jay@example.com',
++      options: { emailRedirectTo: window.location.origin },
++    })
++  })
++
++  it('signInWithGoogle calls signInWithOAuth with provider google and the app origin as redirectTo', async () => {
++    const user = userEvent.setup()
++    await renderHarness()
++
++    await user.click(screen.getByRole('button', { name: /sign in with google/i }))
++
++    expect(supabase.auth.signInWithOAuth).toHaveBeenCalledWith({
++      provider: 'google',
++      options: { redirectTo: window.location.origin },
++    })
++  })
++
++  it('surfaces a signInWithEmail error to the caller instead of swallowing it', async () => {
++    supabase.auth.signInWithOtp.mockResolvedValue({
++      data: {},
++      error: new Error('rate limited'),
++    })
++    const user = userEvent.setup()
++    await renderHarness()
++
++    await user.click(screen.getByRole('button', { name: /send magic link/i }))
++
++    expect(screen.getByTestId('error')).toHaveTextContent('rate limited')
++  })
++
++  it('surfaces a signInWithGoogle error to the caller instead of swallowing it', async () => {
++    supabase.auth.signInWithOAuth.mockResolvedValue({
++      data: {},
++      error: new Error('oauth misconfigured'),
++    })
++    const user = userEvent.setup()
++    await renderHarness()
++
++    await user.click(screen.getByRole('button', { name: /sign in with google/i }))
++
++    expect(screen.getByTestId('error')).toHaveTextContent('oauth misconfigured')
++  })
++
++  it('signOut calls supabase.auth.signOut', async () => {
++    const user = userEvent.setup()
++    await renderHarness()
++
++    await user.click(screen.getByRole('button', { name: /sign out/i }))
++
++    expect(supabase.auth.signOut).toHaveBeenCalledTimes(1)
++  })
++
++  it('surfaces a signOut error to the caller instead of swallowing it', async () => {
++    supabase.auth.signOut.mockResolvedValue({ error: new Error('sign out failed') })
++    const user = userEvent.setup()
++    await renderHarness()
++
++    await user.click(screen.getByRole('button', { name: /sign out/i }))
++
++    expect(screen.getByTestId('error')).toHaveTextContent('sign out failed')
++  })
++
++  it('throws a clear error when useAuth is used outside AuthProvider', () => {
++    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
++
++    function BareHarness() {
++      useAuth()
++      return null
++    }
++
++    expect(() => render(<BareHarness />)).toThrow(/useAuth must be used within an AuthProvider/)
++
++    consoleError.mockRestore()
++  })
++})

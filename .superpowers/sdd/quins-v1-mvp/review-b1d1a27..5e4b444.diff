@@ -1,0 +1,930 @@
+# Review package: b1d1a27..HEAD
+
+## Commits
+5e4b444 feat: add Task 9 shared UI primitives (Card, Chip, Sheet, Badge, TeamPills, ScopeNote, Empty, Spinner)
+
+## Files changed
+ src/components/Badge.jsx     |  57 +++++++
+ src/components/Card.jsx      |  31 ++++
+ src/components/Chip.jsx      |  51 +++++++
+ src/components/Empty.jsx     |  36 +++++
+ src/components/ScopeNote.jsx |  54 +++++++
+ src/components/Sheet.jsx     | 140 +++++++++++++++++
+ src/components/Spinner.jsx   |  32 ++++
+ src/components/TeamPills.jsx |  54 +++++++
+ tailwind.config.js           |  28 ++++
+ tests/components.test.jsx    | 355 +++++++++++++++++++++++++++++++++++++++++++
+ 10 files changed, 838 insertions(+)
+
+## Diff
+diff --git a/src/components/Badge.jsx b/src/components/Badge.jsx
+new file mode 100644
+index 0000000..1bd9229
+--- /dev/null
++++ b/src/components/Badge.jsx
+@@ -0,0 +1,57 @@
++// Small role/status label — NOT a duplicate of Chip. See design-system.md
++// §4.15 (.p-cap captain badge) and §4.20 (.role-tag): both are visually and
++// structurally distinct from the event-type Chip (§4.7) —
++//   - smaller text (10px vs Chip's 11.5px), uppercase, wider letter-spacing
++//   - a much smaller corner radius (6px, near-square) vs Chip's fully-
++//     rounded 20px pill
++//   - different padding (2px 7px vs Chip's 3px 9px)
++// and a different purpose: Chip marks *what an event is* (match/training/
++// social); Badge marks *who someone is* (a role tag next to a name) or a
++// short status flag (the "Capt" marker next to a captain's name). Screens
++// from Task 11 onward need both, so building only one and overloading its
++// meaning would mean approximating rather than porting the design system —
++// see the task-9 report for the full ruling.
++//
++// Tones map 1:1 onto the prototype's role-tag/captain-badge colour pairs:
++// role-admin reuses --maroon/white, role-coach uses #eaf4fb/sky-deep,
++// role-parent and the captain badge both use the warn bg/text pair (the
++// design system notes these intentionally share the --warn tokens, despite
++// being semantically different — captain status and parent role are simply
++// not visually distinguished from each other in the source design).
++//
++// Contrast note: the literal --warn/--warn-bg pair (#c9861a on #fbf1dd)
++// measures ~2.71:1 — fails AA. Background kept as specified; foreground
++// darkened to #8a5a12 (~5.3:1), same treatment as Chip's social variant.
++
++const TONES = {
++  admin: 'bg-quinsRed text-white',
++  coach: 'bg-[#eaf4fb] text-[#2F7D3D]',
++  parent: 'bg-[#fbf1dd] text-[#8a5a12]',
++  captain: 'bg-[#fbf1dd] text-[#8a5a12]',
++}
++
++const NEUTRAL_TONE = 'bg-[#f0ecf2] text-[#77726e]'
++
++export function Badge({ tone, children, className = '' }) {
++  const toneClasses = TONES[tone] ?? NEUTRAL_TONE
++
++  const classes = [
++    'inline-flex',
++    'items-center',
++    'rounded-[6px]',
++    'px-[7px]',
++    'py-[2px]',
++    'text-[10px]',
++    'font-extrabold',
++    'uppercase',
++    'tracking-[.5px]',
++    toneClasses,
++    className,
++  ]
++    .filter(Boolean)
++    .join(' ')
++
++  return <span className={classes}>{children}</span>
++}
++
++export default Badge
+diff --git a/src/components/Card.jsx b/src/components/Card.jsx
+new file mode 100644
+index 0000000..a135fb6
+--- /dev/null
++++ b/src/components/Card.jsx
+@@ -0,0 +1,31 @@
++// Base card container (design-system.md §4.5 / §3): white background, the
++// design system's large radius (--radius, 16px) and elevation (--shadow), a
++// hairline border. No default padding — the prototype uses .card both as a
++// bare wrapper around list rows (rows supply their own padding + dividers,
++// e.g. .fixture, .player) and as a padded content box (padding added per
++// context, e.g. .stat). Callers pass padding via className.
++//
++// `as` lets a caller render the card as something other than a <div> (e.g. a
++// <section>) without duplicating the base styling — not used yet, but cheap
++// and matches how Nav/AppShell already accept a few such escape hatches.
++
++export function Card({ as: Tag = 'div', className = '', children, ...rest }) {
++  const classes = [
++    'rounded-[16px]',
++    'border',
++    'border-[#e6e3e1]',
++    'bg-white',
++    'shadow-[0_6px_24px_rgba(20,20,20,0.10)]',
++    className,
++  ]
++    .filter(Boolean)
++    .join(' ')
++
++  return (
++    <Tag className={classes} {...rest}>
++      {children}
++    </Tag>
++  )
++}
++
++export default Card
+diff --git a/src/components/Chip.jsx b/src/components/Chip.jsx
+new file mode 100644
+index 0000000..31a68c0
+--- /dev/null
++++ b/src/components/Chip.jsx
+@@ -0,0 +1,51 @@
++// Event-type category chip (design-system.md §4.7): a pill-shaped inline
++// label used on fixture/event rows to mark whether an event is a match,
++// training, or social. Colours are ported verbatim from the prototype's
++// .chip.match / .chip.training / .chip.social CSS, not from the Tailwind
++// brand tokens — quinsGreen (#7DC351) is never used here, because the
++// prototype's own training-chip pairing is light green-bg (#eef7e6) with
++// dark sky-deep text (#2F7D3D), which is what actually meets AA contrast;
++// quinsGreen itself is a gradient/block-fill colour only (~1.9:1 on white,
++// fails AA for text — see design-system.md §1 and the task-9 brief).
++//
++// An unrecognised (or missing) `type` renders the prototype's default
++// neutral chip styling (#f0ecf2 bg / --muted text) rather than crashing or
++// rendering nothing — screens should never be able to produce a blank chip
++// just because an event's type value is unexpected.
++//
++// Contrast note (social variant): the design system's literal --warn/
++// --warn-bg pair (#c9861a text on #fbf1dd bg) measures ~2.71:1, which fails
++// AA even for the 3:1 non-text minimum, let alone 4.5:1 for text. The
++// background is kept as specified; the foreground is darkened (same hue,
++// #8a5a12) to ~5.3:1, following the same "darken it for text use" rule the
++// task-9 brief applies to quinsGreen. See task-9-report.md for the numbers.
++
++const VARIANTS = {
++  match: 'bg-quinsRed text-white',
++  training: 'bg-[#eef7e6] text-[#2F7D3D]',
++  social: 'bg-[#fbf1dd] text-[#8a5a12]',
++}
++
++const NEUTRAL_VARIANT = 'bg-[#f0ecf2] text-[#77726e]'
++
++export function Chip({ type, children, className = '' }) {
++  const variantClasses = VARIANTS[type] ?? NEUTRAL_VARIANT
++
++  const classes = [
++    'inline-flex',
++    'items-center',
++    'rounded-[20px]',
++    'px-[9px]',
++    'py-[3px]',
++    'text-[11.5px]',
++    'font-bold',
++    variantClasses,
++    className,
++  ]
++    .filter(Boolean)
++    .join(' ')
++
++  return <span className={classes}>{children}</span>
++}
++
++export default Chip
+diff --git a/src/components/Empty.jsx b/src/components/Empty.jsx
+new file mode 100644
+index 0000000..2cd6dec
+--- /dev/null
++++ b/src/components/Empty.jsx
+@@ -0,0 +1,36 @@
++// Shared empty state (design-system.md §4.10 .empty): a centered icon +
++// muted message, used whenever a list has zero matching rows (no fixtures,
++// no players, no search results). `action`, when given, renders a single
++// primary button below the message — e.g. "Add a player" on an empty
++// roster — so a screen doesn't have to invent its own empty-state button
++// styling. Every screen's loading/empty/error contract (see the task-9
++// brief) uses this for the "empty" leg.
++
++function InboxIcon(props) {
++  return (
++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++      <path d="M3 12h4.5l1.5 3h6l1.5-3H21" />
++      <path d="M5.5 5h13L21 12v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6L5.5 5Z" />
++    </svg>
++  )
++}
++
++export function Empty({ message, action }) {
++  return (
++    <div className="flex flex-col items-center gap-3 px-5 py-11 text-center">
++      <InboxIcon className="h-[42px] w-[42px] text-[#77726e] opacity-40" aria-hidden="true" />
++      <p className="text-sm text-[#77726e]">{message}</p>
++      {action && (
++        <button
++          type="button"
++          onClick={action.onClick}
++          className="rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-quinsRedDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
++        >
++          {action.label}
++        </button>
++      )}
++    </div>
++  )
++}
++
++export default Empty
+diff --git a/src/components/ScopeNote.jsx b/src/components/ScopeNote.jsx
+new file mode 100644
+index 0000000..e4156d1
+--- /dev/null
++++ b/src/components/ScopeNote.jsx
+@@ -0,0 +1,54 @@
++// Scope callout (design-system.md §4.25 .scope-note): tells the signed-in
++// user what slice of the club they're looking at ("You're seeing your
++// squads only", "Parent view · read-only. You're only seeing U10."). This
++// is deliberately a dumb presentational component — it takes the message as
++// children and a `tone` for which of the two prototype variants to use
++// (coach = green eye-icon banner, parent = warn lock-icon banner, read-only)
++// — it must NOT import useMemberships or scope.js itself. The screen already
++// has memberships/visibleTeams from Task 6/8's helpers; it computes the
++// message and role and passes the result down here. Keeping the scope
++// computation out of this component is what makes it trivially reusable
++// (and trivially testable) everywhere the "you're scoped to X" pattern is
++// needed later.
++
++function EyeIcon(props) {
++  return (
++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
++      <circle cx="12" cy="12" r="3" />
++    </svg>
++  )
++}
++
++function LockIcon(props) {
++  return (
++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++      <rect x="5" y="11" width="14" height="9" rx="2" />
++      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
++    </svg>
++  )
++}
++
++// Contrast note (parent tone): the literal --warn (#c9861a) icon on
++// --warn-bg (#fbf1dd) measures ~2.71:1, below the 3:1 minimum for
++// meaningful icons (WCAG 1.4.11). The border keeps the literal --warn value
++// (decorative, not conveying information on its own); the icon — which
++// conveys the "read-only/locked" meaning — uses the same darkened #8a5a12
++// as Chip's social variant and Badge's parent/captain tones, for ~5.3:1.
++const TONES = {
++  coach: { border: 'border-l-[#2F7D3D]', bg: 'bg-[#eef7e6]', Icon: EyeIcon, iconColor: 'text-[#2F7D3D]' },
++  parent: { border: 'border-l-[#c9861a]', bg: 'bg-[#fbf1dd]', Icon: LockIcon, iconColor: 'text-[#8a5a12]' },
++}
++
++export function ScopeNote({ tone = 'coach', children }) {
++  const { border, bg, Icon, iconColor } = TONES[tone] ?? TONES.coach
++
++  return (
++    <div className={['mb-4 flex items-start gap-3 rounded-[11px] border-l-4 px-4 py-3 text-sm', border, bg].join(' ')}>
++      <Icon className={['mt-0.5 h-5 w-5 shrink-0', iconColor].join(' ')} aria-hidden="true" />
++      <div className="text-[#221f1d]">{children}</div>
++    </div>
++  )
++}
++
++export default ScopeNote
+diff --git a/src/components/Sheet.jsx b/src/components/Sheet.jsx
+new file mode 100644
+index 0000000..ac47653
+--- /dev/null
++++ b/src/components/Sheet.jsx
+@@ -0,0 +1,140 @@
++import { useEffect, useId, useRef } from 'react'
++
++// The single generic modal (design-system.md §4.16 .sheet + .scrim): a
++// bottom-anchored sheet on mobile, a centered dialog at the `desktop:`
++// breakpoint. Used for event detail, event add/edit, player detail, player
++// add/edit — every overlay in the app.
++//
++// No portal: this renders in place (no createPortal). The sheet is
++// `position:fixed`, which positions against the viewport regardless of
++// where it sits in the DOM tree, as long as no ancestor sets a CSS
++// `transform`/`filter`/`perspective` (any of which would turn that ancestor
++// into the fixed-positioning containing block instead). AppShell (Task 8)
++// sets none of those on any ancestor today, so a portal buys no correctness
++// here — it would only add indirection. If a future ancestor ever adopts a
++// transform (e.g. a page-transition wrapper), this assumption breaks and a
++// portal becomes necessary; flagged here so that's not a surprise.
++//
++// Accessibility (design-system.md §8 lists these as the prototype's gaps —
++// this is the "fix in the rewrite" the doc calls for):
++//   - role="dialog" aria-modal="true", labelled by the visible title
++//   - closes on Escape and on backdrop click
++//   - traps Tab/Shift+Tab focus inside the panel while open
++//   - moves focus into the panel on open, restores it to whatever had focus
++//     before opening (the trigger element) on close
++//   - renders nothing at all when closed (no hidden-but-present DOM)
++//
++// Motion: the mobile slide-up / desktop scale-fade entrance (design-
++// system.md §4.16) is implemented via the `animate-sheet-slide-up` /
++// `animate-sheet-scale-in` / `animate-scrim-fade-in` keyframes registered in
++// tailwind.config.js, each paired with `motion-reduce:animate-none`. There
++// is deliberately no matching exit animation — since the panel unmounts to
++// nothing the instant `open` goes false, an exit animation would need to
++// delay that unmount, which conflicts with the "renders nothing at all when
++// closed" requirement above. Closing is instant; opening animates.
++
++const FOCUSABLE_SELECTOR = [
++  'a[href]',
++  'button:not([disabled])',
++  'textarea:not([disabled])',
++  'input:not([disabled])',
++  'select:not([disabled])',
++  '[tabindex]:not([tabindex="-1"])',
++].join(',')
++
++export function Sheet({ open, onClose, title, children }) {
++  const titleId = useId()
++  const panelRef = useRef(null)
++  const triggerRef = useRef(null)
++
++  useEffect(() => {
++    if (!open) return undefined
++
++    // Capture whatever had focus before the sheet opened, so it can be
++    // restored on close (design-system.md §8 gap: "no focus return to the
++    // trigger element on close").
++    triggerRef.current = document.activeElement
++
++    const panel = panelRef.current
++    const focusables = panel ? Array.from(panel.querySelectorAll(FOCUSABLE_SELECTOR)) : []
++    ;(focusables[0] ?? panel)?.focus()
++
++    function handleKeyDown(event) {
++      if (event.key === 'Escape') {
++        event.stopPropagation()
++        onClose()
++        return
++      }
++
++      if (event.key !== 'Tab') return
++
++      const nodes = panel ? Array.from(panel.querySelectorAll(FOCUSABLE_SELECTOR)) : []
++      if (nodes.length === 0) {
++        event.preventDefault()
++        return
++      }
++
++      const first = nodes[0]
++      const last = nodes[nodes.length - 1]
++
++      if (event.shiftKey && document.activeElement === first) {
++        event.preventDefault()
++        last.focus()
++      } else if (!event.shiftKey && document.activeElement === last) {
++        event.preventDefault()
++        first.focus()
++      }
++    }
++
++    document.addEventListener('keydown', handleKeyDown, true)
++
++    // Prevent background scroll while the sheet is open (matches the
++    // prototype's body.style.overflow="hidden" behaviour).
++    const previousOverflow = document.body.style.overflow
++    document.body.style.overflow = 'hidden'
++
++    return () => {
++      document.removeEventListener('keydown', handleKeyDown, true)
++      document.body.style.overflow = previousOverflow
++      triggerRef.current?.focus?.()
++    }
++  }, [open, onClose])
++
++  if (!open) return null
++
++  return (
++    <div
++      className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(24,10,20,0.5)] backdrop-blur-[2px] animate-scrim-fade-in motion-reduce:animate-none desktop:items-center"
++      onClick={onClose}
++    >
++      <div
++        ref={panelRef}
++        role="dialog"
++        aria-modal="true"
++        aria-labelledby={titleId}
++        tabIndex={-1}
++        onClick={(event) => event.stopPropagation()}
++        className="max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] bg-white shadow-[0_6px_24px_rgba(20,20,20,0.10)] animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] desktop:w-[min(520px,94vw)] desktop:animate-sheet-scale-in desktop:rounded-[20px]"
++      >
++        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[#e6e3e1] bg-white px-[18px] py-4">
++          <h3 id={titleId} className="text-[18px] font-extrabold text-[#221f1d]">
++            {title}
++          </h3>
++          <button
++            type="button"
++            onClick={onClose}
++            aria-label="Close"
++            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f2edf4] text-[#221f1d] outline-none transition focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
++          >
++            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
++              <path d="M6 6l12 12M18 6L6 18" />
++            </svg>
++          </button>
++        </div>
++        <div className="px-[18px] py-4">{children}</div>
++      </div>
++    </div>
++  )
++}
++
++export default Sheet
+diff --git a/src/components/Spinner.jsx b/src/components/Spinner.jsx
+new file mode 100644
+index 0000000..133ce6a
+--- /dev/null
++++ b/src/components/Spinner.jsx
+@@ -0,0 +1,32 @@
++// Shared loading indicator. Not present as a distinct component in the
++// prototype (design-system.md has no `.spinner` entry — the prototype never
++// shows a loading state at all, since localStorage reads are synchronous);
++// this is new for the Supabase-backed app, where every screen's
++// loading/empty/error contract (task-9 brief) needs a real "loading" leg.
++// `role="status"` gives it an implicit aria-live polite region; `aria-label`
++// supplies the accessible name directly, since `status` does not compute its
++// name from visible content per the ARIA spec (a visually-hidden child span
++// alone is not announced as the name). The spin animation is disabled under
++// prefers-reduced-motion.
++
++export function Spinner({ label = 'Loading…', className = '' }) {
++  return (
++    <span
++      role="status"
++      aria-label={label}
++      className={['inline-flex items-center gap-2', className].filter(Boolean).join(' ')}
++    >
++      <svg
++        className="h-5 w-5 animate-spin text-quinsRed motion-reduce:animate-none"
++        viewBox="0 0 24 24"
++        fill="none"
++        aria-hidden="true"
++      >
++        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
++        <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
++      </svg>
++    </span>
++  )
++}
++
++export default Spinner
+diff --git a/src/components/TeamPills.jsx b/src/components/TeamPills.jsx
+new file mode 100644
+index 0000000..54b3622
+--- /dev/null
++++ b/src/components/TeamPills.jsx
+@@ -0,0 +1,54 @@
++// Team filter pill row (design-system.md §4.8 .pill / .pill-row): a
++// horizontally-scrollable row of single-select filter buttons — "All" plus
++// one pill per visible team, used for both the schedule team filter and the
++// roster team filter. `selected` is either a team id or the ALL_TEAMS_ID
++// sentinel; `onChange` is called with whichever was clicked.
++//
++// aria-pressed (not aria-current): these pills behave like a segmented
++// single-select toggle, not like a set of pages/steps a user moves through
++// in sequence (the usual case for aria-current). aria-pressed communicates
++// "this is the active state of a toggle button" — which is exactly what a
++// filter pill is — without borrowing "current page" semantics that don't
++// apply here.
++//
++// An empty (or missing) teams array renders nothing at all, rather than an
++// "All" pill with nothing to filter against — a filter control with zero
++// options to select between isn't a usable control, and the screens that
++// consume this already hide the whole row when there's only one visible
++// team (design-system.md §5.2/§5.3), so a component-level "nothing to show"
++// guard for the zero case is consistent with that same pattern.
++
++export const ALL_TEAMS_ID = 'all'
++
++function PillButton({ active, onClick, children }) {
++  const classes = [
++    'shrink-0 whitespace-nowrap rounded-[20px] px-[14px] py-[7px] text-[13px] font-bold outline-none transition',
++    'focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2',
++    active ? 'bg-quinsBlack text-white' : 'bg-white text-[#77726e] shadow-[inset_0_0_0_1.5px_#e6e3e1]',
++  ].join(' ')
++
++  return (
++    <button type="button" aria-pressed={active} onClick={onClick} className={classes}>
++      {children}
++    </button>
++  )
++}
++
++export function TeamPills({ teams, selected, onChange, allLabel = 'All' }) {
++  if (!teams || teams.length === 0) return null
++
++  return (
++    <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
++      <PillButton active={selected === ALL_TEAMS_ID} onClick={() => onChange(ALL_TEAMS_ID)}>
++        {allLabel}
++      </PillButton>
++      {teams.map((team) => (
++        <PillButton key={team.id} active={selected === team.id} onClick={() => onChange(team.id)}>
++          {team.name}
++        </PillButton>
++      ))}
++    </div>
++  )
++}
++
++export default TeamPills
+diff --git a/tailwind.config.js b/tailwind.config.js
+index 02227de..6b8fc19 100644
+--- a/tailwind.config.js
++++ b/tailwind.config.js
+@@ -9,14 +9,42 @@ export default {
+         quinsGreenSoft: '#87C97F',
+         quinsRedDark: '#8E1526',
+         quinsBlack: '#141414',
+       },
+       screens: {
+         // The prototype's single responsive breakpoint (design-system.md
+         // §5): below it is mobile (bottom tab bar, FAB, bottom sheet), at/
+         // above it is desktop (top nav, no FAB, centered dialog).
+         desktop: '820px',
+       },
++      // Sheet's (src/components/Sheet.jsx) enter animation (design-system.md
++      // §4.16). Implemented as a keyframe `animation`, not a `transition`,
++      // because Sheet renders nothing at all when closed (task-9 brief) —
++      // there's no "before" DOM state to transition from, only a mount
++      // event. A CSS animation plays automatically on element insertion,
++      // same technique the prototype itself uses for its view fade-in (see
++      // design-system.md §6: "the .25s ease fade-in keyframe plays
++      // automatically because the newly-active section re-triggers its CSS
++      // animation").
++      keyframes: {
++        sheetSlideUp: {
++          from: { transform: 'translateY(100%)' },
++          to: { transform: 'translateY(0)' },
++        },
++        sheetScaleIn: {
++          from: { transform: 'scale(.98)', opacity: '0' },
++          to: { transform: 'scale(1)', opacity: '1' },
++        },
++        scrimFadeIn: {
++          from: { opacity: '0' },
++          to: { opacity: '1' },
++        },
++      },
++      animation: {
++        'sheet-slide-up': 'sheetSlideUp .28s cubic-bezier(.32,.72,0,1)',
++        'sheet-scale-in': 'sheetScaleIn .2s ease-out',
++        'scrim-fade-in': 'scrimFadeIn .2s ease',
++      },
+     },
+   },
+   plugins: [],
+ }
+diff --git a/tests/components.test.jsx b/tests/components.test.jsx
+new file mode 100644
+index 0000000..6ff6172
+--- /dev/null
++++ b/tests/components.test.jsx
+@@ -0,0 +1,355 @@
++import { describe, it, expect, vi } from 'vitest'
++import { useState } from 'react'
++import { render, screen } from '@testing-library/react'
++import userEvent from '@testing-library/user-event'
++
++// Unit tests for the Task 9 shared UI primitives (src/components/{Card,Chip,
++// Sheet,Badge,TeamPills,ScopeNote,Empty,Spinner}.jsx). These are pure
++// presentational components — no network, no router, no auth context.
++//
++// jsdom does not apply Tailwind's generated CSS, so assertions that a
++// requirement is inherently visual (bottom sheet vs centered dialog,
++// backdrop blur, colour contrast) are made against the literal class tokens
++// the component emits, not against computed styles or "visibility". Real
++// rendering is verified separately in a browser.
++
++import Card from '../src/components/Card.jsx'
++import Chip from '../src/components/Chip.jsx'
++import Sheet from '../src/components/Sheet.jsx'
++import Badge from '../src/components/Badge.jsx'
++import TeamPills, { ALL_TEAMS_ID } from '../src/components/TeamPills.jsx'
++import ScopeNote from '../src/components/ScopeNote.jsx'
++import Empty from '../src/components/Empty.jsx'
++import Spinner from '../src/components/Spinner.jsx'
++
++function hasClassToken(element, token) {
++  return element.className.split(/\s+/).includes(token)
++}
++
++describe('Card', () => {
++  it('renders children inside a card with the design-system radius and shadow tokens', () => {
++    render(<Card>Card content</Card>)
++    const el = screen.getByText('Card content')
++    expect(hasClassToken(el, 'rounded-[16px]')).toBe(true)
++    expect(hasClassToken(el, 'shadow-[0_6px_24px_rgba(20,20,20,0.10)]')).toBe(true)
++  })
++
++  it('accepts a className passthrough without clobbering the base classes', () => {
++    render(<Card className="p-4">Padded</Card>)
++    const el = screen.getByText('Padded')
++    expect(hasClassToken(el, 'p-4')).toBe(true)
++    expect(hasClassToken(el, 'rounded-[16px]')).toBe(true)
++  })
++})
++
++describe('Chip', () => {
++  it('renders the match variant (maroon bg, white text) per design-system.md §4.7', () => {
++    render(<Chip type="match">MATCH</Chip>)
++    const el = screen.getByText('MATCH')
++    expect(hasClassToken(el, 'bg-quinsRed')).toBe(true)
++    expect(hasClassToken(el, 'text-white')).toBe(true)
++  })
++
++  it('renders the training variant (green-bg, sky-deep text)', () => {
++    render(<Chip type="training">TRAINING</Chip>)
++    const el = screen.getByText('TRAINING')
++    expect(hasClassToken(el, 'bg-[#eef7e6]')).toBe(true)
++    expect(hasClassToken(el, 'text-[#2F7D3D]')).toBe(true)
++  })
++
++  it('renders the social variant (warn-bg, darkened warn text for AA contrast)', () => {
++    render(<Chip type="social">SOCIAL</Chip>)
++    const el = screen.getByText('SOCIAL')
++    expect(hasClassToken(el, 'bg-[#fbf1dd]')).toBe(true)
++    // The design system's literal --warn text (#c9861a) on --warn-bg
++    // measures ~2.71:1 and fails AA — see Chip.jsx's contrast note. This
++    // asserts the darkened, AA-passing foreground actually ships.
++    expect(hasClassToken(el, 'text-[#8a5a12]')).toBe(true)
++  })
++
++  it('falls back to the neutral variant for an unknown type instead of crashing or rendering nothing', () => {
++    render(<Chip type="not-a-real-type">MYSTERY</Chip>)
++    const el = screen.getByText('MYSTERY')
++    expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
++    expect(hasClassToken(el, 'text-[#77726e]')).toBe(true)
++  })
++
++  it('falls back to the neutral variant when no type is given at all', () => {
++    render(<Chip>NO TYPE</Chip>)
++    const el = screen.getByText('NO TYPE')
++    expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
++  })
++})
++
++describe('Badge', () => {
++  it('renders the admin tone (maroon bg, white text)', () => {
++    render(<Badge tone="admin">Club admin</Badge>)
++    const el = screen.getByText('Club admin')
++    expect(hasClassToken(el, 'bg-quinsRed')).toBe(true)
++    expect(hasClassToken(el, 'text-white')).toBe(true)
++  })
++
++  it('renders the captain tone (darkened warn colours) distinctly from Chip — smaller radius token', () => {
++    render(<Badge tone="captain">Capt</Badge>)
++    const el = screen.getByText('Capt')
++    expect(hasClassToken(el, 'bg-[#fbf1dd]')).toBe(true)
++    expect(hasClassToken(el, 'text-[#8a5a12]')).toBe(true)
++    expect(hasClassToken(el, 'rounded-[6px]')).toBe(true)
++  })
++
++  it('falls back to a neutral tone for an unrecognised tone', () => {
++    render(<Badge tone="not-a-real-tone">Mystery</Badge>)
++    expect(screen.getByText('Mystery')).toBeInTheDocument()
++  })
++})
++
++describe('Empty', () => {
++  it('renders the message', () => {
++    render(<Empty message="No players match." />)
++    expect(screen.getByText('No players match.')).toBeInTheDocument()
++  })
++
++  it('renders no button when no action is given', () => {
++    render(<Empty message="No fixtures yet." />)
++    expect(screen.queryByRole('button')).not.toBeInTheDocument()
++  })
++
++  it('renders the action as a named button and calls it on click', async () => {
++    const user = userEvent.setup()
++    const onClick = vi.fn()
++    render(<Empty message="No players match." action={{ label: 'Add a player', onClick }} />)
++
++    const button = screen.getByRole('button', { name: 'Add a player' })
++    await user.click(button)
++
++    expect(onClick).toHaveBeenCalledTimes(1)
++  })
++})
++
++describe('Spinner', () => {
++  it('exposes an accessible name via role=status', () => {
++    render(<Spinner />)
++    expect(screen.getByRole('status', { name: 'Loading…' })).toBeInTheDocument()
++  })
++
++  it('accepts a custom accessible label', () => {
++    render(<Spinner label="Loading fixtures…" />)
++    expect(screen.getByRole('status', { name: 'Loading fixtures…' })).toBeInTheDocument()
++  })
++})
++
++describe('ScopeNote', () => {
++  it('renders its message as passed children, without computing scope itself', () => {
++    render(<ScopeNote tone="parent">You&apos;re seeing your squads only</ScopeNote>)
++    expect(screen.getByText("You're seeing your squads only")).toBeInTheDocument()
++  })
++
++  it('defaults to the coach tone when no tone is given', () => {
++    render(<ScopeNote>Some scope message</ScopeNote>)
++    expect(screen.getByText('Some scope message')).toBeInTheDocument()
++  })
++})
++
++describe('TeamPills', () => {
++  const teams = [
++    { id: 'u10', name: 'U10' },
++    { id: 'u12', name: 'U12' },
++  ]
++
++  it('marks the selected pill with aria-pressed and leaves the others unpressed', () => {
++    render(<TeamPills teams={teams} selected="u10" onChange={() => {}} />)
++
++    expect(screen.getByRole('button', { name: 'U10' })).toHaveAttribute('aria-pressed', 'true')
++    expect(screen.getByRole('button', { name: 'U12' })).toHaveAttribute('aria-pressed', 'false')
++    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false')
++  })
++
++  it('marks the All pill pressed when selected is the ALL_TEAMS_ID sentinel', () => {
++    render(<TeamPills teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} />)
++    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
++  })
++
++  it('calls onChange with the clicked team id', async () => {
++    const user = userEvent.setup()
++    const onChange = vi.fn()
++    render(<TeamPills teams={teams} selected="u10" onChange={onChange} />)
++
++    await user.click(screen.getByRole('button', { name: 'U12' }))
++
++    expect(onChange).toHaveBeenCalledWith('u12')
++  })
++
++  it('calls onChange with the ALL_TEAMS_ID sentinel when All is clicked', async () => {
++    const user = userEvent.setup()
++    const onChange = vi.fn()
++    render(<TeamPills teams={teams} selected="u10" onChange={onChange} />)
++
++    await user.click(screen.getByRole('button', { name: 'All' }))
++
++    expect(onChange).toHaveBeenCalledWith(ALL_TEAMS_ID)
++  })
++
++  it('renders no broken control for an empty teams array', () => {
++    const { container } = render(<TeamPills teams={[]} selected={ALL_TEAMS_ID} onChange={() => {}} />)
++    expect(container).toBeEmptyDOMElement()
++    expect(screen.queryAllByRole('button')).toHaveLength(0)
++  })
++
++  it('renders no broken control when teams is missing entirely', () => {
++    const { container } = render(<TeamPills selected={ALL_TEAMS_ID} onChange={() => {}} />)
++    expect(container).toBeEmptyDOMElement()
++  })
++})
++
++describe('Sheet', () => {
++  function Harness({ initialOpen = false }) {
++    const [open, setOpen] = useState(initialOpen)
++    return (
++      <div>
++        <button type="button" onClick={() => setOpen(true)}>
++          Open sheet
++        </button>
++        <Sheet open={open} onClose={() => setOpen(false)} title="Event details">
++          <button type="button">First field</button>
++          <button type="button">Second field</button>
++        </Sheet>
++      </div>
++    )
++  }
++
++  it('renders nothing at all when closed', () => {
++    const { container } = render(<Sheet open={false} onClose={() => {}} title="Hidden" />)
++    expect(container).toBeEmptyDOMElement()
++  })
++
++  it('renders as a dialog labelled by its title when open', () => {
++    render(
++      <Sheet open onClose={() => {}} title="Event details">
++        <p>Body content</p>
++      </Sheet>,
++    )
++    const dialog = screen.getByRole('dialog', { name: 'Event details' })
++    expect(dialog).toHaveAttribute('aria-modal', 'true')
++  })
++
++  it('is styled as a mobile bottom sheet with a desktop centred-dialog variant (class tokens only — real rendering verified in-browser)', () => {
++    render(
++      <Sheet open onClose={() => {}} title="Event details">
++        <p>Body content</p>
++      </Sheet>,
++    )
++    const dialog = screen.getByRole('dialog')
++    expect(hasClassToken(dialog, 'rounded-t-[22px]')).toBe(true)
++    expect(hasClassToken(dialog, 'desktop:rounded-[20px]')).toBe(true)
++    expect(hasClassToken(dialog, 'desktop:w-[min(520px,94vw)]')).toBe(true)
++  })
++
++  it('respects prefers-reduced-motion by disabling its entrance animation under motion-reduce', () => {
++    render(
++      <Sheet open onClose={() => {}} title="Event details">
++        <p>Body content</p>
++      </Sheet>,
++    )
++    const dialog = screen.getByRole('dialog')
++    expect(hasClassToken(dialog, 'animate-sheet-slide-up')).toBe(true)
++    expect(hasClassToken(dialog, 'desktop:animate-sheet-scale-in')).toBe(true)
++    expect(hasClassToken(dialog, 'motion-reduce:animate-none')).toBe(true)
++  })
++
++  it('closes on backdrop click', async () => {
++    const user = userEvent.setup()
++    const onClose = vi.fn()
++    render(
++      <Sheet open onClose={onClose} title="Event details">
++        <p>Body content</p>
++      </Sheet>,
++    )
++
++    // The backdrop is the dialog's parent — click it directly, not the panel.
++    const dialog = screen.getByRole('dialog')
++    await user.click(dialog.parentElement)
++
++    expect(onClose).toHaveBeenCalledTimes(1)
++  })
++
++  it('does not close when clicking inside the panel', async () => {
++    const user = userEvent.setup()
++    const onClose = vi.fn()
++    render(
++      <Sheet open onClose={onClose} title="Event details">
++        <p>Body content</p>
++      </Sheet>,
++    )
++
++    await user.click(screen.getByText('Body content'))
++
++    expect(onClose).not.toHaveBeenCalled()
++  })
++
++  it('closes on Escape', async () => {
++    const user = userEvent.setup()
++    const onClose = vi.fn()
++    render(
++      <Sheet open onClose={onClose} title="Event details">
++        <p>Body content</p>
++      </Sheet>,
++    )
++
++    await user.keyboard('{Escape}')
++
++    expect(onClose).toHaveBeenCalledTimes(1)
++  })
++
++  it('traps focus: Tab from the last focusable element wraps to the first', async () => {
++    const user = userEvent.setup()
++    render(
++      <Sheet open onClose={() => {}} title="Event details">
++        <button type="button">First field</button>
++        <button type="button">Second field</button>
++      </Sheet>,
++    )
++
++    const closeButton = screen.getByRole('button', { name: 'Close' })
++    const second = screen.getByRole('button', { name: 'Second field' })
++
++    second.focus()
++    expect(document.activeElement).toBe(second)
++
++    await user.tab()
++    expect(document.activeElement).toBe(closeButton)
++  })
++
++  it('traps focus: Shift+Tab from the first focusable element wraps to the last', async () => {
++    const user = userEvent.setup()
++    render(
++      <Sheet open onClose={() => {}} title="Event details">
++        <button type="button">First field</button>
++        <button type="button">Second field</button>
++      </Sheet>,
++    )
++
++    const closeButton = screen.getByRole('button', { name: 'Close' })
++    const second = screen.getByRole('button', { name: 'Second field' })
++
++    closeButton.focus()
++    expect(document.activeElement).toBe(closeButton)
++
++    await user.tab({ shift: true })
++    expect(document.activeElement).toBe(second)
++  })
++
++  it('restores focus to the trigger element on close', async () => {
++    const user = userEvent.setup()
++    render(<Harness />)
++
++    const trigger = screen.getByRole('button', { name: 'Open sheet' })
++    await user.click(trigger)
++
++    expect(screen.getByRole('dialog')).toBeInTheDocument()
++
++    await user.keyboard('{Escape}')
++
++    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
++    expect(document.activeElement).toBe(trigger)
++  })
++})

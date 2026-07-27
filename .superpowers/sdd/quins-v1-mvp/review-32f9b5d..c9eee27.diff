@@ -1,0 +1,370 @@
+# Review package: 32f9b5d..HEAD
+
+## Commits
+c9eee27 feat: add auth gate and router, replacing App's static placeholder
+
+## Files changed
+ src/App.jsx                    |  42 +++++++++++---
+ src/components/RequireAuth.jsx |  51 +++++++++++++++++
+ src/main.jsx                   |   5 +-
+ tests/app.test.jsx             |  82 ++++++++++++++++++++++++++-
+ tests/require-auth.test.jsx    | 126 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 294 insertions(+), 12 deletions(-)
+
+## Diff
+diff --git a/src/App.jsx b/src/App.jsx
+index 5634ef6..2b4adad 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -1,13 +1,39 @@
+-import crest from './assets/crest.png'
++import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
++import RequireAuth from './components/RequireAuth.jsx'
++
++// Route placeholders only. Task 8 replaces these with the real app shell and
++// navigation; Tasks 11-17 replace them again with the real screens. They live
++// here (not in src/screens/) so those later tasks create their screen files
++// without fighting a stub of the same name.
++
++function Home() {
++  return <h1>Home</h1>
++}
++
++function Schedule() {
++  return <h1>Schedule</h1>
++}
++
++function Roster() {
++  return <h1>Roster</h1>
++}
++
++function More() {
++  return <h1>More</h1>
++}
+ 
+ export default function App() {
+   return (
+-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_100%)] px-6 text-center text-white">
+-      <img src={crest} alt="Abu Dhabi Harlequins crest" className="h-24 w-24 drop-shadow-lg" />
+-      <h1 className="text-2xl font-extrabold tracking-tight">Abu Dhabi Harlequins</h1>
+-      <p className="text-sm font-semibold uppercase tracking-widest opacity-80">
+-        Quins Club Hub
+-      </p>
+-    </div>
++    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
++      <RequireAuth>
++        <Routes>
++          <Route path="/" element={<Home />} />
++          <Route path="/schedule" element={<Schedule />} />
++          <Route path="/roster" element={<Roster />} />
++          <Route path="/more" element={<More />} />
++          <Route path="*" element={<Navigate to="/" replace />} />
++        </Routes>
++      </RequireAuth>
++    </BrowserRouter>
+   )
+ }
+diff --git a/src/components/RequireAuth.jsx b/src/components/RequireAuth.jsx
+new file mode 100644
+index 0000000..5486440
+--- /dev/null
++++ b/src/components/RequireAuth.jsx
+@@ -0,0 +1,51 @@
++import { useEffect } from 'react'
++import { useAuth } from '../lib/auth.jsx'
++import Login from '../screens/Login.jsx'
++
++// Gates its children behind an authenticated session: shows a loading
++// indicator while the initial session check is in flight, the Login screen
++// when there is none, and the children once a session exists. It renders in
++// place rather than redirecting to a /login route, so a magic-link recipient
++// landing on any deep URL still lands correctly after sign-in.
++//
++// It also does the one piece of URL cleanup this app needs: supabase-js
++// (detectSessionInUrl: true) consumes the magic-link/OAuth token from the URL
++// fragment itself and fires onAuthStateChange — this component never parses
++// or exchanges tokens. Once a session is established, if a leftover
++// #access_token=... or #error_description=... fragment is still in the
++// address bar, it's stripped with replaceState (not pushState, so no extra
++// history entry) so it isn't left visible or bookmarkable.
++
++export default function RequireAuth({ children }) {
++  const { session, loading } = useAuth()
++
++  useEffect(() => {
++    if (!session) return
++
++    const hash = window.location.hash
++    if (hash.includes('access_token') || hash.includes('error_description')) {
++      window.history.replaceState(
++        null,
++        '',
++        window.location.pathname + window.location.search,
++      )
++    }
++  }, [session])
++
++  if (loading) {
++    return (
++      <div
++        role="status"
++        className="flex min-h-screen items-center justify-center bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_100%)] text-white"
++      >
++        <p className="text-sm font-semibold uppercase tracking-widest opacity-80">Loading…</p>
++      </div>
++    )
++  }
++
++  if (!session) {
++    return <Login />
++  }
++
++  return children
++}
+diff --git a/src/main.jsx b/src/main.jsx
+index 54b39dd..3827019 100644
+--- a/src/main.jsx
++++ b/src/main.jsx
+@@ -1,10 +1,13 @@
+ import React from 'react'
+ import ReactDOM from 'react-dom/client'
+ import App from './App.jsx'
++import { AuthProvider } from './lib/auth.jsx'
+ import './index.css'
+ 
+ ReactDOM.createRoot(document.getElementById('root')).render(
+   <React.StrictMode>
+-    <App />
++    <AuthProvider>
++      <App />
++    </AuthProvider>
+   </React.StrictMode>,
+ )
+diff --git a/tests/app.test.jsx b/tests/app.test.jsx
+index c63b4ca..285ddeb 100644
+--- a/tests/app.test.jsx
++++ b/tests/app.test.jsx
+@@ -1,12 +1,88 @@
+-import { describe, it, expect } from 'vitest'
++import { describe, it, expect, vi, beforeEach } from 'vitest'
+ import { render, screen } from '@testing-library/react'
+-import App from '../src/App'
++
++// Unit tests for src/App.jsx (Task 6: auth gate + routing). useAuth is
++// mocked so this exercises App's routing/gating wiring only — not the real
++// AuthProvider (tests/auth.test.jsx) or the real Login screen's own behaviour
++// (tests/login.test.jsx) — and no network is ever reachable from this file.
++//
++// This replaces the Task 1 test that asserted on App's static placeholder
++// (crest + brand name + tagline centred on the gradient). That placeholder no
++// longer lives in App.jsx — App now renders routes behind RequireAuth, and
++// Task 8 will replace today's route placeholders with the real app shell.
++// The signed-out case below still covers the brand name/tagline, because
++// RequireAuth renders the real Login screen (which carries that copy) when
++// there is no session.
++
++const useAuthMock = vi.fn()
++
++vi.mock('../src/lib/auth.jsx', () => ({
++  useAuth: () => useAuthMock(),
++}))
++
++// Import after vi.mock so this binds to the mocked module.
++import App from '../src/App.jsx'
++
++const signedIn = { session: { user: { id: 'u1' } }, loading: false }
++
++beforeEach(() => {
++  useAuthMock.mockReset()
++  window.history.pushState({}, '', '/')
++})
+ 
+ describe('App', () => {
+-  it('renders the club brand name and tagline', () => {
++  it('renders the Login screen when there is no session', () => {
++    useAuthMock.mockReturnValue({ session: null, loading: false })
++
+     render(<App />)
+ 
+     expect(screen.getByText('Abu Dhabi Harlequins')).toBeInTheDocument()
+     expect(screen.getByText('Quins Club Hub')).toBeInTheDocument()
++    expect(screen.getByText(/invite-only/i)).toBeInTheDocument()
++  })
++
++  it('renders the home placeholder at / when signed in', () => {
++    useAuthMock.mockReturnValue(signedIn)
++
++    render(<App />)
++
++    expect(screen.getByRole('heading', { name: /home/i })).toBeInTheDocument()
++  })
++
++  it('renders the schedule placeholder at /schedule when signed in', () => {
++    window.history.pushState({}, '', '/schedule')
++    useAuthMock.mockReturnValue(signedIn)
++
++    render(<App />)
++
++    expect(screen.getByRole('heading', { name: /schedule/i })).toBeInTheDocument()
++  })
++
++  it('renders the roster placeholder at /roster when signed in', () => {
++    window.history.pushState({}, '', '/roster')
++    useAuthMock.mockReturnValue(signedIn)
++
++    render(<App />)
++
++    expect(screen.getByRole('heading', { name: /roster/i })).toBeInTheDocument()
++  })
++
++  it('renders the more placeholder at /more when signed in', () => {
++    window.history.pushState({}, '', '/more')
++    useAuthMock.mockReturnValue(signedIn)
++
++    render(<App />)
++
++    expect(screen.getByRole('heading', { name: /more/i })).toBeInTheDocument()
++  })
++
++  it('redirects an unknown path to / when signed in', () => {
++    window.history.pushState({}, '', '/nope')
++    useAuthMock.mockReturnValue(signedIn)
++
++    render(<App />)
++
++    expect(screen.getByRole('heading', { name: /home/i })).toBeInTheDocument()
++    expect(window.location.pathname).toBe('/')
+   })
+ })
+diff --git a/tests/require-auth.test.jsx b/tests/require-auth.test.jsx
+new file mode 100644
+index 0000000..437d8d2
+--- /dev/null
++++ b/tests/require-auth.test.jsx
+@@ -0,0 +1,126 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest'
++import { render, screen } from '@testing-library/react'
++
++// Unit tests for src/components/RequireAuth.jsx (Task 6). Both useAuth and
++// the Login screen are mocked so this exercises only RequireAuth's own
++// gating/loading/cleanup logic — not the real AuthProvider (tests/auth.test.jsx)
++// or the real Login screen (tests/login.test.jsx) — and no network is ever
++// reachable from this file.
++
++const useAuthMock = vi.fn()
++
++vi.mock('../src/lib/auth.jsx', () => ({
++  useAuth: () => useAuthMock(),
++}))
++
++vi.mock('../src/screens/Login.jsx', () => ({
++  default: () => <div>Login screen stub</div>,
++}))
++
++// Import after vi.mock so this binds to the mocked modules.
++import RequireAuth from '../src/components/RequireAuth.jsx'
++
++beforeEach(() => {
++  useAuthMock.mockReset()
++  window.history.pushState({}, '', '/')
++})
++
++describe('RequireAuth', () => {
++  it('renders a loading indicator while loading is true, not Login and not children', () => {
++    useAuthMock.mockReturnValue({ session: null, loading: true })
++
++    render(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++
++    expect(screen.getByRole('status')).toBeInTheDocument()
++    expect(screen.queryByText('Login screen stub')).not.toBeInTheDocument()
++    expect(screen.queryByText('Protected content')).not.toBeInTheDocument()
++  })
++
++  it('renders Login when loading is false and there is no session', () => {
++    useAuthMock.mockReturnValue({ session: null, loading: false })
++
++    render(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++
++    expect(screen.getByText('Login screen stub')).toBeInTheDocument()
++    expect(screen.queryByText('Protected content')).not.toBeInTheDocument()
++  })
++
++  it('renders children when a session is present', () => {
++    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
++
++    render(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++
++    expect(screen.getByText('Protected content')).toBeInTheDocument()
++    expect(screen.queryByText('Login screen stub')).not.toBeInTheDocument()
++  })
++})
++
++describe('RequireAuth fragment cleanup', () => {
++  it('strips an #access_token fragment once a session is present, preserving path and query', () => {
++    window.history.pushState({}, '', '/schedule?foo=bar#access_token=abc123&type=magiclink')
++    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
++
++    render(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++
++    expect(window.location.pathname).toBe('/schedule')
++    expect(window.location.search).toBe('?foo=bar')
++    expect(window.location.hash).toBe('')
++  })
++
++  it('strips an #error_description fragment once a session is present, preserving path', () => {
++    window.history.pushState({}, '', '/?error_description=denied')
++    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
++
++    render(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++
++    expect(window.location.pathname).toBe('/')
++    expect(window.location.hash).toBe('')
++  })
++
++  it('leaves an unrelated hash alone', () => {
++    window.history.pushState({}, '', '/roster#section-2')
++    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
++
++    render(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++
++    expect(window.location.pathname).toBe('/roster')
++    expect(window.location.hash).toBe('#section-2')
++  })
++
++  it('does not touch the hash while there is no session yet', () => {
++    window.history.pushState({}, '', '/#access_token=abc123')
++    useAuthMock.mockReturnValue({ session: null, loading: false })
++
++    render(
++      <RequireAuth>
++        <div>Protected content</div>
++      </RequireAuth>,
++    )
++
++    expect(window.location.hash).toBe('#access_token=abc123')
++  })
++})
