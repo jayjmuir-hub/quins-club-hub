@@ -3,7 +3,7 @@
 **Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
 Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
 
-**19 of 22 tasks complete, 528 tests passing, build clean.**
+**20 of 22 tasks complete, 535 tests passing, build clean.**
 
 ---
 
@@ -33,7 +33,7 @@ Never put the `sb_secret_…` key in this repo or in a chat.
 Verify:
 
 ```bash
-npm test        # expect 528 passing across 22 files
+npm test        # expect 535 passing across 23 files
 npm run build   # expect clean
 ```
 
@@ -77,7 +77,7 @@ does.
 | **D — Read features** | 10 data-access, 11 schedule, 12 roster, 13 dashboard | done |
 | **E — Write features** | 14 event form, 15 player form, 16 availability RSVPs | done |
 | **F — Admin** | 17 admin overview, 18 invite flow, 19 first-admin doc | done |
-| **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | next |
+| **G — Release** | 20 PWA (done), 21 RLS hardening, 22 E2E + a11y + deploy docs | in progress |
 
 Every completed task passed a spec-compliance and code-quality review; several needed fix
 rounds, all closed by a scoped re-review. The ledger at
@@ -92,7 +92,7 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Resume at Task 20 — PWA (installable + offline read)
+## Resume at Task 21 — Security hardening (RLS helpers → private schema)
 
 Phase F is now FULLY COMPLETE (17 admin overview, 18 invite flow, 19 first-admin bootstrap
 doc). Task 18 added a new `invites` table + RLS + a `SECURITY DEFINER accept_invite(token)`
@@ -116,13 +116,42 @@ hasn't signed in yet — the doc's "sign in first" framing isn't hypothetical), 
 memberships schema details the doc references (club id `00000000-...000ad`, nullable
 `team_id`/`player_id`) were checked against the live database, not assumed from memory.
 
-Task 20 (PWA) starts Phase G — the final phase. Per the plan (`docs/plans/quins-v1-mvp.md`,
-Task 20): create `public/manifest.webmanifest`, icons from the crest, `src/sw-register.js`,
-add `vite-plugin-pwa` config. Interfaces: installable to home screen; caches the app shell and
-last-loaded data for offline read. Icon label "Quins", theme colour `#C21F32`. Test: the built
-`dist/` contains the manifest and a service worker; the manifest declares name, short_name
-"Quins", 192px and 512px icons, `display: standalone`, and the theme colour. Its brief is not
-yet generated.
+Task 20 (PWA) started Phase G and is now **complete** (commit `256718b`). Added
+`vite-plugin-pwa`, configured `manifest` (name/short_name "Quins"/theme_color `#C21F32`/
+display standalone/icons split any-vs-maskable using the existing, unmodified icon files) and
+`workbox.runtimeCaching` (`NetworkFirst` on `GET /rest/v1/*` only, excluding auth and all
+mutations, 1-day expiration). `src/sw-register.js` registers via `virtual:pwa-register` with
+`registerType: 'prompt'` (deliberate — no silent mid-session code swap under an open form);
+`updateSW` is exported for a future in-app "update available" toast, not built yet (console-only
+for v1, a self-flagged, accepted gap). `index.html` ended up byte-identical — the plugin
+auto-injects its own manifest `<link>` tag, so a manual one would have duplicated it.
+
+**Self-caught bug worth remembering for any future Workbox config:** a `urlPattern` function's
+outer-scope `const` reference (`SUPABASE_HOST`, declared in `vite.config.js`) is invisible to the
+*built* service worker — Workbox stringifies and re-executes `urlPattern` functions inside
+`dist/sw.js`, which does not share the build-time module scope, so the constant would have been
+`undefined` at runtime. Only visible by reading the real generated `dist/sw.js`, not the plugin
+config object — exactly why `tests/pwa-build.test.js` shells out to a real `vite build` rather
+than asserting on config. Fixed by inlining the hostname as a string literal.
+
+Controller-side verification for this task used **Playwright against a real `vite build` +
+`vite preview`**, not the usual Chromium-harness screen render (this task added no visible
+screen) and not the `claude-in-chrome` MCP tools (those drive the *user's own desktop Chrome*,
+which cannot reach a `localhost` preview server running inside the cloud sandbox — confirmed the
+wrong tool for this kind of check before falling back to the sandbox's pre-installed
+`/opt/pw-browsers/chromium-1194` directly). Confirmed live: the manifest `<link>` resolves and
+parses correctly, the service worker registers and reaches `ready`, a reload leaves the page
+genuinely controlled by the service worker, and a real `context.setOffline(true)` reload still
+renders the app shell from precache instead of a browser offline error page. 535/535 tests,
+build clean, 0 fix rounds needed.
+
+Task 21 (RLS hardening) is next. Per the plan (`docs/plans/quins-v1-mvp.md`, Task 21): move
+`is_admin`, `can_see_team`, `can_edit_team`, `is_own_player` out of `public` into a `private`
+schema not exposed by PostgREST, re-point every policy that calls them, pin each function's
+`search_path`, and confirm via `get_advisors` that the "function search_path mutable"-class
+warnings clear. This is schema/RLS work — per the Task 18 precedent (a bad RLS predicate fails
+silently, not loudly), the controller should very likely apply this migration directly rather
+than delegating it to an implementer subagent. Its brief is not yet generated.
 
 `src/App.jsx` was restructured from one shared `<AppShell><Routes>...</Routes></AppShell>` to
 each route wrapping its own `<AppShell>` individually, so `/accept-invite/:token` could exist
