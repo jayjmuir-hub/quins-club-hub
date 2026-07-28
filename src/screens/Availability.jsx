@@ -172,6 +172,19 @@ export default function Availability({ event, team, onClose }) {
     setSavingPlayerId(playerId)
     setSaveError(null)
     setAvailability(event.id, playerId, status)
+      .then((saved) => {
+        // Patch the clicked row into local state immediately on a genuine
+        // success — the person who just tapped a status must see it change
+        // without waiting on a realtime round-trip (which may be delayed,
+        // disconnected, or never echo back to its own writer). Only applied
+        // here, in the success branch, so a refused/failed write (caught
+        // below) never optimistically shows a status that was never saved.
+        setRows((current) => {
+          const next = current.filter((row) => row.player_id !== playerId)
+          next.push(saved)
+          return next
+        })
+      })
       .catch((err) => setSaveError(err))
       .finally(() => setSavingPlayerId(null))
   }

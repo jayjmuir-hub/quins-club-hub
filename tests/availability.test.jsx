@@ -147,6 +147,50 @@ describe('Availability — coach/admin can override anyone', () => {
     expect(setAvailabilityMock).toHaveBeenCalledWith('e-1', 'p-ana', 'in')
   })
 
+  it('updates the clicked row to the new status as soon as the save succeeds, without waiting for realtime', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    listAvailabilityMock.mockResolvedValue([
+      { id: 'a1', event_id: 'e-1', player_id: 'p-ana', status: 'in' },
+    ])
+    setAvailabilityMock.mockResolvedValue({
+      id: 'a1',
+      event_id: 'e-1',
+      player_id: 'p-ana',
+      status: 'maybe',
+    })
+    const { user } = setup()
+
+    await screen.findByText('Ana Silva')
+    const row = screen.getByText('Ana Silva').closest('li')
+
+    expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(within(row).getByRole('button', { name: /maybe/i }))
+
+    expect(within(row).getByRole('button', { name: /maybe/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(await screen.findByText(/1 maybe/i)).toBeInTheDocument()
+    expect(screen.getByText(/0 in/i)).toBeInTheDocument()
+  })
+
+  it('does not change the row status when the save is refused', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    listAvailabilityMock.mockResolvedValue([
+      { id: 'a1', event_id: 'e-1', player_id: 'p-ana', status: 'in' },
+    ])
+    setAvailabilityMock.mockRejectedValue(new Error("We couldn't save that RSVP."))
+    const { user } = setup()
+
+    await screen.findByText('Ana Silva')
+    const row = screen.getByText('Ana Silva').closest('li')
+
+    await user.click(within(row).getByRole('button', { name: /maybe/i }))
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(row).getByRole('button', { name: /maybe/i })).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('lets an admin override too', async () => {
     useMembershipsMock.mockReturnValue(memberships(ADMIN))
     const { user } = setup()
