@@ -22,6 +22,8 @@ const listEventsMock = vi.fn()
 const subscribeEventsMock = vi.fn()
 const listAvailabilityMock = vi.fn()
 const subscribeAvailabilityMock = vi.fn()
+const setAvailabilityMock = vi.fn()
+const listPlayersMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -35,6 +37,15 @@ vi.mock('../src/data/events.js', () => ({
 vi.mock('../src/data/availability.js', () => ({
   listAvailability: (...args) => listAvailabilityMock(...args),
   subscribeAvailability: (...args) => subscribeAvailabilityMock(...args),
+  setAvailability: (...args) => setAvailabilityMock(...args),
+}))
+
+// Task 16: Availability (the RSVP/team-sheet sheet opened from EventDetail)
+// also reads the team roster. This file's own suite for that screen's
+// behaviour lives in tests/availability.test.jsx; the tests below only
+// prove Schedule wires the entry point/sheet correctly.
+vi.mock('../src/data/players.js', () => ({
+  listPlayers: (...args) => listPlayersMock(...args),
 }))
 
 // Import after vi.mock so this binds to the mocked modules.
@@ -132,6 +143,8 @@ beforeEach(() => {
   subscribeEventsMock.mockReturnValue(unsubscribeEvents)
   listAvailabilityMock.mockResolvedValue([])
   subscribeAvailabilityMock.mockReturnValue(vi.fn())
+  setAvailabilityMock.mockResolvedValue({ id: 'a-1' })
+  listPlayersMock.mockResolvedValue([])
 })
 
 function setup() {
@@ -637,6 +650,58 @@ describe('Schedule — event detail sheet', () => {
     })
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('Schedule — availability entry point (Task 16)', () => {
+  it('opens the Availability sheet for the selected fixture, and closing it returns to the detail sheet', async () => {
+    const { user } = setup()
+
+    await user.click(await screen.findByRole('button', { name: /Dubai Exiles/ }))
+    const detail = screen.getByRole('dialog')
+    await user.click(within(detail).getByRole('button', { name: /set availability/i }))
+
+    // Passed the right event/team: Availability's own header renders the
+    // fixture title and age group — proof this is wired to the SELECTED
+    // fixture, not a stale or wrong one.
+    const availabilitySheet = screen.getByRole('dialog')
+    expect(within(availabilitySheet).getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u10'] })
+
+    // One sheet at a time: the detail sheet's own content is gone.
+    expect(within(availabilitySheet).queryByText('West Asia Premiership')).not.toBeInTheDocument()
+
+    await user.click(within(availabilitySheet).getByRole('button', { name: /close/i }))
+
+    // Back to the detail sheet, not all the way out to the schedule list.
+    expect(await screen.findByText('West Asia Premiership')).toBeInTheDocument()
+  })
+
+  it('offers the entry point to a read-only parent too, worded differently from the coach/admin label', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    const { user } = setup()
+
+    await user.click(await screen.findByRole('button', { name: /Dubai Exiles/ }))
+    const detail = screen.getByRole('dialog')
+
+    expect(within(detail).getByRole('button', { name: /set my availability/i })).toBeInTheDocument()
+  })
+
+  it('does not open the wrong fixture’s availability sheet when a different row is picked mid-flow', async () => {
+    const { user } = setup()
+
+    await user.click(await screen.findByRole('button', { name: /Dubai Exiles/ }))
+    await user.click(screen.getByRole('button', { name: /set availability/i }))
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'Quins vs Dubai Exiles' })).toBeInTheDocument()
+
+    // Close entirely and pick the OTHER upcoming fixture.
+    await user.click(screen.getByRole('button', { name: /close/i }))
+    await user.click(await screen.findByRole('button', { name: /Senior squad training/ }))
+
+    // Lands on ITS detail sheet, not stuck showing an availability sheet
+    // left open from the previous selection.
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Senior squad training')).toBeInTheDocument()
   })
 })
 

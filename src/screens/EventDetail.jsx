@@ -262,7 +262,7 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
   )
 }
 
-export default function EventDetail({ event, team, onClose, canEdit = false, onEdit, onDeleted }) {
+export default function EventDetail({ event, team, onClose, canEdit = false, onEdit, onDeleted, onOpenAvailability }) {
   const date = eventDate(event)
   const Icon = TYPE_ICONS[event.type] ?? WhistleIcon
   const typeLabel = TYPE_LABELS[event.type] ?? 'Event'
@@ -319,6 +319,21 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
         <div>
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-[#77726e]">Availability</h4>
           <AvailabilitySummary eventId={event.id} />
+          {/* Everyone gets this button, not just canEdit users: a player or
+              parent who cannot edit the FIXTURE still needs to set their own
+              RSVP, and Task 16's brief calls this out explicitly. Schedule
+              holds the "is the RSVP sheet open" state and renders
+              src/screens/Availability.jsx from it — the same
+              parent-holds-the-state wiring EventForm/PlayerForm already use
+              from Schedule/Roster — rather than this component opening a
+              second sheet of its own. */}
+          <button
+            type="button"
+            onClick={() => onOpenAvailability?.(event)}
+            className="mt-3 w-full rounded-[11px] border-[1.5px] border-[#e6e3e1] bg-white px-4 py-2.5 text-sm font-bold text-[#221f1d] transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+          >
+            {canEdit ? 'View & set availability' : 'Set my availability'}
+          </button>
         </div>
       )}
 

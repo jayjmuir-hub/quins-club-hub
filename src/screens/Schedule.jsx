@@ -5,6 +5,7 @@ import FixtureRow from '../components/FixtureRow.jsx'
 import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import TeamPills, { ALL_TEAMS_ID, PillButton } from '../components/TeamPills.jsx'
+import Availability from './Availability.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
@@ -271,6 +272,24 @@ export default function Schedule() {
   // A wrapper object rather than the event itself, so "add" is distinguishable
   // from "closed" without a second boolean that could drift out of sync.
   const [formState, setFormState] = useState(null)
+  // Whether the RSVP/team-sheet sheet is open for the currently selected
+  // event (Task 16). Tied to selectedEventId rather than carrying its own
+  // event id: Availability only ever opens from within the open detail
+  // sheet, for that same fixture, so there is nothing else for it to name.
+  const [availabilityOpen, setAvailabilityOpen] = useState(false)
+
+  // A stored "availability open" flag can outlive the fixture it was opened
+  // for: picking a different row from the list underneath sets
+  // selectedEventId directly, bypassing the "close, then open" round trip
+  // that would otherwise reset this. Without this effect, selecting a new
+  // fixture while the sheet was open would show ITS availability screen
+  // rather than its detail sheet — an unrequested screen for the wrong
+  // event. Closing the current selection entirely (selectedEventId → null)
+  // also passes through here and leaves availabilityOpen false, which is
+  // what the "one sheet at a time" comment below relies on.
+  useEffect(() => {
+    setAvailabilityOpen(false)
+  }, [selectedEventId])
 
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -447,13 +466,14 @@ export default function Schedule() {
         />
       )}
 
-      {selectedEvent && !formState && (
+      {selectedEvent && !formState && !availabilityOpen && (
         <EventDetail
           event={selectedEvent}
           team={teamsById.get(selectedEvent.team_id)}
           onClose={() => setSelectedEventId(null)}
           canEdit={canEditSelected}
           onEdit={(event) => setFormState({ event })}
+          onOpenAvailability={() => setAvailabilityOpen(true)}
           onDeleted={() => {
             setSelectedEventId(null)
             refresh()
@@ -473,6 +493,21 @@ export default function Schedule() {
             setSelectedEventId(null)
           }}
           onSaved={refresh}
+        />
+      )}
+
+      {/* The RSVP/team-sheet sheet (Task 16). Unlike the form above, closing
+          it returns to the event's detail sheet rather than dropping all
+          the way back to the schedule: this is a "drill in and back" flow,
+          not a save-and-return-to-the-list one — someone who just set their
+          RSVP, or a coach who just overrode a player, is most likely to want
+          to glance at the fixture they were looking at, not lose their place
+          in the list. */}
+      {selectedEvent && availabilityOpen && !formState && (
+        <Availability
+          event={selectedEvent}
+          team={teamsById.get(selectedEvent.team_id)}
+          onClose={() => setAvailabilityOpen(false)}
         />
       )}
     </section>
