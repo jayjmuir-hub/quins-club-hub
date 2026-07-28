@@ -3,7 +3,7 @@
 **Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
 Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
 
-**13 of 22 tasks complete, 330 tests passing, build clean.**
+**15 of 22 tasks complete, 451 tests passing, build clean.**
 
 ---
 
@@ -33,7 +33,7 @@ Never put the `sb_secret_…` key in this repo or in a chat.
 Verify:
 
 ```bash
-npm test        # expect 330 passing across 16 files
+npm test        # expect 451 passing across 18 files
 npm run build   # expect clean
 ```
 
@@ -75,7 +75,8 @@ does.
 | **B — Auth & scope** | 3+4 auth context, 5 login screen, 6 auth gate + router, 7 scope helpers | done |
 | **C — Shell & design system** | 8 app shell + nav, 9 shared UI primitives | done |
 | **D — Read features** | 10 data-access, 11 schedule, 12 roster, 13 dashboard | done |
-| **E — Write features** | 14 event form, 15 player form, 16 availability RSVPs | todo |
+| **E — Write features** | 14 event form, 15 player form | done |
+| | 16 availability RSVPs | next |
 | **F — Admin** | 17 admin overview, 18 invite flow, 19 first-admin doc | todo |
 | **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | todo |
 
@@ -92,26 +93,29 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Resume at Task 14 — Event create/edit/delete
+## Resume at Task 16 — Availability RSVPs + coach team-sheet
 
-Phase D (all read screens) is complete. Phase E starts the write screens. Task 14's brief is
-not yet generated — run `scripts/task-brief docs/plans/quins-v1-mvp.md 14` from the
-`subagent-driven-development` skill directory to produce it.
-
-**Read the Task 11 amendment note before starting Task 14:** the event form must interpret
-an entered date and time as Abu Dhabi time when it builds `starts_at` — a naive
-`new Date(\`${d}T${t}\`)` resolves in the browser's zone, so a UK coach entering 20:00 would
-write a 23:00 Abu Dhabi kick-off. This is the mirror image of the read-side fix and it is
-easy to miss. The plan is `docs/plans/quins-v1-mvp.md`; the visual spec is
+Phase E is 2 of 3 done (14 event form, 15 player form). Task 16 is the last write screen and
+owns two things deliberately deferred by earlier tasks: the "N available" count on upcoming
+schedule rows (Task 11 ruling) and the per-event availability data behind Task 13's Dashboard
+stat tiles. Its brief is not yet generated — run
+`scripts/task-brief docs/plans/quins-v1-mvp.md 16` from the `subagent-driven-development`
+skill directory to produce it. The plan is `docs/plans/quins-v1-mvp.md`; the visual spec is
 `docs/design-system.md` (597 lines, extracted from the approved prototype — implementers
 build from it without reading the prototype HTML).
 
+**Task 16 opens every RSVP control in a `Sheet` — read the two bug notes below before
+starting** (stale-`onClose` keystroke bug, already fixed with a latest-ref pattern and a
+regression test; safe-area inset already fixed in Task 12). **Force every RSVP timestamp
+through the Abu Dhabi rulings below** — this class of bug has shipped twice already.
+
 Execution method: `superpowers:subagent-driven-development` — one implementer subagent per
 task, then a spec+quality review, then a scoped re-review of any fixes, then a ledger entry.
-Tasks 11 and 12 added a further gate that has earned its place: an **independent
+Tasks 11 onward added a further gate that has earned its place every time: an **independent
 controller-side browser pass**, rendering the real components in Chromium at 375px and
-1280px via `harness/`. It has caught a defect on both screens that no jsdom test could see.
-Screenshots are git-ignored — regenerate them, don't commit them.
+1280px via `harness/`. It has caught defects on every screen that jsdom could not see —
+Task 15's pass was safeguarding-focused given the contact-data writes. Screenshots are
+git-ignored — regenerate them, don't commit them.
 
 **`.superpowers/sdd/.gitignore` gets reset to `*` by tooling, repeatedly.** It silently
 untracks the whole ledger. Do not fight it — stage the workspace with
@@ -209,6 +213,34 @@ was darkened to `#5c5854` (6.04:1) because the design system's `--muted` on the 
 background was 4.07:1, under the threshold. `--muted #77726e` also fails on the **paper**
 background `#f5f4f3` (4.33:1) while passing on white inside a card (4.75:1) — on-paper text
 uses `#5c5854` (6.42:1).
+
+**A component that states a safeguarding invariant must enforce it itself.** Task 15's
+`PlayerForm` claimed "a null contact row here can only mean nothing recorded yet, never
+withheld" — true only because *something else* (`Roster.jsx`) gated who could open the form
+for which player. The form's own gate was coarser ("has any editable squad"). Fixed by
+folding the per-player check directly into the component that makes the claim:
+`Boolean(player) && !canEditTeam(memberships, player.team_id)`. Nothing leaked — RLS and
+Roster's gating were both already correct — but don't split "asserts" from "enforces" across
+files again.
+
+**Contact disclosure copy must match the real RLS predicate, not the intuitive one.** The
+read policy is `can_edit_team(...) OR is_own_player(player_id)` — the linked player can read
+their own contact row, not just coaches/admins. Copy shown to whoever is entering a minor's
+guardian details must name both.
+
+**Writing a player's contact details is two separate calls, never one.** `upsertPlayer` then
+`upsertContact` — so a partial failure (player saved, contact rejected) is surfaced distinctly
+rather than silently rolled into one ambiguous error.
+
+**Delete confirmation is a two-step inline control, never a native `confirm()`.** A native
+dialog blocks the event loop and hangs Playwright's browser check dead — established in
+Task 14, reused in Task 15's player delete.
+
+**Squad reassignment on edit must fall back to the entity's own team, not the first editable
+one.** `editableTeams[0]` as a fallback silently reassigns whoever is being edited to a coach's
+first squad the moment the form opens. Reconcile against the entity's actual `team_id` instead.
+Fixed in `PlayerForm.jsx`; `EventForm.jsx` has the identical shape and has NOT been fixed —
+it's a separate file and a separate decision, deliberately left alone in Task 15's fix round.
 
 **Conventions set by earlier tasks:** data-access functions **throw** on error, never return
 `{data, error}` tuples, and return `[]` not `null`. `src/lib/scope.js` holds only pure
