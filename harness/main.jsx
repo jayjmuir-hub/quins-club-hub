@@ -6,6 +6,8 @@ import Login from '../src/screens/Login.jsx'
 import Schedule from '../src/screens/Schedule.jsx'
 import Roster from '../src/screens/Roster.jsx'
 import Dashboard from '../src/screens/Dashboard.jsx'
+import PlayerForm from '../src/screens/PlayerForm.jsx'
+import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
 import '../src/index.css'
@@ -190,6 +192,35 @@ const scenarios = {
   dashboard: dashboardScenario(COACH_MEMBERSHIPS),
   'dashboard-admin': dashboardScenario(ADMIN_MEMBERSHIPS),
   'dashboard-parent': dashboardScenario(PARENT_MEMBERSHIPS),
+
+  // Independent verification pass, Task 15: mount PlayerForm DIRECTLY so the
+  // gated branches can be reached without Roster's own gating deciding first.
+  // ?pf=add|edit|edit-null|edit-foreign|no-teams picks the case.
+  //   edit          -> p1 (U12, coach can edit, contact row on file)
+  //   edit-null     -> p4 (U12, coach can edit, NO contact row on file)
+  //   edit-foreign  -> p21 (U16 — coach coaches U12/U14 only)
+  //   no-teams      -> a parent, i.e. zero editable squads
+  playerform: () => {
+    const params = new URLSearchParams(window.location.search)
+    const which = params.get('pf') || 'add'
+    const byId = (id) => PLAYERS.find((p) => p.id === id)
+    const player =
+      which === 'edit' ? byId('p1')
+      : which === 'edit-null' ? byId('p4')
+      : which === 'edit-foreign' ? byId('p21')
+      : which === 'no-teams' ? byId('p1')
+      : null
+    const memberships = which === 'no-teams' ? PARENT_MEMBERSHIPS : COACH_MEMBERSHIPS
+    return (
+      <Shell
+        route="/roster"
+        authValue={baseAuth(COACH_EMAIL)}
+        membershipValue={{ memberships, teams: TEAMS_THREE, loading: false, error: null, reload: noop }}
+      >
+        <PlayerForm player={player} onClose={noop} onSaved={noop} />
+      </Shell>
+    )
+  },
 
   'shell-loading': () => (
     <Shell

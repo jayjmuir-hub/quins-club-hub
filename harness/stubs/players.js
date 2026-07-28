@@ -78,10 +78,18 @@ export async function listPlayers({ teamIds } = {}) {
 // fixed rather than only asserted in jsdom.
 const CONTACT_DELAY = Number(new URLSearchParams(window.location.search).get('contactDelay') || 0)
 
+// Independent verification addition: ?contactThrow=1 makes the contact READ
+// reject (not resolve null). Different failure from contactFail (which
+// rejects the WRITE), and the only one that could destroy data.
+const CONTACT_THROW = new URLSearchParams(window.location.search).get('contactThrow') === '1'
+
 export async function getPlayerContact(playerId) {
+  window.__reads = window.__reads || []
+  window.__reads.push({ table: 'player_contacts', playerId })
   if (CONTACT_DELAY > 0) {
     await new Promise((resolve) => setTimeout(resolve, CONTACT_DELAY))
   }
+  if (CONTACT_THROW) throw new Error('permission denied for table player_contacts')
   // p4 stands in for the RLS-withheld case: a parent asking about a player
   // they aren't linked to gets no row back, and the sheet must show nothing
   // at all about contact details.
