@@ -92,7 +92,7 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Resume at Task 21 — Security hardening (RLS helpers → private schema)
+## Resume at Task 22 — End-to-end role + a11y verification, release docs
 
 Phase F is now FULLY COMPLETE (17 admin overview, 18 invite flow, 19 first-admin bootstrap
 doc). Task 18 added a new `invites` table + RLS + a `SECURITY DEFINER accept_invite(token)`
@@ -145,13 +145,36 @@ genuinely controlled by the service worker, and a real `context.setOffline(true)
 renders the app shell from precache instead of a browser offline error page. 535/535 tests,
 build clean, 0 fix rounds needed.
 
-Task 21 (RLS hardening) is next. Per the plan (`docs/plans/quins-v1-mvp.md`, Task 21): move
-`is_admin`, `can_see_team`, `can_edit_team`, `is_own_player` out of `public` into a `private`
-schema not exposed by PostgREST, re-point every policy that calls them, pin each function's
-`search_path`, and confirm via `get_advisors` that the "function search_path mutable"-class
-warnings clear. This is schema/RLS work — per the Task 18 precedent (a bad RLS predicate fails
-silently, not loudly), the controller should very likely apply this migration directly rather
-than delegating it to an implementer subagent. Its brief is not yet generated.
+Task 21 (RLS hardening) is now **complete** — controller-applied, no app code, no
+implementer/reviewer loop (there was no diff for one to review). Moved `is_admin`,
+`can_see_team`, `can_edit_team`, `is_own_player`, `handle_new_user` out of `public` into a new
+`private` schema (not in Supabase's exposed-schemas list, so nothing in it is reachable via
+`/rest/v1/rpc/...` regardless of grants) with byte-identical bodies, re-pointed all 14 RLS
+policies and the `on_auth_user_created` trigger, and dropped the old `public` copies.
+`accept_invite` deliberately stayed in `public` — it's the one function meant to be called from
+the frontend via `supabase.rpc(...)`, and was already correctly locked down since Task 18.
+
+**Self-caught regression, fixed same session:** the first draft of the migration also revoked
+`anon`'s `EXECUTE` on the four moved helpers, as defense-in-depth beyond what the task asked
+for. This broke real behaviour — several policies (`team manage`, `memb manage`, `player edit`,
+etc.) are `FOR ALL`, so they're OR'd into SELECT-policy evaluation alongside each table's read
+policy; when Postgres hits a function `anon` can't execute while evaluating that OR'd
+expression, it raises `permission denied for function ...` instead of resolving that disjunct
+to `false`. Previously `anon` had this EXECUTE implicitly via Supabase's default-privilege
+auto-grant (the exact gotcha Task 18 documented) — so unauthenticated requests always got
+silent empty results, never errors, which is what `tests/supabase.integration.test.js` pins.
+Caught by actually running `npm run test:integration` against the live project with the real
+anon key (the sandbox's `.env` holds a placeholder `sb_publishable_dummy...` value, not a real
+one — fetched the genuine key via `get_publishable_keys` for verification instead). Fixed with
+a same-session follow-up migration restoring `anon`'s `EXECUTE` on the four helpers only
+(never `handle_new_user`, which is trigger-only). The actual fix — schema-level unreachability
+— was untouched by this correction and still holds: confirmed via direct `curl` with the real
+anon key that `POST /rest/v1/rpc/is_admin` now 404s (function not found by PostgREST at all),
+while `GET /rest/v1/teams|players|availability` as `anon` still return `200 []`, identical to
+pre-migration behaviour. See "Database schema changes" below for the full detail.
+
+535/535 tests, build clean (this task touched zero frontend files — the diff is entirely
+server-side SQL, verified live rather than through the app's own mocked test suite).
 
 `src/App.jsx` was restructured from one shared `<AppShell><Routes>...</Routes></AppShell>` to
 each route wrapping its own `<AppShell>` individually, so `/accept-invite/:token` could exist
@@ -230,6 +253,40 @@ needed an explicit follow-up `REVOKE EXECUTE ON FUNCTION public.accept_invite(uu
 This is also the **first migration Supabase's own migration history has ever tracked** for
 this project — `list_migrations` returned empty before this (the original schema was applied
 as raw SQL outside that tracking system at some point before this repo's current build began).
+
+### Database schema changes (Task 21 — RLS helpers moved to a `private` schema)
+
+Two migrations, both controller-applied directly:
+
+1. `move_rls_helpers_to_private_schema` — created `schema private` (`revoke all on schema
+   private from public, anon, authenticated; grant usage ... to authenticated` — `anon` has no
+   `USAGE` on the schema itself, though this doesn't matter for RLS evaluation, only for
+   direct `schema.function()` calls, which `anon` never makes). Recreated `is_admin(_club)`,
+   `can_see_team(_team)`, `can_edit_team(_team)`, `is_own_player(_player)` (all `STABLE
+   SECURITY DEFINER`, `SET search_path = 'public'`) and `handle_new_user()` (`SECURITY
+   DEFINER`, same search_path) in `private`, with bodies byte-identical to their old `public`
+   versions. Re-pointed the `on_auth_user_created` trigger to `private.handle_new_user()`.
+   Dropped and recreated all 14 policies that referenced the old functions (`teams.team
+   manage`; `memberships.memb manage`+`memb read`; `invites.invites manage`; `players.player
+   edit`+`player read`; `player_contacts.contact edit`+`contact read`; `events.event
+   edit`+`event read`; `availability.avail coach manage`+`avail own insert`+`avail own
+   update`+`avail read`) to call `private.*` instead of `public.*`, then dropped the 5 old
+   `public` functions.
+2. `restore_anon_execute_on_rls_helpers` — same-session fix-up: `grant execute on function
+   private.is_admin/can_see_team/can_edit_team/is_own_player(uuid) to anon` (restores
+   pre-migration behaviour — see the regression writeup above). `handle_new_user` intentionally
+   has no `anon`/`authenticated` grant either before or after — it is only ever invoked by the
+   trigger, which runs as the function owner regardless of the firing role's own grants.
+
+`accept_invite(uuid)` is unchanged by this task — still in `public`, still `SECURITY DEFINER`,
+still `authenticated`+`service_role` only (no `anon`), per the Task 18 gotcha fix.
+
+**Net effect:** `GET /rest/v1/teams|players|player_contacts|events|availability|memberships`
+behave identically for every role, before and after. `POST /rest/v1/rpc/is_admin` (and the
+other three) now 404 — PostgREST can no longer find them anywhere in its exposed schema
+cache — where before this task they were live, callable endpoints (the advisor's original
+"anon/authenticated can execute via RPC" warning). `accept_invite` remains the one function
+genuinely reachable via RPC, exactly as intended.
 
 **`.superpowers/sdd/.gitignore` gets reset to `*` by tooling, repeatedly.** It silently
 untracks the whole ledger. Do not fight it — stage the workspace with
