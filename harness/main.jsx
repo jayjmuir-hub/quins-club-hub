@@ -41,9 +41,10 @@ const COACH_MEMBERSHIPS = [
   { id: 'm1', role: 'coach', team_id: 't1', player_id: null },
   { id: 'm2', role: 'coach', team_id: 't2', player_id: null },
 ]
+const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 const TEAMS = [
-  { id: 't1', name: 'U12 Boys', sort_order: 4 },
-  { id: 't2', name: 'U14 Boys', sort_order: 6 },
+  { id: 't1', club_id: CLUB_ID, name: 'U12 Boys', sort_order: 4 },
+  { id: 't2', club_id: CLUB_ID, name: 'U14 Boys', sort_order: 6 },
 ]
 
 // Three-age-group variants, added for the independent controller-side
@@ -55,7 +56,7 @@ const COACH_THREE_MEMBERSHIPS = [
   { id: 'm2', role: 'coach', team_id: 't2', player_id: null },
   { id: 'm3', role: 'coach', team_id: 't3', player_id: null },
 ]
-const TEAMS_THREE = [...TEAMS, { id: 't3', name: 'U16 Boys', sort_order: 8 }]
+const TEAMS_THREE = [...TEAMS, { id: 't3', club_id: CLUB_ID, name: 'U16 Boys', sort_order: 8 }]
 
 function Shell({ authValue, membershipValue, route = '/', children }) {
   return (
@@ -159,6 +160,8 @@ const scenarios = {
   // component state, so Playwright drives them by clicking (see shoot.mjs).
   schedule: scheduleScenario(COACH_MEMBERSHIPS),
   'schedule-admin': scheduleScenario(ADMIN_MEMBERSHIPS),
+  // Task 14: the read-only side of the new Add/Edit/Delete affordances.
+  'schedule-parent': scheduleScenario(PARENT_MEMBERSHIPS),
 
   // Task 12 Roster screens. Search text, pill selection and the PlayerDetail
   // sheet are real component state, so Playwright drives them by typing and

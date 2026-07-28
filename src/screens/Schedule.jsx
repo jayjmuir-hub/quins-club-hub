@@ -6,9 +6,10 @@ import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import TeamPills, { ALL_TEAMS_ID, PillButton } from '../components/TeamPills.jsx'
 import EventDetail from './EventDetail.jsx'
+import EventForm from './EventForm.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import { clubDayParts, clubToday, eventDate, hasResult, sortByStart } from '../lib/eventFormat.js'
 
 // Schedule & fixtures (design-system.md §5.2): scope note, section head,
@@ -266,6 +267,10 @@ export default function Schedule() {
   const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [month, setMonth] = useState(currentClubMonth)
+  // null = the form is closed. { event: null } = adding; { event } = editing.
+  // A wrapper object rather than the event itself, so "add" is distinguishable
+  // from "closed" without a second boolean that could drift out of sync.
+  const [formState, setFormState] = useState(null)
 
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -336,6 +341,14 @@ export default function Schedule() {
   // deleted fixture closes it instead of stranding a stale copy on screen.
   const selectedEvent = events.find((event) => event.id === selectedEventId) ?? null
 
+  // Whether the signed-in user may write to the OPEN event's squad. Asked per
+  // team through canEditTeam rather than inferred from the role, so its
+  // deliberate refusal of a null/unresolvable team_id applies here too. RLS
+  // is what actually enforces this; getting it wrong here can only hide a
+  // control, never authorise a write.
+  const canEditSelected = selectedEvent ? canEditTeam(memberships, selectedEvent.team_id) : false
+  const refresh = () => setReloadToken((token) => token + 1)
+
   return (
     <section>
       {!admin && (
@@ -347,9 +360,23 @@ export default function Schedule() {
         </ScopeNote>
       )}
 
-      <div className="mb-3.5 mt-1">
-        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Schedule &amp; fixtures</h2>
-        <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
+      {/* design-system.md §5.2: the section head carries an "Add" button on
+          the right for admin/coach. It is absent, not disabled, for everyone
+          else — and it only exists at all now that Task 14's form does. */}
+      <div className="mb-3.5 mt-1 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Schedule &amp; fixtures</h2>
+          <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
+        </div>
+        {canEditAnything && (
+          <button
+            type="button"
+            onClick={() => setFormState({ event: null })}
+            className="shrink-0 rounded-[11px] bg-quinsRed px-3.5 py-2 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+          >
+            Add fixture
+          </button>
+        )}
       </div>
 
       <div className="mb-3 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -420,11 +447,32 @@ export default function Schedule() {
         />
       )}
 
-      {selectedEvent && (
+      {selectedEvent && !formState && (
         <EventDetail
           event={selectedEvent}
           team={teamsById.get(selectedEvent.team_id)}
           onClose={() => setSelectedEventId(null)}
+          canEdit={canEditSelected}
+          onEdit={(event) => setFormState({ event })}
+          onDeleted={() => {
+            setSelectedEventId(null)
+            refresh()
+          }}
+        />
+      )}
+
+      {/* One sheet at a time: opening the form closes the detail sheet
+          above rather than stacking two dialogs. Closing the form drops
+          back to the schedule, not to the detail sheet, which is where a
+          coach who just saved wants to be. */}
+      {formState && (
+        <EventForm
+          event={formState.event}
+          onClose={() => {
+            setFormState(null)
+            setSelectedEventId(null)
+          }}
+          onSaved={refresh}
         />
       )}
     </section>

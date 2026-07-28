@@ -53,3 +53,47 @@ export function subscribeEvents(callback) {
     supabase.removeChannel(channel)
   }
 }
+
+// A write the database refused is not an error as far as PostgREST is
+// concerned: RLS filters the row out, the statement affects zero rows, and
+// the response is a perfectly successful "nothing". Both writers below ask
+// for the affected row back and treat "no row" as a refusal, so the form
+// shows a real message instead of a false "Saved". The check is a
+// *reporting* mechanism, not an access control — can_edit_team() on the
+// events table's "event edit" policy (USING and WITH CHECK) is what actually
+// decides, server-side, and nothing here can widen it.
+const REFUSED = "We couldn't save that. You may not have permission to change this squad's fixtures."
+const REFUSED_DELETE =
+  "We couldn't delete that. You may not have permission to change this squad's fixtures."
+
+/**
+ * Creates or updates one event. Inserts when `event` has no id, updates the
+ * matching row when it has one — the id is used only as the filter and is
+ * never sent as a column either way. Returns the saved row.
+ *
+ * Every field is passed through as given; in particular starts_at must
+ * already be a UTC instant built from Abu Dhabi wall-clock (see
+ * clubWallTimeToUtc in src/lib/eventFormat.js), never a browser-local Date.
+ */
+export async function upsertEvent(event) {
+  const { id, ...fields } = event ?? {}
+
+  const query = id
+    ? supabase.from('events').update(fields).eq('id', id).select().maybeSingle()
+    : supabase.from('events').insert(fields).select().maybeSingle()
+
+  const { data, error } = await query
+  if (error) throw error
+  if (!data) throw new Error(REFUSED)
+  return data
+}
+
+/**
+ * Deletes one event by id. Resolves with nothing on success and throws when
+ * the delete failed or removed nothing.
+ */
+export async function deleteEvent(id) {
+  const { data, error } = await supabase.from('events').delete().eq('id', id).select()
+  if (error) throw error
+  if (!data || data.length === 0) throw new Error(REFUSED_DELETE)
+}

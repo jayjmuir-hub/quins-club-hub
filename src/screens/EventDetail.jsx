@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Chip from '../components/Chip.jsx'
+import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
+import { deleteEvent } from '../data/events.js'
 import {
   eventDate,
   eventTitle,
@@ -20,9 +22,13 @@ import {
 // event is selected — Schedule renders it conditionally — so there is no
 // `open` prop to thread through and no hidden-but-present DOM.
 //
-// Edit/Delete actions are deliberately absent: Task 14 owns event writes.
-// Adding a disabled or read-only affordance now would promise a control
-// that doesn't exist yet.
+// Footer actions (design-system.md §5.5): Edit + Delete for a user who can
+// edit this event's squad, a read-only scope note for everyone else. Delete
+// is two-step — the confirm replaces the buttons in place rather than using
+// a native confirm(), which is unstyled, unannounced and untestable in the
+// browser check. `canEdit` is passed in rather than computed here: this
+// component stays presentational and the screen already holds memberships
+// (the same split ScopeNote uses).
 
 const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
 
@@ -169,7 +175,94 @@ function AvailabilitySummary({ eventId }) {
   )
 }
 
-export default function EventDetail({ event, team, onClose }) {
+const FOOTER_BUTTON =
+  'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
+
+function FooterActions({ event, canEdit, onEdit, onDeleted }) {
+  const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState(null)
+
+  if (!canEdit) {
+    return (
+      <div className="mt-5">
+        <ScopeNote tone="parent">
+          <b>Read-only.</b> Only a coach or club admin can change this event.
+        </ScopeNote>
+      </div>
+    )
+  }
+
+  function handleDelete() {
+    setDeleting(true)
+    setError(null)
+    deleteEvent(event.id)
+      .then(() => onDeleted?.(event))
+      .catch((err) => {
+        setError(err)
+        setDeleting(false)
+        setConfirming(false)
+      })
+  }
+
+  return (
+    <div className="mt-5 border-t border-[#e6e3e1] pt-4">
+      {error && (
+        <p
+          role="alert"
+          className="mb-3 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
+        >
+          {error.message || "We couldn't delete that. Try again."}
+        </p>
+      )}
+
+      {confirming ? (
+        <div>
+          <p className="mb-3 text-sm font-semibold text-[#221f1d]">
+            Delete this event? This can&apos;t be undone.
+          </p>
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={deleting}
+              className={`${FOOTER_BUTTON} border-[1.5px] border-[#e6e3e1] bg-white text-[#221f1d] hover:bg-[#faf8fb]`}
+            >
+              Keep it
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className={`${FOOTER_BUTTON} bg-quinsRedDark text-white hover:bg-quinsRed`}
+            >
+              {deleting ? 'Deleting…' : 'Yes, delete'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2.5">
+          <button
+            type="button"
+            onClick={() => onEdit?.(event)}
+            className={`${FOOTER_BUTTON} bg-quinsRed text-white hover:bg-[#D62A3D]`}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className={`${FOOTER_BUTTON} border-[1.5px] border-[#e6e3e1] bg-white text-quinsRedDark hover:bg-[#fbeae8]`}
+          >
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function EventDetail({ event, team, onClose, canEdit = false, onEdit, onDeleted }) {
   const date = eventDate(event)
   const Icon = TYPE_ICONS[event.type] ?? WhistleIcon
   const typeLabel = TYPE_LABELS[event.type] ?? 'Event'
@@ -228,6 +321,8 @@ export default function EventDetail({ event, team, onClose }) {
           <AvailabilitySummary eventId={event.id} />
         </div>
       )}
+
+      <FooterActions event={event} canEdit={canEdit} onEdit={onEdit} onDeleted={onDeleted} />
     </Sheet>
   )
 }

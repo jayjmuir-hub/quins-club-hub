@@ -20,6 +20,8 @@ import { MemoryRouter } from 'react-router-dom'
 const useMembershipsMock = vi.fn()
 const listEventsMock = vi.fn()
 const subscribeEventsMock = vi.fn()
+const upsertEventMock = vi.fn()
+const deleteEventMock = vi.fn()
 const listPlayersMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
@@ -29,6 +31,11 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 vi.mock('../src/data/events.js', () => ({
   listEvents: (...args) => listEventsMock(...args),
   subscribeEvents: (...args) => subscribeEventsMock(...args),
+  // Task 14 wired the detail sheet's Edit/Delete footer and the event form
+  // into this screen too. Stubbed so a mis-wiring would fail loudly here
+  // rather than reaching an undefined import at call time.
+  upsertEvent: (...args) => upsertEventMock(...args),
+  deleteEvent: (...args) => deleteEventMock(...args),
 }))
 
 vi.mock('../src/data/players.js', () => ({
@@ -418,6 +425,42 @@ describe('Dashboard — upcoming list and last result', () => {
       .getAllByTestId('fixture-title')
       .map((node) => node.textContent)
     expect(titles).toEqual(['Session 0', 'Session 1', 'Session 2', 'Session 3', 'Session 4'])
+  })
+
+  // Task 14. The dashboard opens the same EventDetail as the schedule, so it
+  // has to pass the same canEdit/onEdit wiring — without it a coach tapping a
+  // fixture here is told, untruthfully, that the event is read-only.
+  it('gives a coach the Edit and Delete actions in the detail sheet', async () => {
+    renderDashboard()
+
+    const list = await screen.findByTestId('upcoming-list')
+    await userEvent.click(within(list).getByText('U10 skills session').closest('[data-testid="fixture-row"]'))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+  })
+
+  it('tells a parent the detail sheet is read-only instead', async () => {
+    useMembershipsMock.mockReturnValue(membershipValue(PARENT))
+    renderDashboard()
+
+    const list = await screen.findByTestId('upcoming-list')
+    await userEvent.click(within(list).getByText('U10 skills session').closest('[data-testid="fixture-row"]'))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(within(dialog).getByText(/read-only/i)).toBeInTheDocument()
+  })
+
+  it('opens the edit form from the detail sheet', async () => {
+    renderDashboard()
+
+    const list = await screen.findByTestId('upcoming-list')
+    await userEvent.click(within(list).getByText('U10 skills session').closest('[data-testid="fixture-row"]'))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Edit' }))
+
+    expect(await screen.findByRole('heading', { name: 'Edit event' })).toBeInTheDocument()
   })
 
   it('opens the event detail sheet when a fixture row is tapped', async () => {

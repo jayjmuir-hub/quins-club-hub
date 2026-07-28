@@ -198,3 +198,108 @@ export function sortByStart(events, direction = 'asc') {
     return (aTime - bTime) * factor
   })
 }
+
+// --- Writing: club wall-clock -> UTC ---------------------------------
+//
+// Everything above turns a stored instant into Abu Dhabi wall-clock for
+// display. Task 14's event form needs the mirror image (design-system.md §7,
+// "Writing"): the date and time a coach types ARE Abu Dhabi wall-clock, and
+// have to become the right UTC instant before they're written to starts_at.
+//
+// The naive `new Date(`${date}T${time}`)` resolves in the *browser's* zone,
+// so a coach entering 20:00 from London would store 19:00Z — a 23:00 Abu
+// Dhabi kick-off. Hardcoding '+04:00' would be correct today and would rot
+// silently if the UAE ever adopted DST, which is the same reason
+// CLUB_TIME_ZONE is an IANA identifier rather than an offset. So the offset
+// is *derived from the zone, at the instant in question*, via Intl — the
+// only abstraction that stays correct by definition.
+
+// Second-precision club-time field extractor. hourCycle h23 keeps midnight
+// as "00" rather than en-US's default "24", which Number() would read as
+// hour 24 and silently roll a midnight kick-off onto the wrong day.
+const CLUB_FIELDS_FORMAT = new Intl.DateTimeFormat('en-US', {
+  timeZone: CLUB_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+})
+
+function clubFields(date) {
+  const parts = CLUB_FIELDS_FORMAT.formatToParts(date)
+  const value = (type) => Number(parts.find((part) => part.type === type).value)
+  return {
+    year: value('year'),
+    month: value('month'),
+    day: value('day'),
+    hour: value('hour'),
+    minute: value('minute'),
+    second: value('second'),
+  }
+}
+
+/**
+ * The club zone's UTC offset in milliseconds at a given instant. Positive
+ * east of Greenwich (+4h for Dubai today). Derived by asking Intl what the
+ * club's wall clock reads at that instant and subtracting the instant
+ * itself — so it follows whatever rules the zone has, DST or not.
+ */
+function clubOffsetMsAt(timestamp) {
+  const f = clubFields(new Date(timestamp))
+  const wallAsUtc = Date.UTC(f.year, f.month - 1, f.day, f.hour, f.minute, f.second)
+  // Drop sub-second precision on both sides: zone offsets are whole minutes,
+  // and formatToParts has no milliseconds to give back.
+  return wallAsUtc - Math.floor(timestamp / 1000) * 1000
+}
+
+const DATE_INPUT = /^(\d{4})-(\d{2})-(\d{2})$/
+const TIME_INPUT = /^(\d{2}):(\d{2})(?::\d{2})?$/
+
+/**
+ * Converts a form's `<input type="date">` value ("2026-07-30") and
+ * `<input type="time">` value ("20:00", or "20:00:00" in some browsers),
+ * both understood as **Abu Dhabi wall-clock**, into the UTC ISO string to
+ * write to events.starts_at. Returns null when either value is missing or
+ * isn't in the input element's own format — callers treat that as a
+ * validation failure rather than writing an Invalid Date.
+ */
+export function clubWallTimeToUtc(dateValue, timeValue) {
+  const dateMatch = DATE_INPUT.exec(String(dateValue ?? ''))
+  const timeMatch = TIME_INPUT.exec(String(timeValue ?? ''))
+  if (!dateMatch || !timeMatch) return null
+
+  const [, year, month, day] = dateMatch.map(Number)
+  const [, hour, minute] = timeMatch.map(Number)
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null
+
+  // Treat the typed wall-clock as if it were UTC, then subtract the club's
+  // offset to get the real instant. The offset has to be looked up *at that
+  // instant*, which is circular — so look it up at the first approximation
+  // and then again at the result. One refinement is enough for any real
+  // zone: the two only differ within an hour of a DST transition, and the
+  // second lookup lands on the correct side of it.
+  const wallAsUtc = Date.UTC(year, month - 1, day, hour, minute)
+  const firstPass = wallAsUtc - clubOffsetMsAt(wallAsUtc)
+  const timestamp = wallAsUtc - clubOffsetMsAt(firstPass)
+  return new Date(timestamp).toISOString()
+}
+
+/**
+ * The inverse: splits an instant into the `<input type="date">` /
+ * `<input type="time">` values an edit form prefills with, in club time.
+ * Time is 24-hour and zero-padded because that is the only value format a
+ * time input accepts. Returns empty strings for a missing or unparseable
+ * date, so the form renders blank fields rather than "Invalid Date".
+ */
+export function clubDateTimeInputs(date) {
+  if (!date || Number.isNaN(date.getTime())) return { date: '', time: '' }
+  const f = clubFields(date)
+  const pad = (n) => String(n).padStart(2, '0')
+  return {
+    date: `${f.year}-${pad(f.month)}-${pad(f.day)}`,
+    time: `${pad(f.hour)}:${pad(f.minute)}`,
+  }
+}

@@ -215,3 +215,18 @@ export async function listEvents({ teamIds } = {}) {
 export function subscribeEvents() {
   return () => {}
 }
+
+// Task 14 writes. No network and no Supabase: each call records its payload
+// on window so the browser check can assert what the form ACTUALLY built —
+// in particular that a typed 20:00 becomes the right UTC instant while the
+// browser context is deliberately in a non-Dubai zone.
+export async function upsertEvent(event) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: event?.id ? 'update' : 'insert', payload: event })
+  return { id: event?.id ?? 'e-new', ...event }
+}
+
+export async function deleteEvent(id) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'delete', id })
+}

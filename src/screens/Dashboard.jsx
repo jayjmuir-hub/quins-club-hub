@@ -6,6 +6,7 @@ import FixtureRow from '../components/FixtureRow.jsx'
 import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import EventDetail from './EventDetail.jsx'
+import EventForm from './EventForm.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -250,6 +251,10 @@ export default function Dashboard() {
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
   const [selectedEventId, setSelectedEventId] = useState(null)
+  // null = closed; { event } = editing that event. The dashboard never opens
+  // the form for a NEW event (that lives on the Schedule screen), so there
+  // is no "adding" case here.
+  const [formState, setFormState] = useState(null)
 
   // The countdown is recomputed on render, and re-rendered once a minute so
   // that a phone left on this screen doesn't sit showing a stale "3 Min" for
@@ -478,11 +483,35 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {selectedEvent && (
+      {/* The dashboard's fixture rows open the same detail sheet the
+          schedule does, so they get the same Edit/Delete footer and the same
+          form — otherwise a coach tapping a fixture here would be told the
+          event is read-only, which is untrue. Adding fixtures still lives on
+          the Schedule screen only (design-system.md §5.2); the quick-actions
+          card above stays as it is until Task 15's player form lands with
+          it. */}
+      {selectedEvent && !formState && (
         <EventDetail
           event={selectedEvent}
           team={teamsById.get(selectedEvent.team_id)}
           onClose={() => setSelectedEventId(null)}
+          canEdit={canEditTeam(memberships, selectedEvent.team_id)}
+          onEdit={(event) => setFormState({ event })}
+          onDeleted={() => {
+            setSelectedEventId(null)
+            setReloadToken((token) => token + 1)
+          }}
+        />
+      )}
+
+      {formState && (
+        <EventForm
+          event={formState.event}
+          onClose={() => {
+            setFormState(null)
+            setSelectedEventId(null)
+          }}
+          onSaved={() => setReloadToken((token) => token + 1)}
         />
       )}
     </section>

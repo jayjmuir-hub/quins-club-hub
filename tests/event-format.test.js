@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   CLUB_TIME_ZONE,
+  clubDateTimeInputs,
   clubDayParts,
   clubToday,
+  clubWallTimeToUtc,
   dateBoxParts,
   eventDate,
   eventTitle,
@@ -406,5 +408,98 @@ describe('formatTime / formatLongDate in club time', () => {
     expect(formatTime(null)).toBe('Time to be confirmed')
     expect(formatLongDate(null)).toBe('Date to be confirmed')
     expect(dateBoxParts(null)).toEqual({ month: '—', day: '–', weekday: '' })
+  })
+})
+
+// --- Task 14: the WRITE direction ------------------------------------
+//
+// Everything above converts an instant to Abu Dhabi wall-clock for display.
+// The event form needs the mirror image: a date + time a coach typed is Abu
+// Dhabi wall-clock and has to become the right UTC instant before it is
+// written to `starts_at` (design-system.md §7, "Writing (Task 14, the event
+// form)"). A naive `new Date(`${date}T${time}`)` resolves in the *browser's*
+// zone, so every assertion below is run under all three HOSTILE_ZONES — a
+// suite that only ran under UTC would pass against exactly that bug.
+
+describe('clubWallTimeToUtc', () => {
+  it('reads an entered date and time as Abu Dhabi wall-clock under every process zone', () => {
+    // 20:00 at Zayed Sports City is 16:00Z. In New York the naive
+    // construction would give 20:00 EDT = 00:00Z the next day; in Auckland,
+    // 08:00Z. Only a club-zone-aware conversion gives 16:00Z everywhere.
+    const written = HOSTILE_ZONES.map((zone) =>
+      withTimeZone(zone, () => clubWallTimeToUtc('2026-07-30', '20:00')),
+    )
+    expect(new Set(written).size).toBe(1)
+    expect(written[0]).toBe('2026-07-30T16:00:00.000Z')
+  })
+
+  it('carries an after-midnight kick-off back into the previous UTC day', () => {
+    const written = HOSTILE_ZONES.map((zone) =>
+      withTimeZone(zone, () => clubWallTimeToUtc('2026-07-25', '01:00')),
+    )
+    expect(new Set(written).size).toBe(1)
+    expect(written[0]).toBe('2026-07-24T21:00:00.000Z')
+  })
+
+  it('handles exact midnight in club time', () => {
+    expect(clubWallTimeToUtc('2026-07-25', '00:00')).toBe('2026-07-24T20:00:00.000Z')
+  })
+
+  it('handles the first minute of a month in club time', () => {
+    expect(clubWallTimeToUtc('2026-08-01', '01:00')).toBe('2026-07-31T21:00:00.000Z')
+  })
+
+  it('round-trips through the display formatters', () => {
+    // The strongest single check: what a coach types is what every reader
+    // sees, whichever zone either of them is in.
+    HOSTILE_ZONES.forEach((zone) => {
+      withTimeZone(zone, () => {
+        const stored = clubWallTimeToUtc('2026-07-25', '01:00')
+        expect(clubDayParts(new Date(stored))).toEqual({ year: 2026, month: 6, day: 25 })
+        expect(formatTime(new Date(stored))).toMatch(/\b1:00\b|\b01:00\b/)
+      })
+    })
+  })
+
+  it('accepts a seconds-bearing time value without shifting the instant', () => {
+    // Some browsers' <input type="time"> emit "20:00:00".
+    expect(clubWallTimeToUtc('2026-07-30', '20:00:00')).toBe('2026-07-30T16:00:00.000Z')
+  })
+
+  it('returns null for a missing or unparseable date or time', () => {
+    expect(clubWallTimeToUtc('', '20:00')).toBeNull()
+    expect(clubWallTimeToUtc('2026-07-30', '')).toBeNull()
+    expect(clubWallTimeToUtc(null, null)).toBeNull()
+    expect(clubWallTimeToUtc('30/07/2026', '20:00')).toBeNull()
+    expect(clubWallTimeToUtc('2026-07-30', '8pm')).toBeNull()
+  })
+})
+
+describe('clubDateTimeInputs', () => {
+  it('splits an instant into the club-time date and time an edit form prefills with', () => {
+    const fields = HOSTILE_ZONES.map((zone) =>
+      withTimeZone(zone, () => clubDateTimeInputs(NEXT_DAY_IN_DUBAI)),
+    )
+    fields.forEach((f) => expect(f).toEqual({ date: '2026-07-25', time: '01:00' }))
+  })
+
+  it('uses a 24-hour, zero-padded time so it is a valid <input type="time"> value', () => {
+    expect(clubDateTimeInputs(MIDNIGHT_IN_DUBAI)).toEqual({ date: '2026-07-25', time: '00:00' })
+    expect(clubDateTimeInputs(SAME_DAY_IN_DUBAI)).toEqual({ date: '2026-07-24', time: '17:00' })
+  })
+
+  it('is the exact inverse of clubWallTimeToUtc', () => {
+    HOSTILE_ZONES.forEach((zone) => {
+      withTimeZone(zone, () => {
+        const { date, time } = clubDateTimeInputs(LAST_MINUTE_OF_JULY)
+        expect({ date, time }).toEqual({ date: '2026-07-31', time: '23:59' })
+        expect(clubWallTimeToUtc(date, time)).toBe(LAST_MINUTE_OF_JULY.toISOString())
+      })
+    })
+  })
+
+  it('returns empty strings for a missing or unparseable date', () => {
+    expect(clubDateTimeInputs(null)).toEqual({ date: '', time: '' })
+    expect(clubDateTimeInputs(new Date('nope'))).toEqual({ date: '', time: '' })
   })
 })

@@ -28,12 +28,12 @@ vi.mock('../src/lib/supabase.js', () => ({
 }))
 
 import { supabase } from '../src/lib/supabase.js'
-import { listEvents, subscribeEvents } from '../src/data/events.js'
+import { listEvents, subscribeEvents, upsertEvent, deleteEvent } from '../src/data/events.js'
 import { listPlayers, getPlayerContact } from '../src/data/players.js'
 import { listAvailability, subscribeAvailability } from '../src/data/availability.js'
 
 function createQueryBuilder({ data = null, error = null } = {}) {
-  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [] }
+  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [] }
   const builder = {}
   const chain = (name) =>
     vi.fn((...args) => {
@@ -46,6 +46,13 @@ function createQueryBuilder({ data = null, error = null } = {}) {
   builder.lte = chain('lte')
   builder.eq = chain('eq')
   builder.order = chain('order')
+  // Write-side chain methods (Task 14). Like the read ones, each records its
+  // args and returns the same thenable builder, mirroring the real
+  // PostgrestQueryBuilder where .insert()/.update()/.delete() are chainable
+  // with .eq()/.select() and awaited directly.
+  builder.insert = chain('insert')
+  builder.update = chain('update')
+  builder.delete = chain('delete')
   builder.maybeSingle = vi.fn(() => Promise.resolve({ data, error }))
   // Real PostgrestFilterBuilder instances are thenable so `await query`
   // resolves without an explicit terminal method — mirror that here.
@@ -181,6 +188,124 @@ describe('subscribeEvents', () => {
     const [nameA] = supabase.channel.mock.calls[0]
     const [nameB] = supabase.channel.mock.calls[1]
     expect(nameA).not.toEqual(nameB)
+  })
+})
+
+// --- upsertEvent ----------------------------------------------------------
+
+// Task 14. A single function that inserts when the row has no id and updates
+// when it has one — the two branches are the reason it exists, so both are
+// asserted on the recorded query, not just on the return value.
+describe('upsertEvent', () => {
+  it('inserts when there is no id, and does not send an id column', async () => {
+    const saved = { id: 'e-new', type: 'match' }
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await upsertEvent({ type: 'match', team_id: 't1', starts_at: '2026-07-30T16:00:00.000Z' })
+
+    expect(supabase.from).toHaveBeenCalledWith('events')
+    expect(builder.insert).toHaveBeenCalledTimes(1)
+    expect(builder.update).not.toHaveBeenCalled()
+    expect(calls.insert[0][0]).toEqual({
+      type: 'match',
+      team_id: 't1',
+      starts_at: '2026-07-30T16:00:00.000Z',
+    })
+    expect(calls.insert[0][0]).not.toHaveProperty('id')
+    // No .eq() filter on an insert — an insert has no row to match.
+    expect(builder.eq).not.toHaveBeenCalled()
+    expect(result).toEqual(saved)
+  })
+
+  it('inserts when the id is explicitly null or an empty string', async () => {
+    // A "new event" form field can legitimately carry id: null rather than
+    // omitting the key. A truthiness test is what makes both behave the same.
+    for (const id of [null, undefined, '']) {
+      const { builder } = createQueryBuilder({ data: { id: 'e-new' } })
+      supabase.from.mockReturnValue(builder)
+      await upsertEvent({ id, type: 'training', team_id: 't1' })
+      expect(builder.insert).toHaveBeenCalledTimes(1)
+      expect(builder.update).not.toHaveBeenCalled()
+    }
+  })
+
+  it('updates the matching row when there is an id, and does not send the id as a column', async () => {
+    const saved = { id: 'e-1', type: 'training' }
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await upsertEvent({ id: 'e-1', type: 'training', team_id: 't2' })
+
+    expect(supabase.from).toHaveBeenCalledWith('events')
+    expect(builder.update).toHaveBeenCalledTimes(1)
+    expect(builder.insert).not.toHaveBeenCalled()
+    expect(calls.update[0][0]).toEqual({ type: 'training', team_id: 't2' })
+    // Sending the primary key back as a column is at best a no-op write and
+    // at worst an attempt to repoint a foreign-keyed row.
+    expect(calls.update[0][0]).not.toHaveProperty('id')
+    expect(calls.eq[0]).toEqual(['id', 'e-1'])
+    expect(result).toEqual(saved)
+  })
+
+  it('asks for the saved row back so the caller can refresh from it', async () => {
+    const { builder } = createQueryBuilder({ data: { id: 'e-1' } })
+    supabase.from.mockReturnValue(builder)
+
+    await upsertEvent({ id: 'e-1', type: 'social' })
+
+    expect(builder.select).toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('duplicate key value') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(upsertEvent({ type: 'match', team_id: 't1' })).rejects.toThrow('duplicate key value')
+  })
+
+  it('throws when the write succeeds but comes back with no row (an RLS refusal)', async () => {
+    // The security case. An update or insert a coach is not allowed to make
+    // is not an *error* from PostgREST — RLS simply matches zero rows and
+    // returns nothing. Without this the form would show "Saved" for a write
+    // the database silently threw away.
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(upsertEvent({ id: 'e-1', type: 'match', team_id: 'not-mine' })).rejects.toThrow(
+      /permission|not allowed|couldn.t save/i,
+    )
+  })
+})
+
+// --- deleteEvent ----------------------------------------------------------
+
+describe('deleteEvent', () => {
+  it('deletes the row with the given id', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'e-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await deleteEvent('e-1')
+
+    expect(supabase.from).toHaveBeenCalledWith('events')
+    expect(builder.delete).toHaveBeenCalledTimes(1)
+    expect(calls.eq[0]).toEqual(['id', 'e-1'])
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('network down') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(deleteEvent('e-1')).rejects.toThrow('network down')
+  })
+
+  it('throws when nothing was deleted (an RLS refusal)', async () => {
+    // Same silent-refusal shape as upsertEvent: a delete a coach may not
+    // make removes zero rows and reports no error.
+    const { builder } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(deleteEvent('e-1')).rejects.toThrow(/permission|not allowed|couldn.t delete/i)
   })
 })
 
