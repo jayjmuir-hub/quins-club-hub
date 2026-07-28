@@ -56,6 +56,14 @@ vi.mock('../src/data/players.js', () => ({
   getPlayerContact: () => new Promise(() => {}),
 }))
 
+// Same treatment for "/more", which renders the real Admin screen as of
+// Task 17. The Admin screen's own behaviour (the not-authorised gate,
+// loading/empty/error, teams/players/members) is covered by
+// tests/admin.test.jsx; here it only has to be the thing "/more" renders.
+vi.mock('../src/data/members.js', () => ({
+  listClubMembers: () => new Promise(() => {}),
+}))
+
 // Import after vi.mock so this binds to the mocked modules.
 import App from '../src/App.jsx'
 
@@ -117,13 +125,26 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: /roster/i })).toBeInTheDocument()
   })
 
-  it('renders the more placeholder at /more when signed in', () => {
+  it('renders the admin screen at /more when signed in as an admin', () => {
     window.history.pushState({}, '', '/more')
     useAuthMock.mockReturnValue(signedIn)
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /more/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /admin overview/i })).toBeInTheDocument()
+  })
+
+  it('renders a not-authorised message at /more for a non-admin', () => {
+    window.history.pushState({}, '', '/more')
+    useAuthMock.mockReturnValue(signedIn)
+    useMembershipsMock.mockReturnValue({
+      ...membershipsLoaded,
+      memberships: [{ role: 'coach', team_id: 'team-u10' }],
+    })
+
+    render(<App />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/not authorised/i)
   })
 
   it('redirects an unknown path to / when signed in', () => {
