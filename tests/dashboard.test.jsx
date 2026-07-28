@@ -61,6 +61,10 @@ const COACH = [
 ]
 const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
 const ADMIN = [{ id: 'm0', role: 'admin', team_id: null }]
+const PLAYER = [{ id: 'm5', role: 'player', team_id: 'team-u10', player_id: 'p1' }]
+// A coach row with no resolvable team. canEditTeam refuses it deliberately;
+// a raw `role === 'coach'` check would grant on it.
+const TEAMLESS_COACH = [{ id: 'm6', role: 'coach', team_id: null }]
 
 // 2026-07-24T13:00Z = 17:00 Abu Dhabi = 4 days 8 hours after NOW.
 const NEXT_MATCH = {
@@ -147,9 +151,11 @@ function renderDashboard() {
 }
 
 let nowSpy
+let setIntervalSpy
 
 beforeEach(() => {
   nowSpy = vi.spyOn(Date, 'now').mockReturnValue(NOW)
+  setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
   useMembershipsMock.mockReset()
   listEventsMock.mockReset()
   subscribeEventsMock.mockReset()
@@ -163,6 +169,7 @@ beforeEach(() => {
 
 afterEach(() => {
   nowSpy.mockRestore()
+  setIntervalSpy.mockRestore()
 })
 
 describe('Dashboard — loading, scoping and errors', () => {
@@ -310,6 +317,25 @@ describe('Dashboard — next fixture hero', () => {
     expect(screen.queryByTestId('next-fixture')).not.toBeInTheDocument()
   })
 
+  it('only runs the once-a-minute countdown tick while there is a hero', async () => {
+    // Filtered to the countdown's own 60s delay so nothing React or RTL
+    // schedules internally can make this pass by accident.
+    const ticks = () =>
+      setIntervalSpy.mock.calls.filter(([, delay]) => delay === 60 * 1000).length
+
+    const { unmount } = renderDashboard()
+    await screen.findByTestId('next-fixture')
+    expect(ticks()).toBe(1)
+    unmount()
+
+    setIntervalSpy.mockClear()
+    listEventsMock.mockResolvedValue([LAST_RESULT])
+    renderDashboard()
+    await screen.findByText(/no upcoming fixtures/i)
+    // Nothing to count down to, so nothing to re-render the dashboard for.
+    expect(ticks()).toBe(0)
+  })
+
   it('hides the hero entirely when there is nothing upcoming', async () => {
     listEventsMock.mockResolvedValue([LAST_RESULT])
 
@@ -405,36 +431,72 @@ describe('Dashboard — upcoming list and last result', () => {
 })
 
 describe('Dashboard — quick actions', () => {
-  it('offers the add actions to a coach', async () => {
+  // The card holds exactly the actions a role may take. Asserting on the full
+  // set, not on one button at a time, is what makes these fail if a
+  // not-yet-built action is ever added back: getByRole('button') matches a
+  // disabled button just as happily as an enabled one, so "the add button is
+  // present" proves nothing about whether it works.
+  const actionNames = () =>
+    within(screen.getByTestId('quick-actions'))
+      .getAllByRole('link')
+      .concat(within(screen.getByTestId('quick-actions')).queryAllByRole('button'))
+      .map((node) => node.textContent.trim())
+
+  it('offers a coach navigation only — no add actions until Tasks 14/15 build them', async () => {
     renderDashboard()
     await screen.findByTestId('stat-players')
 
-    expect(screen.getByRole('button', { name: /add fixture/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /add a player/i })).toBeInTheDocument()
+    expect(actionNames()).toEqual(['View full schedule', 'View team list'])
   })
 
-  it('offers the add actions to an admin', async () => {
+  it('offers an admin the same, and no read-only explanation', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(ADMIN))
 
     renderDashboard()
     await screen.findByTestId('stat-players')
 
-    expect(screen.getByRole('button', { name: /add fixture/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /add a player/i })).toBeInTheDocument()
+    expect(actionNames()).toEqual(['View full schedule', 'View team list'])
+    expect(screen.queryByText(/you're signed in as a/i)).not.toBeInTheDocument()
   })
 
-  it('hides the add actions from a parent and explains why', async () => {
+  it('offers a parent navigation only, and says why', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
 
     renderDashboard()
     await screen.findByTestId('stat-players')
 
-    expect(screen.queryByRole('button', { name: /add fixture/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /add a player/i })).not.toBeInTheDocument()
+    expect(actionNames()).toEqual(['View schedule', 'View team list'])
     expect(screen.getByText(/signed in as a parent/i)).toBeInTheDocument()
   })
 
-  it('always links to the full schedule and the team list', async () => {
+  // A player is one of the four supported roles, and used to be told they
+  // were a parent — twelve lines below a scope note reading "Player view".
+  it('calls a player a player, not a parent', async () => {
+    useMembershipsMock.mockReturnValue(membershipValue(PLAYER))
+
+    renderDashboard()
+    await screen.findByTestId('stat-players')
+
+    expect(actionNames()).toEqual(['View schedule', 'View team list'])
+    expect(screen.getByText(/signed in as a player/i)).toBeInTheDocument()
+    expect(screen.queryByText(/signed in as a parent/i)).not.toBeInTheDocument()
+  })
+
+  it('treats a coach with no resolvable team as read-only', async () => {
+    useMembershipsMock.mockReturnValue(membershipValue(TEAMLESS_COACH))
+    listEventsMock.mockResolvedValue([])
+    listPlayersMock.mockResolvedValue([])
+
+    renderDashboard()
+    await screen.findByTestId('stat-players')
+
+    // canEditTeam refuses a null team_id, so this coach gets the read-only
+    // card rather than an action pointing at a form with no squad to pick.
+    expect(actionNames()).toEqual(['View schedule', 'View team list'])
+    expect(screen.getByText(/signed in as a coach/i)).toBeInTheDocument()
+  })
+
+  it('links to the full schedule and the team list', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
 
     renderDashboard()

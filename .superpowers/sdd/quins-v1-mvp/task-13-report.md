@@ -277,3 +277,128 @@ Findings:
   absence was visible rather than merely wrong — but the stub fixtures are
   pinned to July 2026 and will start showing an empty "Upcoming" once real
   time passes them. That's a pre-existing harness property, not new.
+
+---
+
+# Task 13 — fix round 1 (review response)
+
+All four findings addressed in one round. No pushback on any of them.
+
+## 1. (Important) A `player` was told they were a parent
+
+`QuickActions` hardcoded the noun "parent" for every non-admin, non-coach
+user, while the scope note on the same screen read "Player view" from
+`roleLabel`. Fixed: the screen now computes
+
+```js
+const readOnlyRole = canEdit ? null : roleLabel(memberships).toLowerCase()
+```
+
+and interpolates it, so the sentence and the scope note draw the role from
+one source. Also removed a dead `admin ?` branch inside that same line —
+`admin` implies `canEdit`, so it could never have rendered.
+
+## 2. (Important) Disabled placeholder controls removed
+
+Accepted the ruling: `EventDetail.jsx`'s precedent governs, and my "the card
+changes shape later either way" reasoning was wrong — the card gains the
+buttons when Tasks 14/15 land regardless of what it renders today, so there
+was no shape cost to omitting them. Both disabled buttons and the "arrives in
+the next update" line are gone, along with the now-unused `BUTTON_DISABLED`
+token. The in-file comment now records the rule rather than the exception, and
+cites EventDetail so the next person finds the precedent rather than
+re-deciding it. **No disabled placeholders for not-yet-built routes anywhere,
+going forward.**
+
+**Layout check:** the design system already specifies this exact shape — §5.1's
+parent variant *is* two ghost actions plus a muted line. So admin/coach now
+render the parent variant minus the line, which is two full-width ghost links
+in a `p-[14px]` card. Verified in the browser at both widths (screenshot
+re-read): it does not read as sparse, and the right-hand column still balances
+against the five-row Upcoming list. No layout adjustment needed, so none made.
+
+## 3. (Minor) `canEdit` now goes through `canEditTeam`
+
+```js
+const canEdit = admin || scopedTeams.some((team) => canEditTeam(memberships, team.id))
+```
+
+matching `Schedule.jsx:315`. A coach row with a null `team_id` is now treated
+as read-only, which is what `canEditTeam` deliberately decides and what the
+brief named.
+
+## 5. (Minor) Countdown timer gated on the hero
+
+The interval moved below `nextFixture` and is now gated on
+`hasCountdown = nextFixture != null`. The dependency is that boolean, not the
+event object, so a realtime refetch returning the same next fixture doesn't
+restart the interval. With no hero there is no timer and no 60-second
+whole-dashboard re-render.
+
+## Tests
+
+`tests/dashboard.test.jsx`, 25 → 28 tests. The `Dashboard — quick actions`
+block was rewritten: the reviewer was right that `getByRole('button')` passes
+for a disabled button, so those assertions proved nothing. It now asserts the
+**complete** action list per role via a `quick-actions` test id —
+`expect(actionNames()).toEqual([...])` — which fails if a not-yet-built action
+is ever added back, disabled or not.
+
+New/changed coverage: coach, admin, parent, **player**, and a **teamless
+coach** each get their exact action set; the read-only sentence names parent /
+player / coach correctly and never says "parent" for a player; admin gets no
+read-only sentence; the 60s tick is started when a hero renders and not
+started when none does (spy filtered to the 60000 ms delay so nothing React
+schedules internally can make it pass by accident).
+
+### Mutation testing of the amended code
+
+| # | Mutation | Result |
+|---|---|---|
+| 11 | re-add a disabled "Add fixture or training" for editors | 2 tests fail |
+| 12 | hardcode the read-only role noun back to `'parent'` | 2 fail |
+| 13 | `canEdit` back to a raw `role === 'coach'` check | 1 fail |
+| 14 | ungate the countdown interval | 1 fail |
+
+All four killed.
+
+### Commands and output
+
+`npx vitest run tests/dashboard.test.jsx`:
+
+```
+ ✓ tests/dashboard.test.jsx (28 tests)
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+```
+
+`npm test` (files covering the amended code: `tests/dashboard.test.jsx`,
+`tests/app.test.jsx`, `tests/schedule.test.jsx`, `tests/scope.test.js`):
+
+```
+ Test Files  16 passed (16)
+      Tests  329 passed (329)
+```
+
+326 → 329 (+3 net: 6 rewritten quick-action tests replacing 5, plus the timer
+test). No stderr output. `npm run build` clean.
+
+### Browser re-check
+
+Re-ran `harness/shoot-dashboard.mjs` (3 personas × 375/1280) and re-read the
+screenshots. No horizontal overflow anywhere; the two ghost links measure
+40 px high with a 12 px text offset in every shot (`<a>` layout still explicit,
+not UA-dependent); the parent card's live text reads
+`"View schedule | View team list | You're signed in as a parent, so you can
+read fixtures and squads but not change them."`; no console or page errors.
+
+## Files changed this round
+
+- `src/screens/Dashboard.jsx`
+- `tests/dashboard.test.jsx`
+
+## Deferred (per the ruling, not acted on)
+
+- The error path replacing the whole screen on a failed realtime refetch
+  (pre-existing pattern inherited from `Schedule.jsx`).
+- Extracting the fourth copy of the retry-button markup.

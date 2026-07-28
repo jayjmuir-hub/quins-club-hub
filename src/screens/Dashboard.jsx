@@ -9,7 +9,7 @@ import EventDetail from './EventDetail.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import {
   eventDate,
   eventTitle,
@@ -56,10 +56,6 @@ const BUTTON_BASE =
   'flex w-full items-center justify-center gap-2 rounded-[11px] px-[15px] py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2'
 // Ghost: --maroon text on white, 5.93:1, clears AA.
 const BUTTON_GHOST = `${BUTTON_BASE} bg-white text-quinsRed shadow-[inset_0_0_0_1.5px_#e6e3e1] hover:bg-[#faf8fb]`
-// Disabled: the neutral chip fill with the darkened --muted this project
-// already uses on it (#5c5854 on #f0ecf2 = 6.0:1), so a disabled action is
-// still legible rather than a grey-on-grey guess.
-const BUTTON_DISABLED = `${BUTTON_BASE} cursor-not-allowed bg-[#f0ecf2] text-[#5c5854]`
 
 const MINUTE = 60 * 1000
 const HOUR = 60 * MINUTE
@@ -201,31 +197,23 @@ function NextFixtureHero({ event, teamName, now }) {
   )
 }
 
-function QuickActions({ canEdit, admin }) {
+// Quick actions (design-system.md §5.1). Every role gets the same two
+// navigation actions; a read-only role additionally gets a line saying why
+// there is nothing else here.
+//
+// The prototype's admin/coach variant also lists "Add fixture or training"
+// and "Add a player". Those are absent, not disabled, and deliberately so:
+// Tasks 14 and 15 own event and player writes, and there is no route for
+// either form to open yet. src/screens/EventDetail.jsx already settled this
+// question for the identical Task 14 gap — "adding a disabled or read-only
+// affordance now would promise a control that doesn't exist yet" — and it
+// matters more here than there, because this is the landing screen and so
+// the first thing a coach sees. The card gains the two buttons when the
+// forms land, whichever way it renders today.
+function QuickActions({ canEdit, readOnlyRole }) {
   return (
-    <Card className="p-[14px]">
+    <Card data-testid="quick-actions" className="p-[14px]">
       <div className="flex flex-col gap-2.5">
-        {canEdit && (
-          <>
-            {/* Tasks 14 and 15 build the event and player forms; until then
-                there is no route for these to open, and pointing them at a
-                path that does not resolve would bounce the user back here via
-                App.jsx's catch-all. They are rendered disabled rather than
-                omitted so the people who can use them can see they are coming
-                — and so this card does not silently change shape for a coach
-                the day the forms land. */}
-            <button type="button" disabled className={BUTTON_DISABLED}>
-              Add fixture or training
-            </button>
-            <button type="button" disabled className={BUTTON_DISABLED}>
-              Add a player
-            </button>
-            <p className="text-center text-[12.5px] text-[#77726e]">
-              Adding fixtures and players arrives in the next update.
-            </p>
-          </>
-        )}
-
         <Link to="/schedule" className={BUTTON_GHOST}>
           {canEdit ? 'View full schedule' : 'View schedule'}
         </Link>
@@ -233,11 +221,14 @@ function QuickActions({ canEdit, admin }) {
           View team list
         </Link>
 
-        {!canEdit && (
-          <p className="text-center text-[12.5px] text-[#77726e]">
-            {admin
-              ? 'You can view every squad in the club.'
-              : "You're signed in as a parent, so you can read fixtures and squads but not change them."}
+        {/* The role noun comes from roleLabel(), the same source as the scope
+            note at the top of this screen. Hardcoding "parent" here told a
+            player they were a parent, twelve lines below a scope note that
+            said "Player view". */}
+        {readOnlyRole && (
+          <p className="text-center text-[12.5px] leading-relaxed text-[#77726e]">
+            You&apos;re signed in as a {readOnlyRole}, so you can read fixtures and squads but not
+            change them.
           </p>
         )}
       </div>
@@ -262,13 +253,9 @@ export default function Dashboard() {
 
   // The countdown is recomputed on render, and re-rendered once a minute so
   // that a phone left on this screen doesn't sit showing a stale "3 Min" for
-  // an hour. The prototype computed it at render only (design-system.md §6),
-  // which was fine for a demo that re-rendered on every interaction.
+  // an hour. The timer itself is started further down, once we know whether
+  // there is a hero to tick for.
   const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), MINUTE)
-    return () => clearInterval(id)
-  }, [])
 
   // Both reads go out together and land together: the stat tiles mix counts
   // from each, so settling them independently would show a half-filled grid.
@@ -313,7 +300,15 @@ export default function Dashboard() {
   const isFirstLoad = loading && !settled
 
   const admin = isAdmin(memberships)
-  const canEdit = admin || memberships.some((membership) => membership.role === 'coach')
+  // Asked through canEditTeam rather than by looking for a 'coach' row, so
+  // this agrees with the helper that will gate the actual writes in Tasks
+  // 14/15: canEditTeam deliberately refuses a coach row with a null team_id,
+  // and a raw role check would grant on one — enabling an action that opens a
+  // form with no squad to pick. Same shape as Schedule.jsx's precedent.
+  const canEdit = admin || scopedTeams.some((team) => canEditTeam(memberships, team.id))
+  // Null for anyone who can edit; otherwise the role noun for the read-only
+  // explanation, from the same roleLabel() the scope note uses.
+  const readOnlyRole = canEdit ? null : roleLabel(memberships).toLowerCase()
   const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
   // "To play" is the project's result rule: a fixture is a result when a
@@ -335,6 +330,18 @@ export default function Dashboard() {
     return date != null && date.getTime() > now
   })
   const nextFixture = future.find((event) => event.type === 'match') ?? future[0] ?? null
+
+  // Gated on the hero existing: with nothing to count down to there is
+  // nothing for a tick to change, and an ungated timer re-renders the whole
+  // dashboard every 60s for no visible effect. The dependency is a boolean,
+  // not the event, so a realtime refetch that returns the same next fixture
+  // doesn't restart the interval.
+  const hasCountdown = nextFixture != null
+  useEffect(() => {
+    if (!hasCountdown) return undefined
+    const id = setInterval(() => setNow(Date.now()), MINUTE)
+    return () => clearInterval(id)
+  }, [hasCountdown])
 
   const upcoming = toPlay.slice(0, 5)
 
@@ -445,7 +452,7 @@ export default function Dashboard() {
 
         <div>
           <BlockTitle>Quick actions</BlockTitle>
-          <QuickActions canEdit={canEdit} admin={admin} />
+          <QuickActions canEdit={canEdit} readOnlyRole={readOnlyRole} />
 
           <BlockTitle>Last result</BlockTitle>
           <Card data-testid="last-result" className="overflow-hidden">
