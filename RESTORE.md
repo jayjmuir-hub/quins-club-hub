@@ -3,7 +3,7 @@
 **Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
 Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
 
-**12 of 22 tasks complete, 271 tests passing, build clean.**
+**13 of 22 tasks complete, 330 tests passing, build clean.**
 
 ---
 
@@ -33,7 +33,7 @@ Never put the `sb_secret_…` key in this repo or in a chat.
 Verify:
 
 ```bash
-npm test        # expect 271 passing across 14 files
+npm test        # expect 330 passing across 16 files
 npm run build   # expect clean
 ```
 
@@ -74,8 +74,7 @@ does.
 | **A — Scaffold** | 1 scaffold, 2 Supabase client | done |
 | **B — Auth & scope** | 3+4 auth context, 5 login screen, 6 auth gate + router, 7 scope helpers | done |
 | **C — Shell & design system** | 8 app shell + nav, 9 shared UI primitives | done |
-| **D — Read features** | 10 data-access modules, 11 schedule, 12 roster | done |
-| | 13 dashboard | next |
+| **D — Read features** | 10 data-access, 11 schedule, 12 roster, 13 dashboard | done |
 | **E — Write features** | 14 event form, 15 player form, 16 availability RSVPs | todo |
 | **F — Admin** | 17 admin overview, 18 invite flow, 19 first-admin doc | todo |
 | **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | todo |
@@ -93,9 +92,17 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Resume at Task 13 — Dashboard
+## Resume at Task 14 — Event create/edit/delete
 
-Its brief is already generated at `.superpowers/sdd/quins-v1-mvp/task-13-brief.md`. The plan is `docs/plans/quins-v1-mvp.md`; the visual spec is
+Phase D (all read screens) is complete. Phase E starts the write screens. Task 14's brief is
+not yet generated — run `scripts/task-brief docs/plans/quins-v1-mvp.md 14` from the
+`subagent-driven-development` skill directory to produce it.
+
+**Read the Task 11 amendment note before starting Task 14:** the event form must interpret
+an entered date and time as Abu Dhabi time when it builds `starts_at` — a naive
+`new Date(\`${d}T${t}\`)` resolves in the browser's zone, so a UK coach entering 20:00 would
+write a 23:00 Abu Dhabi kick-off. This is the mirror image of the read-side fix and it is
+easy to miss. The plan is `docs/plans/quins-v1-mvp.md`; the visual spec is
 `docs/design-system.md` (597 lines, extracted from the approved prototype — implementers
 build from it without reading the prototype HTML).
 
@@ -158,6 +165,36 @@ spinner over already-rendered content — Schedule uses a derived `isFirstLoad`,
 **A `<button>` used as a layout box inherits Chromium's UA content-centring**, which no jsdom
 test can see. Task 11's calendar shipped with populated day cells floating 66px below their
 empty neighbours at desktop width. Set layout explicitly on any interactive non-text element.
+
+**The club does not use jersey numbers.** `players.jersey_num` stays in the schema (nullable,
+harmless, available if a senior side ever wants it) but nothing in the UI reads it. Roster rows
+and the PlayerDetail hero show initials instead, via `src/lib/playerFormat.js`. Never add a
+jersey field to the event/player forms.
+
+**All event times are forced to Abu Dhabi time (`Asia/Dubai`), always** — a deliberate,
+twice-reviewed decision, not a leftover default. One club, one ground: "20:00" must always mean
+20:00 at Zayed Sports City, regardless of the viewer's browser timezone. Route every date/time
+formatter through `src/lib/eventFormat.js`'s Dubai-anchored functions — never `toLocale*` with
+an implicit zone, never a hardcoded `+04:00` offset (use the IANA zone via `Intl`'s `timeZone`
+option; offsets are a derived fact and the wrong abstraction). Calendar day-bucketing and any
+"today" highlight must also be computed in club-local days, not the browser's. **Any test
+touching this must prove zone-independence, not assume it** — pin a fixed instant and
+demonstrate the same output under a hostile `TZ` (e.g. `America/New_York`); a test that only
+passes because the runner sits in UTC is not evidence. This exact failure mode has shipped
+twice already, hiding in tests that *looked* zone-safe.
+
+**"Upcoming" and "not yet scored" are two different questions that happen to look similar.**
+Schedule's Upcoming *tab* deliberately shows unscored events regardless of date — a match still
+needing a score stays visible until someone scores it. That's correct and must not change.
+Dashboard's "what's coming up" list and its stat tile want something different: chronologically
+future events (`starts_at > now`), because trainings and socials can never have a score and
+would otherwise sit in "Upcoming" forever. Don't collapse these two back into one filter — they
+were split apart on purpose in Task 13.
+
+**Task 14's event form must interpret an entered date and time as Abu Dhabi time** when it
+builds the `starts_at` value. A naive `new Date(\`${d}T${t}\`)` resolves in the browser's zone,
+so a coach entering 20:00 from outside the UAE would write a 23:00 (or worse) Abu Dhabi
+kick-off. This is the mirror image of the read-side timezone fix and is easy to miss.
 
 **`getPlayerContact` uses `.maybeSingle()`, not `.single()`.** Zero rows is the normal
 outcome for a parent — RLS hides contacts from them. `.single()` throws on zero rows, which
