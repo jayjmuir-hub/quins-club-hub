@@ -1,0 +1,2776 @@
+# Review package: ac67abb..HEAD
+
+## Commits
+df39882 feat: event create/edit/delete (Task 14)
+
+## Files changed
+ .superpowers/sdd/quins-v1-mvp/task-14-brief.md  |   6 +
+ .superpowers/sdd/quins-v1-mvp/task-14-report.md | 315 +++++++++++++
+ harness/main.jsx                                |   9 +-
+ harness/shoot-eventform.mjs                     | 267 +++++++++++
+ harness/stubs/events.js                         |  15 +
+ src/data/events.js                              |  44 ++
+ src/lib/eventFormat.js                          | 105 +++++
+ src/screens/Dashboard.jsx                       |  31 +-
+ src/screens/EventDetail.jsx                     | 103 ++++-
+ src/screens/EventForm.jsx                       | 455 +++++++++++++++++++
+ src/screens/Schedule.jsx                        |  58 ++-
+ tests/dashboard.test.jsx                        |  43 ++
+ tests/data.test.js                              | 129 +++++-
+ tests/event-form.test.jsx                       | 562 ++++++++++++++++++++++++
+ tests/event-format.test.js                      |  95 ++++
+ 15 files changed, 2222 insertions(+), 15 deletions(-)
+
+## Diff
+diff --git a/.superpowers/sdd/quins-v1-mvp/task-14-brief.md b/.superpowers/sdd/quins-v1-mvp/task-14-brief.md
+new file mode 100644
+index 0000000..e5fe225
+--- /dev/null
++++ b/.superpowers/sdd/quins-v1-mvp/task-14-brief.md
+@@ -0,0 +1,6 @@
++### Task 14: Event create/edit/delete
++**Files:** Create `src/screens/EventForm.jsx`; modify `src/data/events.js` (`upsertEvent`, `deleteEvent`).
++**Interfaces:** Coaches/admin only; squad dropdown limited to `canEditTeam` teams; type match/training/social with conditional fields (opponent/home/competition/score only for match).
++- [ ] Test: `upsertEvent` inserts when there is no id and updates when there is; the form blocks submit when required fields are empty; team options are limited to editable teams; a Supabase error surfaces as a visible error message.
++- [ ] Implement. Commit.
++
+diff --git a/.superpowers/sdd/quins-v1-mvp/task-14-report.md b/.superpowers/sdd/quins-v1-mvp/task-14-report.md
+new file mode 100644
+index 0000000..f31bf73
+--- /dev/null
++++ b/.superpowers/sdd/quins-v1-mvp/task-14-report.md
+@@ -0,0 +1,315 @@
++# Task 14 — Event create/edit/delete — report
++
++Branch `build/v1-mvp`, from `ac67abb`.
++
++## What I implemented
++
++### `src/lib/eventFormat.js` — the write direction (new, pure, no imports)
++Two new exports, tested in the existing `tests/event-format.test.js`:
++
++- `clubWallTimeToUtc(dateValue, timeValue)` — takes an `<input type="date">`
++  value and an `<input type="time">` value, reads BOTH as **Abu Dhabi
++  wall-clock**, and returns the UTC ISO string for `starts_at`. Returns
++  `null` for a missing/unparseable pair so the caller treats it as a
++  validation failure rather than writing an Invalid Date.
++- `clubDateTimeInputs(date)` — the exact inverse, used to prefill the edit
++  form. Zero-padded 24-hour time so it is a legal time-input value.
++
++**Approach (the abstraction question).** The offset is *derived from the IANA
++zone at the instant in question*, never hardcoded as `+04:00`. A private
++`clubOffsetMsAt(ts)` formats the instant through an `Intl.DateTimeFormat`
++bound to `CLUB_TIME_ZONE` (`hourCycle: 'h23'`, so midnight is `00` and not
++en-US's `24`), rebuilds those fields with `Date.UTC`, and subtracts. The
++conversion then treats the typed wall-clock as if it were UTC, subtracts the
++offset, and looks the offset up a second time at the first approximation —
++one refinement, which is what makes it land on the correct side of a DST
++transition should the UAE ever adopt one. This is the same reasoning
++`CLUB_TIME_ZONE` already documents for the read side.
++
++### `src/data/events.js` — `upsertEvent` / `deleteEvent`
++- `upsertEvent(event)`: one function, branching on `event.id` — `insert`
++  when falsy, `update(...).eq('id', id)` when set. The id is used only as the
++  filter and is **never sent as a column** on either path.
++- `deleteEvent(id)`: `delete().eq('id', id).select()`.
++- Both follow the file's existing conventions (throw on error, never a
++  `{data, error}` tuple, JSDoc + prose comments).
++- **New for this codebase (there was no `upsert*` precedent — `players.js` /
++  `members.js` are read-only):** both writers ask for the affected row(s)
++  back and **throw when nothing comes back**. This is the security-relevant
++  bit: an RLS-refused write is *not* a PostgREST error — the policy filters
++  the row out, the statement affects zero rows, and the response is a
++  perfectly successful "nothing". Without this the form would show a
++  success and close on a write the database silently threw away. The check
++  is a *reporting* mechanism, explicitly not an access control.
++
++### `src/screens/EventForm.jsx` (new)
++Design-system §5.6 field order: segmented Type (Match/Training/Social) →
++Opponent (match) or Title (training/social) → Date+Time field-row → Age
++group select → Home/Away segmented (match only) → Venue (prefilled "Zayed
++Sports City, Abu Dhabi") → Competition (match only) → Quins/Opposition score
++(match only) → full-width Save.
++
++- **Squad dropdown** = `visibleTeams(memberships, allTeams).filter(t =>
++  canEditTeam(memberships, t.id))`. Admin gets every team; a coach gets only
++  the squads they coach. `canEditTeam` is asked per team rather than inferred
++  from the role, so its deliberate null-`team_id` refusal applies here too.
++- **Zero editable teams** → the screen **refuses to render a form at all**:
++  the Sheet opens with a `role="alert"` explanation and no Save button. An
++  empty dropdown over a live Save button would offer a write RLS is
++  guaranteed to refuse. (Both entry points already gate on the same check, so
++  this is defensive.)
++- **Chosen squad is reconciled against the live editable list on every
++  render** (same pattern Schedule/Roster use for their team filters) rather
++  than trusting stored state, which can outlive the scope that produced it.
++- **Validation:** date, time, squad, and opponent (match) / title
++  (training-social) are required. Submit is blocked, a `role="alert"` region
++  explains why, and the offending fields get `aria-invalid` + a dark-red
++  border. Venue, competition and scores are optional. `noValidate` on the
++  form so our announced message replaces the native bubble.
++- **Score is optional even for a match** — a future fixture has none — and a
++  half-entered score is written as `null/null`, mirroring `hasResult()`'s
++  both-halves rule so a half-score can never knock a fixture out of Upcoming.
++  0–0 is written as a real score.
++- **Segmented control** uses `<label>` + visually-hidden radio + `<span>`,
++  with the checked look driven by React state (the design system's port note
++  warns against silently relying on `:has()`). Options are `<span>`s, not
++  `<button>`s, precisely to avoid the UA content-centring trap.
++- Disabled-while-saving submit ("Saving…"), plus a non-state `inFlight` ref
++  so a double click cannot land two inserts.
++- The one place the form names the zone: "Times are Abu Dhabi time." under
++  the date/time row, mirroring the detail sheet.
++- **No jersey field, and no numeric player identifier anywhere.**
++
++### UX decisions
++
++**Delete.** Design-system §5.5 puts Edit + Delete in the **EventDetail
++footer**, not in the form, and that is where I put them. There is no existing
++delete pattern in the codebase to follow — `PlayerDetail.jsx` explicitly
++defers its own to Task 15, so **this is the first one**, and it sets the
++precedent. Delete is **two-step and inline**: the Delete button swaps the
++footer for "Delete this event? This can't be undone." with `Keep it` /
++`Yes, delete`. I deliberately did **not** use a native `confirm()` (the
++prototype's demo-only reset used one) — it is unstyled, unreliably announced,
++and invisible to the browser check. After a successful delete the sheet
++closes and the user lands back on the list they came from, which then
++reloads. A failed delete surfaces in a `role="alert"` inside the sheet and
++leaves the event on screen.
++
++**Entry points.**
++1. **Schedule section-head "Add fixture" button** (design-system §5.2,
++   admin/coach only, absent — not disabled — otherwise). Task 13 removed the
++   dashboard placeholder under the no-disabled-placeholders rule; this is the
++   task that makes a real control possible, and §5.2 is where the design
++   system puts it.
++2. **EventDetail "Edit"**, from both Schedule *and* Dashboard.
++
++I wired the Dashboard's EventDetail too. That was not optional: once
++EventDetail grew a footer, leaving `canEdit` at its default would have told a
++coach tapping a fixture on the landing screen that the event is read-only,
++which is false. The Dashboard does **not** get an "add" affordance — that
++belongs to Schedule per §5.2, and the quick-actions card stays as it is until
++Task 15's player form lands with its pair (its existing comment says exactly
++this). No scope creep into Tasks 15/16.
++
++Only one sheet is open at a time: opening the form unmounts the detail sheet
++rather than stacking two dialogs, and closing the form drops back to the
++schedule, which is where a coach who just saved wants to be.
++
++### RLS writability check (done, not assumed)
++Queried the live project (`lusmshimxdcxpnrktlgz`) directly:
++
++- `pg_policies` on `public.events`:
++  - `event read` — `SELECT`, `USING can_see_team(team_id)`
++  - `event edit` — **`ALL`**, `USING can_edit_team(team_id)` **and
++    `WITH CHECK can_edit_team(team_id)`**
++- `can_edit_team(_team)` = `exists (select 1 from memberships m where
++  m.profile_id = auth.uid() and ((m.role='admin' and m.club_id = (select
++  club_id from teams where id=_team)) or (m.role='coach' and
++  m.team_id=_team)))`
++
++So INSERT/UPDATE/DELETE on `events` are already enforced server-side for
++exactly admin-of-the-club and coach-of-that-team, with `WITH CHECK` covering
++the row a write *lands on* (a coach cannot re-point a fixture at a squad they
++don't coach). `upsertEvent`/`deleteEvent` therefore need nothing beyond
++issuing the call — the only client-side addition is the zero-row detection
++described above, which reports refusals rather than enforcing anything.
++
++Schema note: `events.club_id` is `NOT NULL` with no default, so the form
++derives it from the selected team's `club_id` (`teams` is fetched with
++`select('*')`, so it is available) rather than hardcoding the club constant.
++
++## What I tested
++
++`tests/event-format.test.js` (+11): both new helpers, every assertion run
++under all three `HOSTILE_ZONES` (`UTC`, `America/New_York`,
++`Pacific/Auckland`) via the file's existing `withTimeZone`, including 20:00
++Dubai → 16:00Z, an after-midnight kick-off crossing back a UTC day, exact
++midnight, a month boundary, a seconds-bearing time value, a round trip
++through the display formatters, the exact-inverse property, and null/garbage
++handling.
++
++`tests/data.test.js` (+9): insert-when-no-id (and when id is `null`/`''`),
++update-when-id, no `id` column sent either way, `.eq('id', …)` filter,
++`.select()` requested, error thrown not returned, and the zero-row RLS
++refusal on both writers. The shared mock builder gained
++`insert`/`update`/`delete` chain recorders.
++
++`tests/event-form.test.jsx` (new, 34): sheet titles, dropdown limited to
++editable teams (coach vs admin), refusal to render with no editable team,
++conditional fields in all three directions, blocked submit + `aria-invalid`
++on the right fields only, the club-time submit payload, optional/0–0/half
++scores, training payload shape, edit prefill + update-by-id, an unchanged
++round trip not shifting `starts_at`, a Supabase error surfacing while
++keeping typed values and re-enabling the button, disabled-while-saving,
++double-click protection, typing without lost keystrokes, and the Schedule +
++EventDetail wiring (Add button gating, opening the form, reload after save,
++Edit/Delete vs the parent read-only note, cancel-delete, confirm-delete,
++delete failure).
++**The whole file runs under `TZ=America/New_York`**, with a guard test
++asserting the process zone really is hostile so the timezone assertions
++cannot pass vacuously.
++
++`tests/dashboard.test.jsx` (+3): the Dashboard's detail sheet offers
++Edit/Delete to a coach, the read-only note to a parent, and opens the form.
++
++**Anti-vacuity (the suite was not green on the first attempt, and I
++mutation-tested the risky parts anyway):**
++- Replacing `clubWallTimeToUtc`/`clubDateTimeInputs` with the naive
++  `new Date(\`${date}T${time}\`)` / `getHours()` implementations → **9
++  failures** in `event-format.test.js`.
++- Hardcoding `canEdit={false}` in Dashboard → **2 failures** in
++  `dashboard.test.jsx`.
++
++## TDD evidence
++
++**RED — eventFormat**
++```
++$ npx vitest run tests/event-format.test.js
++TypeError: clubWallTimeToUtc is not a function
++TypeError: clubDateTimeInputs is not a function
++ Test Files  1 failed (1)
++      Tests  11 failed | 43 passed (54)
++```
++**GREEN** → `Tests  54 passed (54)`
++
++**RED — data layer**
++```
++$ npx vitest run tests/data.test.js
++ FAIL  tests/data.test.js > upsertEvent > inserts when there is no id, and does not send an id column
++ FAIL  tests/data.test.js > upsertEvent > updates the matching row when there is an id, …
++ FAIL  tests/data.test.js > deleteEvent > deletes the row with the given id
++ … (9 failed)
++      Tests  9 failed | 25 passed (34)
++```
++**GREEN** → `Tests  34 passed (34)`
++
++**RED — form**
++```
++$ npx vitest run tests/event-form.test.jsx
++Failed to resolve import "../src/screens/EventForm.jsx"
++ Test Files  1 failed (1)
++      Tests  no tests
++```
++**GREEN** → `Tests  34 passed (34)`
++
++**Full suite (baseline 330 across 16 files):**
++```
++$ npm test
++ Test Files  17 passed (17)
++      Tests  387 passed (387)
++```
++No regressions, no `act(...)` warnings, no stderr noise.
++
++```
++$ npm run build
++✓ built in 2.32s
++```
++
++## Browser check
++
++`harness/shoot-eventform.mjs` (new; `harness/stubs/events.js` gained
++write stubs that record payloads on `window.__writes`; `harness/main.jsx`
++gained a `schedule-parent` scenario and `club_id` on the stub teams).
++13 shots × {375×812, 1280×900} = 26, **with the browser context pinned to
++`timezoneId: 'America/New_York'`.**
++
++- **The load-bearing result.** Typing 30 Jul 2026 / 20:00 in a New York
++  browser produced
++  `starts_at: "2026-07-30T16:00:00.000Z"` — correct Abu Dhabi time. A naive
++  implementation would have written `2026-07-31T00:00:00.000Z`. Full recorded
++  payload: `{club_id, team_id: "t1", type:"match", title:null, opponent, home:true,
++  venue, competition:null, starts_at, result_us:null, result_them:null}` —
++  and no `id`, i.e. an insert.
++- **Edit prefill** of a `15:00Z` fixture showed `07/30/2026` / `07:00 PM` —
++  19:00 Dubai, not 11:00 New York.
++- **Typing (Sheet focus trap):** a `pressSequentially` shot (one key at a
++  time, 25ms apart) typed "Jebel Ali Dragons" and "West Asia Premiership" in
++  full, with `document.activeElement` still on the field being typed into.
++- **Type selector:** Match shows Opponent/Home-Away/Competition/Score;
++  Training and Social swap in Title and remove all four. Verified in the DOM
++  and in the screenshots.
++- **Button-as-layout-box:** segmented options measured 108×42 / 108×42 /
++  108×42 (and 166×42 / 166×42) at identical `y` — no misalignment.
++- **Contrast:** every uppercase form label computes to `rgb(92,88,84)` =
++  `#5c5854`. No `quinsGreen` on white anywhere in the form. Checked state is
++  `#8E1526` on `#fbf3f6`.
++- **Overflow:** `document.scrollWidth === innerWidth` at 375px on all 26
++  shots; zero overflowing elements.
++- **Console:** zero errors, zero page errors. The only warnings are the two
++  pre-existing React Router v7 future-flag notices the harness's MemoryRouter
++  emits on every scenario (not from this change).
++- Screenshots reviewed with the Read tool: `add-match`,
++  `add-match-scrolled`, `add-training`, `validation`, `edit-match` (desktop
++  dialog), `edit-match-scrolled`, `detail-footer`, `delete-confirm`,
++  `detail-footer-parent`, `schedule-head-admin`, `schedule-head-parent`.
++  Saved under `screenshots/task14/` (git-ignored).
++
++## Files changed
++
++- `src/screens/EventForm.jsx` — new
++- `src/data/events.js` — `upsertEvent`, `deleteEvent`
++- `src/lib/eventFormat.js` — `clubWallTimeToUtc`, `clubDateTimeInputs`
++- `src/screens/EventDetail.jsx` — `FooterActions` (Edit/Delete/confirm/parent
++  note), `canEdit`/`onEdit`/`onDeleted` props
++- `src/screens/Schedule.jsx` — "Add fixture" button, form state, wiring
++- `src/screens/Dashboard.jsx` — detail-sheet edit/delete wiring
++- `tests/event-form.test.jsx` — new
++- `tests/event-format.test.js`, `tests/data.test.js`,
++  `tests/dashboard.test.jsx`
++- `harness/shoot-eventform.mjs` — new; `harness/stubs/events.js`,
++  `harness/main.jsx`
++
++## Self-review findings (fixed before reporting)
++
++1. **Stale squad id.** The form initialised `teamId` once from the editable
++   list. If teams hadn't loaded on first render, or memberships reloaded and
++   shrank, the select displayed one squad while state held another (or `''`).
++   Fixed by reconciling against the live list every render, the same pattern
++   Schedule/Roster already use.
++2. **`act(...)` warning** leaking from the double-click test, whose deferred
++   promise settled after the test ended. Now awaited.
++3. **First screenshot pass was wrong**, not the UI: `fullPage: true` on a
++   `position: fixed` sheet clips the panel and renders the page behind it.
++   Switched the form shots to viewport-only with explicit scrolled variants.
++4. **`fill()` is not a keystroke test** — it sets the value in one go and
++   would not have caught a focus-stealing Sheet. Added the
++   `pressSequentially` shot.
++
++## Concerns
++
++- **None on RLS.** The `events` write policy was read from the live database
++  and does permit coach/admin writes with a matching `WITH CHECK`. No
++  client-side-only permission gate exists.
++- Minor, deliberate inconsistency: form labels use `#5c5854` where
++  `EventDetail`'s key/value labels use `#77726e`. Both clear AA on white
++  (4.755:1 for the latter); I took the darker value for the 12.5px labels
++  since the muted-on-light defect has shipped twice. Worth normalising
++  codebase-wide at some point, not in this task.
++- Negative scores are typeable (`min="0"` is not enforced under
++  `noValidate`). Out of scope for the brief; a `< 0` guard would be a
++  one-liner if wanted.
++- `upsertEvent`'s zero-row check assumes PostgREST returns the affected row
++  when `.select()` is chained. That is its documented behaviour and the
++  behaviour the mocked builder reproduces, but it has not been exercised
++  against the live project — the first real save on `adhjrt.com` is where
++  that gets confirmed.
+diff --git a/harness/main.jsx b/harness/main.jsx
+index b6b7fd7..d2d1b50 100644
+--- a/harness/main.jsx
++++ b/harness/main.jsx
+@@ -34,35 +34,36 @@ function baseAuth(email) {
+   }
+ }
+ 
+ const COACH_EMAIL = 'coach.sam@adhq.example'
+ const JAY_EMAIL = 'jayjmuir@gmail.com'
+ 
+ const COACH_MEMBERSHIPS = [
+   { id: 'm1', role: 'coach', team_id: 't1', player_id: null },
+   { id: 'm2', role: 'coach', team_id: 't2', player_id: null },
+ ]
++const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
+ const TEAMS = [
+-  { id: 't1', name: 'U12 Boys', sort_order: 4 },
+-  { id: 't2', name: 'U14 Boys', sort_order: 6 },
++  { id: 't1', club_id: CLUB_ID, name: 'U12 Boys', sort_order: 4 },
++  { id: 't2', club_id: CLUB_ID, name: 'U14 Boys', sort_order: 6 },
+ ]
+ 
+ // Three-age-group variants, added for the independent controller-side
+ // verification pass. Two groups is the minimum that makes the age-group
+ // branch fire at all; three is what it actually looks like in the club, and
+ // it is what puts enough pills in the row to test the 375px overflow.
+ const COACH_THREE_MEMBERSHIPS = [
+   { id: 'm1', role: 'coach', team_id: 't1', player_id: null },
+   { id: 'm2', role: 'coach', team_id: 't2', player_id: null },
+   { id: 'm3', role: 'coach', team_id: 't3', player_id: null },
+ ]
+-const TEAMS_THREE = [...TEAMS, { id: 't3', name: 'U16 Boys', sort_order: 8 }]
++const TEAMS_THREE = [...TEAMS, { id: 't3', club_id: CLUB_ID, name: 'U16 Boys', sort_order: 8 }]
+ 
+ function Shell({ authValue, membershipValue, route = '/', children }) {
+   return (
+     <MemoryRouter initialEntries={[route]}>
+       <AuthProvider value={authValue}>
+         <MembershipProvider value={membershipValue}>
+           <AppShell>{children ?? <Home />}</AppShell>
+         </MembershipProvider>
+       </AuthProvider>
+     </MemoryRouter>
+@@ -152,20 +153,22 @@ const scenarios = {
+         error: new Error('Network request failed while loading your account.'),
+         reload: noop,
+       }}
+     />
+   ),
+ 
+   // Task 11 Schedule screens. Sub-tab selection and sheet opening are real
+   // component state, so Playwright drives them by clicking (see shoot.mjs).
+   schedule: scheduleScenario(COACH_MEMBERSHIPS),
+   'schedule-admin': scheduleScenario(ADMIN_MEMBERSHIPS),
++  // Task 14: the read-only side of the new Add/Edit/Delete affordances.
++  'schedule-parent': scheduleScenario(PARENT_MEMBERSHIPS),
+ 
+   // Task 12 Roster screens. Search text, pill selection and the PlayerDetail
+   // sheet are real component state, so Playwright drives them by typing and
+   // clicking (see shoot-roster.mjs).
+   roster: rosterScenario(COACH_MEMBERSHIPS),
+   'roster-one-team': rosterScenario(COACH_ONE_TEAM),
+   'roster-admin': rosterScenario(ADMIN_MEMBERSHIPS),
+ 
+   // Independent verification pass: three age groups in scope.
+   'roster-three': rosterScenario(COACH_THREE_MEMBERSHIPS, TEAMS_THREE),
+diff --git a/harness/shoot-eventform.mjs b/harness/shoot-eventform.mjs
+new file mode 100644
+index 0000000..8e4b5aa
+--- /dev/null
++++ b/harness/shoot-eventform.mjs
+@@ -0,0 +1,267 @@
++import { loadChromium } from './playwright.mjs'
++import path from 'node:path'
++import { fileURLToPath } from 'node:url'
++import fs from 'node:fs'
++
++// Task 14 visual + behavioural verification of src/screens/EventForm.jsx and
++// the Edit/Delete footer it opens from.
++//
++// The browser context runs in America/New_York on purpose. The form's job on
++// submit is to read the typed date and time as ABU DHABI wall-clock; under a
++// UTC browser a naive implementation looks correct, under New York it is
++// four hours out. The `writes` field recorded per shot is what the form
++// actually handed to the data layer, so the timezone claim is measured in a
++// real browser rather than only in jsdom.
++//
++// Also measured per shot: horizontal overflow at 375px, the computed colours
++// of the form's muted labels (the --muted-on-paper contrast defect that has
++// shipped twice), and the geometry of the segmented-control options (the
++// button-as-layout-box misalignment trap — these are <span>s precisely to
++// avoid it, and this is the check that proves it).
++
++const __dirname = path.dirname(fileURLToPath(import.meta.url))
++const outDir = path.resolve(__dirname, '../screenshots/task14')
++fs.mkdirSync(outDir, { recursive: true })
++
++const BASE = 'http://localhost:5199'
++
++const openAddForm = async (page) => {
++  await page.getByRole('button', { name: 'Add fixture' }).click()
++  await page.getByRole('dialog').waitFor()
++  await page.waitForTimeout(350)
++}
++
++const openEditForm = async (page) => {
++  await page.locator('button', { hasText: 'Sharjah Wanderers' }).first().click()
++  await page.getByRole('dialog').waitFor()
++  await page.getByRole('button', { name: 'Edit' }).click()
++  await page.waitForTimeout(350)
++}
++
++const shots = [
++  // The sheet is position:fixed, so a fullPage shot renders it clipped at
++  // viewport height with the page behind it running on — every form shot is
++  // viewport-only, with an explicit scrolled variant for the lower half.
++  { file: 'add-match', scenario: 'schedule', viewportOnly: true, steps: openAddForm },
++  {
++    file: 'add-match-scrolled',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await openAddForm(page)
++      await page.getByRole('dialog').evaluate((el) => el.scrollTo(0, el.scrollHeight))
++      await page.waitForTimeout(200)
++    },
++  },
++  {
++    file: 'add-training',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await openAddForm(page)
++      await page.getByRole('radio', { name: 'Training' }).click({ force: true })
++      await page.waitForTimeout(150)
++    },
++  },
++  {
++    file: 'add-away',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await openAddForm(page)
++      await page.getByRole('radio', { name: 'Away' }).click({ force: true })
++      await page.waitForTimeout(150)
++    },
++  },
++  {
++    file: 'validation',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await openAddForm(page)
++      await page.getByRole('button', { name: 'Add event' }).click()
++      await page.waitForTimeout(150)
++    },
++  },
++  {
++    // The load-bearing one: type a real Abu Dhabi kick-off from a New York
++    // browser and read back what the form wrote.
++    file: 'typed-and-saved',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await openAddForm(page)
++      await page.getByLabel('Opponent').fill('Jebel Ali Dragons')
++      await page.getByLabel('Date').fill('2026-07-30')
++      await page.getByLabel('Time').fill('20:00')
++      await page.getByLabel('Venue').fill('The Sevens, Dubai')
++      await page.waitForTimeout(100)
++      await page.getByRole('button', { name: 'Add event' }).click()
++      await page.waitForTimeout(350)
++    },
++  },
++  {
++    // Sheet used to re-run its focus effect on every render, yanking focus
++    // out of the field after each character. fill() would not catch that;
++    // pressSequentially types one key at a time, like a person.
++    file: 'typed-slowly',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await openAddForm(page)
++      await page.getByLabel('Opponent').pressSequentially('Jebel Ali Dragons', { delay: 25 })
++      await page.getByLabel('Competition').pressSequentially('West Asia Premiership', { delay: 25 })
++      await page.waitForTimeout(150)
++    },
++  },
++  { file: 'edit-match', scenario: 'schedule', viewportOnly: true, steps: openEditForm },
++  {
++    file: 'edit-match-scrolled',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await openEditForm(page)
++      await page.getByRole('dialog').evaluate((el) => el.scrollTo(0, el.scrollHeight))
++      await page.waitForTimeout(200)
++    },
++  },
++  {
++    file: 'detail-footer',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await page.locator('button', { hasText: 'Sharjah Wanderers' }).first().click()
++      await page.getByRole('dialog').waitFor()
++      await page.getByRole('dialog').evaluate((el) => el.scrollTo(0, el.scrollHeight))
++      await page.waitForTimeout(350)
++    },
++  },
++  {
++    file: 'delete-confirm',
++    scenario: 'schedule',
++    viewportOnly: true,
++    steps: async (page) => {
++      await page.locator('button', { hasText: 'Sharjah Wanderers' }).first().click()
++      await page.getByRole('dialog').waitFor()
++      await page.getByRole('button', { name: 'Delete' }).click()
++      await page.getByRole('dialog').evaluate((el) => el.scrollTo(0, el.scrollHeight))
++      await page.waitForTimeout(250)
++    },
++  },
++  {
++    file: 'detail-footer-parent',
++    scenario: 'schedule-parent',
++    viewportOnly: true,
++    steps: async (page) => {
++      await page.locator('button', { hasText: 'Sharjah Wanderers' }).first().click()
++      await page.getByRole('dialog').waitFor()
++      await page.getByRole('dialog').evaluate((el) => el.scrollTo(0, el.scrollHeight))
++      await page.waitForTimeout(350)
++    },
++  },
++  { file: 'schedule-head-admin', scenario: 'schedule-admin', steps: async () => {} },
++  { file: 'schedule-head-parent', scenario: 'schedule-parent', steps: async () => {} },
++]
++
++const viewports = [
++  { name: 'mobile', width: 375, height: 812 },
++  { name: 'desktop', width: 1280, height: 900 },
++]
++
++const results = []
++const chromium = await loadChromium()
++const browser = await chromium.launch()
++
++for (const shot of shots) {
++  for (const vp of viewports) {
++    const page = await browser.newPage({
++      viewport: { width: vp.width, height: vp.height },
++      timezoneId: 'America/New_York',
++    })
++    const consoleErrors = []
++    const consoleWarnings = []
++    const pageErrors = []
++    page.on('console', (msg) => {
++      if (msg.type() === 'error') consoleErrors.push(msg.text())
++      if (msg.type() === 'warning') consoleWarnings.push(msg.text())
++    })
++    page.on('pageerror', (err) => pageErrors.push(err.message))
++
++    await page.goto(`${BASE}/?scenario=${shot.scenario}`, { waitUntil: 'networkidle' })
++    await page.waitForTimeout(250)
++    await shot.steps(page)
++    await page.waitForTimeout(200)
++
++    const metrics = await page.evaluate(() => {
++      const overflowing = [...document.querySelectorAll('*')]
++        .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1)
++        .slice(0, 6)
++        .map((el) => `${el.tagName}.${el.className?.toString?.().slice(0, 50)}`)
++
++      const panel = document.querySelector('[role="dialog"]')
++      const box = (el) => {
++        if (!el) return null
++        const r = el.getBoundingClientRect()
++        return {
++          x: Math.round(r.left),
++          y: Math.round(r.top),
++          w: Math.round(r.width),
++          h: Math.round(r.height),
++        }
++      }
++
++      // Segmented-control options: same size, same baseline, text top-aligned
++      // the same way in each. A <button> laid out as a box would centre its
++      // content and break exactly this.
++      const segs = [...document.querySelectorAll('fieldset label > span')].map((el) => ({
++        text: el.textContent.trim(),
++        ...box(el),
++        color: getComputedStyle(el).color,
++        background: getComputedStyle(el).backgroundColor,
++        borderColor: getComputedStyle(el).borderTopColor,
++        textAlign: getComputedStyle(el).textAlign,
++      }))
++
++      const labels = [...document.querySelectorAll('[role="dialog"] label, [role="dialog"] legend')]
++        .filter((el) => el.className && el.className.toString().includes('uppercase'))
++        .map((el) => ({ text: el.textContent.trim(), color: getComputedStyle(el).color }))
++
++      const submit = document.querySelector('[role="dialog"] button[type="submit"]')
++      const alert = document.querySelector('[role="dialog"] [role="alert"]')
++
++      // Everything the form handed the data layer this page-load.
++      const writes = window.__writes ?? []
++
++      return {
++        innerWidth: window.innerWidth,
++        docWidth: document.documentElement.scrollWidth,
++        overflowing,
++        browserZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
++        panel: box(panel),
++        segs,
++        labelColors: [...new Set(labels.map((l) => l.color))],
++        submit: submit && { text: submit.textContent.trim(), ...box(submit), disabled: submit.disabled },
++        alert: alert && alert.textContent.trim(),
++        fieldValues: {
++          date: document.getElementById('event-date')?.value ?? null,
++          time: document.getElementById('event-time')?.value ?? null,
++          opponent: document.getElementById('event-opponent')?.value ?? null,
++          team: document.getElementById('event-team')?.value ?? null,
++          teamOptions: [...(document.getElementById('event-team')?.options ?? [])].map((o) => o.text),
++          competition: document.getElementById('event-competition')?.value ?? null,
++          activeElementId: document.activeElement?.id ?? null,
++        },
++        writes,
++      }
++    })
++
++    const outPath = path.join(outDir, `${shot.file}-${vp.name}.png`)
++    await page.screenshot({ path: outPath, fullPage: !shot.viewportOnly })
++
++    results.push({ shot: shot.file, viewport: vp.name, file: outPath, metrics, consoleErrors, consoleWarnings, pageErrors })
++    await page.close()
++  }
++}
++
++await browser.close()
++console.log(JSON.stringify(results, null, 2))
+diff --git a/harness/stubs/events.js b/harness/stubs/events.js
+index b523ac5..936d923 100644
+--- a/harness/stubs/events.js
++++ b/harness/stubs/events.js
+@@ -208,10 +208,25 @@ export async function listEvents({ teamIds } = {}) {
+   if (Array.isArray(teamIds) && teamIds.length === 0) return []
+   if (Array.isArray(teamIds) && teamIds.length > 0) {
+     return EVENTS.filter((event) => teamIds.includes(event.team_id))
+   }
+   return EVENTS
+ }
+ 
+ export function subscribeEvents() {
+   return () => {}
+ }
++
++// Task 14 writes. No network and no Supabase: each call records its payload
++// on window so the browser check can assert what the form ACTUALLY built —
++// in particular that a typed 20:00 becomes the right UTC instant while the
++// browser context is deliberately in a non-Dubai zone.
++export async function upsertEvent(event) {
++  window.__writes = window.__writes || []
++  window.__writes.push({ op: event?.id ? 'update' : 'insert', payload: event })
++  return { id: event?.id ?? 'e-new', ...event }
++}
++
++export async function deleteEvent(id) {
++  window.__writes = window.__writes || []
++  window.__writes.push({ op: 'delete', id })
++}
+diff --git a/src/data/events.js b/src/data/events.js
+index 61c0ecb..ae573c5 100644
+--- a/src/data/events.js
++++ b/src/data/events.js
+@@ -46,10 +46,54 @@ export function subscribeEvents(callback) {
+     .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, callback)
+     .subscribe()
+ 
+   let unsubscribed = false
+   return () => {
+     if (unsubscribed) return
+     unsubscribed = true
+     supabase.removeChannel(channel)
+   }
+ }
++
++// A write the database refused is not an error as far as PostgREST is
++// concerned: RLS filters the row out, the statement affects zero rows, and
++// the response is a perfectly successful "nothing". Both writers below ask
++// for the affected row back and treat "no row" as a refusal, so the form
++// shows a real message instead of a false "Saved". The check is a
++// *reporting* mechanism, not an access control — can_edit_team() on the
++// events table's "event edit" policy (USING and WITH CHECK) is what actually
++// decides, server-side, and nothing here can widen it.
++const REFUSED = "We couldn't save that. You may not have permission to change this squad's fixtures."
++const REFUSED_DELETE =
++  "We couldn't delete that. You may not have permission to change this squad's fixtures."
++
++/**
++ * Creates or updates one event. Inserts when `event` has no id, updates the
++ * matching row when it has one — the id is used only as the filter and is
++ * never sent as a column either way. Returns the saved row.
++ *
++ * Every field is passed through as given; in particular starts_at must
++ * already be a UTC instant built from Abu Dhabi wall-clock (see
++ * clubWallTimeToUtc in src/lib/eventFormat.js), never a browser-local Date.
++ */
++export async function upsertEvent(event) {
++  const { id, ...fields } = event ?? {}
++
++  const query = id
++    ? supabase.from('events').update(fields).eq('id', id).select().maybeSingle()
++    : supabase.from('events').insert(fields).select().maybeSingle()
++
++  const { data, error } = await query
++  if (error) throw error
++  if (!data) throw new Error(REFUSED)
++  return data
++}
++
++/**
++ * Deletes one event by id. Resolves with nothing on success and throws when
++ * the delete failed or removed nothing.
++ */
++export async function deleteEvent(id) {
++  const { data, error } = await supabase.from('events').delete().eq('id', id).select()
++  if (error) throw error
++  if (!data || data.length === 0) throw new Error(REFUSED_DELETE)
++}
+diff --git a/src/lib/eventFormat.js b/src/lib/eventFormat.js
+index 421a2aa..ef9fb68 100644
+--- a/src/lib/eventFormat.js
++++ b/src/lib/eventFormat.js
+@@ -191,10 +191,115 @@ export function sortByStart(events, direction = 'asc') {
+   const factor = direction === 'desc' ? -1 : 1
+   return [...events].sort((a, b) => {
+     const aTime = eventDate(a)?.getTime()
+     const bTime = eventDate(b)?.getTime()
+     if (aTime == null && bTime == null) return 0
+     if (aTime == null) return 1
+     if (bTime == null) return -1
+     return (aTime - bTime) * factor
+   })
+ }
++
++// --- Writing: club wall-clock -> UTC ---------------------------------
++//
++// Everything above turns a stored instant into Abu Dhabi wall-clock for
++// display. Task 14's event form needs the mirror image (design-system.md §7,
++// "Writing"): the date and time a coach types ARE Abu Dhabi wall-clock, and
++// have to become the right UTC instant before they're written to starts_at.
++//
++// The naive `new Date(`${date}T${time}`)` resolves in the *browser's* zone,
++// so a coach entering 20:00 from London would store 19:00Z — a 23:00 Abu
++// Dhabi kick-off. Hardcoding '+04:00' would be correct today and would rot
++// silently if the UAE ever adopted DST, which is the same reason
++// CLUB_TIME_ZONE is an IANA identifier rather than an offset. So the offset
++// is *derived from the zone, at the instant in question*, via Intl — the
++// only abstraction that stays correct by definition.
++
++// Second-precision club-time field extractor. hourCycle h23 keeps midnight
++// as "00" rather than en-US's default "24", which Number() would read as
++// hour 24 and silently roll a midnight kick-off onto the wrong day.
++const CLUB_FIELDS_FORMAT = new Intl.DateTimeFormat('en-US', {
++  timeZone: CLUB_TIME_ZONE,
++  year: 'numeric',
++  month: '2-digit',
++  day: '2-digit',
++  hour: '2-digit',
++  minute: '2-digit',
++  second: '2-digit',
++  hourCycle: 'h23',
++})
++
++function clubFields(date) {
++  const parts = CLUB_FIELDS_FORMAT.formatToParts(date)
++  const value = (type) => Number(parts.find((part) => part.type === type).value)
++  return {
++    year: value('year'),
++    month: value('month'),
++    day: value('day'),
++    hour: value('hour'),
++    minute: value('minute'),
++    second: value('second'),
++  }
++}
++
++/**
++ * The club zone's UTC offset in milliseconds at a given instant. Positive
++ * east of Greenwich (+4h for Dubai today). Derived by asking Intl what the
++ * club's wall clock reads at that instant and subtracting the instant
++ * itself — so it follows whatever rules the zone has, DST or not.
++ */
++function clubOffsetMsAt(timestamp) {
++  const f = clubFields(new Date(timestamp))
++  const wallAsUtc = Date.UTC(f.year, f.month - 1, f.day, f.hour, f.minute, f.second)
++  // Drop sub-second precision on both sides: zone offsets are whole minutes,
++  // and formatToParts has no milliseconds to give back.
++  return wallAsUtc - Math.floor(timestamp / 1000) * 1000
++}
++
++const DATE_INPUT = /^(\d{4})-(\d{2})-(\d{2})$/
++const TIME_INPUT = /^(\d{2}):(\d{2})(?::\d{2})?$/
++
++/**
++ * Converts a form's `<input type="date">` value ("2026-07-30") and
++ * `<input type="time">` value ("20:00", or "20:00:00" in some browsers),
++ * both understood as **Abu Dhabi wall-clock**, into the UTC ISO string to
++ * write to events.starts_at. Returns null when either value is missing or
++ * isn't in the input element's own format — callers treat that as a
++ * validation failure rather than writing an Invalid Date.
++ */
++export function clubWallTimeToUtc(dateValue, timeValue) {
++  const dateMatch = DATE_INPUT.exec(String(dateValue ?? ''))
++  const timeMatch = TIME_INPUT.exec(String(timeValue ?? ''))
++  if (!dateMatch || !timeMatch) return null
++
++  const [, year, month, day] = dateMatch.map(Number)
++  const [, hour, minute] = timeMatch.map(Number)
++  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null
++
++  // Treat the typed wall-clock as if it were UTC, then subtract the club's
++  // offset to get the real instant. The offset has to be looked up *at that
++  // instant*, which is circular — so look it up at the first approximation
++  // and then again at the result. One refinement is enough for any real
++  // zone: the two only differ within an hour of a DST transition, and the
++  // second lookup lands on the correct side of it.
++  const wallAsUtc = Date.UTC(year, month - 1, day, hour, minute)
++  const firstPass = wallAsUtc - clubOffsetMsAt(wallAsUtc)
++  const timestamp = wallAsUtc - clubOffsetMsAt(firstPass)
++  return new Date(timestamp).toISOString()
++}
++
++/**
++ * The inverse: splits an instant into the `<input type="date">` /
++ * `<input type="time">` values an edit form prefills with, in club time.
++ * Time is 24-hour and zero-padded because that is the only value format a
++ * time input accepts. Returns empty strings for a missing or unparseable
++ * date, so the form renders blank fields rather than "Invalid Date".
++ */
++export function clubDateTimeInputs(date) {
++  if (!date || Number.isNaN(date.getTime())) return { date: '', time: '' }
++  const f = clubFields(date)
++  const pad = (n) => String(n).padStart(2, '0')
++  return {
++    date: `${f.year}-${pad(f.month)}-${pad(f.day)}`,
++    time: `${pad(f.hour)}:${pad(f.minute)}`,
++  }
++}
+diff --git a/src/screens/Dashboard.jsx b/src/screens/Dashboard.jsx
+index ced3cb5..fa2bbfc 100644
+--- a/src/screens/Dashboard.jsx
++++ b/src/screens/Dashboard.jsx
+@@ -1,18 +1,19 @@
+ import { useEffect, useMemo, useState } from 'react'
+ import { Link } from 'react-router-dom'
+ import Card from '../components/Card.jsx'
+ import Empty from '../components/Empty.jsx'
+ import FixtureRow from '../components/FixtureRow.jsx'
+ import ScopeNote from '../components/ScopeNote.jsx'
+ import Spinner from '../components/Spinner.jsx'
+ import EventDetail from './EventDetail.jsx'
++import EventForm from './EventForm.jsx'
+ import { listEvents, subscribeEvents } from '../data/events.js'
+ import { listPlayers } from '../data/players.js'
+ import { useMemberships } from '../lib/memberships.jsx'
+ import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+ import {
+   eventDate,
+   eventTitle,
+   formatLongDate,
+   formatTime,
+   hasResult,
+@@ -243,20 +244,24 @@ export default function Dashboard() {
+   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
+   const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
+ 
+   const [events, setEvents] = useState([])
+   const [players, setPlayers] = useState([])
+   const [loading, setLoading] = useState(true)
+   const [settled, setSettled] = useState(false)
+   const [error, setError] = useState(null)
+   const [reloadToken, setReloadToken] = useState(0)
+   const [selectedEventId, setSelectedEventId] = useState(null)
++  // null = closed; { event } = editing that event. The dashboard never opens
++  // the form for a NEW event (that lives on the Schedule screen), so there
++  // is no "adding" case here.
++  const [formState, setFormState] = useState(null)
+ 
+   // The countdown is recomputed on render, and re-rendered once a minute so
+   // that a phone left on this screen doesn't sit showing a stale "3 Min" for
+   // an hour. The timer itself is started further down, once we know whether
+   // there is a hero to tick for.
+   const [now, setNow] = useState(() => Date.now())
+ 
+   // Both reads go out together and land together: the stat tiles mix counts
+   // from each, so settling them independently would show a half-filled grid.
+   useEffect(() => {
+@@ -471,20 +476,44 @@ export default function Dashboard() {
+                 teamName={teamsById.get(lastResult.team_id)?.name}
+                 onSelect={setSelectedEventId}
+               />
+             ) : (
+               <Empty message="No results yet. Scores show here once someone adds them." />
+             )}
+           </Card>
+         </div>
+       </div>
+ 
+-      {selectedEvent && (
++      {/* The dashboard's fixture rows open the same detail sheet the
++          schedule does, so they get the same Edit/Delete footer and the same
++          form — otherwise a coach tapping a fixture here would be told the
++          event is read-only, which is untrue. Adding fixtures still lives on
++          the Schedule screen only (design-system.md §5.2); the quick-actions
++          card above stays as it is until Task 15's player form lands with
++          it. */}
++      {selectedEvent && !formState && (
+         <EventDetail
+           event={selectedEvent}
+           team={teamsById.get(selectedEvent.team_id)}
+           onClose={() => setSelectedEventId(null)}
++          canEdit={canEditTeam(memberships, selectedEvent.team_id)}
++          onEdit={(event) => setFormState({ event })}
++          onDeleted={() => {
++            setSelectedEventId(null)
++            setReloadToken((token) => token + 1)
++          }}
++        />
++      )}
++
++      {formState && (
++        <EventForm
++          event={formState.event}
++          onClose={() => {
++            setFormState(null)
++            setSelectedEventId(null)
++          }}
++          onSaved={() => setReloadToken((token) => token + 1)}
+         />
+       )}
+     </section>
+   )
+ }
+diff --git a/src/screens/EventDetail.jsx b/src/screens/EventDetail.jsx
+index 1c0f2af..c767c0e 100644
+--- a/src/screens/EventDetail.jsx
++++ b/src/screens/EventDetail.jsx
+@@ -1,35 +1,41 @@
+ import { useEffect, useRef, useState } from 'react'
+ import Sheet from '../components/Sheet.jsx'
+ import Chip from '../components/Chip.jsx'
++import ScopeNote from '../components/ScopeNote.jsx'
+ import Spinner from '../components/Spinner.jsx'
+ import { listAvailability, subscribeAvailability } from '../data/availability.js'
++import { deleteEvent } from '../data/events.js'
+ import {
+   eventDate,
+   eventTitle,
+   formatLongDate,
+   formatTime,
+   hasResult,
+   resultLabel,
+   resultOutcome,
+   resultScore,
+ } from '../lib/eventFormat.js'
+ 
+ // The event detail sheet (design-system.md §5.5): a branded hero, a set of
+ // key/value rows, and then either the score (for a fixture that has one) or
+ // a live availability summary (for one that doesn't). Mounted only while an
+ // event is selected — Schedule renders it conditionally — so there is no
+ // `open` prop to thread through and no hidden-but-present DOM.
+ //
+-// Edit/Delete actions are deliberately absent: Task 14 owns event writes.
+-// Adding a disabled or read-only affordance now would promise a control
+-// that doesn't exist yet.
++// Footer actions (design-system.md §5.5): Edit + Delete for a user who can
++// edit this event's squad, a read-only scope note for everyone else. Delete
++// is two-step — the confirm replaces the buttons in place rather than using
++// a native confirm(), which is unstyled, unannounced and untestable in the
++// browser check. `canEdit` is passed in rather than computed here: this
++// component stays presentational and the screen already holds memberships
++// (the same split ScopeNote uses).
+ 
+ const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
+ 
+ // design-system.md §5.5: whistle = match, shirt = training, trophy = social.
+ function WhistleIcon(props) {
+   return (
+     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+       <circle cx="9" cy="14" r="5" />
+       <path d="M14 12h7l-2-4h-9l1 2" />
+       <path d="M9 9V6" />
+@@ -162,21 +168,108 @@ function AvailabilitySummary({ eventId }) {
+           <span key={status} className="flex items-center gap-1.5 text-xs font-bold text-[#5c5854]">
+             <span className={['h-2 w-2 rounded-full', AVAILABILITY_TONES[status].dot].join(' ')} aria-hidden="true" />
+             {counts[status]} {AVAILABILITY_TONES[status].label}
+           </span>
+         ))}
+       </div>
+     </div>
+   )
+ }
+ 
+-export default function EventDetail({ event, team, onClose }) {
++const FOOTER_BUTTON =
++  'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
++
++function FooterActions({ event, canEdit, onEdit, onDeleted }) {
++  const [confirming, setConfirming] = useState(false)
++  const [deleting, setDeleting] = useState(false)
++  const [error, setError] = useState(null)
++
++  if (!canEdit) {
++    return (
++      <div className="mt-5">
++        <ScopeNote tone="parent">
++          <b>Read-only.</b> Only a coach or club admin can change this event.
++        </ScopeNote>
++      </div>
++    )
++  }
++
++  function handleDelete() {
++    setDeleting(true)
++    setError(null)
++    deleteEvent(event.id)
++      .then(() => onDeleted?.(event))
++      .catch((err) => {
++        setError(err)
++        setDeleting(false)
++        setConfirming(false)
++      })
++  }
++
++  return (
++    <div className="mt-5 border-t border-[#e6e3e1] pt-4">
++      {error && (
++        <p
++          role="alert"
++          className="mb-3 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
++        >
++          {error.message || "We couldn't delete that. Try again."}
++        </p>
++      )}
++
++      {confirming ? (
++        <div>
++          <p className="mb-3 text-sm font-semibold text-[#221f1d]">
++            Delete this event? This can&apos;t be undone.
++          </p>
++          <div className="flex gap-2.5">
++            <button
++              type="button"
++              onClick={() => setConfirming(false)}
++              disabled={deleting}
++              className={`${FOOTER_BUTTON} border-[1.5px] border-[#e6e3e1] bg-white text-[#221f1d] hover:bg-[#faf8fb]`}
++            >
++              Keep it
++            </button>
++            <button
++              type="button"
++              onClick={handleDelete}
++              disabled={deleting}
++              className={`${FOOTER_BUTTON} bg-quinsRedDark text-white hover:bg-quinsRed`}
++            >
++              {deleting ? 'Deleting…' : 'Yes, delete'}
++            </button>
++          </div>
++        </div>
++      ) : (
++        <div className="flex gap-2.5">
++          <button
++            type="button"
++            onClick={() => onEdit?.(event)}
++            className={`${FOOTER_BUTTON} bg-quinsRed text-white hover:bg-[#D62A3D]`}
++          >
++            Edit
++          </button>
++          <button
++            type="button"
++            onClick={() => setConfirming(true)}
++            className={`${FOOTER_BUTTON} border-[1.5px] border-[#e6e3e1] bg-white text-quinsRedDark hover:bg-[#fbeae8]`}
++          >
++            Delete
++          </button>
++        </div>
++      )}
++    </div>
++  )
++}
++
++export default function EventDetail({ event, team, onClose, canEdit = false, onEdit, onDeleted }) {
+   const date = eventDate(event)
+   const Icon = TYPE_ICONS[event.type] ?? WhistleIcon
+   const typeLabel = TYPE_LABELS[event.type] ?? 'Event'
+   const played = hasResult(event)
+ 
+   return (
+     <Sheet open onClose={onClose} title={typeLabel}>
+       {/* Negative margins bleed the hero to the sheet's edges, matching the
+           prototype's .detail-hero (design-system.md §4.21). */}
+       <div className="-mx-[18px] -mt-4 mb-4 bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] px-[18px] py-[22px] text-white">
+@@ -221,13 +314,15 @@ export default function EventDetail({ event, team, onClose }) {
+             <Chip type={resultOutcome(event)}>{resultLabel(event)}</Chip>
+             <span className="text-base font-extrabold text-[#221f1d]">{resultScore(event)}</span>
+           </div>
+         </div>
+       ) : (
+         <div>
+           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-[#77726e]">Availability</h4>
+           <AvailabilitySummary eventId={event.id} />
+         </div>
+       )}
++
++      <FooterActions event={event} canEdit={canEdit} onEdit={onEdit} onDeleted={onDeleted} />
+     </Sheet>
+   )
+ }
+diff --git a/src/screens/EventForm.jsx b/src/screens/EventForm.jsx
+new file mode 100644
+index 0000000..b504f02
+--- /dev/null
++++ b/src/screens/EventForm.jsx
+@@ -0,0 +1,455 @@
++import { useMemo, useRef, useState } from 'react'
++import Sheet from '../components/Sheet.jsx'
++import { upsertEvent } from '../data/events.js'
++import { useMemberships } from '../lib/memberships.jsx'
++import { canEditTeam, visibleTeams } from '../lib/scope.js'
++import { clubDateTimeInputs, clubToday, clubWallTimeToUtc, eventDate } from '../lib/eventFormat.js'
++
++// The event add/edit form (design-system.md §5.6), opened in the shared
++// Sheet from Schedule's "Add fixture" button and from EventDetail's "Edit".
++// Field order is the design system's: type → opponent/title → date+time →
++// age group → home/away → venue → competition → score → Save.
++//
++// Access control is NOT enforced here. The events table's "event edit" RLS
++// policy (ALL, USING and WITH CHECK `can_edit_team(team_id)`) is the real
++// boundary: admin of the team's club, or coach of that team. Everything this
++// screen does with canEditTeam only narrows what it offers, so a mistake
++// here can hide a squad the user may edit but can never let a write through
++// that the database would refuse. upsertEvent turns a refused write — which
++// PostgREST reports as a successful zero-row response, not an error — into a
++// thrown error, so a silently-dropped save surfaces as a message.
++
++// design-system.md §4.17. --muted is #77726e, which clears AA on white; the
++// darker #5c5854 is used here for the same reason Schedule/Roster use it —
++// these labels are the smallest text in the sheet (12.5px) and the extra
++// headroom costs nothing.
++const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-[#5c5854]'
++const FIELD = 'mb-3.5'
++const INPUT_BASE =
++  'w-full rounded-[11px] border-[1.5px] bg-white px-3 py-[11px] text-[16px] text-[#221f1d] outline-none transition placeholder:text-[#a29d99] focus:border-quinsRed'
++const FIELD_ROW = 'mb-3.5 grid grid-cols-2 gap-3'
++
++// design-system.md §4.18. The prototype toggles the checked look with the
++// CSS `:has()` relational selector; the port note says not to rely on that
++// silently, so the visual state is driven from React state instead and the
++// radio itself stays a real, focusable input (sr-only, not display:none, so
++// it keeps keyboard access and an accessible name).
++const SEG_OPTION_BASE =
++  'block cursor-pointer select-none rounded-[11px] border-[1.5px] px-2 py-2.5 text-center text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-quinsRed peer-focus-visible:ring-offset-2'
++const SEG_OPTION_ON = 'border-quinsRed bg-[#fbf3f6] font-bold text-quinsRedDark'
++const SEG_OPTION_OFF = 'border-[#e6e3e1] font-semibold text-[#221f1d]'
++
++const TYPES = [
++  { value: 'match', label: 'Match' },
++  { value: 'training', label: 'Training' },
++  { value: 'social', label: 'Social' },
++]
++
++const DEFAULT_VENUE = 'Zayed Sports City, Abu Dhabi'
++
++function inputClasses(invalid) {
++  return [INPUT_BASE, invalid ? 'border-quinsRedDark' : 'border-[#e6e3e1]'].join(' ')
++}
++
++function Segmented({ legend, name, options, value, onChange }) {
++  return (
++    <fieldset className={FIELD}>
++      <legend className={LABEL}>{legend}</legend>
++      {/* An explicit flex row of equal-width blocks. The options are
++          <label>/<span> pairs rather than <button>s on purpose — a button
++          used as a layout box inherits Chromium's UA content-centring,
++          which jsdom cannot see. */}
++      <div className="flex gap-2">
++        {options.map((option) => (
++          <label key={option.value} className="flex-1">
++            <input
++              type="radio"
++              name={name}
++              value={option.value}
++              checked={value === option.value}
++              onChange={() => onChange(option.value)}
++              className="peer sr-only"
++            />
++            <span
++              className={[
++                SEG_OPTION_BASE,
++                value === option.value ? SEG_OPTION_ON : SEG_OPTION_OFF,
++              ].join(' ')}
++            >
++              {option.label}
++            </span>
++          </label>
++        ))}
++      </div>
++    </fieldset>
++  )
++}
++
++// The form's initial state, derived once per mount. For a new event the date
++// defaults to the club's today (design-system.md §7: "not new Date()") and
++// the time is left blank — a kick-off time is something the coach must
++// actually choose, and a prefilled one would quietly become wrong.
++function initialValues(event, editableTeams) {
++  const teamIds = editableTeams.map((team) => team.id)
++  const fallbackTeamId = teamIds[0] ?? ''
++
++  if (!event) {
++    const today = clubToday()
++    const pad = (n) => String(n).padStart(2, '0')
++    return {
++      type: 'match',
++      title: '',
++      opponent: '',
++      date: `${today.year}-${pad(today.month + 1)}-${pad(today.day)}`,
++      time: '',
++      teamId: fallbackTeamId,
++      home: true,
++      venue: DEFAULT_VENUE,
++      competition: '',
++      resultUs: '',
++      resultThem: '',
++    }
++  }
++
++  const { date, time } = clubDateTimeInputs(eventDate(event))
++  return {
++    type: event.type ?? 'match',
++    title: event.title ?? '',
++    opponent: event.opponent ?? '',
++    date,
++    time,
++    teamId: teamIds.includes(event.team_id) ? event.team_id : fallbackTeamId,
++    home: event.home !== false,
++    venue: event.venue ?? '',
++    competition: event.competition ?? '',
++    resultUs: event.result_us == null ? '' : String(event.result_us),
++    resultThem: event.result_them == null ? '' : String(event.result_them),
++  }
++}
++
++// A score is only a score when BOTH halves are present — the same rule
++// hasResult() applies when reading (a half-entered score must not knock a
++// fixture out of Upcoming), applied here so a half-entered one is never
++// written in the first place.
++function parseScore(us, them) {
++  const a = us.trim()
++  const b = them.trim()
++  if (a === '' || b === '') return { result_us: null, result_them: null }
++  const nus = Number(a)
++  const nthem = Number(b)
++  if (!Number.isFinite(nus) || !Number.isFinite(nthem)) return { result_us: null, result_them: null }
++  return { result_us: nus, result_them: nthem }
++}
++
++export default function EventForm({ event = null, onClose, onSaved }) {
++  const { memberships, teams } = useMemberships()
++
++  // Teams this user may actually write to. For an admin that is every team;
++  // for a coach only the squads they coach. canEditTeam is asked per team
++  // rather than inferred from the role, so its deliberate null-team_id
++  // refusal applies here too — a team with no resolvable id never becomes a
++  // dropdown option.
++  const editableTeams = useMemo(
++    () => visibleTeams(memberships, teams).filter((team) => canEditTeam(memberships, team.id)),
++    [memberships, teams],
++  )
++
++  const [values, setValues] = useState(() => initialValues(event, editableTeams))
++  const [invalid, setInvalid] = useState({})
++  const [error, setError] = useState(null)
++  const [saving, setSaving] = useState(false)
++  // Guards against a double submit landing two inserts: `saving` state is
++  // async, this is not.
++  const inFlight = useRef(false)
++
++  const set = (key) => (nextValue) => setValues((current) => ({ ...current, [key]: nextValue }))
++  const setFromInput = (key) => (domEvent) => set(key)(domEvent.target.value)
++
++  const isMatch = values.type === 'match'
++  const editing = Boolean(event?.id)
++
++  // Reconcile the chosen squad against the live editable list on every
++  // render rather than trusting the stored value — the same thing Schedule
++  // and Roster do with their team filters. A stored id can outlive the scope
++  // that produced it (memberships reload and shrink), and on a first render
++  // where teams hadn't loaded yet the initial value is ''. Either way the
++  // select would show a squad it wasn't actually holding in state.
++  const teamId = editableTeams.some((team) => team.id === values.teamId)
++    ? values.teamId
++    : editableTeams[0]?.id ?? ''
++
++  // A user with nothing they can edit should not be shown a form whose Save
++  // button the database is guaranteed to refuse. This is defensive — every
++  // entry point already gates on the same check — so it explains rather than
++  // apologises.
++  if (editableTeams.length === 0) {
++    return (
++      <Sheet open onClose={onClose} title={editing ? 'Edit event' : 'Add event'}>
++        <p role="alert" className="rounded-[11px] bg-[#fbf1dd] px-4 py-3 text-sm text-[#221f1d]">
++          You don&apos;t have a squad you can add or change fixtures for. Ask a club admin if that
++          looks wrong.
++        </p>
++      </Sheet>
++    )
++  }
++
++  function handleSubmit(domEvent) {
++    domEvent.preventDefault()
++    if (inFlight.current) return
++
++    const starts_at = clubWallTimeToUtc(values.date, values.time)
++    const nextInvalid = {
++      date: !values.date,
++      time: !values.time || !starts_at,
++      teamId: !teamId,
++      opponent: isMatch && !values.opponent.trim(),
++      title: !isMatch && !values.title.trim(),
++    }
++    setInvalid(nextInvalid)
++
++    if (Object.values(nextInvalid).some(Boolean)) {
++      setError(new Error('Fill in the highlighted fields before saving.'))
++      return
++    }
++
++    const team = editableTeams.find((candidate) => candidate.id === teamId)
++    const payload = {
++      ...(editing ? { id: event.id } : null),
++      ...(team?.club_id ? { club_id: team.club_id } : null),
++      team_id: teamId,
++      type: values.type,
++      title: isMatch ? null : values.title.trim(),
++      opponent: isMatch ? values.opponent.trim() : null,
++      home: isMatch ? values.home : null,
++      venue: values.venue.trim() || null,
++      competition: isMatch ? values.competition.trim() || null : null,
++      starts_at,
++      ...(isMatch ? parseScore(values.resultUs, values.resultThem) : { result_us: null, result_them: null }),
++    }
++
++    inFlight.current = true
++    setSaving(true)
++    setError(null)
++
++    upsertEvent(payload)
++      .then((saved) => {
++        onSaved?.(saved)
++        onClose?.()
++      })
++      .catch((err) => {
++        setError(err)
++      })
++      .finally(() => {
++        inFlight.current = false
++        setSaving(false)
++      })
++  }
++
++  return (
++    <Sheet open onClose={onClose} title={editing ? 'Edit event' : 'Add event'}>
++      {/* noValidate: this form does its own validation and reports it in a
++          role="alert" region, which a screen reader announces — the native
++          bubble is neither announced reliably nor visible to the browser
++          check. */}
++      <form onSubmit={handleSubmit} noValidate>
++        <Segmented
++          legend="Type"
++          name="event-type"
++          options={TYPES}
++          value={values.type}
++          onChange={(next) => {
++            set('type')(next)
++            setInvalid({})
++          }}
++        />
++
++        {isMatch ? (
++          <div className={FIELD}>
++            <label className={LABEL} htmlFor="event-opponent">
++              Opponent
++            </label>
++            <input
++              id="event-opponent"
++              type="text"
++              value={values.opponent}
++              onChange={setFromInput('opponent')}
++              aria-invalid={invalid.opponent ? 'true' : undefined}
++              placeholder="e.g. Dubai Exiles"
++              className={inputClasses(invalid.opponent)}
++            />
++          </div>
++        ) : (
++          <div className={FIELD}>
++            <label className={LABEL} htmlFor="event-title">
++              Title
++            </label>
++            <input
++              id="event-title"
++              type="text"
++              value={values.title}
++              onChange={setFromInput('title')}
++              aria-invalid={invalid.title ? 'true' : undefined}
++              placeholder="e.g. U14 Contact &amp; Conditioning"
++              className={inputClasses(invalid.title)}
++            />
++          </div>
++        )}
++
++        <div className={FIELD_ROW}>
++          <div>
++            <label className={LABEL} htmlFor="event-date">
++              Date
++            </label>
++            <input
++              id="event-date"
++              type="date"
++              value={values.date}
++              onChange={setFromInput('date')}
++              aria-invalid={invalid.date ? 'true' : undefined}
++              className={inputClasses(invalid.date)}
++            />
++          </div>
++          <div>
++            <label className={LABEL} htmlFor="event-time">
++              Time
++            </label>
++            <input
++              id="event-time"
++              type="time"
++              value={values.time}
++              onChange={setFromInput('time')}
++              aria-invalid={invalid.time ? 'true' : undefined}
++              aria-describedby="event-time-note"
++              className={inputClasses(invalid.time)}
++            />
++          </div>
++        </div>
++        {/* The one place the form names the zone, mirroring the detail
++            sheet (§4.21). A coach entering fixtures from the UK over the
++            summer needs to know 20:00 means 20:00 at Zayed Sports City. */}
++        <p id="event-time-note" className="-mt-2 mb-3.5 text-[12.5px] text-[#5c5854]">
++          Times are Abu Dhabi time.
++        </p>
++
++        <div className={FIELD}>
++          <label className={LABEL} htmlFor="event-team">
++            Age group
++          </label>
++          <select
++            id="event-team"
++            value={teamId}
++            onChange={setFromInput('teamId')}
++            aria-invalid={invalid.teamId ? 'true' : undefined}
++            className={inputClasses(invalid.teamId)}
++          >
++            {editableTeams.map((team) => (
++              <option key={team.id} value={team.id}>
++                {team.name}
++              </option>
++            ))}
++          </select>
++        </div>
++
++        {isMatch && (
++          <Segmented
++            legend="Home or away"
++            name="event-home"
++            options={[
++              { value: 'home', label: 'Home' },
++              { value: 'away', label: 'Away' },
++            ]}
++            value={values.home ? 'home' : 'away'}
++            onChange={(next) => set('home')(next === 'home')}
++          />
++        )}
++
++        <div className={FIELD}>
++          <label className={LABEL} htmlFor="event-venue">
++            Venue
++          </label>
++          <input
++            id="event-venue"
++            type="text"
++            value={values.venue}
++            onChange={setFromInput('venue')}
++            placeholder={DEFAULT_VENUE}
++            className={inputClasses(false)}
++          />
++        </div>
++
++        {isMatch && (
++          <>
++            <div className={FIELD}>
++              <label className={LABEL} htmlFor="event-competition">
++                Competition
++              </label>
++              <input
++                id="event-competition"
++                type="text"
++                value={values.competition}
++                onChange={setFromInput('competition')}
++                placeholder="e.g. UAE Youth League"
++                className={inputClasses(false)}
++              />
++            </div>
++
++            <div className={FIELD_ROW}>
++              <div>
++                <label className={LABEL} htmlFor="event-result-us">
++                  Quins score
++                </label>
++                <input
++                  id="event-result-us"
++                  type="number"
++                  inputMode="numeric"
++                  min="0"
++                  value={values.resultUs}
++                  onChange={setFromInput('resultUs')}
++                  aria-describedby="event-score-note"
++                  className={inputClasses(false)}
++                />
++              </div>
++              <div>
++                <label className={LABEL} htmlFor="event-result-them">
++                  Opposition score
++                </label>
++                <input
++                  id="event-result-them"
++                  type="number"
++                  inputMode="numeric"
++                  min="0"
++                  value={values.resultThem}
++                  onChange={setFromInput('resultThem')}
++                  aria-describedby="event-score-note"
++                  className={inputClasses(false)}
++                />
++              </div>
++            </div>
++            {/* A fixture becomes a result when it has a score, not when its
++                date passes — so leaving these blank is the normal case. */}
++            <p id="event-score-note" className="-mt-2 mb-3.5 text-[12.5px] text-[#5c5854]">
++              Leave the scores blank until the match has been played.
++            </p>
++          </>
++        )}
++
++        {error && (
++          <p
++            role="alert"
++            className="mb-3.5 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
++          >
++            {error.message || "We couldn't save that. Try again."}
++          </p>
++        )}
++
++        <button
++          type="submit"
++          disabled={saving}
++          className="w-full rounded-[11px] bg-quinsRed px-4 py-3 text-[15px] font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
++        >
++          {saving ? 'Saving…' : editing ? 'Save changes' : 'Add event'}
++        </button>
++      </form>
++    </Sheet>
++  )
++}
+diff --git a/src/screens/Schedule.jsx b/src/screens/Schedule.jsx
+index 490f7b1..b538785 100644
+--- a/src/screens/Schedule.jsx
++++ b/src/screens/Schedule.jsx
+@@ -1,21 +1,22 @@
+ import { useEffect, useMemo, useState } from 'react'
+ import Card from '../components/Card.jsx'
+ import Empty from '../components/Empty.jsx'
+ import FixtureRow from '../components/FixtureRow.jsx'
+ import ScopeNote from '../components/ScopeNote.jsx'
+ import Spinner from '../components/Spinner.jsx'
+ import TeamPills, { ALL_TEAMS_ID, PillButton } from '../components/TeamPills.jsx'
+ import EventDetail from './EventDetail.jsx'
++import EventForm from './EventForm.jsx'
+ import { listEvents, subscribeEvents } from '../data/events.js'
+ import { useMemberships } from '../lib/memberships.jsx'
+-import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
++import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+ import { clubDayParts, clubToday, eventDate, hasResult, sortByStart } from '../lib/eventFormat.js'
+ 
+ // Schedule & fixtures (design-system.md §5.2): scope note, section head,
+ // Upcoming/Results/Calendar sub-tabs, a team filter, then the list or the
+ // month grid. Reads events once for the whole visible scope and filters in
+ // memory — the scope is at most 15 teams' worth of fixtures, so refetching
+ // on every pill tap would add latency and flicker for nothing.
+ //
+ // Access control is not enforced here. RLS decides which rows come back;
+ // visibleTeams() only tells the UI which pills to draw and which team ids
+@@ -259,20 +260,24 @@ export default function Schedule() {
+   const { memberships, teams } = useMemberships()
+ 
+   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
+   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
+   const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
+ 
+   const [tab, setTab] = useState('upcoming')
+   const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
+   const [selectedEventId, setSelectedEventId] = useState(null)
+   const [month, setMonth] = useState(currentClubMonth)
++  // null = the form is closed. { event: null } = adding; { event } = editing.
++  // A wrapper object rather than the event itself, so "add" is distinguishable
++  // from "closed" without a second boolean that could drift out of sync.
++  const [formState, setFormState] = useState(null)
+ 
+   const [events, setEvents] = useState([])
+   const [loading, setLoading] = useState(true)
+   const [error, setError] = useState(null)
+   const [reloadToken, setReloadToken] = useState(0)
+ 
+   // `loading` means "a fetch is in flight", which is true of a background
+   // realtime refresh as much as of the first load. What must NOT be true of
+   // a refresh is blanking the screen — see isFirstLoad below.
+   useEffect(() => {
+@@ -329,34 +334,56 @@ export default function Schedule() {
+   const visible =
+     activeFilter === ALL_TEAMS_ID ? events : events.filter((event) => event.team_id === activeFilter)
+   const upcoming = sortByStart(visible.filter((event) => !hasResult(event)), 'asc')
+   const results = sortByStart(visible.filter(hasResult), 'desc')
+ 
+   // Derive the open event from the live list rather than storing the row
+   // itself, so a realtime update keeps the sheet's contents fresh and a
+   // deleted fixture closes it instead of stranding a stale copy on screen.
+   const selectedEvent = events.find((event) => event.id === selectedEventId) ?? null
+ 
++  // Whether the signed-in user may write to the OPEN event's squad. Asked per
++  // team through canEditTeam rather than inferred from the role, so its
++  // deliberate refusal of a null/unresolvable team_id applies here too. RLS
++  // is what actually enforces this; getting it wrong here can only hide a
++  // control, never authorise a write.
++  const canEditSelected = selectedEvent ? canEditTeam(memberships, selectedEvent.team_id) : false
++  const refresh = () => setReloadToken((token) => token + 1)
++
+   return (
+     <section>
+       {!admin && (
+         <ScopeNote tone={canEditAnything ? 'coach' : 'parent'}>
+           <b>
+             {roleLabel(memberships)} view{canEditAnything ? '' : ' · read-only'}.
+           </b>{' '}
+           You&apos;re seeing {teamNames || 'no squads'} — every other age group is hidden.
+         </ScopeNote>
+       )}
+ 
+-      <div className="mb-3.5 mt-1">
+-        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Schedule &amp; fixtures</h2>
+-        <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
++      {/* design-system.md §5.2: the section head carries an "Add" button on
++          the right for admin/coach. It is absent, not disabled, for everyone
++          else — and it only exists at all now that Task 14's form does. */}
++      <div className="mb-3.5 mt-1 flex items-start justify-between gap-3">
++        <div>
++          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Schedule &amp; fixtures</h2>
++          <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
++        </div>
++        {canEditAnything && (
++          <button
++            type="button"
++            onClick={() => setFormState({ event: null })}
++            className="shrink-0 rounded-[11px] bg-quinsRed px-3.5 py-2 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
++          >
++            Add fixture
++          </button>
++        )}
+       </div>
+ 
+       <div className="mb-3 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+         {TABS.map(({ id, label }) => (
+           <PillButton key={id} active={tab === id} onClick={() => setTab(id)}>
+             {label}
+           </PillButton>
+         ))}
+       </div>
+ 
+@@ -413,20 +440,41 @@ export default function Schedule() {
+       {!isFirstLoad && !error && tab === 'calendar' && (
+         <CalendarMonth
+           month={month}
+           onMonthChange={setMonth}
+           events={events}
+           teamsById={teamsById}
+           onSelect={setSelectedEventId}
+         />
+       )}
+ 
+-      {selectedEvent && (
++      {selectedEvent && !formState && (
+         <EventDetail
+           event={selectedEvent}
+           team={teamsById.get(selectedEvent.team_id)}
+           onClose={() => setSelectedEventId(null)}
++          canEdit={canEditSelected}
++          onEdit={(event) => setFormState({ event })}
++          onDeleted={() => {
++            setSelectedEventId(null)
++            refresh()
++          }}
++        />
++      )}
++
++      {/* One sheet at a time: opening the form closes the detail sheet
++          above rather than stacking two dialogs. Closing the form drops
++          back to the schedule, not to the detail sheet, which is where a
++          coach who just saved wants to be. */}
++      {formState && (
++        <EventForm
++          event={formState.event}
++          onClose={() => {
++            setFormState(null)
++            setSelectedEventId(null)
++          }}
++          onSaved={refresh}
+         />
+       )}
+     </section>
+   )
+ }
+diff --git a/tests/dashboard.test.jsx b/tests/dashboard.test.jsx
+index 001072d..a7c0c19 100644
+--- a/tests/dashboard.test.jsx
++++ b/tests/dashboard.test.jsx
+@@ -13,29 +13,36 @@ import { MemoryRouter } from 'react-router-dom'
+ // The clock is pinned by spying on Date.now rather than with
+ // vi.useFakeTimers(): RTL's waitFor does not detect Vitest's fake timers (its
+ // jestFakeTimersAreEnabled() check looks for a global `jest`), so fake timers
+ // make every findBy*/waitFor hang. Date.now is the only clock the Dashboard
+ // reads, and pinning it is what makes the countdown assertions exact instead
+ // of racing the real second hand.
+ 
+ const useMembershipsMock = vi.fn()
+ const listEventsMock = vi.fn()
+ const subscribeEventsMock = vi.fn()
++const upsertEventMock = vi.fn()
++const deleteEventMock = vi.fn()
+ const listPlayersMock = vi.fn()
+ 
+ vi.mock('../src/lib/memberships.jsx', () => ({
+   useMemberships: () => useMembershipsMock(),
+ }))
+ 
+ vi.mock('../src/data/events.js', () => ({
+   listEvents: (...args) => listEventsMock(...args),
+   subscribeEvents: (...args) => subscribeEventsMock(...args),
++  // Task 14 wired the detail sheet's Edit/Delete footer and the event form
++  // into this screen too. Stubbed so a mis-wiring would fail loudly here
++  // rather than reaching an undefined import at call time.
++  upsertEvent: (...args) => upsertEventMock(...args),
++  deleteEvent: (...args) => deleteEventMock(...args),
+ }))
+ 
+ vi.mock('../src/data/players.js', () => ({
+   listPlayers: (...args) => listPlayersMock(...args),
+ }))
+ 
+ // Only reached when a fixture row opens EventDetail; mocked so this file
+ // stays network-free either way. EventDetail's own behaviour is covered by
+ // tests/schedule.test.jsx.
+ vi.mock('../src/data/availability.js', () => ({
+@@ -413,20 +420,56 @@ describe('Dashboard — upcoming list and last result', () => {
+ 
+     renderDashboard()
+ 
+     const list = await screen.findByTestId('upcoming-list')
+     const titles = within(list)
+       .getAllByTestId('fixture-title')
+       .map((node) => node.textContent)
+     expect(titles).toEqual(['Session 0', 'Session 1', 'Session 2', 'Session 3', 'Session 4'])
+   })
+ 
++  // Task 14. The dashboard opens the same EventDetail as the schedule, so it
++  // has to pass the same canEdit/onEdit wiring — without it a coach tapping a
++  // fixture here is told, untruthfully, that the event is read-only.
++  it('gives a coach the Edit and Delete actions in the detail sheet', async () => {
++    renderDashboard()
++
++    const list = await screen.findByTestId('upcoming-list')
++    await userEvent.click(within(list).getByText('U10 skills session').closest('[data-testid="fixture-row"]'))
++
++    const dialog = await screen.findByRole('dialog')
++    expect(within(dialog).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
++    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
++  })
++
++  it('tells a parent the detail sheet is read-only instead', async () => {
++    useMembershipsMock.mockReturnValue(membershipValue(PARENT))
++    renderDashboard()
++
++    const list = await screen.findByTestId('upcoming-list')
++    await userEvent.click(within(list).getByText('U10 skills session').closest('[data-testid="fixture-row"]'))
++
++    const dialog = await screen.findByRole('dialog')
++    expect(within(dialog).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
++    expect(within(dialog).getByText(/read-only/i)).toBeInTheDocument()
++  })
++
++  it('opens the edit form from the detail sheet', async () => {
++    renderDashboard()
++
++    const list = await screen.findByTestId('upcoming-list')
++    await userEvent.click(within(list).getByText('U10 skills session').closest('[data-testid="fixture-row"]'))
++    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Edit' }))
++
++    expect(await screen.findByRole('heading', { name: 'Edit event' })).toBeInTheDocument()
++  })
++
+   it('opens the event detail sheet when a fixture row is tapped', async () => {
+     renderDashboard()
+ 
+     const list = await screen.findByTestId('upcoming-list')
+     const row = within(list).getByText('U10 skills session').closest('[data-testid="fixture-row"]')
+     await userEvent.click(row)
+ 
+     const dialog = await screen.findByRole('dialog')
+     expect(within(dialog).getByText(/U10 skills session/)).toBeInTheDocument()
+   })
+diff --git a/tests/data.test.js b/tests/data.test.js
+index 8735b13..2c4eea6 100644
+--- a/tests/data.test.js
++++ b/tests/data.test.js
+@@ -21,38 +21,45 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
+ 
+ vi.mock('../src/lib/supabase.js', () => ({
+   supabase: {
+     from: vi.fn(),
+     channel: vi.fn(),
+     removeChannel: vi.fn(),
+   },
+ }))
+ 
+ import { supabase } from '../src/lib/supabase.js'
+-import { listEvents, subscribeEvents } from '../src/data/events.js'
++import { listEvents, subscribeEvents, upsertEvent, deleteEvent } from '../src/data/events.js'
+ import { listPlayers, getPlayerContact } from '../src/data/players.js'
+ import { listAvailability, subscribeAvailability } from '../src/data/availability.js'
+ 
+ function createQueryBuilder({ data = null, error = null } = {}) {
+-  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [] }
++  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [] }
+   const builder = {}
+   const chain = (name) =>
+     vi.fn((...args) => {
+       calls[name].push(args)
+       return builder
+     })
+   builder.select = chain('select')
+   builder.in = chain('in')
+   builder.gte = chain('gte')
+   builder.lte = chain('lte')
+   builder.eq = chain('eq')
+   builder.order = chain('order')
++  // Write-side chain methods (Task 14). Like the read ones, each records its
++  // args and returns the same thenable builder, mirroring the real
++  // PostgrestQueryBuilder where .insert()/.update()/.delete() are chainable
++  // with .eq()/.select() and awaited directly.
++  builder.insert = chain('insert')
++  builder.update = chain('update')
++  builder.delete = chain('delete')
+   builder.maybeSingle = vi.fn(() => Promise.resolve({ data, error }))
+   // Real PostgrestFilterBuilder instances are thenable so `await query`
+   // resolves without an explicit terminal method — mirror that here.
+   builder.then = (resolve, reject) => Promise.resolve({ data, error }).then(resolve, reject)
+   return { builder, calls }
+ }
+ 
+ function createChannel() {
+   return {
+     on: vi.fn().mockReturnThis(),
+@@ -177,20 +184,138 @@ describe('subscribeEvents', () => {
+ 
+     subscribeEvents(vi.fn())
+     subscribeEvents(vi.fn())
+ 
+     const [nameA] = supabase.channel.mock.calls[0]
+     const [nameB] = supabase.channel.mock.calls[1]
+     expect(nameA).not.toEqual(nameB)
+   })
+ })
+ 
++// --- upsertEvent ----------------------------------------------------------
++
++// Task 14. A single function that inserts when the row has no id and updates
++// when it has one — the two branches are the reason it exists, so both are
++// asserted on the recorded query, not just on the return value.
++describe('upsertEvent', () => {
++  it('inserts when there is no id, and does not send an id column', async () => {
++    const saved = { id: 'e-new', type: 'match' }
++    const { builder, calls } = createQueryBuilder({ data: saved })
++    supabase.from.mockReturnValue(builder)
++
++    const result = await upsertEvent({ type: 'match', team_id: 't1', starts_at: '2026-07-30T16:00:00.000Z' })
++
++    expect(supabase.from).toHaveBeenCalledWith('events')
++    expect(builder.insert).toHaveBeenCalledTimes(1)
++    expect(builder.update).not.toHaveBeenCalled()
++    expect(calls.insert[0][0]).toEqual({
++      type: 'match',
++      team_id: 't1',
++      starts_at: '2026-07-30T16:00:00.000Z',
++    })
++    expect(calls.insert[0][0]).not.toHaveProperty('id')
++    // No .eq() filter on an insert — an insert has no row to match.
++    expect(builder.eq).not.toHaveBeenCalled()
++    expect(result).toEqual(saved)
++  })
++
++  it('inserts when the id is explicitly null or an empty string', async () => {
++    // A "new event" form field can legitimately carry id: null rather than
++    // omitting the key. A truthiness test is what makes both behave the same.
++    for (const id of [null, undefined, '']) {
++      const { builder } = createQueryBuilder({ data: { id: 'e-new' } })
++      supabase.from.mockReturnValue(builder)
++      await upsertEvent({ id, type: 'training', team_id: 't1' })
++      expect(builder.insert).toHaveBeenCalledTimes(1)
++      expect(builder.update).not.toHaveBeenCalled()
++    }
++  })
++
++  it('updates the matching row when there is an id, and does not send the id as a column', async () => {
++    const saved = { id: 'e-1', type: 'training' }
++    const { builder, calls } = createQueryBuilder({ data: saved })
++    supabase.from.mockReturnValue(builder)
++
++    const result = await upsertEvent({ id: 'e-1', type: 'training', team_id: 't2' })
++
++    expect(supabase.from).toHaveBeenCalledWith('events')
++    expect(builder.update).toHaveBeenCalledTimes(1)
++    expect(builder.insert).not.toHaveBeenCalled()
++    expect(calls.update[0][0]).toEqual({ type: 'training', team_id: 't2' })
++    // Sending the primary key back as a column is at best a no-op write and
++    // at worst an attempt to repoint a foreign-keyed row.
++    expect(calls.update[0][0]).not.toHaveProperty('id')
++    expect(calls.eq[0]).toEqual(['id', 'e-1'])
++    expect(result).toEqual(saved)
++  })
++
++  it('asks for the saved row back so the caller can refresh from it', async () => {
++    const { builder } = createQueryBuilder({ data: { id: 'e-1' } })
++    supabase.from.mockReturnValue(builder)
++
++    await upsertEvent({ id: 'e-1', type: 'social' })
++
++    expect(builder.select).toHaveBeenCalled()
++  })
++
++  it('throws the Supabase error rather than returning a tuple', async () => {
++    const { builder } = createQueryBuilder({ error: new Error('duplicate key value') })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(upsertEvent({ type: 'match', team_id: 't1' })).rejects.toThrow('duplicate key value')
++  })
++
++  it('throws when the write succeeds but comes back with no row (an RLS refusal)', async () => {
++    // The security case. An update or insert a coach is not allowed to make
++    // is not an *error* from PostgREST — RLS simply matches zero rows and
++    // returns nothing. Without this the form would show "Saved" for a write
++    // the database silently threw away.
++    const { builder } = createQueryBuilder({ data: null })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(upsertEvent({ id: 'e-1', type: 'match', team_id: 'not-mine' })).rejects.toThrow(
++      /permission|not allowed|couldn.t save/i,
++    )
++  })
++})
++
++// --- deleteEvent ----------------------------------------------------------
++
++describe('deleteEvent', () => {
++  it('deletes the row with the given id', async () => {
++    const { builder, calls } = createQueryBuilder({ data: [{ id: 'e-1' }] })
++    supabase.from.mockReturnValue(builder)
++
++    await deleteEvent('e-1')
++
++    expect(supabase.from).toHaveBeenCalledWith('events')
++    expect(builder.delete).toHaveBeenCalledTimes(1)
++    expect(calls.eq[0]).toEqual(['id', 'e-1'])
++  })
++
++  it('throws the Supabase error rather than returning a tuple', async () => {
++    const { builder } = createQueryBuilder({ error: new Error('network down') })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(deleteEvent('e-1')).rejects.toThrow('network down')
++  })
++
++  it('throws when nothing was deleted (an RLS refusal)', async () => {
++    // Same silent-refusal shape as upsertEvent: a delete a coach may not
++    // make removes zero rows and reports no error.
++    const { builder } = createQueryBuilder({ data: [] })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(deleteEvent('e-1')).rejects.toThrow(/permission|not allowed|couldn.t delete/i)
++  })
++})
++
+ // --- listPlayers ----------------------------------------------------------
+ 
+ describe('listPlayers', () => {
+   it('queries players, orders by full_name ascending, with no filter when called with no args', async () => {
+     const rows = [{ id: 'p-1', full_name: 'Ana' }]
+     const { builder, calls } = createQueryBuilder({ data: rows })
+     supabase.from.mockReturnValue(builder)
+ 
+     const result = await listPlayers()
+ 
+diff --git a/tests/event-form.test.jsx b/tests/event-form.test.jsx
+new file mode 100644
+index 0000000..1360303
+--- /dev/null
++++ b/tests/event-form.test.jsx
+@@ -0,0 +1,562 @@
++import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
++import { render, screen, within, waitFor } from '@testing-library/react'
++import userEvent from '@testing-library/user-event'
++
++// Unit tests for src/screens/EventForm.jsx (Task 14) plus the wiring that
++// opens it — Schedule's "Add" button and EventDetail's Edit/Delete footer.
++// useMemberships and every data module are mocked, so no network is
++// reachable from this file.
++//
++// PROCESS ZONE. This whole file runs under America/New_York, deliberately.
++// The single most-regressed thing in this codebase is Abu Dhabi time, and
++// the form's job on submit is to read the typed date/time as Abu Dhabi
++// wall-clock and write the matching UTC instant. Under a UTC runner a naive
++// `new Date(`${date}T${time}`)` produces the right answer by accident and
++// the assertion proves nothing; under New York it is four (or five) hours
++// wrong. Set before any module is imported so the runtime picks it up.
++const ORIGINAL_TZ = process.env.TZ
++process.env.TZ = 'America/New_York'
++afterAll(() => {
++  if (ORIGINAL_TZ === undefined) delete process.env.TZ
++  else process.env.TZ = ORIGINAL_TZ
++})
++
++const useMembershipsMock = vi.fn()
++const upsertEventMock = vi.fn()
++const deleteEventMock = vi.fn()
++const listEventsMock = vi.fn()
++const subscribeEventsMock = vi.fn()
++
++vi.mock('../src/lib/memberships.jsx', () => ({
++  useMemberships: () => useMembershipsMock(),
++}))
++
++vi.mock('../src/data/events.js', () => ({
++  listEvents: (...args) => listEventsMock(...args),
++  subscribeEvents: (...args) => subscribeEventsMock(...args),
++  upsertEvent: (...args) => upsertEventMock(...args),
++  deleteEvent: (...args) => deleteEventMock(...args),
++}))
++
++// Only reached when a fixture row opens EventDetail; mocked so this file
++// stays network-free either way.
++vi.mock('../src/data/availability.js', () => ({
++  listAvailability: async () => [],
++  subscribeAvailability: () => () => {},
++}))
++
++// Imported after vi.mock so these bind to the mocked modules.
++import EventForm from '../src/screens/EventForm.jsx'
++import Schedule from '../src/screens/Schedule.jsx'
++
++const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
++
++const TEAM_U12 = { id: 't-u12', club_id: CLUB_ID, name: 'U12', sort_order: 7 }
++const TEAM_U14 = { id: 't-u14', club_id: CLUB_ID, name: 'U14', sort_order: 9 }
++const TEAM_1XV = { id: 't-1xv', club_id: CLUB_ID, name: 'Senior Men 1st XV', sort_order: 13 }
++const TEAMS = [TEAM_1XV, TEAM_U12, TEAM_U14] // deliberately unsorted
++
++const ADMIN = [{ id: 'm-a', role: 'admin', team_id: null }]
++const COACH_U12 = [{ id: 'm-c', role: 'coach', team_id: 't-u12' }]
++const COACH_TWO = [
++  { id: 'm-c1', role: 'coach', team_id: 't-u12' },
++  { id: 'm-c2', role: 'coach', team_id: 't-u14' },
++]
++const PARENT = [{ id: 'm-p', role: 'parent', team_id: 't-u12', player_id: 'p1' }]
++
++// 16:00Z on 30 Jul 2026 is 20:00 in Abu Dhabi — and 12:00 in New York, the
++// zone this file runs under.
++const EXISTING_MATCH = {
++  id: 'e-1',
++  club_id: CLUB_ID,
++  team_id: 't-u12',
++  type: 'match',
++  title: null,
++  opponent: 'Dubai Exiles',
++  home: true,
++  venue: 'Zayed Sports City, Abu Dhabi',
++  competition: 'UAE Youth League',
++  starts_at: '2026-07-30T16:00:00.000Z',
++  result_us: null,
++  result_them: null,
++}
++
++function membershipValue(memberships, teams = TEAMS) {
++  return { memberships, teams, loading: false, error: null, reload: vi.fn() }
++}
++
++function renderForm({ memberships = COACH_U12, teams = TEAMS, event = null, ...rest } = {}) {
++  useMembershipsMock.mockReturnValue(membershipValue(memberships, teams))
++  const onClose = vi.fn()
++  const onSaved = vi.fn()
++  const utils = render(<EventForm event={event} onClose={onClose} onSaved={onSaved} {...rest} />)
++  return { ...utils, onClose, onSaved }
++}
++
++beforeEach(() => {
++  useMembershipsMock.mockReset()
++  upsertEventMock.mockReset()
++  deleteEventMock.mockReset()
++  listEventsMock.mockReset()
++  subscribeEventsMock.mockReset()
++  upsertEventMock.mockResolvedValue({ id: 'e-saved' })
++  deleteEventMock.mockResolvedValue(undefined)
++  listEventsMock.mockResolvedValue([])
++  subscribeEventsMock.mockReturnValue(() => {})
++})
++
++// Guard the guard: if Node ever stopped honouring a runtime TZ change, the
++// timezone assertions below would pass vacuously against the exact bug they
++// exist to catch.
++describe('the test process zone really is hostile', () => {
++  it('is not UTC', () => {
++    expect(new Date('2026-07-30T16:00:00Z').getHours()).toBe(12)
++  })
++})
++
++describe('EventForm — shape and scoping', () => {
++  it('opens as a sheet titled for adding when there is no event', () => {
++    renderForm()
++    expect(screen.getByRole('dialog')).toBeInTheDocument()
++    expect(screen.getByRole('heading', { name: 'Add event' })).toBeInTheDocument()
++  })
++
++  it('opens as a sheet titled for editing when there is an event', () => {
++    renderForm({ event: EXISTING_MATCH })
++    expect(screen.getByRole('heading', { name: 'Edit event' })).toBeInTheDocument()
++  })
++
++  it('limits the age-group options to the teams the coach can edit', () => {
++    renderForm({ memberships: COACH_TWO })
++    const select = screen.getByLabelText('Age group')
++    const options = within(select).getAllByRole('option').map((o) => o.textContent)
++    expect(options).toEqual(['U12', 'U14'])
++    expect(options).not.toContain('Senior Men 1st XV')
++  })
++
++  it('gives an admin every team, in the club sort order', () => {
++    renderForm({ memberships: ADMIN })
++    const select = screen.getByLabelText('Age group')
++    const options = within(select).getAllByRole('option').map((o) => o.textContent)
++    expect(options).toEqual(['U12', 'U14', 'Senior Men 1st XV'])
++  })
++
++  it('refuses to render a form at all when there is no team the user can edit', () => {
++    // A parent has no editable team, and canEditTeam(memberships, null) is
++    // false by design even for an admin with an unresolvable team. Rendering
++    // an empty dropdown over a live Save button would offer a write that RLS
++    // will always refuse.
++    renderForm({ memberships: PARENT })
++    expect(screen.getByRole('alert')).toHaveTextContent(/squad you can add or change/i)
++    expect(screen.queryByRole('button', { name: /save|add event/i })).not.toBeInTheDocument()
++    expect(screen.queryByLabelText('Age group')).not.toBeInTheDocument()
++  })
++})
++
++describe('EventForm — conditional fields', () => {
++  it('shows the match-only fields for a match and no title field', () => {
++    renderForm()
++    expect(screen.getByLabelText('Opponent')).toBeInTheDocument()
++    expect(screen.getByRole('radio', { name: 'Home' })).toBeInTheDocument()
++    expect(screen.getByRole('radio', { name: 'Away' })).toBeInTheDocument()
++    expect(screen.getByLabelText('Competition')).toBeInTheDocument()
++    expect(screen.getByLabelText('Quins score')).toBeInTheDocument()
++    expect(screen.getByLabelText('Opposition score')).toBeInTheDocument()
++    expect(screen.queryByLabelText('Title')).not.toBeInTheDocument()
++  })
++
++  it('swaps to a title field and hides every match-only field for training', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.click(screen.getByRole('radio', { name: 'Training' }))
++
++    expect(screen.getByLabelText('Title')).toBeInTheDocument()
++    expect(screen.queryByLabelText('Opponent')).not.toBeInTheDocument()
++    expect(screen.queryByRole('radio', { name: 'Home' })).not.toBeInTheDocument()
++    expect(screen.queryByLabelText('Competition')).not.toBeInTheDocument()
++    expect(screen.queryByLabelText('Quins score')).not.toBeInTheDocument()
++  })
++
++  it('does the same for social', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.click(screen.getByRole('radio', { name: 'Social' }))
++
++    expect(screen.getByLabelText('Title')).toBeInTheDocument()
++    expect(screen.queryByLabelText('Opponent')).not.toBeInTheDocument()
++  })
++
++  it('keeps the date, time, age group and venue fields for every type', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    for (const type of ['Training', 'Social', 'Match']) {
++      await user.click(screen.getByRole('radio', { name: type }))
++      expect(screen.getByLabelText('Date')).toBeInTheDocument()
++      expect(screen.getByLabelText('Time')).toBeInTheDocument()
++      expect(screen.getByLabelText('Age group')).toBeInTheDocument()
++      expect(screen.getByLabelText('Venue')).toBeInTheDocument()
++    }
++  })
++})
++
++describe('EventForm — validation', () => {
++  it('blocks submit and explains why when required fields are empty', async () => {
++    const user = userEvent.setup()
++    const { onSaved } = renderForm()
++
++    // A brand-new match form has no opponent and no time.
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    expect(upsertEventMock).not.toHaveBeenCalled()
++    expect(onSaved).not.toHaveBeenCalled()
++    expect(screen.getByRole('alert')).toHaveTextContent(/fill in|before saving/i)
++  })
++
++  it('marks the offending fields invalid rather than only shouting at the top', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    expect(screen.getByLabelText('Opponent')).toHaveAttribute('aria-invalid', 'true')
++    expect(screen.getByLabelText('Time')).toHaveAttribute('aria-invalid', 'true')
++    // Venue is prefilled and optional — it must not be flagged.
++    expect(screen.getByLabelText('Venue')).not.toHaveAttribute('aria-invalid', 'true')
++  })
++
++  it('requires a title instead of an opponent for training', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.click(screen.getByRole('radio', { name: 'Training' }))
++    await user.type(screen.getByLabelText('Time'), '17:30')
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    expect(upsertEventMock).not.toHaveBeenCalled()
++    expect(screen.getByLabelText('Title')).toHaveAttribute('aria-invalid', 'true')
++  })
++})
++
++describe('EventForm — saving', () => {
++  it('writes the typed date and time as ABU DHABI wall-clock, not the browser zone', async () => {
++    const user = userEvent.setup()
++    const { onSaved, onClose } = renderForm()
++
++    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
++    await user.clear(screen.getByLabelText('Date'))
++    await user.type(screen.getByLabelText('Date'), '2026-07-30')
++    await user.type(screen.getByLabelText('Time'), '20:00')
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
++    const written = upsertEventMock.mock.calls[0][0]
++    // 20:00 in Abu Dhabi. The browser here is in New York, where the naive
++    // construction would give 2026-07-31T00:00:00.000Z.
++    expect(written.starts_at).toBe('2026-07-30T16:00:00.000Z')
++    expect(written).not.toHaveProperty('id')
++    expect(written).toMatchObject({
++      club_id: CLUB_ID,
++      team_id: 't-u12',
++      type: 'match',
++      opponent: 'Dubai Exiles',
++      title: null,
++      home: true,
++      venue: 'Zayed Sports City, Abu Dhabi',
++    })
++    await waitFor(() => expect(onSaved).toHaveBeenCalled())
++    expect(onClose).toHaveBeenCalled()
++  })
++
++  it('leaves the score null when a future fixture has none', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
++    await user.type(screen.getByLabelText('Time'), '20:00')
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
++    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ result_us: null, result_them: null })
++  })
++
++  it('records a nil-all draw as a real score, not as no score', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
++    await user.type(screen.getByLabelText('Time'), '20:00')
++    await user.type(screen.getByLabelText('Quins score'), '0')
++    await user.type(screen.getByLabelText('Opposition score'), '0')
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
++    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ result_us: 0, result_them: 0 })
++  })
++
++  it('drops a half-entered score rather than writing an unreadable result', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
++    await user.type(screen.getByLabelText('Time'), '20:00')
++    await user.type(screen.getByLabelText('Quins score'), '31')
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
++    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ result_us: null, result_them: null })
++  })
++
++  it('sends training with a title, no opponent and no match-only fields', async () => {
++    const user = userEvent.setup()
++    renderForm({ memberships: COACH_TWO })
++
++    await user.click(screen.getByRole('radio', { name: 'Training' }))
++    await user.type(screen.getByLabelText('Title'), 'U14 Contact & Conditioning')
++    await user.selectOptions(screen.getByLabelText('Age group'), 't-u14')
++    await user.type(screen.getByLabelText('Time'), '17:30')
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
++    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({
++      type: 'training',
++      team_id: 't-u14',
++      title: 'U14 Contact & Conditioning',
++      opponent: null,
++      competition: null,
++      result_us: null,
++      result_them: null,
++    })
++  })
++
++  it('prefills an existing event in club time and updates it by id', async () => {
++    const user = userEvent.setup()
++    renderForm({ event: EXISTING_MATCH })
++
++    // 16:00Z is 20:00 in Abu Dhabi and 12:00 in New York.
++    expect(screen.getByLabelText('Date')).toHaveValue('2026-07-30')
++    expect(screen.getByLabelText('Time')).toHaveValue('20:00')
++    expect(screen.getByLabelText('Opponent')).toHaveValue('Dubai Exiles')
++    expect(screen.getByLabelText('Competition')).toHaveValue('UAE Youth League')
++    expect(screen.getByRole('radio', { name: 'Home' })).toBeChecked()
++
++    await user.type(screen.getByLabelText('Quins score'), '31')
++    await user.type(screen.getByLabelText('Opposition score'), '19')
++    await user.click(screen.getByRole('button', { name: /save changes/i }))
++
++    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
++    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({
++      id: 'e-1',
++      starts_at: '2026-07-30T16:00:00.000Z',
++      result_us: 31,
++      result_them: 19,
++    })
++  })
++
++  it('round-trips an unchanged event without shifting its start time', async () => {
++    const user = userEvent.setup()
++    renderForm({ event: EXISTING_MATCH })
++
++    await user.click(screen.getByRole('button', { name: /save changes/i }))
++
++    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
++    expect(upsertEventMock.mock.calls[0][0].starts_at).toBe(EXISTING_MATCH.starts_at)
++  })
++
++  it('surfaces a Supabase error and keeps the form open with the typed values', async () => {
++    const user = userEvent.setup()
++    upsertEventMock.mockRejectedValue(new Error('new row violates row-level security policy'))
++    const { onSaved, onClose } = renderForm()
++
++    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
++    await user.type(screen.getByLabelText('Time'), '20:00')
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    expect(await screen.findByRole('alert')).toHaveTextContent(
++      'new row violates row-level security policy',
++    )
++    expect(onSaved).not.toHaveBeenCalled()
++    expect(onClose).not.toHaveBeenCalled()
++    expect(screen.getByLabelText('Opponent')).toHaveValue('Dubai Exiles')
++    // And the button is usable again, not stuck in its saving state.
++    expect(screen.getByRole('button', { name: /add event/i })).toBeEnabled()
++  })
++
++  it('disables the submit button while the save is in flight', async () => {
++    const user = userEvent.setup()
++    let release
++    upsertEventMock.mockReturnValue(new Promise((resolve) => {
++      release = () => resolve({ id: 'e-saved' })
++    }))
++    renderForm()
++
++    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
++    await user.type(screen.getByLabelText('Time'), '20:00')
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    const button = await screen.findByRole('button', { name: /saving/i })
++    expect(button).toBeDisabled()
++    release()
++    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
++  })
++
++  it('does not submit twice when the button is clicked twice', async () => {
++    const user = userEvent.setup()
++    let release
++    upsertEventMock.mockReturnValue(new Promise((resolve) => {
++      release = () => resolve({ id: 'e-saved' })
++    }))
++    const { onClose } = renderForm()
++
++    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
++    await user.type(screen.getByLabelText('Time'), '20:00')
++    const button = screen.getByRole('button', { name: /add event/i })
++    await user.click(button)
++    await user.click(screen.getByRole('button', { name: /saving/i }))
++
++    expect(upsertEventMock).toHaveBeenCalledTimes(1)
++
++    // Let the in-flight save settle before the test ends, so React's state
++    // update lands inside the test's act() scope rather than leaking an
++    // "update was not wrapped in act(...)" warning into the suite's stderr.
++    release()
++    await waitFor(() => expect(onClose).toHaveBeenCalled())
++  })
++
++  it('accepts typed text into every field without losing keystrokes', async () => {
++    // Sheet's focus effect used to re-run on every keystroke when the caller
++    // passed an inline onClose, yanking focus out of the input after each
++    // character. A controlled form inside a Sheet is exactly that case.
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Opponent'), 'Jebel Ali Dragons')
++    await user.clear(screen.getByLabelText('Venue'))
++    await user.type(screen.getByLabelText('Venue'), 'The Sevens, Dubai')
++    await user.type(screen.getByLabelText('Competition'), 'West Asia Premiership')
++
++    expect(screen.getByLabelText('Opponent')).toHaveValue('Jebel Ali Dragons')
++    expect(screen.getByLabelText('Venue')).toHaveValue('The Sevens, Dubai')
++    expect(screen.getByLabelText('Competition')).toHaveValue('West Asia Premiership')
++  })
++})
++
++// --- wiring ---------------------------------------------------------------
++
++describe('Schedule wiring', () => {
++  it('offers an Add fixture button to a coach', async () => {
++    useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
++    render(<Schedule />)
++    expect(await screen.findByRole('button', { name: /add fixture/i })).toBeInTheDocument()
++  })
++
++  it('does not offer it to a parent', async () => {
++    useMembershipsMock.mockReturnValue(membershipValue(PARENT))
++    render(<Schedule />)
++    await screen.findByText(/no upcoming fixtures/i)
++    expect(screen.queryByRole('button', { name: /add fixture/i })).not.toBeInTheDocument()
++  })
++
++  it('opens the empty form from the Add button', async () => {
++    const user = userEvent.setup()
++    useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
++    render(<Schedule />)
++
++    await user.click(await screen.findByRole('button', { name: /add fixture/i }))
++
++    expect(await screen.findByRole('heading', { name: 'Add event' })).toBeInTheDocument()
++    expect(screen.getByLabelText('Opponent')).toHaveValue('')
++  })
++
++  it('reloads the schedule after a save', async () => {
++    const user = userEvent.setup()
++    useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
++    render(<Schedule />)
++
++    await user.click(await screen.findByRole('button', { name: /add fixture/i }))
++    const callsBefore = listEventsMock.mock.calls.length
++
++    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
++    await user.type(screen.getByLabelText('Time'), '20:00')
++    await user.click(screen.getByRole('button', { name: /add event/i }))
++
++    await waitFor(() => expect(listEventsMock.mock.calls.length).toBeGreaterThan(callsBefore))
++  })
++})
++
++describe('EventDetail wiring', () => {
++  beforeEach(() => {
++    listEventsMock.mockResolvedValue([EXISTING_MATCH])
++  })
++
++  async function openDetail(memberships) {
++    const user = userEvent.setup()
++    useMembershipsMock.mockReturnValue(membershipValue(memberships))
++    render(<Schedule />)
++    await user.click(await screen.findByRole('button', { name: /Dubai Exiles/i }))
++    await screen.findByRole('dialog')
++    return user
++  }
++
++  it('offers Edit and Delete to a coach of that squad', async () => {
++    await openDetail(COACH_U12)
++    const dialog = screen.getByRole('dialog')
++    expect(within(dialog).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
++    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
++  })
++
++  it('tells a parent it is read-only instead of offering the buttons', async () => {
++    await openDetail(PARENT)
++    const dialog = screen.getByRole('dialog')
++    expect(within(dialog).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
++    expect(within(dialog).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
++    expect(within(dialog).getByText(/read-only|can't change/i)).toBeInTheDocument()
++  })
++
++  it('opens the edit form prefilled from the event', async () => {
++    const user = await openDetail(COACH_U12)
++
++    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit' }))
++
++    expect(await screen.findByRole('heading', { name: 'Edit event' })).toBeInTheDocument()
++    expect(screen.getByLabelText('Opponent')).toHaveValue('Dubai Exiles')
++  })
++
++  it('asks for confirmation before deleting, and does nothing if cancelled', async () => {
++    const user = await openDetail(COACH_U12)
++
++    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
++    expect(deleteEventMock).not.toHaveBeenCalled()
++    expect(screen.getByText(/delete this event\?/i)).toBeInTheDocument()
++
++    await user.click(screen.getByRole('button', { name: /keep it/i }))
++    expect(deleteEventMock).not.toHaveBeenCalled()
++    expect(screen.getByRole('dialog')).toBeInTheDocument()
++  })
++
++  it('deletes on confirmation and closes back to the schedule', async () => {
++    const user = await openDetail(COACH_U12)
++
++    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
++    await user.click(screen.getByRole('button', { name: /yes, delete/i }))
++
++    await waitFor(() => expect(deleteEventMock).toHaveBeenCalledWith('e-1'))
++    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
++  })
++
++  it('surfaces a delete failure and leaves the event on screen', async () => {
++    deleteEventMock.mockRejectedValue(new Error('permission denied for table events'))
++    const user = await openDetail(COACH_U12)
++
++    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
++    await user.click(screen.getByRole('button', { name: /yes, delete/i }))
++
++    const dialog = screen.getByRole('dialog')
++    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
++      'permission denied for table events',
++    )
++    expect(dialog).toBeInTheDocument()
++  })
++})
+diff --git a/tests/event-format.test.js b/tests/event-format.test.js
+index 2cc3c0e..e02c98a 100644
+--- a/tests/event-format.test.js
++++ b/tests/event-format.test.js
+@@ -1,15 +1,17 @@
+ import { describe, it, expect } from 'vitest'
+ import {
+   CLUB_TIME_ZONE,
++  clubDateTimeInputs,
+   clubDayParts,
+   clubToday,
++  clubWallTimeToUtc,
+   dateBoxParts,
+   eventDate,
+   eventTitle,
+   formatLongDate,
+   formatTime,
+   hasResult,
+   resultLabel,
+   resultOutcome,
+   resultScore,
+   sortByStart,
+@@ -401,10 +403,103 @@ describe('formatTime / formatLongDate in club time', () => {
+     const august = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', month: 'short' }).format(Date.UTC(2026, 7, 1))
+     expect(rendered[0]).toContain(august)
+   })
+ 
+   it('keeps its null fallbacks', () => {
+     expect(formatTime(null)).toBe('Time to be confirmed')
+     expect(formatLongDate(null)).toBe('Date to be confirmed')
+     expect(dateBoxParts(null)).toEqual({ month: '—', day: '–', weekday: '' })
+   })
+ })
++
++// --- Task 14: the WRITE direction ------------------------------------
++//
++// Everything above converts an instant to Abu Dhabi wall-clock for display.
++// The event form needs the mirror image: a date + time a coach typed is Abu
++// Dhabi wall-clock and has to become the right UTC instant before it is
++// written to `starts_at` (design-system.md §7, "Writing (Task 14, the event
++// form)"). A naive `new Date(`${date}T${time}`)` resolves in the *browser's*
++// zone, so every assertion below is run under all three HOSTILE_ZONES — a
++// suite that only ran under UTC would pass against exactly that bug.
++
++describe('clubWallTimeToUtc', () => {
++  it('reads an entered date and time as Abu Dhabi wall-clock under every process zone', () => {
++    // 20:00 at Zayed Sports City is 16:00Z. In New York the naive
++    // construction would give 20:00 EDT = 00:00Z the next day; in Auckland,
++    // 08:00Z. Only a club-zone-aware conversion gives 16:00Z everywhere.
++    const written = HOSTILE_ZONES.map((zone) =>
++      withTimeZone(zone, () => clubWallTimeToUtc('2026-07-30', '20:00')),
++    )
++    expect(new Set(written).size).toBe(1)
++    expect(written[0]).toBe('2026-07-30T16:00:00.000Z')
++  })
++
++  it('carries an after-midnight kick-off back into the previous UTC day', () => {
++    const written = HOSTILE_ZONES.map((zone) =>
++      withTimeZone(zone, () => clubWallTimeToUtc('2026-07-25', '01:00')),
++    )
++    expect(new Set(written).size).toBe(1)
++    expect(written[0]).toBe('2026-07-24T21:00:00.000Z')
++  })
++
++  it('handles exact midnight in club time', () => {
++    expect(clubWallTimeToUtc('2026-07-25', '00:00')).toBe('2026-07-24T20:00:00.000Z')
++  })
++
++  it('handles the first minute of a month in club time', () => {
++    expect(clubWallTimeToUtc('2026-08-01', '01:00')).toBe('2026-07-31T21:00:00.000Z')
++  })
++
++  it('round-trips through the display formatters', () => {
++    // The strongest single check: what a coach types is what every reader
++    // sees, whichever zone either of them is in.
++    HOSTILE_ZONES.forEach((zone) => {
++      withTimeZone(zone, () => {
++        const stored = clubWallTimeToUtc('2026-07-25', '01:00')
++        expect(clubDayParts(new Date(stored))).toEqual({ year: 2026, month: 6, day: 25 })
++        expect(formatTime(new Date(stored))).toMatch(/\b1:00\b|\b01:00\b/)
++      })
++    })
++  })
++
++  it('accepts a seconds-bearing time value without shifting the instant', () => {
++    // Some browsers' <input type="time"> emit "20:00:00".
++    expect(clubWallTimeToUtc('2026-07-30', '20:00:00')).toBe('2026-07-30T16:00:00.000Z')
++  })
++
++  it('returns null for a missing or unparseable date or time', () => {
++    expect(clubWallTimeToUtc('', '20:00')).toBeNull()
++    expect(clubWallTimeToUtc('2026-07-30', '')).toBeNull()
++    expect(clubWallTimeToUtc(null, null)).toBeNull()
++    expect(clubWallTimeToUtc('30/07/2026', '20:00')).toBeNull()
++    expect(clubWallTimeToUtc('2026-07-30', '8pm')).toBeNull()
++  })
++})
++
++describe('clubDateTimeInputs', () => {
++  it('splits an instant into the club-time date and time an edit form prefills with', () => {
++    const fields = HOSTILE_ZONES.map((zone) =>
++      withTimeZone(zone, () => clubDateTimeInputs(NEXT_DAY_IN_DUBAI)),
++    )
++    fields.forEach((f) => expect(f).toEqual({ date: '2026-07-25', time: '01:00' }))
++  })
++
++  it('uses a 24-hour, zero-padded time so it is a valid <input type="time"> value', () => {
++    expect(clubDateTimeInputs(MIDNIGHT_IN_DUBAI)).toEqual({ date: '2026-07-25', time: '00:00' })
++    expect(clubDateTimeInputs(SAME_DAY_IN_DUBAI)).toEqual({ date: '2026-07-24', time: '17:00' })
++  })
++
++  it('is the exact inverse of clubWallTimeToUtc', () => {
++    HOSTILE_ZONES.forEach((zone) => {
++      withTimeZone(zone, () => {
++        const { date, time } = clubDateTimeInputs(LAST_MINUTE_OF_JULY)
++        expect({ date, time }).toEqual({ date: '2026-07-31', time: '23:59' })
++        expect(clubWallTimeToUtc(date, time)).toBe(LAST_MINUTE_OF_JULY.toISOString())
++      })
++    })
++  })
++
++  it('returns empty strings for a missing or unparseable date', () => {
++    expect(clubDateTimeInputs(null)).toEqual({ date: '', time: '' })
++    expect(clubDateTimeInputs(new Date('nope'))).toEqual({ date: '', time: '' })
++  })
++})

@@ -72,17 +72,26 @@ function Shell({ authValue, membershipValue, route = '/', children }) {
 
 const ADMIN_MEMBERSHIPS = [{ id: 'm0', role: 'admin', team_id: null, player_id: null }]
 
-function scheduleScenario(memberships) {
+function scheduleScenario(memberships, teams = TEAMS) {
   return () => (
     <Shell
       route="/schedule"
       authValue={baseAuth(COACH_EMAIL)}
-      membershipValue={{ memberships, teams: TEAMS, loading: false, error: null, reload: noop }}
+      membershipValue={{ memberships, teams, loading: false, error: null, reload: noop }}
     >
       <Schedule />
     </Shell>
   )
 }
+
+// Independent Task 14 verification: the club really has 15 age groups, and
+// the point of the form's squad <select> is that a coach of ONE of them sees
+// exactly one option, not all 15. Two teams (TEAMS) cannot show that.
+const TEAMS_15 = [
+  'Senior Men 1st XV', 'Senior Men 2nd XV', 'Senior Women', 'U18 Boys', 'U16 Boys',
+  'U15 Boys', 'U14 Boys', 'U13 Boys', 'U12 Boys', 'U11 Mixed',
+  'U10 Mixed', 'U9 Mixed', 'U8 Mixed', 'U7 Mixed', 'U6 Mixed',
+].map((name, i) => ({ id: i === 8 ? 't1' : `t${100 + i}`, club_id: CLUB_ID, name, sort_order: i }))
 
 function rosterScenario(memberships, teams = TEAMS) {
   return () => (
@@ -162,6 +171,9 @@ const scenarios = {
   'schedule-admin': scheduleScenario(ADMIN_MEMBERSHIPS),
   // Task 14: the read-only side of the new Add/Edit/Delete affordances.
   'schedule-parent': scheduleScenario(PARENT_MEMBERSHIPS),
+  // Coach of exactly one squad, in a club of 15. Independent verification.
+  'schedule-one-team': scheduleScenario(COACH_ONE_TEAM, TEAMS_15),
+  'schedule-admin-15': scheduleScenario(ADMIN_MEMBERSHIPS, TEAMS_15),
 
   // Task 12 Roster screens. Search text, pill selection and the PlayerDetail
   // sheet are real component state, so Playwright drives them by typing and
