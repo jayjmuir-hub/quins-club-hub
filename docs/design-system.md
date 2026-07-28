@@ -530,7 +530,7 @@ Positions enum used by the Add/Edit form: `["Prop","Hooker","Lock","Flanker","Nu
   type: "training",             // enum: "match" | "training" | "social"      — events.type
   title: "Senior Squad Training", // string. For matches this is SET TO THE OPPONENT NAME (see openEventForm: `title:type==="match"?opp:titleV`) — i.e. `title` is redundant/derived for matches; the render layer actually displays "Quins vs {opponent}" for matches and just `{title}` for training/social. Real schema should likely just use `opponent` for matches and `title` for non-matches, and NOT duplicate opponent into title.
   opponent: "Al Ain Amblers",   // string|null, match-only                     — events.opponent
-  home: true,                   // boolean, match-only (defaults true for non-matches but unused) — events.is_home
+  home: true,                   // boolean, match-only (defaults true for non-matches but unused) — events.home (NOT events.is_home; verified against the live schema — the wrong name here caused a silently-missing Home/Away badge in Task 13)
   venue: "Zayed Sports City, Abu Dhabi", // string, freeform (sometimes "Ground — Pitch N", parsed client-side by splitting on "—" and "," for compact display) — events.venue / events.location
   comp: "West Asia Premiership",// string|null, match-only optional            — events.competition
   team: "Senior Men 1st XV",    // string, must match one of the 15 TEAMS      — events.team_id (fk -> teams)

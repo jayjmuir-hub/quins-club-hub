@@ -402,3 +402,136 @@ read fixtures and squads but not change them."`; no console or page errors.
 - The error path replacing the whole screen on a failed realtime refetch
   (pre-existing pattern inherited from `Schedule.jsx`).
 - Extracting the fourth copy of the retry-button markup.
+
+---
+
+# Task 13 — fix round 2 (review response)
+
+## Important — trainings and socials never left "Fixtures to play"
+
+Accepted, and the diagnosis is exactly right: two different questions were
+sharing one filter.
+
+- **Schedule's Upcoming tab** asks the *result* question — "which fixtures
+  still need a score" — so an unscored match from last week stays visible
+  until somebody records it. That is Task 11's ruling and it is correct.
+  **`Schedule.jsx` is untouched by this round.**
+- **The Dashboard** asks a *calendar* question — "what is coming up next, and
+  how much of it is there". Under `!hasResult` that answer was wrong for any
+  event type that can never be scored: a training or a social has no score to
+  enter, so once its date passed it sat at the top of "Upcoming" permanently
+  and inflated the stat tile forever.
+
+`src/screens/Dashboard.jsx` now derives `toPlay` from the date:
+
+```js
+const toPlay = sortByStart(
+  events.filter((event) => {
+    const date = eventDate(event)
+    return date != null && date.getTime() > now
+  }),
+  'asc',
+)
+```
+
+This feeds both the Upcoming list and the "Fixtures to play" tile. `results` /
+`lastResult` still use `hasResult` and are unchanged — a score is still what
+makes something a result.
+
+Two consequences, both deliberate and commented in the file:
+
+1. The hero's separate `future` filter is gone. It existed only to re-apply
+   "must be in the future" on top of the result filter; now that `toPlay`
+   already means that, `nextFixture` is simply the head of `toPlay`
+   (preferring a match). One rule, one place.
+2. An event with an unparseable `starts_at` is now excluded here rather than
+   listed. `sortByStart` already sinks those to the bottom on Schedule, where
+   they stay visible — so a bad row is still findable, just not on a screen
+   whose entire premise is "when is this happening".
+
+## Doc fix
+
+`docs/design-system.md:533` mapped `home` → `events.is_home`. Corrected to
+`events.home`, with a note that it was verified against the live schema and
+that the wrong name here is what produced the silently-missing Home/Away badge
+in round 1 — so whoever builds Task 14 doesn't inherit the same trap.
+
+## Cosmetic (from the re-review note)
+
+The `canEdit` comment credited `canEditTeam`'s null-guard for refusing a
+teamless coach. The actual mechanism is `visibleTeams` dropping null team ids,
+which empties `scopedTeams` so `.some()` is vacuously false; `canEditTeam`'s
+guard is the second line of defence behind it. Comment corrected — behaviour
+unchanged, and the test that pins it (`treats a coach with no resolvable team
+as read-only`) still passes.
+
+## Tests
+
+`tests/dashboard.test.jsx`, 28 → 29 tests.
+
+- New fixture `PAST_SOCIAL` — a week-old social, the case that exposed the
+  split, since it can never carry a score under any rule.
+- New test **`leaves stale unscored events out of both the list and the
+  count`**: with "now" pinned at `2026-07-20T05:00Z`, it asserts the Upcoming
+  list is exactly `['U10 skills session', 'Quins vs Al Ain Amblers']` — both
+  genuinely future — and explicitly that it contains neither the past social
+  nor the past unscored match, and that the stat tile reads 2.
+- `counts players in scope, fixtures still to play, and age groups` updated
+  from 3 to 2 with the reason stated.
+- `never picks a fixture that has already kicked off, even unscored` rewritten:
+  it used to assert the stale match *was* listed. It now asserts the list is
+  empty and there is no hero.
+
+### Mutation testing
+
+| # | Mutation | Result |
+|---|---|---|
+| 15 | `toPlay` back to `!hasResult` | 7 tests fail |
+| 16 | drop the `> now` comparison | 10 fail |
+
+Both killed, and the blast radius confirms the new assertions are load-bearing
+rather than incidental.
+
+### Commands and output
+
+`npx vitest run tests/dashboard.test.jsx`:
+
+```
+ ✓ tests/dashboard.test.jsx (29 tests)
+      Tests  29 passed (29)
+```
+
+`npm test` — files covering the amended code are `tests/dashboard.test.jsx`
+(the change) and `tests/schedule.test.jsx` (proves Schedule's tab semantics
+did **not** move):
+
+```
+ Test Files  16 passed (16)
+      Tests  330 passed (330)
+```
+
+`TZ=America/New_York npx vitest run`: `16 passed / 330 passed` — identical.
+`npm run build`: clean. No stderr output.
+
+### Browser re-check (run under `TZ=America/New_York`)
+
+Re-ran `harness/shoot-dashboard.mjs`, 3 personas × 375/1280, and re-read the
+screenshots. The fix is visible in a real render: the coach's "Fixtures to
+play" went **9 → 8** and the parent's **5 → 4**, and the stale
+`2026-07-20T21:00Z` "Late Night Touch" social that previously headed the
+Upcoming list is gone — the list now starts at today. Hero still reads
+"Thu, Jul 30, 2026 · 7:00 PM" for a `15:00Z` fixture under the hostile zone.
+Zero console/page errors, no overflow at either width.
+
+## Files changed this round
+
+- `src/screens/Dashboard.jsx`
+- `tests/dashboard.test.jsx`
+- `docs/design-system.md`
+
+## Deferred (per the ruling, not acted on)
+
+- `FixtureRow.jsx:66` date-box weekday `#77726e` on `#f3eef5` (4.16:1) — to be
+  fixed alongside the next `FixtureRow` touch.
+- The error path replacing the whole screen on a failed realtime refetch.
+- Extracting the fourth copy of the retry-button markup.

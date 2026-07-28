@@ -89,10 +89,10 @@ const SOONER_TRAINING = {
   result_us: null,
   result_them: null,
 }
-// Kicked off before NOW and nobody has entered a score. Per the project's
-// result rule it is still "to play", so it belongs in the upcoming list and
-// the fixtures-to-play count — but it must never become the hero, because a
-// countdown to a past instant is meaningless.
+// Kicked off before NOW and nobody has entered a score. Schedule's Upcoming
+// tab keeps this visible on purpose (it still needs a score), but the
+// Dashboard asks a calendar question — what is coming up — so it must not
+// appear here at all.
 const PAST_UNSCORED = {
   id: 'e-stale',
   team_id: 'team-u10',
@@ -121,7 +121,28 @@ const OLDER_RESULT = {
   result_them: 20,
 }
 
-const EVENTS = [NEXT_MATCH, SOONER_TRAINING, PAST_UNSCORED, LAST_RESULT, OLDER_RESULT]
+// A training or a social can NEVER carry a score, so under a hasResult-based
+// filter this one would sit at the top of "Upcoming" and inflate the
+// fixtures-to-play count forever. It is the case that exposed the split
+// between "still needs a score" and "still to come".
+const PAST_SOCIAL = {
+  id: 'e-social',
+  team_id: 'team-u10',
+  type: 'social',
+  title: 'Season launch barbecue',
+  starts_at: '2026-07-04T14:00:00Z',
+  result_us: null,
+  result_them: null,
+}
+
+const EVENTS = [
+  NEXT_MATCH,
+  SOONER_TRAINING,
+  PAST_UNSCORED,
+  PAST_SOCIAL,
+  LAST_RESULT,
+  OLDER_RESULT,
+]
 
 const PLAYERS = [
   { id: 'p1', team_id: 'team-u10', full_name: 'Amir Haddad', position: 'Prop' },
@@ -309,11 +330,9 @@ describe('Dashboard — next fixture hero', () => {
     listEventsMock.mockResolvedValue([PAST_UNSCORED, LAST_RESULT])
 
     renderDashboard()
-    const list = await screen.findByTestId('upcoming-list')
+    await screen.findByText(/no upcoming fixtures/i)
 
-    // Still "to play" — no score has been entered — so it stays in the list…
-    expect(within(list).getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
-    // …but a countdown to an instant that has already passed is meaningless.
+    // A countdown to an instant that has already passed is meaningless.
     expect(screen.queryByTestId('next-fixture')).not.toBeInTheDocument()
   })
 
@@ -353,9 +372,10 @@ describe('Dashboard — stats', () => {
     await screen.findByTestId('stat-players')
 
     expect(screen.getByTestId('stat-players')).toHaveTextContent('3')
-    // NEXT_MATCH, SOONER_TRAINING and PAST_UNSCORED have no score; the two
-    // scored fixtures are results, not fixtures to play.
-    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('3')
+    // Only NEXT_MATCH and SOONER_TRAINING are still to come. The two scored
+    // fixtures are results; PAST_UNSCORED and PAST_SOCIAL have already
+    // happened, whether or not anyone can ever score them.
+    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('2')
     expect(screen.getByTestId('stat-groups')).toHaveTextContent('2')
   })
 
@@ -409,6 +429,30 @@ describe('Dashboard — upcoming list and last result', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText(/U10 skills session/)).toBeInTheDocument()
+  })
+
+  // The Dashboard asks "what's coming up", not "what still needs a score".
+  // Those coincide for matches and diverge completely for trainings and
+  // socials, which can never be scored — so a hasResult-based filter left
+  // stale ones on the list and in the count indefinitely.
+  it('leaves stale unscored events out of both the list and the count', async () => {
+    renderDashboard()
+
+    const list = await screen.findByTestId('upcoming-list')
+    const titles = within(list)
+      .getAllByTestId('fixture-title')
+      .map((node) => node.textContent)
+
+    // Both future events, nothing else.
+    expect(titles).toEqual(['U10 skills session', 'Quins vs Al Ain Amblers'])
+    // A week-old social, which can never carry a score…
+    expect(titles).not.toContain('Season launch barbecue')
+    // …and a match played last week that nobody has scored yet. That one is
+    // still on Schedule's Upcoming tab by design; it is not this screen's
+    // question.
+    expect(titles).not.toContain('Quins vs Dubai Exiles')
+
+    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('2')
   })
 
   it('shows the most recent scored fixture as the last result', async () => {

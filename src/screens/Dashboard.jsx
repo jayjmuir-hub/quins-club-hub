@@ -300,36 +300,45 @@ export default function Dashboard() {
   const isFirstLoad = loading && !settled
 
   const admin = isAdmin(memberships)
-  // Asked through canEditTeam rather than by looking for a 'coach' row, so
-  // this agrees with the helper that will gate the actual writes in Tasks
-  // 14/15: canEditTeam deliberately refuses a coach row with a null team_id,
-  // and a raw role check would grant on one — enabling an action that opens a
-  // form with no squad to pick. Same shape as Schedule.jsx's precedent.
+  // Asked per visible team through canEditTeam, rather than by looking for a
+  // 'coach' membership row, so this agrees with the helper that will gate the
+  // actual writes in Tasks 14/15. A coach row with a null team_id contributes
+  // no team to scopedTeams (visibleTeams drops null ids), so `.some()` over an
+  // empty list is false and that coach is read-only — where a raw role check
+  // would grant, enabling an action that opens a form with no squad to pick.
+  // canEditTeam's own null guard is the second line of defence behind that.
+  // Same shape as Schedule.jsx's precedent.
   const canEdit = admin || scopedTeams.some((team) => canEditTeam(memberships, team.id))
   // Null for anyone who can edit; otherwise the role noun for the read-only
   // explanation, from the same roleLabel() the scope note uses.
   const readOnlyRole = canEdit ? null : roleLabel(memberships).toLowerCase()
   const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
-  // "To play" is the project's result rule: a fixture is a result when a
-  // score is recorded, not when its date has passed (see hasResult). A match
-  // played last week whose score nobody has entered is still to play, and
-  // still listed — which is the point, it stays visible until someone records
-  // the score.
-  const toPlay = sortByStart(events.filter((event) => !hasResult(event)), 'asc')
+  // What the Dashboard calls "to play" is a question about the CALENDAR:
+  // what is coming up next, and how much of it is there. That is not the same
+  // question as Schedule's Upcoming tab, which asks about the RESULT rule —
+  // "which fixtures still need a score" — and deliberately keeps an unscored
+  // match from last week visible until somebody records it (Task 11's ruling,
+  // untouched). The two questions shared a filter here, and the split showed:
+  // trainings and socials can never carry a score, so under `!hasResult` a
+  // week-old social sat at the top of "Upcoming" forever and was counted in
+  // "Fixtures to play". Filtering on the date is what this screen actually
+  // means. An event with an unparseable starts_at is excluded rather than
+  // floated to the top; sortByStart already sinks those to the bottom on
+  // Schedule, where they stay visible.
+  const toPlay = sortByStart(
+    events.filter((event) => {
+      const date = eventDate(event)
+      return date != null && date.getTime() > now
+    }),
+    'asc',
+  )
   const results = sortByStart(events.filter(hasResult), 'desc')
   const lastResult = results[0] ?? null
 
-  // The hero is the one place that also needs the fixture to be in the
-  // FUTURE: a countdown to an instant that has passed is meaningless, so an
-  // unscored fixture from last week is legitimately "to play" in the list
-  // above but can never be the next fixture. Matches come first, falling back
-  // to the next event of any type (design-system.md §4.11).
-  const future = toPlay.filter((event) => {
-    const date = eventDate(event)
-    return date != null && date.getTime() > now
-  })
-  const nextFixture = future.find((event) => event.type === 'match') ?? future[0] ?? null
+  // The hero is just the head of that list, preferring a match and falling
+  // back to the next event of any type (design-system.md §4.11).
+  const nextFixture = toPlay.find((event) => event.type === 'match') ?? toPlay[0] ?? null
 
   // Gated on the hero existing: with nothing to count down to there is
   // nothing for a tick to change, and an ungated timer re-renders the whole
