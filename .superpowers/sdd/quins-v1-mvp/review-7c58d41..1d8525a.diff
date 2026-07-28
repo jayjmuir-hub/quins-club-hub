@@ -1,0 +1,1515 @@
+# Review package: 7c58d41..HEAD
+
+## Commits
+1d8525a fix: make the timezone tests actually hold the guarantee, and correct the docs
+
+## Files changed
+ .superpowers/sdd/quins-v1-mvp/progress.md          |    4 +
+ .../sdd/quins-v1-mvp/review-5ca6d01..7c58d41.diff  | 1071 ++++++++++++++++++++
+ .superpowers/sdd/quins-v1-mvp/task-11-report.md    |  123 +++
+ docs/design-system.md                              |   22 +-
+ tests/event-format.test.js                         |   21 +-
+ tests/schedule.test.jsx                            |   51 +
+ 6 files changed, 1288 insertions(+), 4 deletions(-)
+
+## Diff
+diff --git a/.superpowers/sdd/quins-v1-mvp/progress.md b/.superpowers/sdd/quins-v1-mvp/progress.md
+index bd2e3c7..9387fec 100644
+--- a/.superpowers/sdd/quins-v1-mvp/progress.md
++++ b/.superpowers/sdd/quins-v1-mvp/progress.md
+@@ -72,10 +72,14 @@ PHASE D: 3 of 4 done (10, 11, 12). 271 tests passing across 14 files. Next: Task
+ Task 12 AMENDMENT (product change from Jay, 27 Jul): THE CLUB DOES NOT USE JERSEY NUMBERS. Positions and captains ARE tracked, just unpopulated — position grouping and the captain badge stay exactly as built. Verified against the live DB: players.jersey_num is nullable, players.full_name is NOT NULL, and every table is empty except clubs (1) and teams (15), so nothing had to be migrated. The COLUMN IS KEPT — nullable, costs nothing, available if the senior sides ever want squad numbers. UI-only change.
+ Task 12 amendment: implemented — roster row and PlayerDetail hero now show INITIALS from full_name via a new pure module src/lib/playerFormat.js (+ tests/player-format.test.js), position branch sorts by name, the Jersey number row is gone from PlayerDetail, and the dead placeholder / Infinity sort fallback / jersey search term are removed. Initials rules, each pinned by a test: middle names skipped (Faisal Al Mansoori -> FM); a hyphenated or apostrophed surname is ONE name contributing one letter (Nguyen-Fitzgerald -> N, O'Sullivan -> O); single-word name -> first two letters (Ronaldinho -> RO); empty/null -> "?"; codepoint-aware splitting. The tile is aria-hidden so a screen reader hears the name, not the initials. docs/design-system.md updated in 14 places with superseded notes INCLUDING "do not add a jersey field" on the add/edit form spec — the likeliest place Tasks 14/15 would reintroduce it. commits 12d0cfd..e1a28e6, review Approved (0 Critical, 0 Important), one fix round for a stale doc line + a missing hero assertion, re-review clean.
+ Task 12 amendment: reviewer independently cleared the implementer's volunteered TDD caveat — it traced the path from the mocked listPlayers result to the bucket, confirmed there is no intervening sort, and verified that deleting .sort(byName) fails the test. The caveat did not hold.
+ Task 12 amendment: minor (deferred): initials('...') returns '..' for a punctuation-only name; the '?' fallback covers non-string/empty/whitespace only. Aria-hidden and unreachable given full_name NOT NULL plus a real name.
+ Task 12: CARRY TO TASKS 14/15 — the add/edit player form must NOT offer a jersey number field. docs/design-system.md says so explicitly now.
+ Task 11 amendment: all event times forced to Abu Dhabi time (Jay's ruling on the open question from Task 11). CLUB_TIME_ZONE='Asia/Dubai' as an IANA zone via Intl's timeZone option, NOT a +04:00 offset; formatTime/formatLongDate/dateBoxParts routed through it; new pure helpers clubDayParts/clubToday. CalendarMonth now carries its month as {year,month} numbers instead of a Date (a Date is an instant, so getDay/getDate silently read the browser zone) — day bucketing and the today-ring are club-local. EventDetail date line gains a single quiet "· Abu Dhabi time"; deliberately NOT on list rows. Presentation only: starts_at stays timestamptz/UTC, instant comparisons untouched, no schema change. 300 tests / 15 files (was 282), build clean.
+ Task 11 amendment: TDD evidence is behavioural, not import-error — stashing only the 3 source files left the unfixed formatTime producing 3 different strings for one instant under UTC/New_York/Auckland (expected 3 to be 1). Tests pin instants where Dubai's day differs from UTC's (21:00Z = next Dubai day, midnight boundary, month boundary both directions, club new year), assert byte-identical output across three process zones, and include a guard-the-guard test that process.env.TZ manipulation really works — without it every zone assertion could pass vacuously. Screen-level tests derive expectations from an independent Intl formatter, not from eventFormat.js.
+ Task 11 amendment: browser check run with dev server AND Chromium under TZ=America/New_York (a UTC browser check would prove almost nothing). Boundary fixture 2026-07-20T21:00Z renders as JUL 21 Tue 1:00 AM and dots the 21st cell, not the 20th; today-ring landed on 28 (Dubai) not 27 (New York), demonstrating that fix live. Calendar cells uniform 40x40 / 147x147 across button and div variants — the UA content-centring trap has not reopened. Zero overflow/console/page errors across 16 shots.
+ Task 11 amendment: self-review corrected a wrong contrast number in a code comment — white/85% on #C21F32 is 4.632:1, not the 5.02:1 claimed. Still clears AA for normal text but the margin is thin; recomputed independently. The #5c5854 muted ruling correctly ruled inapplicable (that governs on-paper muted; this sits on the red hero gradient).
+ Task 11 amendment: CARRY TO TASK 14 — the event form must interpret an entered date+time as Abu Dhabi time when building starts_at. A naive new Date(`${d}T${t}`) resolves in the BROWSER's zone, so a UK coach entering 20:00 writes 19:00Z (= 23:00 Abu Dhabi) and the schedule would faithfully render that wrong instant. Reading and writing must agree; the date field should also default from clubToday(), not new Date().
++Task 11 AMENDMENT (product change from Jay, 28 Jul): ALL EVENT TIMES FORCED TO ABU DHABI TIME (Asia/Dubai), regardless of viewer's browser timezone. Rationale: single-city club, one ground, "20:00" must always mean 20:00 at Zayed Sports City. Presentation-only — starts_at stays UTC timestamptz, instant comparisons untouched, no schema change.
++Task 11 amendment: review round 1 — spec has TWO issues, quality NEEDS FIXES. 0 Critical. 3 Important: (1) two PRE-EXISTING tests in tests/event-format.test.js (dateBoxParts split, formatTime/formatLongDate leak check) build fixtures with the browser-local Date constructor and now fail under TZ=America/New_York — the exact failure mode this change exists to prevent, hiding only because the runner sits in UTC; (2) the club-local "today" calendar highlight has ZERO test coverage — reviewer reverted it to browser-local in an isolated copy and all 34 schedule tests still passed under TZ=America/New_York; (3) docs/design-system.md:527 still specifies UAE-is-fixed-UTC+4 offset thinking, the exact model requirement 1 rejects, and is what Task 14's event form will be built from.
++Task 11 amendment: contrast INDEPENDENTLY RECOMPUTED TWICE NOW (implementer, then reviewer via full sRGB linearization) — 4.632:1 confirmed correct, clears AA for the 14px normal text actually used (threshold 4.5:1, margin 0.13). The original in-code comment claiming 5.02:1 was wrong and is already corrected.
++Task 11 amendment: reviewer verified the "found already present, uncommitted, from a prior session" account is internally consistent with the diff (exact test-count arithmetic checks out, no orphaned helpers, no evidence of two different attempts) — not itself a finding, recorded for the record.
+diff --git a/.superpowers/sdd/quins-v1-mvp/review-5ca6d01..7c58d41.diff b/.superpowers/sdd/quins-v1-mvp/review-5ca6d01..7c58d41.diff
+new file mode 100644
+index 0000000..97ab928
+--- /dev/null
++++ b/.superpowers/sdd/quins-v1-mvp/review-5ca6d01..7c58d41.diff
+@@ -0,0 +1,1071 @@
++# Review package: 5ca6d01..HEAD
++
++## Commits
++7c58d41 feat: force all event times to Abu Dhabi time
++
++## Files changed
++ .superpowers/sdd/quins-v1-mvp/progress.md       |   5 +
++ .superpowers/sdd/quins-v1-mvp/task-11-report.md | 181 +++++++++++++++++++++
++ harness/stubs/events.js                         |  18 +++
++ src/lib/eventFormat.js                          |  82 +++++++++-
++ src/screens/EventDetail.jsx                     |  13 ++
++ src/screens/Schedule.jsx                        |  73 ++++++---
++ tests/event-format.test.js                      | 204 ++++++++++++++++++++++++
++ tests/schedule.test.jsx                         | 101 +++++++++++-
++ 8 files changed, 641 insertions(+), 36 deletions(-)
++
++## Diff
++diff --git a/.superpowers/sdd/quins-v1-mvp/progress.md b/.superpowers/sdd/quins-v1-mvp/progress.md
++index 8e79159..bd2e3c7 100644
++--- a/.superpowers/sdd/quins-v1-mvp/progress.md
+++++ b/.superpowers/sdd/quins-v1-mvp/progress.md
++@@ -67,10 +67,15 @@ Task 12: CONTROLLER ADJUDICATION of the verifier's "Critical" contact-loading fi
++ Task 12: minor (deferred): the age-group grouping branch keeps listPlayers' name ordering, so the jersey column reads scrambled (2, 10, 14, -, 4, 8). Faithful to design-system 5.3, which specifies jersey sort only for the position branch — but it looks like a bug to a user. Product call for Jay.
++ Task 12: fix round 2/5 (5 addressed, 0 open — contact block renders nothing while in flight (Spinner import removed, test holds the promise open and asserts no role="status" and no contact/loading text); MUTED_ON_PAPER #5c5854 = 6.418:1 replaces #77726e = 4.331:1 at the three on-paper sites across Roster and Schedule, on-card instances correctly left alone; Sheet gains pb-[calc(16px+env(safe-area-inset-bottom))], verified in the BUILT css not just the class string; design-system 5.7 Call/Email row added inside the contact block behind the same guard so it is unreachable without a row, and each anchor additionally gated on its own field; harness/shoot.mjs moved to the portable loader. commits d2916c6..2a8da05). Re-review: all ADDRESSED, no new breakage, contrast ratios independently recomputed and the built CSS independently grepped.
++ Task 12: complete (commits f34f627..2a8da05, review clean after 2 fix rounds + an independent browser visual pass)
++ Task 12: NOTE — Sheet's safe-area inset is now fixed, which was flagged as a deferred minor in Task 11. Tasks 14-16 put every add/edit form in a Sheet and can rely on it.
++ PHASE D: 3 of 4 done (10, 11, 12). 271 tests passing across 14 files. Next: Task 13 (Dashboard) — brief pre-generated at task-13-brief.md.
++ Task 12 AMENDMENT (product change from Jay, 27 Jul): THE CLUB DOES NOT USE JERSEY NUMBERS. Positions and captains ARE tracked, just unpopulated — position grouping and the captain badge stay exactly as built. Verified against the live DB: players.jersey_num is nullable, players.full_name is NOT NULL, and every table is empty except clubs (1) and teams (15), so nothing had to be migrated. The COLUMN IS KEPT — nullable, costs nothing, available if the senior sides ever want squad numbers. UI-only change.
++ Task 12 amendment: implemented — roster row and PlayerDetail hero now show INITIALS from full_name via a new pure module src/lib/playerFormat.js (+ tests/player-format.test.js), position branch sorts by name, the Jersey number row is gone from PlayerDetail, and the dead placeholder / Infinity sort fallback / jersey search term are removed. Initials rules, each pinned by a test: middle names skipped (Faisal Al Mansoori -> FM); a hyphenated or apostrophed surname is ONE name contributing one letter (Nguyen-Fitzgerald -> N, O'Sullivan -> O); single-word name -> first two letters (Ronaldinho -> RO); empty/null -> "?"; codepoint-aware splitting. The tile is aria-hidden so a screen reader hears the name, not the initials. docs/design-system.md updated in 14 places with superseded notes INCLUDING "do not add a jersey field" on the add/edit form spec — the likeliest place Tasks 14/15 would reintroduce it. commits 12d0cfd..e1a28e6, review Approved (0 Critical, 0 Important), one fix round for a stale doc line + a missing hero assertion, re-review clean.
++ Task 12 amendment: reviewer independently cleared the implementer's volunteered TDD caveat — it traced the path from the mocked listPlayers result to the bucket, confirmed there is no intervening sort, and verified that deleting .sort(byName) fails the test. The caveat did not hold.
++ Task 12 amendment: minor (deferred): initials('...') returns '..' for a punctuation-only name; the '?' fallback covers non-string/empty/whitespace only. Aria-hidden and unreachable given full_name NOT NULL plus a real name.
++ Task 12: CARRY TO TASKS 14/15 — the add/edit player form must NOT offer a jersey number field. docs/design-system.md says so explicitly now.
+++Task 11 amendment: all event times forced to Abu Dhabi time (Jay's ruling on the open question from Task 11). CLUB_TIME_ZONE='Asia/Dubai' as an IANA zone via Intl's timeZone option, NOT a +04:00 offset; formatTime/formatLongDate/dateBoxParts routed through it; new pure helpers clubDayParts/clubToday. CalendarMonth now carries its month as {year,month} numbers instead of a Date (a Date is an instant, so getDay/getDate silently read the browser zone) — day bucketing and the today-ring are club-local. EventDetail date line gains a single quiet "· Abu Dhabi time"; deliberately NOT on list rows. Presentation only: starts_at stays timestamptz/UTC, instant comparisons untouched, no schema change. 300 tests / 15 files (was 282), build clean.
+++Task 11 amendment: TDD evidence is behavioural, not import-error — stashing only the 3 source files left the unfixed formatTime producing 3 different strings for one instant under UTC/New_York/Auckland (expected 3 to be 1). Tests pin instants where Dubai's day differs from UTC's (21:00Z = next Dubai day, midnight boundary, month boundary both directions, club new year), assert byte-identical output across three process zones, and include a guard-the-guard test that process.env.TZ manipulation really works — without it every zone assertion could pass vacuously. Screen-level tests derive expectations from an independent Intl formatter, not from eventFormat.js.
+++Task 11 amendment: browser check run with dev server AND Chromium under TZ=America/New_York (a UTC browser check would prove almost nothing). Boundary fixture 2026-07-20T21:00Z renders as JUL 21 Tue 1:00 AM and dots the 21st cell, not the 20th; today-ring landed on 28 (Dubai) not 27 (New York), demonstrating that fix live. Calendar cells uniform 40x40 / 147x147 across button and div variants — the UA content-centring trap has not reopened. Zero overflow/console/page errors across 16 shots.
+++Task 11 amendment: self-review corrected a wrong contrast number in a code comment — white/85% on #C21F32 is 4.632:1, not the 5.02:1 claimed. Still clears AA for normal text but the margin is thin; recomputed independently. The #5c5854 muted ruling correctly ruled inapplicable (that governs on-paper muted; this sits on the red hero gradient).
+++Task 11 amendment: CARRY TO TASK 14 — the event form must interpret an entered date+time as Abu Dhabi time when building starts_at. A naive new Date(`${d}T${t}`) resolves in the BROWSER's zone, so a UK coach entering 20:00 writes 19:00Z (= 23:00 Abu Dhabi) and the schedule would faithfully render that wrong instant. Reading and writing must agree; the date field should also default from clubToday(), not new Date().
++diff --git a/.superpowers/sdd/quins-v1-mvp/task-11-report.md b/.superpowers/sdd/quins-v1-mvp/task-11-report.md
++index cd2f644..29ed971 100644
++--- a/.superpowers/sdd/quins-v1-mvp/task-11-report.md
+++++ b/.superpowers/sdd/quins-v1-mvp/task-11-report.md
++@@ -549,10 +549,191 @@ None outstanding on the code. Two process notes:
++    box inheriting UA centring — applies anywhere else the app makes a non-text
++    element interactive. The fixture rows in this screen are also `<button>`s, but
++    they set `flex items-center` explicitly, so they are fine. Worth watching in
++    Tasks 12/13, which will follow this screen's patterns.
++ 2. **`.superpowers/sdd/.gitignore` has now been reset to `*` by tooling three times**
++    across this task (twice during my work, once during the visual check). Each reset
++    silently untracks the entire build ledger. I restored it from HEAD again before
++    committing and confirmed the `*` version is not in any of my commits, but
++    something is rewriting it repeatedly and it will eventually land in someone's
++    commit unnoticed.
+++
+++---
+++
+++# Task 11 — Amendment: force all event times to Abu Dhabi time
+++
+++Jay's ruling on the open product question I flagged in the original report: event
+++times are no longer rendered in the reader's browser zone. They are always Abu
+++Dhabi time. One club, one home ground — "20:00" has to mean 20:00 at Zayed Sports
+++City whether the reader is on the touchline, on tour, or a committee member
+++checking fixtures from the UK. Under the old behaviour a parent in London read a
+++20:00 kick-off as 16:00.
+++
+++This is a **presentation-only** change. `starts_at` is still `timestamptz`, still
+++stored UTC, and every instant comparison (`sortByStart`, upcoming-vs-past,
+++`hasResult`) is untouched and was already zone-agnostic. No schema change.
+++
+++## What I implemented
+++
+++**One constant, one source of truth** — `CLUB_TIME_ZONE = 'Asia/Dubai'` in
+++`src/lib/eventFormat.js`, deliberately an IANA **zone identifier** consumed via
+++`Intl.DateTimeFormat`'s `timeZone` option, not a hardcoded `+04:00`. The UAE has
+++no DST today so the two agree, but an offset is a derived fact that would rot
+++silently if that ever changed; the zone stays correct by definition. `formatTime`,
+++`formatLongDate` and `dateBoxParts` all route through it.
+++
+++**Two new pure helpers**, same zero-import/no-React pattern as the rest of the module:
+++
+++- `clubDayParts(date)` → `{ year, month, day }` — the calendar day an instant falls
+++  on *in club time*, month 0-based to match `Date`'s convention. Built on
+++  `formatToParts` off a module-level formatter pinned to `en-US` **only** because it
+++  extracts numbers, never user-visible text (a `ja-JP` numeric day returns `"24日"`).
+++  The user-facing formatters still use the reader's own locale — only the *zone* is
+++  forced, not the language.
+++- `clubToday()` — today in club time, for the "today" ring and the month the
+++  calendar opens on.
+++
+++**The calendar grid** was the subtle part. `CalendarMonth` now carries its displayed
+++month as plain `{ year, month }` numbers rather than a `Date`. That is the actual
+++fix, not a tidy-up: a `Date` is always an *instant*, and every arithmetic path on
+++one (`new Date(y, m, d)`, `getDay()`, `getDate()`) silently reads the browser's
+++zone. Day bucketing and the today-highlight now both compare `clubDayParts`. The
+++only `Date`s left in the grid are UTC-anchored throwaways used to ask "what weekday
+++is the 1st?" and "how many days in this month?" — questions about a calendar, not
+++about an instant.
+++
+++**One quiet UI note**, on the `EventDetail` date/time line only:
+++`Tue, Jul 28, 2026 · 7:30 PM · Abu Dhabi time`. Not on every list row — someone
+++scanning a list doesn't need reminding once per line; someone reading one fixture
+++from abroad does need to know 20:00 isn't their 20:00. Kept on the same line at the
+++same `white/[.85]`, set apart by weight rather than colour.
+++
+++## TDD evidence
+++
+++RED was produced honestly by stashing **only** the three source files and keeping
+++the new tests, so the failures are the tests catching the real defect rather than
+++import errors:
+++
+++```
+++$ git stash push src/lib/eventFormat.js src/screens/Schedule.jsx src/screens/EventDetail.jsx
+++$ npx vitest run tests/event-format.test.js tests/schedule.test.jsx
+++  Test Files  2 failed (2)
+++       Tests  16 failed | 61 passed (77)
+++```
+++
+++All 16 named failures were the new assertions, including the three screen-level
+++ones ("buckets a fixture into its Abu Dhabi day, not the browser's", "carries a
+++fixture into the next month when Abu Dhabi has already rolled over", "says once
+++that times are Abu Dhabi time"). The important one is behavioural, not a missing
+++export:
+++
+++```
+++$ npx vitest run tests/event-format.test.js -t "renders the Dubai wall-clock time"
+++AssertionError: expected 3 to be 1
+++  ❯ tests/event-format.test.js:361  expect(new Set(rendered).size).toBe(1)
+++```
+++
+++i.e. the unfixed `formatTime` produced **three different strings** for one instant
+++under UTC / New York / Auckland. That single line is also the proof that runtime
+++`process.env.TZ` manipulation genuinely works in this setup — had it not, the
+++assertion would have passed vacuously.
+++
+++GREEN after `git stash pop`:
+++
+++```
+++$ npx vitest run tests/event-format.test.js tests/schedule.test.jsx
+++  Test Files  2 passed (2)   Tests  77 passed (77)
+++```
+++
+++Full suite: **300 passed across 15 files** (baseline 282, +18 new), pristine output,
+++no regressions. `npm run build` clean.
+++
+++### How the tests avoid proving nothing
+++
+++The trap here is that this runner is UTC, and UTC and Dubai share a calendar day
+++for 20 hours out of every 24 — a mid-afternoon instant would pass just as happily
+++against a completely unfixed formatter. So:
+++
+++- Every pinned instant is chosen so Dubai's answer **differs** from at least one of
+++  UTC / New York / Auckland: 21:00 UTC → 01:00 the *next* Dubai day; 20:00 UTC →
+++  exactly midnight Dubai; 19:59 UTC on 31 Jul → last minute of the month; 21:00 UTC
+++  on 31 Jul → first hour of August; 20:00 UTC on 31 Dec → the club new year.
+++- The whole set is re-run under all three process zones, asserting the rendered
+++  output is **byte-identical** across them.
+++- A `withTimeZone` **guard-the-guard** test asserts the helper really does move the
+++  process zone (`getDate()` returns 24 in New York, 25 in Auckland for the same
+++  instant) — without it, every zone assertion below it could pass vacuously.
+++- The screen-level tests derive their expected month/day from an
+++  `Intl.DateTimeFormat` computed **independently of `eventFormat.js`**, so they are
+++  not just the implementation agreeing with itself, and they don't flake during the
+++  four hours a day when UTC and Dubai disagree.
+++
+++## Files changed
+++
+++- `src/lib/eventFormat.js` — `CLUB_TIME_ZONE`, `clubDayParts`, `clubToday`; the
+++  three formatters routed through the zone
+++- `src/screens/Schedule.jsx` — month state as `{year, month}`; club-local bucketing
+++  and today-highlight; UTC-anchored month labels
+++- `src/screens/EventDetail.jsx` — the "· Abu Dhabi time" suffix
+++- `tests/event-format.test.js` — new club-timezone suites (+15)
+++- `tests/schedule.test.jsx` — bucketing, month roll-over, UI-note tests (+3)
+++- `harness/stubs/events.js` — one boundary fixture at `2026-07-20T21:00:00Z`, so
+++  the browser check can *see* the cell a naive implementation gets wrong
+++
+++## Browser check
+++
+++Ran `harness/shoot-schedule.mjs` at 375px and 1280px with **both the dev server and
+++Chromium under `TZ=America/New_York`** — a browser check in UTC would have been
+++nearly as worthless as a test in UTC. Screenshots read with the Read tool, not just
+++asserted in code.
+++
+++- **Calendar, 375 & 1280.** The boundary fixture (`2026-07-20T21:00Z`) renders in
+++  the list as **JUL 21 Tue, 1:00 AM**. Under New York the old code would have shown
+++  *JUL 20 Mon, 5:00 PM*. Its dot sits in the **21st** cell; the 20th is empty.
+++- **Today ring.** Container clock was 2026-07-28 01:09 UTC = 28 Jul in Dubai, 27 Jul
+++  in New York. The ring is on **28** — so the today-highlight fix is demonstrated
+++  live, not just unit-tested.
+++- **Row geometry undisturbed.** Calendar cells uniform at 40×40 (mobile) and
+++  147×147 (desktop) across the button and div variants — the UA content-centring
+++  trap from the original task has not reopened. Zero horizontal overflow
+++  (`docWidth === innerWidth` at both widths), zero console errors, zero page errors
+++  across all 16 shots.
+++- **EventDetail line** renders correctly at both widths, and the list rows visible
+++  behind the open sheet carry no "Abu Dhabi time" — it appears exactly once.
+++
+++## Self-review findings
+++
+++1. **Fixed: a wrong contrast number in a code comment.** The comment on the new
+++   EventDetail line claimed `white/85%` on `#C21F32` measures **5.02:1**. I
+++   recomputed it independently (sRGB→linear, WCAG 4.5:1 for normal text) and it is
+++   **4.632:1**. The conclusion survives — 4.632 still clears AA, and the rejected
+++   `white/70%` alternative really is 3.55:1 (the comment's 3.53 was near enough) —
+++   but a confidently stated wrong number in a comment is worse than no number,
+++   because the next person trusts it instead of recomputing. Corrected to 4.63:1
+++   with the AA margin stated explicitly, since 4.63 against a 4.5 threshold is a
+++   thin margin worth being honest about.
+++2. **Swept for every other user-facing date/time.** Grepped `src/` for
+++   `toLocale*String`, `Intl.DateTimeFormat`, `getDate/getMonth/getFullYear/getDay/
+++   getHours`, `toDateString` and `new Date(`. Every surviving call site is either
+++   club-zoned or deliberately UTC-anchored. Separately checked for other
+++   date-bearing fields reaching the UI (`created_at`, `updated_at`, DOB/birth):
+++   there are none — `starts_at` is the only timestamp the app renders, and "age
+++   group" is a team name, not a date. Nothing is left rendering in the browser zone.
+++3. **YAGNI held.** No timezone picker, no per-user preference, no offset display for
+++   remote readers, no `date-fns-tz` dependency. `clubDayParts` and `clubToday` are
+++   both consumed by real call sites; neither is speculative.
+++4. **`--muted` ruling checked and correctly ruled inapplicable.** The `#5c5854`
+++   decision governs muted text *on paper*. This line sits on the red hero gradient
+++   at `white/[.85]`, a different context, so it was left alone rather than
+++   mechanically recoloured.
+++
+++## Note for Task 14 (flagged only — NOT implemented)
+++
+++**Task 14's event form must interpret the date and time a coach enters as Abu Dhabi
+++time when it builds `starts_at`.** This is the exact mirror image of this change. A
+++naive `new Date(\`${dateInput}T${timeInput}\`)` resolves in the *browser's* zone, so
+++a coach in the UK entering "20:00" would write `19:00Z` — a 23:00 Abu Dhabi kick-off
+++— and this screen would then faithfully render that wrong instant. Reading and
+++writing have to agree: the form needs to convert club wall-clock → UTC using
+++`CLUB_TIME_ZONE`, and the form's date field should default from `clubToday()` rather
+++than `new Date()`. Worth a test with the process zone set to something other than
+++UTC+4, for the same reason as above.
++diff --git a/harness/stubs/events.js b/harness/stubs/events.js
++index f50b471..b523ac5 100644
++--- a/harness/stubs/events.js
+++++ b/harness/stubs/events.js
++@@ -177,20 +177,38 @@ export const EVENTS = [
++     type: 'social',
++     opponent: null,
++     title: 'Committee Meeting',
++     venue: 'Quins Clubhouse',
++     home: null,
++     competition: null,
++     starts_at: '2026-07-28T18:30:00Z',
++     result_us: null,
++     result_them: null,
++   },
+++  // Day-boundary fixture, added with the Abu Dhabi timezone change. 21:00
+++  // UTC is 01:00 on the 21st in Dubai but still the 20th in UTC and London,
+++  // and 17:00 on the 20th in New York. It exists so the browser check can
+++  // see the calendar bucket it on the 21st — the cell a naive
+++  // browser-local implementation gets wrong.
+++  {
+++    id: 'e-boundary',
+++    team_id: T1,
+++    type: 'social',
+++    opponent: null,
+++    title: 'Late Night Touch',
+++    venue: VENUE,
+++    home: null,
+++    competition: null,
+++    starts_at: '2026-07-20T21:00:00Z',
+++    result_us: null,
+++    result_them: null,
+++  },
++ ]
++ 
++ export async function listEvents({ teamIds } = {}) {
++   if (Array.isArray(teamIds) && teamIds.length === 0) return []
++   if (Array.isArray(teamIds) && teamIds.length > 0) {
++     return EVENTS.filter((event) => teamIds.includes(event.team_id))
++   }
++   return EVENTS
++ }
++ 
++diff --git a/src/lib/eventFormat.js b/src/lib/eventFormat.js
++index 0aae028..421a2aa 100644
++--- a/src/lib/eventFormat.js
+++++ b/src/lib/eventFormat.js
++@@ -3,20 +3,80 @@
++ // network, no React, no global state.
++ //
++ // These live here rather than inside Schedule.jsx because both Schedule and
++ // EventDetail need them right now (Schedule imports EventDetail, so putting
++ // them in either screen would mean an import cycle or a wrong-way
++ // dependency), and Task 13's dashboard needs the same "next fixture" /
++ // "last result" vocabulary.
++ 
++ const OUTCOME = { win: 'Won', loss: 'Lost', draw: 'Drew' }
++ 
+++/**
+++ * Every event time in this app renders in Abu Dhabi time, whoever is
+++ * reading it. The club has one home ground, so "20:00" has to mean 20:00 at
+++ * Zayed Sports City for a parent checking fixtures from London as much as
+++ * for one standing on the touchline — otherwise that parent reads a 20:00
+++ * kick-off as 16:00 and turns up four hours late.
+++ *
+++ * This is an IANA zone identifier, deliberately not a fixed '+04:00'
+++ * offset. The UAE has no DST today, so the two currently agree — but an
+++ * offset is a derived fact that would silently rot if that ever changed,
+++ * whereas the zone identifier stays correct by definition. Everything here
+++ * goes through Intl's `timeZone` option rather than any local-Date getter.
+++ *
+++ * This is a PRESENTATION concern only. starts_at is timestamptz and stays
+++ * UTC in the database; upcoming-vs-past is an instant comparison and is
+++ * already zone-agnostic (see sortByStart / hasResult — neither is touched
+++ * by any of this).
+++ */
+++export const CLUB_TIME_ZONE = 'Asia/Dubai'
+++
+++// Locale is pinned to en-US here on purpose, and only here: this formatter
+++// exists to extract *numbers*, never to produce user-visible text, and a
+++// locale like ja-JP would return "24日" for a numeric day. The user-facing
+++// formatters below still use the reader's own locale.
+++//
+++// Built once at module load and reused. That is safe despite the tests
+++// changing process.env.TZ underneath it, because the timeZone is bound
+++// explicitly to CLUB_TIME_ZONE — this formatter never consults the ambient
+++// zone, which is the entire point.
+++const CLUB_PARTS_FORMAT = new Intl.DateTimeFormat('en-US', {
+++  timeZone: CLUB_TIME_ZONE,
+++  year: 'numeric',
+++  month: 'numeric',
+++  day: 'numeric',
+++})
+++
+++/**
+++ * The calendar year/month/day an instant falls on **in club time**, as
+++ * plain numbers (month is 0-based, matching Date's convention).
+++ *
+++ * This is what day-bucketing and "is this today" must be built on. A 01:00
+++ * Dubai kick-off is 21:00 the previous day in UTC and 22:00 the previous
+++ * evening in London, so reading date.getDate() would file it under the
+++ * wrong day — a wrong, visible calendar cell for whoever is reading.
+++ */
+++export function clubDayParts(date) {
+++  const parts = CLUB_PARTS_FORMAT.formatToParts(date)
+++  const value = (type) => Number(parts.find((part) => part.type === type).value)
+++  return { year: value('year'), month: value('month') - 1, day: value('day') }
+++}
+++
+++/**
+++ * Today's date in club time. Used for the calendar's "today" ring and for
+++ * which month it opens on — both of which must follow Abu Dhabi's day, not
+++ * the reader's.
+++ */
+++export function clubToday() {
+++  return clubDayParts(new Date())
+++}
+++
++ /**
++  * True when a fixture has a score recorded.
++  *
++  * This — not an elapsed date — is what makes an event a "result", matching
++  * the prototype (design-system.md §7: "'past' vs 'upcoming' is determined
++  * by event.result being non-null, not by comparing when to the current
++  * date"). A match played last week whose score nobody has entered yet is
++  * still Upcoming, which is the point: it stays visible until someone
++  * records the score. Both halves must be present — a half-entered score is
++  * not a result.
++@@ -77,40 +137,50 @@ export function eventDate(event) {
++   return Number.isNaN(date.getTime()) ? null : date
++ }
++ 
++ /**
++  * The three lines of the fixture row's date box (design-system.md §4.13):
++  * short month, day of month, short weekday.
++  */
++ export function dateBoxParts(date) {
++   if (!date) return { month: '—', day: '–', weekday: '' }
++   return {
++-    month: date.toLocaleDateString(undefined, { month: 'short' }),
++-    day: String(date.getDate()),
++-    weekday: date.toLocaleDateString(undefined, { weekday: 'short' }),
+++    month: date.toLocaleDateString(undefined, { timeZone: CLUB_TIME_ZONE, month: 'short' }),
+++    // Read off clubDayParts rather than a `day: 'numeric'` format, which in
+++    // some locales appends a unit ("24日") — the date box wants a bare
+++    // number.
+++    day: String(clubDayParts(date).day),
+++    weekday: date.toLocaleDateString(undefined, { timeZone: CLUB_TIME_ZONE, weekday: 'short' }),
++   }
++ }
++ 
++ /**
++- * "7:30 PM" — the time shown on fixture rows and in the detail sheet.
+++ * "7:30 PM" — the time shown on fixture rows and in the detail sheet,
+++ * always the Abu Dhabi wall-clock time (see CLUB_TIME_ZONE).
++  */
++ export function formatTime(date) {
++   if (!date) return 'Time to be confirmed'
++-  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+++  return date.toLocaleTimeString(undefined, {
+++    timeZone: CLUB_TIME_ZONE,
+++    hour: 'numeric',
+++    minute: '2-digit',
+++  })
++ }
++ 
++ /**
++- * "Fri, 24 Jul 2026" — the long form used in the detail sheet header.
+++ * "Fri, 24 Jul 2026" — the long form used in the detail sheet header,
+++ * always the Abu Dhabi calendar date.
++  */
++ export function formatLongDate(date) {
++   if (!date) return 'Date to be confirmed'
++   return date.toLocaleDateString(undefined, {
+++    timeZone: CLUB_TIME_ZONE,
++     weekday: 'short',
++     day: 'numeric',
++     month: 'short',
++     year: 'numeric',
++   })
++ }
++ 
++ /**
++  * Sorts events by start time. Ascending for what's coming up, descending
++  * for results (most recent first). Never mutates the input array. Events
++diff --git a/src/screens/EventDetail.jsx b/src/screens/EventDetail.jsx
++index bce0665..1c0f2af 100644
++--- a/src/screens/EventDetail.jsx
+++++ b/src/screens/EventDetail.jsx
++@@ -177,22 +177,35 @@ export default function EventDetail({ event, team, onClose }) {
++ 
++   return (
++     <Sheet open onClose={onClose} title={typeLabel}>
++       {/* Negative margins bleed the hero to the sheet's edges, matching the
++           prototype's .detail-hero (design-system.md §4.21). */}
++       <div className="-mx-[18px] -mt-4 mb-4 bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] px-[18px] py-[22px] text-white">
++         <div className="mb-3 grid h-14 w-14 place-items-center rounded-[14px] bg-white/20">
++           <Icon className="h-7 w-7" aria-hidden="true" />
++         </div>
++         <h3 className="text-[22px] font-bold leading-tight">{eventTitle(event)}</h3>
+++        {/* Every time in the app is Abu Dhabi time (see CLUB_TIME_ZONE), and
+++            this line is the one place that says so. It belongs here and not
+++            on every fixture row: someone scanning the list doesn't need
+++            reminding once per line, but someone reading a single fixture
+++            from abroad does need to know that 20:00 isn't their 20:00.
+++            Kept on the same line, at the same white/85% as the rest of it —
+++            that measures 4.63:1 against the lightest point of the hero
+++            gradient (quinsRed #C21F32) and so clears AA for normal text,
+++            where dropping to white/70% for emphasis would have fallen to
+++            3.55:1 and failed. It is set apart by weight instead. The
+++            --muted-on-paper rule (#5c5854, not #77726e) doesn't apply here:
+++            this sits on the gradient, not on paper. */}
++         <p className="mt-1 text-sm font-semibold text-white/[.85]">
++           {formatLongDate(date)} · {formatTime(date)}
+++          {date && <span className="font-normal"> · Abu Dhabi time</span>}
++         </p>
++       </div>
++ 
++       <div className="mb-4">
++         <KeyValue label="Type">
++           {typeLabel}
++           {event.type === 'match' ? ` · ${event.home ? 'Home' : 'Away'}` : ''}
++         </KeyValue>
++         <KeyValue label="Age group">{team?.name ?? 'Not set'}</KeyValue>
++         <KeyValue label="Venue">{event.venue || 'To be confirmed'}</KeyValue>
++diff --git a/src/screens/Schedule.jsx b/src/screens/Schedule.jsx
++index 86b43f9..4be7e74 100644
++--- a/src/screens/Schedule.jsx
+++++ b/src/screens/Schedule.jsx
++@@ -3,20 +3,22 @@ import Card from '../components/Card.jsx'
++ import Chip from '../components/Chip.jsx'
++ import Empty from '../components/Empty.jsx'
++ import ScopeNote from '../components/ScopeNote.jsx'
++ import Spinner from '../components/Spinner.jsx'
++ import TeamPills, { ALL_TEAMS_ID, PillButton } from '../components/TeamPills.jsx'
++ import EventDetail from './EventDetail.jsx'
++ import { listEvents, subscribeEvents } from '../data/events.js'
++ import { useMemberships } from '../lib/memberships.jsx'
++ import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
++ import {
+++  clubDayParts,
+++  clubToday,
++   dateBoxParts,
++   eventDate,
++   eventTitle,
++   formatTime,
++   hasResult,
++   resultLabel,
++   resultOutcome,
++   resultScore,
++   sortByStart,
++ } from '../lib/eventFormat.js'
++@@ -84,28 +86,40 @@ function PinIcon(props) {
++ }
++ 
++ function ChevronIcon({ direction = 'left', ...props }) {
++   return (
++     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++       <path d={direction === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'} />
++     </svg>
++   )
++ }
++ 
++-function startOfMonth(date) {
++-  return new Date(date.getFullYear(), date.getMonth(), 1)
+++// The calendar carries its displayed month as plain { year, month } numbers
+++// rather than a Date. That is deliberate: a Date is always an instant, and
+++// every arithmetic path on one (new Date(y, m, d), getDay(), getDate())
+++// silently reads the *browser's* zone. The club's calendar is Abu Dhabi's,
+++// so the grid is built from numbers and the only Dates involved are
+++// UTC-anchored throwaways used purely to ask "what weekday is the 1st?" and
+++// "how many days has this month got?" — questions about a calendar, not
+++// about an instant. See CLUB_TIME_ZONE in src/lib/eventFormat.js.
+++function monthAnchor(year, month, day = 1) {
+++  return new Date(Date.UTC(year, month, day))
++ }
++ 
++-function isSameDay(a, b) {
++-  return (
++-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
++-  )
+++function shiftMonth({ year, month }, delta) {
+++  const anchor = monthAnchor(year, month + delta)
+++  return { year: anchor.getUTCFullYear(), month: anchor.getUTCMonth() }
+++}
+++
+++function currentClubMonth() {
+++  const { year, month } = clubToday()
+++  return { year, month }
++ }
++ 
++ function FixtureRow({ event, teamName, onSelect }) {
++   const date = eventDate(event)
++   const { month, day, weekday } = dateBoxParts(date)
++   const played = hasResult(event)
++ 
++   return (
++     <button
++       type="button"
++@@ -165,61 +179,72 @@ function FixtureList({ events, teamsById, onSelect, emptyMessage }) {
++           event={event}
++           teamName={teamsById.get(event.team_id)?.name}
++           onSelect={onSelect}
++         />
++       ))}
++     </Card>
++   )
++ }
++ 
++ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
++-  const year = month.getFullYear()
++-  const monthIndex = month.getMonth()
++-  const leadingBlanks = new Date(year, monthIndex, 1).getDay()
++-  const dayCount = new Date(year, monthIndex + 1, 0).getDate()
++-  const today = new Date()
++-
++-  // Only this month's events, bucketed by day-of-month. The prototype
++-  // renders leading blanks only (no trailing ones) — design-system.md §4.14.
+++  const { year, month: monthIndex } = month
+++  const firstOfMonth = monthAnchor(year, monthIndex)
+++  const leadingBlanks = firstOfMonth.getUTCDay()
+++  const dayCount = monthAnchor(year, monthIndex + 1, 0).getUTCDate()
+++  const today = clubToday()
+++
+++  // Bucketed by the event's ABU DHABI day, not the reader's. A 01:00 Dubai
+++  // kick-off is 21:00 the previous day in UTC and 22:00 the previous
+++  // evening in London, so bucketing on the browser's local day would drop
+++  // that fixture into the cell before the one it belongs in — and for a
+++  // fixture on the 1st, into the previous month entirely.
+++  // The prototype renders leading blanks only, no trailing ones
+++  // (design-system.md §4.14).
++   const byDay = new Map()
++   const monthEvents = []
++   events.forEach((event) => {
++     const date = eventDate(event)
++-    if (!date || date.getFullYear() !== year || date.getMonth() !== monthIndex) return
+++    if (!date) return
+++    const parts = clubDayParts(date)
+++    if (parts.year !== year || parts.month !== monthIndex) return
++     monthEvents.push(event)
++-    const bucket = byDay.get(date.getDate()) ?? []
+++    const bucket = byDay.get(parts.day) ?? []
++     bucket.push(event)
++-    byDay.set(date.getDate(), bucket)
+++    byDay.set(parts.day, bucket)
++   })
++ 
++-  const shiftMonth = (delta) => onMonthChange(new Date(year, monthIndex + delta, 1))
+++  const goToMonth = (delta) => onMonthChange(shiftMonth(month, delta))
++ 
++   return (
++     <>
++       <Card className="p-[14px]">
++         <div className="mb-3 flex items-center justify-between">
++           <b className="text-base font-extrabold text-[#221f1d]">
++-            {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+++            {firstOfMonth.toLocaleDateString(undefined, {
+++              timeZone: 'UTC',
+++              month: 'long',
+++              year: 'numeric',
+++            })}
++           </b>
++           <div className="flex gap-2">
++             <button
++               type="button"
++               aria-label="Previous month"
++-              onClick={() => shiftMonth(-1)}
+++              onClick={() => goToMonth(-1)}
++               className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-[#f2edf4] text-[#221f1d] transition hover:bg-[#e6e3e1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed"
++             >
++               <ChevronIcon direction="left" className="h-4 w-4" aria-hidden="true" />
++             </button>
++             <button
++               type="button"
++               aria-label="Next month"
++-              onClick={() => shiftMonth(1)}
+++              onClick={() => goToMonth(1)}
++               className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-[#f2edf4] text-[#221f1d] transition hover:bg-[#e6e3e1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed"
++             >
++               <ChevronIcon direction="right" className="h-4 w-4" aria-hidden="true" />
++             </button>
++           </div>
++         </div>
++ 
++         <div className="grid grid-cols-7 gap-[5px]">
++           {WEEKDAYS.map((weekday) => (
++             <div key={weekday} className="text-center text-[10.5px] font-extrabold uppercase text-[#77726e]">
++@@ -227,21 +252,21 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
++             </div>
++           ))}
++ 
++           {Array.from({ length: leadingBlanks }, (_, index) => (
++             <div key={`blank-${index}`} aria-hidden="true" />
++           ))}
++ 
++           {Array.from({ length: dayCount }, (_, index) => {
++             const dayNumber = index + 1
++             const dayEvents = byDay.get(dayNumber) ?? []
++-            const isToday = isSameDay(new Date(year, monthIndex, dayNumber), today)
+++            const isToday = today.year === year && today.month === monthIndex && today.day === dayNumber
++             // CELL_LAYOUT is shared verbatim by both variants, and it is what
++             // keeps them aligned. A day with events must be a <button> for
++             // keyboard access, and Chromium's UA stylesheet lays a button's
++             // content out centred inside its box — so with only `p-[5px]` the
++             // number floated in the middle of a populated cell while its empty
++             // <div> neighbours sat top-left (measured 66px vs 8px from the top
++             // at 1280px, where the cells are 147px tall: the grid read as
++             // broken). Making every cell an explicit flex container with
++             // start alignment overrides that UA layout, so both variants place
++             // the number identically at any cell size. Do not move any of
++@@ -259,21 +284,21 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
++                 </div>
++               )
++             }
++ 
++             return (
++               <button
++                 key={dayNumber}
++                 type="button"
++                 data-testid="calendar-day"
++                 onClick={() => onSelect(dayEvents[0].id)}
++-                aria-label={`${dayNumber} ${month.toLocaleDateString(undefined, { month: 'long' })}, ${dayEvents.length} ${dayEvents.length === 1 ? 'event' : 'events'}`}
+++                aria-label={`${dayNumber} ${firstOfMonth.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long' })}, ${dayEvents.length} ${dayEvents.length === 1 ? 'event' : 'events'}`}
++                 className={`${cellClasses} transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed`}
++               >
++                 {dayNumber}
++                 <span className="absolute bottom-1 left-1 flex gap-0.5" aria-hidden="true">
++                   {dayEvents.slice(0, 4).map((event) => (
++                     <span
++                       key={event.id}
++                       className={['h-1.5 w-1.5 rounded-full', DOT_COLOURS[event.type] ?? 'bg-[#77726e]'].join(' ')}
++                     />
++                   ))}
++@@ -308,21 +333,21 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
++ export default function Schedule() {
++   const { memberships, teams } = useMemberships()
++ 
++   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
++   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
++   const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
++ 
++   const [tab, setTab] = useState('upcoming')
++   const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
++   const [selectedEventId, setSelectedEventId] = useState(null)
++-  const [month, setMonth] = useState(() => startOfMonth(new Date()))
+++  const [month, setMonth] = useState(currentClubMonth)
++ 
++   const [events, setEvents] = useState([])
++   const [loading, setLoading] = useState(true)
++   const [error, setError] = useState(null)
++   const [reloadToken, setReloadToken] = useState(0)
++ 
++   // `loading` means "a fetch is in flight", which is true of a background
++   // realtime refresh as much as of the first load. What must NOT be true of
++   // a refresh is blanking the screen — see isFirstLoad below.
++   useEffect(() => {
++diff --git a/tests/event-format.test.js b/tests/event-format.test.js
++index 1f708bb..fd16d6b 100644
++--- a/tests/event-format.test.js
+++++ b/tests/event-format.test.js
++@@ -1,12 +1,15 @@
++ import { describe, it, expect } from 'vitest'
++ import {
+++  CLUB_TIME_ZONE,
+++  clubDayParts,
+++  clubToday,
++   dateBoxParts,
++   eventDate,
++   eventTitle,
++   formatLongDate,
++   formatTime,
++   hasResult,
++   resultLabel,
++   resultOutcome,
++   resultScore,
++   sortByStart,
++@@ -180,10 +183,211 @@ describe('sortByStart', () => {
++     const other = { id: 'other', starts_at: null }
++     expect(sortByStart([undated, other]).map((e) => e.id)).toEqual(['undated', 'other'])
++   })
++ 
++   it('does not mutate the array it was given', () => {
++     const input = [c, a, b]
++     sortByStart(input)
++     expect(input.map((e) => e.id)).toEqual(['c', 'a', 'b'])
++   })
++ })
+++
+++// --- Club timezone -------------------------------------------------------
+++//
+++// Jay's ruling: every event time renders in Abu Dhabi time, whoever is
+++// reading. "20:00" must mean 20:00 at Zayed Sports City for a parent in
+++// London as much as for one in Abu Dhabi.
+++//
+++// The trap in testing this is that the defect is invisible on a machine
+++// whose clock agrees with the assertion. This runner defaults to UTC, and
+++// UTC and Dubai share a calendar day for 20 hours out of every 24 — so a
+++// test using a mid-afternoon instant would pass just as happily against a
+++// completely unfixed formatter. Every instant below is therefore chosen so
+++// that Dubai's answer differs from at least one of UTC, New York and
+++// Auckland, and the whole set is run under all three process zones.
+++
+++const HOSTILE_ZONES = ['UTC', 'America/New_York', 'Pacific/Auckland']
+++
+++function withTimeZone(zone, fn) {
+++  const previous = process.env.TZ
+++  process.env.TZ = zone
+++  try {
+++    return fn()
+++  } finally {
+++    if (previous === undefined) delete process.env.TZ
+++    else process.env.TZ = previous
+++  }
+++}
+++
+++// 21:00 UTC on 24 Jul = 01:00 on the 25th in Dubai (UTC+4).
+++//   UTC       -> 24th 21:00
+++//   New York  -> 24th 17:00
+++//   Auckland  -> 25th 09:00   (agrees with Dubai on the day, not the time)
+++const NEXT_DAY_IN_DUBAI = new Date('2026-07-24T21:00:00Z')
+++
+++// 13:00 UTC on 24 Jul = 17:00 on the 24th in Dubai.
+++//   UTC/New York -> 24th
+++//   Auckland     -> 25th      (disagrees with Dubai on the day)
+++const SAME_DAY_IN_DUBAI = new Date('2026-07-24T13:00:00Z')
+++
+++// 20:00 UTC = exactly 00:00 on the 25th in Dubai — the midnight boundary.
+++const MIDNIGHT_IN_DUBAI = new Date('2026-07-24T20:00:00Z')
+++
+++// 19:59 UTC on 31 Jul = 23:59 on the 31st in Dubai: last minute of the month.
+++const LAST_MINUTE_OF_JULY = new Date('2026-07-31T19:59:00Z')
+++
+++// 21:00 UTC on 31 Jul = 01:00 on 1 Aug in Dubai: first minute of the next
+++// month, and the case that puts a fixture in the wrong calendar cell.
+++const FIRST_HOUR_OF_AUGUST = new Date('2026-07-31T21:00:00Z')
+++
+++describe('club timezone', () => {
+++  it('is the IANA zone identifier, not a fixed offset', () => {
+++    // An offset would be a derived fact that silently rots if the UAE ever
+++    // adopts DST; the zone identifier is the durable abstraction.
+++    expect(CLUB_TIME_ZONE).toBe('Asia/Dubai')
+++  })
+++
+++  // Guard the guard. If Node ever stopped honouring a runtime TZ change,
+++  // every zone assertion below would pass vacuously and prove nothing.
+++  it('the withTimeZone helper really does change the process zone', () => {
+++    expect(withTimeZone('America/New_York', () => NEXT_DAY_IN_DUBAI.getDate())).toBe(24)
+++    expect(withTimeZone('Pacific/Auckland', () => NEXT_DAY_IN_DUBAI.getDate())).toBe(25)
+++    expect(withTimeZone('UTC', () => NEXT_DAY_IN_DUBAI.getHours())).toBe(21)
+++  })
+++})
+++
+++describe('clubDayParts', () => {
+++  it('reports the Dubai calendar day, not the process one', () => {
+++    HOSTILE_ZONES.forEach((zone) => {
+++      withTimeZone(zone, () => {
+++        // 01:00 on the 25th in Dubai.
+++        expect(clubDayParts(NEXT_DAY_IN_DUBAI)).toEqual({ year: 2026, month: 6, day: 25 })
+++        // 17:00 on the 24th in Dubai — Auckland would say the 25th.
+++        expect(clubDayParts(SAME_DAY_IN_DUBAI)).toEqual({ year: 2026, month: 6, day: 24 })
+++      })
+++    })
+++  })
+++
+++  it('handles the midnight boundary', () => {
+++    HOSTILE_ZONES.forEach((zone) => {
+++      withTimeZone(zone, () => {
+++        expect(clubDayParts(MIDNIGHT_IN_DUBAI)).toEqual({ year: 2026, month: 6, day: 25 })
+++      })
+++    })
+++  })
+++
+++  it('handles a month boundary in both directions', () => {
+++    HOSTILE_ZONES.forEach((zone) => {
+++      withTimeZone(zone, () => {
+++        expect(clubDayParts(LAST_MINUTE_OF_JULY)).toEqual({ year: 2026, month: 6, day: 31 })
+++        // The one that would land a fixture in the wrong month's grid.
+++        expect(clubDayParts(FIRST_HOUR_OF_AUGUST)).toEqual({ year: 2026, month: 7, day: 1 })
+++      })
+++    })
+++  })
+++
+++  it('rolls the year over at the club new year', () => {
+++    // 20:00 UTC on 31 Dec 2026 = 00:00 on 1 Jan 2027 in Dubai.
+++    HOSTILE_ZONES.forEach((zone) => {
+++      withTimeZone(zone, () => {
+++        expect(clubDayParts(new Date('2026-12-31T20:00:00Z'))).toEqual({ year: 2027, month: 0, day: 1 })
+++      })
+++    })
+++  })
+++})
+++
+++describe('clubToday', () => {
+++  it('returns the club-local date for right now, whatever the process zone', () => {
+++    const reference = (zone) =>
+++      withTimeZone(zone, () => {
+++        const now = new Date()
+++        const parts = new Intl.DateTimeFormat('en-US', {
+++          timeZone: 'Asia/Dubai',
+++          year: 'numeric',
+++          month: 'numeric',
+++          day: 'numeric',
+++        }).formatToParts(now)
+++        const get = (type) => Number(parts.find((part) => part.type === type).value)
+++        return { today: clubToday(), expected: { year: get('year'), month: get('month') - 1, day: get('day') } }
+++      })
+++
+++    HOSTILE_ZONES.forEach((zone) => {
+++      const { today, expected } = reference(zone)
+++      expect(today).toEqual(expected)
+++    })
+++  })
+++})
+++
+++describe('dateBoxParts in club time', () => {
+++  it('shows the Dubai day for a fixture that falls on the next Dubai day', () => {
+++    HOSTILE_ZONES.forEach((zone) => {
+++      withTimeZone(zone, () => {
+++        expect(dateBoxParts(NEXT_DAY_IN_DUBAI).day).toBe('25')
+++        expect(dateBoxParts(SAME_DAY_IN_DUBAI).day).toBe('24')
+++        expect(dateBoxParts(MIDNIGHT_IN_DUBAI).day).toBe('25')
+++        expect(dateBoxParts(FIRST_HOUR_OF_AUGUST).day).toBe('1')
+++      })
+++    })
+++  })
+++
+++  it('renders byte-identically under every process zone', () => {
+++    // Exact-output pinning that does not depend on the runner's locale:
+++    // whatever the strings are, they must not vary with the process zone.
+++    ;[NEXT_DAY_IN_DUBAI, SAME_DAY_IN_DUBAI, MIDNIGHT_IN_DUBAI, FIRST_HOUR_OF_AUGUST].forEach((instant) => {
+++      const rendered = HOSTILE_ZONES.map((zone) => withTimeZone(zone, () => JSON.stringify(dateBoxParts(instant))))
+++      expect(new Set(rendered).size).toBe(1)
+++    })
+++  })
+++
+++  it('reports the month and weekday of the Dubai day, not the process day', () => {
+++    HOSTILE_ZONES.forEach((zone) => {
+++      withTimeZone(zone, () => {
+++        // 1 Aug 2026 in Dubai is a Saturday; 31 Jul is a Friday. A formatter
+++        // reading the process zone would say Friday/July here under UTC.
+++        const parts = dateBoxParts(FIRST_HOUR_OF_AUGUST)
+++        expect(parts.month).toBe(
+++          new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', month: 'short' }).format(Date.UTC(2026, 7, 1)),
+++        )
+++        expect(parts.weekday).toBe(
+++          new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', weekday: 'short' }).format(Date.UTC(2026, 7, 1)),
+++        )
+++      })
+++    })
+++  })
+++})
+++
+++describe('formatTime / formatLongDate in club time', () => {
+++  it('renders the Dubai wall-clock time under every process zone', () => {
+++    const rendered = HOSTILE_ZONES.map((zone) => withTimeZone(zone, () => formatTime(NEXT_DAY_IN_DUBAI)))
+++    expect(new Set(rendered).size).toBe(1)
+++    // 01:00 in Dubai — "1:00" in 12-hour locales, "01:00" in 24-hour ones.
+++    expect(rendered[0]).toMatch(/\b0?1:00\b/)
+++    // and specifically NOT the 21:00/9:00 the raw UTC instant would give.
+++    expect(rendered[0]).not.toMatch(/\b(21:00|9:00)\b/)
+++  })
+++
+++  it('renders midnight in Dubai, not the previous evening elsewhere', () => {
+++    const rendered = HOSTILE_ZONES.map((zone) => withTimeZone(zone, () => formatTime(MIDNIGHT_IN_DUBAI)))
+++    expect(new Set(rendered).size).toBe(1)
+++    expect(rendered[0]).toMatch(/\b(12:00|00:00|0:00)\b/)
+++  })
+++
+++  it('renders the Dubai calendar date in the long form under every process zone', () => {
+++    const rendered = HOSTILE_ZONES.map((zone) => withTimeZone(zone, () => formatLongDate(NEXT_DAY_IN_DUBAI)))
+++    expect(new Set(rendered).size).toBe(1)
+++    expect(rendered[0]).toContain('25')
+++    expect(rendered[0]).toContain('2026')
+++  })
+++
+++  it('carries the long date into the next month at a month boundary', () => {
+++    const rendered = HOSTILE_ZONES.map((zone) => withTimeZone(zone, () => formatLongDate(FIRST_HOUR_OF_AUGUST)))
+++    expect(new Set(rendered).size).toBe(1)
+++    const august = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', month: 'short' }).format(Date.UTC(2026, 7, 1))
+++    expect(rendered[0]).toContain(august)
+++  })
+++
+++  it('keeps its null fallbacks', () => {
+++    expect(formatTime(null)).toBe('Time to be confirmed')
+++    expect(formatLongDate(null)).toBe('Date to be confirmed')
+++    expect(dateBoxParts(null)).toEqual({ month: '—', day: '–', weekday: '' })
+++  })
+++})
++diff --git a/tests/schedule.test.jsx b/tests/schedule.test.jsx
++index 6d332d8..284027c 100644
++--- a/tests/schedule.test.jsx
+++++ b/tests/schedule.test.jsx
++@@ -301,29 +301,106 @@ describe('Schedule — scope note', () => {
++   it('shows no scope note to an admin', async () => {
++     setup()
++ 
++     await screen.findByText('Quins vs Dubai Exiles')
++     expect(screen.queryByText(/you're seeing/i)).not.toBeInTheDocument()
++     expect(screen.getByText('All squads')).toBeInTheDocument()
++   })
++ })
++ 
++ describe('Schedule — calendar tab', () => {
+++  // The displayed month follows the CLUB's today (Abu Dhabi), not the
+++  // runner's. Those differ for the last four hours of every UTC day, so
+++  // deriving the expectation from `new Date()` would flake nightly. This
+++  // computes the reference independently of src/lib/eventFormat.js, so the
+++  // assertions are not just the implementation agreeing with itself.
+++  const dubaiToday = () => {
+++    const parts = new Intl.DateTimeFormat('en-US', {
+++      timeZone: 'Asia/Dubai',
+++      year: 'numeric',
+++      month: 'numeric',
+++      day: 'numeric',
+++    }).formatToParts(new Date())
+++    const get = (type) => Number(parts.find((part) => part.type === type).value)
+++    return { year: get('year'), month: get('month') - 1, day: get('day') }
+++  }
+++
+++  // Month names are read off a UTC-anchored instant so they never depend on
+++  // the process zone either.
+++  const monthName = (year, month) =>
+++    new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', month: 'long' }).format(Date.UTC(year, month, 1))
+++
++   const monthLabel = (offset = 0) => {
++-    const d = new Date()
++-    // Anchor to the 1st before shifting, so a 31st never rolls past a
++-    // 30-day month the way `setMonth` on the 31st would.
++-    d.setDate(1)
++-    d.setMonth(d.getMonth() + offset)
++-    return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+++    const { year, month } = dubaiToday()
+++    const anchor = new Date(Date.UTC(year, month + offset, 1))
+++    return anchor.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long', year: 'numeric' })
++   }
++ 
+++  const inTimeZone = async (zone, fn) => {
+++    const previous = process.env.TZ
+++    process.env.TZ = zone
+++    try {
+++      await fn()
+++    } finally {
+++      if (previous === undefined) delete process.env.TZ
+++      else process.env.TZ = previous
+++    }
+++  }
+++
+++  // 21:00 UTC is 01:00 the NEXT day in Dubai. A grid that buckets by the
+++  // browser's local day puts this fixture in the wrong cell — visibly wrong
+++  // to a coach, and the kind of defect that only shows up outside UTC+4.
+++  it('buckets a fixture into its Abu Dhabi day, not the browser\'s', async () => {
+++    await inTimeZone('America/New_York', async () => {
+++      const { year, month } = dubaiToday()
+++      // Mid-month, so the roll-forward can never leave the displayed month
+++      // and turn this into a month-boundary test by accident.
+++      const startsAt = new Date(Date.UTC(year, month, 15, 21, 0)).toISOString()
+++      listEventsMock.mockResolvedValue([{ ...UPCOMING_MATCH, starts_at: startsAt }])
+++
+++      const { user } = setup()
+++
+++      await screen.findByText('Quins vs Dubai Exiles')
+++      await user.click(screen.getByRole('button', { name: 'Calendar' }))
+++
+++      const name = monthName(year, month)
+++      expect(screen.getByRole('button', { name: `16 ${name}, 1 event` })).toBeInTheDocument()
+++      expect(screen.queryByRole('button', { name: new RegExp(`^15 ${name},`) })).not.toBeInTheDocument()
+++    })
+++  })
+++
+++  it('carries a fixture into the next month when Abu Dhabi has already rolled over', async () => {
+++    await inTimeZone('America/New_York', async () => {
+++      const { year, month } = dubaiToday()
+++      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+++      // 21:00 UTC on the last day of the month = 01:00 on the 1st next month
+++      // in Dubai.
+++      const startsAt = new Date(Date.UTC(year, month, lastDay, 21, 0)).toISOString()
+++      listEventsMock.mockResolvedValue([{ ...UPCOMING_MATCH, starts_at: startsAt }])
+++
+++      const { user } = setup()
+++
+++      await screen.findByText('Quins vs Dubai Exiles')
+++      await user.click(screen.getByRole('button', { name: 'Calendar' }))
+++
+++      // Nothing at all in this month's grid: every populated cell is a button
+++      // whose name ends in "N event(s)".
+++      expect(screen.queryAllByRole('button', { name: /, \d+ events?$/ })).toHaveLength(0)
+++      expect(screen.getByText(/nothing is scheduled this month/i)).toBeInTheDocument()
+++
+++      await user.click(screen.getByRole('button', { name: /next month/i }))
+++
+++      const nextName = monthName(year, month + 1)
+++      expect(screen.getByRole('button', { name: `1 ${nextName}, 1 event` })).toBeInTheDocument()
+++    })
+++  })
+++
++   // A day with events has to be a <button> for keyboard access; a day
++   // without one stays a <div>. Chromium's UA stylesheet lays a button's
++   // content out centred inside its box, so the two variants silently drifted
++   // apart vertically — populated days floated mid-cell while their empty
++   // neighbours sat top-left (measured 66px vs 8px from the cell top at
++   // 1280px). jsdom applies no UA stylesheet and computes no layout, so no
++   // rendering assertion here could ever catch that. The testable invariant
++   // is that both variants carry the same alignment classes, which is what
++   // pins the number to the same place in either.
++   it('aligns populated and empty day cells identically', async () => {
++@@ -425,20 +502,32 @@ describe('Schedule — event detail sheet', () => {
++     const { user } = setup()
++ 
++     await user.click(await screen.findByRole('button', { name: /Dubai Exiles/ }))
++ 
++     const dialog = screen.getByRole('dialog')
++     expect(within(dialog).getByText('Zayed Sports City')).toBeInTheDocument()
++     expect(within(dialog).getByText('West Asia Premiership')).toBeInTheDocument()
++     expect(within(dialog).getByText('U10')).toBeInTheDocument()
++   })
++ 
+++  it('says once that times are Abu Dhabi time, on the date line only', async () => {
+++    const { user } = setup()
+++
+++    await user.click(await screen.findByRole('button', { name: /Dubai Exiles/ }))
+++
+++    const dialog = screen.getByRole('dialog')
+++    // On the detail sheet's date/time line...
+++    expect(within(dialog).getByText(/Abu Dhabi time/)).toBeInTheDocument()
+++    // ...and exactly once, not once per fixture row behind it.
+++    expect(screen.getAllByText(/Abu Dhabi time/)).toHaveLength(1)
+++  })
+++
++   it('summarises availability for an upcoming fixture', async () => {
++     listAvailabilityMock.mockResolvedValue([
++       { id: 'a1', player_id: 'p1', status: 'in' },
++       { id: 'a2', player_id: 'p2', status: 'in' },
++       { id: 'a3', player_id: 'p3', status: 'maybe' },
++       { id: 'a4', player_id: 'p4', status: 'out' },
++     ])
++ 
++     const { user } = setup()
++ 
+diff --git a/.superpowers/sdd/quins-v1-mvp/task-11-report.md b/.superpowers/sdd/quins-v1-mvp/task-11-report.md
+index 29ed971..01f721d 100644
+--- a/.superpowers/sdd/quins-v1-mvp/task-11-report.md
++++ b/.superpowers/sdd/quins-v1-mvp/task-11-report.md
+@@ -730,10 +730,133 @@ asserted in code.
+ 
+ **Task 14's event form must interpret the date and time a coach enters as Abu Dhabi
+ time when it builds `starts_at`.** This is the exact mirror image of this change. A
+ naive `new Date(\`${dateInput}T${timeInput}\`)` resolves in the *browser's* zone, so
+ a coach in the UK entering "20:00" would write `19:00Z` — a 23:00 Abu Dhabi kick-off
+ — and this screen would then faithfully render that wrong instant. Reading and
+ writing have to agree: the form needs to convert club wall-clock → UTC using
+ `CLUB_TIME_ZONE`, and the form's date field should default from `clubToday()` rather
+ than `new Date()`. Worth a test with the process zone set to something other than
+ UTC+4, for the same reason as above.
++
++---
++
++# Fix round on the amendment (review findings 1–3)
++
++Tests and docs only. **No production behaviour changed** — `eventFormat.js`,
++`Schedule.jsx` and `EventDetail.jsx` are byte-identical to `7c58d41`. The
++"today" code needed no refactor to be testable: `vi.useFakeTimers({ toFake:
++['Date'] })` controls the clock without faking `setTimeout`, so the RTL
++`waitFor` trap documented at the top of `tests/schedule.test.jsx` is avoided
++and `clubToday()` could be tested exactly as it is written.
++
++## Finding 1 — two pre-existing tests were zone-dependent
++
++`tests/event-format.test.js` built two fixtures with the browser-local
++constructor `new Date(2026, 6, 24, 17, 0)` and asserted the club day was `24`.
++That was zone-proof before this task (local in, local out, both moving
++together) and stopped being so the moment the formatters were pinned to
++`Asia/Dubai`.
++
++**Reproduced before touching anything:**
++
++```
++$ TZ=America/New_York npx vitest run tests/event-format.test.js
++ FAIL  dateBoxParts > splits a date into month, day and weekday
++   AssertionError: expected '25' to be '24'   (tests/event-format.test.js:136)
++ FAIL  formatTime / formatLongDate > formats a real date without leaking "Invalid Date"
++   AssertionError: expected 'Sat, Jul 25, 2026' to contain '24'   (:152)
++ Tests  2 failed | 41 passed (43)
++```
++
++17:00 in New York is 21:00 UTC is 01:00 on the **25th** in Dubai — exactly the
++predicted failure.
++
++**Fix.** Both fixtures now use `new Date(Date.UTC(2026, 6, 23, 21, 0))` — an
++unambiguous instant. It is deliberately *not* a mid-afternoon same-day case:
++21:00 UTC on the 23rd is 01:00 on the **24th** in Dubai, so the assertions keep
++their original expected values (`day === '24'`, long date containing `24`) while
++now being a genuine day-boundary crossing that anything reading the browser's
++own day answers `23` to, under both UTC and New York. Comments at both sites
++record why the local constructor must not come back.
++
++## Finding 2 — the club-local "today" ring had no coverage
++
++New test in `tests/schedule.test.jsx`: **"rings the Abu Dhabi today, not the
++browser's"**. Clock pinned to `2026-07-20T21:00:00Z` — 01:00 on the **21st** in
++Dubai, still the **20th** in New York (17:00) and in UTC, so the correct cell and
++the browser-local cell differ under either process zone. Asserts exactly one
++cell carries `border-quinsRed`, that it is `cells[20]` (the 21st), and that
++`cells[19]` (the browser-local day) carries the plain `border-[#e6e3e1]`
++instead. Two guard-the-guard assertions first confirm the fake clock is really
++in force (`new Date().toISOString()`) and that the browser day really is 20.
++
++**RED — today calculation reverted to browser-local** (`const now = new Date();
++const today = { year: now.getFullYear(), month: now.getMonth(), day:
++now.getDate() }`):
++
++```
++$ npx vitest run tests/schedule.test.jsx
++ FAIL  Schedule — calendar tab > rings the Abu Dhabi today, not the browser’s
++   expected element  class="... border-[#e6e3e1]">21</div>
++   received element  class="... border-quinsRed shadow-[inset_0_0_0_1px_...]">20</div>
++   ❯ tests/schedule.test.jsx:437
++ Tests  1 failed | 34 passed (35)
++```
++
++Note the `34 passed`: that is the reviewer's finding reproduced exactly — the
++whole pre-existing suite is blind to this regression, and only the new test
++catches it.
++
++**GREEN — real implementation restored, no other change:**
++
++```
++$ npx vitest run tests/schedule.test.jsx
++ Test Files  1 passed (1)   Tests  35 passed (35)
++```
++
++## Finding 3 — docs still specified the rejected fixed-offset model
++
++`docs/design-system.md`:
++
++- **§7 Event object, the `when` line.** Was "ISO-ish local datetime string …
++  (needs real timezone-aware timestamptz in Supabase; UAE is UTC+4 fixed, no
++  DST)". Now marks `when` as prototype-only and states that `events.starts_at`
++  is already a real `timestamptz`. Followed by a new **timezone note** covering
++  the actual model: storage is an absolute instant; rendering goes through
++  `Intl` with `timeZone: 'Asia/Dubai'` via `CLUB_TIME_ZONE`; **do not hardcode
++  `+04:00`**; day-bucketing and "today" use `clubDayParts`/`clubToday`; and the
++  Task 14 write-side mirror (a coach's typed time is club wall-clock and must be
++  converted to UTC — a naive `new Date(\`${d}T${t}\`)` stores a UK coach's 20:00
++  as 19:00Z).
++- **§4.21 Detail hero.** Subtitle spec now shows the trailing `· Abu Dhabi time`
++  and records the deliberate weight distinction: the note is `font-normal`
++  against the date's `font-semibold`, both at `white/85%`, because de-emphasising
++  by *colour* (`white/70%`) would drop contrast to 3.55:1 and fail AA, while
++  `white/85%` on `#C21F32` measures 4.63:1 and passes.
++
++**Swept the whole document** (the Task 12 jersey-number precedent), grepping for
++`timezone|time zone|UTC|offset|timestamptz|toLocale|starts_at|DST|today|AM|PM|
++weekday|month`. Three further sections rendered dates or days and said nothing
++about the zone; all three now do:
++
++- **§4.13 Fixture row** — date box and meta time are club-zoned via
++  `dateBoxParts`/`formatTime`; the row carries no zone label by design.
++- **§4.14 Calendar grid** — dot placement, opening month and the `.today` ring
++  are all computed on the club's day, and the month heading off a UTC anchor.
++- **§4.11 Hero / next-fixture card** (Task 13, not yet built) — date/time reuse
++  the club-zoned helpers, but the countdown stays a pure instant subtraction and
++  must **not** be routed through the zone.
++
++Nothing else in the document assumes a fixed offset or a browser-local day.
++
++## Verification
++
++| Command | Result |
++| --- | --- |
++| `npx vitest run` | 15 files, **301 passed** (baseline 300, +1 new) |
++| `TZ=America/New_York npx vitest run` | 15 files, **301 passed** |
++| `TZ=Pacific/Auckland npx vitest run` | 15 files, **301 passed** |
++| `npm run build` | clean, `✓ built in 3.47s` |
++
++Files changed: `tests/event-format.test.js`, `tests/schedule.test.jsx`,
++`docs/design-system.md`. No `src/` file was modified.
+diff --git a/docs/design-system.md b/docs/design-system.md
+index 4948fbd..2908e2c 100644
+--- a/docs/design-system.md
++++ b/docs/design-system.md
+@@ -268,54 +268,60 @@ Centered, `padding:44px 20px`, icon 42×42 at 40% opacity above 14px muted text.
+   <div class="countdown">
+     <div class="cd-box"><b>4</b><span>Days</span></div>
+     <div class="cd-box"><b>8</b><span>Hrs</span></div>
+     <div class="cd-box"><b>0</b><span>Min</span></div>
+     <div class="cd-box"><b>14</b><span>Available</span></div>
+   </div>
+ </div>
+ ```
+ Dashboard-only, top of the Home view. Same plum→maroon diagonal gradient as other "hero" surfaces, `border-radius:var(--radius)`, `padding:18px`, `overflow:hidden` with a decorative `::before` conic-gradient blob in the top-right corner (rotated 15°, purely decorative). 4-column countdown row (`display:flex;gap:10px`, each box `flex:1`, translucent white `rgba(255,255,255,.14)` chip). Only shown if there's an upcoming event (`next` truthy) — computed as the next `type==="match"` event, falling back to the very next event of any type if no match is upcoming. Days/Hrs/Min are computed live against a **hardcoded demo "now"**: `function now(){return new Date("2026-07-20T09:00:00")}` — the real app must use `Date.now()`. 4th box is not a countdown value — it's the RSVP "in" count for that event.
+ 
++**Timezone (Task 11 amendment, for Task 13's dashboard).** The hero's date and time lines are **Abu Dhabi time** — reuse `dateBoxParts`/`formatLongDate`/`formatTime` from `src/lib/eventFormat.js`, don't reformat locally. The countdown itself is a pure instant subtraction (`starts_at` − `Date.now()`) and is correctly zone-agnostic; leave it that way rather than routing it through the club zone. See §7's timezone note.
++
+ ### 4.12 Countdown component (`.countdown`/`.cd-box`)
+ Standalone reusable piece of the hero (see above): `background:rgba(255,255,255,.14);border-radius:10px;padding:8px 0;text-align:center;flex:1`, big number 22px/800, uppercase 10px label below at 80% opacity.
+ 
+ ### 4.13 Fixture / event row (`.fixture`)
+ The single most-reused component — used identically in Home "Upcoming" list, Home "Last result", full Schedule list (all 3 tabs), and inside the Calendar's "events this month" list.
+ ```html
+ <div class="fixture" data-event="1001">
+   <div class="datebox"><div class="mon">Jul</div><div class="day">21</div><div class="dow">Tue</div></div>
+   <div class="fx-body">
+     <div class="fx-top"><span class="chip training">TRAINING</span><span class="chip">Senior Men 1st XV</span></div>
+     <div class="fx-title">Senior Squad Training</div>
+     <div class="fx-sub"><span>{clock} 7:30 PM</span><span>{pin} Zayed Sports City</span></div>
+   </div>
+   <div class="fx-right"><div class="avail-mini">{check} 22</div></div>
+ </div>
+ ```
+ `display:flex;gap:13px;padding:14px`, bottom hairline divider (`:last-child` none), `cursor:pointer`, hover `background:#faf8fb`, transition `.12s`. Left: fixed 52px date box. Middle (`flex:1;min-width:0`): type+team chips row, title, meta row (clock/pin/trophy icons + text, wraps on small widths). Right (`flex:0 0 auto`): for upcoming events, a green "✓ N" available count (`.avail-mini`); for past/results events, a result chip (WIN/LOSS/DRAW) stacked above the score e.g. "31–19". Click anywhere on the row opens the Event Detail sheet (`wireList()` binds `onclick` to every `[data-event]` element after each render — since content is fully re-rendered via `innerHTML`, listeners must be rebound every render, there is no event delegation).
+ 
++The date box (month / day / weekday) and the meta row's time are **Abu Dhabi time**, via `dateBoxParts` and `formatTime` from `src/lib/eventFormat.js` — see the timezone note under "Event object" in §7. The row itself carries no zone label; only the detail sheet says so (§4.21).
++
+ ### 4.14 Calendar grid (`.cal-grid`)
+ ```html
+ <div class="card" style="padding:14px">
+   <div class="cal-head"><b>July 2026</b><div class="cal-nav"><button id="calPrev">‹</button><button id="calNext">›</button></div></div>
+   <div class="cal-grid">
+     <div class="cal-dow">Sun</div>...<div class="cal-dow">Sat</div>  <!-- 7 headers -->
+     <div class="cal-cell out"></div>  <!-- leading blanks for days before month start -->
+     <div class="cal-cell today" data-event="1001"><!-- day number --> 21<div class="dots"><span class="cal-dot match"></span></div></div>
+     ...
+   </div>
+   <div><!-- legend: Match / Training / Social dots + labels --></div>
+ </div>
+ <div class="card"><!-- .fixture rows for every event that month, chronological --></div>
+ ```
+ `grid-template-columns:repeat(7,1fr)`, `gap:5px`. Each `.cal-cell` is `aspect-ratio:1` (perfect square), white bg, `1px solid var(--line)`, `border-radius:9px`, `padding:5px`, `font-size:12.5px/600`. `.out` (days from adjacent months, only leading blanks are rendered — no trailing blanks) = `opacity:.35`. `.today` gets a maroon border + inset ring. Up to 4 small 6×6px coloured dots (`.cal-dot.match`=maroon, `.training`=sky, `.social`=warn) stack bottom-left inside the cell for each event that day; cell is clickable (opens the first event of that day) only if it has ≥1 event. Month navigation is prev/next arrow buttons (34×34px circular icon buttons) — no "today" jump button, no year picker, no swipe gesture.
+ 
++**Timezone (Task 11 amendment).** Which cell a fixture's dot lands in, which month the grid opens on, and which cell gets `.today` are all computed on the **club's** calendar day (`clubDayParts` / `clubToday`, `Asia/Dubai`), never the browser's — a 01:00 Dubai kick-off is 21:00 the previous day in UTC, and for four hours of every UTC day the club is already on tomorrow. The month heading is formatted off a UTC-anchored anchor date for the same reason. See §7's timezone note.
++
+ ### 4.15 Roster group header + player row
+ ```html
+ <div class="roster-group">
+   <div class="gh">Forwards <span class="cnt">10</span></div>
+   <div class="card">
+     <div class="player" data-player="12">
+       <div class="pnum">TF</div><!-- initials, not a jersey number — see the note below -->
+       <div class="pinfo"><div class="nm">Tom Fletcher<span class="p-cap">Capt</span></div><div class="pos">Flanker · U15</div></div>
+       <div class="p-arrow">›</div>
+     </div>
+@@ -369,25 +375,29 @@ Radio buttons styled as a row of equal-width buttons: `display:flex;gap:8px`, ea
+ Selectable row-card: `padding:13px 14px;border:1.5px solid var(--line);border-radius:13px`, hover → maroon border, `.sel` → maroon border + `#fbf3f6` tint. `.pa`: 40×40px initials avatar with per-persona gradient. `.tick`: 22×22px maroon circle checkmark, `display:none` unless `.sel`. This entire component is demo-only scaffolding — it will not exist in the real app (replaced by actual auth), but its **visual language** (avatar + name + role tag + subtitle row) is reusable for e.g. a coach-assignment picker or member list.
+ 
+ ### 4.20 Role tag (`.role-tag`)
+ Small uppercase pill, `10px/800`, `.5px` letter-spacing, `padding:2px 7px;border-radius:6px`. `.role-admin` = maroon/white, `.role-coach` = `#eaf4fb`/sky-deep, `.role-parent` = warn-bg/warn.
+ 
+ ### 4.21 Detail hero (`.detail-hero`)
+ ```html
+ <div class="detail-hero">
+   <div class="dh-num">{icon, or initials on the player sheet}</div>
+   <h3>Quins vs Dubai Exiles</h3>
+-  <p>Fri 24 Jul 2026 · 5:00 PM</p>
++  <p>Fri 24 Jul 2026 · 5:00 PM<span class="tz"> · Abu Dhabi time</span></p>
+ </div>
+ ```
+ Top banner inside the Event/Player Detail sheet: same plum→maroon gradient, negative margins to bleed to the sheet's edges (`margin:-16px -18px 16px`), `padding:22px 18px`. `.dh-num`: 56×56px translucent white rounded-square icon tile — an event-type icon on the event sheet, the player's **initials** on the player sheet (the prototype used the jersey number; see the Task 12 note in §4.15). Title 22px, subtitle 14px/600 at 85% opacity.
+ 
++**Task 11 amendment — the "Abu Dhabi time" note.** The event sheet's subtitle carries a trailing `· Abu Dhabi time` (rendered only when the event actually has a date). This is the **one and only** place in the app that names the zone: someone scanning the fixture list doesn't need reminding once per row, but someone reading a single fixture from abroad does need to know that a 20:00 kick-off isn't their 20:00. Two deliberate details:
++- **Same colour, different weight.** The date/time keeps `font-semibold`; the zone note is `font-normal`. Both stay at `white/85%`. The weight drop, not a colour drop, is what sets the note apart — `white/85%` on the lightest point of the hero gradient (`--quins-red` `#C21F32`) measures **4.63:1**, clearing WCAG AA for normal text, whereas dropping to `white/70%` for de-emphasis would fall to **3.55:1** and fail.
++- The `--muted`-on-paper ruling (`#5c5854`) does **not** apply here: this sits on the red gradient, not on paper.
++
+ ### 4.22 Key/value row (`.kv`)
+ ```html
+ <div class="kv"><span class="k">Venue</span><span class="v">Zayed Sports City</span></div>
+ ```
+ `display:flex;justify-content:space-between;padding:12px 0`, hairline divider, key = muted/600, value = bold/700 right-aligned; value can contain a link (`.v a{color:var(--sky-deep)}`) e.g. `tel:`/`mailto:` links on the player detail sheet.
+ 
+ ### 4.23 Availability bar (`.avail-bar`)
+ ```html
+ <div class="avail-bar"><i style="width:70%;background:var(--good)"></i><i style="width:15%;background:var(--warn)"></i><i style="width:15%;background:var(--bad)"></i></div>
+ <div class="avail-legend"><span><span class="dot" style="background:var(--good)"></span>19 In</span>...</div>
+@@ -517,25 +527,33 @@ Positions enum used by the Add/Edit form: `["Prop","Hooker","Lock","Flanker","Nu
+ ```js
+ {
+   id: 1001,                     // number (Date.now() on new records)         — events.id (uuid)
+   type: "training",             // enum: "match" | "training" | "social"      — events.type
+   title: "Senior Squad Training", // string. For matches this is SET TO THE OPPONENT NAME (see openEventForm: `title:type==="match"?opp:titleV`) — i.e. `title` is redundant/derived for matches; the render layer actually displays "Quins vs {opponent}" for matches and just `{title}` for training/social. Real schema should likely just use `opponent` for matches and `title` for non-matches, and NOT duplicate opponent into title.
+   opponent: "Al Ain Amblers",   // string|null, match-only                     — events.opponent
+   home: true,                   // boolean, match-only (defaults true for non-matches but unused) — events.is_home
+   venue: "Zayed Sports City, Abu Dhabi", // string, freeform (sometimes "Ground — Pitch N", parsed client-side by splitting on "—" and "," for compact display) — events.venue / events.location
+   comp: "West Asia Premiership",// string|null, match-only optional            — events.competition
+   team: "Senior Men 1st XV",    // string, must match one of the 15 TEAMS      — events.team_id (fk -> teams)
+-  when: "2026-07-24T19:00",     // ISO-ish local datetime string, NO timezone/seconds — events.starts_at (needs real timezone-aware timestamptz in Supabase; UAE is UTC+4 fixed, no DST)
++  when: "2026-07-24T19:00",     // PROTOTYPE ONLY: ISO-ish browser-local datetime string, no timezone/seconds — events.starts_at is a real `timestamptz` in Supabase (already built), i.e. an absolute instant stored in UTC. See the timezone note below.
+   result: { us: 31, them: 19 }, // object|null — presence of `result` is what flags an event as "past"/"played", not a computed date comparison — events.result_us / events.result_them (or a nullable jsonb)
+   rsvpIn: 19, rsvpOut: 2, rsvpMaybe: 3  // numbers — DEMO-ONLY AGGREGATE COUNTS, hardcoded per seed event, never recomputed from real RSVPs. The real build replaces these three fields entirely with a live COUNT(*) FILTER query against the `availability` table (per project schema: one row per player per event with a status).
+ }
+ ```
++**Timezone note (Task 11 amendment — supersedes the old "UAE is UTC+4 fixed" wording).** Every event time in this app renders in **Abu Dhabi time for every reader**, whatever zone their browser is in — the club has one home ground, so "20:00" must mean 20:00 at Zayed Sports City for a parent checking fixtures from London as much as for one on the touchline. The model is:
++- **Storage:** `events.starts_at` is `timestamptz` — an absolute instant. No offset or wall-clock string is stored. Ordering, and upcoming-vs-past, are instant comparisons and are already zone-agnostic.
++- **Rendering:** every user-visible date/time goes through `Intl.DateTimeFormat`/`toLocale*String` with `timeZone: 'Asia/Dubai'` — the IANA zone identifier exported as `CLUB_TIME_ZONE` from `src/lib/eventFormat.js`. Use the helpers there (`dateBoxParts`, `formatTime`, `formatLongDate`, `clubDayParts`, `clubToday`); never a bare `date.getHours()/getDate()`, which reads the *browser's* zone.
++- **Not a fixed offset.** Do **not** hardcode `+04:00`. The UAE has no DST today so the two currently agree, but an offset is a derived fact that would rot silently if that ever changed; the zone identifier stays correct by definition.
++- **Day bucketing and "today".** A 01:00 Dubai kick-off is 21:00 the *previous* day in UTC, so anything that groups by calendar day — the calendar grid (§4.14), its `.today` ring, the fixture date box (§4.13) — must bucket on the **club's** day via `clubDayParts`/`clubToday`, not the browser's, or fixtures land in the wrong cell (and, on the 1st, the wrong month).
++- **Writing (Task 14, the event form).** The mirror image: a date + time a coach types is **Abu Dhabi wall-clock** and must be converted to UTC using `CLUB_TIME_ZONE` before being written to `starts_at`. A naive `new Date(\`${date}T${time}\`)` resolves in the *browser's* zone, so a coach in the UK entering "20:00" would store `19:00Z` — a 23:00 Abu Dhabi kick-off. The form's date field should default from `clubToday()`, not `new Date()`.
++- Only the event sheet names the zone in the UI (§4.21); rows and the calendar stay unlabelled.
++
+ Important behavioural note for the Supabase mapping: **"past" vs "upcoming" is determined by `event.result` being non-null, not by comparing `when` to the current date** (`past()` filters `e.result` truthy, `upcoming()` filters `e.result` falsy). A real implementation should decide deliberately whether "upcoming" means "no result yet" or "date is in the future" — they can diverge (e.g. a match that happened but has no score entered yet).
+ 
+ ### Team / age-group list (not a stored object, a hardcoded constant)
+ ```js
+ const TEAMS = ["U6","U7","U8","U9","U10","U11","U12","U13","U14","U15","U16","U18 Colts",
+                "Senior Men 1st XV","Senior Men 2nd XV","Women's XV"];
+ ```
+ This is exactly the 15 age groups already seeded in the live `teams` table per the project's Supabase schema — order matters for display (youngest → oldest → seniors), and every "All teams" iteration in the UI (roster grouping, schedule team pills) walks this fixed array rather than deriving/sorting team names dynamically.
+ 
+ ### Persona / demo-auth objects (`PERSONAS`) — NOT part of the real data model
+diff --git a/tests/event-format.test.js b/tests/event-format.test.js
+index fd16d6b..2cc3c0e 100644
+--- a/tests/event-format.test.js
++++ b/tests/event-format.test.js
+@@ -124,35 +124,52 @@ describe('eventDate', () => {
+     expect(eventDate({})).toBeNull()
+     expect(eventDate(undefined)).toBeNull()
+   })
+ 
+   it('is null for an unparseable timestamp rather than an Invalid Date', () => {
+     expect(eventDate({ starts_at: 'not a date' })).toBeNull()
+   })
+ })
+ 
+ describe('dateBoxParts', () => {
++  // Fixtures here are anchored with Date.UTC, never the local
++  // `new Date(y, m, d, h, m)` constructor. That constructor builds a
++  // DIFFERENT INSTANT in every process zone, while these assertions read it
++  // back through formatters pinned to Asia/Dubai — so `new Date(2026, 6,
++  // 24, 17, 0)` asserted as day "24" passes in UTC and fails under
++  // TZ=America/New_York (17:00 New York = 01:00 on the 25th in Dubai). It
++  // was zone-proof before the formatters were club-anchored, because
++  // construction and read-back moved together; it is not any more. In a
++  // file whose whole purpose is zone-independence, the fixture has to be an
++  // unambiguous instant.
++  //
++  // 21:00 UTC on the 23rd is 01:00 on the 24th in Dubai, so this stays a
++  // real assertion rather than a same-day tautology: anything reading the
++  // browser's own day answers 23 here under both UTC and New York.
+   it('splits a date into month, day and weekday', () => {
+-    const parts = dateBoxParts(new Date(2026, 6, 24, 17, 0))
++    const parts = dateBoxParts(new Date(Date.UTC(2026, 6, 23, 21, 0)))
+     expect(parts.day).toBe('24')
+     expect(parts.month).not.toBe('—')
+     expect(parts.weekday).not.toBe('')
+   })
+ 
+   it('renders placeholders instead of "Invalid Date" for a null date', () => {
+     expect(dateBoxParts(null)).toEqual({ month: '—', day: '–', weekday: '' })
+   })
+ })
+ 
+ describe('formatTime / formatLongDate', () => {
++  // Same UTC-anchored instant, and for the same reason as in dateBoxParts
++  // above: 21:00 UTC on the 23rd = 01:00 on Fri 24 Jul 2026 in Dubai, which
++  // is the day and year asserted below.
+   it('formats a real date without leaking "Invalid Date"', () => {
+-    const date = new Date(2026, 6, 24, 17, 0)
++    const date = new Date(Date.UTC(2026, 6, 23, 21, 0))
+     expect(formatTime(date)).toContain('00')
+     expect(formatTime(date)).not.toMatch(/invalid/i)
+     expect(formatLongDate(date)).toContain('2026')
+     expect(formatLongDate(date)).toContain('24')
+   })
+ 
+   it('falls back to plain copy for a null date', () => {
+     expect(formatTime(null)).toBe('Time to be confirmed')
+     expect(formatLongDate(null)).toBe('Date to be confirmed')
+   })
+diff --git a/tests/schedule.test.jsx b/tests/schedule.test.jsx
+index 284027c..b253504 100644
+--- a/tests/schedule.test.jsx
++++ b/tests/schedule.test.jsx
+@@ -387,20 +387,71 @@ describe('Schedule — calendar tab', () => {
+       expect(screen.queryAllByRole('button', { name: /, \d+ events?$/ })).toHaveLength(0)
+       expect(screen.getByText(/nothing is scheduled this month/i)).toBeInTheDocument()
+ 
+       await user.click(screen.getByRole('button', { name: /next month/i }))
+ 
+       const nextName = monthName(year, month + 1)
+       expect(screen.getByRole('button', { name: `1 ${nextName}, 1 event` })).toBeInTheDocument()
+     })
+   })
+ 
++  // The today-ring has to follow Abu Dhabi's day too — for four hours of
++  // every UTC day the club is already on tomorrow, and a coach in London or
++  // New York is further behind still. Pinning the clock is the only way to
++  // test this: at a live "now" the club day and the runner's day agree for
++  // 20 hours out of 24, so an unpinned assertion would pass against a
++  // browser-local implementation almost all the time.
++  //
++  // Only `Date` is faked (`toFake: ['Date']`). Faking setTimeout/setInterval
++  // is the trap documented at the top of this file — RTL's waitFor does not
++  // detect Vitest's fake timers, so every findBy*/waitFor would hang. Real
++  // timers plus a frozen Date gives a controlled clock and a working
++  // await-loop at the same time.
++  it('rings the Abu Dhabi today, not the browser’s', async () => {
++    // 2026-07-20T21:00Z is 01:00 on the 21st in Dubai, but still the 20th
++    // in New York (17:00) and in UTC — so the correct ring (21) and the
++    // browser-local one (20) are different cells under either process zone.
++    vi.useFakeTimers({ toFake: ['Date'], now: Date.UTC(2026, 6, 20, 21, 0) })
++    try {
++      await inTimeZone('America/New_York', async () => {
++        listEventsMock.mockResolvedValue([])
++
++        const { user } = setup()
++
++        await screen.findByText(/no upcoming fixtures/i)
++        await user.click(screen.getByRole('button', { name: 'Calendar' }))
++
++        // Guard the guard: the fake clock must actually be in force, and
++        // the browser-local day must actually differ from the club's.
++        expect(new Date().toISOString()).toBe('2026-07-20T21:00:00.000Z')
++        expect(new Date().getDate()).toBe(20)
++
++        expect(screen.getByText('July 2026')).toBeInTheDocument()
++
++        // Day cells only (leading blanks carry no testid), so index N is
++        // day N + 1.
++        const cells = screen.getAllByTestId('calendar-day')
++        expect(cells).toHaveLength(31)
++
++        const ringed = cells.filter((cell) => hasClassToken(cell, 'border-quinsRed'))
++        expect(ringed).toHaveLength(1)
++        expect(ringed[0]).toBe(cells[20]) // the 21st
++        expect(ringed[0]).toHaveTextContent('21')
++        // And the browser-local day is explicitly NOT ringed.
++        expect(hasClassToken(cells[19], 'border-quinsRed')).toBe(false)
++        expect(hasClassToken(cells[19], 'border-[#e6e3e1]')).toBe(true)
++      })
++    } finally {
++      vi.useRealTimers()
++    }
++  })
++
+   // A day with events has to be a <button> for keyboard access; a day
+   // without one stays a <div>. Chromium's UA stylesheet lays a button's
+   // content out centred inside its box, so the two variants silently drifted
+   // apart vertically — populated days floated mid-cell while their empty
+   // neighbours sat top-left (measured 66px vs 8px from the cell top at
+   // 1280px). jsdom applies no UA stylesheet and computes no layout, so no
+   // rendering assertion here could ever catch that. The testable invariant
+   // is that both variants carry the same alignment classes, which is what
+   // pins the number to the same place in either.
+   it('aligns populated and empty day cells identically', async () => {
