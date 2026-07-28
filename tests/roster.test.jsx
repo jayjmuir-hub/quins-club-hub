@@ -491,6 +491,19 @@ describe('PlayerDetail — opening a player', () => {
     expect(within(dialog).queryByText(/jersey/i)).not.toBeInTheDocument()
   })
 
+  // The hero tile replaced the jersey number with initials. Asserting only
+  // the absence of the jersey row would leave an empty tile undetected.
+  it('shows the player’s initials in the hero tile', async () => {
+    const { user } = setup()
+
+    const dialog = await openTom(user)
+    const hero = within(dialog).getByText('TF')
+
+    expect(hero).toBeInTheDocument()
+    // Decoration: the name is already the dialog's heading right beside it.
+    expect(hero).toHaveAttribute('aria-hidden', 'true')
+  })
+
   it('closes on the close button', async () => {
     const { user } = setup()
 

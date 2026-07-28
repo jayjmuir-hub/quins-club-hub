@@ -445,7 +445,7 @@ Order, top to bottom:
 5. Body — **grouping toggle logic**:
    - If a **specific team is selected** (or the persona only has one visible team) → group by **position**: Forwards / Backs / Other (order fixed), each a `.roster-group` with header + count + card of `.player` rows sorted **by name**. ⚠️ **Superseded (Task 12):** the prototype sorted these by jersey number ascending (numberless last, via a `||99` fallback); with no jersey numbers there is nothing to sort on, so both the position and age-group branches order by `full_name`.
    - Otherwise (viewing "All" across multiple visible teams) → group by **age group**, iterating the fixed `TEAMS` order (U6→Women's XV), same row styling, each group only rendered if it has ≥1 matching player.
-   - Search query filters the underlying player list (name/position/team/number substring match) **before** grouping, so groups with 0 matches after filtering are simply omitted.
+   - Search query filters the underlying player list (name/position/team substring match — **not** jersey number; see the Task 12 note above and §4.9) **before** grouping, so groups with 0 matches after filtering are simply omitted.
 
 ### 5.4 More (`#view-more`)
 1. `.section-head`: "More" / "Club info & settings".

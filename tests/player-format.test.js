@@ -56,7 +56,7 @@ describe('initials', () => {
     expect(initials('   Tom    Fletcher  ')).toBe('TF')
   })
 
-  it('handles a non-Latin script', () => {
+  it('handles Latin letters beyond ASCII, including Turkish dotless ı', () => {
     expect(initials('Emre Yıldırım')).toBe('EY')
   })
 

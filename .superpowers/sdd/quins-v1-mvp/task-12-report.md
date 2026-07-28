@@ -549,7 +549,7 @@ The awkward cases, decided deliberately and each pinned by a test:
 | `Ronaldinho` | `RO` | single word → first two letters, so every tile stays two characters wide |
 | `X` | `X` | nothing more to take |
 | `mateo fernández` | `MF` | uppercased |
-| `Emre Yıldırım` | `EY` | non-Latin script |
+| `Emre Yıldırım` | `EY` | Latin letters beyond ASCII (Turkish dotless ı) |
 | `''` / `'   '` / `null` | `?` | unreachable (NOT NULL) but better than rendering "undefined" |
 
 Splitting is codepoint-aware, so an astral-plane name can't be cut through a
@@ -674,3 +674,89 @@ Rendered initials verified visually across every awkward case in one shot:
 (Osei-Bonsu), `RO` (Ronaldinho, single word). The player sheet hero shows `DR`
 with rows Position / Age group / Role and no Jersey row. A single-word name was
 added to the harness fixtures so that branch stays visible in future passes.
+
+---
+
+# Task 12 amendment — review follow-up
+
+Two items from the jersey-removal review, plus one label correction.
+
+## 1. Spec gap — `docs/design-system.md` §5.3 still specified number search
+
+`:448` read "name/position/team/**number** substring match", contradicting the
+corrected §4.9 and the Task 12 note two lines above it in the same section.
+That is precisely the reintroduction vector the doc update existed to close,
+so it mattered more than its size suggests.
+
+Now reads: "name/position/team substring match — **not** jersey number; see
+the Task 12 note above and §4.9".
+
+My audit missed it because I grepped for `jersey`/`Jersey` and this line said
+only "number". A word-boundary search would still have missed it; what would
+have caught it is reading §5.3 end to end after editing it, which is what I
+did this time. The re-audit now greps for `/number` as well as `jersey`, and
+comes back clean — every remaining mention in the doc is an explicit
+superseded note.
+
+## 2. Coverage hole — nothing asserted the hero renders initials
+
+`tests/roster.test.jsx` asserted only the *absence* of a jersey row, so an
+empty hero tile would have passed. It had been verified in the browser harness
+only.
+
+Added `shows the player's initials in the hero tile`, which asserts both the
+rendered `TF` and that the tile is `aria-hidden` (the name is already the
+dialog's heading immediately beside it).
+
+Mutation-checked against the exact hole described — replacing the hero's
+`{initials(player.full_name)}` with `{''}`:
+
+```
+× PlayerDetail — opening a player > shows the player's initials in the hero tile
+  Tests  1 failed | 38 passed (39)
+```
+
+Reverted; green again.
+
+## 3. Label correction (the deferred one-word edit)
+
+`handles a non-Latin script` was inaccurate — Turkish is Latin script; the
+interesting property is the dotless ı, a non-ASCII Latin letter. Renamed to
+`handles Latin letters beyond ASCII, including Turkish dotless ı`. Behaviour
+was and is correct. The corresponding row in this report's initials table has
+been corrected in place too.
+
+Not acted on, as ruled: `initials('...')` returning `'..'` for a
+punctuation-only name — unreachable given `full_name` is NOT NULL, and
+aria-hidden if it ever rendered.
+
+## Covering tests
+
+| File | Test |
+|---|---|
+| `tests/roster.test.jsx` | `shows the player's initials in the hero tile` (new) |
+| `tests/player-format.test.js` | `handles Latin letters beyond ASCII…` (renamed) |
+
+## Command and output
+
+Files changed: `docs/design-system.md`, `tests/roster.test.jsx`,
+`tests/player-format.test.js`.
+
+```
+$ npx vitest run tests/roster.test.jsx tests/player-format.test.js
+ Test Files  2 passed (2)
+      Tests  49 passed (49)
+
+$ npm test
+ Test Files  15 passed (15)
+      Tests  282 passed (282)
+
+$ npm run build
+✓ built in 3.35s
+```
+
+282 = 281 + 1. No source file changed, so no browser re-check was warranted.
+
+Noted with thanks: `players.full_name` is confirmed NOT NULL against the live
+schema, so `byName`'s `localeCompare` cannot throw on the age-group branch —
+no defensive guard needed.
