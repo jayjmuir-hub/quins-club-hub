@@ -1,0 +1,2980 @@
+# Review package: 335451e..HEAD
+
+## Commits
+c6c196a fix: scope the dashboard's upcoming list and count to future events
+
+## Files changed
+ .superpowers/sdd/quins-v1-mvp/progress.md          |    5 +
+ .../sdd/quins-v1-mvp/review-11c6430..335451e.diff  | 2501 ++++++++++++++++++++
+ .superpowers/sdd/quins-v1-mvp/task-13-report.md    |  133 ++
+ docs/design-system.md                              |    2 +-
+ src/screens/Dashboard.jsx                          |   51 +-
+ tests/dashboard.test.jsx                           |   68 +-
+ 6 files changed, 2726 insertions(+), 34 deletions(-)
+
+## Diff
+diff --git a/.superpowers/sdd/quins-v1-mvp/progress.md b/.superpowers/sdd/quins-v1-mvp/progress.md
+index 7bdcd76..2c2580f 100644
+--- a/.superpowers/sdd/quins-v1-mvp/progress.md
++++ b/.superpowers/sdd/quins-v1-mvp/progress.md
+@@ -81,10 +81,15 @@ Task 11 amendment: self-review corrected a wrong contrast number in a code comme
+ Task 11 amendment: CARRY TO TASK 14 — the event form must interpret an entered date+time as Abu Dhabi time when building starts_at. A naive new Date(`${d}T${t}`) resolves in the BROWSER's zone, so a UK coach entering 20:00 writes 19:00Z (= 23:00 Abu Dhabi) and the schedule would faithfully render that wrong instant. Reading and writing must agree; the date field should also default from clubToday(), not new Date().
+ Task 11 AMENDMENT (product change from Jay, 28 Jul): ALL EVENT TIMES FORCED TO ABU DHABI TIME (Asia/Dubai), regardless of viewer's browser timezone. Rationale: single-city club, one ground, "20:00" must always mean 20:00 at Zayed Sports City. Presentation-only — starts_at stays UTC timestamptz, instant comparisons untouched, no schema change.
+ Task 11 amendment: review round 1 — spec has TWO issues, quality NEEDS FIXES. 0 Critical. 3 Important: (1) two PRE-EXISTING tests in tests/event-format.test.js (dateBoxParts split, formatTime/formatLongDate leak check) build fixtures with the browser-local Date constructor and now fail under TZ=America/New_York — the exact failure mode this change exists to prevent, hiding only because the runner sits in UTC; (2) the club-local "today" calendar highlight has ZERO test coverage — reviewer reverted it to browser-local in an isolated copy and all 34 schedule tests still passed under TZ=America/New_York; (3) docs/design-system.md:527 still specifies UAE-is-fixed-UTC+4 offset thinking, the exact model requirement 1 rejects, and is what Task 14's event form will be built from.
+ Task 11 amendment: contrast INDEPENDENTLY RECOMPUTED TWICE NOW (implementer, then reviewer via full sRGB linearization) — 4.632:1 confirmed correct, clears AA for the 14px normal text actually used (threshold 4.5:1, margin 0.13). The original in-code comment claiming 5.02:1 was wrong and is already corrected.
+ Task 11 amendment: reviewer verified the "found already present, uncommitted, from a prior session" account is internally consistent with the diff (exact test-count arithmetic checks out, no orphaned helpers, no evidence of two different attempts) — not itself a finding, recorded for the record.
+ Task 11 amendment: fix round 1/5 (3 addressed, 0 open — two pre-existing tests re-anchored on Date.UTC(2026,6,23,21,0) [01:00 the 24th in Dubai, still the 23rd in UTC/NY] rather than a same-day tautology; new "rings the Abu Dhabi today, not the browser's" test pins the clock to 2026-07-20T21:00Z via vi.useFakeTimers({toFake:['Date']}), proven RED against browser-local first, GREEN against the real clubToday(); docs/design-system.md corrected at the "when" section, 4.21, and swept across 4.11/4.13/4.14 — no fixed-offset language remains except the corrected note's own back-reference to the rejected wording. commits 7c58d41..1d8525a). Re-review: all ADDRESSED, no new breakage. Re-reviewer independently re-ran the fixed and new tests under BOTH TZ=America/New_York and TZ=Pacific/Auckland (78/78 both times) rather than trusting the report, and specifically verified clubToday() reads exclusively through new Date() so the fake-timer guarantee is genuine, not a false positive.
+ Task 11 (Abu Dhabi timezone amendment): complete (commits 5ca6d01..1d8525a, review clean after 1 fix round)
+ PHASE D COMPLETE except Task 13. 301 tests passing across 15 files. Next: Task 13 (Dashboard) — brief pre-generated at task-13-brief.md.
+ Task 13: review round 1 — spec has 2 issues, quality NEEDS FIXES. 0 Critical. Every rulings-sensitive area verified clean: scoping ({teamIds: []} honoured), first-load-vs-refresh (stricter than Schedule's version and correctly so), Dubai-time formatting (test genuinely fails under every runner zone, not just UTC — pinned 2026-07-24T20:30:00Z, asserts 12:30 AM / Jul 25), the score-based result rule (matches Schedule's hasResult exactly), and the reported event.home column-name bug fix (verified real, cross-checked against EventDetail.jsx and events.js select('*')). 2 Important: (1) Dashboard.jsx:238-241 hardcodes "signed in as a parent" for every non-admin/non-coach role including player, contradicting roleLabel(memberships) twelve lines away on the same screen; (2) disabled placeholder Add-fixture/Add-player buttons directly contradict EventDetail.jsx:23-25's already-written ruling for the identical Task 14 dependency ("Adding a disabled or read-only affordance now would promise a control that doesn't exist yet").
+ Task 13: CONTROLLER RULING on the disabled-vs-omitted conflict — EventDetail's precedent governs. Omit the Add-fixture/Add-player quick actions entirely until Tasks 14/15 exist rather than showing disabled controls. The reviewer's own read agreed on the merits: these sit on the landing screen, so a dead button is the first thing a coach sees. FIX ROUND MUST APPLY THIS SAME RULE CONSISTENTLY GOING FORWARD — no disabled placeholders for not-yet-built routes anywhere in this app.
++Task 13: fix round 1/5 (4 addressed, 0 open — roleLabel() replaces hardcoded "parent"; both disabled Add-fixture/Add-player buttons removed per the EventDetail precedent ruling, quick-actions card now legitimately matches design-system 5.1's two-ghost-action parent-variant shape for admin/coach too; canEdit routed through canEditTeam per visible team (teamless-coach test added); countdown interval gated on the hero being present. commits 11c6430..335451e). Re-review: all ADDRESSED, no new breakage. Re-reviewer noted the in-code comment slightly overstates WHY the teamless-coach case is refused (visibleTeams' pre-filtering empties scopedTeams before canEditTeam's own null-guard would ever fire) — end-to-end behaviour is correct, comment is cosmetically imprecise, not worth another round.
++Task 13: controller visual verification (independent pass, run entirely under TZ=America/New_York to stress the timezone claim). CLEAN: Home/Away badge fix confirmed correct against the live schema (events.home is the real column); Abu Dhabi time held under the hostile zone on the hero, player view and last-result; role noun correct for player vs parent in a real render; two-ghost-action quick-actions card reads as deliberate, not sparse; no button-as-layout-box risk; no overflow; --muted correctly #5c5854 (Task 12 defect did not recur); zero console/page errors. TWO DEFECTS — see fix round 2.
++Task 13: minor (deferred): FixtureRow.jsx:66 date-box weekday text (10px) is #77726e on the #f3eef5 date-box fill = 4.16:1, fails AA. Same contrast family as Task 12's defect, against the lilac box instead of paper. #5c5854 would give 6.0:1. Fix alongside the next FixtureRow touch.
++Task 13: IMPORTANT FINDING — trainings and socials never leave "Fixtures to play" / the Dashboard's toPlay list, because it filters on hasResult (score present) and trainings/socials can never have a score. A week-old social sat at the top of "Upcoming" on the coach/parent dashboard and was counted in the "9 Fixtures to play" stat tile. This is a genuine semantic split hiding under one name: Schedule's "Upcoming" TAB deliberately shows unscored events regardless of date (Task 11 ruling — a match needing a score stays visible until scored) and that ruling is correct and untouched. But Dashboard's "what's coming up" list and stat tile want chronologically-future events, not merely unscored ones. RULING: fix is SCOPED TO DASHBOARD ONLY. Filter Dashboard's toPlay/stat-tile list by future date (starts_at > now), not by hasResult. Do not touch Schedule.jsx or its Upcoming tab semantics — that ruling stands as-is.
++Task 13: doc drift found alongside the above — docs/design-system.md:533 still maps home -> events.is_home; the real column is events.home. Plausibly the original source of the bug this task's browser check caught. Fix in the same round.
+diff --git a/.superpowers/sdd/quins-v1-mvp/review-11c6430..335451e.diff b/.superpowers/sdd/quins-v1-mvp/review-11c6430..335451e.diff
+new file mode 100644
+index 0000000..a75769f
+--- /dev/null
++++ b/.superpowers/sdd/quins-v1-mvp/review-11c6430..335451e.diff
+@@ -0,0 +1,2501 @@
++# Review package: 11c6430..HEAD
++
++## Commits
++335451e fix: correct the dashboard's role copy and drop placeholder add actions
++
++## Files changed
++ .superpowers/sdd/quins-v1-mvp/progress.md          |    2 +
++ .../sdd/quins-v1-mvp/review-98108c7..11c6430.diff  | 1869 ++++++++++++++++++++
++ .superpowers/sdd/quins-v1-mvp/task-13-report.md    |  125 ++
++ src/screens/Dashboard.jsx                          |   89 +-
++ tests/dashboard.test.jsx                           |   82 +-
++ 5 files changed, 2116 insertions(+), 51 deletions(-)
++
++## Diff
++diff --git a/.superpowers/sdd/quins-v1-mvp/progress.md b/.superpowers/sdd/quins-v1-mvp/progress.md
++index 92b6763..7bdcd76 100644
++--- a/.superpowers/sdd/quins-v1-mvp/progress.md
+++++ b/.superpowers/sdd/quins-v1-mvp/progress.md
++@@ -79,10 +79,12 @@ Task 11 amendment: TDD evidence is behavioural, not import-error — stashing on
++ Task 11 amendment: browser check run with dev server AND Chromium under TZ=America/New_York (a UTC browser check would prove almost nothing). Boundary fixture 2026-07-20T21:00Z renders as JUL 21 Tue 1:00 AM and dots the 21st cell, not the 20th; today-ring landed on 28 (Dubai) not 27 (New York), demonstrating that fix live. Calendar cells uniform 40x40 / 147x147 across button and div variants — the UA content-centring trap has not reopened. Zero overflow/console/page errors across 16 shots.
++ Task 11 amendment: self-review corrected a wrong contrast number in a code comment — white/85% on #C21F32 is 4.632:1, not the 5.02:1 claimed. Still clears AA for normal text but the margin is thin; recomputed independently. The #5c5854 muted ruling correctly ruled inapplicable (that governs on-paper muted; this sits on the red hero gradient).
++ Task 11 amendment: CARRY TO TASK 14 — the event form must interpret an entered date+time as Abu Dhabi time when building starts_at. A naive new Date(`${d}T${t}`) resolves in the BROWSER's zone, so a UK coach entering 20:00 writes 19:00Z (= 23:00 Abu Dhabi) and the schedule would faithfully render that wrong instant. Reading and writing must agree; the date field should also default from clubToday(), not new Date().
++ Task 11 AMENDMENT (product change from Jay, 28 Jul): ALL EVENT TIMES FORCED TO ABU DHABI TIME (Asia/Dubai), regardless of viewer's browser timezone. Rationale: single-city club, one ground, "20:00" must always mean 20:00 at Zayed Sports City. Presentation-only — starts_at stays UTC timestamptz, instant comparisons untouched, no schema change.
++ Task 11 amendment: review round 1 — spec has TWO issues, quality NEEDS FIXES. 0 Critical. 3 Important: (1) two PRE-EXISTING tests in tests/event-format.test.js (dateBoxParts split, formatTime/formatLongDate leak check) build fixtures with the browser-local Date constructor and now fail under TZ=America/New_York — the exact failure mode this change exists to prevent, hiding only because the runner sits in UTC; (2) the club-local "today" calendar highlight has ZERO test coverage — reviewer reverted it to browser-local in an isolated copy and all 34 schedule tests still passed under TZ=America/New_York; (3) docs/design-system.md:527 still specifies UAE-is-fixed-UTC+4 offset thinking, the exact model requirement 1 rejects, and is what Task 14's event form will be built from.
++ Task 11 amendment: contrast INDEPENDENTLY RECOMPUTED TWICE NOW (implementer, then reviewer via full sRGB linearization) — 4.632:1 confirmed correct, clears AA for the 14px normal text actually used (threshold 4.5:1, margin 0.13). The original in-code comment claiming 5.02:1 was wrong and is already corrected.
++ Task 11 amendment: reviewer verified the "found already present, uncommitted, from a prior session" account is internally consistent with the diff (exact test-count arithmetic checks out, no orphaned helpers, no evidence of two different attempts) — not itself a finding, recorded for the record.
++ Task 11 amendment: fix round 1/5 (3 addressed, 0 open — two pre-existing tests re-anchored on Date.UTC(2026,6,23,21,0) [01:00 the 24th in Dubai, still the 23rd in UTC/NY] rather than a same-day tautology; new "rings the Abu Dhabi today, not the browser's" test pins the clock to 2026-07-20T21:00Z via vi.useFakeTimers({toFake:['Date']}), proven RED against browser-local first, GREEN against the real clubToday(); docs/design-system.md corrected at the "when" section, 4.21, and swept across 4.11/4.13/4.14 — no fixed-offset language remains except the corrected note's own back-reference to the rejected wording. commits 7c58d41..1d8525a). Re-review: all ADDRESSED, no new breakage. Re-reviewer independently re-ran the fixed and new tests under BOTH TZ=America/New_York and TZ=Pacific/Auckland (78/78 both times) rather than trusting the report, and specifically verified clubToday() reads exclusively through new Date() so the fake-timer guarantee is genuine, not a false positive.
++ Task 11 (Abu Dhabi timezone amendment): complete (commits 5ca6d01..1d8525a, review clean after 1 fix round)
++ PHASE D COMPLETE except Task 13. 301 tests passing across 15 files. Next: Task 13 (Dashboard) — brief pre-generated at task-13-brief.md.
+++Task 13: review round 1 — spec has 2 issues, quality NEEDS FIXES. 0 Critical. Every rulings-sensitive area verified clean: scoping ({teamIds: []} honoured), first-load-vs-refresh (stricter than Schedule's version and correctly so), Dubai-time formatting (test genuinely fails under every runner zone, not just UTC — pinned 2026-07-24T20:30:00Z, asserts 12:30 AM / Jul 25), the score-based result rule (matches Schedule's hasResult exactly), and the reported event.home column-name bug fix (verified real, cross-checked against EventDetail.jsx and events.js select('*')). 2 Important: (1) Dashboard.jsx:238-241 hardcodes "signed in as a parent" for every non-admin/non-coach role including player, contradicting roleLabel(memberships) twelve lines away on the same screen; (2) disabled placeholder Add-fixture/Add-player buttons directly contradict EventDetail.jsx:23-25's already-written ruling for the identical Task 14 dependency ("Adding a disabled or read-only affordance now would promise a control that doesn't exist yet").
+++Task 13: CONTROLLER RULING on the disabled-vs-omitted conflict — EventDetail's precedent governs. Omit the Add-fixture/Add-player quick actions entirely until Tasks 14/15 exist rather than showing disabled controls. The reviewer's own read agreed on the merits: these sit on the landing screen, so a dead button is the first thing a coach sees. FIX ROUND MUST APPLY THIS SAME RULE CONSISTENTLY GOING FORWARD — no disabled placeholders for not-yet-built routes anywhere in this app.
++diff --git a/.superpowers/sdd/quins-v1-mvp/review-98108c7..11c6430.diff b/.superpowers/sdd/quins-v1-mvp/review-98108c7..11c6430.diff
++new file mode 100644
++index 0000000..d4d350e
++--- /dev/null
+++++ b/.superpowers/sdd/quins-v1-mvp/review-98108c7..11c6430.diff
++@@ -0,0 +1,1869 @@
+++# Review package: 98108c7..HEAD
+++
+++## Commits
+++11c6430 feat: dashboard with next fixture, countdown, stats and quick actions
+++
+++## Files changed
+++ .superpowers/sdd/quins-v1-mvp/task-13-report.md | 279 ++++++++++++++
+++ harness/main.jsx                                |  24 +-
+++ harness/shoot-dashboard.mjs                     | 131 +++++++
+++ src/App.jsx                                     |  15 +-
+++ src/components/FixtureRow.jsx                   |  97 +++++
+++ src/screens/Dashboard.jsx                       | 474 ++++++++++++++++++++++++
+++ src/screens/Schedule.jsx                        |  83 +----
+++ tests/app.test.jsx                              |  12 +-
+++ tests/dashboard.test.jsx                        | 446 ++++++++++++++++++++++
+++ 9 files changed, 1466 insertions(+), 95 deletions(-)
+++
+++## Diff
+++diff --git a/.superpowers/sdd/quins-v1-mvp/task-13-report.md b/.superpowers/sdd/quins-v1-mvp/task-13-report.md
+++new file mode 100644
+++index 0000000..852c464
+++--- /dev/null
++++++ b/.superpowers/sdd/quins-v1-mvp/task-13-report.md
+++@@ -0,0 +1,279 @@
++++# Task 13 — Dashboard — report
++++
++++## What I implemented
++++
++++`src/screens/Dashboard.jsx`, the real screen behind `/`, built from
++++`docs/design-system.md` §5.1 (with §4.11 hero, §4.12 countdown, §4.6 stat
++++tiles, §4.13 fixture rows).
++++
++++Top to bottom: scope note (non-admin only) → next-fixture hero with live
++++countdown → three stat tiles → the dash-cols block (mobile: one column,
++++Upcoming / Quick actions / Last result in DOM order; desktop ≥820px:
++++`1.15fr .85fr` grid, Upcoming left, Quick actions + Last result right).
++++
++++It introduces **no new data access**. It reads exactly the two scoped calls
++++Schedule and Roster already use — `listEvents({teamIds})` and
++++`listPlayers({teamIds})` — issued together in one `Promise.all` so the stat
++++grid (which mixes counts from both) never renders half-filled, plus
++++`subscribeEvents` for realtime, same reload-token pattern as Schedule.
++++
++++### Derived rules
++++
++++- **Fixtures to play / Upcoming list**: `!hasResult(event)` — the project's
++++  result rule (score present, not date passed). A match played last week with
++++  no score entered is still to play and still listed.
++++- **Next fixture (hero)**: the *soonest future* unscored event, preferring
++++  `type === 'match'`, falling back to the next event of any type
++++  (design-system.md §4.11). This is the one place that also requires
++++  `starts_at > now`: a countdown to an instant that has already passed is
++++  meaningless, so the stale-unscored fixture above appears in the list but can
++++  never be the hero. Hero hidden entirely when nothing is upcoming.
++++- **Last result**: `hasResult` sorted descending, first row. Empty-state card
++++  when no scores exist yet.
++++- **Times**: every displayed date/time goes through `eventFormat.js`
++++  (`formatLongDate` / `formatTime` / the row's `dateBoxParts`), i.e. Abu Dhabi
++++  time. The countdown itself is a pure `starts_at − Date.now()` subtraction,
++++  correctly zone-agnostic, left that way. The hero carries one
++++  "All times are Abu Dhabi time." line so a parent reading from abroad knows
++++  which clock they are on.
++++- **Countdown liveness**: recomputed on a 60 s interval (cleaned up on
++++  unmount). The prototype computed it at render only, which was fine for a
++++  demo that re-rendered on every click; a PWA left open on a phone would
++++  otherwise sit showing a stale "3 Min" for an hour.
++++
++++### Decision: which quick actions, and the routes that don't exist yet
++++
++++The brief requires the add actions to exist and be gated. Tasks 14 and 15
++++build the event/player forms, and `src/App.jsx` today resolves only `/`,
++++`/schedule`, `/roster`, `/more` — anything else hits the catch-all and bounces
++++back to `/`. So:
++++
++++| Action | Who sees it | Behaviour now |
++++|---|---|---|
++++| **Add fixture or training** | admin + coach | rendered **disabled** |
++++| **Add a player** | admin + coach | rendered **disabled** |
++++| **View full schedule** / **View schedule** | everyone | real `<Link to="/schedule">` |
++++| **View team list** | everyone | real `<Link to="/roster">` |
++++
++++Disabled rather than omitted or pointed at an invented route: omitting them
++++would silently change the card's shape the day the forms land, and pointing
++++them at a non-resolving path would bounce the user back to the dashboard,
++++which is worse than an honestly-disabled control. A muted line under them says
++++"Adding fixtures and players arrives in the next update." Parents get neither
++++add action plus the read-only explanation; admins get a "You can view every
++++squad in the club." line in place of it. Tasks 14/15 only have to swap
++++`disabled` for an `onClick`/`Link`.
++++
++++### Deliberate deviations from design-system.md §5.1 (documented in-file)
++++
++++1. **Three stat tiles, not four.** The fourth is "Available for the next
++++   event" — availability data, which Task 16 owns. Same reason the hero's
++++   fourth countdown box (an RSVP "in" count, not a countdown value) is absent.
++++   The third tile spans both columns on mobile so the 2-up grid isn't ragged;
++++   three across on desktop.
++++2. **Home/Away badge as a translucent white pill**, not `<Chip type="home">`.
++++   Chip's specified home/away variants are pale fills designed for a white
++++   card; on the maroon hero gradient they read as a smudge. Reused the same
++++   `white/.18` fill as the countdown boxes on the same surface.
++++3. **`<h2 class="sr-only">Dashboard</h2>`.** The prototype's home view has no
++++   visible title — the hero is the opening statement. The visually-hidden
++++   heading keeps the document outline intact for screen readers (every other
++++   screen has a visible `h2`) without changing the approved design.
++++
++++### Refactor: `src/components/FixtureRow.jsx`
++++
++++design-system.md §4.13 calls the fixture row "the single most-reused
++++component — used identically in Home 'Upcoming', Home 'Last result', and all
++++three Schedule tabs". It lived inside `Schedule.jsx`. Moved verbatim into
++++`src/components/FixtureRow.jsx` (plus `data-testid` hooks) and imported by
++++both screens, rather than copying ~50 lines of markup that would then drift.
++++`Schedule.jsx`'s own 35 tests pass unchanged against the extracted component.
++++Dashboard rows open the existing `EventDetail` sheet, as the prototype does.
++++
++++### `src/App.jsx`
++++
++++Placeholder `function Home()` deleted; `/` now renders `<Dashboard />`.
++++`tests/app.test.jsx` updated accordingly (it asserted on a "Home" heading).
++++
++++## Bug found by the browser check
++++
++++The hero's Home/Away badge was keyed on `event.is_home`. The real `events`
++++table column (verified against the live Supabase project, not guessed) is
++++**`home`** (boolean, nullable, default true) — which is also what
++++`EventDetail.jsx` reads. So the badge silently never rendered. Fixed, and
++++covered by two new tests (home → "Home", `home: false` → "Away") plus a
++++mutation check. This is exactly the class of bug jsdom cannot see: nothing
++++failed, the element simply wasn't there.
++++
++++## What I tested
++++
++++`tests/dashboard.test.jsx` — 25 tests, all data modules and `useMemberships`
++++mocked, no network reachable. Clock pinned with `vi.spyOn(Date, 'now')`
++++rather than fake timers (RTL's `waitFor` doesn't detect Vitest fake timers and
++++hangs).
++++
++++Coverage: first-load spinner; both queries scoped to `visibleTeams`; empty
++++scope asks for `teamIds: []` rather than everything; error region with a
++++working retry; realtime refresh keeps content on screen; hero prefers the
++++match over a sooner training; hero renders Abu-Dhabi date/time; hero rolls the
++++date over on Abu Dhabi's midnight; Home/Away badge both ways; countdown
++++values; fallback to any event type; never picks a past unscored fixture;
++++hero hidden when nothing upcoming; three stat counts; admin vs non-admin tile
++++labels; upcoming list ordering and 5-row cap; row opens EventDetail; last
++++result is the most recent scored fixture; empty last-result state; quick
++++actions for coach / admin / parent; the two navigation links' hrefs.
++++
++++### Timezone independence
++++
++++The suite is green under `TZ=UTC` (default), `TZ=America/New_York` and
++++`TZ=Pacific/Kiritimati` (UTC+14) — 324→326 tests each time. The rollover test
++++uses `2026-07-24T20:30Z`, which is the 24th in UTC and New York but 00:30 on
++++the **25th** in Abu Dhabi, so it fails under any browser-local rendering
++++regardless of the runner's zone.
++++
++++### Mutation testing (the suite was green on first full run, so this was required)
++++
++++Ten mutations applied to `Dashboard.jsx`, each reverted after:
++++
++++| # | Mutation | Result |
++++|---|---|---|
++++| 1 | hero formats with `toLocaleDateString()/toLocaleTimeString()` (browser zone) | 2 tests fail |
++++| 2 | hero drops the match preference | 3 fail |
++++| 3 | hero drops the `> now` filter | 4 fail |
++++| 4 | "Fixtures to play" counts all events | 1 fail |
++++| 5 | last result sorted ascending (oldest) | 1 fail |
++++| 6 | `QuickActions canEdit` hardcoded true | 1 fail |
++++| 7 | upcoming list not capped at 5 | 1 fail |
++++| 8 | `isFirstLoad = loading` (spinner on every refetch) | 1 fail |
++++| 9 | `listEvents({})/listPlayers({})` — ignore scope | 2 fail |
++++| 10 | Home/Away badge always says "Home" | 1 fail |
++++
++++All ten killed. No vacuous assertions.
++++
++++## TDD evidence
++++
++++**RED** — `npx vitest run tests/dashboard.test.jsx`, before any implementation:
++++
++++```
++++14 |  const __vi_import_3__ = await import('react-router-dom')
++++15 |  const __vi_import_4__ = await import('../src/screens/Dashboard.jsx')
++++   |                                       ^
++++ ❯ TransformPluginContext._formatError …
++++ Test Files  1 failed (1)
++++      Tests  no tests
++++```
++++
++++Expected: the test file imports `src/screens/Dashboard.jsx`, which did not
++++exist, so collection itself fails before any test can run.
++++
++++After creating the screen, the first real run was **13 failed | 8 passed**,
++++which surfaced four genuine test-side defects (an ambiguous
++++`findByText('Quins vs Al Ain Amblers')` matching both hero and list; a fixture
++++set that made the "empty scope" case return data no such user could receive;
++++a wrong expectation about a past-unscored fixture still being listed; and
++++Intl's U+202F narrow no-break space before AM/PM). Fixed those; then the
++++`home`/`is_home` bug came out of the browser check.
++++
++++**GREEN** — `npx vitest run tests/dashboard.test.jsx`:
++++
++++```
++++ ✓ tests/dashboard.test.jsx (25 tests)
++++ Test Files  1 passed (1)
++++      Tests  25 passed (25)
++++```
++++
++++**Full suite** — `npm test`:
++++
++++```
++++ Test Files  16 passed (16)
++++      Tests  326 passed (326)
++++```
++++
++++Baseline was 301 across 15 files; +25 new tests, +1 file, nothing regressed,
++++no stderr output (`MemoryRouter` is given the same `v7_*` future flags
++++`App.jsx` sets, or react-router logs two upgrade warnings per render).
++++
++++**Build** — `npm run build`: clean, no warnings.
++++
++++## Browser check
++++
++++`harness/shoot-dashboard.mjs` (new), three personas × 375 px and 1280 px, six
++++full-page screenshots in `screenshots/task13/`. Read every one of them with
++++the Read tool. The script also measures, per shot: document vs viewport width,
++++any element overflowing the viewport, any `data-testid` element laid out to
++++zero size, the hero's rendered text, the stat-grid and layout boxes, and — the
++++point of the exercise — every full-width button and anchor's height plus its
++++text's offset from its own top edge.
++++
++++Findings:
++++
++++- **No horizontal overflow** at either width (`docWidth === innerWidth`,
++++  overflowing-element list empty in all six).
++++- **No CSS-hidden/collapsed content**. The only zero-size elements are
++++  AppShell's pre-existing responsive `role-label-mobile`/`-desktop` pair,
++++  which is correct.
++++- **Button-as-layout-box**: the quick-action stack mixes disabled `<button>`s
++++  and `<a>`s. Measured text offset is **12 px on every one of them**, both
++++  tags, both widths — the explicit `flex items-center justify-center` is doing
++++  its job. Fixture rows measure 14 px uniformly across rows of 99/100/121/143 px
++++  height, so the taller (wrapping-venue) rows align with the short ones.
++++- **Layout**: mobile stat grid `165.5px 165.5px` (2-up, third tile spanning);
++++  desktop `354.7px ×3`. Mobile dash-cols stacked (upcoming y=678, last result
++++  y=1527); desktop side by side (upcoming x=96 w=615, last result x=729 w=455)
++++  — the 1.15/0.85 split.
++++- **Abu Dhabi time actually renders**: hero reads "Thu, Jul 30, 2026 · 7:00 PM"
++++  for a `15:00Z` fixture (19:00 Dubai), and the "Late Night Touch" row at
++++  `2026-07-20T21:00Z` shows as **Jul 21, 1:00 AM** — i.e. the date box rolled
++++  over into the club's next day, not UTC's. Machine TZ is UTC, so browser-local
++++  rendering would have printed Jul 20 / 9:00 PM.
++++- **Contrast**: ghost buttons are `#C21F32` on white = 5.93:1 (recomputed);
++++  disabled buttons `#5c5854` on `#f0ecf2` = 6.0:1; block titles `#5c5854` on
++++  paper = 6.42:1; hero text is white on a plum→maroon gradient (≥5.9:1 at the
++++  lighter end). `quinsGreen` is not used for text anywhere.
++++- **Console**: zero errors, zero page errors across all six shots. The only
++++  warnings are the harness's own `MemoryRouter` future-flag notices (the
++++  harness `Shell` predates this task).
++++
++++## Files changed
++++
++++- **New** `src/screens/Dashboard.jsx`
++++- **New** `src/components/FixtureRow.jsx` (extracted from `Schedule.jsx`)
++++- **New** `tests/dashboard.test.jsx`
++++- **New** `harness/shoot-dashboard.mjs`
++++- `src/App.jsx` — `/` renders `Dashboard`; `Home()` placeholder removed
++++- `src/screens/Schedule.jsx` — imports the extracted `FixtureRow`; now-unused
++++  local row/icons/imports removed
++++- `tests/app.test.jsx` — `/` assertions updated from the "Home" placeholder
++++- `harness/main.jsx` — `dashboard`, `dashboard-admin`, `dashboard-parent`
++++  scenarios; the harness `Home` now renders the real Dashboard, mirroring
++++  `App.jsx`
++++
++++## Self-review findings (all fixed before reporting)
++++
++++1. `event.is_home` → `event.home` (see above) — found in the browser, not the
++++   tests, and then covered by tests.
++++2. The Home/Away badge originally reused `<Chip type="win">`/`"draw"` as a
++++   colour hack. Semantically wrong ("win" meaning "home") and visually poor on
++++   the gradient; replaced with an explicit pill.
++++3. `BUTTON_PRIMARY` was defined and then never used once the add actions
++++   became disabled; deleted rather than left as a dead token. A leftover
++++   `.replace()` string hack on the class list went with it.
++++4. `StatTile` silently dropped a `className` prop it was being passed;
++++   plumbed through.
++++5. `Chip` import left dangling in `Dashboard.jsx` after (2); removed.
++++6. Test suite stderr had react-router future-flag noise; silenced by matching
++++   `App.jsx`'s flags.
++++7. YAGNI check: no availability fetching, no team-filter pills (§5.1 has none,
++++   so decision 3 in the brief doesn't apply), no form scaffolding, no
++++   `countdownParts` promoted into `src/lib` — it is used by exactly one screen,
++++   matching the precedent that `positionGroup` stayed local to `Roster.jsx`.
++++
++++## Concerns
++++
++++- The two disabled add-actions are a deliberate placeholder. If Tasks 14/15
++++  slip, they are visible-but-dead controls on the landing screen for coaches;
++++  worth a look during committee sign-off if they haven't been wired by then.
++++- `harness/stubs/events.js` uses `home:` correctly, which is why the badge's
++++  absence was visible rather than merely wrong — but the stub fixtures are
++++  pinned to July 2026 and will start showing an empty "Upcoming" once real
++++  time passes them. That's a pre-existing harness property, not new.
+++diff --git a/harness/main.jsx b/harness/main.jsx
+++index 8f04a21..b6b7fd7 100644
+++--- a/harness/main.jsx
++++++ b/harness/main.jsx
+++@@ -1,30 +1,31 @@
+++ import React from 'react'
+++ import ReactDOM from 'react-dom/client'
+++ import { MemoryRouter } from 'react-router-dom'
+++ import AppShell from '../src/components/AppShell.jsx'
+++ import Login from '../src/screens/Login.jsx'
+++ import Schedule from '../src/screens/Schedule.jsx'
+++ import Roster from '../src/screens/Roster.jsx'
++++import Dashboard from '../src/screens/Dashboard.jsx'
+++ import { AuthProvider } from './stubs/auth.jsx'
+++ import { MembershipProvider } from './stubs/memberships.jsx'
+++ import '../src/index.css'
+++ 
+++ // Throwaway visual-verification harness. Renders the REAL AppShell/Nav/Login
+++ // components (imported straight from src/) with stubbed auth + membership
+++ // context values selected via ?scenario=<name>, so Playwright can screenshot
+++ // real Tailwind-rendered layout without a Supabase session or any network
+++ // access. Not part of the app build; not committed.
+++ 
++++// "/" renders the real Dashboard as of Task 13 (see src/App.jsx).
+++ function Home() {
+++-  // Mirrors App.jsx's routed Home placeholder exactly (see src/App.jsx).
+++-  return <h1>Home</h1>
++++  return <Dashboard />
+++ }
+++ 
+++ const noop = async () => {}
+++ 
+++ function baseAuth(email) {
+++   return {
+++     session: { user: { email } },
+++     user: { email },
+++     loading: false,
+++     signInWithEmail: noop,
+++@@ -87,20 +88,35 @@ function rosterScenario(memberships, teams = TEAMS) {
+++     <Shell
+++       route="/roster"
+++       authValue={baseAuth(COACH_EMAIL)}
+++       membershipValue={{ memberships, teams, loading: false, error: null, reload: noop }}
+++     >
+++       <Roster />
+++     </Shell>
+++   )
+++ }
+++ 
++++// Task 13 Dashboard screens. The default Shell child is already the
++++// Dashboard, so these only vary the persona (which is what changes the scope
++++// note, the stat-tile labels and the quick-action gating).
++++function dashboardScenario(memberships, teams = TEAMS) {
++++  return () => (
++++    <Shell
++++      route="/"
++++      authValue={baseAuth(COACH_EMAIL)}
++++      membershipValue={{ memberships, teams, loading: false, error: null, reload: noop }}
++++    />
++++  )
++++}
++++
++++const PARENT_MEMBERSHIPS = [{ id: 'm4', role: 'parent', team_id: 't1', player_id: 'p1' }]
++++
+++ // A coach of one squad: the team filter is hidden and the list groups by
+++ // position. Task 12's grouping rule turns on team count, so this is the
+++ // scenario that renders the Forwards/Backs/Other headings.
+++ const COACH_ONE_TEAM = [{ id: 'm1', role: 'coach', team_id: 't1', player_id: null }]
+++ 
+++ const scenarios = {
+++   login: () => (
+++     <AuthProvider value={baseAuth('')}>
+++       <Login />
+++     </AuthProvider>
+++@@ -147,20 +163,24 @@ const scenarios = {
+++   // Task 12 Roster screens. Search text, pill selection and the PlayerDetail
+++   // sheet are real component state, so Playwright drives them by typing and
+++   // clicking (see shoot-roster.mjs).
+++   roster: rosterScenario(COACH_MEMBERSHIPS),
+++   'roster-one-team': rosterScenario(COACH_ONE_TEAM),
+++   'roster-admin': rosterScenario(ADMIN_MEMBERSHIPS),
+++ 
+++   // Independent verification pass: three age groups in scope.
+++   'roster-three': rosterScenario(COACH_THREE_MEMBERSHIPS, TEAMS_THREE),
+++ 
++++  dashboard: dashboardScenario(COACH_MEMBERSHIPS),
++++  'dashboard-admin': dashboardScenario(ADMIN_MEMBERSHIPS),
++++  'dashboard-parent': dashboardScenario(PARENT_MEMBERSHIPS),
++++
+++   'shell-loading': () => (
+++     <Shell
+++       authValue={baseAuth(JAY_EMAIL)}
+++       membershipValue={{ memberships: [], teams: [], loading: true, error: null, reload: noop }}
+++     />
+++   ),
+++ }
+++ 
+++ const params = new URLSearchParams(window.location.search)
+++ const scenario = params.get('scenario') || 'login'
+++diff --git a/harness/shoot-dashboard.mjs b/harness/shoot-dashboard.mjs
+++new file mode 100644
+++index 0000000..ab13b2a
+++--- /dev/null
++++++ b/harness/shoot-dashboard.mjs
+++@@ -0,0 +1,131 @@
++++import { loadChromium } from './playwright.mjs'
++++import path from 'node:path'
++++import { fileURLToPath } from 'node:url'
++++import fs from 'node:fs'
++++
++++// Task 13 visual verification. Same pattern as shoot-roster.mjs. The
++++// measurements matter as much as the pictures: the quick-action stack mixes
++++// <button>s and <a>s used as layout boxes, and Chromium's UA stylesheet
++++// centres a button's content but not an anchor's — a difference jsdom can
++++// never see. Every shot therefore records each action's height and its text's
++++// offset from its own top edge, so a dropped `flex items-center justify-center`
++++// shows up as a number, not a vibe. It also records the hero's rendered date
++++// and time text, which must be Abu Dhabi's, not the machine's.
++++
++++const __dirname = path.dirname(fileURLToPath(import.meta.url))
++++const outDir = path.resolve(__dirname, '../screenshots/task13')
++++fs.mkdirSync(outDir, { recursive: true })
++++
++++const BASE = 'http://localhost:5199'
++++
++++const shots = [
++++  { file: 'coach', scenario: 'dashboard' },
++++  { file: 'admin', scenario: 'dashboard-admin' },
++++  { file: 'parent', scenario: 'dashboard-parent' },
++++]
++++
++++const viewports = [
++++  { name: 'mobile', width: 375, height: 812 },
++++  { name: 'desktop', width: 1280, height: 900 },
++++]
++++
++++const results = []
++++const chromium = await loadChromium()
++++const browser = await chromium.launch()
++++
++++for (const shot of shots) {
++++  for (const vp of viewports) {
++++    const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } })
++++    const consoleErrors = []
++++    const consoleWarnings = []
++++    const pageErrors = []
++++    page.on('console', (msg) => {
++++      if (msg.type() === 'error') consoleErrors.push(msg.text())
++++      if (msg.type() === 'warning') consoleWarnings.push(msg.text())
++++    })
++++    page.on('pageerror', (err) => pageErrors.push(err.message))
++++
++++    await page.goto(`${BASE}/?scenario=${shot.scenario}`, { waitUntil: 'networkidle' })
++++    await page.waitForTimeout(400)
++++
++++    const metrics = await page.evaluate(() => {
++++      const text = (sel) => document.querySelector(sel)?.innerText.replace(/\n+/g, ' | ') ?? null
++++
++++      const overflowing = [...document.querySelectorAll('*')]
++++        .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1)
++++        .slice(0, 6)
++++        .map(
++++          (el) =>
++++            `${el.tagName}.${el.className?.toString?.().slice(0, 60)} right=${Math.round(el.getBoundingClientRect().right)}`,
++++        )
++++
++++      // Anything laid out to zero size, or clipped away, is content the
++++      // jsdom tests would still have called "visible".
++++      const collapsed = [...document.querySelectorAll('[data-testid]')]
++++        .filter((el) => {
++++          const r = el.getBoundingClientRect()
++++          return r.width < 1 || r.height < 1
++++        })
++++        .map((el) => el.dataset.testid)
++++
++++      // The UA-centring check, for both the <button> and <a> variants.
++++      const actions = [...document.querySelectorAll('a[href], button')]
++++        .filter((el) => el.className.includes('w-full'))
++++        .map((el) => {
++++          const box = el.getBoundingClientRect()
++++          const range = document.createRange()
++++          range.selectNodeContents(el)
++++          const inner = range.getBoundingClientRect()
++++          return {
++++            tag: el.tagName,
++++            label: el.innerText.trim(),
++++            disabled: el.disabled === true,
++++            h: Math.round(box.height),
++++            w: Math.round(box.width),
++++            textOffsetTop: Math.round(inner.top - box.top),
++++          }
++++        })
++++
++++      const statGrid = document.querySelector('[data-testid="stat-players"]')?.parentElement
++++      const cols = statGrid ? getComputedStyle(statGrid).gridTemplateColumns : null
++++
++++      const dashCols = document.querySelector('[data-testid="upcoming-list"]')?.closest('div')
++++        ?.parentElement
++++      const box = (sel) => {
++++        const el = document.querySelector(sel)
++++        if (!el) return null
++++        const r = el.getBoundingClientRect()
++++        return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width) }
++++      }
++++
++++      return {
++++        docWidth: document.documentElement.scrollWidth,
++++        innerWidth: window.innerWidth,
++++        overflowing,
++++        collapsed,
++++        hero: text('[data-testid="next-fixture"]'),
++++        countdown: text('[data-testid="countdown"]'),
++++        stats: ['stat-players', 'stat-fixtures', 'stat-groups'].map((id) =>
++++          text(`[data-testid="${id}"]`),
++++        ),
++++        statGridColumns: cols,
++++        dashColumns: dashCols ? getComputedStyle(dashCols).gridTemplateColumns : null,
++++        upcomingBox: box('[data-testid="upcoming-list"]'),
++++        lastResultBox: box('[data-testid="last-result"]'),
++++        upcomingRows: document.querySelectorAll('[data-testid="upcoming-list"] [data-testid="fixture-row"]')
++++          .length,
++++        lastResult: text('[data-testid="last-result"]'),
++++        actions,
++++      }
++++    })
++++
++++    const outPath = path.join(outDir, `${shot.file}-${vp.name}.png`)
++++    await page.screenshot({ path: outPath, fullPage: true })
++++
++++    results.push({ shot: shot.file, viewport: vp.name, file: outPath, metrics, consoleErrors, consoleWarnings, pageErrors })
++++    await page.close()
++++  }
++++}
++++
++++await browser.close()
++++console.log(JSON.stringify(results, null, 2))
+++diff --git a/src/App.jsx b/src/App.jsx
+++index 8dfef34..9388a42 100644
+++--- a/src/App.jsx
++++++ b/src/App.jsx
+++@@ -1,38 +1,35 @@
+++ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+++ import RequireAuth from './components/RequireAuth.jsx'
+++ import { MembershipProvider } from './lib/memberships.jsx'
+++ import AppShell from './components/AppShell.jsx'
++++import Dashboard from './screens/Dashboard.jsx'
+++ import Schedule from './screens/Schedule.jsx'
+++ import Roster from './screens/Roster.jsx'
+++ 
+++-// Home/More are route placeholders still — Task 13 replaces Home and a later
+++-// task replaces More. They live here (not in src/screens/) so those tasks
+++-// create their screen files without fighting a stub of the same name.
+++-// Schedule is real as of Task 11, Roster as of Task 12.
+++-
+++-function Home() {
+++-  return <h1>Home</h1>
+++-}
++++// More is a route placeholder still — a later task replaces it. It lives here
++++// (not in src/screens/) so that task creates its screen file without fighting
++++// a stub of the same name. Schedule is real as of Task 11, Roster as of Task
++++// 12, and "/" is the real Dashboard as of Task 13.
+++ 
+++ function More() {
+++   return <h1>More</h1>
+++ }
+++ 
+++ export default function App() {
+++   return (
+++     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+++       <RequireAuth>
+++         <MembershipProvider>
+++           <AppShell>
+++             <Routes>
+++-              <Route path="/" element={<Home />} />
++++              <Route path="/" element={<Dashboard />} />
+++               <Route path="/schedule" element={<Schedule />} />
+++               <Route path="/roster" element={<Roster />} />
+++               <Route path="/more" element={<More />} />
+++               <Route path="*" element={<Navigate to="/" replace />} />
+++             </Routes>
+++           </AppShell>
+++         </MembershipProvider>
+++       </RequireAuth>
+++     </BrowserRouter>
+++   )
+++diff --git a/src/components/FixtureRow.jsx b/src/components/FixtureRow.jsx
+++new file mode 100644
+++index 0000000..3123e44
+++--- /dev/null
++++++ b/src/components/FixtureRow.jsx
+++@@ -0,0 +1,97 @@
++++import Chip from './Chip.jsx'
++++import {
++++  dateBoxParts,
++++  eventDate,
++++  eventTitle,
++++  formatTime,
++++  hasResult,
++++  resultLabel,
++++  resultOutcome,
++++  resultScore,
++++} from '../lib/eventFormat.js'
++++
++++// Fixture / event row (design-system.md §4.13) — "the single most-reused
++++// component", rendered identically in the Dashboard's Upcoming list, the
++++// Dashboard's Last result card, and all three Schedule tabs. It lived inside
++++// Schedule.jsx until Task 13 needed the same row on the Dashboard; moved here
++++// verbatim rather than copied, so the two screens can never drift apart.
++++//
++++// The date box's month/day/weekday and the meta row's time are Abu Dhabi
++++// time, via dateBoxParts/formatTime (see CLUB_TIME_ZONE in eventFormat.js).
++++// The row itself carries no zone label; only the detail sheet says so.
++++
++++const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
++++
++++function ClockIcon(props) {
++++  return (
++++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++++      <circle cx="12" cy="12" r="9" />
++++      <path d="M12 7v5l3 2" />
++++    </svg>
++++  )
++++}
++++
++++function PinIcon(props) {
++++  return (
++++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++++      <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" />
++++      <circle cx="12" cy="10" r="2.5" />
++++    </svg>
++++  )
++++}
++++
++++export function FixtureRow({ event, teamName, onSelect }) {
++++  const date = eventDate(event)
++++  const { month, day, weekday } = dateBoxParts(date)
++++  const played = hasResult(event)
++++
++++  return (
++++    <button
++++      type="button"
++++      data-testid="fixture-row"
++++      onClick={() => onSelect(event.id)}
++++      // `flex` and `items-center` are load-bearing, not decorative:
++++      // Chromium's UA stylesheet centres a <button>'s content inside its box,
++++      // which would shove this row's contents around once it is taller than
++++      // its text. Setting the layout explicitly overrides that.
++++      className="flex w-full items-center gap-[13px] border-b border-[#e6e3e1] p-[14px] text-left transition last:border-b-0 hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-quinsRed"
++++    >
++++      <span className="w-[52px] shrink-0 rounded-[11px] bg-[#f3eef5] px-1 py-2 text-center">
++++        <span className="block text-[10.5px] font-extrabold uppercase tracking-[.5px] text-quinsRed">{month}</span>
++++        <span className="block text-[21px] font-extrabold leading-none text-[#221f1d]">{day}</span>
++++        <span className="block text-[10px] font-semibold text-[#77726e]">{weekday}</span>
++++      </span>
++++
++++      <span className="min-w-0 flex-1">
++++        <span className="mb-1 flex flex-wrap items-center gap-1.5">
++++          <Chip type={event.type}>{TYPE_LABELS[event.type] ?? 'Event'}</Chip>
++++          {teamName && <Chip>{teamName}</Chip>}
++++        </span>
++++        <span data-testid="fixture-title" className="block text-[15.5px] font-extrabold text-[#221f1d]">
++++          {eventTitle(event)}
++++        </span>
++++        <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12.5px] text-[#77726e]">
++++          <span className="flex items-center gap-1">
++++            <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
++++            {formatTime(date)}
++++          </span>
++++          {event.venue && (
++++            <span className="flex items-center gap-1">
++++              <PinIcon className="h-3.5 w-3.5" aria-hidden="true" />
++++              {event.venue}
++++            </span>
++++          )}
++++        </span>
++++      </span>
++++
++++      {played && (
++++        <span className="shrink-0 text-right">
++++          <Chip type={resultOutcome(event)}>{resultLabel(event)}</Chip>
++++          <span className="mt-1 block text-base font-extrabold text-[#221f1d]">{resultScore(event)}</span>
++++        </span>
++++      )}
++++    </button>
++++  )
++++}
++++
++++export default FixtureRow
+++diff --git a/src/screens/Dashboard.jsx b/src/screens/Dashboard.jsx
+++new file mode 100644
+++index 0000000..1924d83
+++--- /dev/null
++++++ b/src/screens/Dashboard.jsx
+++@@ -0,0 +1,474 @@
++++import { useEffect, useMemo, useState } from 'react'
++++import { Link } from 'react-router-dom'
++++import Card from '../components/Card.jsx'
++++import Empty from '../components/Empty.jsx'
++++import FixtureRow from '../components/FixtureRow.jsx'
++++import ScopeNote from '../components/ScopeNote.jsx'
++++import Spinner from '../components/Spinner.jsx'
++++import EventDetail from './EventDetail.jsx'
++++import { listEvents, subscribeEvents } from '../data/events.js'
++++import { listPlayers } from '../data/players.js'
++++import { useMemberships } from '../lib/memberships.jsx'
++++import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
++++import {
++++  eventDate,
++++  eventTitle,
++++  formatLongDate,
++++  formatTime,
++++  hasResult,
++++  sortByStart,
++++} from '../lib/eventFormat.js'
++++
++++// Home / dashboard (design-system.md §5.1): scope note, next-fixture hero,
++++// stat tiles, then the two-column block — upcoming fixtures on the left,
++++// quick actions + last result on the right (a single stacked column below
++++// 820px, in that same DOM order).
++++//
++++// This screen introduces no data access of its own: it reads exactly the
++++// same scoped listEvents/listPlayers that Schedule and Roster read, and
++++// derives everything it shows from those two arrays. Access control is not
++++// enforced here — RLS decides which rows come back; visibleTeams() only tells
++++// the UI which team ids to ask for, so a mistake here can narrow what a user
++++// sees but can never widen it. An empty teamIds array means "no teams, show
++++// nothing" (see src/data/events.js), never "no filter, show everything".
++++//
++++// Deliberately NOT here (Task 16 owns availability RSVPs): the prototype's
++++// fourth stat tile ("Available for the next event") and the hero's fourth
++++// countdown box, which is an RSVP "in" count rather than a countdown value.
++++// Both would need availability data this screen has no business fetching yet,
++++// so the stat grid is three tiles and the countdown three boxes until Task 16
++++// adds the fourth of each.
++++
++++// design-system.md's --muted (#77726e) is specified against a card, where it
++++// measures 4.755:1 on white and clears AA. The block titles sit OUTSIDE any
++++// card, on --paper (#f5f4f3), where the same pair measures 4.329:1 and fails
++++// the 4.5:1 threshold. Darkened to #5c5854 (6.417:1 on paper) — the same
++++// value Schedule.jsx and Roster.jsx use for the same reason.
++++const MUTED_ON_PAPER = 'text-[#5c5854]'
++++
++++// design-system.md §3: .btn{padding:10px 15px;border-radius:11px}, 14px/700.
++++// `flex items-center justify-center` is load-bearing rather than decorative:
++++// these are full-width buttons and links used as layout boxes, and a
++++// <button>'s content is centred by Chromium's UA stylesheet but an <a>'s is
++++// not — so without an explicit layout the two variants would sit differently
++++// on the same stack. Declared once here so they cannot drift.
++++const BUTTON_BASE =
++++  'flex w-full items-center justify-center gap-2 rounded-[11px] px-[15px] py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2'
++++// Ghost: --maroon text on white, 5.93:1, clears AA.
++++const BUTTON_GHOST = `${BUTTON_BASE} bg-white text-quinsRed shadow-[inset_0_0_0_1.5px_#e6e3e1] hover:bg-[#faf8fb]`
++++// Disabled: the neutral chip fill with the darkened --muted this project
++++// already uses on it (#5c5854 on #f0ecf2 = 6.0:1), so a disabled action is
++++// still legible rather than a grey-on-grey guess.
++++const BUTTON_DISABLED = `${BUTTON_BASE} cursor-not-allowed bg-[#f0ecf2] text-[#5c5854]`
++++
++++const MINUTE = 60 * 1000
++++const HOUR = 60 * MINUTE
++++const DAY = 24 * HOUR
++++
++++/**
++++ * Whole days/hours/minutes between two instants, floored and never negative.
++++ *
++++ * A pure instant subtraction, and correctly zone-agnostic — "how long until
++++ * kick-off" is the same answer in Abu Dhabi and in London, unlike the
++++ * *displayed* date and time, which always render in club time via
++++ * eventFormat.js. Local to this screen because only the hero needs it; the
++++ * shared lib is for things two screens genuinely share.
++++ */
++++function countdownParts(target, now) {
++++  const remaining = Math.max(0, target - now)
++++  return {
++++    days: Math.floor(remaining / DAY),
++++    hours: Math.floor((remaining % DAY) / HOUR),
++++    minutes: Math.floor((remaining % HOUR) / MINUTE),
++++  }
++++}
++++
++++function CalendarIcon(props) {
++++  return (
++++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++++      <rect x="3" y="5" width="18" height="16" rx="2" />
++++      <path d="M3 10h18M8 3v4M16 3v4" />
++++    </svg>
++++  )
++++}
++++
++++function ClockIcon(props) {
++++  return (
++++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++++      <circle cx="12" cy="12" r="9" />
++++      <path d="M12 7v5l3 2" />
++++    </svg>
++++  )
++++}
++++
++++function PinIcon(props) {
++++  return (
++++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
++++      <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" />
++++      <circle cx="12" cy="10" r="2.5" />
++++    </svg>
++++  )
++++}
++++
++++function BlockTitle({ children }) {
++++  return (
++++    <h3 className={`mb-2.5 ml-0.5 mt-[18px] text-[13px] font-extrabold uppercase tracking-[.8px] first:mt-0 ${MUTED_ON_PAPER}`}>
++++      {children}
++++    </h3>
++++  )
++++}
++++
++++function StatTile({ testId, value, label, tone = 'text-[#221f1d]', className = '' }) {
++++  return (
++++    <Card data-testid={testId} className={`px-4 py-[15px] ${className}`}>
++++      <div className={`text-[27px] font-extrabold leading-none tracking-[-0.5px] ${tone}`}>{value}</div>
++++      <div className="mt-1.5 text-[12.5px] font-semibold text-[#77726e]">{label}</div>
++++    </Card>
++++  )
++++}
++++
++++function CountdownBox({ testId, value, label }) {
++++  return (
++++    <div className="flex-1 rounded-[10px] bg-white/[.14] py-2 text-center">
++++      <b data-testid={testId} className="block text-[22px] font-extrabold leading-none">
++++        {value}
++++      </b>
++++      <span className="mt-1 block text-[10px] uppercase tracking-[1px] opacity-80">{label}</span>
++++    </div>
++++  )
++++}
++++
++++// design-system.md §4.11. Two-stop plum -> maroon gradient, white text
++++// throughout (>= 5.9:1 against the lighter maroon end).
++++function NextFixtureHero({ event, teamName, now }) {
++++  const date = eventDate(event)
++++  const { days, hours, minutes } = countdownParts(date.getTime(), now)
++++
++++  return (
++++    <div
++++      data-testid="next-fixture"
++++      className="mb-4 overflow-hidden rounded-[16px] bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] p-[18px] text-white shadow-[0_6px_24px_rgba(20,20,20,0.10)]"
++++    >
++++      <div className="text-[11px] font-bold uppercase tracking-[1.6px] opacity-80">
++++        Next fixture{teamName ? ` · ${teamName}` : ''}
++++      </div>
++++
++++      <div className="mt-1.5 text-[23px] font-extrabold leading-tight desktop:text-[27px]">
++++        {eventTitle(event)}
++++      </div>
++++
++++      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13.5px] font-semibold">
++++        <span className="flex items-center gap-1.5">
++++          <CalendarIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
++++          {formatLongDate(date)}
++++        </span>
++++        <span className="flex items-center gap-1.5">
++++          <ClockIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
++++          {formatTime(date)}
++++        </span>
++++        {event.venue && (
++++          <span className="flex items-center gap-1.5">
++++            <PinIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
++++            {event.venue}
++++          </span>
++++        )}
++++        {/* The prototype's hero carries a .chip.home / .chip.away badge here
++++            (design-system.md §4.11). Rendered as a translucent white pill
++++            rather than through <Chip>, because Chip's home/away variants are
++++            pale fills meant for a white card — on this maroon gradient they
++++            read as a smudge, while the same white/.18 fill the countdown
++++            boxes use sits on it cleanly. `home` is the events column's real
++++            name (boolean, defaults true); it is nullable, so a null stays
++++            silent rather than claiming "Away". */}
++++        {event.type === 'match' && event.home != null && (
++++          <span className="rounded-[20px] bg-white/[.18] px-2.5 py-1 text-[11.5px] font-bold uppercase tracking-[.5px]">
++++            {event.home ? 'Home' : 'Away'}
++++          </span>
++++        )}
++++      </div>
++++
++++      {/* Times shown are Abu Dhabi time, stated once here rather than on
++++          every line — the club has one home ground, so a parent reading from
++++          abroad needs to know which clock these are on. */}
++++      <p className="mt-2 text-[11.5px] opacity-80">All times are Abu Dhabi time.</p>
++++
++++      <div data-testid="countdown" className="mt-3.5 flex gap-2.5">
++++        <CountdownBox testId="countdown-days" value={days} label="Days" />
++++        <CountdownBox testId="countdown-hours" value={hours} label="Hrs" />
++++        <CountdownBox testId="countdown-minutes" value={minutes} label="Min" />
++++      </div>
++++    </div>
++++  )
++++}
++++
++++function QuickActions({ canEdit, admin }) {
++++  return (
++++    <Card className="p-[14px]">
++++      <div className="flex flex-col gap-2.5">
++++        {canEdit && (
++++          <>
++++            {/* Tasks 14 and 15 build the event and player forms; until then
++++                there is no route for these to open, and pointing them at a
++++                path that does not resolve would bounce the user back here via
++++                App.jsx's catch-all. They are rendered disabled rather than
++++                omitted so the people who can use them can see they are coming
++++                — and so this card does not silently change shape for a coach
++++                the day the forms land. */}
++++            <button type="button" disabled className={BUTTON_DISABLED}>
++++              Add fixture or training
++++            </button>
++++            <button type="button" disabled className={BUTTON_DISABLED}>
++++              Add a player
++++            </button>
++++            <p className="text-center text-[12.5px] text-[#77726e]">
++++              Adding fixtures and players arrives in the next update.
++++            </p>
++++          </>
++++        )}
++++
++++        <Link to="/schedule" className={BUTTON_GHOST}>
++++          {canEdit ? 'View full schedule' : 'View schedule'}
++++        </Link>
++++        <Link to="/roster" className={BUTTON_GHOST}>
++++          View team list
++++        </Link>
++++
++++        {!canEdit && (
++++          <p className="text-center text-[12.5px] text-[#77726e]">
++++            {admin
++++              ? 'You can view every squad in the club.'
++++              : "You're signed in as a parent, so you can read fixtures and squads but not change them."}
++++          </p>
++++        )}
++++      </div>
++++    </Card>
++++  )
++++}
++++
++++export default function Dashboard() {
++++  const { memberships, teams } = useMemberships()
++++
++++  const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
++++  const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
++++  const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
++++
++++  const [events, setEvents] = useState([])
++++  const [players, setPlayers] = useState([])
++++  const [loading, setLoading] = useState(true)
++++  const [settled, setSettled] = useState(false)
++++  const [error, setError] = useState(null)
++++  const [reloadToken, setReloadToken] = useState(0)
++++  const [selectedEventId, setSelectedEventId] = useState(null)
++++
++++  // The countdown is recomputed on render, and re-rendered once a minute so
++++  // that a phone left on this screen doesn't sit showing a stale "3 Min" for
++++  // an hour. The prototype computed it at render only (design-system.md §6),
++++  // which was fine for a demo that re-rendered on every interaction.
++++  const [now, setNow] = useState(() => Date.now())
++++  useEffect(() => {
++++    const id = setInterval(() => setNow(Date.now()), MINUTE)
++++    return () => clearInterval(id)
++++  }, [])
++++
++++  // Both reads go out together and land together: the stat tiles mix counts
++++  // from each, so settling them independently would show a half-filled grid.
++++  useEffect(() => {
++++    let mounted = true
++++    setLoading(true)
++++    setError(null)
++++
++++    Promise.all([listEvents({ teamIds }), listPlayers({ teamIds })])
++++      .then(([eventRows, playerRows]) => {
++++        if (!mounted) return
++++        setEvents(eventRows)
++++        setPlayers(playerRows)
++++      })
++++      .catch((err) => {
++++        if (!mounted) return
++++        setError(err)
++++        setEvents([])
++++        setPlayers([])
++++      })
++++      .finally(() => {
++++        if (!mounted) return
++++        setLoading(false)
++++        setSettled(true)
++++      })
++++
++++    return () => {
++++      mounted = false
++++    }
++++  }, [teamIds, reloadToken])
++++
++++  // Realtime: bump the token and let the effect above refetch. The callback
++++  // closes over nothing but setReloadToken (a stable state setter), so this
++++  // subscribes exactly once for the life of the screen, and its cleanup only
++++  // unsubscribes — it never touches focus.
++++  useEffect(() => subscribeEvents(() => setReloadToken((token) => token + 1)), [])
++++
++++  // Only a load with nothing on screen replaces the content with a spinner. A
++++  // realtime refresh fires on every insert/update/delete anywhere in scope,
++++  // from any user — spinning on those would tear the dashboard out of the DOM
++++  // and collapse the page height each time somebody else touched a fixture.
++++  const isFirstLoad = loading && !settled
++++
++++  const admin = isAdmin(memberships)
++++  const canEdit = admin || memberships.some((membership) => membership.role === 'coach')
++++  const teamNames = scopedTeams.map((team) => team.name).join(', ')
++++
++++  // "To play" is the project's result rule: a fixture is a result when a
++++  // score is recorded, not when its date has passed (see hasResult). A match
++++  // played last week whose score nobody has entered is still to play, and
++++  // still listed — which is the point, it stays visible until someone records
++++  // the score.
++++  const toPlay = sortByStart(events.filter((event) => !hasResult(event)), 'asc')
++++  const results = sortByStart(events.filter(hasResult), 'desc')
++++  const lastResult = results[0] ?? null
++++
++++  // The hero is the one place that also needs the fixture to be in the
++++  // FUTURE: a countdown to an instant that has passed is meaningless, so an
++++  // unscored fixture from last week is legitimately "to play" in the list
++++  // above but can never be the next fixture. Matches come first, falling back
++++  // to the next event of any type (design-system.md §4.11).
++++  const future = toPlay.filter((event) => {
++++    const date = eventDate(event)
++++    return date != null && date.getTime() > now
++++  })
++++  const nextFixture = future.find((event) => event.type === 'match') ?? future[0] ?? null
++++
++++  const upcoming = toPlay.slice(0, 5)
++++
++++  // Derive the open event from the live list rather than storing the row
++++  // itself, so a realtime update keeps the sheet's contents fresh and a
++++  // deleted fixture closes it instead of stranding a stale copy on screen.
++++  const selectedEvent = events.find((event) => event.id === selectedEventId) ?? null
++++
++++  if (isFirstLoad) {
++++    return (
++++      <section>
++++        <h2 className="sr-only">Dashboard</h2>
++++        <Card className="flex justify-center py-10">
++++          <Spinner label="Loading your dashboard…" />
++++        </Card>
++++      </section>
++++    )
++++  }
++++
++++  if (error) {
++++    return (
++++      <section>
++++        <h2 className="sr-only">Dashboard</h2>
++++        <Card role="alert" className="p-6 text-center">
++++          <h3 className="text-base font-extrabold text-quinsRedDark">We couldn&apos;t load your dashboard</h3>
++++          <p className="mt-2 text-sm leading-relaxed text-quinsRedDark">
++++            {error.message || 'Something went wrong. Try again.'}
++++          </p>
++++          <button
++++            type="button"
++++            onClick={() => setReloadToken((token) => token + 1)}
++++            className="mx-auto mt-4 w-auto rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
++++          >
++++            Try again
++++          </button>
++++        </Card>
++++      </section>
++++    )
++++  }
++++
++++  return (
++++    <section>
++++      {/* The prototype's home view has no visible title (design-system.md
++++          §5.1) — the hero is the page's opening statement. This heading keeps
++++          the document outline intact for screen readers without changing the
++++          approved design. */}
++++      <h2 className="sr-only">Dashboard</h2>
++++
++++      {!admin && (
++++        <ScopeNote tone={canEdit ? 'coach' : 'parent'}>
++++          <b>
++++            {roleLabel(memberships)} view{canEdit ? '' : ' · read-only'}.
++++          </b>{' '}
++++          You&apos;re seeing {teamNames || 'no squads'} — every other age group is hidden.
++++        </ScopeNote>
++++      )}
++++
++++      {nextFixture && (
++++        <NextFixtureHero
++++          event={nextFixture}
++++          teamName={teamsById.get(nextFixture.team_id)?.name}
++++          now={now}
++++        />
++++      )}
++++
++++      <div className="grid grid-cols-2 gap-3 desktop:grid-cols-3">
++++        <StatTile
++++          testId="stat-players"
++++          value={players.length}
++++          label={admin ? 'Registered players' : 'Players in view'}
++++          tone="text-quinsRed"
++++        />
++++        <StatTile testId="stat-fixtures" value={toPlay.length} label="Fixtures to play" />
++++        {/* Third of three tiles: fills the row on mobile's 2-up grid rather
++++            than leaving a ragged half-width tile. */}
++++        <StatTile
++++          testId="stat-groups"
++++          value={scopedTeams.length}
++++          label={admin ? 'Age groups' : 'Your groups'}
++++          className="col-span-2 desktop:col-span-1"
++++        />
++++      </div>
++++
++++      {/* Mobile: one column, stacked in DOM order (upcoming, quick actions,
++++          last result). Desktop: 1.15fr / .85fr two-column grid
++++          (design-system.md §5.1). The two wrappers give both layouts from the
++++          same DOM order. */}
++++      <div className="mt-[18px] desktop:grid desktop:grid-cols-[1.15fr_0.85fr] desktop:gap-[18px]">
++++        <div>
++++          <BlockTitle>Upcoming</BlockTitle>
++++          {upcoming.length === 0 ? (
++++            <Card data-testid="upcoming-list">
++++              <Empty message="No upcoming fixtures yet." />
++++            </Card>
++++          ) : (
++++            <Card data-testid="upcoming-list" className="overflow-hidden">
++++              {upcoming.map((event) => (
++++                <FixtureRow
++++                  key={event.id}
++++                  event={event}
++++                  teamName={teamsById.get(event.team_id)?.name}
++++                  onSelect={setSelectedEventId}
++++                />
++++              ))}
++++            </Card>
++++          )}
++++        </div>
++++
++++        <div>
++++          <BlockTitle>Quick actions</BlockTitle>
++++          <QuickActions canEdit={canEdit} admin={admin} />
++++
++++          <BlockTitle>Last result</BlockTitle>
++++          <Card data-testid="last-result" className="overflow-hidden">
++++            {lastResult ? (
++++              <FixtureRow
++++                event={lastResult}
++++                teamName={teamsById.get(lastResult.team_id)?.name}
++++                onSelect={setSelectedEventId}
++++              />
++++            ) : (
++++              <Empty message="No results yet. Scores show here once someone adds them." />
++++            )}
++++          </Card>
++++        </div>
++++      </div>
++++
++++      {selectedEvent && (
++++        <EventDetail
++++          event={selectedEvent}
++++          team={teamsById.get(selectedEvent.team_id)}
++++          onClose={() => setSelectedEventId(null)}
++++        />
++++      )}
++++    </section>
++++  )
++++}
+++diff --git a/src/screens/Schedule.jsx b/src/screens/Schedule.jsx
+++index 4be7e74..490f7b1 100644
+++--- a/src/screens/Schedule.jsx
++++++ b/src/screens/Schedule.jsx
+++@@ -1,52 +1,42 @@
+++ import { useEffect, useMemo, useState } from 'react'
+++ import Card from '../components/Card.jsx'
+++-import Chip from '../components/Chip.jsx'
+++ import Empty from '../components/Empty.jsx'
++++import FixtureRow from '../components/FixtureRow.jsx'
+++ import ScopeNote from '../components/ScopeNote.jsx'
+++ import Spinner from '../components/Spinner.jsx'
+++ import TeamPills, { ALL_TEAMS_ID, PillButton } from '../components/TeamPills.jsx'
+++ import EventDetail from './EventDetail.jsx'
+++ import { listEvents, subscribeEvents } from '../data/events.js'
+++ import { useMemberships } from '../lib/memberships.jsx'
+++ import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+++-import {
+++-  clubDayParts,
+++-  clubToday,
+++-  dateBoxParts,
+++-  eventDate,
+++-  eventTitle,
+++-  formatTime,
+++-  hasResult,
+++-  resultLabel,
+++-  resultOutcome,
+++-  resultScore,
+++-  sortByStart,
+++-} from '../lib/eventFormat.js'
++++import { clubDayParts, clubToday, eventDate, hasResult, sortByStart } from '../lib/eventFormat.js'
+++ 
+++ // Schedule & fixtures (design-system.md §5.2): scope note, section head,
+++ // Upcoming/Results/Calendar sub-tabs, a team filter, then the list or the
+++ // month grid. Reads events once for the whole visible scope and filters in
+++ // memory — the scope is at most 15 teams' worth of fixtures, so refetching
+++ // on every pill tap would add latency and flicker for nothing.
+++ //
+++ // Access control is not enforced here. RLS decides which rows come back;
+++ // visibleTeams() only tells the UI which pills to draw and which team ids
+++ // to ask for, so a mistake here can narrow what a user sees but can never
+++ // widen it.
+++ 
+++ const TABS = [
+++   { id: 'upcoming', label: 'Upcoming' },
+++   { id: 'results', label: 'Results' },
+++   { id: 'calendar', label: 'Calendar' },
+++ ]
+++ 
++++// The calendar's dot legend only. The fixture rows' own type chips live in
++++// src/components/FixtureRow.jsx, which carries its own copy of these labels.
+++ const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
+++ 
+++ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+++ 
+++ // Every calendar day cell carries these, whether it renders as a <div> (no
+++ // events) or a <button> (has events). The flex + start-alignment tokens are
+++ // load-bearing, not decorative — see the comment at the cell markup.
+++ const CELL_LAYOUT =
+++   'relative flex aspect-square items-start justify-start rounded-[9px] border p-[5px] text-left text-[12.5px] font-semibold text-[#221f1d]'
+++ 
+++@@ -60,38 +50,20 @@ const CELL_LAYOUT =
+++ // inside a card (the fixture rows, the calendar weekday headers) is
+++ // untouched.
+++ const MUTED_ON_PAPER = 'text-[#5c5854]'
+++ 
+++ const DOT_COLOURS = {
+++   match: 'bg-quinsRed',
+++   training: 'bg-[#3E9C4F]',
+++   social: 'bg-[#c9861a]',
+++ }
+++ 
+++-function ClockIcon(props) {
+++-  return (
+++-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+++-      <circle cx="12" cy="12" r="9" />
+++-      <path d="M12 7v5l3 2" />
+++-    </svg>
+++-  )
+++-}
+++-
+++-function PinIcon(props) {
+++-  return (
+++-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+++-      <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" />
+++-      <circle cx="12" cy="10" r="2.5" />
+++-    </svg>
+++-  )
+++-}
+++-
+++ function ChevronIcon({ direction = 'left', ...props }) {
+++   return (
+++     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+++       <path d={direction === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'} />
+++     </svg>
+++   )
+++ }
+++ 
+++ // The calendar carries its displayed month as plain { year, month } numbers
+++ // rather than a Date. That is deliberate: a Date is always an instant, and
+++@@ -108,67 +80,20 @@ function monthAnchor(year, month, day = 1) {
+++ function shiftMonth({ year, month }, delta) {
+++   const anchor = monthAnchor(year, month + delta)
+++   return { year: anchor.getUTCFullYear(), month: anchor.getUTCMonth() }
+++ }
+++ 
+++ function currentClubMonth() {
+++   const { year, month } = clubToday()
+++   return { year, month }
+++ }
+++ 
+++-function FixtureRow({ event, teamName, onSelect }) {
+++-  const date = eventDate(event)
+++-  const { month, day, weekday } = dateBoxParts(date)
+++-  const played = hasResult(event)
+++-
+++-  return (
+++-    <button
+++-      type="button"
+++-      onClick={() => onSelect(event.id)}
+++-      className="flex w-full items-center gap-[13px] border-b border-[#e6e3e1] p-[14px] text-left transition last:border-b-0 hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-quinsRed"
+++-    >
+++-      <span className="w-[52px] shrink-0 rounded-[11px] bg-[#f3eef5] px-1 py-2 text-center">
+++-        <span className="block text-[10.5px] font-extrabold uppercase tracking-[.5px] text-quinsRed">{month}</span>
+++-        <span className="block text-[21px] font-extrabold leading-none text-[#221f1d]">{day}</span>
+++-        <span className="block text-[10px] font-semibold text-[#77726e]">{weekday}</span>
+++-      </span>
+++-
+++-      <span className="min-w-0 flex-1">
+++-        <span className="mb-1 flex flex-wrap items-center gap-1.5">
+++-          <Chip type={event.type}>{TYPE_LABELS[event.type] ?? 'Event'}</Chip>
+++-          {teamName && <Chip>{teamName}</Chip>}
+++-        </span>
+++-        <span className="block text-[15.5px] font-extrabold text-[#221f1d]">{eventTitle(event)}</span>
+++-        <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12.5px] text-[#77726e]">
+++-          <span className="flex items-center gap-1">
+++-            <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
+++-            {formatTime(date)}
+++-          </span>
+++-          {event.venue && (
+++-            <span className="flex items-center gap-1">
+++-              <PinIcon className="h-3.5 w-3.5" aria-hidden="true" />
+++-              {event.venue}
+++-            </span>
+++-          )}
+++-        </span>
+++-      </span>
+++-
+++-      {played && (
+++-        <span className="shrink-0 text-right">
+++-          <Chip type={resultOutcome(event)}>{resultLabel(event)}</Chip>
+++-          <span className="mt-1 block text-base font-extrabold text-[#221f1d]">{resultScore(event)}</span>
+++-        </span>
+++-      )}
+++-    </button>
+++-  )
+++-}
+++-
+++ function FixtureList({ events, teamsById, onSelect, emptyMessage }) {
+++   if (events.length === 0) {
+++     return (
+++       <Card>
+++         <Empty message={emptyMessage} />
+++       </Card>
+++     )
+++   }
+++ 
+++   return (
+++diff --git a/tests/app.test.jsx b/tests/app.test.jsx
+++index efdd184..f6d5fa8 100644
+++--- a/tests/app.test.jsx
++++++ b/tests/app.test.jsx
+++@@ -41,21 +41,23 @@ vi.mock('../src/lib/memberships.jsx', () => ({
+++ // assert synchronously straight after render, so a resolving promise would
+++ // land its setState after the test body had finished and produce act()
+++ // warnings for a state change no assertion here cares about. Schedule's own
+++ // loading/loaded/error behaviour is covered by tests/schedule.test.jsx.
+++ vi.mock('../src/data/events.js', () => ({
+++   listEvents: () => new Promise(() => {}),
+++   subscribeEvents: () => () => {},
+++ }))
+++ 
+++ // Same treatment for the /roster route, which renders the real Roster screen
+++-// as of Task 12. Roster's own behaviour is covered by tests/roster.test.jsx.
++++// as of Task 12, and for "/" — the real Dashboard as of Task 13, which reads
++++// both modules. The Dashboard's own behaviour is covered by
++++// tests/dashboard.test.jsx; here it only has to be the thing "/" renders.
+++ vi.mock('../src/data/players.js', () => ({
+++   listPlayers: () => new Promise(() => {}),
+++   getPlayerContact: () => new Promise(() => {}),
+++ }))
+++ 
+++ // Import after vi.mock so this binds to the mocked modules.
+++ import App from '../src/App.jsx'
+++ 
+++ const signedIn = {
+++   session: { user: { id: 'u1' } },
+++@@ -82,29 +84,29 @@ describe('App', () => {
+++   it('renders the Login screen when there is no session', () => {
+++     useAuthMock.mockReturnValue({ session: null, loading: false })
+++ 
+++     render(<App />)
+++ 
+++     expect(screen.getByText('Abu Dhabi Harlequins')).toBeInTheDocument()
+++     expect(screen.getByText('Quins Club Hub')).toBeInTheDocument()
+++     expect(screen.getByText(/invite-only/i)).toBeInTheDocument()
+++   })
+++ 
+++-  it('renders the home placeholder at / when signed in', () => {
++++  it('renders the dashboard at / when signed in', () => {
+++     useAuthMock.mockReturnValue(signedIn)
+++ 
+++     render(<App />)
+++ 
+++-    expect(screen.getByRole('heading', { name: /home/i })).toBeInTheDocument()
++++    expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
+++   })
+++ 
+++-  it('renders the schedule placeholder at /schedule when signed in', () => {
++++  it('renders the schedule screen at /schedule when signed in', () => {
+++     window.history.pushState({}, '', '/schedule')
+++     useAuthMock.mockReturnValue(signedIn)
+++ 
+++     render(<App />)
+++ 
+++     expect(screen.getByRole('heading', { name: /schedule/i })).toBeInTheDocument()
+++   })
+++ 
+++   it('renders the roster screen at /roster when signed in', () => {
+++     window.history.pushState({}, '', '/roster')
+++@@ -123,14 +125,14 @@ describe('App', () => {
+++ 
+++     expect(screen.getByRole('heading', { name: /more/i })).toBeInTheDocument()
+++   })
+++ 
+++   it('redirects an unknown path to / when signed in', () => {
+++     window.history.pushState({}, '', '/nope')
+++     useAuthMock.mockReturnValue(signedIn)
+++ 
+++     render(<App />)
+++ 
+++-    expect(screen.getByRole('heading', { name: /home/i })).toBeInTheDocument()
++++    expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
+++     expect(window.location.pathname).toBe('/')
+++   })
+++ })
+++diff --git a/tests/dashboard.test.jsx b/tests/dashboard.test.jsx
+++new file mode 100644
+++index 0000000..9cca124
+++--- /dev/null
++++++ b/tests/dashboard.test.jsx
+++@@ -0,0 +1,446 @@
++++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
++++import { render, screen, within, act } from '@testing-library/react'
++++import userEvent from '@testing-library/user-event'
++++import { MemoryRouter } from 'react-router-dom'
++++
++++// Unit tests for src/screens/Dashboard.jsx (Task 13). useMemberships and both
++++// data modules are mocked, so this exercises only the screen's own behaviour —
++++// scoping both queries to the user's visible teams, choosing the next fixture,
++++// the countdown, the stat tiles, the upcoming list, the last result, the
++++// edit-gated quick actions, and the loading/empty/error contract. No network is
++++// ever reachable from this file.
++++//
++++// The clock is pinned by spying on Date.now rather than with
++++// vi.useFakeTimers(): RTL's waitFor does not detect Vitest's fake timers (its
++++// jestFakeTimersAreEnabled() check looks for a global `jest`), so fake timers
++++// make every findBy*/waitFor hang. Date.now is the only clock the Dashboard
++++// reads, and pinning it is what makes the countdown assertions exact instead
++++// of racing the real second hand.
++++
++++const useMembershipsMock = vi.fn()
++++const listEventsMock = vi.fn()
++++const subscribeEventsMock = vi.fn()
++++const listPlayersMock = vi.fn()
++++
++++vi.mock('../src/lib/memberships.jsx', () => ({
++++  useMemberships: () => useMembershipsMock(),
++++}))
++++
++++vi.mock('../src/data/events.js', () => ({
++++  listEvents: (...args) => listEventsMock(...args),
++++  subscribeEvents: (...args) => subscribeEventsMock(...args),
++++}))
++++
++++vi.mock('../src/data/players.js', () => ({
++++  listPlayers: (...args) => listPlayersMock(...args),
++++}))
++++
++++// Only reached when a fixture row opens EventDetail; mocked so this file
++++// stays network-free either way. EventDetail's own behaviour is covered by
++++// tests/schedule.test.jsx.
++++vi.mock('../src/data/availability.js', () => ({
++++  listAvailability: async () => [],
++++  subscribeAvailability: () => () => {},
++++}))
++++
++++// Import after vi.mock so this binds to the mocked modules.
++++import Dashboard from '../src/screens/Dashboard.jsx'
++++
++++// 2026-07-20T09:00 Abu Dhabi — the prototype's own demo "now"
++++// (design-system.md §4.11), so the fixture below reproduces the documented
++++// "4 Days / 8 Hrs / 0 Min" hero exactly.
++++const NOW = Date.parse('2026-07-20T05:00:00Z')
++++
++++const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
++++const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
++++const TEAMS = [TEAM_FIRST_XV, TEAM_U10] // deliberately unsorted; visibleTeams sorts
++++
++++const COACH = [
++++  { id: 'm1', role: 'coach', team_id: 'team-u10' },
++++  { id: 'm2', role: 'coach', team_id: 'team-1xv' },
++++]
++++const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
++++const ADMIN = [{ id: 'm0', role: 'admin', team_id: null }]
++++
++++// 2026-07-24T13:00Z = 17:00 Abu Dhabi = 4 days 8 hours after NOW.
++++const NEXT_MATCH = {
++++  id: 'e-match',
++++  team_id: 'team-1xv',
++++  type: 'match',
++++  opponent: 'Al Ain Amblers',
++++  starts_at: '2026-07-24T13:00:00Z',
++++  venue: 'Zayed Sports City',
++++  home: true,
++++  result_us: null,
++++  result_them: null,
++++}
++++// Sooner than the match, but training — the hero must still prefer the match.
++++const SOONER_TRAINING = {
++++  id: 'e-training',
++++  team_id: 'team-u10',
++++  type: 'training',
++++  title: 'U10 skills session',
++++  starts_at: '2026-07-21T15:30:00Z',
++++  venue: 'Zayed Sports City',
++++  result_us: null,
++++  result_them: null,
++++}
++++// Kicked off before NOW and nobody has entered a score. Per the project's
++++// result rule it is still "to play", so it belongs in the upcoming list and
++++// the fixtures-to-play count — but it must never become the hero, because a
++++// countdown to a past instant is meaningless.
++++const PAST_UNSCORED = {
++++  id: 'e-stale',
++++  team_id: 'team-u10',
++++  type: 'match',
++++  opponent: 'Dubai Exiles',
++++  starts_at: '2026-07-15T13:00:00Z',
++++  result_us: null,
++++  result_them: null,
++++}
++++const LAST_RESULT = {
++++  id: 'e-result',
++++  team_id: 'team-1xv',
++++  type: 'match',
++++  opponent: 'Jebel Ali Dragons',
++++  starts_at: '2026-07-10T13:00:00Z',
++++  result_us: 31,
++++  result_them: 19,
++++}
++++const OLDER_RESULT = {
++++  id: 'e-older',
++++  team_id: 'team-u10',
++++  type: 'match',
++++  opponent: 'Sharjah Wanderers',
++++  starts_at: '2026-07-03T13:00:00Z',
++++  result_us: 10,
++++  result_them: 20,
++++}
++++
++++const EVENTS = [NEXT_MATCH, SOONER_TRAINING, PAST_UNSCORED, LAST_RESULT, OLDER_RESULT]
++++
++++const PLAYERS = [
++++  { id: 'p1', team_id: 'team-u10', full_name: 'Amir Haddad', position: 'Prop' },
++++  { id: 'p2', team_id: 'team-u10', full_name: 'Bea Okoro', position: 'Wing' },
++++  { id: 'p3', team_id: 'team-1xv', full_name: 'Cal Fletcher', position: 'Lock' },
++++]
++++
++++function membershipValue(memberships, teams = TEAMS) {
++++  return { memberships, teams, loading: false, error: null, reload: vi.fn() }
++++}
++++
++++// Intl separates the time from AM/PM with U+202F (narrow no-break space) in
++++// current Node, which no plain-space assertion would match.
++++function heroText(node) {
++++  return node.textContent.replace(/[\u202f\u00a0]/g, ' ')
++++}
++++
++++function renderDashboard() {
++++  return render(
++++    // Same future flags App.jsx sets on its BrowserRouter — without them
++++    // react-router logs two upgrade warnings per render into the suite's
++++    // stderr.
++++    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
++++      <Dashboard />
++++    </MemoryRouter>,
++++  )
++++}
++++
++++let nowSpy
++++
++++beforeEach(() => {
++++  nowSpy = vi.spyOn(Date, 'now').mockReturnValue(NOW)
++++  useMembershipsMock.mockReset()
++++  listEventsMock.mockReset()
++++  subscribeEventsMock.mockReset()
++++  listPlayersMock.mockReset()
++++
++++  useMembershipsMock.mockReturnValue(membershipValue(COACH))
++++  listEventsMock.mockResolvedValue(EVENTS)
++++  listPlayersMock.mockResolvedValue(PLAYERS)
++++  subscribeEventsMock.mockReturnValue(() => {})
++++})
++++
++++afterEach(() => {
++++  nowSpy.mockRestore()
++++})
++++
++++describe('Dashboard — loading, scoping and errors', () => {
++++  it('shows a spinner on first load and nothing else', () => {
++++    listEventsMock.mockReturnValue(new Promise(() => {}))
++++    listPlayersMock.mockReturnValue(new Promise(() => {}))
++++
++++    renderDashboard()
++++
++++    expect(screen.getByRole('status')).toBeInTheDocument()
++++    expect(screen.queryByText(/Quins vs/)).not.toBeInTheDocument()
++++  })
++++
++++  it('asks for events and players scoped to the visible teams only', async () => {
++++    renderDashboard()
++++    await screen.findByTestId('stat-players')
++++
++++    expect(listEventsMock).toHaveBeenCalledWith({ teamIds: ['team-u10', 'team-1xv'] })
++++    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u10', 'team-1xv'] })
++++  })
++++
++++  it('asks for no teams rather than everything when the scope is empty', async () => {
++++    useMembershipsMock.mockReturnValue(membershipValue(COACH, []))
++++    // The real modules return [] for an empty teamIds array; the mocks must
++++    // too, or this would assert against data no such user could ever receive.
++++    listEventsMock.mockResolvedValue([])
++++    listPlayersMock.mockResolvedValue([])
++++
++++    renderDashboard()
++++    await screen.findByText(/no upcoming fixtures/i)
++++
++++    expect(listEventsMock).toHaveBeenCalledWith({ teamIds: [] })
++++    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: [] })
++++  })
++++
++++  it('renders an error region with a working retry', async () => {
++++    listEventsMock.mockRejectedValueOnce(new Error('Network unreachable'))
++++
++++    renderDashboard()
++++
++++    const alert = await screen.findByRole('alert')
++++    expect(within(alert).getByText(/Network unreachable/)).toBeInTheDocument()
++++
++++    listEventsMock.mockResolvedValue(EVENTS)
++++    await userEvent.click(within(alert).getByRole('button', { name: /try again/i }))
++++
++++    expect(await screen.findByTestId('stat-players')).toBeInTheDocument()
++++    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
++++  })
++++
++++  it('keeps the rendered content on screen while a realtime refresh is in flight', async () => {
++++    renderDashboard()
++++    await screen.findByTestId('stat-players')
++++
++++    const refresh = subscribeEventsMock.mock.calls[0][0]
++++    // Both refetches hang, so the screen is in the "loading again" state for
++++    // the whole of the assertions below.
++++    listEventsMock.mockReturnValue(new Promise(() => {}))
++++    listPlayersMock.mockReturnValue(new Promise(() => {}))
++++    await act(async () => {
++++      refresh()
++++    })
++++
++++    expect(screen.getByTestId('next-fixture')).toBeInTheDocument()
++++    expect(screen.queryByRole('status')).not.toBeInTheDocument()
++++  })
++++})
++++
++++describe('Dashboard — next fixture hero', () => {
++++  it('shows the next upcoming match, not the sooner training session', async () => {
++++    renderDashboard()
++++
++++    const hero = await screen.findByTestId('next-fixture')
++++    expect(within(hero).getByText('Quins vs Al Ain Amblers')).toBeInTheDocument()
++++    expect(within(hero).getByText(/Senior Men 1st XV/)).toBeInTheDocument()
++++    expect(within(hero).queryByText(/skills session/i)).not.toBeInTheDocument()
++++  })
++++
++++  it('renders the kick-off in Abu Dhabi time, not the browser zone', async () => {
++++    renderDashboard()
++++
++++    const hero = await screen.findByTestId('next-fixture')
++++    // 2026-07-24T13:00Z is 17:00 in Abu Dhabi. Any browser-local rendering
++++    // would print a different hour under a non-UTC TZ.
++++    expect(heroText(hero)).toContain('5:00 PM')
++++    expect(heroText(hero)).toMatch(/Jul 24, 2026|24 Jul 2026/)
++++  })
++++
++++  it('rolls the hero date over on Abu Dhabi\u2019s midnight, not the reader\u2019s', async () => {
++++    // 20:30 UTC on 24 Jul is 00:30 on 25 Jul in Abu Dhabi — a different
++++    // calendar day from UTC (the test runner's zone) and from New York. Only
++++    // a club-zone formatter prints the 25th and a 12:30 AM kick-off here, so
++++    // this assertion fails under any browser-local rendering whatever TZ the
++++    // suite runs in.
++++    listEventsMock.mockResolvedValue([
++++      { ...NEXT_MATCH, starts_at: '2026-07-24T20:30:00Z' },
++++    ])
++++
++++    renderDashboard()
++++
++++    const hero = await screen.findByTestId('next-fixture')
++++    expect(heroText(hero)).toContain('12:30 AM')
++++    expect(heroText(hero)).toMatch(/Jul 25, 2026|25 Jul 2026/)
++++  })
++++
++++  it('badges a home match as home and an away one as away', async () => {
++++    renderDashboard()
++++    expect(within(await screen.findByTestId('next-fixture')).getByText('Home')).toBeInTheDocument()
++++  })
++++
++++  it('badges an away match as away', async () => {
++++    listEventsMock.mockResolvedValue([{ ...NEXT_MATCH, home: false }])
++++
++++    renderDashboard()
++++    expect(within(await screen.findByTestId('next-fixture')).getByText('Away')).toBeInTheDocument()
++++  })
++++
++++  it('counts down to the kick-off instant', async () => {
++++    renderDashboard()
++++
++++    const countdown = await screen.findByTestId('countdown')
++++    expect(within(countdown).getByTestId('countdown-days')).toHaveTextContent('4')
++++    expect(within(countdown).getByTestId('countdown-hours')).toHaveTextContent('8')
++++    expect(within(countdown).getByTestId('countdown-minutes')).toHaveTextContent('0')
++++  })
++++
++++  it('falls back to the next event of any type when no match is upcoming', async () => {
++++    listEventsMock.mockResolvedValue([SOONER_TRAINING, LAST_RESULT])
++++
++++    renderDashboard()
++++
++++    const hero = await screen.findByTestId('next-fixture')
++++    expect(within(hero).getByText('U10 skills session')).toBeInTheDocument()
++++  })
++++
++++  it('never picks a fixture that has already kicked off, even unscored', async () => {
++++    listEventsMock.mockResolvedValue([PAST_UNSCORED, LAST_RESULT])
++++
++++    renderDashboard()
++++    const list = await screen.findByTestId('upcoming-list')
++++
++++    // Still "to play" — no score has been entered — so it stays in the list…
++++    expect(within(list).getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
++++    // …but a countdown to an instant that has already passed is meaningless.
++++    expect(screen.queryByTestId('next-fixture')).not.toBeInTheDocument()
++++  })
++++
++++  it('hides the hero entirely when there is nothing upcoming', async () => {
++++    listEventsMock.mockResolvedValue([LAST_RESULT])
++++
++++    renderDashboard()
++++    await screen.findByText(/no upcoming fixtures/i)
++++
++++    expect(screen.queryByTestId('next-fixture')).not.toBeInTheDocument()
++++    expect(screen.queryByTestId('countdown')).not.toBeInTheDocument()
++++  })
++++})
++++
++++describe('Dashboard — stats', () => {
++++  it('counts players in scope, fixtures still to play, and age groups', async () => {
++++    renderDashboard()
++++    await screen.findByTestId('stat-players')
++++
++++    expect(screen.getByTestId('stat-players')).toHaveTextContent('3')
++++    // NEXT_MATCH, SOONER_TRAINING and PAST_UNSCORED have no score; the two
++++    // scored fixtures are results, not fixtures to play.
++++    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('3')
++++    expect(screen.getByTestId('stat-groups')).toHaveTextContent('2')
++++  })
++++
++++  it('labels the tiles for the whole club when the user is an admin', async () => {
++++    useMembershipsMock.mockReturnValue(membershipValue(ADMIN))
++++
++++    renderDashboard()
++++    await screen.findByTestId('stat-players')
++++
++++    expect(screen.getByTestId('stat-players')).toHaveTextContent(/registered players/i)
++++    expect(screen.getByTestId('stat-groups')).toHaveTextContent(/age groups/i)
++++  })
++++
++++  it('labels the tiles as the user’s own slice when they are not an admin', async () => {
++++    renderDashboard()
++++    await screen.findByTestId('stat-players')
++++
++++    expect(screen.getByTestId('stat-players')).toHaveTextContent(/players in view/i)
++++    expect(screen.getByTestId('stat-groups')).toHaveTextContent(/your groups/i)
++++  })
++++})
++++
++++describe('Dashboard — upcoming list and last result', () => {
++++  it('lists the fixtures still to play, soonest first, capped at five', async () => {
++++    const many = Array.from({ length: 8 }, (_, index) => ({
++++      id: `e-${index}`,
++++      team_id: 'team-u10',
++++      type: 'training',
++++      title: `Session ${index}`,
++++      starts_at: new Date(NOW + (index + 1) * 86400000).toISOString(),
++++      result_us: null,
++++      result_them: null,
++++    }))
++++    listEventsMock.mockResolvedValue([...many].reverse())
++++
++++    renderDashboard()
++++
++++    const list = await screen.findByTestId('upcoming-list')
++++    const titles = within(list)
++++      .getAllByTestId('fixture-title')
++++      .map((node) => node.textContent)
++++    expect(titles).toEqual(['Session 0', 'Session 1', 'Session 2', 'Session 3', 'Session 4'])
++++  })
++++
++++  it('opens the event detail sheet when a fixture row is tapped', async () => {
++++    renderDashboard()
++++
++++    const list = await screen.findByTestId('upcoming-list')
++++    const row = within(list).getByText('U10 skills session').closest('[data-testid="fixture-row"]')
++++    await userEvent.click(row)
++++
++++    const dialog = await screen.findByRole('dialog')
++++    expect(within(dialog).getByText(/U10 skills session/)).toBeInTheDocument()
++++  })
++++
++++  it('shows the most recent scored fixture as the last result', async () => {
++++    renderDashboard()
++++
++++    const block = await screen.findByTestId('last-result')
++++    expect(within(block).getByText('Quins vs Jebel Ali Dragons')).toBeInTheDocument()
++++    expect(within(block).getByText('31–19')).toBeInTheDocument()
++++    expect(within(block).queryByText(/Sharjah Wanderers/)).not.toBeInTheDocument()
++++  })
++++
++++  it('says so when no scores have been entered yet', async () => {
++++    listEventsMock.mockResolvedValue([NEXT_MATCH])
++++
++++    renderDashboard()
++++
++++    const block = await screen.findByTestId('last-result')
++++    expect(within(block).getByText(/no results yet/i)).toBeInTheDocument()
++++  })
++++})
++++
++++describe('Dashboard — quick actions', () => {
++++  it('offers the add actions to a coach', async () => {
++++    renderDashboard()
++++    await screen.findByTestId('stat-players')
++++
++++    expect(screen.getByRole('button', { name: /add fixture/i })).toBeInTheDocument()
++++    expect(screen.getByRole('button', { name: /add a player/i })).toBeInTheDocument()
++++  })
++++
++++  it('offers the add actions to an admin', async () => {
++++    useMembershipsMock.mockReturnValue(membershipValue(ADMIN))
++++
++++    renderDashboard()
++++    await screen.findByTestId('stat-players')
++++
++++    expect(screen.getByRole('button', { name: /add fixture/i })).toBeInTheDocument()
++++    expect(screen.getByRole('button', { name: /add a player/i })).toBeInTheDocument()
++++  })
++++
++++  it('hides the add actions from a parent and explains why', async () => {
++++    useMembershipsMock.mockReturnValue(membershipValue(PARENT))
++++
++++    renderDashboard()
++++    await screen.findByTestId('stat-players')
++++
++++    expect(screen.queryByRole('button', { name: /add fixture/i })).not.toBeInTheDocument()
++++    expect(screen.queryByRole('button', { name: /add a player/i })).not.toBeInTheDocument()
++++    expect(screen.getByText(/signed in as a parent/i)).toBeInTheDocument()
++++  })
++++
++++  it('always links to the full schedule and the team list', async () => {
++++    useMembershipsMock.mockReturnValue(membershipValue(PARENT))
++++
++++    renderDashboard()
++++    await screen.findByTestId('stat-players')
++++
++++    expect(screen.getByRole('link', { name: /schedule/i })).toHaveAttribute('href', '/schedule')
++++    expect(screen.getByRole('link', { name: /team list/i })).toHaveAttribute('href', '/roster')
++++  })
++++})
++diff --git a/.superpowers/sdd/quins-v1-mvp/task-13-report.md b/.superpowers/sdd/quins-v1-mvp/task-13-report.md
++index 852c464..9ade102 100644
++--- a/.superpowers/sdd/quins-v1-mvp/task-13-report.md
+++++ b/.superpowers/sdd/quins-v1-mvp/task-13-report.md
++@@ -270,10 +270,135 @@ Findings:
++ 
++ ## Concerns
++ 
++ - The two disabled add-actions are a deliberate placeholder. If Tasks 14/15
++   slip, they are visible-but-dead controls on the landing screen for coaches;
++   worth a look during committee sign-off if they haven't been wired by then.
++ - `harness/stubs/events.js` uses `home:` correctly, which is why the badge's
++   absence was visible rather than merely wrong — but the stub fixtures are
++   pinned to July 2026 and will start showing an empty "Upcoming" once real
++   time passes them. That's a pre-existing harness property, not new.
+++
+++---
+++
+++# Task 13 — fix round 1 (review response)
+++
+++All four findings addressed in one round. No pushback on any of them.
+++
+++## 1. (Important) A `player` was told they were a parent
+++
+++`QuickActions` hardcoded the noun "parent" for every non-admin, non-coach
+++user, while the scope note on the same screen read "Player view" from
+++`roleLabel`. Fixed: the screen now computes
+++
+++```js
+++const readOnlyRole = canEdit ? null : roleLabel(memberships).toLowerCase()
+++```
+++
+++and interpolates it, so the sentence and the scope note draw the role from
+++one source. Also removed a dead `admin ?` branch inside that same line —
+++`admin` implies `canEdit`, so it could never have rendered.
+++
+++## 2. (Important) Disabled placeholder controls removed
+++
+++Accepted the ruling: `EventDetail.jsx`'s precedent governs, and my "the card
+++changes shape later either way" reasoning was wrong — the card gains the
+++buttons when Tasks 14/15 land regardless of what it renders today, so there
+++was no shape cost to omitting them. Both disabled buttons and the "arrives in
+++the next update" line are gone, along with the now-unused `BUTTON_DISABLED`
+++token. The in-file comment now records the rule rather than the exception, and
+++cites EventDetail so the next person finds the precedent rather than
+++re-deciding it. **No disabled placeholders for not-yet-built routes anywhere,
+++going forward.**
+++
+++**Layout check:** the design system already specifies this exact shape — §5.1's
+++parent variant *is* two ghost actions plus a muted line. So admin/coach now
+++render the parent variant minus the line, which is two full-width ghost links
+++in a `p-[14px]` card. Verified in the browser at both widths (screenshot
+++re-read): it does not read as sparse, and the right-hand column still balances
+++against the five-row Upcoming list. No layout adjustment needed, so none made.
+++
+++## 3. (Minor) `canEdit` now goes through `canEditTeam`
+++
+++```js
+++const canEdit = admin || scopedTeams.some((team) => canEditTeam(memberships, team.id))
+++```
+++
+++matching `Schedule.jsx:315`. A coach row with a null `team_id` is now treated
+++as read-only, which is what `canEditTeam` deliberately decides and what the
+++brief named.
+++
+++## 5. (Minor) Countdown timer gated on the hero
+++
+++The interval moved below `nextFixture` and is now gated on
+++`hasCountdown = nextFixture != null`. The dependency is that boolean, not the
+++event object, so a realtime refetch returning the same next fixture doesn't
+++restart the interval. With no hero there is no timer and no 60-second
+++whole-dashboard re-render.
+++
+++## Tests
+++
+++`tests/dashboard.test.jsx`, 25 → 28 tests. The `Dashboard — quick actions`
+++block was rewritten: the reviewer was right that `getByRole('button')` passes
+++for a disabled button, so those assertions proved nothing. It now asserts the
+++**complete** action list per role via a `quick-actions` test id —
+++`expect(actionNames()).toEqual([...])` — which fails if a not-yet-built action
+++is ever added back, disabled or not.
+++
+++New/changed coverage: coach, admin, parent, **player**, and a **teamless
+++coach** each get their exact action set; the read-only sentence names parent /
+++player / coach correctly and never says "parent" for a player; admin gets no
+++read-only sentence; the 60s tick is started when a hero renders and not
+++started when none does (spy filtered to the 60000 ms delay so nothing React
+++schedules internally can make it pass by accident).
+++
+++### Mutation testing of the amended code
+++
+++| # | Mutation | Result |
+++|---|---|---|
+++| 11 | re-add a disabled "Add fixture or training" for editors | 2 tests fail |
+++| 12 | hardcode the read-only role noun back to `'parent'` | 2 fail |
+++| 13 | `canEdit` back to a raw `role === 'coach'` check | 1 fail |
+++| 14 | ungate the countdown interval | 1 fail |
+++
+++All four killed.
+++
+++### Commands and output
+++
+++`npx vitest run tests/dashboard.test.jsx`:
+++
+++```
+++ ✓ tests/dashboard.test.jsx (28 tests)
+++ Test Files  1 passed (1)
+++      Tests  28 passed (28)
+++```
+++
+++`npm test` (files covering the amended code: `tests/dashboard.test.jsx`,
+++`tests/app.test.jsx`, `tests/schedule.test.jsx`, `tests/scope.test.js`):
+++
+++```
+++ Test Files  16 passed (16)
+++      Tests  329 passed (329)
+++```
+++
+++326 → 329 (+3 net: 6 rewritten quick-action tests replacing 5, plus the timer
+++test). No stderr output. `npm run build` clean.
+++
+++### Browser re-check
+++
+++Re-ran `harness/shoot-dashboard.mjs` (3 personas × 375/1280) and re-read the
+++screenshots. No horizontal overflow anywhere; the two ghost links measure
+++40 px high with a 12 px text offset in every shot (`<a>` layout still explicit,
+++not UA-dependent); the parent card's live text reads
+++`"View schedule | View team list | You're signed in as a parent, so you can
+++read fixtures and squads but not change them."`; no console or page errors.
+++
+++## Files changed this round
+++
+++- `src/screens/Dashboard.jsx`
+++- `tests/dashboard.test.jsx`
+++
+++## Deferred (per the ruling, not acted on)
+++
+++- The error path replacing the whole screen on a failed realtime refetch
+++  (pre-existing pattern inherited from `Schedule.jsx`).
+++- Extracting the fourth copy of the retry-button markup.
++diff --git a/src/screens/Dashboard.jsx b/src/screens/Dashboard.jsx
++index 1924d83..0516ec0 100644
++--- a/src/screens/Dashboard.jsx
+++++ b/src/screens/Dashboard.jsx
++@@ -2,21 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
++ import { Link } from 'react-router-dom'
++ import Card from '../components/Card.jsx'
++ import Empty from '../components/Empty.jsx'
++ import FixtureRow from '../components/FixtureRow.jsx'
++ import ScopeNote from '../components/ScopeNote.jsx'
++ import Spinner from '../components/Spinner.jsx'
++ import EventDetail from './EventDetail.jsx'
++ import { listEvents, subscribeEvents } from '../data/events.js'
++ import { listPlayers } from '../data/players.js'
++ import { useMemberships } from '../lib/memberships.jsx'
++-import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+++import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
++ import {
++   eventDate,
++   eventTitle,
++   formatLongDate,
++   formatTime,
++   hasResult,
++   sortByStart,
++ } from '../lib/eventFormat.js'
++ 
++ // Home / dashboard (design-system.md §5.1): scope note, next-fixture hero,
++@@ -49,24 +49,20 @@ const MUTED_ON_PAPER = 'text-[#5c5854]'
++ // design-system.md §3: .btn{padding:10px 15px;border-radius:11px}, 14px/700.
++ // `flex items-center justify-center` is load-bearing rather than decorative:
++ // these are full-width buttons and links used as layout boxes, and a
++ // <button>'s content is centred by Chromium's UA stylesheet but an <a>'s is
++ // not — so without an explicit layout the two variants would sit differently
++ // on the same stack. Declared once here so they cannot drift.
++ const BUTTON_BASE =
++   'flex w-full items-center justify-center gap-2 rounded-[11px] px-[15px] py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2'
++ // Ghost: --maroon text on white, 5.93:1, clears AA.
++ const BUTTON_GHOST = `${BUTTON_BASE} bg-white text-quinsRed shadow-[inset_0_0_0_1.5px_#e6e3e1] hover:bg-[#faf8fb]`
++-// Disabled: the neutral chip fill with the darkened --muted this project
++-// already uses on it (#5c5854 on #f0ecf2 = 6.0:1), so a disabled action is
++-// still legible rather than a grey-on-grey guess.
++-const BUTTON_DISABLED = `${BUTTON_BASE} cursor-not-allowed bg-[#f0ecf2] text-[#5c5854]`
++ 
++ const MINUTE = 60 * 1000
++ const HOUR = 60 * MINUTE
++ const DAY = 24 * HOUR
++ 
++ /**
++  * Whole days/hours/minutes between two instants, floored and never negative.
++  *
++  * A pure instant subtraction, and correctly zone-agnostic — "how long until
++  * kick-off" is the same answer in Abu Dhabi and in London, unlike the
++@@ -194,57 +190,52 @@ function NextFixtureHero({ event, teamName, now }) {
++ 
++       <div data-testid="countdown" className="mt-3.5 flex gap-2.5">
++         <CountdownBox testId="countdown-days" value={days} label="Days" />
++         <CountdownBox testId="countdown-hours" value={hours} label="Hrs" />
++         <CountdownBox testId="countdown-minutes" value={minutes} label="Min" />
++       </div>
++     </div>
++   )
++ }
++ 
++-function QuickActions({ canEdit, admin }) {
+++// Quick actions (design-system.md §5.1). Every role gets the same two
+++// navigation actions; a read-only role additionally gets a line saying why
+++// there is nothing else here.
+++//
+++// The prototype's admin/coach variant also lists "Add fixture or training"
+++// and "Add a player". Those are absent, not disabled, and deliberately so:
+++// Tasks 14 and 15 own event and player writes, and there is no route for
+++// either form to open yet. src/screens/EventDetail.jsx already settled this
+++// question for the identical Task 14 gap — "adding a disabled or read-only
+++// affordance now would promise a control that doesn't exist yet" — and it
+++// matters more here than there, because this is the landing screen and so
+++// the first thing a coach sees. The card gains the two buttons when the
+++// forms land, whichever way it renders today.
+++function QuickActions({ canEdit, readOnlyRole }) {
++   return (
++-    <Card className="p-[14px]">
+++    <Card data-testid="quick-actions" className="p-[14px]">
++       <div className="flex flex-col gap-2.5">
++-        {canEdit && (
++-          <>
++-            {/* Tasks 14 and 15 build the event and player forms; until then
++-                there is no route for these to open, and pointing them at a
++-                path that does not resolve would bounce the user back here via
++-                App.jsx's catch-all. They are rendered disabled rather than
++-                omitted so the people who can use them can see they are coming
++-                — and so this card does not silently change shape for a coach
++-                the day the forms land. */}
++-            <button type="button" disabled className={BUTTON_DISABLED}>
++-              Add fixture or training
++-            </button>
++-            <button type="button" disabled className={BUTTON_DISABLED}>
++-              Add a player
++-            </button>
++-            <p className="text-center text-[12.5px] text-[#77726e]">
++-              Adding fixtures and players arrives in the next update.
++-            </p>
++-          </>
++-        )}
++-
++         <Link to="/schedule" className={BUTTON_GHOST}>
++           {canEdit ? 'View full schedule' : 'View schedule'}
++         </Link>
++         <Link to="/roster" className={BUTTON_GHOST}>
++           View team list
++         </Link>
++ 
++-        {!canEdit && (
++-          <p className="text-center text-[12.5px] text-[#77726e]">
++-            {admin
++-              ? 'You can view every squad in the club.'
++-              : "You're signed in as a parent, so you can read fixtures and squads but not change them."}
+++        {/* The role noun comes from roleLabel(), the same source as the scope
+++            note at the top of this screen. Hardcoding "parent" here told a
+++            player they were a parent, twelve lines below a scope note that
+++            said "Player view". */}
+++        {readOnlyRole && (
+++          <p className="text-center text-[12.5px] leading-relaxed text-[#77726e]">
+++            You&apos;re signed in as a {readOnlyRole}, so you can read fixtures and squads but not
+++            change them.
++           </p>
++         )}
++       </div>
++     </Card>
++   )
++ }
++ 
++ export default function Dashboard() {
++   const { memberships, teams } = useMemberships()
++ 
++@@ -255,27 +246,23 @@ export default function Dashboard() {
++   const [events, setEvents] = useState([])
++   const [players, setPlayers] = useState([])
++   const [loading, setLoading] = useState(true)
++   const [settled, setSettled] = useState(false)
++   const [error, setError] = useState(null)
++   const [reloadToken, setReloadToken] = useState(0)
++   const [selectedEventId, setSelectedEventId] = useState(null)
++ 
++   // The countdown is recomputed on render, and re-rendered once a minute so
++   // that a phone left on this screen doesn't sit showing a stale "3 Min" for
++-  // an hour. The prototype computed it at render only (design-system.md §6),
++-  // which was fine for a demo that re-rendered on every interaction.
+++  // an hour. The timer itself is started further down, once we know whether
+++  // there is a hero to tick for.
++   const [now, setNow] = useState(() => Date.now())
++-  useEffect(() => {
++-    const id = setInterval(() => setNow(Date.now()), MINUTE)
++-    return () => clearInterval(id)
++-  }, [])
++ 
++   // Both reads go out together and land together: the stat tiles mix counts
++   // from each, so settling them independently would show a half-filled grid.
++   useEffect(() => {
++     let mounted = true
++     setLoading(true)
++     setError(null)
++ 
++     Promise.all([listEvents({ teamIds }), listPlayers({ teamIds })])
++       .then(([eventRows, playerRows]) => {
++@@ -306,21 +293,29 @@ export default function Dashboard() {
++   // unsubscribes — it never touches focus.
++   useEffect(() => subscribeEvents(() => setReloadToken((token) => token + 1)), [])
++ 
++   // Only a load with nothing on screen replaces the content with a spinner. A
++   // realtime refresh fires on every insert/update/delete anywhere in scope,
++   // from any user — spinning on those would tear the dashboard out of the DOM
++   // and collapse the page height each time somebody else touched a fixture.
++   const isFirstLoad = loading && !settled
++ 
++   const admin = isAdmin(memberships)
++-  const canEdit = admin || memberships.some((membership) => membership.role === 'coach')
+++  // Asked through canEditTeam rather than by looking for a 'coach' row, so
+++  // this agrees with the helper that will gate the actual writes in Tasks
+++  // 14/15: canEditTeam deliberately refuses a coach row with a null team_id,
+++  // and a raw role check would grant on one — enabling an action that opens a
+++  // form with no squad to pick. Same shape as Schedule.jsx's precedent.
+++  const canEdit = admin || scopedTeams.some((team) => canEditTeam(memberships, team.id))
+++  // Null for anyone who can edit; otherwise the role noun for the read-only
+++  // explanation, from the same roleLabel() the scope note uses.
+++  const readOnlyRole = canEdit ? null : roleLabel(memberships).toLowerCase()
++   const teamNames = scopedTeams.map((team) => team.name).join(', ')
++ 
++   // "To play" is the project's result rule: a fixture is a result when a
++   // score is recorded, not when its date has passed (see hasResult). A match
++   // played last week whose score nobody has entered is still to play, and
++   // still listed — which is the point, it stays visible until someone records
++   // the score.
++   const toPlay = sortByStart(events.filter((event) => !hasResult(event)), 'asc')
++   const results = sortByStart(events.filter(hasResult), 'desc')
++   const lastResult = results[0] ?? null
++@@ -329,20 +324,32 @@ export default function Dashboard() {
++   // FUTURE: a countdown to an instant that has passed is meaningless, so an
++   // unscored fixture from last week is legitimately "to play" in the list
++   // above but can never be the next fixture. Matches come first, falling back
++   // to the next event of any type (design-system.md §4.11).
++   const future = toPlay.filter((event) => {
++     const date = eventDate(event)
++     return date != null && date.getTime() > now
++   })
++   const nextFixture = future.find((event) => event.type === 'match') ?? future[0] ?? null
++ 
+++  // Gated on the hero existing: with nothing to count down to there is
+++  // nothing for a tick to change, and an ungated timer re-renders the whole
+++  // dashboard every 60s for no visible effect. The dependency is a boolean,
+++  // not the event, so a realtime refetch that returns the same next fixture
+++  // doesn't restart the interval.
+++  const hasCountdown = nextFixture != null
+++  useEffect(() => {
+++    if (!hasCountdown) return undefined
+++    const id = setInterval(() => setNow(Date.now()), MINUTE)
+++    return () => clearInterval(id)
+++  }, [hasCountdown])
+++
++   const upcoming = toPlay.slice(0, 5)
++ 
++   // Derive the open event from the live list rather than storing the row
++   // itself, so a realtime update keeps the sheet's contents fresh and a
++   // deleted fixture closes it instead of stranding a stale copy on screen.
++   const selectedEvent = events.find((event) => event.id === selectedEventId) ?? null
++ 
++   if (isFirstLoad) {
++     return (
++       <section>
++@@ -438,21 +445,21 @@ export default function Dashboard() {
++                   teamName={teamsById.get(event.team_id)?.name}
++                   onSelect={setSelectedEventId}
++                 />
++               ))}
++             </Card>
++           )}
++         </div>
++ 
++         <div>
++           <BlockTitle>Quick actions</BlockTitle>
++-          <QuickActions canEdit={canEdit} admin={admin} />
+++          <QuickActions canEdit={canEdit} readOnlyRole={readOnlyRole} />
++ 
++           <BlockTitle>Last result</BlockTitle>
++           <Card data-testid="last-result" className="overflow-hidden">
++             {lastResult ? (
++               <FixtureRow
++                 event={lastResult}
++                 teamName={teamsById.get(lastResult.team_id)?.name}
++                 onSelect={setSelectedEventId}
++               />
++             ) : (
++diff --git a/tests/dashboard.test.jsx b/tests/dashboard.test.jsx
++index 9cca124..b61b077 100644
++--- a/tests/dashboard.test.jsx
+++++ b/tests/dashboard.test.jsx
++@@ -54,20 +54,24 @@ const NOW = Date.parse('2026-07-20T05:00:00Z')
++ const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
++ const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
++ const TEAMS = [TEAM_FIRST_XV, TEAM_U10] // deliberately unsorted; visibleTeams sorts
++ 
++ const COACH = [
++   { id: 'm1', role: 'coach', team_id: 'team-u10' },
++   { id: 'm2', role: 'coach', team_id: 'team-1xv' },
++ ]
++ const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
++ const ADMIN = [{ id: 'm0', role: 'admin', team_id: null }]
+++const PLAYER = [{ id: 'm5', role: 'player', team_id: 'team-u10', player_id: 'p1' }]
+++// A coach row with no resolvable team. canEditTeam refuses it deliberately;
+++// a raw `role === 'coach'` check would grant on it.
+++const TEAMLESS_COACH = [{ id: 'm6', role: 'coach', team_id: null }]
++ 
++ // 2026-07-24T13:00Z = 17:00 Abu Dhabi = 4 days 8 hours after NOW.
++ const NEXT_MATCH = {
++   id: 'e-match',
++   team_id: 'team-1xv',
++   type: 'match',
++   opponent: 'Al Ain Amblers',
++   starts_at: '2026-07-24T13:00:00Z',
++   venue: 'Zayed Sports City',
++   home: true,
++@@ -140,36 +144,39 @@ function renderDashboard() {
++     // Same future flags App.jsx sets on its BrowserRouter — without them
++     // react-router logs two upgrade warnings per render into the suite's
++     // stderr.
++     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
++       <Dashboard />
++     </MemoryRouter>,
++   )
++ }
++ 
++ let nowSpy
+++let setIntervalSpy
++ 
++ beforeEach(() => {
++   nowSpy = vi.spyOn(Date, 'now').mockReturnValue(NOW)
+++  setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
++   useMembershipsMock.mockReset()
++   listEventsMock.mockReset()
++   subscribeEventsMock.mockReset()
++   listPlayersMock.mockReset()
++ 
++   useMembershipsMock.mockReturnValue(membershipValue(COACH))
++   listEventsMock.mockResolvedValue(EVENTS)
++   listPlayersMock.mockResolvedValue(PLAYERS)
++   subscribeEventsMock.mockReturnValue(() => {})
++ })
++ 
++ afterEach(() => {
++   nowSpy.mockRestore()
+++  setIntervalSpy.mockRestore()
++ })
++ 
++ describe('Dashboard — loading, scoping and errors', () => {
++   it('shows a spinner on first load and nothing else', () => {
++     listEventsMock.mockReturnValue(new Promise(() => {}))
++     listPlayersMock.mockReturnValue(new Promise(() => {}))
++ 
++     renderDashboard()
++ 
++     expect(screen.getByRole('status')).toBeInTheDocument()
++@@ -303,20 +310,39 @@ describe('Dashboard — next fixture hero', () => {
++ 
++     renderDashboard()
++     const list = await screen.findByTestId('upcoming-list')
++ 
++     // Still "to play" — no score has been entered — so it stays in the list…
++     expect(within(list).getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
++     // …but a countdown to an instant that has already passed is meaningless.
++     expect(screen.queryByTestId('next-fixture')).not.toBeInTheDocument()
++   })
++ 
+++  it('only runs the once-a-minute countdown tick while there is a hero', async () => {
+++    // Filtered to the countdown's own 60s delay so nothing React or RTL
+++    // schedules internally can make this pass by accident.
+++    const ticks = () =>
+++      setIntervalSpy.mock.calls.filter(([, delay]) => delay === 60 * 1000).length
+++
+++    const { unmount } = renderDashboard()
+++    await screen.findByTestId('next-fixture')
+++    expect(ticks()).toBe(1)
+++    unmount()
+++
+++    setIntervalSpy.mockClear()
+++    listEventsMock.mockResolvedValue([LAST_RESULT])
+++    renderDashboard()
+++    await screen.findByText(/no upcoming fixtures/i)
+++    // Nothing to count down to, so nothing to re-render the dashboard for.
+++    expect(ticks()).toBe(0)
+++  })
+++
++   it('hides the hero entirely when there is nothing upcoming', async () => {
++     listEventsMock.mockResolvedValue([LAST_RESULT])
++ 
++     renderDashboard()
++     await screen.findByText(/no upcoming fixtures/i)
++ 
++     expect(screen.queryByTestId('next-fixture')).not.toBeInTheDocument()
++     expect(screen.queryByTestId('countdown')).not.toBeInTheDocument()
++   })
++ })
++@@ -398,49 +424,85 @@ describe('Dashboard — upcoming list and last result', () => {
++     listEventsMock.mockResolvedValue([NEXT_MATCH])
++ 
++     renderDashboard()
++ 
++     const block = await screen.findByTestId('last-result')
++     expect(within(block).getByText(/no results yet/i)).toBeInTheDocument()
++   })
++ })
++ 
++ describe('Dashboard — quick actions', () => {
++-  it('offers the add actions to a coach', async () => {
+++  // The card holds exactly the actions a role may take. Asserting on the full
+++  // set, not on one button at a time, is what makes these fail if a
+++  // not-yet-built action is ever added back: getByRole('button') matches a
+++  // disabled button just as happily as an enabled one, so "the add button is
+++  // present" proves nothing about whether it works.
+++  const actionNames = () =>
+++    within(screen.getByTestId('quick-actions'))
+++      .getAllByRole('link')
+++      .concat(within(screen.getByTestId('quick-actions')).queryAllByRole('button'))
+++      .map((node) => node.textContent.trim())
+++
+++  it('offers a coach navigation only — no add actions until Tasks 14/15 build them', async () => {
++     renderDashboard()
++     await screen.findByTestId('stat-players')
++ 
++-    expect(screen.getByRole('button', { name: /add fixture/i })).toBeInTheDocument()
++-    expect(screen.getByRole('button', { name: /add a player/i })).toBeInTheDocument()
+++    expect(actionNames()).toEqual(['View full schedule', 'View team list'])
++   })
++ 
++-  it('offers the add actions to an admin', async () => {
+++  it('offers an admin the same, and no read-only explanation', async () => {
++     useMembershipsMock.mockReturnValue(membershipValue(ADMIN))
++ 
++     renderDashboard()
++     await screen.findByTestId('stat-players')
++ 
++-    expect(screen.getByRole('button', { name: /add fixture/i })).toBeInTheDocument()
++-    expect(screen.getByRole('button', { name: /add a player/i })).toBeInTheDocument()
+++    expect(actionNames()).toEqual(['View full schedule', 'View team list'])
+++    expect(screen.queryByText(/you're signed in as a/i)).not.toBeInTheDocument()
++   })
++ 
++-  it('hides the add actions from a parent and explains why', async () => {
+++  it('offers a parent navigation only, and says why', async () => {
++     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
++ 
++     renderDashboard()
++     await screen.findByTestId('stat-players')
++ 
++-    expect(screen.queryByRole('button', { name: /add fixture/i })).not.toBeInTheDocument()
++-    expect(screen.queryByRole('button', { name: /add a player/i })).not.toBeInTheDocument()
+++    expect(actionNames()).toEqual(['View schedule', 'View team list'])
++     expect(screen.getByText(/signed in as a parent/i)).toBeInTheDocument()
++   })
++ 
++-  it('always links to the full schedule and the team list', async () => {
+++  // A player is one of the four supported roles, and used to be told they
+++  // were a parent — twelve lines below a scope note reading "Player view".
+++  it('calls a player a player, not a parent', async () => {
+++    useMembershipsMock.mockReturnValue(membershipValue(PLAYER))
+++
+++    renderDashboard()
+++    await screen.findByTestId('stat-players')
+++
+++    expect(actionNames()).toEqual(['View schedule', 'View team list'])
+++    expect(screen.getByText(/signed in as a player/i)).toBeInTheDocument()
+++    expect(screen.queryByText(/signed in as a parent/i)).not.toBeInTheDocument()
+++  })
+++
+++  it('treats a coach with no resolvable team as read-only', async () => {
+++    useMembershipsMock.mockReturnValue(membershipValue(TEAMLESS_COACH))
+++    listEventsMock.mockResolvedValue([])
+++    listPlayersMock.mockResolvedValue([])
+++
+++    renderDashboard()
+++    await screen.findByTestId('stat-players')
+++
+++    // canEditTeam refuses a null team_id, so this coach gets the read-only
+++    // card rather than an action pointing at a form with no squad to pick.
+++    expect(actionNames()).toEqual(['View schedule', 'View team list'])
+++    expect(screen.getByText(/signed in as a coach/i)).toBeInTheDocument()
+++  })
+++
+++  it('links to the full schedule and the team list', async () => {
++     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
++ 
++     renderDashboard()
++     await screen.findByTestId('stat-players')
++ 
++     expect(screen.getByRole('link', { name: /schedule/i })).toHaveAttribute('href', '/schedule')
++     expect(screen.getByRole('link', { name: /team list/i })).toHaveAttribute('href', '/roster')
++   })
++ })
+diff --git a/.superpowers/sdd/quins-v1-mvp/task-13-report.md b/.superpowers/sdd/quins-v1-mvp/task-13-report.md
+index 9ade102..20d83aa 100644
+--- a/.superpowers/sdd/quins-v1-mvp/task-13-report.md
++++ b/.superpowers/sdd/quins-v1-mvp/task-13-report.md
+@@ -395,10 +395,143 @@ read fixtures and squads but not change them."`; no console or page errors.
+ ## Files changed this round
+ 
+ - `src/screens/Dashboard.jsx`
+ - `tests/dashboard.test.jsx`
+ 
+ ## Deferred (per the ruling, not acted on)
+ 
+ - The error path replacing the whole screen on a failed realtime refetch
+   (pre-existing pattern inherited from `Schedule.jsx`).
+ - Extracting the fourth copy of the retry-button markup.
++
++---
++
++# Task 13 — fix round 2 (review response)
++
++## Important — trainings and socials never left "Fixtures to play"
++
++Accepted, and the diagnosis is exactly right: two different questions were
++sharing one filter.
++
++- **Schedule's Upcoming tab** asks the *result* question — "which fixtures
++  still need a score" — so an unscored match from last week stays visible
++  until somebody records it. That is Task 11's ruling and it is correct.
++  **`Schedule.jsx` is untouched by this round.**
++- **The Dashboard** asks a *calendar* question — "what is coming up next, and
++  how much of it is there". Under `!hasResult` that answer was wrong for any
++  event type that can never be scored: a training or a social has no score to
++  enter, so once its date passed it sat at the top of "Upcoming" permanently
++  and inflated the stat tile forever.
++
++`src/screens/Dashboard.jsx` now derives `toPlay` from the date:
++
++```js
++const toPlay = sortByStart(
++  events.filter((event) => {
++    const date = eventDate(event)
++    return date != null && date.getTime() > now
++  }),
++  'asc',
++)
++```
++
++This feeds both the Upcoming list and the "Fixtures to play" tile. `results` /
++`lastResult` still use `hasResult` and are unchanged — a score is still what
++makes something a result.
++
++Two consequences, both deliberate and commented in the file:
++
++1. The hero's separate `future` filter is gone. It existed only to re-apply
++   "must be in the future" on top of the result filter; now that `toPlay`
++   already means that, `nextFixture` is simply the head of `toPlay`
++   (preferring a match). One rule, one place.
++2. An event with an unparseable `starts_at` is now excluded here rather than
++   listed. `sortByStart` already sinks those to the bottom on Schedule, where
++   they stay visible — so a bad row is still findable, just not on a screen
++   whose entire premise is "when is this happening".
++
++## Doc fix
++
++`docs/design-system.md:533` mapped `home` → `events.is_home`. Corrected to
++`events.home`, with a note that it was verified against the live schema and
++that the wrong name here is what produced the silently-missing Home/Away badge
++in round 1 — so whoever builds Task 14 doesn't inherit the same trap.
++
++## Cosmetic (from the re-review note)
++
++The `canEdit` comment credited `canEditTeam`'s null-guard for refusing a
++teamless coach. The actual mechanism is `visibleTeams` dropping null team ids,
++which empties `scopedTeams` so `.some()` is vacuously false; `canEditTeam`'s
++guard is the second line of defence behind it. Comment corrected — behaviour
++unchanged, and the test that pins it (`treats a coach with no resolvable team
++as read-only`) still passes.
++
++## Tests
++
++`tests/dashboard.test.jsx`, 28 → 29 tests.
++
++- New fixture `PAST_SOCIAL` — a week-old social, the case that exposed the
++  split, since it can never carry a score under any rule.
++- New test **`leaves stale unscored events out of both the list and the
++  count`**: with "now" pinned at `2026-07-20T05:00Z`, it asserts the Upcoming
++  list is exactly `['U10 skills session', 'Quins vs Al Ain Amblers']` — both
++  genuinely future — and explicitly that it contains neither the past social
++  nor the past unscored match, and that the stat tile reads 2.
++- `counts players in scope, fixtures still to play, and age groups` updated
++  from 3 to 2 with the reason stated.
++- `never picks a fixture that has already kicked off, even unscored` rewritten:
++  it used to assert the stale match *was* listed. It now asserts the list is
++  empty and there is no hero.
++
++### Mutation testing
++
++| # | Mutation | Result |
++|---|---|---|
++| 15 | `toPlay` back to `!hasResult` | 7 tests fail |
++| 16 | drop the `> now` comparison | 10 fail |
++
++Both killed, and the blast radius confirms the new assertions are load-bearing
++rather than incidental.
++
++### Commands and output
++
++`npx vitest run tests/dashboard.test.jsx`:
++
++```
++ ✓ tests/dashboard.test.jsx (29 tests)
++      Tests  29 passed (29)
++```
++
++`npm test` — files covering the amended code are `tests/dashboard.test.jsx`
++(the change) and `tests/schedule.test.jsx` (proves Schedule's tab semantics
++did **not** move):
++
++```
++ Test Files  16 passed (16)
++      Tests  330 passed (330)
++```
++
++`TZ=America/New_York npx vitest run`: `16 passed / 330 passed` — identical.
++`npm run build`: clean. No stderr output.
++
++### Browser re-check (run under `TZ=America/New_York`)
++
++Re-ran `harness/shoot-dashboard.mjs`, 3 personas × 375/1280, and re-read the
++screenshots. The fix is visible in a real render: the coach's "Fixtures to
++play" went **9 → 8** and the parent's **5 → 4**, and the stale
++`2026-07-20T21:00Z` "Late Night Touch" social that previously headed the
++Upcoming list is gone — the list now starts at today. Hero still reads
++"Thu, Jul 30, 2026 · 7:00 PM" for a `15:00Z` fixture under the hostile zone.
++Zero console/page errors, no overflow at either width.
++
++## Files changed this round
++
++- `src/screens/Dashboard.jsx`
++- `tests/dashboard.test.jsx`
++- `docs/design-system.md`
++
++## Deferred (per the ruling, not acted on)
++
++- `FixtureRow.jsx:66` date-box weekday `#77726e` on `#f3eef5` (4.16:1) — to be
++  fixed alongside the next `FixtureRow` touch.
++- The error path replacing the whole screen on a failed realtime refetch.
++- Extracting the fourth copy of the retry-button markup.
+diff --git a/docs/design-system.md b/docs/design-system.md
+index 2908e2c..6af07be 100644
+--- a/docs/design-system.md
++++ b/docs/design-system.md
+@@ -523,21 +523,21 @@ store.load("quins_events_v2",  null) // -> array of Event
+ Positions enum used by the Add/Edit form: `["Prop","Hooker","Lock","Flanker","Number 8","Scrum-half","Fly-half","Centre","Wing","Fullback","Utility"]`.
+ `posGroup(pos)` maps position → `"Forwards"` (Prop/Hooker/Lock/Flanker/Number 8), `"Backs"` (Scrum-half/Fly-half/Centre/Wing/Fullback), or `"Other"` (anything else, e.g. "Utility") — this grouping function must be ported verbatim for the Roster grouped-by-position view to match.
+ 
+ ### Event object
+ ```js
+ {
+   id: 1001,                     // number (Date.now() on new records)         — events.id (uuid)
+   type: "training",             // enum: "match" | "training" | "social"      — events.type
+   title: "Senior Squad Training", // string. For matches this is SET TO THE OPPONENT NAME (see openEventForm: `title:type==="match"?opp:titleV`) — i.e. `title` is redundant/derived for matches; the render layer actually displays "Quins vs {opponent}" for matches and just `{title}` for training/social. Real schema should likely just use `opponent` for matches and `title` for non-matches, and NOT duplicate opponent into title.
+   opponent: "Al Ain Amblers",   // string|null, match-only                     — events.opponent
+-  home: true,                   // boolean, match-only (defaults true for non-matches but unused) — events.is_home
++  home: true,                   // boolean, match-only (defaults true for non-matches but unused) — events.home (NOT events.is_home; verified against the live schema — the wrong name here caused a silently-missing Home/Away badge in Task 13)
+   venue: "Zayed Sports City, Abu Dhabi", // string, freeform (sometimes "Ground — Pitch N", parsed client-side by splitting on "—" and "," for compact display) — events.venue / events.location
+   comp: "West Asia Premiership",// string|null, match-only optional            — events.competition
+   team: "Senior Men 1st XV",    // string, must match one of the 15 TEAMS      — events.team_id (fk -> teams)
+   when: "2026-07-24T19:00",     // PROTOTYPE ONLY: ISO-ish browser-local datetime string, no timezone/seconds — events.starts_at is a real `timestamptz` in Supabase (already built), i.e. an absolute instant stored in UTC. See the timezone note below.
+   result: { us: 31, them: 19 }, // object|null — presence of `result` is what flags an event as "past"/"played", not a computed date comparison — events.result_us / events.result_them (or a nullable jsonb)
+   rsvpIn: 19, rsvpOut: 2, rsvpMaybe: 3  // numbers — DEMO-ONLY AGGREGATE COUNTS, hardcoded per seed event, never recomputed from real RSVPs. The real build replaces these three fields entirely with a live COUNT(*) FILTER query against the `availability` table (per project schema: one row per player per event with a status).
+ }
+ ```
+ **Timezone note (Task 11 amendment — supersedes the old "UAE is UTC+4 fixed" wording).** Every event time in this app renders in **Abu Dhabi time for every reader**, whatever zone their browser is in — the club has one home ground, so "20:00" must mean 20:00 at Zayed Sports City for a parent checking fixtures from London as much as for one on the touchline. The model is:
+ - **Storage:** `events.starts_at` is `timestamptz` — an absolute instant. No offset or wall-clock string is stored. Ordering, and upcoming-vs-past, are instant comparisons and are already zone-agnostic.
+diff --git a/src/screens/Dashboard.jsx b/src/screens/Dashboard.jsx
+index 0516ec0..ced3cb5 100644
+--- a/src/screens/Dashboard.jsx
++++ b/src/screens/Dashboard.jsx
+@@ -293,50 +293,59 @@ export default function Dashboard() {
+   // unsubscribes — it never touches focus.
+   useEffect(() => subscribeEvents(() => setReloadToken((token) => token + 1)), [])
+ 
+   // Only a load with nothing on screen replaces the content with a spinner. A
+   // realtime refresh fires on every insert/update/delete anywhere in scope,
+   // from any user — spinning on those would tear the dashboard out of the DOM
+   // and collapse the page height each time somebody else touched a fixture.
+   const isFirstLoad = loading && !settled
+ 
+   const admin = isAdmin(memberships)
+-  // Asked through canEditTeam rather than by looking for a 'coach' row, so
+-  // this agrees with the helper that will gate the actual writes in Tasks
+-  // 14/15: canEditTeam deliberately refuses a coach row with a null team_id,
+-  // and a raw role check would grant on one — enabling an action that opens a
+-  // form with no squad to pick. Same shape as Schedule.jsx's precedent.
++  // Asked per visible team through canEditTeam, rather than by looking for a
++  // 'coach' membership row, so this agrees with the helper that will gate the
++  // actual writes in Tasks 14/15. A coach row with a null team_id contributes
++  // no team to scopedTeams (visibleTeams drops null ids), so `.some()` over an
++  // empty list is false and that coach is read-only — where a raw role check
++  // would grant, enabling an action that opens a form with no squad to pick.
++  // canEditTeam's own null guard is the second line of defence behind that.
++  // Same shape as Schedule.jsx's precedent.
+   const canEdit = admin || scopedTeams.some((team) => canEditTeam(memberships, team.id))
+   // Null for anyone who can edit; otherwise the role noun for the read-only
+   // explanation, from the same roleLabel() the scope note uses.
+   const readOnlyRole = canEdit ? null : roleLabel(memberships).toLowerCase()
+   const teamNames = scopedTeams.map((team) => team.name).join(', ')
+ 
+-  // "To play" is the project's result rule: a fixture is a result when a
+-  // score is recorded, not when its date has passed (see hasResult). A match
+-  // played last week whose score nobody has entered is still to play, and
+-  // still listed — which is the point, it stays visible until someone records
+-  // the score.
+-  const toPlay = sortByStart(events.filter((event) => !hasResult(event)), 'asc')
++  // What the Dashboard calls "to play" is a question about the CALENDAR:
++  // what is coming up next, and how much of it is there. That is not the same
++  // question as Schedule's Upcoming tab, which asks about the RESULT rule —
++  // "which fixtures still need a score" — and deliberately keeps an unscored
++  // match from last week visible until somebody records it (Task 11's ruling,
++  // untouched). The two questions shared a filter here, and the split showed:
++  // trainings and socials can never carry a score, so under `!hasResult` a
++  // week-old social sat at the top of "Upcoming" forever and was counted in
++  // "Fixtures to play". Filtering on the date is what this screen actually
++  // means. An event with an unparseable starts_at is excluded rather than
++  // floated to the top; sortByStart already sinks those to the bottom on
++  // Schedule, where they stay visible.
++  const toPlay = sortByStart(
++    events.filter((event) => {
++      const date = eventDate(event)
++      return date != null && date.getTime() > now
++    }),
++    'asc',
++  )
+   const results = sortByStart(events.filter(hasResult), 'desc')
+   const lastResult = results[0] ?? null
+ 
+-  // The hero is the one place that also needs the fixture to be in the
+-  // FUTURE: a countdown to an instant that has passed is meaningless, so an
+-  // unscored fixture from last week is legitimately "to play" in the list
+-  // above but can never be the next fixture. Matches come first, falling back
+-  // to the next event of any type (design-system.md §4.11).
+-  const future = toPlay.filter((event) => {
+-    const date = eventDate(event)
+-    return date != null && date.getTime() > now
+-  })
+-  const nextFixture = future.find((event) => event.type === 'match') ?? future[0] ?? null
++  // The hero is just the head of that list, preferring a match and falling
++  // back to the next event of any type (design-system.md §4.11).
++  const nextFixture = toPlay.find((event) => event.type === 'match') ?? toPlay[0] ?? null
+ 
+   // Gated on the hero existing: with nothing to count down to there is
+   // nothing for a tick to change, and an ungated timer re-renders the whole
+   // dashboard every 60s for no visible effect. The dependency is a boolean,
+   // not the event, so a realtime refetch that returns the same next fixture
+   // doesn't restart the interval.
+   const hasCountdown = nextFixture != null
+   useEffect(() => {
+     if (!hasCountdown) return undefined
+     const id = setInterval(() => setNow(Date.now()), MINUTE)
+diff --git a/tests/dashboard.test.jsx b/tests/dashboard.test.jsx
+index b61b077..001072d 100644
+--- a/tests/dashboard.test.jsx
++++ b/tests/dashboard.test.jsx
+@@ -82,24 +82,24 @@ const NEXT_MATCH = {
+ const SOONER_TRAINING = {
+   id: 'e-training',
+   team_id: 'team-u10',
+   type: 'training',
+   title: 'U10 skills session',
+   starts_at: '2026-07-21T15:30:00Z',
+   venue: 'Zayed Sports City',
+   result_us: null,
+   result_them: null,
+ }
+-// Kicked off before NOW and nobody has entered a score. Per the project's
+-// result rule it is still "to play", so it belongs in the upcoming list and
+-// the fixtures-to-play count — but it must never become the hero, because a
+-// countdown to a past instant is meaningless.
++// Kicked off before NOW and nobody has entered a score. Schedule's Upcoming
++// tab keeps this visible on purpose (it still needs a score), but the
++// Dashboard asks a calendar question — what is coming up — so it must not
++// appear here at all.
+ const PAST_UNSCORED = {
+   id: 'e-stale',
+   team_id: 'team-u10',
+   type: 'match',
+   opponent: 'Dubai Exiles',
+   starts_at: '2026-07-15T13:00:00Z',
+   result_us: null,
+   result_them: null,
+ }
+ const LAST_RESULT = {
+@@ -114,21 +114,42 @@ const LAST_RESULT = {
+ const OLDER_RESULT = {
+   id: 'e-older',
+   team_id: 'team-u10',
+   type: 'match',
+   opponent: 'Sharjah Wanderers',
+   starts_at: '2026-07-03T13:00:00Z',
+   result_us: 10,
+   result_them: 20,
+ }
+ 
+-const EVENTS = [NEXT_MATCH, SOONER_TRAINING, PAST_UNSCORED, LAST_RESULT, OLDER_RESULT]
++// A training or a social can NEVER carry a score, so under a hasResult-based
++// filter this one would sit at the top of "Upcoming" and inflate the
++// fixtures-to-play count forever. It is the case that exposed the split
++// between "still needs a score" and "still to come".
++const PAST_SOCIAL = {
++  id: 'e-social',
++  team_id: 'team-u10',
++  type: 'social',
++  title: 'Season launch barbecue',
++  starts_at: '2026-07-04T14:00:00Z',
++  result_us: null,
++  result_them: null,
++}
++
++const EVENTS = [
++  NEXT_MATCH,
++  SOONER_TRAINING,
++  PAST_UNSCORED,
++  PAST_SOCIAL,
++  LAST_RESULT,
++  OLDER_RESULT,
++]
+ 
+ const PLAYERS = [
+   { id: 'p1', team_id: 'team-u10', full_name: 'Amir Haddad', position: 'Prop' },
+   { id: 'p2', team_id: 'team-u10', full_name: 'Bea Okoro', position: 'Wing' },
+   { id: 'p3', team_id: 'team-1xv', full_name: 'Cal Fletcher', position: 'Lock' },
+ ]
+ 
+ function membershipValue(memberships, teams = TEAMS) {
+   return { memberships, teams, loading: false, error: null, reload: vi.fn() }
+ }
+@@ -302,25 +323,23 @@ describe('Dashboard — next fixture hero', () => {
+     renderDashboard()
+ 
+     const hero = await screen.findByTestId('next-fixture')
+     expect(within(hero).getByText('U10 skills session')).toBeInTheDocument()
+   })
+ 
+   it('never picks a fixture that has already kicked off, even unscored', async () => {
+     listEventsMock.mockResolvedValue([PAST_UNSCORED, LAST_RESULT])
+ 
+     renderDashboard()
+-    const list = await screen.findByTestId('upcoming-list')
++    await screen.findByText(/no upcoming fixtures/i)
+ 
+-    // Still "to play" — no score has been entered — so it stays in the list…
+-    expect(within(list).getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+-    // …but a countdown to an instant that has already passed is meaningless.
++    // A countdown to an instant that has already passed is meaningless.
+     expect(screen.queryByTestId('next-fixture')).not.toBeInTheDocument()
+   })
+ 
+   it('only runs the once-a-minute countdown tick while there is a hero', async () => {
+     // Filtered to the countdown's own 60s delay so nothing React or RTL
+     // schedules internally can make this pass by accident.
+     const ticks = () =>
+       setIntervalSpy.mock.calls.filter(([, delay]) => delay === 60 * 1000).length
+ 
+     const { unmount } = renderDashboard()
+@@ -346,23 +365,24 @@ describe('Dashboard — next fixture hero', () => {
+     expect(screen.queryByTestId('countdown')).not.toBeInTheDocument()
+   })
+ })
+ 
+ describe('Dashboard — stats', () => {
+   it('counts players in scope, fixtures still to play, and age groups', async () => {
+     renderDashboard()
+     await screen.findByTestId('stat-players')
+ 
+     expect(screen.getByTestId('stat-players')).toHaveTextContent('3')
+-    // NEXT_MATCH, SOONER_TRAINING and PAST_UNSCORED have no score; the two
+-    // scored fixtures are results, not fixtures to play.
+-    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('3')
++    // Only NEXT_MATCH and SOONER_TRAINING are still to come. The two scored
++    // fixtures are results; PAST_UNSCORED and PAST_SOCIAL have already
++    // happened, whether or not anyone can ever score them.
++    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('2')
+     expect(screen.getByTestId('stat-groups')).toHaveTextContent('2')
+   })
+ 
+   it('labels the tiles for the whole club when the user is an admin', async () => {
+     useMembershipsMock.mockReturnValue(membershipValue(ADMIN))
+ 
+     renderDashboard()
+     await screen.findByTestId('stat-players')
+ 
+     expect(screen.getByTestId('stat-players')).toHaveTextContent(/registered players/i)
+@@ -404,20 +424,44 @@ describe('Dashboard — upcoming list and last result', () => {
+     renderDashboard()
+ 
+     const list = await screen.findByTestId('upcoming-list')
+     const row = within(list).getByText('U10 skills session').closest('[data-testid="fixture-row"]')
+     await userEvent.click(row)
+ 
+     const dialog = await screen.findByRole('dialog')
+     expect(within(dialog).getByText(/U10 skills session/)).toBeInTheDocument()
+   })
+ 
++  // The Dashboard asks "what's coming up", not "what still needs a score".
++  // Those coincide for matches and diverge completely for trainings and
++  // socials, which can never be scored — so a hasResult-based filter left
++  // stale ones on the list and in the count indefinitely.
++  it('leaves stale unscored events out of both the list and the count', async () => {
++    renderDashboard()
++
++    const list = await screen.findByTestId('upcoming-list')
++    const titles = within(list)
++      .getAllByTestId('fixture-title')
++      .map((node) => node.textContent)
++
++    // Both future events, nothing else.
++    expect(titles).toEqual(['U10 skills session', 'Quins vs Al Ain Amblers'])
++    // A week-old social, which can never carry a score…
++    expect(titles).not.toContain('Season launch barbecue')
++    // …and a match played last week that nobody has scored yet. That one is
++    // still on Schedule's Upcoming tab by design; it is not this screen's
++    // question.
++    expect(titles).not.toContain('Quins vs Dubai Exiles')
++
++    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('2')
++  })
++
+   it('shows the most recent scored fixture as the last result', async () => {
+     renderDashboard()
+ 
+     const block = await screen.findByTestId('last-result')
+     expect(within(block).getByText('Quins vs Jebel Ali Dragons')).toBeInTheDocument()
+     expect(within(block).getByText('31–19')).toBeInTheDocument()
+     expect(within(block).queryByText(/Sharjah Wanderers/)).not.toBeInTheDocument()
+   })
+ 
+   it('says so when no scores have been entered yet', async () => {
