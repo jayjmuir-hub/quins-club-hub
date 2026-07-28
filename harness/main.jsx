@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import ReactDOM from 'react-dom/client'
-import { MemoryRouter, BrowserRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '../src/components/AppShell.jsx'
 import Login from '../src/screens/Login.jsx'
 import Schedule from '../src/screens/Schedule.jsx'
@@ -9,6 +9,7 @@ import Dashboard from '../src/screens/Dashboard.jsx'
 import PlayerForm from '../src/screens/PlayerForm.jsx'
 import Availability from '../src/screens/Availability.jsx'
 import Admin from '../src/screens/Admin.jsx'
+import AcceptInvite from '../src/screens/AcceptInvite.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
@@ -345,6 +346,61 @@ const scenarios = {
         </AuthProvider>
       </BrowserRouter>
     )
+  },
+
+  // Independent Task 18 verification. A faithful reproduction of App.jsx's
+  // OWN route structure (per-route <AppShell> wrapping, /accept-invite/:token
+  // as a sibling outside all of them) — not one screen mounted directly like
+  // the scenarios above — because this task's top-priority risk (a possible
+  // remount flash/jank on every route change, since each <Route> now owns its
+  // own <AppShell> instead of one shared shell wrapping a nested <Routes>) can
+  // only be observed by actually navigating a real router, not by rendering
+  // one screen in isolation. RequireAuth is deliberately NOT reproduced here:
+  // every scenario below assumes a session already exists (that's what
+  // AuthProvider's stub value supplies), so RequireAuth would only ever take
+  // its "render children" branch — reproducing it would add nothing to
+  // observe. `memberships` is real React state (not a fixed prop) so
+  // AcceptInvite's real reload()-then-navigate sequence can be exercised
+  // end-to-end: reload() here flips a zero-membership account to a
+  // one-membership account, the same effect the real reload() has after a
+  // genuine accept_invite RPC call inserts a row.
+  'full-app': () => {
+    const params = new URLSearchParams(window.location.search)
+    const startMemberships = params.get('start') === 'none' ? [] : ADMIN_MEMBERSHIPS
+    const startTeams = params.get('start') === 'none' ? [] : TEAMS_15
+
+    function FullApp() {
+      const [memberships, setMemberships] = useState(startMemberships)
+      const [teams] = useState(startTeams)
+
+      function reload() {
+        // Simulate what a genuine accept_invite RPC call achieves: the
+        // invitee now has exactly one membership row that didn't exist
+        // before.
+        setMemberships([{ id: 'm-accepted', role: 'player', team_id: 't1', player_id: 'p1' }])
+      }
+
+      const membershipValue = { memberships, teams, loading: false, error: null, reload }
+
+      return (
+        <BrowserRouter>
+          <AuthProvider value={baseAuth(JAY_EMAIL)}>
+            <MembershipProvider value={membershipValue}>
+              <Routes>
+                <Route path="/accept-invite/:token" element={<AcceptInvite />} />
+                <Route path="/" element={<AppShell><Dashboard /></AppShell>} />
+                <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
+                <Route path="/roster" element={<AppShell><Roster /></AppShell>} />
+                <Route path="/more" element={<AppShell><Admin /></AppShell>} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </MembershipProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      )
+    }
+
+    return <FullApp />
   },
 
   'shell-loading': () => (

@@ -39,3 +39,52 @@ export async function listClubMembers() {
   }
   return [...MEMBERS]
 }
+
+// Task 18 additions, following the same ?<name>Delay=/<name>Throw= knob
+// convention as listClubMembers above.
+//
+// ?inviteDelay=<ms> widens the window before createInvite resolves, so the
+// form's "Sending…" disabled-button state is screenshot-able. ?inviteThrow=1
+// makes it reject with the same message InviteForm's doc comment says the
+// real REFUSED_INVITE constant produces, so the role="alert" path is
+// screenshot-able without needing a real RLS refusal.
+export async function createInvite({ email, role, teamId } = {}) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('inviteDelay') || 0)
+  const shouldThrow = params.get('inviteThrow') === '1'
+
+  if (delay > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delay))
+  }
+  if (shouldThrow) {
+    throw new Error("We couldn't send that invite. You may not have permission to invite members.")
+  }
+  return {
+    id: 'inv-stub-1',
+    email,
+    role,
+    team_id: teamId ?? null,
+    token: 'stub-token-abcdef123456',
+  }
+}
+
+// ?acceptDelay=<ms> (default 500) widens the window before acceptInvite
+// resolves, so AcceptInvite's "Accepting your invite…" spinner state is
+// screenshot-able instead of resolving before the first paint. ?acceptThrow=1
+// makes it reject; ?acceptError=<text> (URL-encoded) picks the message, so
+// the "already used"/"wrong email" wording the real RPC returns can be
+// exercised verbatim without a live Supabase call.
+export async function acceptInvite(token) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('acceptDelay') ?? 500)
+  const shouldThrow = params.get('acceptThrow') === '1'
+  const errorMessage = params.get('acceptError') || 'This invite has already been used.'
+
+  if (delay > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delay))
+  }
+  if (shouldThrow) {
+    throw new Error(errorMessage)
+  }
+  return { id: 'm-new', role: 'player', team_id: 't1', player_id: 'p1', token }
+}
