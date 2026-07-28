@@ -36,7 +36,7 @@ import {
   deletePlayer,
   upsertContact,
 } from '../src/data/players.js'
-import { listAvailability, subscribeAvailability } from '../src/data/availability.js'
+import { listAvailability, subscribeAvailability, setAvailability } from '../src/data/availability.js'
 
 function createQueryBuilder({ data = null, error = null } = {}) {
   const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [], upsert: [] }
@@ -702,5 +702,65 @@ describe('subscribeAvailability', () => {
     const [nameA] = supabase.channel.mock.calls[0]
     const [nameB] = supabase.channel.mock.calls[1]
     expect(nameA).not.toEqual(nameB)
+  })
+})
+
+// --- setAvailability -------------------------------------------------------
+
+// Task 16. availability has no surrogate key for a (event, player) pair —
+// same shape as upsertContact against player_contacts: a genuine ON CONFLICT
+// upsert naming its conflict target explicitly, not an insert/update branch.
+describe('setAvailability', () => {
+  it('upserts on the (event_id, player_id) conflict target', async () => {
+    const saved = { id: 'a-1', event_id: 'e-1', player_id: 'p-1', status: 'in' }
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await setAvailability('e-1', 'p-1', 'in')
+
+    expect(supabase.from).toHaveBeenCalledWith('availability')
+    expect(builder.upsert).toHaveBeenCalledTimes(1)
+    expect(calls.upsert[0][0]).toEqual({ event_id: 'e-1', player_id: 'p-1', status: 'in' })
+    expect(calls.upsert[0][1]).toMatchObject({ onConflict: 'event_id,player_id' })
+    expect(builder.insert).not.toHaveBeenCalled()
+    expect(builder.update).not.toHaveBeenCalled()
+    expect(result).toEqual(saved)
+  })
+
+  it('asks for the saved row back', async () => {
+    const { builder } = createQueryBuilder({ data: { id: 'a-1', event_id: 'e-1', player_id: 'p-1', status: 'out' } })
+    supabase.from.mockReturnValue(builder)
+
+    await setAvailability('e-1', 'p-1', 'out')
+
+    expect(builder.select).toHaveBeenCalled()
+    expect(builder.maybeSingle).toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('boom') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(setAvailability('e-1', 'p-1', 'in')).rejects.toThrow('boom')
+  })
+
+  it('throws when the write succeeds but comes back with no row (an RLS refusal)', async () => {
+    // The scoping case: a parent trying to set availability for a player who
+    // is not their own child, or a player outside the team a coach edits.
+    // RLS matches zero rows and PostgREST reports a successful empty
+    // response, not an error — so this must be turned into a visible refusal
+    // the same way upsertEvent/upsertPlayer/upsertContact already do.
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(setAvailability('e-1', 'not-my-child', 'in')).rejects.toThrow(
+      /permission|not allowed|couldn.t save/i,
+    )
+  })
+
+  it('refuses to write without an event id or player id rather than hitting the network', async () => {
+    await expect(setAvailability(null, 'p-1', 'in')).rejects.toThrow(/event|player/i)
+    await expect(setAvailability('e-1', null, 'in')).rejects.toThrow(/event|player/i)
+    expect(supabase.from).not.toHaveBeenCalled()
   })
 })

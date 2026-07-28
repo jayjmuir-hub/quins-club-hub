@@ -48,3 +48,43 @@ export function subscribeAvailability(eventId, callback) {
     supabase.removeChannel(channel)
   }
 }
+
+// A write the database refused is not an error as far as PostgREST is
+// concerned: RLS filters the row out, the statement affects zero rows, and
+// the response is a perfectly successful "nothing" — the same shape
+// src/data/events.js and src/data/players.js already handle. Here that
+// covers a parent trying to set availability for a player who is not their
+// own child, and a coach/admin trying to set it for a player outside a
+// team they may edit — both are the availability table's "availability
+// write" RLS policy refusing, not this module deciding anything.
+const REFUSED_AVAILABILITY =
+  "We couldn't save that RSVP. You may not have permission to change it."
+
+/**
+ * Sets one player's availability status for one event, upserting on the
+ * (event_id, player_id) conflict target — availability has no surrogate key
+ * for that pair, so this is a genuine ON CONFLICT upsert, the same shape as
+ * src/data/players.js's upsertContact against player_contacts (keyed by
+ * player_id alone). The conflict target is named explicitly rather than
+ * left to PostgREST's inference, so this keeps updating in place if the
+ * table ever gains a second unique constraint.
+ *
+ * Returns the saved row. Throws — rather than writing an orphan row or
+ * failing obscurely at a NOT NULL constraint — when eventId or playerId is
+ * missing.
+ */
+export async function setAvailability(eventId, playerId, status) {
+  if (!eventId || !playerId) {
+    throw new Error('setAvailability needs both an event id and a player id.')
+  }
+
+  const { data, error } = await supabase
+    .from('availability')
+    .upsert({ event_id: eventId, player_id: playerId, status }, { onConflict: 'event_id,player_id' })
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(REFUSED_AVAILABILITY)
+  return data
+}
