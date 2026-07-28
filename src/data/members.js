@@ -40,3 +40,66 @@ export async function listClubMembers() {
   if (error) throw error
   return data ?? []
 }
+
+// A refused invite insert is not a thrown Supabase error — the "invites
+// manage" RLS policy (ALL, USING+WITH CHECK is_admin(club_id)) simply matches
+// zero rows for a non-admin caller, and PostgREST reports that as a
+// successful empty response, the same silent-refusal shape upsertPlayer/
+// upsertEvent already handle. This is a *reporting* mechanism, not access
+// control: RLS is what actually decides, server-side.
+const REFUSED_INVITE = "We couldn't send that invite. You may not have permission to invite members."
+
+/**
+ * Creates one invite row and returns it (including the database-generated
+ * `token`, needed to build the accept link/URL for the admin to send
+ * manually — there is no email-sending infrastructure in this build).
+ *
+ * The `token` column is never generated client-side: it is left out of the
+ * insert entirely so its `gen_random_uuid()` default supplies it, then read
+ * back via `.select().maybeSingle()` — the same insert-then-read-back shape
+ * upsertPlayer/upsertEvent already use.
+ *
+ * teamId/playerId default to null (an admin invite has no team; most invites
+ * have no linked player). The database's own check constraint
+ * (`invites_team_required_unless_admin`) is the real enforcement of "a team
+ * is required unless role is admin" — InviteForm validates this client-side
+ * too, so a bad submission never reaches the database, but this function
+ * does not re-check it: it is a thin query builder, like every other
+ * function in this module.
+ */
+export async function createInvite({ clubId, email, role, teamId, playerId, createdBy }) {
+  const { data, error } = await supabase
+    .from('invites')
+    .insert({
+      club_id: clubId,
+      email,
+      role,
+      team_id: teamId ?? null,
+      player_id: playerId ?? null,
+      created_by: createdBy,
+    })
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(REFUSED_INVITE)
+  return data
+}
+
+/**
+ * Accepts an invite by token, via the `accept_invite` SECURITY DEFINER RPC —
+ * the invitee never needs (and never gets) direct write access to
+ * memberships. The RPC does its own validation server-side (token exists,
+ * not already used, email matches the caller's own authenticated email) and
+ * raises a Postgres exception with a friendly message on failure; that
+ * surfaces here as a normal Supabase `{ data, error }` response, so this
+ * follows the same throw-on-error convention as every other function in this
+ * module rather than swallowing or rewording it.
+ *
+ * Returns the newly-created memberships row on success.
+ */
+export async function acceptInvite(token) {
+  const { data, error } = await supabase.rpc('accept_invite', { _token: token })
+  if (error) throw error
+  return data
+}

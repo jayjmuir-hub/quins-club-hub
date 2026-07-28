@@ -324,11 +324,12 @@ describe('childPlayerIds', () => {
 vi.mock('../src/lib/supabase.js', () => ({
   supabase: {
     from: vi.fn(),
+    rpc: vi.fn(),
   },
 }))
 
 import { supabase } from '../src/lib/supabase.js'
-import { loadMyMemberships, listClubMembers } from '../src/data/members.js'
+import { loadMyMemberships, listClubMembers, createInvite, acceptInvite } from '../src/data/members.js'
 
 describe('loadMyMemberships', () => {
   it('returns the rows from the memberships table joined to teams', async () => {
@@ -402,5 +403,133 @@ describe('listClubMembers', () => {
     supabase.from.mockReturnValue({ select })
 
     await expect(listClubMembers()).rejects.toThrow('permission denied')
+  })
+})
+
+// --- createInvite() / acceptInvite() (src/data/members.js, Task 18) --------
+// createInvite inserts a row into `invites` and asks for it back (same
+// insert-then-select().maybeSingle() shape as upsertPlayer/upsertEvent in
+// src/data/players.js and src/data/events.js), so a non-admin's insert being
+// silently zero-rowed by RLS (the "invites manage" policy) is reported as a
+// refusal rather than a false "sent". acceptInvite is a thin wrapper over the
+// accept_invite RPC — the real validation (token exists, not already used,
+// email matches) lives in the SECURITY DEFINER function itself, verified
+// live; this module only has to throw the RPC's error rather than swallow it.
+
+function createInsertBuilder({ data = null, error = null } = {}) {
+  const calls = { insert: [] }
+  const builder = {}
+  builder.insert = vi.fn((...args) => {
+    calls.insert.push(args)
+    return builder
+  })
+  builder.select = vi.fn(() => builder)
+  builder.maybeSingle = vi.fn(() => Promise.resolve({ data, error }))
+  return { builder, calls }
+}
+
+describe('createInvite', () => {
+  it('inserts club_id, email, role, team_id, player_id and created_by, and reads the row back', async () => {
+    const saved = {
+      id: 'inv-1',
+      club_id: 'club-1',
+      email: 'coach@example.com',
+      role: 'coach',
+      team_id: U12.id,
+      player_id: null,
+      created_by: 'user-1',
+      token: 'tok-abc',
+      accepted_at: null,
+    }
+    const { builder, calls } = createInsertBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await createInvite({
+      clubId: 'club-1',
+      email: 'coach@example.com',
+      role: 'coach',
+      teamId: U12.id,
+      createdBy: 'user-1',
+    })
+
+    expect(supabase.from).toHaveBeenCalledWith('invites')
+    expect(calls.insert[0][0]).toEqual({
+      club_id: 'club-1',
+      email: 'coach@example.com',
+      role: 'coach',
+      team_id: U12.id,
+      player_id: null,
+      created_by: 'user-1',
+    })
+    // The token is never generated client-side — the column default supplies
+    // it, and it's read back from the inserted row.
+    expect(calls.insert[0][0]).not.toHaveProperty('token')
+    expect(builder.select).toHaveBeenCalled()
+    expect(builder.maybeSingle).toHaveBeenCalled()
+    expect(result).toEqual(saved)
+  })
+
+  it('passes team_id and player_id as null when omitted (an admin invite)', async () => {
+    const { builder, calls } = createInsertBuilder({ data: { id: 'inv-2', token: 'tok' } })
+    supabase.from.mockReturnValue(builder)
+
+    await createInvite({ clubId: 'club-1', email: 'admin@example.com', role: 'admin', createdBy: 'user-1' })
+
+    expect(calls.insert[0][0]).toMatchObject({ team_id: null, player_id: null })
+  })
+
+  it('passes a given player_id through (a parent invite linked to their child)', async () => {
+    const { builder, calls } = createInsertBuilder({ data: { id: 'inv-3', token: 'tok' } })
+    supabase.from.mockReturnValue(builder)
+
+    await createInvite({
+      clubId: 'club-1',
+      email: 'parent@example.com',
+      role: 'parent',
+      teamId: U12.id,
+      playerId: 'player-1',
+      createdBy: 'user-1',
+    })
+
+    expect(calls.insert[0][0]).toMatchObject({ player_id: 'player-1' })
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createInsertBuilder({ error: new Error('duplicate key value') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      createInvite({ clubId: 'club-1', email: 'a@example.com', role: 'coach', teamId: U12.id, createdBy: 'u1' }),
+    ).rejects.toThrow('duplicate key value')
+  })
+
+  it('throws a friendly message when the insert is silently refused by RLS (a non-admin)', async () => {
+    const { builder } = createInsertBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      createInvite({ clubId: 'club-1', email: 'a@example.com', role: 'coach', teamId: U12.id, createdBy: 'u1' }),
+    ).rejects.toThrow(/permission|not allowed|couldn.t (create|send)/i)
+  })
+})
+
+describe('acceptInvite', () => {
+  it('calls the accept_invite RPC with the token and returns the new membership row', async () => {
+    const membershipRow = { id: 'm-new', role: 'coach', team_id: U12.id, profile_id: 'user-1' }
+    supabase.rpc.mockResolvedValue({ data: membershipRow, error: null })
+
+    const result = await acceptInvite('tok-abc')
+
+    expect(supabase.rpc).toHaveBeenCalledWith('accept_invite', { _token: 'tok-abc' })
+    expect(result).toEqual(membershipRow)
+  })
+
+  it('throws the RPC error rather than returning a tuple', async () => {
+    supabase.rpc.mockResolvedValue({
+      data: null,
+      error: new Error('This invite has already been used.'),
+    })
+
+    await expect(acceptInvite('tok-abc')).rejects.toThrow('This invite has already been used.')
   })
 })
