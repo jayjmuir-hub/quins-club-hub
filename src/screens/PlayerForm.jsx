@@ -29,15 +29,20 @@ import { canEditTeam, visibleTeams } from '../lib/scope.js'
 //    mode of that conflation is a contact refusal reported as "saved". They
 //    are two calls so a partial failure is reported as a partial failure.
 // 2. The form's EXISTENCE is gated, not just its buttons: a user with no
-//    editable squad gets an explanation and no fields at all — in particular
-//    no phone/email boxes, which for a player whose contact row RLS withholds
-//    would be exactly the leak player_contacts exists to prevent. The same
-//    guard stops the contact read from being issued at all.
+//    editable squad, OR one who can't edit this particular player's squad,
+//    gets an explanation and no fields at all — in particular no phone/email
+//    boxes, which for a player whose contact row RLS withholds would be
+//    exactly the leak player_contacts exists to prevent. The same guard stops
+//    the contact read from being issued at all.
 // 3. A null contact row here can only mean "nothing recorded yet", never
 //    "withheld": this form renders only for someone who passes
-//    can_edit_team, and player_contacts' read policy is
-//    `can_edit_team(...) OR is_own_player(...)` — edit access strictly
-//    implies read access. So blank, editable fields are honest, and there is
+//    can_edit_team FOR THIS PLAYER'S TEAM — enforced by the `gated` check
+//    below, in this file, not by whoever opened it — and player_contacts'
+//    read policy is `can_edit_team(...) OR is_own_player(...)`, so edit
+//    access strictly implies read access. That local enforcement is what
+//    makes this paragraph true; without it a coach handed a player from
+//    another age group would see a null row RLS had withheld and read it as
+//    "nothing on file". So blank, editable fields are honest, and there is
 //    nothing to hint at. (PlayerDetail's rule — never suggest withheld data
 //    exists — is about a screen parents can reach; this one they cannot.)
 // 4. A contact read that FAILED is different again, and is the one case that
@@ -123,14 +128,15 @@ function Segmented({ legend, name, options, value, onChange }) {
 // (see the contact effect below), and for a new player there is nothing to
 // fetch.
 function initialValues(player, editableTeams) {
-  const teamIds = editableTeams.map((team) => team.id)
-  const fallbackTeamId = teamIds[0] ?? ''
+  const fallbackTeamId = editableTeams[0]?.id ?? ''
 
   return {
     fullName: player?.full_name ?? '',
     position: player?.position ?? '',
-    teamId:
-      player && teamIds.includes(player.team_id) ? player.team_id : fallbackTeamId,
+    // An existing player's own squad wins, even if the editable list hasn't
+    // loaded yet — see the reconciliation note in the component for why
+    // falling through to "the first team" is not acceptable here.
+    teamId: player ? player.team_id : fallbackTeamId,
     isCaptain: player?.is_captain === true,
     phone: '',
     email: '',
@@ -151,7 +157,26 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   )
 
   const editing = Boolean(player?.id)
-  const gated = editableTeams.length === 0
+
+  // Two gates, and the second one is the one this file's safeguarding claims
+  // actually rest on.
+  //
+  //   noEditableTeams — "you can't edit ANY squad". Blocks the add form.
+  //   notThisPlayer   — "you can't edit THIS player's squad". Blocks the edit
+  //                     form for a player outside your teams.
+  //
+  // The second used to live only in Roster.jsx (which computes the same check
+  // to decide whether to offer an Edit button at all), which meant the
+  // invariant this component's header depends on — "a null contact row here
+  // can only mean nothing recorded yet, never withheld" — was enforced in a
+  // different file from the one asserting it. That is only true if the caller
+  // never opens this form for a player it may not edit. Enforced here instead,
+  // so the component is self-enforcing whoever opens it: a U12 coach handed a
+  // U14 player gets the refusal, not blank contact fields over a null row that
+  // RLS actually withheld.
+  const noEditableTeams = editableTeams.length === 0
+  const notThisPlayer = Boolean(player) && !canEditTeam(memberships, player.team_id)
+  const gated = noEditableTeams || notThisPlayer
 
   const [values, setValues] = useState(() => initialValues(player, editableTeams))
   const [invalid, setInvalid] = useState({})
@@ -213,7 +238,23 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
     }
   }, [editing, gated, player?.id])
 
-  const set = (key) => (nextValue) => setValues((current) => ({ ...current, [key]: nextValue }))
+  const set = (key) => (nextValue) => {
+    setValues((current) => ({ ...current, [key]: nextValue }))
+    // Editing a field drops its invalid highlight immediately, rather than
+    // leaving it lit until the next submit re-derives everything.
+    setInvalid((current) => (current[key] ? { ...current, [key]: false } : current))
+    // ...and any input clears the "fill in the highlighted fields" banner. It
+    // is cleared on ANY change rather than only when every field is valid,
+    // because the banner's job is to point at the highlights and the
+    // highlights are already per-field — a banner that outlives the state it
+    // describes is just noise. Only validation errors are cleared this way: a
+    // failed WRITE must survive typing, since nothing the user types makes a
+    // refused save true again.
+    if (errorStage === 'validation') {
+      setError(null)
+      setErrorStage(null)
+    }
+  }
   const setFromInput = (key) => (domEvent) => set(key)(domEvent.target.value)
 
   // Reconcile the chosen squad against the live editable list on every render
@@ -221,21 +262,32 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   // shrink, and on a first render where teams hadn't loaded the initial value
   // is ''. Either way the select would otherwise show a squad it wasn't
   // actually holding in state.
+  //
+  // The fallback when editing is the player's OWN squad, never "the first team
+  // in the list". Falling through to editableTeams[0] would show, and then on
+  // save actually write, a different age group than the one the player is in —
+  // moving a child between age groups behind the coach's back. The stakes are
+  // what make this different from the same reconciliation on a fixture.
   const teamId = editableTeams.some((team) => team.id === values.teamId)
     ? values.teamId
-    : editableTeams[0]?.id ?? ''
+    : editing
+      ? player.team_id
+      : editableTeams[0]?.id ?? ''
 
-  // A user with nothing they can edit should not be shown a form whose Save
-  // button the database is guaranteed to refuse — and, for this form
-  // specifically, should not be shown contact fields at all. This is
-  // defensive (every entry point already gates on the same check), so it
-  // explains rather than apologises.
+  // A user who can't write here should not be shown a form whose Save button
+  // the database is guaranteed to refuse — and, for this form specifically,
+  // should not be shown contact fields at all. Both entry points already gate
+  // on the same checks, so this is defensive: it explains rather than
+  // apologises. The two reasons get their own wording, because "you coach no
+  // squads" and "you don't coach this one" are different problems with
+  // different fixes.
   if (gated) {
     return (
       <Sheet open onClose={onClose} title={editing ? 'Edit player' : 'Add player'}>
         <p role="alert" className="rounded-[11px] bg-[#fbf1dd] px-4 py-3 text-sm text-[#221f1d]">
-          You don&apos;t have a squad you can add or change players for. Ask a club admin if that
-          looks wrong.
+          {noEditableTeams
+            ? "You don't have a squad you can add or change players for. Ask a club admin if that looks wrong."
+            : "You can't change players in this age group. Ask a club admin if that looks wrong."}
         </p>
       </Sheet>
     )
@@ -430,11 +482,16 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             </div>
 
             {/* Says what happens to the data, not what the user must do. For
-                a minor these are the guardian's details, and who can read
-                them back is the club's safeguarding promise. */}
+                a minor these are the guardian's details, and who can read them
+                back is the club's safeguarding promise — so this line has to
+                match the policy exactly, not approximately. The confirmed
+                player_contacts read policy is
+                `can_edit_team(...) OR is_own_player(player_id)`: the linked
+                player can read their own row too, which an earlier "only
+                coaches and club admins" wording quietly misstated. */}
             <p id="player-contact-note" className="-mt-2 mb-3.5 text-[12.5px] text-[#5c5854]">
-              Only coaches and club admins can see these. Leave them blank if you don&apos;t have
-              them.
+              Only coaches, club admins and the player themselves can see these. Leave them blank if
+              you don&apos;t have them.
             </p>
           </>
         )}

@@ -1,0 +1,2749 @@
+# Review package: 7d8a098..HEAD
+
+## Commits
+a982baa feat: player create/edit/delete with contact details
+
+## Files changed
+ .superpowers/sdd/quins-v1-mvp/task-15-brief.md  |   6 +
+ .superpowers/sdd/quins-v1-mvp/task-15-report.md | 351 +++++++++++++
+ harness/main.jsx                                |   2 +
+ harness/shoot-t15-verify.mjs                    | 377 ++++++++++++++
+ harness/stubs/players.js                        |  28 +
+ src/data/players.js                             |  95 ++++
+ src/screens/PlayerDetail.jsx                    | 114 ++++-
+ src/screens/PlayerForm.jsx                      | 479 ++++++++++++++++++
+ src/screens/Roster.jsx                          |  69 ++-
+ tests/data.test.js                              | 222 +++++++-
+ tests/player-form.test.jsx                      | 645 ++++++++++++++++++++++++
+ 11 files changed, 2370 insertions(+), 18 deletions(-)
+
+## Diff
+diff --git a/.superpowers/sdd/quins-v1-mvp/task-15-brief.md b/.superpowers/sdd/quins-v1-mvp/task-15-brief.md
+new file mode 100644
+index 0000000..e1addfa
+--- /dev/null
++++ b/.superpowers/sdd/quins-v1-mvp/task-15-brief.md
+@@ -0,0 +1,6 @@
++### Task 15: Player create/edit/delete + contact
++**Files:** Create `src/screens/PlayerForm.jsx`; modify `src/data/players.js` (`upsertPlayer`, `deletePlayer`, `upsertContact`).
++**Interfaces:** Coaches/admin only; writes `players` + `player_contacts`; team-restricted.
++- [ ] Test: `upsertPlayer` insert then update; `upsertContact` upserts on `player_id`; `deletePlayer` removes; form validates required name + team.
++- [ ] Implement. Commit.
++
+diff --git a/.superpowers/sdd/quins-v1-mvp/task-15-report.md b/.superpowers/sdd/quins-v1-mvp/task-15-report.md
+new file mode 100644
+index 0000000..a128e9e
+--- /dev/null
++++ b/.superpowers/sdd/quins-v1-mvp/task-15-report.md
+@@ -0,0 +1,351 @@
++# Task 15 — Player create/edit/delete + contact
++
++Branch `build/v1-mvp`, from `7d8a098`. Status: **DONE**.
++
++## What I implemented
++
++### `src/data/players.js` — three new writers
++
++- **`upsertPlayer(player)`** — direct copy of Task 14's `upsertEvent` shape against `players`:
++  inserts when there is no id, updates when there is one, destructures `id` out of the payload and
++  uses it only as the `.eq` filter, asks for the row back with `.select().maybeSingle()`, throws on
++  a Supabase error, and throws `REFUSED_PLAYER` on a zero-row response (the RLS refusal that
++  PostgREST reports as a successful "nothing"). No `jersey_num` — the column stays in the schema
++  and nothing writes it.
++- **`deletePlayer(id)`** — `delete().eq('id', id).select()`, throws on error and on an empty array.
++  It deletes **only** the `players` row. I checked the live schema:
++  `player_contacts_player_id_fkey FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE`,
++  so the contact row goes with it, atomically, server-side. A second client-side delete would
++  introduce a failure mode the database does not have (contact gone, player left). There is a test
++  asserting `supabase.from` is called exactly once and never with `player_contacts`.
++- **`upsertContact(contact)`** — see the decisions below.
++
++Three distinct refusal messages (`REFUSED_PLAYER`, `REFUSED_PLAYER_DELETE`, `REFUSED_CONTACT`), so
++the three failures are never confused for one another in the UI.
++
++### `src/screens/PlayerForm.jsx` (new)
++
++Design-system §5.8 field order, verbatim: Full name → Position → Age group → Phone → Email →
++Player/Captain segmented → full-width Save. Built on the shared `Sheet`. Reuses EventForm's
++`LABEL`/`FIELD`/`INPUT_BASE`/`Segmented` treatment including the sr-only-radio segmented control
++(no `<button>` used as a layout box, no reliance on CSS `:has()`).
++
++**No jersey field.** Confirmed by a test asserting no such label exists and no "jersey" text renders
++anywhere, and by a browser probe (`jerseyAnywhere: false` at both breakpoints).
++
++### Entry points
++
++1. **`Roster.jsx` section head → "Add player"**, exactly parallel to Task 14 putting "Add fixture"
++   on Schedule's section head (design-system §5.3 item 2 specifies an Add button there). Shown only
++   when `canEditAnything` (admin, or holder of any coach membership); **absent**, not disabled, for
++   everyone else. Restructured the section head into the same `flex items-start justify-between`
++   layout Schedule uses.
++2. **`PlayerDetail.jsx` footer → Edit / Delete**, parallel to `EventDetail`'s, gated on a new
++   `canEdit` prop that `Roster` computes as `canEditTeam(memberships, selectedPlayer.team_id)`.
++   A user without edit rights gets a `ScopeNote tone="parent"` read-only line instead.
++   Delete is the Task 14 two-step inline confirm — no native `confirm()`.
++3. `Roster` renders one sheet at a time (`selectedPlayer && !formState`), and closing the form drops
++   back to the roster rather than to the detail sheet, matching Schedule.
++
++## Decisions, and the reasoning
++
++### `upsertContact`'s conflict target: `.upsert(..., { onConflict: 'player_id' })`
++
++I queried the live database rather than assuming:
++
++```
++player_contacts_pkey  PRIMARY KEY (player_id)
++columns: player_id uuid NOT NULL, phone text NULL, email text NULL
++```
++
++`player_id` **is** the primary key — there is no surrogate id. So this is the one writer in the
++codebase where a genuine `ON CONFLICT` upsert is the right tool rather than the id-present/id-absent
++branch `upsertPlayer` uses. I chose it over a manual select-then-insert-or-update because:
++
++- **It is one statement, so there is no TOCTOU window.** Two coaches editing the same player would
++  both read "no row exists" and both try to insert; one would get a primary-key violation surfaced
++  as a raw Postgres error. `ON CONFLICT` makes the second one an update.
++- **Fewer round trips** to Tokyo from the UAE, which is the project's known latency profile.
++- **The refusal-detection pattern still works unchanged**: `.select().maybeSingle()` after the
++  upsert returns nothing when RLS refuses, exactly like the other writers.
++
++The conflict target is named explicitly rather than left to PostgREST's primary-key inference, so
++this keeps updating in place if the table ever gains a second unique constraint.
++
++The `player_id` **stays** in the payload (unlike `upsertPlayer`, which strips `id`) — it is what the
++row is keyed *by*, not a surrogate being needlessly rewritten. A test asserts both behaviours.
++
++`upsertContact` refuses (before touching the network) when called with no `player_id`, rather than
++letting an orphan write fail obscurely at the NOT NULL constraint.
++
++### Blank-both-fields behaviour
++
++I split this between the two layers deliberately:
++
++- **`upsertContact` itself is dumb**: it writes exactly what it is given, nulls included. Clearing a
++  wrong phone number has to actually clear it, and a data function that second-guesses its caller
++  cannot express that.
++- **`PlayerForm` decides whether there is anything worth writing**:
++  `writeContact = contactStatus === 'ready' && (phone || email || hadContact)`.
++  - New player, both blank → **skip the write**. Nothing to record and nothing to clear; an
++    all-null row would be litter. (Verified in the browser: only one write recorded.)
++  - Editing, no contact was on file, both still blank → **skip**. Same reasoning.
++  - Editing, a contact **was** on file and both are now blank → **write nulls**. This is the case
++    where an all-null row is exactly right, and skipping would silently keep a phone number the
++    coach just deleted. (Verified: `{ player_id: 'p1', phone: null, email: null }`.)
++
++Neither `null` nor an all-null row is a leak on the read side either: `PlayerDetail`'s
++`ContactBlock` already treats `!contact.phone && !contact.email` identically to no row at all.
++
++### Two writes, not one
++
++`upsertPlayer` first (its returned row is where a new player's id comes from), then `upsertContact`
++keyed on that id. The two tables have two separate policies and are written by two separate
++statements, so a partial failure is reported as a partial failure:
++
++- **Player write fails** → error shown, sheet stays open with the typed values, **`upsertContact`
++  is never called**, `onClose`/`onSaved` never fire.
++- **Contact write fails** → `onSaved` fires (the player really was saved, so the roster must
++  refresh), the sheet **stays open**, and the alert leads with a distinct line: *"The player was
++  saved, but their contact details were not."* followed by the underlying message.
++- **Retry after a contact failure does not insert the player twice.** The id from the first insert
++  is stored in `savedPlayerId` and used on the next submit, so attempt 2 is an `update`. Verified in
++  the browser: writes are `insert players` → `upsert player_contacts` (fails) → `update players
++  {id: p-new}` → `upsert player_contacts`. This is a real bug that the obvious implementation has.
++
++The player payload carries no `phone`/`email` keys at all — asserted by a test.
++
++### Explicit answer: does edit-access imply contact-read-access?
++
++**Yes, for this database, and I verified it against the live policies rather than reasoning from the
++brief alone.**
++
++```
++player_contacts "contact read"  (SELECT) — can_edit_team(...) OR is_own_player(player_id)
++player_contacts "contact edit"  (ALL)    — can_edit_team(...)  [USING and WITH CHECK]
++players         "player edit"   (ALL)    — can_edit_team(team_id)
++```
++
++The read predicate is a strict superset of the edit predicate (`can_edit_team OR X` ⊇
++`can_edit_team`). This form renders only for a user with at least one `canEditTeam` team, and the
++Edit entry point is gated per-player on `canEditTeam(memberships, player.team_id)`. So a user who
++reaches the edit form for a given player necessarily satisfies `can_edit_team` for that player's
++team, and therefore satisfies the contact-read predicate. **There is no case where edit-form access
++exists but the contact read is refused.** A `null` row in this form can therefore only mean "nothing
++recorded yet" — never "withheld" — which is why the fields render blank and editable with nothing
++said about why, and no hint that anything might be missing.
++
++This is a property of the current policies, not of the schema, so I wrote the code not to *depend*
++on it: the two writes are separate and a contact refusal is reported distinctly. If the read policy
++were ever narrowed, the failure mode is a visible error, not silent data loss.
++
++### One thing the brief did not anticipate: a *failed* contact read
++
++The brief covers "null because withheld" vs "null because never entered". There is a third case that
++is the genuinely dangerous one: **the contact read errors** (network, timeout). The fields would sit
++blank, and saving would write those blanks over real details the coach never saw — silent
++destruction of safeguarding data. Handled explicitly:
++
++- While the contact read is **in flight**, the phone/email fields are **not rendered** and the Save
++  button is **disabled**. (Verified in the browser at 250 ms of simulated latency: `player-phone:
++  absent`, save button `disabled: true`, then both present and enabled once it lands. Fields are
++  never rendered-then-repopulated, so there is no keystroke-loss window either.)
++- If the read **fails**, the contact fields stay absent, an amber note says the details couldn't be
++  loaded and that *"Saving will leave them exactly as they are"*, and the contact write is skipped.
++  The player's own fields still save normally.
++
++## Safeguarding review (re-read with fresh eyes, per the brief)
++
++1. **The form's existence is gated, not just its buttons.** `editableTeams.length === 0` returns an
++   explanatory sheet with **no fields at all** — in particular no phone/email boxes. A test asserts
++   `queryByLabelText('Phone')` and `('Email')` are both absent for a parent. An editable phone box
++   for a player whose contact row RLS withholds would be exactly the leak `player_contacts` exists
++   to prevent.
++2. **A refused form issues no contact read.** The prefill effect returns early when `gated`, so a
++   user who shouldn't be here never causes a `player_contacts` query. Test:
++   `expect(getPlayerContactMock).not.toHaveBeenCalled()`.
++3. **The footer sits outside `ContactBlock`, and that difference is deliberate.** `Call`/`Email`
++   expose the contact data itself and must vanish with it (Task 12's rule, unchanged). `Edit`/
++   `Delete` are about the player record and are governed by squad edit rights alone. If footer
++   visibility depended on whether a contact row came back, the footer would become a way to infer
++   that withheld details exist. Documented in the file.
++4. **Nothing hints at absence.** Browser check on the stub's null-contact player:
++   `alerts: []`, `mentionsHidden: false`, both fields present, blank and enabled.
++5. **`PlayerDetail`'s read-side contract is untouched** — I added a footer below `ContactBlock` and
++   changed nothing inside it; `roster.test.jsx` (39 tests, including the Task 12 second-round
++   fixes) still passes unmodified.
++6. **The delete confirm names the consequence**: "Remove this player? Their contact details go too,
++   and this can't be undone." The cascade is not hidden from the user.
++
++## TDD evidence
++
++**RED — data layer** (`upsertPlayer`/`deletePlayer`/`upsertContact` written as tests first):
++
++```
++$ npx vitest run tests/data.test.js
++TypeError: upsertContact is not a function
++ Test Files  1 failed (1)
++      Tests  17 failed | 34 passed (51)
++```
++
++**GREEN — data layer:**
++
++```
++$ npx vitest run tests/data.test.js
++ ✓ tests/data.test.js (51 tests) 45ms
++ Test Files  1 passed (1)   Tests  51 passed (51)
++```
++
++**RED — form** (`tests/player-form.test.jsx` written before `PlayerForm.jsx` existed):
++
++```
++$ npx vitest run tests/player-form.test.jsx
++ FAIL  tests/player-form.test.jsx [ tests/player-form.test.jsx ]
++ Failed to resolve import "../src/screens/PlayerForm.jsx"
++ Test Files  1 failed (1)   Tests  no tests
++```
++
++**GREEN — form:**
++
++```
++$ npx vitest run tests/player-form.test.jsx
++ ✓ tests/player-form.test.jsx (40 tests) 2413ms
++ Test Files  1 passed (1)   Tests  40 passed (40)
++```
++
++An intermediate GREEN run emitted two `not wrapped in act(...)` warnings from the two
++pending-promise tests. Fixed by settling the in-flight save before the test ends (the same
++`release()` + `waitFor(onClose)` pattern Task 14 uses and documents). Output is now silent.
++
++**Full suite:**
++
++```
++$ npm test
++ Test Files  18 passed (18)
++      Tests  444 passed (444)
++```
++
++Baseline was 387 across 17 files. +57 (17 data, 40 form), +1 file. Nothing regressed —
++`roster.test.jsx` still 39, `event-form.test.jsx` still 34.
++
++**Build:**
++
++```
++$ npm run build
++ ✓ 107 modules transformed.
++ ✓ built in 2.51s
++```
++
++## What I tested
++
++Unit (40 in `tests/player-form.test.jsx`, 17 added to `tests/data.test.js`), all with the data
++modules and `useMemberships` mocked — no network is reachable from either file:
++
++- Shape/scoping: add vs edit title; dropdown limited to `canEditTeam` teams for a coach; every team
++  in sort order for an admin; the gated no-editable-team branch (no Save, no Age group, **no Phone,
++  no Email**); no contact read for a gated form; no jersey field; the §7 position enum plus a
++  "Not set" option.
++- Validation: empty name blocks submit with `role="alert"` + `aria-invalid`, and issues **neither**
++  write; whitespace-only name treated as empty.
++- Saving new: trimmed name/position/squad/captaincy; `null` position not `''`; blank-both skips the
++  contact write; contact keyed on the id the insert returned; player-then-contact ordering asserted
++  on a recorded call order, with no contact columns in the player payload; trimming.
++- Editing: player prefill + update by id; contact prefill; "no contact on file" → blank editable
++  fields with nothing said; skip when nothing to write; **nulls written when an existing contact is
++  cleared**; Save disabled while the prefill is in flight; a failed prefill never overwrites.
++- Failures: player-write failure keeps the form open and skips the contact write; contact failure
++  reported as a contact failure with the "player was saved" framing; retry does not double-insert;
++  disabled while saving; double-click submits once; no keystroke loss.
++- Wiring: Roster "Add player" for a coach, absent for a parent, opens empty, reloads after save;
++  PlayerDetail Edit/Delete for a coach, read-only note for a parent, edit prefilled, two-step
++  confirm, delete + close, delete failure surfaced.
++
++## Browser check
++
++`harness/shoot-t15-verify.mjs` (new), 8 scenarios × 2 viewports (375×812, 1280×900), real Chromium,
++real keystrokes. Full output in `screenshots/task15-verify/report.json`.
++
++| Check | 375px | 1280px |
++|---|---|---|
++| Character loss typing name / phone / email (real keystrokes, 18 ms) | 0 / 0 / 0 | 0 / 0 / 0 |
++| Focus after typing | stays in `player-email` | same |
++| Jersey text anywhere | `false` | `false` |
++| Horizontal overflow / `docWidth` vs `innerWidth` | none / 375 = 375 | none / 1280 = 1280 |
++| Smallest text colour | `12.5px rgb(92,88,84)` = `#5c5854` | same |
++| Segmented options aligned (same y, same height) | y 694, 42px both | y 677, 42px both |
++| Footer Edit/Delete aligned | y 754, 42px both | y 728, 42px both |
++| Native `confirm()` dialogs | 0 | 0 |
++| Console errors | none (only the pre-existing React Router v7 future-flag warnings) | same |
++
++Behavioural results (identical at both breakpoints):
++
++- **New player + contact** → exactly two writes, in order:
++  `insert players {club_id, team_id, full_name, position: null, is_captain: false}` then
++  `upsert player_contacts {player_id: 'p-new', phone, email}`. Sheet closes.
++- **Validation** → alert rendered `484×40 visible`, `player-name` bordered `rgb(142,21,38)`,
++  **zero writes**.
++- **Blank-both contact** → one write only (`insert players`). No contact row.
++- **Edit prefill under 250 ms latency** → while loading: `player-phone: absent`, `player-email:
++  absent`, Save `disabled: true`. After: both present, populated from the contact row, Save enabled.
++- **Clearing both contact fields** → `update players` + `upsert player_contacts {phone: null,
++  email: null}`.
++- **Player with no contact on file** → fields present, blank, enabled; `alerts: []`;
++  `mentionsHidden: false`; saving writes only the player row.
++- **Contact write refused** (`?contactFail=1`) → sheet stays open, typed values intact, alert reads
++  "The player was saved, but their contact details were not. / We couldn't save the contact
++  details…". Retry produces `update players {id: 'p-new'}`, **not** a second insert.
++- **Delete** → two clicks (Delete → Yes, delete), zero writes after the first click, zero native
++  dialogs, one `delete players p1`, sheet closes.
++- **Parent** → `addPlayerButtons: 0`, no footer buttons, read-only note present.
++
++Screenshots: `screenshots/task15-verify/{mobile,desktop}-*.png`.
++
++`Sheet`'s stale-`onClose` latest-ref fix holds — `Roster` passes an inline arrow `onClose` that gets
++a fresh identity on every keystroke, and typing 18 characters into three fields lost nothing and
++never lost focus. The bug shape was not reintroduced: no caller-supplied callback appears in any
++`useEffect` dependency array whose cleanup touches focus.
++
++## Files changed
++
++- `src/data/players.js` — added `upsertPlayer`, `deletePlayer`, `upsertContact` + refusal constants.
++- `src/screens/PlayerForm.jsx` — **new**.
++- `src/screens/PlayerDetail.jsx` — added `canEdit`/`onEdit`/`onDeleted` props and `FooterActions`.
++- `src/screens/Roster.jsx` — "Add player" in the section head, `formState`, `canEditSelected`,
++  `refresh`, wired `PlayerDetail` + `PlayerForm`.
++- `tests/data.test.js` — `upsert` chain method on the mock builder + 17 new tests.
++- `tests/player-form.test.jsx` — **new**, 40 tests.
++- `harness/shoot-t15-verify.mjs` — **new** verification script.
++- `harness/stubs/players.js` — write stubs recording payloads on `window.__writes`, `?contactFail=1`.
++- `harness/main.jsx` — added the `roster-parent` scenario.
++
++## Self-review findings
++
++- **Completeness** — every brief checkbox covered, plus the failed-contact-read case the brief did
++  not name (see above).
++- **YAGNI** — no availability/RSVP work (Task 16). `POSITIONS` is kept local to `PlayerForm` rather
++  than shared with `Roster`'s `FORWARDS`/`BACKS`: those are a *grouping* rule that must handle
++  positions outside this list, not a list of choices. Merging them would couple two coincidentally
++  similar things. Noted in a comment.
++- **Naming** — `upsertPlayer`/`deletePlayer` mirror `upsertEvent`/`deleteEvent`; `upsertContact`
++  reads as the natural-key upsert it is.
++- **Real behaviour** — the tests assert recorded call payloads and ordering, not just return values;
++  the two-writes contract, the retry-no-double-insert case and the blank-vs-cleared distinction are
++  all behavioural.
++- **Pristine output** — no `act()` warnings, no console errors, clean build.
++- **Duplication I accepted**: `LABEL`/`FIELD`/`INPUT_BASE`/`Segmented` and `FOOTER_BUTTON` are now
++  each in two files. Task 12 set the precedent ("two small copies is not yet a pattern") and said to
++  extract on the third. A third form would be the trigger; there isn't one in the v1 plan.
++
++## Concerns
++
++None blocking. Two things worth flagging for later:
++
++1. `upsertContact` uses `.upsert()`, which under RLS needs **both** the INSERT and UPDATE arms of
++   the policy to permit the row. `"contact edit"` is `ALL`, so both are covered today. If that
++   policy is ever split into separate INSERT/UPDATE policies, an upsert could be refused where an
++   update alone would succeed. It would surface as a visible, correctly-worded error, not as silent
++   loss — but it's a coupling worth knowing about.
++2. The contact fields have no format validation (any string goes to `phone`/`email`). That matches
++   the design system, which specifies plain text inputs, and matches the schema (both nullable
++   `text`). The Wild Apricot import will need normalising anyway; validating here first would just
++   mean two competing rules.
+diff --git a/harness/main.jsx b/harness/main.jsx
+index 8e7c4d7..7e45c46 100644
+--- a/harness/main.jsx
++++ b/harness/main.jsx
+@@ -174,20 +174,22 @@ const scenarios = {
+   // Coach of exactly one squad, in a club of 15. Independent verification.
+   'schedule-one-team': scheduleScenario(COACH_ONE_TEAM, TEAMS_15),
+   'schedule-admin-15': scheduleScenario(ADMIN_MEMBERSHIPS, TEAMS_15),
+ 
+   // Task 12 Roster screens. Search text, pill selection and the PlayerDetail
+   // sheet are real component state, so Playwright drives them by typing and
+   // clicking (see shoot-roster.mjs).
+   roster: rosterScenario(COACH_MEMBERSHIPS),
+   'roster-one-team': rosterScenario(COACH_ONE_TEAM),
+   'roster-admin': rosterScenario(ADMIN_MEMBERSHIPS),
++  // Task 15: the read-only side of the new Add/Edit/Delete affordances.
++  'roster-parent': rosterScenario(PARENT_MEMBERSHIPS),
+ 
+   // Independent verification pass: three age groups in scope.
+   'roster-three': rosterScenario(COACH_THREE_MEMBERSHIPS, TEAMS_THREE),
+ 
+   dashboard: dashboardScenario(COACH_MEMBERSHIPS),
+   'dashboard-admin': dashboardScenario(ADMIN_MEMBERSHIPS),
+   'dashboard-parent': dashboardScenario(PARENT_MEMBERSHIPS),
+ 
+   'shell-loading': () => (
+     <Shell
+diff --git a/harness/shoot-t15-verify.mjs b/harness/shoot-t15-verify.mjs
+new file mode 100644
+index 0000000..2fad0a7
+--- /dev/null
++++ b/harness/shoot-t15-verify.mjs
+@@ -0,0 +1,377 @@
++// INDEPENDENT controller-side verification of Task 15 (PlayerForm /
++// PlayerDetail footer / Roster "Add player"). Types with real keystrokes and
++// measures character loss, checks the two-writes-not-one contract on the
++// recorded payloads, checks the blank-both and prefill contact cases, counts
++// clicks needed for delete, and reads back contrast/overflow/layout.
++
++import { loadChromium } from './playwright.mjs'
++import path from 'node:path'
++import { fileURLToPath } from 'node:url'
++import fs from 'node:fs'
++
++const __dirname = path.dirname(fileURLToPath(import.meta.url))
++const outDir = path.resolve(__dirname, '../screenshots/task15-verify')
++fs.mkdirSync(outDir, { recursive: true })
++const BASE = 'http://localhost:5199'
++
++const viewports = [
++  { name: 'mobile', width: 375, height: 812 },
++  { name: 'desktop', width: 1280, height: 900 },
++]
++
++const log = []
++const note = (o) => log.push(o)
++
++// Inlined inside probe() below rather than closed over: page.evaluate
++// serialises the function, so an outer-scope constant would be undefined in
++// the page.
++
++const probe = () => ({
++  innerWidth: window.innerWidth,
++  docWidth: document.documentElement.scrollWidth,
++  overflow: [...document.querySelectorAll('*')]
++    .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1)
++    .slice(0, 5)
++    .map((el) => `${el.tagName}.${String(el.className).slice(0, 60)}`),
++  fields: Object.fromEntries(
++    ['player-name', 'player-position', 'player-team', 'player-phone', 'player-email'].map((id) => [id, document.getElementById(id) ? document.getElementById(id).value : null]),
++  ),
++  present: Object.fromEntries(
++    ['player-name', 'player-position', 'player-team', 'player-phone', 'player-email'].map((id) => {
++      const el = document.getElementById(id)
++      if (!el) return [id, 'absent']
++      const r = el.getBoundingClientRect()
++      const cs = getComputedStyle(el)
++      return [id, `present ${Math.round(r.width)}x${Math.round(r.height)} vis=${cs.visibility} disp=${cs.display} op=${cs.opacity}`]
++    }),
++  ),
++  jerseyAnywhere: /jersey|shirt number|squad number/i.test(document.body.innerText),
++  teamOptions: [...(document.getElementById('player-team')?.options ?? [])].map((o) => o.text),
++  positionOptions: [...(document.getElementById('player-position')?.options ?? [])].map((o) => o.text),
++  saveButton: (() => {
++    const b = [...document.querySelectorAll('[role="dialog"] button[type="submit"]')][0]
++    if (!b) return null
++    const r = b.getBoundingClientRect()
++    const cs = getComputedStyle(b)
++    return { text: b.textContent.trim(), disabled: b.disabled, w: Math.round(r.width), h: Math.round(r.height), color: cs.color, bg: cs.backgroundColor }
++  })(),
++  activeId: document.activeElement?.id || document.activeElement?.tagName,
++  alerts: [...document.querySelectorAll('[role="dialog"] [role="alert"]')].map((el) => {
++    const r = el.getBoundingClientRect()
++    const cs = getComputedStyle(el)
++    return { text: el.textContent.trim().slice(0, 160), w: Math.round(r.width), h: Math.round(r.height), vis: cs.visibility, disp: cs.display, color: cs.color, bg: cs.backgroundColor }
++  }),
++  invalidFields: [...document.querySelectorAll('[role="dialog"] [aria-invalid="true"]')].map((el) => ({
++    id: el.id,
++    border: getComputedStyle(el).borderTopColor,
++  })),
++  segs: [...document.querySelectorAll('[role="dialog"] fieldset label > span')].map((el) => {
++    const r = el.getBoundingClientRect()
++    return { text: el.textContent.trim(), x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), color: getComputedStyle(el).color, bg: getComputedStyle(el).backgroundColor }
++  }),
++  smallTextColors: [
++    ...new Set(
++      [...document.querySelectorAll('[role="dialog"] label, [role="dialog"] legend, [role="dialog"] p')].map(
++        (el) => `${getComputedStyle(el).fontSize} ${getComputedStyle(el).color}`,
++      ),
++    ),
++  ],
++  dialogBox: (() => {
++    const d = document.querySelector('[role="dialog"]')
++    if (!d) return null
++    const r = d.getBoundingClientRect()
++    return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), scrollH: d.scrollHeight }
++  })(),
++  footerButtons: [...document.querySelectorAll('[role="dialog"] button')]
++    .map((b) => {
++      const r = b.getBoundingClientRect()
++      return { text: b.textContent.trim().slice(0, 24), x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }
++    })
++    .filter((b) => b.text && b.text !== ''),
++  writes: window.__writes ?? [],
++  nativeDialogs: window.__nativeDialogs ?? [],
++})
++
++const shot = async (page, name) => {
++  const p = path.join(outDir, `${name}.png`)
++  await page.screenshot({ path: p })
++  return p
++}
++
++const chromium = await loadChromium()
++const browser = await chromium.launch()
++
++async function newPage(vp, query) {
++  const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } })
++  const consoleMsgs = []
++  page.on('console', (m) => {
++    if (m.type() === 'error' || m.type() === 'warning') consoleMsgs.push(`${m.type()}: ${m.text()}`)
++  })
++  page.on('pageerror', (e) => consoleMsgs.push(`pageerror: ${e.message}`))
++  page.on('dialog', async (d) => {
++    await page
++      .evaluate((t) => {
++        window.__nativeDialogs = (window.__nativeDialogs || []).concat(t)
++      }, `${d.type()}: ${d.message()}`)
++      .catch(() => {})
++    await d.dismiss().catch(() => {})
++  })
++  await page.goto(`${BASE}/${query}`, { waitUntil: 'networkidle' })
++  await page.waitForTimeout(300)
++  return { page, consoleMsgs }
++}
++
++// The roster scenarios render Roster directly inside AppShell at /roster, so
++// there is no tab to click — the screen is already up.
++const gotoRoster = async (page) => {
++  await page.getByRole('heading', { name: /Roster & members/ }).waitFor()
++}
++
++for (const vp of viewports) {
++  // ---- 1: empty create form, real keystroke typing ----
++  {
++    const { page, consoleMsgs } = await newPage(vp, '?scenario=roster')
++    await gotoRoster(page)
++    await page.getByRole('button', { name: 'Add player' }).click()
++    await page.getByRole('dialog').waitFor()
++    await page.waitForTimeout(400)
++
++    const NAME = 'Faisal Al Mansoori'
++    const PHONE = '+971 50 200 1000'
++    const EMAIL = 'guardian@example.com'
++    await page.locator('#player-name').click()
++    await page.keyboard.type(NAME, { delay: 18 })
++    await page.locator('#player-phone').click()
++    await page.keyboard.type(PHONE, { delay: 18 })
++    await page.locator('#player-email').click()
++    await page.keyboard.type(EMAIL, { delay: 18 })
++
++    const typed = await page.evaluate(probe)
++    note({
++      vp: vp.name,
++      case: '1-add-typing',
++      shot: await shot(page, `${vp.name}-1-add-typed`),
++      expectedName: NAME,
++      gotName: typed.fields['player-name'],
++      nameLoss: NAME.length - (typed.fields['player-name'] || '').length,
++      expectedPhone: PHONE,
++      gotPhone: typed.fields['player-phone'],
++      phoneLoss: PHONE.length - (typed.fields['player-phone'] || '').length,
++      expectedEmail: EMAIL,
++      gotEmail: typed.fields['player-email'],
++      emailLoss: EMAIL.length - (typed.fields['player-email'] || '').length,
++      focusAfterTyping: typed.activeId,
++      jerseyAnywhere: typed.jerseyAnywhere,
++      teamOptions: typed.teamOptions,
++      positionOptions: typed.positionOptions,
++      saveButton: typed.saveButton,
++      segs: typed.segs,
++      smallTextColors: typed.smallTextColors,
++      overflow: typed.overflow,
++      docWidth: typed.docWidth,
++      innerWidth: typed.innerWidth,
++      dialogBox: typed.dialogBox,
++      console: consoleMsgs,
++    })
++
++    await page.getByRole('dialog').getByRole('button', { name: 'Add player' }).click()
++    await page.waitForTimeout(500)
++    const after = await page.evaluate(probe)
++    note({ vp: vp.name, case: '1b-add-submitted', writes: after.writes, sheetStillOpen: Boolean(after.dialogBox), console: consoleMsgs })
++    await page.close()
++  }
++
++  // ---- 2: validation blocks submit ----
++  {
++    const { page, consoleMsgs } = await newPage(vp, '?scenario=roster')
++    await gotoRoster(page)
++    await page.getByRole('button', { name: 'Add player' }).click()
++    await page.getByRole('dialog').waitFor()
++    await page.getByRole('dialog').getByRole('button', { name: 'Add player' }).click()
++    await page.waitForTimeout(300)
++    const p = await page.evaluate(probe)
++    note({
++      vp: vp.name,
++      case: '2-validation',
++      shot: await shot(page, `${vp.name}-2-validation`),
++      alerts: p.alerts,
++      invalidFields: p.invalidFields,
++      writes: p.writes,
++      console: consoleMsgs,
++    })
++    await page.close()
++  }
++
++  // ---- 3: blank-both contact on a new player writes NO contact row ----
++  {
++    const { page, consoleMsgs } = await newPage(vp, '?scenario=roster')
++    await gotoRoster(page)
++    await page.getByRole('button', { name: 'Add player' }).click()
++    await page.getByRole('dialog').waitFor()
++    await page.locator('#player-name').click()
++    await page.keyboard.type('Nathan Cole', { delay: 12 })
++    await page.getByRole('dialog').getByRole('button', { name: 'Add player' }).click()
++    await page.waitForTimeout(500)
++    const p = await page.evaluate(probe)
++    note({ vp: vp.name, case: '3-blank-contact', writes: p.writes, console: consoleMsgs })
++    await page.close()
++  }
++
++  // ---- 4: edit prefills BOTH tables; clearing contact writes nulls ----
++  {
++    const { page, consoleMsgs } = await newPage(vp, '?scenario=roster&contactDelay=250')
++    await gotoRoster(page)
++    await page.getByRole('button', { name: /Aaron Whitfield/ }).click()
++    await page.getByRole('dialog').waitFor()
++    await page.getByRole('dialog').getByRole('button', { name: 'Edit' }).click()
++    await page.waitForTimeout(80)
++    const loading = await page.evaluate(probe)
++    await page.waitForTimeout(600)
++    const ready = await page.evaluate(probe)
++    note({
++      vp: vp.name,
++      case: '4-edit-prefill',
++      shot: await shot(page, `${vp.name}-4-edit-prefill`),
++      whileContactLoading: { saveButton: loading.saveButton, present: loading.present },
++      afterContactLoaded: { saveButton: ready.saveButton, fields: ready.fields },
++      console: consoleMsgs,
++    })
++
++    await page.locator('#player-phone').fill('')
++    await page.locator('#player-email').fill('')
++    await page.getByRole('dialog').getByRole('button', { name: 'Save changes' }).click()
++    await page.waitForTimeout(500)
++    const cleared = await page.evaluate(probe)
++    note({ vp: vp.name, case: '4b-clear-contact', writes: cleared.writes, console: consoleMsgs })
++    await page.close()
++  }
++
++  // ---- 5: player with NO contact on file -> blank editable fields, no hint ----
++  {
++    const { page, consoleMsgs } = await newPage(vp, '?scenario=roster')
++    await gotoRoster(page)
++    // p4 (Dhruv Ramachandran) is the stub's null-contact player.
++    await page.getByRole('button', { name: /Dhruv Ramachandran/ }).click()
++    await page.getByRole('dialog').waitFor()
++    await page.getByRole('dialog').getByRole('button', { name: 'Edit' }).click()
++    await page.waitForTimeout(500)
++    const p = await page.evaluate(probe)
++    const bodyText = await page.evaluate(() => document.querySelector('[role="dialog"]').innerText)
++    note({
++      vp: vp.name,
++      case: '5-no-contact-on-file',
++      shot: await shot(page, `${vp.name}-5-no-contact`),
++      fields: p.fields,
++      present: p.present,
++      alerts: p.alerts,
++      mentionsHidden: /hidden|withheld|not permitted|no permission/i.test(bodyText),
++      console: consoleMsgs,
++    })
++    await page.getByRole('dialog').getByRole('button', { name: 'Save changes' }).click()
++    await page.waitForTimeout(400)
++    const after = await page.evaluate(probe)
++    note({ vp: vp.name, case: '5b-no-contact-save', writes: after.writes })
++    await page.close()
++  }
++
++  // ---- 6: contact write refused -> distinct message, sheet stays open ----
++  {
++    const { page, consoleMsgs } = await newPage(vp, '?scenario=roster&contactFail=1')
++    await gotoRoster(page)
++    await page.getByRole('button', { name: 'Add player' }).click()
++    await page.getByRole('dialog').waitFor()
++    await page.locator('#player-name').click()
++    await page.keyboard.type('Tom Fletcher', { delay: 12 })
++    await page.locator('#player-phone').click()
++    await page.keyboard.type('+971 50 111 2222', { delay: 12 })
++    await page.getByRole('dialog').getByRole('button', { name: 'Add player' }).click()
++    await page.waitForTimeout(600)
++    const p = await page.evaluate(probe)
++    note({
++      vp: vp.name,
++      case: '6-contact-refused',
++      shot: await shot(page, `${vp.name}-6-contact-refused`),
++      alerts: p.alerts,
++      writes: p.writes,
++      sheetStillOpen: Boolean(p.dialogBox),
++      typedValuesKept: p.fields,
++      console: consoleMsgs,
++    })
++    // Retry: must UPDATE the player, not insert a second one.
++    await page.getByRole('dialog').getByRole('button', { name: 'Add player' }).click()
++    await page.waitForTimeout(600)
++    const retry = await page.evaluate(probe)
++    note({ vp: vp.name, case: '6b-retry', writes: retry.writes })
++    await page.close()
++  }
++
++  // ---- 7: PlayerDetail footer, two-step delete, no native confirm ----
++  {
++    const { page, consoleMsgs } = await newPage(vp, '?scenario=roster')
++    await gotoRoster(page)
++    await page.getByRole('button', { name: /Aaron Whitfield/ }).click()
++    await page.getByRole('dialog').waitFor()
++    await page.waitForTimeout(400)
++    const detail = await page.evaluate(probe)
++    note({
++      vp: vp.name,
++      case: '7-detail-footer',
++      shot: await shot(page, `${vp.name}-7-detail-footer`),
++      buttons: detail.footerButtons,
++      overflow: detail.overflow,
++      dialogBox: detail.dialogBox,
++    })
++
++    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
++    await page.waitForTimeout(300)
++    const confirming = await page.evaluate(probe)
++    note({
++      vp: vp.name,
++      case: '7b-confirm',
++      shot: await shot(page, `${vp.name}-7b-confirm`),
++      buttons: confirming.footerButtons,
++      writesBeforeConfirm: confirming.writes,
++      nativeDialogs: confirming.nativeDialogs,
++    })
++
++    await page.getByRole('button', { name: 'Yes, delete' }).click()
++    await page.waitForTimeout(500)
++    const deleted = await page.evaluate(probe)
++    note({
++      vp: vp.name,
++      case: '7c-deleted',
++      writes: deleted.writes,
++      sheetClosed: !deleted.dialogBox,
++      nativeDialogs: deleted.nativeDialogs,
++      console: consoleMsgs,
++    })
++    await page.close()
++  }
++
++  // ---- 8: parent sees no Add player and no footer buttons ----
++  {
++    const { page, consoleMsgs } = await newPage(vp, '?scenario=roster-parent')
++    await gotoRoster(page)
++    await page.waitForTimeout(300)
++    const addCount = await page.getByRole('button', { name: 'Add player' }).count()
++    await page.getByRole('button', { name: /Aaron Whitfield/ }).click()
++    await page.getByRole('dialog').waitFor()
++    await page.waitForTimeout(400)
++    const p = await page.evaluate(probe)
++    const bodyText = await page.evaluate(() => document.querySelector('[role="dialog"]').innerText)
++    note({
++      vp: vp.name,
++      case: '8-parent',
++      shot: await shot(page, `${vp.name}-8-parent`),
++      addPlayerButtons: addCount,
++      buttons: p.footerButtons,
++      readOnlyNote: /read-only/i.test(bodyText),
++      console: consoleMsgs,
++    })
++    await page.close()
++  }
++}
++
++await browser.close()
++fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(log, null, 2))
++console.log(JSON.stringify(log, null, 2))
+diff --git a/harness/stubs/players.js b/harness/stubs/players.js
+index 5c8ebe9..e462618 100644
+--- a/harness/stubs/players.js
++++ b/harness/stubs/players.js
+@@ -85,10 +85,38 @@ export async function getPlayerContact(playerId) {
+   // p4 stands in for the RLS-withheld case: a parent asking about a player
+   // they aren't linked to gets no row back, and the sheet must show nothing
+   // at all about contact details.
+   if (playerId === 'p4') return null
+   return {
+     player_id: playerId,
+     phone: '+971 50 200 1000',
+     email: `${playerId}.guardian@example.com`,
+   }
+ }
++
++// Task 15 writes. No network and no Supabase: each call records its payload
++// on window so the browser check can assert what the form ACTUALLY built —
++// in particular that the player write and the contact write are two separate
++// statements, and that a blank-both contact is skipped rather than written as
++// an empty row. ?contactFail=1 makes the contact write reject, so the
++// partial-failure path (player saved, contact not) is screenshot-able.
++const CONTACT_FAIL = new URLSearchParams(window.location.search).get('contactFail') === '1'
++
++export async function upsertPlayer(player) {
++  window.__writes = window.__writes || []
++  window.__writes.push({ op: player?.id ? 'update' : 'insert', table: 'players', payload: player })
++  return { id: player?.id ?? 'p-new', ...player }
++}
++
++export async function deletePlayer(id) {
++  window.__writes = window.__writes || []
++  window.__writes.push({ op: 'delete', table: 'players', id })
++}
++
++export async function upsertContact(contact) {
++  window.__writes = window.__writes || []
++  window.__writes.push({ op: 'upsert', table: 'player_contacts', payload: contact })
++  if (CONTACT_FAIL) {
++    throw new Error("We couldn't save the contact details. You may not have permission to change them.")
++  }
++  return { ...contact }
++}
+diff --git a/src/data/players.js b/src/data/players.js
+index ae8ecff..a33e668 100644
+--- a/src/data/players.js
++++ b/src/data/players.js
+@@ -38,10 +38,105 @@ export async function listPlayers({ teamIds } = {}) {
+  */
+ export async function getPlayerContact(playerId) {
+   const { data, error } = await supabase
+     .from('player_contacts')
+     .select('*')
+     .eq('player_id', playerId)
+     .maybeSingle()
+   if (error) throw error
+   return data ?? null
+ }
++
++// A write the database refused is not an error as far as PostgREST is
++// concerned: RLS filters the row out, the statement affects zero rows, and
++// the response is a perfectly successful "nothing". Every writer below asks
++// for the affected row back and treats "no row" as a refusal, so the form
++// shows a real message instead of a false "Saved" — the same mechanism
++// src/data/events.js uses, and for the same reason. It is a *reporting*
++// mechanism, not access control: the players table's "player edit" policy
++// and player_contacts' "contact edit" policy (both ALL, USING and WITH CHECK
++// `can_edit_team(...)`) are what actually decide, server-side.
++//
++// The two messages are deliberately different. players and player_contacts
++// are separate tables behind separate policies, and the whole reason this
++// module keeps them separate is that a contact refusal must never be
++// reported as — or silently folded into — a player save.
++const REFUSED_PLAYER =
++  "We couldn't save that player. You may not have permission to change this squad."
++const REFUSED_PLAYER_DELETE =
++  "We couldn't delete that player. You may not have permission to change this squad."
++// Says nothing about the player write: this module does not know whether one
++// happened. Framing the failure ("the player saved, the contact didn't") is
++// PlayerForm's job, because only the form knows what it did first.
++const REFUSED_CONTACT =
++  "We couldn't save the contact details. You may not have permission to change them."
++
++/**
++ * Creates or updates one player. Inserts when `player` has no id, updates the
++ * matching row when it has one — the id is used only as the filter and is
++ * never sent as a column either way. Returns the saved row, which is how a
++ * caller learns a newly-inserted player's id (upsertContact needs it).
++ *
++ * There is deliberately no jersey_num here: the club does not use squad
++ * numbers (see src/lib/playerFormat.js). The column stays in the schema and
++ * nothing writes it.
++ */
++export async function upsertPlayer(player) {
++  const { id, ...fields } = player ?? {}
++
++  const query = id
++    ? supabase.from('players').update(fields).eq('id', id).select().maybeSingle()
++    : supabase.from('players').insert(fields).select().maybeSingle()
++
++  const { data, error } = await query
++  if (error) throw error
++  if (!data) throw new Error(REFUSED_PLAYER)
++  return data
++}
++
++/**
++ * Deletes one player by id. Resolves with nothing on success and throws when
++ * the delete failed or removed nothing.
++ *
++ * Only the players row is deleted: player_contacts.player_id is a foreign key
++ * declared ON DELETE CASCADE, so the contact row goes with it, atomically and
++ * server-side. Issuing a second client-side delete would add a failure mode
++ * the database does not have (contact deleted, player left behind).
++ */
++export async function deletePlayer(id) {
++  const { data, error } = await supabase.from('players').delete().eq('id', id).select()
++  if (error) throw error
++  if (!data || data.length === 0) throw new Error(REFUSED_PLAYER_DELETE)
++}
++
++/**
++ * Creates or updates one player's contact row. Returns the saved row.
++ *
++ * player_id is player_contacts' PRIMARY KEY, so this is a genuine ON CONFLICT
++ * upsert rather than the id-present/id-absent branch upsertPlayer uses: a
++ * single statement, with no select-then-insert-or-update window in which two
++ * coaches editing the same player could both decide "no row exists" and race
++ * to insert. The conflict target is named explicitly rather than left to
++ * PostgREST's primary-key inference, so this keeps updating in place if the
++ * table ever gains a second unique constraint.
++ *
++ * Nulls are written through, not skipped — clearing a wrong phone number has
++ * to actually clear it. Deciding whether there is anything worth writing at
++ * all is the caller's job (see src/screens/PlayerForm.jsx), not this
++ * function's.
++ */
++export async function upsertContact(contact) {
++  const { player_id: playerId, phone = null, email = null } = contact ?? {}
++  // Without a key this would insert an orphan row (or fail obscurely at the
++  // NOT NULL constraint); refuse before touching the network.
++  if (!playerId) throw new Error('upsertContact needs a player_id.')
++
++  const { data, error } = await supabase
++    .from('player_contacts')
++    .upsert({ player_id: playerId, phone, email }, { onConflict: 'player_id' })
++    .select()
++    .maybeSingle()
++
++  if (error) throw error
++  if (!data) throw new Error(REFUSED_CONTACT)
++  return data
++}
+diff --git a/src/screens/PlayerDetail.jsx b/src/screens/PlayerDetail.jsx
+index 7995c1b..37c9c01 100644
+--- a/src/screens/PlayerDetail.jsx
++++ b/src/screens/PlayerDetail.jsx
+@@ -1,33 +1,46 @@
+ import { useEffect, useState } from 'react'
+ import Sheet from '../components/Sheet.jsx'
+-import { getPlayerContact } from '../data/players.js'
++import ScopeNote from '../components/ScopeNote.jsx'
++import { deletePlayer, getPlayerContact } from '../data/players.js'
+ import { initials } from '../lib/playerFormat.js'
+ 
+ // The player detail sheet (design-system.md §5.7): a branded hero carrying
+ // the player's initials, a set of key/value rows, and — only when the database
+ // actually returns one — a contact block. Mounted only while a player is
+ // selected (Roster renders it conditionally), so there is no `open` prop to
+ // thread through and no hidden-but-present DOM.
+ //
+ // Safeguarding, and the single most important rule in this file: a null
+ // contact row is the NORMAL outcome for a parent. player_contacts exists as
+ // a separate table precisely so RLS can withhold it, including for minors.
+ // So a null row renders *nothing*: no error, and no "contact details are
+ // hidden" note either — such a note would confirm to someone who may not see
+ // the data that there is data to see. The prototype showed a parent a lock
+ // message here (design-system.md §5.7); that is the one place this screen
+ // deliberately departs from it.
+ //
+-// Edit/Delete actions are deliberately absent: Task 15 owns player writes.
+-// Adding a disabled affordance now would promise a control that doesn't
+-// exist yet.
++// Footer actions (design-system.md §5.7, Task 15): Edit + Delete for a user
++// who can edit this player's squad, a read-only scope note for everyone else.
++// Delete is two-step — the confirm replaces the buttons in place rather than
++// using a native confirm(), which is unstyled, unannounced and untestable in
++// the browser check. `canEdit` is passed in rather than computed here: this
++// component stays presentational and Roster already holds memberships (the
++// same split ScopeNote and EventDetail use).
++//
++// The footer sits OUTSIDE ContactBlock, unlike the Call/Email row which sits
++// inside it. That difference is deliberate and safeguarding-relevant: Call
++// and Email expose the contact data itself, so they must vanish with it,
++// whereas Edit/Delete are about the player record and are governed by squad
++// edit rights alone. Whether a contact row came back is never allowed to
++// change what the footer shows — if it did, the footer would become a way to
++// infer that withheld details exist.
+ 
+ // design-system.md §4.22 (.kv). Duplicated from EventDetail rather than
+ // extracted: the Task 9 shared-primitives set deliberately doesn't include
+ // it, and two small copies is not yet a pattern. If Tasks 14/15's forms need
+ // a third, extract it then.
+ function KeyValue({ label, children }) {
+   return (
+     <div className="flex items-baseline justify-between gap-4 border-b border-[#e6e3e1] py-3 last:border-b-0">
+       <span className="text-[14.5px] font-semibold text-[#77726e]">{label}</span>
+       <span className="text-right text-[14.5px] font-bold text-[#221f1d]">{children}</span>
+@@ -157,21 +170,110 @@ function ContactBlock({ playerId }) {
+           <a href={`mailto:${contact.email}`} className={GHOST_ACTION}>
+             <MailIcon className="h-4 w-4" aria-hidden="true" />
+             Email
+           </a>
+         )}
+       </div>
+     </div>
+   )
+ }
+ 
+-export default function PlayerDetail({ player, team, onClose }) {
++const FOOTER_BUTTON =
++  'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
++
++function FooterActions({ player, canEdit, onEdit, onDeleted }) {
++  const [confirming, setConfirming] = useState(false)
++  const [deleting, setDeleting] = useState(false)
++  const [error, setError] = useState(null)
++
++  if (!canEdit) {
++    return (
++      <div className="mt-5">
++        <ScopeNote tone="parent">
++          <b>Read-only.</b> Only a coach or club admin can change this player.
++        </ScopeNote>
++      </div>
++    )
++  }
++
++  function handleDelete() {
++    setDeleting(true)
++    setError(null)
++    // Only the player row is deleted; player_contacts cascades server-side
++    // (see deletePlayer), so there is no second call to fail halfway.
++    deletePlayer(player.id)
++      .then(() => onDeleted?.(player))
++      .catch((err) => {
++        setError(err)
++        setDeleting(false)
++        setConfirming(false)
++      })
++  }
++
++  return (
++    <div className="mt-5 border-t border-[#e6e3e1] pt-4">
++      {error && (
++        <p
++          role="alert"
++          className="mb-3 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
++        >
++          {error.message || "We couldn't remove that player. Try again."}
++        </p>
++      )}
++
++      {confirming ? (
++        <div>
++          <p className="mb-3 text-sm font-semibold text-[#221f1d]">
++            Remove this player? Their contact details go too, and this can&apos;t be undone.
++          </p>
++          <div className="flex gap-2.5">
++            <button
++              type="button"
++              onClick={() => setConfirming(false)}
++              disabled={deleting}
++              className={`${FOOTER_BUTTON} border-[1.5px] border-[#e6e3e1] bg-white text-[#221f1d] hover:bg-[#faf8fb]`}
++            >
++              Keep them
++            </button>
++            <button
++              type="button"
++              onClick={handleDelete}
++              disabled={deleting}
++              className={`${FOOTER_BUTTON} bg-quinsRedDark text-white hover:bg-quinsRed`}
++            >
++              {deleting ? 'Deleting…' : 'Yes, delete'}
++            </button>
++          </div>
++        </div>
++      ) : (
++        <div className="flex gap-2.5">
++          <button
++            type="button"
++            onClick={() => onEdit?.(player)}
++            className={`${FOOTER_BUTTON} bg-quinsRed text-white hover:bg-[#D62A3D]`}
++          >
++            Edit
++          </button>
++          <button
++            type="button"
++            onClick={() => setConfirming(true)}
++            className={`${FOOTER_BUTTON} border-[1.5px] border-[#e6e3e1] bg-white text-quinsRedDark hover:bg-[#fbeae8]`}
++          >
++            Delete
++          </button>
++        </div>
++      )}
++    </div>
++  )
++}
++
++export default function PlayerDetail({ player, team, onClose, canEdit = false, onEdit, onDeleted }) {
+   const teamName = team?.name ?? 'Not set'
+   const position = player.position || 'Not set'
+ 
+   return (
+     <Sheet open onClose={onClose} title="Player">
+       {/* Negative margins bleed the hero to the sheet's edges, matching the
+           prototype's .detail-hero (design-system.md §4.21). The prototype
+           suffixed a captain's name with "©"; that glyph is announced as
+           "copyright" by screen readers and carries no meaning on its own, so
+           captaincy is stated in the Role row below instead. */}
+@@ -188,13 +290,15 @@ export default function PlayerDetail({ player, team, onClose }) {
+         </p>
+       </div>
+ 
+       <div className="mb-4">
+         <KeyValue label="Position">{position}</KeyValue>
+         <KeyValue label="Age group">{teamName}</KeyValue>
+         <KeyValue label="Role">{player.is_captain ? 'Captain' : 'Player'}</KeyValue>
+       </div>
+ 
+       <ContactBlock playerId={player.id} />
++
++      <FooterActions player={player} canEdit={canEdit} onEdit={onEdit} onDeleted={onDeleted} />
+     </Sheet>
+   )
+ }
+diff --git a/src/screens/PlayerForm.jsx b/src/screens/PlayerForm.jsx
+new file mode 100644
+index 0000000..369b187
+--- /dev/null
++++ b/src/screens/PlayerForm.jsx
+@@ -0,0 +1,479 @@
++import { useEffect, useMemo, useRef, useState } from 'react'
++import Sheet from '../components/Sheet.jsx'
++import { getPlayerContact, upsertContact, upsertPlayer } from '../data/players.js'
++import { useMemberships } from '../lib/memberships.jsx'
++import { canEditTeam, visibleTeams } from '../lib/scope.js'
++
++// The player add/edit form (design-system.md §5.8), opened in the shared
++// Sheet from Roster's "Add player" button and from PlayerDetail's "Edit".
++// Field order is the design system's: full name → position → age group →
++// phone → email → player/captain → Save. There is deliberately NO jersey
++// field: the club does not use squad numbers (see src/lib/playerFormat.js and
++// the §5.8 supersession note).
++//
++// Access control is NOT enforced here. Two RLS policies are the real
++// boundary, and they are separate on purpose:
++//   players.“player edit”          ALL, USING + WITH CHECK can_edit_team(team_id)
++//   player_contacts.“contact edit” ALL, USING + WITH CHECK can_edit_team(via player_id)
++// Everything this screen does with canEditTeam only narrows what it offers,
++// so a mistake here can hide a squad the user may edit but can never let a
++// write through that the database would refuse.
++//
++// SAFEGUARDING — the reason this file is not just EventForm with different
++// labels:
++//
++// 1. Contact details live in their own table behind their own policy, and
++//    this form writes them with their own statement (upsertPlayer, THEN
++//    upsertContact). One combined write would make a refused contact write
++//    indistinguishable from a refused player write, and the natural failure
++//    mode of that conflation is a contact refusal reported as "saved". They
++//    are two calls so a partial failure is reported as a partial failure.
++// 2. The form's EXISTENCE is gated, not just its buttons: a user with no
++//    editable squad gets an explanation and no fields at all — in particular
++//    no phone/email boxes, which for a player whose contact row RLS withholds
++//    would be exactly the leak player_contacts exists to prevent. The same
++//    guard stops the contact read from being issued at all.
++// 3. A null contact row here can only mean "nothing recorded yet", never
++//    "withheld": this form renders only for someone who passes
++//    can_edit_team, and player_contacts' read policy is
++//    `can_edit_team(...) OR is_own_player(...)` — edit access strictly
++//    implies read access. So blank, editable fields are honest, and there is
++//    nothing to hint at. (PlayerDetail's rule — never suggest withheld data
++//    exists — is about a screen parents can reach; this one they cannot.)
++// 4. A contact read that FAILED is different again, and is the one case that
++//    could destroy data: blank fields written back would wipe details the
++//    coach never saw. So a failed read hides the contact fields entirely,
++//    says so, and skips the contact write — the player's own fields still
++//    save.
++
++// design-system.md §4.17, and the same #5c5854 the other screens use for
++// --muted on a light fill: #77726e fails AA at this size.
++const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-[#5c5854]'
++const FIELD = 'mb-3.5'
++const INPUT_BASE =
++  'w-full rounded-[11px] border-[1.5px] bg-white px-3 py-[11px] text-[16px] text-[#221f1d] outline-none transition placeholder:text-[#a29d99] focus:border-quinsRed'
++
++// design-system.md §4.18, matching EventForm: the radio stays a real,
++// focusable input (sr-only, not display:none) and the checked look is driven
++// from React state rather than the CSS `:has()` selector.
++const SEG_OPTION_BASE =
++  'block cursor-pointer select-none rounded-[11px] border-[1.5px] px-2 py-2.5 text-center text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-quinsRed peer-focus-visible:ring-offset-2'
++const SEG_OPTION_ON = 'border-quinsRed bg-[#fbf3f6] font-bold text-quinsRedDark'
++const SEG_OPTION_OFF = 'border-[#e6e3e1] font-semibold text-[#221f1d]'
++
++// design-system.md §7's POSITIONS enum, verbatim. Kept here rather than
++// shared with Roster.jsx: Roster's FORWARDS/BACKS arrays are a *grouping*
++// rule (which bucket a position falls in, including positions not on this
++// list), not the list of choices this form offers. Merging them would couple
++// two things that are only coincidentally similar.
++const POSITIONS = [
++  'Prop',
++  'Hooker',
++  'Lock',
++  'Flanker',
++  'Number 8',
++  'Scrum-half',
++  'Fly-half',
++  'Centre',
++  'Wing',
++  'Fullback',
++  'Utility',
++]
++
++function inputClasses(invalid) {
++  return [INPUT_BASE, invalid ? 'border-quinsRedDark' : 'border-[#e6e3e1]'].join(' ')
++}
++
++function Segmented({ legend, name, options, value, onChange }) {
++  return (
++    <fieldset className={FIELD}>
++      <legend className={LABEL}>{legend}</legend>
++      {/* An explicit flex row of equal-width blocks. The options are
++          <label>/<span> pairs rather than <button>s on purpose — a button
++          used as a layout box inherits Chromium's UA content-centring,
++          which jsdom cannot see. */}
++      <div className="flex gap-2">
++        {options.map((option) => (
++          <label key={option.value} className="flex-1">
++            <input
++              type="radio"
++              name={name}
++              value={option.value}
++              checked={value === option.value}
++              onChange={() => onChange(option.value)}
++              className="peer sr-only"
++            />
++            <span
++              className={[
++                SEG_OPTION_BASE,
++                value === option.value ? SEG_OPTION_ON : SEG_OPTION_OFF,
++              ].join(' ')}
++            >
++              {option.label}
++            </span>
++          </label>
++        ))}
++      </div>
++    </fieldset>
++  )
++}
++
++// The player half of the form's initial state, derived once per mount. The
++// contact half is not here: it arrives asynchronously from a second table
++// (see the contact effect below), and for a new player there is nothing to
++// fetch.
++function initialValues(player, editableTeams) {
++  const teamIds = editableTeams.map((team) => team.id)
++  const fallbackTeamId = teamIds[0] ?? ''
++
++  return {
++    fullName: player?.full_name ?? '',
++    position: player?.position ?? '',
++    teamId:
++      player && teamIds.includes(player.team_id) ? player.team_id : fallbackTeamId,
++    isCaptain: player?.is_captain === true,
++    phone: '',
++    email: '',
++  }
++}
++
++export default function PlayerForm({ player = null, onClose, onSaved }) {
++  const { memberships, teams } = useMemberships()
++
++  // Teams this user may actually write to. For an admin that is every team;
++  // for a coach only the squads they coach. canEditTeam is asked per team
++  // rather than inferred from the role, so its deliberate null-team_id
++  // refusal applies here too — a team with no resolvable id never becomes a
++  // dropdown option.
++  const editableTeams = useMemo(
++    () => visibleTeams(memberships, teams).filter((team) => canEditTeam(memberships, team.id)),
++    [memberships, teams],
++  )
++
++  const editing = Boolean(player?.id)
++  const gated = editableTeams.length === 0
++
++  const [values, setValues] = useState(() => initialValues(player, editableTeams))
++  const [invalid, setInvalid] = useState({})
++  const [error, setError] = useState(null)
++  // Which of the two writes failed. The distinction is the point: a contact
++  // failure means the player IS saved, and saying otherwise would send a
++  // coach back to re-enter a player who already exists.
++  const [errorStage, setErrorStage] = useState(null)
++  const [saving, setSaving] = useState(false)
++
++  // 'ready' the moment there is nothing to fetch (a new player), otherwise
++  // 'loading' until the existing contact row lands, then 'ready' or 'error'.
++  const [contactStatus, setContactStatus] = useState(editing ? 'loading' : 'ready')
++  const [contactError, setContactError] = useState(null)
++  // Whether a contact row existed when the form opened. This is what makes
++  // "clear the phone number" different from "there was never a phone number":
++  // the first has to be written through as nulls, the second is nothing at
++  // all and must not leave an empty row behind.
++  const [hadContact, setHadContact] = useState(false)
++
++  // The id of the player row this form has already written, if any. Set from
++  // the insert's returned row so a retry after a CONTACT failure updates that
++  // player rather than inserting a second copy of them.
++  const [savedPlayerId, setSavedPlayerId] = useState(player?.id ?? null)
++
++  // Guards against a double submit landing two inserts: `saving` state is
++  // async, this is not.
++  const inFlight = useRef(false)
++
++  // The contact prefill. Runs only when editing, and only when the form is
++  // not gated — a user who may not edit this squad must not cause a
++  // player_contacts read at all, let alone see its result.
++  useEffect(() => {
++    if (!editing || gated) return undefined
++
++    let mounted = true
++    setContactStatus('loading')
++    setContactError(null)
++
++    getPlayerContact(player.id)
++      .then((row) => {
++        if (!mounted) return
++        setHadContact(Boolean(row))
++        setValues((current) => ({
++          ...current,
++          phone: row?.phone ?? '',
++          email: row?.email ?? '',
++        }))
++        setContactStatus('ready')
++      })
++      .catch((err) => {
++        if (!mounted) return
++        setContactError(err)
++        setContactStatus('error')
++      })
++
++    return () => {
++      mounted = false
++    }
++  }, [editing, gated, player?.id])
++
++  const set = (key) => (nextValue) => setValues((current) => ({ ...current, [key]: nextValue }))
++  const setFromInput = (key) => (domEvent) => set(key)(domEvent.target.value)
++
++  // Reconcile the chosen squad against the live editable list on every render
++  // rather than trusting the stored value — memberships can reload and
++  // shrink, and on a first render where teams hadn't loaded the initial value
++  // is ''. Either way the select would otherwise show a squad it wasn't
++  // actually holding in state.
++  const teamId = editableTeams.some((team) => team.id === values.teamId)
++    ? values.teamId
++    : editableTeams[0]?.id ?? ''
++
++  // A user with nothing they can edit should not be shown a form whose Save
++  // button the database is guaranteed to refuse — and, for this form
++  // specifically, should not be shown contact fields at all. This is
++  // defensive (every entry point already gates on the same check), so it
++  // explains rather than apologises.
++  if (gated) {
++    return (
++      <Sheet open onClose={onClose} title={editing ? 'Edit player' : 'Add player'}>
++        <p role="alert" className="rounded-[11px] bg-[#fbf1dd] px-4 py-3 text-sm text-[#221f1d]">
++          You don&apos;t have a squad you can add or change players for. Ask a club admin if that
++          looks wrong.
++        </p>
++      </Sheet>
++    )
++  }
++
++  function handleSubmit(domEvent) {
++    domEvent.preventDefault()
++    if (inFlight.current) return
++
++    const fullName = values.fullName.trim()
++    const nextInvalid = { fullName: !fullName, teamId: !teamId }
++    setInvalid(nextInvalid)
++
++    if (Object.values(nextInvalid).some(Boolean)) {
++      setErrorStage('validation')
++      setError(new Error('Fill in the highlighted fields before saving.'))
++      return
++    }
++
++    const team = editableTeams.find((candidate) => candidate.id === teamId)
++    const playerPayload = {
++      ...(savedPlayerId ? { id: savedPlayerId } : null),
++      ...(team?.club_id ? { club_id: team.club_id } : null),
++      team_id: teamId,
++      full_name: fullName,
++      position: values.position || null,
++      is_captain: values.isCaptain,
++    }
++
++    const phone = values.phone.trim() || null
++    const email = values.email.trim() || null
++    // Write the contact row when there is something to record, or something
++    // to clear. Never when the read failed — those blanks are not the
++    // coach's answer, they are the absence of one.
++    const writeContact = contactStatus === 'ready' && Boolean(phone || email || hadContact)
++
++    inFlight.current = true
++    setSaving(true)
++    setError(null)
++    setErrorStage(null)
++
++    const run = async () => {
++      let saved
++      try {
++        saved = await upsertPlayer(playerPayload)
++      } catch (err) {
++        setErrorStage('player')
++        setError(err)
++        return
++      }
++
++      // Recorded before the contact attempt, so a retry after a contact
++      // failure updates this player instead of inserting them again.
++      if (saved?.id) setSavedPlayerId(saved.id)
++
++      if (!writeContact) {
++        onSaved?.(saved)
++        onClose?.()
++        return
++      }
++
++      try {
++        await upsertContact({ player_id: saved.id, phone, email })
++      } catch (err) {
++        // The player really was saved — tell the roster so, and keep the
++        // sheet open on the contact problem rather than closing over it.
++        onSaved?.(saved)
++        setErrorStage('contact')
++        setError(err)
++        return
++      }
++
++      onSaved?.(saved)
++      onClose?.()
++    }
++
++    run().finally(() => {
++      inFlight.current = false
++      setSaving(false)
++    })
++  }
++
++  const contactLoading = contactStatus === 'loading'
++
++  return (
++    <Sheet open onClose={onClose} title={editing ? 'Edit player' : 'Add player'}>
++      {/* noValidate: this form does its own validation and reports it in a
++          role="alert" region, which a screen reader announces — the native
++          bubble is neither announced reliably nor visible to the browser
++          check. */}
++      <form onSubmit={handleSubmit} noValidate>
++        <div className={FIELD}>
++          <label className={LABEL} htmlFor="player-name">
++            Full name
++          </label>
++          <input
++            id="player-name"
++            type="text"
++            value={values.fullName}
++            onChange={setFromInput('fullName')}
++            aria-invalid={invalid.fullName ? 'true' : undefined}
++            placeholder="e.g. Tom Fletcher"
++            className={inputClasses(invalid.fullName)}
++          />
++        </div>
++
++        <div className={FIELD}>
++          <label className={LABEL} htmlFor="player-position">
++            Position
++          </label>
++          {/* Optional: players.position is nullable and most of the club's
++              records don't carry one yet, so "Not set" is a real answer
++              rather than a placeholder to be got rid of. */}
++          <select
++            id="player-position"
++            value={values.position}
++            onChange={setFromInput('position')}
++            className={inputClasses(false)}
++          >
++            <option value="">Not set</option>
++            {POSITIONS.map((position) => (
++              <option key={position} value={position}>
++                {position}
++              </option>
++            ))}
++          </select>
++        </div>
++
++        <div className={FIELD}>
++          <label className={LABEL} htmlFor="player-team">
++            Age group
++          </label>
++          <select
++            id="player-team"
++            value={teamId}
++            onChange={setFromInput('teamId')}
++            aria-invalid={invalid.teamId ? 'true' : undefined}
++            className={inputClasses(invalid.teamId)}
++          >
++            {editableTeams.map((team) => (
++              <option key={team.id} value={team.id}>
++                {team.name}
++              </option>
++            ))}
++          </select>
++        </div>
++
++        {/* Contact details: a different table, a different policy, a
++            different write. See the safeguarding notes at the top. */}
++        {contactStatus === 'error' && (
++          <p
++            role="alert"
++            className="mb-3.5 rounded-[11px] bg-[#fbf1dd] px-3 py-2.5 text-sm text-[#221f1d]"
++          >
++            We couldn&apos;t load this player&apos;s contact details, so they can&apos;t be edited
++            right now. Saving will leave them exactly as they are.
++            {contactError?.message ? ` (${contactError.message})` : ''}
++          </p>
++        )}
++
++        {contactStatus === 'ready' && (
++          <>
++            <div className={FIELD}>
++              <label className={LABEL} htmlFor="player-phone">
++                Phone
++              </label>
++              <input
++                id="player-phone"
++                type="tel"
++                inputMode="tel"
++                value={values.phone}
++                onChange={setFromInput('phone')}
++                placeholder="e.g. +971 50 200 1000"
++                aria-describedby="player-contact-note"
++                className={inputClasses(false)}
++              />
++            </div>
++
++            <div className={FIELD}>
++              <label className={LABEL} htmlFor="player-email">
++                Email
++              </label>
++              <input
++                id="player-email"
++                type="email"
++                value={values.email}
++                onChange={setFromInput('email')}
++                placeholder="e.g. guardian@example.com"
++                aria-describedby="player-contact-note"
++                className={inputClasses(false)}
++              />
++            </div>
++
++            {/* Says what happens to the data, not what the user must do. For
++                a minor these are the guardian's details, and who can read
++                them back is the club's safeguarding promise. */}
++            <p id="player-contact-note" className="-mt-2 mb-3.5 text-[12.5px] text-[#5c5854]">
++              Only coaches and club admins can see these. Leave them blank if you don&apos;t have
++              them.
++            </p>
++          </>
++        )}
++
++        <Segmented
++          legend="Role"
++          name="player-role"
++          options={[
++            { value: 'player', label: 'Player' },
++            { value: 'captain', label: 'Captain' },
++          ]}
++          value={values.isCaptain ? 'captain' : 'player'}
++          onChange={(next) => set('isCaptain')(next === 'captain')}
++        />
++
++        {error && (
++          <p
++            role="alert"
++            className="mb-3.5 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
++          >
++            {errorStage === 'contact' && (
++              <span className="block">
++                The player was saved, but their contact details were not.
++              </span>
++            )}
++            {error.message || "We couldn't save that. Try again."}
++          </p>
++        )}
++
++        <button
++          type="submit"
++          // Disabled until the existing contact row has settled: a submit
++          // before then would write the still-blank fields over real details.
++          disabled={saving || contactLoading}
++          className="w-full rounded-[11px] bg-quinsRed px-4 py-3 text-[15px] font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
++        >
++          {saving ? 'Saving…' : editing ? 'Save changes' : 'Add player'}
++        </button>
++      </form>
++    </Sheet>
++  )
++}
+diff --git a/src/screens/Roster.jsx b/src/screens/Roster.jsx
+index 991bde8..778d13a 100644
+--- a/src/screens/Roster.jsx
++++ b/src/screens/Roster.jsx
+@@ -1,40 +1,40 @@
+ import { useEffect, useMemo, useState } from 'react'
+ import Badge from '../components/Badge.jsx'
+ import Card from '../components/Card.jsx'
+ import Empty from '../components/Empty.jsx'
+ import ScopeNote from '../components/ScopeNote.jsx'
+ import Spinner from '../components/Spinner.jsx'
+ import TeamPills, { ALL_TEAMS_ID } from '../components/TeamPills.jsx'
+ import PlayerDetail from './PlayerDetail.jsx'
++import PlayerForm from './PlayerForm.jsx'
+ import { listPlayers } from '../data/players.js'
+ import { useMemberships } from '../lib/memberships.jsx'
+-import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
++import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+ import { initials } from '../lib/playerFormat.js'
+ 
+ // Roster & members (design-system.md §5.3): scope note, section head, search
+ // bar, a team filter, then the grouped player list. Reads players once for
+ // the whole visible scope and filters/groups in memory — the scope is at
+ // most 15 squads' worth of players, so refetching on every keystroke or pill
+ // tap would add latency and flicker for nothing.
+ //
+ // Access control is not enforced here. RLS decides which rows come back;
+ // visibleTeams() only tells the UI which pills to draw and which team ids to
+ // ask for, so a mistake here can narrow what a user sees but can never widen
+ // it. In particular an empty teamIds array means "no teams, show nothing"
+ // (see src/data/players.js) — never "no filter, show everything".
+ //
+ // The helpers below stay local rather than moving to a src/lib module: only
+ // this screen needs them (PlayerDetail receives everything as props), and
+ // src/lib/eventFormat.js was extracted only because two screens genuinely
+-// shared it. Add-player actions are deliberately absent — Task 15 owns
+-// player writes.
++// shared it.
+ 
+ // Ported verbatim from the prototype's posGroup() (design-system.md §7), so
+ // the grouped-by-position view matches the approved design exactly.
+ const FORWARDS = ['Prop', 'Hooker', 'Lock', 'Flanker', 'Number 8']
+ const BACKS = ['Scrum-half', 'Fly-half', 'Centre', 'Wing', 'Fullback']
+ const POSITION_GROUP_ORDER = ['Forwards', 'Backs', 'Other']
+ 
+ // design-system.md's --muted (#77726e) is specified against a card, where it
+ // measures 4.755:1 on white and clears AA. The section head and the group
+ // headers sit OUTSIDE any card, on --paper (#f5f4f3), where the same pair
+@@ -161,20 +161,24 @@ function RosterGroup({ label, players, teamsById, onSelect }) {
+ export default function Roster() {
+   const { memberships, teams } = useMemberships()
+ 
+   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
+   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
+   const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
+ 
+   const [query, setQuery] = useState('')
+   const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
+   const [selectedPlayerId, setSelectedPlayerId] = useState(null)
++  // null when the add/edit sheet is closed; { player } when open (player is
++  // null for "add"). An object rather than a boolean so opening the form for
++  // an existing player and opening it empty are the same state transition.
++  const [formState, setFormState] = useState(null)
+ 
+   const [players, setPlayers] = useState([])
+   const [loading, setLoading] = useState(true)
+   const [error, setError] = useState(null)
+   const [reloadToken, setReloadToken] = useState(0)
+ 
+   useEffect(() => {
+     let mounted = true
+     setLoading(true)
+     setError(null)
+@@ -268,42 +272,64 @@ export default function Roster() {
+       key,
+       label: groupByPosition ? key : (teamsById.get(key)?.name ?? 'No age group'),
+       players: [...bucket.get(key)].sort(byName),
+     }))
+ 
+   // Derive the open player from the live list rather than storing the row
+   // itself, so the sheet's contents stay in step with a reload and a removed
+   // player closes it instead of stranding a stale copy on screen.
+   const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null
+ 
++  // Whether the signed-in user may write to the OPEN player's squad. Asked
++  // per team through canEditTeam rather than inferred from the role, so its
++  // deliberate refusal of a null/unresolvable team_id applies here too. RLS
++  // is what actually enforces this; getting it wrong here can only hide a
++  // control, never authorise a write.
++  const canEditSelected = selectedPlayer ? canEditTeam(memberships, selectedPlayer.team_id) : false
++  const refresh = () => setReloadToken((token) => token + 1)
++
+   // One squad is more useful named than counted; several are more useful
+   // counted than listed (an admin sees all 15).
+   const scopeSummary = scopedTeams.length === 1 ? teamNames : `${scopedTeams.length} age groups`
+ 
+   return (
+     <section>
+       {!admin && (
+         <ScopeNote tone={canEditAnything ? 'coach' : 'parent'}>
+           <b>
+             {roleLabel(memberships)} view{canEditAnything ? '' : ' · read-only'}.
+           </b>{' '}
+           You&apos;re seeing {teamNames || 'no squads'} — every other age group is hidden.
+         </ScopeNote>
+       )}
+ 
+-      <div className="mb-3.5 mt-1">
+-        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Roster &amp; members</h2>
+-        {/* Describes the scope, not the current filter — the per-group counts
+-            below already report what the search and pills leave. */}
+-        <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
+-          {players.length} {players.length === 1 ? 'player' : 'players'} · {scopeSummary}
+-        </p>
++      {/* design-system.md §5.3: the section head carries an "Add" button on
++          the right for admin/coach. It is absent, not disabled, for everyone
++          else — and it only exists at all now that Task 15's form does. */}
++      <div className="mb-3.5 mt-1 flex items-start justify-between gap-3">
++        <div>
++          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Roster &amp; members</h2>
++          {/* Describes the scope, not the current filter — the per-group counts
++              below already report what the search and pills leave. */}
++          <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
++            {players.length} {players.length === 1 ? 'player' : 'players'} · {scopeSummary}
++          </p>
++        </div>
++        {canEditAnything && (
++          <button
++            type="button"
++            onClick={() => setFormState({ player: null })}
++            className="shrink-0 rounded-[11px] bg-quinsRed px-3.5 py-2 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
++          >
++            Add player
++          </button>
++        )}
+       </div>
+ 
+       <div className="mb-3 flex items-center gap-2.5 rounded-[20px] bg-white px-3.5 py-2.5 shadow-[inset_0_0_0_1.5px_#e6e3e1,0_2px_8px_rgba(20,20,20,0.08)]">
+         <SearchIcon className="h-[18px] w-[18px] shrink-0 text-[#77726e]" aria-hidden="true" />
+         {/* type="search" is what gives this the `searchbox` role. Its
+             trade-off is Chromium's UA clear glyph, which paints itself
+             #365A99 (measured in the browser check) — a blue with no business
+             on a red/green brand page, and one that -webkit- pseudo-elements
+             won't let us recolour. The design system's .search (§4.9) has no
+             clear control at all, so the glyph is suppressed rather than
+@@ -371,20 +397,41 @@ export default function Roster() {
+         groups.map((group) => (
+           <RosterGroup
+             key={group.key}
+             label={group.label}
+             players={group.players}
+             teamsById={teamsById}
+             onSelect={setSelectedPlayerId}
+           />
+         ))}
+ 
+-      {selectedPlayer && (
++      {selectedPlayer && !formState && (
+         <PlayerDetail
+           player={selectedPlayer}
+           team={teamsById.get(selectedPlayer.team_id)}
+           onClose={() => setSelectedPlayerId(null)}
++          canEdit={canEditSelected}
++          onEdit={(player) => setFormState({ player })}
++          onDeleted={() => {
++            setSelectedPlayerId(null)
++            refresh()
++          }}
++        />
++      )}
++
++      {/* One sheet at a time: opening the form closes the detail sheet above
++          rather than stacking two dialogs. Closing the form drops back to the
++          roster, not to the detail sheet, which is where a coach who just
++          saved wants to be. */}
++      {formState && (
++        <PlayerForm
++          player={formState.player}
++          onClose={() => {
++            setFormState(null)
++            setSelectedPlayerId(null)
++          }}
++          onSaved={refresh}
+         />
+       )}
+     </section>
+   )
+ }
+diff --git a/tests/data.test.js b/tests/data.test.js
+index 2c4eea6..656abc3 100644
+--- a/tests/data.test.js
++++ b/tests/data.test.js
+@@ -22,44 +22,54 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
+ vi.mock('../src/lib/supabase.js', () => ({
+   supabase: {
+     from: vi.fn(),
+     channel: vi.fn(),
+     removeChannel: vi.fn(),
+   },
+ }))
+ 
+ import { supabase } from '../src/lib/supabase.js'
+ import { listEvents, subscribeEvents, upsertEvent, deleteEvent } from '../src/data/events.js'
+-import { listPlayers, getPlayerContact } from '../src/data/players.js'
++import {
++  listPlayers,
++  getPlayerContact,
++  upsertPlayer,
++  deletePlayer,
++  upsertContact,
++} from '../src/data/players.js'
+ import { listAvailability, subscribeAvailability } from '../src/data/availability.js'
+ 
+ function createQueryBuilder({ data = null, error = null } = {}) {
+-  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [] }
++  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [], upsert: [] }
+   const builder = {}
+   const chain = (name) =>
+     vi.fn((...args) => {
+       calls[name].push(args)
+       return builder
+     })
+   builder.select = chain('select')
+   builder.in = chain('in')
+   builder.gte = chain('gte')
+   builder.lte = chain('lte')
+   builder.eq = chain('eq')
+   builder.order = chain('order')
+   // Write-side chain methods (Task 14). Like the read ones, each records its
+   // args and returns the same thenable builder, mirroring the real
+   // PostgrestQueryBuilder where .insert()/.update()/.delete() are chainable
+   // with .eq()/.select() and awaited directly.
+   builder.insert = chain('insert')
+   builder.update = chain('update')
+   builder.delete = chain('delete')
++  // Task 15. player_contacts is keyed by player_id (its PRIMARY KEY), so its
++  // writer uses a real ON CONFLICT upsert rather than an insert/update
++  // branch — hence a chain method the event writers never needed.
++  builder.upsert = chain('upsert')
+   builder.maybeSingle = vi.fn(() => Promise.resolve({ data, error }))
+   // Real PostgrestFilterBuilder instances are thenable so `await query`
+   // resolves without an explicit terminal method — mirror that here.
+   builder.then = (resolve, reject) => Promise.resolve({ data, error }).then(resolve, reject)
+   return { builder, calls }
+ }
+ 
+ function createChannel() {
+   return {
+     on: vi.fn().mockReturnThis(),
+@@ -396,20 +406,228 @@ describe('getPlayerContact', () => {
+   })
+ 
+   it('throws rather than swallowing a Supabase error', async () => {
+     const { builder } = createQueryBuilder({ error: new Error('boom') })
+     supabase.from.mockReturnValue(builder)
+ 
+     await expect(getPlayerContact('p-1')).rejects.toThrow('boom')
+   })
+ })
+ 
++// --- upsertPlayer ---------------------------------------------------------
++
++// Task 15. Same shape as upsertEvent, against the players table: insert when
++// the row has no id, update when it has one, and treat a zero-row response as
++// the RLS refusal it is.
++describe('upsertPlayer', () => {
++  it('inserts when there is no id, and does not send an id column', async () => {
++    const saved = { id: 'p-new', full_name: 'Tom Fletcher' }
++    const { builder, calls } = createQueryBuilder({ data: saved })
++    supabase.from.mockReturnValue(builder)
++
++    const result = await upsertPlayer({ full_name: 'Tom Fletcher', team_id: 't1', club_id: 'c1' })
++
++    expect(supabase.from).toHaveBeenCalledWith('players')
++    expect(builder.insert).toHaveBeenCalledTimes(1)
++    expect(builder.update).not.toHaveBeenCalled()
++    expect(calls.insert[0][0]).toEqual({ full_name: 'Tom Fletcher', team_id: 't1', club_id: 'c1' })
++    expect(calls.insert[0][0]).not.toHaveProperty('id')
++    expect(builder.eq).not.toHaveBeenCalled()
++    expect(result).toEqual(saved)
++  })
++
++  it('inserts when the id is explicitly null or an empty string', async () => {
++    for (const id of [null, undefined, '']) {
++      const { builder } = createQueryBuilder({ data: { id: 'p-new' } })
++      supabase.from.mockReturnValue(builder)
++      await upsertPlayer({ id, full_name: 'Tom Fletcher', team_id: 't1' })
++      expect(builder.insert).toHaveBeenCalledTimes(1)
++      expect(builder.update).not.toHaveBeenCalled()
++    }
++  })
++
++  it('updates the matching row when there is an id, and does not send the id as a column', async () => {
++    const saved = { id: 'p-1', full_name: 'Tom Fletcher' }
++    const { builder, calls } = createQueryBuilder({ data: saved })
++    supabase.from.mockReturnValue(builder)
++
++    const result = await upsertPlayer({ id: 'p-1', full_name: 'Tom Fletcher', team_id: 't2' })
++
++    expect(builder.update).toHaveBeenCalledTimes(1)
++    expect(builder.insert).not.toHaveBeenCalled()
++    expect(calls.update[0][0]).toEqual({ full_name: 'Tom Fletcher', team_id: 't2' })
++    expect(calls.update[0][0]).not.toHaveProperty('id')
++    expect(calls.eq[0]).toEqual(['id', 'p-1'])
++    expect(result).toEqual(saved)
++  })
++
++  it('asks for the saved row back so the caller has the new id', async () => {
++    // A new player's id is not optional here: the contact write is a second,
++    // separate statement keyed on that id, so a caller with no id back has no
++    // way to save the contact details it was just given.
++    const { builder } = createQueryBuilder({ data: { id: 'p-new' } })
++    supabase.from.mockReturnValue(builder)
++
++    await upsertPlayer({ full_name: 'Tom Fletcher', team_id: 't1' })
++
++    expect(builder.select).toHaveBeenCalled()
++    expect(builder.maybeSingle).toHaveBeenCalled()
++  })
++
++  it('throws the Supabase error rather than returning a tuple', async () => {
++    const { builder } = createQueryBuilder({ error: new Error('null value in column "team_id"') })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(upsertPlayer({ full_name: 'Tom Fletcher' })).rejects.toThrow('null value in column')
++  })
++
++  it('throws when the write succeeds but comes back with no row (an RLS refusal)', async () => {
++    const { builder } = createQueryBuilder({ data: null })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(upsertPlayer({ id: 'p-1', team_id: 'not-mine' })).rejects.toThrow(
++      /permission|not allowed|couldn.t save/i,
++    )
++  })
++})
++
++// --- deletePlayer ---------------------------------------------------------
++
++describe('deletePlayer', () => {
++  it('deletes the row with the given id', async () => {
++    const { builder, calls } = createQueryBuilder({ data: [{ id: 'p-1' }] })
++    supabase.from.mockReturnValue(builder)
++
++    await deletePlayer('p-1')
++
++    expect(supabase.from).toHaveBeenCalledWith('players')
++    expect(builder.delete).toHaveBeenCalledTimes(1)
++    expect(calls.eq[0]).toEqual(['id', 'p-1'])
++  })
++
++  it('does not issue a separate player_contacts delete', async () => {
++    // player_contacts.player_id is a FK with ON DELETE CASCADE, so the
++    // contact row goes with the player. A second client-side delete would be
++    // a redundant statement whose failure mode (contact gone, player left) is
++    // strictly worse than the database's own atomic one.
++    const { builder } = createQueryBuilder({ data: [{ id: 'p-1' }] })
++    supabase.from.mockReturnValue(builder)
++
++    await deletePlayer('p-1')
++
++    expect(supabase.from).toHaveBeenCalledTimes(1)
++    expect(supabase.from).not.toHaveBeenCalledWith('player_contacts')
++  })
++
++  it('throws the Supabase error rather than returning a tuple', async () => {
++    const { builder } = createQueryBuilder({ error: new Error('network down') })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(deletePlayer('p-1')).rejects.toThrow('network down')
++  })
++
++  it('throws when nothing was deleted (an RLS refusal)', async () => {
++    const { builder } = createQueryBuilder({ data: [] })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(deletePlayer('p-1')).rejects.toThrow(/permission|not allowed|couldn.t delete/i)
++  })
++})
++
++// --- upsertContact --------------------------------------------------------
++
++// Task 15. player_contacts has no surrogate key — player_id IS the primary
++// key — so this is the one writer in the codebase that uses a genuine
++// ON CONFLICT upsert rather than an insert/update branch.
++describe('upsertContact', () => {
++  it('upserts on player_id, sending the id as a column because it is the key', async () => {
++    const saved = { player_id: 'p-1', phone: '+971 50 200 1000', email: 'a@example.com' }
++    const { builder, calls } = createQueryBuilder({ data: saved })
++    supabase.from.mockReturnValue(builder)
++
++    const result = await upsertContact({
++      player_id: 'p-1',
++      phone: '+971 50 200 1000',
++      email: 'a@example.com',
++    })
++
++    expect(supabase.from).toHaveBeenCalledWith('player_contacts')
++    expect(builder.upsert).toHaveBeenCalledTimes(1)
++    // Unlike upsertPlayer, the key stays in the payload: it is what the row
++    // is keyed BY, not a surrogate id being needlessly rewritten.
++    expect(calls.upsert[0][0]).toEqual({
++      player_id: 'p-1',
++      phone: '+971 50 200 1000',
++      email: 'a@example.com',
++    })
++    // The conflict target is stated rather than inferred, so this keeps
++    // updating in place if a second unique constraint is ever added.
++    expect(calls.upsert[0][1]).toMatchObject({ onConflict: 'player_id' })
++    expect(builder.insert).not.toHaveBeenCalled()
++    expect(builder.update).not.toHaveBeenCalled()
++    expect(result).toEqual(saved)
++  })
++
++  it('writes nulls through, so clearing a wrong phone number actually clears it', async () => {
++    const { builder, calls } = createQueryBuilder({ data: { player_id: 'p-1', phone: null, email: null } })
++    supabase.from.mockReturnValue(builder)
++
++    await upsertContact({ player_id: 'p-1', phone: null, email: null })
++
++    expect(calls.upsert[0][0]).toEqual({ player_id: 'p-1', phone: null, email: null })
++  })
++
++  it('refuses to write without a player_id rather than creating an orphan row', async () => {
++    const { builder } = createQueryBuilder({ data: null })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(upsertContact({ phone: '0500000000' })).rejects.toThrow(/player/i)
++    expect(supabase.from).not.toHaveBeenCalled()
++  })
++
++  it('asks for the saved row back', async () => {
++    const { builder } = createQueryBuilder({ data: { player_id: 'p-1' } })
++    supabase.from.mockReturnValue(builder)
++
++    await upsertContact({ player_id: 'p-1', phone: null, email: null })
++
++    expect(builder.select).toHaveBeenCalled()
++    expect(builder.maybeSingle).toHaveBeenCalled()
++  })
++
++  it('throws the Supabase error rather than returning a tuple', async () => {
++    const { builder } = createQueryBuilder({ error: new Error('boom') })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(upsertContact({ player_id: 'p-1', phone: '1' })).rejects.toThrow('boom')
++  })
++
++  it('throws when the write succeeds but comes back with no row (an RLS refusal)', async () => {
++    // The safeguarding case. "contact edit" is a separate policy from
++    // "player edit"; a refusal here must be reported, never conflated with a
++    // successful player save.
++    const { builder } = createQueryBuilder({ data: null })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(upsertContact({ player_id: 'p-1', phone: '1' })).rejects.toThrow(
++      /permission|not allowed|couldn.t save/i,
++    )
++  })
++
++  it('names contact details in its refusal message, distinctly from a player refusal', async () => {
++    const { builder } = createQueryBuilder({ data: null })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(upsertContact({ player_id: 'p-1', phone: '1' })).rejects.toThrow(/contact/i)
++  })
++})
++
+ // --- listAvailability ---------------------------------------------------
+ 
+ describe('listAvailability', () => {
+   it('queries availability scoped to the event id', async () => {
+     const rows = [{ id: 'a-1', event_id: 'e-1', player_id: 'p-1', status: 'in' }]
+     const { builder, calls } = createQueryBuilder({ data: rows })
+     supabase.from.mockReturnValue(builder)
+ 
+     const result = await listAvailability('e-1')
+ 
+diff --git a/tests/player-form.test.jsx b/tests/player-form.test.jsx
+new file mode 100644
+index 0000000..54726ab
+--- /dev/null
++++ b/tests/player-form.test.jsx
+@@ -0,0 +1,645 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest'
++import { render, screen, within, waitFor } from '@testing-library/react'
++import userEvent from '@testing-library/user-event'
++
++// Unit tests for src/screens/PlayerForm.jsx (Task 15) plus the wiring that
++// opens it — Roster's "Add player" button and PlayerDetail's Edit/Delete
++// footer. useMemberships and every data module are mocked, so no network is
++// reachable from this file.
++//
++// The theme running through this file is that players and player_contacts are
++// TWO tables behind TWO policies, written by TWO statements. Most of the
++// assertions below exist to pin that separation down: that a contact refusal
++// is reported as a contact refusal and never folded into "saved", that
++// blanking a contact clears it rather than being skipped, that a contact the
++// form never successfully read is never overwritten with blanks, and that a
++// retry after a contact failure does not insert the player a second time.
++
++const useMembershipsMock = vi.fn()
++const listPlayersMock = vi.fn()
++const getPlayerContactMock = vi.fn()
++const upsertPlayerMock = vi.fn()
++const deletePlayerMock = vi.fn()
++const upsertContactMock = vi.fn()
++
++vi.mock('../src/lib/memberships.jsx', () => ({
++  useMemberships: () => useMembershipsMock(),
++}))
++
++vi.mock('../src/data/players.js', () => ({
++  listPlayers: (...args) => listPlayersMock(...args),
++  getPlayerContact: (...args) => getPlayerContactMock(...args),
++  upsertPlayer: (...args) => upsertPlayerMock(...args),
++  deletePlayer: (...args) => deletePlayerMock(...args),
++  upsertContact: (...args) => upsertContactMock(...args),
++}))
++
++// Imported after vi.mock so these bind to the mocked module.
++import PlayerForm from '../src/screens/PlayerForm.jsx'
++import Roster from '../src/screens/Roster.jsx'
++
++const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
++
++const TEAM_U12 = { id: 't-u12', club_id: CLUB_ID, name: 'U12', sort_order: 7 }
++const TEAM_U14 = { id: 't-u14', club_id: CLUB_ID, name: 'U14', sort_order: 9 }
++const TEAM_1XV = { id: 't-1xv', club_id: CLUB_ID, name: 'Senior Men 1st XV', sort_order: 13 }
++const TEAMS = [TEAM_1XV, TEAM_U12, TEAM_U14] // deliberately unsorted
++
++const ADMIN = [{ id: 'm-a', role: 'admin', team_id: null }]
++const COACH_U12 = [{ id: 'm-c', role: 'coach', team_id: 't-u12' }]
++const COACH_TWO = [
++  { id: 'm-c1', role: 'coach', team_id: 't-u12' },
++  { id: 'm-c2', role: 'coach', team_id: 't-u14' },
++]
++const PARENT = [{ id: 'm-p', role: 'parent', team_id: 't-u12', player_id: 'p-1' }]
++
++const EXISTING_PLAYER = {
++  id: 'p-1',
++  club_id: CLUB_ID,
++  team_id: 't-u12',
++  full_name: 'Dhruv Ramachandran',
++  position: 'Flanker',
++  is_captain: true,
++}
++
++const EXISTING_CONTACT = {
++  player_id: 'p-1',
++  phone: '+971 50 200 1000',
++  email: 'guardian@example.com',
++}
++
++function membershipValue(memberships, teams = TEAMS) {
++  return { memberships, teams, loading: false, error: null, reload: vi.fn() }
++}
++
++function renderForm({ memberships = COACH_U12, teams = TEAMS, player = null, ...rest } = {}) {
++  useMembershipsMock.mockReturnValue(membershipValue(memberships, teams))
++  const onClose = vi.fn()
++  const onSaved = vi.fn()
++  const utils = render(<PlayerForm player={player} onClose={onClose} onSaved={onSaved} {...rest} />)
++  return { ...utils, onClose, onSaved }
++}
++
++// An edit form does one contact read before it is usable. Waiting for the
++// Save button to come out of its disabled state is how the tests below know
++// that read has settled — see the "disables save while the contact prefill is
++// in flight" test for why that gate exists at all.
++async function renderEditForm(options = {}) {
++  const utils = renderForm({ player: EXISTING_PLAYER, ...options })
++  await waitFor(() =>
++    expect(screen.getByRole('button', { name: /save changes/i })).not.toBeDisabled(),
++  )
++  return utils
++}
++
++beforeEach(() => {
++  useMembershipsMock.mockReset()
++  listPlayersMock.mockReset()
++  getPlayerContactMock.mockReset()
++  upsertPlayerMock.mockReset()
++  deletePlayerMock.mockReset()
++  upsertContactMock.mockReset()
++  listPlayersMock.mockResolvedValue([])
++  getPlayerContactMock.mockResolvedValue(null)
++  upsertPlayerMock.mockImplementation(async (player) => ({ id: player?.id ?? 'p-new', ...player }))
++  deletePlayerMock.mockResolvedValue(undefined)
++  upsertContactMock.mockImplementation(async (contact) => ({ ...contact }))
++})
++
++describe('PlayerForm — shape and scoping', () => {
++  it('opens as a sheet titled for adding when there is no player', () => {
++    renderForm()
++    expect(screen.getByRole('dialog')).toBeInTheDocument()
++    expect(screen.getByRole('heading', { name: 'Add player' })).toBeInTheDocument()
++  })
++
++  it('opens as a sheet titled for editing when there is a player', async () => {
++    await renderEditForm()
++    expect(screen.getByRole('heading', { name: 'Edit player' })).toBeInTheDocument()
++  })
++
++  it('limits the age-group options to the teams the coach can edit', () => {
++    renderForm({ memberships: COACH_TWO })
++    const select = screen.getByLabelText('Age group')
++    const options = within(select).getAllByRole('option').map((o) => o.textContent)
++    expect(options).toEqual(['U12', 'U14'])
++    expect(options).not.toContain('Senior Men 1st XV')
++  })
++
++  it('gives an admin every team, in the club sort order', () => {
++    renderForm({ memberships: ADMIN })
++    const select = screen.getByLabelText('Age group')
++    const options = within(select).getAllByRole('option').map((o) => o.textContent)
++    expect(options).toEqual(['U12', 'U14', 'Senior Men 1st XV'])
++  })
++
++  it('refuses to render a form at all when there is no team the user can edit', () => {
++    // The form's very existence is gated, not just its Save button. A parent
++    // has no editable team, and canEditTeam(memberships, null) is false by
++    // design even for an admin with an unresolvable team. Crucially the
++    // CONTACT fields must not exist either — an editable phone box for a
++    // player whose details RLS withholds would be exactly the leak
++    // player_contacts exists to prevent.
++    renderForm({ memberships: PARENT })
++    expect(screen.getByRole('alert')).toHaveTextContent(/squad you can add or change/i)
++    expect(screen.queryByRole('button', { name: /save|add player/i })).not.toBeInTheDocument()
++    expect(screen.queryByLabelText('Age group')).not.toBeInTheDocument()
++    expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
++    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
++  })
++
++  it('never reads contact details for a form it refuses to render', () => {
++    renderForm({ memberships: PARENT, player: EXISTING_PLAYER })
++    expect(getPlayerContactMock).not.toHaveBeenCalled()
++  })
++
++  it('has no jersey number field, because the club does not use them', () => {
++    renderForm()
++    expect(screen.queryByLabelText(/jersey|squad number|shirt number/i)).not.toBeInTheDocument()
++    expect(screen.queryByText(/jersey/i)).not.toBeInTheDocument()
++  })
++
++  it('offers the club position list plus an unset option, since position is optional', () => {
++    renderForm()
++    const select = screen.getByLabelText('Position')
++    const options = within(select).getAllByRole('option').map((o) => o.textContent)
++    expect(options[0]).toMatch(/not set/i)
++    expect(options).toEqual(
++      expect.arrayContaining([
++        'Prop',
++        'Hooker',
++        'Lock',
++        'Flanker',
++        'Number 8',
++        'Scrum-half',
++        'Fly-half',
++        'Centre',
++        'Wing',
++        'Fullback',
++        'Utility',
++      ]),
++    )
++  })
++})
++
++describe('PlayerForm — validation', () => {
++  it('blocks submit and explains why when the name is empty', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    expect(await screen.findByRole('alert')).toHaveTextContent(/highlighted|fill in/i)
++    expect(upsertPlayerMock).not.toHaveBeenCalled()
++    expect(upsertContactMock).not.toHaveBeenCalled()
++  })
++
++  it('marks the offending field invalid rather than only shouting at the top', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    expect(screen.getByLabelText('Full name')).toHaveAttribute('aria-invalid', 'true')
++  })
++
++  it('treats a whitespace-only name as empty', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), '   ')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    expect(upsertPlayerMock).not.toHaveBeenCalled()
++  })
++})
++
++describe('PlayerForm — saving a new player', () => {
++  it('writes the trimmed name, squad, position and captaincy', async () => {
++    const user = userEvent.setup()
++    const { onSaved, onClose } = renderForm({ memberships: COACH_TWO })
++
++    await user.type(screen.getByLabelText('Full name'), '  Tom Fletcher  ')
++    await user.selectOptions(screen.getByLabelText('Position'), 'Flanker')
++    await user.selectOptions(screen.getByLabelText('Age group'), 't-u14')
++    await user.click(screen.getByRole('radio', { name: 'Captain' }))
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalledTimes(1))
++    expect(upsertPlayerMock.mock.calls[0][0]).toEqual({
++      club_id: CLUB_ID,
++      team_id: 't-u14',
++      full_name: 'Tom Fletcher',
++      position: 'Flanker',
++      is_captain: true,
++    })
++    // No id on an insert, and never a jersey number.
++    expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('id')
++    expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('jersey_num')
++    await waitFor(() => expect(onSaved).toHaveBeenCalled())
++    expect(onClose).toHaveBeenCalled()
++  })
++
++  it('writes a null position rather than an empty string when none is chosen', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
++    expect(upsertPlayerMock.mock.calls[0][0].position).toBeNull()
++  })
++
++  it('skips the contact write entirely when both contact fields are left blank', async () => {
++    // A new player with no contact details on file should not leave an
++    // all-null contact row behind. There is nothing to record and nothing to
++    // clear.
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
++    expect(upsertContactMock).not.toHaveBeenCalled()
++  })
++
++  it('writes the contact against the id the player insert came back with', async () => {
++    const user = userEvent.setup()
++    upsertPlayerMock.mockResolvedValue({ id: 'p-fresh', full_name: 'Tom Fletcher' })
++    renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
++    await user.type(screen.getByLabelText('Phone'), '+971 50 200 1000')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    await waitFor(() => expect(upsertContactMock).toHaveBeenCalledTimes(1))
++    expect(upsertContactMock).toHaveBeenCalledWith({
++      player_id: 'p-fresh',
++      phone: '+971 50 200 1000',
++      email: null,
++    })
++  })
++
++  it('writes the player before the contact, never as one combined call', async () => {
++    const user = userEvent.setup()
++    const order = []
++    upsertPlayerMock.mockImplementation(async () => {
++      order.push('player')
++      return { id: 'p-fresh' }
++    })
++    upsertContactMock.mockImplementation(async () => {
++      order.push('contact')
++      return {}
++    })
++    renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
++    await user.type(screen.getByLabelText('Email'), 'guardian@example.com')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    await waitFor(() => expect(order).toEqual(['player', 'contact']))
++    // The player payload carries no contact columns: they live in a different
++    // table behind a different policy.
++    expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('phone')
++    expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('email')
++  })
++
++  it('trims contact values and stores a blank one as null', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
++    await user.type(screen.getByLabelText('Email'), '  guardian@example.com  ')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    await waitFor(() => expect(upsertContactMock).toHaveBeenCalled())
++    expect(upsertContactMock.mock.calls[0][0]).toMatchObject({
++      email: 'guardian@example.com',
++      phone: null,
++    })
++  })
++})
++
++describe('PlayerForm — editing an existing player', () => {
++  it('prefills the player fields and updates by id', async () => {
++    const user = userEvent.setup()
++    await renderEditForm({ memberships: COACH_TWO })
++
++    expect(screen.getByLabelText('Full name')).toHaveValue('Dhruv Ramachandran')
++    expect(screen.getByLabelText('Position')).toHaveValue('Flanker')
++    expect(screen.getByLabelText('Age group')).toHaveValue('t-u12')
++    expect(screen.getByRole('radio', { name: 'Captain' })).toBeChecked()
++
++    await user.click(screen.getByRole('button', { name: /save changes/i }))
++
++    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
++    expect(upsertPlayerMock.mock.calls[0][0]).toMatchObject({
++      id: 'p-1',
++      full_name: 'Dhruv Ramachandran',
++      team_id: 't-u12',
++    })
++  })
++
++  it('prefills the contact fields from the contact row', async () => {
++    getPlayerContactMock.mockResolvedValue(EXISTING_CONTACT)
++    await renderEditForm()
++
++    expect(screen.getByLabelText('Phone')).toHaveValue('+971 50 200 1000')
++    expect(screen.getByLabelText('Email')).toHaveValue('guardian@example.com')
++  })
++
++  it('shows empty, editable contact fields when there is simply no contact on file', async () => {
++    // "No contact recorded yet" is not "contact withheld". This form only
++    // renders for a user who can edit the squad, and the contact-read policy
++    // is can_edit_team(...) OR is_own_player(...) — so edit access implies
++    // read access and a null row here can only mean "never entered". The
++    // fields are therefore blank and usable, with nothing said about why.
++    getPlayerContactMock.mockResolvedValue(null)
++    await renderEditForm()
++
++    expect(screen.getByLabelText('Phone')).toHaveValue('')
++    expect(screen.getByLabelText('Email')).toHaveValue('')
++    expect(screen.getByLabelText('Phone')).not.toBeDisabled()
++    expect(screen.queryByText(/hidden|withheld|not permitted/i)).not.toBeInTheDocument()
++  })
++
++  it('skips the contact write when there was no contact and both fields stay blank', async () => {
++    const user = userEvent.setup()
++    getPlayerContactMock.mockResolvedValue(null)
++    await renderEditForm()
++
++    await user.click(screen.getByRole('button', { name: /save changes/i }))
++
++    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
++    expect(upsertContactMock).not.toHaveBeenCalled()
++  })
++
++  it('writes nulls when an existing contact is cleared, so the details really go', async () => {
++    // The one case where an all-null contact row is exactly right: a coach
++    // deleting a wrong phone number must not have it silently kept.
++    const user = userEvent.setup()
++    getPlayerContactMock.mockResolvedValue(EXISTING_CONTACT)
++    await renderEditForm()
++
++    await user.clear(screen.getByLabelText('Phone'))
++    await user.clear(screen.getByLabelText('Email'))
++    await user.click(screen.getByRole('button', { name: /save changes/i }))
++
++    await waitFor(() => expect(upsertContactMock).toHaveBeenCalledTimes(1))
++    expect(upsertContactMock).toHaveBeenCalledWith({ player_id: 'p-1', phone: null, email: null })
++  })
++
++  it('disables save while the contact prefill is in flight', async () => {
++    // Without this, a fast-fingered coach could submit before the existing
++    // contact landed, and the blank fields would overwrite real details.
++    let resolveContact
++    getPlayerContactMock.mockReturnValue(new Promise((resolve) => { resolveContact = resolve }))
++    renderForm({ player: EXISTING_PLAYER })
++
++    expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled()
++
++    resolveContact(EXISTING_CONTACT)
++    await waitFor(() =>
++      expect(screen.getByRole('button', { name: /save changes/i })).not.toBeDisabled(),
++    )
++  })
++
++  it('never overwrites contact details it failed to read', async () => {
++    // A failed read leaves the fields blank. Writing those blanks would
++    // destroy details the coach never saw. The player fields still save; the
++    // contact write is skipped and said so.
++    const user = userEvent.setup()
++    getPlayerContactMock.mockRejectedValue(new Error('network down'))
++    renderForm({ player: EXISTING_PLAYER })
++
++    const alert = await screen.findByRole('alert')
++    expect(alert).toHaveTextContent(/contact details/i)
++    expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
++
++    await user.click(screen.getByRole('button', { name: /save changes/i }))
++    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
++    expect(upsertContactMock).not.toHaveBeenCalled()
++  })
++})
++
++describe('PlayerForm — failures', () => {
++  it('surfaces a player-write failure and keeps the form open with the typed values', async () => {
++    const user = userEvent.setup()
++    upsertPlayerMock.mockRejectedValue(new Error('permission denied for table players'))
++    const { onClose } = renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    expect(await screen.findByRole('alert')).toHaveTextContent('permission denied for table players')
++    expect(screen.getByLabelText('Full name')).toHaveValue('Tom Fletcher')
++    expect(onClose).not.toHaveBeenCalled()
++    expect(upsertContactMock).not.toHaveBeenCalled()
++  })
++
++  it('reports a contact failure as a contact failure, not as a failed save', async () => {
++    const user = userEvent.setup()
++    upsertContactMock.mockRejectedValue(new Error("We couldn't save the contact details."))
++    const { onClose } = renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
++    await user.type(screen.getByLabelText('Phone'), '+971 50 200 1000')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    const alert = await screen.findByRole('alert')
++    expect(alert).toHaveTextContent(/contact details/i)
++    // The distinguishing bit: the player DID save, and the message says so
++    // rather than implying nothing was written.
++    expect(alert).toHaveTextContent(/player.*saved|saved.*player/i)
++    expect(onClose).not.toHaveBeenCalled()
++  })
++
++  it('does not insert the player twice when a contact failure is retried', async () => {
++    const user = userEvent.setup()
++    upsertContactMock.mockRejectedValueOnce(new Error('contact write failed'))
++    renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
++    await user.type(screen.getByLabelText('Phone'), '+971 50 200 1000')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++    await screen.findByRole('alert')
++
++    await user.click(screen.getByRole('button', { name: /save changes|add player/i }))
++
++    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalledTimes(2))
++    // Second attempt is an UPDATE of the row the first attempt created.
++    expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('id')
++    expect(upsertPlayerMock.mock.calls[1][0]).toMatchObject({ id: 'p-new' })
++  })
++
++  it('disables the submit button while the save is in flight', async () => {
++    const user = userEvent.setup()
++    let release
++    upsertPlayerMock.mockReturnValue(new Promise((resolve) => {
++      release = () => resolve({ id: 'p-new' })
++    }))
++    const { onClose } = renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++
++    expect(await screen.findByRole('button', { name: /saving/i })).toBeDisabled()
++
++    // Let the in-flight save settle before the test ends, so React's state
++    // update lands inside the test's act() scope rather than leaking an
++    // "update was not wrapped in act(...)" warning into the suite's stderr.
++    release()
++    await waitFor(() => expect(onClose).toHaveBeenCalled())
++  })
++
++  it('does not submit twice when the button is clicked twice', async () => {
++    const user = userEvent.setup()
++    let release
++    upsertPlayerMock.mockReturnValue(new Promise((resolve) => {
++      release = () => resolve({ id: 'p-new' })
++    }))
++    const { onClose } = renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
++    await user.click(screen.getByRole('button', { name: /add player/i }))
++    await user.click(screen.getByRole('button', { name: /saving/i }))
++
++    expect(upsertPlayerMock).toHaveBeenCalledTimes(1)
++
++    release()
++    await waitFor(() => expect(onClose).toHaveBeenCalled())
++  })
++
++  it('accepts typed text into every field without losing keystrokes', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Full name'), 'Faisal Al Mansoori')
++    await user.type(screen.getByLabelText('Phone'), '+971 50 200 1000')
++    await user.type(screen.getByLabelText('Email'), 'guardian@example.com')
++
++    expect(screen.getByLabelText('Full name')).toHaveValue('Faisal Al Mansoori')
++    expect(screen.getByLabelText('Phone')).toHaveValue('+971 50 200 1000')
++    expect(screen.getByLabelText('Email')).toHaveValue('guardian@example.com')
++  })
++})
++
++describe('Roster wiring', () => {
++  it('offers an Add player button to a coach', async () => {
++    useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
++    render(<Roster />)
++    expect(await screen.findByRole('button', { name: /add player/i })).toBeInTheDocument()
++  })
++
++  it('does not offer it to a parent', async () => {
++    useMembershipsMock.mockReturnValue(membershipValue(PARENT))
++    render(<Roster />)
++    await screen.findByText(/no players yet/i)
++    expect(screen.queryByRole('button', { name: /add player/i })).not.toBeInTheDocument()
++  })
++
++  it('opens the empty form from the Add button', async () => {
++    const user = userEvent.setup()
++    useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
++    render(<Roster />)
++
++    await user.click(await screen.findByRole('button', { name: /add player/i }))
++
++    expect(await screen.findByRole('heading', { name: 'Add player' })).toBeInTheDocument()
++    expect(screen.getByLabelText('Full name')).toHaveValue('')
++  })
++
++  it('reloads the roster after a save', async () => {
++    const user = userEvent.setup()
++    useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
++    render(<Roster />)
++
++    await user.click(await screen.findByRole('button', { name: /add player/i }))
++    const callsBefore = listPlayersMock.mock.calls.length
++
++    // Scoped to the sheet: the section head's "Add player" button matches the
++    // same name, and the one being clicked here is the form's submit.
++    const dialog = screen.getByRole('dialog')
++    await user.type(within(dialog).getByLabelText('Full name'), 'Tom Fletcher')
++    await user.click(within(dialog).getByRole('button', { name: /^add player$/i }))
++
++    await waitFor(() => expect(listPlayersMock.mock.calls.length).toBeGreaterThan(callsBefore))
++  })
++})
++
++describe('PlayerDetail wiring', () => {
++  beforeEach(() => {
++    listPlayersMock.mockResolvedValue([EXISTING_PLAYER])
++  })
++
++  async function openDetail(memberships) {
++    const user = userEvent.setup()
++    useMembershipsMock.mockReturnValue(membershipValue(memberships))
++    render(<Roster />)
++    await user.click(await screen.findByRole('button', { name: /Dhruv Ramachandran/i }))
++    await screen.findByRole('dialog')
++    return user
++  }
++
++  it('offers Edit and Delete to a coach of that squad', async () => {
++    await openDetail(COACH_U12)
++    const dialog = screen.getByRole('dialog')
++    expect(within(dialog).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
++    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
++  })
++
++  it('tells a parent it is read-only instead of offering the buttons', async () => {
++    await openDetail(PARENT)
++    const dialog = screen.getByRole('dialog')
++    expect(within(dialog).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
++    expect(within(dialog).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
++    expect(within(dialog).getByText(/read-only|can't change/i)).toBeInTheDocument()
++  })
++
++  it('opens the edit form prefilled from the player', async () => {
++    const user = await openDetail(COACH_U12)
++
++    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit' }))
++
++    expect(await screen.findByRole('heading', { name: 'Edit player' })).toBeInTheDocument()
++    expect(screen.getByLabelText('Full name')).toHaveValue('Dhruv Ramachandran')
++  })
++
++  it('asks for confirmation before deleting, and does nothing if cancelled', async () => {
++    const user = await openDetail(COACH_U12)
++
++    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
++    expect(deletePlayerMock).not.toHaveBeenCalled()
++    expect(screen.getByText(/remove this player\?|delete this player\?/i)).toBeInTheDocument()
++
++    await user.click(screen.getByRole('button', { name: /keep them|keep it/i }))
++    expect(deletePlayerMock).not.toHaveBeenCalled()
++    expect(screen.getByRole('dialog')).toBeInTheDocument()
++  })
++
++  it('deletes on confirmation and closes back to the roster', async () => {
++    const user = await openDetail(COACH_U12)
++
++    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
++    await user.click(screen.getByRole('button', { name: /yes, delete/i }))
++
++    await waitFor(() => expect(deletePlayerMock).toHaveBeenCalledWith('p-1'))
++    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
++  })
++
++  it('surfaces a delete failure and leaves the player on screen', async () => {
++    deletePlayerMock.mockRejectedValue(new Error('permission denied for table players'))
++    const user = await openDetail(COACH_U12)
++
++    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
++    await user.click(screen.getByRole('button', { name: /yes, delete/i }))
++
++    const dialog = screen.getByRole('dialog')
++    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
++      'permission denied for table players',
++    )
++    expect(dialog).toBeInTheDocument()
++  })
++})

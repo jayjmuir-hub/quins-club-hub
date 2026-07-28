@@ -153,6 +153,47 @@ describe('PlayerForm — shape and scoping', () => {
     expect(getPlayerContactMock).not.toHaveBeenCalled()
   })
 
+  it('refuses to render for a player whose squad this user cannot edit', () => {
+    // The per-player gate, and the one this file's safeguarding reasoning
+    // actually rests on. A coach of U14 handed a U12 player has SOME editable
+    // squad, so the "no editable teams" gate lets them through — but
+    // getPlayerContact would then return null because RLS withheld the row,
+    // which this form would otherwise read as "no contact on file" and render
+    // as blank, editable fields. Enforced in the component rather than only in
+    // Roster, so it holds whoever opens the form.
+    const coachOfOtherSquad = [{ id: 'm-c', role: 'coach', team_id: 't-u14' }]
+    renderForm({ memberships: coachOfOtherSquad, player: EXISTING_PLAYER })
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/can't change players in this age group/i)
+    expect(screen.queryByRole('button', { name: /save|add player/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
+    expect(getPlayerContactMock).not.toHaveBeenCalled()
+  })
+
+  it('still lets a coach edit a player in a squad they do coach', async () => {
+    // The other side of the gate above: it must not refuse the normal case.
+    await renderEditForm({ memberships: COACH_U12 })
+    expect(screen.getByLabelText('Full name')).toHaveValue('Dhruv Ramachandran')
+  })
+
+  it('tells the two refusals apart rather than blaming the wrong thing', () => {
+    renderForm({ memberships: PARENT })
+    expect(screen.getByRole('alert')).toHaveTextContent(/don't have a squad you can add or change/i)
+  })
+
+  it('promises exactly who can read the contact details, matching the RLS policy', () => {
+    // player_contacts' read policy is `can_edit_team(...) OR
+    // is_own_player(player_id)` — the linked player can read their own row.
+    // This line is a written safeguarding promise shown to whoever is typing a
+    // minor's guardian details in, so it has to match the policy rather than
+    // approximate it.
+    renderForm()
+    expect(
+      screen.getByText(/only coaches, club admins and the player themselves can see these/i),
+    ).toBeInTheDocument()
+  })
+
   it('has no jersey number field, because the club does not use them', () => {
     renderForm()
     expect(screen.queryByLabelText(/jersey|squad number|shirt number/i)).not.toBeInTheDocument()
@@ -201,6 +242,36 @@ describe('PlayerForm — validation', () => {
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     expect(screen.getByLabelText('Full name')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('clears the error and the invalid highlight as soon as the field is fixed', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: /add player/i }))
+    expect(screen.getByLabelText('Full name')).toHaveAttribute('aria-invalid', 'true')
+
+    await user.type(screen.getByLabelText('Full name'), 'T')
+
+    expect(screen.getByLabelText('Full name')).not.toHaveAttribute('aria-invalid')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps a failed SAVE on screen while typing, unlike a validation error', async () => {
+    // Nothing the user types makes a refused write true again, so that message
+    // has to survive editing — only the "fill in the highlighted fields"
+    // banner is transient.
+    const user = userEvent.setup()
+    upsertPlayerMock.mockRejectedValue(new Error('permission denied for table players'))
+    renderForm()
+
+    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await user.click(screen.getByRole('button', { name: /add player/i }))
+    await screen.findByRole('alert')
+
+    await user.type(screen.getByLabelText('Full name'), '!')
+
+    expect(screen.getByRole('alert')).toHaveTextContent('permission denied for table players')
   })
 
   it('treats a whitespace-only name as empty', async () => {
@@ -340,6 +411,28 @@ describe('PlayerForm — editing an existing player', () => {
       full_name: 'Dhruv Ramachandran',
       team_id: 't-u12',
     })
+  })
+
+  it('never reassigns an edited player to a different age group behind the coach', async () => {
+    // The squad reconciliation must fall back to the player's OWN team, not to
+    // "the first editable team". Here the player is in U14 and the coach
+    // coaches both squads, but the loaded `teams` list only carries U12 — so
+    // the player's team is absent from the reconciled options and the old
+    // fallback picked U12. That is a child silently moved between age groups
+    // on save, which is a materially worse outcome than the same slip on a
+    // fixture.
+    const user = userEvent.setup()
+    const u14Player = { ...EXISTING_PLAYER, id: 'p-14', team_id: 't-u14' }
+    renderForm({ memberships: COACH_TWO, teams: [TEAM_U12], player: u14Player })
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /save changes/i })).not.toBeDisabled(),
+    )
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
+    expect(upsertPlayerMock.mock.calls[0][0]).toMatchObject({ id: 'p-14', team_id: 't-u14' })
+    expect(upsertPlayerMock.mock.calls[0][0].team_id).not.toBe('t-u12')
   })
 
   it('prefills the contact fields from the contact row', async () => {

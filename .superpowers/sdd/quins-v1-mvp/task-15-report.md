@@ -349,3 +349,138 @@ None blocking. Two things worth flagging for later:
    the design system, which specifies plain text inputs, and matches the schema (both nullable
    `text`). The Wild Apricot import will need normalising anyway; validating here first would just
    mean two competing rules.
+
+---
+
+# Fix round 1 — review findings
+
+Four findings addressed (2 Important, 2 Minor). All in `src/screens/PlayerForm.jsx` and
+`tests/player-form.test.jsx`. Nothing else touched — in particular `EventForm.jsx` was left alone as
+instructed. The deferred items (dead `invalid.teamId` branch, `club_id` on updates, the retry button
+label) were not acted on.
+
+## 1 (Important) — `PlayerForm` now enforces the per-player edit check itself
+
+**The finding is correct and I accept it.** My file header claimed "a null contact row here can only
+mean nothing recorded yet, never withheld" and justified it with "this form renders only for someone
+who passes `can_edit_team`" — but the component's own gate was `editableTeams.length === 0`, i.e.
+"has ANY editable squad". The per-player check lived only in `Roster.jsx`. The invariant was
+asserted in one file and enforced in another, which is exactly the shape that rots: nothing is
+exposed today, but a second caller or a regression in Roster's gating turns a withheld `null` into
+blank, editable contact fields.
+
+Split into two named gates in the component:
+
+```js
+const noEditableTeams = editableTeams.length === 0
+const notThisPlayer = Boolean(player) && !canEditTeam(memberships, player.team_id)
+const gated = noEditableTeams || notThisPlayer
+```
+
+The two reasons get separate copy, because "you coach no squads" and "you don't coach this one" are
+different problems with different fixes: the first keeps the original wording, the second reads
+"You can't change players in this age group. Ask a club admin if that looks wrong." The contact-read
+effect already returns early on `gated`, so the wider gate also stops the `player_contacts` query
+being issued for a player the user may not edit.
+
+Header comment rewritten to state that the enforcement is local, and to say *why* it has to be —
+so the next person to touch this can't quietly move it back out to the caller.
+
+**Covering tests:**
+- `refuses to render for a player whose squad this user cannot edit` — a coach of U14 handed a U12
+  player: asserts the new copy, no Save button, **no Phone or Email field**, and
+  `getPlayerContact` never called.
+- `still lets a coach edit a player in a squad they do coach` — the gate must not refuse the normal
+  case.
+- `tells the two refusals apart rather than blaming the wrong thing` — a parent still gets the
+  "no squad you can add or change" wording, not the per-player one.
+
+## 2 (Important) — contact disclosure copy corrected
+
+**Also correct.** The note said "Only coaches and club admins can see these." The confirmed read
+policy is `can_edit_team(...) OR is_own_player(player_id)`, so the linked player can read their own
+row. Not a leak, but it is a written safeguarding promise shown to the person typing a minor's
+guardian details in, and it did not match the policy.
+
+Now: **"Only coaches, club admins and the player themselves can see these. Leave them blank if you
+don't have them."** The comment above it now quotes the policy verbatim and records that the earlier
+wording misstated it.
+
+**Covering test:** `promises exactly who can read the contact details, matching the RLS policy`.
+
+## 3 (Minor) — squad reconciliation can no longer reassign a player's age group
+
+Both the mount-time default and the per-render reconciliation fell through to `editableTeams[0]`
+when the player's own team wasn't in the reconciled list, so the form could display and then save a
+different squad than the one the player is actually in. Fixed in `PlayerForm.jsx` only:
+
+```js
+teamId: player ? player.team_id : fallbackTeamId            // initialValues
+// and
+: editing ? player.team_id : editableTeams[0]?.id ?? ''      // reconciliation
+```
+
+`EventForm.jsx` deliberately untouched.
+
+**Covering test:** `never reassigns an edited player to a different age group behind the coach` —
+a U14 player, a coach of both squads, and a `teams` list carrying only U12, so the player's team is
+absent from the reconciled options. Asserts the write carries `team_id: 't-u14'` and explicitly
+`not.toBe('t-u12')`.
+
+## 5 (Minor) — validation error clears as the field is fixed
+
+**Choice made: clear on any input change, and clear the edited field's highlight immediately.**
+Reasoning: the banner's only job is to point at the highlights, and the highlights are already
+per-field — a banner that outlives the state it describes is noise. Implemented in the shared `set`
+helper so it applies to every field including the selects and the segmented control.
+
+Only *validation* errors are cleared this way. A failed **write** survives typing, because nothing
+the user types makes a refused save true again.
+
+**Covering tests:**
+- `clears the error and the invalid highlight as soon as the field is fixed` — after a blocked
+  submit, typing one character removes `aria-invalid` and the alert.
+- `keeps a failed SAVE on screen while typing, unlike a validation error` — the other half, so a
+  future "just clear everything on change" simplification fails a test.
+
+## Verification
+
+New tests confirmed non-vacuous: stashing the amended component and re-running the suite fails
+**exactly four** tests, one per fix, and nothing else.
+
+```
+$ git stash push -q src/screens/PlayerForm.jsx && npx vitest run tests/player-form.test.jsx
+   × PlayerForm — shape and scoping > refuses to render for a player whose squad this user cannot edit
+   × PlayerForm — shape and scoping > promises exactly who can read the contact details, matching the RLS policy
+   × PlayerForm — validation > clears the error and the invalid highlight as soon as the field is fixed
+   × PlayerForm — editing an existing player > never reassigns an edited player to a different age group behind the coach
+      Tests  4 failed | 43 passed (47)
+```
+
+Restored, then:
+
+```
+$ npx vitest run tests/player-form.test.jsx
+ ✓ tests/player-form.test.jsx (47 tests) 2673ms
+ Test Files  1 passed (1)   Tests  47 passed (47)
+
+$ npm test
+ Test Files  18 passed (18)
+      Tests  451 passed (451)
+
+$ npm run build
+ ✓ built in 2.66s
+```
+
+451 passing, up from 444 (+7 new tests). Nothing regressed.
+
+Browser check re-run (`harness/shoot-t15-verify.mjs`, 8 scenarios × 375px and 1280px) after the
+changes: byte-identical behaviour on every recorded write, zero character loss, no overflow, no
+native dialogs, no console errors, and the null-contact player still shows `alerts: []` /
+`mentionsHidden: false` with blank editable fields.
+
+## Files changed in this round
+
+- `src/screens/PlayerForm.jsx` — per-player gate, split refusal copy, corrected disclosure note,
+  squad-reconciliation fallback, validation-error clearing, header comment updated.
+- `tests/player-form.test.jsx` — 7 new tests (40 → 47).
