@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { StrictMode } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
@@ -24,15 +25,16 @@ import AcceptInvite from '../src/screens/AcceptInvite.jsx'
 
 const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
 
-function renderScreen(token = 'tok-abc-123') {
-  return render(
+function renderScreen(token = 'tok-abc-123', { strict = false } = {}) {
+  const tree = (
     <MemoryRouter initialEntries={[`/accept-invite/${token}`]} future={routerFuture}>
       <Routes>
         <Route path="/accept-invite/:token" element={<AcceptInvite />} />
         <Route path="/" element={<div>Home screen marker</div>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   )
+  return render(strict ? <StrictMode>{tree}</StrictMode> : tree)
 }
 
 const reloadMock = vi.fn()
@@ -105,6 +107,47 @@ describe('AcceptInvite', () => {
     renderScreen()
 
     await waitFor(() => expect(reloadMock).toHaveBeenCalled())
+    expect(acceptInviteMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows crest branding on the loading and error states', async () => {
+    acceptInviteMock.mockReturnValue(new Promise(() => {}))
+
+    renderScreen()
+
+    expect(screen.getByText('Abu Dhabi Harlequins')).toBeInTheDocument()
+    expect(screen.getByAltText('Abu Dhabi Harlequins crest')).toBeInTheDocument()
+  })
+
+  // Regression test for D1: React 18 StrictMode double-invokes effects in
+  // dev (mount -> synchronous cleanup -> remount, before first paint). A
+  // previous version of this screen combined a `calledRef` guard with a
+  // `mounted` ref, and the throwaway first mount's cleanup permanently set
+  // `mounted = false` before the real (still in-flight) acceptInvite promise
+  // settled, silently swallowing the eventual success/failure and leaving
+  // the screen stuck on "Accepting your invite..." forever. Rendering with
+  // <StrictMode> here reproduces that double-invoke in this test environment
+  // and asserts the full success sequence (reload + navigate home) still
+  // completes despite it.
+  it('still completes the accept flow under React StrictMode double-invoke', async () => {
+    acceptInviteMock.mockResolvedValue({ id: 'm-new', role: 'coach', team_id: 't-u12' })
+
+    renderScreen('tok-strict-1', { strict: true })
+
+    await waitFor(() => expect(reloadMock).toHaveBeenCalled())
+    expect(await screen.findByText('Home screen marker')).toBeInTheDocument()
+    // acceptInvite may be invoked by both the throwaway and real StrictMode
+    // mounts' effects in principle, but calledRef must prevent that: only
+    // the genuine mount's effect should ever call it.
+    expect(acceptInviteMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('still shows the error alert under React StrictMode double-invoke', async () => {
+    acceptInviteMock.mockRejectedValue(new Error('This invite has already been used.'))
+
+    renderScreen('tok-strict-2', { strict: true })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('This invite has already been used.')
     expect(acceptInviteMock).toHaveBeenCalledTimes(1)
   })
 })

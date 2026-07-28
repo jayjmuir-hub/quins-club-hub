@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import Spinner from '../components/Spinner.jsx'
+import crest from '../assets/crest.png'
 import { acceptInvite } from '../data/members.js'
 import { useMemberships } from '../lib/memberships.jsx'
 
@@ -38,29 +39,34 @@ export default function AcceptInvite() {
   // accept_invite is not safely retryable by design: a second call for an
   // already-accepted token is exactly the "already been used" refusal this
   // screen must not confuse with a genuine failure.
+  //
+  // Deliberately no companion "mounted" flag here. StrictMode's dev-only
+  // double-invoke (mount → synchronous cleanup → remount, before first
+  // paint) doesn't actually unmount this screen for real, so there's nothing
+  // to protect the in-flight promise's `.then()`/`.catch()` from — a
+  // "mounted" ref set false by the throwaway first mount's cleanup would
+  // just make that same promise's eventual resolution silently no-op
+  // forever, which is exactly what used to make this screen hang under
+  // `npm run dev`. calledRef alone already does the one job that matters
+  // (never issue a second real network call), and a genuine unmount before
+  // the promise settles (e.g. the user navigating away) is harmless: the
+  // component is gone, so its setState calls are simply dropped by React
+  // with a no-op (React 18 doesn't warn about this post-unmount).
   const calledRef = useRef(false)
 
   useEffect(() => {
-    if (calledRef.current) return undefined
+    if (calledRef.current) return
     calledRef.current = true
-
-    let mounted = true
 
     acceptInvite(token)
       .then(() => {
-        if (!mounted) return
         reload()
         setStatus('done')
       })
       .catch((err) => {
-        if (!mounted) return
         setError(err)
         setStatus('error')
       })
-
-    return () => {
-      mounted = false
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload comes
     // from context and is stable enough here; token is the only input this
     // effect should ever re-run for, and calledRef already guards a re-run
@@ -74,6 +80,22 @@ export default function AcceptInvite() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#f5f4f3] px-4 text-[#221f1d]">
       <div className="w-full max-w-[420px] rounded-2xl border border-[#e6e3e1] bg-white p-6 text-center shadow-[0_6px_24px_rgba(20,20,20,0.10)]">
+        {/* Standalone branding header for this screen only — this route is
+            a brand-new invitee's first-ever view of the app (see the top of
+            this file for why it sits outside AppShell), so a small crest +
+            club name here is worth the couple of lines even though the rest
+            of this card stays a plain unchromed status card. Not the full
+            AppShell gradient header/nav — this is a lighter touch on
+            purpose. */}
+        <img
+          src={crest}
+          alt="Abu Dhabi Harlequins crest"
+          className="mx-auto h-14 w-14 object-contain"
+        />
+        <p className="mt-2 text-center text-xs font-semibold uppercase tracking-widest text-[#77726e]">
+          Abu Dhabi Harlequins
+        </p>
+
         {status === 'loading' && (
           <div className="flex flex-col items-center gap-3 py-4">
             <Spinner label="Accepting your invite…" />
