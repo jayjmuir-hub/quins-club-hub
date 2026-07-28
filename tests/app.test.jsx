@@ -62,6 +62,11 @@ vi.mock('../src/data/players.js', () => ({
 // tests/admin.test.jsx; here it only has to be the thing "/more" renders.
 vi.mock('../src/data/members.js', () => ({
   listClubMembers: () => new Promise(() => {}),
+  // /accept-invite/:token (Task 18) renders the real AcceptInvite screen,
+  // which calls this on mount. Never resolving keeps that test focused on
+  // routing/reachability, not on AcceptInvite's own behaviour (covered by
+  // tests/accept-invite.test.jsx).
+  acceptInvite: () => new Promise(() => {}),
 }))
 
 // Import after vi.mock so this binds to the mocked modules.
@@ -155,5 +160,22 @@ describe('App', () => {
 
     expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/')
+  })
+
+  it('renders /accept-invite/:token even for a brand-new invitee with zero memberships', () => {
+    // The routing-gap regression this task exists to fix: AppShell only
+    // renders its routed children once memberships.length > 0, which a
+    // just-signed-in invitee never has yet. If this route were nested inside
+    // a single shared AppShell the way the other four are, it would be
+    // permanently unreachable — AppShell's NoMembershipState would render
+    // instead, no matter the URL.
+    window.history.pushState({}, '', '/accept-invite/tok-abc-123')
+    useAuthMock.mockReturnValue(signedIn)
+    useMembershipsMock.mockReturnValue({ ...membershipsLoaded, memberships: [] })
+
+    render(<App />)
+
+    expect(screen.getByRole('status', { name: /accepting your invite/i })).toBeInTheDocument()
+    expect(screen.queryByText(/isn't linked to a squad yet/i)).not.toBeInTheDocument()
   })
 })

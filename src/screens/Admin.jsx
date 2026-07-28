@@ -9,13 +9,14 @@ import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin, roleLabel } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
+import InviteForm from './InviteForm.jsx'
 
 // Admin overview (Task 17, Phase F): a club-wide landing page for admins —
 // every team, every player, everyone with a membership row — with entry
-// points into managing the roster/schedule and (Task 18) inviting new
-// members. Admin-only: a non-admin gets a plain "not authorised" message and
-// none of the data below is ever fetched for them (see the early return
-// before either query runs).
+// points into managing the roster/schedule and inviting new members (Task
+// 18's InviteForm, opened here in the shared Sheet). Admin-only: a non-admin
+// gets a plain "not authorised" message and none of the data below is ever
+// fetched for them (see the early return before either query runs).
 //
 // This screen deliberately does not re-fetch teams: useMemberships() already
 // loads every team an admin can see (all 15, via visibleTeams' admin
@@ -101,6 +102,10 @@ export default function Admin() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
+  // Whether the invite Sheet is open. A plain boolean, unlike Roster's
+  // formState — InviteForm has no "edit" mode and no row of its own to
+  // carry, only ever the "add" case.
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   useEffect(() => {
     if (!admin) return undefined
@@ -193,11 +198,9 @@ export default function Admin() {
               actual add/edit/delete flows for players and events. There is
               no separate "manage" screen to build for Task 17; the useful
               thing this overview can do is point an admin straight at them.
-              An "Invite a member" entry point is deliberately absent rather
-              than a disabled or dead stub: Task 18 owns that flow and it does
-              not exist yet, and Roster.jsx / Dashboard.jsx already settled
-              this exact question for events/players — a control that
-              promises something not yet built is worse than no control. */}
+              "Invite a member" opens Task 18's InviteForm in the shared
+              Sheet — that flow now exists, closing the gap the Task 17
+              comment here used to describe. */}
           <SectionTitle>Manage</SectionTitle>
           <Card className="p-[14px]">
             <div className="flex flex-col gap-2.5 desktop:flex-row">
@@ -213,6 +216,13 @@ export default function Admin() {
               >
                 Manage schedule &amp; fixtures
               </Link>
+              <button
+                type="button"
+                onClick={() => setInviteOpen(true)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-quinsRed px-[15px] py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+              >
+                Invite a member
+              </button>
             </div>
           </Card>
 
@@ -243,6 +253,8 @@ export default function Admin() {
           )}
         </>
       )}
+
+      {inviteOpen && <InviteForm onClose={() => setInviteOpen(false)} />}
     </section>
   )
 }

@@ -15,11 +15,21 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 // non-admin, not just that their output isn't on screen.
 
 const useMembershipsMock = vi.fn()
+const useAuthMock = vi.fn()
 const listPlayersMock = vi.fn()
 const listClubMembersMock = vi.fn()
+const createInviteMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
+}))
+
+// Admin renders InviteForm (Task 18) in a Sheet; InviteForm itself reads
+// useAuth for the inviting admin's id and calls createInvite. Its own
+// behaviour is covered by tests/invite-form.test.jsx — here it only matters
+// that Admin's "Invite a member" button actually opens it.
+vi.mock('../src/lib/auth.jsx', () => ({
+  useAuth: () => useAuthMock(),
 }))
 
 vi.mock('../src/data/players.js', () => ({
@@ -28,6 +38,7 @@ vi.mock('../src/data/players.js', () => ({
 
 vi.mock('../src/data/members.js', () => ({
   listClubMembers: (...args) => listClubMembersMock(...args),
+  createInvite: (...args) => createInviteMock(...args),
 }))
 
 // Import after vi.mock so this binds to the mocked modules.
@@ -58,6 +69,7 @@ function memberships(rows, teams = TEAMS) {
 beforeEach(() => {
   vi.clearAllMocks()
   useMembershipsMock.mockReturnValue(memberships(ADMIN))
+  useAuthMock.mockReturnValue({ user: { id: 'admin-1', email: 'jay@example.com' } })
   listPlayersMock.mockResolvedValue(ALL_PLAYERS)
   listClubMembersMock.mockResolvedValue(MEMBER_ROWS)
 })
@@ -263,5 +275,39 @@ describe('Admin — content', () => {
 
     await screen.findByText('Sara Coach')
     expect(screen.queryByText(/jersey/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('Admin — invite entry point (Task 18)', () => {
+  it('offers a real, functional "Invite a member" button', async () => {
+    setup()
+
+    await screen.findByText('Sara Coach')
+    expect(screen.getByRole('button', { name: /invite a member/i })).toBeInTheDocument()
+  })
+
+  it('opens InviteForm in a sheet when clicked', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.click(screen.getByRole('button', { name: /invite a member/i }))
+
+    expect(await screen.findByRole('heading', { name: /invite a member/i })).toBeInTheDocument()
+  })
+
+  it('closes the sheet without touching the club-wide member list', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.click(screen.getByRole('button', { name: /invite a member/i }))
+    await screen.findByRole('dialog')
+
+    await user.click(screen.getByRole('button', { name: /close/i }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // Sending an invite creates an `invites` row, not a `memberships` row —
+    // nothing changes in the club-members list until the invite is
+    // accepted, so closing the sheet must not re-query it.
+    expect(listClubMembersMock).toHaveBeenCalledTimes(1)
   })
 })
