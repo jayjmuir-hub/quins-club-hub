@@ -556,3 +556,184 @@ None outstanding on the code. Two process notes:
    committing and confirmed the `*` version is not in any of my commits, but
    something is rewriting it repeatedly and it will eventually land in someone's
    commit unnoticed.
+
+---
+
+# Task 11 — Amendment: force all event times to Abu Dhabi time
+
+Jay's ruling on the open product question I flagged in the original report: event
+times are no longer rendered in the reader's browser zone. They are always Abu
+Dhabi time. One club, one home ground — "20:00" has to mean 20:00 at Zayed Sports
+City whether the reader is on the touchline, on tour, or a committee member
+checking fixtures from the UK. Under the old behaviour a parent in London read a
+20:00 kick-off as 16:00.
+
+This is a **presentation-only** change. `starts_at` is still `timestamptz`, still
+stored UTC, and every instant comparison (`sortByStart`, upcoming-vs-past,
+`hasResult`) is untouched and was already zone-agnostic. No schema change.
+
+## What I implemented
+
+**One constant, one source of truth** — `CLUB_TIME_ZONE = 'Asia/Dubai'` in
+`src/lib/eventFormat.js`, deliberately an IANA **zone identifier** consumed via
+`Intl.DateTimeFormat`'s `timeZone` option, not a hardcoded `+04:00`. The UAE has
+no DST today so the two agree, but an offset is a derived fact that would rot
+silently if that ever changed; the zone stays correct by definition. `formatTime`,
+`formatLongDate` and `dateBoxParts` all route through it.
+
+**Two new pure helpers**, same zero-import/no-React pattern as the rest of the module:
+
+- `clubDayParts(date)` → `{ year, month, day }` — the calendar day an instant falls
+  on *in club time*, month 0-based to match `Date`'s convention. Built on
+  `formatToParts` off a module-level formatter pinned to `en-US` **only** because it
+  extracts numbers, never user-visible text (a `ja-JP` numeric day returns `"24日"`).
+  The user-facing formatters still use the reader's own locale — only the *zone* is
+  forced, not the language.
+- `clubToday()` — today in club time, for the "today" ring and the month the
+  calendar opens on.
+
+**The calendar grid** was the subtle part. `CalendarMonth` now carries its displayed
+month as plain `{ year, month }` numbers rather than a `Date`. That is the actual
+fix, not a tidy-up: a `Date` is always an *instant*, and every arithmetic path on
+one (`new Date(y, m, d)`, `getDay()`, `getDate()`) silently reads the browser's
+zone. Day bucketing and the today-highlight now both compare `clubDayParts`. The
+only `Date`s left in the grid are UTC-anchored throwaways used to ask "what weekday
+is the 1st?" and "how many days in this month?" — questions about a calendar, not
+about an instant.
+
+**One quiet UI note**, on the `EventDetail` date/time line only:
+`Tue, Jul 28, 2026 · 7:30 PM · Abu Dhabi time`. Not on every list row — someone
+scanning a list doesn't need reminding once per line; someone reading one fixture
+from abroad does need to know 20:00 isn't their 20:00. Kept on the same line at the
+same `white/[.85]`, set apart by weight rather than colour.
+
+## TDD evidence
+
+RED was produced honestly by stashing **only** the three source files and keeping
+the new tests, so the failures are the tests catching the real defect rather than
+import errors:
+
+```
+$ git stash push src/lib/eventFormat.js src/screens/Schedule.jsx src/screens/EventDetail.jsx
+$ npx vitest run tests/event-format.test.js tests/schedule.test.jsx
+  Test Files  2 failed (2)
+       Tests  16 failed | 61 passed (77)
+```
+
+All 16 named failures were the new assertions, including the three screen-level
+ones ("buckets a fixture into its Abu Dhabi day, not the browser's", "carries a
+fixture into the next month when Abu Dhabi has already rolled over", "says once
+that times are Abu Dhabi time"). The important one is behavioural, not a missing
+export:
+
+```
+$ npx vitest run tests/event-format.test.js -t "renders the Dubai wall-clock time"
+AssertionError: expected 3 to be 1
+  ❯ tests/event-format.test.js:361  expect(new Set(rendered).size).toBe(1)
+```
+
+i.e. the unfixed `formatTime` produced **three different strings** for one instant
+under UTC / New York / Auckland. That single line is also the proof that runtime
+`process.env.TZ` manipulation genuinely works in this setup — had it not, the
+assertion would have passed vacuously.
+
+GREEN after `git stash pop`:
+
+```
+$ npx vitest run tests/event-format.test.js tests/schedule.test.jsx
+  Test Files  2 passed (2)   Tests  77 passed (77)
+```
+
+Full suite: **300 passed across 15 files** (baseline 282, +18 new), pristine output,
+no regressions. `npm run build` clean.
+
+### How the tests avoid proving nothing
+
+The trap here is that this runner is UTC, and UTC and Dubai share a calendar day
+for 20 hours out of every 24 — a mid-afternoon instant would pass just as happily
+against a completely unfixed formatter. So:
+
+- Every pinned instant is chosen so Dubai's answer **differs** from at least one of
+  UTC / New York / Auckland: 21:00 UTC → 01:00 the *next* Dubai day; 20:00 UTC →
+  exactly midnight Dubai; 19:59 UTC on 31 Jul → last minute of the month; 21:00 UTC
+  on 31 Jul → first hour of August; 20:00 UTC on 31 Dec → the club new year.
+- The whole set is re-run under all three process zones, asserting the rendered
+  output is **byte-identical** across them.
+- A `withTimeZone` **guard-the-guard** test asserts the helper really does move the
+  process zone (`getDate()` returns 24 in New York, 25 in Auckland for the same
+  instant) — without it, every zone assertion below it could pass vacuously.
+- The screen-level tests derive their expected month/day from an
+  `Intl.DateTimeFormat` computed **independently of `eventFormat.js`**, so they are
+  not just the implementation agreeing with itself, and they don't flake during the
+  four hours a day when UTC and Dubai disagree.
+
+## Files changed
+
+- `src/lib/eventFormat.js` — `CLUB_TIME_ZONE`, `clubDayParts`, `clubToday`; the
+  three formatters routed through the zone
+- `src/screens/Schedule.jsx` — month state as `{year, month}`; club-local bucketing
+  and today-highlight; UTC-anchored month labels
+- `src/screens/EventDetail.jsx` — the "· Abu Dhabi time" suffix
+- `tests/event-format.test.js` — new club-timezone suites (+15)
+- `tests/schedule.test.jsx` — bucketing, month roll-over, UI-note tests (+3)
+- `harness/stubs/events.js` — one boundary fixture at `2026-07-20T21:00:00Z`, so
+  the browser check can *see* the cell a naive implementation gets wrong
+
+## Browser check
+
+Ran `harness/shoot-schedule.mjs` at 375px and 1280px with **both the dev server and
+Chromium under `TZ=America/New_York`** — a browser check in UTC would have been
+nearly as worthless as a test in UTC. Screenshots read with the Read tool, not just
+asserted in code.
+
+- **Calendar, 375 & 1280.** The boundary fixture (`2026-07-20T21:00Z`) renders in
+  the list as **JUL 21 Tue, 1:00 AM**. Under New York the old code would have shown
+  *JUL 20 Mon, 5:00 PM*. Its dot sits in the **21st** cell; the 20th is empty.
+- **Today ring.** Container clock was 2026-07-28 01:09 UTC = 28 Jul in Dubai, 27 Jul
+  in New York. The ring is on **28** — so the today-highlight fix is demonstrated
+  live, not just unit-tested.
+- **Row geometry undisturbed.** Calendar cells uniform at 40×40 (mobile) and
+  147×147 (desktop) across the button and div variants — the UA content-centring
+  trap from the original task has not reopened. Zero horizontal overflow
+  (`docWidth === innerWidth` at both widths), zero console errors, zero page errors
+  across all 16 shots.
+- **EventDetail line** renders correctly at both widths, and the list rows visible
+  behind the open sheet carry no "Abu Dhabi time" — it appears exactly once.
+
+## Self-review findings
+
+1. **Fixed: a wrong contrast number in a code comment.** The comment on the new
+   EventDetail line claimed `white/85%` on `#C21F32` measures **5.02:1**. I
+   recomputed it independently (sRGB→linear, WCAG 4.5:1 for normal text) and it is
+   **4.632:1**. The conclusion survives — 4.632 still clears AA, and the rejected
+   `white/70%` alternative really is 3.55:1 (the comment's 3.53 was near enough) —
+   but a confidently stated wrong number in a comment is worse than no number,
+   because the next person trusts it instead of recomputing. Corrected to 4.63:1
+   with the AA margin stated explicitly, since 4.63 against a 4.5 threshold is a
+   thin margin worth being honest about.
+2. **Swept for every other user-facing date/time.** Grepped `src/` for
+   `toLocale*String`, `Intl.DateTimeFormat`, `getDate/getMonth/getFullYear/getDay/
+   getHours`, `toDateString` and `new Date(`. Every surviving call site is either
+   club-zoned or deliberately UTC-anchored. Separately checked for other
+   date-bearing fields reaching the UI (`created_at`, `updated_at`, DOB/birth):
+   there are none — `starts_at` is the only timestamp the app renders, and "age
+   group" is a team name, not a date. Nothing is left rendering in the browser zone.
+3. **YAGNI held.** No timezone picker, no per-user preference, no offset display for
+   remote readers, no `date-fns-tz` dependency. `clubDayParts` and `clubToday` are
+   both consumed by real call sites; neither is speculative.
+4. **`--muted` ruling checked and correctly ruled inapplicable.** The `#5c5854`
+   decision governs muted text *on paper*. This line sits on the red hero gradient
+   at `white/[.85]`, a different context, so it was left alone rather than
+   mechanically recoloured.
+
+## Note for Task 14 (flagged only — NOT implemented)
+
+**Task 14's event form must interpret the date and time a coach enters as Abu Dhabi
+time when it builds `starts_at`.** This is the exact mirror image of this change. A
+naive `new Date(\`${dateInput}T${timeInput}\`)` resolves in the *browser's* zone, so
+a coach in the UK entering "20:00" would write `19:00Z` — a 23:00 Abu Dhabi kick-off
+— and this screen would then faithfully render that wrong instant. Reading and
+writing have to agree: the form needs to convert club wall-clock → UTC using
+`CLUB_TIME_ZONE`, and the form's date field should default from `clubToday()` rather
+than `new Date()`. Worth a test with the process zone set to something other than
+UTC+4, for the same reason as above.

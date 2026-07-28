@@ -308,14 +308,91 @@ describe('Schedule — scope note', () => {
 })
 
 describe('Schedule — calendar tab', () => {
-  const monthLabel = (offset = 0) => {
-    const d = new Date()
-    // Anchor to the 1st before shifting, so a 31st never rolls past a
-    // 30-day month the way `setMonth` on the 31st would.
-    d.setDate(1)
-    d.setMonth(d.getMonth() + offset)
-    return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  // The displayed month follows the CLUB's today (Abu Dhabi), not the
+  // runner's. Those differ for the last four hours of every UTC day, so
+  // deriving the expectation from `new Date()` would flake nightly. This
+  // computes the reference independently of src/lib/eventFormat.js, so the
+  // assertions are not just the implementation agreeing with itself.
+  const dubaiToday = () => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Dubai',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).formatToParts(new Date())
+    const get = (type) => Number(parts.find((part) => part.type === type).value)
+    return { year: get('year'), month: get('month') - 1, day: get('day') }
   }
+
+  // Month names are read off a UTC-anchored instant so they never depend on
+  // the process zone either.
+  const monthName = (year, month) =>
+    new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', month: 'long' }).format(Date.UTC(year, month, 1))
+
+  const monthLabel = (offset = 0) => {
+    const { year, month } = dubaiToday()
+    const anchor = new Date(Date.UTC(year, month + offset, 1))
+    return anchor.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long', year: 'numeric' })
+  }
+
+  const inTimeZone = async (zone, fn) => {
+    const previous = process.env.TZ
+    process.env.TZ = zone
+    try {
+      await fn()
+    } finally {
+      if (previous === undefined) delete process.env.TZ
+      else process.env.TZ = previous
+    }
+  }
+
+  // 21:00 UTC is 01:00 the NEXT day in Dubai. A grid that buckets by the
+  // browser's local day puts this fixture in the wrong cell — visibly wrong
+  // to a coach, and the kind of defect that only shows up outside UTC+4.
+  it('buckets a fixture into its Abu Dhabi day, not the browser\'s', async () => {
+    await inTimeZone('America/New_York', async () => {
+      const { year, month } = dubaiToday()
+      // Mid-month, so the roll-forward can never leave the displayed month
+      // and turn this into a month-boundary test by accident.
+      const startsAt = new Date(Date.UTC(year, month, 15, 21, 0)).toISOString()
+      listEventsMock.mockResolvedValue([{ ...UPCOMING_MATCH, starts_at: startsAt }])
+
+      const { user } = setup()
+
+      await screen.findByText('Quins vs Dubai Exiles')
+      await user.click(screen.getByRole('button', { name: 'Calendar' }))
+
+      const name = monthName(year, month)
+      expect(screen.getByRole('button', { name: `16 ${name}, 1 event` })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: new RegExp(`^15 ${name},`) })).not.toBeInTheDocument()
+    })
+  })
+
+  it('carries a fixture into the next month when Abu Dhabi has already rolled over', async () => {
+    await inTimeZone('America/New_York', async () => {
+      const { year, month } = dubaiToday()
+      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+      // 21:00 UTC on the last day of the month = 01:00 on the 1st next month
+      // in Dubai.
+      const startsAt = new Date(Date.UTC(year, month, lastDay, 21, 0)).toISOString()
+      listEventsMock.mockResolvedValue([{ ...UPCOMING_MATCH, starts_at: startsAt }])
+
+      const { user } = setup()
+
+      await screen.findByText('Quins vs Dubai Exiles')
+      await user.click(screen.getByRole('button', { name: 'Calendar' }))
+
+      // Nothing at all in this month's grid: every populated cell is a button
+      // whose name ends in "N event(s)".
+      expect(screen.queryAllByRole('button', { name: /, \d+ events?$/ })).toHaveLength(0)
+      expect(screen.getByText(/nothing is scheduled this month/i)).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /next month/i }))
+
+      const nextName = monthName(year, month + 1)
+      expect(screen.getByRole('button', { name: `1 ${nextName}, 1 event` })).toBeInTheDocument()
+    })
+  })
 
   // A day with events has to be a <button> for keyboard access; a day
   // without one stays a <div>. Chromium's UA stylesheet lays a button's
@@ -430,6 +507,18 @@ describe('Schedule — event detail sheet', () => {
     expect(within(dialog).getByText('Zayed Sports City')).toBeInTheDocument()
     expect(within(dialog).getByText('West Asia Premiership')).toBeInTheDocument()
     expect(within(dialog).getByText('U10')).toBeInTheDocument()
+  })
+
+  it('says once that times are Abu Dhabi time, on the date line only', async () => {
+    const { user } = setup()
+
+    await user.click(await screen.findByRole('button', { name: /Dubai Exiles/ }))
+
+    const dialog = screen.getByRole('dialog')
+    // On the detail sheet's date/time line...
+    expect(within(dialog).getByText(/Abu Dhabi time/)).toBeInTheDocument()
+    // ...and exactly once, not once per fixture row behind it.
+    expect(screen.getAllByText(/Abu Dhabi time/)).toHaveLength(1)
   })
 
   it('summarises availability for an upcoming fixture', async () => {

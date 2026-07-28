@@ -10,6 +10,8 @@ import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import {
+  clubDayParts,
+  clubToday,
   dateBoxParts,
   eventDate,
   eventTitle,
@@ -91,14 +93,26 @@ function ChevronIcon({ direction = 'left', ...props }) {
   )
 }
 
-function startOfMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1)
+// The calendar carries its displayed month as plain { year, month } numbers
+// rather than a Date. That is deliberate: a Date is always an instant, and
+// every arithmetic path on one (new Date(y, m, d), getDay(), getDate())
+// silently reads the *browser's* zone. The club's calendar is Abu Dhabi's,
+// so the grid is built from numbers and the only Dates involved are
+// UTC-anchored throwaways used purely to ask "what weekday is the 1st?" and
+// "how many days has this month got?" — questions about a calendar, not
+// about an instant. See CLUB_TIME_ZONE in src/lib/eventFormat.js.
+function monthAnchor(year, month, day = 1) {
+  return new Date(Date.UTC(year, month, day))
 }
 
-function isSameDay(a, b) {
-  return (
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  )
+function shiftMonth({ year, month }, delta) {
+  const anchor = monthAnchor(year, month + delta)
+  return { year: anchor.getUTCFullYear(), month: anchor.getUTCMonth() }
+}
+
+function currentClubMonth() {
+  const { year, month } = clubToday()
+  return { year, month }
 }
 
 function FixtureRow({ event, teamName, onSelect }) {
@@ -172,39 +186,50 @@ function FixtureList({ events, teamsById, onSelect, emptyMessage }) {
 }
 
 function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
-  const year = month.getFullYear()
-  const monthIndex = month.getMonth()
-  const leadingBlanks = new Date(year, monthIndex, 1).getDay()
-  const dayCount = new Date(year, monthIndex + 1, 0).getDate()
-  const today = new Date()
+  const { year, month: monthIndex } = month
+  const firstOfMonth = monthAnchor(year, monthIndex)
+  const leadingBlanks = firstOfMonth.getUTCDay()
+  const dayCount = monthAnchor(year, monthIndex + 1, 0).getUTCDate()
+  const today = clubToday()
 
-  // Only this month's events, bucketed by day-of-month. The prototype
-  // renders leading blanks only (no trailing ones) — design-system.md §4.14.
+  // Bucketed by the event's ABU DHABI day, not the reader's. A 01:00 Dubai
+  // kick-off is 21:00 the previous day in UTC and 22:00 the previous
+  // evening in London, so bucketing on the browser's local day would drop
+  // that fixture into the cell before the one it belongs in — and for a
+  // fixture on the 1st, into the previous month entirely.
+  // The prototype renders leading blanks only, no trailing ones
+  // (design-system.md §4.14).
   const byDay = new Map()
   const monthEvents = []
   events.forEach((event) => {
     const date = eventDate(event)
-    if (!date || date.getFullYear() !== year || date.getMonth() !== monthIndex) return
+    if (!date) return
+    const parts = clubDayParts(date)
+    if (parts.year !== year || parts.month !== monthIndex) return
     monthEvents.push(event)
-    const bucket = byDay.get(date.getDate()) ?? []
+    const bucket = byDay.get(parts.day) ?? []
     bucket.push(event)
-    byDay.set(date.getDate(), bucket)
+    byDay.set(parts.day, bucket)
   })
 
-  const shiftMonth = (delta) => onMonthChange(new Date(year, monthIndex + delta, 1))
+  const goToMonth = (delta) => onMonthChange(shiftMonth(month, delta))
 
   return (
     <>
       <Card className="p-[14px]">
         <div className="mb-3 flex items-center justify-between">
           <b className="text-base font-extrabold text-[#221f1d]">
-            {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+            {firstOfMonth.toLocaleDateString(undefined, {
+              timeZone: 'UTC',
+              month: 'long',
+              year: 'numeric',
+            })}
           </b>
           <div className="flex gap-2">
             <button
               type="button"
               aria-label="Previous month"
-              onClick={() => shiftMonth(-1)}
+              onClick={() => goToMonth(-1)}
               className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-[#f2edf4] text-[#221f1d] transition hover:bg-[#e6e3e1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed"
             >
               <ChevronIcon direction="left" className="h-4 w-4" aria-hidden="true" />
@@ -212,7 +237,7 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
             <button
               type="button"
               aria-label="Next month"
-              onClick={() => shiftMonth(1)}
+              onClick={() => goToMonth(1)}
               className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-[#f2edf4] text-[#221f1d] transition hover:bg-[#e6e3e1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed"
             >
               <ChevronIcon direction="right" className="h-4 w-4" aria-hidden="true" />
@@ -234,7 +259,7 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
           {Array.from({ length: dayCount }, (_, index) => {
             const dayNumber = index + 1
             const dayEvents = byDay.get(dayNumber) ?? []
-            const isToday = isSameDay(new Date(year, monthIndex, dayNumber), today)
+            const isToday = today.year === year && today.month === monthIndex && today.day === dayNumber
             // CELL_LAYOUT is shared verbatim by both variants, and it is what
             // keeps them aligned. A day with events must be a <button> for
             // keyboard access, and Chromium's UA stylesheet lays a button's
@@ -266,7 +291,7 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
                 type="button"
                 data-testid="calendar-day"
                 onClick={() => onSelect(dayEvents[0].id)}
-                aria-label={`${dayNumber} ${month.toLocaleDateString(undefined, { month: 'long' })}, ${dayEvents.length} ${dayEvents.length === 1 ? 'event' : 'events'}`}
+                aria-label={`${dayNumber} ${firstOfMonth.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long' })}, ${dayEvents.length} ${dayEvents.length === 1 ? 'event' : 'events'}`}
                 className={`${cellClasses} transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed`}
               >
                 {dayNumber}
@@ -315,7 +340,7 @@ export default function Schedule() {
   const [tab, setTab] = useState('upcoming')
   const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
   const [selectedEventId, setSelectedEventId] = useState(null)
-  const [month, setMonth] = useState(() => startOfMonth(new Date()))
+  const [month, setMonth] = useState(currentClubMonth)
 
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)

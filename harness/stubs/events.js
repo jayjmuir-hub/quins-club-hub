@@ -184,6 +184,24 @@ export const EVENTS = [
     result_us: null,
     result_them: null,
   },
+  // Day-boundary fixture, added with the Abu Dhabi timezone change. 21:00
+  // UTC is 01:00 on the 21st in Dubai but still the 20th in UTC and London,
+  // and 17:00 on the 20th in New York. It exists so the browser check can
+  // see the calendar bucket it on the 21st — the cell a naive
+  // browser-local implementation gets wrong.
+  {
+    id: 'e-boundary',
+    team_id: T1,
+    type: 'social',
+    opponent: null,
+    title: 'Late Night Touch',
+    venue: VENUE,
+    home: null,
+    competition: null,
+    starts_at: '2026-07-20T21:00:00Z',
+    result_us: null,
+    result_them: null,
+  },
 ]
 
 export async function listEvents({ teamIds } = {}) {

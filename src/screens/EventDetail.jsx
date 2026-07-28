@@ -184,8 +184,21 @@ export default function EventDetail({ event, team, onClose }) {
           <Icon className="h-7 w-7" aria-hidden="true" />
         </div>
         <h3 className="text-[22px] font-bold leading-tight">{eventTitle(event)}</h3>
+        {/* Every time in the app is Abu Dhabi time (see CLUB_TIME_ZONE), and
+            this line is the one place that says so. It belongs here and not
+            on every fixture row: someone scanning the list doesn't need
+            reminding once per line, but someone reading a single fixture
+            from abroad does need to know that 20:00 isn't their 20:00.
+            Kept on the same line, at the same white/85% as the rest of it —
+            that measures 4.63:1 against the lightest point of the hero
+            gradient (quinsRed #C21F32) and so clears AA for normal text,
+            where dropping to white/70% for emphasis would have fallen to
+            3.55:1 and failed. It is set apart by weight instead. The
+            --muted-on-paper rule (#5c5854, not #77726e) doesn't apply here:
+            this sits on the gradient, not on paper. */}
         <p className="mt-1 text-sm font-semibold text-white/[.85]">
           {formatLongDate(date)} · {formatTime(date)}
+          {date && <span className="font-normal"> · Abu Dhabi time</span>}
         </p>
       </div>
 
