@@ -3,7 +3,7 @@
 **Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
 Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
 
-**17 of 22 tasks complete, 493 tests passing, build clean.**
+**18 of 22 tasks complete, 528 tests passing, build clean.**
 
 ---
 
@@ -33,7 +33,7 @@ Never put the `sb_secret_…` key in this repo or in a chat.
 Verify:
 
 ```bash
-npm test        # expect 493 passing across 20 files
+npm test        # expect 528 passing across 22 files
 npm run build   # expect clean
 ```
 
@@ -76,8 +76,8 @@ does.
 | **C — Shell & design system** | 8 app shell + nav, 9 shared UI primitives | done |
 | **D — Read features** | 10 data-access, 11 schedule, 12 roster, 13 dashboard | done |
 | **E — Write features** | 14 event form, 15 player form, 16 availability RSVPs | done |
-| **F — Admin** | 17 admin overview | done |
-| | 18 invite flow, 19 first-admin doc | next |
+| **F — Admin** | 17 admin overview, 18 invite flow | done |
+| | 19 first-admin doc | next |
 | **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | todo |
 
 Every completed task passed a spec-compliance and code-quality review; several needed fix
@@ -93,29 +93,39 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Resume at Task 18 — Invite flow (create + accept)
+## Resume at Task 19 — First-admin bootstrap (docs only, no app code)
 
-Phase F started with Task 17 (Admin overview): `src/screens/Admin.jsx`, gated on `isAdmin()`
-from `src/lib/scope.js`, wired at the existing `/more` route (not a new `/admin` route —
-`tests/nav.test.jsx` pins the bottom nav to exactly Home/Schedule/Roster/More, and the old
-`/more` was a bare one-line placeholder for everyone, so this was a lateral move, not a
-regression). Lists all 15 teams with live player counts and all club members via a new
-`listClubMembers()` in `src/data/members.js` (name/role/team only — `profiles` has no email
-column, confirmed live). "Manage" links to `/roster`/`/schedule` are real; an "Invite" entry
-point was deliberately omitted (Task 18 owns that flow and doesn't exist yet — same
-no-disabled-placeholders ruling from Task 13). Its independent browser check caught one
-High-severity defect jsdom missed — the Manage links were plain `<a href>` tags causing a
-full hard page reload instead of client-side navigation, confirmed via a real Chromium click
-wiping a `window.__navMarker` — fixed by swapping to `<Link to="...">` from react-router-dom.
+Phase F is now COMPLETE (17 admin overview, 18 invite flow). Task 18 added a new `invites`
+table + RLS + a `SECURITY DEFINER accept_invite(token)` RPC — **applied directly by the
+controller against the live Supabase project, not by an implementer subagent**, because this
+was the first task in the build to touch the database, and a bad RLS predicate fails silently
+(wrong rows, no error) rather than loudly. See "Database schema changes" below for the exact
+shape and a real gotcha worth remembering for Task 21 (RLS hardening) or any future
+`SECURITY DEFINER` function.
 
-Task 18 (Invite flow) is next. **It's the first task in this build that touches the
-database schema** — it adds a new `invites` table migration + RLS + a `SECURITY DEFINER`
-`accept_invite(token)` function, per the plan (`docs/plans/quins-v1-mvp.md`, Task 18): admin
-creates an invite (email + role + team + optional child `player_id`); the invitee follows a
-tokenised link and, on first login, `acceptInvite(token)` creates the `membership` row and
-links parent→child. The invitee must be able to read and accept a row matching their own
-email without write access to `memberships` directly — hence the `SECURITY DEFINER` RPC.
-Its brief is not yet generated.
+`src/App.jsx` was restructured from one shared `<AppShell><Routes>...</Routes></AppShell>` to
+each route wrapping its own `<AppShell>` individually, so `/accept-invite/:token` could exist
+as a sibling route OUTSIDE any `AppShell` — `AppShell` refuses to render its routed content at
+all until `memberships.length > 0`, which a fresh invitee doesn't have until they accept. This
+was a real, confirmed-live bug the restructuring fixes (a naive route nested inside the old
+single-`AppShell` structure would have been permanently unreachable for exactly the people who
+need it most). The independent browser check specifically stress-tested cross-route navigation
+after this restructuring (16 sampled frames across 4 real nav clicks, a 24-click rapid-nav
+stress test) and found it CLEAN — no remount flash, no stale active-nav frame, no focus loss,
+no extra crest network requests. It did catch two real defects: `AcceptInvite` hung forever
+under React StrictMode/`npm run dev` only (a `mounted` ref's cleanup fired on StrictMode's
+throwaway first mount, permanently discarding the real in-flight `acceptInvite` promise's
+result — confirmed absent in a production build, fixed by relying solely on `calledRef`), and
+the invite-accept screen — the first screen a brand-new member ever sees — had zero club
+branding (fixed with a small crest + name addition, without touching the AppShell-avoidance
+routing).
+
+Task 19 (First-admin bootstrap) is next and is **docs-only, no app code**: create
+`docs/first-admin.md` documenting the exact SQL to grant Jay `admin` after his first sign-in
+(see `docs/plans/quins-v1-mvp.md`, Task 19), plus how to verify he then sees all 15 teams.
+This does not need the full subagent-driven-development task loop (no code, no tests to
+review) — a single pass of writing the doc, having it reviewed against the plan text and the
+live schema (the `memberships` table's actual columns/constraints), is proportionate.
 
 **Tooling note:** the `superpowers` plugin (subagent-driven-development's `task-brief`/
 `review-package`/`sdd-workspace` scripts) disappeared from disk mid-Task-17 after an MCP
@@ -135,9 +145,41 @@ Execution method: `superpowers:subagent-driven-development` (or its manual equiv
 any fixes, then a ledger entry. Tasks 11 onward added a further gate that has earned its
 place every time: an **independent controller-side browser pass**, rendering the real
 components in Chromium at 375px and 1280px via `harness/`. It has caught defects on every
-screen that jsdom could not see — Task 16 caught a no-visual-confirmation RSVP bug, Task 17
-caught the hard-reload navigation bug above. Screenshots are git-ignored — regenerate them,
+screen that jsdom could not see — Task 17 caught a hard-reload navigation bug, Task 18 caught
+the StrictMode hang and branding gap above. Screenshots are git-ignored — regenerate them,
 don't commit them.
+
+### Database schema changes (Task 18 — the first migration this build has applied)
+
+`public.invites`: `id`, `club_id`, `email`, `role` (same check as `memberships`: admin/coach/
+parent/player), `team_id` (nullable, but `invites_team_required_unless_admin` requires it
+NOT NULL unless `role='admin'`), `player_id` (nullable, links to an existing player — most
+commonly a parent naming their child), `token uuid default gen_random_uuid()` (never generate
+this client-side — read it back from the insert), `created_by`, `created_at`, `accepted_at`.
+RLS: `invites manage` (ALL, `is_admin(club_id)`) + `invites read own` (SELECT,
+`lower(email) = lower(auth.jwt()->>'email')` — the invitee's own verified login email, never
+a client-supplied value). `accept_invite(token uuid)`: `SECURITY DEFINER`, verifies the token
+exists, isn't already accepted, and the caller's authenticated email matches (row-locked
+`for update` against a concurrent double-accept), inserts the `memberships` row, stamps
+`accepted_at`, returns the new membership row. Call it via
+`supabase.rpc('accept_invite', { _token: token })` — the parameter name is `_token`, not
+`token`.
+
+**Gotcha worth remembering for any future `SECURITY DEFINER` function (Task 21 will likely
+add more):** Supabase's default privileges auto-grant `EXECUTE` on every new public-schema
+function to both `anon` and `authenticated`, regardless of an explicit
+`REVOKE ALL ... FROM PUBLIC` — that only revokes the `PUBLIC` pseudo-role's implicit grant,
+not each real role's own default-privilege grant. `get_advisors` (security) surfaces this
+immediately after applying a migration. Since `accept_invite` performs a real write (unlike
+this schema's existing read-only `SECURITY DEFINER` helpers — `is_admin`, `can_edit_team`,
+`can_see_team`, `is_own_player` — which are harmless booleans left broadly grantable), it
+needed an explicit follow-up `REVOKE EXECUTE ON FUNCTION public.accept_invite(uuid) FROM anon`
+— verified afterward via `information_schema.role_routine_grants` that only
+`authenticated`/`service_role`/`postgres` can call it.
+
+This is also the **first migration Supabase's own migration history has ever tracked** for
+this project — `list_migrations` returned empty before this (the original schema was applied
+as raw SQL outside that tracking system at some point before this repo's current build began).
 
 **`.superpowers/sdd/.gitignore` gets reset to `*` by tooling, repeatedly.** It silently
 untracks the whole ledger. Do not fight it — stage the workspace with
@@ -269,6 +311,29 @@ it's a separate file and a separate decision, deliberately left alone in Task 15
 functions with zero imports. Screens catch and render errors in a `role="alert"` region.
 Data modules never import React.
 
+**A screen that must be reachable before a user has any memberships cannot live inside
+`AppShell`.** `AppShell` deliberately refuses to render its routed content at all until
+`memberships.length > 0` (showing `NoMembershipState` instead) — correct for every normal
+screen, but it means any future screen aimed at a membership-less user (Task 18's
+`/accept-invite/:token` is the first, and likely not the last — an invite-decline flow, an
+"invalid invite" landing page, etc. would have the same shape) must be routed as a sibling
+OUTSIDE `AppShell`, per-route now that `src/App.jsx` wraps each route in its own `<AppShell>`
+individually rather than one shared instance around a shared `<Routes>`. Don't nest a new
+"pre-membership" screen inside an `AppShell`-wrapped route and expect it to be reachable.
+
+**React 18 StrictMode's dev-only double-invoke can permanently break a non-idempotent effect
+if a `mounted`-ref guard and a `calledRef`-style once-only guard fight each other.** Task 18's
+`AcceptInvite` hung forever in `npm run dev` (never in a production build) because the
+StrictMode mount→cleanup→remount cycle set `mounted = false` in the throwaway first mount's
+cleanup, and the guarded second mount declined to start a new call — so the real in-flight
+promise's result got silently discarded by the `if (!mounted) return` check with nothing left
+to ever flip `mounted` back. The fix was to drop the `mounted` flag and rely solely on the
+once-only guard, since the underlying call (`accept_invite`) is deliberately not safely
+re-callable anyway. Any future one-shot side-effecting screen (payment confirmation, a
+one-time RPC) should be built with this in mind, and tested by literally rendering under a
+real `<React.StrictMode>` wrapper in RTL — jsdom/RTL doesn't do this by default, so a normal
+test render won't catch it.
+
 ---
 
 ## Two bugs worth knowing about, because the tests didn't catch them
@@ -296,8 +361,12 @@ just in jsdom.
 
 - **Google OAuth client credentials** for Supabase -> Auth -> Providers. Task 4's code is
   done and waiting on them.
-- **First-admin SQL** — after Jay's first sign-in, grant himself `admin` (Task 19 documents
-  this). Until then he sees the "not linked to a squad yet" screen.
+- **First-admin SQL** — after Jay's first sign-in, grant himself `admin` (Task 19 will
+  document this — not yet built). Until then he sees the "not linked to a squad yet" screen.
+  Note: with Task 18 now live, an alternative to raw SQL exists — any existing admin could
+  send Jay an invite through the app's own `InviteForm` instead, but there is no admin yet, so
+  the very first grant still has to happen via direct SQL (or the Supabase dashboard) either
+  way. Task 19 documents that one-time bootstrap step.
 - **Netlify** — MCP works. `adhjrt.com` points at Netlify project `serene-gingersnap-1d0eb6`
   (Pro plan, password-protected, deploy current). Deploying builds directly via MCP is the
   route until CI is wired to this repo.

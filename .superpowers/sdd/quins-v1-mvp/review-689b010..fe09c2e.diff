@@ -1,0 +1,1430 @@
+=== Commits ===
+fe09c2e feat: wire the invite flow into routing and the admin screen
+02bd8b0 feat: add invite-acceptance screen
+7343c35 feat: add admin invite creation screen
+11879bf feat: add createInvite/acceptInvite data-access functions
+
+=== Stat ===
+ src/App.jsx                  |  31 +++--
+ src/data/members.js          |  63 +++++++++
+ src/screens/AcceptInvite.jsx |  97 +++++++++++++
+ src/screens/Admin.jsx        |  30 ++--
+ src/screens/InviteForm.jsx   | 319 +++++++++++++++++++++++++++++++++++++++++++
+ tests/accept-invite.test.jsx | 110 +++++++++++++++
+ tests/admin.test.jsx         |  46 +++++++
+ tests/app.test.jsx           |  22 +++
+ tests/invite-form.test.jsx   | 241 ++++++++++++++++++++++++++++++++
+ tests/scope.test.js          | 131 +++++++++++++++++-
+ 10 files changed, 1070 insertions(+), 20 deletions(-)
+
+=== Full diff ===
+diff --git a/src/App.jsx b/src/App.jsx
+index dfdd9ca..efaad05 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -1,40 +1,51 @@
+ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+ import RequireAuth from './components/RequireAuth.jsx'
+ import { MembershipProvider } from './lib/memberships.jsx'
+ import AppShell from './components/AppShell.jsx'
+ import Dashboard from './screens/Dashboard.jsx'
+ import Schedule from './screens/Schedule.jsx'
+ import Roster from './screens/Roster.jsx'
+ import Admin from './screens/Admin.jsx'
++import AcceptInvite from './screens/AcceptInvite.jsx'
+ 
+ // "/more" now renders the real Admin screen (Task 17) rather than a stub.
+ // design-system.md §5.4 describes "More" as club info (everyone) + a
+ // "Manage" block (admin/coach only) — this task builds only the admin-only
+ // piece of that (Admin.jsx already gates itself on isAdmin() and shows a
+ // plain "not authorised" message otherwise), reusing the nav's existing
+ // "More" tab rather than adding a fifth nav item: Nav's four items
+ // (Home/Schedule/Roster/More) are asserted exactly by tests/nav.test.jsx, and
+ // there is no unused nav slot to add a dedicated admin route to. A later task
+ // can fold in the club-info/about content §5.4 also describes, for every
+ // role, without moving this route again. Schedule is real as of Task 11,
+ // Roster as of Task 12, "/" is the real Dashboard as of Task 13.
+-
++//
++// /accept-invite/:token (Task 18) is deliberately NOT one of AppShell's
++// wrapped routes below. AppShell only renders its `children` once
++// memberships.length > 0 (its `ready` gate) — a brand-new invitee who just
++// signed in via magic link has zero memberships until they accept, so
++// nesting this route inside a single shared <AppShell> the way the other
++// four routes are would make it permanently unreachable: AppShell would show
++// NoMembershipState forever and never render the Routes block at all,
++// regardless of the URL. Wrapping each of the other four routes in its own
++// <AppShell> individually (rather than one <AppShell> around a single nested
++// <Routes>) is what makes it possible for this one route to opt out of that
++// gate entirely, without teaching AppShell itself about a specific path.
+ export default function App() {
+   return (
+     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+       <RequireAuth>
+         <MembershipProvider>
+-          <AppShell>
+-            <Routes>
+-              <Route path="/" element={<Dashboard />} />
+-              <Route path="/schedule" element={<Schedule />} />
+-              <Route path="/roster" element={<Roster />} />
+-              <Route path="/more" element={<Admin />} />
+-              <Route path="*" element={<Navigate to="/" replace />} />
+-            </Routes>
+-          </AppShell>
++          <Routes>
++            <Route path="/accept-invite/:token" element={<AcceptInvite />} />
++            <Route path="/" element={<AppShell><Dashboard /></AppShell>} />
++            <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
++            <Route path="/roster" element={<AppShell><Roster /></AppShell>} />
++            <Route path="/more" element={<AppShell><Admin /></AppShell>} />
++            <Route path="*" element={<Navigate to="/" replace />} />
++          </Routes>
+         </MembershipProvider>
+       </RequireAuth>
+     </BrowserRouter>
+   )
+ }
+diff --git a/src/data/members.js b/src/data/members.js
+index b3a59cc..c4f96d3 100644
+--- a/src/data/members.js
++++ b/src/data/members.js
+@@ -33,10 +33,73 @@ export async function loadMyMemberships() {
+  *
+  * A non-admin calling this legitimately gets back only their own row(s) —
+  * RLS does the narrowing, not this function — so it is safe to call from
+  * any signed-in context, but Admin.jsx only does so once isAdmin() is true.
+  */
+ export async function listClubMembers() {
+   const { data, error } = await supabase.from('memberships').select('*, profiles(full_name), teams(name)')
+   if (error) throw error
+   return data ?? []
+ }
++
++// A refused invite insert is not a thrown Supabase error — the "invites
++// manage" RLS policy (ALL, USING+WITH CHECK is_admin(club_id)) simply matches
++// zero rows for a non-admin caller, and PostgREST reports that as a
++// successful empty response, the same silent-refusal shape upsertPlayer/
++// upsertEvent already handle. This is a *reporting* mechanism, not access
++// control: RLS is what actually decides, server-side.
++const REFUSED_INVITE = "We couldn't send that invite. You may not have permission to invite members."
++
++/**
++ * Creates one invite row and returns it (including the database-generated
++ * `token`, needed to build the accept link/URL for the admin to send
++ * manually — there is no email-sending infrastructure in this build).
++ *
++ * The `token` column is never generated client-side: it is left out of the
++ * insert entirely so its `gen_random_uuid()` default supplies it, then read
++ * back via `.select().maybeSingle()` — the same insert-then-read-back shape
++ * upsertPlayer/upsertEvent already use.
++ *
++ * teamId/playerId default to null (an admin invite has no team; most invites
++ * have no linked player). The database's own check constraint
++ * (`invites_team_required_unless_admin`) is the real enforcement of "a team
++ * is required unless role is admin" — InviteForm validates this client-side
++ * too, so a bad submission never reaches the database, but this function
++ * does not re-check it: it is a thin query builder, like every other
++ * function in this module.
++ */
++export async function createInvite({ clubId, email, role, teamId, playerId, createdBy }) {
++  const { data, error } = await supabase
++    .from('invites')
++    .insert({
++      club_id: clubId,
++      email,
++      role,
++      team_id: teamId ?? null,
++      player_id: playerId ?? null,
++      created_by: createdBy,
++    })
++    .select()
++    .maybeSingle()
++
++  if (error) throw error
++  if (!data) throw new Error(REFUSED_INVITE)
++  return data
++}
++
++/**
++ * Accepts an invite by token, via the `accept_invite` SECURITY DEFINER RPC —
++ * the invitee never needs (and never gets) direct write access to
++ * memberships. The RPC does its own validation server-side (token exists,
++ * not already used, email matches the caller's own authenticated email) and
++ * raises a Postgres exception with a friendly message on failure; that
++ * surfaces here as a normal Supabase `{ data, error }` response, so this
++ * follows the same throw-on-error convention as every other function in this
++ * module rather than swallowing or rewording it.
++ *
++ * Returns the newly-created memberships row on success.
++ */
++export async function acceptInvite(token) {
++  const { data, error } = await supabase.rpc('accept_invite', { _token: token })
++  if (error) throw error
++  return data
++}
+diff --git a/src/screens/AcceptInvite.jsx b/src/screens/AcceptInvite.jsx
+new file mode 100644
+index 0000000..ae6d430
+--- /dev/null
++++ b/src/screens/AcceptInvite.jsx
+@@ -0,0 +1,97 @@
++import { useEffect, useRef, useState } from 'react'
++import { Navigate, useParams } from 'react-router-dom'
++import Spinner from '../components/Spinner.jsx'
++import { acceptInvite } from '../data/members.js'
++import { useMemberships } from '../lib/memberships.jsx'
++
++// The invitee-facing half of Task 18's invite flow, reached via
++// /accept-invite/:token (see src/App.jsx for why this route sits outside
++// AppShell rather than nested inside it: a brand-new invitee has zero
++// memberships, and AppShell only renders its routed children once
++// memberships.length > 0 — this screen has to be reachable before that's
++// true).
++//
++// On mount, calls acceptInvite(token), which runs the accept_invite
++// SECURITY DEFINER RPC server-side (token lookup, "already used"/"wrong
++// email" checks, the actual membership insert) — none of that validation
++// happens here. On success this person now has exactly one membership row
++// that didn't exist a moment ago; useMemberships()'s MembershipProvider has
++// no way to know that on its own (its effect only re-runs on
++// [session, reloadToken], and accepting an invite changes neither), so
++// reload() is called explicitly before navigating home, or the rest of the
++// app would still show the zero-membership screen after the redirect.
++//
++// A failure shows the RPC's own message (already friendly — see
++// src/data/members.js's acceptInvite doc comment) in a role="alert" region,
++// not a generic "something went wrong" wrapper: "this invite was already
++// used" and "wrong email" are actionable, specific messages worth showing
++// verbatim.
++
++export default function AcceptInvite() {
++  const { token } = useParams()
++  const { reload } = useMemberships()
++  const [status, setStatus] = useState('loading')
++  const [error, setError] = useState(null)
++
++  // Guards against React 18 StrictMode's double-invoke-in-dev (and any
++  // accidental re-render before the token changes) calling the RPC twice —
++  // accept_invite is not safely retryable by design: a second call for an
++  // already-accepted token is exactly the "already been used" refusal this
++  // screen must not confuse with a genuine failure.
++  const calledRef = useRef(false)
++
++  useEffect(() => {
++    if (calledRef.current) return undefined
++    calledRef.current = true
++
++    let mounted = true
++
++    acceptInvite(token)
++      .then(() => {
++        if (!mounted) return
++        reload()
++        setStatus('done')
++      })
++      .catch((err) => {
++        if (!mounted) return
++        setError(err)
++        setStatus('error')
++      })
++
++    return () => {
++      mounted = false
++    }
++    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload comes
++    // from context and is stable enough here; token is the only input this
++    // effect should ever re-run for, and calledRef already guards a re-run
++    // within the same mount.
++  }, [token])
++
++  if (status === 'done') {
++    return <Navigate to="/" replace />
++  }
++
++  return (
++    <div className="flex min-h-screen items-center justify-center bg-[#f5f4f3] px-4 text-[#221f1d]">
++      <div className="w-full max-w-[420px] rounded-2xl border border-[#e6e3e1] bg-white p-6 text-center shadow-[0_6px_24px_rgba(20,20,20,0.10)]">
++        {status === 'loading' && (
++          <div className="flex flex-col items-center gap-3 py-4">
++            <Spinner label="Accepting your invite…" />
++            <p aria-hidden="true" className="text-sm text-[#5c5854]">
++              Accepting your invite…
++            </p>
++          </div>
++        )}
++
++        {status === 'error' && (
++          <>
++            <h2 className="text-lg font-extrabold text-quinsRedDark">We couldn&apos;t accept that invite</h2>
++            <p role="alert" className="mt-2 text-sm leading-relaxed text-quinsRedDark">
++              {error?.message || "We couldn't accept that invite. Try again."}
++            </p>
++          </>
++        )}
++      </div>
++    </div>
++  )
++}
+diff --git a/src/screens/Admin.jsx b/src/screens/Admin.jsx
+index 447b6b0..483da46 100644
+--- a/src/screens/Admin.jsx
++++ b/src/screens/Admin.jsx
+@@ -2,27 +2,28 @@ import { useEffect, useState } from 'react'
+ import { Link } from 'react-router-dom'
+ import Badge from '../components/Badge.jsx'
+ import Card from '../components/Card.jsx'
+ import Empty from '../components/Empty.jsx'
+ import Spinner from '../components/Spinner.jsx'
+ import { listClubMembers } from '../data/members.js'
+ import { listPlayers } from '../data/players.js'
+ import { useMemberships } from '../lib/memberships.jsx'
+ import { isAdmin, roleLabel } from '../lib/scope.js'
+ import { initials } from '../lib/playerFormat.js'
++import InviteForm from './InviteForm.jsx'
+ 
+ // Admin overview (Task 17, Phase F): a club-wide landing page for admins —
+ // every team, every player, everyone with a membership row — with entry
+-// points into managing the roster/schedule and (Task 18) inviting new
+-// members. Admin-only: a non-admin gets a plain "not authorised" message and
+-// none of the data below is ever fetched for them (see the early return
+-// before either query runs).
++// points into managing the roster/schedule and inviting new members (Task
++// 18's InviteForm, opened here in the shared Sheet). Admin-only: a non-admin
++// gets a plain "not authorised" message and none of the data below is ever
++// fetched for them (see the early return before either query runs).
+ //
+ // This screen deliberately does not re-fetch teams: useMemberships() already
+ // loads every team an admin can see (all 15, via visibleTeams' admin
+ // special-case) once per session, and re-querying the same table here would
+ // just be a second network round trip for data already in hand.
+ //
+ // Access control is not enforced here — RLS decides what listPlayers() and
+ // listClubMembers() actually return. isAdmin() only decides whether this
+ // screen's own UI is shown at all; getting it wrong could hide the screen
+ // from an admin, but could never show club-wide data to someone RLS would
+@@ -94,20 +95,24 @@ function MemberRow({ member }) {
+ 
+ export default function Admin() {
+   const { memberships, teams } = useMemberships()
+   const admin = isAdmin(memberships)
+ 
+   const [players, setPlayers] = useState([])
+   const [members, setMembers] = useState([])
+   const [loading, setLoading] = useState(true)
+   const [error, setError] = useState(null)
+   const [reloadToken, setReloadToken] = useState(0)
++  // Whether the invite Sheet is open. A plain boolean, unlike Roster's
++  // formState — InviteForm has no "edit" mode and no row of its own to
++  // carry, only ever the "add" case.
++  const [inviteOpen, setInviteOpen] = useState(false)
+ 
+   useEffect(() => {
+     if (!admin) return undefined
+ 
+     let mounted = true
+     setLoading(true)
+     setError(null)
+ 
+     // No teamIds argument: an admin sees every player club-wide, and passing
+     // an empty array here would mean "no teams" and return nothing (see
+@@ -186,40 +191,45 @@ export default function Admin() {
+         </Card>
+       )}
+ 
+       {!isFirstLoad && !error && (
+         <>
+           {/* Manage actions: these are real, functional entry points — not
+               placeholders — because Roster and Schedule already own the
+               actual add/edit/delete flows for players and events. There is
+               no separate "manage" screen to build for Task 17; the useful
+               thing this overview can do is point an admin straight at them.
+-              An "Invite a member" entry point is deliberately absent rather
+-              than a disabled or dead stub: Task 18 owns that flow and it does
+-              not exist yet, and Roster.jsx / Dashboard.jsx already settled
+-              this exact question for events/players — a control that
+-              promises something not yet built is worse than no control. */}
++              "Invite a member" opens Task 18's InviteForm in the shared
++              Sheet — that flow now exists, closing the gap the Task 17
++              comment here used to describe. */}
+           <SectionTitle>Manage</SectionTitle>
+           <Card className="p-[14px]">
+             <div className="flex flex-col gap-2.5 desktop:flex-row">
+               <Link
+                 to="/roster"
+                 className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-white px-[15px] py-2.5 text-sm font-bold text-quinsRed shadow-[inset_0_0_0_1.5px_#e6e3e1] transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+               >
+                 Manage roster &amp; players
+               </Link>
+               <Link
+                 to="/schedule"
+                 className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-white px-[15px] py-2.5 text-sm font-bold text-quinsRed shadow-[inset_0_0_0_1.5px_#e6e3e1] transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+               >
+                 Manage schedule &amp; fixtures
+               </Link>
++              <button
++                type="button"
++                onClick={() => setInviteOpen(true)}
++                className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-quinsRed px-[15px] py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
++              >
++                Invite a member
++              </button>
+             </div>
+           </Card>
+ 
+           <SectionTitle>Age groups ({sortedTeams.length})</SectionTitle>
+           {sortedTeams.length === 0 ? (
+             <Card>
+               <Empty message="No age groups yet." />
+             </Card>
+           ) : (
+             <Card className="overflow-hidden">
+@@ -236,13 +246,15 @@ export default function Admin() {
+             </Card>
+           ) : (
+             <Card className="overflow-hidden">
+               {sortedMembers.map((member) => (
+                 <MemberRow key={member.id} member={member} />
+               ))}
+             </Card>
+           )}
+         </>
+       )}
++
++      {inviteOpen && <InviteForm onClose={() => setInviteOpen(false)} />}
+     </section>
+   )
+ }
+diff --git a/src/screens/InviteForm.jsx b/src/screens/InviteForm.jsx
+new file mode 100644
+index 0000000..97c8f5e
+--- /dev/null
++++ b/src/screens/InviteForm.jsx
+@@ -0,0 +1,319 @@
++import { useEffect, useMemo, useRef, useState } from 'react'
++import Sheet from '../components/Sheet.jsx'
++import { createInvite } from '../data/members.js'
++import { listPlayers } from '../data/players.js'
++import { useAuth } from '../lib/auth.jsx'
++import { useMemberships } from '../lib/memberships.jsx'
++import { visibleTeams } from '../lib/scope.js'
++
++// The admin-only invite creation form (Task 18), opened in the shared Sheet
++// from Admin.jsx's "Invite a member" entry point. Fields: email, role, age
++// group (required unless the role is admin — the invites table's own check
++// constraint, `invites_team_required_unless_admin`, is the real enforcement;
++// this form validates the same rule client-side purely so a bad submission
++// never reaches the database as a raw constraint-violation message), and an
++// optional player link (most commonly a parent invite naming their child).
++//
++// Access control is NOT enforced here: the invites table's "invites manage"
++// RLS policy (ALL, USING+WITH CHECK is_admin(club_id)) is the real boundary.
++// This form is only ever opened from Admin.jsx, which already gates on
++// isAdmin() before rendering an "Invite a member" button at all — but
++// createInvite() still turns a hypothetical non-admin refusal into a thrown,
++// visible error rather than a silent no-op, the same as every other write in
++// this codebase.
++//
++// There is no email-sending infrastructure in this build (no constraint here
++// authorises adding a third-party email service), so on success this shows
++// the generated accept link for the admin to copy and send manually, rather
++// than closing the sheet as every other add/edit form does.
++
++const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-[#5c5854]'
++const FIELD = 'mb-3.5'
++const INPUT_BASE =
++  'w-full rounded-[11px] border-[1.5px] bg-white px-3 py-[11px] text-[16px] text-[#221f1d] outline-none transition placeholder:text-[#a29d99] focus:border-quinsRed'
++
++const ROLES = [
++  { value: 'admin', label: 'Admin' },
++  { value: 'coach', label: 'Coach' },
++  { value: 'parent', label: 'Parent' },
++  { value: 'player', label: 'Player' },
++]
++
++// A deliberately simple check, matching the input's own type="email" intent:
++// this is a friendly-typo catch, not the source of truth on validity — the
++// database has no email-format constraint either, and Supabase Auth is what
++// actually verifies an address by requiring the invitee to click a real
++// magic link sent to it.
++const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
++
++function inputClasses(invalid) {
++  return [INPUT_BASE, invalid ? 'border-quinsRedDark' : 'border-[#e6e3e1]'].join(' ')
++}
++
++export default function InviteForm({ onClose, onSaved }) {
++  const { user } = useAuth()
++  const { memberships, teams } = useMemberships()
++
++  // Every team in the club, in the club's own sort order — an admin invites
++  // club-wide, unlike PlayerForm/EventForm's canEditTeam-filtered lists,
++  // which narrow to what the *current* user may edit. visibleTeams' admin
++  // special-case already returns every team sorted; this form is admin-only
++  // regardless of the signed-in admin's own team_id (which is null anyway).
++  const allTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
++
++  const [email, setEmail] = useState('')
++  const [role, setRole] = useState('coach')
++  const [teamId, setTeamId] = useState('')
++  const [playerId, setPlayerId] = useState('')
++  const [invalid, setInvalid] = useState({})
++  const [error, setError] = useState(null)
++  const [saving, setSaving] = useState(false)
++  const [invite, setInvite] = useState(null)
++
++  const [players, setPlayers] = useState([])
++  const [playersLoading, setPlayersLoading] = useState(false)
++
++  // Guards against a double submit landing two invites: `saving` state is
++  // async, this is not.
++  const inFlight = useRef(false)
++
++  const needsTeam = role !== 'admin'
++
++  // The optional player picker only makes sense once a team is chosen (a
++  // parent's child must belong to that team) — listPlayers() is scoped to
++  // it, the same team-scoping every other player picker in this codebase
++  // uses. Switching role/team clears any previously chosen player rather
++  // than silently keeping a selection that may no longer be visible.
++  useEffect(() => {
++    setPlayerId('')
++
++    if (!needsTeam || !teamId) {
++      setPlayers([])
++      return undefined
++    }
++
++    let mounted = true
++    setPlayersLoading(true)
++
++    listPlayers({ teamIds: [teamId] })
++      .then((rows) => {
++        if (!mounted) return
++        setPlayers(rows)
++      })
++      .catch(() => {
++        // A failed player-list read should not block sending the invite —
++        // it only narrows an optional convenience field. Leave the picker
++        // empty rather than surfacing a second alert alongside the form's
++        // own.
++        if (!mounted) return
++        setPlayers([])
++      })
++      .finally(() => {
++        if (mounted) setPlayersLoading(false)
++      })
++
++    return () => {
++      mounted = false
++    }
++    // eslint-disable-next-line react-hooks/exhaustive-deps -- needsTeam is
++    // derived from role, listed via teamId/role directly below.
++  }, [teamId, needsTeam])
++
++  function handleRoleChange(nextRole) {
++    setRole(nextRole)
++    setTeamId('')
++    setInvalid((current) => ({ ...current, teamId: false }))
++  }
++
++  function handleSubmit(domEvent) {
++    domEvent.preventDefault()
++    if (inFlight.current) return
++
++    const trimmedEmail = email.trim()
++    const nextInvalid = {
++      email: !trimmedEmail || !EMAIL_PATTERN.test(trimmedEmail),
++      teamId: needsTeam && !teamId,
++    }
++    setInvalid(nextInvalid)
++
++    if (Object.values(nextInvalid).some(Boolean)) {
++      setError(
++        new Error(
++          nextInvalid.email && !nextInvalid.teamId
++            ? 'Enter a valid email address before sending.'
++            : 'Fill in the highlighted fields before sending.',
++        ),
++      )
++      return
++    }
++
++    const clubId = teams[0]?.club_id ?? null
++
++    inFlight.current = true
++    setSaving(true)
++    setError(null)
++
++    createInvite({
++      clubId,
++      email: trimmedEmail,
++      role,
++      teamId: needsTeam ? teamId : null,
++      playerId: playerId || null,
++      createdBy: user?.id ?? null,
++    })
++      .then((saved) => {
++        setInvite(saved)
++        onSaved?.(saved)
++      })
++      .catch((err) => {
++        setError(err)
++      })
++      .finally(() => {
++        inFlight.current = false
++        setSaving(false)
++      })
++  }
++
++  const acceptLink = invite?.token ? `${window.location.origin}/accept-invite/${invite.token}` : ''
++
++  return (
++    <Sheet open onClose={onClose} title="Invite a member">
++      {invite ? (
++        <div>
++          <p className="mb-3 text-sm leading-relaxed text-[#221f1d]">
++            Invite created for <strong>{invite.email}</strong>. There&apos;s no automatic email
++            for this yet — copy the link below and send it to them directly.
++          </p>
++          <div className={FIELD}>
++            <label className={LABEL} htmlFor="invite-link">
++              Accept link
++            </label>
++            <input
++              id="invite-link"
++              type="text"
++              readOnly
++              value={acceptLink}
++              onFocus={(domEvent) => domEvent.target.select()}
++              className={inputClasses(false)}
++            />
++          </div>
++          <button
++            type="button"
++            onClick={onClose}
++            className="w-full rounded-[11px] bg-quinsRed px-4 py-3 text-[15px] font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
++          >
++            Done
++          </button>
++        </div>
++      ) : (
++        // noValidate: this form does its own validation and reports it in a
++        // role="alert" region, which a screen reader announces — the native
++        // bubble is neither announced reliably nor visible to the browser
++        // check.
++        <form onSubmit={handleSubmit} noValidate>
++          <div className={FIELD}>
++            <label className={LABEL} htmlFor="invite-email">
++              Email
++            </label>
++            <input
++              id="invite-email"
++              type="email"
++              value={email}
++              onChange={(domEvent) => {
++                setEmail(domEvent.target.value)
++                setInvalid((current) => (current.email ? { ...current, email: false } : current))
++              }}
++              aria-invalid={invalid.email ? 'true' : undefined}
++              placeholder="e.g. coach@example.com"
++              className={inputClasses(invalid.email)}
++            />
++          </div>
++
++          <div className={FIELD}>
++            <label className={LABEL} htmlFor="invite-role">
++              Role
++            </label>
++            <select
++              id="invite-role"
++              value={role}
++              onChange={(domEvent) => handleRoleChange(domEvent.target.value)}
++              className={inputClasses(false)}
++            >
++              {ROLES.map((option) => (
++                <option key={option.value} value={option.value}>
++                  {option.label}
++                </option>
++              ))}
++            </select>
++          </div>
++
++          {needsTeam && (
++            <div className={FIELD}>
++              <label className={LABEL} htmlFor="invite-team">
++                Age group
++              </label>
++              <select
++                id="invite-team"
++                value={teamId}
++                onChange={(domEvent) => {
++                  setTeamId(domEvent.target.value)
++                  setInvalid((current) => (current.teamId ? { ...current, teamId: false } : current))
++                }}
++                aria-invalid={invalid.teamId ? 'true' : undefined}
++                className={inputClasses(invalid.teamId)}
++              >
++                <option value="">Choose an age group</option>
++                {allTeams.map((team) => (
++                  <option key={team.id} value={team.id}>
++                    {team.name}
++                  </option>
++                ))}
++              </select>
++            </div>
++          )}
++
++          {needsTeam && teamId && !playersLoading && players.length > 0 && (
++            <div className={FIELD}>
++              <label className={LABEL} htmlFor="invite-player">
++                Player (optional)
++              </label>
++              <select
++                id="invite-player"
++                value={playerId}
++                onChange={(domEvent) => setPlayerId(domEvent.target.value)}
++                className={inputClasses(false)}
++              >
++                <option value="">Not linked to a player</option>
++                {players.map((player) => (
++                  <option key={player.id} value={player.id}>
++                    {player.full_name}
++                  </option>
++                ))}
++              </select>
++              <p className="mt-1.5 text-[12.5px] text-[#5c5854]">
++                For a parent invite, link the child this account is for.
++              </p>
++            </div>
++          )}
++
++          {error && (
++            <p
++              role="alert"
++              className="mb-3.5 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
++            >
++              {error.message || "We couldn't send that invite. Try again."}
++            </p>
++          )}
++
++          <button
++            type="submit"
++            disabled={saving}
++            className="w-full rounded-[11px] bg-quinsRed px-4 py-3 text-[15px] font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
++          >
++            {saving ? 'Sending…' : 'Send invite'}
++          </button>
++        </form>
++      )}
++    </Sheet>
++  )
++}
+diff --git a/tests/accept-invite.test.jsx b/tests/accept-invite.test.jsx
+new file mode 100644
+index 0000000..194fd07
+--- /dev/null
++++ b/tests/accept-invite.test.jsx
+@@ -0,0 +1,110 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest'
++import { render, screen, waitFor } from '@testing-library/react'
++import { MemoryRouter, Routes, Route } from 'react-router-dom'
++
++// Unit tests for src/screens/AcceptInvite.jsx (Task 18): the invitee-facing
++// screen reached via /accept-invite/:token. acceptInvite and useMemberships
++// are mocked, so this exercises only the screen's own load/success/failure
++// behaviour — never a real network call, and never the real
++// MembershipProvider.
++
++const acceptInviteMock = vi.fn()
++const useMembershipsMock = vi.fn()
++
++vi.mock('../src/data/members.js', () => ({
++  acceptInvite: (...args) => acceptInviteMock(...args),
++}))
++
++vi.mock('../src/lib/memberships.jsx', () => ({
++  useMemberships: () => useMembershipsMock(),
++}))
++
++// Imported after vi.mock so this binds to the mocked modules.
++import AcceptInvite from '../src/screens/AcceptInvite.jsx'
++
++const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
++
++function renderScreen(token = 'tok-abc-123') {
++  return render(
++    <MemoryRouter initialEntries={[`/accept-invite/${token}`]} future={routerFuture}>
++      <Routes>
++        <Route path="/accept-invite/:token" element={<AcceptInvite />} />
++        <Route path="/" element={<div>Home screen marker</div>} />
++      </Routes>
++    </MemoryRouter>,
++  )
++}
++
++const reloadMock = vi.fn()
++
++beforeEach(() => {
++  acceptInviteMock.mockReset()
++  useMembershipsMock.mockReset()
++  reloadMock.mockReset()
++  useMembershipsMock.mockReturnValue({
++    memberships: [],
++    teams: [],
++    loading: false,
++    error: null,
++    reload: reloadMock,
++  })
++})
++
++describe('AcceptInvite', () => {
++  it('shows a loading state while acceptInvite is in flight', () => {
++    acceptInviteMock.mockReturnValue(new Promise(() => {}))
++
++    renderScreen()
++
++    expect(screen.getByRole('status')).toBeInTheDocument()
++  })
++
++  it('calls acceptInvite with the token from the URL', async () => {
++    acceptInviteMock.mockResolvedValue({ id: 'm-new', role: 'coach', team_id: 't-u12' })
++
++    renderScreen('tok-xyz-789')
++
++    await waitFor(() => expect(acceptInviteMock).toHaveBeenCalledWith('tok-xyz-789'))
++  })
++
++  it('reloads memberships and navigates home on success', async () => {
++    acceptInviteMock.mockResolvedValue({ id: 'm-new', role: 'coach', team_id: 't-u12' })
++
++    renderScreen()
++
++    await waitFor(() => expect(reloadMock).toHaveBeenCalledTimes(1))
++    expect(await screen.findByText('Home screen marker')).toBeInTheDocument()
++  })
++
++  it("shows the RPC's actual error message in an alert region on failure, without a generic wrapper", async () => {
++    acceptInviteMock.mockRejectedValue(
++      new Error('This invite was sent to a different email address than the one you signed in with.'),
++    )
++
++    renderScreen()
++
++    expect(await screen.findByRole('alert')).toHaveTextContent(
++      'This invite was sent to a different email address than the one you signed in with.',
++    )
++    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument()
++  })
++
++  it('does not reload or navigate home on failure', async () => {
++    acceptInviteMock.mockRejectedValue(new Error('This invite has already been used.'))
++
++    renderScreen()
++
++    await screen.findByRole('alert')
++    expect(reloadMock).not.toHaveBeenCalled()
++    expect(screen.queryByText('Home screen marker')).not.toBeInTheDocument()
++  })
++
++  it('calls acceptInvite exactly once even if the screen re-renders', async () => {
++    acceptInviteMock.mockResolvedValue({ id: 'm-new' })
++
++    renderScreen()
++
++    await waitFor(() => expect(reloadMock).toHaveBeenCalled())
++    expect(acceptInviteMock).toHaveBeenCalledTimes(1)
++  })
++})
+diff --git a/tests/admin.test.jsx b/tests/admin.test.jsx
+index 210192a..3feb588 100644
+--- a/tests/admin.test.jsx
++++ b/tests/admin.test.jsx
+@@ -8,33 +8,44 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
+ // behaviour — the admin gate, the loading/empty/error contract, and the
+ // teams/players/members lists it renders. No network is ever reachable
+ // from this file.
+ //
+ // The gate is the whole point of this screen (see the brief): a non-admin
+ // must see a clear "not authorised" message and never any admin data —
+ // asserted below by checking neither data module is ever called for a
+ // non-admin, not just that their output isn't on screen.
+ 
+ const useMembershipsMock = vi.fn()
++const useAuthMock = vi.fn()
+ const listPlayersMock = vi.fn()
+ const listClubMembersMock = vi.fn()
++const createInviteMock = vi.fn()
+ 
+ vi.mock('../src/lib/memberships.jsx', () => ({
+   useMemberships: () => useMembershipsMock(),
+ }))
+ 
++// Admin renders InviteForm (Task 18) in a Sheet; InviteForm itself reads
++// useAuth for the inviting admin's id and calls createInvite. Its own
++// behaviour is covered by tests/invite-form.test.jsx — here it only matters
++// that Admin's "Invite a member" button actually opens it.
++vi.mock('../src/lib/auth.jsx', () => ({
++  useAuth: () => useAuthMock(),
++}))
++
+ vi.mock('../src/data/players.js', () => ({
+   listPlayers: (...args) => listPlayersMock(...args),
+ }))
+ 
+ vi.mock('../src/data/members.js', () => ({
+   listClubMembers: (...args) => listClubMembersMock(...args),
++  createInvite: (...args) => createInviteMock(...args),
+ }))
+ 
+ // Import after vi.mock so this binds to the mocked modules.
+ import Admin from '../src/screens/Admin.jsx'
+ 
+ const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
+ const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
+ const TEAMS = [TEAM_FIRST_XV, TEAM_U10] // deliberately unsorted; Admin sorts
+ 
+ const ADMIN = [{ id: 'm1', role: 'admin', team_id: null }]
+@@ -51,20 +62,21 @@ const MEMBER_ROWS = [
+   { id: 'mem-3', role: 'parent', team_id: 'team-1xv', profiles: { full_name: 'Ali Parent' }, teams: { name: 'Senior Men 1st XV' } },
+ ]
+ 
+ function memberships(rows, teams = TEAMS) {
+   return { memberships: rows, teams, loading: false, error: null, reload: vi.fn() }
+ }
+ 
+ beforeEach(() => {
+   vi.clearAllMocks()
+   useMembershipsMock.mockReturnValue(memberships(ADMIN))
++  useAuthMock.mockReturnValue({ user: { id: 'admin-1', email: 'jay@example.com' } })
+   listPlayersMock.mockResolvedValue(ALL_PLAYERS)
+   listClubMembersMock.mockResolvedValue(MEMBER_ROWS)
+ })
+ 
+ function setup() {
+   const user = userEvent.setup()
+   const utils = render(<Admin />, { wrapper: RouterOnly })
+   return { user, ...utils }
+ }
+ 
+@@ -258,10 +270,44 @@ describe('Admin — content', () => {
+     expect(await screen.findByText('Schedule screen marker')).toBeInTheDocument()
+   })
+ 
+   it('does not use jersey numbers on club member rows', async () => {
+     setup()
+ 
+     await screen.findByText('Sara Coach')
+     expect(screen.queryByText(/jersey/i)).not.toBeInTheDocument()
+   })
+ })
++
++describe('Admin — invite entry point (Task 18)', () => {
++  it('offers a real, functional "Invite a member" button', async () => {
++    setup()
++
++    await screen.findByText('Sara Coach')
++    expect(screen.getByRole('button', { name: /invite a member/i })).toBeInTheDocument()
++  })
++
++  it('opens InviteForm in a sheet when clicked', async () => {
++    const { user } = setup()
++
++    await screen.findByText('Sara Coach')
++    await user.click(screen.getByRole('button', { name: /invite a member/i }))
++
++    expect(await screen.findByRole('heading', { name: /invite a member/i })).toBeInTheDocument()
++  })
++
++  it('closes the sheet without touching the club-wide member list', async () => {
++    const { user } = setup()
++
++    await screen.findByText('Sara Coach')
++    await user.click(screen.getByRole('button', { name: /invite a member/i }))
++    await screen.findByRole('dialog')
++
++    await user.click(screen.getByRole('button', { name: /close/i }))
++
++    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
++    // Sending an invite creates an `invites` row, not a `memberships` row —
++    // nothing changes in the club-members list until the invite is
++    // accepted, so closing the sheet must not re-query it.
++    expect(listClubMembersMock).toHaveBeenCalledTimes(1)
++  })
++})
+diff --git a/tests/app.test.jsx b/tests/app.test.jsx
+index 4de18ec..981d6cb 100644
+--- a/tests/app.test.jsx
++++ b/tests/app.test.jsx
+@@ -55,20 +55,25 @@ vi.mock('../src/data/players.js', () => ({
+   listPlayers: () => new Promise(() => {}),
+   getPlayerContact: () => new Promise(() => {}),
+ }))
+ 
+ // Same treatment for "/more", which renders the real Admin screen as of
+ // Task 17. The Admin screen's own behaviour (the not-authorised gate,
+ // loading/empty/error, teams/players/members) is covered by
+ // tests/admin.test.jsx; here it only has to be the thing "/more" renders.
+ vi.mock('../src/data/members.js', () => ({
+   listClubMembers: () => new Promise(() => {}),
++  // /accept-invite/:token (Task 18) renders the real AcceptInvite screen,
++  // which calls this on mount. Never resolving keeps that test focused on
++  // routing/reachability, not on AcceptInvite's own behaviour (covered by
++  // tests/accept-invite.test.jsx).
++  acceptInvite: () => new Promise(() => {}),
+ }))
+ 
+ // Import after vi.mock so this binds to the mocked modules.
+ import App from '../src/App.jsx'
+ 
+ const signedIn = {
+   session: { user: { id: 'u1' } },
+   user: { id: 'u1', email: 'jay@example.com' },
+   loading: false,
+   signOut: vi.fn(),
+@@ -149,11 +154,28 @@ describe('App', () => {
+ 
+   it('redirects an unknown path to / when signed in', () => {
+     window.history.pushState({}, '', '/nope')
+     useAuthMock.mockReturnValue(signedIn)
+ 
+     render(<App />)
+ 
+     expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
+     expect(window.location.pathname).toBe('/')
+   })
++
++  it('renders /accept-invite/:token even for a brand-new invitee with zero memberships', () => {
++    // The routing-gap regression this task exists to fix: AppShell only
++    // renders its routed children once memberships.length > 0, which a
++    // just-signed-in invitee never has yet. If this route were nested inside
++    // a single shared AppShell the way the other four are, it would be
++    // permanently unreachable — AppShell's NoMembershipState would render
++    // instead, no matter the URL.
++    window.history.pushState({}, '', '/accept-invite/tok-abc-123')
++    useAuthMock.mockReturnValue(signedIn)
++    useMembershipsMock.mockReturnValue({ ...membershipsLoaded, memberships: [] })
++
++    render(<App />)
++
++    expect(screen.getByRole('status', { name: /accepting your invite/i })).toBeInTheDocument()
++    expect(screen.queryByText(/isn't linked to a squad yet/i)).not.toBeInTheDocument()
++  })
+ })
+diff --git a/tests/invite-form.test.jsx b/tests/invite-form.test.jsx
+new file mode 100644
+index 0000000..9282be3
+--- /dev/null
++++ b/tests/invite-form.test.jsx
+@@ -0,0 +1,241 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest'
++import { render, screen, waitFor } from '@testing-library/react'
++import userEvent from '@testing-library/user-event'
++
++// Unit tests for src/screens/InviteForm.jsx (Task 18): the admin-only invite
++// creation UI, opened in the shared Sheet. useAuth, useMemberships and both
++// data modules it touches (createInvite, listPlayers) are mocked, so this
++// exercises only the form's own validation/submission behaviour — never a
++// real network call.
++
++const useAuthMock = vi.fn()
++const useMembershipsMock = vi.fn()
++const createInviteMock = vi.fn()
++const listPlayersMock = vi.fn()
++
++vi.mock('../src/lib/auth.jsx', () => ({
++  useAuth: () => useAuthMock(),
++}))
++
++vi.mock('../src/lib/memberships.jsx', () => ({
++  useMemberships: () => useMembershipsMock(),
++}))
++
++vi.mock('../src/data/members.js', () => ({
++  createInvite: (...args) => createInviteMock(...args),
++}))
++
++vi.mock('../src/data/players.js', () => ({
++  listPlayers: (...args) => listPlayersMock(...args),
++}))
++
++// Imported after vi.mock so this binds to the mocked modules.
++import InviteForm from '../src/screens/InviteForm.jsx'
++
++const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
++const TEAM_U12 = { id: 't-u12', club_id: CLUB_ID, name: 'U12', sort_order: 7 }
++const TEAM_U14 = { id: 't-u14', club_id: CLUB_ID, name: 'U14', sort_order: 9 }
++const TEAMS = [TEAM_U14, TEAM_U12] // deliberately unsorted
++
++const ADMIN = [{ id: 'm-a', role: 'admin', team_id: null }]
++
++function renderForm({ memberships = ADMIN, teams = TEAMS, ...rest } = {}) {
++  useAuthMock.mockReturnValue({ user: { id: 'user-1', email: 'admin@example.com' } })
++  useMembershipsMock.mockReturnValue({ memberships, teams, loading: false, error: null, reload: vi.fn() })
++  const onClose = vi.fn()
++  const onSaved = vi.fn()
++  const utils = render(<InviteForm onClose={onClose} onSaved={onSaved} {...rest} />)
++  return { ...utils, onClose, onSaved }
++}
++
++beforeEach(() => {
++  useAuthMock.mockReset()
++  useMembershipsMock.mockReset()
++  createInviteMock.mockReset()
++  listPlayersMock.mockReset()
++  listPlayersMock.mockResolvedValue([])
++  createInviteMock.mockImplementation(async (fields) => ({
++    id: 'inv-1',
++    token: 'tok-abc-123',
++    ...fields,
++  }))
++})
++
++describe('InviteForm — shape', () => {
++  it('opens as a sheet titled for inviting a member', () => {
++    renderForm()
++    expect(screen.getByRole('dialog')).toBeInTheDocument()
++    expect(screen.getByRole('heading', { name: /invite a member/i })).toBeInTheDocument()
++  })
++
++  it('offers every role', () => {
++    renderForm()
++    const select = screen.getByLabelText('Role')
++    const options = Array.from(select.querySelectorAll('option')).map((o) => o.value)
++    expect(options).toEqual(expect.arrayContaining(['admin', 'coach', 'parent', 'player']))
++  })
++
++  it('shows the age-group field for a non-admin role', () => {
++    renderForm()
++    expect(screen.getByLabelText('Age group')).toBeInTheDocument()
++  })
++
++  it('hides the age-group field when the role is admin', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.selectOptions(screen.getByLabelText('Role'), 'admin')
++
++    expect(screen.queryByLabelText('Age group')).not.toBeInTheDocument()
++  })
++
++  it('gives an admin every team in sort order', () => {
++    renderForm()
++    const select = screen.getByLabelText('Age group')
++    const options = Array.from(select.querySelectorAll('option')).map((o) => o.textContent)
++    expect(options).toEqual(['Choose an age group', 'U12', 'U14'])
++  })
++})
++
++describe('InviteForm — validation', () => {
++  it('blocks submit and explains why when the email is blank', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.click(screen.getByRole('button', { name: /send invite/i }))
++
++    expect(await screen.findByRole('alert')).toHaveTextContent(/highlighted|fill in|valid email/i)
++    expect(createInviteMock).not.toHaveBeenCalled()
++  })
++
++  it('blocks submit and marks the field invalid when the email is not a valid address', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Email'), 'not-an-email')
++    await user.click(screen.getByRole('button', { name: /send invite/i }))
++
++    expect(await screen.findByRole('alert')).toBeInTheDocument()
++    expect(screen.getByLabelText('Email')).toHaveAttribute('aria-invalid', 'true')
++    expect(createInviteMock).not.toHaveBeenCalled()
++  })
++
++  it('requires a team for a coach invite', async () => {
++    const user = userEvent.setup()
++    renderForm({ teams: [] })
++
++    await user.type(screen.getByLabelText('Email'), 'coach@example.com')
++    await user.selectOptions(screen.getByLabelText('Role'), 'coach')
++    await user.click(screen.getByRole('button', { name: /send invite/i }))
++
++    expect(await screen.findByRole('alert')).toBeInTheDocument()
++    expect(createInviteMock).not.toHaveBeenCalled()
++  })
++
++  it('does not require a team for an admin invite', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Email'), 'newadmin@example.com')
++    await user.selectOptions(screen.getByLabelText('Role'), 'admin')
++    await user.click(screen.getByRole('button', { name: /send invite/i }))
++
++    await waitFor(() => expect(createInviteMock).toHaveBeenCalledTimes(1))
++    expect(createInviteMock.mock.calls[0][0]).toMatchObject({ role: 'admin', teamId: null })
++  })
++})
++
++describe('InviteForm — creating an invite', () => {
++  it('creates a coach invite with the club id, email, role, team and no player', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Email'), '  coach@example.com  ')
++    await user.selectOptions(screen.getByLabelText('Role'), 'coach')
++    await user.selectOptions(screen.getByLabelText('Age group'), 't-u14')
++    await user.click(screen.getByRole('button', { name: /send invite/i }))
++
++    await waitFor(() => expect(createInviteMock).toHaveBeenCalledTimes(1))
++    expect(createInviteMock.mock.calls[0][0]).toEqual({
++      clubId: CLUB_ID,
++      email: 'coach@example.com',
++      role: 'coach',
++      teamId: 't-u14',
++      playerId: null,
++      createdBy: 'user-1',
++    })
++  })
++
++  it('lists players scoped to the chosen team once a parent invite has a team', async () => {
++    const user = userEvent.setup()
++    listPlayersMock.mockResolvedValue([
++      { id: 'p-1', full_name: 'Tom Fletcher', team_id: 't-u12' },
++    ])
++    renderForm()
++
++    await user.selectOptions(screen.getByLabelText('Role'), 'parent')
++    await user.selectOptions(screen.getByLabelText('Age group'), 't-u12')
++
++    await waitFor(() => expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['t-u12'] }))
++    expect(await screen.findByText('Tom Fletcher')).toBeInTheDocument()
++  })
++
++  it('sends the chosen player id when linking a parent to their child', async () => {
++    const user = userEvent.setup()
++    listPlayersMock.mockResolvedValue([
++      { id: 'p-1', full_name: 'Tom Fletcher', team_id: 't-u12' },
++    ])
++    renderForm()
++
++    await user.type(screen.getByLabelText('Email'), 'parent@example.com')
++    await user.selectOptions(screen.getByLabelText('Role'), 'parent')
++    await user.selectOptions(screen.getByLabelText('Age group'), 't-u12')
++    await screen.findByText('Tom Fletcher')
++    await user.selectOptions(screen.getByLabelText('Player (optional)'), 'p-1')
++    await user.click(screen.getByRole('button', { name: /send invite/i }))
++
++    await waitFor(() => expect(createInviteMock).toHaveBeenCalledTimes(1))
++    expect(createInviteMock.mock.calls[0][0]).toMatchObject({ playerId: 'p-1' })
++  })
++
++  it('shows the accept link on success rather than closing the sheet', async () => {
++    const user = userEvent.setup()
++    renderForm()
++
++    await user.type(screen.getByLabelText('Email'), 'coach@example.com')
++    await user.selectOptions(screen.getByLabelText('Role'), 'coach')
++    await user.selectOptions(screen.getByLabelText('Age group'), 't-u14')
++    await user.click(screen.getByRole('button', { name: /send invite/i }))
++
++    const link = await screen.findByDisplayValue(/\/accept-invite\/tok-abc-123$/)
++    expect(link).toBeInTheDocument()
++  })
++
++  it('surfaces a creation failure in an alert region', async () => {
++    const user = userEvent.setup()
++    createInviteMock.mockRejectedValue(new Error("We couldn't send that invite."))
++    renderForm()
++
++    await user.type(screen.getByLabelText('Email'), 'coach@example.com')
++    await user.selectOptions(screen.getByLabelText('Role'), 'coach')
++    await user.selectOptions(screen.getByLabelText('Age group'), 't-u14')
++    await user.click(screen.getByRole('button', { name: /send invite/i }))
++
++    expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't send that invite.")
++  })
++
++  it('has no jersey number anywhere in the player picker', async () => {
++    const user = userEvent.setup()
++    listPlayersMock.mockResolvedValue([
++      { id: 'p-1', full_name: 'Tom Fletcher', team_id: 't-u12', jersey_num: 7 },
++    ])
++    renderForm()
++
++    await user.selectOptions(screen.getByLabelText('Role'), 'parent')
++    await user.selectOptions(screen.getByLabelText('Age group'), 't-u12')
++    await screen.findByText('Tom Fletcher')
++
++    expect(screen.queryByText(/jersey/i)).not.toBeInTheDocument()
++    expect(screen.queryByText('7')).not.toBeInTheDocument()
++  })
++})
+diff --git a/tests/scope.test.js b/tests/scope.test.js
+index 74b6d2f..1231a06 100644
+--- a/tests/scope.test.js
++++ b/tests/scope.test.js
+@@ -317,25 +317,26 @@ describe('childPlayerIds', () => {
+ })
+ 
+ // --- loadMyMemberships() (src/data/members.js) -----------------------------
+ // RLS already restricts rows to the caller, so this takes no user id
+ // argument. The convention set by supabase.js/auth.jsx is throw-on-error,
+ // not {data, error} tuples — verified below.
+ 
+ vi.mock('../src/lib/supabase.js', () => ({
+   supabase: {
+     from: vi.fn(),
++    rpc: vi.fn(),
+   },
+ }))
+ 
+ import { supabase } from '../src/lib/supabase.js'
+-import { loadMyMemberships, listClubMembers } from '../src/data/members.js'
++import { loadMyMemberships, listClubMembers, createInvite, acceptInvite } from '../src/data/members.js'
+ 
+ describe('loadMyMemberships', () => {
+   it('returns the rows from the memberships table joined to teams', async () => {
+     const rows = [
+       { id: 'm-1', role: 'coach', team_id: U12.id, player_id: null, teams: U12 },
+     ]
+     const select = vi.fn().mockResolvedValue({ data: rows, error: null })
+     supabase.from.mockReturnValue({ select })
+ 
+     const result = await loadMyMemberships()
+@@ -397,10 +398,138 @@ describe('listClubMembers', () => {
+   it('throws rather than swallowing a Supabase error', async () => {
+     const select = vi.fn().mockResolvedValue({
+       data: null,
+       error: new Error('permission denied'),
+     })
+     supabase.from.mockReturnValue({ select })
+ 
+     await expect(listClubMembers()).rejects.toThrow('permission denied')
+   })
+ })
++
++// --- createInvite() / acceptInvite() (src/data/members.js, Task 18) --------
++// createInvite inserts a row into `invites` and asks for it back (same
++// insert-then-select().maybeSingle() shape as upsertPlayer/upsertEvent in
++// src/data/players.js and src/data/events.js), so a non-admin's insert being
++// silently zero-rowed by RLS (the "invites manage" policy) is reported as a
++// refusal rather than a false "sent". acceptInvite is a thin wrapper over the
++// accept_invite RPC — the real validation (token exists, not already used,
++// email matches) lives in the SECURITY DEFINER function itself, verified
++// live; this module only has to throw the RPC's error rather than swallow it.
++
++function createInsertBuilder({ data = null, error = null } = {}) {
++  const calls = { insert: [] }
++  const builder = {}
++  builder.insert = vi.fn((...args) => {
++    calls.insert.push(args)
++    return builder
++  })
++  builder.select = vi.fn(() => builder)
++  builder.maybeSingle = vi.fn(() => Promise.resolve({ data, error }))
++  return { builder, calls }
++}
++
++describe('createInvite', () => {
++  it('inserts club_id, email, role, team_id, player_id and created_by, and reads the row back', async () => {
++    const saved = {
++      id: 'inv-1',
++      club_id: 'club-1',
++      email: 'coach@example.com',
++      role: 'coach',
++      team_id: U12.id,
++      player_id: null,
++      created_by: 'user-1',
++      token: 'tok-abc',
++      accepted_at: null,
++    }
++    const { builder, calls } = createInsertBuilder({ data: saved })
++    supabase.from.mockReturnValue(builder)
++
++    const result = await createInvite({
++      clubId: 'club-1',
++      email: 'coach@example.com',
++      role: 'coach',
++      teamId: U12.id,
++      createdBy: 'user-1',
++    })
++
++    expect(supabase.from).toHaveBeenCalledWith('invites')
++    expect(calls.insert[0][0]).toEqual({
++      club_id: 'club-1',
++      email: 'coach@example.com',
++      role: 'coach',
++      team_id: U12.id,
++      player_id: null,
++      created_by: 'user-1',
++    })
++    // The token is never generated client-side — the column default supplies
++    // it, and it's read back from the inserted row.
++    expect(calls.insert[0][0]).not.toHaveProperty('token')
++    expect(builder.select).toHaveBeenCalled()
++    expect(builder.maybeSingle).toHaveBeenCalled()
++    expect(result).toEqual(saved)
++  })
++
++  it('passes team_id and player_id as null when omitted (an admin invite)', async () => {
++    const { builder, calls } = createInsertBuilder({ data: { id: 'inv-2', token: 'tok' } })
++    supabase.from.mockReturnValue(builder)
++
++    await createInvite({ clubId: 'club-1', email: 'admin@example.com', role: 'admin', createdBy: 'user-1' })
++
++    expect(calls.insert[0][0]).toMatchObject({ team_id: null, player_id: null })
++  })
++
++  it('passes a given player_id through (a parent invite linked to their child)', async () => {
++    const { builder, calls } = createInsertBuilder({ data: { id: 'inv-3', token: 'tok' } })
++    supabase.from.mockReturnValue(builder)
++
++    await createInvite({
++      clubId: 'club-1',
++      email: 'parent@example.com',
++      role: 'parent',
++      teamId: U12.id,
++      playerId: 'player-1',
++      createdBy: 'user-1',
++    })
++
++    expect(calls.insert[0][0]).toMatchObject({ player_id: 'player-1' })
++  })
++
++  it('throws the Supabase error rather than returning a tuple', async () => {
++    const { builder } = createInsertBuilder({ error: new Error('duplicate key value') })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(
++      createInvite({ clubId: 'club-1', email: 'a@example.com', role: 'coach', teamId: U12.id, createdBy: 'u1' }),
++    ).rejects.toThrow('duplicate key value')
++  })
++
++  it('throws a friendly message when the insert is silently refused by RLS (a non-admin)', async () => {
++    const { builder } = createInsertBuilder({ data: null })
++    supabase.from.mockReturnValue(builder)
++
++    await expect(
++      createInvite({ clubId: 'club-1', email: 'a@example.com', role: 'coach', teamId: U12.id, createdBy: 'u1' }),
++    ).rejects.toThrow(/permission|not allowed|couldn.t (create|send)/i)
++  })
++})
++
++describe('acceptInvite', () => {
++  it('calls the accept_invite RPC with the token and returns the new membership row', async () => {
++    const membershipRow = { id: 'm-new', role: 'coach', team_id: U12.id, profile_id: 'user-1' }
++    supabase.rpc.mockResolvedValue({ data: membershipRow, error: null })
++
++    const result = await acceptInvite('tok-abc')
++
++    expect(supabase.rpc).toHaveBeenCalledWith('accept_invite', { _token: 'tok-abc' })
++    expect(result).toEqual(membershipRow)
++  })
++
++  it('throws the RPC error rather than returning a tuple', async () => {
++    supabase.rpc.mockResolvedValue({
++      data: null,
++      error: new Error('This invite has already been used.'),
++    })
++
++    await expect(acceptInvite('tok-abc')).rejects.toThrow('This invite has already been used.')
++  })
++})
