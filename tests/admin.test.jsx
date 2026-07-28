@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 // Unit tests for src/screens/Admin.jsx (Task 17). useMemberships and both
 // data modules are mocked, so this exercises only the screen's own
@@ -63,7 +64,45 @@ beforeEach(() => {
 
 function setup() {
   const user = userEvent.setup()
-  const utils = render(<Admin />)
+  const utils = render(<Admin />, { wrapper: RouterOnly })
+  return { user, ...utils }
+}
+
+// react-router-dom's <Link> renders an <a href> under the hood, but only
+// works (and only stays a client-side navigation) inside a Router. Admin no
+// longer renders plain <a href> for its Manage entry points, so every test
+// here needs a Router in the tree even when it doesn't care about routing —
+// hence this bare wrapper for setup().
+function RouterOnly({ children }) {
+  return (
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {children}
+    </MemoryRouter>
+  )
+}
+
+// Renders Admin plus real <Route>s for /roster and /schedule in one
+// MemoryRouter/Routes tree, exactly the standard RTL pattern for proving an
+// element is a genuine <Link> wired to the router rather than a plain <a
+// href>: jsdom can't observe a hard vs soft navigation directly (a hard nav
+// would tear down the whole JS realm, which jsdom doesn't model), but it can
+// observe whether clicking swaps the rendered content *within the same
+// render tree* without a fresh render() call — which is only possible via
+// the router's history API, i.e. only via <Link>/<NavLink>. A plain <a
+// href="/roster"> inside this same tree would not be intercepted by
+// react-router at all and this test would fail to find the target markers
+// after the click, since jsdom does not follow anchor navigations.
+function renderAdminWithRoutes() {
+  const user = userEvent.setup()
+  const utils = render(
+    <MemoryRouter initialEntries={['/more']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Routes>
+        <Route path="/more" element={<Admin />} />
+        <Route path="/roster" element={<div>Roster screen marker</div>} />
+        <Route path="/schedule" element={<div>Schedule screen marker</div>} />
+      </Routes>
+    </MemoryRouter>,
+  )
   return { user, ...utils }
 }
 
@@ -181,8 +220,42 @@ describe('Admin — content', () => {
     setup()
 
     await screen.findByText('Sara Coach')
+    // A <Link> still renders as an <a href="...">, so these attribute
+    // assertions hold both before and after the D1 fix — they alone would
+    // not have caught a plain <a href> regression. The two tests below
+    // (client-side navigation) are what actually pin the fix down.
     expect(screen.getByRole('link', { name: /manage roster/i })).toHaveAttribute('href', '/roster')
     expect(screen.getByRole('link', { name: /manage schedule/i })).toHaveAttribute('href', '/schedule')
+  })
+
+  // Regression test for Defect D1 (Task 17 visual verification): both
+  // "Manage" entry points were plain <a href> tags, which a real Chromium
+  // click proved caused a full hard page reload instead of an SPA route
+  // change. jsdom never actually follows an <a href> to a new document, so
+  // a plain-<a> version of Admin would render this test's target route as
+  // unreachable within the same tree — no navigation event fires, and the
+  // marker text is never found — while the fixed <Link> version does
+  // navigate within the tree. This is the meaningful jsdom-level proxy for
+  // "genuinely wired to the router" per RTL's documented Link-testing
+  // pattern; the real hard-vs-soft-nav distinction was independently
+  // confirmed by the browser-based visual verification pass, not by this
+  // unit test.
+  it('navigates to the roster route client-side when "Manage roster & players" is clicked', async () => {
+    const { user } = renderAdminWithRoutes()
+
+    await screen.findByText('Sara Coach')
+    await user.click(screen.getByRole('link', { name: /manage roster/i }))
+
+    expect(await screen.findByText('Roster screen marker')).toBeInTheDocument()
+  })
+
+  it('navigates to the schedule route client-side when "Manage schedule & fixtures" is clicked', async () => {
+    const { user } = renderAdminWithRoutes()
+
+    await screen.findByText('Sara Coach')
+    await user.click(screen.getByRole('link', { name: /manage schedule/i }))
+
+    expect(await screen.findByText('Schedule screen marker')).toBeInTheDocument()
   })
 
   it('does not use jersey numbers on club member rows', async () => {

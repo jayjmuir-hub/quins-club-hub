@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import Badge from '../components/Badge.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
@@ -200,18 +201,18 @@ export default function Admin() {
           <SectionTitle>Manage</SectionTitle>
           <Card className="p-[14px]">
             <div className="flex flex-col gap-2.5 desktop:flex-row">
-              <a
-                href="/roster"
+              <Link
+                to="/roster"
                 className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-white px-[15px] py-2.5 text-sm font-bold text-quinsRed shadow-[inset_0_0_0_1.5px_#e6e3e1] transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
               >
                 Manage roster &amp; players
-              </a>
-              <a
-                href="/schedule"
+              </Link>
+              <Link
+                to="/schedule"
                 className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-white px-[15px] py-2.5 text-sm font-bold text-quinsRed shadow-[inset_0_0_0_1.5px_#e6e3e1] transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
               >
                 Manage schedule &amp; fixtures
-              </a>
+              </Link>
             </div>
           </Card>
 
