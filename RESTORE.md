@@ -3,7 +3,7 @@
 **Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
 Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
 
-**16 of 22 tasks complete, 474 tests passing, build clean.**
+**17 of 22 tasks complete, 493 tests passing, build clean.**
 
 ---
 
@@ -33,7 +33,7 @@ Never put the `sb_secret_…` key in this repo or in a chat.
 Verify:
 
 ```bash
-npm test        # expect 474 passing across 19 files
+npm test        # expect 493 passing across 20 files
 npm run build   # expect clean
 ```
 
@@ -76,7 +76,8 @@ does.
 | **C — Shell & design system** | 8 app shell + nav, 9 shared UI primitives | done |
 | **D — Read features** | 10 data-access, 11 schedule, 12 roster, 13 dashboard | done |
 | **E — Write features** | 14 event form, 15 player form, 16 availability RSVPs | done |
-| **F — Admin** | 17 admin overview, 18 invite flow, 19 first-admin doc | next |
+| **F — Admin** | 17 admin overview | done |
+| | 18 invite flow, 19 first-admin doc | next |
 | **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | todo |
 
 Every completed task passed a spec-compliance and code-quality review; several needed fix
@@ -92,34 +93,51 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Resume at Task 17 — Admin overview
+## Resume at Task 18 — Invite flow (create + accept)
 
-Phase E (write features) is now COMPLETE (14 event form, 15 player form, 16 availability
-RSVPs). Task 16 shipped `src/screens/Availability.jsx` (one component serving both the
-parent/player RSVP view and the coach/admin team-sheet, gated per-row via `canEditTeam`/
-`childPlayerIds`) plus `setAvailability(eventId, playerId, status)` in
-`src/data/availability.js`. Its independent browser check caught one High-severity defect
-jsdom missed — RSVP taps wrote to the DB but never updated the tapped row's own UI, relying
-solely on a realtime echo that never arrives promptly for the writer — fixed by patching the
-saved row into local state in `handleSet`'s success branch. Live RLS on `availability` was
-confirmed directly against Postgres: `avail coach manage` (can_edit_team), `avail own insert`/
-`avail own update` (is_own_player), `avail read` (can_see_team) — matches the client-side
-scoping exactly.
+Phase F started with Task 17 (Admin overview): `src/screens/Admin.jsx`, gated on `isAdmin()`
+from `src/lib/scope.js`, wired at the existing `/more` route (not a new `/admin` route —
+`tests/nav.test.jsx` pins the bottom nav to exactly Home/Schedule/Roster/More, and the old
+`/more` was a bare one-line placeholder for everyone, so this was a lateral move, not a
+regression). Lists all 15 teams with live player counts and all club members via a new
+`listClubMembers()` in `src/data/members.js` (name/role/team only — `profiles` has no email
+column, confirmed live). "Manage" links to `/roster`/`/schedule` are real; an "Invite" entry
+point was deliberately omitted (Task 18 owns that flow and doesn't exist yet — same
+no-disabled-placeholders ruling from Task 13). Its independent browser check caught one
+High-severity defect jsdom missed — the Manage links were plain `<a href>` tags causing a
+full hard page reload instead of client-side navigation, confirmed via a real Chromium click
+wiping a `window.__navMarker` — fixed by swapping to `<Link to="...">` from react-router-dom.
 
-Task 17 (Admin overview) starts Phase F. Its brief is not yet generated — run
-`scripts/task-brief docs/plans/quins-v1-mvp.md 17` from the `subagent-driven-development`
-skill directory to produce it. The plan is `docs/plans/quins-v1-mvp.md`; the visual spec is
-`docs/design-system.md` (597 lines, extracted from the approved prototype — implementers
-build from it without reading the prototype HTML).
+Task 18 (Invite flow) is next. **It's the first task in this build that touches the
+database schema** — it adds a new `invites` table migration + RLS + a `SECURITY DEFINER`
+`accept_invite(token)` function, per the plan (`docs/plans/quins-v1-mvp.md`, Task 18): admin
+creates an invite (email + role + team + optional child `player_id`); the invitee follows a
+tokenised link and, on first login, `acceptInvite(token)` creates the `membership` row and
+links parent→child. The invitee must be able to read and accept a row matching their own
+email without write access to `memberships` directly — hence the `SECURITY DEFINER` RPC.
+Its brief is not yet generated.
 
-Execution method: `superpowers:subagent-driven-development` — one implementer subagent per
-task, then a spec+quality review, then a scoped re-review of any fixes, then a ledger entry.
-Tasks 11 onward added a further gate that has earned its place every time: an **independent
-controller-side browser pass**, rendering the real components in Chromium at 375px and
-1280px via `harness/`. It has caught defects on every screen that jsdom could not see —
-Task 15's pass was safeguarding-focused given the contact-data writes, Task 16's caught the
-no-visual-confirmation RSVP bug above. Screenshots are git-ignored — regenerate them, don't
-commit them.
+**Tooling note:** the `superpowers` plugin (subagent-driven-development's `task-brief`/
+`review-package`/`sdd-workspace` scripts) disappeared from disk mid-Task-17 after an MCP
+reconnect churn — re-invoking the skill failed with "Unknown skill." If this recurs, fall
+back to doing it by hand: extract a task's plan section directly into
+`.superpowers/sdd/quins-v1-mvp/task-N-brief.md`, and build review diffs with `git log
+--oneline`/`git diff --stat`/`git diff -U10` redirected to
+`.superpowers/sdd/quins-v1-mvp/review-<base7>..<head7>.diff` — same naming convention the
+scripts used. The ledger/workspace layout doesn't depend on the scripts existing.
+
+The plan is `docs/plans/quins-v1-mvp.md`; the visual spec is `docs/design-system.md` (597
+lines, extracted from the approved prototype — implementers build from it without reading
+the prototype HTML).
+
+Execution method: `superpowers:subagent-driven-development` (or its manual equivalent above)
+— one implementer subagent per task, then a spec+quality review, then a scoped re-review of
+any fixes, then a ledger entry. Tasks 11 onward added a further gate that has earned its
+place every time: an **independent controller-side browser pass**, rendering the real
+components in Chromium at 375px and 1280px via `harness/`. It has caught defects on every
+screen that jsdom could not see — Task 16 caught a no-visual-confirmation RSVP bug, Task 17
+caught the hard-reload navigation bug above. Screenshots are git-ignored — regenerate them,
+don't commit them.
 
 **`.superpowers/sdd/.gitignore` gets reset to `*` by tooling, repeatedly.** It silently
 untracks the whole ledger. Do not fight it — stage the workspace with
