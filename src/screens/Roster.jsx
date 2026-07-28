@@ -6,9 +6,10 @@ import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import TeamPills, { ALL_TEAMS_ID } from '../components/TeamPills.jsx'
 import PlayerDetail from './PlayerDetail.jsx'
+import PlayerForm from './PlayerForm.jsx'
 import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 
 // Roster & members (design-system.md §5.3): scope note, section head, search
@@ -26,8 +27,7 @@ import { initials } from '../lib/playerFormat.js'
 // The helpers below stay local rather than moving to a src/lib module: only
 // this screen needs them (PlayerDetail receives everything as props), and
 // src/lib/eventFormat.js was extracted only because two screens genuinely
-// shared it. Add-player actions are deliberately absent — Task 15 owns
-// player writes.
+// shared it.
 
 // Ported verbatim from the prototype's posGroup() (design-system.md §7), so
 // the grouped-by-position view matches the approved design exactly.
@@ -168,6 +168,10 @@ export default function Roster() {
   const [query, setQuery] = useState('')
   const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
   const [selectedPlayerId, setSelectedPlayerId] = useState(null)
+  // null when the add/edit sheet is closed; { player } when open (player is
+  // null for "add"). An object rather than a boolean so opening the form for
+  // an existing player and opening it empty are the same state transition.
+  const [formState, setFormState] = useState(null)
 
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -275,6 +279,14 @@ export default function Roster() {
   // player closes it instead of stranding a stale copy on screen.
   const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null
 
+  // Whether the signed-in user may write to the OPEN player's squad. Asked
+  // per team through canEditTeam rather than inferred from the role, so its
+  // deliberate refusal of a null/unresolvable team_id applies here too. RLS
+  // is what actually enforces this; getting it wrong here can only hide a
+  // control, never authorise a write.
+  const canEditSelected = selectedPlayer ? canEditTeam(memberships, selectedPlayer.team_id) : false
+  const refresh = () => setReloadToken((token) => token + 1)
+
   // One squad is more useful named than counted; several are more useful
   // counted than listed (an admin sees all 15).
   const scopeSummary = scopedTeams.length === 1 ? teamNames : `${scopedTeams.length} age groups`
@@ -290,13 +302,27 @@ export default function Roster() {
         </ScopeNote>
       )}
 
-      <div className="mb-3.5 mt-1">
-        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Roster &amp; members</h2>
-        {/* Describes the scope, not the current filter — the per-group counts
-            below already report what the search and pills leave. */}
-        <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
-          {players.length} {players.length === 1 ? 'player' : 'players'} · {scopeSummary}
-        </p>
+      {/* design-system.md §5.3: the section head carries an "Add" button on
+          the right for admin/coach. It is absent, not disabled, for everyone
+          else — and it only exists at all now that Task 15's form does. */}
+      <div className="mb-3.5 mt-1 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Roster &amp; members</h2>
+          {/* Describes the scope, not the current filter — the per-group counts
+              below already report what the search and pills leave. */}
+          <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
+            {players.length} {players.length === 1 ? 'player' : 'players'} · {scopeSummary}
+          </p>
+        </div>
+        {canEditAnything && (
+          <button
+            type="button"
+            onClick={() => setFormState({ player: null })}
+            className="shrink-0 rounded-[11px] bg-quinsRed px-3.5 py-2 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+          >
+            Add player
+          </button>
+        )}
       </div>
 
       <div className="mb-3 flex items-center gap-2.5 rounded-[20px] bg-white px-3.5 py-2.5 shadow-[inset_0_0_0_1.5px_#e6e3e1,0_2px_8px_rgba(20,20,20,0.08)]">
@@ -378,11 +404,32 @@ export default function Roster() {
           />
         ))}
 
-      {selectedPlayer && (
+      {selectedPlayer && !formState && (
         <PlayerDetail
           player={selectedPlayer}
           team={teamsById.get(selectedPlayer.team_id)}
           onClose={() => setSelectedPlayerId(null)}
+          canEdit={canEditSelected}
+          onEdit={(player) => setFormState({ player })}
+          onDeleted={() => {
+            setSelectedPlayerId(null)
+            refresh()
+          }}
+        />
+      )}
+
+      {/* One sheet at a time: opening the form closes the detail sheet above
+          rather than stacking two dialogs. Closing the form drops back to the
+          roster, not to the detail sheet, which is where a coach who just
+          saved wants to be. */}
+      {formState && (
+        <PlayerForm
+          player={formState.player}
+          onClose={() => {
+            setFormState(null)
+            setSelectedPlayerId(null)
+          }}
+          onSaved={refresh}
         />
       )}
     </section>

@@ -92,3 +92,31 @@ export async function getPlayerContact(playerId) {
     email: `${playerId}.guardian@example.com`,
   }
 }
+
+// Task 15 writes. No network and no Supabase: each call records its payload
+// on window so the browser check can assert what the form ACTUALLY built —
+// in particular that the player write and the contact write are two separate
+// statements, and that a blank-both contact is skipped rather than written as
+// an empty row. ?contactFail=1 makes the contact write reject, so the
+// partial-failure path (player saved, contact not) is screenshot-able.
+const CONTACT_FAIL = new URLSearchParams(window.location.search).get('contactFail') === '1'
+
+export async function upsertPlayer(player) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: player?.id ? 'update' : 'insert', table: 'players', payload: player })
+  return { id: player?.id ?? 'p-new', ...player }
+}
+
+export async function deletePlayer(id) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'delete', table: 'players', id })
+}
+
+export async function upsertContact(contact) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'upsert', table: 'player_contacts', payload: contact })
+  if (CONTACT_FAIL) {
+    throw new Error("We couldn't save the contact details. You may not have permission to change them.")
+  }
+  return { ...contact }
+}

@@ -181,6 +181,8 @@ const scenarios = {
   roster: rosterScenario(COACH_MEMBERSHIPS),
   'roster-one-team': rosterScenario(COACH_ONE_TEAM),
   'roster-admin': rosterScenario(ADMIN_MEMBERSHIPS),
+  // Task 15: the read-only side of the new Add/Edit/Delete affordances.
+  'roster-parent': rosterScenario(PARENT_MEMBERSHIPS),
 
   // Independent verification pass: three age groups in scope.
   'roster-three': rosterScenario(COACH_THREE_MEMBERSHIPS, TEAMS_THREE),

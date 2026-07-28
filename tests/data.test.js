@@ -29,11 +29,17 @@ vi.mock('../src/lib/supabase.js', () => ({
 
 import { supabase } from '../src/lib/supabase.js'
 import { listEvents, subscribeEvents, upsertEvent, deleteEvent } from '../src/data/events.js'
-import { listPlayers, getPlayerContact } from '../src/data/players.js'
+import {
+  listPlayers,
+  getPlayerContact,
+  upsertPlayer,
+  deletePlayer,
+  upsertContact,
+} from '../src/data/players.js'
 import { listAvailability, subscribeAvailability } from '../src/data/availability.js'
 
 function createQueryBuilder({ data = null, error = null } = {}) {
-  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [] }
+  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [], upsert: [] }
   const builder = {}
   const chain = (name) =>
     vi.fn((...args) => {
@@ -53,6 +59,10 @@ function createQueryBuilder({ data = null, error = null } = {}) {
   builder.insert = chain('insert')
   builder.update = chain('update')
   builder.delete = chain('delete')
+  // Task 15. player_contacts is keyed by player_id (its PRIMARY KEY), so its
+  // writer uses a real ON CONFLICT upsert rather than an insert/update
+  // branch — hence a chain method the event writers never needed.
+  builder.upsert = chain('upsert')
   builder.maybeSingle = vi.fn(() => Promise.resolve({ data, error }))
   // Real PostgrestFilterBuilder instances are thenable so `await query`
   // resolves without an explicit terminal method — mirror that here.
@@ -400,6 +410,214 @@ describe('getPlayerContact', () => {
     supabase.from.mockReturnValue(builder)
 
     await expect(getPlayerContact('p-1')).rejects.toThrow('boom')
+  })
+})
+
+// --- upsertPlayer ---------------------------------------------------------
+
+// Task 15. Same shape as upsertEvent, against the players table: insert when
+// the row has no id, update when it has one, and treat a zero-row response as
+// the RLS refusal it is.
+describe('upsertPlayer', () => {
+  it('inserts when there is no id, and does not send an id column', async () => {
+    const saved = { id: 'p-new', full_name: 'Tom Fletcher' }
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await upsertPlayer({ full_name: 'Tom Fletcher', team_id: 't1', club_id: 'c1' })
+
+    expect(supabase.from).toHaveBeenCalledWith('players')
+    expect(builder.insert).toHaveBeenCalledTimes(1)
+    expect(builder.update).not.toHaveBeenCalled()
+    expect(calls.insert[0][0]).toEqual({ full_name: 'Tom Fletcher', team_id: 't1', club_id: 'c1' })
+    expect(calls.insert[0][0]).not.toHaveProperty('id')
+    expect(builder.eq).not.toHaveBeenCalled()
+    expect(result).toEqual(saved)
+  })
+
+  it('inserts when the id is explicitly null or an empty string', async () => {
+    for (const id of [null, undefined, '']) {
+      const { builder } = createQueryBuilder({ data: { id: 'p-new' } })
+      supabase.from.mockReturnValue(builder)
+      await upsertPlayer({ id, full_name: 'Tom Fletcher', team_id: 't1' })
+      expect(builder.insert).toHaveBeenCalledTimes(1)
+      expect(builder.update).not.toHaveBeenCalled()
+    }
+  })
+
+  it('updates the matching row when there is an id, and does not send the id as a column', async () => {
+    const saved = { id: 'p-1', full_name: 'Tom Fletcher' }
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await upsertPlayer({ id: 'p-1', full_name: 'Tom Fletcher', team_id: 't2' })
+
+    expect(builder.update).toHaveBeenCalledTimes(1)
+    expect(builder.insert).not.toHaveBeenCalled()
+    expect(calls.update[0][0]).toEqual({ full_name: 'Tom Fletcher', team_id: 't2' })
+    expect(calls.update[0][0]).not.toHaveProperty('id')
+    expect(calls.eq[0]).toEqual(['id', 'p-1'])
+    expect(result).toEqual(saved)
+  })
+
+  it('asks for the saved row back so the caller has the new id', async () => {
+    // A new player's id is not optional here: the contact write is a second,
+    // separate statement keyed on that id, so a caller with no id back has no
+    // way to save the contact details it was just given.
+    const { builder } = createQueryBuilder({ data: { id: 'p-new' } })
+    supabase.from.mockReturnValue(builder)
+
+    await upsertPlayer({ full_name: 'Tom Fletcher', team_id: 't1' })
+
+    expect(builder.select).toHaveBeenCalled()
+    expect(builder.maybeSingle).toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('null value in column "team_id"') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(upsertPlayer({ full_name: 'Tom Fletcher' })).rejects.toThrow('null value in column')
+  })
+
+  it('throws when the write succeeds but comes back with no row (an RLS refusal)', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(upsertPlayer({ id: 'p-1', team_id: 'not-mine' })).rejects.toThrow(
+      /permission|not allowed|couldn.t save/i,
+    )
+  })
+})
+
+// --- deletePlayer ---------------------------------------------------------
+
+describe('deletePlayer', () => {
+  it('deletes the row with the given id', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'p-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await deletePlayer('p-1')
+
+    expect(supabase.from).toHaveBeenCalledWith('players')
+    expect(builder.delete).toHaveBeenCalledTimes(1)
+    expect(calls.eq[0]).toEqual(['id', 'p-1'])
+  })
+
+  it('does not issue a separate player_contacts delete', async () => {
+    // player_contacts.player_id is a FK with ON DELETE CASCADE, so the
+    // contact row goes with the player. A second client-side delete would be
+    // a redundant statement whose failure mode (contact gone, player left) is
+    // strictly worse than the database's own atomic one.
+    const { builder } = createQueryBuilder({ data: [{ id: 'p-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await deletePlayer('p-1')
+
+    expect(supabase.from).toHaveBeenCalledTimes(1)
+    expect(supabase.from).not.toHaveBeenCalledWith('player_contacts')
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('network down') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(deletePlayer('p-1')).rejects.toThrow('network down')
+  })
+
+  it('throws when nothing was deleted (an RLS refusal)', async () => {
+    const { builder } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(deletePlayer('p-1')).rejects.toThrow(/permission|not allowed|couldn.t delete/i)
+  })
+})
+
+// --- upsertContact --------------------------------------------------------
+
+// Task 15. player_contacts has no surrogate key — player_id IS the primary
+// key — so this is the one writer in the codebase that uses a genuine
+// ON CONFLICT upsert rather than an insert/update branch.
+describe('upsertContact', () => {
+  it('upserts on player_id, sending the id as a column because it is the key', async () => {
+    const saved = { player_id: 'p-1', phone: '+971 50 200 1000', email: 'a@example.com' }
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await upsertContact({
+      player_id: 'p-1',
+      phone: '+971 50 200 1000',
+      email: 'a@example.com',
+    })
+
+    expect(supabase.from).toHaveBeenCalledWith('player_contacts')
+    expect(builder.upsert).toHaveBeenCalledTimes(1)
+    // Unlike upsertPlayer, the key stays in the payload: it is what the row
+    // is keyed BY, not a surrogate id being needlessly rewritten.
+    expect(calls.upsert[0][0]).toEqual({
+      player_id: 'p-1',
+      phone: '+971 50 200 1000',
+      email: 'a@example.com',
+    })
+    // The conflict target is stated rather than inferred, so this keeps
+    // updating in place if a second unique constraint is ever added.
+    expect(calls.upsert[0][1]).toMatchObject({ onConflict: 'player_id' })
+    expect(builder.insert).not.toHaveBeenCalled()
+    expect(builder.update).not.toHaveBeenCalled()
+    expect(result).toEqual(saved)
+  })
+
+  it('writes nulls through, so clearing a wrong phone number actually clears it', async () => {
+    const { builder, calls } = createQueryBuilder({ data: { player_id: 'p-1', phone: null, email: null } })
+    supabase.from.mockReturnValue(builder)
+
+    await upsertContact({ player_id: 'p-1', phone: null, email: null })
+
+    expect(calls.upsert[0][0]).toEqual({ player_id: 'p-1', phone: null, email: null })
+  })
+
+  it('refuses to write without a player_id rather than creating an orphan row', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(upsertContact({ phone: '0500000000' })).rejects.toThrow(/player/i)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('asks for the saved row back', async () => {
+    const { builder } = createQueryBuilder({ data: { player_id: 'p-1' } })
+    supabase.from.mockReturnValue(builder)
+
+    await upsertContact({ player_id: 'p-1', phone: null, email: null })
+
+    expect(builder.select).toHaveBeenCalled()
+    expect(builder.maybeSingle).toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('boom') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(upsertContact({ player_id: 'p-1', phone: '1' })).rejects.toThrow('boom')
+  })
+
+  it('throws when the write succeeds but comes back with no row (an RLS refusal)', async () => {
+    // The safeguarding case. "contact edit" is a separate policy from
+    // "player edit"; a refusal here must be reported, never conflated with a
+    // successful player save.
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(upsertContact({ player_id: 'p-1', phone: '1' })).rejects.toThrow(
+      /permission|not allowed|couldn.t save/i,
+    )
+  })
+
+  it('names contact details in its refusal message, distinctly from a player refusal', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(upsertContact({ player_id: 'p-1', phone: '1' })).rejects.toThrow(/contact/i)
   })
 })
 
