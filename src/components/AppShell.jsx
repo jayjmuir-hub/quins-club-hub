@@ -118,7 +118,46 @@ export default function AppShell({ children }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f4f3] text-[#221f1d]">
-      <header className="sticky top-0 z-40 bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_100%)] text-white shadow-[0_2px_16px_rgba(20,20,20,0.28)]">
+      {/* Task 22: skip-to-content link — design-system.md §8's last
+          remaining open gap. Must be the very first focusable element in
+          the DOM (it is: nothing above this in AppShell, and AppShell wraps
+          every routed screen, so this is the first thing any screen's Tab
+          sequence reaches). sr-only by default, popped into view with the
+          app's usual focus-visible treatment (quinsRed background, white
+          text — the same red used for every other focus ring in the app)
+          the instant it receives keyboard focus, hidden again on blur —
+          the standard skip-link pattern. Points at <main>'s new
+          `id="main-content"`; <main> also gets `tabIndex={-1}` (below)
+          because jumping a same-page anchor link moves the *viewport* but
+          not keyboard focus unless the target itself is focusable — without
+          that, Tab immediately after activating this link would resume
+          from the top of the page again, not from inside <main>. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-[11px] focus:bg-quinsRed focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-white focus:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-quinsRedDark"
+      >
+        Skip to content
+      </a>
+
+      {/* Task 22: the final quinsGreen stop is deliberately placed at 300%,
+          not 100%. This header's gradient paints across the FULL viewport
+          width (not just the centered mx-auto content column below), and
+          the centered content column's right edge can land anywhere from
+          ~98% of the viewport width (mobile/tablet-desktop widths just
+          above the 820px breakpoint, where the column is edge-to-edge) down
+          to ~50% (very wide monitors, where the column shrinks toward the
+          centre as a fraction of viewport width) — verified empirically
+          with Playwright across 820-3440px, see docs/accessibility.md.
+          With a 100% stop, that whole range could land on or near pure
+          quinsGreen, which measures ~1.9:1 for white text/pills — a real
+          AA failure this project hadn't previously checked. Moving the
+          stop to 300% means the interpolation from #B23A38 (62%) toward
+          quinsGreen only reaches ~16% of the way there by 100% of the
+          width, keeping every on-screen pixel within the red family
+          (>=5.3:1 for white text at the worst measured position) while
+          leaving the gradient definition itself (and its look at the red/
+          crest end, which this task must not change) otherwise untouched. */}
+      <header className="sticky top-0 z-40 bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_300%)] text-white shadow-[0_2px_16px_rgba(20,20,20,0.28)]">
         <div className="mx-auto flex max-w-[1120px] items-center gap-3 px-4 py-3">
           {/* crest.png is 369x400 (portrait) — object-contain keeps its native
               aspect ratio inside the 46x46 badge box (matching the
@@ -151,10 +190,26 @@ export default function AppShell({ children }) {
 
           <div className="flex-1" />
 
+          {/* Task 22: bg-black/[.22], not the visually-lighter bg-white/[.16]
+              this used to be. Both are semi-transparent pills sitting on the
+              header's gradient, but they push contrast in opposite
+              directions against the WHITE text inside them: a white overlay
+              lightens whatever gradient colour sits underneath (making a
+              near-white text sit on a near-white pill — worse contrast), a
+              black overlay darkens it (better contrast), regardless of
+              which part of the gradient underlies it at a given viewport
+              width. Measured with the real bg-white/[.16] version in a real
+              browser: the pill's own composited background (not the raw
+              gradient) landed at 4.34-4.56:1 against white text across
+              820-3440px widths — under the 4.5:1 AA threshold at every width
+              except the very widest tested. With bg-black/[.22]: 6.5-8:1 at
+              the same measured underlying colours, comfortably clearing AA
+              everywhere (see docs/accessibility.md). Nav.jsx's active-pill
+              fill uses the identical class for the identical reason. */}
           {showRole && (
             <span
               data-testid="role-label-desktop"
-              className="hidden shrink-0 rounded-full bg-white/[.16] px-3 py-1 text-xs font-bold uppercase tracking-wide desktop:inline-block"
+              className="hidden shrink-0 rounded-full bg-black/[.22] px-3 py-1 text-xs font-bold uppercase tracking-wide desktop:inline-block"
             >
               {currentRoleLabel}
             </span>
@@ -164,7 +219,11 @@ export default function AppShell({ children }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16 focus:outline-none"
+      >
         {loading && <LoadingState />}
         {!loading && error && <ErrorState error={error} reload={reload} />}
         {!loading && !error && memberships.length === 0 && (

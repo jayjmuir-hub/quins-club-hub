@@ -59,7 +59,12 @@ function StatusButtons({ status, disabled, onSet }) {
           aria-pressed={status === option.value}
           onClick={() => onSet(option.value)}
           className={[
-            'rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[12.5px] font-bold transition disabled:cursor-not-allowed disabled:opacity-60',
+            // Task 22 fix: these three toggle buttons had no
+            // focus-visible ring at all — a real gap the brief's "focus
+            // rings are already everywhere" claim didn't hold for, caught
+            // by actually tabbing through the Availability sheet rather
+            // than trusting the grep. Same convention used app-wide.
+            'rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[12.5px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
             status === option.value ? STATUS_ON[option.value] : STATUS_OFF,
           ].join(' ')}
         >

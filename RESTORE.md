@@ -77,7 +77,7 @@ does.
 | **D — Read features** | 10 data-access, 11 schedule, 12 roster, 13 dashboard | done |
 | **E — Write features** | 14 event form, 15 player form, 16 availability RSVPs | done |
 | **F — Admin** | 17 admin overview, 18 invite flow, 19 first-admin doc | done |
-| **G — Release** | 20 PWA (done), 21 RLS hardening, 22 E2E + a11y + deploy docs | in progress |
+| **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | done — **all 22 tasks complete** |
 
 Every completed task passed a spec-compliance and code-quality review; several needed fix
 rounds, all closed by a scoped re-review. The ledger at
@@ -92,7 +92,48 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Resume at Task 22 — End-to-end role + a11y verification, release docs
+## Task 22 — End-to-end role + a11y verification, release docs — COMPLETE (final task)
+
+The v1 MVP plan is now fully built (22 of 22 tasks). Task 22 added three new docs
+(`docs/accessibility.md`, `docs/e2e-roles.md`, `docs/deploy.md`) and fixed real bugs found by
+empirical browser verification rather than trusting the brief's own hand-calculated hypothesis:
+
+- **Header gradient contrast (confirmed real, fixed).** Verified with real headless Chromium
+  (Playwright, `/opt/pw-browsers`) at 8 real widths (820-3440px), reading actual composited
+  pixel colours, not CSS introspection. Found TWO separate AA failures: (1) the brief's own
+  hypothesis — the rightmost nav pill near the gradient's green end at narrow desktop widths,
+  measured 2.32-2.36:1 before the fix; (2) a second, previously-unknown one — the role badge
+  and active nav pill's `bg-white/[.16]` fill actually *reduces* contrast (a white overlay
+  lightens the red underneath it), measuring 4.06-4.46:1 (under 4.5:1) at every width tested,
+  regardless of the green-stop issue. Fixed both: moved the gradient's final `quinsGreen` stop
+  from `100%` to `300%` (keeps the visible portion within the red family at any viewport width);
+  changed the badge/active-pill fill to `bg-black/[.22]` (darkens instead of lightens) and gave
+  inactive nav pills their own `bg-black/[.1]` fill (previously none at all). Re-measured after:
+  4.74-8.49:1 across all 8 widths. Full numbers in `docs/accessibility.md` §1.
+- **Skip-to-content link** (design-system.md §8's one confirmed-still-open gap) — added to
+  `AppShell.jsx`, verified with real Tab/Enter keypresses in Playwright (first-focusable,
+  genuinely hidden until focus, Enter moves real keyboard focus to `<main>`, not just the
+  viewport).
+- **One real, previously-unknown a11y gap found and fixed**: `Availability.jsx`'s In/Maybe/Out
+  toggle buttons had no `focus-visible:ring` at all — found by checking every `<button>` in
+  `src/screens`/`src/components`, not by trusting the brief's "already everywhere" claim.
+- Everything else the brief flagged as "verify, don't trust" (Sheet's focus trap/Escape/restore,
+  icon `aria-label`s, `role="alert"`, calendar day cells as real buttons,
+  `prefers-reduced-motion`) checked out as already correct.
+- **A live infrastructure finding worth knowing for the deploy step**: checked the Netlify MCP
+  while writing `docs/deploy.md` and confirmed `adhjrt.com`'s bare root domain is **already
+  serving a different, unrelated Netlify project** of Jay's (`serene-gingersnap-1d0eb6` — a
+  tournament/registration app, from a different GitHub repo `jayjmuir-hub/adhjrt`, not this one).
+  `docs/deploy.md` flags this explicitly: the Quins Club Hub trial must use a genuine subdomain
+  (e.g. `app.adhjrt.com`) on a **new, separate** Netlify site, never reusing or overwriting that
+  existing project.
+
+537/537 tests (2 new, for the skip link), build clean. Full detail:
+`.superpowers/sdd/quins-v1-mvp/task-22-report.md`.
+
+---
+
+## Resume at Task 22 (historical — pre-Task-22 state, kept for context)
 
 Phase F is now FULLY COMPLETE (17 admin overview, 18 invite flow, 19 first-admin bootstrap
 doc). Task 18 added a new `invites` table + RLS + a `SECURITY DEFINER accept_invite(token)`

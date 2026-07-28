@@ -68,11 +68,26 @@ function linkClassName({ isActive }) {
     'focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2',
     isActive ? 'text-quinsRed' : 'text-[#77726e] hover:text-quinsBlack',
     // Desktop (in-header top nav): text-only pill on the gradient, per
-    // design-system.md §4.1 (.nav-desktop button styling).
+    // design-system.md §4.1 (.nav-desktop button styling). Task 22: every
+    // pill (active AND inactive) now gets a bg-black overlay, not just the
+    // active one — measured in a real browser that the INACTIVE items'
+    // text, at its existing desktop:opacity-[.82], composites to
+    // ~4.19-4.47:1 against the bare gradient (no overlay at all): under the
+    // 4.5:1 AA threshold at every desktop width tested (820-3440px), because
+    // 82%-opacity white text is itself slightly darker than pure white, on
+    // top of a background that on its own is only just above the same
+    // threshold. A flat bg-black/[.1] under the inactive items (measured
+    // 4.87-5.16:1 with it) fixes that while staying visually a much lighter
+    // touch than the active pill's bg-black/[.22] (a white overlay would
+    // make this worse, not better, for the same reason described on
+    // AppShell.jsx's role badge — see docs/accessibility.md).
     'desktop:flex-row desktop:gap-0 desktop:rounded-[10px] desktop:px-3.5 desktop:py-2 desktop:text-sm desktop:font-semibold desktop:text-white',
+    // Mutually exclusive background classes (never both applied to the same
+    // element at once) so there is no risk of Tailwind's utility-ordering
+    // resolving a conflict between the two arbitrary bg-black values.
     isActive
-      ? 'desktop:bg-white/[.16] desktop:opacity-100'
-      : 'desktop:opacity-[.82] desktop:hover:opacity-100',
+      ? 'desktop:bg-black/[.22] desktop:opacity-100'
+      : 'desktop:bg-black/[.1] desktop:opacity-[.82] desktop:hover:opacity-100',
   ].join(' ')
 }
 

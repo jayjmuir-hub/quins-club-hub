@@ -105,6 +105,46 @@ describe('AppShell', () => {
     expect(hasClassToken(tagline, 'desktop:text-[12px]')).toBe(true)
   })
 
+  // Task 22: skip-to-content link (the one confirmed-open gap left by
+  // design-system.md §8). jsdom can't tell us whether sr-only actually hides
+  // it visually or whether focus-visible ring colours render correctly —
+  // that's what the real-browser Playwright pass in docs/accessibility.md
+  // §2 is for. What jsdom *can* verify, and is worth pinning here so a
+  // future change can't silently regress it: it exists, is the first
+  // element AppShell renders, points at the right target, and that target
+  // is genuinely programmatically focusable.
+  it('renders a skip-to-content link as the very first element, pointing at a focusable <main>', () => {
+    useMembershipsMock.mockReturnValue(loaded())
+
+    const { container } = renderShell()
+
+    const skipLink = screen.getByRole('link', { name: 'Skip to content' })
+    expect(skipLink).toHaveAttribute('href', '#main-content')
+    // "very first element" per the brief: nothing above it in the DOM that
+    // AppShell itself controls (MemoryRouter/render() wrapper aside).
+    expect(container.querySelector('a, button, input, [tabindex]')).toBe(skipLink)
+
+    const main = document.getElementById('main-content')
+    expect(main).not.toBeNull()
+    expect(main.tagName).toBe('MAIN')
+    // tabIndex={-1}: focusable programmatically (by the skip link's href
+    // jump) without joining the normal Tab sequence.
+    expect(main).toHaveAttribute('tabindex', '-1')
+
+    main.focus()
+    expect(document.activeElement).toBe(main)
+  })
+
+  it('the skip link is visually hidden (sr-only) until it receives focus', () => {
+    useMembershipsMock.mockReturnValue(loaded())
+
+    renderShell()
+
+    const skipLink = screen.getByRole('link', { name: 'Skip to content' })
+    expect(hasClassToken(skipLink, 'sr-only')).toBe(true)
+    expect(hasClassToken(skipLink, 'focus:not-sr-only')).toBe(true)
+  })
+
   it('renders the routed content and a role label once memberships have loaded', () => {
     useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'coach', team_id: 't1' }] }))
 
