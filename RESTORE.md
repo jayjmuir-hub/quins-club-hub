@@ -3,7 +3,7 @@
 **Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
 Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
 
-**18 of 22 tasks complete, 528 tests passing, build clean.**
+**19 of 22 tasks complete, 528 tests passing, build clean.**
 
 ---
 
@@ -76,9 +76,8 @@ does.
 | **C — Shell & design system** | 8 app shell + nav, 9 shared UI primitives | done |
 | **D — Read features** | 10 data-access, 11 schedule, 12 roster, 13 dashboard | done |
 | **E — Write features** | 14 event form, 15 player form, 16 availability RSVPs | done |
-| **F — Admin** | 17 admin overview, 18 invite flow | done |
-| | 19 first-admin doc | next |
-| **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | todo |
+| **F — Admin** | 17 admin overview, 18 invite flow, 19 first-admin doc | done |
+| **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | next |
 
 Every completed task passed a spec-compliance and code-quality review; several needed fix
 rounds, all closed by a scoped re-review. The ledger at
@@ -93,15 +92,37 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Resume at Task 19 — First-admin bootstrap (docs only, no app code)
+## Resume at Task 20 — PWA (installable + offline read)
 
-Phase F is now COMPLETE (17 admin overview, 18 invite flow). Task 18 added a new `invites`
-table + RLS + a `SECURITY DEFINER accept_invite(token)` RPC — **applied directly by the
-controller against the live Supabase project, not by an implementer subagent**, because this
-was the first task in the build to touch the database, and a bad RLS predicate fails silently
-(wrong rows, no error) rather than loudly. See "Database schema changes" below for the exact
-shape and a real gotcha worth remembering for Task 21 (RLS hardening) or any future
-`SECURITY DEFINER` function.
+Phase F is now FULLY COMPLETE (17 admin overview, 18 invite flow, 19 first-admin bootstrap
+doc). Task 18 added a new `invites` table + RLS + a `SECURITY DEFINER accept_invite(token)`
+RPC — **applied directly by the controller against the live Supabase project, not by an
+implementer subagent**, because this was the first task in the build to touch the database,
+and a bad RLS predicate fails silently (wrong rows, no error) rather than loudly. See
+"Database schema changes" below for the exact shape and a real gotcha worth remembering for
+Task 21 (RLS hardening) or any future `SECURITY DEFINER` function.
+
+Task 19 added `docs/first-admin.md` — the exact SQL for Jay to run himself (not something this
+build automates — see the doc's own reasoning) after his first sign-in, to grant himself
+`admin`. This was docs-only (no app code, no tests, no review loop or browser check — those
+gates exist for code, not a static SQL doc), but the controller caught a real bug in its own
+first draft before committing: the draft used `ON CONFLICT DO NOTHING` to make the admin-grant
+insert safe to run twice, but `memberships` has no unique constraint on
+`(profile_id, club_id, role)` — only a PK on a fresh uuid every insert, which never conflicts
+— so that statement would have silently created a SECOND admin row if ever run twice, not
+no-op'd as claimed. Fixed with `INSERT ... SELECT ... WHERE NOT EXISTS (...)`, which is
+genuinely idempotent. Verified live before writing: `auth.users` currently has zero rows (Jay
+hasn't signed in yet — the doc's "sign in first" framing isn't hypothetical), and the club/
+memberships schema details the doc references (club id `00000000-...000ad`, nullable
+`team_id`/`player_id`) were checked against the live database, not assumed from memory.
+
+Task 20 (PWA) starts Phase G — the final phase. Per the plan (`docs/plans/quins-v1-mvp.md`,
+Task 20): create `public/manifest.webmanifest`, icons from the crest, `src/sw-register.js`,
+add `vite-plugin-pwa` config. Interfaces: installable to home screen; caches the app shell and
+last-loaded data for offline read. Icon label "Quins", theme colour `#C21F32`. Test: the built
+`dist/` contains the manifest and a service worker; the manifest declares name, short_name
+"Quins", 192px and 512px icons, `display: standalone`, and the theme colour. Its brief is not
+yet generated.
 
 `src/App.jsx` was restructured from one shared `<AppShell><Routes>...</Routes></AppShell>` to
 each route wrapping its own `<AppShell>` individually, so `/accept-invite/:token` could exist
