@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import { getPlayerContact } from '../data/players.js'
+import { initials } from '../lib/playerFormat.js'
 
 // The player detail sheet (design-system.md §5.7): a branded hero carrying
-// the jersey number, a set of key/value rows, and — only when the database
+// the player's initials, a set of key/value rows, and — only when the database
 // actually returns one — a contact block. Mounted only while a player is
 // selected (Roster renders it conditionally), so there is no `open` prop to
 // thread through and no hidden-but-present DOM.
@@ -164,7 +165,6 @@ function ContactBlock({ playerId }) {
 }
 
 export default function PlayerDetail({ player, team, onClose }) {
-  const jersey = player.jersey_num == null ? '–' : String(player.jersey_num)
   const teamName = team?.name ?? 'Not set'
   const position = player.position || 'Not set'
 
@@ -177,10 +177,10 @@ export default function PlayerDetail({ player, team, onClose }) {
           captaincy is stated in the Role row below instead. */}
       <div className="-mx-[18px] -mt-4 mb-4 bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] px-[18px] py-[22px] text-white">
         <div
-          className="mb-3 grid h-14 w-14 place-items-center rounded-[14px] bg-white/20 text-[22px] font-extrabold"
+          className="mb-3 grid h-14 w-14 place-items-center rounded-[14px] bg-white/20 text-[20px] font-extrabold tracking-[.5px]"
           aria-hidden="true"
         >
-          {jersey}
+          {initials(player.full_name)}
         </div>
         <h3 className="text-[22px] font-bold leading-tight">{player.full_name}</h3>
         <p className="mt-1 text-sm font-semibold text-white/[.85]">
@@ -191,7 +191,6 @@ export default function PlayerDetail({ player, team, onClose }) {
       <div className="mb-4">
         <KeyValue label="Position">{position}</KeyValue>
         <KeyValue label="Age group">{teamName}</KeyValue>
-        <KeyValue label="Jersey number">{player.jersey_num == null ? 'Not set' : player.jersey_num}</KeyValue>
         <KeyValue label="Role">{player.is_captain ? 'Captain' : 'Player'}</KeyValue>
       </div>
 

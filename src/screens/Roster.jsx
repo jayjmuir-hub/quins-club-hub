@@ -9,6 +9,7 @@ import PlayerDetail from './PlayerDetail.jsx'
 import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { initials } from '../lib/playerFormat.js'
 
 // Roster & members (design-system.md §5.3): scope note, section head, search
 // bar, a team filter, then the grouped player list. Reads players once for
@@ -51,23 +52,22 @@ function positionGroup(position) {
   return 'Other'
 }
 
-// Numberless players sort last, matching the prototype's `num || 99`
-// fallback — but via an explicit Infinity so a real jersey 99 can't tie with
-// "has no number at all". Ties (two 99s, or two numberless players) fall
-// back to name, which keeps the order stable whatever the fetch returned.
-function byJersey(a, b) {
-  const left = a.jersey_num == null ? Infinity : a.jersey_num
-  const right = b.jersey_num == null ? Infinity : b.jersey_num
-  if (left !== right) return left - right
+// Every group is ordered by name. The prototype sorted position groups by
+// jersey number, but the club does not use numbers (see playerFormat.js), so
+// that sort had nothing to sort on. Stated explicitly here rather than
+// inherited from listPlayers' ORDER BY, so the ordering the user sees is a
+// decision this screen makes and a change to the query can't silently
+// scramble it.
+function byName(a, b) {
   return a.full_name.localeCompare(b.full_name)
 }
 
-// Case-insensitive substring match across name, position, age group and
-// jersey number — the four things printed on a roster row, so anything a
-// user can see, they can search for (design-system.md §4.9).
+// Case-insensitive substring match across name, position and age group — the
+// three things printed on a roster row, so anything a user can see, they can
+// search for (design-system.md §4.9).
 function matchesQuery(player, teamName, query) {
   if (!query) return true
-  const haystack = [player.full_name, player.position, teamName, player.jersey_num]
+  const haystack = [player.full_name, player.position, teamName]
     .filter((part) => part != null && part !== '')
     .join(' ')
     .toLowerCase()
@@ -92,8 +92,6 @@ function ChevronRightIcon(props) {
 }
 
 function PlayerRow({ player, teamName, onSelect }) {
-  const numbered = player.jersey_num != null
-
   return (
     <button
       type="button"
@@ -105,16 +103,16 @@ function PlayerRow({ player, teamName, onSelect }) {
       // taller than its text. Setting the layout explicitly overrides that.
       className="flex w-full items-center gap-3 border-b border-[#e6e3e1] px-[14px] py-[11px] text-left transition last:border-b-0 hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-quinsRed"
     >
+      {/* Initials tile (design-system.md §4.15 .pnum, which the prototype
+          filled with a jersey number). aria-hidden because it restates the
+          name rendered right beside it — without that, every row would
+          announce itself as "T F Tom Fletcher". Always populated, so the
+          flat no-number variant of this tile is gone with the numbers. */}
       <span
-        className={[
-          'grid h-10 w-10 shrink-0 place-items-center rounded-[11px] text-[15px] font-extrabold',
-          numbered
-            ? 'bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] text-white'
-            : 'bg-[#ece6f0] text-[#5c5854]',
-        ].join(' ')}
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] text-[13px] font-extrabold tracking-[.5px] text-white"
         aria-hidden="true"
       >
-        {numbered ? player.jersey_num : '–'}
+        {initials(player.full_name)}
       </span>
 
       <span className="min-w-0 flex-1">
@@ -269,9 +267,7 @@ export default function Roster() {
     .map((key) => ({
       key,
       label: groupByPosition ? key : (teamsById.get(key)?.name ?? 'No age group'),
-      // Position groups sort by jersey number (design-system.md §5.3);
-      // age-group listings keep listPlayers' full_name ordering.
-      players: groupByPosition ? [...bucket.get(key)].sort(byJersey) : bucket.get(key),
+      players: [...bucket.get(key)].sort(byName),
     }))
 
   // Derive the open player from the live list rather than storing the row

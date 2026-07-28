@@ -8,7 +8,7 @@ import fs from 'node:fs'
 // <button> used as a layout box, and Chromium's UA stylesheet centres a
 // button's content — the exact class of bug that shipped in Task 11's
 // calendar cells and that jsdom can never see. So every shot records the
-// jersey tile's offset from its row's top edge, at both widths: if the row's
+// initials tile's offset from its row's top edge, at both widths: if the row's
 // explicit flex layout were dropped, those numbers would drift apart between
 // short and tall rows.
 
@@ -109,7 +109,7 @@ for (const shot of shots) {
             `${el.tagName}.${el.className?.toString?.().slice(0, 60)} right=${Math.round(el.getBoundingClientRect().right)}`,
         )
 
-      // The UA-centring check. For each row, how far is the jersey tile's top
+      // The UA-centring check. For each row, how far is the initials tile's top
       // from the row's top? Identical across rows of differing heights means
       // the explicit flex layout is doing its job.
       const rows = [...document.querySelectorAll('[data-testid="player-row"]')].slice(0, 8).map((row) => {

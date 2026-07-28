@@ -43,15 +43,15 @@ const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p-f
 // case is asserted rather than assumed away.
 const UNRESOLVED_TEAM = [{ id: 'm4', role: 'parent', team_id: 'team-gone', player_id: 'p-x' }]
 
-// Positions chosen to hit all three position groups: Flanker + Prop =>
-// Forwards, Fly-half => Backs, Utility => Other. Jersey numbers are out of
-// order in this array so the "sorted by jersey" assertions mean something,
-// and NUMBERLESS has jersey_num null so it can prove numberless-goes-last.
+// Positions chosen to hit all three position groups: Flanker/Prop/Hooker/Lock
+// => Forwards, Fly-half => Backs, Utility => Other. The club does not use
+// jersey numbers, so players carry no jersey_num at all and groups sort by
+// name; ALL_PLAYERS is deliberately NOT in name order so that sort has to be
+// done by the screen rather than inherited from the fixture order.
 const FLANKER = {
   id: 'p-flanker',
   team_id: 'team-u10',
   full_name: 'Tom Fletcher',
-  jersey_num: 7,
   position: 'Flanker',
   is_captain: true,
 }
@@ -59,7 +59,6 @@ const FLY_HALF = {
   id: 'p-fly-half',
   team_id: 'team-u10',
   full_name: 'Ali Hassan',
-  jersey_num: 10,
   position: 'Fly-half',
   is_captain: false,
 }
@@ -67,36 +66,30 @@ const PROP = {
   id: 'p-prop',
   team_id: 'team-u10',
   full_name: 'Ben Okafor',
-  jersey_num: 1,
   position: 'Prop',
   is_captain: false,
 }
-const NUMBERLESS = {
+const UTILITY = {
   id: 'p-utility',
   team_id: 'team-u10',
   full_name: 'Sami Rahman',
-  jersey_num: null,
   position: 'Utility',
   is_captain: false,
 }
-// Two more numberless players, both Forwards, so "numberless sorts last"
-// is asserted *within* a group that also holds numbered players — with a
-// numberless player alone in its own group the assertion proves nothing.
-// Their names are reversed relative to fixture order so the tie-break
-// between two numberless players is exercised too.
-const NUMBERLESS_HOOKER = {
+// Two more Forwards, so the name sort is asserted inside a group holding
+// several players rather than one. Their names sort before and after the
+// other forwards, so a group that merely kept fixture order would fail.
+const HOOKER = {
   id: 'p-hooker',
   team_id: 'team-u10',
   full_name: 'Zaid Noor',
-  jersey_num: null,
   position: 'Hooker',
   is_captain: false,
 }
-const NUMBERLESS_LOCK = {
+const LOCK = {
   id: 'p-lock',
   team_id: 'team-u10',
   full_name: 'Adam Price',
-  jersey_num: null,
   position: 'Lock',
   is_captain: false,
 }
@@ -104,13 +97,12 @@ const SENIOR = {
   id: 'p-fullback',
   team_id: 'team-1xv',
   full_name: 'Craig Muir',
-  jersey_num: 15,
   position: 'Fullback',
   is_captain: false,
 }
 
-const ALL_PLAYERS = [FLY_HALF, PROP, SENIOR, FLANKER, NUMBERLESS, NUMBERLESS_HOOKER, NUMBERLESS_LOCK]
-const U10_PLAYERS = [FLY_HALF, PROP, FLANKER, NUMBERLESS, NUMBERLESS_HOOKER, NUMBERLESS_LOCK]
+const ALL_PLAYERS = [FLY_HALF, PROP, SENIOR, FLANKER, UTILITY, HOOKER, LOCK]
+const U10_PLAYERS = [FLY_HALF, PROP, FLANKER, UTILITY, HOOKER, LOCK]
 
 // jsdom applies no CSS at all — no Tailwind, and no UA stylesheet layout
 // either — so asserting on the literal class token is the only way to make a
@@ -245,19 +237,18 @@ describe('Roster — grouping', () => {
     expect(screen.queryByText('Craig Muir')).not.toBeInTheDocument()
   })
 
-  it('sorts a position group by jersey number, numberless last', async () => {
+  it('sorts a position group by name', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
     listPlayersMock.mockResolvedValue(U10_PLAYERS)
 
     setup()
 
     await screen.findByText('Tom Fletcher')
-    // Forwards: Ben (1), Tom (7), then the two numberless ones by name;
-    // Backs: Ali (10); Other: Sami (none).
+    // Forwards, by name: Adam, Ben, Tom, Zaid. Backs: Ali. Other: Sami.
     expect(playerNames()).toEqual([
+      'Adam Price',
       'Ben Okafor',
       'Tom Fletcher',
-      'Adam Price',
       'Zaid Noor',
       'Ali Hassan',
       'Sami Rahman',
@@ -369,15 +360,6 @@ describe('Roster — search', () => {
     expect(playerNames()).toEqual(['Craig Muir'])
   })
 
-  it('filters by jersey number', async () => {
-    const { user } = setup()
-
-    await screen.findByText('Tom Fletcher')
-    await user.type(screen.getByRole('searchbox'), '15')
-
-    expect(playerNames()).toEqual(['Craig Muir'])
-  })
-
   it('drops a group entirely when nothing in it matches', async () => {
     const { user } = setup()
 
@@ -399,13 +381,25 @@ describe('Roster — search', () => {
 })
 
 describe('Roster — player rows', () => {
-  it('shows the jersey number, position and age group on each row', async () => {
+  it('shows the initials, position and age group on each row', async () => {
     setup()
 
     await screen.findByText('Tom Fletcher')
     const row = screen.getByRole('button', { name: /Tom Fletcher/ })
-    expect(within(row).getByText('7')).toBeInTheDocument()
+    expect(within(row).getByText('TF')).toBeInTheDocument()
     expect(within(row).getByText('Flanker · U10')).toBeInTheDocument()
+  })
+
+  // The initials tile is decoration: it restates the name that is already in
+  // the row, so repeating it to a screen reader would just make every row
+  // announce "T F Tom Fletcher".
+  it('does not repeat the initials to a screen reader', async () => {
+    setup()
+
+    await screen.findByText('Tom Fletcher')
+    const row = screen.getByRole('button', { name: /Tom Fletcher/ })
+    expect(within(row).getByText('TF')).toHaveAttribute('aria-hidden', 'true')
+    expect(row).not.toHaveAccessibleName(/TF/)
   })
 
   it('marks the captain', async () => {
@@ -491,6 +485,10 @@ describe('PlayerDetail — opening a player', () => {
     expect(within(dialog).getByText('U10')).toBeInTheDocument()
     expect(within(dialog).getByText('Captain')).toBeInTheDocument()
     expect(getPlayerContactMock).toHaveBeenCalledWith('p-flanker')
+    // The club does not use jersey numbers, so the sheet must not offer a
+    // row for one — an empty "Jersey number / Not set" row on every player
+    // would be pure noise.
+    expect(within(dialog).queryByText(/jersey/i)).not.toBeInTheDocument()
   })
 
   it('closes on the close button', async () => {

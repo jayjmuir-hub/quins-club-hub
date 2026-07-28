@@ -63,7 +63,7 @@ All colours are declared as CSS custom properties on `:root`. Quote:
 | `#efeaf4` / `#7a5aa0` | `.chip.away` bg / text (purple-grey, away-match indicator) |
 | `#eef0f2` / `#5a6470` | `.chip.draw` bg / text |
 | `#f0ecf2` | Default `.chip` bg (neutral chip, e.g. age-group chip) |
-| `#ece6f0` | `.pnum.no` bg (jersey-number-less avatar), `.roster-group .cnt` count-badge bg |
+| `#ece6f0` | `.roster-group .cnt` count-badge bg (was also `.pnum.no`, the jersey-number-less avatar — removed with jersey numbers, Task 12) |
 | `#faf8fb` | `.fixture:hover` / `.player:hover` row background |
 | `#f3eef5` | `.datebox` background |
 | `#dcd4e0` | `.sheet-grip` (drag handle) colour |
@@ -82,7 +82,7 @@ All colours are declared as CSS custom properties on `:root`. Quote:
 ```css
 background:linear-gradient(100deg,var(--plum) 0%,var(--maroon) 42%,#B23A38 62%,var(--green) 100%);
 ```
-100° angle, 4 colour stops: plum → maroon → `#B23A38` → green. This exact gradient is also reused (2-stop, `135deg,var(--plum),var(--maroon)`) for: `.hero`, `.pnum` (jersey-number avatar), `.detail-hero`, `.persona .pa` (default), `.va-av` (viewas avatar) unless a persona colour overrides the second stop.
+100° angle, 4 colour stops: plum → maroon → `#B23A38` → green. This exact gradient is also reused (2-stop, `135deg,var(--plum),var(--maroon)`) for: `.hero`, `.pnum` (initials avatar), `.detail-hero`, `.persona .pa` (default), `.va-av` (viewas avatar) unless a persona colour overrides the second stop.
 
 ---
 
@@ -164,7 +164,7 @@ Concrete measurements pulled from the stylesheet:
 - **Grid gaps**: `.stat-grid{gap:12px}`, `.field-row{gap:12px}`, `.dash-cols{gap:18px}`, `.cal-grid{gap:5px}`, `.pill-row{gap:8px}`.
 - **Buttons**: `.btn{padding:10px 15px;border-radius:11px}`, `.btn.sm{padding:7px 11px}`.
 - **Inputs**: `.field input,.field select,.field textarea{padding:11px 12px;border-radius:11px;border:1.5px solid var(--line)}`, focus state `border-color:var(--maroon)` (colour swap only, no glow/ring).
-- **Avatars / number tiles**: `.pnum{40×40px, border-radius:11px}`, `.dh-num{56×56px, border-radius:14px}`, `.va-av{32×32px, border-radius:9px}`, `.persona .pa{40×40px, border-radius:11px}`.
+- **Avatars / initials tiles**: `.pnum{40×40px, border-radius:11px}`, `.dh-num{56×56px, border-radius:14px}`, `.va-av{32×32px, border-radius:9px}`, `.persona .pa{40×40px, border-radius:11px}`.
 - **Chips/pills**: `.chip{padding:3px 9px;border-radius:20px}` (fully rounded), `.pill{padding:7px 14px;border-radius:20px}`.
 - **FAB**: `54×54px`, `border-radius:50%`, fixed `right:18px; bottom: calc(safe-area+80px)`, shadow `0 8px 24px rgba(122,21,51,.45)`.
 - **Sheet (mobile)**: top corners `22px 22px 0 0`, `max-height:92vh`. **Sheet (desktop ≥820px)**: full `20px` radius, centered modal `width:min(520px,94vw); max-height:88vh`.
@@ -248,7 +248,7 @@ Horizontally-scrollable row (`.pill-row{display:flex;gap:8px;overflow-x:auto}`, 
 ```html
 <div class="search">{search svg}<input id="rSearch" placeholder="Search name, position, age group"/></div>
 ```
-White pill, `box-shadow:inset 0 0 0 1.5px var(--line)`, icon + borderless input. Behaviour: `oninput` re-renders the whole roster view on every keystroke (`rosterQuery=s.value;renderRoster()`), then manually restores focus and caret position afterward (`ns.setSelectionRange(pos,pos)`) since the full re-render replaces the input element. Filters players client-side by substring match against name, position, team, or jersey number (case-insensitive).
+White pill, `box-shadow:inset 0 0 0 1.5px var(--line)`, icon + borderless input. Behaviour: `oninput` re-renders the whole roster view on every keystroke (`rosterQuery=s.value;renderRoster()`), then manually restores focus and caret position afterward (`ns.setSelectionRange(pos,pos)`) since the full re-render replaces the input element. Filters players client-side by substring match against name, position and team (case-insensitive). The prototype also matched jersey number; that is gone with jersey numbers (Task 12).
 
 ### 4.10 Empty state (`.empty`)
 ```html
@@ -315,7 +315,7 @@ The single most-reused component — used identically in Home "Upcoming" list, H
   <div class="gh">Forwards <span class="cnt">10</span></div>
   <div class="card">
     <div class="player" data-player="12">
-      <div class="pnum">7</div>
+      <div class="pnum">TF</div><!-- initials, not a jersey number — see the note below -->
       <div class="pinfo"><div class="nm">Tom Fletcher<span class="p-cap">Capt</span></div><div class="pos">Flanker · U15</div></div>
       <div class="p-arrow">›</div>
     </div>
@@ -323,7 +323,7 @@ The single most-reused component — used identically in Home "Upcoming" list, H
   </div>
 </div>
 ```
-`.gh` group header: 12.5px/800 uppercase muted label + rounded count badge (`.cnt`, `#ece6f0` bg). `.player` row: `display:flex;gap:12px;padding:11px 14px`, hairline divider, hover bg, cursor pointer. `.pnum`: 40×40px rounded-square jersey-number badge with the plum→maroon gradient (or flat `#ece6f0`/muted if no number, class `.pnum.no`, shown as "–"). `.pinfo .nm`: name (700/15px) + inline `.p-cap` "Capt" badge (10px/800, warn colours, uppercase) if `player.cap` is true. `.pinfo .pos`: "Position · Age Group" (12.5px muted). `.p-arrow`: chevron-right in light grey, purely a visual affordance (whole row is clickable, arrow isn't separately interactive). Click → Player Detail sheet.
+`.gh` group header: 12.5px/800 uppercase muted label + rounded count badge (`.cnt`, `#ece6f0` bg). `.player` row: `display:flex;gap:12px;padding:11px 14px`, hairline divider, hover bg, cursor pointer. `.pnum`: 40×40px rounded-square badge with the plum→maroon gradient. ⚠️ **Superseded (Task 12):** the prototype filled this tile with a jersey number and had a flat `#ece6f0` `.pnum.no` "–" variant for players without one. **The club does not use jersey numbers** (confirmed with Jay), so the tile shows **initials derived from `full_name`** ("TF"), it is always populated, and the `.pnum.no` variant no longer exists. The tile is `aria-hidden` — it restates the name beside it. See `src/lib/playerFormat.js` for the initials rules (middle names skipped; a hyphenated or apostrophed surname is one name; a single-word name uses its first two letters). `.pinfo .nm`: name (700/15px) + inline `.p-cap` "Capt" badge (10px/800, warn colours, uppercase) if `player.cap` is true. `.pinfo .pos`: "Position · Age Group" (12.5px muted). `.p-arrow`: chevron-right in light grey, purely a visual affordance (whole row is clickable, arrow isn't separately interactive). Click → Player Detail sheet.
 
 ### 4.16 Bottom sheet / modal (`.sheet` + `.scrim`)
 The **single generic modal** used for every overlay in the app: event detail, event add/edit form, player detail, player add/edit form, and the persona switcher. There is exactly one `#sheet`/`#sheetBody`/`#sheetTitle` DOM node; `openSheet(title, bodyHtml)` swaps its contents and toggles `.open` classes; `closeSheet()` reverses it.
@@ -345,7 +345,7 @@ The **single generic modal** used for every overlay in the app: event detail, ev
 ```html
 <div class="field"><label>Full name</label><input id="p_name" placeholder="e.g. Charlie Hughes"/></div>
 ```
-`margin-bottom:14px`. Label: 12.5px/700 uppercase muted, `.4px` letter-spacing, `margin-bottom:6px`. Input/select/textarea: full width, `padding:11px 12px`, `border-radius:11px`, `1.5px solid var(--line)`, `font-size:16px`; focus state is a colour-only border swap to `var(--maroon)` (no box-shadow ring). `.field-row` lays two fields side-by-side (`display:grid;grid-template-columns:1fr 1fr;gap:12px`) — used for Date+Time and Jersey#+Position pairs.
+`margin-bottom:14px`. Label: 12.5px/700 uppercase muted, `.4px` letter-spacing, `margin-bottom:6px`. Input/select/textarea: full width, `padding:11px 12px`, `border-radius:11px`, `1.5px solid var(--line)`, `font-size:16px`; focus state is a colour-only border swap to `var(--maroon)` (no box-shadow ring). `.field-row` lays two fields side-by-side (`display:grid;grid-template-columns:1fr 1fr;gap:12px`) — used for the Date+Time pair. (The prototype also paired Jersey#+Position; there is no jersey field any more — Task 12.)
 
 ### 4.18 Segmented control (`.seg`)
 ```html
@@ -374,12 +374,12 @@ Small uppercase pill, `10px/800`, `.5px` letter-spacing, `padding:2px 7px;border
 ### 4.21 Detail hero (`.detail-hero`)
 ```html
 <div class="detail-hero">
-  <div class="dh-num">{icon or jersey number}</div>
+  <div class="dh-num">{icon, or initials on the player sheet}</div>
   <h3>Quins vs Dubai Exiles</h3>
   <p>Fri 24 Jul 2026 · 5:00 PM</p>
 </div>
 ```
-Top banner inside the Event/Player Detail sheet: same plum→maroon gradient, negative margins to bleed to the sheet's edges (`margin:-16px -18px 16px`), `padding:22px 18px`. `.dh-num`: 56×56px translucent white rounded-square icon/number tile. Title 22px, subtitle 14px/600 at 85% opacity.
+Top banner inside the Event/Player Detail sheet: same plum→maroon gradient, negative margins to bleed to the sheet's edges (`margin:-16px -18px 16px`), `padding:22px 18px`. `.dh-num`: 56×56px translucent white rounded-square icon tile — an event-type icon on the event sheet, the player's **initials** on the player sheet (the prototype used the jersey number; see the Task 12 note in §4.15). Title 22px, subtitle 14px/600 at 85% opacity.
 
 ### 4.22 Key/value row (`.kv`)
 ```html
@@ -443,7 +443,7 @@ Order, top to bottom:
 3. `.search` bar.
 4. `.pill-row` team filter (All + counts per team) — hidden if only 1 visible team.
 5. Body — **grouping toggle logic**:
-   - If a **specific team is selected** (or the persona only has one visible team) → group by **position**: Forwards / Backs / Other (order fixed), each a `.roster-group` with header + count + card of `.player` rows sorted by jersey number ascending (numberless last, via `||99` fallback).
+   - If a **specific team is selected** (or the persona only has one visible team) → group by **position**: Forwards / Backs / Other (order fixed), each a `.roster-group` with header + count + card of `.player` rows sorted **by name**. ⚠️ **Superseded (Task 12):** the prototype sorted these by jersey number ascending (numberless last, via a `||99` fallback); with no jersey numbers there is nothing to sort on, so both the position and age-group branches order by `full_name`.
    - Otherwise (viewing "All" across multiple visible teams) → group by **age group**, iterating the fixed `TEAMS` order (U6→Women's XV), same row styling, each group only rendered if it has ≥1 matching player.
    - Search query filters the underlying player list (name/position/team/number substring match) **before** grouping, so groups with 0 matches after filtering are simply omitted.
 
@@ -460,10 +460,10 @@ Order, top to bottom:
 Segmented Type control (Match/Training/Social) → conditionally-shown Opponent field (match only) or Title field (training/social only) → Date+Time field-row → Age group/Squad select (options = editable teams for this persona) → conditionally-shown Home/Away segmented control (match only) → Venue text field (pre-filled "Zayed Sports City, Abu Dhabi") → conditionally-shown Competition field (match only) → full-width Save button. Field visibility toggles live via the type-radio `onchange` handler (not CSS-only, since 4 different fields' visibility depend on it).
 
 ### 5.7 Player Detail (sheet)
-`detail-hero` (jersey number as `.dh-num`; name + " ©" suffix if captain; position · team) → `.kv` rows: Position, Age group, Jersey #, Role (Captain/Player) → **if `canEdit()`**: Phone + Email `.kv` rows as `tel:`/`mailto:` links, then a Call/Email button row, then an Edit/Delete button row → **else (parent)**: a `.scope-note.parent` explaining contact details are hidden for privacy (no phone/email rendered at all client-side, not just visually hidden — a real build must enforce this server-side too, matching the project's `player_contacts` RLS table).
+`detail-hero` (**initials** as `.dh-num` — the prototype used the jersey number; name + " ©" suffix if captain; position · team) → `.kv` rows: Position, Age group, Role (Captain/Player). ⚠️ **Superseded (Task 12):** there is no "Jersey #" row — the club does not use numbers. The " ©" captain suffix is also not ported: it is announced as "copyright" by screen readers, and the Role row already states captaincy. → **if `canEdit()`**: Phone + Email `.kv` rows as `tel:`/`mailto:` links, then a Call/Email button row, then an Edit/Delete button row → **else (parent)**: a `.scope-note.parent` explaining contact details are hidden for privacy (no phone/email rendered at all client-side, not just visually hidden — a real build must enforce this server-side too, matching the project's `player_contacts` RLS table).
 
 ### 5.8 Player Add/Edit form (sheet)
-Full name → Jersey#+Position field-row → Age group/Squad select → Phone → Email → Player/Captain segmented control → full-width Save button.
+Full name → Position → Age group/Squad select → Phone → Email → Player/Captain segmented control → full-width Save button. ⚠️ **Superseded (Task 12):** the prototype had a Jersey# field paired with Position. **Do not add a jersey field** — the club does not use numbers. Position and captaincy ARE tracked (they are simply not populated yet), so those stay.
 
 ### 5.9 "Viewing as" / persona switcher (sheet) — demo-only
 Intro paragraph explaining the demo → list of `.persona` cards (§4.19), one per `PERSONAS` entry, click selects and immediately closes the sheet + re-renders the whole app under the new scope + shows a toast.
@@ -499,7 +499,7 @@ store.load("quins_events_v2",  null) // -> array of Event
 ```js
 {
   id: 12,                       // number, sequential int (Date.now() on new records) — Supabase: players.id (uuid)
-  num: 7,                       // number 1-99, or 0/falsy for "no number"    — players.jersey_number
+  num: 7,                       // ⚠️ NOT USED (Task 12) — the club does not use jersey numbers. `players.jersey_num` remains in the schema (nullable, empty) in case the senior sides ever want squad numbers, but nothing in the UI reads or writes it.
   name: "Tom Fletcher",         // string, single full-name field             — SPLIT into players.first_name/last_name for Supabase (or keep as full_name, confirm schema)
   pos: "Flanker",               // string, one of the fixed POSITIONS list    — players.position
   team: "U15",                  // string, must match one of the 15 TEAMS     — players.team_id (fk -> teams)

@@ -519,3 +519,158 @@ All reverted; suite re-verified green.
 The age-group branch keeping name order rather than jersey order (faithful to
 §5.3; raised as a product question for Jay), and the roster row's `aria-hidden`
 jersey number (Task 22's accessibility pass).
+
+---
+
+# Task 12 amendment — the club does not use jersey numbers
+
+Product change from Jay: jersey numbers come out of the UI. Positions and
+captains stay (tracked, just not populated yet). Schema untouched —
+`players.jersey_num` is nullable and every player table is empty, so nothing
+was migrated and nothing was lost; the column stays for a possible future
+senior squad-numbering.
+
+## What changed
+
+**1. The roster row's leading tile shows initials.** New pure module
+`src/lib/playerFormat.js` exporting `initials(fullName)`, used by both the
+roster row and the player-detail hero. It went in `src/lib/` rather than
+staying local to `Roster.jsx` precisely because two screens need it — the same
+test `eventFormat.js` had to pass.
+
+The awkward cases, decided deliberately and each pinned by a test:
+
+| Input | Result | Reasoning |
+|---|---|---|
+| `Tom Fletcher` | `TF` | first + last |
+| `Faisal Al Mansoori` | `FM` | middle names skipped — `FAM` overflows a 40px tile |
+| `Charlie Nguyen-Fitzgerald` | `CN` | a hyphenated surname is ONE name, contributing one letter |
+| `Eoin O'Sullivan` | `EO` | same for apostrophes (straight and curly) |
+| `Ronaldinho` | `RO` | single word → first two letters, so every tile stays two characters wide |
+| `X` | `X` | nothing more to take |
+| `mateo fernández` | `MF` | uppercased |
+| `Emre Yıldırım` | `EY` | non-Latin script |
+| `''` / `'   '` / `null` | `?` | unreachable (NOT NULL) but better than rendering "undefined" |
+
+Splitting is codepoint-aware, so an astral-plane name can't be cut through a
+surrogate pair. Punctuation is deliberately *not* a word separator: treating
+it as one would give three-letter initials for a single surname.
+
+**2. Position groups sort by name.** The `byJersey` comparator (with its
+`Infinity` numberless-last fallback) is gone, replaced by `byName`. Both
+branches — position and age group — now sort by `full_name`. I kept it as an
+explicit sort in the screen rather than leaning on `listPlayers`' `ORDER BY`,
+so the order the user sees is a decision this screen makes and a change to the
+query can't silently scramble it. The fixture array is deliberately not in
+name order, so that test is non-vacuous.
+
+**3. `PlayerDetail`'s "Jersey number" row is gone,** and its hero tile shows
+initials instead of the number.
+
+**4. Dead handling removed:** the `–` placeholder, the flat `#ece6f0`
+no-number tile variant, the `Infinity` sort fallback, `jersey_num` from the
+search haystack (so search is name/position/age group — matching the
+placeholder text, which never mentioned numbers), and the field from every
+test and harness fixture.
+
+**5. `docs/design-system.md` updated in 13 places** — §4.15 (tile + markup),
+§4.9 (search), §5.3 (sort), §4.21 (`.dh-num`), §5.7 (no Jersey # row), §4.17
+and §5.8 (the add/edit form's Jersey#+Position field-row), §7 (the player
+object), the colour table and the sizes list. Each carries an explicit
+"⚠️ Superseded (Task 12)" note stating that the club does not use numbers and
+that the column remains in the schema — including a "**do not add a jersey
+field**" on the form spec, which is where Tasks 14/15 would otherwise
+reintroduce it straight from the doc.
+
+## Knock-on effects, handled
+
+- The deferred `aria-hidden` minor is resolved rather than moot: the initials
+  tile is `aria-hidden="true"`, so a row announces "Tom Fletcher Capt Flanker ·
+  U10" and not "T F Tom Fletcher". A test asserts both the attribute and that
+  the row's accessible name does not contain the initials.
+- The deferred "age-group branch shows a scrambled jersey column" minor
+  disappears with the column.
+
+## Jersey audit
+
+`grep -rn "jersey\|Jersey" src tests harness` returns 10 hits, **all of them
+comments explaining the absence** — no code reads or writes `jersey_num`. Two
+stale "jersey tile" comments in `harness/shoot-roster.mjs` were renamed to
+"initials tile". `docs/design-system.md`'s remaining mentions are the
+superseded notes above. The `.superpowers/` ledger keeps its mentions
+deliberately: those are historical records of what was true at the time, and
+rewriting them would falsify the paper trail.
+
+## TDD evidence
+
+**RED** — tests amended first, run against the unchanged implementation:
+
+```
+$ npx vitest run tests/roster.test.jsx tests/player-format.test.js
+ × Roster — player rows > shows the initials, position and age group on each row
+ × Roster — player rows > does not repeat the initials to a screen reader
+ × PlayerDetail — opening a player > opens a dialog with the player's details
+Error: Failed to resolve import "../src/lib/playerFormat.js" from "tests/player-format.test.js"
+ Test Files  2 failed (2)
+      Tests  3 failed | 35 passed (38)
+```
+
+`TestingLibraryElementError: Unable to find an element with the text: TF` — the
+tile still held a number; the sheet still held a Jersey row; the module did not
+exist.
+
+**GREEN** — after implementing:
+
+```
+$ npx vitest run tests/roster.test.jsx tests/player-format.test.js
+ ✓ tests/roster.test.jsx (38 tests) 2198ms
+ ✓ tests/player-format.test.js (10 tests) 5ms
+ Test Files  2 passed (2)
+      Tests  48 passed (48)
+```
+
+One honest note: the "sorts a position group by name" test went green the
+moment `jersey_num` left the fixtures, because `byJersey` then saw `Infinity`
+on both sides and fell through to its name tie-break. It was therefore not a
+RED-first test for the sort change — it pins the required behaviour, but the
+comparator swap is a refactor under it rather than a change it drove.
+
+## Command and output
+
+Files changed: `src/lib/playerFormat.js` (new), `tests/player-format.test.js`
+(new), `src/screens/Roster.jsx`, `src/screens/PlayerDetail.jsx`,
+`tests/roster.test.jsx`, `docs/design-system.md`, `harness/stubs/players.js`,
+`harness/shoot-roster.mjs`.
+
+```
+$ npm test
+ Test Files  15 passed (15)
+      Tests  281 passed (281)
+
+$ npm run build
+✓ built in 3.68s
+```
+
+281 = 271 baseline + 10 in the new `player-format` file. The roster file stayed
+at 38: two jersey-only tests were removed (`filters by jersey number`, and the
+numberless-last half of the sort test) and two initials tests added. Output
+pristine — no act() warnings, no stderr.
+
+## Browser check (375px and 1280px)
+
+The geometry the last two rounds established is intact — this was the specific
+risk, since the tile is the row's first flex child:
+
+| | value |
+|---|---|
+| initials tile offset from row top | **13px on every row, every scenario, both widths** (unchanged) |
+| tile size | 40×40 throughout |
+| row heights | 65–66px (unchanged) |
+| horizontal overflow | zero elements, `scrollWidth === innerWidth` at both widths |
+| console errors / page errors | none |
+
+Rendered initials verified visually across every awkward case in one shot:
+`CN` (Nguyen-Fitzgerald), `EO` (O'Sullivan), `FM` (Al Mansoori), `KO`
+(Osei-Bonsu), `RO` (Ronaldinho, single word). The player sheet hero shows `DR`
+with rows Position / Age group / Role and no Jersey row. A single-word name was
+added to the harness fixtures so that branch stays visible in future passes.
