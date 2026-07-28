@@ -328,7 +328,7 @@ vi.mock('../src/lib/supabase.js', () => ({
 }))
 
 import { supabase } from '../src/lib/supabase.js'
-import { loadMyMemberships } from '../src/data/members.js'
+import { loadMyMemberships, listClubMembers } from '../src/data/members.js'
 
 describe('loadMyMemberships', () => {
   it('returns the rows from the memberships table joined to teams', async () => {
@@ -362,5 +362,45 @@ describe('loadMyMemberships', () => {
     supabase.from.mockReturnValue({ select })
 
     await expect(loadMyMemberships()).rejects.toThrow('permission denied')
+  })
+})
+
+// --- listClubMembers() (src/data/members.js, Task 17) ----------------------
+// Same throw-on-error / never-null convention as loadMyMemberships, but this
+// query is club-wide, not scoped to the caller — see the function's own
+// comment for why that is safe (RLS's `memb read` policy).
+
+describe('listClubMembers', () => {
+  it('returns every membership row, joined to the profile and team', async () => {
+    const rows = [
+      { id: 'm-1', role: 'coach', team_id: U12.id, player_id: null, profiles: { full_name: 'Jay Muir' }, teams: { name: U12.name } },
+    ]
+    const select = vi.fn().mockResolvedValue({ data: rows, error: null })
+    supabase.from.mockReturnValue({ select })
+
+    const result = await listClubMembers()
+
+    expect(supabase.from).toHaveBeenCalledWith('memberships')
+    expect(select).toHaveBeenCalled()
+    expect(result).toEqual(rows)
+  })
+
+  it('returns an empty array, never null, when there are no rows', async () => {
+    const select = vi.fn().mockResolvedValue({ data: null, error: null })
+    supabase.from.mockReturnValue({ select })
+
+    const result = await listClubMembers()
+
+    expect(result).toEqual([])
+  })
+
+  it('throws rather than swallowing a Supabase error', async () => {
+    const select = vi.fn().mockResolvedValue({
+      data: null,
+      error: new Error('permission denied'),
+    })
+    supabase.from.mockReturnValue({ select })
+
+    await expect(listClubMembers()).rejects.toThrow('permission denied')
   })
 })
