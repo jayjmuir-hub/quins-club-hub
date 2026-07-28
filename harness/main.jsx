@@ -5,6 +5,7 @@ import AppShell from '../src/components/AppShell.jsx'
 import Login from '../src/screens/Login.jsx'
 import Schedule from '../src/screens/Schedule.jsx'
 import Roster from '../src/screens/Roster.jsx'
+import Dashboard from '../src/screens/Dashboard.jsx'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
 import '../src/index.css'
@@ -15,9 +16,9 @@ import '../src/index.css'
 // real Tailwind-rendered layout without a Supabase session or any network
 // access. Not part of the app build; not committed.
 
+// "/" renders the real Dashboard as of Task 13 (see src/App.jsx).
 function Home() {
-  // Mirrors App.jsx's routed Home placeholder exactly (see src/App.jsx).
-  return <h1>Home</h1>
+  return <Dashboard />
 }
 
 const noop = async () => {}
@@ -94,6 +95,21 @@ function rosterScenario(memberships, teams = TEAMS) {
   )
 }
 
+// Task 13 Dashboard screens. The default Shell child is already the
+// Dashboard, so these only vary the persona (which is what changes the scope
+// note, the stat-tile labels and the quick-action gating).
+function dashboardScenario(memberships, teams = TEAMS) {
+  return () => (
+    <Shell
+      route="/"
+      authValue={baseAuth(COACH_EMAIL)}
+      membershipValue={{ memberships, teams, loading: false, error: null, reload: noop }}
+    />
+  )
+}
+
+const PARENT_MEMBERSHIPS = [{ id: 'm4', role: 'parent', team_id: 't1', player_id: 'p1' }]
+
 // A coach of one squad: the team filter is hidden and the list groups by
 // position. Task 12's grouping rule turns on team count, so this is the
 // scenario that renders the Forwards/Backs/Other headings.
@@ -153,6 +169,10 @@ const scenarios = {
 
   // Independent verification pass: three age groups in scope.
   'roster-three': rosterScenario(COACH_THREE_MEMBERSHIPS, TEAMS_THREE),
+
+  dashboard: dashboardScenario(COACH_MEMBERSHIPS),
+  'dashboard-admin': dashboardScenario(ADMIN_MEMBERSHIPS),
+  'dashboard-parent': dashboardScenario(PARENT_MEMBERSHIPS),
 
   'shell-loading': () => (
     <Shell

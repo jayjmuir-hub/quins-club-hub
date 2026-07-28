@@ -48,7 +48,9 @@ vi.mock('../src/data/events.js', () => ({
 }))
 
 // Same treatment for the /roster route, which renders the real Roster screen
-// as of Task 12. Roster's own behaviour is covered by tests/roster.test.jsx.
+// as of Task 12, and for "/" — the real Dashboard as of Task 13, which reads
+// both modules. The Dashboard's own behaviour is covered by
+// tests/dashboard.test.jsx; here it only has to be the thing "/" renders.
 vi.mock('../src/data/players.js', () => ({
   listPlayers: () => new Promise(() => {}),
   getPlayerContact: () => new Promise(() => {}),
@@ -89,15 +91,15 @@ describe('App', () => {
     expect(screen.getByText(/invite-only/i)).toBeInTheDocument()
   })
 
-  it('renders the home placeholder at / when signed in', () => {
+  it('renders the dashboard at / when signed in', () => {
     useAuthMock.mockReturnValue(signedIn)
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /home/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
   })
 
-  it('renders the schedule placeholder at /schedule when signed in', () => {
+  it('renders the schedule screen at /schedule when signed in', () => {
     window.history.pushState({}, '', '/schedule')
     useAuthMock.mockReturnValue(signedIn)
 
@@ -130,7 +132,7 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /home/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/')
   })
 })

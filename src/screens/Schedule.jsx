@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Card from '../components/Card.jsx'
-import Chip from '../components/Chip.jsx'
 import Empty from '../components/Empty.jsx'
+import FixtureRow from '../components/FixtureRow.jsx'
 import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import TeamPills, { ALL_TEAMS_ID, PillButton } from '../components/TeamPills.jsx'
@@ -9,19 +9,7 @@ import EventDetail from './EventDetail.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
-import {
-  clubDayParts,
-  clubToday,
-  dateBoxParts,
-  eventDate,
-  eventTitle,
-  formatTime,
-  hasResult,
-  resultLabel,
-  resultOutcome,
-  resultScore,
-  sortByStart,
-} from '../lib/eventFormat.js'
+import { clubDayParts, clubToday, eventDate, hasResult, sortByStart } from '../lib/eventFormat.js'
 
 // Schedule & fixtures (design-system.md §5.2): scope note, section head,
 // Upcoming/Results/Calendar sub-tabs, a team filter, then the list or the
@@ -40,6 +28,8 @@ const TABS = [
   { id: 'calendar', label: 'Calendar' },
 ]
 
+// The calendar's dot legend only. The fixture rows' own type chips live in
+// src/components/FixtureRow.jsx, which carries its own copy of these labels.
 const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -65,24 +55,6 @@ const DOT_COLOURS = {
   match: 'bg-quinsRed',
   training: 'bg-[#3E9C4F]',
   social: 'bg-[#c9861a]',
-}
-
-function ClockIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  )
-}
-
-function PinIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" />
-      <circle cx="12" cy="10" r="2.5" />
-    </svg>
-  )
 }
 
 function ChevronIcon({ direction = 'left', ...props }) {
@@ -113,53 +85,6 @@ function shiftMonth({ year, month }, delta) {
 function currentClubMonth() {
   const { year, month } = clubToday()
   return { year, month }
-}
-
-function FixtureRow({ event, teamName, onSelect }) {
-  const date = eventDate(event)
-  const { month, day, weekday } = dateBoxParts(date)
-  const played = hasResult(event)
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(event.id)}
-      className="flex w-full items-center gap-[13px] border-b border-[#e6e3e1] p-[14px] text-left transition last:border-b-0 hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-quinsRed"
-    >
-      <span className="w-[52px] shrink-0 rounded-[11px] bg-[#f3eef5] px-1 py-2 text-center">
-        <span className="block text-[10.5px] font-extrabold uppercase tracking-[.5px] text-quinsRed">{month}</span>
-        <span className="block text-[21px] font-extrabold leading-none text-[#221f1d]">{day}</span>
-        <span className="block text-[10px] font-semibold text-[#77726e]">{weekday}</span>
-      </span>
-
-      <span className="min-w-0 flex-1">
-        <span className="mb-1 flex flex-wrap items-center gap-1.5">
-          <Chip type={event.type}>{TYPE_LABELS[event.type] ?? 'Event'}</Chip>
-          {teamName && <Chip>{teamName}</Chip>}
-        </span>
-        <span className="block text-[15.5px] font-extrabold text-[#221f1d]">{eventTitle(event)}</span>
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12.5px] text-[#77726e]">
-          <span className="flex items-center gap-1">
-            <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            {formatTime(date)}
-          </span>
-          {event.venue && (
-            <span className="flex items-center gap-1">
-              <PinIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              {event.venue}
-            </span>
-          )}
-        </span>
-      </span>
-
-      {played && (
-        <span className="shrink-0 text-right">
-          <Chip type={resultOutcome(event)}>{resultLabel(event)}</Chip>
-          <span className="mt-1 block text-base font-extrabold text-[#221f1d]">{resultScore(event)}</span>
-        </span>
-      )}
-    </button>
-  )
 }
 
 function FixtureList({ events, teamsById, onSelect, emptyMessage }) {
