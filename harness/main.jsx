@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, BrowserRouter, Routes, Route } from 'react-router-dom'
 import AppShell from '../src/components/AppShell.jsx'
 import Login from '../src/screens/Login.jsx'
 import Schedule from '../src/screens/Schedule.jsx'
@@ -8,6 +8,7 @@ import Roster from '../src/screens/Roster.jsx'
 import Dashboard from '../src/screens/Dashboard.jsx'
 import PlayerForm from '../src/screens/PlayerForm.jsx'
 import Availability from '../src/screens/Availability.jsx'
+import Admin from '../src/screens/Admin.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
@@ -285,6 +286,64 @@ const scenarios = {
       >
         <Availability event={event} team={TEAMS.find((t) => t.id === teamId)} onClose={noop} />
       </Shell>
+    )
+  },
+
+  // Independent Task 17 verification: mount Admin DIRECTLY (same reasoning
+  // as the `playerform`/`availability` scenarios above) so its own isAdmin()
+  // gate and data-fetch effect can be exercised for every role without
+  // App.jsx's routing deciding which case is even reachable first.
+  // ?who=admin|coach|parent|player picks the membership. Real 15-age-group
+  // fixture (TEAMS_15) is used so "Age groups (15)" is genuine, not a
+  // 2-3-team stand-in.
+  admin: () => {
+    const params = new URLSearchParams(window.location.search)
+    const who = params.get('who') || 'admin'
+    const membershipsByWho = {
+      admin: ADMIN_MEMBERSHIPS,
+      coach: COACH_MEMBERSHIPS,
+      parent: PARENT_MEMBERSHIPS,
+      player: [{ id: 'm5', role: 'player', team_id: 't1', player_id: 'p1' }],
+    }
+    const memberships = membershipsByWho[who] ?? ADMIN_MEMBERSHIPS
+    return (
+      <Shell
+        route="/more"
+        authValue={baseAuth(JAY_EMAIL)}
+        membershipValue={{ memberships, teams: TEAMS_15, loading: false, error: null, reload: noop }}
+      >
+        <Admin />
+      </Shell>
+    )
+  },
+
+  // Independent Task 17 verification: a real BrowserRouter (not
+  // MemoryRouter) with real Routes for /more, /schedule, /roster — same
+  // shape as App.jsx's own <Routes> — so a click on Admin's "Manage" links
+  // can be checked for what it ACTUALLY does in a real browser: a
+  // client-routed SPA navigation (URL changes, JS context/state survives) vs
+  // a hard full-page reload (which a plain <a href> triggers regardless of
+  // which router wraps it). window.__navMarker is set once on load and
+  // checked after the click — it survives a client-side route change but is
+  // wiped by a real page load, which is how the two are told apart.
+  'admin-nav': () => {
+    window.__navMarker = 'harness-loaded'
+    return (
+      <BrowserRouter>
+        <AuthProvider value={baseAuth(JAY_EMAIL)}>
+          <MembershipProvider
+            value={{ memberships: ADMIN_MEMBERSHIPS, teams: TEAMS_15, loading: false, error: null, reload: noop }}
+          >
+            <AppShell>
+              <Routes>
+                <Route path="/more" element={<Admin />} />
+                <Route path="/schedule" element={<Schedule />} />
+                <Route path="/roster" element={<Roster />} />
+              </Routes>
+            </AppShell>
+          </MembershipProvider>
+        </AuthProvider>
+      </BrowserRouter>
     )
   },
 
