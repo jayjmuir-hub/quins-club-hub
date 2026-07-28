@@ -1,0 +1,118 @@
+# Review package: 4ffbb30..HEAD
+
+## Commits
+f810b35 fix: update Availability row state immediately after a successful RSVP save
+
+## Files changed
+ src/screens/Availability.jsx | 13 +++++++++++++
+ tests/availability.test.jsx  | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 57 insertions(+)
+
+## Diff
+diff --git a/src/screens/Availability.jsx b/src/screens/Availability.jsx
+index 0244ae9..069450a 100644
+--- a/src/screens/Availability.jsx
++++ b/src/screens/Availability.jsx
+@@ -165,20 +165,33 @@ export default function Availability({ event, team, onClose }) {
+       counts[status] += 1
+     } else {
+       counts.none += 1
+     }
+   })
+ 
+   function handleSet(playerId, status) {
+     setSavingPlayerId(playerId)
+     setSaveError(null)
+     setAvailability(event.id, playerId, status)
++      .then((saved) => {
++        // Patch the clicked row into local state immediately on a genuine
++        // success — the person who just tapped a status must see it change
++        // without waiting on a realtime round-trip (which may be delayed,
++        // disconnected, or never echo back to its own writer). Only applied
++        // here, in the success branch, so a refused/failed write (caught
++        // below) never optimistically shows a status that was never saved.
++        setRows((current) => {
++          const next = current.filter((row) => row.player_id !== playerId)
++          next.push(saved)
++          return next
++        })
++      })
+       .catch((err) => setSaveError(err))
+       .finally(() => setSavingPlayerId(null))
+   }
+ 
+   const date = eventDate(event)
+   const isFirstLoad = loading && players.length === 0 && !error
+ 
+   return (
+     <Sheet open onClose={onClose} title="Availability">
+       <div className="mb-4">
+diff --git a/tests/availability.test.jsx b/tests/availability.test.jsx
+index 2d3f46a..df8c8d0 100644
+--- a/tests/availability.test.jsx
++++ b/tests/availability.test.jsx
+@@ -140,20 +140,64 @@ describe('Availability — coach/admin can override anyone', () => {
+     useMembershipsMock.mockReturnValue(memberships(COACH))
+     const { user } = setup()
+ 
+     await screen.findByText('Ana Silva')
+     const row = screen.getByText('Ana Silva').closest('li')
+     await user.click(within(row).getByRole('button', { name: /^in$/i }))
+ 
+     expect(setAvailabilityMock).toHaveBeenCalledWith('e-1', 'p-ana', 'in')
+   })
+ 
++  it('updates the clicked row to the new status as soon as the save succeeds, without waiting for realtime', async () => {
++    useMembershipsMock.mockReturnValue(memberships(COACH))
++    listAvailabilityMock.mockResolvedValue([
++      { id: 'a1', event_id: 'e-1', player_id: 'p-ana', status: 'in' },
++    ])
++    setAvailabilityMock.mockResolvedValue({
++      id: 'a1',
++      event_id: 'e-1',
++      player_id: 'p-ana',
++      status: 'maybe',
++    })
++    const { user } = setup()
++
++    await screen.findByText('Ana Silva')
++    const row = screen.getByText('Ana Silva').closest('li')
++
++    expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'true')
++
++    await user.click(within(row).getByRole('button', { name: /maybe/i }))
++
++    expect(within(row).getByRole('button', { name: /maybe/i })).toHaveAttribute('aria-pressed', 'true')
++    expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'false')
++    expect(await screen.findByText(/1 maybe/i)).toBeInTheDocument()
++    expect(screen.getByText(/0 in/i)).toBeInTheDocument()
++  })
++
++  it('does not change the row status when the save is refused', async () => {
++    useMembershipsMock.mockReturnValue(memberships(COACH))
++    listAvailabilityMock.mockResolvedValue([
++      { id: 'a1', event_id: 'e-1', player_id: 'p-ana', status: 'in' },
++    ])
++    setAvailabilityMock.mockRejectedValue(new Error("We couldn't save that RSVP."))
++    const { user } = setup()
++
++    await screen.findByText('Ana Silva')
++    const row = screen.getByText('Ana Silva').closest('li')
++
++    await user.click(within(row).getByRole('button', { name: /maybe/i }))
++
++    expect(await screen.findByRole('alert')).toBeInTheDocument()
++    expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'true')
++    expect(within(row).getByRole('button', { name: /maybe/i })).toHaveAttribute('aria-pressed', 'false')
++  })
++
+   it('lets an admin override too', async () => {
+     useMembershipsMock.mockReturnValue(memberships(ADMIN))
+     const { user } = setup()
+ 
+     await screen.findByText('Joe Brown')
+     const row = screen.getByText('Joe Brown').closest('li')
+     await user.click(within(row).getByRole('button', { name: /out/i }))
+ 
+     expect(setAvailabilityMock).toHaveBeenCalledWith('e-1', 'p-joe', 'out')
+   })

@@ -3,7 +3,7 @@
 **Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
 Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
 
-**15 of 22 tasks complete, 451 tests passing, build clean.**
+**16 of 22 tasks complete, 474 tests passing, build clean.**
 
 ---
 
@@ -33,7 +33,7 @@ Never put the `sb_secret_…` key in this repo or in a chat.
 Verify:
 
 ```bash
-npm test        # expect 451 passing across 18 files
+npm test        # expect 474 passing across 19 files
 npm run build   # expect clean
 ```
 
@@ -75,9 +75,8 @@ does.
 | **B — Auth & scope** | 3+4 auth context, 5 login screen, 6 auth gate + router, 7 scope helpers | done |
 | **C — Shell & design system** | 8 app shell + nav, 9 shared UI primitives | done |
 | **D — Read features** | 10 data-access, 11 schedule, 12 roster, 13 dashboard | done |
-| **E — Write features** | 14 event form, 15 player form | done |
-| | 16 availability RSVPs | next |
-| **F — Admin** | 17 admin overview, 18 invite flow, 19 first-admin doc | todo |
+| **E — Write features** | 14 event form, 15 player form, 16 availability RSVPs | done |
+| **F — Admin** | 17 admin overview, 18 invite flow, 19 first-admin doc | next |
 | **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | todo |
 
 Every completed task passed a spec-compliance and code-quality review; several needed fix
@@ -93,29 +92,34 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Resume at Task 16 — Availability RSVPs + coach team-sheet
+## Resume at Task 17 — Admin overview
 
-Phase E is 2 of 3 done (14 event form, 15 player form). Task 16 is the last write screen and
-owns two things deliberately deferred by earlier tasks: the "N available" count on upcoming
-schedule rows (Task 11 ruling) and the per-event availability data behind Task 13's Dashboard
-stat tiles. Its brief is not yet generated — run
-`scripts/task-brief docs/plans/quins-v1-mvp.md 16` from the `subagent-driven-development`
+Phase E (write features) is now COMPLETE (14 event form, 15 player form, 16 availability
+RSVPs). Task 16 shipped `src/screens/Availability.jsx` (one component serving both the
+parent/player RSVP view and the coach/admin team-sheet, gated per-row via `canEditTeam`/
+`childPlayerIds`) plus `setAvailability(eventId, playerId, status)` in
+`src/data/availability.js`. Its independent browser check caught one High-severity defect
+jsdom missed — RSVP taps wrote to the DB but never updated the tapped row's own UI, relying
+solely on a realtime echo that never arrives promptly for the writer — fixed by patching the
+saved row into local state in `handleSet`'s success branch. Live RLS on `availability` was
+confirmed directly against Postgres: `avail coach manage` (can_edit_team), `avail own insert`/
+`avail own update` (is_own_player), `avail read` (can_see_team) — matches the client-side
+scoping exactly.
+
+Task 17 (Admin overview) starts Phase F. Its brief is not yet generated — run
+`scripts/task-brief docs/plans/quins-v1-mvp.md 17` from the `subagent-driven-development`
 skill directory to produce it. The plan is `docs/plans/quins-v1-mvp.md`; the visual spec is
 `docs/design-system.md` (597 lines, extracted from the approved prototype — implementers
 build from it without reading the prototype HTML).
-
-**Task 16 opens every RSVP control in a `Sheet` — read the two bug notes below before
-starting** (stale-`onClose` keystroke bug, already fixed with a latest-ref pattern and a
-regression test; safe-area inset already fixed in Task 12). **Force every RSVP timestamp
-through the Abu Dhabi rulings below** — this class of bug has shipped twice already.
 
 Execution method: `superpowers:subagent-driven-development` — one implementer subagent per
 task, then a spec+quality review, then a scoped re-review of any fixes, then a ledger entry.
 Tasks 11 onward added a further gate that has earned its place every time: an **independent
 controller-side browser pass**, rendering the real components in Chromium at 375px and
 1280px via `harness/`. It has caught defects on every screen that jsdom could not see —
-Task 15's pass was safeguarding-focused given the contact-data writes. Screenshots are
-git-ignored — regenerate them, don't commit them.
+Task 15's pass was safeguarding-focused given the contact-data writes, Task 16's caught the
+no-visual-confirmation RSVP bug above. Screenshots are git-ignored — regenerate them, don't
+commit them.
 
 **`.superpowers/sdd/.gitignore` gets reset to `*` by tooling, repeatedly.** It silently
 untracks the whole ledger. Do not fight it — stage the workspace with

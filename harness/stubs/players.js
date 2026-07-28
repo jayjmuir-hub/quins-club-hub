@@ -62,7 +62,17 @@ export const PLAYERS = [
   P('p26', T3, 'Emre Yıldırım', 'Utility back / hooker cover'),
 ]
 
+// Independent Task 16 verification addition: ?playersDelay=<ms> widens the
+// window between a prop change (e.g. Schedule swapping which event's
+// Availability sheet is open) and the roster fetch actually resolving, so a
+// stale-state flash between two different events/teams is screenshot-able
+// instead of resolving too fast for Playwright to ever observe it.
+const PLAYERS_DELAY = Number(new URLSearchParams(window.location.search).get('playersDelay') || 0)
+
 export async function listPlayers({ teamIds } = {}) {
+  if (PLAYERS_DELAY > 0) {
+    await new Promise((resolve) => setTimeout(resolve, PLAYERS_DELAY))
+  }
   if (Array.isArray(teamIds) && teamIds.length === 0) return []
   const rows =
     Array.isArray(teamIds) && teamIds.length > 0

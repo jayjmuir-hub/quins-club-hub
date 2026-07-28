@@ -7,6 +7,7 @@ import Schedule from '../src/screens/Schedule.jsx'
 import Roster from '../src/screens/Roster.jsx'
 import Dashboard from '../src/screens/Dashboard.jsx'
 import PlayerForm from '../src/screens/PlayerForm.jsx'
+import Availability from '../src/screens/Availability.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
@@ -218,6 +219,71 @@ const scenarios = {
         membershipValue={{ memberships, teams: TEAMS_THREE, loading: false, error: null, reload: noop }}
       >
         <PlayerForm player={player} onClose={noop} onSaved={noop} />
+      </Shell>
+    )
+  },
+
+  // Independent Task 16 verification: mount Availability DIRECTLY (same
+  // reasoning as the `playerform` scenario above) so its own per-row
+  // `editable` computation can be exercised for every role/team combination
+  // without Schedule's/EventDetail's own gating deciding which case is even
+  // reachable first. ?who=coach|admin|coach-foreign|parent-own|parent-foreign
+  // picks the membership; ?team=t1|t2 picks which squad's event is open.
+  // e6/e7 match the harness availability stub's REAL_ROWS keys, so the
+  // per-row status (not just the count-only MIX fixture) is real and
+  // player-id-addressable.
+  availability: () => {
+    const params = new URLSearchParams(window.location.search)
+    const who = params.get('who') || 'coach'
+    const teamId = params.get('team') || 't1'
+    const otherTeamId = teamId === 't1' ? 't2' : 't1'
+    const event =
+      teamId === 't1'
+        ? {
+            id: 'e6',
+            team_id: 't1',
+            type: 'training',
+            title: 'U12 Squad Training',
+            opponent: null,
+            venue: 'Zayed Sports City',
+            starts_at: '2026-07-28T15:30:00Z',
+            result_us: null,
+            result_them: null,
+          }
+        : {
+            id: 'e7',
+            team_id: 't2',
+            type: 'training',
+            title: 'U14 Contact & Conditioning',
+            opponent: null,
+            venue: 'Zayed Sports City — Pitch 3',
+            starts_at: '2026-07-28T17:00:00Z',
+            result_us: null,
+            result_them: null,
+          }
+    const membershipsByWho = {
+      coach: COACH_MEMBERSHIPS, // coaches both t1 and t2 -> canOverrideAll for either.
+      admin: ADMIN_MEMBERSHIPS,
+      // Coaches only the OTHER team -> zero override rights on this one.
+      'coach-foreign': [{ id: 'mx', role: 'coach', team_id: otherTeamId, player_id: null }],
+      // Child p1 is on t1's roster. Viewing t1 -> exactly one editable row.
+      // Viewing t2 (via ?team=t2) -> p1 is not on t2's roster at all, so this
+      // doubles as the "child NOT on this roster" case with no extra wiring.
+      'parent-own': PARENT_MEMBERSHIPS,
+      // A parent linked to THIS team, but to a player id that is not one of
+      // its actual roster rows (a malformed/stale link) — the strictest
+      // version of "child not on the roster": even same-team membership must
+      // not grant a clickable row for a player id that isn't really there.
+      'parent-foreign': [{ id: 'mx', role: 'parent', team_id: teamId, player_id: 'not-on-roster' }],
+    }
+    const memberships = membershipsByWho[who] ?? COACH_MEMBERSHIPS
+    return (
+      <Shell
+        route="/schedule"
+        authValue={baseAuth(COACH_EMAIL)}
+        membershipValue={{ memberships, teams: TEAMS, loading: false, error: null, reload: noop }}
+      >
+        <Availability event={event} team={TEAMS.find((t) => t.id === teamId)} onClose={noop} />
       </Shell>
     )
   },
