@@ -275,6 +275,8 @@ Centered, `padding:44px 20px`, icon 42×42 at 40% opacity above 14px muted text.
 ```
 Dashboard-only, top of the Home view. Same plum→maroon diagonal gradient as other "hero" surfaces, `border-radius:var(--radius)`, `padding:18px`, `overflow:hidden` with a decorative `::before` conic-gradient blob in the top-right corner (rotated 15°, purely decorative). 4-column countdown row (`display:flex;gap:10px`, each box `flex:1`, translucent white `rgba(255,255,255,.14)` chip). Only shown if there's an upcoming event (`next` truthy) — computed as the next `type==="match"` event, falling back to the very next event of any type if no match is upcoming. Days/Hrs/Min are computed live against a **hardcoded demo "now"**: `function now(){return new Date("2026-07-20T09:00:00")}` — the real app must use `Date.now()`. 4th box is not a countdown value — it's the RSVP "in" count for that event.
 
+**Timezone (Task 11 amendment, for Task 13's dashboard).** The hero's date and time lines are **Abu Dhabi time** — reuse `dateBoxParts`/`formatLongDate`/`formatTime` from `src/lib/eventFormat.js`, don't reformat locally. The countdown itself is a pure instant subtraction (`starts_at` − `Date.now()`) and is correctly zone-agnostic; leave it that way rather than routing it through the club zone. See §7's timezone note.
+
 ### 4.12 Countdown component (`.countdown`/`.cd-box`)
 Standalone reusable piece of the hero (see above): `background:rgba(255,255,255,.14);border-radius:10px;padding:8px 0;text-align:center;flex:1`, big number 22px/800, uppercase 10px label below at 80% opacity.
 
@@ -293,6 +295,8 @@ The single most-reused component — used identically in Home "Upcoming" list, H
 ```
 `display:flex;gap:13px;padding:14px`, bottom hairline divider (`:last-child` none), `cursor:pointer`, hover `background:#faf8fb`, transition `.12s`. Left: fixed 52px date box. Middle (`flex:1;min-width:0`): type+team chips row, title, meta row (clock/pin/trophy icons + text, wraps on small widths). Right (`flex:0 0 auto`): for upcoming events, a green "✓ N" available count (`.avail-mini`); for past/results events, a result chip (WIN/LOSS/DRAW) stacked above the score e.g. "31–19". Click anywhere on the row opens the Event Detail sheet (`wireList()` binds `onclick` to every `[data-event]` element after each render — since content is fully re-rendered via `innerHTML`, listeners must be rebound every render, there is no event delegation).
 
+The date box (month / day / weekday) and the meta row's time are **Abu Dhabi time**, via `dateBoxParts` and `formatTime` from `src/lib/eventFormat.js` — see the timezone note under "Event object" in §7. The row itself carries no zone label; only the detail sheet says so (§4.21).
+
 ### 4.14 Calendar grid (`.cal-grid`)
 ```html
 <div class="card" style="padding:14px">
@@ -308,6 +312,8 @@ The single most-reused component — used identically in Home "Upcoming" list, H
 <div class="card"><!-- .fixture rows for every event that month, chronological --></div>
 ```
 `grid-template-columns:repeat(7,1fr)`, `gap:5px`. Each `.cal-cell` is `aspect-ratio:1` (perfect square), white bg, `1px solid var(--line)`, `border-radius:9px`, `padding:5px`, `font-size:12.5px/600`. `.out` (days from adjacent months, only leading blanks are rendered — no trailing blanks) = `opacity:.35`. `.today` gets a maroon border + inset ring. Up to 4 small 6×6px coloured dots (`.cal-dot.match`=maroon, `.training`=sky, `.social`=warn) stack bottom-left inside the cell for each event that day; cell is clickable (opens the first event of that day) only if it has ≥1 event. Month navigation is prev/next arrow buttons (34×34px circular icon buttons) — no "today" jump button, no year picker, no swipe gesture.
+
+**Timezone (Task 11 amendment).** Which cell a fixture's dot lands in, which month the grid opens on, and which cell gets `.today` are all computed on the **club's** calendar day (`clubDayParts` / `clubToday`, `Asia/Dubai`), never the browser's — a 01:00 Dubai kick-off is 21:00 the previous day in UTC, and for four hours of every UTC day the club is already on tomorrow. The month heading is formatted off a UTC-anchored anchor date for the same reason. See §7's timezone note.
 
 ### 4.15 Roster group header + player row
 ```html
@@ -376,10 +382,14 @@ Small uppercase pill, `10px/800`, `.5px` letter-spacing, `padding:2px 7px;border
 <div class="detail-hero">
   <div class="dh-num">{icon, or initials on the player sheet}</div>
   <h3>Quins vs Dubai Exiles</h3>
-  <p>Fri 24 Jul 2026 · 5:00 PM</p>
+  <p>Fri 24 Jul 2026 · 5:00 PM<span class="tz"> · Abu Dhabi time</span></p>
 </div>
 ```
 Top banner inside the Event/Player Detail sheet: same plum→maroon gradient, negative margins to bleed to the sheet's edges (`margin:-16px -18px 16px`), `padding:22px 18px`. `.dh-num`: 56×56px translucent white rounded-square icon tile — an event-type icon on the event sheet, the player's **initials** on the player sheet (the prototype used the jersey number; see the Task 12 note in §4.15). Title 22px, subtitle 14px/600 at 85% opacity.
+
+**Task 11 amendment — the "Abu Dhabi time" note.** The event sheet's subtitle carries a trailing `· Abu Dhabi time` (rendered only when the event actually has a date). This is the **one and only** place in the app that names the zone: someone scanning the fixture list doesn't need reminding once per row, but someone reading a single fixture from abroad does need to know that a 20:00 kick-off isn't their 20:00. Two deliberate details:
+- **Same colour, different weight.** The date/time keeps `font-semibold`; the zone note is `font-normal`. Both stay at `white/85%`. The weight drop, not a colour drop, is what sets the note apart — `white/85%` on the lightest point of the hero gradient (`--quins-red` `#C21F32`) measures **4.63:1**, clearing WCAG AA for normal text, whereas dropping to `white/70%` for de-emphasis would fall to **3.55:1** and fail.
+- The `--muted`-on-paper ruling (`#5c5854`) does **not** apply here: this sits on the red gradient, not on paper.
 
 ### 4.22 Key/value row (`.kv`)
 ```html
@@ -524,11 +534,19 @@ Positions enum used by the Add/Edit form: `["Prop","Hooker","Lock","Flanker","Nu
   venue: "Zayed Sports City, Abu Dhabi", // string, freeform (sometimes "Ground — Pitch N", parsed client-side by splitting on "—" and "," for compact display) — events.venue / events.location
   comp: "West Asia Premiership",// string|null, match-only optional            — events.competition
   team: "Senior Men 1st XV",    // string, must match one of the 15 TEAMS      — events.team_id (fk -> teams)
-  when: "2026-07-24T19:00",     // ISO-ish local datetime string, NO timezone/seconds — events.starts_at (needs real timezone-aware timestamptz in Supabase; UAE is UTC+4 fixed, no DST)
+  when: "2026-07-24T19:00",     // PROTOTYPE ONLY: ISO-ish browser-local datetime string, no timezone/seconds — events.starts_at is a real `timestamptz` in Supabase (already built), i.e. an absolute instant stored in UTC. See the timezone note below.
   result: { us: 31, them: 19 }, // object|null — presence of `result` is what flags an event as "past"/"played", not a computed date comparison — events.result_us / events.result_them (or a nullable jsonb)
   rsvpIn: 19, rsvpOut: 2, rsvpMaybe: 3  // numbers — DEMO-ONLY AGGREGATE COUNTS, hardcoded per seed event, never recomputed from real RSVPs. The real build replaces these three fields entirely with a live COUNT(*) FILTER query against the `availability` table (per project schema: one row per player per event with a status).
 }
 ```
+**Timezone note (Task 11 amendment — supersedes the old "UAE is UTC+4 fixed" wording).** Every event time in this app renders in **Abu Dhabi time for every reader**, whatever zone their browser is in — the club has one home ground, so "20:00" must mean 20:00 at Zayed Sports City for a parent checking fixtures from London as much as for one on the touchline. The model is:
+- **Storage:** `events.starts_at` is `timestamptz` — an absolute instant. No offset or wall-clock string is stored. Ordering, and upcoming-vs-past, are instant comparisons and are already zone-agnostic.
+- **Rendering:** every user-visible date/time goes through `Intl.DateTimeFormat`/`toLocale*String` with `timeZone: 'Asia/Dubai'` — the IANA zone identifier exported as `CLUB_TIME_ZONE` from `src/lib/eventFormat.js`. Use the helpers there (`dateBoxParts`, `formatTime`, `formatLongDate`, `clubDayParts`, `clubToday`); never a bare `date.getHours()/getDate()`, which reads the *browser's* zone.
+- **Not a fixed offset.** Do **not** hardcode `+04:00`. The UAE has no DST today so the two currently agree, but an offset is a derived fact that would rot silently if that ever changed; the zone identifier stays correct by definition.
+- **Day bucketing and "today".** A 01:00 Dubai kick-off is 21:00 the *previous* day in UTC, so anything that groups by calendar day — the calendar grid (§4.14), its `.today` ring, the fixture date box (§4.13) — must bucket on the **club's** day via `clubDayParts`/`clubToday`, not the browser's, or fixtures land in the wrong cell (and, on the 1st, the wrong month).
+- **Writing (Task 14, the event form).** The mirror image: a date + time a coach types is **Abu Dhabi wall-clock** and must be converted to UTC using `CLUB_TIME_ZONE` before being written to `starts_at`. A naive `new Date(\`${date}T${time}\`)` resolves in the *browser's* zone, so a coach in the UK entering "20:00" would store `19:00Z` — a 23:00 Abu Dhabi kick-off. The form's date field should default from `clubToday()`, not `new Date()`.
+- Only the event sheet names the zone in the UI (§4.21); rows and the calendar stay unlabelled.
+
 Important behavioural note for the Supabase mapping: **"past" vs "upcoming" is determined by `event.result` being non-null, not by comparing `when` to the current date** (`past()` filters `e.result` truthy, `upcoming()` filters `e.result` falsy). A real implementation should decide deliberately whether "upcoming" means "no result yet" or "date is in the future" — they can diverge (e.g. a match that happened but has no score entered yet).
 
 ### Team / age-group list (not a stored object, a hardcoded constant)

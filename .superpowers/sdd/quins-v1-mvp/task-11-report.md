@@ -737,3 +737,126 @@ writing have to agree: the form needs to convert club wall-clock → UTC using
 `CLUB_TIME_ZONE`, and the form's date field should default from `clubToday()` rather
 than `new Date()`. Worth a test with the process zone set to something other than
 UTC+4, for the same reason as above.
+
+---
+
+# Fix round on the amendment (review findings 1–3)
+
+Tests and docs only. **No production behaviour changed** — `eventFormat.js`,
+`Schedule.jsx` and `EventDetail.jsx` are byte-identical to `7c58d41`. The
+"today" code needed no refactor to be testable: `vi.useFakeTimers({ toFake:
+['Date'] })` controls the clock without faking `setTimeout`, so the RTL
+`waitFor` trap documented at the top of `tests/schedule.test.jsx` is avoided
+and `clubToday()` could be tested exactly as it is written.
+
+## Finding 1 — two pre-existing tests were zone-dependent
+
+`tests/event-format.test.js` built two fixtures with the browser-local
+constructor `new Date(2026, 6, 24, 17, 0)` and asserted the club day was `24`.
+That was zone-proof before this task (local in, local out, both moving
+together) and stopped being so the moment the formatters were pinned to
+`Asia/Dubai`.
+
+**Reproduced before touching anything:**
+
+```
+$ TZ=America/New_York npx vitest run tests/event-format.test.js
+ FAIL  dateBoxParts > splits a date into month, day and weekday
+   AssertionError: expected '25' to be '24'   (tests/event-format.test.js:136)
+ FAIL  formatTime / formatLongDate > formats a real date without leaking "Invalid Date"
+   AssertionError: expected 'Sat, Jul 25, 2026' to contain '24'   (:152)
+ Tests  2 failed | 41 passed (43)
+```
+
+17:00 in New York is 21:00 UTC is 01:00 on the **25th** in Dubai — exactly the
+predicted failure.
+
+**Fix.** Both fixtures now use `new Date(Date.UTC(2026, 6, 23, 21, 0))` — an
+unambiguous instant. It is deliberately *not* a mid-afternoon same-day case:
+21:00 UTC on the 23rd is 01:00 on the **24th** in Dubai, so the assertions keep
+their original expected values (`day === '24'`, long date containing `24`) while
+now being a genuine day-boundary crossing that anything reading the browser's
+own day answers `23` to, under both UTC and New York. Comments at both sites
+record why the local constructor must not come back.
+
+## Finding 2 — the club-local "today" ring had no coverage
+
+New test in `tests/schedule.test.jsx`: **"rings the Abu Dhabi today, not the
+browser's"**. Clock pinned to `2026-07-20T21:00:00Z` — 01:00 on the **21st** in
+Dubai, still the **20th** in New York (17:00) and in UTC, so the correct cell and
+the browser-local cell differ under either process zone. Asserts exactly one
+cell carries `border-quinsRed`, that it is `cells[20]` (the 21st), and that
+`cells[19]` (the browser-local day) carries the plain `border-[#e6e3e1]`
+instead. Two guard-the-guard assertions first confirm the fake clock is really
+in force (`new Date().toISOString()`) and that the browser day really is 20.
+
+**RED — today calculation reverted to browser-local** (`const now = new Date();
+const today = { year: now.getFullYear(), month: now.getMonth(), day:
+now.getDate() }`):
+
+```
+$ npx vitest run tests/schedule.test.jsx
+ FAIL  Schedule — calendar tab > rings the Abu Dhabi today, not the browser’s
+   expected element  class="... border-[#e6e3e1]">21</div>
+   received element  class="... border-quinsRed shadow-[inset_0_0_0_1px_...]">20</div>
+   ❯ tests/schedule.test.jsx:437
+ Tests  1 failed | 34 passed (35)
+```
+
+Note the `34 passed`: that is the reviewer's finding reproduced exactly — the
+whole pre-existing suite is blind to this regression, and only the new test
+catches it.
+
+**GREEN — real implementation restored, no other change:**
+
+```
+$ npx vitest run tests/schedule.test.jsx
+ Test Files  1 passed (1)   Tests  35 passed (35)
+```
+
+## Finding 3 — docs still specified the rejected fixed-offset model
+
+`docs/design-system.md`:
+
+- **§7 Event object, the `when` line.** Was "ISO-ish local datetime string …
+  (needs real timezone-aware timestamptz in Supabase; UAE is UTC+4 fixed, no
+  DST)". Now marks `when` as prototype-only and states that `events.starts_at`
+  is already a real `timestamptz`. Followed by a new **timezone note** covering
+  the actual model: storage is an absolute instant; rendering goes through
+  `Intl` with `timeZone: 'Asia/Dubai'` via `CLUB_TIME_ZONE`; **do not hardcode
+  `+04:00`**; day-bucketing and "today" use `clubDayParts`/`clubToday`; and the
+  Task 14 write-side mirror (a coach's typed time is club wall-clock and must be
+  converted to UTC — a naive `new Date(\`${d}T${t}\`)` stores a UK coach's 20:00
+  as 19:00Z).
+- **§4.21 Detail hero.** Subtitle spec now shows the trailing `· Abu Dhabi time`
+  and records the deliberate weight distinction: the note is `font-normal`
+  against the date's `font-semibold`, both at `white/85%`, because de-emphasising
+  by *colour* (`white/70%`) would drop contrast to 3.55:1 and fail AA, while
+  `white/85%` on `#C21F32` measures 4.63:1 and passes.
+
+**Swept the whole document** (the Task 12 jersey-number precedent), grepping for
+`timezone|time zone|UTC|offset|timestamptz|toLocale|starts_at|DST|today|AM|PM|
+weekday|month`. Three further sections rendered dates or days and said nothing
+about the zone; all three now do:
+
+- **§4.13 Fixture row** — date box and meta time are club-zoned via
+  `dateBoxParts`/`formatTime`; the row carries no zone label by design.
+- **§4.14 Calendar grid** — dot placement, opening month and the `.today` ring
+  are all computed on the club's day, and the month heading off a UTC anchor.
+- **§4.11 Hero / next-fixture card** (Task 13, not yet built) — date/time reuse
+  the club-zoned helpers, but the countdown stays a pure instant subtraction and
+  must **not** be routed through the zone.
+
+Nothing else in the document assumes a fixed offset or a browser-local day.
+
+## Verification
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run` | 15 files, **301 passed** (baseline 300, +1 new) |
+| `TZ=America/New_York npx vitest run` | 15 files, **301 passed** |
+| `TZ=Pacific/Auckland npx vitest run` | 15 files, **301 passed** |
+| `npm run build` | clean, `✓ built in 3.47s` |
+
+Files changed: `tests/event-format.test.js`, `tests/schedule.test.jsx`,
+`docs/design-system.md`. No `src/` file was modified.

@@ -131,8 +131,22 @@ describe('eventDate', () => {
 })
 
 describe('dateBoxParts', () => {
+  // Fixtures here are anchored with Date.UTC, never the local
+  // `new Date(y, m, d, h, m)` constructor. That constructor builds a
+  // DIFFERENT INSTANT in every process zone, while these assertions read it
+  // back through formatters pinned to Asia/Dubai — so `new Date(2026, 6,
+  // 24, 17, 0)` asserted as day "24" passes in UTC and fails under
+  // TZ=America/New_York (17:00 New York = 01:00 on the 25th in Dubai). It
+  // was zone-proof before the formatters were club-anchored, because
+  // construction and read-back moved together; it is not any more. In a
+  // file whose whole purpose is zone-independence, the fixture has to be an
+  // unambiguous instant.
+  //
+  // 21:00 UTC on the 23rd is 01:00 on the 24th in Dubai, so this stays a
+  // real assertion rather than a same-day tautology: anything reading the
+  // browser's own day answers 23 here under both UTC and New York.
   it('splits a date into month, day and weekday', () => {
-    const parts = dateBoxParts(new Date(2026, 6, 24, 17, 0))
+    const parts = dateBoxParts(new Date(Date.UTC(2026, 6, 23, 21, 0)))
     expect(parts.day).toBe('24')
     expect(parts.month).not.toBe('—')
     expect(parts.weekday).not.toBe('')
@@ -144,8 +158,11 @@ describe('dateBoxParts', () => {
 })
 
 describe('formatTime / formatLongDate', () => {
+  // Same UTC-anchored instant, and for the same reason as in dateBoxParts
+  // above: 21:00 UTC on the 23rd = 01:00 on Fri 24 Jul 2026 in Dubai, which
+  // is the day and year asserted below.
   it('formats a real date without leaking "Invalid Date"', () => {
-    const date = new Date(2026, 6, 24, 17, 0)
+    const date = new Date(Date.UTC(2026, 6, 23, 21, 0))
     expect(formatTime(date)).toContain('00')
     expect(formatTime(date)).not.toMatch(/invalid/i)
     expect(formatLongDate(date)).toContain('2026')

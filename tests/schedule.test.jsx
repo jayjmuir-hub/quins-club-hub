@@ -394,6 +394,57 @@ describe('Schedule — calendar tab', () => {
     })
   })
 
+  // The today-ring has to follow Abu Dhabi's day too — for four hours of
+  // every UTC day the club is already on tomorrow, and a coach in London or
+  // New York is further behind still. Pinning the clock is the only way to
+  // test this: at a live "now" the club day and the runner's day agree for
+  // 20 hours out of 24, so an unpinned assertion would pass against a
+  // browser-local implementation almost all the time.
+  //
+  // Only `Date` is faked (`toFake: ['Date']`). Faking setTimeout/setInterval
+  // is the trap documented at the top of this file — RTL's waitFor does not
+  // detect Vitest's fake timers, so every findBy*/waitFor would hang. Real
+  // timers plus a frozen Date gives a controlled clock and a working
+  // await-loop at the same time.
+  it('rings the Abu Dhabi today, not the browser’s', async () => {
+    // 2026-07-20T21:00Z is 01:00 on the 21st in Dubai, but still the 20th
+    // in New York (17:00) and in UTC — so the correct ring (21) and the
+    // browser-local one (20) are different cells under either process zone.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.UTC(2026, 6, 20, 21, 0) })
+    try {
+      await inTimeZone('America/New_York', async () => {
+        listEventsMock.mockResolvedValue([])
+
+        const { user } = setup()
+
+        await screen.findByText(/no upcoming fixtures/i)
+        await user.click(screen.getByRole('button', { name: 'Calendar' }))
+
+        // Guard the guard: the fake clock must actually be in force, and
+        // the browser-local day must actually differ from the club's.
+        expect(new Date().toISOString()).toBe('2026-07-20T21:00:00.000Z')
+        expect(new Date().getDate()).toBe(20)
+
+        expect(screen.getByText('July 2026')).toBeInTheDocument()
+
+        // Day cells only (leading blanks carry no testid), so index N is
+        // day N + 1.
+        const cells = screen.getAllByTestId('calendar-day')
+        expect(cells).toHaveLength(31)
+
+        const ringed = cells.filter((cell) => hasClassToken(cell, 'border-quinsRed'))
+        expect(ringed).toHaveLength(1)
+        expect(ringed[0]).toBe(cells[20]) // the 21st
+        expect(ringed[0]).toHaveTextContent('21')
+        // And the browser-local day is explicitly NOT ringed.
+        expect(hasClassToken(cells[19], 'border-quinsRed')).toBe(false)
+        expect(hasClassToken(cells[19], 'border-[#e6e3e1]')).toBe(true)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // A day with events has to be a <button> for keyboard access; a day
   // without one stays a <div>. Chromium's UA stylesheet lays a button's
   // content out centred inside its box, so the two variants silently drifted
