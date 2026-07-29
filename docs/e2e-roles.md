@@ -1,5 +1,12 @@
 # Quins Club Hub — End-to-end role & scoping checklist
 
+> **Availability/RSVP is currently OFF** (`src/lib/features.js`, `FEATURES.availability = false`,
+> set 2026-07-29 — the club isn't ready to rely on digital RSVP yet). Every item in this doc that
+> mentions Availability/RSVP describes what happens when that flag is **on**; today, EventDetail
+> shows neither the summary bar nor a "set availability" button, and `listAvailability` is never
+> called. The `availability` table, its RLS policies, `src/screens/Availability.jsx` and this
+> checklist are all still fully valid — re-run this doc as-is once the flag is flipped back.
+
 This is the checklist to run once real `admin` / `coach` / `parent` (and, where the club treats
 them separately, `player`) accounts actually exist — after the Task 19 first-admin bootstrap step
 and the Task 18 invite flow have been used to create them. There is no seeded real membership
