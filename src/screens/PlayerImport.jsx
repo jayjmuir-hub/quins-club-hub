@@ -1,0 +1,192 @@
+import { useMemo, useRef, useState } from 'react'
+import Sheet from '../components/Sheet.jsx'
+import { insertPlayers } from '../data/players.js'
+import { useMemberships } from '../lib/memberships.jsx'
+import { canEditTeam, visibleTeams } from '../lib/scope.js'
+import { parsePlayerPaste, toInsertRows } from '../lib/playerImport.js'
+
+// Bulk player import (desktop-spec.md §5.1). The reason this exists: the club
+// has 15 squads and the app has no players in it, because entering them one
+// form at a time on a phone is a day's work.
+//
+// The shape is paste → preview → confirm, and the preview is not decoration.
+// Input here is a paste out of Excel, so malformed rows are the normal case;
+// showing the user exactly what will be created, with per-row reasons for
+// anything that won't, is what makes an all-or-nothing insert acceptable.
+// See src/lib/playerImport.js for the parser and why the insert is
+// all-or-nothing (src/data/players.js insertPlayers).
+
+const LABEL = 'mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-faint'
+const CELL = 'border-t border-line px-2.5 py-1.5 text-[13px] align-top'
+
+const EXAMPLE = 'Tom Fletcher\tFlanker\tU10\nAmy Rose\tWing\tU12'
+
+export default function PlayerImport({ onClose, onImported }) {
+  const { memberships, teams } = useMemberships()
+  const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
+  const clubId = memberships.find((m) => m.club_id)?.club_id ?? null
+
+  const [text, setText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [failure, setFailure] = useState(null)
+  // Guards the double-click case the same way PlayerForm does: state updates
+  // are async, so a ref is what actually stops a second submit landing.
+  const inFlight = useRef(false)
+
+  const parsed = useMemo(
+    () => parsePlayerPaste(text, {
+      teams: scopedTeams,
+      canEditTeam: (teamId) => canEditTeam(memberships, teamId),
+    }),
+    [text, scopedTeams, memberships],
+  )
+
+  const hasInput = text.trim() !== ''
+  const canSubmit = parsed.validCount > 0 && !saving
+
+  async function handleImport() {
+    if (inFlight.current || parsed.validCount === 0) return
+    inFlight.current = true
+    setSaving(true)
+    setFailure(null)
+
+    try {
+      const rows = toInsertRows(parsed, { clubId })
+      await insertPlayers(rows)
+      onImported?.(rows.length)
+      onClose()
+    } catch (err) {
+      setFailure(err?.message || "We couldn't add those players.")
+    } finally {
+      inFlight.current = false
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Sheet open onClose={onClose} title="Import players">
+      {scopedTeams.length === 0 ? (
+        <p role="alert" className="rounded-[11px] bg-warn-bg px-4 py-3 text-sm text-ink">
+          You don&apos;t have a squad you can add players to. Ask a club admin if that looks wrong.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="import-paste" className={LABEL}>
+              Paste from a spreadsheet
+            </label>
+            <p className="mb-2 text-[13px] leading-relaxed text-ink-muted">
+              One player per line: <b>name, position, age group</b>. Copy the three columns
+              straight out of Excel or Sheets — a header row is ignored, and blank lines are
+              skipped. Position can be left empty.
+            </p>
+            <textarea
+              id="import-paste"
+              data-testid="import-paste"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              rows={7}
+              spellCheck="false"
+              placeholder={EXAMPLE}
+              className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 font-mono text-[13px] text-ink outline-none transition placeholder:text-ink-faint focus:border-brand"
+            />
+          </div>
+
+          {hasInput && (
+            <div>
+              <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+                <span data-testid="import-valid" className="font-bold text-ink">
+                  {parsed.validCount} ready to add
+                </span>
+                {parsed.invalidCount > 0 && (
+                  <span data-testid="import-invalid" className="font-bold text-brand-deep">
+                    {parsed.invalidCount} need fixing
+                  </span>
+                )}
+                {parsed.headerSkipped && (
+                  <span className="text-ink-faint">Header row ignored</span>
+                )}
+              </div>
+
+              {/* The preview is the whole safety mechanism for an
+                  all-or-nothing insert: every row that will be created, and a
+                  reason for every row that won't. */}
+              <div className="max-h-[38vh] overflow-auto rounded-[11px] border border-line">
+                <table className="w-full border-collapse" data-testid="import-preview">
+                  <caption className="sr-only">
+                    Preview of the players that will be added, and why any rows were rejected.
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col" className={`${CELL} border-t-0 bg-surface-sunk text-left text-[11px] uppercase tracking-[.5px] text-ink-muted`}>Line</th>
+                      <th scope="col" className={`${CELL} border-t-0 bg-surface-sunk text-left text-[11px] uppercase tracking-[.5px] text-ink-muted`}>Name</th>
+                      <th scope="col" className={`${CELL} border-t-0 bg-surface-sunk text-left text-[11px] uppercase tracking-[.5px] text-ink-muted`}>Position</th>
+                      <th scope="col" className={`${CELL} border-t-0 bg-surface-sunk text-left text-[11px] uppercase tracking-[.5px] text-ink-muted`}>Age group</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsed.rows.map((row) => (
+                      <tr
+                        key={row.lineNo}
+                        data-testid={row.ok ? 'import-row-ok' : 'import-row-bad'}
+                        className={row.ok ? '' : 'bg-danger-bg'}
+                      >
+                        <td className={`${CELL} tabular-nums text-ink-faint`}>{row.lineNo}</td>
+                        <td className={`${CELL} font-semibold text-ink`}>
+                          {row.full_name || <span className="text-ink-faint">—</span>}
+                          {!row.ok && (
+                            <span className="mt-0.5 block text-[12px] font-semibold text-brand-deep">
+                              {row.errors.join('. ')}
+                            </span>
+                          )}
+                        </td>
+                        <td className={`${CELL} text-ink-muted`}>{row.position || '—'}</td>
+                        <td className={`${CELL} text-ink-muted`}>{row.teamName || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {failure && (
+            <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
+              {failure}
+            </p>
+          )}
+
+          {/* Says what will happen, including that nothing partial can occur —
+              the insert is one statement, so a refusal adds nobody. */}
+          {parsed.invalidCount > 0 && parsed.validCount > 0 && (
+            <p className="text-[12.5px] leading-relaxed text-ink-muted">
+              Only the {parsed.validCount} valid {parsed.validCount === 1 ? 'row' : 'rows'} will be
+              added. Fix the highlighted lines and paste again to add the rest.
+            </p>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-ink transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleImport}
+              disabled={!canSubmit}
+              data-testid="import-submit"
+              className="rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              {saving
+                ? 'Adding…'
+                : `Add ${parsed.validCount} ${parsed.validCount === 1 ? 'player' : 'players'}`}
+            </button>
+          </div>
+        </div>
+      )}
+    </Sheet>
+  )
+}

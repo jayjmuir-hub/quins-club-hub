@@ -8,6 +8,7 @@ import RosterTable from '../components/RosterTable.jsx'
 import TeamPills, { ALL_TEAMS_ID } from '../components/TeamPills.jsx'
 import PlayerDetail from './PlayerDetail.jsx'
 import PlayerForm from './PlayerForm.jsx'
+import PlayerImport from './PlayerImport.jsx'
 import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
@@ -193,6 +194,7 @@ export default function Roster() {
   // null for "add"). An object rather than a boolean so opening the form for
   // an existing player and opening it empty are the same state transition.
   const [formState, setFormState] = useState(null)
+  const [importing, setImporting] = useState(false)
 
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -355,13 +357,28 @@ export default function Roster() {
           </p>
         </div>
         {canEditAnything && (
-          <button
-            type="button"
-            onClick={() => setFormState({ player: null })}
-            className="shrink-0 rounded-[11px] bg-brand px-3.5 py-2 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-          >
-            Add player
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Import is desktop-only and unapologetically so: it is a paste
+                target, and pasting a spreadsheet into a phone is not a thing
+                anyone does. Hidden rather than disabled on mobile — an
+                always-greyed button just asks a question it can't answer. */}
+            {isDesktop && (
+              <button
+                type="button"
+                onClick={() => setImporting(true)}
+                className="rounded-[11px] border-[1.5px] border-line bg-surface-card px-3.5 py-2 text-sm font-bold text-ink transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              >
+                Import
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setFormState({ player: null })}
+              className="rounded-[11px] bg-brand px-3.5 py-2 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              Add player
+            </button>
+          </div>
         )}
       </div>
 
@@ -481,6 +498,13 @@ export default function Roster() {
           rather than stacking two dialogs. Closing the form drops back to the
           roster, not to the detail sheet, which is where a coach who just
           saved wants to be. */}
+      {importing && (
+        <PlayerImport
+          onClose={() => setImporting(false)}
+          onImported={refresh}
+        />
+      )}
+
       {formState && (
         <PlayerForm
           player={formState.player}
