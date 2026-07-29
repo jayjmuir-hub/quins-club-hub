@@ -78,8 +78,8 @@ export default function AcceptInvite() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f4f3] px-4 text-[#221f1d]">
-      <div className="w-full max-w-[420px] rounded-2xl border border-[#e6e3e1] bg-white p-6 text-center shadow-[0_6px_24px_rgba(20,20,20,0.10)]">
+    <div className="flex min-h-screen items-center justify-center bg-surface px-4 text-ink">
+      <div className="w-full max-w-[420px] rounded-2xl border border-line bg-surface-card p-6 text-center shadow-card">
         {/* Standalone branding header for this screen only — this route is
             a brand-new invitee's first-ever view of the app (see the top of
             this file for why it sits outside AppShell), so a small crest +
@@ -92,14 +92,14 @@ export default function AcceptInvite() {
           alt="Abu Dhabi Harlequins crest"
           className="mx-auto h-14 w-14 object-contain"
         />
-        <p className="mt-2 text-center text-xs font-semibold uppercase tracking-widest text-[#77726e]">
+        <p className="mt-2 text-center text-xs font-semibold uppercase tracking-widest text-ink-faint">
           Abu Dhabi Harlequins
         </p>
 
         {status === 'loading' && (
           <div className="flex flex-col items-center gap-3 py-4">
             <Spinner label="Accepting your invite…" />
-            <p aria-hidden="true" className="text-sm text-[#5c5854]">
+            <p aria-hidden="true" className="text-sm text-ink-muted">
               Accepting your invite…
             </p>
           </div>
@@ -107,8 +107,8 @@ export default function AcceptInvite() {
 
         {status === 'error' && (
           <>
-            <h2 className="text-lg font-extrabold text-quinsRedDark">We couldn&apos;t accept that invite</h2>
-            <p role="alert" className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+            <h2 className="text-lg font-extrabold text-brand-deep">We couldn&apos;t accept that invite</h2>
+            <p role="alert" className="mt-2 text-sm leading-relaxed text-brand-deep">
               {error?.message || "We couldn't accept that invite. Try again."}
             </p>
           </>

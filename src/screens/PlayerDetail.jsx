@@ -41,9 +41,9 @@ import { initials } from '../lib/playerFormat.js'
 // a third, extract it then.
 function KeyValue({ label, children }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-[#e6e3e1] py-3 last:border-b-0">
-      <span className="text-[14.5px] font-semibold text-[#77726e]">{label}</span>
-      <span className="text-right text-[14.5px] font-bold text-[#221f1d]">{children}</span>
+    <div className="flex items-baseline justify-between gap-4 border-b border-line py-3 last:border-b-0">
+      <span className="text-[14.5px] font-semibold text-ink-faint">{label}</span>
+      <span className="text-right text-[14.5px] font-bold text-ink">{children}</span>
     </div>
   )
 }
@@ -55,13 +55,13 @@ function telHref(phone) {
 
 // design-system.md §3: .btn is padding 10px 15px, radius 11px, 14px/700 —
 // filled maroon for the primary action, --maroon text on white for the ghost
-// variant (#C21F32 on white measures 5.94:1, clearing AA). Hover on the
-// filled variant is --magenta #D62A3D, the same pairing Empty and the retry
+// variant (#e11b22 on white measures 5.94:1, clearing AA). Hover on the
+// filled variant is --magenta #f0343a, the same pairing Empty and the retry
 // buttons already use.
 const ACTION_BASE =
-  'flex flex-1 items-center justify-center gap-2 rounded-[11px] px-[15px] py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2'
-const PRIMARY_ACTION = `${ACTION_BASE} bg-quinsRed text-white hover:bg-[#D62A3D]`
-const GHOST_ACTION = `${ACTION_BASE} border border-[#e6e3e1] bg-white text-quinsRed hover:bg-[#faf8fb]`
+  'flex flex-1 items-center justify-center gap-2 rounded-[11px] px-[15px] py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
+const PRIMARY_ACTION = `${ACTION_BASE} bg-brand text-white hover:bg-brand-deep`
+const GHOST_ACTION = `${ACTION_BASE} border border-line bg-surface-card text-brand hover:bg-surface-mute`
 
 function PhoneIcon(props) {
   return (
@@ -126,7 +126,7 @@ function ContactBlock({ playerId }) {
 
   if (error) {
     return (
-      <p role="alert" className="rounded-[11px] bg-[#fbeae8] px-3 py-2 text-sm font-semibold text-quinsRedDark">
+      <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
         {error.message || "We couldn't load contact details. Try again."}
       </p>
     )
@@ -137,17 +137,17 @@ function ContactBlock({ playerId }) {
 
   return (
     <div>
-      <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-[#77726e]">Contact</h4>
+      <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Contact</h4>
       {contact.phone && (
         <KeyValue label="Phone">
-          <a className="text-[#2F7D3D] underline" href={telHref(contact.phone)}>
+          <a className="text-accent-ink underline" href={telHref(contact.phone)}>
             {contact.phone}
           </a>
         </KeyValue>
       )}
       {contact.email && (
         <KeyValue label="Email">
-          <a className="break-all text-[#2F7D3D] underline" href={`mailto:${contact.email}`}>
+          <a className="break-all text-accent-ink underline" href={`mailto:${contact.email}`}>
             {contact.email}
           </a>
         </KeyValue>
@@ -178,7 +178,7 @@ function ContactBlock({ playerId }) {
 }
 
 const FOOTER_BUTTON =
-  'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
+  'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
 
 function FooterActions({ player, canEdit, onEdit, onDeleted }) {
   const [confirming, setConfirming] = useState(false)
@@ -210,11 +210,11 @@ function FooterActions({ player, canEdit, onEdit, onDeleted }) {
   }
 
   return (
-    <div className="mt-5 border-t border-[#e6e3e1] pt-4">
+    <div className="mt-5 border-t border-line pt-4">
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
+          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
         >
           {error.message || "We couldn't remove that player. Try again."}
         </p>
@@ -222,7 +222,7 @@ function FooterActions({ player, canEdit, onEdit, onDeleted }) {
 
       {confirming ? (
         <div>
-          <p className="mb-3 text-sm font-semibold text-[#221f1d]">
+          <p className="mb-3 text-sm font-semibold text-ink">
             Remove this player? Their contact details go too, and this can&apos;t be undone.
           </p>
           <div className="flex gap-2.5">
@@ -230,7 +230,7 @@ function FooterActions({ player, canEdit, onEdit, onDeleted }) {
               type="button"
               onClick={() => setConfirming(false)}
               disabled={deleting}
-              className={`${FOOTER_BUTTON} border-[1.5px] border-[#e6e3e1] bg-white text-[#221f1d] hover:bg-[#faf8fb]`}
+              className={`${FOOTER_BUTTON} border-[1.5px] border-line bg-surface-card text-ink hover:bg-surface-mute`}
             >
               Keep them
             </button>
@@ -238,7 +238,7 @@ function FooterActions({ player, canEdit, onEdit, onDeleted }) {
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className={`${FOOTER_BUTTON} bg-quinsRedDark text-white hover:bg-quinsRed`}
+              className={`${FOOTER_BUTTON} bg-brand-deep text-white hover:bg-brand`}
             >
               {deleting ? 'Deleting…' : 'Yes, delete'}
             </button>
@@ -249,14 +249,14 @@ function FooterActions({ player, canEdit, onEdit, onDeleted }) {
           <button
             type="button"
             onClick={() => onEdit?.(player)}
-            className={`${FOOTER_BUTTON} bg-quinsRed text-white hover:bg-[#D62A3D]`}
+            className={`${FOOTER_BUTTON} bg-brand text-white hover:bg-brand-deep`}
           >
             Edit
           </button>
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            className={`${FOOTER_BUTTON} border-[1.5px] border-[#e6e3e1] bg-white text-quinsRedDark hover:bg-[#fbeae8]`}
+            className={`${FOOTER_BUTTON} border-[1.5px] border-line bg-surface-card text-brand-deep hover:bg-danger-bg`}
           >
             Delete
           </button>
@@ -277,7 +277,7 @@ export default function PlayerDetail({ player, team, onClose, canEdit = false, o
           suffixed a captain's name with "©"; that glyph is announced as
           "copyright" by screen readers and carries no meaning on its own, so
           captaincy is stated in the Role row below instead. */}
-      <div className="-mx-[18px] -mt-4 mb-4 bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] px-[18px] py-[22px] text-white">
+      <div className="-mx-[18px] -mt-4 mb-4 bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] px-[18px] py-[22px] text-white">
         <div
           className="mb-3 grid h-14 w-14 place-items-center rounded-[14px] bg-white/20 text-[20px] font-extrabold tracking-[.5px]"
           aria-hidden="true"

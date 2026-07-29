@@ -23,10 +23,10 @@ import { clubDateTimeInputs, clubToday, clubWallTimeToUtc, eventDate } from '../
 // darker #5c5854 is used here for the same reason Schedule/Roster use it —
 // these labels are the smallest text in the sheet (12.5px) and the extra
 // headroom costs nothing.
-const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-[#5c5854]'
+const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 const FIELD = 'mb-3.5'
 const INPUT_BASE =
-  'w-full rounded-[11px] border-[1.5px] bg-white px-3 py-[11px] text-[16px] text-[#221f1d] outline-none transition placeholder:text-[#a29d99] focus:border-quinsRed'
+  'w-full rounded-[11px] border-[1.5px] bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition placeholder:text-ink-faint focus:border-brand'
 const FIELD_ROW = 'mb-3.5 grid grid-cols-2 gap-3'
 
 // design-system.md §4.18. The prototype toggles the checked look with the
@@ -35,9 +35,9 @@ const FIELD_ROW = 'mb-3.5 grid grid-cols-2 gap-3'
 // radio itself stays a real, focusable input (sr-only, not display:none, so
 // it keeps keyboard access and an accessible name).
 const SEG_OPTION_BASE =
-  'block cursor-pointer select-none rounded-[11px] border-[1.5px] px-2 py-2.5 text-center text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-quinsRed peer-focus-visible:ring-offset-2'
-const SEG_OPTION_ON = 'border-quinsRed bg-[#fbf3f6] font-bold text-quinsRedDark'
-const SEG_OPTION_OFF = 'border-[#e6e3e1] font-semibold text-[#221f1d]'
+  'block cursor-pointer select-none rounded-[11px] border-[1.5px] px-2 py-2.5 text-center text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2'
+const SEG_OPTION_ON = 'border-brand bg-surface-mute font-bold text-brand-deep'
+const SEG_OPTION_OFF = 'border-line font-semibold text-ink'
 
 const TYPES = [
   { value: 'match', label: 'Match' },
@@ -48,7 +48,7 @@ const TYPES = [
 const DEFAULT_VENUE = 'Zayed Sports City, Abu Dhabi'
 
 function inputClasses(invalid) {
-  return [INPUT_BASE, invalid ? 'border-quinsRedDark' : 'border-[#e6e3e1]'].join(' ')
+  return [INPUT_BASE, invalid ? 'border-brand-deep' : 'border-line'].join(' ')
 }
 
 function Segmented({ legend, name, options, value, onChange }) {
@@ -185,7 +185,7 @@ export default function EventForm({ event = null, onClose, onSaved }) {
   if (editableTeams.length === 0) {
     return (
       <Sheet open onClose={onClose} title={editing ? 'Edit event' : 'Add event'}>
-        <p role="alert" className="rounded-[11px] bg-[#fbf1dd] px-4 py-3 text-sm text-[#221f1d]">
+        <p role="alert" className="rounded-[11px] bg-warn-bg px-4 py-3 text-sm text-ink">
           You don&apos;t have a squad you can add or change fixtures for. Ask a club admin if that
           looks wrong.
         </p>
@@ -327,7 +327,7 @@ export default function EventForm({ event = null, onClose, onSaved }) {
         {/* The one place the form names the zone, mirroring the detail
             sheet (§4.21). A coach entering fixtures from the UK over the
             summer needs to know 20:00 means 20:00 at Zayed Sports City. */}
-        <p id="event-time-note" className="-mt-2 mb-3.5 text-[12.5px] text-[#5c5854]">
+        <p id="event-time-note" className="-mt-2 mb-3.5 text-[12.5px] text-ink-muted">
           Times are Abu Dhabi time.
         </p>
 
@@ -427,7 +427,7 @@ export default function EventForm({ event = null, onClose, onSaved }) {
             </div>
             {/* A fixture becomes a result when it has a score, not when its
                 date passes — so leaving these blank is the normal case. */}
-            <p id="event-score-note" className="-mt-2 mb-3.5 text-[12.5px] text-[#5c5854]">
+            <p id="event-score-note" className="-mt-2 mb-3.5 text-[12.5px] text-ink-muted">
               Leave the scores blank until the match has been played.
             </p>
           </>
@@ -436,7 +436,7 @@ export default function EventForm({ event = null, onClose, onSaved }) {
         {error && (
           <p
             role="alert"
-            className="mb-3.5 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
+            className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
           >
             {error.message || "We couldn't save that. Try again."}
           </p>
@@ -445,7 +445,7 @@ export default function EventForm({ event = null, onClose, onSaved }) {
         <button
           type="submit"
           disabled={saving}
-          className="w-full rounded-[11px] bg-quinsRed px-4 py-3 text-[15px] font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Add event'}
         </button>

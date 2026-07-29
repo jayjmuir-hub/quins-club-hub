@@ -45,7 +45,7 @@ import {
 // card, on --paper (#f5f4f3), where the same pair measures 4.329:1 and fails
 // the 4.5:1 threshold. Darkened to #5c5854 (6.417:1 on paper) — the same
 // value Schedule.jsx and Roster.jsx use for the same reason.
-const MUTED_ON_PAPER = 'text-[#5c5854]'
+const MUTED_ON_PAPER = 'text-ink-muted'
 
 // design-system.md §3: .btn{padding:10px 15px;border-radius:11px}, 14px/700.
 // `flex items-center justify-center` is load-bearing rather than decorative:
@@ -54,9 +54,9 @@ const MUTED_ON_PAPER = 'text-[#5c5854]'
 // not — so without an explicit layout the two variants would sit differently
 // on the same stack. Declared once here so they cannot drift.
 const BUTTON_BASE =
-  'flex w-full items-center justify-center gap-2 rounded-[11px] px-[15px] py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2'
+  'flex w-full items-center justify-center gap-2 rounded-[11px] px-[15px] py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
 // Ghost: --maroon text on white, 5.93:1, clears AA.
-const BUTTON_GHOST = `${BUTTON_BASE} bg-white text-quinsRed shadow-[inset_0_0_0_1.5px_#e6e3e1] hover:bg-[#faf8fb]`
+const BUTTON_GHOST = `${BUTTON_BASE} bg-surface-card text-brand shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT)] hover:bg-surface-mute`
 
 const MINUTE = 60 * 1000
 const HOUR = 60 * MINUTE
@@ -107,30 +107,69 @@ function PinIcon(props) {
   )
 }
 
+// Section headers get Anton plus the website's red rule fading out across the
+// remaining width. Anton is legitimate here — these are two-word signposts, not
+// running text. The rule is a flex child rather than a border so it can taper.
 function BlockTitle({ children }) {
   return (
-    <h3 className={`mb-2.5 ml-0.5 mt-[18px] text-[13px] font-extrabold uppercase tracking-[.8px] first:mt-0 ${MUTED_ON_PAPER}`}>
-      {children}
+    <h3 className="mb-2.5 ml-0.5 mt-[18px] flex items-center gap-2.5 font-display text-[17px] uppercase tracking-[0.03em] text-ink first:mt-0">
+      <span>{children}</span>
+      <span
+        aria-hidden="true"
+        className="h-[2px] flex-1 rounded-sm bg-[image:linear-gradient(90deg,theme(colors.brand.DEFAULT),transparent)]"
+      />
     </h3>
   )
 }
 
-function StatTile({ testId, value, label, tone = 'text-[#221f1d]', className = '' }) {
+// StatTile is no longer a Card. The three tiles now render as cells of one
+// continuous red->green band — the club website's single strongest signature
+// (its .statband). `tone` is kept in the signature so callers don't change,
+// but it is ignored: every numeral on the band is white, because the band's
+// own colour is what varies across it.
+//
+// See tailwind.config.js `stat-band` for why the green stop is #157f3c rather
+// than the site's #3bd070 (white text hits 2.01:1 on the raw green).
+function StatTile({ testId, value, label, className = '' }) {
   return (
-    <Card data-testid={testId} className={`px-4 py-[15px] ${className}`}>
-      <div className={`text-[27px] font-extrabold leading-none tracking-[-0.5px] ${tone}`}>{value}</div>
-      <div className="mt-1.5 text-[12.5px] font-semibold text-[#77726e]">{label}</div>
-    </Card>
+    <div
+      data-testid={testId}
+      className={`border-r border-white/25 px-3 py-4 text-center last:border-r-0 ${className}`}
+    >
+      <div className="font-display text-[30px] leading-none text-white desktop:text-[42px]">
+        {value}
+      </div>
+      <div className="mt-1 font-condensed text-[11px] font-bold uppercase leading-tight tracking-[0.04em] text-white/95 desktop:text-[14px] desktop:tracking-[0.1em]">
+        {label}
+      </div>
+    </div>
+  )
+}
+
+// Wraps the tiles in the gradient band plus the vivid brand-rule hairline.
+// The hairline is where the full-saturation #3bd070 lives now — it carries no
+// text, so it is free to be as bright as the website's.
+function StatBand({ children }) {
+  return (
+    <div className="overflow-hidden rounded-card shadow-card">
+      <div className="brand-rule" />
+      <div className="grid grid-cols-3 bg-stat-band">{children}</div>
+    </div>
   )
 }
 
 function CountdownBox({ testId, value, label }) {
   return (
-    <div className="flex-1 rounded-[10px] bg-white/[.14] py-2 text-center">
-      <b data-testid={testId} className="block text-[22px] font-extrabold leading-none">
+    <div className="flex-1 rounded-[10px] bg-white/[.16] py-2 text-center">
+      <b data-testid={testId} className="block font-display text-[26px] font-normal leading-none">
         {value}
       </b>
-      <span className="mt-1 block text-[10px] uppercase tracking-[1px] opacity-80">{label}</span>
+      {/* font-semibold is load-bearing: only the 600 and 700 cuts of Barlow
+          Condensed are bundled, so a condensed element left at the default
+          400 silently renders in the fallback face instead. */}
+      <span className="mt-1 block font-condensed text-[12px] font-semibold uppercase tracking-[1px] opacity-90">
+        {label}
+      </span>
     </div>
   )
 }
@@ -144,13 +183,16 @@ function NextFixtureHero({ event, teamName, now }) {
   return (
     <div
       data-testid="next-fixture"
-      className="mb-4 overflow-hidden rounded-[16px] bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] p-[18px] text-white shadow-[0_6px_24px_rgba(20,20,20,0.10)]"
+      className="harlequin relative mb-4 overflow-hidden rounded-card bg-hero-grad p-[18px] text-white shadow-card"
     >
-      <div className="text-[11px] font-bold uppercase tracking-[1.6px] opacity-80">
+      <div className="relative z-10 font-condensed text-[14px] font-bold uppercase tracking-[0.18em] opacity-95">
         Next fixture{teamName ? ` · ${teamName}` : ''}
       </div>
 
-      <div className="mt-1.5 text-[23px] font-extrabold leading-tight desktop:text-[27px]">
+      {/* Anton. This is the page's opening statement and the one piece of type
+          on the dashboard that is meant to be read as a headline rather than
+          scanned, so it gets the display face. */}
+      <div className="relative z-10 mt-1.5 font-display text-[30px] uppercase leading-[0.94] desktop:text-[42px]">
         {eventTitle(event)}
       </div>
 
@@ -227,7 +269,7 @@ function QuickActions({ canEdit, readOnlyRole }) {
             player they were a parent, twelve lines below a scope note that
             said "Player view". */}
         {readOnlyRole && (
-          <p className="text-center text-[12.5px] leading-relaxed text-[#77726e]">
+          <p className="text-center text-[12.5px] leading-relaxed text-ink-faint">
             You&apos;re signed in as a {readOnlyRole}, so you can read fixtures and squads but not
             change them.
           </p>
@@ -380,14 +422,14 @@ export default function Dashboard() {
       <section>
         <h2 className="sr-only">Dashboard</h2>
         <Card role="alert" className="p-6 text-center">
-          <h3 className="text-base font-extrabold text-quinsRedDark">We couldn&apos;t load your dashboard</h3>
-          <p className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+          <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load your dashboard</h3>
+          <p className="mt-2 text-sm leading-relaxed text-brand-deep">
             {error.message || 'Something went wrong. Try again.'}
           </p>
           <button
             type="button"
             onClick={() => setReloadToken((token) => token + 1)}
-            className="mx-auto mt-4 w-auto rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+            className="mx-auto mt-4 w-auto rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             Try again
           </button>
@@ -421,23 +463,24 @@ export default function Dashboard() {
         />
       )}
 
-      <div className="grid grid-cols-2 gap-3 desktop:grid-cols-3">
+      {/* Three cells in one band at every width. The old 2-up mobile grid
+          needed the third tile to span both columns to avoid a ragged
+          half-width tile; a single 3-column band has no ragged case, so that
+          special-casing is gone. The labels are Barlow Condensed precisely so
+          three of them fit across a narrow phone without wrapping. */}
+      <StatBand>
         <StatTile
           testId="stat-players"
           value={players.length}
           label={admin ? 'Registered players' : 'Players in view'}
-          tone="text-quinsRed"
         />
         <StatTile testId="stat-fixtures" value={toPlay.length} label="Fixtures to play" />
-        {/* Third of three tiles: fills the row on mobile's 2-up grid rather
-            than leaving a ragged half-width tile. */}
         <StatTile
           testId="stat-groups"
           value={scopedTeams.length}
           label={admin ? 'Age groups' : 'Your groups'}
-          className="col-span-2 desktop:col-span-1"
         />
-      </div>
+      </StatBand>
 
       {/* Mobile: one column, stacked in DOM order (upcoming, quick actions,
           last result). Desktop: 1.15fr / .85fr two-column grid

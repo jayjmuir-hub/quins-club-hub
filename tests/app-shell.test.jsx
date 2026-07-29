@@ -96,13 +96,21 @@ describe('AppShell', () => {
     expect(classes).not.toContain('object-cover')
   })
 
-  it('the tagline steps up to 12px at the desktop breakpoint (design-system.md §2)', () => {
+  it('sets the tagline in the condensed face at one size across breakpoints', () => {
     useMembershipsMock.mockReturnValue(loaded())
 
     renderShell()
 
     const tagline = screen.getByText('Quins Club Hub').parentElement
-    expect(hasClassToken(tagline, 'desktop:text-[12px]')).toBe(true)
+    // Retheme: the tagline no longer steps 11.5px -> 12px across the
+    // breakpoint. It is Barlow Condensed at a single 13px, which reads at the
+    // same optical size as the old 11.5px Barlow (condensed faces need more
+    // point size for equal apparent size) and so needs no breakpoint step.
+    // What still matters, and is what this now pins, is that it uses the
+    // condensed face rather than silently falling back to body Barlow.
+    expect(hasClassToken(tagline, 'font-condensed')).toBe(true)
+    expect(hasClassToken(tagline, 'text-[13px]')).toBe(true)
+    expect(tagline.className.split(/\s+/).some((c) => c.startsWith('desktop:text-'))).toBe(false)
   })
 
   // Task 22: skip-to-content link (the one confirmed-open gap left by
@@ -193,9 +201,9 @@ describe('AppShell', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/permission denied/i)
     expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
 
-    // Regression: error text must use the quinsRedDark token (binding
+    // Regression: error text must use the brand-deep token (binding
     // global constraint), not a muted grey — see Task 8 review finding.
-    expect(hasClassToken(screen.getByTestId('error-message'), 'text-quinsRedDark')).toBe(true)
+    expect(hasClassToken(screen.getByTestId('error-message'), 'text-brand-deep')).toBe(true)
   })
 
   it('renders a zero-membership message with the signed-in email instead of routed content', () => {

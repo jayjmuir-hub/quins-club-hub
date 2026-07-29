@@ -131,7 +131,7 @@ export function Sheet({ open, onClose, title, children }) {
         aria-labelledby={titleId}
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] bg-white shadow-[0_6px_24px_rgba(20,20,20,0.10)] animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] desktop:w-[min(520px,94vw)] desktop:animate-sheet-scale-in desktop:rounded-[20px]"
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] bg-surface-card shadow-card animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] desktop:w-[min(520px,94vw)] desktop:animate-sheet-scale-in desktop:rounded-[20px]"
       >
         {/* Drag-handle bar (design-system.md §4.16 .sheet-grip): mobile
             only, visual affordance only — there is no swipe-to-dismiss
@@ -139,17 +139,17 @@ export function Sheet({ open, onClose, title, children }) {
             or tap-close only). Hidden at the desktop breakpoint, where the
             sheet becomes a centered dialog with no grip. */}
         <div className="flex justify-center pb-1 pt-2.5 desktop:hidden" aria-hidden="true">
-          <span className="h-1 w-[38px] rounded-full bg-[#dcd4e0]" />
+          <span className="h-1 w-[38px] rounded-full bg-surface-sunk" />
         </div>
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[#e6e3e1] bg-white px-[18px] py-4">
-          <h3 id={titleId} className="text-[18px] font-extrabold text-[#221f1d]">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface-card px-[18px] py-4">
+          <h3 id={titleId} className="text-[18px] font-extrabold text-ink">
             {title}
           </h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f2edf4] text-[#221f1d] outline-none transition focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-mute text-ink outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
               <path d="M6 6l12 12M18 6L6 18" />

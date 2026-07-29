@@ -18,17 +18,17 @@ function InboxIcon(props) {
 export function Empty({ message, action }) {
   return (
     <div className="flex flex-col items-center gap-3 px-5 py-11 text-center">
-      <InboxIcon className="h-[42px] w-[42px] text-[#77726e] opacity-40" aria-hidden="true" />
-      <p className="text-sm text-[#77726e]">{message}</p>
+      <InboxIcon className="h-[42px] w-[42px] text-ink-faint opacity-40" aria-hidden="true" />
+      <p className="text-sm text-ink-faint">{message}</p>
       {action && (
         <button
           type="button"
           onClick={action.onClick}
-          // Hover is --magenta (#D62A3D, design-system.md §1: "Primary
-          // button hover background"), not quinsRedDark (#8E1526, which the
+          // Hover is --magenta (#f0343a, design-system.md §1: "Primary
+          // button hover background"), not brand-deep (#b3141a, which the
           // design system uses elsewhere as the darker gradient-start
           // colour, not a button hover state).
-          className="rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+          className="rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
         >
           {action.label}
         </button>

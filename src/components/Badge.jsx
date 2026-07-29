@@ -29,13 +29,13 @@
 //     10px bold size. Foreground darkened to #5c5854 (~6.0:1).
 
 const TONES = {
-  admin: 'bg-quinsRed text-white',
-  coach: 'bg-[#eaf4fb] text-[#2F7D3D]',
-  parent: 'bg-[#fbf1dd] text-[#8a5a12]',
-  captain: 'bg-[#fbf1dd] text-[#8a5a12]',
+  admin: 'bg-brand text-white',
+  coach: 'bg-info-bg text-accent-ink',
+  parent: 'bg-warn-bg text-warn-ink',
+  captain: 'bg-warn-bg text-warn-ink',
 }
 
-const NEUTRAL_TONE = 'bg-[#f0ecf2] text-[#5c5854]'
+const NEUTRAL_TONE = 'bg-surface-mute text-ink-muted'
 
 export function Badge({ tone, children, className = '' }) {
   const toneClasses = TONES[tone] ?? NEUTRAL_TONE

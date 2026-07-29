@@ -2,10 +2,10 @@
 // label used on fixture/event rows to mark whether an event is a match,
 // training, or social. Colours are ported verbatim from the prototype's
 // .chip.match / .chip.training / .chip.social CSS, not from the Tailwind
-// brand tokens — quinsGreen (#7DC351) is never used here, because the
+// brand tokens — accent (#3bd070) is never used here, because the
 // prototype's own training-chip pairing is light green-bg (#eef7e6) with
 // dark sky-deep text (#2F7D3D), which is what actually meets AA contrast;
-// quinsGreen itself is a gradient/block-fill colour only (~1.9:1 on white,
+// accent itself is a gradient/block-fill colour only (~1.9:1 on white,
 // fails AA for text — see design-system.md §1 and the task-9 brief).
 //
 // An unrecognised (or missing) `type` renders the prototype's default
@@ -31,9 +31,9 @@
 //     is untouched.
 
 const VARIANTS = {
-  match: 'bg-quinsRed text-white',
-  training: 'bg-[#eef7e6] text-[#2F7D3D]',
-  social: 'bg-[#fbf1dd] text-[#8a5a12]',
+  match: 'bg-brand text-white',
+  training: 'bg-accent-bg text-accent-ink',
+  social: 'bg-warn-bg text-warn-ink',
   // Result variants (win/loss/draw) come from the same design-system.md
   // §4.7 variant list as match/training/social — the same chip, used on the
   // Schedule's Results rows, not a second component. Same contrast
@@ -44,14 +44,14 @@ const VARIANTS = {
   //           Text swapped to --sky-deep (#2F7D3D), already the training
   //           chip's foreground, for ~4.6:1.
   //   - loss: --bad (#d1483b) on --bad-bg (#fbeae8) measures 3.84:1. Text
-  //           swapped to --plum/quinsRedDark (#8E1526) for ~7.9:1.
+  //           swapped to --plum/brand-deep (#b3141a) for ~7.9:1.
   //   - draw: #5a6470 on #eef0f2 already measures ~5.3:1 — used verbatim.
-  win: 'bg-[#e7f6ea] text-[#2F7D3D]',
-  loss: 'bg-[#fbeae8] text-quinsRedDark',
-  draw: 'bg-[#eef0f2] text-[#5a6470]',
+  win: 'bg-accent-bg text-accent-ink',
+  loss: 'bg-danger-bg text-brand-deep',
+  draw: 'bg-surface-mute text-ink-muted',
 }
 
-const NEUTRAL_VARIANT = 'bg-[#f0ecf2] text-[#5c5854]'
+const NEUTRAL_VARIANT = 'bg-surface-mute text-ink-muted'
 
 export function Chip({ type, children, className = '' }) {
   const variantClasses = VARIANTS[type] ?? NEUTRAL_VARIANT

@@ -24,16 +24,30 @@ import { fileURLToPath } from 'node:url'
 // the integration-only lane, and the brief's own wording calls for exactly
 // this: real built output, not config intent.
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const viteBin = path.join(projectRoot, 'node_modules', '.bin', 'vite')
+// Invoke vite's JS entry with the Node binary already running this test,
+// rather than a node_modules/.bin launcher. The .bin route is a cross-platform
+// minefield and this file had never actually run on Windows because of it:
+// npm writes an extensionless shell script there (the only one that exists on
+// macOS/Linux) plus a .cmd and a .ps1 on Windows. execFileSync does no PATHEXT
+// resolution, so the extensionless name throws ENOENT on Windows; and since
+// Node 20's CVE-2024-27980 fix, pointing at the .cmd instead throws EINVAL
+// unless you opt into `shell: true`, which then drags in shell quoting rules
+// for every argument. Running the .js entry directly sidesteps all of it and
+// guarantees the child uses the same Node as the parent.
+const viteBin = path.join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js')
 
 let outDir
 let manifest
 
 beforeAll(() => {
   outDir = mkdtempSync(path.join(tmpdir(), 'quins-pwa-build-'))
-  execFileSync(viteBin, ['build', '--outDir', outDir, '--emptyOutDir'], {
+  execFileSync(process.execPath, [viteBin, 'build', '--outDir', outDir, '--emptyOutDir'], {
     cwd: projectRoot,
     stdio: 'pipe',
+    // vite build must run as a production build regardless of the NODE_ENV the
+    // test runner itself was started with (this repo's suite runs under
+    // NODE_ENV=test, and some machines export NODE_ENV=production globally).
+    env: { ...process.env, NODE_ENV: 'production' },
   })
   manifest = JSON.parse(readFileSync(path.join(outDir, 'manifest.webmanifest'), 'utf-8'))
 }, 60_000)
@@ -58,7 +72,10 @@ describe('PWA production build output', () => {
 
   it('manifest declares standalone display and the club theme colour', () => {
     expect(manifest.display).toBe('standalone')
-    expect(manifest.theme_color).toBe('#C21F32')
+    // Chrome near-black, not the brand red: theme_color tints the OS/browser
+    // chrome to blend with the top of the page, and the top of the page is the
+    // dark masthead. See the note in vite.config.js.
+    expect(manifest.theme_color).toBe('#0c0c0e')
   })
 
   it('manifest declares start_url and scope covering the whole app', () => {

@@ -445,13 +445,13 @@ describe('Schedule — calendar tab', () => {
         const cells = screen.getAllByTestId('calendar-day')
         expect(cells).toHaveLength(31)
 
-        const ringed = cells.filter((cell) => hasClassToken(cell, 'border-quinsRed'))
+        const ringed = cells.filter((cell) => hasClassToken(cell, 'border-brand'))
         expect(ringed).toHaveLength(1)
         expect(ringed[0]).toBe(cells[20]) // the 21st
         expect(ringed[0]).toHaveTextContent('21')
         // And the browser-local day is explicitly NOT ringed.
-        expect(hasClassToken(cells[19], 'border-quinsRed')).toBe(false)
-        expect(hasClassToken(cells[19], 'border-[#e6e3e1]')).toBe(true)
+        expect(hasClassToken(cells[19], 'border-brand')).toBe(false)
+        expect(hasClassToken(cells[19], 'border-line')).toBe(true)
       })
     } finally {
       vi.useRealTimers()

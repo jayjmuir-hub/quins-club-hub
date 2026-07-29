@@ -41,7 +41,7 @@ function SignOutControl({ signOut, className = '' }) {
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded-[11px] bg-[#fbeae8] px-3 py-2 text-sm font-semibold text-quinsRedDark"
+          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
         >
           {error}
         </p>
@@ -50,7 +50,7 @@ function SignOutControl({ signOut, className = '' }) {
         type="button"
         onClick={handleClick}
         disabled={pending}
-        className="w-full rounded-[11px] border-[1.5px] border-[#e6e3e1] bg-white px-4 py-2.5 text-sm font-bold text-quinsRed transition hover:border-quinsRed disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 desktop:w-auto"
+        className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-brand transition hover:border-brand disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 desktop:w-auto"
       >
         {pending ? 'Signing out…' : 'Sign out'}
       </button>
@@ -61,7 +61,7 @@ function SignOutControl({ signOut, className = '' }) {
 function LoadingState() {
   return (
     <div role="status" className="flex flex-1 items-center justify-center py-20">
-      <p className="text-sm font-semibold uppercase tracking-widest text-[#77726e]">Loading…</p>
+      <p className="text-sm font-semibold uppercase tracking-widest text-ink-faint">Loading…</p>
     </div>
   )
 }
@@ -70,16 +70,16 @@ function ErrorState({ error, reload }) {
   return (
     <div
       role="alert"
-      className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-[#e6e3e1] bg-white p-6 text-center shadow-[0_6px_24px_rgba(20,20,20,0.10)]"
+      className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-line bg-surface-card p-6 text-center shadow-card"
     >
-      <h2 className="text-lg font-extrabold text-quinsRedDark">Couldn&apos;t load your account</h2>
-      <p data-testid="error-message" className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+      <h2 className="text-lg font-extrabold text-brand-deep">Couldn&apos;t load your account</h2>
+      <p data-testid="error-message" className="mt-2 text-sm leading-relaxed text-brand-deep">
         {error.message || 'Something went wrong. Try again.'}
       </p>
       <button
         type="button"
         onClick={reload}
-        className="mt-4 rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-quinsRedDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+        className="mt-4 rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
       >
         Try again
       </button>
@@ -94,11 +94,11 @@ function ErrorState({ error, reload }) {
 // tone is "you're in, hang tight" rather than an error.
 function NoMembershipState({ email, signOut }) {
   return (
-    <div className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-[#e6e3e1] bg-white p-6 text-center shadow-[0_6px_24px_rgba(20,20,20,0.10)]">
-      <h2 className="text-lg font-extrabold text-[#221f1d]">You&apos;re signed in</h2>
-      <p className="mt-2 text-sm leading-relaxed text-[#77726e]">
+    <div className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-line bg-surface-card p-6 text-center shadow-card">
+      <h2 className="text-lg font-extrabold text-ink">You&apos;re signed in</h2>
+      <p className="mt-2 text-sm leading-relaxed text-ink-faint">
         Your account isn&apos;t linked to a squad yet. Ask a club admin to send
-        you an invite for <strong className="text-[#221f1d]">{email}</strong>,
+        you an invite for <strong className="text-ink">{email}</strong>,
         then sign in again to get access.
       </p>
       <SignOutControl signOut={signOut} className="mt-5" />
@@ -117,13 +117,13 @@ export default function AppShell({ children }) {
   const currentRoleLabel = roleLabel(memberships)
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f5f4f3] text-[#221f1d]">
+    <div className="flex min-h-screen flex-col bg-surface text-ink">
       {/* Task 22: skip-to-content link — design-system.md §8's last
           remaining open gap. Must be the very first focusable element in
           the DOM (it is: nothing above this in AppShell, and AppShell wraps
           every routed screen, so this is the first thing any screen's Tab
           sequence reaches). sr-only by default, popped into view with the
-          app's usual focus-visible treatment (quinsRed background, white
+          app's usual focus-visible treatment (brand background, white
           text — the same red used for every other focus ring in the app)
           the instant it receives keyboard focus, hidden again on blur —
           the standard skip-link pattern. Points at <main>'s new
@@ -134,31 +134,34 @@ export default function AppShell({ children }) {
           from the top of the page again, not from inside <main>. */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-[11px] focus:bg-quinsRed focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-white focus:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-quinsRedDark"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-[11px] focus:bg-brand focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-white focus:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-deep"
       >
         Skip to content
       </a>
 
-      {/* Task 22: the final quinsGreen stop is deliberately placed at 300%,
-          not 100%. This header's gradient paints across the FULL viewport
-          width (not just the centered mx-auto content column below), and
-          the centered content column's right edge can land anywhere from
-          ~98% of the viewport width (mobile/tablet-desktop widths just
-          above the 820px breakpoint, where the column is edge-to-edge) down
-          to ~50% (very wide monitors, where the column shrinks toward the
-          centre as a fraction of viewport width) — verified empirically
-          with Playwright across 820-3440px, see docs/accessibility.md.
-          With a 100% stop, that whole range could land on or near pure
-          quinsGreen, which measures ~1.9:1 for white text/pills — a real
-          AA failure this project hadn't previously checked. Moving the
-          stop to 300% means the interpolation from #B23A38 (62%) toward
-          quinsGreen only reaches ~16% of the way there by 100% of the
-          width, keeping every on-screen pixel within the red family
-          (>=5.3:1 for white text at the worst measured position) while
-          leaving the gradient definition itself (and its look at the red/
-          crest end, which this task must not change) otherwise untouched. */}
-      <header className="sticky top-0 z-40 bg-[image:linear-gradient(100deg,theme(colors.quinsRedDark)_0%,theme(colors.quinsRed)_42%,#B23A38_62%,theme(colors.quinsGreen)_300%)] text-white shadow-[0_2px_16px_rgba(20,20,20,0.28)]">
-        <div className="mx-auto flex max-w-[1120px] items-center gap-3 px-4 py-3">
+      {/* The masthead is DARK CHROME (#151517 -> #0c0c0e), not the red
+          gradient it used to be. Two reasons, in order of importance:
+          
+          1. It is the core move of the "A+" theme — brand identity lives on
+             the chrome (masthead + bottom tab bar) so the data surfaces
+             underneath can stay light and stay readable on a phone in Abu
+             Dhabi daylight. See docs/design-system.md §2.
+          2. It retires a whole class of contrast problem. The old red->green
+             gradient painted across the FULL viewport width while the content
+             column is centred and max-1120px, so which gradient colour sat
+             under the white text depended on the monitor. That needed the
+             green stop pushed out to 300% to keep every on-screen pixel in
+             the red family, and it was still only ~5.3:1 at its worst. Flat
+             near-black is 19.54:1 at every width, on every monitor, with no
+             empirical sweep required.
+          
+          The vivid green is not lost — it moves to the `brand-rule` hairline
+          across the top edge, where it is decoration and carries no text, so
+          full saturation is free there. `harlequin` adds the site's diagonal
+          shapes bleeding off the right edge. */}
+      <header className="sticky top-0 z-40 bg-chrome-grad text-white shadow-masthead">
+        <div className="brand-rule" />
+        <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3">
           {/* crest.png is 369x400 (portrait) — object-contain keeps its native
               aspect ratio inside the 46x46 badge box (matching the
               prototype's background:contain treatment) instead of the
@@ -169,11 +172,16 @@ export default function AppShell({ children }) {
             alt="Abu Dhabi Harlequins crest"
             className="h-[46px] w-[46px] shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
           />
-          <div className="min-w-0">
-            <h1 className="text-base font-extrabold leading-[1.1] tracking-[0.2px]">
+          {/* The club name is one of the few places Anton is allowed (see
+              tailwind.config.js fontFamily): it is a masthead wordmark, not
+              something anyone reads at speed. `truncate` because Anton is
+              wide and the name is long — on a narrow phone it would
+              otherwise push the nav off the row. */}
+          <div className="relative min-w-0">
+            <h1 className="truncate font-display text-[19px] uppercase leading-none tracking-[0.02em] desktop:text-[21px]">
               Abu Dhabi Harlequins
             </h1>
-            <p className="flex items-baseline gap-1 text-[11.5px] font-semibold uppercase tracking-[1.3px] text-white/[.82] desktop:text-[12px]">
+            <p className="flex items-baseline gap-1 font-condensed text-[13px] font-semibold uppercase tracking-[1.6px] text-white/70">
               <span>Quins Club Hub</span>
               {/* Mobile-only compact role indicator (decision 6: the role
                   label has no breakpoint qualifier, and mobile is the
@@ -190,26 +198,18 @@ export default function AppShell({ children }) {
 
           <div className="flex-1" />
 
-          {/* Task 22: bg-black/[.22], not the visually-lighter bg-white/[.16]
-              this used to be. Both are semi-transparent pills sitting on the
-              header's gradient, but they push contrast in opposite
-              directions against the WHITE text inside them: a white overlay
-              lightens whatever gradient colour sits underneath (making a
-              near-white text sit on a near-white pill — worse contrast), a
-              black overlay darkens it (better contrast), regardless of
-              which part of the gradient underlies it at a given viewport
-              width. Measured with the real bg-white/[.16] version in a real
-              browser: the pill's own composited background (not the raw
-              gradient) landed at 4.34-4.56:1 against white text across
-              820-3440px widths — under the 4.5:1 AA threshold at every width
-              except the very widest tested. With bg-black/[.22]: 6.5-8:1 at
-              the same measured underlying colours, comfortably clearing AA
-              everywhere (see docs/accessibility.md). Nav.jsx's active-pill
-              fill uses the identical class for the identical reason. */}
+          {/* The old version of this pill was a semi-transparent overlay
+              (bg-black/[.22]) because it sat on a gradient whose colour
+              varied with viewport width — that whole problem is gone now the
+              masthead is flat near-black. So this is an opaque red-tinted
+              pill with a red hairline, which reads as brand rather than as
+              "slightly darker patch". #ff8f8f on #0c0c0e composited with the
+              20% red fill measures >8:1; the fill is opaque-over-flat, so it
+              does not move with viewport width. */}
           {showRole && (
             <span
               data-testid="role-label-desktop"
-              className="hidden shrink-0 rounded-full bg-black/[.22] px-3 py-1 text-xs font-bold uppercase tracking-wide desktop:inline-block"
+              className="hidden shrink-0 rounded-pill bg-brand/20 px-3 py-1 font-condensed text-[13px] font-bold uppercase tracking-[0.08em] text-brand-onDark ring-1 ring-inset ring-brand/45 desktop:inline-block"
             >
               {currentRoleLabel}
             </span>
@@ -233,7 +233,7 @@ export default function AppShell({ children }) {
           <>
             {children}
             {isMoreRoute && (
-              <div className="mt-6 border-t border-[#e6e3e1] pt-6">
+              <div className="mt-6 border-t border-line pt-6">
                 <SignOutControl signOut={signOut} />
               </div>
             )}

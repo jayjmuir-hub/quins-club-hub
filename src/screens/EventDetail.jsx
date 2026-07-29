@@ -66,17 +66,17 @@ const TYPE_ICONS = { match: WhistleIcon, training: ShirtIcon, social: TrophyIcon
 
 function KeyValue({ label, children }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-[#e6e3e1] py-3 last:border-b-0">
-      <span className="text-[14.5px] font-semibold text-[#77726e]">{label}</span>
-      <span className="text-right text-[14.5px] font-bold text-[#221f1d]">{children}</span>
+    <div className="flex items-baseline justify-between gap-4 border-b border-line py-3 last:border-b-0">
+      <span className="text-[14.5px] font-semibold text-ink-faint">{label}</span>
+      <span className="text-right text-[14.5px] font-bold text-ink">{children}</span>
     </div>
   )
 }
 
 const AVAILABILITY_TONES = {
-  in: { bar: 'bg-[#2F9E4F]', dot: 'bg-[#2F9E4F]', label: 'in' },
-  maybe: { bar: 'bg-[#c9861a]', dot: 'bg-[#c9861a]', label: 'maybe' },
-  out: { bar: 'bg-[#d1483b]', dot: 'bg-[#d1483b]', label: 'out' },
+  in: { bar: 'bg-accent-mid', dot: 'bg-accent-mid', label: 'in' },
+  maybe: { bar: 'bg-warn', dot: 'bg-warn', label: 'maybe' },
+  out: { bar: 'bg-danger', dot: 'bg-danger', label: 'out' },
 }
 
 const STATUSES = ['in', 'maybe', 'out']
@@ -134,7 +134,7 @@ function AvailabilitySummary({ eventId }) {
 
   if (error) {
     return (
-      <p role="alert" className="rounded-[11px] bg-[#fbeae8] px-3 py-2 text-sm font-semibold text-quinsRedDark">
+      <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
         {error.message || "We couldn't load availability. Try again."}
       </p>
     )
@@ -147,12 +147,12 @@ function AvailabilitySummary({ eventId }) {
   const total = counts.in + counts.maybe + counts.out
 
   if (total === 0) {
-    return <p className="text-sm text-[#77726e]">No one has responded yet.</p>
+    return <p className="text-sm text-ink-faint">No one has responded yet.</p>
   }
 
   return (
     <div>
-      <div className="flex h-3 overflow-hidden rounded-[20px] bg-[#eee]">
+      <div className="flex h-3 overflow-hidden rounded-[20px] bg-surface-sunk">
         {STATUSES.map((status) =>
           counts[status] > 0 ? (
             <span
@@ -165,7 +165,7 @@ function AvailabilitySummary({ eventId }) {
       </div>
       <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1">
         {STATUSES.map((status) => (
-          <span key={status} className="flex items-center gap-1.5 text-xs font-bold text-[#5c5854]">
+          <span key={status} className="flex items-center gap-1.5 text-xs font-bold text-ink-muted">
             <span className={['h-2 w-2 rounded-full', AVAILABILITY_TONES[status].dot].join(' ')} aria-hidden="true" />
             {counts[status]} {AVAILABILITY_TONES[status].label}
           </span>
@@ -176,7 +176,7 @@ function AvailabilitySummary({ eventId }) {
 }
 
 const FOOTER_BUTTON =
-  'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
+  'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
 
 function FooterActions({ event, canEdit, onEdit, onDeleted }) {
   const [confirming, setConfirming] = useState(false)
@@ -206,11 +206,11 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
   }
 
   return (
-    <div className="mt-5 border-t border-[#e6e3e1] pt-4">
+    <div className="mt-5 border-t border-line pt-4">
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
+          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
         >
           {error.message || "We couldn't delete that. Try again."}
         </p>
@@ -218,7 +218,7 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
 
       {confirming ? (
         <div>
-          <p className="mb-3 text-sm font-semibold text-[#221f1d]">
+          <p className="mb-3 text-sm font-semibold text-ink">
             Delete this event? This can&apos;t be undone.
           </p>
           <div className="flex gap-2.5">
@@ -226,7 +226,7 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
               type="button"
               onClick={() => setConfirming(false)}
               disabled={deleting}
-              className={`${FOOTER_BUTTON} border-[1.5px] border-[#e6e3e1] bg-white text-[#221f1d] hover:bg-[#faf8fb]`}
+              className={`${FOOTER_BUTTON} border-[1.5px] border-line bg-surface-card text-ink hover:bg-surface-mute`}
             >
               Keep it
             </button>
@@ -234,7 +234,7 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className={`${FOOTER_BUTTON} bg-quinsRedDark text-white hover:bg-quinsRed`}
+              className={`${FOOTER_BUTTON} bg-brand-deep text-white hover:bg-brand`}
             >
               {deleting ? 'Deleting…' : 'Yes, delete'}
             </button>
@@ -245,14 +245,14 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
           <button
             type="button"
             onClick={() => onEdit?.(event)}
-            className={`${FOOTER_BUTTON} bg-quinsRed text-white hover:bg-[#D62A3D]`}
+            className={`${FOOTER_BUTTON} bg-brand text-white hover:bg-brand-deep`}
           >
             Edit
           </button>
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            className={`${FOOTER_BUTTON} border-[1.5px] border-[#e6e3e1] bg-white text-quinsRedDark hover:bg-[#fbeae8]`}
+            className={`${FOOTER_BUTTON} border-[1.5px] border-line bg-surface-card text-brand-deep hover:bg-danger-bg`}
           >
             Delete
           </button>
@@ -272,7 +272,7 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
     <Sheet open onClose={onClose} title={typeLabel}>
       {/* Negative margins bleed the hero to the sheet's edges, matching the
           prototype's .detail-hero (design-system.md §4.21). */}
-      <div className="-mx-[18px] -mt-4 mb-4 bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] px-[18px] py-[22px] text-white">
+      <div className="-mx-[18px] -mt-4 mb-4 bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] px-[18px] py-[22px] text-white">
         <div className="mb-3 grid h-14 w-14 place-items-center rounded-[14px] bg-white/20">
           <Icon className="h-7 w-7" aria-hidden="true" />
         </div>
@@ -284,7 +284,7 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
             from abroad does need to know that 20:00 isn't their 20:00.
             Kept on the same line, at the same white/85% as the rest of it —
             that measures 4.63:1 against the lightest point of the hero
-            gradient (quinsRed #C21F32) and so clears AA for normal text,
+            gradient (brand #e11b22) and so clears AA for normal text,
             where dropping to white/70% for emphasis would have fallen to
             3.55:1 and failed. It is set apart by weight instead. The
             --muted-on-paper rule (#5c5854, not #77726e) doesn't apply here:
@@ -309,15 +309,15 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
 
       {played ? (
         <div>
-          <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-[#77726e]">Result</h4>
+          <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Result</h4>
           <div className="flex items-center gap-3">
             <Chip type={resultOutcome(event)}>{resultLabel(event)}</Chip>
-            <span className="text-base font-extrabold text-[#221f1d]">{resultScore(event)}</span>
+            <span className="text-base font-extrabold text-ink">{resultScore(event)}</span>
           </div>
         </div>
       ) : (
         <div>
-          <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-[#77726e]">Availability</h4>
+          <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Availability</h4>
           <AvailabilitySummary eventId={event.id} />
           {/* Everyone gets this button, not just canEdit users: a player or
               parent who cannot edit the FIXTURE still needs to set their own
@@ -330,7 +330,7 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
           <button
             type="button"
             onClick={() => onOpenAvailability?.(event)}
-            className="mt-3 w-full rounded-[11px] border-[1.5px] border-[#e6e3e1] bg-white px-4 py-2.5 text-sm font-bold text-[#221f1d] transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+            className="mt-3 w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             {canEdit ? 'View & set availability' : 'Set my availability'}
           </button>

@@ -27,10 +27,10 @@ import { visibleTeams } from '../lib/scope.js'
 // the generated accept link for the admin to copy and send manually, rather
 // than closing the sheet as every other add/edit form does.
 
-const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-[#5c5854]'
+const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 const FIELD = 'mb-3.5'
 const INPUT_BASE =
-  'w-full rounded-[11px] border-[1.5px] bg-white px-3 py-[11px] text-[16px] text-[#221f1d] outline-none transition placeholder:text-[#a29d99] focus:border-quinsRed'
+  'w-full rounded-[11px] border-[1.5px] bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition placeholder:text-ink-faint focus:border-brand'
 
 const ROLES = [
   { value: 'admin', label: 'Admin' },
@@ -47,7 +47,7 @@ const ROLES = [
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function inputClasses(invalid) {
-  return [INPUT_BASE, invalid ? 'border-quinsRedDark' : 'border-[#e6e3e1]'].join(' ')
+  return [INPUT_BASE, invalid ? 'border-brand-deep' : 'border-line'].join(' ')
 }
 
 export default function InviteForm({ onClose, onSaved }) {
@@ -180,7 +180,7 @@ export default function InviteForm({ onClose, onSaved }) {
     <Sheet open onClose={onClose} title="Invite a member">
       {invite ? (
         <div>
-          <p className="mb-3 text-sm leading-relaxed text-[#221f1d]">
+          <p className="mb-3 text-sm leading-relaxed text-ink">
             Invite created for <strong>{invite.email}</strong>. There&apos;s no automatic email
             for this yet — copy the link below and send it to them directly.
           </p>
@@ -200,7 +200,7 @@ export default function InviteForm({ onClose, onSaved }) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-[11px] bg-quinsRed px-4 py-3 text-[15px] font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+            className="w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             Done
           </button>
@@ -290,7 +290,7 @@ export default function InviteForm({ onClose, onSaved }) {
                   </option>
                 ))}
               </select>
-              <p className="mt-1.5 text-[12.5px] text-[#5c5854]">
+              <p className="mt-1.5 text-[12.5px] text-ink-muted">
                 For a parent invite, link the child this account is for.
               </p>
             </div>
@@ -299,7 +299,7 @@ export default function InviteForm({ onClose, onSaved }) {
           {error && (
             <p
               role="alert"
-              className="mb-3.5 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
+              className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
             >
               {error.message || "We couldn't send that invite. Try again."}
             </p>
@@ -308,7 +308,7 @@ export default function InviteForm({ onClose, onSaved }) {
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-[11px] bg-quinsRed px-4 py-3 text-[15px] font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? 'Sending…' : 'Send invite'}
           </button>

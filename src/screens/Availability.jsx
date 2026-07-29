@@ -42,11 +42,11 @@ const STATUS_LABELS = { in: 'In', maybe: 'Maybe', out: 'Out' }
 // so a status reads the same colour whether it's seen on the summary bar or
 // here on the team sheet.
 const STATUS_ON = {
-  in: 'border-[#2F9E4F] bg-[#eef7ee] text-[#2F7D3D]',
-  maybe: 'border-[#c9861a] bg-[#fbf1dd] text-[#8a5a12]',
-  out: 'border-[#d1483b] bg-[#fbeae8] text-quinsRedDark',
+  in: 'border-accent-mid bg-accent-bg text-accent-ink',
+  maybe: 'border-warn bg-warn-bg text-warn-ink',
+  out: 'border-danger bg-danger-bg text-brand-deep',
 }
-const STATUS_OFF = 'border-[#e6e3e1] bg-white text-[#5c5854] hover:bg-[#faf8fb]'
+const STATUS_OFF = 'border-line bg-surface-card text-ink-muted hover:bg-surface-mute'
 
 function StatusButtons({ status, disabled, onSet }) {
   return (
@@ -64,7 +64,7 @@ function StatusButtons({ status, disabled, onSet }) {
             // rings are already everywhere" claim didn't hold for, caught
             // by actually tabbing through the Availability sheet rather
             // than trusting the grep. Same convention used app-wide.
-            'rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[12.5px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
+            'rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[12.5px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
             status === option.value ? STATUS_ON[option.value] : STATUS_OFF,
           ].join(' ')}
         >
@@ -77,21 +77,21 @@ function StatusButtons({ status, disabled, onSet }) {
 
 function PlayerRow({ player, status, editable, saving, onSet }) {
   return (
-    <li className="flex items-center justify-between gap-3 border-b border-[#e6e3e1] py-3 last:border-b-0">
+    <li className="flex items-center justify-between gap-3 border-b border-line py-3 last:border-b-0">
       <div className="flex min-w-0 items-center gap-3">
         <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] text-[12px] font-extrabold tracking-[.5px] text-white"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[12px] font-extrabold tracking-[.5px] text-white"
           aria-hidden="true"
         >
           {initials(player.full_name)}
         </span>
-        <span className="truncate text-[14.5px] font-bold text-[#221f1d]">{player.full_name}</span>
+        <span className="truncate text-[14.5px] font-bold text-ink">{player.full_name}</span>
       </div>
 
       {editable ? (
         <StatusButtons status={status} disabled={saving} onSet={(next) => onSet(player.id, next)} />
       ) : (
-        <span className="shrink-0 text-[13px] font-bold text-[#5c5854]">
+        <span className="shrink-0 text-[13px] font-bold text-ink-muted">
           {status ? STATUS_LABELS[status] : 'No response'}
         </span>
       )}
@@ -200,8 +200,8 @@ export default function Availability({ event, team, onClose }) {
   return (
     <Sheet open onClose={onClose} title="Availability">
       <div className="mb-4">
-        <h3 className="text-[17px] font-extrabold leading-tight text-[#221f1d]">{eventTitle(event)}</h3>
-        <p className="mt-1 text-[13px] font-semibold text-[#5c5854]">
+        <h3 className="text-[17px] font-extrabold leading-tight text-ink">{eventTitle(event)}</h3>
+        <p className="mt-1 text-[13px] font-semibold text-ink-muted">
           {team?.name ?? 'Age group not set'} · {formatLongDate(date)} · {formatTime(date)}
         </p>
       </div>
@@ -209,7 +209,7 @@ export default function Availability({ event, team, onClose }) {
       {saveError && (
         <p
           role="alert"
-          className="mb-3.5 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
+          className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
         >
           {saveError.message || "We couldn't save that RSVP. Try again."}
         </p>
@@ -224,19 +224,19 @@ export default function Availability({ event, team, onClose }) {
       {!isFirstLoad && error && (
         <p
           role="alert"
-          className="rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
+          className="rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
         >
           {error.message || "We couldn't load availability. Try again."}
         </p>
       )}
 
       {!isFirstLoad && !error && players.length === 0 && (
-        <p className="text-sm text-[#5c5854]">No players in this squad yet.</p>
+        <p className="text-sm text-ink-muted">No players in this squad yet.</p>
       )}
 
       {!isFirstLoad && !error && players.length > 0 && (
         <>
-          <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-[#5c5854]">
+          <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-ink-muted">
             <span>{counts.in} in</span>
             <span>{counts.maybe} maybe</span>
             <span>{counts.out} out</span>

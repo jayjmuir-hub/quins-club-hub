@@ -44,7 +44,7 @@ const POSITION_GROUP_ORDER = ['Forwards', 'Backs', 'Other']
 // lands on a light fill (Chip's and Badge's neutral variants use exactly this
 // value), so it introduces no new colour. --muted inside a card is untouched:
 // the player row's "Flanker · U10" meta line still uses it.
-const MUTED_ON_PAPER = 'text-[#5c5854]'
+const MUTED_ON_PAPER = 'text-ink-muted'
 
 function positionGroup(position) {
   if (FORWARDS.includes(position)) return 'Forwards'
@@ -101,7 +101,7 @@ function PlayerRow({ player, teamName, onSelect }) {
       // Chromium's UA stylesheet centres a <button>'s content inside its box,
       // which would push this row's contents around once it is wider or
       // taller than its text. Setting the layout explicitly overrides that.
-      className="flex w-full items-center gap-3 border-b border-[#e6e3e1] px-[14px] py-[11px] text-left transition last:border-b-0 hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-quinsRed"
+      className="flex w-full items-center gap-3 border-b border-line px-[14px] py-[11px] text-left transition last:border-b-0 hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
     >
       {/* Initials tile (design-system.md §4.15 .pnum, which the prototype
           filled with a jersey number). aria-hidden because it restates the
@@ -109,7 +109,7 @@ function PlayerRow({ player, teamName, onSelect }) {
           announce itself as "T F Tom Fletcher". Always populated, so the
           flat no-number variant of this tile is gone with the numbers. */}
       <span
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] text-[13px] font-extrabold tracking-[.5px] text-white"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[13px] font-extrabold tracking-[.5px] text-white"
         aria-hidden="true"
       >
         {initials(player.full_name)}
@@ -117,17 +117,17 @@ function PlayerRow({ player, teamName, onSelect }) {
 
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
-          <span data-testid="player-name" className="text-[15px] font-bold text-[#221f1d]">
+          <span data-testid="player-name" className="text-[15px] font-bold text-ink">
             {player.full_name}
           </span>
           {player.is_captain && <Badge tone="captain">Capt</Badge>}
         </span>
-        <span className="mt-0.5 block text-[12.5px] text-[#77726e]">
+        <span className="mt-0.5 block text-[12.5px] text-ink-faint">
           {player.position || 'Position not set'} · {teamName}
         </span>
       </span>
 
-      <ChevronRightIcon className="h-5 w-5 shrink-0 text-[#cfc7d5]" aria-hidden="true" />
+      <ChevronRightIcon className="h-5 w-5 shrink-0 text-ink-faint" aria-hidden="true" />
     </button>
   )
 }
@@ -139,7 +139,7 @@ function RosterGroup({ label, players, teamsById, onSelect }) {
         <span data-testid="group-label">{label}</span>
         <span
           data-testid="group-count"
-          className="rounded-[20px] bg-[#ece6f0] px-2 py-0.5 text-[11px] font-extrabold text-[#5c5854]"
+          className="rounded-[20px] bg-surface-sunk px-2 py-0.5 text-[11px] font-extrabold text-ink-muted"
         >
           {players.length}
         </span>
@@ -307,7 +307,7 @@ export default function Roster() {
           else — and it only exists at all now that Task 15's form does. */}
       <div className="mb-3.5 mt-1 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Roster &amp; members</h2>
+          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Roster &amp; members</h2>
           {/* Describes the scope, not the current filter — the per-group counts
               below already report what the search and pills leave. */}
           <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
@@ -318,15 +318,15 @@ export default function Roster() {
           <button
             type="button"
             onClick={() => setFormState({ player: null })}
-            className="shrink-0 rounded-[11px] bg-quinsRed px-3.5 py-2 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+            className="shrink-0 rounded-[11px] bg-brand px-3.5 py-2 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             Add player
           </button>
         )}
       </div>
 
-      <div className="mb-3 flex items-center gap-2.5 rounded-[20px] bg-white px-3.5 py-2.5 shadow-[inset_0_0_0_1.5px_#e6e3e1,0_2px_8px_rgba(20,20,20,0.08)]">
-        <SearchIcon className="h-[18px] w-[18px] shrink-0 text-[#77726e]" aria-hidden="true" />
+      <div className="mb-3 flex items-center gap-2.5 rounded-[20px] bg-surface-card px-3.5 py-2.5 shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT),0_2px_8px_rgba(20,20,20,0.08)]">
+        <SearchIcon className="h-[18px] w-[18px] shrink-0 text-ink-faint" aria-hidden="true" />
         {/* type="search" is what gives this the `searchbox` role. Its
             trade-off is Chromium's UA clear glyph, which paints itself
             #365A99 (measured in the browser check) — a blue with no business
@@ -340,7 +340,7 @@ export default function Roster() {
           onChange={(event) => setQuery(event.target.value)}
           aria-label="Search players"
           placeholder="Search name, position, age group"
-          className="w-full border-0 bg-transparent text-[15px] text-[#221f1d] outline-none placeholder:text-[#77726e] [&::-webkit-search-cancel-button]:appearance-none"
+          className="w-full border-0 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-faint [&::-webkit-search-cancel-button]:appearance-none"
         />
       </div>
 
@@ -366,14 +366,14 @@ export default function Roster() {
 
       {!isFirstLoad && error && (
         <Card role="alert" className="p-6 text-center">
-          <h3 className="text-base font-extrabold text-quinsRedDark">We couldn&apos;t load the roster</h3>
-          <p className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+          <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load the roster</h3>
+          <p className="mt-2 text-sm leading-relaxed text-brand-deep">
             {error.message || 'Something went wrong. Try again.'}
           </p>
           <button
             type="button"
             onClick={() => setReloadToken((token) => token + 1)}
-            className="mt-4 rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+            className="mt-4 rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             Try again
           </button>

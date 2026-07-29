@@ -36,8 +36,8 @@ function LockIcon(props) {
 // conveys the "read-only/locked" meaning — uses the same darkened #8a5a12
 // as Chip's social variant and Badge's parent/captain tones, for ~5.3:1.
 const TONES = {
-  coach: { border: 'border-l-[#2F7D3D]', bg: 'bg-[#eef7e6]', Icon: EyeIcon, iconColor: 'text-[#2F7D3D]' },
-  parent: { border: 'border-l-[#c9861a]', bg: 'bg-[#fbf1dd]', Icon: LockIcon, iconColor: 'text-[#8a5a12]' },
+  coach: { border: 'border-l-accent-ink', bg: 'bg-accent-bg', Icon: EyeIcon, iconColor: 'text-accent-ink' },
+  parent: { border: 'border-l-warn', bg: 'bg-warn-bg', Icon: LockIcon, iconColor: 'text-warn-ink' },
 }
 
 export function ScopeNote({ tone = 'coach', children }) {
@@ -46,7 +46,7 @@ export function ScopeNote({ tone = 'coach', children }) {
   return (
     <div className={['mb-4 flex items-start gap-3 rounded-[11px] border-l-4 px-4 py-3 text-sm', border, bg].join(' ')}>
       <Icon className={['mt-0.5 h-5 w-5 shrink-0', iconColor].join(' ')} aria-hidden="true" />
-      <div className="text-[#221f1d]">{children}</div>
+      <div className="text-ink">{children}</div>
     </div>
   )
 }

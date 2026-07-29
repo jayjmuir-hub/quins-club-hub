@@ -436,8 +436,8 @@ describe('Roster — contrast', () => {
 
     await screen.findByText('Tom Fletcher')
     const header = screen.getAllByTestId('group-label')[0].parentElement
-    expect(hasClassToken(header, 'text-[#5c5854]')).toBe(true)
-    expect(hasClassToken(header, 'text-[#77726e]')).toBe(false)
+    expect(hasClassToken(header, 'text-ink-muted')).toBe(true)
+    expect(hasClassToken(header, 'text-ink-faint')).toBe(false)
   })
 })
 

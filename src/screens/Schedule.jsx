@@ -40,7 +40,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 // events) or a <button> (has events). The flex + start-alignment tokens are
 // load-bearing, not decorative — see the comment at the cell markup.
 const CELL_LAYOUT =
-  'relative flex aspect-square items-start justify-start rounded-[9px] border p-[5px] text-left text-[12.5px] font-semibold text-[#221f1d]'
+  'relative flex aspect-square items-start justify-start rounded-[9px] border p-[5px] text-left text-[12.5px] font-semibold text-ink'
 
 // design-system.md §4.14: match = maroon, training = --sky, social = --warn.
 // design-system.md's --muted (#77726e) is specified against a card, where it
@@ -51,12 +51,12 @@ const CELL_LAYOUT =
 // and the one Chip/Badge already use for --muted on a light fill. --muted
 // inside a card (the fixture rows, the calendar weekday headers) is
 // untouched.
-const MUTED_ON_PAPER = 'text-[#5c5854]'
+const MUTED_ON_PAPER = 'text-ink-muted'
 
 const DOT_COLOURS = {
-  match: 'bg-quinsRed',
-  training: 'bg-[#3E9C4F]',
-  social: 'bg-[#c9861a]',
+  match: 'bg-brand',
+  training: 'bg-accent-mid',
+  social: 'bg-warn',
 }
 
 function ChevronIcon({ direction = 'left', ...props }) {
@@ -145,7 +145,7 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
     <>
       <Card className="p-[14px]">
         <div className="mb-3 flex items-center justify-between">
-          <b className="text-base font-extrabold text-[#221f1d]">
+          <b className="text-base font-extrabold text-ink">
             {firstOfMonth.toLocaleDateString(undefined, {
               timeZone: 'UTC',
               month: 'long',
@@ -157,7 +157,7 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
               type="button"
               aria-label="Previous month"
               onClick={() => goToMonth(-1)}
-              className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-[#f2edf4] text-[#221f1d] transition hover:bg-[#e6e3e1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed"
+              className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-surface-mute text-ink transition hover:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               <ChevronIcon direction="left" className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -165,7 +165,7 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
               type="button"
               aria-label="Next month"
               onClick={() => goToMonth(1)}
-              className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-[#f2edf4] text-[#221f1d] transition hover:bg-[#e6e3e1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed"
+              className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-surface-mute text-ink transition hover:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               <ChevronIcon direction="right" className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -174,7 +174,7 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
 
         <div className="grid grid-cols-7 gap-[5px]">
           {WEEKDAYS.map((weekday) => (
-            <div key={weekday} className="text-center text-[10.5px] font-extrabold uppercase text-[#77726e]">
+            <div key={weekday} className="text-center text-[10.5px] font-extrabold uppercase text-ink-faint">
               {weekday}
             </div>
           ))}
@@ -201,7 +201,7 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
             // asserts both variants carry all of them.
             const cellClasses = [
               CELL_LAYOUT,
-              isToday ? 'border-quinsRed shadow-[inset_0_0_0_1px_theme(colors.quinsRed)]' : 'border-[#e6e3e1]',
+              isToday ? 'border-brand shadow-[inset_0_0_0_1px_theme(colors.brand.DEFAULT)]' : 'border-line',
             ].join(' ')
 
             if (dayEvents.length === 0) {
@@ -219,14 +219,14 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
                 data-testid="calendar-day"
                 onClick={() => onSelect(dayEvents[0].id)}
                 aria-label={`${dayNumber} ${firstOfMonth.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long' })}, ${dayEvents.length} ${dayEvents.length === 1 ? 'event' : 'events'}`}
-                className={`${cellClasses} transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed`}
+                className={`${cellClasses} transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
               >
                 {dayNumber}
                 <span className="absolute bottom-1 left-1 flex gap-0.5" aria-hidden="true">
                   {dayEvents.slice(0, 4).map((event) => (
                     <span
                       key={event.id}
-                      className={['h-1.5 w-1.5 rounded-full', DOT_COLOURS[event.type] ?? 'bg-[#77726e]'].join(' ')}
+                      className={['h-1.5 w-1.5 rounded-full', DOT_COLOURS[event.type] ?? 'bg-ink-faint'].join(' ')}
                     />
                   ))}
                 </span>
@@ -237,7 +237,7 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
 
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
           {Object.entries(TYPE_LABELS).map(([type, label]) => (
-            <span key={type} className="flex items-center gap-1.5 text-xs font-bold text-[#5c5854]">
+            <span key={type} className="flex items-center gap-1.5 text-xs font-bold text-ink-muted">
               <span className={['h-1.5 w-1.5 rounded-full', DOT_COLOURS[type]].join(' ')} aria-hidden="true" />
               {label}
             </span>
@@ -384,14 +384,14 @@ export default function Schedule() {
           else — and it only exists at all now that Task 14's form does. */}
       <div className="mb-3.5 mt-1 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Schedule &amp; fixtures</h2>
+          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Schedule &amp; fixtures</h2>
           <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
         </div>
         {canEditAnything && (
           <button
             type="button"
             onClick={() => setFormState({ event: null })}
-            className="shrink-0 rounded-[11px] bg-quinsRed px-3.5 py-2 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+            className="shrink-0 rounded-[11px] bg-brand px-3.5 py-2 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             Add fixture
           </button>
@@ -424,14 +424,14 @@ export default function Schedule() {
 
       {!isFirstLoad && error && (
         <Card role="alert" className="p-6 text-center">
-          <h3 className="text-base font-extrabold text-quinsRedDark">We couldn&apos;t load the schedule</h3>
-          <p className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+          <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load the schedule</h3>
+          <p className="mt-2 text-sm leading-relaxed text-brand-deep">
             {error.message || 'Something went wrong. Try again.'}
           </p>
           <button
             type="button"
             onClick={() => setReloadToken((token) => token + 1)}
-            className="mt-4 rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+            className="mt-4 rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             Try again
           </button>

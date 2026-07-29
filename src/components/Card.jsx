@@ -11,11 +11,11 @@
 
 export function Card({ as: Tag = 'div', className = '', children, ...rest }) {
   const classes = [
-    'rounded-[16px]',
+    'rounded-card',
     'border',
-    'border-[#e6e3e1]',
-    'bg-white',
-    'shadow-[0_6px_24px_rgba(20,20,20,0.10)]',
+    'border-line',
+    'bg-surface-card',
+    'shadow-card',
     className,
   ]
     .filter(Boolean)

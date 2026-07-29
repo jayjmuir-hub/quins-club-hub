@@ -29,8 +29,8 @@ export const ALL_TEAMS_ID = 'all'
 export function PillButton({ active, onClick, children }) {
   const classes = [
     'shrink-0 whitespace-nowrap rounded-[20px] px-[14px] py-[7px] text-[13px] font-bold outline-none transition',
-    'focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2',
-    active ? 'bg-quinsBlack text-white' : 'bg-white text-[#77726e] shadow-[inset_0_0_0_1.5px_#e6e3e1]',
+    'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
+    active ? 'bg-chrome text-white' : 'bg-surface-card text-ink-faint shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT)]',
   ].join(' ')
 
   return (

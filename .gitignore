@@ -8,3 +8,5 @@ coverage
 # Visual-verification output. Regenerable from harness/ (which stays tracked);
 # ~2.6 MB per task would bloat the repo across 22 tasks.
 screenshots
+preview.log
+_to_delete/

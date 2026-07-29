@@ -53,18 +53,18 @@ import { canEditTeam, visibleTeams } from '../lib/scope.js'
 
 // design-system.md §4.17, and the same #5c5854 the other screens use for
 // --muted on a light fill: #77726e fails AA at this size.
-const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-[#5c5854]'
+const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 const FIELD = 'mb-3.5'
 const INPUT_BASE =
-  'w-full rounded-[11px] border-[1.5px] bg-white px-3 py-[11px] text-[16px] text-[#221f1d] outline-none transition placeholder:text-[#a29d99] focus:border-quinsRed'
+  'w-full rounded-[11px] border-[1.5px] bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition placeholder:text-ink-faint focus:border-brand'
 
 // design-system.md §4.18, matching EventForm: the radio stays a real,
 // focusable input (sr-only, not display:none) and the checked look is driven
 // from React state rather than the CSS `:has()` selector.
 const SEG_OPTION_BASE =
-  'block cursor-pointer select-none rounded-[11px] border-[1.5px] px-2 py-2.5 text-center text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-quinsRed peer-focus-visible:ring-offset-2'
-const SEG_OPTION_ON = 'border-quinsRed bg-[#fbf3f6] font-bold text-quinsRedDark'
-const SEG_OPTION_OFF = 'border-[#e6e3e1] font-semibold text-[#221f1d]'
+  'block cursor-pointer select-none rounded-[11px] border-[1.5px] px-2 py-2.5 text-center text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2'
+const SEG_OPTION_ON = 'border-brand bg-surface-mute font-bold text-brand-deep'
+const SEG_OPTION_OFF = 'border-line font-semibold text-ink'
 
 // design-system.md §7's POSITIONS enum, verbatim. Kept here rather than
 // shared with Roster.jsx: Roster's FORWARDS/BACKS arrays are a *grouping*
@@ -86,7 +86,7 @@ const POSITIONS = [
 ]
 
 function inputClasses(invalid) {
-  return [INPUT_BASE, invalid ? 'border-quinsRedDark' : 'border-[#e6e3e1]'].join(' ')
+  return [INPUT_BASE, invalid ? 'border-brand-deep' : 'border-line'].join(' ')
 }
 
 function Segmented({ legend, name, options, value, onChange }) {
@@ -284,7 +284,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   if (gated) {
     return (
       <Sheet open onClose={onClose} title={editing ? 'Edit player' : 'Add player'}>
-        <p role="alert" className="rounded-[11px] bg-[#fbf1dd] px-4 py-3 text-sm text-[#221f1d]">
+        <p role="alert" className="rounded-[11px] bg-warn-bg px-4 py-3 text-sm text-ink">
           {noEditableTeams
             ? "You don't have a squad you can add or change players for. Ask a club admin if that looks wrong."
             : "You can't change players in this age group. Ask a club admin if that looks wrong."}
@@ -440,7 +440,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         {contactStatus === 'error' && (
           <p
             role="alert"
-            className="mb-3.5 rounded-[11px] bg-[#fbf1dd] px-3 py-2.5 text-sm text-[#221f1d]"
+            className="mb-3.5 rounded-[11px] bg-warn-bg px-3 py-2.5 text-sm text-ink"
           >
             We couldn&apos;t load this player&apos;s contact details, so they can&apos;t be edited
             right now. Saving will leave them exactly as they are.
@@ -489,7 +489,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
                 `can_edit_team(...) OR is_own_player(player_id)`: the linked
                 player can read their own row too, which an earlier "only
                 coaches and club admins" wording quietly misstated. */}
-            <p id="player-contact-note" className="-mt-2 mb-3.5 text-[12.5px] text-[#5c5854]">
+            <p id="player-contact-note" className="-mt-2 mb-3.5 text-[12.5px] text-ink-muted">
               Only coaches, club admins and the player themselves can see these. Leave them blank if
               you don&apos;t have them.
             </p>
@@ -510,7 +510,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         {error && (
           <p
             role="alert"
-            className="mb-3.5 rounded-[11px] bg-[#fbeae8] px-3 py-2.5 text-sm font-semibold text-quinsRedDark"
+            className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
           >
             {errorStage === 'contact' && (
               <span className="block">
@@ -526,7 +526,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           // Disabled until the existing contact row has settled: a submit
           // before then would write the still-blank fields over real details.
           disabled={saving || contactLoading}
-          className="w-full rounded-[11px] bg-quinsRed px-4 py-3 text-[15px] font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Add player'}
         </button>

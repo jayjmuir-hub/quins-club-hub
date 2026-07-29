@@ -30,15 +30,15 @@ describe('Card', () => {
   it('renders children inside a card with the design-system radius and shadow tokens', () => {
     render(<Card>Card content</Card>)
     const el = screen.getByText('Card content')
-    expect(hasClassToken(el, 'rounded-[16px]')).toBe(true)
-    expect(hasClassToken(el, 'shadow-[0_6px_24px_rgba(20,20,20,0.10)]')).toBe(true)
+    expect(hasClassToken(el, 'rounded-card')).toBe(true)
+    expect(hasClassToken(el, 'shadow-card')).toBe(true)
   })
 
   it('accepts a className passthrough without clobbering the base classes', () => {
     render(<Card className="p-4">Padded</Card>)
     const el = screen.getByText('Padded')
     expect(hasClassToken(el, 'p-4')).toBe(true)
-    expect(hasClassToken(el, 'rounded-[16px]')).toBe(true)
+    expect(hasClassToken(el, 'rounded-card')).toBe(true)
   })
 })
 
@@ -46,41 +46,41 @@ describe('Chip', () => {
   it('renders the match variant (maroon bg, white text) per design-system.md §4.7', () => {
     render(<Chip type="match">MATCH</Chip>)
     const el = screen.getByText('MATCH')
-    expect(hasClassToken(el, 'bg-quinsRed')).toBe(true)
+    expect(hasClassToken(el, 'bg-brand')).toBe(true)
     expect(hasClassToken(el, 'text-white')).toBe(true)
   })
 
   it('renders the training variant (green-bg, sky-deep text)', () => {
     render(<Chip type="training">TRAINING</Chip>)
     const el = screen.getByText('TRAINING')
-    expect(hasClassToken(el, 'bg-[#eef7e6]')).toBe(true)
-    expect(hasClassToken(el, 'text-[#2F7D3D]')).toBe(true)
+    expect(hasClassToken(el, 'bg-accent-bg')).toBe(true)
+    expect(hasClassToken(el, 'text-accent-ink')).toBe(true)
   })
 
   it('renders the social variant (warn-bg, darkened warn text for AA contrast)', () => {
     render(<Chip type="social">SOCIAL</Chip>)
     const el = screen.getByText('SOCIAL')
-    expect(hasClassToken(el, 'bg-[#fbf1dd]')).toBe(true)
+    expect(hasClassToken(el, 'bg-warn-bg')).toBe(true)
     // The design system's literal --warn text (#c9861a) on --warn-bg
     // measures ~2.71:1 and fails AA — see Chip.jsx's contrast note. This
     // asserts the darkened, AA-passing foreground actually ships.
-    expect(hasClassToken(el, 'text-[#8a5a12]')).toBe(true)
+    expect(hasClassToken(el, 'text-warn-ink')).toBe(true)
   })
 
   it('falls back to the neutral variant for an unknown type instead of crashing or rendering nothing', () => {
     render(<Chip type="not-a-real-type">MYSTERY</Chip>)
     const el = screen.getByText('MYSTERY')
-    expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
+    expect(hasClassToken(el, 'bg-surface-mute')).toBe(true)
     // The design system's literal --muted text (#77726e) on this bg
     // measures 4.07:1 and falls short of AA at this size — see Chip.jsx's
     // contrast note. This asserts the darkened, AA-passing foreground.
-    expect(hasClassToken(el, 'text-[#5c5854]')).toBe(true)
+    expect(hasClassToken(el, 'text-ink-muted')).toBe(true)
   })
 
   it('falls back to the neutral variant when no type is given at all', () => {
     render(<Chip>NO TYPE</Chip>)
     const el = screen.getByText('NO TYPE')
-    expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
+    expect(hasClassToken(el, 'bg-surface-mute')).toBe(true)
   })
 
   // Result variants, added in Task 11 for the Schedule's Results rows. They
@@ -89,26 +89,26 @@ describe('Chip', () => {
   it('renders the win variant (good-bg, sky-deep text for AA contrast)', () => {
     render(<Chip type="win">Won</Chip>)
     const el = screen.getByText('Won')
-    expect(hasClassToken(el, 'bg-[#e7f6ea]')).toBe(true)
+    expect(hasClassToken(el, 'bg-accent-bg')).toBe(true)
     // The literal --good text (#2F9E4F) on --good-bg measures 3.06:1 and
     // fails AA — see Chip.jsx's contrast note for the substitution.
-    expect(hasClassToken(el, 'text-[#2F7D3D]')).toBe(true)
+    expect(hasClassToken(el, 'text-accent-ink')).toBe(true)
   })
 
   it('renders the loss variant (bad-bg, darkened text for AA contrast)', () => {
     render(<Chip type="loss">Lost</Chip>)
     const el = screen.getByText('Lost')
-    expect(hasClassToken(el, 'bg-[#fbeae8]')).toBe(true)
+    expect(hasClassToken(el, 'bg-danger-bg')).toBe(true)
     // The literal --bad text (#d1483b) on --bad-bg measures 3.84:1.
-    expect(hasClassToken(el, 'text-quinsRedDark')).toBe(true)
+    expect(hasClassToken(el, 'text-brand-deep')).toBe(true)
   })
 
   it('renders the draw variant with the design system colours verbatim', () => {
     render(<Chip type="draw">Drew</Chip>)
     const el = screen.getByText('Drew')
-    expect(hasClassToken(el, 'bg-[#eef0f2]')).toBe(true)
+    expect(hasClassToken(el, 'bg-surface-mute')).toBe(true)
     // This pair already measures ~5.3:1, so no substitution was needed.
-    expect(hasClassToken(el, 'text-[#5a6470]')).toBe(true)
+    expect(hasClassToken(el, 'text-ink-muted')).toBe(true)
   })
 })
 
@@ -116,23 +116,23 @@ describe('Badge', () => {
   it('renders the admin tone (maroon bg, white text)', () => {
     render(<Badge tone="admin">Club admin</Badge>)
     const el = screen.getByText('Club admin')
-    expect(hasClassToken(el, 'bg-quinsRed')).toBe(true)
+    expect(hasClassToken(el, 'bg-brand')).toBe(true)
     expect(hasClassToken(el, 'text-white')).toBe(true)
   })
 
   it('renders the captain tone (darkened warn colours) distinctly from Chip — smaller radius token', () => {
     render(<Badge tone="captain">Capt</Badge>)
     const el = screen.getByText('Capt')
-    expect(hasClassToken(el, 'bg-[#fbf1dd]')).toBe(true)
-    expect(hasClassToken(el, 'text-[#8a5a12]')).toBe(true)
+    expect(hasClassToken(el, 'bg-warn-bg')).toBe(true)
+    expect(hasClassToken(el, 'text-warn-ink')).toBe(true)
     expect(hasClassToken(el, 'rounded-[6px]')).toBe(true)
   })
 
   it('falls back to a neutral tone for an unrecognised tone, using the darkened AA-passing muted text', () => {
     render(<Badge tone="not-a-real-tone">Mystery</Badge>)
     const el = screen.getByText('Mystery')
-    expect(hasClassToken(el, 'bg-[#f0ecf2]')).toBe(true)
-    expect(hasClassToken(el, 'text-[#5c5854]')).toBe(true)
+    expect(hasClassToken(el, 'bg-surface-mute')).toBe(true)
+    expect(hasClassToken(el, 'text-ink-muted')).toBe(true)
   })
 })
 

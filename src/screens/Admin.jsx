@@ -29,15 +29,15 @@ import InviteForm from './InviteForm.jsx'
 // from an admin, but could never show club-wide data to someone RLS would
 // refuse it to.
 
-const MUTED_ON_PAPER = 'text-[#5c5854]'
+const MUTED_ON_PAPER = 'text-ink-muted'
 
 function NotAuthorised() {
   return (
     <section>
       <h2 className="sr-only">Admin</h2>
       <Card role="alert" className="p-6 text-center">
-        <h3 className="text-base font-extrabold text-quinsRedDark">Not authorised</h3>
-        <p className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+        <h3 className="text-base font-extrabold text-brand-deep">Not authorised</h3>
+        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
           This page is for club admins only. If you think you should have access, ask a
           current admin to check your account.
         </p>
@@ -56,8 +56,8 @@ function SectionTitle({ children }) {
 
 function TeamRow({ team, playerCount }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-[#e6e3e1] px-[14px] py-[11px] last:border-b-0">
-      <span className="text-[15px] font-bold text-[#221f1d]">{team.name}</span>
+    <div className="flex items-center justify-between gap-3 border-b border-line px-[14px] py-[11px] last:border-b-0">
+      <span className="text-[15px] font-bold text-ink">{team.name}</span>
       <span className={`text-[12.5px] font-semibold ${MUTED_ON_PAPER}`}>
         {playerCount} {playerCount === 1 ? 'player' : 'players'}
       </span>
@@ -72,17 +72,17 @@ function MemberRow({ member }) {
   return (
     <div
       data-testid="member-row"
-      className="flex items-center gap-3 border-b border-[#e6e3e1] px-[14px] py-[11px] last:border-b-0"
+      className="flex items-center gap-3 border-b border-line px-[14px] py-[11px] last:border-b-0"
     >
       <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-[image:linear-gradient(135deg,theme(colors.quinsRedDark),theme(colors.quinsRed))] text-[12px] font-extrabold tracking-[.5px] text-white"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[12px] font-extrabold tracking-[.5px] text-white"
         aria-hidden="true"
       >
         {initials(name)}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
-          <span data-testid="member-name" className="text-[14.5px] font-bold text-[#221f1d]">
+          <span data-testid="member-name" className="text-[14.5px] font-bold text-ink">
             {name}
           </span>
           <Badge tone={member.role}>{member.role}</Badge>
@@ -162,7 +162,7 @@ export default function Admin() {
   return (
     <section>
       <div className="mb-3.5 mt-1">
-        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-[#221f1d]">Admin overview</h2>
+        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Admin overview</h2>
         <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
           {roleLabel(memberships)} · {teams.length} age groups · {players.length} players ·{' '}
           {members.length} {members.length === 1 ? 'member' : 'members'}
@@ -177,14 +177,14 @@ export default function Admin() {
 
       {!isFirstLoad && error && (
         <Card role="alert" className="p-6 text-center">
-          <h3 className="text-base font-extrabold text-quinsRedDark">We couldn&apos;t load the overview</h3>
-          <p className="mt-2 text-sm leading-relaxed text-quinsRedDark">
+          <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load the overview</h3>
+          <p className="mt-2 text-sm leading-relaxed text-brand-deep">
             {error.message || 'Something went wrong. Try again.'}
           </p>
           <button
             type="button"
             onClick={() => setReloadToken((token) => token + 1)}
-            className="mt-4 rounded-[11px] bg-quinsRed px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+            className="mt-4 rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             Try again
           </button>
@@ -206,20 +206,20 @@ export default function Admin() {
             <div className="flex flex-col gap-2.5 desktop:flex-row">
               <Link
                 to="/roster"
-                className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-white px-[15px] py-2.5 text-sm font-bold text-quinsRed shadow-[inset_0_0_0_1.5px_#e6e3e1] transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+                className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-surface-card px-[15px] py-2.5 text-sm font-bold text-brand shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT)] transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
               >
                 Manage roster &amp; players
               </Link>
               <Link
                 to="/schedule"
-                className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-white px-[15px] py-2.5 text-sm font-bold text-quinsRed shadow-[inset_0_0_0_1.5px_#e6e3e1] transition hover:bg-[#faf8fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+                className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-surface-card px-[15px] py-2.5 text-sm font-bold text-brand shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT)] transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
               >
                 Manage schedule &amp; fixtures
               </Link>
               <button
                 type="button"
                 onClick={() => setInviteOpen(true)}
-                className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-quinsRed px-[15px] py-2.5 text-sm font-bold text-white transition hover:bg-[#D62A3D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2"
+                className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-brand px-[15px] py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
               >
                 Invite a member
               </button>

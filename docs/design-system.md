@@ -1,5 +1,88 @@
 # Quins Club Hub — Design System Reference
 
+> ## 0. RETHEME NOTICE — read before trusting any colour below
+>
+> **The app no longer uses the palette or the type described in §1–§4 of this
+> document.** It was rethemed onto the Abu Dhabi Harlequins *club website*
+> system (adhquins-website-redesign) so the app and the public site read as one
+> brand. Everything in this file about **layout, spacing, component anatomy,
+> breakpoints and interaction** is still accurate and still the reference.
+> Everything about **specific colours and fonts** is history.
+>
+> **The source of truth for colour and type is now `tailwind.config.js`.** Every
+> value there carries its measured contrast ratio in a comment.
+>
+> ### What changed, in one line
+> Light content well, dark brand chrome: near-black masthead and bottom tab bar,
+> light readable data surfaces between them, club red/green for accent, and the
+> website's red→green gradient stat band on the dashboard.
+>
+> ### Token mapping (old → new)
+>
+> | Old (this doc) | New token | New value |
+> |---|---|---|
+> | `--maroon` `#C21F32` | `brand` | `#e11b22` |
+> | `--magenta` `#D62A3D` | *(removed)* — hover now uses `brand-deep` | `#b3141a` |
+> | `--plum` `#8E1526` | `brand-deep` | `#b3141a` |
+> | *(red as text)* | `brand-ink` | `#b3141a` |
+> | *(red as text on dark)* | `brand-onDark` | `#ff8f8f` |
+> | `--green` `#7DC351` | `accent` | `#3bd070` |
+> | `--sky` `#3E9C4F` | `accent-mid` | `#1f9d4d` |
+> | `--sky-deep` `#2F7D3D` | `accent-ink` | `#157f3c` |
+> | `--green-bg` `#eef7e6` | `accent-bg` | `#e6f7ec` |
+> | `--paper` `#f5f4f3` | `surface` | `#eef0f3` |
+> | `--card` `#ffffff` | `surface-card` | `#ffffff` |
+> | *(seven near-white greys)* | `surface-mute` / `surface-sunk` | `#f2f4f7` / `#e6e9ee` |
+> | `--text` `#221f1d` | `ink` | `#101116` |
+> | `--muted` `#77726e` | `ink-muted` / `ink-faint` | `#565c67` / `#636974` |
+> | `--line` `#e6e3e1` | `line` | `#dfe2e8` |
+> | `--ink` `#141414` | `chrome` (masthead/tab bar) | `#0c0c0e` |
+> | `--good` / `--bad` / `--warn` | `accent-mid` / `danger` / `warn` | see config |
+>
+> ### Type
+> System sans is gone. Three self-hosted faces, in `public/fonts/`:
+> - **Barlow** (`font-sans`) — all body copy, form labels, table rows. 400/500/600/700.
+> - **Anton** (`font-display`) — display ONLY: screen titles, stat numerals, the
+>   masthead wordmark, date chips. Never a form label or a row of data.
+> - **Barlow Condensed** (`font-condensed`) — nav, eyebrows, stat labels, pills.
+>   **Only 600 and 700 are bundled.** `font-condensed` without `font-semibold`
+>   or `font-bold` silently falls back to Barlow.
+>
+> ### Rules the build enforces
+> `tests/theme.test.js` fails the suite if either is broken:
+> 1. **No raw hex in component class names.** Colours come from tokens or they
+>    don't go in. (Comments are exempt — the prose history is worth keeping.)
+> 2. **`font-condensed` always pairs with a 600/700 weight.**
+>
+> `scripts/contrast-check.mjs` measures every foreground/background pair the app
+> renders, including sampling both gradients across their width, and exits
+> non-zero on any AA failure. Run it after touching a colour.
+>
+> ### Contrast traps found during the retheme — do not reintroduce
+> - **The website's own red→green stat band fails AA.** White text on the raw
+>   `#3bd070` end measures **2.01:1**. The app's `stat-band` gradient therefore
+>   ends at `#157f3c` (holds ≥4.79:1 across its full width) and the vivid green
+>   lives in the decorative `brand-rule` hairline, which carries no text.
+>   *The live club website still has this defect in its own `.statband`.*
+> - **Brand red as small text on white is 4.0:1 — a fail.** Use `brand-ink`.
+> - **Lighter-on-hover breaks red buttons.** Any red lighter than `#e11b22`
+>   drops white text under 4.5:1. Hover goes *darker*, to `brand-deep`.
+> - **`ink-faint` must clear AA on the page, not just on cards.** The first pass
+>   used `#6f7681`: fine on white (4.58:1), failing on `surface` (4.01:1).
+> - **A Tailwind `boxShadow` key must not collide with a colour key.**
+>   `shadow-chrome` resolved as a shadow *colour* and silently produced no
+>   shadow; it is `shadow-masthead` now.
+>
+> ### Why the masthead stopped being a gradient
+> The old red→green header gradient painted across the full viewport while the
+> content column is centred and capped at 1120px, so the colour behind the white
+> text depended on monitor width. That required the green stop pushed out to
+> 300% and still only reached ~5.3:1 at its worst. Flat `#0c0c0e` is 19.54:1 at
+> every width, with no empirical sweep needed. The same fix applies to the Login
+> and RequireAuth full-screen backgrounds, which had the identical problem.
+
+---
+
 Source of truth: `/home/claude/quins-club-hub/assets/prototype-downloads.html` (clean,
 unrendered source — used for all code quoted below) and
 `/home/claude/quins-club-hub/assets/prototype-desktop.html` (a browser-saved snapshot of

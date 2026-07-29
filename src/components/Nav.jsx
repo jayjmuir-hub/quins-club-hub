@@ -63,43 +63,47 @@ export const NAV_ITEMS = [
 
 function linkClassName({ isActive }) {
   return [
-    // Mobile (tab bar item): icon above label, muted/active colour swap.
-    'flex flex-col items-center justify-center gap-1 rounded-lg py-2 text-[10.5px] font-bold outline-none transition',
-    'focus-visible:ring-2 focus-visible:ring-quinsRed focus-visible:ring-offset-2',
-    isActive ? 'text-quinsRed' : 'text-[#77726e] hover:text-quinsBlack',
-    // Desktop (in-header top nav): text-only pill on the gradient, per
-    // design-system.md §4.1 (.nav-desktop button styling). Task 22: every
-    // pill (active AND inactive) now gets a bg-black overlay, not just the
-    // active one — measured in a real browser that the INACTIVE items'
-    // text, at its existing desktop:opacity-[.82], composites to
-    // ~4.19-4.47:1 against the bare gradient (no overlay at all): under the
-    // 4.5:1 AA threshold at every desktop width tested (820-3440px), because
-    // 82%-opacity white text is itself slightly darker than pure white, on
-    // top of a background that on its own is only just above the same
-    // threshold. A flat bg-black/[.1] under the inactive items (measured
-    // 4.87-5.16:1 with it) fixes that while staying visually a much lighter
-    // touch than the active pill's bg-black/[.22] (a white overlay would
-    // make this worse, not better, for the same reason described on
-    // AppShell.jsx's role badge — see docs/accessibility.md).
-    'desktop:flex-row desktop:gap-0 desktop:rounded-[10px] desktop:px-3.5 desktop:py-2 desktop:text-sm desktop:font-semibold desktop:text-white',
-    // Mutually exclusive background classes (never both applied to the same
-    // element at once) so there is no risk of Tailwind's utility-ordering
-    // resolving a conflict between the two arbitrary bg-black values.
+    // Mobile (tab bar item): icon above label. The bar itself is now dark
+    // chrome, so idle items are chrome-muted (#8b9099, 6.09:1 on #0c0c0e)
+    // and the active item goes pure white plus a red icon — brighter, not
+    // just a different hue, so it reads at a glance in sunlight.
+    'flex flex-col items-center justify-center gap-1 rounded-lg py-2 font-condensed text-[11px] font-bold uppercase tracking-[0.06em] outline-none transition',
+    'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
+    isActive ? 'text-white' : 'text-chrome-muted hover:text-white',
+    // Desktop (in-header top nav): text pill on the flat near-black masthead.
+    // The old code needed two different black overlays here, one for active
+    // and one for idle, because the underlying gradient's colour varied with
+    // viewport width and idle text at 82% opacity fell under 4.5:1 without
+    // help. The masthead is flat #0c0c0e now, so idle text can simply be
+    // full-strength white at 19.54:1 and the active state can be a solid red
+    // pill (4.79:1 white-on-red) instead of a darker patch. No opacity
+    // tricks, no width-dependent measurements.
+    'desktop:flex-row desktop:gap-0 desktop:rounded-pill desktop:px-4 desktop:py-2 desktop:text-[16px] desktop:tracking-[0.06em]',
     isActive
-      ? 'desktop:bg-black/[.22] desktop:opacity-100'
-      : 'desktop:bg-black/[.1] desktop:opacity-[.82] desktop:hover:opacity-100',
+      ? 'desktop:bg-brand desktop:text-white'
+      : 'desktop:text-white/80 desktop:hover:bg-white/10 desktop:hover:text-white',
   ].join(' ')
 }
 
 export default function Nav() {
   return (
+    // The bar is dark chrome so the app is bookended in near-black — masthead
+    // at the top, tab bar at the bottom, light content well between. The
+    // `brand-rule` hairline sits on its top edge, mirroring the masthead's.
+    // Opaque, not the old bg-white/95 + backdrop-blur: a translucent bar over
+    // scrolling light content made the idle label contrast depend on whatever
+    // happened to be underneath it.
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-[#e6e3e1] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md desktop:static desktop:z-auto desktop:flex desktop:w-auto desktop:grid-cols-none desktop:gap-1 desktop:border-0 desktop:bg-transparent desktop:p-0 desktop:backdrop-blur-none"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 bg-chrome pb-[env(safe-area-inset-bottom)] shadow-tabbar desktop:static desktop:z-auto desktop:flex desktop:w-auto desktop:grid-cols-none desktop:gap-1 desktop:bg-transparent desktop:p-0 desktop:shadow-none"
     >
+      <div className="brand-rule absolute inset-x-0 top-0 desktop:hidden" />
       {NAV_ITEMS.map(({ to, label, end, icon: Icon }) => (
         <NavLink key={to} to={to} end={end} className={linkClassName}>
-          <Icon className="h-[23px] w-[23px] desktop:hidden" aria-hidden="true" />
+          <Icon
+            className={'h-[23px] w-[23px] desktop:hidden'}
+            aria-hidden="true"
+          />
           <span>{label}</span>
         </NavLink>
       ))}

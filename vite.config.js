@@ -21,11 +21,16 @@ export default defineConfig({
         name: 'Abu Dhabi Harlequins',
         short_name: 'Quins',
         description: 'Abu Dhabi Harlequins — Quins Club Hub: schedule, roster & availability.',
-        theme_color: '#C21F32',
+        // theme_color tints the mobile browser/OS chrome so it blends into the
+        // top of the page. The top of the page is the near-black masthead, so
+        // this is chrome (#0c0c0e), not the brand red — a red status bar above
+        // a black masthead reads as a rendering bug. Keep in sync with the
+        // <meta name="theme-color"> in index.html.
+        theme_color: '#0c0c0e',
         // Splash-screen background shown while the app loads on first launch.
-        // Matches the app's --paper background so there's no colour flash
-        // before the CSS paints.
-        background_color: '#f5f4f3',
+        // Matches the app's page surface so there's no colour flash before the
+        // CSS paints.
+        background_color: '#eef0f3',
         display: 'standalone',
         start_url: '/',
         scope: '/',
