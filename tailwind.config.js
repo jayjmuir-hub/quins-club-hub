@@ -145,6 +145,18 @@ export default {
         // §5): below it is mobile (bottom tab bar, FAB, bottom sheet), at/
         // above it is desktop (top nav, no FAB, centered dialog).
         desktop: '820px',
+
+        // Second stop, added with the desktop roster work (desktop-spec.md
+        // §4). `desktop` covers "not a phone" — tablets and small laptops —
+        // and keeps a reduced column set. `wide` is the line for "there is a
+        // mouse and a big screen", where full tables, the availability matrix
+        // and side-by-side detail panes are appropriate.
+        //
+        // 1280 rather than 1024 deliberately: a landscape iPad is 1024px and
+        // is still a touch device with no hover and fat targets. Giving it a
+        // dense table designed for a cursor would be worse than the card list
+        // it already gets.
+        wide: '1280px',
       },
 
       // Sheet's (src/components/Sheet.jsx) enter animation (design-system.md

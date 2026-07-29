@@ -3,6 +3,7 @@ import Sheet from '../components/Sheet.jsx'
 import { getPlayerContact, upsertContact, upsertPlayer } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
+import { POSITIONS } from '../lib/positions.js'
 
 // The player add/edit form (design-system.md §5.8), opened in the shared
 // Sheet from Roster's "Add player" button and from PlayerDetail's "Edit".
@@ -66,24 +67,11 @@ const SEG_OPTION_BASE =
 const SEG_OPTION_ON = 'border-brand bg-surface-mute font-bold text-brand-deep'
 const SEG_OPTION_OFF = 'border-line font-semibold text-ink'
 
-// design-system.md §7's POSITIONS enum, verbatim. Kept here rather than
-// shared with Roster.jsx: Roster's FORWARDS/BACKS arrays are a *grouping*
-// rule (which bucket a position falls in, including positions not on this
-// list), not the list of choices this form offers. Merging them would couple
-// two things that are only coincidentally similar.
-const POSITIONS = [
-  'Prop',
-  'Hooker',
-  'Lock',
-  'Flanker',
-  'Number 8',
-  'Scrum-half',
-  'Fly-half',
-  'Centre',
-  'Wing',
-  'Fullback',
-  'Utility',
-]
+// POSITIONS moved to src/lib/positions.js when the bulk importer arrived and
+// needed to validate pasted positions against exactly the same set this form
+// offers. The original reasoning still holds and is restated there: this is
+// the list of choices, NOT Roster.jsx's FORWARDS/BACKS grouping rule, which
+// buckets positions that may not be on this list.
 
 function inputClasses(invalid) {
   return [INPUT_BASE, invalid ? 'border-brand-deep' : 'border-line'].join(' ')
