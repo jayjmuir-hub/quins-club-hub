@@ -162,7 +162,7 @@ export default function AppShell({ children }) {
       <header className="sticky top-0 z-40 bg-chrome-grad text-white shadow-masthead">
         <div className="brand-rule" />
         <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3">
-          {/* crest.png is 369x400 (portrait) — object-contain keeps its native
+          {/* crest.png is 370x400 (portrait) — object-contain keeps its native
               aspect ratio inside the 46x46 badge box (matching the
               prototype's background:contain treatment) instead of the
               default object-fit:fill, which stretched it to fill the square

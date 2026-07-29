@@ -80,7 +80,7 @@ export default function Login({ authError = null }) {
           diagonals — that pseudo-element is absolutely positioned, and
           positioned boxes paint over non-positioned siblings. */}
       <div className="relative z-10 w-full max-w-[380px] rounded-card border border-line bg-surface-card p-6 shadow-card sm:p-8">
-        {/* crest.png is 369x400 (portrait) — object-contain keeps its native
+        {/* crest.png is 370x400 (portrait) — object-contain keeps its native
             aspect ratio inside the square box instead of stretching to fill
             it (see AppShell's header badge for the same fix/reasoning). */}
         <img
