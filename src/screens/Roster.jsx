@@ -4,6 +4,7 @@ import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
+import RosterTable from '../components/RosterTable.jsx'
 import TeamPills, { ALL_TEAMS_ID } from '../components/TeamPills.jsx'
 import PlayerDetail from './PlayerDetail.jsx'
 import PlayerForm from './PlayerForm.jsx'
@@ -11,6 +12,24 @@ import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
+import { useMediaQuery, DESKTOP_QUERY } from '../lib/useMediaQuery.js'
+
+// The team filter survives a reload. Without this, choosing club-wide as the
+// desktop default (desktop-spec.md §10 decision 2) would make a coach who
+// only runs one age group re-filter on every visit — the noise objection to
+// that decision, and this is the mitigation for it.
+const TEAM_FILTER_KEY = 'quins.roster.teamFilter'
+
+function readStoredFilter() {
+  try {
+    return window.localStorage.getItem(TEAM_FILTER_KEY) || ALL_TEAMS_ID
+  } catch {
+    // Private browsing and some locked-down enterprise profiles throw on
+    // access rather than returning null. A filter is a convenience; failing
+    // to read one must never stop the roster rendering.
+    return ALL_TEAMS_ID
+  }
+}
 
 // Roster & members (design-system.md §5.3): scope note, section head, search
 // bar, a team filter, then the grouped player list. Reads players once for
@@ -165,8 +184,10 @@ export default function Roster() {
   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
   const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
 
+  const isDesktop = useMediaQuery(DESKTOP_QUERY)
+
   const [query, setQuery] = useState('')
-  const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
+  const [teamFilter, setTeamFilter] = useState(readStoredFilter)
   const [selectedPlayerId, setSelectedPlayerId] = useState(null)
   // null when the add/edit sheet is closed; { player } when open (player is
   // null for "add"). An object rather than a boolean so opening the form for
@@ -279,6 +300,25 @@ export default function Roster() {
   // player closes it instead of stranding a stale copy on screen.
   const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null
 
+  // Applies an inline edit to the loaded list without refetching. Used for
+  // both halves of an optimistic write: the table calls it with the new value
+  // before the request, and with the old one again if the write is refused.
+  // Refetching instead would be a round trip for a field we already know, and
+  // would reorder the table under the user's cursor mid-edit.
+  const patchPlayer = (id, patch) => {
+    setPlayers((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)))
+  }
+
+  const persistFilter = (next) => {
+    setTeamFilter(next)
+    try {
+      window.localStorage.setItem(TEAM_FILTER_KEY, next)
+    } catch {
+      // Same reasoning as readStoredFilter: a filter that can't be persisted
+      // still has to work for this session.
+    }
+  }
+
   // Whether the signed-in user may write to the OPEN player's squad. Asked
   // per team through canEditTeam rather than inferred from the role, so its
   // deliberate refusal of a null/unresolvable team_id applies here too. RLS
@@ -353,7 +393,7 @@ export default function Roster() {
             teams={scopedTeams}
             counts={pillCounts}
             selected={activeFilter}
-            onChange={setTeamFilter}
+            onChange={persistFilter}
           />
         </div>
       )}
@@ -392,8 +432,27 @@ export default function Roster() {
         </Card>
       )}
 
+      {/* Desktop gets the table, mobile keeps the grouped card list. One or
+          the other renders, never both — the two would emit the same player
+          names and make every by-text query ambiguous (see
+          src/lib/useMediaQuery.js). The position/age-group grouping is
+          deliberately dropped on desktop: sortable columns answer the same
+          question better, and a table broken into group headings can't be
+          sorted across. */}
+      {!isFirstLoad && !error && groups.length > 0 && isDesktop && (
+        <RosterTable
+          players={visible}
+          teams={scopedTeams}
+          teamsById={teamsById}
+          canEditTeam={(teamId) => canEditTeam(memberships, teamId)}
+          onSelect={setSelectedPlayerId}
+          onPatch={patchPlayer}
+        />
+      )}
+
       {!isFirstLoad &&
         !error &&
+        !isDesktop &&
         groups.map((group) => (
           <RosterGroup
             key={group.key}

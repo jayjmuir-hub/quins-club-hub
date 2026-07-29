@@ -1,0 +1,241 @@
+import { useState } from 'react'
+import Badge from './Badge.jsx'
+import Card from './Card.jsx'
+import { POSITIONS } from '../lib/positions.js'
+import { upsertPlayer } from '../data/players.js'
+
+// The desktop roster table (desktop-spec.md §5.1). Rendered INSTEAD of the
+// mobile card list, not alongside it — see src/lib/useMediaQuery.js for why
+// that switch is made in JS rather than with a `desktop:` class.
+//
+// Three columns are editable in place: position, age group and captain. Those
+// are the fields that change during a season; everything else still goes
+// through PlayerForm, which is where validation, contacts and the two-table
+// save sequence already live. There is deliberately no jersey column — the
+// club does not use squad numbers (src/lib/playerFormat.js).
+//
+// Access control is not enforced here. `canEditTeam` decides whether a cell
+// renders as a control or as text, so a mistake can only make the UI
+// read-only, never authorise a write. RLS refuses server-side and
+// upsertPlayer turns "zero rows affected" into a thrown refusal, which is
+// what the row error below reports.
+
+const HEAD_CELL =
+  'sticky top-0 z-10 bg-surface-sunk px-3 py-2.5 text-left text-[11.5px] font-extrabold uppercase tracking-[.5px] text-ink-muted'
+const BODY_CELL = 'border-t border-line px-3 py-2 text-[14px] text-ink align-middle'
+// Inline controls are borderless until hovered/focused so a dense table does
+// not read as a wall of form fields — the affordance appears when the cursor
+// is on it. Focus-visible keeps that discoverable from the keyboard too.
+const INLINE_CONTROL =
+  'w-full rounded-[8px] border border-transparent bg-transparent px-2 py-1 text-[14px] text-ink transition hover:border-line hover:bg-surface-card focus:border-brand focus:bg-surface-card focus-visible:outline-none disabled:cursor-not-allowed'
+
+const SORTABLE = [
+  { key: 'full_name', label: 'Name' },
+  { key: 'position', label: 'Position' },
+  { key: 'team', label: 'Age group' },
+  { key: 'is_captain', label: 'Captain' },
+]
+
+function compare(a, b, key, teamsById) {
+  if (key === 'team') {
+    const at = teamsById.get(a.team_id)
+    const bt = teamsById.get(b.team_id)
+    return (at?.sort_order ?? 0) - (bt?.sort_order ?? 0) ||
+      (at?.name ?? '').localeCompare(bt?.name ?? '')
+  }
+  if (key === 'is_captain') {
+    // Captains first when ascending. Booleans have no natural collation, so
+    // this is stated rather than left to whatever true > false does.
+    return (b.is_captain ? 1 : 0) - (a.is_captain ? 1 : 0)
+  }
+  // Empty positions sort last in either direction rather than leading the
+  // table with a block of "—", which is never what someone sorting by
+  // position is looking for.
+  const av = a[key] ?? ''
+  const bv = b[key] ?? ''
+  if (av === '' && bv !== '') return 1
+  if (bv === '' && av !== '') return -1
+  return String(av).localeCompare(String(bv))
+}
+
+export default function RosterTable({ players, teams, teamsById, canEditTeam, onSelect, onPatch }) {
+  const [sort, setSort] = useState({ key: 'full_name', dir: 'asc' })
+  // Per-row, keyed by player id: the field currently in flight, and the last
+  // refusal message. Kept here rather than in Roster because nothing outside
+  // this table needs to know a cell is saving.
+  const [saving, setSaving] = useState({})
+  const [errors, setErrors] = useState({})
+
+  const sorted = [...players].sort((a, b) => {
+    const result = compare(a, b, sort.key, teamsById)
+    // Name is the tiebreaker for every other column, so equal positions or
+    // equal age groups still come out in a stable, readable order.
+    const tie = result === 0 && sort.key !== 'full_name'
+      ? a.full_name.localeCompare(b.full_name)
+      : 0
+    return (sort.dir === 'asc' ? result : -result) || tie
+  })
+
+  function toggleSort(key) {
+    setSort((prev) => (prev.key === key
+      ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+      : { key, dir: 'asc' }))
+  }
+
+  async function save(player, field, value) {
+    // No write when nothing changed. Blurring a select the user only opened
+    // and closed should cost nothing, and an UPDATE that sets a column to its
+    // current value still bumps the row and still has to clear RLS.
+    if (player[field] === value) return
+
+    const previous = player[field]
+    setErrors((e) => ({ ...e, [player.id]: null }))
+    setSaving((s) => ({ ...s, [player.id]: field }))
+    // Optimistic: the cell shows the new value immediately, and is put back
+    // if the write is refused.
+    onPatch(player.id, { [field]: value })
+
+    try {
+      await upsertPlayer({ id: player.id, [field]: value })
+    } catch (err) {
+      onPatch(player.id, { [field]: previous })
+      setErrors((e) => ({
+        ...e,
+        [player.id]: err?.message || "We couldn't save that change.",
+      }))
+    } finally {
+      setSaving((s) => ({ ...s, [player.id]: null }))
+    }
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="max-h-[70vh] overflow-auto">
+        <table className="w-full border-collapse" data-testid="roster-table">
+          <caption className="sr-only">
+            Club roster. Position, age group and captain can be changed in place.
+          </caption>
+          <thead>
+            <tr>
+              {SORTABLE.map(({ key, label }) => (
+                <th
+                  key={key}
+                  scope="col"
+                  className={HEAD_CELL}
+                  aria-sort={sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSort(key)}
+                    className="flex items-center gap-1 font-extrabold uppercase tracking-[.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  >
+                    {label}
+                    <span aria-hidden="true" className="text-[9px]">
+                      {sort.key === key ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
+                    </span>
+                  </button>
+                </th>
+              ))}
+              <th scope="col" className={`${HEAD_CELL} w-px whitespace-nowrap`}>
+                <span className="sr-only">Open player</span>
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {sorted.map((player) => {
+              const editable = canEditTeam(player.team_id)
+              const busy = saving[player.id]
+              const error = errors[player.id]
+
+              return (
+                <tr key={player.id} data-testid="roster-table-row" className="hover:bg-surface-mute">
+                  <td className={`${BODY_CELL} font-bold`}>
+                    <span data-testid="table-player-name">{player.full_name}</span>
+                    {/* The refusal lands in the row that caused it, not in a
+                        toast that scrolls away from a long table. */}
+                    {error && (
+                      <span role="alert" className="mt-0.5 block text-[12px] font-semibold text-brand-deep">
+                        {error}
+                      </span>
+                    )}
+                  </td>
+
+                  <td className={BODY_CELL}>
+                    {editable ? (
+                      <select
+                        className={INLINE_CONTROL}
+                        aria-label={`Position for ${player.full_name}`}
+                        value={player.position ?? ''}
+                        disabled={busy === 'position'}
+                        onChange={(event) => save(player, 'position', event.target.value || null)}
+                      >
+                        <option value="">Not set</option>
+                        {POSITIONS.map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="px-2 text-ink-muted">{player.position || 'Not set'}</span>
+                    )}
+                  </td>
+
+                  <td className={BODY_CELL}>
+                    {editable ? (
+                      <select
+                        className={INLINE_CONTROL}
+                        aria-label={`Age group for ${player.full_name}`}
+                        value={player.team_id ?? ''}
+                        disabled={busy === 'team_id'}
+                        onChange={(event) => save(player, 'team_id', event.target.value)}
+                      >
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>{team.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="px-2 text-ink-muted">
+                        {teamsById.get(player.team_id)?.name ?? 'No age group'}
+                      </span>
+                    )}
+                  </td>
+
+                  <td className={BODY_CELL}>
+                    {editable ? (
+                      <button
+                        type="button"
+                        aria-pressed={Boolean(player.is_captain)}
+                        aria-label={`Captain: ${player.full_name}`}
+                        disabled={busy === 'is_captain'}
+                        onClick={() => save(player, 'is_captain', !player.is_captain)}
+                        className="rounded-[100px] px-1 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+                      >
+                        {player.is_captain
+                          ? <Badge tone="captain">Capt</Badge>
+                          : <span className="px-2 text-[13px] text-ink-faint">—</span>}
+                      </button>
+                    ) : (
+                      player.is_captain
+                        ? <Badge tone="captain">Capt</Badge>
+                        : <span className="px-2 text-ink-faint">—</span>
+                    )}
+                  </td>
+
+                  <td className={`${BODY_CELL} text-right`}>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(player.id)}
+                      className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    >
+                      Open
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}

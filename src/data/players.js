@@ -93,6 +93,40 @@ export async function upsertPlayer(player) {
   return data
 }
 
+const REFUSED_BULK =
+  "We couldn't add those players. You may not have permission to change one of those squads."
+
+/**
+ * Inserts many players in one statement and returns the inserted rows.
+ *
+ * This is NOT upsertPlayer in a loop, and the difference is worth stating
+ * because it changes what failure means. PostgREST sends a multi-row insert as
+ * a single statement, so an RLS WITH CHECK violation on ANY row aborts the
+ * whole thing — Postgres raises, rather than filtering the offending row out
+ * the way a SELECT policy would. There is therefore no such thing as a partial
+ * success here: either every row lands or none do.
+ *
+ * That is the honest behaviour to build on, so the caller's job is to make
+ * refusals impossible before calling — src/lib/playerImport.js checks every
+ * pasted row's team against canEditTeam and marks the bad ones invalid in the
+ * preview. This message is the backstop for the case that check missed, and it
+ * says "nothing was added" rather than implying some players got through.
+ *
+ * A row-at-a-time loop would give genuinely per-row outcomes, at the cost of N
+ * round trips and a half-imported squad to reconcile when the tenth of forty
+ * fails. Rejected deliberately: a clean all-or-nothing failure the user can
+ * retry after fixing the preview is easier to reason about than a partial
+ * write they have to diff by hand.
+ */
+export async function insertPlayers(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return []
+
+  const { data, error } = await supabase.from('players').insert(rows).select()
+  if (error) throw error
+  if (!data || data.length === 0) throw new Error(REFUSED_BULK)
+  return data
+}
+
 /**
  * Deletes one player by id. Resolves with nothing on success and throws when
  * the delete failed or removed nothing.
