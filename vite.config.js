@@ -15,7 +15,25 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      // 'autoUpdate' (not 'prompt'): the new service worker calls skipWaiting +
+      // clientsClaim and takes over on the next page load, then the page
+      // reloads itself.
+      //
+      // This started as 'prompt' to avoid swapping app code under someone
+      // mid-form. In practice that protection was imaginary: 'prompt' only
+      // defers to a UI that asks the user, and no such UI was ever built —
+      // onNeedRefresh just wrote to the console. The real-world result was
+      // that a deploy never reached anyone. Worse, once a deploy changed
+      // asset hashes (the retheme + crest), the stale cached build kept
+      // requesting files that no longer exist on the CDN, so members saw a
+      // BROKEN crest rather than merely an old one, with no way back short of
+      // a hard reload or closing every instance of an installed PWA.
+      //
+      // Reloading someone mid-form is the lesser evil, and is rare: it only
+      // happens on the first load after a deploy. If that ever bites, the fix
+      // is a real refresh banner wired to updateSW(true) — not going back to
+      // a 'prompt' that prompts nobody.
+      registerType: 'autoUpdate',
       injectRegister: null,
       manifest: {
         name: 'Abu Dhabi Harlequins',

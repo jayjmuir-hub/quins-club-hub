@@ -5,21 +5,45 @@
 // safely in dev/test — the virtual module only resolves when the PWA plugin
 // runs, so this file has no effect outside a real Vite build.
 //
-// Update behaviour: this app uses `registerType: 'prompt'` (see
-// vite.config.js), so a new service worker waits until the user is asked
-// rather than silently taking over mid-session (which could swap cached app
-// code under someone filling in a form). For v1 we keep this low-key rather
-// than building a bespoke toast: log to the console and immediately activate
-// the new version and reload on next call to `updateSW()`. A future task can
-// wire this into the app's existing alert/toast UI if it turns out users
-// need a visible prompt — no native `confirm()` is used here either way.
+// Update behaviour: the app uses `registerType: 'autoUpdate'` (see
+// vite.config.js). The plugin handles the swap itself — the new worker calls
+// skipWaiting + clientsClaim and the page reloads once the new worker is in
+// control. There is deliberately nothing to click: the previous 'prompt'
+// setup logged to the console and waited for a UI that was never built, so
+// deploys never reached anyone, and a hash change left members staring at a
+// broken crest.
+//
+// What this file still adds on top of the default is the periodic check
+// below. Without it, an installed PWA that is never fully closed may not
+// notice a deploy for a long time: the browser only re-checks the worker
+// script on navigation, and a standalone PWA left open on a phone does not
+// navigate. An hourly poll means a deploy lands within the hour instead of
+// whenever the member happens to cold-start the app.
 import { registerSW } from 'virtual:pwa-register'
 
+// Hourly. Long enough to be invisible in bandwidth terms (it is a conditional
+// request for one small script), short enough that a fix reaches the club the
+// same afternoon.
+const UPDATE_CHECK_MS = 60 * 60 * 1000
+
 export const updateSW = registerSW({
-  onNeedRefresh() {
-    // eslint-disable-next-line no-console
-    console.info('[Quins] A new version is available. Refresh to update.')
+  // Runs once the worker is registered. `registration` is the live
+  // ServiceWorkerRegistration; calling .update() on it asks the browser to
+  // re-fetch the worker script and, if it changed, start the swap.
+  onRegisteredSW(swUrl, registration) {
+    if (!registration) return
+
+    setInterval(() => {
+      // Don't burn a request while the tab is hidden or the device is offline;
+      // the next tick picks it up. update() rejects when the worker script is
+      // unreachable, which is routine on a flaky connection, so swallow it
+      // rather than surfacing an unhandled rejection.
+      if (document.visibilityState !== 'visible') return
+      if (!navigator.onLine) return
+      registration.update().catch(() => {})
+    }, UPDATE_CHECK_MS)
   },
+
   onOfflineReady() {
     // eslint-disable-next-line no-console
     console.info('[Quins] App ready to work offline.')
