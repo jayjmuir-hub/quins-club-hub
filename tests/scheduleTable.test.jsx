@@ -1,0 +1,202 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+// Tests for the wide-screen schedule table (desktop-spec.md §5.2). The
+// stacked FixtureRow list is covered by tests/schedule.test.jsx and is
+// deliberately untouched by this file.
+//
+// The table is a `wide` (1280px) feature, not `desktop` (820px): at tablet
+// width the stacked list is still the better shape. These tests pin that
+// boundary, because getting it wrong is invisible until someone opens the app
+// on an iPad.
+
+const useMembershipsMock = vi.fn()
+const listEventsMock = vi.fn()
+
+vi.mock('../src/lib/memberships.jsx', () => ({
+  useMemberships: () => useMembershipsMock(),
+}))
+
+vi.mock('../src/data/events.js', () => ({
+  listEvents: (...a) => listEventsMock(...a),
+  subscribeEvents: () => () => {},
+}))
+
+import Schedule from '../src/screens/Schedule.jsx'
+
+const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
+const TEAM_U12 = { id: 'team-u12', name: 'U12', sort_order: 6 }
+const TEAMS = [TEAM_U10, TEAM_U12]
+const ADMIN = [{ id: 'm1', role: 'admin', team_id: null, club_id: 'club-1' }]
+
+// Fixed instants so the club-timezone formatting is asserted, not the
+// browser's. 2030 keeps "upcoming" upcoming without freezing the clock.
+const FUTURE_MATCH = {
+  id: 'e1', team_id: 'team-u10', type: 'match', opponent: 'Dubai Exiles',
+  home: true, venue: 'Zayed Sports City', competition: 'West Asia Cup',
+  starts_at: '2030-03-14T11:00:00Z', result_us: null, result_them: null,
+}
+const FUTURE_TRAINING = {
+  id: 'e2', team_id: 'team-u12', type: 'training', title: 'Skills session',
+  venue: 'Al Ain', starts_at: '2030-03-10T15:30:00Z',
+  result_us: null, result_them: null,
+}
+const PLAYED_WIN = {
+  id: 'e3', team_id: 'team-u10', type: 'match', opponent: 'Bahrain',
+  home: false, venue: 'Manama', starts_at: '2024-02-02T10:00:00Z',
+  result_us: 24, result_them: 12,
+}
+const PLAYED_LOSS = {
+  id: 'e4', team_id: 'team-u12', type: 'match', opponent: 'Doha',
+  home: true, venue: 'Abu Dhabi', starts_at: '2024-01-01T10:00:00Z',
+  result_us: 5, result_them: 30,
+}
+
+function setWidth({ wide }) {
+  window.matchMedia = vi.fn().mockImplementation((query) => ({
+    // WIDE_QUERY is 1280px; DESKTOP_QUERY is 820px. Only the wide query
+    // matters to this screen, but both are answered so the stub is honest.
+    matches: query.includes('1280') ? wide : true,
+    media: query,
+    addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    addListener: vi.fn(), removeListener: vi.fn(),
+  }))
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  setWidth({ wide: true })
+  useMembershipsMock.mockReturnValue({ memberships: ADMIN, teams: TEAMS })
+  listEventsMock.mockResolvedValue([FUTURE_MATCH, FUTURE_TRAINING, PLAYED_WIN, PLAYED_LOSS])
+})
+
+const fixtures = () => screen.getAllByTestId('schedule-fixture').map((n) => n.textContent)
+
+describe('ScheduleTable — the wide boundary', () => {
+  it('renders the table at wide', async () => {
+    render(<Schedule />)
+    expect(await screen.findByTestId('schedule-table')).toBeInTheDocument()
+    expect(screen.queryByTestId('fixture-row')).not.toBeInTheDocument()
+  })
+
+  it('keeps the stacked list below 1280px, where seven columns would be cramped', async () => {
+    setWidth({ wide: false })
+    render(<Schedule />)
+    await screen.findByText(/Dubai Exiles/)
+    expect(screen.queryByTestId('schedule-table')).not.toBeInTheDocument()
+  })
+})
+
+describe('ScheduleTable — content', () => {
+  it('shows upcoming fixtures across every age group, not one team', async () => {
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+    expect(screen.getAllByTestId('schedule-table-row')).toHaveLength(2)
+    // Scoped to the table: the team filter pills render the same age-group
+    // names above it, so a bare getByText would be ambiguous.
+    const table = screen.getByTestId('schedule-table')
+    expect(table).toHaveTextContent('U10')
+    expect(table).toHaveTextContent('U12')
+  })
+
+  it('orders upcoming fixtures by date ascending', async () => {
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+    // 10 March training precedes 14 March match.
+    expect(fixtures()[0]).toMatch(/Skills session/)
+  })
+
+  it('marks a home match H and an away match A', async () => {
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+    expect(screen.getByText('H')).toBeInTheDocument()
+  })
+
+  it('does not label a training session home or away — it has no opponent', async () => {
+    listEventsMock.mockResolvedValue([FUTURE_TRAINING])
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+    expect(screen.queryByText('H')).not.toBeInTheDocument()
+    expect(screen.queryByText('A')).not.toBeInTheDocument()
+  })
+
+  it('formats the kick-off in club time, not the browser zone', async () => {
+    render(<Schedule />)
+    const table = await screen.findByTestId('schedule-table')
+    // 11:00Z on 14 March is 15:00 in Asia/Dubai (UTC+4). formatTime uses the
+    // RUNTIME locale (toLocaleTimeString(undefined, …)) with hour:'numeric',
+    // so the rendering is "3:00 PM" under jsdom's en-US and "15:00" under a
+    // 24-hour locale. The zone is what this test is about, so assert the hour
+    // in whichever form the locale produced rather than pinning the format —
+    // pinning it would make this test fail on a machine with a different
+    // locale, which is not a real defect.
+    expect(table.textContent).toMatch(/15:00|3:00\s?PM/i)
+  })
+
+  it('shows the competition under the fixture when there is one', async () => {
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+    expect(screen.getByText('West Asia Cup')).toBeInTheDocument()
+  })
+})
+
+describe('ScheduleTable — results', () => {
+  it('shows played fixtures with their score on the Results tab', async () => {
+    const user = userEvent.setup()
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+    await user.click(screen.getByRole('button', { name: 'Results' }))
+
+    const table = await screen.findByTestId('schedule-table')
+    // EN DASH, not a hyphen: resultScore() in src/lib/eventFormat.js formats
+    // scores as "24–12" deliberately, which is the typographically correct
+    // mark for a range. Asserted with the real character rather than
+    // loosened to a regex — the dash is a design decision, so a change to it
+    // should break this test and be looked at, not slip through.
+    expect(table).toHaveTextContent('24–12')
+    expect(table).toHaveTextContent('5–30')
+  })
+
+  it('shows an em dash rather than an empty cell for an unplayed fixture', async () => {
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+  })
+})
+
+describe('ScheduleTable — sorting', () => {
+  it('sorts by age group when that header is clicked', async () => {
+    const user = userEvent.setup()
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+    await user.click(screen.getByRole('button', { name: /^Age group/ }))
+
+    const first = screen.getAllByTestId('schedule-table-row')[0]
+    expect(first).toHaveTextContent('U10')
+  })
+
+  it('reverses on a second click of the same header', async () => {
+    const user = userEvent.setup()
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+    const header = screen.getByRole('button', { name: /^Date/ })
+    await user.click(header)
+    expect(fixtures()[0]).toMatch(/Dubai Exiles/)
+  })
+
+  it('exposes sort direction through aria-sort', async () => {
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+    expect(screen.getByRole('columnheader', { name: /Date/ })).toHaveAttribute('aria-sort', 'ascending')
+  })
+})
+
+describe('ScheduleTable — empty', () => {
+  it('says nothing is scheduled rather than rendering an empty table', async () => {
+    listEventsMock.mockResolvedValue([])
+    render(<Schedule />)
+    expect(await screen.findByText('No upcoming fixtures yet.')).toBeInTheDocument()
+    expect(screen.queryByTestId('schedule-table')).not.toBeInTheDocument()
+  })
+})
