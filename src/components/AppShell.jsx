@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import Nav from './Nav.jsx'
+import { ViewAsBanner, ViewAsSwitcher } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
@@ -146,85 +147,105 @@ export default function AppShell({ children }) {
         Skip to content
       </a>
 
-      {/* The masthead is DARK CHROME (#151517 -> #0c0c0e), not the red
-          gradient it used to be. Two reasons, in order of importance:
+      {/* Banner + masthead stick together as ONE unit. The banner has to sit
+          above the header and stay visible (spec §1: persistent, unmissable),
+          but two separately-`sticky top-0` siblings would both pin to y=0 and
+          the higher-z banner would paint over the masthead as soon as the
+          page scrolled. Hoisting the sticky positioning to a shared wrapper
+          keeps them stacked in document order at every scroll position, and
+          costs nothing when no preview is active (the banner renders null).
+          The Sheet's own scrim is z-50, so it still covers this. */}
+      <div className="sticky top-0 z-40">
+        <ViewAsBanner />
+
+        {/* The masthead is DARK CHROME (#151517 -> #0c0c0e), not the red
+            gradient it used to be. Two reasons, in order of importance:
           
-          1. It is the core move of the "A+" theme — brand identity lives on
-             the chrome (masthead + bottom tab bar) so the data surfaces
-             underneath can stay light and stay readable on a phone in Abu
-             Dhabi daylight. See docs/design-system.md §2.
-          2. It retires a whole class of contrast problem. The old red->green
-             gradient painted across the FULL viewport width while the content
-             column is centred and max-1120px, so which gradient colour sat
-             under the white text depended on the monitor. That needed the
-             green stop pushed out to 300% to keep every on-screen pixel in
-             the red family, and it was still only ~5.3:1 at its worst. Flat
-             near-black is 19.54:1 at every width, on every monitor, with no
-             empirical sweep required.
+            1. It is the core move of the "A+" theme — brand identity lives on
+               the chrome (masthead + bottom tab bar) so the data surfaces
+               underneath can stay light and stay readable on a phone in Abu
+               Dhabi daylight. See docs/design-system.md §2.
+            2. It retires a whole class of contrast problem. The old red->green
+               gradient painted across the FULL viewport width while the content
+               column is centred and max-1120px, so which gradient colour sat
+               under the white text depended on the monitor. That needed the
+               green stop pushed out to 300% to keep every on-screen pixel in
+               the red family, and it was still only ~5.3:1 at its worst. Flat
+               near-black is 19.54:1 at every width, on every monitor, with no
+               empirical sweep required.
           
-          The vivid green is not lost — it moves to the `brand-rule` hairline
-          across the top edge, where it is decoration and carries no text, so
-          full saturation is free there. `harlequin` adds the site's diagonal
-          shapes bleeding off the right edge. */}
-      <header className="sticky top-0 z-40 bg-chrome-grad text-white shadow-masthead">
-        <div className="brand-rule" />
-        <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3">
-          {/* crest.png is 370x400 (portrait) — object-contain keeps its native
-              aspect ratio inside the 46x46 badge box (matching the
-              prototype's background:contain treatment) instead of the
-              default object-fit:fill, which stretched it to fill the square
-              and visually flattened the shield's pointed base. */}
-          <img
-            src={crest}
-            alt="Abu Dhabi Harlequins crest"
-            className="h-[46px] w-[46px] shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
-          />
-          {/* The club name is one of the few places Anton is allowed (see
-              tailwind.config.js fontFamily): it is a masthead wordmark, not
-              something anyone reads at speed. `truncate` because Anton is
-              wide and the name is long — on a narrow phone it would
-              otherwise push the nav off the row. */}
-          <div className="relative min-w-0">
-            <h1 className="truncate font-display text-[19px] uppercase leading-none tracking-[0.02em] desktop:text-[21px]">
-              Abu Dhabi Harlequins
-            </h1>
-            <p className="flex items-baseline gap-1 font-condensed text-[13px] font-semibold uppercase tracking-[1.6px] text-white/70">
-              <span>Quins Club Hub</span>
-              {/* Mobile-only compact role indicator (decision 6: the role
-                  label has no breakpoint qualifier, and mobile is the
-                  primary case for a pitch-side club app). The desktop badge
-                  below covers >=820px; this covers below it, so the role is
-                  never CSS-hidden at any width. */}
-              {showRole && (
-                <span data-testid="role-label-mobile" className="truncate desktop:hidden">
-                  · {currentRoleLabel}
-                </span>
-              )}
-            </p>
+            The vivid green is not lost — it moves to the `brand-rule` hairline
+            across the top edge, where it is decoration and carries no text, so
+            full saturation is free there. `harlequin` adds the site's diagonal
+            shapes bleeding off the right edge. */}
+        <header className="bg-chrome-grad text-white shadow-masthead">
+          <div className="brand-rule" />
+          <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3">
+            {/* crest.png is 370x400 (portrait) — object-contain keeps its native
+                aspect ratio inside the 46x46 badge box (matching the
+                prototype's background:contain treatment) instead of the
+                default object-fit:fill, which stretched it to fill the square
+                and visually flattened the shield's pointed base. */}
+            <img
+              src={crest}
+              alt="Abu Dhabi Harlequins crest"
+              className="h-[46px] w-[46px] shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
+            />
+            {/* The club name is one of the few places Anton is allowed (see
+                tailwind.config.js fontFamily): it is a masthead wordmark, not
+                something anyone reads at speed. `truncate` because Anton is
+                wide and the name is long — on a narrow phone it would
+                otherwise push the nav off the row. */}
+            <div className="relative min-w-0">
+              <h1 className="truncate font-display text-[19px] uppercase leading-none tracking-[0.02em] desktop:text-[21px]">
+                Abu Dhabi Harlequins
+              </h1>
+              <p className="flex items-baseline gap-1 font-condensed text-[13px] font-semibold uppercase tracking-[1.6px] text-white/70">
+                <span>Quins Club Hub</span>
+                {/* Mobile-only compact role indicator (decision 6: the role
+                    label has no breakpoint qualifier, and mobile is the
+                    primary case for a pitch-side club app). The desktop badge
+                    below covers >=820px; this covers below it, so the role is
+                    never CSS-hidden at any width. */}
+                {showRole && (
+                  <span data-testid="role-label-mobile" className="truncate desktop:hidden">
+                    · {currentRoleLabel}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            <div className="flex-1" />
+
+            {/* The old version of this pill was a semi-transparent overlay
+                (bg-black/[.22]) because it sat on a gradient whose colour
+                varied with viewport width — that whole problem is gone now the
+                masthead is flat near-black. So this is an opaque red-tinted
+                pill with a red hairline, which reads as brand rather than as
+                "slightly darker patch". #ff8f8f on #0c0c0e composited with the
+                20% red fill measures >8:1; the fill is opaque-over-flat, so it
+                does not move with viewport width. */}
+            {showRole && (
+              <span
+                data-testid="role-label-desktop"
+                className="hidden shrink-0 rounded-pill bg-brand/20 px-3 py-1 font-condensed text-[13px] font-bold uppercase tracking-[0.08em] text-brand-onDark ring-1 ring-inset ring-brand/45 desktop:inline-block"
+              >
+                {currentRoleLabel}
+              </span>
+            )}
+
+            {/* Gates on realMemberships inside the component itself, never on
+                the effective `memberships` destructured above — see
+                ViewAsSwitcher.jsx's header comment. */}
+            <ViewAsSwitcher />
+
+            {/* Accounts is admin-only, and gates on the EFFECTIVE membership
+                set (the same one Accounts.jsx itself reads), so an admin
+                previewing as a coach loses the link along with the screen. */}
+            <Nav canManage={canManage} canManageAccounts={isAdmin(memberships)} />
           </div>
-
-          <div className="flex-1" />
-
-          {/* The old version of this pill was a semi-transparent overlay
-              (bg-black/[.22]) because it sat on a gradient whose colour
-              varied with viewport width — that whole problem is gone now the
-              masthead is flat near-black. So this is an opaque red-tinted
-              pill with a red hairline, which reads as brand rather than as
-              "slightly darker patch". #ff8f8f on #0c0c0e composited with the
-              20% red fill measures >8:1; the fill is opaque-over-flat, so it
-              does not move with viewport width. */}
-          {showRole && (
-            <span
-              data-testid="role-label-desktop"
-              className="hidden shrink-0 rounded-pill bg-brand/20 px-3 py-1 font-condensed text-[13px] font-bold uppercase tracking-[0.08em] text-brand-onDark ring-1 ring-inset ring-brand/45 desktop:inline-block"
-            >
-              {currentRoleLabel}
-            </span>
-          )}
-
-          <Nav canManage={canManage} />
-        </div>
-      </header>
+        </header>
+      </div>
 
       <main
         id="main-content"
