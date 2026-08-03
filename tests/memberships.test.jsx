@@ -25,6 +25,13 @@ import { supabase } from '../src/lib/supabase.js'
 import { MembershipProvider, useMemberships } from '../src/lib/memberships.jsx'
 
 const MEMBERSHIP_ROW = { id: 'm-1', role: 'coach', team_id: 'team-1', player_id: null }
+const ADMIN_ROW = {
+  id: 'm-admin',
+  role: 'admin',
+  team_id: null,
+  player_id: null,
+  club_id: 'club-ad',
+}
 const TEAM_ROW = { id: 'team-1', name: 'U12', sort_order: 7 }
 
 function Harness() {
@@ -62,9 +69,26 @@ function mockFrom({ memberships, membershipsError, teams, teamsError } = {}) {
   })
 }
 
+// Second harness for the "view as" preview (design spec 2026-08-03 §1): it
+// exposes the effective set, the real set, and buttons that drive setViewAs.
+function ViewAsHarness() {
+  const { memberships, realMemberships, viewAs, setViewAs, loading } = useMemberships()
+  return (
+    <div>
+      <div data-testid="loading">{String(loading)}</div>
+      <div data-testid="memberships">{JSON.stringify(memberships)}</div>
+      <div data-testid="real">{JSON.stringify(realMemberships)}</div>
+      <div data-testid="viewAs">{JSON.stringify(viewAs)}</div>
+      <button onClick={() => setViewAs({ role: 'parent', teamId: 'team-1' })}>Preview</button>
+      <button onClick={() => setViewAs(null)}>Exit</button>
+    </div>
+  )
+}
+
 beforeEach(() => {
   useAuthMock.mockReset()
   supabase.from.mockReset()
+  window.localStorage.clear()
 })
 
 afterEach(() => {
@@ -203,5 +227,153 @@ describe('MembershipProvider / useMemberships', () => {
     )
 
     consoleError.mockRestore()
+  })
+})
+
+describe('MembershipProvider view-as preview', () => {
+  const VIEW_AS_KEY = 'quins.viewAs'
+
+  function renderAs({ session = { user: { id: 'u1' } }, memberships, teams } = {}) {
+    useAuthMock.mockReturnValue({ session })
+    mockFrom({ memberships, teams })
+    return render(
+      <MembershipProvider>
+        <ViewAsHarness />
+      </MembershipProvider>,
+    )
+  }
+
+  it('returns the real membership set when nothing is being previewed', async () => {
+    renderAs({ memberships: [ADMIN_ROW] })
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+
+    expect(screen.getByTestId('viewAs')).toHaveTextContent('null')
+    expect(screen.getByTestId('memberships')).toHaveTextContent('m-admin')
+    expect(screen.getByTestId('real')).toHaveTextContent('m-admin')
+  })
+
+  it('gives an admin the synthetic set while previewing, and keeps realMemberships true', async () => {
+    const user = userEvent.setup()
+    renderAs({ memberships: [ADMIN_ROW] })
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+
+    const effective = JSON.parse(screen.getByTestId('memberships').textContent)
+    expect(effective).toEqual([
+      {
+        id: 'view-as',
+        role: 'parent',
+        team_id: 'team-1',
+        player_id: null,
+        club_id: 'club-ad',
+      },
+    ])
+    expect(screen.getByTestId('real')).toHaveTextContent('m-admin')
+    expect(JSON.parse(window.localStorage.getItem(VIEW_AS_KEY))).toEqual({
+      role: 'parent',
+      teamId: 'team-1',
+    })
+  })
+
+  it('exits the preview back to the real set', async () => {
+    const user = userEvent.setup()
+    renderAs({ memberships: [ADMIN_ROW] })
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    await user.click(screen.getByRole('button', { name: 'Exit' }))
+
+    expect(screen.getByTestId('viewAs')).toHaveTextContent('null')
+    expect(screen.getByTestId('memberships')).toHaveTextContent('m-admin')
+    expect(window.localStorage.getItem(VIEW_AS_KEY)).toBeNull()
+  })
+
+  it('refuses to preview for a non-admin, even if one is stored', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem(VIEW_AS_KEY, JSON.stringify({ role: 'parent', teamId: 'team-1' }))
+
+    renderAs({ memberships: [MEMBERSHIP_ROW] })
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+
+    expect(screen.getByTestId('viewAs')).toHaveTextContent('null')
+    expect(screen.getByTestId('memberships')).toHaveTextContent('m-1')
+    await waitFor(() => expect(window.localStorage.getItem(VIEW_AS_KEY)).toBeNull())
+
+    // And a coach who calls the setter directly still gets the real set.
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.getByTestId('memberships')).toHaveTextContent('m-1')
+    await waitFor(() => expect(screen.getByTestId('viewAs')).toHaveTextContent('null'))
+  })
+
+  it('restores a valid stored preview for an admin on load', async () => {
+    window.localStorage.setItem(VIEW_AS_KEY, JSON.stringify({ role: 'coach', teamId: 'team-1' }))
+
+    renderAs({ memberships: [ADMIN_ROW] })
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+
+    await waitFor(() => expect(screen.getByTestId('memberships')).toHaveTextContent('view-as'))
+    expect(screen.getByTestId('viewAs')).toHaveTextContent('team-1')
+    expect(window.localStorage.getItem(VIEW_AS_KEY)).not.toBeNull()
+  })
+
+  it('drops a stored preview whose team no longer exists', async () => {
+    window.localStorage.setItem(VIEW_AS_KEY, JSON.stringify({ role: 'coach', teamId: 'team-gone' }))
+
+    renderAs({ memberships: [ADMIN_ROW] })
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+
+    expect(screen.getByTestId('viewAs')).toHaveTextContent('null')
+    expect(screen.getByTestId('memberships')).toHaveTextContent('m-admin')
+    await waitFor(() => expect(window.localStorage.getItem(VIEW_AS_KEY)).toBeNull())
+  })
+
+  it('clears the preview on sign-out', async () => {
+    const user = userEvent.setup()
+    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
+    mockFrom({ memberships: [ADMIN_ROW] })
+
+    const { rerender } = render(
+      <MembershipProvider>
+        <ViewAsHarness />
+      </MembershipProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.getByTestId('memberships')).toHaveTextContent('view-as')
+
+    useAuthMock.mockReturnValue({ session: null })
+    rerender(
+      <MembershipProvider>
+        <ViewAsHarness />
+      </MembershipProvider>,
+    )
+
+    expect(screen.getByTestId('viewAs')).toHaveTextContent('null')
+    expect(screen.getByTestId('memberships')).toHaveTextContent('[]')
+    expect(window.localStorage.getItem(VIEW_AS_KEY)).toBeNull()
+  })
+
+  it('survives a localStorage that throws', async () => {
+    const getItem = vi
+      .spyOn(window.localStorage.__proto__, 'getItem')
+      .mockImplementation(() => {
+        throw new Error('access denied')
+      })
+    const setItem = vi
+      .spyOn(window.localStorage.__proto__, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('access denied')
+      })
+    const user = userEvent.setup()
+
+    renderAs({ memberships: [ADMIN_ROW] })
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.getByTestId('memberships')).toHaveTextContent('view-as')
+
+    getItem.mockRestore()
+    setItem.mockRestore()
   })
 })
