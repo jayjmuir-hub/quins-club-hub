@@ -64,6 +64,74 @@ export async function listClubMembers() {
   return data ?? []
 }
 
+/**
+ * Lists every profile row the caller is allowed to read.
+ *
+ * READ THE NAME WITH SUSPICION: this does NOT return only pending profiles,
+ * and it cannot. There is no server-side "has no membership" filter available
+ * through PostgREST here — the not-exists lives inside
+ * `private.can_admin_see_pending()`, a SECURITY DEFINER predicate behind the
+ * `profile read pending` SELECT policy, which decides *visibility* but is not
+ * something the client can also select on. So what comes back for an admin is
+ * the union of the three profiles policies:
+ *   - `profile read own`        — their own row
+ *   - `profile read club admin` — everyone with a membership in their club
+ *   - `profile read pending`    — everyone, anywhere, with ZERO memberships
+ * The unattached signups are the third group, and the only way to isolate
+ * them client-side is to subtract the profile_ids already present in
+ * listClubMembers() (plus, if you care, the caller's own id — an admin is in
+ * the second group, so they are already subtracted by that same step).
+ *
+ * That subtraction is deliberately NOT done here: this stays a thin data
+ * accessor like every other function in this module, and the caller already
+ * has the members list it needs to diff against. src/screens/Accounts.jsx is
+ * where it happens.
+ *
+ * A non-admin gets back exactly one row — their own — because the other two
+ * policies evaluate false for them. RLS does the narrowing, not this
+ * function.
+ *
+ * Ordered newest-first: for the "Waiting for access" list, the person who
+ * just signed up and is standing there waiting is the one being looked for.
+ */
+export async function listPendingProfiles() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, created_at')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Reads one profile row by id, or null when there isn't one.
+ *
+ * Takes the id explicitly rather than reaching for the session, matching
+ * createInvite's `createdBy` — screens already hold `user` from useAuth. It
+ * is NOT optional: with `profile read club admin` and `profile read pending`
+ * in play an admin's unfiltered profiles select returns many rows, and
+ * .maybeSingle() over many rows is an error, not a lucky guess. So a missing
+ * id throws here rather than issuing that query.
+ *
+ * Null is a normal answer, not a failure: the profiles row is created by the
+ * `on_auth_user_created` trigger, so immediately after a first magic-link
+ * sign-in the session can exist a moment before the row does. Callers should
+ * treat null as "not known yet" and re-read, never as "this user has no
+ * profile".
+ */
+export async function getMyProfile(userId) {
+  if (!userId) throw new Error('getMyProfile needs a user id.')
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, created_at')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data ?? null
+}
+
 // A refused invite insert is not a thrown Supabase error — the "invites
 // manage" RLS policy (ALL, USING+WITH CHECK is_admin(club_id)) simply matches
 // zero rows for a non-admin caller, and PostgREST reports that as a
@@ -140,6 +208,8 @@ export async function acceptInvite(token) {
 // screen may do one without the other.
 const REFUSED_MEMBERSHIP =
   "We couldn't change that member's access. You may not have permission to manage members."
+const REFUSED_MEMBERSHIP_GRANT =
+  "We couldn't give that person access. You may not have permission to manage members."
 const REFUSED_MEMBERSHIP_DELETE =
   "We couldn't remove that member's access. You may not have permission to manage members."
 const REFUSED_PROFILE =
@@ -192,6 +262,60 @@ export async function updateMembershipRole({ membershipId, role, teamId } = {}) 
 
   if (error) throw error
   if (!data) throw new Error(REFUSED_MEMBERSHIP)
+  return data
+}
+
+/**
+ * Creates one membership row — "grant access" for someone who signed up but
+ * was never invited, and so has no membership at all (see
+ * listPendingProfiles). Returns the new row.
+ *
+ * No new policy was needed for this: `memb manage` on memberships is
+ * FOR ALL with USING+WITH CHECK `private.is_admin(club_id)`, so its WITH
+ * CHECK already covers INSERT — verified against the live policy rather than
+ * assumed. A non-admin's insert is therefore refused the same silent way
+ * every other write in this module is: success, zero rows, no error. Hence
+ * the `.select().maybeSingle()` read-back and the throw on null.
+ *
+ * The role/team rule is the SAME one updateMembershipRole enforces, and for
+ * the same reason: memberships has no check constraint mirroring
+ * `invites_team_required_unless_admin`, so JavaScript is the only place it is
+ * enforced at all. Both halves behave identically to that function on
+ * purpose — role 'admin' coerces team_id to null whatever was passed (a
+ * form's team dropdown may still hold a stale selection), any other role with
+ * a null/absent teamId throws before the network call (there is no safe value
+ * to coerce to, and a null team_id scopes the account to nothing).
+ *
+ * playerId is optional and defaults to null, like createInvite's: an admin or
+ * coach grant links to no player, and a parent/player grant can be linked
+ * later from the Accounts screen.
+ */
+export async function grantMembership({ profileId, clubId, role, teamId, playerId } = {}) {
+  if (!profileId) throw new Error('grantMembership needs a profileId.')
+  if (!clubId) throw new Error('grantMembership needs a clubId.')
+  if (!ROLES.includes(role)) {
+    throw new Error(`grantMembership needs a role of ${ROLES.join(', ')}.`)
+  }
+
+  const isAdminRole = role === 'admin'
+  if (!isAdminRole && !teamId) {
+    throw new Error('Choose an age group for this role.')
+  }
+
+  const { data, error } = await supabase
+    .from('memberships')
+    .insert({
+      profile_id: profileId,
+      club_id: clubId,
+      role,
+      team_id: isAdminRole ? null : teamId,
+      player_id: playerId ?? null,
+    })
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(REFUSED_MEMBERSHIP_GRANT)
   return data
 }
 

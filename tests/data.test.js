@@ -56,6 +56,9 @@ import {
   updateMembershipRole,
   deleteMembership,
   updateProfileName,
+  listPendingProfiles,
+  grantMembership,
+  getMyProfile,
 } from '../src/data/members.js'
 
 function createQueryBuilder({ data = null, error = null } = {}) {
@@ -1145,5 +1148,252 @@ describe('updateProfileName', () => {
     await expect(updateProfileName({ profileId: 'u-other-club', fullName: 'Jay' })).rejects.toThrow(
       /permission|not allowed|couldn.t save/i,
     )
+  })
+})
+
+// --- listPendingProfiles --------------------------------------------------
+
+// Task A (pending-access plan). The function whose name lies: it returns
+// EVERY profile the caller can read, not just the unattached ones. The
+// "has no membership" test lives inside private.can_admin_see_pending(), the
+// SECURITY DEFINER predicate behind the `profile read pending` SELECT policy,
+// and is not expressible as a PostgREST filter — so the pending set is
+// obtained by subtracting listClubMembers()'s profile_ids in the screen.
+// These tests pin that: no filter is sent, and rows come back untouched.
+describe('listPendingProfiles', () => {
+  it('selects the profile columns the waiting-for-access list needs, newest first', async () => {
+    const rows = [
+      { id: 'pr-new', full_name: '', email: 'janice@example.com', created_at: '2026-08-03T11:37:00Z' },
+    ]
+    const { builder } = createQueryBuilder({ data: rows })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await listPendingProfiles()
+
+    expect(supabase.from).toHaveBeenCalledWith('profiles')
+    expect(builder.select).toHaveBeenCalledWith('id, full_name, email, created_at')
+    expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false })
+    expect(result).toEqual(rows)
+  })
+
+  it('applies no filter at all — RLS decides what is readable, not this query', async () => {
+    // The load-bearing assertion. Any .eq()/.in() added here would silently
+    // narrow the set the screen diffs against and could hide a real signup;
+    // there is no client-side predicate that can express "zero memberships".
+    const { builder, calls } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await listPendingProfiles()
+
+    expect(calls.eq).toEqual([])
+    expect(calls.in).toEqual([])
+  })
+
+  it('returns every readable profile, including ones that already have access', async () => {
+    // Proof that it does NOT pre-filter: an admin's own row and a club
+    // member's row come straight back, and it is the caller's job to subtract
+    // them. A future "fix" that drops them here would break the contract this
+    // documents.
+    const rows = [
+      { id: 'pr-jay', full_name: 'Jay Muir', email: 'jay@example.com', created_at: '2026-01-05T09:00:00Z' },
+      { id: 'pr-new', full_name: '', email: 'janice@example.com', created_at: '2026-08-03T11:37:00Z' },
+    ]
+    const { builder } = createQueryBuilder({ data: rows })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await listPendingProfiles()
+
+    expect(result).toHaveLength(2)
+    expect(result.map((row) => row.id)).toContain('pr-jay')
+  })
+
+  it('returns [] rather than null when data is null', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    expect(await listPendingProfiles()).toEqual([])
+  })
+
+  it('throws rather than swallowing a Supabase error', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('permission denied') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(listPendingProfiles()).rejects.toThrow('permission denied')
+  })
+})
+
+// --- getMyProfile ---------------------------------------------------------
+
+describe('getMyProfile', () => {
+  it('reads the one profile row by id with maybeSingle', async () => {
+    const row = { id: 'u-1', full_name: '', email: 'jay@example.com', created_at: '2026-01-05T09:00:00Z' }
+    const { builder, calls } = createQueryBuilder({ data: row })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await getMyProfile('u-1')
+
+    expect(supabase.from).toHaveBeenCalledWith('profiles')
+    expect(calls.eq).toEqual([['id', 'u-1']])
+    expect(builder.maybeSingle).toHaveBeenCalled()
+    expect(result).toEqual(row)
+  })
+
+  it('returns null, not a throw, when the row is not there yet', async () => {
+    // The profiles row is created by the on_auth_user_created trigger, so
+    // straight after a first magic-link sign-in the session can exist a
+    // moment before the row does. That is "not known yet", not an error.
+    const { builder } = createQueryBuilder({ data: null, error: null })
+    supabase.from.mockReturnValue(builder)
+
+    expect(await getMyProfile('u-brand-new')).toBeNull()
+  })
+
+  it('refuses to query without a user id rather than reading someone else', async () => {
+    // Unfiltered, an admin's profiles select returns many rows (the club-admin
+    // and pending read policies), and .maybeSingle() over many rows is an
+    // error — or, worse read, a stranger's profile treated as "mine".
+    await expect(getMyProfile()).rejects.toThrow(/user id/i)
+    await expect(getMyProfile(null)).rejects.toThrow(/user id/i)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('throws rather than swallowing a Supabase error', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('boom') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(getMyProfile('u-1')).rejects.toThrow('boom')
+  })
+})
+
+// --- grantMembership ------------------------------------------------------
+
+// Task A. Insert-side twin of updateMembershipRole, for someone who signed up
+// but was never invited. memberships still has no check constraint mirroring
+// invites_team_required_unless_admin, so the same JS guard is the only
+// enforcement — asserted here as behaviour, not duplicated style.
+describe('grantMembership', () => {
+  it('inserts a membership with the profile, club, role and team', async () => {
+    const saved = { id: 'm-new', profile_id: 'pr-new', club_id: 'c-1', role: 'coach', team_id: 't-12' }
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await grantMembership({
+      profileId: 'pr-new',
+      clubId: 'c-1',
+      role: 'coach',
+      teamId: 't-12',
+    })
+
+    expect(supabase.from).toHaveBeenCalledWith('memberships')
+    expect(builder.insert).toHaveBeenCalledTimes(1)
+    expect(builder.update).not.toHaveBeenCalled()
+    expect(calls.insert[0][0]).toEqual({
+      profile_id: 'pr-new',
+      club_id: 'c-1',
+      role: 'coach',
+      team_id: 't-12',
+      player_id: null,
+    })
+    // An insert has no existing row to match.
+    expect(builder.eq).not.toHaveBeenCalled()
+    expect(builder.select).toHaveBeenCalled()
+    expect(builder.maybeSingle).toHaveBeenCalled()
+    expect(result).toEqual(saved)
+  })
+
+  it('never sends an id column — the row is new and the default supplies it', async () => {
+    const { builder, calls } = createQueryBuilder({ data: { id: 'm-new' } })
+    supabase.from.mockReturnValue(builder)
+
+    await grantMembership({ profileId: 'pr-new', clubId: 'c-1', role: 'parent', teamId: 't-12' })
+
+    expect(calls.insert[0][0]).not.toHaveProperty('id')
+  })
+
+  it('passes a linked player through when one is given', async () => {
+    const { builder, calls } = createQueryBuilder({ data: { id: 'm-new' } })
+    supabase.from.mockReturnValue(builder)
+
+    await grantMembership({
+      profileId: 'pr-new',
+      clubId: 'c-1',
+      role: 'parent',
+      teamId: 't-12',
+      playerId: 'p-9',
+    })
+
+    expect(calls.insert[0][0].player_id).toBe('p-9')
+  })
+
+  it('forces team_id to null for the admin role, even when a team id is passed', async () => {
+    // Same coercion as updateMembershipRole, and for the same reason: the
+    // grant form's age-group select may still hold a selection at the moment
+    // the role is set to admin.
+    const { builder, calls } = createQueryBuilder({ data: { id: 'm-new', role: 'admin' } })
+    supabase.from.mockReturnValue(builder)
+
+    await grantMembership({ profileId: 'pr-new', clubId: 'c-1', role: 'admin', teamId: 't-12' })
+
+    expect(calls.insert[0][0]).toMatchObject({ role: 'admin', team_id: null })
+  })
+
+  it('allows the admin role with no team id at all', async () => {
+    const { builder, calls } = createQueryBuilder({ data: { id: 'm-new', role: 'admin' } })
+    supabase.from.mockReturnValue(builder)
+
+    await grantMembership({ profileId: 'pr-new', clubId: 'c-1', role: 'admin' })
+
+    expect(calls.insert[0][0]).toMatchObject({ role: 'admin', team_id: null })
+  })
+
+  it('refuses a non-admin role with no team, without hitting the network', async () => {
+    for (const role of ['coach', 'parent', 'player']) {
+      await expect(grantMembership({ profileId: 'pr-new', clubId: 'c-1', role })).rejects.toThrow(
+        /age group/i,
+      )
+      await expect(
+        grantMembership({ profileId: 'pr-new', clubId: 'c-1', role, teamId: null }),
+      ).rejects.toThrow(/age group/i)
+    }
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('refuses a role outside the four the database allows', async () => {
+    await expect(
+      grantMembership({ profileId: 'pr-new', clubId: 'c-1', role: 'manager', teamId: 't-12' }),
+    ).rejects.toThrow(/role/i)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('refuses to insert without a profile id or a club id', async () => {
+    // club_id and profile_id are both NOT NULL on the live table, and club_id
+    // is what `memb manage`'s is_admin() check is evaluated against — a
+    // missing one is a guaranteed server-side failure worth catching here.
+    await expect(grantMembership({ clubId: 'c-1', role: 'admin' })).rejects.toThrow(/profile/i)
+    await expect(grantMembership({ profileId: 'pr-new', role: 'admin' })).rejects.toThrow(/club/i)
+    await expect(grantMembership()).rejects.toThrow(/profile/i)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('violates foreign key constraint') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      grantMembership({ profileId: 'pr-new', clubId: 'c-1', role: 'admin' }),
+    ).rejects.toThrow('violates foreign key constraint')
+  })
+
+  it('throws when the insert succeeds but comes back with no row (an RLS refusal)', async () => {
+    // `memb manage` (FOR ALL, WITH CHECK private.is_admin(club_id)) matches
+    // zero rows for a non-admin and PostgREST reports that as a successful
+    // empty response — the same silent refusal every other writer here turns
+    // into a visible message.
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      grantMembership({ profileId: 'pr-new', clubId: 'c-1', role: 'admin' }),
+    ).rejects.toThrow(/permission|not allowed|couldn.t give/i)
   })
 })
