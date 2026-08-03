@@ -66,6 +66,16 @@ the reliable one.
 `git pull` before starting work on either. GitHub is what keeps them in sync; nothing else
 does.
 
+**Every Cowork/Claude session — not just the two PCs — runs in its own throwaway cloud
+sandbox, separate from every other session.** GitHub is the *only* thing connecting any of
+them. Anything written but not committed exists only in that one session's sandbox and is
+gone the moment the session ends — this already happened once (see the "Prior art note" in
+`docs/superpowers/specs/2026-08-03-club-overview-dashboard-design.md`: a real planning doc,
+`desktop-spec.md`, was written in a different session, referenced by several commit messages,
+and never committed — now unrecoverable). **The fix: commit and push anything durable —
+specs, plans, docs, not just code — before a session ends, regardless of which PC or session
+started it.**
+
 ---
 
 ## What's built
