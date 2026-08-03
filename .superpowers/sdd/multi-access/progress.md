@@ -56,31 +56,34 @@ Confirmed clean afterwards: 2 memberships, 1 invite, 1 invite_target — nothing
 persisted. The `for update` concurrency lock is unchanged from the original function
 and was **not** independently re-proven; claiming otherwise would be false.
 
-### Migration history is messier than it should be — read this before trusting it
+### Migration history for `accept_invite` is badly polluted — read this first
 
-`accept_invite` was migrated **four** times on 3 Aug, and two of those names are
-misleading:
+**Always take the migration with the HIGHEST version number.** Do not go by name.
 
-1. `accept_invite_multi_target` — first attempt, failed (cannot change return type
-   without dropping).
-2. `accept_invite_multi_target` (again) — succeeded.
-3. `invites_team_constraint_moves_into_accept` — dropped the CHECK and added the
-   incomplete-invite guard. **This was the good version.**
-4. `accept_invite_multi_target` (a third time) — a stale copy was re-applied **by
-   mistake**, silently reverting the incomplete-invite guard and moving the
-   `accepted_at` stamp back after the row return.
-5. `accept_invite_restore_incomplete_guard` — restores the correct behaviour and
-   adds `distinct` against duplicate target rows. **This is the live version.**
+`supabase_migrations.schema_migrations` contains **30 rows**, of which **12 are named
+`accept_invite_multi_target`**. Every one of those 12 is an *older* definition that
+silently removes the incomplete-invite guard. They exist because the same stale
+migration was re-applied repeatedly in error during the 3 Aug session, each time
+followed by a restore. The alternating pattern in the tail of the list is exactly
+that: revert, restore, revert, restore.
 
-So the newest migration is authoritative, and a migration named
-`accept_invite_multi_target` is *not* the final state despite sounding like it.
-The full six-case verification was re-run after the restore and all passed
-(three-child invite → three memberships with correct pairs, `accepted_at` stamped,
-legacy fallback, wrong-email, double-accept and incomplete all rejected), with the
-live data confirmed unchanged afterwards.
+The authoritative migration is the last row,
+**`zzz_accept_invite_authoritative_do_not_overwrite`** (`20260803150349`). The `zzz_`
+prefix exists purely so it sorts last and is visibly current.
 
-Lesson: re-applying a migration from an earlier point in a session is a silent
-revert. `CREATE OR REPLACE FUNCTION` gives no warning that you have gone backwards.
+The live function is correct and was re-verified after the final restore: guard
+present in `prosrc`, three-child invite → three memberships with the correct
+`(team, child)` on each, legacy fallback intact, and wrong-email / already-accepted /
+incomplete all rejected. Club data was confirmed unchanged throughout (2 memberships,
+1 invite, 3 profiles, 315 players, 15 teams, 1 event).
+
+**The real lesson, and why `db/schema/` now exists:** re-applying an earlier migration
+is a *silent* revert. `CREATE OR REPLACE FUNCTION` and `DROP`+`CREATE` both report
+success whether you are moving forward or backwards, and with no schema SQL in the
+repo there was nothing to diff against — the regression was invisible at every layer
+except reading `prosrc` by hand. The captured schema under `db/schema/` closes that
+hole: the function body is now a checked-in file, so going backwards shows up as a
+diff in code review instead of a green tool result.
 
 ## Frontend
 
