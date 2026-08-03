@@ -41,12 +41,25 @@ export async function loadMyMemberships() {
  *     private.shares_admin_club(id)) is what makes the embed actually
  *     populate for an admin.
  *
+ * The players embed is the linked player a parent/player membership points at
+ * (memberships.player_id). It is what the Accounts screen's "Linked player"
+ * column shows; without it the column could only render a raw uuid. Two facts
+ * about it, both verified against the live schema rather than assumed:
+ *   - players.full_name exists and is NOT NULL, so a joined row always has a
+ *     name — a missing name means a missing LINK (player_id null), which is
+ *     normal and expected for admin and coach rows.
+ *   - memberships.player_id is the ONLY foreign key from memberships to
+ *     players (`memberships_player_id_fkey`), so `players(full_name)` is
+ *     unambiguous to PostgREST and needs no explicit !fkey hint.
+ *
  * A non-admin calling this legitimately gets back only their own row(s) —
  * RLS does the narrowing, not this function — so it is safe to call from
  * any signed-in context, but Admin.jsx only does so once isAdmin() is true.
  */
 export async function listClubMembers() {
-  const { data, error } = await supabase.from('memberships').select('*, profiles(full_name, email), teams(name)')
+  const { data, error } = await supabase
+    .from('memberships')
+    .select('*, profiles(full_name, email), teams(name), players(full_name)')
   if (error) throw error
   return data ?? []
 }

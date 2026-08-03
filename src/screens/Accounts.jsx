@@ -469,6 +469,34 @@ export default function Accounts() {
                         </select>
                       )}
 
+                      {/* Linked player (spec §2's column list). A membership
+                          points at a players row only for the roles where it
+                          means something — a parent's child, or a player's own
+                          record — so a null player_id is the NORMAL case for
+                          admin and coach rows, not missing data. Hence a plain
+                          "—" placeholder rather than a warning: the column has
+                          to stay legible at a glance for a club whose admins
+                          and coaches will never have one. The name comes from
+                          listClubMembers' players(full_name) embed; the raw
+                          uuid is never shown, since it would mean nothing to
+                          anyone reading this screen. */}
+                      <span
+                        data-testid="account-linked-player"
+                        className={`text-[12.5px] ${MUTED_ON_PAPER}`}
+                      >
+                        {member.player_id ? (
+                          <>
+                            <span className="sr-only">Linked player: </span>
+                            {member.players?.full_name ?? 'Unknown player'}
+                          </>
+                        ) : (
+                          <>
+                            <span className="sr-only">No linked player</span>
+                            <span aria-hidden="true">—</span>
+                          </>
+                        )}
+                      </span>
+
                       {joined && (
                         <span className={`text-[12.5px] ${MUTED_ON_PAPER}`}>Joined {joined}</span>
                       )}

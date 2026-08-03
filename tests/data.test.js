@@ -888,14 +888,35 @@ describe('setAvailability', () => {
 // `profiles_email_and_admin_access`; a regression to `profiles(full_name)`
 // would leave the Accounts screen with an empty Email column and no error.
 describe('listClubMembers select shape', () => {
-  it('embeds profiles(full_name, email) and teams(name)', async () => {
+  it('embeds profiles(full_name, email), teams(name) and players(full_name)', async () => {
     const { builder } = createQueryBuilder({ data: [] })
     supabase.from.mockReturnValue(builder)
 
     await listClubMembers()
 
     expect(supabase.from).toHaveBeenCalledWith('memberships')
-    expect(builder.select).toHaveBeenCalledWith('*, profiles(full_name, email), teams(name)')
+    expect(builder.select).toHaveBeenCalledWith(
+      '*, profiles(full_name, email), teams(name), players(full_name)',
+    )
+  })
+
+  // Task 5. The players embed is what the Accounts screen's "Linked player"
+  // column renders; without it that column could only show a raw
+  // memberships.player_id uuid. Asserted as its own case so a regression that
+  // drops just this embed (leaving profiles/teams intact) still fails loudly,
+  // rather than silently turning every linked parent/player row into an
+  // em dash. memberships.player_id is the only FK from memberships to players
+  // (memberships_player_id_fkey, verified against the live schema), so no
+  // disambiguating !fkey hint belongs in the string.
+  it('names the players embed without an !fkey hint', async () => {
+    const { builder } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await listClubMembers()
+
+    const selectArg = builder.select.mock.calls[0][0]
+    expect(selectArg).toContain('players(full_name)')
+    expect(selectArg).not.toContain('!')
   })
 })
 

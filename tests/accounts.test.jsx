@@ -74,14 +74,20 @@ const SARA_PARENT = {
   profiles: { full_name: 'Sara Coach', email: 'sara@example.com' },
   teams: { name: 'U12 Boys' },
 }
+// The only row here with a linked player. memberships.player_id is null for
+// admin and coach rows by design (there is no player to point at), so this
+// fixture set deliberately mixes the two: Ali's parent row carries a child,
+// Jay's admin and Sara's coach/parent rows do not.
 const ALI_PARENT = {
   id: 'mem-ali',
   profile_id: 'profile-ali',
   role: 'parent',
   team_id: 'team-u12',
+  player_id: 'player-omar',
   created_at: '2026-03-01T09:00:00Z',
   profiles: { full_name: 'Ali Parent', email: 'ali@example.com' },
   teams: { name: 'U12 Boys' },
+  players: { full_name: 'Omar Ali' },
 }
 
 const MEMBER_ROWS = [JAY_ADMIN, SARA_COACH, SARA_PARENT, ALI_PARENT]
@@ -180,6 +186,39 @@ describe('Accounts — list', () => {
     // Age group is an editable select holding the member's current team.
     expect(roleSelect('Ali Parent (U12 Boys)')).toHaveValue('parent')
     expect(screen.getByLabelText('Age group for Ali Parent (U12 Boys)')).toHaveValue('team-u12')
+  })
+
+  // Task 5: the "Linked player" column the spec's column list asks for
+  // (Name · Email · Role · Age group · Linked player · Joined). It is fed by
+  // listClubMembers' players(full_name) embed.
+  it('shows the linked player’s name, and a placeholder when there is none', async () => {
+    setup()
+
+    await screen.findByText('Sara Coach')
+
+    const aliRow = screen
+      .getAllByTestId('account-membership')
+      .find((row) => within(row).queryByLabelText('Role for Ali Parent (U12 Boys)'))
+    expect(within(aliRow).getByTestId('account-linked-player')).toHaveTextContent('Omar Ali')
+
+    // An admin row has no player to link to — that is normal, so it reads as
+    // an em dash rather than anything that looks like missing data.
+    const jayRow = screen
+      .getAllByTestId('account-membership')
+      .find((row) => within(row).queryByLabelText('Role for Jay Muir (club-wide)'))
+    expect(within(jayRow).getByTestId('account-linked-player')).toHaveTextContent('—')
+    expect(within(jayRow).getByText('No linked player')).toBeInTheDocument()
+  })
+
+  it('falls back to "Unknown player" when a linked row has no embedded name', async () => {
+    // player_id set but the embed empty: not reachable for an admin under the
+    // current policies, but a partial join or a deleted player would produce
+    // it, and showing the raw uuid instead would mean nothing to anyone.
+    listClubMembersMock.mockResolvedValue([{ ...ALI_PARENT, players: null }])
+    setup()
+
+    await screen.findByText('Ali Parent')
+    expect(screen.getByTestId('account-linked-player')).toHaveTextContent('Unknown player')
   })
 
   it('groups a person with several membership rows into one block', async () => {

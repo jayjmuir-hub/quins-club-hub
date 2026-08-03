@@ -10,6 +10,7 @@ import Overview from '../src/screens/Overview.jsx'
 import PlayerForm from '../src/screens/PlayerForm.jsx'
 import Availability from '../src/screens/Availability.jsx'
 import Admin from '../src/screens/Admin.jsx'
+import Accounts from '../src/screens/Accounts.jsx'
 import AcceptInvite from '../src/screens/AcceptInvite.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
@@ -428,6 +429,90 @@ const scenarios = {
     }
 
     return <FullApp />
+  },
+
+  // Task 5 (view-as + Accounts) browser verification.
+  //
+  // Accounts mounted DIRECTLY, same reasoning as the admin/playerform
+  // scenarios above: its own isAdmin() gate and fetch effect are what is
+  // being checked, not App.jsx's routing. TEAMS_THREE (t1/t2/t3) is used
+  // rather than TEAMS_15 because the members stub's rows point at exactly
+  // those three team ids, so every age-group <select> holds a value that
+  // really exists in its option list. The auth stub supplies an id matching
+  // the fixture admin's profile_id (pr-jay), which is what makes the
+  // last-admin guard reachable at all — with no id, ownAdminCount is 0 and
+  // the guard can never fire. ?who=admin|coach picks the gate case.
+  'accounts-admin': () => {
+    const params = new URLSearchParams(window.location.search)
+    const who = params.get('who') || 'admin'
+    const memberships = who === 'coach' ? COACH_MEMBERSHIPS : ADMIN_MEMBERSHIPS
+    const authValue = { ...baseAuth(JAY_EMAIL), user: { id: 'pr-jay', email: JAY_EMAIL } }
+    return (
+      <Shell
+        route="/accounts"
+        authValue={authValue}
+        membershipValue={{
+          memberships,
+          realMemberships: memberships,
+          viewAs: null,
+          setViewAs: noop,
+          teams: TEAMS_THREE,
+          loading: false,
+          error: null,
+          reload: noop,
+        }}
+      >
+        <Accounts />
+      </Shell>
+    )
+  },
+
+  // The view-as switcher needs membership context that actually CHANGES when
+  // a persona is chosen — a fixed `value` prop (what every scenario above
+  // passes) would render the sheet but never re-scope anything, which is the
+  // whole behaviour under test. So this scenario holds viewAs in real React
+  // state and derives the effective set exactly as
+  // src/lib/memberships.jsx's syntheticMemberships does. That derivation is
+  // duplicated here deliberately and is NOT the authority on it —
+  // tests/memberships.test.jsx tests the real provider; this exists so the
+  // real ViewAsSwitcher/ViewAsBanner/Roster can be driven in a real browser
+  // without a Supabase session.
+  //
+  // Roster is the child screen because its age-group pills make re-scoping
+  // visible at a glance: admin sees all three squads, a coach persona sees
+  // one. ?who=non-admin flips the caller to a coach, which is how the
+  // "switcher renders nothing for a non-admin" case is checked.
+  'view-as': () => {
+    const params = new URLSearchParams(window.location.search)
+    const real = params.get('who') === 'non-admin' ? COACH_MEMBERSHIPS : ADMIN_MEMBERSHIPS
+
+    function ViewAsHarness() {
+      const [viewAs, setViewAsState] = useState(null)
+      const effective = viewAs
+        ? [{ id: 'view-as', role: viewAs.role, team_id: viewAs.teamId, player_id: null, club_id: CLUB_ID }]
+        : real
+
+      return (
+        <Shell
+          route="/roster"
+          authValue={baseAuth(JAY_EMAIL)}
+          membershipValue={{
+            memberships: effective,
+            realMemberships: real,
+            viewAs,
+            setViewAs: (next) => setViewAsState(next ? { role: next.role, teamId: next.teamId } : null),
+            teams: TEAMS_THREE,
+            loading: false,
+            error: null,
+            reload: noop,
+          }}
+        >
+          <Roster />
+        </Shell>
+      )
+    }
+
+    return <ViewAsHarness />
   },
 
   'shell-loading': () => (

@@ -15,16 +15,35 @@
 // simply letting retry succeed once membersThrow is dropped from the URL, is
 // what the shoot script checks).
 
+// Task 5 (Accounts) widened these rows to the full shape the real
+// listClubMembers now returns: profile_id (what the screen groups by),
+// team_id + created_at (the age-group select and the Joined column), the
+// profiles email, and the players(full_name) embed behind the Linked player
+// column. `mm4`/`mm5` carry a linked player, the admin and coach rows do not
+// — which is the real distribution, and the reason the column needs a
+// placeholder at all. `mm2`/`mm9` share one profile_id so the group-by-person
+// path renders a block with two access rows, and `mm8` keeps a null name so
+// the "Unnamed member" fallback stays screenshot-able.
 const MEMBERS = [
-  { id: 'mm1', role: 'admin', profiles: { full_name: 'Jay Muir' }, teams: null },
-  { id: 'mm2', role: 'coach', profiles: { full_name: 'Sam Carter' }, teams: { name: 'U12 Boys' } },
-  { id: 'mm3', role: 'coach', profiles: { full_name: 'Aisha Al Marzooqi' }, teams: { name: 'U14 Boys' } },
-  { id: 'mm4', role: 'parent', profiles: { full_name: 'Priya Nair' }, teams: { name: 'U12 Boys' } },
-  { id: 'mm5', role: 'parent', profiles: { full_name: 'Bilal Haddad Sr.' }, teams: { name: 'U14 Boys' } },
-  { id: 'mm6', role: 'player', profiles: { full_name: 'Zane Kowalczyk' }, teams: { name: 'U16 Boys' } },
-  { id: 'mm7', role: 'player', profiles: { full_name: 'Ronaldinho' }, teams: { name: 'U12 Boys' } },
-  { id: 'mm8', role: 'parent', profiles: { full_name: null }, teams: { name: 'U16 Boys' } },
+  { id: 'mm1', profile_id: 'pr-jay', role: 'admin', team_id: null, player_id: null, created_at: '2026-01-05T09:00:00Z', profiles: { full_name: 'Jay Muir', email: 'jayjmuir@gmail.com' }, teams: null, players: null },
+  { id: 'mm2', profile_id: 'pr-sam', role: 'coach', team_id: 't1', player_id: null, created_at: '2026-02-01T09:00:00Z', profiles: { full_name: 'Sam Carter', email: 'coach.sam@adhq.example' }, teams: { name: 'U12 Boys' }, players: null },
+  { id: 'mm9', profile_id: 'pr-sam', role: 'coach', team_id: 't2', player_id: null, created_at: '2026-02-03T09:00:00Z', profiles: { full_name: 'Sam Carter', email: 'coach.sam@adhq.example' }, teams: { name: 'U14 Boys' }, players: null },
+  { id: 'mm3', profile_id: 'pr-aisha', role: 'coach', team_id: 't2', player_id: null, created_at: '2026-02-10T09:00:00Z', profiles: { full_name: 'Aisha Al Marzooqi', email: 'aisha@adhq.example' }, teams: { name: 'U14 Boys' }, players: null },
+  { id: 'mm4', profile_id: 'pr-priya', role: 'parent', team_id: 't1', player_id: 'p1', created_at: '2026-03-01T09:00:00Z', profiles: { full_name: 'Priya Nair', email: 'priya@adhq.example' }, teams: { name: 'U12 Boys' }, players: { full_name: 'Arjun Nair' } },
+  { id: 'mm5', profile_id: 'pr-bilal', role: 'parent', team_id: 't2', player_id: 'p2', created_at: '2026-03-04T09:00:00Z', profiles: { full_name: 'Bilal Haddad Sr.', email: 'bilal@adhq.example' }, teams: { name: 'U14 Boys' }, players: { full_name: 'Bilal Haddad' } },
+  { id: 'mm6', profile_id: 'pr-zane', role: 'player', team_id: 't3', player_id: 'p21', created_at: '2026-03-06T09:00:00Z', profiles: { full_name: 'Zane Kowalczyk', email: 'zane@adhq.example' }, teams: { name: 'U16 Boys' }, players: { full_name: 'Zane Kowalczyk' } },
+  { id: 'mm7', profile_id: 'pr-ronaldinho', role: 'player', team_id: 't1', player_id: 'p3', created_at: '2026-03-07T09:00:00Z', profiles: { full_name: 'Ronaldinho', email: 'ronaldinho@adhq.example' }, teams: { name: 'U12 Boys' }, players: { full_name: 'Ronaldinho' } },
+  { id: 'mm8', profile_id: 'pr-anon', role: 'parent', team_id: 't3', player_id: null, created_at: '2026-03-09T09:00:00Z', profiles: { full_name: null, email: 'no-name@adhq.example' }, teams: { name: 'U16 Boys' }, players: null },
 ]
+
+// The real module exports this too (src/lib/memberships.jsx calls it). The
+// harness aliases src/lib/memberships.jsx to its own stub so nothing here
+// actually calls it — but a stub that is missing an export its real module
+// has is exactly the drift that took down EVERY scenario once before
+// (players.js/insertPlayers), so the mirror is kept complete on purpose.
+export async function loadMyMemberships() {
+  return MEMBERS.map(({ profiles, teams, players, ...row }) => row)
+}
 
 export async function listClubMembers() {
   const params = new URLSearchParams(window.location.search)
@@ -87,4 +106,58 @@ export async function acceptInvite(token) {
     throw new Error(errorMessage)
   }
   return { id: 'm-new', role: 'player', team_id: 't1', player_id: 'p1', token }
+}
+
+// Task 5 additions: the three writers the Accounts screen calls. Same
+// ?<name>Delay=/<name>Throw= knob convention as everything above, so the
+// in-flight disabled state and the inline refusal message are both
+// screenshot-able without a live RLS refusal.
+//
+// These mirror src/data/members.js's exports one-for-one. That is not
+// housekeeping: harness/main.jsx statically imports every screen, so a single
+// missing export here is a module-resolution failure that blanks EVERY
+// scenario, not just the new one (this happened with players.js/insertPlayers
+// during the Overview build).
+export async function updateMembershipRole({ membershipId, role, teamId } = {}) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('writeDelay') || 0)
+  const shouldThrow = params.get('writeThrow') === '1'
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (shouldThrow) {
+    throw new Error(
+      "We couldn't change that member's access. You may not have permission to manage members.",
+    )
+  }
+  // Same admin-implies-no-team coercion the real function applies, so the
+  // screen's "All age groups" branch is driven by the response, not by hope.
+  return { id: membershipId, role, team_id: role === 'admin' ? null : teamId ?? null }
+}
+
+export async function deleteMembership(membershipId) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('writeDelay') || 0)
+  const shouldThrow = params.get('writeThrow') === '1'
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (shouldThrow) {
+    throw new Error(
+      "We couldn't remove that member's access. You may not have permission to manage members.",
+    )
+  }
+  return undefined
+}
+
+export async function updateProfileName({ profileId, fullName } = {}) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('writeDelay') || 0)
+  const shouldThrow = params.get('writeThrow') === '1'
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (shouldThrow) {
+    throw new Error(
+      "We couldn't save that name. You may not have permission to change this member's details.",
+    )
+  }
+  return { id: profileId, full_name: String(fullName ?? '').trim() }
 }
