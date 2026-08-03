@@ -5,6 +5,7 @@ import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { deleteEvent } from '../data/events.js'
+import { FEATURES } from '../lib/features.js'
 import {
   eventDate,
   eventTitle,
@@ -315,7 +316,7 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
             <span className="text-base font-extrabold text-ink">{resultScore(event)}</span>
           </div>
         </div>
-      ) : (
+      ) : FEATURES.availability ? (
         <div>
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Availability</h4>
           <AvailabilitySummary eventId={event.id} />
@@ -335,7 +336,7 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
             {canEdit ? 'View & set availability' : 'Set my availability'}
           </button>
         </div>
-      )}
+      ) : null}
 
       <FooterActions event={event} canEdit={canEdit} onEdit={onEdit} onDeleted={onDeleted} />
     </Sheet>

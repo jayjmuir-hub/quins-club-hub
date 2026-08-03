@@ -25,6 +25,20 @@ const subscribeAvailabilityMock = vi.fn()
 const setAvailabilityMock = vi.fn()
 const listPlayersMock = vi.fn()
 
+// The `availability` feature flag (src/lib/features.js) defaults to false in
+// the real app as of 2026-07-29 — the club isn't using RSVP yet. Every
+// existing test below that exercises the availability summary/entry point
+// was written when the feature was on, and still proves that built behaviour
+// works; it does so by forcing the flag on via this mutable mock object,
+// reset in beforeEach. The "flag off" describe block near the bottom of this
+// file tests the real, current default instead.
+// vi.mock's factory is hoisted above every top-level const in this file, so
+// the mutable flag object it returns has to be created via vi.hoisted rather
+// than a plain const — otherwise the factory closes over a
+// not-yet-initialised binding and throws before a single test runs.
+const featuresMock = vi.hoisted(() => ({ availability: true }))
+vi.mock('../src/lib/features.js', () => ({ FEATURES: featuresMock }))
+
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
@@ -138,6 +152,7 @@ const unsubscribeEvents = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
+  featuresMock.availability = true
   useMembershipsMock.mockReturnValue(memberships(ADMIN))
   listEventsMock.mockResolvedValue(ALL_EVENTS)
   subscribeEventsMock.mockReturnValue(unsubscribeEvents)
@@ -831,5 +846,36 @@ describe('Schedule — responsive rendering', () => {
 
     await user.click(screen.getByRole('button', { name: 'Calendar' }))
     expect(container.querySelectorAll('.hidden')).toHaveLength(0)
+  })
+})
+
+describe('Schedule — availability flag off (real default as of 2026-07-29)', () => {
+  beforeEach(() => {
+    featuresMock.availability = false
+  })
+
+  it('shows neither the availability summary nor a set-availability button on an upcoming fixture', async () => {
+    const { user } = setup()
+
+    await user.click(await screen.findByRole('button', { name: /Dubai Exiles/ }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByText(/availability/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /availability/i })).not.toBeInTheDocument()
+    // The flag being off must mean the query is never even made, not just
+    // that its result is hidden — otherwise turning it back on would need a
+    // second look to confirm no stray network call was left running.
+    expect(listAvailabilityMock).not.toHaveBeenCalled()
+  })
+
+  it('still shows the result for a played fixture — the flag only affects unplayed ones', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Quins vs Dubai Exiles')
+    await user.click(screen.getByRole('button', { name: 'Results' }))
+    await user.click(screen.getByRole('button', { name: /Al Ain Amblers/ }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('31–19')).toBeInTheDocument()
   })
 })
