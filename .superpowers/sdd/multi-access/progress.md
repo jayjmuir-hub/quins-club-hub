@@ -56,6 +56,32 @@ Confirmed clean afterwards: 2 memberships, 1 invite, 1 invite_target — nothing
 persisted. The `for update` concurrency lock is unchanged from the original function
 and was **not** independently re-proven; claiming otherwise would be false.
 
+### Migration history is messier than it should be — read this before trusting it
+
+`accept_invite` was migrated **four** times on 3 Aug, and two of those names are
+misleading:
+
+1. `accept_invite_multi_target` — first attempt, failed (cannot change return type
+   without dropping).
+2. `accept_invite_multi_target` (again) — succeeded.
+3. `invites_team_constraint_moves_into_accept` — dropped the CHECK and added the
+   incomplete-invite guard. **This was the good version.**
+4. `accept_invite_multi_target` (a third time) — a stale copy was re-applied **by
+   mistake**, silently reverting the incomplete-invite guard and moving the
+   `accepted_at` stamp back after the row return.
+5. `accept_invite_restore_incomplete_guard` — restores the correct behaviour and
+   adds `distinct` against duplicate target rows. **This is the live version.**
+
+So the newest migration is authoritative, and a migration named
+`accept_invite_multi_target` is *not* the final state despite sounding like it.
+The full six-case verification was re-run after the restore and all passed
+(three-child invite → three memberships with correct pairs, `accepted_at` stamped,
+legacy fallback, wrong-email, double-accept and incomplete all rejected), with the
+live data confirmed unchanged afterwards.
+
+Lesson: re-applying a migration from an earlier point in a session is a silent
+revert. `CREATE OR REPLACE FUNCTION` gives no warning that you have gone backwards.
+
 ## Frontend
 
 `AccessBuilder.jsx` + `PlayerPicker.jsx` (both reusable, shared by Accounts and
