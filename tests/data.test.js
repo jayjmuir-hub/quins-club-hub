@@ -35,6 +35,7 @@ import {
   upsertPlayer,
   deletePlayer,
   upsertContact,
+  listContactsForPlayers,
 } from '../src/data/players.js'
 import {
   listAvailability,
@@ -623,6 +624,52 @@ describe('upsertContact', () => {
     supabase.from.mockReturnValue(builder)
 
     await expect(upsertContact({ player_id: 'p-1', phone: '1' })).rejects.toThrow(/contact/i)
+  })
+})
+
+// --- listContactsForPlayers -------------------------------------------
+
+// Task 2 (Club Overview Dashboard plan). Bulk contact-presence fetch across
+// many players in one query, so the Overview screen can compute per-team
+// roster gaps (a player id with no row in the returned set) without an
+// N+1 of getPlayerContact calls — same teamIds-array convention as
+// listPlayers({teamIds})/listAvailabilityForEvents: an empty array must
+// never be read as "no filter", so it short-circuits without querying.
+describe('listContactsForPlayers', () => {
+  it('does not query at all when playerIds is an empty array, and returns []', async () => {
+    const result = await listContactsForPlayers([])
+
+    expect(supabase.from).not.toHaveBeenCalled()
+    expect(result).toEqual([])
+  })
+
+  it('queries player_contacts with select(player_id, phone, email) and .in("player_id", playerIds)', async () => {
+    const rows = [{ player_id: 'p1', phone: '+971500000000', email: 'a@example.com' }]
+    const { builder, calls } = createQueryBuilder({ data: rows })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await listContactsForPlayers(['p1', 'p2'])
+
+    expect(supabase.from).toHaveBeenCalledWith('player_contacts')
+    expect(builder.select).toHaveBeenCalledWith('player_id, phone, email')
+    expect(calls.in).toEqual([['player_id', ['p1', 'p2']]])
+    expect(result).toEqual(rows)
+  })
+
+  it('returns [] rather than null when data is null', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await listContactsForPlayers(['p1'])
+
+    expect(result).toEqual([])
+  })
+
+  it('throws rather than swallowing a Supabase error', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('rls refused') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(listContactsForPlayers(['p1'])).rejects.toThrow('rls refused')
   })
 })
 

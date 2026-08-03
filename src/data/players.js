@@ -46,6 +46,28 @@ export async function getPlayerContact(playerId) {
   return data ?? null
 }
 
+/**
+ * Lists contact rows for many players in one query — used by the Overview
+ * screen to compute, per team, how many players have no contact record at
+ * all (a player id with no row in the returned set). Selects only the three
+ * columns the caller needs (not '*') since this is an aggregate-presence
+ * check, not a form load — src/screens/PlayerForm.jsx's per-player load via
+ * getPlayerContact still uses '*' for its own different purpose.
+ *
+ * An empty playerIds array returns [] without querying, matching the same
+ * convention as listPlayers({teamIds})/listEvents({teamIds}).
+ */
+export async function listContactsForPlayers(playerIds) {
+  if (!Array.isArray(playerIds) || playerIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('player_contacts')
+    .select('player_id, phone, email')
+    .in('player_id', playerIds)
+  if (error) throw error
+  return data ?? []
+}
+
 // A write the database refused is not an error as far as PostgREST is
 // concerned: RLS filters the row out, the statement affects zero rows, and
 // the response is a perfectly successful "nothing". Every writer below asks
