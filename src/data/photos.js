@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { resizePhoto } from '../lib/imageResize.js'
 
 // Head-shot photos for players, held in the PRIVATE Supabase Storage bucket
 // `player-photos`.
@@ -33,6 +34,59 @@ const MAX_BYTES = 5 * 1024 * 1024 // 5 MB, same as the bucket's file_size_limit
 // handle on a child's photograph.
 const SIGNED_URL_TTL_SECONDS = 3600
 
+// SIGNED-URL CACHE. Signing is cheap but not free, and — the real reason —
+// a *different* URL for the same object defeats the browser's own image
+// cache: the query string changes, so it is a new resource and the bytes are
+// fetched again. Re-signing on every render therefore re-downloads every face
+// on every visit to the roster. Caching the URL for a little less than its
+// lifetime means a second visit is a straight cache hit.
+//
+// Module-level and unbounded, which is safe here for two reasons: entries are
+// keyed by object path so the ceiling is the number of players the user can
+// see (hundreds, not millions), and the map dies with the page. A signed URL
+// is not a secret this app is protecting from its own user — they were shown
+// the photo — so holding it in memory adds no exposure.
+const signedUrlCache = new Map()
+
+// Re-sign a minute early rather than at the exact expiry, so a URL cannot be
+// handed to an <img> a few hundred milliseconds before it dies.
+const CACHE_SAFETY_MARGIN_MS = 60 * 1000
+
+function cacheGet(path) {
+  const entry = signedUrlCache.get(path)
+  if (!entry) return null
+  if (Date.now() >= entry.expiresAt) {
+    signedUrlCache.delete(path)
+    return null
+  }
+  return entry.url
+}
+
+function cacheSet(path, url) {
+  signedUrlCache.set(path, {
+    url,
+    expiresAt: Date.now() + SIGNED_URL_TTL_SECONDS * 1000 - CACHE_SAFETY_MARGIN_MS,
+  })
+}
+
+/**
+ * Empties the whole cache. Called on sign-out: the next person to use this
+ * browser must not inherit working URLs to the previous user's squad photos
+ * from memory. (They expire on their own within the hour, but "within the
+ * hour" is not an access-control answer.)
+ */
+export function clearPhotoUrlCache() {
+  signedUrlCache.clear()
+}
+
+/**
+ * Drops a path from the cache. Called after a photo is replaced or removed so
+ * the old URL cannot be served from memory for the rest of the session.
+ */
+export function forgetPhotoUrl(path) {
+  if (path) signedUrlCache.delete(path)
+}
+
 const EXTENSIONS = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -63,12 +117,19 @@ export async function uploadPlayerPhoto(playerId, file) {
     throw new Error('That photo is too large. The limit is 5 MB.')
   }
 
-  const extension = EXTENSIONS[file.type] ?? 'jpg'
+  // Downscale BEFORE upload (see src/lib/imageResize.js). This is where
+  // almost all of the bandwidth saving in this feature comes from: a 4 MB
+  // camera photo becomes ~40 KB, both on the way up and on every subsequent
+  // read. resizePhoto returns the original untouched if it cannot do the
+  // work, so this can only improve on the input, never block it.
+  const upload = await resizePhoto(file)
+
+  const extension = EXTENSIONS[upload.type] ?? 'jpg'
   const key = `${playerId}/${Date.now()}.${extension}`
 
   const { error } = await supabase.storage
     .from(PHOTO_BUCKET)
-    .upload(key, file, { contentType: file.type, upsert: false })
+    .upload(key, upload, { contentType: upload.type, upsert: false })
 
   if (error) throw error
   return key
@@ -87,12 +148,18 @@ export async function uploadPlayerPhoto(playerId, file) {
 export async function signPhotoUrl(path) {
   if (!path) return null
 
+  const cached = cacheGet(path)
+  if (cached) return cached
+
   const { data, error } = await supabase.storage
     .from(PHOTO_BUCKET)
     .createSignedUrl(path, SIGNED_URL_TTL_SECONDS)
 
   if (error) return null
-  return data?.signedUrl ?? null
+
+  const url = data?.signedUrl ?? null
+  if (url) cacheSet(path, url)
+  return url
 }
 
 /**
@@ -108,18 +175,28 @@ export async function signPhotoUrls(paths) {
   const keys = (Array.isArray(paths) ? paths : []).filter(Boolean)
   if (keys.length === 0) return {}
 
+  // Serve what is already cached and ask only for the rest. On a roster
+  // revisit this is usually everything, and the network call is skipped.
+  const urls = {}
+  const missing = []
+  for (const key of keys) {
+    const cached = cacheGet(key)
+    if (cached) urls[key] = cached
+    else missing.push(key)
+  }
+  if (missing.length === 0) return urls
+
   const { data, error } = await supabase.storage
     .from(PHOTO_BUCKET)
-    .createSignedUrls(keys, SIGNED_URL_TTL_SECONDS)
+    .createSignedUrls(missing, SIGNED_URL_TTL_SECONDS)
 
-  if (error) return {}
-
-  const urls = {}
+  if (error) return urls
   for (const entry of data ?? []) {
     // createSignedUrls reports per-key failures inside the array rather than
     // failing the batch, so check each one.
     if (entry?.path && entry?.signedUrl && !entry.error) {
       urls[entry.path] = entry.signedUrl
+      cacheSet(entry.path, entry.signedUrl)
     }
   }
   return urls
@@ -136,6 +213,7 @@ export async function signPhotoUrls(paths) {
  */
 export async function deletePlayerPhoto(path) {
   if (!path) return false
+  forgetPhotoUrl(path)
   const { error } = await supabase.storage.from(PHOTO_BUCKET).remove([path])
   return !error
 }

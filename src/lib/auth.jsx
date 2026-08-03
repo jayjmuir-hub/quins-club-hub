@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import { clearPhotoUrlCache } from '../data/photos.js'
 
 // Auth context for the app: current session/user, loading state, and the
 // three sign-in/sign-out actions. No sign-up, password auth, profile
@@ -60,6 +61,10 @@ export function AuthProvider({ children }) {
   async function signOut() {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
+    // Drop any signed photo URLs held in memory. They expire within the hour
+    // on their own, but the next person to use this browser must not inherit
+    // working links to the previous user's squad photos in the meantime.
+    clearPhotoUrlCache()
   }
 
   const value = {

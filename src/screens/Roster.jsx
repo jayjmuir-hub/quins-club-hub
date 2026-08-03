@@ -13,6 +13,8 @@ import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
+import PlayerAvatar from '../components/PlayerAvatar.jsx'
+import { signPhotoUrls } from '../data/photos.js'
 import { useMediaQuery, DESKTOP_QUERY } from '../lib/useMediaQuery.js'
 
 // The team filter survives a reload. Without this, choosing club-wide as the
@@ -111,7 +113,7 @@ function ChevronRightIcon(props) {
   )
 }
 
-function PlayerRow({ player, teamName, onSelect }) {
+function PlayerRow({ player, teamName, photoUrl, onSelect }) {
   return (
     <button
       type="button"
@@ -123,17 +125,19 @@ function PlayerRow({ player, teamName, onSelect }) {
       // taller than its text. Setting the layout explicitly overrides that.
       className="flex w-full items-center gap-3 border-b border-line px-[14px] py-[11px] text-left transition last:border-b-0 hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
     >
-      {/* Initials tile (design-system.md §4.15 .pnum, which the prototype
-          filled with a jersey number). aria-hidden because it restates the
-          name rendered right beside it — without that, every row would
-          announce itself as "T F Tom Fletcher". Always populated, so the
-          flat no-number variant of this tile is gone with the numbers. */}
-      <span
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[13px] font-extrabold tracking-[.5px] text-white"
-        aria-hidden="true"
-      >
-        {initials(player.full_name)}
-      </span>
+      {/* The player's head shot, falling back to the initials tile
+          (design-system.md §4.15 .pnum, which the prototype filled with a
+          jersey number) when there is no photo. Both variants are aria-hidden
+          because they restate the name rendered right beside them — without
+          that, every row would announce itself as "T F Tom Fletcher".
+          The signed URL is passed IN, already batched by the screen: signing
+          per row would fire one request per player on every roster load. */}
+      <PlayerAvatar
+        player={player}
+        url={photoUrl}
+        size="sm"
+        className="bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[13px] text-white"
+      />
 
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
@@ -152,7 +156,7 @@ function PlayerRow({ player, teamName, onSelect }) {
   )
 }
 
-function RosterGroup({ label, players, teamsById, onSelect }) {
+function RosterGroup({ label, players, teamsById, photoUrls, onSelect }) {
   return (
     <div className="mb-4 last:mb-0">
       <h3 className={`mb-2 flex items-center gap-2 text-[12.5px] font-extrabold uppercase tracking-[.5px] ${MUTED_ON_PAPER}`}>
@@ -170,6 +174,7 @@ function RosterGroup({ label, players, teamsById, onSelect }) {
             key={player.id}
             player={player}
             teamName={teamsById.get(player.team_id)?.name ?? 'No age group'}
+            photoUrl={player.photo_path ? photoUrls?.[player.photo_path] : undefined}
             onSelect={onSelect}
           />
         ))}
@@ -197,6 +202,32 @@ export default function Roster() {
   const [importing, setImporting] = useState(false)
 
   const [players, setPlayers] = useState([])
+  // path -> signed URL for every photo in the loaded squad(s). Signed in ONE
+  // call rather than per row: a 30-player squad would otherwise issue 30
+  // sequential signing requests before the first face appeared.
+  const [photoUrls, setPhotoUrls] = useState({})
+
+  // Sign every head shot in the loaded set in one call. Keyed on the joined
+  // path list rather than on `players` so a re-render that produces an
+  // equivalent array does not re-sign; signPhotoUrls caches anyway, so a
+  // revisit is usually a no-op.
+  const photoPaths = players.map((row) => row.photo_path).filter(Boolean)
+  const photoPathKey = photoPaths.join(',')
+
+  useEffect(() => {
+    if (photoPaths.length === 0) {
+      setPhotoUrls({})
+      return undefined
+    }
+    let mounted = true
+    signPhotoUrls(photoPaths).then((urls) => {
+      if (mounted) setPhotoUrls(urls)
+    })
+    return () => {
+      mounted = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoPathKey])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
@@ -476,6 +507,7 @@ export default function Roster() {
             label={group.label}
             players={group.players}
             teamsById={teamsById}
+            photoUrls={photoUrls}
             onSelect={setSelectedPlayerId}
           />
         ))}

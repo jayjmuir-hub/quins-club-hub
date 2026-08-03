@@ -10,6 +10,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // supabase.storage.from(...) returns a different object with upload /
 // createSignedUrl(s) / remove on it rather than the chainable query builder.
 
+// Canvas/createImageBitmap do not exist in jsdom. The resize itself is
+// covered in tests/image-resize.test.js; here it is stubbed to a pass-through
+// so the upload tests assert what upload does, not what the canvas does.
+vi.mock('../src/lib/imageResize.js', () => ({
+  resizePhoto: (file) => Promise.resolve(file),
+}))
+
 vi.mock('../src/lib/supabase.js', () => ({
   supabase: {
     from: vi.fn(),
@@ -30,6 +37,7 @@ import {
   signPhotoUrl,
   signPhotoUrls,
   deletePlayerPhoto,
+  clearPhotoUrlCache,
 } from '../src/data/photos.js'
 
 function createQueryBuilder({ data = null, error = null } = {}) {
@@ -64,6 +72,11 @@ function createStorageBucket(responses = {}) {
 beforeEach(() => {
   supabase.from.mockReset()
   supabase.storage.from.mockReset()
+  // The signed-URL cache is module-level and deliberately outlives any one
+  // component, so it also outlives any one test. Clear it between tests or a
+  // URL signed in an earlier test satisfies a later one that meant to assert
+  // a signing failure.
+  clearPhotoUrlCache()
 })
 
 // --- listParents ------------------------------------------------------
@@ -359,5 +372,91 @@ describe('deletePlayerPhoto', () => {
     const bucket = createStorageBucket({ remove: { data: null, error: new Error('nope') } })
     supabase.storage.from.mockReturnValue(bucket)
     expect(await deletePlayerPhoto('p1/a.jpg')).toBe(false)
+  })
+})
+
+// --- signed-URL caching -----------------------------------------------
+
+describe('signed-URL caching', () => {
+  it('does not re-sign a path it has already signed', async () => {
+    const bucket = createStorageBucket({
+      createSignedUrl: { data: { signedUrl: 'https://signed/1.jpg' }, error: null },
+    })
+    supabase.storage.from.mockReturnValue(bucket)
+
+    const first = await signPhotoUrl('player-1/1.jpg')
+    const second = await signPhotoUrl('player-1/1.jpg')
+
+    expect(second).toBe(first)
+    // The point isn't saving the signing call — it's that a NEW signed URL is
+    // a new resource to the browser, so re-signing re-downloads the image.
+    expect(bucket.createSignedUrl).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks only for the keys it does not already hold', async () => {
+    const bucket = createStorageBucket({
+      createSignedUrls: {
+        data: [{ path: 'p1/a.jpg', signedUrl: 'https://signed/a' }],
+        error: null,
+      },
+    })
+    supabase.storage.from.mockReturnValue(bucket)
+
+    await signPhotoUrls(['p1/a.jpg'])
+
+    bucket.createSignedUrls.mockResolvedValue({
+      data: [{ path: 'p2/b.jpg', signedUrl: 'https://signed/b' }],
+      error: null,
+    })
+    const urls = await signPhotoUrls(['p1/a.jpg', 'p2/b.jpg'])
+
+    // Only the uncached key was requested the second time...
+    expect(bucket.createSignedUrls).toHaveBeenLastCalledWith(['p2/b.jpg'], expect.any(Number))
+    // ...but the caller still gets both.
+    expect(urls).toEqual({ 'p1/a.jpg': 'https://signed/a', 'p2/b.jpg': 'https://signed/b' })
+  })
+
+  it('skips the network entirely when everything is cached', async () => {
+    const bucket = createStorageBucket({
+      createSignedUrls: {
+        data: [{ path: 'p1/a.jpg', signedUrl: 'https://signed/a' }],
+        error: null,
+      },
+    })
+    supabase.storage.from.mockReturnValue(bucket)
+
+    await signPhotoUrls(['p1/a.jpg'])
+    bucket.createSignedUrls.mockClear()
+    const urls = await signPhotoUrls(['p1/a.jpg'])
+
+    expect(bucket.createSignedUrls).not.toHaveBeenCalled()
+    expect(urls).toEqual({ 'p1/a.jpg': 'https://signed/a' })
+  })
+
+  it('forgets a path when its photo is deleted', async () => {
+    const bucket = createStorageBucket({
+      createSignedUrl: { data: { signedUrl: 'https://signed/1.jpg' }, error: null },
+    })
+    supabase.storage.from.mockReturnValue(bucket)
+
+    await signPhotoUrl('player-1/1.jpg')
+    await deletePlayerPhoto('player-1/1.jpg')
+    await signPhotoUrl('player-1/1.jpg')
+
+    // A deleted photo's URL must not keep being served from memory.
+    expect(bucket.createSignedUrl).toHaveBeenCalledTimes(2)
+  })
+
+  it('clears everything on demand, for sign-out', async () => {
+    const bucket = createStorageBucket({
+      createSignedUrl: { data: { signedUrl: 'https://signed/1.jpg' }, error: null },
+    })
+    supabase.storage.from.mockReturnValue(bucket)
+
+    await signPhotoUrl('player-1/1.jpg')
+    clearPhotoUrlCache()
+    await signPhotoUrl('player-1/1.jpg')
+
+    expect(bucket.createSignedUrl).toHaveBeenCalledTimes(2)
   })
 })

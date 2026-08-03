@@ -22,6 +22,25 @@ const upsertPlayerMock = vi.fn()
 const deletePlayerMock = vi.fn()
 const upsertContactMock = vi.fn()
 
+const listParentsMock = vi.fn()
+const saveParentsMock = vi.fn()
+
+vi.mock('../src/data/parents.js', () => ({
+  listParents: (...args) => listParentsMock(...args),
+  saveParents: (...args) => saveParentsMock(...args),
+}))
+
+// The photo bucket is private, so the form signs URLs and uploads through
+// these. Mocked wholesale: photo behaviour has its own tests, and an
+// unmocked call would put the network into a unit test.
+vi.mock('../src/data/photos.js', () => ({
+  signPhotoUrl: () => Promise.resolve(null),
+  signPhotoUrls: () => Promise.resolve({}),
+  uploadPlayerPhoto: vi.fn(() => Promise.resolve('p-1/1.jpg')),
+  deletePlayerPhoto: vi.fn(() => Promise.resolve(true)),
+  forgetPhotoUrl: vi.fn(),
+}))
+
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
@@ -40,23 +59,27 @@ import Roster from '../src/screens/Roster.jsx'
 
 const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 
-const TEAM_U12 = { id: 't-u12', club_id: CLUB_ID, name: 'U12', sort_order: 7 }
+// Both squads are U13 or above on purpose: a player's own phone and email
+// only exist from U13 up, and most of this file is about those fields. The
+// under-13 case is asserted in its own suite at the foot of the file.
 const TEAM_U14 = { id: 't-u14', club_id: CLUB_ID, name: 'U14', sort_order: 9 }
+const TEAM_U16 = { id: 't-u16', club_id: CLUB_ID, name: 'U16', sort_order: 11 }
+const TEAM_U10 = { id: 't-u10', club_id: CLUB_ID, name: 'U10', sort_order: 5 }
 const TEAM_1XV = { id: 't-1xv', club_id: CLUB_ID, name: 'Senior Men 1st XV', sort_order: 13 }
-const TEAMS = [TEAM_1XV, TEAM_U12, TEAM_U14] // deliberately unsorted
+const TEAMS = [TEAM_1XV, TEAM_U14, TEAM_U16] // deliberately unsorted
 
 const ADMIN = [{ id: 'm-a', role: 'admin', team_id: null }]
-const COACH_U12 = [{ id: 'm-c', role: 'coach', team_id: 't-u12' }]
+const COACH_U14 = [{ id: 'm-c', role: 'coach', team_id: 't-u14' }]
 const COACH_TWO = [
-  { id: 'm-c1', role: 'coach', team_id: 't-u12' },
-  { id: 'm-c2', role: 'coach', team_id: 't-u14' },
+  { id: 'm-c1', role: 'coach', team_id: 't-u14' },
+  { id: 'm-c2', role: 'coach', team_id: 't-u16' },
 ]
-const PARENT = [{ id: 'm-p', role: 'parent', team_id: 't-u12', player_id: 'p-1' }]
+const PARENT = [{ id: 'm-p', role: 'parent', team_id: 't-u14', player_id: 'p-1' }]
 
 const EXISTING_PLAYER = {
   id: 'p-1',
   club_id: CLUB_ID,
-  team_id: 't-u12',
+  team_id: 't-u14',
   full_name: 'Dhruv Ramachandran',
   position: 'Flanker',
   is_captain: true,
@@ -72,7 +95,7 @@ function membershipValue(memberships, teams = TEAMS) {
   return { memberships, teams, loading: false, error: null, reload: vi.fn() }
 }
 
-function renderForm({ memberships = COACH_U12, teams = TEAMS, player = null, ...rest } = {}) {
+function renderForm({ memberships = COACH_U14, teams = TEAMS, player = null, ...rest } = {}) {
   useMembershipsMock.mockReturnValue(membershipValue(memberships, teams))
   const onClose = vi.fn()
   const onSaved = vi.fn()
@@ -104,6 +127,10 @@ beforeEach(() => {
   upsertPlayerMock.mockImplementation(async (player) => ({ id: player?.id ?? 'p-new', ...player }))
   deletePlayerMock.mockResolvedValue(undefined)
   upsertContactMock.mockImplementation(async (contact) => ({ ...contact }))
+  listParentsMock.mockReset()
+  saveParentsMock.mockReset()
+  listParentsMock.mockResolvedValue([])
+  saveParentsMock.mockResolvedValue([])
 })
 
 describe('PlayerForm — shape and scoping', () => {
@@ -122,7 +149,7 @@ describe('PlayerForm — shape and scoping', () => {
     renderForm({ memberships: COACH_TWO })
     const select = screen.getByLabelText('Age group')
     const options = within(select).getAllByRole('option').map((o) => o.textContent)
-    expect(options).toEqual(['U12', 'U14'])
+    expect(options).toEqual(['U14', 'U16'])
     expect(options).not.toContain('Senior Men 1st XV')
   })
 
@@ -130,7 +157,7 @@ describe('PlayerForm — shape and scoping', () => {
     renderForm({ memberships: ADMIN })
     const select = screen.getByLabelText('Age group')
     const options = within(select).getAllByRole('option').map((o) => o.textContent)
-    expect(options).toEqual(['U12', 'U14', 'Senior Men 1st XV'])
+    expect(options).toEqual(['U14', 'U16', 'Senior Men 1st XV'])
   })
 
   it('refuses to render a form at all when there is no team the user can edit', () => {
@@ -144,8 +171,8 @@ describe('PlayerForm — shape and scoping', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/squad you can add or change/i)
     expect(screen.queryByRole('button', { name: /save|add player/i })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Age group')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Player phone')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Player email')).not.toBeInTheDocument()
   })
 
   it('never reads contact details for a form it refuses to render', () => {
@@ -161,19 +188,19 @@ describe('PlayerForm — shape and scoping', () => {
     // which this form would otherwise read as "no contact on file" and render
     // as blank, editable fields. Enforced in the component rather than only in
     // Roster, so it holds whoever opens the form.
-    const coachOfOtherSquad = [{ id: 'm-c', role: 'coach', team_id: 't-u14' }]
+    const coachOfOtherSquad = [{ id: 'm-c', role: 'coach', team_id: 't-u16' }]
     renderForm({ memberships: coachOfOtherSquad, player: EXISTING_PLAYER })
 
     expect(screen.getByRole('alert')).toHaveTextContent(/can't change players in this age group/i)
     expect(screen.queryByRole('button', { name: /save|add player/i })).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Player phone')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Player email')).not.toBeInTheDocument()
     expect(getPlayerContactMock).not.toHaveBeenCalled()
   })
 
   it('still lets a coach edit a player in a squad they do coach', async () => {
     // The other side of the gate above: it must not refuse the normal case.
-    await renderEditForm({ memberships: COACH_U12 })
+    await renderEditForm({ memberships: COACH_U14 })
     expect(screen.getByLabelText('Full name')).toHaveValue('Dhruv Ramachandran')
   })
 
@@ -197,7 +224,10 @@ describe('PlayerForm — shape and scoping', () => {
   it('has no jersey number field, because the club does not use them', () => {
     renderForm()
     expect(screen.queryByLabelText(/jersey|squad number|shirt number/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/jersey/i)).not.toBeInTheDocument()
+    // NOT a document-wide text search for /jersey/i any more: the phone
+    // country picker contains Jersey, the Channel Island. Scoped to labels
+    // and headings, which is what this test was ever about.
+    expect(screen.queryByText(/jersey number|squad number|shirt number/i)).not.toBeInTheDocument()
   })
 
   it('offers the club position list plus an unset option, since position is optional', () => {
@@ -342,13 +372,15 @@ describe('PlayerForm — saving a new player', () => {
     renderForm()
 
     await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
-    await user.type(screen.getByLabelText('Phone'), '+971 50 200 1000')
+    await user.type(screen.getByLabelText('Player phone'), '50 200 1000')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     await waitFor(() => expect(upsertContactMock).toHaveBeenCalledTimes(1))
+    // Stored canonically: the country picker's default (UAE) plus the typed
+    // national number, normalised to E.164 regardless of how it was spaced.
     expect(upsertContactMock).toHaveBeenCalledWith({
       player_id: 'p-fresh',
-      phone: '+971 50 200 1000',
+      phone: '+971502001000',
       email: null,
     })
   })
@@ -367,7 +399,7 @@ describe('PlayerForm — saving a new player', () => {
     renderForm()
 
     await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
-    await user.type(screen.getByLabelText('Email'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('Player email'), 'guardian@example.com')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     await waitFor(() => expect(order).toEqual(['player', 'contact']))
@@ -382,7 +414,7 @@ describe('PlayerForm — saving a new player', () => {
     renderForm()
 
     await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
-    await user.type(screen.getByLabelText('Email'), '  guardian@example.com  ')
+    await user.type(screen.getByLabelText('Player email'), '  guardian@example.com  ')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     await waitFor(() => expect(upsertContactMock).toHaveBeenCalled())
@@ -400,7 +432,7 @@ describe('PlayerForm — editing an existing player', () => {
 
     expect(screen.getByLabelText('Full name')).toHaveValue('Dhruv Ramachandran')
     expect(screen.getByLabelText('Position')).toHaveValue('Flanker')
-    expect(screen.getByLabelText('Age group')).toHaveValue('t-u12')
+    expect(screen.getByLabelText('Age group')).toHaveValue('t-u14')
     expect(screen.getByRole('radio', { name: 'Captain' })).toBeChecked()
 
     await user.click(screen.getByRole('button', { name: /save changes/i }))
@@ -409,21 +441,21 @@ describe('PlayerForm — editing an existing player', () => {
     expect(upsertPlayerMock.mock.calls[0][0]).toMatchObject({
       id: 'p-1',
       full_name: 'Dhruv Ramachandran',
-      team_id: 't-u12',
+      team_id: 't-u14',
     })
   })
 
   it('never reassigns an edited player to a different age group behind the coach', async () => {
     // The squad reconciliation must fall back to the player's OWN team, not to
-    // "the first editable team". Here the player is in U14 and the coach
-    // coaches both squads, but the loaded `teams` list only carries U12 — so
+    // "the first editable team". Here the player is in U16 and the coach
+    // coaches both squads, but the loaded `teams` list only carries U14 — so
     // the player's team is absent from the reconciled options and the old
-    // fallback picked U12. That is a child silently moved between age groups
+    // fallback picked U14. That is a child silently moved between age groups
     // on save, which is a materially worse outcome than the same slip on a
     // fixture.
     const user = userEvent.setup()
-    const u14Player = { ...EXISTING_PLAYER, id: 'p-14', team_id: 't-u14' }
-    renderForm({ memberships: COACH_TWO, teams: [TEAM_U12], player: u14Player })
+    const u14Player = { ...EXISTING_PLAYER, id: 'p-14', team_id: 't-u16' }
+    renderForm({ memberships: COACH_TWO, teams: [TEAM_U14], player: u14Player })
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /save changes/i })).not.toBeDisabled(),
     )
@@ -431,16 +463,19 @@ describe('PlayerForm — editing an existing player', () => {
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
-    expect(upsertPlayerMock.mock.calls[0][0]).toMatchObject({ id: 'p-14', team_id: 't-u14' })
-    expect(upsertPlayerMock.mock.calls[0][0].team_id).not.toBe('t-u12')
+    expect(upsertPlayerMock.mock.calls[0][0]).toMatchObject({ id: 'p-14', team_id: 't-u16' })
+    expect(upsertPlayerMock.mock.calls[0][0].team_id).not.toBe('t-u14')
   })
 
   it('prefills the contact fields from the contact row', async () => {
     getPlayerContactMock.mockResolvedValue(EXISTING_CONTACT)
     await renderEditForm()
 
-    expect(screen.getByLabelText('Phone')).toHaveValue('+971 50 200 1000')
-    expect(screen.getByLabelText('Email')).toHaveValue('guardian@example.com')
+    // The stored E.164 number is split across the two controls: the country
+    // picker holds +971 and the box holds the national part.
+    expect(screen.getByLabelText('Player phone')).toHaveValue('502001000')
+    expect(screen.getByLabelText('Player phone country')).toHaveValue('AE')
+    expect(screen.getByLabelText('Player email')).toHaveValue('guardian@example.com')
   })
 
   it('shows empty, editable contact fields when there is simply no contact on file', async () => {
@@ -452,9 +487,9 @@ describe('PlayerForm — editing an existing player', () => {
     getPlayerContactMock.mockResolvedValue(null)
     await renderEditForm()
 
-    expect(screen.getByLabelText('Phone')).toHaveValue('')
-    expect(screen.getByLabelText('Email')).toHaveValue('')
-    expect(screen.getByLabelText('Phone')).not.toBeDisabled()
+    expect(screen.getByLabelText('Player phone')).toHaveValue('')
+    expect(screen.getByLabelText('Player email')).toHaveValue('')
+    expect(screen.getByLabelText('Player phone')).not.toBeDisabled()
     expect(screen.queryByText(/hidden|withheld|not permitted/i)).not.toBeInTheDocument()
   })
 
@@ -476,8 +511,8 @@ describe('PlayerForm — editing an existing player', () => {
     getPlayerContactMock.mockResolvedValue(EXISTING_CONTACT)
     await renderEditForm()
 
-    await user.clear(screen.getByLabelText('Phone'))
-    await user.clear(screen.getByLabelText('Email'))
+    await user.clear(screen.getByLabelText('Player phone'))
+    await user.clear(screen.getByLabelText('Player email'))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => expect(upsertContactMock).toHaveBeenCalledTimes(1))
@@ -509,7 +544,7 @@ describe('PlayerForm — editing an existing player', () => {
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/contact details/i)
-    expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Player phone')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /save changes/i }))
     await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
@@ -538,7 +573,7 @@ describe('PlayerForm — failures', () => {
     const { onClose } = renderForm()
 
     await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
-    await user.type(screen.getByLabelText('Phone'), '+971 50 200 1000')
+    await user.type(screen.getByLabelText('Player phone'), '50 200 1000')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     const alert = await screen.findByRole('alert')
@@ -555,7 +590,7 @@ describe('PlayerForm — failures', () => {
     renderForm()
 
     await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
-    await user.type(screen.getByLabelText('Phone'), '+971 50 200 1000')
+    await user.type(screen.getByLabelText('Player phone'), '50 200 1000')
     await user.click(screen.getByRole('button', { name: /add player/i }))
     await screen.findByRole('alert')
 
@@ -610,18 +645,24 @@ describe('PlayerForm — failures', () => {
     renderForm()
 
     await user.type(screen.getByLabelText('Full name'), 'Faisal Al Mansoori')
-    await user.type(screen.getByLabelText('Phone'), '+971 50 200 1000')
-    await user.type(screen.getByLabelText('Email'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('Player phone'), '50 200 1000')
+    await user.type(screen.getByLabelText('Player email'), 'guardian@example.com')
 
     expect(screen.getByLabelText('Full name')).toHaveValue('Faisal Al Mansoori')
-    expect(screen.getByLabelText('Phone')).toHaveValue('+971 50 200 1000')
-    expect(screen.getByLabelText('Email')).toHaveValue('guardian@example.com')
+    // The box holds EXACTLY what was typed, spaces and all. The field does
+    // not reformat as you type on purpose: rewriting an input's value under
+    // the user throws the caret to the end, so correcting a digit in the
+    // middle of a number becomes impossible. Normalising to E.164 happens
+    // once, at save.
+    expect(screen.getByLabelText('Player phone')).toHaveValue('50 200 1000')
+    expect(screen.getByLabelText('Player phone country')).toHaveValue('AE')
+    expect(screen.getByLabelText('Player email')).toHaveValue('guardian@example.com')
   })
 })
 
 describe('Roster wiring', () => {
   it('offers an Add player button to a coach', async () => {
-    useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
+    useMembershipsMock.mockReturnValue(membershipValue(COACH_U14))
     render(<Roster />)
     expect(await screen.findByRole('button', { name: /add player/i })).toBeInTheDocument()
   })
@@ -635,7 +676,7 @@ describe('Roster wiring', () => {
 
   it('opens the empty form from the Add button', async () => {
     const user = userEvent.setup()
-    useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
+    useMembershipsMock.mockReturnValue(membershipValue(COACH_U14))
     render(<Roster />)
 
     await user.click(await screen.findByRole('button', { name: /add player/i }))
@@ -646,7 +687,7 @@ describe('Roster wiring', () => {
 
   it('reloads the roster after a save', async () => {
     const user = userEvent.setup()
-    useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
+    useMembershipsMock.mockReturnValue(membershipValue(COACH_U14))
     render(<Roster />)
 
     await user.click(await screen.findByRole('button', { name: /add player/i }))
@@ -677,7 +718,7 @@ describe('PlayerDetail wiring', () => {
   }
 
   it('offers Edit and Delete to a coach of that squad', async () => {
-    await openDetail(COACH_U12)
+    await openDetail(COACH_U14)
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
@@ -692,7 +733,7 @@ describe('PlayerDetail wiring', () => {
   })
 
   it('opens the edit form prefilled from the player', async () => {
-    const user = await openDetail(COACH_U12)
+    const user = await openDetail(COACH_U14)
 
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit' }))
 
@@ -701,7 +742,7 @@ describe('PlayerDetail wiring', () => {
   })
 
   it('asks for confirmation before deleting, and does nothing if cancelled', async () => {
-    const user = await openDetail(COACH_U12)
+    const user = await openDetail(COACH_U14)
 
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
     expect(deletePlayerMock).not.toHaveBeenCalled()
@@ -713,7 +754,7 @@ describe('PlayerDetail wiring', () => {
   })
 
   it('deletes on confirmation and closes back to the roster', async () => {
-    const user = await openDetail(COACH_U12)
+    const user = await openDetail(COACH_U14)
 
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
     await user.click(screen.getByRole('button', { name: /yes, delete/i }))
@@ -724,7 +765,7 @@ describe('PlayerDetail wiring', () => {
 
   it('surfaces a delete failure and leaves the player on screen', async () => {
     deletePlayerMock.mockRejectedValue(new Error('permission denied for table players'))
-    const user = await openDetail(COACH_U12)
+    const user = await openDetail(COACH_U14)
 
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
     await user.click(screen.getByRole('button', { name: /yes, delete/i }))
@@ -734,5 +775,161 @@ describe('PlayerDetail wiring', () => {
       'permission denied for table players',
     )
     expect(dialog).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------
+// Parents editor, photo field and the U13 boundary (3 Aug 2026)
+// ---------------------------------------------------------------------
+
+describe('PlayerForm — parents', () => {
+  it('warns when there is no parent on file, without blocking the save', async () => {
+    // Jay's ruling: warn, never block. ~159 existing players have no parent
+    // rows, so a hard requirement would make a typo fix impossible until
+    // someone tracked down a phone number.
+    const user = userEvent.setup()
+    renderForm()
+
+    expect(screen.getByRole('status')).toHaveTextContent(/no parent on file/i)
+
+    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    const save = screen.getByRole('button', { name: /add player/i })
+    expect(save).not.toBeDisabled()
+
+    await user.click(save)
+    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
+  })
+
+  it('adds a parent row and saves it as E.164 against the new player id', async () => {
+    const user = userEvent.setup()
+    upsertPlayerMock.mockResolvedValue({ id: 'p-fresh', full_name: 'Tom Fletcher' })
+    renderForm()
+
+    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await user.click(screen.getByRole('button', { name: /add parent/i }))
+
+    await user.type(screen.getByLabelText('Full name', { selector: '#parent-name-0' }), 'Sara Fletcher')
+    await user.selectOptions(screen.getByLabelText('Relationship'), 'Mother')
+    await user.type(screen.getByLabelText('Phone'), '50 200 1000')
+    await user.type(screen.getByLabelText('Email'), 'sara@example.com')
+
+    await user.click(screen.getByRole('button', { name: /add player/i }))
+
+    await waitFor(() => expect(saveParentsMock).toHaveBeenCalled())
+    const [playerId, rows] = saveParentsMock.mock.calls[0]
+    expect(playerId).toBe('p-fresh')
+    expect(rows[0]).toMatchObject({
+      full_name: 'Sara Fletcher',
+      relationship: 'Mother',
+      email: 'sara@example.com',
+      phone: '+971502001000',
+      is_primary: true, // the first parent added is the main contact
+    })
+  })
+
+  it('prefills existing parent rows with the phone split across the two controls', async () => {
+    listParentsMock.mockResolvedValue([
+      {
+        id: 'pp-1',
+        full_name: 'Sara Fletcher',
+        relationship: 'Mother',
+        email: 'sara@example.com',
+        phone: '+971502001000',
+        is_primary: true,
+      },
+    ])
+    await renderEditForm()
+
+    expect(screen.getByLabelText('Full name', { selector: '#parent-name-0' })).toHaveValue(
+      'Sara Fletcher',
+    )
+    expect(screen.getByLabelText('Relationship')).toHaveValue('Mother')
+    expect(screen.getByLabelText('Phone')).toHaveValue('502001000')
+    expect(screen.getByLabelText('Phone country')).toHaveValue('AE')
+  })
+
+  it('offers only the agreed relationships, with no free-text option', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.click(screen.getByRole('button', { name: /add parent/i }))
+
+    const select = screen.getByLabelText('Relationship')
+    expect(select.tagName).toBe('SELECT')
+    const options = within(select)
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+    expect(options).toEqual([
+      'Not set',
+      'Mother',
+      'Father',
+      'Step-mother',
+      'Step-father',
+      'Aunt',
+      'Uncle',
+      'Grandmother',
+      'Grandfather',
+      'Guardian',
+    ])
+  })
+
+  it('skips the parent write entirely when the parent read failed', async () => {
+    // saveParents replaces the whole set, so saving an empty editor over rows
+    // that exist but were never loaded would delete them.
+    const user = userEvent.setup()
+    listParentsMock.mockRejectedValue(new Error('nope'))
+    await renderEditForm()
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/couldn't load this player's parent/i)
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
+    expect(saveParentsMock).not.toHaveBeenCalled()
+  })
+
+  it('reports a parent failure as a parent failure, not as a failed save', async () => {
+    const user = userEvent.setup()
+    saveParentsMock.mockRejectedValue(new Error('Parents refused'))
+    await renderEditForm()
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /the player was saved, but the parent details were not/i,
+      ),
+    )
+  })
+})
+
+describe('PlayerForm — the U13 own-contact boundary', () => {
+  it('offers no player contact fields for an under-13 squad', async () => {
+    renderForm({ memberships: [{ id: 'm-c', role: 'coach', team_id: 't-u10' }], teams: [TEAM_U10] })
+
+    await waitFor(() => expect(screen.getByLabelText('Age group')).toHaveValue('t-u10'))
+    expect(screen.queryByLabelText('Player phone')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Player email')).not.toBeInTheDocument()
+    expect(screen.getByText(/players under 13 don't have their own contact details/i)).toBeInTheDocument()
+    // The parent rows are still offered — they are where an under-13's
+    // details belong.
+    expect(screen.getByRole('button', { name: /add parent/i })).toBeInTheDocument()
+  })
+
+  it('reveals the fields as soon as the squad is changed to U13 or above', async () => {
+    // Keyed off the SELECTED squad, not the stored one, so moving a player up
+    // an age group shows the fields immediately rather than after a reopen.
+    const user = userEvent.setup()
+    renderForm({
+      memberships: [
+        { id: 'm-c1', role: 'coach', team_id: 't-u10' },
+        { id: 'm-c2', role: 'coach', team_id: 't-u14' },
+      ],
+      teams: [TEAM_U10, TEAM_U14],
+    })
+
+    expect(screen.queryByLabelText('Player phone')).not.toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Age group'), 't-u14')
+
+    expect(screen.getByLabelText('Player phone')).toBeInTheDocument()
   })
 })

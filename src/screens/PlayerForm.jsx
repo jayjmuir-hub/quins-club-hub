@@ -4,6 +4,13 @@ import { getPlayerContact, upsertContact, upsertPlayer } from '../data/players.j
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { POSITIONS } from '../lib/positions.js'
+import { listParents, saveParents } from '../data/parents.js'
+import { deletePlayerPhoto, forgetPhotoUrl, uploadPlayerPhoto } from '../data/photos.js'
+import { allowsOwnContact } from '../lib/ageGroup.js'
+import { joinPhone, splitPhone } from '../lib/phone.js'
+import ParentsEditor from '../components/ParentsEditor.jsx'
+import PhotoField from '../components/PhotoField.jsx'
+import PhoneInput from '../components/PhoneInput.jsx'
 
 // The player add/edit form (design-system.md §5.8), opened in the shared
 // Sheet from Roster's "Add player" button and from PlayerDetail's "Edit".
@@ -126,7 +133,10 @@ function initialValues(player, editableTeams) {
     // falling through to "the first team" is not acceptable here.
     teamId: player ? player.team_id : fallbackTeamId,
     isCaptain: player?.is_captain === true,
-    phone: '',
+    // The player's own number is held split (country + national) for the same
+    // reason the parent rows are — see src/components/PhoneInput.jsx.
+    phoneCountry: splitPhone('').country,
+    phoneNational: '',
     email: '',
   }
 }
@@ -190,6 +200,20 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   // player rather than inserting a second copy of them.
   const [savedPlayerId, setSavedPlayerId] = useState(player?.id ?? null)
 
+  // Parent rows. Loaded alongside the contact row and behind the same gate:
+  // player_parents has the same read policy as player_contacts, so a user who
+  // may not edit this squad must not cause the query at all.
+  const [parents, setParents] = useState([])
+  const [parentsStatus, setParentsStatus] = useState(editing ? 'loading' : 'ready')
+
+  // The photo is three pieces of state, not one: the file just chosen (not
+  // yet uploaded), whether the existing one is being removed, and the path
+  // already stored on the player row. Keeping "chosen" separate from "saved"
+  // is what lets the form be abandoned without leaving an orphaned photo of a
+  // child in the bucket.
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoRemoved, setPhotoRemoved] = useState(false)
+
   // Guards against a double submit landing two inserts: `saving` state is
   // async, this is not.
   const inFlight = useRef(false)
@@ -208,9 +232,14 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       .then((row) => {
         if (!mounted) return
         setHadContact(Boolean(row))
+        // Split the stored E.164 number across the country picker and the
+        // number box. splitPhone keeps a legacy free-form number's digits
+        // rather than discarding them (see src/lib/phone.js).
+        const { country, national } = splitPhone(row?.phone)
         setValues((current) => ({
           ...current,
-          phone: row?.phone ?? '',
+          phoneCountry: country,
+          phoneNational: national,
           email: row?.email ?? '',
         }))
         setContactStatus('ready')
@@ -219,6 +248,48 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         if (!mounted) return
         setContactError(err)
         setContactStatus('error')
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [editing, gated, player?.id])
+
+  // Parent rows prefill. Same gate and same shape as the contact effect
+  // above. A failure here is NOT treated the way a failed contact read is:
+  // saveParents replaces the whole set, so saving after a failed read would
+  // delete rows the coach never saw. So a failed read leaves the editor
+  // empty AND marks the status 'error', and the submit handler skips the
+  // parent write entirely on that status.
+  useEffect(() => {
+    if (!editing || gated) return undefined
+
+    let mounted = true
+    setParentsStatus('loading')
+
+    listParents(player.id)
+      .then((rows) => {
+        if (!mounted) return
+        setParents(
+          rows.map((row) => {
+            const { country, national } = splitPhone(row.phone)
+            return {
+              id: row.id,
+              full_name: row.full_name ?? '',
+              relationship: row.relationship ?? '',
+              email: row.email ?? '',
+              phoneCountry: country,
+              phoneNational: national,
+              is_primary: Boolean(row.is_primary),
+            }
+          }),
+        )
+        setParentsStatus('ready')
+      })
+      .catch(() => {
+        if (!mounted) return
+        setParents([])
+        setParentsStatus('error')
       })
 
     return () => {
@@ -305,7 +376,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       is_captain: values.isCaptain,
     }
 
-    const phone = values.phone.trim() || null
+    const phone = joinPhone(values.phoneCountry, values.phoneNational)
     const email = values.email.trim() || null
     // Write the contact row when there is something to record, or something
     // to clear. Never when the read failed — those blanks are not the
@@ -327,25 +398,76 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         return
       }
 
-      // Recorded before the contact attempt, so a retry after a contact
-      // failure updates this player instead of inserting them again.
+      // Recorded before the later attempts, so a retry after any of them
+      // updates this player instead of inserting them again.
       if (saved?.id) setSavedPlayerId(saved.id)
 
-      if (!writeContact) {
-        onSaved?.(saved)
-        onClose?.()
-        return
+      // --- photo ------------------------------------------------------
+      // Done AFTER the player row exists, because the object key is built
+      // from the player id (the storage policies read the squad out of it),
+      // and a brand-new player has no id until now.
+      //
+      // The old object is deleted only once the new path is safely recorded
+      // on the player row. Doing it the other way round would, on a failed
+      // update, leave a player pointing at a file that no longer exists.
+      const previousPath = player?.photo_path ?? null
+      if (photoFile || photoRemoved) {
+        try {
+          const nextPath = photoFile ? await uploadPlayerPhoto(saved.id, photoFile) : null
+          saved = await upsertPlayer({ id: saved.id, photo_path: nextPath })
+          if (previousPath && previousPath !== nextPath) {
+            forgetPhotoUrl(previousPath)
+            // Best-effort: an orphaned file in a private bucket is untidy,
+            // not harmful, and must not turn a good save into an error.
+            deletePlayerPhoto(previousPath)
+          }
+          setPhotoFile(null)
+          setPhotoRemoved(false)
+        } catch (err) {
+          onSaved?.(saved)
+          setErrorStage('photo')
+          setError(err)
+          return
+        }
       }
 
-      try {
-        await upsertContact({ player_id: saved.id, phone, email })
-      } catch (err) {
-        // The player really was saved — tell the roster so, and keep the
-        // sheet open on the contact problem rather than closing over it.
-        onSaved?.(saved)
-        setErrorStage('contact')
-        setError(err)
-        return
+      if (writeContact) {
+        try {
+          await upsertContact({ player_id: saved.id, phone, email })
+        } catch (err) {
+          // The player really was saved — tell the roster so, and keep the
+          // sheet open on the contact problem rather than closing over it.
+          onSaved?.(saved)
+          setErrorStage('contact')
+          setError(err)
+          return
+        }
+      }
+
+      // --- parents ----------------------------------------------------
+      // Skipped outright when the prefill failed: saveParents replaces the
+      // whole set, so writing an empty editor over rows that exist but were
+      // never loaded would delete them.
+      if (parentsStatus === 'ready') {
+        try {
+          await saveParents(
+            saved.id,
+            parents.map((row, index) => ({
+              id: row.id,
+              full_name: row.full_name,
+              relationship: row.relationship,
+              email: row.email,
+              phone: joinPhone(row.phoneCountry, row.phoneNational),
+              is_primary: row.is_primary,
+              sort_order: index,
+            })),
+          )
+        } catch (err) {
+          onSaved?.(saved)
+          setErrorStage('parents')
+          setError(err)
+          return
+        }
       }
 
       onSaved?.(saved)
@@ -359,6 +481,14 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   }
 
   const contactLoading = contactStatus === 'loading'
+  const parentsLoading = parentsStatus === 'loading'
+
+  // The U13 rule keys off the SELECTED squad, not the player's stored one, so
+  // moving a U12 up to U13 in this form reveals the player-contact fields
+  // immediately rather than only after a save-and-reopen. allowsOwnContact
+  // fails closed on an unknown squad name.
+  const selectedTeam = editableTeams.find((candidate) => candidate.id === teamId)
+  const ownContactAllowed = allowsOwnContact(selectedTeam?.name)
 
   return (
     <Sheet open onClose={onClose} title={editing ? 'Edit player' : 'Add player'}>
@@ -381,6 +511,22 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             className={inputClasses(invalid.fullName)}
           />
         </div>
+
+        <PhotoField
+          player={player}
+          file={photoFile}
+          removed={photoRemoved}
+          disabled={saving}
+          onFileChange={(file) => {
+            setPhotoFile(file)
+            // Choosing a new photo cancels a pending removal.
+            if (file) setPhotoRemoved(false)
+          }}
+          onRemove={() => {
+            setPhotoFile(null)
+            setPhotoRemoved(true)
+          }}
+        />
 
         <div className={FIELD}>
           <label className={LABEL} htmlFor="player-position">
@@ -436,27 +582,23 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           </p>
         )}
 
-        {contactStatus === 'ready' && (
+        {contactStatus === 'ready' && ownContactAllowed && (
           <>
             <div className={FIELD}>
-              <label className={LABEL} htmlFor="player-phone">
-                Phone
-              </label>
-              <input
+              <PhoneInput
                 id="player-phone"
-                type="tel"
-                inputMode="tel"
-                value={values.phone}
-                onChange={setFromInput('phone')}
-                placeholder="e.g. +971 50 200 1000"
-                aria-describedby="player-contact-note"
-                className={inputClasses(false)}
+                label="Player phone"
+                country={values.phoneCountry}
+                national={values.phoneNational}
+                disabled={saving}
+                onCountryChange={set('phoneCountry')}
+                onNationalChange={set('phoneNational')}
               />
             </div>
 
             <div className={FIELD}>
               <label className={LABEL} htmlFor="player-email">
-                Email
+                Player email
               </label>
               <input
                 id="player-email"
@@ -484,6 +626,28 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           </>
         )}
 
+        {/* Below U13 the player's own contact fields are not rendered at all,
+            and this says why — otherwise their absence reads as a bug to a
+            coach who has just seen them on an older squad. It replaces the
+            fields rather than sitting beside them. */}
+        {contactStatus === 'ready' && !ownContactAllowed && (
+          <p className="mb-3.5 rounded-[11px] bg-surface-mute px-3 py-2.5 text-[12.5px] text-ink-muted">
+            Players under 13 don&apos;t have their own contact details in the app. Use the parent
+            details below.
+          </p>
+        )}
+
+        {parentsStatus === 'error' && (
+          <p role="alert" className="mb-3.5 rounded-[11px] bg-warn-bg px-3 py-2.5 text-sm text-ink">
+            We couldn&apos;t load this player&apos;s parent details, so they can&apos;t be edited
+            right now. Saving will leave them exactly as they are.
+          </p>
+        )}
+
+        {parentsStatus === 'ready' && (
+          <ParentsEditor parents={parents} onChange={setParents} disabled={saving} />
+        )}
+
         <Segmented
           legend="Role"
           name="player-role"
@@ -505,6 +669,14 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
                 The player was saved, but their contact details were not.
               </span>
             )}
+            {errorStage === 'photo' && (
+              <span className="block">The player was saved, but the photo was not.</span>
+            )}
+            {errorStage === 'parents' && (
+              <span className="block">
+                The player was saved, but the parent details were not.
+              </span>
+            )}
             {error.message || "We couldn't save that. Try again."}
           </p>
         )}
@@ -513,7 +685,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           type="submit"
           // Disabled until the existing contact row has settled: a submit
           // before then would write the still-blank fields over real details.
-          disabled={saving || contactLoading}
+          disabled={saving || contactLoading || parentsLoading}
           className="w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Add player'}
