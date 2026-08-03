@@ -12,6 +12,22 @@ import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import { clubDayParts, clubToday, eventDate, hasResult, sortByStart } from '../lib/eventFormat.js'
+import ScheduleTable from '../components/ScheduleTable.jsx'
+import { useMediaQuery, WIDE_QUERY } from '../lib/useMediaQuery.js'
+
+// Same reasoning as Roster's: the filter has to outlive a reload, or a coach
+// who runs one age group re-filters on every visit. Separate key from the
+// roster's — filtering the schedule to U12 says nothing about which squad you
+// want to see the players of.
+const TEAM_FILTER_KEY = 'quins.schedule.teamFilter'
+
+function readStoredFilter() {
+  try {
+    return window.localStorage.getItem(TEAM_FILTER_KEY) || ALL_TEAMS_ID
+  } catch {
+    return ALL_TEAMS_ID
+  }
+}
 
 // Schedule & fixtures (design-system.md §5.2): scope note, section head,
 // Upcoming/Results/Calendar sub-tabs, a team filter, then the list or the
@@ -264,8 +280,13 @@ export default function Schedule() {
   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
   const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
 
+  // The table is a `wide` feature, not a `desktop` one. At 820-1279px — a
+  // landscape tablet or a small laptop — the stacked FixtureRow list is still
+  // the better shape; seven columns there would be cramped rather than dense.
+  const isWide = useMediaQuery(WIDE_QUERY)
+
   const [tab, setTab] = useState('upcoming')
-  const [teamFilter, setTeamFilter] = useState(ALL_TEAMS_ID)
+  const [teamFilter, setTeamFilter] = useState(readStoredFilter)
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [month, setMonth] = useState(currentClubMonth)
   // null = the form is closed. { event: null } = adding; { event } = editing.
@@ -368,6 +389,15 @@ export default function Schedule() {
   const canEditSelected = selectedEvent ? canEditTeam(memberships, selectedEvent.team_id) : false
   const refresh = () => setReloadToken((token) => token + 1)
 
+  const persistFilter = (next) => {
+    setTeamFilter(next)
+    try {
+      window.localStorage.setItem(TEAM_FILTER_KEY, next)
+    } catch {
+      // A filter that can't be persisted still has to work for this session.
+    }
+  }
+
   return (
     <section>
       {!admin && (
@@ -412,7 +442,7 @@ export default function Schedule() {
           renders nothing for an empty list. */}
       {tab !== 'calendar' && scopedTeams.length > 1 && (
         <div className="mb-4">
-          <TeamPills teams={scopedTeams} selected={activeFilter} onChange={setTeamFilter} />
+          <TeamPills teams={scopedTeams} selected={activeFilter} onChange={persistFilter} />
         </div>
       )}
 
@@ -438,22 +468,44 @@ export default function Schedule() {
         </Card>
       )}
 
+      {/* Table at `wide`, the stacked list everywhere else. One or the other
+          renders, never both: they emit the same fixture titles, so having
+          both in the DOM makes every by-text query ambiguous — the same
+          reason Roster switches in JS (src/lib/useMediaQuery.js). */}
       {!isFirstLoad && !error && tab === 'upcoming' && (
-        <FixtureList
-          events={upcoming}
-          teamsById={teamsById}
-          onSelect={setSelectedEventId}
-          emptyMessage="No upcoming fixtures yet."
-        />
+        isWide ? (
+          <ScheduleTable
+            events={upcoming}
+            teamsById={teamsById}
+            onSelect={setSelectedEventId}
+            emptyMessage="No upcoming fixtures yet."
+          />
+        ) : (
+          <FixtureList
+            events={upcoming}
+            teamsById={teamsById}
+            onSelect={setSelectedEventId}
+            emptyMessage="No upcoming fixtures yet."
+          />
+        )
       )}
 
       {!isFirstLoad && !error && tab === 'results' && (
-        <FixtureList
-          events={results}
-          teamsById={teamsById}
-          onSelect={setSelectedEventId}
-          emptyMessage="No results yet. Scores show here once someone adds them."
-        />
+        isWide ? (
+          <ScheduleTable
+            events={results}
+            teamsById={teamsById}
+            onSelect={setSelectedEventId}
+            emptyMessage="No results yet. Scores show here once someone adds them."
+          />
+        ) : (
+          <FixtureList
+            events={results}
+            teamsById={teamsById}
+            onSelect={setSelectedEventId}
+            emptyMessage="No results yet. Scores show here once someone adds them."
+          />
+        )
       )}
 
       {!isFirstLoad && !error && tab === 'calendar' && (
