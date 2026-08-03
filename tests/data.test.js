@@ -36,7 +36,12 @@ import {
   deletePlayer,
   upsertContact,
 } from '../src/data/players.js'
-import { listAvailability, subscribeAvailability, setAvailability } from '../src/data/availability.js'
+import {
+  listAvailability,
+  subscribeAvailability,
+  setAvailability,
+  listAvailabilityForEvents,
+} from '../src/data/availability.js'
 
 function createQueryBuilder({ data = null, error = null } = {}) {
   const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [], upsert: [] }
@@ -702,6 +707,53 @@ describe('subscribeAvailability', () => {
     const [nameA] = supabase.channel.mock.calls[0]
     const [nameB] = supabase.channel.mock.calls[1]
     expect(nameA).not.toEqual(nameB)
+  })
+})
+
+// --- listAvailabilityForEvents ---------------------------------------------
+
+// Task 1 (Club Overview Dashboard plan). Bulk RSVP fetch across many events
+// in one query, for the Overview screen — same teamIds-array convention as
+// listEvents({teamIds})/listPlayers({teamIds}): an empty array must never be
+// read as "no filter", so it short-circuits without querying at all.
+describe('listAvailabilityForEvents', () => {
+  it('does not query at all when eventIds is an empty array, and returns []', async () => {
+    const result = await listAvailabilityForEvents([])
+
+    expect(supabase.from).not.toHaveBeenCalled()
+    expect(result).toEqual([])
+  })
+
+  it('queries availability with .in("event_id", eventIds)', async () => {
+    const rows = [
+      { id: 'a1', event_id: 'e1', player_id: 'p1', status: 'in' },
+      { id: 'a2', event_id: 'e2', player_id: 'p2', status: 'maybe' },
+    ]
+    const { builder, calls } = createQueryBuilder({ data: rows })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await listAvailabilityForEvents(['e1', 'e2'])
+
+    expect(supabase.from).toHaveBeenCalledWith('availability')
+    expect(builder.select).toHaveBeenCalledWith('*')
+    expect(calls.in).toEqual([['event_id', ['e1', 'e2']]])
+    expect(result).toEqual(rows)
+  })
+
+  it('returns [] rather than null when data is null', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await listAvailabilityForEvents(['e1'])
+
+    expect(result).toEqual([])
+  })
+
+  it('throws rather than swallowing a Supabase error', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('network down') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(listAvailabilityForEvents(['e1'])).rejects.toThrow('network down')
   })
 })
 

@@ -20,6 +20,30 @@ export async function listAvailability(eventId) {
   return data ?? []
 }
 
+/**
+ * Lists availability rows across many events in one query — used by the
+ * Overview screen, which needs RSVP counts for every upcoming fixture across
+ * however many teams are in scope, not just one event at a time the way
+ * listAvailability(eventId) does. One .in('event_id', ...) query rather than
+ * one round trip per fixture, matching the same teamIds-array pattern
+ * src/data/events.js's listEvents({teamIds}) and src/data/players.js's
+ * listPlayers({teamIds}) already use.
+ *
+ * An empty eventIds array returns [] without querying — there is nothing to
+ * ask about, and (matching the existing teamIds convention) an empty input
+ * must never be read as "no filter, return everything".
+ */
+export async function listAvailabilityForEvents(eventIds) {
+  if (!Array.isArray(eventIds) || eventIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('availability')
+    .select('*')
+    .in('event_id', eventIds)
+  if (error) throw error
+  return data ?? []
+}
+
 // Suffixed so concurrent subscriptions to the same event (e.g. a list view
 // and a detail view both watching it) get distinct realtime channel topics
 // rather than colliding.
