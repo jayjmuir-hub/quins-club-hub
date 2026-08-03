@@ -5,7 +5,9 @@ import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import {
   deleteMembership,
+  grantMembership,
   listClubMembers,
+  listPendingProfiles,
   updateMembershipRole,
   updateProfileName,
 } from '../data/members.js'
@@ -54,6 +56,31 @@ const INLINE_CONTROL =
 // Checked against the full club-wide list, not just the rows on screen.
 const LAST_ADMIN_REFUSAL =
   "You can't change your own last admin access — the club would be locked out of its own admin screens. Add another admin first, or ask a different admin to make this change."
+
+// "Waiting for access" (plan 2026-08-03 §Task B). Signing up with a magic
+// link creates an auth user and a profiles row but NO membership, and every
+// other list on this screen is a list of memberships — so before this section
+// existed a self-signed-up person was invisible to admins.
+//
+// Two things about this section are deliberate and easy to undo by accident:
+//
+//   1. listPendingProfiles() does NOT return only pending profiles. It
+//      returns every profile the caller can read, which for an admin is the
+//      union of three RLS policies: their own row, everyone with a membership
+//      in their club, and everyone anywhere with zero memberships. The
+//      subtraction below (against the profile_ids in the member list) is what
+//      makes this the pending set. Drop it and every existing member reappears
+//      here as if they were waiting.
+//   2. There is no reject/dismiss control, on purpose. Nobody has asked for
+//      anything — there is nothing to reject — and leaving a stranger with no
+//      membership is already the correct outcome: they read zero rows from
+//      every table. Deleting the underlying auth user needs the service-role
+//      key, which never touches this frontend. The UI says that instead of
+//      offering a button that could not do it.
+const NO_ROLE_CHOSEN = 'Choose a role for this person.'
+const NO_TEAM_CHOSEN = 'Choose an age group for this role.'
+const NO_CLUB_KNOWN =
+  "We couldn't work out which club to add them to. Reload the page and try again."
 
 function NotAuthorised() {
   return (
@@ -116,6 +143,9 @@ export default function Accounts() {
   const admin = isAdmin(memberships)
 
   const [members, setMembers] = useState([])
+  // Every profile the admin can read (see the NO_ROLE_CHOSEN block above) —
+  // NOT the pending set. `waiting` below is the pending set.
+  const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
@@ -127,6 +157,9 @@ export default function Accounts() {
   const [rowState, setRowState] = useState({})
   // Per-profile name editing, keyed by profile id.
   const [nameEdit, setNameEdit] = useState({})
+  // Per-waiting-person grant form, keyed by profile id: chosen role, chosen
+  // age group, whether the insert is in flight, and the last refusal.
+  const [grantState, setGrantState] = useState({})
 
   useEffect(() => {
     // A non-admin issues no query at all — same shape as Admin.jsx's effect.
@@ -136,15 +169,24 @@ export default function Accounts() {
     setLoading(true)
     setError(null)
 
-    listClubMembers()
-      .then((rows) => {
+    // allSettled, not all: the member list is the screen, the profile list is
+    // one section of it. A failed profiles read must not blank the accounts an
+    // admin came here to manage — it just costs the "waiting for access"
+    // section, which then correctly shows nobody rather than a wrong list. The
+    // reverse is not true: without the member list there is nothing to
+    // subtract, so a failed member read hides the waiting section entirely
+    // (handled at the render site) rather than showing every member as
+    // "waiting".
+    Promise.allSettled([listClubMembers(), listPendingProfiles()])
+      .then(([membersResult, profilesResult]) => {
         if (!mounted) return
-        setMembers(rows)
-      })
-      .catch((err) => {
-        if (!mounted) return
-        setError(err)
-        setMembers([])
+        if (membersResult.status === 'fulfilled') {
+          setMembers(membersResult.value)
+        } else {
+          setError(membersResult.reason)
+          setMembers([])
+        }
+        setProfiles(profilesResult.status === 'fulfilled' ? profilesResult.value : [])
       })
       .finally(() => {
         if (mounted) setLoading(false)
@@ -166,10 +208,35 @@ export default function Accounts() {
   )
   const teamsById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams])
 
+  // The club to grant into. There is no club context in this app — every
+  // screen that needs a club id digs it out of data it already holds
+  // (InviteForm reads teams[0]?.club_id, PlayerImport reads it off the
+  // caller's own memberships). Both are read here, memberships first: the
+  // admin's own membership row names the club they actually administer,
+  // whereas teams[0] is only right because this database has exactly one
+  // club. It is opportunistic either way — see the report note.
+  const clubId = useMemo(
+    () =>
+      memberships.find((row) => row.club_id)?.club_id ??
+      teams.find((team) => team.club_id)?.club_id ??
+      null,
+    [memberships, teams],
+  )
+
   if (!admin) return <NotAuthorised />
 
   const groups = groupByProfile(members)
   const isFirstLoad = loading && members.length === 0
+
+  // THE subtraction. listPendingProfiles() returns everyone the admin can
+  // read; only the ids with no membership row are actually waiting. The
+  // caller's own id is excluded belt-and-braces — an admin always has a
+  // membership, so the first filter already removes them, but not if the
+  // member list came back short.
+  const memberProfileIds = new Set(members.map((member) => member.profile_id).filter(Boolean))
+  const waiting = profiles.filter(
+    (profile) => !memberProfileIds.has(profile.id) && profile.id !== user?.id,
+  )
 
   // Counted from the full club-wide list, so the guard holds even if the
   // caller's other admin row is rendered in some block further down.
@@ -239,6 +306,76 @@ export default function Accounts() {
     }
   }
 
+  function patchGrant(profileId, patch) {
+    setGrantState((prev) => ({ ...prev, [profileId]: { ...prev[profileId], ...patch } }))
+  }
+
+  async function grant(profile) {
+    const draft = grantState[profile.id] ?? {}
+    const role = draft.role ?? ''
+    const teamId = draft.teamId ?? ''
+
+    // Validated here as well as in grantMembership: the data layer throws for
+    // a missing age group, but a missing role would reach the network as an
+    // invalid insert, and neither refusal reads as well as being told before
+    // anything is attempted.
+    if (!role) {
+      patchGrant(profile.id, { error: NO_ROLE_CHOSEN })
+      return
+    }
+    if (role !== 'admin' && !teamId) {
+      patchGrant(profile.id, { error: NO_TEAM_CHOSEN })
+      return
+    }
+    if (!clubId) {
+      patchGrant(profile.id, { error: NO_CLUB_KNOWN })
+      return
+    }
+
+    patchGrant(profile.id, { saving: true, error: null })
+    try {
+      const created = await grantMembership({
+        profileId: profile.id,
+        clubId,
+        role,
+        // grantMembership coerces this to null for an admin grant anyway; the
+        // age-group select is hidden in that case, so it is normally ''.
+        teamId: role === 'admin' ? null : teamId,
+      })
+
+      // Move the person from "waiting" into the main list in place, rather
+      // than re-querying: the insert returns the row, and the profile and team
+      // are both already in hand. The embeds listClubMembers would have
+      // supplied are reconstructed here so the new block renders identically
+      // to every other one. A blank full_name becomes null, not '', because
+      // the list falls back on nullish only — an empty string would render as
+      // a nameless block that looks like a bug.
+      setMembers((prev) => [
+        ...prev,
+        {
+          ...created,
+          profiles: {
+            full_name: profile.full_name?.trim() ? profile.full_name : null,
+            email: profile.email ?? null,
+          },
+          teams: created.team_id ? teamsById.get(created.team_id) ?? null : null,
+          players: null,
+        },
+      ])
+      setProfiles((prev) => prev.filter((row) => row.id !== profile.id))
+      setGrantState((prev) => {
+        const next = { ...prev }
+        delete next[profile.id]
+        return next
+      })
+    } catch (err) {
+      patchGrant(profile.id, {
+        saving: false,
+        error: err?.message || "We couldn't give that person access.",
+      })
+    }
+  }
+
   async function saveName(group) {
     const draft = nameEdit[group.key]
     if (!draft) return
@@ -297,6 +434,134 @@ export default function Accounts() {
         <Card className="flex justify-center py-10">
           <Spinner label="Loading accounts…" />
         </Card>
+      )}
+
+      {/* Hidden while the member list is missing: without it there is nothing
+          to subtract, and every existing member would show up as "waiting". */}
+      {!isFirstLoad && !error && (
+        <section data-testid="waiting-for-access" className="mb-5">
+          <h3 className="text-[16px] font-extrabold tracking-[-0.2px] text-ink">
+            Waiting for access
+          </h3>
+          <p className={`mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
+            Anyone can create a login with their email address, but they see nothing at all in
+            the app until an admin gives them access. These people have signed up and have no
+            access yet — they haven&apos;t asked for anything, and nothing is waiting on you
+            unless you recognise them.
+          </p>
+
+          {waiting.length === 0 ? (
+            <Card className="mt-2.5">
+              <Empty message="Nobody is waiting for access. Anyone who signs up without an invite will appear here." />
+            </Card>
+          ) : (
+            <>
+              <div className="mt-2.5 flex flex-col gap-3">
+                {waiting.map((profile) => {
+                  const state = grantState[profile.id] ?? {}
+                  const role = state.role ?? ''
+                  const displayName = profile.full_name?.trim() || 'No name yet'
+                  const label = profile.email || displayName
+                  const signedUp = formatJoined(profile.created_at)
+
+                  return (
+                    <Card
+                      key={profile.id}
+                      data-testid="waiting-person"
+                      className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[14px] py-3"
+                    >
+                      <span
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-surface-mute text-[12px] font-extrabold tracking-[.5px] text-ink-muted"
+                        aria-hidden="true"
+                      >
+                        {initials(profile.full_name?.trim() || profile.email || '?')}
+                      </span>
+
+                      <div className="min-w-0">
+                        <span className="block text-[15px] font-bold text-ink">{displayName}</span>
+                        <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
+                          {profile.email ?? 'No email on file'}
+                          {signedUp ? ` · signed up ${signedUp}` : ''}
+                        </span>
+                      </div>
+
+                      <span className="flex-1" />
+
+                      <select
+                        className={INLINE_CONTROL}
+                        aria-label={`Role for ${label}`}
+                        value={role}
+                        disabled={Boolean(state.saving)}
+                        onChange={(event) =>
+                          patchGrant(profile.id, { role: event.target.value, error: null })
+                        }
+                      >
+                        <option value="">Choose a role</option>
+                        {ROLE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Same rule as the member rows above and as
+                          grantMembership itself: an admin is club-wide, every
+                          other role needs an age group or it scopes to
+                          nothing. */}
+                      {role === 'admin' ? (
+                        <span className={`px-2 text-[13px] ${MUTED_ON_PAPER}`}>All age groups</span>
+                      ) : (
+                        <select
+                          className={INLINE_CONTROL}
+                          aria-label={`Age group for ${label}`}
+                          value={state.teamId ?? ''}
+                          disabled={Boolean(state.saving)}
+                          onChange={(event) =>
+                            patchGrant(profile.id, { teamId: event.target.value, error: null })
+                          }
+                        >
+                          <option value="">Choose an age group</option>
+                          {sortedTeams.map((team) => (
+                            <option key={team.id} value={team.id}>
+                              {team.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      <button
+                        type="button"
+                        aria-label={`Give access to ${label}`}
+                        disabled={Boolean(state.saving)}
+                        onClick={() => grant(profile)}
+                        className="rounded-[8px] bg-brand px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-brand-deep disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                      >
+                        {state.saving ? 'Giving access…' : 'Give access'}
+                      </button>
+
+                      {state.error && (
+                        <span
+                          role="alert"
+                          className="basis-full text-[12.5px] font-semibold text-brand-deep"
+                        >
+                          {state.error}
+                        </span>
+                      )}
+                    </Card>
+                  )
+                })}
+              </div>
+
+              {/* Said rather than offered as a control — see the comment on
+                  NO_ROLE_CHOSEN above. */}
+              <p className={`mt-2 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
+                There&apos;s nothing to turn down here. If you don&apos;t recognise someone,
+                leave them alone — with no access they can already see nothing, and they stay on
+                this list. Closing an account itself isn&apos;t something this screen can do.
+              </p>
+            </>
+          )}
+        </section>
       )}
 
       {!isFirstLoad && error && (

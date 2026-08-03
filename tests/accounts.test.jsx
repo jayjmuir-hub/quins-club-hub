@@ -12,6 +12,8 @@ import userEvent from '@testing-library/user-event'
 const useMembershipsMock = vi.fn()
 const useAuthMock = vi.fn()
 const listClubMembersMock = vi.fn()
+const listPendingProfilesMock = vi.fn()
+const grantMembershipMock = vi.fn()
 const updateMembershipRoleMock = vi.fn()
 const deleteMembershipMock = vi.fn()
 const updateProfileNameMock = vi.fn()
@@ -26,6 +28,8 @@ vi.mock('../src/lib/auth.jsx', () => ({
 
 vi.mock('../src/data/members.js', () => ({
   listClubMembers: (...args) => listClubMembersMock(...args),
+  listPendingProfiles: (...args) => listPendingProfilesMock(...args),
+  grantMembership: (...args) => grantMembershipMock(...args),
   updateMembershipRole: (...args) => updateMembershipRoleMock(...args),
   deleteMembership: (...args) => deleteMembershipMock(...args),
   updateProfileName: (...args) => updateProfileNameMock(...args),
@@ -38,7 +42,9 @@ const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
 const TEAM_U12 = { id: 'team-u12', name: 'U12 Boys', sort_order: 6 }
 const TEAMS = [TEAM_U12, TEAM_U10] // deliberately unsorted; the screen sorts
 
-const ADMIN = [{ id: 'm1', role: 'admin', team_id: null }]
+const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
+
+const ADMIN = [{ id: 'm1', role: 'admin', team_id: null, club_id: CLUB_ID }]
 const COACH = [{ id: 'm2', role: 'coach', team_id: 'team-u10' }]
 const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
 
@@ -92,6 +98,31 @@ const ALI_PARENT = {
 
 const MEMBER_ROWS = [JAY_ADMIN, SARA_COACH, SARA_PARENT, ALI_PARENT]
 
+// What listPendingProfiles ACTUALLY returns for an admin: their own profile,
+// every profile with a membership in their club, AND the genuinely unattached
+// signups — the union of three RLS policies, not a pending list. Only the last
+// two rows here are waiting for access. Any test fixture that returns only the
+// unattached rows would hide the exact bug this screen has to avoid.
+const JANICE_PENDING = {
+  id: 'profile-janice',
+  full_name: '',
+  email: 'janice@example.com',
+  created_at: '2026-08-03T11:37:00Z',
+}
+const RAW_PENDING = {
+  id: 'profile-raw',
+  full_name: 'Raw Recruit',
+  email: 'raw@example.com',
+  created_at: '2026-08-02T08:00:00Z',
+}
+const PROFILE_ROWS = [
+  JANICE_PENDING,
+  RAW_PENDING,
+  { id: SELF_ID, full_name: 'Jay Muir', email: 'jay@example.com', created_at: '2026-01-05T09:00:00Z' },
+  { id: 'profile-sara', full_name: 'Sara Coach', email: 'sara@example.com', created_at: '2026-02-01T09:00:00Z' },
+  { id: 'profile-ali', full_name: 'Ali Parent', email: 'ali@example.com', created_at: '2026-03-01T09:00:00Z' },
+]
+
 function memberships(rows, teams = TEAMS) {
   return {
     memberships: rows,
@@ -110,6 +141,16 @@ beforeEach(() => {
   useMembershipsMock.mockReturnValue(memberships(ADMIN))
   useAuthMock.mockReturnValue({ user: { id: SELF_ID, email: 'jay@example.com' } })
   listClubMembersMock.mockResolvedValue(MEMBER_ROWS)
+  listPendingProfilesMock.mockResolvedValue(PROFILE_ROWS)
+  grantMembershipMock.mockImplementation(async ({ profileId, clubId, role, teamId }) => ({
+    id: `mem-new-${profileId}`,
+    profile_id: profileId,
+    club_id: clubId,
+    role,
+    team_id: role === 'admin' ? null : teamId,
+    player_id: null,
+    created_at: '2026-08-03T12:00:00Z',
+  }))
   updateMembershipRoleMock.mockImplementation(async ({ membershipId, role, teamId }) => ({
     id: membershipId,
     role,
@@ -368,7 +409,16 @@ describe('Accounts — revoking access', () => {
 
     expect(deleteMembershipMock).toHaveBeenCalledWith('mem-ali')
     expect(await screen.findByText(/2 people/i)).toBeInTheDocument()
-    expect(screen.queryByText('Ali Parent')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('account-person')).toHaveLength(2)
+
+    // He was holding his ONLY membership, so revoking it leaves him with a
+    // login and no access — which is exactly what "Waiting for access" means.
+    // He therefore moves into that section rather than vanishing (a reload
+    // would show the same thing). Not a bug: the alternative is an account
+    // that exists and is listed nowhere, which is the problem Task B fixed.
+    expect(
+      within(screen.getByTestId('waiting-for-access')).getByText('Ali Parent'),
+    ).toBeInTheDocument()
   })
 
   it('removes only the confirmed row of a person who holds several', async () => {
@@ -442,5 +492,184 @@ describe('Accounts — last-admin guard', () => {
     await user.click(screen.getByRole('button', { name: /yes, revoke ali parent/i }))
 
     expect(deleteMembershipMock).toHaveBeenCalledWith('mem-ali')
+  })
+})
+
+// Task B (plan 2026-08-03 §Task B). Signing up creates a profile but no
+// membership, so these people are invisible everywhere else on this screen.
+describe('Accounts — waiting for access', () => {
+  function waitingSection() {
+    return screen.getByTestId('waiting-for-access')
+  }
+
+  // The single most important test in this file. listPendingProfiles returns
+  // EVERY profile the admin can read — their own, every member of their club,
+  // and the unattached signups — so the screen has to subtract the profile ids
+  // already in the member list. Skip that and every existing member is shown
+  // as if they had no access.
+  it('lists only the profiles with no membership, never existing members', async () => {
+    setup()
+
+    await screen.findByText('Sara Coach')
+    const section = waitingSection()
+
+    expect(within(section).getAllByTestId('waiting-person')).toHaveLength(2)
+    expect(within(section).getByText(/janice@example\.com/)).toBeInTheDocument()
+    expect(within(section).getByText('Raw Recruit')).toBeInTheDocument()
+
+    // Members, and the signed-in admin, are all in the readable profile list
+    // and must NOT be here.
+    expect(within(section).queryByText('Sara Coach')).not.toBeInTheDocument()
+    expect(within(section).queryByText(/sara@example\.com/)).not.toBeInTheDocument()
+    expect(within(section).queryByText('Ali Parent')).not.toBeInTheDocument()
+    expect(within(section).queryByText(/ali@example\.com/)).not.toBeInTheDocument()
+    expect(within(section).queryByText('Jay Muir')).not.toBeInTheDocument()
+    expect(within(section).queryByText(/jay@example\.com/)).not.toBeInTheDocument()
+  })
+
+  it('shows the signup date, a blank-name fallback, and explains what the list is', async () => {
+    setup()
+
+    await screen.findByText('Sara Coach')
+    const section = waitingSection()
+
+    expect(within(section).getByRole('heading', { name: /waiting for access/i })).toBeInTheDocument()
+    expect(within(section).getByText(/see nothing at all in the app/i)).toBeInTheDocument()
+    // Not "requests" — nobody asked for anything.
+    expect(within(section).queryByText(/request/i)).not.toBeInTheDocument()
+    expect(within(section).getByText('No name yet')).toBeInTheDocument()
+    expect(within(section).getByText(/signed up 3 Aug 2026/)).toBeInTheDocument()
+  })
+
+  it('offers no reject or dismiss control, and says why', async () => {
+    setup()
+
+    await screen.findByText('Sara Coach')
+    const section = waitingSection()
+
+    expect(within(section).queryByRole('button', { name: /dismiss|reject|decline|ignore/i })).toBeNull()
+    expect(within(section).getByText(/nothing to turn down/i)).toBeInTheDocument()
+  })
+
+  it('renders an empty state, not a bare heading, when nobody is waiting', async () => {
+    // Only members and the admin readable — the normal steady state.
+    listPendingProfilesMock.mockResolvedValue(PROFILE_ROWS.filter((row) => row.id.startsWith('profile-') && row.id !== 'profile-janice' && row.id !== 'profile-raw'))
+
+    setup()
+
+    await screen.findByText('Sara Coach')
+    const section = waitingSection()
+
+    expect(within(section).queryAllByTestId('waiting-person')).toHaveLength(0)
+    expect(within(section).getByText(/nobody is waiting for access/i)).toBeInTheDocument()
+  })
+
+  it('grants access with the club, role and age group, and moves the person into the list', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.selectOptions(screen.getByLabelText('Role for raw@example.com'), 'coach')
+    await user.selectOptions(screen.getByLabelText('Age group for raw@example.com'), 'team-u10')
+    await user.click(screen.getByRole('button', { name: /give access to raw@example\.com/i }))
+
+    expect(grantMembershipMock).toHaveBeenCalledWith({
+      profileId: 'profile-raw',
+      clubId: CLUB_ID,
+      role: 'coach',
+      teamId: 'team-u10',
+    })
+
+    // Moved, not duplicated: gone from the waiting list, present in the main
+    // one, with no reload.
+    expect(await screen.findByLabelText('Role for Raw Recruit (U10)')).toHaveValue('coach')
+    expect(within(waitingSection()).getAllByTestId('waiting-person')).toHaveLength(1)
+    expect(screen.getAllByTestId('account-person')).toHaveLength(4)
+    expect(listClubMembersMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('grants an admin with no age group control at all', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.selectOptions(screen.getByLabelText('Role for raw@example.com'), 'admin')
+
+    expect(screen.queryByLabelText('Age group for raw@example.com')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /give access to raw@example\.com/i }))
+
+    expect(grantMembershipMock).toHaveBeenCalledWith({
+      profileId: 'profile-raw',
+      clubId: CLUB_ID,
+      role: 'admin',
+      teamId: null,
+    })
+    expect(await screen.findByLabelText('Role for Raw Recruit (club-wide)')).toHaveValue('admin')
+  })
+
+  it('refuses to grant without a role, before any network call', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.click(screen.getByRole('button', { name: /give access to raw@example\.com/i }))
+
+    expect(grantMembershipMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/choose a role/i)
+  })
+
+  it('refuses a non-admin grant without an age group, before any network call', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.selectOptions(screen.getByLabelText('Role for raw@example.com'), 'parent')
+    await user.click(screen.getByRole('button', { name: /give access to raw@example\.com/i }))
+
+    expect(grantMembershipMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/choose an age group/i)
+  })
+
+  it('reports a refused grant inline and keeps the person on the list', async () => {
+    grantMembershipMock.mockRejectedValue(
+      new Error("We couldn't give that person access. You may not have permission to manage members."),
+    )
+
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.selectOptions(screen.getByLabelText('Role for raw@example.com'), 'coach')
+    await user.selectOptions(screen.getByLabelText('Age group for raw@example.com'), 'team-u10')
+    await user.click(screen.getByRole('button', { name: /give access to raw@example\.com/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/may not have permission/i)
+    expect(within(waitingSection()).getAllByTestId('waiting-person')).toHaveLength(2)
+  })
+
+  // Without the member list there is nothing to subtract against, so showing
+  // the section would show every member as waiting.
+  it('hides the section entirely when the member list failed to load', async () => {
+    listClubMembersMock.mockRejectedValue(new Error('Network unreachable'))
+
+    setup()
+
+    await screen.findByText(/network unreachable/i)
+    expect(screen.queryByTestId('waiting-for-access')).not.toBeInTheDocument()
+  })
+
+  // The reverse failure is survivable: the accounts an admin came to manage
+  // still render, and the section honestly shows nobody.
+  it('still renders the accounts when the profile read failed', async () => {
+    listPendingProfilesMock.mockRejectedValue(new Error('permission denied'))
+
+    setup()
+
+    expect(await screen.findByText('Sara Coach')).toBeInTheDocument()
+    expect(within(waitingSection()).getByText(/nobody is waiting for access/i)).toBeInTheDocument()
+  })
+
+  it('issues no profile query for a non-admin', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+
+    setup()
+
+    expect(listPendingProfilesMock).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('waiting-for-access')).not.toBeInTheDocument()
   })
 })
