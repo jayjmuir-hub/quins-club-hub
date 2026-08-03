@@ -1,0 +1,379 @@
+-- =====================================================================
+-- db/schema/functions.sql
+-- CAPTURE of every function in the `public` and `private` schemas of
+-- Supabase project lusmshimxdcxpnrktlgz (quins-club-hub), 2026-08-03.
+--
+-- This is a CAPTURE, not a migration. Do not run this file. See README.md.
+--
+-- Source: pg_proc + pg_get_functiondef(oid) + proacl, verbatim. Bodies
+-- below are exactly what the database returns — not reformatted.
+--
+-- Schema-level USAGE (pg_namespace.nspacl), which gates whether an
+-- EXECUTE grant is reachable at all:
+--   private: {postgres=UC/postgres, authenticated=U/postgres}
+--   public : {pg_database_owner=UC/pg_database_owner, =U/pg_database_owner,
+--             postgres=U/pg_database_owner, anon=U/pg_database_owner,
+--             authenticated=U/pg_database_owner, service_role=U/pg_database_owner}
+--
+-- NOTE (recorded, not fixed): `anon` holds EXECUTE on four private
+-- helpers (is_admin, can_see_team, can_edit_team, is_own_player) but has
+-- NO USAGE on the `private` schema, so it cannot actually call them
+-- directly. Those grants were restored deliberately by the migration
+-- `restore_anon_execute_on_rls_helpers` to match pre-migration behaviour;
+-- they are inert for direct calls and irrelevant to RLS evaluation
+-- (policies run the function as the policy owner). Leaving as-is.
+-- =====================================================================
+
+
+-- #####################################################################
+-- ##                                                                 ##
+-- ##   public.accept_invite(uuid) — SECURITY-CRITICAL                ##
+-- ##                                                                 ##
+-- ##   THIS FUNCTION IS `SECURITY DEFINER` AND IT WRITES ACCESS.     ##
+-- ##   It is the ONLY path that turns an invite token into a         ##
+-- ##   memberships row, and memberships are what every RLS policy    ##
+-- ##   in this database bottoms out in. A weakened guard here is a   ##
+-- ##   privilege-escalation hole, not a bug.                         ##
+-- ##                                                                 ##
+-- ##   The five guards, in order, MUST NEVER BE WEAKENED OR          ##
+-- ##   REORDERED AWAY:                                               ##
+-- ##     1. SIGNED IN — caller_email resolved from auth.users via    ##
+-- ##        auth.uid(); null means not signed in, hard raise.        ##
+-- ##     2. TOKEN EXISTS, ROW-LOCKED — `select ... for update`       ##
+-- ##        against a concurrent double-accept. The FOR UPDATE is    ##
+-- ##        load-bearing; a plain SELECT lets two calls both pass    ##
+-- ##        the accepted_at check.                                   ##
+-- ##     3. NOT ALREADY ACCEPTED — accepted_at must be null.         ##
+-- ##     4. CALLER EMAIL MATCHES — lower(inv.email) must equal       ##
+-- ##        lower(caller_email), taken from auth.users, NOT from any ##
+-- ##        client-supplied argument.                                ##
+-- ##     5. INCOMPLETE-INVITE CHECK — a non-admin invite with no     ##
+-- ##        invite_targets rows AND no team_id is rejected. This     ##
+-- ##        replaces the dropped table CHECK constraint              ##
+-- ##        `invites_team_required_unless_admin`; it is the only     ##
+-- ##        thing now stopping a club-wide-scoped membership being   ##
+-- ##        minted from a malformed invite.                          ##
+-- ##                                                                 ##
+-- ##   EXECUTE grants are authenticated + service_role + postgres    ##
+-- ##   ONLY. `anon` must never be granted EXECUTE. Supabase's        ##
+-- ##   default privileges auto-grant EXECUTE on new public-schema    ##
+-- ##   functions to anon AND authenticated, so ANY migration that    ##
+-- ##   recreates this function must be followed by an explicit       ##
+-- ##   REVOKE EXECUTE ... FROM anon and re-verified.                 ##
+-- ##                                                                 ##
+-- ##   HISTORY — READ BEFORE TOUCHING: on 2026-08-03 an older        ##
+-- ##   migration named `accept_invite_multi_target` was re-applied   ##
+-- ##   repeatedly and silently reverted guard 5 each time. That is   ##
+-- ##   why this file exists. See db/schema/README.md.                ##
+-- ##                                                                 ##
+-- #####################################################################
+--
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- prosecdef: true    provolatile: v (VOLATILE)    proconfig: search_path=public
+
+CREATE OR REPLACE FUNCTION public.accept_invite(_token uuid)
+ RETURNS SETOF memberships
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  inv public.invites%rowtype;
+  caller_email text;
+  target_count int;
+begin
+  select email into caller_email from auth.users where id = auth.uid();
+  if caller_email is null then
+    raise exception 'You must be signed in to accept an invite.';
+  end if;
+
+  select * into inv from public.invites where token = _token for update;
+  if not found then
+    raise exception 'This invite link is not valid.';
+  end if;
+
+  if inv.accepted_at is not null then
+    raise exception 'This invite has already been used.';
+  end if;
+
+  if lower(inv.email) <> lower(caller_email) then
+    raise exception 'This invite was sent to a different email address than the one you signed in with.';
+  end if;
+
+  select count(*) into target_count
+  from public.invite_targets t where t.invite_id = inv.id;
+
+  -- Replaces the dropped invites_team_required_unless_admin CHECK.
+  if inv.role <> 'admin' and target_count = 0 and inv.team_id is null then
+    raise exception 'This invite is incomplete — it has no age group. Ask an admin to send a new one.';
+  end if;
+
+  update public.invites set accepted_at = now() where id = inv.id;
+
+  if target_count > 0 then
+    return query
+    insert into public.memberships (profile_id, club_id, team_id, role, player_id)
+    select distinct auth.uid(), inv.club_id, t.team_id, inv.role, t.player_id
+    from public.invite_targets t
+    where t.invite_id = inv.id
+    returning *;
+  else
+    return query
+    insert into public.memberships (profile_id, club_id, team_id, role, player_id)
+    values (auth.uid(), inv.club_id, inv.team_id, inv.role, inv.player_id)
+    returning *;
+  end if;
+end;
+$function$
+;
+
+-- Grants as captured:
+REVOKE ALL ON FUNCTION public.accept_invite(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
+-- (postgres holds EXECUTE as owner. `anon` deliberately does NOT.)
+
+
+-- =====================================================================
+-- private.* — RLS helper functions
+--
+-- All are SECURITY DEFINER with SET search_path = 'public'. The read-only
+-- boolean helpers are STABLE; the two trigger functions are VOLATILE.
+-- They live in `private` rather than `public` so PostgREST cannot expose
+-- them as RPC endpoints (Task 21).
+-- =====================================================================
+
+
+-- ---------------------------------------------------------------------
+-- private.can_admin_see_pending(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_admin_see_pending(_profile uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+           select 1 from memberships mine
+           where mine.profile_id = auth.uid() and mine.role = 'admin'
+         )
+     and not exists (
+           select 1 from memberships m where m.profile_id = _profile
+         );
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.can_admin_see_pending(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.can_edit_team(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,anon=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_edit_team(_team uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from memberships m
+    where m.profile_id = auth.uid()
+      and ((m.role = 'admin' and m.club_id = (select club_id from teams where id = _team))
+           or (m.role = 'coach' and m.team_id = _team)));
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.can_edit_team(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION private.can_edit_team(uuid) TO anon;  -- inert: anon has no USAGE on `private`
+
+
+-- ---------------------------------------------------------------------
+-- private.can_manage_invite(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_manage_invite(_invite uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from invites i
+    where i.id = _invite and private.is_admin(i.club_id)
+  );
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.can_manage_invite(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.can_see_team(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,anon=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_see_team(_team uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from memberships m
+    where m.profile_id = auth.uid()
+      and ((m.role = 'admin' and m.club_id = (select club_id from teams where id = _team))
+           or m.team_id = _team));
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.can_see_team(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION private.can_see_team(uuid) TO anon;  -- inert: anon has no USAGE on `private`
+
+
+-- ---------------------------------------------------------------------
+-- private.handle_new_user()  — trigger fn for on_auth_user_created
+-- proacl: {postgres=X/postgres}   (no anon/authenticated grant, by design:
+--   it is only ever invoked by the trigger, which runs as the fn owner)
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.handle_new_user()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  insert into public.profiles (id, full_name, email)
+  values (new.id, coalesce(new.raw_user_meta_data->>'full_name',''), new.email)
+  on conflict (id) do update set email = excluded.email;
+  return new;
+end;
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.handle_new_user() FROM PUBLIC;
+
+
+-- ---------------------------------------------------------------------
+-- private.handle_user_email_change()  — trigger fn for
+--   on_auth_user_email_updated
+--
+-- proacl: NULL — i.e. DEFAULT privileges, which for a function means
+-- EXECUTE to PUBLIC. Unlike handle_new_user() above (explicitly revoked),
+-- this one was never revoked. It is not directly reachable because `anon`
+-- lacks USAGE on `private` and it takes no arguments a caller could
+-- exploit (it reads NEW, so a direct call errors out), but the asymmetry
+-- with handle_new_user is recorded here rather than silently corrected.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.handle_user_email_change()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  update public.profiles set email = new.email where id = new.id;
+  return new;
+end;
+$function$
+;
+
+
+-- ---------------------------------------------------------------------
+-- private.is_admin(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,anon=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_admin(_club uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from memberships m
+    where m.profile_id = auth.uid() and m.club_id = _club and m.role = 'admin');
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.is_admin(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION private.is_admin(uuid) TO anon;  -- inert: anon has no USAGE on `private`
+
+
+-- ---------------------------------------------------------------------
+-- private.is_own_invite(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_own_invite(_invite uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from invites i
+    where i.id = _invite
+      and lower(i.email) = lower(auth.jwt() ->> 'email')
+  );
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.is_own_invite(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.is_own_player(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,anon=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_own_player(_player uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from memberships m
+    where m.profile_id = auth.uid() and m.player_id = _player
+      and m.role in ('parent','player'));
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.is_own_player(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION private.is_own_player(uuid) TO anon;  -- inert: anon has no USAGE on `private`
+
+
+-- ---------------------------------------------------------------------
+-- private.shares_admin_club(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.shares_admin_club(_profile uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1
+    from memberships target
+    join memberships mine on mine.club_id = target.club_id
+    where target.profile_id = _profile
+      and mine.profile_id = auth.uid()
+      and mine.role = 'admin'
+  );
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO authenticated;
+
+
+-- =====================================================================
+-- Complete inventory as captured (11 functions):
+--   public.accept_invite(uuid)                  SECURITY DEFINER, VOLATILE
+--   private.can_admin_see_pending(uuid)         SECURITY DEFINER, STABLE
+--   private.can_edit_team(uuid)                 SECURITY DEFINER, STABLE
+--   private.can_manage_invite(uuid)             SECURITY DEFINER, STABLE
+--   private.can_see_team(uuid)                  SECURITY DEFINER, STABLE
+--   private.handle_new_user()                   SECURITY DEFINER, VOLATILE
+--   private.handle_user_email_change()          SECURITY DEFINER, VOLATILE
+--   private.is_admin(uuid)                      SECURITY DEFINER, STABLE
+--   private.is_own_invite(uuid)                 SECURITY DEFINER, STABLE
+--   private.is_own_player(uuid)                 SECURITY DEFINER, STABLE
+--   private.shares_admin_club(uuid)             SECURITY DEFINER, STABLE
+--
+-- There are NO functions left in `public` other than accept_invite.
+-- =====================================================================

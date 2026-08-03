@@ -520,6 +520,36 @@ cache — where before this task they were live, callable endpoints (the advisor
 "anon/authenticated can execute via RPC" warning). `accept_invite` remains the one function
 genuinely reachable via RPC, exactly as intended.
 
+### The schema is now checked into the repo — `db/schema/`
+
+Everything above describes the schema in prose. **Prose does not diff.** That is precisely
+how an older migration named `accept_invite_multi_target` got re-applied on 2026-08-03 and
+silently reverted the incomplete-invite guard inside `public.accept_invite` — repeatedly,
+undetected, because there was no file in the repo to compare the live function against.
+
+`db/schema/` fixes that. It holds a **capture of the live database** — four SQL files
+(`tables.sql`, `policies.sql`, `functions.sql`, `triggers.sql`) generated from read-only
+catalogue queries (`information_schema.columns`, `pg_constraint`, `pg_policies`,
+`pg_proc` + `pg_get_functiondef` + `proacl`, `pg_trigger`, `pg_class.relrowsecurity`).
+
+Read `db/schema/README.md` first. The essentials:
+
+- **It is a capture, not a migration runner. Do not run those files.** Supabase migrations
+  remain the one and only mechanism for changing the schema.
+- The workflow after any schema change is: apply the migration → re-capture into
+  `db/schema/` → commit both together. If the re-capture shows changes you did not intend,
+  something drifted or was reverted. That is the whole point.
+- The files carry the notes that matter alongside the SQL: the deliberately-absent unique
+  constraints on `memberships` and `invite_targets`, and a prominent header on
+  `public.accept_invite` listing its five guards (signed in / token exists with
+  `FOR UPDATE` / not already accepted / caller email matches / incomplete-invite check)
+  that must never be weakened.
+- `supabase_migrations.schema_migrations` is polluted and must not be trusted as a record
+  of intent: **12 rows named `accept_invite_multi_target` are all stale** and each one
+  reverts the function if re-run. The authoritative definition is the highest version
+  number, `20260803150349 zzz_accept_invite_authoritative_do_not_overwrite` — the `zzz_`
+  prefix is there so "the last one by name" is also the right one.
+
 **`.superpowers/sdd/.gitignore` gets reset to `*` by tooling, repeatedly.** It silently
 untracks the whole ledger. Do not fight it — stage the workspace with
 `git add -f .superpowers/sdd/quins-v1-mvp/` every time.
