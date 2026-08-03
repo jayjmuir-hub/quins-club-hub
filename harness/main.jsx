@@ -6,6 +6,7 @@ import Login from '../src/screens/Login.jsx'
 import Schedule from '../src/screens/Schedule.jsx'
 import Roster from '../src/screens/Roster.jsx'
 import Dashboard from '../src/screens/Dashboard.jsx'
+import Overview from '../src/screens/Overview.jsx'
 import PlayerForm from '../src/screens/PlayerForm.jsx'
 import Availability from '../src/screens/Availability.jsx'
 import Admin from '../src/screens/Admin.jsx'
@@ -195,6 +196,32 @@ const scenarios = {
   dashboard: dashboardScenario(COACH_MEMBERSHIPS),
   'dashboard-admin': dashboardScenario(ADMIN_MEMBERSHIPS),
   'dashboard-parent': dashboardScenario(PARENT_MEMBERSHIPS),
+
+  // Task 5 (Overview screen) browser verification. Same Shell/membership
+  // pattern as the dashboard scenarios above; renders the real Overview
+  // screen instead of Dashboard. COACH_MEMBERSHIPS/ADMIN_MEMBERSHIPS/TEAMS
+  // are the same fixtures every other scenario in this file already uses,
+  // so upcoming fixtures (e6/e7, both within the 14-day window of the repo's
+  // pinned "today") and roster gaps (p4 has no contact row, per players.js's
+  // stub) render with real, reused fixture data rather than new ones.
+  'overview-admin': () => (
+    <Shell
+      route="/overview"
+      authValue={baseAuth(JAY_EMAIL)}
+      membershipValue={{ memberships: ADMIN_MEMBERSHIPS, teams: TEAMS, loading: false, error: null, reload: noop }}
+    >
+      <Overview />
+    </Shell>
+  ),
+  'overview-coach': () => (
+    <Shell
+      route="/overview"
+      authValue={baseAuth(COACH_EMAIL)}
+      membershipValue={{ memberships: COACH_MEMBERSHIPS, teams: TEAMS, loading: false, error: null, reload: noop }}
+    >
+      <Overview />
+    </Shell>
+  ),
 
   // Independent verification pass, Task 15: mount PlayerForm DIRECTLY so the
   // gated branches can be reached without Roster's own gating deciding first.

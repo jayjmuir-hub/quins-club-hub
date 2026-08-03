@@ -54,6 +54,19 @@ export function subscribeAvailability(eventId, callback) {
   }
 }
 
+// Harness addition for Task 5 (Overview screen verification): mirrors the
+// real src/data/availability.js's listAvailabilityForEvents, which bulk-fetches
+// across many event ids. Built from the same per-event listAvailability
+// already defined above (REAL_ROWS/MIX), rather than inventing new fixture
+// data, exactly as the plan asks.
+export async function listAvailabilityForEvents(eventIds) {
+  const results = []
+  for (const eventId of eventIds) {
+    results.push(...(await listAvailability(eventId)))
+  }
+  return results
+}
+
 export async function setAvailability(eventId, playerId, status) {
   window.__writes = window.__writes || []
   window.__writes.push({ op: 'upsert', table: 'availability', payload: { event_id: eventId, player_id: playerId, status } })

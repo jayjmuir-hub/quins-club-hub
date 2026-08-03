@@ -111,6 +111,24 @@ export async function getPlayerContact(playerId) {
   }
 }
 
+// Harness addition for Task 5 (Overview screen verification): the real
+// src/data/players.js's listContactsForPlayers, which bulk-fetches contact
+// rows for many players at once. Mirrors getPlayerContact's own fixture
+// rule above (a row for everyone except p4, the deliberate "no contact on
+// file" case) rather than inventing new fixture data, so Overview's roster-
+// gap count for p4's team reflects the same "missing contact info" case the
+// PlayerDetail sheet already exercises.
+export async function listContactsForPlayers(playerIds) {
+  if (!Array.isArray(playerIds) || playerIds.length === 0) return []
+  return playerIds
+    .filter((id) => id !== 'p4')
+    .map((id) => ({
+      player_id: id,
+      phone: '+971 50 200 1000',
+      email: `${id}.guardian@example.com`,
+    }))
+}
+
 // Task 15 writes. No network and no Supabase: each call records its payload
 // on window so the browser check can assert what the form ACTUALLY built —
 // in particular that the player write and the contact write are two separate
@@ -128,6 +146,23 @@ export async function upsertPlayer(player) {
 export async function deletePlayer(id) {
   window.__writes = window.__writes || []
   window.__writes.push({ op: 'delete', table: 'players', id })
+}
+
+// Harness gap found (and fixed) while verifying Task 5: src/screens/
+// PlayerImport.jsx imports insertPlayers from src/data/players.js, and
+// Roster.jsx imports PlayerImport.jsx, so main.jsx's static import of
+// Roster.jsx pulls this into every scenario's module graph — not just
+// PlayerImport's own. Vite/ESM resolves named exports eagerly, so a missing
+// export here broke every scenario in this file (verified: even
+// ?scenario=roster threw the same "does not provide an export named
+// 'insertPlayers'" pageerror before this was added), not just the new
+// overview-admin/overview-coach ones. Mirrors upsertPlayer's write-recording
+// shape above; no scenario currently drives PlayerImport's bulk-add flow, so
+// this only needs to satisfy the import, not simulate a real bulk insert.
+export async function insertPlayers(rows) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'insert', table: 'players', payload: rows })
+  return (rows ?? []).map((row, i) => ({ id: `p-new-${i}`, ...row }))
 }
 
 export async function upsertContact(contact) {
