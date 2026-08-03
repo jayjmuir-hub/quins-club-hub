@@ -19,6 +19,20 @@ const useMembershipsMock = vi.fn()
 const listPlayersMock = vi.fn()
 const getPlayerContactMock = vi.fn()
 
+const listParentsMock = vi.fn()
+
+vi.mock('../src/data/parents.js', () => ({
+  listParents: (...args) => listParentsMock(...args),
+}))
+
+// The photo bucket is private, so PlayerAvatar signs a URL on mount. Mocked
+// to null here: these tests are about details and contacts, and an unmocked
+// signing call would put a real network request in a unit test.
+vi.mock('../src/data/photos.js', () => ({
+  signPhotoUrl: () => Promise.resolve(null),
+  signPhotoUrls: () => Promise.resolve({}),
+}))
+
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
@@ -124,6 +138,7 @@ beforeEach(() => {
   useMembershipsMock.mockReturnValue(memberships(ADMIN))
   listPlayersMock.mockResolvedValue(ALL_PLAYERS)
   getPlayerContactMock.mockResolvedValue(null)
+  listParentsMock.mockResolvedValue([])
 })
 
 function setup() {
@@ -484,7 +499,10 @@ describe('PlayerDetail — opening a player', () => {
     expect(within(dialog).getByText('Flanker')).toBeInTheDocument()
     expect(within(dialog).getByText('U10')).toBeInTheDocument()
     expect(within(dialog).getByText('Captain')).toBeInTheDocument()
-    expect(getPlayerContactMock).toHaveBeenCalledWith('p-flanker')
+    // Tom is U10. A player's OWN contact details are a U13+ feature, so the
+    // block is not rendered and — the part that matters — the query is never
+    // issued for an under-13 in the first place.
+    expect(getPlayerContactMock).not.toHaveBeenCalled()
     // The club does not use jersey numbers, so the sheet must not offer a
     // row for one — an empty "Jersey number / Not set" row on every player
     // would be pure noise.
@@ -515,15 +533,19 @@ describe('PlayerDetail — opening a player', () => {
 })
 
 describe('PlayerDetail — contact details', () => {
+  // Craig Muir (Senior Men 1st XV), NOT Tom Fletcher (U10). A player's own
+  // phone and email are shown only from U13 up, so the whole of this suite
+  // needs a player old enough to have them. The U13 boundary itself is
+  // asserted in its own suite below.
   async function openTom(user) {
-    await screen.findByText('Tom Fletcher')
-    await user.click(screen.getByRole('button', { name: /Tom Fletcher/ }))
+    await screen.findByText('Craig Muir')
+    await user.click(screen.getByRole('button', { name: /Craig Muir/ }))
     return screen.getByRole('dialog')
   }
 
   it('shows phone and email as links when the contact row comes back', async () => {
     getPlayerContactMock.mockResolvedValue({
-      player_id: 'p-flanker',
+      player_id: 'p-fullback',
       phone: '+971 50 200 1000',
       email: 'tom.fletcher@example.com',
     })
@@ -549,7 +571,7 @@ describe('PlayerDetail — contact details', () => {
     const { user } = setup()
     const dialog = await openTom(user)
 
-    expect(await within(dialog).findByText('Captain')).toBeInTheDocument()
+    expect(await within(dialog).findByRole('heading', { name: 'Craig Muir' })).toBeInTheDocument()
     expect(within(dialog).queryByText(/contact/i)).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/hidden/i)).not.toBeInTheDocument()
     // The Call/Email row lives inside the contact block, so it must go with
@@ -563,7 +585,7 @@ describe('PlayerDetail — contact details', () => {
   })
 
   it('shows only the fields the contact row actually has', async () => {
-    getPlayerContactMock.mockResolvedValue({ player_id: 'p-flanker', phone: null, email: 'a@example.com' })
+    getPlayerContactMock.mockResolvedValue({ player_id: 'p-fullback', phone: null, email: 'a@example.com' })
 
     const { user } = setup()
     const dialog = await openTom(user)
@@ -583,7 +605,7 @@ describe('PlayerDetail — contact details', () => {
     const dialog = await openTom(user)
 
     // The rest of the sheet is already on screen...
-    expect(within(dialog).getByText('Captain')).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Craig Muir' })).toBeInTheDocument()
     // ...but the contact block announces nothing while it waits.
     expect(within(dialog).queryByRole('status')).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/contact/i)).not.toBeInTheDocument()
@@ -592,7 +614,7 @@ describe('PlayerDetail — contact details', () => {
 
   it('offers Call and Email actions for the values that exist', async () => {
     getPlayerContactMock.mockResolvedValue({
-      player_id: 'p-flanker',
+      player_id: 'p-fullback',
       phone: '+971 50 200 1000',
       email: 'tom.fletcher@example.com',
     })
@@ -611,7 +633,7 @@ describe('PlayerDetail — contact details', () => {
   })
 
   it('omits the Call action when there is no phone number', async () => {
-    getPlayerContactMock.mockResolvedValue({ player_id: 'p-flanker', phone: null, email: 'a@example.com' })
+    getPlayerContactMock.mockResolvedValue({ player_id: 'p-fullback', phone: null, email: 'a@example.com' })
 
     const { user } = setup()
     const dialog = await openTom(user)
@@ -628,5 +650,125 @@ describe('PlayerDetail — contact details', () => {
 
     const alert = await within(dialog).findByRole('alert')
     expect(within(alert).getByText(/contact lookup failed/i)).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------
+// Parents block + the U13 own-contact boundary (3 Aug 2026)
+// ---------------------------------------------------------------------
+
+describe('PlayerDetail — parents', () => {
+  async function openTom(user) {
+    await screen.findByText('Tom Fletcher')
+    await user.click(screen.getByRole('button', { name: /Tom Fletcher/ }))
+    return screen.getByRole('dialog')
+  }
+
+  it('lists each parent with their relationship and contact links', async () => {
+    listParentsMock.mockResolvedValue([
+      {
+        id: 'pp-1',
+        player_id: 'p-flanker',
+        full_name: 'Sara Fletcher',
+        relationship: 'Mother',
+        phone: '+971502001000',
+        email: 'sara@example.com',
+        is_primary: true,
+      },
+      {
+        id: 'pp-2',
+        player_id: 'p-flanker',
+        full_name: 'Mark Fletcher',
+        relationship: 'Father',
+        phone: null,
+        email: 'mark@example.com',
+        is_primary: false,
+      },
+    ])
+
+    const { user } = setup()
+    const dialog = await openTom(user)
+
+    expect(await within(dialog).findByText('Sara Fletcher')).toBeInTheDocument()
+    expect(within(dialog).getByText(/Mother/)).toBeInTheDocument()
+    expect(within(dialog).getByText('Mark Fletcher')).toBeInTheDocument()
+    // Stored E.164 is displayed in readable international form.
+    expect(within(dialog).getByRole('link', { name: '+971 50 200 1000' })).toHaveAttribute(
+      'href',
+      'tel:+971502001000',
+    )
+    expect(within(dialog).getByRole('link', { name: 'mark@example.com' })).toHaveAttribute(
+      'href',
+      'mailto:mark@example.com',
+    )
+  })
+
+  it('marks the main contact', async () => {
+    listParentsMock.mockResolvedValue([
+      {
+        id: 'pp-1',
+        player_id: 'p-flanker',
+        full_name: 'Sara Fletcher',
+        relationship: 'Mother',
+        is_primary: true,
+      },
+    ])
+
+    const { user } = setup()
+    const dialog = await openTom(user)
+
+    expect(await within(dialog).findByText(/main contact/i)).toBeInTheDocument()
+  })
+
+  // The safeguarding case, identical in spirit to the contact-row one: an
+  // empty result is normal for a parent viewing a team-mate, and the screen
+  // must not hint that withheld rows exist.
+  it('renders nothing, and no explanation, when RLS returns no parent rows', async () => {
+    listParentsMock.mockResolvedValue([])
+
+    const { user } = setup()
+    const dialog = await openTom(user)
+
+    await within(dialog).findByRole('heading', { name: 'Tom Fletcher' })
+    expect(within(dialog).queryByText(/^parents?$/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/hidden/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('PlayerDetail — the U13 own-contact boundary', () => {
+  it('does not query or show a U10 player’s own contact details', async () => {
+    getPlayerContactMock.mockResolvedValue({
+      player_id: 'p-flanker',
+      phone: '+971502001000',
+      email: 'tom@example.com',
+    })
+
+    const { user } = setup()
+    await screen.findByText('Tom Fletcher')
+    await user.click(screen.getByRole('button', { name: /Tom Fletcher/ }))
+    const dialog = screen.getByRole('dialog')
+
+    await within(dialog).findByRole('heading', { name: 'Tom Fletcher' })
+    // Even with a contact row available, an under-13 gets no player contact
+    // block — and the query is never issued.
+    expect(getPlayerContactMock).not.toHaveBeenCalled()
+    expect(within(dialog).queryByText(/player contact/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('tom@example.com')).not.toBeInTheDocument()
+  })
+
+  it('shows a senior player’s own contact details', async () => {
+    getPlayerContactMock.mockResolvedValue({
+      player_id: 'p-fullback',
+      phone: '+971502001000',
+      email: 'craig@example.com',
+    })
+
+    const { user } = setup()
+    await screen.findByText('Craig Muir')
+    await user.click(screen.getByRole('button', { name: /Craig Muir/ }))
+    const dialog = screen.getByRole('dialog')
+
+    expect(await within(dialog).findByText(/player contact/i)).toBeInTheDocument()
+    expect(within(dialog).getByRole('link', { name: 'craig@example.com' })).toBeInTheDocument()
   })
 })

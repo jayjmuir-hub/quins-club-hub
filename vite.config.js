@@ -80,6 +80,14 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // The flag SVGs behind the phone-number country picker are emitted by
+        // the build (flag-icons is a CSS file of ~271 background images) but
+        // must NOT be precached: that would make every install download every
+        // country's flag, several megabytes of which no user will ever see.
+        // They are fetched on demand instead — a picker that needs the network
+        // to draw a flag it has never shown before is an acceptable trade,
+        // since the field still works and the number still saves offline.
+        globIgnores: ['**/flags/**', '**/assets/*-flag*.svg'],
         // Runtime caching for Supabase REST reads (schedule/roster/dashboard data) so a
         // previously-loaded screen still shows its last-seen data when offline. Auth
         // endpoints and mutations (POST/PATCH/DELETE) are intentionally NOT cached —

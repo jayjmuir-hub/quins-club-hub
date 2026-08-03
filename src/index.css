@@ -4,6 +4,15 @@
    which also means no third-party call from a pitch-side phone on bad signal. */
 @import './../public/fonts/fonts.css';
 
+/* Country flags for the phone-number country picker (src/components/PhoneInput.jsx).
+   SVG rather than emoji flags because Windows ships no flag glyphs — Chrome and
+   Edge on Windows render an emoji flag as the two-letter country code, and the
+   club's admin work is done on a Windows desktop. These are CSS background
+   images, so only the flags actually painted are ever downloaded; the build
+   emits all ~271 but they are excluded from the service worker's precache
+   (see vite.config.js) so an install does not pull megabytes of unused flags. */
+@import 'flag-icons/css/flag-icons.min.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

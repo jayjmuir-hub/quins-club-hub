@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import ScopeNote from '../components/ScopeNote.jsx'
 import { deletePlayer, getPlayerContact } from '../data/players.js'
-import { initials } from '../lib/playerFormat.js'
+import { listParents } from '../data/parents.js'
+import { allowsOwnContact } from '../lib/ageGroup.js'
+import { formatPhone } from '../lib/phone.js'
+import PlayerAvatar from '../components/PlayerAvatar.jsx'
 
 // The player detail sheet (design-system.md §5.7): a branded hero carrying
 // the player's initials, a set of key/value rows, and — only when the database
@@ -80,6 +83,97 @@ function MailIcon(props) {
   )
 }
 
+// The parents/carers block. Same shape and the same rules as ContactBlock
+// below, and for the same reason: player_parents carries adults' names and
+// contact details attached to a named child, and its RLS policies are copied
+// verbatim from player_contacts. So an empty result renders NOTHING — no
+// error, and no "hidden" note, because such a note would confirm to someone
+// who may not see the data that there is data to see.
+//
+// Ordering is the database's (primary first, then sort_order, then name), so
+// the household's main contact is always the first row.
+function ParentsBlock({ playerId }) {
+  const [parents, setParents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    setError(null)
+
+    listParents(playerId)
+      .then((rows) => {
+        if (mounted) setParents(rows)
+      })
+      .catch((err) => {
+        if (!mounted) return
+        setError(err)
+        setParents([])
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [playerId])
+
+  // Nothing while in flight — the block appears late rather than announcing
+  // itself and then collapsing to nothing on an empty result.
+  if (loading) return null
+
+  if (error) {
+    return (
+      <p role="alert" className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
+        {error.message || "We couldn't load parent details. Try again."}
+      </p>
+    )
+  }
+
+  if (parents.length === 0) return null
+
+  return (
+    <div className="mb-4">
+      <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
+        {parents.length === 1 ? 'Parent' : 'Parents'}
+      </h4>
+
+      {parents.map((parent) => (
+        <div key={parent.id} className="border-b border-line py-3 last:border-b-0">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[15px] font-bold text-ink">{parent.full_name}</span>
+            {parent.relationship && (
+              <span className="shrink-0 text-[13px] font-semibold text-ink-faint">
+                {parent.relationship}
+                {parent.is_primary ? ' · main contact' : ''}
+              </span>
+            )}
+          </div>
+
+          {parent.phone && (
+            <a
+              className="mt-1 block text-[14.5px] font-semibold text-accent-ink underline"
+              href={telHref(parent.phone)}
+            >
+              {formatPhone(parent.phone)}
+            </a>
+          )}
+          {parent.email && (
+            <a
+              className="mt-0.5 block break-all text-[14.5px] font-semibold text-accent-ink underline"
+              href={`mailto:${parent.email}`}
+            >
+              {parent.email}
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function ContactBlock({ playerId }) {
   const [contact, setContact] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -137,11 +231,13 @@ function ContactBlock({ playerId }) {
 
   return (
     <div>
-      <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Contact</h4>
+      <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
+        Player contact
+      </h4>
       {contact.phone && (
         <KeyValue label="Phone">
           <a className="text-accent-ink underline" href={telHref(contact.phone)}>
-            {contact.phone}
+            {formatPhone(contact.phone)}
           </a>
         </KeyValue>
       )}
@@ -278,12 +374,7 @@ export default function PlayerDetail({ player, team, onClose, canEdit = false, o
           "copyright" by screen readers and carries no meaning on its own, so
           captaincy is stated in the Role row below instead. */}
       <div className="-mx-[18px] -mt-4 mb-4 bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] px-[18px] py-[22px] text-white">
-        <div
-          className="mb-3 grid h-14 w-14 place-items-center rounded-[14px] bg-white/20 text-[20px] font-extrabold tracking-[.5px]"
-          aria-hidden="true"
-        >
-          {initials(player.full_name)}
-        </div>
+        <PlayerAvatar player={player} size="lg" className="mb-3" />
         <h3 className="text-[22px] font-bold leading-tight">{player.full_name}</h3>
         <p className="mt-1 text-sm font-semibold text-white/[.85]">
           {position} · {teamName}
@@ -296,7 +387,16 @@ export default function PlayerDetail({ player, team, onClose, canEdit = false, o
         <KeyValue label="Role">{player.is_captain ? 'Captain' : 'Player'}</KeyValue>
       </div>
 
-      <ContactBlock playerId={player.id} />
+      <ParentsBlock playerId={player.id} />
+
+      {/* A player's OWN email and phone are shown only from U13 up (Jay's
+          rule, 3 Aug 2026). Below that the block is not rendered at all
+          rather than rendered empty: an under-13 should have no direct
+          contact route in the app, and an empty "Player contact" heading
+          invites someone to go and fill it in. allowsOwnContact fails closed
+          when the squad is unknown, so a team row that failed to load
+          withholds rather than exposes. */}
+      {allowsOwnContact(team?.name) && <ContactBlock playerId={player.id} />}
 
       <FooterActions player={player} canEdit={canEdit} onEdit={onEdit} onDeleted={onDeleted} />
     </Sheet>
