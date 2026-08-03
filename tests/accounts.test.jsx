@@ -139,6 +139,66 @@ const PROFILE_ROWS = [
   { id: 'profile-ali', full_name: 'Ali Parent', email: 'ali@example.com', created_at: '2026-03-01T09:00:00Z' },
 ]
 
+// ---------------------------------------------------------------------------
+// The five-child parent fixture (Jay, 3 Aug 2026: "some parents have 3, 4 or
+// even 5 children at the club, across different age groups").
+//
+// The roster here is 45 players — deliberately bigger than PlayerPicker's
+// MAX_RESULTS = 25 — so the draw cap is genuinely active while these tests
+// run. Two of the five Haddad children sit past index 25 and are therefore not
+// even DRAWN until they are searched for, which is the only honest way to
+// prove the cap limits what is shown and never what can be selected.
+const TEAM_U8 = { id: 'team-u8', name: 'U8', sort_order: 3 }
+const TEAM_U14 = { id: 'team-u14', name: 'U14', sort_order: 8 }
+const TEAM_U16 = { id: 'team-u16', name: 'U16', sort_order: 10 }
+const BIG_TEAMS = [TEAM_U14, TEAM_U8, TEAM_U16, TEAM_U12, TEAM_U10] // unsorted on purpose
+
+// One family, five children, five different age groups. They share a surname
+// (as a real family does), so each child is reached by a DIFFERENT search
+// term — their first name — and each of those terms matches exactly one row.
+// That matters: when the query is "layla", Yusuf is not in the result list at
+// all, so his chip staying on screen proves the selection lives in the caller
+// and survives a query that no longer matches him.
+const HADDADS = [
+  { id: 'player-yusuf', full_name: 'Yusuf Haddad', team_id: 'team-u8' },
+  { id: 'player-layla', full_name: 'Layla Haddad', team_id: 'team-u10' },
+  { id: 'player-ibrahim', full_name: 'Ibrahim Haddad', team_id: 'team-u12' },
+  { id: 'player-noura', full_name: 'Noura Haddad', team_id: 'team-u14' },
+  { id: 'player-zaid', full_name: 'Zaid Haddad', team_id: 'team-u16' },
+]
+
+// 40 other players. No filler name contains "haddad" or any Haddad first name
+// as a substring, so every search below is unambiguous.
+const FILLER_FIRST = [
+  'Adam', 'Ben', 'Callum', 'Daniel', 'Ethan', 'Farhan', 'George', 'Hamza',
+  'Isaac', 'Jack', 'Kareem', 'Liam', 'Mohsin', 'Nathan', 'Oscar', 'Patrick',
+  'Quentin', 'Rashid', 'Samir', 'Tariq',
+]
+const FILLER_LAST = ['Brown', 'Carter']
+const FILLER_TEAMS = ['team-u8', 'team-u10', 'team-u12', 'team-u14', 'team-u16']
+const FILLER = FILLER_LAST.flatMap((last, lastIndex) =>
+  FILLER_FIRST.map((first, firstIndex) => ({
+    id: `filler-${lastIndex}-${firstIndex}`,
+    full_name: `${first} ${last}`,
+    team_id: FILLER_TEAMS[(lastIndex * FILLER_FIRST.length + firstIndex) % FILLER_TEAMS.length],
+  })),
+)
+
+// Scattered, not clustered: indexes 3, 12, 26, 33 and 44 of 45. The last two
+// are past the 25-row cap, so an unsearched picker cannot reach them.
+const BIG_ROSTER = [
+  ...FILLER.slice(0, 3),
+  HADDADS[0],
+  ...FILLER.slice(3, 11),
+  HADDADS[1],
+  ...FILLER.slice(11, 24),
+  HADDADS[2],
+  ...FILLER.slice(24, 30),
+  HADDADS[3],
+  ...FILLER.slice(30, 40),
+  HADDADS[4],
+]
+
 function memberships(rows, teams = TEAMS) {
   return {
     memberships: rows,
@@ -970,6 +1030,93 @@ describe('Accounts — access builder', () => {
 
     expect(screen.queryByTestId('add-access')).toBeNull()
     expect(grantMembershipsMock).not.toHaveBeenCalled()
+  })
+
+  // Jay, 3 Aug 2026: some parents have three, four or five children at the
+  // club, across different age groups. Five rows in one save, each carrying
+  // its own child and that child's own team — driven through the REAL picker
+  // search, because "select a child, change the search, select another" is the
+  // only way an admin can actually do this and the only thing that can break.
+  it('parent + FIVE children in five different age groups creates five correct rows', async () => {
+    useMembershipsMock.mockReturnValue(memberships(ADMIN, BIG_TEAMS))
+    listPlayersMock.mockResolvedValue(BIG_ROSTER)
+
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+    await chooseRole(user, 'raw@example.com', 'parent')
+
+    const picker = within(builderFor('raw@example.com')).getByTestId('player-picker')
+    await within(picker).findByRole('checkbox', { name: /Yusuf Haddad/ })
+    const search = within(picker).getByLabelText(/search players/i)
+
+    // The cap is genuinely active: 45 on the roster, 25 drawn, and the two
+    // children past index 25 are not reachable without typing.
+    expect(within(picker).getAllByRole('checkbox')).toHaveLength(25)
+    expect(within(picker).getByText(/Showing 25 of 45/)).toBeInTheDocument()
+    expect(within(picker).queryByRole('checkbox', { name: /Noura Haddad/ })).toBeNull()
+    expect(within(picker).queryByRole('checkbox', { name: /Zaid Haddad/ })).toBeNull()
+
+    const chosen = []
+    for (const [term, child] of [
+      ['yusuf', 'Yusuf Haddad'],
+      ['layla', 'Layla Haddad'],
+      ['ibrahim', 'Ibrahim Haddad'],
+      ['noura', 'Noura Haddad'],
+      ['zaid', 'Zaid Haddad'],
+    ]) {
+      await user.clear(search)
+      await user.type(search, term)
+
+      // Each term narrows to exactly one row, so the previously chosen
+      // children are NOT in the result list at this point.
+      const results = within(picker).getAllByRole('checkbox')
+      expect(results).toHaveLength(1)
+      expect(results[0]).toHaveAccessibleName(new RegExp(child))
+
+      await user.click(results[0])
+      chosen.push(child)
+
+      // Everything chosen so far is still pinned above the results, even
+      // though the current query matches none of the earlier children.
+      const pinned = within(picker).getByTestId('player-picker-selected')
+      expect(within(pinned).getAllByRole('button').map((chip) => chip.textContent)).toEqual(
+        chosen.map((name) => `${name}×`),
+      )
+    }
+
+    // A query matching nobody at all leaves all five selections standing.
+    await user.clear(search)
+    await user.type(search, 'zzzzz')
+    expect(within(picker).queryAllByRole('checkbox')).toHaveLength(0)
+    expect(
+      within(within(picker).getByTestId('player-picker-selected')).getAllByRole('button'),
+    ).toHaveLength(5)
+
+    await submitAccess(user, 'Give access', 'raw@example.com')
+
+    // Exactly five rows, in selection order, each (team_id, player_id) pair
+    // stated explicitly — a fifth child is not a rounding error.
+    expect(grantMembershipsMock).toHaveBeenCalledTimes(1)
+    expect(grantMembershipsMock).toHaveBeenCalledWith([
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'parent', teamId: 'team-u8', playerId: 'player-yusuf' },
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'parent', teamId: 'team-u10', playerId: 'player-layla' },
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'parent', teamId: 'team-u12', playerId: 'player-ibrahim' },
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'parent', teamId: 'team-u14', playerId: 'player-noura' },
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'parent', teamId: 'team-u16', playerId: 'player-zaid' },
+    ])
+
+    // And all five land in the list as one person with five access rows.
+    const rawBlock = (await screen.findAllByTestId('account-person')).find((block) =>
+      within(block).queryByText('Raw Recruit'),
+    )
+    expect(within(rawBlock).getByText(/5 access rows/i)).toBeInTheDocument()
+    expect(within(rawBlock).getAllByTestId('account-membership')).toHaveLength(5)
+    for (const child of HADDADS) {
+      expect(within(rawBlock).getByText(child.full_name)).toBeInTheDocument()
+    }
+    for (const team of ['U8', 'U10', 'U12 Boys', 'U14', 'U16']) {
+      expect(screen.getByLabelText(`Role for Raw Recruit (${team})`)).toHaveValue('parent')
+    }
   })
 
   it('reports a refused add-access inline and leaves the existing rows alone', async () => {

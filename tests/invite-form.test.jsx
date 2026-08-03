@@ -44,6 +44,57 @@ const ELLA = { id: 'p-2', full_name: 'Ella Fletcher', team_id: 't-u14' }
 
 const ADMIN = [{ id: 'm-a', role: 'admin', team_id: null }]
 
+// The five-child family (Jay, 3 Aug 2026: some parents have three, four or
+// five children at the club, in different age groups). Five age groups, and a
+// roster of 45 — bigger than PlayerPicker's MAX_RESULTS = 25 — so the draw cap
+// is active for the whole of the invite test below.
+const TEAM_U8 = { id: 't-u8', club_id: CLUB_ID, name: 'U8', sort_order: 3 }
+const TEAM_U10 = { id: 't-u10', club_id: CLUB_ID, name: 'U10', sort_order: 5 }
+const TEAM_U16 = { id: 't-u16', club_id: CLUB_ID, name: 'U16', sort_order: 11 }
+const BIG_TEAMS = [TEAM_U14, TEAM_U8, TEAM_U16, TEAM_U12, TEAM_U10]
+
+// Siblings share a surname, so each is reached by a different search term
+// (their first name) and each term matches exactly one row — which is what
+// makes "does an earlier pick survive a query that no longer matches it?" a
+// real question rather than an accident of the fixture.
+const HADDADS = [
+  { id: 'p-yusuf', full_name: 'Yusuf Haddad', team_id: 't-u8' },
+  { id: 'p-layla', full_name: 'Layla Haddad', team_id: 't-u10' },
+  { id: 'p-ibrahim', full_name: 'Ibrahim Haddad', team_id: 't-u12' },
+  { id: 'p-noura', full_name: 'Noura Haddad', team_id: 't-u14' },
+  { id: 'p-zaid', full_name: 'Zaid Haddad', team_id: 't-u16' },
+]
+
+const FILLER_FIRST = [
+  'Adam', 'Ben', 'Callum', 'Daniel', 'Ethan', 'Farhan', 'George', 'Hamza',
+  'Isaac', 'Jack', 'Kareem', 'Liam', 'Mohsin', 'Nathan', 'Oscar', 'Patrick',
+  'Quentin', 'Rashid', 'Samir', 'Tariq',
+]
+const FILLER_TEAMS = ['t-u8', 't-u10', 't-u12', 't-u14', 't-u16']
+// 40 players, none of whose names contain "haddad" or any Haddad first name.
+const FILLER = ['Brown', 'Carter'].flatMap((last, lastIndex) =>
+  FILLER_FIRST.map((first, firstIndex) => ({
+    id: `p-filler-${lastIndex}-${firstIndex}`,
+    full_name: `${first} ${last}`,
+    team_id: FILLER_TEAMS[(lastIndex * FILLER_FIRST.length + firstIndex) % FILLER_TEAMS.length],
+  })),
+)
+
+// The five children sit at indexes 3, 12, 26, 33 and 44 of 45 — two of them
+// past the 25-row cap, so they are not drawn until they are searched for.
+const BIG_ROSTER = [
+  ...FILLER.slice(0, 3),
+  HADDADS[0],
+  ...FILLER.slice(3, 11),
+  HADDADS[1],
+  ...FILLER.slice(11, 24),
+  HADDADS[2],
+  ...FILLER.slice(24, 30),
+  HADDADS[3],
+  ...FILLER.slice(30, 40),
+  HADDADS[4],
+]
+
 const ROLE = 'Role for the new member'
 const SEND = /send invite/i
 
@@ -253,6 +304,83 @@ describe('InviteForm — creating an invite', () => {
     ])
     // With several targets the legacy columns stay null — any single value
     // would misdescribe the invite if the targets insert were rolled back.
+    expect(fields.teamId).toBeNull()
+    expect(fields.playerId).toBeNull()
+  })
+
+  // The same request at its real size: one parent, FIVE children, five age
+  // groups, one invite. Driven through the real PlayerPicker search — an admin
+  // cannot see 45 players at once, so they must type, click, retype, click,
+  // five times over, and the fifth click has to work exactly like the first.
+  it('gives a parent of FIVE children in five age groups ONE invite with five targets', async () => {
+    const user = userEvent.setup()
+    listPlayersMock.mockResolvedValue(BIG_ROSTER)
+    renderForm({ teams: BIG_TEAMS })
+
+    await user.type(screen.getByLabelText('Email'), 'haddad@example.com')
+    await user.selectOptions(screen.getByLabelText(ROLE), 'parent')
+
+    const picker = await screen.findByTestId('player-picker')
+    await within(picker).findByLabelText(/Yusuf Haddad/i)
+    const search = within(picker).getByLabelText(/search players/i)
+
+    // The cap is real while this test runs: 25 of 45 drawn, and the two
+    // children past the cap are unreachable until searched for.
+    expect(within(picker).getAllByRole('checkbox')).toHaveLength(25)
+    expect(within(picker).getByText(/Showing 25 of 45/)).toBeInTheDocument()
+    expect(within(picker).queryByLabelText(/Noura Haddad/i)).toBeNull()
+    expect(within(picker).queryByLabelText(/Zaid Haddad/i)).toBeNull()
+
+    const chosen = []
+    for (const [term, child] of [
+      ['yusuf', 'Yusuf Haddad'],
+      ['layla', 'Layla Haddad'],
+      ['ibrahim', 'Ibrahim Haddad'],
+      ['noura', 'Noura Haddad'],
+      ['zaid', 'Zaid Haddad'],
+    ]) {
+      await user.clear(search)
+      await user.type(search, term)
+
+      const results = within(picker).getAllByRole('checkbox')
+      expect(results).toHaveLength(1)
+      expect(results[0]).toHaveAccessibleName(new RegExp(child))
+
+      await user.click(results[0])
+      chosen.push(child)
+
+      // Selected children stay pinned above the results even though the
+      // current query matches none of the earlier ones.
+      const pinned = within(picker).getByTestId('player-picker-selected')
+      expect(within(pinned).getAllByRole('button').map((chip) => chip.textContent)).toEqual(
+        chosen.map((name) => `${name}×`),
+      )
+    }
+
+    await user.clear(search)
+    await user.type(search, 'zzzzz')
+    expect(within(picker).queryAllByRole('checkbox')).toHaveLength(0)
+    const pinned = within(picker).getByTestId('player-picker-selected')
+    expect(within(pinned).getAllByRole('button')).toHaveLength(5)
+    for (const child of HADDADS) {
+      expect(within(pinned).getByRole('button', { name: `Remove ${child.full_name}` })).toBeInTheDocument()
+    }
+
+    await user.click(screen.getByRole('button', { name: SEND }))
+
+    await waitFor(() => expect(createInviteMock).toHaveBeenCalledTimes(1))
+    const fields = createInviteMock.mock.calls[0][0]
+    expect(fields.role).toBe('parent')
+    // ONE invite, five targets, each age group taken from that child.
+    expect(fields.targets).toEqual([
+      { teamId: 't-u8', playerId: 'p-yusuf' },
+      { teamId: 't-u10', playerId: 'p-layla' },
+      { teamId: 't-u12', playerId: 'p-ibrahim' },
+      { teamId: 't-u14', playerId: 'p-noura' },
+      { teamId: 't-u16', playerId: 'p-zaid' },
+    ])
+    // The legacy single-target columns are mirrored only when there is exactly
+    // one target; with five, any single value would misdescribe the invite.
     expect(fields.teamId).toBeNull()
     expect(fields.playerId).toBeNull()
   })
