@@ -5,10 +5,25 @@ Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold c
 
 **v1 MVP (22 of 22 tasks) complete and live at `app.adhjrt.com`. Post-v1 refinement is
 underway** (desktop-focused work: bulk player import, roster/schedule tables, theme/brand
-update, and — as of 3 Aug 2026 — the Club Overview Dashboard, spec'd and built this session:
-see `docs/superpowers/plans/2026-08-03-club-overview-dashboard.md` and
-`.superpowers/sdd/club-overview-dashboard/progress.md`). **622 tests passing, build clean**
-as of the latest commit on `build/v1-mvp`.
+update, and — as of 3 Aug 2026 — the Club Overview Dashboard, the admin **Accounts**
+screen and the **view-as preview** switcher. See
+`docs/superpowers/plans/2026-08-03-club-overview-dashboard.md`,
+`docs/superpowers/plans/2026-08-03-view-as-and-accounts.md` and the ledgers under
+`.superpowers/sdd/`). **718 tests passing, build clean** as of the latest commit on
+`build/v1-mvp`.
+
+### Two rulings from 3 Aug 2026 worth reading before touching auth or roles
+
+1. **"View as" is a cosmetic preview, not a security boundary.** RLS scopes on the real
+   `auth.uid()`, so an admin previewing as a coach still *receives* club-wide rows — the
+   browser just declines to render them. Never cite this feature as evidence to the
+   committee that coaches cannot see other squads' data (that claim is true, but RLS is
+   the evidence, not this). Real impersonation needs a server-side scoped token; noted
+   for the AWS migration.
+2. **The switcher and its banner gate on `realMemberships`, never on effective
+   `memberships`.** Previewing as a parent makes `isAdmin(memberships)` false. If the
+   exit control were gated on the effective set, the admin could only escape by clearing
+   localStorage. This is the single highest-risk line in that feature.
 
 ---
 
@@ -370,6 +385,35 @@ components in Chromium at 375px and 1280px via `harness/`. It has caught defects
 screen that jsdom could not see — Task 17 caught a hard-reload navigation bug, Task 18 caught
 the StrictMode hang and branding gap above. Screenshots are git-ignored — regenerate them,
 don't commit them.
+
+### Migration `profiles_email_and_admin_access` (3 Aug 2026)
+
+Applied while building the Accounts screen. It also fixed a **live latent bug**: `profiles`
+RLS was own-row-only (`profile read own` = `id = auth.uid()`) with **no admin policy**, so
+`listClubMembers()`'s `profiles(full_name)` embed returned `null` for every member except
+the caller. `Admin.jsx`'s `?? 'Unnamed member'` fallback disguised it completely — the
+member list had been showing "Unnamed member" for everybody.
+
+- `profiles.email text` added and backfilled from `auth.users`. Client code can now
+  identify members; `auth.users` itself stays unreachable from the browser by design, and
+  no service-role key goes near the frontend.
+- `private.handle_new_user()` now populates `email` on signup; new
+  `private.handle_user_email_change()` + `on_auth_user_email_updated` trigger keeps it in
+  sync if a user later changes their login email.
+- `private.shares_admin_club(_profile uuid)` — `security definer` specifically so its
+  `memberships` lookup is not itself subject to `memberships` RLS (which would recurse).
+  Execute granted to `authenticated` only.
+- New permissive policies `profile read club admin` (SELECT) and `profile update club
+  admin` (UPDATE). They OR with the existing own-row policies.
+
+**`profiles.email` is read-only from the app.** It mirrors `auth.users`; writing it would
+desync the address people actually log in with. Password resets stay self-serve — an admin
+cannot reset another user's password from the client (that needs the service role).
+
+**`memberships` still has no unique constraint** on `(profile_id, club_id, role)` — only a
+PK on a fresh uuid. Duplicate rows for one person are possible (one was created once by an
+`ON CONFLICT DO NOTHING`, see above), which is why the Accounts screen groups by
+`profile_id` instead of rendering one row per membership.
 
 ### Database schema changes (Task 18 — the first migration this build has applied)
 
