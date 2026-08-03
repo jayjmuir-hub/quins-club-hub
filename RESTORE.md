@@ -3,7 +3,8 @@
 **Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
 Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
 
-**20 of 22 tasks complete, 535 tests passing, build clean.**
+**22 of 22 tasks complete, 537 tests passing, build clean. Deployed and live at
+`app.adhjrt.com` — Jay is signed in as the first admin.**
 
 ---
 
@@ -89,6 +90,38 @@ config-file API), React Router v6 with `v7_startTransition` and `v7_relativeSpla
 future flags, Vitest + React Testing Library. No ESLint or Prettier. `npm test` runs unit
 tests only and never touches the network; `npm run test:integration` runs the
 `*.integration.test.js` files against the live Supabase project.
+
+---
+
+## Deployment status — LIVE
+
+The v1 MVP is deployed and working end to end, not just built:
+
+- **Hosting:** Netlify project `quins-club-hub`, connected to GitHub, branch
+  `build/v1-mvp`, auto-deploys on push.
+- **Domain:** `app.adhjrt.com` (a subdomain of Jay's own `adhjrt.com`, which was already on
+  Netlify DNS, so no manual CNAME was needed). The bare root `adhjrt.com` is a **separate,
+  unrelated** Netlify project (`serene-gingersnap-1d0eb6`, a tournament/registration app) —
+  do not touch that one; this app only owns the `app.` subdomain.
+- **Supabase Auth URL Configuration:** Site URL = `https://app.adhjrt.com`, Redirect URLs =
+  `https://app.adhjrt.com/**` and `https://quins-club-hub.netlify.app/**` (kept as a fallback).
+  Confirmed persisted and correct.
+- **First admin:** Jay signed in via magic link and ran the `docs/first-admin.md` SQL himself.
+  Verified live, through the real app (not just the database) — Dashboard loads, role badge
+  reads "Admin", Admin overview lists all 15 age groups, "Invite a member" button present.
+- This trial is on `adhjrt.com` deliberately, per the original plan — committee-only, unlisted
+  URL, not linked from anywhere public yet.
+
+**Strategic change — no Wild Apricot import.** Earlier plans (see `docs/e2e-roles.md`,
+`docs/deploy.md`, `docs/first-admin.md`) assumed real player data would eventually come from a
+Wild Apricot member export off `abudhabiquins.com`. That's no longer the plan: **the club's new
+website is being built separately on AWS**, and Quins Club Hub will integrate with *that* site
+instead once it exists — not with Wild Apricot. Those docs' Wild Apricot mentions are now stale
+and should be revisited when the AWS integration shape is known; nothing has been changed there
+yet as of this note.
+
+**Next phase:** refining app functionality and usability based on real use, not new
+infrastructure work. No further deploy/account-setup steps are currently blocking.
 
 ---
 
@@ -508,16 +541,14 @@ just in jsdom.
 ## Outstanding, needs Jay
 
 - **Google OAuth client credentials** for Supabase -> Auth -> Providers. Task 4's code is
-  done and waiting on them.
-- **First-admin SQL** — after Jay's first sign-in, grant himself `admin` (Task 19 will
-  document this — not yet built). Until then he sees the "not linked to a squad yet" screen.
-  Note: with Task 18 now live, an alternative to raw SQL exists — any existing admin could
-  send Jay an invite through the app's own `InviteForm` instead, but there is no admin yet, so
-  the very first grant still has to happen via direct SQL (or the Supabase dashboard) either
-  way. Task 19 documents that one-time bootstrap step.
-- **Netlify** — MCP works. `adhjrt.com` points at Netlify project `serene-gingersnap-1d0eb6`
-  (Pro plan, password-protected, deploy current). Deploying builds directly via MCP is the
-  route until CI is wired to this repo.
+  done and waiting on them; magic-link sign-in works today without this.
+- ~~First-admin SQL~~ — **done.** Jay signed in and ran the Task 19 bootstrap SQL himself;
+  verified live as admin in the real app.
+- ~~Netlify deploy~~ — **done.** Live at `app.adhjrt.com`, auto-deploys from `build/v1-mvp`.
+  See "Deployment status" above for the full picture, including the separate
+  `adhjrt.com` root-domain project this one must never touch.
+- **Inviting committee members** — next manual step, whenever Jay's ready: More → Invite a
+  member, inside the live app. No SQL needed for this or any future invite.
 
 ## Infrastructure facts
 
