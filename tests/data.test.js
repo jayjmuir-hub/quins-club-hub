@@ -43,6 +43,20 @@ import {
   setAvailability,
   listAvailabilityForEvents,
 } from '../src/data/availability.js'
+// Task 3 (view-as + Accounts plan). NOTE the split: the earlier
+// src/data/members.js functions (loadMyMemberships, listClubMembers,
+// createInvite, acceptInvite) are tested in tests/scope.test.js, which
+// predates this file and uses its own ad-hoc select/insert mocks. Those mocks
+// cannot express an update/delete chain, and the plan directs data-layer
+// tests here, so the write functions and the listClubMembers select shape are
+// covered below against createQueryBuilder() instead of being bolted onto
+// scope.test.js. Both files therefore touch members.js — look in both.
+import {
+  listClubMembers,
+  updateMembershipRole,
+  deleteMembership,
+  updateProfileName,
+} from '../src/data/members.js'
 
 function createQueryBuilder({ data = null, error = null } = {}) {
   const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [], upsert: [] }
@@ -861,5 +875,254 @@ describe('setAvailability', () => {
     await expect(setAvailability(null, 'p-1', 'in')).rejects.toThrow(/event|player/i)
     await expect(setAvailability('e-1', null, 'in')).rejects.toThrow(/event|player/i)
     expect(supabase.from).not.toHaveBeenCalled()
+  })
+})
+
+// --- listClubMembers (select shape) ---------------------------------------
+
+// Task 3. The behavioural tests (rows through, [] not null, throw on error)
+// live in tests/scope.test.js; what is asserted here is the one thing that
+// file's mock cannot see and that changed in this task — the exact embed
+// string. The email column and the admin-read policy that makes the profiles
+// embed populate for an admin both arrived in the live migration
+// `profiles_email_and_admin_access`; a regression to `profiles(full_name)`
+// would leave the Accounts screen with an empty Email column and no error.
+describe('listClubMembers select shape', () => {
+  it('embeds profiles(full_name, email) and teams(name)', async () => {
+    const { builder } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await listClubMembers()
+
+    expect(supabase.from).toHaveBeenCalledWith('memberships')
+    expect(builder.select).toHaveBeenCalledWith('*, profiles(full_name, email), teams(name)')
+  })
+})
+
+// --- updateMembershipRole -------------------------------------------------
+
+// Task 3. Unlike every other writer in src/data, this one validates before
+// querying, because memberships has no check constraint mirroring
+// invites_team_required_unless_admin — verified against the live table, whose
+// only constraints are the PK, four FKs and memberships_role_check. The JS
+// guard is the sole enforcement, so it is tested as behaviour, not style.
+describe('updateMembershipRole', () => {
+  it('updates the row by id with the new role and team, and reads it back', async () => {
+    const saved = { id: 'm-1', role: 'coach', team_id: 't-12' }
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await updateMembershipRole({ membershipId: 'm-1', role: 'coach', teamId: 't-12' })
+
+    expect(supabase.from).toHaveBeenCalledWith('memberships')
+    expect(builder.update).toHaveBeenCalledTimes(1)
+    expect(calls.update[0][0]).toEqual({ role: 'coach', team_id: 't-12' })
+    expect(calls.eq[0]).toEqual(['id', 'm-1'])
+    expect(builder.select).toHaveBeenCalled()
+    expect(builder.maybeSingle).toHaveBeenCalled()
+    expect(result).toEqual(saved)
+  })
+
+  it('never sends the membership id as a column, only as the filter', async () => {
+    const { builder, calls } = createQueryBuilder({ data: { id: 'm-1' } })
+    supabase.from.mockReturnValue(builder)
+
+    await updateMembershipRole({ membershipId: 'm-1', role: 'parent', teamId: 't-12' })
+
+    expect(calls.update[0][0]).not.toHaveProperty('id')
+  })
+
+  it('forces team_id to null for the admin role, even when a team id is passed', async () => {
+    // The promote-to-admin case: a form's team dropdown still holds the
+    // previous selection at the moment the role flips. Coercing to the only
+    // valid value keeps the write correct without failing in front of the
+    // user, and an admin row carrying a team_id is meaningless to scope.js.
+    const { builder, calls } = createQueryBuilder({ data: { id: 'm-1', role: 'admin' } })
+    supabase.from.mockReturnValue(builder)
+
+    await updateMembershipRole({ membershipId: 'm-1', role: 'admin', teamId: 't-12' })
+
+    expect(calls.update[0][0]).toEqual({ role: 'admin', team_id: null })
+  })
+
+  it('allows the admin role with no team id at all', async () => {
+    const { builder, calls } = createQueryBuilder({ data: { id: 'm-1', role: 'admin' } })
+    supabase.from.mockReturnValue(builder)
+
+    await updateMembershipRole({ membershipId: 'm-1', role: 'admin' })
+
+    expect(calls.update[0][0]).toEqual({ role: 'admin', team_id: null })
+  })
+
+  it('refuses a non-admin role with no team, without hitting the network', async () => {
+    // The opposite half of the rule, and the one that must throw: there is no
+    // safe value to coerce to, and a coach/parent/player row with a null
+    // team_id scopes to nothing.
+    for (const role of ['coach', 'parent', 'player']) {
+      await expect(updateMembershipRole({ membershipId: 'm-1', role })).rejects.toThrow(/age group/i)
+      await expect(
+        updateMembershipRole({ membershipId: 'm-1', role, teamId: null }),
+      ).rejects.toThrow(/age group/i)
+    }
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('refuses a role outside the four the database allows', async () => {
+    await expect(
+      updateMembershipRole({ membershipId: 'm-1', role: 'manager', teamId: 't-12' }),
+    ).rejects.toThrow(/role/i)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('refuses to write without a membership id rather than updating every row', async () => {
+    // A missing .eq() filter on an UPDATE is the worst failure mode available
+    // to this function: it would rewrite every membership row RLS lets the
+    // admin touch, i.e. the whole club.
+    await expect(updateMembershipRole({ role: 'coach', teamId: 't-12' })).rejects.toThrow(/membership/i)
+    await expect(updateMembershipRole()).rejects.toThrow(/membership/i)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('violates check constraint') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      updateMembershipRole({ membershipId: 'm-1', role: 'coach', teamId: 't-12' }),
+    ).rejects.toThrow('violates check constraint')
+  })
+
+  it('throws when the write succeeds but comes back with no row (an RLS refusal)', async () => {
+    // `memb manage` matches zero rows for a non-admin and PostgREST reports
+    // that as a successful empty response — the same silent refusal
+    // createInvite/upsertPlayer already turn into a visible message.
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      updateMembershipRole({ membershipId: 'm-1', role: 'coach', teamId: 't-12' }),
+    ).rejects.toThrow(/permission|not allowed|couldn.t change/i)
+  })
+})
+
+// --- deleteMembership -----------------------------------------------------
+
+describe('deleteMembership', () => {
+  it('deletes the membership row with the given id', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'm-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await deleteMembership('m-1')
+
+    expect(supabase.from).toHaveBeenCalledWith('memberships')
+    expect(builder.delete).toHaveBeenCalledTimes(1)
+    expect(calls.eq[0]).toEqual(['id', 'm-1'])
+  })
+
+  it('touches only memberships — the profile and login survive a revoke', async () => {
+    // Revoking access removes the club role, not the person. Deleting the
+    // auth user needs the service-role key, which never reaches this client.
+    const { builder } = createQueryBuilder({ data: [{ id: 'm-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await deleteMembership('m-1')
+
+    expect(supabase.from).toHaveBeenCalledTimes(1)
+    expect(supabase.from).not.toHaveBeenCalledWith('profiles')
+  })
+
+  it('refuses to delete without an id rather than deleting every row', async () => {
+    await expect(deleteMembership(undefined)).rejects.toThrow(/membership/i)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('network down') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(deleteMembership('m-1')).rejects.toThrow('network down')
+  })
+
+  it('throws when nothing was deleted (an RLS refusal)', async () => {
+    const { builder } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(deleteMembership('m-1')).rejects.toThrow(/permission|not allowed|couldn.t remove/i)
+  })
+})
+
+// --- updateProfileName ----------------------------------------------------
+
+// Task 3. Writes profiles, not memberships: one person can hold several
+// membership rows (no unique constraint on (profile_id, club_id, role)), and
+// they share a single name. Permitted by the `profile update club admin`
+// policy added in the profiles_email_and_admin_access migration.
+describe('updateProfileName', () => {
+  it('updates profiles.full_name for the given profile id and reads the row back', async () => {
+    const saved = { id: 'u-1', full_name: 'Jay Muir', email: 'jay@example.com' }
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await updateProfileName({ profileId: 'u-1', fullName: 'Jay Muir' })
+
+    expect(supabase.from).toHaveBeenCalledWith('profiles')
+    expect(builder.update).toHaveBeenCalledTimes(1)
+    expect(calls.update[0][0]).toEqual({ full_name: 'Jay Muir' })
+    expect(calls.eq[0]).toEqual(['id', 'u-1'])
+    expect(builder.select).toHaveBeenCalled()
+    expect(builder.maybeSingle).toHaveBeenCalled()
+    expect(result).toEqual(saved)
+  })
+
+  it('never writes the email column, which mirrors the login address', async () => {
+    // profiles.email is a trigger-maintained mirror of auth.users.email.
+    // Writing it here would desync the address the person signs in with.
+    const { builder, calls } = createQueryBuilder({ data: { id: 'u-1' } })
+    supabase.from.mockReturnValue(builder)
+
+    await updateProfileName({ profileId: 'u-1', fullName: 'Jay Muir', email: 'new@example.com' })
+
+    expect(calls.update[0][0]).not.toHaveProperty('email')
+    expect(calls.update[0][0]).not.toHaveProperty('id')
+  })
+
+  it('trims the name before writing', async () => {
+    const { builder, calls } = createQueryBuilder({ data: { id: 'u-1' } })
+    supabase.from.mockReturnValue(builder)
+
+    await updateProfileName({ profileId: 'u-1', fullName: '  Jay Muir  ' })
+
+    expect(calls.update[0][0]).toEqual({ full_name: 'Jay Muir' })
+  })
+
+  it('refuses a blank name rather than writing one', async () => {
+    // Admin.jsx renders `full_name ?? 'Unnamed member'` — null falls back, an
+    // empty string does not, so a blank save would render a nameless row.
+    for (const fullName of ['', '   ', null, undefined]) {
+      await expect(updateProfileName({ profileId: 'u-1', fullName })).rejects.toThrow(/name/i)
+    }
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('refuses to write without a profile id rather than updating every row', async () => {
+    await expect(updateProfileName({ fullName: 'Jay Muir' })).rejects.toThrow(/profile/i)
+    await expect(updateProfileName()).rejects.toThrow(/profile/i)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('boom') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(updateProfileName({ profileId: 'u-1', fullName: 'Jay' })).rejects.toThrow('boom')
+  })
+
+  it('throws when the write succeeds but comes back with no row (an RLS refusal)', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(updateProfileName({ profileId: 'u-other-club', fullName: 'Jay' })).rejects.toThrow(
+      /permission|not allowed|couldn.t save/i,
+    )
   })
 })
