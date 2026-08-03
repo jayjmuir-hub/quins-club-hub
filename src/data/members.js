@@ -146,6 +146,12 @@ const REFUSED_INVITE = "We couldn't send that invite. You may not have permissio
 // wording honestly rather than folding into REFUSED_INVITE.
 const REFUSED_INVITE_TARGETS =
   "We couldn't save the age groups for that invite, so no invite was sent. You may not have permission to invite members."
+// Refused before the insert rather than after acceptance: `accept_invite`
+// raises "This invite is incomplete — it has no age group" for exactly this
+// shape, but by then the link has been sent and the person who has to deal
+// with the failure is the invitee, who can do nothing about it.
+const INCOMPLETE_INVITE =
+  "That invite has no age group, so it wouldn't give anyone access. Choose an age group first."
 
 /**
  * Creates one invite row and returns it (including the database-generated
@@ -170,13 +176,16 @@ const REFUSED_INVITE_TARGETS =
  * invite has no targets. Pairs, not two parallel arrays, because the data
  * genuinely is pairs — child A in U10, child B in U14.
  *
- * NOTE the enforcement split, which is not symmetric on purpose:
- *   - "a team is required unless the role is admin" is NOT re-checked here.
- *     It used to be a database check constraint
- *     (`invites_team_required_unless_admin`); that constraint has since been
- *     DROPPED, so today the rule lives only in InviteForm's client-side
- *     validation. This function stays the thin query builder it always was.
- *   - a target with no teamId IS refused, before any network call, because
+ * Two rules ARE enforced here, before any network call:
+ *   - "a team is required unless the role is admin". This used to be a
+ *     database check constraint (`invites_team_required_unless_admin`), now
+ *     DROPPED; `accept_invite` raises on it instead — but only at ACCEPT
+ *     time, which means an admin can otherwise create a link that looks
+ *     perfectly fine and fails in the invitee's face days later. InviteForm
+ *     refuses it too, and does so with a better message because it knows
+ *     which control is empty; this is the backstop for every other caller,
+ *     because the cost of a bad invite is paid by someone who cannot fix it.
+ *   - a target with no teamId IS refused, because
  *     `invite_targets.team_id` is NOT NULL — sending one is a guaranteed
  *     server-side failure, and catching it up front is what keeps the
  *     half-built-invite cleanup below from ever being needed for a bug the
@@ -196,6 +205,9 @@ export async function createInvite({
   // never leave one behind to clean up.
   for (const target of targetList) {
     if (!target?.teamId) throw new Error('Choose an age group for each person on this invite.')
+  }
+  if (role !== 'admin' && targetList.length === 0 && !teamId) {
+    throw new Error(INCOMPLETE_INVITE)
   }
 
   const { data, error } = await supabase

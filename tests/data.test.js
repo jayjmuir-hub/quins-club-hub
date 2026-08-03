@@ -1650,6 +1650,53 @@ describe('createInvite (multi-target)', () => {
     expect(supabase.from).not.toHaveBeenCalled()
   })
 
+  // The rule that used to be the `invites_team_required_unless_admin` CHECK
+  // constraint. That constraint is gone; accept_invite raises on this shape
+  // instead, but only when the INVITEE clicks the link — far too late for
+  // anyone to fix it. So the data layer refuses it up front, as a backstop
+  // behind InviteForm's own (better-worded) refusal.
+  it('refuses a non-admin invite with no team and no targets before creating anything', async () => {
+    await expect(
+      createInvite({
+        clubId: 'club-1',
+        email: 'coach@example.com',
+        role: 'coach',
+        createdBy: 'user-1',
+      }),
+    ).rejects.toThrow(/no age group|age group/i)
+
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('still allows an admin invite with no team and no targets', async () => {
+    const { builder } = createQueryBuilder({ data: { id: 'inv-1', token: 'tok' } })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      createInvite({
+        clubId: 'club-1',
+        email: 'newadmin@example.com',
+        role: 'admin',
+        createdBy: 'user-1',
+      }),
+    ).resolves.toMatchObject({ id: 'inv-1' })
+  })
+
+  it('still allows a targetless invite that carries a legacy team id', async () => {
+    const { builder } = createQueryBuilder({ data: { id: 'inv-1', token: 'tok' } })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      createInvite({
+        clubId: 'club-1',
+        email: 'coach@example.com',
+        role: 'coach',
+        teamId: 't-u10',
+        createdBy: 'user-1',
+      }),
+    ).resolves.toMatchObject({ id: 'inv-1' })
+  })
+
   it('deletes the invite row and throws when the targets insert errors', async () => {
     const inviteQ = createQueryBuilder({ data: { id: 'inv-1', token: 'tok' } })
     const targetsQ = createQueryBuilder({ error: new Error('violates foreign key constraint') })
