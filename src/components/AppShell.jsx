@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import Nav from './Nav.jsx'
+import NamePrompt from './NamePrompt.jsx'
 import { ViewAsBanner, ViewAsSwitcher } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 
@@ -259,6 +260,14 @@ export default function AppShell({ children }) {
         )}
         {ready && (
           <>
+            {/* First-login display-name prompt (plan Task C). Deliberately
+                inside the `ready` branch: a signed-up user with zero
+                memberships already gets NoMembershipState, and a name prompt
+                stacked on top of "you have no access yet" is noise. It is
+                skippable and never blocks what's below it — its own Sheet is
+                z-50, so it also sits above the sticky view-as banner/masthead
+                wrapper (z-40) rather than fighting it. */}
+            <NamePrompt />
             {children}
             {isMoreRoute && (
               <div className="mt-6 border-t border-line pt-6">

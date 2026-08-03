@@ -148,6 +148,24 @@ export async function deleteMembership(membershipId) {
   return undefined
 }
 
+// Mirrors the real getMyProfile (src/data/members.js), which AppShell's
+// NamePrompt (plan Task C) calls on every load — a stub missing an export its
+// real module has is exactly the drift that took down every scenario once
+// before. ?blankName=1 returns a profile with no name, so the first-login
+// name prompt is screenshot-able; by default the signed-in user is named and
+// the prompt stays shut.
+export async function getMyProfile(userId) {
+  if (!userId) throw new Error('getMyProfile needs a user id.')
+  const params = new URLSearchParams(window.location.search)
+  const blank = params.get('blankName') === '1'
+  return {
+    id: userId,
+    full_name: blank ? '' : 'Jay Muir',
+    email: 'jayjmuir@gmail.com',
+    created_at: '2026-01-05T09:00:00Z',
+  }
+}
+
 export async function updateProfileName({ profileId, fullName } = {}) {
   const params = new URLSearchParams(window.location.search)
   const delay = Number(params.get('writeDelay') || 0)

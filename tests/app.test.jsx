@@ -67,6 +67,10 @@ vi.mock('../src/data/members.js', () => ({
   // routing/reachability, not on AcceptInvite's own behaviour (covered by
   // tests/accept-invite.test.jsx).
   acceptInvite: () => new Promise(() => {}),
+  // AppShell's NamePrompt (plan Task C) calls this on every signed-in load.
+  // Never resolving keeps the prompt shut without asserting anything about
+  // it here (covered by tests/name-prompt.test.jsx).
+  getMyProfile: () => new Promise(() => {}),
 }))
 
 // Import after vi.mock so this binds to the mocked modules.
