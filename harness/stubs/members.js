@@ -271,3 +271,49 @@ export async function grantMembership({ profileId, clubId, role, teamId, playerI
     created_at: '2026-08-03T12:00:00Z',
   }
 }
+
+// Mirrors the real grantMemberships: the multi-access grant, one membership
+// row per entry. Validates the WHOLE list before "writing" anything (a
+// half-applied grant is the thing the real one makes impossible) and collapses
+// identical rows, since memberships has no unique constraint to do it. Same
+// ?writeDelay/?writeThrow knobs as every other writer here.
+export async function grantMemberships(rows) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('writeDelay') || 0)
+
+  if (!Array.isArray(rows) || rows.length === 0) return []
+
+  const built = rows.map(({ profileId, clubId, role, teamId, playerId } = {}) => {
+    if (!profileId) throw new Error('grantMemberships needs a profileId.')
+    if (!clubId) throw new Error('grantMemberships needs a clubId.')
+    if (role !== 'admin' && !teamId) throw new Error('Choose an age group for this role.')
+    return {
+      profile_id: profileId,
+      club_id: clubId,
+      role,
+      team_id: role === 'admin' ? null : teamId ?? null,
+      player_id: playerId ?? null,
+    }
+  })
+
+  const seen = new Set()
+  const unique = built.filter((row) => {
+    const key = JSON.stringify([row.profile_id, row.club_id, row.role, row.team_id, row.player_id])
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (params.get('writeThrow') === '1') {
+    throw new Error(
+      "We couldn't give that person access. You may not have permission to manage members.",
+    )
+  }
+
+  return unique.map((row, index) => ({
+    id: `mm-granted-${row.profile_id}-${index}`,
+    ...row,
+    created_at: '2026-08-03T12:00:00Z',
+  }))
+}

@@ -15,8 +15,13 @@ import { useMemberships } from '../lib/memberships.jsx'
 // On mount, calls acceptInvite(token), which runs the accept_invite
 // SECURITY DEFINER RPC server-side (token lookup, "already used"/"wrong
 // email" checks, the actual membership insert) — none of that validation
-// happens here. On success this person now has exactly one membership row
-// that didn't exist a moment ago; useMemberships()'s MembershipProvider has
+// happens here. On success this person now has one or more membership rows
+// that didn't exist a moment ago — accept_invite returns `SETOF memberships`
+// and creates one row per invite_targets row, so a parent invited for two
+// children lands two. This screen deliberately ignores the RESOLVED VALUE
+// (`.then(() => …)`, not `.then((row) => …)`): all it needs to know is that
+// the call succeeded, so the array-vs-object change costs it nothing and
+// nothing here may assume a single object. useMemberships()'s MembershipProvider has
 // no way to know that on its own (its effect only re-runs on
 // [session, reloadToken], and accepting an invite changes neither), so
 // reload() is called explicitly before navigating home, or the rest of the

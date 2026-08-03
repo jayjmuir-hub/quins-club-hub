@@ -51,6 +51,9 @@ import {
 // tests here, so the write functions and the listClubMembers select shape are
 // covered below against createQueryBuilder() instead of being bolted onto
 // scope.test.js. Both files therefore touch members.js — look in both.
+// createInvite is now genuinely split across the two: its single-row/legacy
+// shape stays in scope.test.js, and its invite_targets half is here, because
+// only createQueryBuilder() can express the two-insert-plus-rollback chain.
 import {
   listClubMembers,
   updateMembershipRole,
@@ -58,7 +61,9 @@ import {
   updateProfileName,
   listPendingProfiles,
   grantMembership,
+  grantMemberships,
   getMyProfile,
+  createInvite,
 } from '../src/data/members.js'
 
 function createQueryBuilder({ data = null, error = null } = {}) {
@@ -1395,5 +1400,339 @@ describe('grantMembership', () => {
     await expect(
       grantMembership({ profileId: 'pr-new', clubId: 'c-1', role: 'admin' }),
     ).rejects.toThrow(/permission|not allowed|couldn.t give/i)
+  })
+})
+
+// --- grantMemberships -----------------------------------------------------
+
+// The multi-access grant (docs/superpowers/specs/2026-08-03-multi-access-design.md).
+// One person legitimately holds several membership rows — two children in
+// different age groups, two coached squads, coach-and-also-parent — and
+// memberships has no unique constraint, so the "don't write the same row
+// twice" guard tested here is the only one there is.
+describe('grantMemberships', () => {
+  it('inserts every row in ONE insert call, as an array, and returns the saved rows', async () => {
+    const saved = [
+      { id: 'm-1', role: 'parent', team_id: 't-u10', player_id: 'p-1' },
+      { id: 'm-2', role: 'parent', team_id: 't-u14', player_id: 'p-2' },
+    ]
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await grantMemberships([
+      { profileId: 'pr-1', clubId: 'c-1', role: 'parent', teamId: 't-u10', playerId: 'p-1' },
+      { profileId: 'pr-1', clubId: 'c-1', role: 'parent', teamId: 't-u14', playerId: 'p-2' },
+    ])
+
+    expect(supabase.from).toHaveBeenCalledWith('memberships')
+    expect(supabase.from).toHaveBeenCalledTimes(1)
+    expect(builder.insert).toHaveBeenCalledTimes(1)
+    expect(calls.insert[0][0]).toEqual([
+      { profile_id: 'pr-1', club_id: 'c-1', role: 'parent', team_id: 't-u10', player_id: 'p-1' },
+      { profile_id: 'pr-1', club_id: 'c-1', role: 'parent', team_id: 't-u14', player_id: 'p-2' },
+    ])
+    expect(builder.select).toHaveBeenCalled()
+    // A set insert reads back with .select(), not .maybeSingle() — many rows.
+    expect(builder.maybeSingle).not.toHaveBeenCalled()
+    expect(result).toEqual(saved)
+  })
+
+  it('keeps rows that differ only in role — the coach-who-is-also-a-parent case', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'm-1' }, { id: 'm-2' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await grantMemberships([
+      { profileId: 'pr-1', clubId: 'c-1', role: 'coach', teamId: 't-u14' },
+      { profileId: 'pr-1', clubId: 'c-1', role: 'parent', teamId: 't-u10', playerId: 'p-1' },
+    ])
+
+    expect(calls.insert[0][0]).toHaveLength(2)
+  })
+
+  it('collapses identical rows within one save', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'm-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await grantMemberships([
+      { profileId: 'pr-1', clubId: 'c-1', role: 'coach', teamId: 't-u14' },
+      { profileId: 'pr-1', clubId: 'c-1', role: 'coach', teamId: 't-u14' },
+    ])
+
+    expect(calls.insert[0][0]).toEqual([
+      { profile_id: 'pr-1', club_id: 'c-1', role: 'coach', team_id: 't-u14', player_id: null },
+    ])
+  })
+
+  it('treats an absent playerId and an explicit null playerId as the same row', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'm-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await grantMemberships([
+      { profileId: 'pr-1', clubId: 'c-1', role: 'coach', teamId: 't-u14' },
+      { profileId: 'pr-1', clubId: 'c-1', role: 'coach', teamId: 't-u14', playerId: null },
+    ])
+
+    expect(calls.insert[0][0]).toHaveLength(1)
+  })
+
+  it('keeps two rows for the same team when they link different children', async () => {
+    // Same age group, two siblings: NOT a duplicate, and collapsing them
+    // would lose one child's access.
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'm-1' }, { id: 'm-2' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await grantMemberships([
+      { profileId: 'pr-1', clubId: 'c-1', role: 'parent', teamId: 't-u10', playerId: 'p-1' },
+      { profileId: 'pr-1', clubId: 'c-1', role: 'parent', teamId: 't-u10', playerId: 'p-2' },
+    ])
+
+    expect(calls.insert[0][0]).toHaveLength(2)
+  })
+
+  it('collapses duplicate admin rows — the failure that has bitten this project before', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'm-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await grantMemberships([
+      { profileId: 'pr-1', clubId: 'c-1', role: 'admin' },
+      { profileId: 'pr-1', clubId: 'c-1', role: 'admin', teamId: 't-u14' },
+    ])
+
+    // The second row's team is coerced to null first, so the two become
+    // identical and only one is written.
+    expect(calls.insert[0][0]).toEqual([
+      { profile_id: 'pr-1', club_id: 'c-1', role: 'admin', team_id: null, player_id: null },
+    ])
+  })
+
+  it('applies the same admin coercion as grantMembership to every row', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'm-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await grantMemberships([{ profileId: 'pr-1', clubId: 'c-1', role: 'admin', teamId: 't-u14' }])
+
+    expect(calls.insert[0][0][0]).toMatchObject({ role: 'admin', team_id: null })
+  })
+
+  it('refuses the WHOLE set when any row is invalid, without hitting the network', async () => {
+    // All-or-nothing validation: a half-applied grant is the thing worth
+    // making impossible, and a multi-row insert is one statement anyway.
+    await expect(
+      grantMemberships([
+        { profileId: 'pr-1', clubId: 'c-1', role: 'coach', teamId: 't-u14' },
+        { profileId: 'pr-1', clubId: 'c-1', role: 'parent' },
+      ]),
+    ).rejects.toThrow(/age group/i)
+
+    await expect(
+      grantMemberships([{ profileId: 'pr-1', clubId: 'c-1', role: 'manager', teamId: 't-u14' }]),
+    ).rejects.toThrow(/role/i)
+
+    await expect(
+      grantMemberships([{ clubId: 'c-1', role: 'admin' }]),
+    ).rejects.toThrow(/profile/i)
+
+    await expect(
+      grantMemberships([{ profileId: 'pr-1', role: 'admin' }]),
+    ).rejects.toThrow(/club/i)
+
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('returns [] without querying for an empty or missing list', async () => {
+    expect(await grantMemberships([])).toEqual([])
+    expect(await grantMemberships()).toEqual([])
+    expect(await grantMemberships(null)).toEqual([])
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('violates foreign key constraint') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      grantMemberships([{ profileId: 'pr-1', clubId: 'c-1', role: 'admin' }]),
+    ).rejects.toThrow('violates foreign key constraint')
+  })
+
+  it('throws when the insert succeeds but comes back with no rows (an RLS refusal)', async () => {
+    const { builder } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      grantMemberships([{ profileId: 'pr-1', clubId: 'c-1', role: 'admin' }]),
+    ).rejects.toThrow(/permission|couldn.t give/i)
+  })
+})
+
+// --- createInvite with multiple targets -----------------------------------
+
+// The single-target/legacy half of createInvite is covered in
+// tests/scope.test.js (which predates this file). What is tested here is the
+// invite_targets half: the second insert, and the hand-rolled rollback that
+// stands in for the transaction PostgREST cannot give the browser.
+describe('createInvite (multi-target)', () => {
+  it('inserts one invite_targets row per target, carrying the new invite id', async () => {
+    const invite = { id: 'inv-1', token: 'tok-abc' }
+    const inviteQ = createQueryBuilder({ data: invite })
+    const targetsQ = createQueryBuilder({ data: [{ id: 'it-1' }, { id: 'it-2' }] })
+    supabase.from.mockReturnValueOnce(inviteQ.builder).mockReturnValueOnce(targetsQ.builder)
+
+    const result = await createInvite({
+      clubId: 'club-1',
+      email: 'parent@example.com',
+      role: 'parent',
+      createdBy: 'user-1',
+      targets: [
+        { teamId: 't-u10', playerId: 'p-1' },
+        { teamId: 't-u14', playerId: 'p-2' },
+      ],
+    })
+
+    expect(supabase.from).toHaveBeenNthCalledWith(1, 'invites')
+    expect(supabase.from).toHaveBeenNthCalledWith(2, 'invite_targets')
+    expect(targetsQ.calls.insert[0][0]).toEqual([
+      { invite_id: 'inv-1', team_id: 't-u10', player_id: 'p-1' },
+      { invite_id: 'inv-1', team_id: 't-u14', player_id: 'p-2' },
+    ])
+    // The invite row itself is still what comes back — the caller needs its
+    // token to build the accept link.
+    expect(result).toEqual(invite)
+  })
+
+  it('defaults a target with no player to player_id null (an age-group-only target)', async () => {
+    const inviteQ = createQueryBuilder({ data: { id: 'inv-1', token: 'tok' } })
+    const targetsQ = createQueryBuilder({ data: [{ id: 'it-1' }] })
+    supabase.from.mockReturnValueOnce(inviteQ.builder).mockReturnValueOnce(targetsQ.builder)
+
+    await createInvite({
+      clubId: 'club-1',
+      email: 'coach@example.com',
+      role: 'coach',
+      createdBy: 'user-1',
+      targets: [{ teamId: 't-u10' }],
+    })
+
+    expect(targetsQ.calls.insert[0][0]).toEqual([
+      { invite_id: 'inv-1', team_id: 't-u10', player_id: null },
+    ])
+  })
+
+  it('makes no second call at all when there are no targets (the legacy path)', async () => {
+    const { builder } = createQueryBuilder({ data: { id: 'inv-1', token: 'tok' } })
+    supabase.from.mockReturnValue(builder)
+
+    await createInvite({
+      clubId: 'club-1',
+      email: 'coach@example.com',
+      role: 'coach',
+      teamId: 't-u10',
+      createdBy: 'user-1',
+    })
+
+    expect(supabase.from).toHaveBeenCalledTimes(1)
+    expect(supabase.from).toHaveBeenCalledWith('invites')
+  })
+
+  it('refuses a target with no team id before creating anything', async () => {
+    // invite_targets.team_id is NOT NULL, so this could only fail after the
+    // invite row existed — cheaper and safer to refuse up front.
+    await expect(
+      createInvite({
+        clubId: 'club-1',
+        email: 'parent@example.com',
+        role: 'parent',
+        createdBy: 'user-1',
+        targets: [{ teamId: 't-u10' }, { playerId: 'p-2' }],
+      }),
+    ).rejects.toThrow(/age group/i)
+
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('deletes the invite row and throws when the targets insert errors', async () => {
+    const inviteQ = createQueryBuilder({ data: { id: 'inv-1', token: 'tok' } })
+    const targetsQ = createQueryBuilder({ error: new Error('violates foreign key constraint') })
+    const deleteQ = createQueryBuilder({ data: [{ id: 'inv-1' }] })
+    supabase.from
+      .mockReturnValueOnce(inviteQ.builder)
+      .mockReturnValueOnce(targetsQ.builder)
+      .mockReturnValueOnce(deleteQ.builder)
+
+    await expect(
+      createInvite({
+        clubId: 'club-1',
+        email: 'parent@example.com',
+        role: 'parent',
+        createdBy: 'user-1',
+        targets: [{ teamId: 't-u10' }],
+      }),
+    ).rejects.toThrow('violates foreign key constraint')
+
+    // A targetless invite is not inert — accept_invite would fall back to the
+    // invite's own (null) team_id and grant the wrong access — so it must not
+    // be left behind.
+    expect(supabase.from).toHaveBeenNthCalledWith(3, 'invites')
+    expect(deleteQ.builder.delete).toHaveBeenCalled()
+    expect(deleteQ.calls.eq[0]).toEqual(['id', 'inv-1'])
+  })
+
+  it('deletes the invite row and throws a friendly message when the targets insert is silently refused', async () => {
+    const inviteQ = createQueryBuilder({ data: { id: 'inv-1', token: 'tok' } })
+    const targetsQ = createQueryBuilder({ data: [] })
+    const deleteQ = createQueryBuilder({ data: [{ id: 'inv-1' }] })
+    supabase.from
+      .mockReturnValueOnce(inviteQ.builder)
+      .mockReturnValueOnce(targetsQ.builder)
+      .mockReturnValueOnce(deleteQ.builder)
+
+    await expect(
+      createInvite({
+        clubId: 'club-1',
+        email: 'parent@example.com',
+        role: 'parent',
+        createdBy: 'user-1',
+        targets: [{ teamId: 't-u10' }],
+      }),
+    ).rejects.toThrow(/no invite was sent/i)
+
+    expect(deleteQ.builder.delete).toHaveBeenCalled()
+  })
+
+  it('still reports the original failure when the cleanup delete is itself refused', async () => {
+    const inviteQ = createQueryBuilder({ data: { id: 'inv-1', token: 'tok' } })
+    const targetsQ = createQueryBuilder({ data: [] })
+    const deleteQ = createQueryBuilder({ error: new Error('permission denied') })
+    supabase.from
+      .mockReturnValueOnce(inviteQ.builder)
+      .mockReturnValueOnce(targetsQ.builder)
+      .mockReturnValueOnce(deleteQ.builder)
+
+    await expect(
+      createInvite({
+        clubId: 'club-1',
+        email: 'parent@example.com',
+        role: 'parent',
+        createdBy: 'user-1',
+        targets: [{ teamId: 't-u10' }],
+      }),
+    ).rejects.toThrow(/no invite was sent/i)
+  })
+
+  it('never writes targets when the invite row itself was refused', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      createInvite({
+        clubId: 'club-1',
+        email: 'parent@example.com',
+        role: 'parent',
+        createdBy: 'user-1',
+        targets: [{ teamId: 't-u10' }],
+      }),
+    ).rejects.toThrow(/permission|couldn.t send/i)
+
+    expect(supabase.from).toHaveBeenCalledTimes(1)
   })
 })

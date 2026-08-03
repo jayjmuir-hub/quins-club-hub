@@ -139,6 +139,13 @@ export async function getMyProfile(userId) {
 // upsertEvent already handle. This is a *reporting* mechanism, not access
 // control: RLS is what actually decides, server-side.
 const REFUSED_INVITE = "We couldn't send that invite. You may not have permission to invite members."
+// Separate message for the second write (invite_targets), because it fails
+// for its own reason behind its own policy (`invite targets manage`, FOR ALL,
+// admin of the invite's club) — and because by the time it fires the invite
+// row has already been created and then rolled back by hand, which is worth
+// wording honestly rather than folding into REFUSED_INVITE.
+const REFUSED_INVITE_TARGETS =
+  "We couldn't save the age groups for that invite, so no invite was sent. You may not have permission to invite members."
 
 /**
  * Creates one invite row and returns it (including the database-generated
@@ -151,14 +158,46 @@ const REFUSED_INVITE = "We couldn't send that invite. You may not have permissio
  * upsertPlayer/upsertEvent already use.
  *
  * teamId/playerId default to null (an admin invite has no team; most invites
- * have no linked player). The database's own check constraint
- * (`invites_team_required_unless_admin`) is the real enforcement of "a team
- * is required unless role is admin" — InviteForm validates this client-side
- * too, so a bad submission never reaches the database, but this function
- * does not re-check it: it is a thin query builder, like every other
- * function in this module.
+ * have no linked player). Those two columns are the LEGACY single-target path
+ * and still work: `accept_invite` falls back to them when an invite has no
+ * `invite_targets` rows, so a caller that passes only teamId/playerId behaves
+ * exactly as it did before.
+ *
+ * `targets` is the multi-target path: an array of `{ teamId, playerId }`
+ * pairs, one per access row the invitee should end up with (a parent of two
+ * children in different age groups is two targets). Each becomes one
+ * `invite_targets` row and, on acceptance, one membership. An admin-role
+ * invite has no targets. Pairs, not two parallel arrays, because the data
+ * genuinely is pairs — child A in U10, child B in U14.
+ *
+ * NOTE the enforcement split, which is not symmetric on purpose:
+ *   - "a team is required unless the role is admin" is NOT re-checked here.
+ *     It used to be a database check constraint
+ *     (`invites_team_required_unless_admin`); that constraint has since been
+ *     DROPPED, so today the rule lives only in InviteForm's client-side
+ *     validation. This function stays the thin query builder it always was.
+ *   - a target with no teamId IS refused, before any network call, because
+ *     `invite_targets.team_id` is NOT NULL — sending one is a guaranteed
+ *     server-side failure, and catching it up front is what keeps the
+ *     half-built-invite cleanup below from ever being needed for a bug the
+ *     caller could see coming.
  */
-export async function createInvite({ clubId, email, role, teamId, playerId, createdBy }) {
+export async function createInvite({
+  clubId,
+  email,
+  role,
+  teamId,
+  playerId,
+  createdBy,
+  targets = [],
+} = {}) {
+  const targetList = Array.isArray(targets) ? targets : []
+  // Validated before the invite row exists, so an obviously-bad target can
+  // never leave one behind to clean up.
+  for (const target of targetList) {
+    if (!target?.teamId) throw new Error('Choose an age group for each person on this invite.')
+  }
+
   const { data, error } = await supabase
     .from('invites')
     .insert({
@@ -174,6 +213,50 @@ export async function createInvite({ clubId, email, role, teamId, playerId, crea
 
   if (error) throw error
   if (!data) throw new Error(REFUSED_INVITE)
+
+  // No targets is the legacy shape, and it must stay a single round trip:
+  // `accept_invite` falls back to the invite's own team_id/player_id when
+  // invite_targets is empty, so there is nothing to write and nothing to
+  // clean up.
+  if (targetList.length === 0) return data
+
+  const { data: savedTargets, error: targetsError } = await supabase
+    .from('invite_targets')
+    .insert(
+      targetList.map((target) => ({
+        invite_id: data.id,
+        team_id: target.teamId,
+        player_id: target.playerId ?? null,
+      })),
+    )
+    .select()
+
+  if (targetsError || !savedTargets || savedTargets.length === 0) {
+    // These are two statements, not a transaction — PostgREST gives the
+    // browser no way to wrap them in one. If the second fails we are left
+    // with a targetless invite, and a targetless invite is NOT inert: it
+    // takes the legacy fallback path, so accepting it would grant the
+    // invite's own team_id/player_id — for a multi-target parent that is
+    // usually null, i.e. an access row scoped to nothing, or worse, silently
+    // the wrong single age group. Leaving it and reporting an error would
+    // hand the invitee a link that "works" and grants the wrong thing.
+    //
+    // So the invite row is deleted and the whole operation reported as
+    // failed: the admin retries and gets one correct invite. The delete is
+    // best-effort — if it too is refused, the original failure is still what
+    // the admin needs to see, and a *targetless* invite is at least visible
+    // in the invites list rather than being a wrong-access one nobody knows
+    // about. (Deleting the invite cascades to any invite_targets rows that
+    // did land, via invite_targets.invite_id ON DELETE CASCADE.)
+    try {
+      await supabase.from('invites').delete().eq('id', data.id)
+    } catch {
+      // Swallowed deliberately: the error below is the useful one.
+    }
+    if (targetsError) throw targetsError
+    throw new Error(REFUSED_INVITE_TARGETS)
+  }
+
   return data
 }
 
@@ -187,7 +270,12 @@ export async function createInvite({ clubId, email, role, teamId, playerId, crea
  * follows the same throw-on-error convention as every other function in this
  * module rather than swallowing or rewording it.
  *
- * Returns the newly-created memberships row on success.
+ * Returns an ARRAY of the newly-created memberships rows on success — the
+ * RPC's return type is `SETOF memberships`, not a single row, because one
+ * invite can carry several targets (a parent of two children in different age
+ * groups) and each target becomes its own membership. An invite with no
+ * `invite_targets` rows still takes the legacy fallback and comes back as a
+ * one-element array. Callers must not treat the result as a single object.
  */
 export async function acceptInvite(token) {
   const { data, error } = await supabase.rpc('accept_invite', { _token: token })
@@ -266,6 +354,47 @@ export async function updateMembershipRole({ membershipId, role, teamId } = {}) 
 }
 
 /**
+ * Validates one caller-facing membership grant and turns it into the column
+ * object to insert. Not exported — it exists so grantMembership and
+ * grantMemberships cannot drift into two different conventions, which is
+ * exactly the risk when the same rule is written out twice.
+ *
+ * The rule is the one updateMembershipRole enforces, unchanged: memberships
+ * has no check constraint mirroring the (now dropped) invites one, so
+ * JavaScript is where it is enforced or it is not enforced at all.
+ *   - role 'admin' → team_id written as null whatever was passed. A form's
+ *     age-group select may still hold a stale selection at the moment the
+ *     role becomes admin; coercing to the single valid value cannot corrupt
+ *     anything, and throwing would fail for a reason the user cannot see.
+ *   - any other role → a null/absent teamId throws, before any network call.
+ *     There is no safe value to coerce to, and a null team_id would quietly
+ *     strand the account with no age group.
+ *
+ * `label` names the calling function in the argument-shape errors so a
+ * mistake points at the function the caller actually called.
+ */
+function toMembershipRow({ profileId, clubId, role, teamId, playerId } = {}, label) {
+  if (!profileId) throw new Error(`${label} needs a profileId.`)
+  if (!clubId) throw new Error(`${label} needs a clubId.`)
+  if (!ROLES.includes(role)) {
+    throw new Error(`${label} needs a role of ${ROLES.join(', ')}.`)
+  }
+
+  const isAdminRole = role === 'admin'
+  if (!isAdminRole && !teamId) {
+    throw new Error('Choose an age group for this role.')
+  }
+
+  return {
+    profile_id: profileId,
+    club_id: clubId,
+    role,
+    team_id: isAdminRole ? null : teamId,
+    player_id: playerId ?? null,
+  }
+}
+
+/**
  * Creates one membership row — "grant access" for someone who signed up but
  * was never invited, and so has no membership at all (see
  * listPendingProfiles). Returns the new row.
@@ -290,32 +419,79 @@ export async function updateMembershipRole({ membershipId, role, teamId } = {}) 
  * coach grant links to no player, and a parent/player grant can be linked
  * later from the Accounts screen.
  */
-export async function grantMembership({ profileId, clubId, role, teamId, playerId } = {}) {
-  if (!profileId) throw new Error('grantMembership needs a profileId.')
-  if (!clubId) throw new Error('grantMembership needs a clubId.')
-  if (!ROLES.includes(role)) {
-    throw new Error(`grantMembership needs a role of ${ROLES.join(', ')}.`)
-  }
-
-  const isAdminRole = role === 'admin'
-  if (!isAdminRole && !teamId) {
-    throw new Error('Choose an age group for this role.')
-  }
+export async function grantMembership(fields = {}) {
+  const row = toMembershipRow(fields, 'grantMembership')
 
   const { data, error } = await supabase
     .from('memberships')
-    .insert({
-      profile_id: profileId,
-      club_id: clubId,
-      role,
-      team_id: isAdminRole ? null : teamId,
-      player_id: playerId ?? null,
-    })
+    .insert(row)
     .select()
     .maybeSingle()
 
   if (error) throw error
   if (!data) throw new Error(REFUSED_MEMBERSHIP_GRANT)
+  return data
+}
+
+/**
+ * Creates MANY membership rows in one insert and returns them.
+ *
+ * This is the multi-access grant: one person legitimately holds several
+ * membership rows — a parent of two children in different age groups, a coach
+ * of two squads, a coach who is also a parent. memberships has never had a
+ * unique constraint on (profile_id, club_id, role), so that has always been
+ * legal at the database level and scope.js already unions the rows correctly;
+ * only the grant path assumed one row per person.
+ *
+ * Takes an array of the SAME `{ profileId, clubId, role, teamId, playerId }`
+ * shape grantMembership takes, and applies the SAME rule to each via the
+ * shared toMembershipRow() — role 'admin' coerces team_id to null, any other
+ * role with a null/absent teamId throws. The whole array is validated BEFORE
+ * the network call, so one bad row means nothing is written rather than a
+ * half-applied grant.
+ *
+ * Rows differing only in role are kept: `{coach, U14}` plus `{parent, U10}`
+ * is precisely the mixed-role case this exists for.
+ *
+ * IDENTICAL rows are collapsed to one before inserting. The database cannot
+ * do this — there is no unique constraint to conflict on — so a UI that
+ * offers the same age group twice would otherwise create two identical rows
+ * that look like one and take two revokes to remove. (Duplicate admin rows
+ * have bitten this project before; see RESTORE.md.) This is the within-one-
+ * save guard only: refusing a row the person ALREADY holds needs their
+ * existing rows, which this function does not have, and belongs in the
+ * screen.
+ *
+ * One statement, not a loop, which decides what failure means — the same
+ * all-or-nothing reasoning as insertPlayers() in src/data/players.js.
+ * PostgREST sends a multi-row insert as a single statement, so an RLS WITH
+ * CHECK violation on any row aborts the lot; there is no partial grant to
+ * reconcile.
+ *
+ * An empty (or non-array) input returns [] without querying, matching
+ * listPlayers({teamIds: []})/insertPlayers([]).
+ */
+export async function grantMemberships(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return []
+
+  const built = rows.map((fields) => toMembershipRow(fields, 'grantMemberships'))
+
+  // De-duplicate on the full row, not on a subset: two parent rows for the
+  // same team but different children are different access and must both be
+  // written. Insertion order is preserved so the caller's list reads back the
+  // way it was built.
+  const seen = new Set()
+  const unique = built.filter((row) => {
+    const key = JSON.stringify([row.profile_id, row.club_id, row.role, row.team_id, row.player_id])
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  const { data, error } = await supabase.from('memberships').insert(unique).select()
+
+  if (error) throw error
+  if (!data || data.length === 0) throw new Error(REFUSED_MEMBERSHIP_GRANT)
   return data
 }
 
