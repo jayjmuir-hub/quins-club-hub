@@ -9,7 +9,7 @@ update, and — as of 3 Aug 2026 — the Club Overview Dashboard, the admin **Ac
 screen, the **view-as preview** switcher, the **"Waiting for access"** section for
 people who sign up without an invite, and the first-login name prompt. See the plans
 under `docs/superpowers/plans/2026-08-03-*` and the ledgers under `.superpowers/sdd/`).
-**774 tests passing, build clean** as of the latest commit on `build/v1-mvp`.
+**816 tests passing, build clean** as of the latest commit on `build/v1-mvp`. Multiple age groups/children per person (incl. parents with 3-5 kids) landed 3 Aug — see `.superpowers/sdd/multi-access/progress.md`.
 
 ### Two rulings from 3 Aug 2026 worth reading before touching auth or roles
 

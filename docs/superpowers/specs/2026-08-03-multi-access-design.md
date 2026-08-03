@@ -99,10 +99,29 @@ one membership per `invite_targets` row instead of one membership total.
 **Legacy fallback retained.** If an invite has no `invite_targets` rows, fall back
 to its own `team_id`/`player_id`. This means the old columns and the new table can
 coexist during rollout, so a frontend that is briefly out of step with the database
-cannot fail an invite. Removing `invites.team_id`/`player_id` and the
-`invites_team_required_unless_admin` constraint is a **follow-up cleanup**, not
-part of this change — dropping them while a deployed frontend still writes them
-would break invites outright.
+cannot fail an invite. Removing `invites.team_id`/`player_id` is a **follow-up
+cleanup** — dropping them while a deployed frontend still writes them would break
+invites outright.
+
+**CORRECTION (during build).** This spec originally listed dropping
+`invites_team_required_unless_admin` as out of scope too. That turned out to be
+impossible: the constraint requires `invites.team_id NOT NULL` for any non-admin
+role, and a multi-target invite has a null `team_id` with the teams living in
+`invite_targets` — so it rejected exactly the case being built. A CHECK cannot
+reference another table, so the constraint was **dropped** and its rule moved into
+`accept_invite`, which raises *"This invite is incomplete — it has no age group"*
+for a non-admin invite with no targets and no `team_id`.
+
+That left a window where an admin could create a dud invite that only failed days
+later, in the invitee's hands. So the rule is now enforced at three points: the
+invite form refuses to submit, `createInvite` throws before any network call, and
+`accept_invite` raises. The invitee is the one who pays for a bad invite and can do
+nothing about it, which is why it is guarded early rather than only at the end.
+
+**Legacy columns are mirrored only when there is exactly one target.** With several
+targets, any single value would be a lie — and if the targets insert failed and its
+cleanup delete were refused, the leftover invite would hit the legacy fallback and
+silently grant one of the age groups. Null makes such a leftover fail loudly.
 
 Return type changes from a single membership row to a set. `AcceptInvite.jsx` only
 needs it to have succeeded, but it must not assume a single object.
