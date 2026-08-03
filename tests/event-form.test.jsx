@@ -446,17 +446,17 @@ describe('EventForm — saving', () => {
 // --- wiring ---------------------------------------------------------------
 
 describe('Schedule wiring', () => {
-  it('offers an Add fixture button to a coach', async () => {
+  it('offers an Add event button to a coach', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
     render(<Schedule />)
-    expect(await screen.findByRole('button', { name: /add fixture/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /add event/i })).toBeInTheDocument()
   })
 
   it('does not offer it to a parent', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
     render(<Schedule />)
     await screen.findByText(/no upcoming fixtures/i)
-    expect(screen.queryByRole('button', { name: /add fixture/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add event/i })).not.toBeInTheDocument()
   })
 
   it('opens the empty form from the Add button', async () => {
@@ -464,7 +464,7 @@ describe('Schedule wiring', () => {
     useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
     render(<Schedule />)
 
-    await user.click(await screen.findByRole('button', { name: /add fixture/i }))
+    await user.click(await screen.findByRole('button', { name: /add event/i }))
 
     expect(await screen.findByRole('heading', { name: 'Add event' })).toBeInTheDocument()
     expect(screen.getByLabelText('Opponent')).toHaveValue('')
@@ -475,12 +475,16 @@ describe('Schedule wiring', () => {
     useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
     render(<Schedule />)
 
-    await user.click(await screen.findByRole('button', { name: /add fixture/i }))
+    await user.click(await screen.findByRole('button', { name: /add event/i }))
     const callsBefore = listEventsMock.mock.calls.length
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
     await user.type(screen.getByLabelText('Time'), '20:00')
-    await user.click(screen.getByRole('button', { name: /add event/i }))
+    // Schedule's trigger button and the form's submit button now share the
+    // "Add event" name (the trigger used to say "Add fixture"), so scope this
+    // to the open sheet rather than matching both.
+    const sheet = screen.getByRole('dialog')
+    await user.click(within(sheet).getByRole('button', { name: /add event/i }))
 
     await waitFor(() => expect(listEventsMock.mock.calls.length).toBeGreaterThan(callsBefore))
   })

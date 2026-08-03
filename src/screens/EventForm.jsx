@@ -6,7 +6,7 @@ import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { clubDateTimeInputs, clubToday, clubWallTimeToUtc, eventDate } from '../lib/eventFormat.js'
 
 // The event add/edit form (design-system.md §5.6), opened in the shared
-// Sheet from Schedule's "Add fixture" button and from EventDetail's "Edit".
+// Sheet from Schedule's "Add event" button and from EventDetail's "Edit".
 // Field order is the design system's: type → opponent/title → date+time →
 // age group → home/away → venue → competition → score → Save.
 //

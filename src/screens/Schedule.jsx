@@ -423,7 +423,7 @@ export default function Schedule() {
             onClick={() => setFormState({ event: null })}
             className="shrink-0 rounded-[11px] bg-brand px-3.5 py-2 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
-            Add fixture
+            Add event
           </button>
         )}
       </div>

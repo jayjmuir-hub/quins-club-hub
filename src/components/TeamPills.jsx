@@ -58,7 +58,12 @@ export function TeamPills({ teams, selected, onChange, allLabel = 'All', counts 
   }
 
   return (
-    <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    // Phone: one swipeable row (scrollbar hidden — touch users drag it).
+    // Desktop (820px+): wrap instead. With 15 age groups + "All" this row is
+    // ~1300px of pills, wider than the content column on most monitors, and
+    // the hidden scrollbar gave a mouse user no affordance at all — you had to
+    // know to drag it. Wrapping keeps every age group one click away.
+    <div className="flex gap-2 overflow-x-auto desktop:flex-wrap desktop:overflow-x-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <PillButton active={selected === ALL_TEAMS_ID} onClick={() => onChange(ALL_TEAMS_ID)}>
         {label(allLabel, ALL_TEAMS_ID)}
       </PillButton>
