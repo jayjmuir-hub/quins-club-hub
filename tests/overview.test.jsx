@@ -29,6 +29,15 @@ const listContactsForPlayersMock = vi.fn()
 const listAvailabilityMock = vi.fn()
 const subscribeAvailabilityMock = vi.fn()
 
+// FEATURES.availability gates the RSVP-status section (src/screens/Overview.jsx,
+// same flag EventDetail.jsx already respects — off club-wide since 2026-07-29).
+// Mutable mock object pattern copied from tests/schedule.test.jsx: vi.mock's
+// factory is hoisted above top-level consts, so a plain const here would be
+// undefined inside the factory — vi.hoisted gives us a real object reference
+// both the factory and the tests below can share and mutate per-test.
+const featuresMock = vi.hoisted(() => ({ availability: true }))
+vi.mock('../src/lib/features.js', () => ({ FEATURES: featuresMock }))
+
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
@@ -67,6 +76,10 @@ const unsubscribeEvents = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Default true so the existing "Overview sections" RSVP tests below keep
+  // exercising the built feature; the real current default (false) gets its
+  // own describe block further down.
+  featuresMock.availability = true
   useMembershipsMock.mockReturnValue(memberships(ADMIN_MEMBERSHIPS))
   listEventsMock.mockResolvedValue([])
   subscribeEventsMock.mockReturnValue(unsubscribeEvents)
@@ -166,6 +179,21 @@ describe('Overview sections', () => {
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
+  })
+})
+
+describe('Overview — RSVP section respects FEATURES.availability', () => {
+  it('flag off (the real current default): never fetches availability and hides the RSVP summary', async () => {
+    featuresMock.availability = false
+    listEventsMock.mockResolvedValue([
+      { id: 'e1', team_id: 't1', type: 'match', starts_at: '2099-01-10T15:00:00Z' },
+    ])
+
+    setup()
+
+    expect(await screen.findByTestId('fixture-row')).toBeInTheDocument()
+    expect(screen.queryByTestId('rsvp-summary-e1')).not.toBeInTheDocument()
+    expect(listAvailabilityForEventsMock).not.toHaveBeenCalled()
   })
 })
 

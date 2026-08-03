@@ -8,6 +8,7 @@ import EventForm from './EventForm.jsx'
 import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
 import { listContactsForPlayers, listPlayers } from '../data/players.js'
+import { FEATURES } from '../lib/features.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { eventDate, sortByStart } from '../lib/eventFormat.js'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
@@ -23,6 +24,15 @@ import { canEditTeam, visibleTeams } from '../lib/scope.js'
 // Three sections, per the spec: upcoming fixtures across every visible team,
 // RSVP status per fixture, and roster gaps per team. No activity feed here —
 // that's Phase 2, gated on a not-yet-built audit-log table.
+//
+// FEATURES.availability (src/lib/features.js) gates the RSVP-status section
+// the same way it already gates EventDetail.jsx's two entry points — the
+// club turned digital RSVP off club-wide on 2026-07-29. While off, this
+// screen skips the listAvailabilityForEvents fetch entirely (not just
+// hiding the rendered summary) so it never asks a question nobody can
+// answer yet, matching EventDetail's own "never calls listAvailability"
+// behaviour while the flag is off. Flipping the flag back to true needs no
+// change here — the section (and its fetch) resume automatically.
 
 const UPCOMING_WINDOW_DAYS = 14
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -88,7 +98,7 @@ export default function Overview() {
         setEvents(eventRows)
         const eventIds = eventRows.map((event) => event.id)
         return Promise.all([
-          listAvailabilityForEvents(eventIds),
+          FEATURES.availability ? listAvailabilityForEvents(eventIds) : Promise.resolve([]),
           listPlayers({ teamIds }),
         ])
       })
@@ -213,13 +223,21 @@ export default function Overview() {
                   teamName={teamsById.get(event.team_id)?.name}
                   onSelect={setSelectedEventId}
                 />
-                <div
-                  data-testid={`rsvp-summary-${event.id}`}
-                  className="border-b border-line px-[14px] pb-3 text-[12.5px] text-ink-faint last:border-b-0"
-                >
-                  {counts.in} In · {counts.maybe} Maybe · {counts.out} Out
-                  {noResponse > 0 ? ` · ${noResponse} no response` : ''}
-                </div>
+                {/* Gated on FEATURES.availability (src/lib/features.js) — the
+                    club turned digital RSVP off club-wide on 2026-07-29, same
+                    flag EventDetail.jsx's two entry points already respect.
+                    While off, the fetch above never runs either, so this
+                    isn't just a hidden empty count — there is genuinely
+                    nothing to show. */}
+                {FEATURES.availability && (
+                  <div
+                    data-testid={`rsvp-summary-${event.id}`}
+                    className="border-b border-line px-[14px] pb-3 text-[12.5px] text-ink-faint last:border-b-0"
+                  >
+                    {counts.in} In · {counts.maybe} Maybe · {counts.out} Out
+                    {noResponse > 0 ? ` · ${noResponse} no response` : ''}
+                  </div>
+                )}
               </div>
             )
           })}
