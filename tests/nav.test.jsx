@@ -87,3 +87,28 @@ describe('Nav — Overview link (Task 4)', () => {
     expect(link.className).toMatch(/desktop:flex/)
   })
 })
+
+// Accounts is admin-only, unlike Overview (admin OR coach), so it gets its
+// own prop. NAV_ITEMS is deliberately still exactly four — like Overview,
+// Accounts is a conditional desktop-only extra rather than a tab-bar item,
+// so the "exactly Home, Schedule, Roster, More" assertion above still holds.
+describe('Nav — Accounts link (design spec 2026-08-03 §2)', () => {
+  it('does not render an Accounts link by default', () => {
+    renderNav()
+    expect(screen.queryByRole('link', { name: 'Accounts' })).not.toBeInTheDocument()
+  })
+
+  it('does not render an Accounts link for a coach (canManage alone is not enough)', () => {
+    renderNav('/', { canManage: true })
+    expect(screen.queryByRole('link', { name: 'Accounts' })).not.toBeInTheDocument()
+  })
+
+  it('renders an Accounts link, hidden on mobile, when canManageAccounts is true', () => {
+    renderNav('/', { canManage: true, canManageAccounts: true })
+
+    const link = screen.getByRole('link', { name: 'Accounts' })
+    expect(link).toHaveAttribute('href', '/accounts')
+    expect(link.className).toMatch(/\bhidden\b/)
+    expect(link.className).toMatch(/desktop:flex/)
+  })
+})

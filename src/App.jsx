@@ -7,6 +7,7 @@ import Schedule from './screens/Schedule.jsx'
 import Roster from './screens/Roster.jsx'
 import Overview from './screens/Overview.jsx'
 import Admin from './screens/Admin.jsx'
+import Accounts from './screens/Accounts.jsx'
 import AcceptInvite from './screens/AcceptInvite.jsx'
 
 // "/more" now renders the real Admin screen (Task 17) rather than a stub.
@@ -44,6 +45,11 @@ export default function App() {
             <Route path="/roster" element={<AppShell><Roster /></AppShell>} />
             <Route path="/overview" element={<AppShell><Overview /></AppShell>} />
             <Route path="/more" element={<AppShell><Admin /></AppShell>} />
+            {/* Admin-only account management (design spec 2026-08-03 §2).
+                Reachable at any width — only its NAV LINK is desktop-only —
+                and Accounts.jsx gates itself on isAdmin(), so typing the URL
+                as a coach gets the same "not authorised" card Admin shows. */}
+            <Route path="/accounts" element={<AppShell><Accounts /></AppShell>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </MembershipProvider>

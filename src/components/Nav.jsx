@@ -85,7 +85,12 @@ function linkClassName({ isActive }) {
   ].join(' ')
 }
 
-export default function Nav({ canManage = false }) {
+// `canManage` (admin OR coach) gates Overview; `canManageAccounts` (admin
+// only) gates Accounts. Deliberately two props rather than one: Accounts
+// edits roles and revokes access, which coaches must not reach, so reusing
+// canManage here would show a coach a link to a screen that then refuses
+// them — and would be one rename away from actually exposing it.
+export default function Nav({ canManage = false, canManageAccounts = false }) {
   return (
     // The bar is dark chrome so the app is bookended in near-black — masthead
     // at the top, tab bar at the bottom, light content well between. The
@@ -119,6 +124,19 @@ export default function Nav({ canManage = false }) {
           className={(state) => `${linkClassName(state)} hidden desktop:flex`}
         >
           <span>Overview</span>
+        </NavLink>
+      )}
+      {canManageAccounts && (
+        <NavLink
+          to="/accounts"
+          // Desktop-only for the same reason as Overview above: `hidden`
+          // keeps it out of the mobile tab bar's grid-cols-4 layout entirely,
+          // `desktop:flex` brings it back as another pill in the desktop row.
+          // Managing accounts is a sit-down-at-a-laptop task, not a
+          // pitch-side one.
+          className={(state) => `${linkClassName(state)} hidden desktop:flex`}
+        >
+          <span>Accounts</span>
         </NavLink>
       )}
     </nav>
