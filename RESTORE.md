@@ -3,8 +3,12 @@
 **Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
 Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
 
-**22 of 22 tasks complete, 537 tests passing, build clean. Deployed and live at
-`app.adhjrt.com` — Jay is signed in as the first admin.**
+**v1 MVP (22 of 22 tasks) complete and live at `app.adhjrt.com`. Post-v1 refinement is
+underway** (desktop-focused work: bulk player import, roster/schedule tables, theme/brand
+update, and — as of 3 Aug 2026 — the Club Overview Dashboard, spec'd and built this session:
+see `docs/superpowers/plans/2026-08-03-club-overview-dashboard.md` and
+`.superpowers/sdd/club-overview-dashboard/progress.md`). **622 tests passing, build clean**
+as of the latest commit on `build/v1-mvp`.
 
 ---
 
