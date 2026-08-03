@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
-import { roleLabel } from '../lib/scope.js'
+import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import Nav from './Nav.jsx'
 import crest from '../assets/crest.png'
 
@@ -108,13 +108,20 @@ function NoMembershipState({ email, signOut }) {
 
 export default function AppShell({ children }) {
   const { user, signOut } = useAuth()
-  const { memberships, loading, error, reload } = useMemberships()
+  const { memberships, teams, loading, error, reload } = useMemberships()
   const location = useLocation()
 
   const isMoreRoute = location.pathname === '/more'
   const ready = !loading && !error && memberships.length > 0
   const showRole = !loading && !error
   const currentRoleLabel = roleLabel(memberships)
+  // Same "can manage anything" boolean Dashboard.jsx already computes for
+  // its own canEdit gating (src/screens/Dashboard.jsx) — admins can manage
+  // everything, coaches can manage whichever of their visible teams they're
+  // assigned to. Drives whether the desktop-only Overview nav link (Task 4)
+  // shows at all; Overview itself re-derives its own scoping independently.
+  const scopedTeams = visibleTeams(memberships, teams)
+  const canManage = isAdmin(memberships) || scopedTeams.some((team) => canEditTeam(memberships, team.id))
 
   return (
     <div className="flex min-h-screen flex-col bg-surface text-ink">
@@ -215,7 +222,7 @@ export default function AppShell({ children }) {
             </span>
           )}
 
-          <Nav />
+          <Nav canManage={canManage} />
         </div>
       </header>
 

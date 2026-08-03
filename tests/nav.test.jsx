@@ -11,10 +11,10 @@ import Nav, { NAV_ITEMS } from '../src/components/Nav.jsx'
 
 const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
 
-function renderNav(initialEntry = '/') {
+function renderNav(initialEntry = '/', props = {}) {
   return render(
     <MemoryRouter initialEntries={[initialEntry]} future={routerFuture}>
-      <Nav />
+      <Nav {...props} />
     </MemoryRouter>,
   )
 }
@@ -68,5 +68,22 @@ describe('Nav', () => {
     expect(screen.getByRole('link', { name: 'Schedule' })).toHaveAttribute('href', '/schedule')
     expect(screen.getByRole('link', { name: 'Roster' })).toHaveAttribute('href', '/roster')
     expect(screen.getByRole('link', { name: 'More' })).toHaveAttribute('href', '/more')
+  })
+})
+
+describe('Nav — Overview link (Task 4)', () => {
+  it('does not render an Overview link when canManage is false (default)', () => {
+    renderNav()
+    expect(screen.queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument()
+  })
+
+  it('renders an Overview link, hidden on mobile, when canManage is true', () => {
+    renderNav('/', { canManage: true })
+
+    const link = screen.getByRole('link', { name: 'Overview' })
+    expect(link).toBeInTheDocument()
+    expect(link).toHaveAttribute('href', '/overview')
+    expect(link.className).toMatch(/\bhidden\b/)
+    expect(link.className).toMatch(/desktop:flex/)
   })
 })

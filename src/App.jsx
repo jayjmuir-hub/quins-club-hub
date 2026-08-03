@@ -5,6 +5,7 @@ import AppShell from './components/AppShell.jsx'
 import Dashboard from './screens/Dashboard.jsx'
 import Schedule from './screens/Schedule.jsx'
 import Roster from './screens/Roster.jsx'
+import Overview from './screens/Overview.jsx'
 import Admin from './screens/Admin.jsx'
 import AcceptInvite from './screens/AcceptInvite.jsx'
 
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/" element={<AppShell><Dashboard /></AppShell>} />
             <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
             <Route path="/roster" element={<AppShell><Roster /></AppShell>} />
+            <Route path="/overview" element={<AppShell><Overview /></AppShell>} />
             <Route path="/more" element={<AppShell><Admin /></AppShell>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -255,3 +255,26 @@ describe('AppShell', () => {
     expect(screen.queryByRole('button', { name: /sign out/i })).not.toBeInTheDocument()
   })
 })
+
+describe('AppShell — Overview nav gating (Task 4)', () => {
+  it('passes canManage=true to Nav for an admin', () => {
+    useMembershipsMock.mockReturnValue(loaded())
+
+    renderShell()
+
+    expect(screen.getByRole('link', { name: 'Overview' })).toBeInTheDocument()
+  })
+
+  it('does not pass canManage=true for a parent', () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({
+        memberships: [{ role: 'parent', team_id: 't1', player_id: 'p1' }],
+        teams: [{ id: 't1', name: 'U12 Boys', sort_order: 4 }],
+      }),
+    )
+
+    renderShell()
+
+    expect(screen.queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument()
+  })
+})

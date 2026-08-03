@@ -85,7 +85,7 @@ function linkClassName({ isActive }) {
   ].join(' ')
 }
 
-export default function Nav() {
+export default function Nav({ canManage = false }) {
   return (
     // The bar is dark chrome so the app is bookended in near-black — masthead
     // at the top, tab bar at the bottom, light content well between. The
@@ -107,6 +107,20 @@ export default function Nav() {
           <span>{label}</span>
         </NavLink>
       ))}
+      {canManage && (
+        <NavLink
+          to="/overview"
+          // Desktop-only regardless of canManage: `hidden` keeps it out of
+          // the mobile tab bar's grid-cols-4 layout entirely (display:none
+          // removes it from grid flow, so the bar still shows exactly 4
+          // visible cells on phone), `desktop:flex` brings it back as a
+          // fifth pill in the desktop row, matching every other item's
+          // `desktop:flex-row` shape from linkClassName.
+          className={(state) => `${linkClassName(state)} hidden desktop:flex`}
+        >
+          <span>Overview</span>
+        </NavLink>
+      )}
     </nav>
   )
 }
