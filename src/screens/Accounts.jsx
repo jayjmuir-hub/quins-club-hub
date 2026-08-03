@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import AccessBuilder from '../components/AccessBuilder.jsx'
 import Badge from '../components/Badge.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import {
   deleteMembership,
-  grantMembership,
+  grantMemberships,
   listClubMembers,
   listPendingProfiles,
   updateMembershipRole,
   updateProfileName,
 } from '../data/members.js'
+import { listPlayers } from '../data/players.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin } from '../lib/scope.js'
@@ -77,8 +79,11 @@ const LAST_ADMIN_REFUSAL =
 //      every table. Deleting the underlying auth user needs the service-role
 //      key, which never touches this frontend. The UI says that instead of
 //      offering a button that could not do it.
-const NO_ROLE_CHOSEN = 'Choose a role for this person.'
-const NO_TEAM_CHOSEN = 'Choose an age group for this role.'
+//
+// Choosing WHAT access to give is src/components/AccessBuilder.jsx's job, not
+// this file's: a person's access is a set of rows (a parent of two children,
+// a coach of two squads, a coach who is also a parent), and the same builder
+// is used both here and on each existing person's block below.
 const NO_CLUB_KNOWN =
   "We couldn't work out which club to add them to. Reload the page and try again."
 
@@ -143,7 +148,8 @@ export default function Accounts() {
   const admin = isAdmin(memberships)
 
   const [members, setMembers] = useState([])
-  // Every profile the admin can read (see the NO_ROLE_CHOSEN block above) —
+  // Every profile the admin can read (see the "Waiting for access" block
+  // above) —
   // NOT the pending set. `waiting` below is the pending set.
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -157,9 +163,45 @@ export default function Accounts() {
   const [rowState, setRowState] = useState({})
   // Per-profile name editing, keyed by profile id.
   const [nameEdit, setNameEdit] = useState({})
-  // Per-waiting-person grant form, keyed by profile id: chosen role, chosen
-  // age group, whether the insert is in flight, and the last refusal.
+  // Per-grant-form state, keyed by profile id for a waiting person and by
+  // `add:<profile id>` for the "Add access" builder on an existing person:
+  // whether the insert is in flight, and the last refusal. WHAT is being
+  // granted lives inside AccessBuilder — the screen only learns it on submit.
   const [grantState, setGrantState] = useState({})
+  // Which existing people have their "Add access" builder open.
+  const [adding, setAdding] = useState({})
+
+  // The roster, loaded ONCE and only when a builder actually needs it (a
+  // parent's children or a player's own record). ~315 rows that most grants
+  // never look at, so loading it with the member list would put a third query
+  // on every visit to this screen to serve a minority of them. listPlayers()
+  // with no teamIds is deliberate: an admin picking a child needs the whole
+  // club, not the teams they happen to be scoped to, and RLS is what narrows
+  // it for anyone else.
+  const [players, setPlayers] = useState([])
+  const [playersLoading, setPlayersLoading] = useState(false)
+  const [playersError, setPlayersError] = useState(null)
+  const playersRequested = useRef(false)
+
+  // Stable across renders: AccessBuilder calls this from an effect, so a new
+  // identity every render would re-fire it every render.
+  const loadPlayers = useCallback(() => {
+    if (playersRequested.current) return
+    playersRequested.current = true
+    setPlayersLoading(true)
+    listPlayers()
+      .then((rows) => {
+        setPlayers(rows)
+        setPlayersError(null)
+      })
+      .catch((err) => {
+        setPlayersError(err)
+        // Re-loadable: a failed roster read must not permanently disable the
+        // child picker for the rest of the session.
+        playersRequested.current = false
+      })
+      .finally(() => setPlayersLoading(false))
+  }, [])
 
   useEffect(() => {
     // A non-admin issues no query at all — same shape as Admin.jsx's effect.
@@ -310,70 +352,100 @@ export default function Accounts() {
     setGrantState((prev) => ({ ...prev, [profileId]: { ...prev[profileId], ...patch } }))
   }
 
-  async function grant(profile) {
-    const draft = grantState[profile.id] ?? {}
-    const role = draft.role ?? ''
-    const teamId = draft.teamId ?? ''
+  /**
+   * Rebuilds the embeds listClubMembers would have supplied for a freshly
+   * inserted membership row, so a new row renders identically to every other
+   * one without re-querying. The profile, the team and (for a parent/player
+   * row) the linked player are all already in hand.
+   */
+  function decorate(row, profileEmbed) {
+    return {
+      ...row,
+      profiles: profileEmbed,
+      teams: row.team_id ? teamsById.get(row.team_id) ?? null : null,
+      players: row.player_id
+        ? { full_name: players.find((player) => player.id === row.player_id)?.full_name ?? null }
+        : null,
+    }
+  }
 
-    // Validated here as well as in grantMembership: the data layer throws for
-    // a missing age group, but a missing role would reach the network as an
-    // invalid insert, and neither refusal reads as well as being told before
-    // anything is attempted.
-    if (!role) {
-      patchGrant(profile.id, { error: NO_ROLE_CHOSEN })
-      return
-    }
-    if (role !== 'admin' && !teamId) {
-      patchGrant(profile.id, { error: NO_TEAM_CHOSEN })
-      return
-    }
-    if (!clubId) {
-      patchGrant(profile.id, { error: NO_CLUB_KNOWN })
+  /**
+   * Saves a set of access rows for one person, in ONE call — a parent of two
+   * children is two rows and must be two rows, not two round trips that can
+   * half-fail. grantMemberships validates the whole array before touching the
+   * network, so one bad row means nothing is written.
+   *
+   * `key` scopes the in-flight/error state: a waiting person's builder is
+   * keyed by their profile id, an existing person's "Add access" builder by
+   * `add:<profile id>`, so the two can never overwrite each other's message.
+   */
+  async function saveAccess({ key, profileId, clubId: rowClubId, rows, profileEmbed, onDone }) {
+    const club = rowClubId ?? clubId
+    if (!club) {
+      patchGrant(key, { error: NO_CLUB_KNOWN })
       return
     }
 
-    patchGrant(profile.id, { saving: true, error: null })
+    patchGrant(key, { saving: true, error: null })
     try {
-      const created = await grantMembership({
-        profileId: profile.id,
-        clubId,
-        role,
-        // grantMembership coerces this to null for an admin grant anyway; the
-        // age-group select is hidden in that case, so it is normally ''.
-        teamId: role === 'admin' ? null : teamId,
-      })
+      const created = await grantMemberships(
+        rows.map((row) => ({
+          profileId,
+          clubId: club,
+          role: row.role,
+          teamId: row.teamId ?? null,
+          playerId: row.playerId ?? null,
+        })),
+      )
 
-      // Move the person from "waiting" into the main list in place, rather
-      // than re-querying: the insert returns the row, and the profile and team
-      // are both already in hand. The embeds listClubMembers would have
-      // supplied are reconstructed here so the new block renders identically
-      // to every other one. A blank full_name becomes null, not '', because
-      // the list falls back on nullish only — an empty string would render as
-      // a nameless block that looks like a bug.
-      setMembers((prev) => [
-        ...prev,
-        {
-          ...created,
-          profiles: {
-            full_name: profile.full_name?.trim() ? profile.full_name : null,
-            email: profile.email ?? null,
-          },
-          teams: created.team_id ? teamsById.get(created.team_id) ?? null : null,
-          players: null,
-        },
-      ])
-      setProfiles((prev) => prev.filter((row) => row.id !== profile.id))
+      setMembers((prev) => [...prev, ...created.map((row) => decorate(row, profileEmbed))])
       setGrantState((prev) => {
         const next = { ...prev }
-        delete next[profile.id]
+        delete next[key]
         return next
       })
+      onDone?.()
     } catch (err) {
-      patchGrant(profile.id, {
+      patchGrant(key, {
         saving: false,
         error: err?.message || "We couldn't give that person access.",
       })
     }
+  }
+
+  // A waiting person: the new rows move them out of the waiting list and into
+  // the main one in place. A blank full_name becomes null, not '', because the
+  // list falls back on nullish only — an empty string would render as a
+  // nameless block that looks like a bug.
+  function grant(profile, rows) {
+    return saveAccess({
+      key: profile.id,
+      profileId: profile.id,
+      rows,
+      profileEmbed: {
+        full_name: profile.full_name?.trim() ? profile.full_name : null,
+        email: profile.email ?? null,
+      },
+      onDone: () => setProfiles((prev) => prev.filter((row) => row.id !== profile.id)),
+    })
+  }
+
+  // An existing person: their club id comes off a row they already hold, which
+  // is better evidence than the screen-wide guess.
+  function addAccess(group, rows) {
+    return saveAccess({
+      key: `add:${group.key}`,
+      profileId: group.profileId,
+      clubId: group.memberships.find((member) => member.club_id)?.club_id ?? null,
+      rows,
+      profileEmbed: { full_name: group.name, email: group.email },
+      onDone: () =>
+        setAdding((prev) => {
+          const next = { ...prev }
+          delete next[group.key]
+          return next
+        }),
+    })
   }
 
   async function saveName(group) {
@@ -459,7 +531,6 @@ export default function Accounts() {
               <div className="mt-2.5 flex flex-col gap-3">
                 {waiting.map((profile) => {
                   const state = grantState[profile.id] ?? {}
-                  const role = state.role ?? ''
                   const displayName = profile.full_name?.trim() || 'No name yet'
                   const label = profile.email || displayName
                   const signedUp = formatJoined(profile.created_at)
@@ -487,73 +558,31 @@ export default function Accounts() {
 
                       <span className="flex-1" />
 
-                      <select
-                        className={INLINE_CONTROL}
-                        aria-label={`Role for ${label}`}
-                        value={role}
-                        disabled={Boolean(state.saving)}
-                        onChange={(event) =>
-                          patchGrant(profile.id, { role: event.target.value, error: null })
-                        }
-                      >
-                        <option value="">Choose a role</option>
-                        {ROLE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-
-                      {/* Same rule as the member rows above and as
-                          grantMembership itself: an admin is club-wide, every
-                          other role needs an age group or it scopes to
-                          nothing. */}
-                      {role === 'admin' ? (
-                        <span className={`px-2 text-[13px] ${MUTED_ON_PAPER}`}>All age groups</span>
-                      ) : (
-                        <select
-                          className={INLINE_CONTROL}
-                          aria-label={`Age group for ${label}`}
-                          value={state.teamId ?? ''}
-                          disabled={Boolean(state.saving)}
-                          onChange={(event) =>
-                            patchGrant(profile.id, { teamId: event.target.value, error: null })
-                          }
-                        >
-                          <option value="">Choose an age group</option>
-                          {sortedTeams.map((team) => (
-                            <option key={team.id} value={team.id}>
-                              {team.name}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      <button
-                        type="button"
-                        aria-label={`Give access to ${label}`}
-                        disabled={Boolean(state.saving)}
-                        onClick={() => grant(profile)}
-                        className="rounded-[8px] bg-brand px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-brand-deep disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-                      >
-                        {state.saving ? 'Giving access…' : 'Give access'}
-                      </button>
-
-                      {state.error && (
-                        <span
-                          role="alert"
-                          className="basis-full text-[12.5px] font-semibold text-brand-deep"
-                        >
-                          {state.error}
-                        </span>
-                      )}
+                      {/* One builder per waiting person. A person waiting for
+                          access can legitimately need several rows on the way
+                          in — a parent of two children is the ordinary case,
+                          not an edge one — so this is the same component the
+                          existing-person blocks use, with no existing rows to
+                          guard against. */}
+                      <AccessBuilder
+                        label={label}
+                        teams={sortedTeams}
+                        players={players}
+                        playersLoading={playersLoading}
+                        playersError={playersError}
+                        onNeedPlayers={loadPlayers}
+                        saving={Boolean(state.saving)}
+                        error={state.error}
+                        submitLabel="Give access"
+                        onSubmit={(rows) => grant(profile, rows)}
+                      />
                     </Card>
                   )
                 })}
               </div>
 
               {/* Said rather than offered as a control — see the comment on
-                  NO_ROLE_CHOSEN above. */}
+                  the "Waiting for access" block at the top of this file. */}
               <p className={`mt-2 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
                 There&apos;s nothing to turn down here. If you don&apos;t recognise someone,
                 leave them alone — with no access they can already see nothing, and they stay on
@@ -679,7 +708,55 @@ export default function Accounts() {
                       {group.memberships.length} access rows
                     </span>
                   )}
+
+                  {/* THE control this whole change exists for. Without it,
+                      giving a parent a second child's age group — or giving a
+                      coach a parent row for their own kid — means revoking
+                      what they have and granting it again from scratch.
+                      Hidden for a group with no profile id: a row whose join
+                      came back partial has nobody to add access for. */}
+                  {group.profileId && !adding[group.key] && (
+                    <button
+                      type="button"
+                      aria-label={`Add access for ${displayName}`}
+                      onClick={() => setAdding((prev) => ({ ...prev, [group.key]: true }))}
+                      className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    >
+                      Add access
+                    </button>
+                  )}
                 </div>
+
+                {adding[group.key] && (
+                  <div
+                    data-testid="add-access"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-surface-mute px-[14px] py-2.5"
+                  >
+                    {/* `existing` is what makes the duplicate guard possible:
+                        the rows this person already holds. The database has no
+                        unique constraint to fall back on. */}
+                    <AccessBuilder
+                      label={displayName}
+                      teams={sortedTeams}
+                      players={players}
+                      playersLoading={playersLoading}
+                      playersError={playersError}
+                      onNeedPlayers={loadPlayers}
+                      existing={group.memberships}
+                      saving={Boolean(grantState[`add:${group.key}`]?.saving)}
+                      error={grantState[`add:${group.key}`]?.error}
+                      submitLabel="Add access"
+                      onSubmit={(rows) => addAccess(group, rows)}
+                      onCancel={() =>
+                        setAdding((prev) => {
+                          const next = { ...prev }
+                          delete next[group.key]
+                          return next
+                        })
+                      }
+                    />
+                  </div>
+                )}
 
                 {group.memberships.map((member) => {
                   const state = rowState[member.id] ?? {}

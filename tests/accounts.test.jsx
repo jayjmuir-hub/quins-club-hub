@@ -13,7 +13,8 @@ const useMembershipsMock = vi.fn()
 const useAuthMock = vi.fn()
 const listClubMembersMock = vi.fn()
 const listPendingProfilesMock = vi.fn()
-const grantMembershipMock = vi.fn()
+const grantMembershipsMock = vi.fn()
+const listPlayersMock = vi.fn()
 const updateMembershipRoleMock = vi.fn()
 const deleteMembershipMock = vi.fn()
 const updateProfileNameMock = vi.fn()
@@ -29,10 +30,16 @@ vi.mock('../src/lib/auth.jsx', () => ({
 vi.mock('../src/data/members.js', () => ({
   listClubMembers: (...args) => listClubMembersMock(...args),
   listPendingProfiles: (...args) => listPendingProfilesMock(...args),
-  grantMembership: (...args) => grantMembershipMock(...args),
+  grantMemberships: (...args) => grantMembershipsMock(...args),
   updateMembershipRole: (...args) => updateMembershipRoleMock(...args),
   deleteMembership: (...args) => deleteMembershipMock(...args),
   updateProfileName: (...args) => updateProfileNameMock(...args),
+}))
+
+// The child picker reads the WHOLE roster (listPlayers with no teamIds), so
+// this screen now touches players.js too.
+vi.mock('../src/data/players.js', () => ({
+  listPlayers: (...args) => listPlayersMock(...args),
 }))
 
 // Import after vi.mock so this binds to the mocked modules.
@@ -49,6 +56,15 @@ const COACH = [{ id: 'm2', role: 'coach', team_id: 'team-u10' }]
 const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
 
 const SELF_ID = 'profile-jay'
+
+// The roster the child picker searches. Two siblings in DIFFERENT age groups
+// (Zara in U10, Omar in U12) is the case the whole multi-access change exists
+// for: one parent, two rows, two different derived teams.
+const PLAYERS = [
+  { id: 'player-omar', full_name: 'Omar Ali', team_id: 'team-u12' },
+  { id: 'player-zara', full_name: 'Zara Ali', team_id: 'team-u10' },
+  { id: 'player-noor', full_name: 'Noor Khan', team_id: 'team-u10' },
+]
 
 // Jay (the signed-in admin) plus two others. Sara holds TWO membership rows —
 // memberships has no unique constraint, so this is legitimate data and the
@@ -142,15 +158,20 @@ beforeEach(() => {
   useAuthMock.mockReturnValue({ user: { id: SELF_ID, email: 'jay@example.com' } })
   listClubMembersMock.mockResolvedValue(MEMBER_ROWS)
   listPendingProfilesMock.mockResolvedValue(PROFILE_ROWS)
-  grantMembershipMock.mockImplementation(async ({ profileId, clubId, role, teamId }) => ({
-    id: `mem-new-${profileId}`,
-    profile_id: profileId,
-    club_id: clubId,
-    role,
-    team_id: role === 'admin' ? null : teamId,
-    player_id: null,
-    created_at: '2026-08-03T12:00:00Z',
-  }))
+  listPlayersMock.mockResolvedValue(PLAYERS)
+  // Mirrors grantMemberships: one returned row per requested row, with the
+  // data layer's admin coercion (team_id null) applied.
+  grantMembershipsMock.mockImplementation(async (rows) =>
+    rows.map((row, index) => ({
+      id: `mem-new-${row.profileId}-${index}`,
+      profile_id: row.profileId,
+      club_id: row.clubId,
+      role: row.role,
+      team_id: row.role === 'admin' ? null : row.teamId,
+      player_id: row.playerId ?? null,
+      created_at: '2026-08-03T12:00:00Z',
+    })),
+  )
   updateMembershipRoleMock.mockImplementation(async ({ membershipId, role, teamId }) => ({
     id: membershipId,
     role,
@@ -171,6 +192,36 @@ function setup() {
 // club-wide>)", which is what makes one person's two rows addressable.
 function roleSelect(label) {
   return screen.getByLabelText(`Role for ${label}`)
+}
+
+// Access-builder helpers. Several builders can be on screen at once (one per
+// waiting person, one per person whose "Add access" is open), so everything is
+// scoped to the builder whose role select carries this person's label.
+function builderFor(label) {
+  return screen.getByLabelText(`Role for ${label}`).closest('[data-testid="access-builder"]')
+}
+
+function chooseRole(user, label, role) {
+  return user.selectOptions(screen.getByLabelText(`Role for ${label}`), role)
+}
+
+function tickAgeGroup(user, label, teamName) {
+  return user.click(
+    within(within(builderFor(label)).getByTestId('age-group-picker')).getByRole('checkbox', {
+      name: teamName,
+    }),
+  )
+}
+
+// The player rows are labelled "<name> <age group>" — the age group is shown
+// because it is what the access row's team_id is derived from.
+function pickPlayer(user, label, playerName, type = 'checkbox') {
+  const picker = within(builderFor(label)).getByTestId('player-picker')
+  return user.click(within(picker).getByRole(type, { name: new RegExp(playerName) }))
+}
+
+function submitAccess(user, submitLabel, label) {
+  return user.click(within(builderFor(label)).getByRole('button', { name: `${submitLabel} for ${label}` }))
 }
 
 describe('Accounts — authorisation gate', () => {
@@ -568,16 +619,13 @@ describe('Accounts — waiting for access', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.selectOptions(screen.getByLabelText('Role for raw@example.com'), 'coach')
-    await user.selectOptions(screen.getByLabelText('Age group for raw@example.com'), 'team-u10')
-    await user.click(screen.getByRole('button', { name: /give access to raw@example\.com/i }))
+    await chooseRole(user, 'raw@example.com', 'coach')
+    await tickAgeGroup(user, 'raw@example.com', 'U10')
+    await submitAccess(user, 'Give access', 'raw@example.com')
 
-    expect(grantMembershipMock).toHaveBeenCalledWith({
-      profileId: 'profile-raw',
-      clubId: CLUB_ID,
-      role: 'coach',
-      teamId: 'team-u10',
-    })
+    expect(grantMembershipsMock).toHaveBeenCalledWith([
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'coach', teamId: 'team-u10', playerId: null },
+    ])
 
     // Moved, not duplicated: gone from the waiting list, present in the main
     // one, with no reload.
@@ -591,17 +639,15 @@ describe('Accounts — waiting for access', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.selectOptions(screen.getByLabelText('Role for raw@example.com'), 'admin')
+    await chooseRole(user, 'raw@example.com', 'admin')
 
-    expect(screen.queryByLabelText('Age group for raw@example.com')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /give access to raw@example\.com/i }))
+    expect(within(builderFor('raw@example.com')).queryByTestId('age-group-picker')).toBeNull()
+    expect(within(builderFor('raw@example.com')).queryByTestId('player-picker')).toBeNull()
+    await submitAccess(user, 'Give access', 'raw@example.com')
 
-    expect(grantMembershipMock).toHaveBeenCalledWith({
-      profileId: 'profile-raw',
-      clubId: CLUB_ID,
-      role: 'admin',
-      teamId: null,
-    })
+    expect(grantMembershipsMock).toHaveBeenCalledWith([
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'admin', teamId: null, playerId: null },
+    ])
     expect(await screen.findByLabelText('Role for Raw Recruit (club-wide)')).toHaveValue('admin')
   })
 
@@ -609,34 +655,34 @@ describe('Accounts — waiting for access', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.click(screen.getByRole('button', { name: /give access to raw@example\.com/i }))
+    await submitAccess(user, 'Give access', 'raw@example.com')
 
-    expect(grantMembershipMock).not.toHaveBeenCalled()
+    expect(grantMembershipsMock).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent(/choose a role/i)
   })
 
-  it('refuses a non-admin grant without an age group, before any network call', async () => {
+  it('refuses a coach grant with no age group, before any network call', async () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.selectOptions(screen.getByLabelText('Role for raw@example.com'), 'parent')
-    await user.click(screen.getByRole('button', { name: /give access to raw@example\.com/i }))
+    await chooseRole(user, 'raw@example.com', 'coach')
+    await submitAccess(user, 'Give access', 'raw@example.com')
 
-    expect(grantMembershipMock).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert')).toHaveTextContent(/choose an age group/i)
+    expect(grantMembershipsMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/at least one age group/i)
   })
 
   it('reports a refused grant inline and keeps the person on the list', async () => {
-    grantMembershipMock.mockRejectedValue(
+    grantMembershipsMock.mockRejectedValue(
       new Error("We couldn't give that person access. You may not have permission to manage members."),
     )
 
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.selectOptions(screen.getByLabelText('Role for raw@example.com'), 'coach')
-    await user.selectOptions(screen.getByLabelText('Age group for raw@example.com'), 'team-u10')
-    await user.click(screen.getByRole('button', { name: /give access to raw@example\.com/i }))
+    await chooseRole(user, 'raw@example.com', 'coach')
+    await tickAgeGroup(user, 'raw@example.com', 'U10')
+    await submitAccess(user, 'Give access', 'raw@example.com')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/may not have permission/i)
     expect(within(waitingSection()).getAllByTestId('waiting-person')).toHaveLength(2)
@@ -671,5 +717,276 @@ describe('Accounts — waiting for access', () => {
 
     expect(listPendingProfilesMock).not.toHaveBeenCalled()
     expect(screen.queryByTestId('waiting-for-access')).not.toBeInTheDocument()
+  })
+})
+
+// The multi-access builder (design spec 2026-08-03, "Grant UI"). One access
+// row = one memberships row = (role, team_id, player_id); a person's access is
+// the SET of their rows. Everything below is about producing that set
+// correctly — and about never producing a row they already hold, since the
+// database has no unique constraint to stop it.
+describe('Accounts — access builder', () => {
+  it('parent + two children creates two rows, each with that child’s own age group', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await chooseRole(user, 'raw@example.com', 'parent')
+    await screen.findByRole('checkbox', { name: /Zara Ali/ })
+    await pickPlayer(user, 'raw@example.com', 'Zara Ali')
+    await pickPlayer(user, 'raw@example.com', 'Omar Ali')
+    await submitAccess(user, 'Give access', 'raw@example.com')
+
+    // Two rows, each carrying its own child and that child's team — Zara is
+    // U10, Omar is U12. One row per child is what makes a two-child parent see
+    // both children (scope.js's childPlayerIds).
+    expect(grantMembershipsMock).toHaveBeenCalledWith([
+      {
+        profileId: 'profile-raw',
+        clubId: CLUB_ID,
+        role: 'parent',
+        teamId: 'team-u10',
+        playerId: 'player-zara',
+      },
+      {
+        profileId: 'profile-raw',
+        clubId: CLUB_ID,
+        role: 'parent',
+        teamId: 'team-u12',
+        playerId: 'player-omar',
+      },
+    ])
+
+    // Both rows land in the list, with the linked-player column populated from
+    // the roster already in hand rather than a re-query.
+    expect(await screen.findByLabelText('Role for Raw Recruit (U10)')).toHaveValue('parent')
+    expect(screen.getByLabelText('Role for Raw Recruit (U12 Boys)')).toHaveValue('parent')
+    expect(listClubMembersMock).toHaveBeenCalledTimes(1)
+    const rawBlock = screen
+      .getAllByTestId('account-person')
+      .find((block) => within(block).queryByText('Raw Recruit'))
+    expect(within(rawBlock).getByText(/2 access rows/i)).toBeInTheDocument()
+    expect(within(rawBlock).getByText('Zara Ali')).toBeInTheDocument()
+    expect(within(rawBlock).getByText('Omar Ali')).toBeInTheDocument()
+  })
+
+  // The age group is DERIVED from the child. Asking for it as well would let
+  // an admin produce a parent row pointing at an U10 child while carrying an
+  // U14 team_id — a contradiction scope.js would resolve in favour of U14.
+  it('never asks for an age group in child mode', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await chooseRole(user, 'raw@example.com', 'parent')
+
+    const builder = builderFor('raw@example.com')
+    expect(within(builder).getByTestId('player-picker')).toBeInTheDocument()
+    expect(within(builder).queryByTestId('age-group-picker')).toBeNull()
+    expect(screen.queryByLabelText('Age group for raw@example.com')).toBeNull()
+  })
+
+  it('loads the whole roster once, unscoped, and only when a picker needs it', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    // A coach grant never opens a player picker, so nothing is fetched.
+    await chooseRole(user, 'raw@example.com', 'coach')
+    expect(listPlayersMock).not.toHaveBeenCalled()
+
+    await chooseRole(user, 'raw@example.com', 'parent')
+    await screen.findByRole('checkbox', { name: /Zara Ali/ })
+    // No teamIds argument: an admin linking a child needs the whole club, and
+    // RLS is what narrows it for anyone else.
+    expect(listPlayersMock).toHaveBeenCalledWith()
+
+    // A second builder reuses the same list rather than fetching again.
+    await chooseRole(user, 'janice@example.com', 'parent')
+    expect(listPlayersMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('searches the roster by name rather than listing every player', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await chooseRole(user, 'raw@example.com', 'parent')
+    const picker = within(builderFor('raw@example.com')).getByTestId('player-picker')
+    await within(picker).findByRole('checkbox', { name: /Zara Ali/ })
+
+    await user.type(within(picker).getByLabelText(/search players/i), 'noor')
+
+    expect(within(picker).getByRole('checkbox', { name: /Noor Khan/ })).toBeInTheDocument()
+    expect(within(picker).queryByRole('checkbox', { name: /Zara Ali/ })).toBeNull()
+  })
+
+  // Jay asked for this explicitly: without it, a parent whose children have
+  // not been imported yet cannot be granted anything at all.
+  it('falls back to age groups, with a null player, when the children are not on the roster', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await chooseRole(user, 'raw@example.com', 'parent')
+    await user.click(
+      within(builderFor('raw@example.com')).getByRole('checkbox', { name: /on the roster yet/i }),
+    )
+
+    const builder = builderFor('raw@example.com')
+    expect(within(builder).queryByTestId('player-picker')).toBeNull()
+
+    await tickAgeGroup(user, 'raw@example.com', 'U10')
+    await tickAgeGroup(user, 'raw@example.com', 'U12 Boys')
+    await submitAccess(user, 'Give access', 'raw@example.com')
+
+    expect(grantMembershipsMock).toHaveBeenCalledWith([
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'parent', teamId: 'team-u10', playerId: null },
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'parent', teamId: 'team-u12', playerId: null },
+    ])
+  })
+
+  it('coach + two age groups creates two rows with no linked player', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await chooseRole(user, 'raw@example.com', 'coach')
+    await tickAgeGroup(user, 'raw@example.com', 'U10')
+    await tickAgeGroup(user, 'raw@example.com', 'U12 Boys')
+    await submitAccess(user, 'Give access', 'raw@example.com')
+
+    expect(grantMembershipsMock).toHaveBeenCalledWith([
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'coach', teamId: 'team-u10', playerId: null },
+      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'coach', teamId: 'team-u12', playerId: null },
+    ])
+    expect(await screen.findByLabelText('Role for Raw Recruit (U10)')).toHaveValue('coach')
+    expect(screen.getByLabelText('Role for Raw Recruit (U12 Boys)')).toHaveValue('coach')
+  })
+
+  it('player is a single choice, with the age group taken from the player', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await chooseRole(user, 'raw@example.com', 'player')
+    await screen.findByRole('radio', { name: /Omar Ali/ })
+    await pickPlayer(user, 'raw@example.com', 'Zara Ali', 'radio')
+    await pickPlayer(user, 'raw@example.com', 'Omar Ali', 'radio')
+    await submitAccess(user, 'Give access', 'raw@example.com')
+
+    // The second choice replaced the first — a person is one player.
+    expect(grantMembershipsMock).toHaveBeenCalledWith([
+      {
+        profileId: 'profile-raw',
+        clubId: CLUB_ID,
+        role: 'player',
+        teamId: 'team-u12',
+        playerId: 'player-omar',
+      },
+    ])
+  })
+
+  it('refuses a parent grant with no child chosen, before any network call', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await chooseRole(user, 'raw@example.com', 'parent')
+    await submitAccess(user, 'Give access', 'raw@example.com')
+
+    expect(grantMembershipsMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/at least one child/i)
+  })
+
+  it('adds a second access row to an existing person without revoking the first', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    // Sara already coaches U10. She also has a child in U10 — a mixed-role
+    // person, which the database has always allowed and the UI never offered.
+    await user.click(screen.getByRole('button', { name: /add access for sara coach/i }))
+    await chooseRole(user, 'Sara Coach', 'parent')
+    await screen.findByRole('checkbox', { name: /Zara Ali/ })
+    await pickPlayer(user, 'Sara Coach', 'Zara Ali')
+    await submitAccess(user, 'Add access', 'Sara Coach')
+
+    expect(grantMembershipsMock).toHaveBeenCalledWith([
+      {
+        profileId: 'profile-sara',
+        clubId: CLUB_ID,
+        role: 'parent',
+        teamId: 'team-u10',
+        playerId: 'player-zara',
+      },
+    ])
+
+    // Her existing two rows are untouched; the new one joins them in the same
+    // block, and the builder closes.
+    expect(await screen.findByText(/3 access rows/i)).toBeInTheDocument()
+    expect(deleteMembershipMock).not.toHaveBeenCalled()
+    expect(screen.getAllByTestId('account-membership')).toHaveLength(5)
+    expect(screen.queryByTestId('add-access')).toBeNull()
+  })
+
+  it('refuses to add a row the person already holds', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.click(screen.getByRole('button', { name: /add access for sara coach/i }))
+    await chooseRole(user, 'Sara Coach', 'coach')
+    // She is already coach of U10 — same role, same team, same (null) player.
+    await tickAgeGroup(user, 'Sara Coach', 'U10')
+    await submitAccess(user, 'Add access', 'Sara Coach')
+
+    expect(grantMembershipsMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/already have that access/i)
+
+    // The same age group is grantable to someone who does NOT hold it.
+    await tickAgeGroup(user, 'Sara Coach', 'U12 Boys')
+    await tickAgeGroup(user, 'Sara Coach', 'U10')
+    await submitAccess(user, 'Add access', 'Sara Coach')
+
+    expect(grantMembershipsMock).toHaveBeenCalledWith([
+      { profileId: 'profile-sara', clubId: CLUB_ID, role: 'coach', teamId: 'team-u12', playerId: null },
+    ])
+  })
+
+  // The duplicate that has actually happened in this database (RESTORE.md): a
+  // second, identical admin row. Both rows are (admin, null, null), so nothing
+  // but this guard distinguishes them.
+  it('refuses a duplicate admin row', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.click(screen.getByRole('button', { name: /add access for jay muir/i }))
+    await chooseRole(user, 'Jay Muir', 'admin')
+    await submitAccess(user, 'Add access', 'Jay Muir')
+
+    expect(grantMembershipsMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/already have that access/i)
+  })
+
+  it('closes the add-access builder on cancel without writing anything', async () => {
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.click(screen.getByRole('button', { name: /add access for ali parent/i }))
+    expect(screen.getByTestId('add-access')).toBeInTheDocument()
+
+    await user.click(within(screen.getByTestId('add-access')).getByRole('button', { name: /cancel/i }))
+
+    expect(screen.queryByTestId('add-access')).toBeNull()
+    expect(grantMembershipsMock).not.toHaveBeenCalled()
+  })
+
+  it('reports a refused add-access inline and leaves the existing rows alone', async () => {
+    grantMembershipsMock.mockRejectedValue(
+      new Error("We couldn't give that person access. You may not have permission to manage members."),
+    )
+
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await user.click(screen.getByRole('button', { name: /add access for sara coach/i }))
+    await chooseRole(user, 'Sara Coach', 'coach')
+    await tickAgeGroup(user, 'Sara Coach', 'U12 Boys')
+    await submitAccess(user, 'Add access', 'Sara Coach')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/may not have permission/i)
+    expect(screen.getAllByTestId('account-membership')).toHaveLength(4)
+    expect(screen.getByTestId('add-access')).toBeInTheDocument()
   })
 })
