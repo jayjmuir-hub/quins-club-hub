@@ -515,6 +515,75 @@ const scenarios = {
     return <ViewAsHarness />
   },
 
+  // Task D (plan 2026-08-03-pending-access) verification: the "Waiting for
+  // access" section on Accounts.
+  //
+  // The section's highest-risk bug is that listPendingProfiles() returns
+  // EVERY profile the admin can read, not just the unattached ones — the
+  // screen subtracts listClubMembers()'s profile_ids, and dropping that
+  // subtraction lists every existing member as "waiting". So this scenario is
+  // pointed at a members stub that deliberately returns both kinds of row
+  // (the three unattached pn-* profiles AND the eight member profiles), which
+  // is what makes the subtraction observable instead of vacuously true.
+  //
+  // The auth user id is `pr-jay` — a profile that IS in the member list — so
+  // the belt-and-braces `profile.id !== user?.id` filter is exercised on a
+  // real id rather than on undefined. TEAMS_THREE for the same reason
+  // accounts-admin uses it: every age-group option in the grant select points
+  // at a team id the fixture rows really use.
+  //
+  // Knobs (read by harness/stubs/members.js): ?pending=none for the empty
+  // state, ?pendingThrow=1 to prove a failed profiles read costs only this
+  // section, ?writeDelay/?writeThrow for the grant button's in-flight and
+  // refusal states.
+  'accounts-pending': () => (
+    <Shell
+      route="/accounts"
+      authValue={{ ...baseAuth(JAY_EMAIL), user: { id: 'pr-jay', email: JAY_EMAIL } }}
+      membershipValue={{
+        memberships: ADMIN_MEMBERSHIPS.map((row) => ({ ...row, club_id: CLUB_ID })),
+        realMemberships: ADMIN_MEMBERSHIPS,
+        viewAs: null,
+        setViewAs: noop,
+        teams: TEAMS_THREE,
+        loading: false,
+        error: null,
+        reload: noop,
+      }}
+    >
+      <Accounts />
+    </Shell>
+  ),
+
+  // Task C's first-login name prompt, in a real browser. It renders inside
+  // AppShell's `ready` branch, so this is a plain signed-in shell — the only
+  // thing that decides whether the Sheet opens is the profile the members
+  // stub returns, driven by ?blankName=1. Without that knob the same scenario
+  // is the control case: a named profile, no prompt.
+  //
+  // An auth user id is mandatory here and easy to miss: NamePrompt returns
+  // early when user?.id is undefined, and baseAuth() alone supplies only an
+  // email — so every other scenario in this file is silently immune to the
+  // prompt. Skipping writes `quins.namePromptSkipped` = this id to
+  // localStorage, which is what the "does not reappear" check clears between
+  // runs.
+  'name-prompt': () => (
+    <Shell
+      route="/"
+      authValue={{ ...baseAuth(JAY_EMAIL), user: { id: 'pr-jay', email: JAY_EMAIL } }}
+      membershipValue={{
+        memberships: ADMIN_MEMBERSHIPS,
+        realMemberships: ADMIN_MEMBERSHIPS,
+        viewAs: null,
+        setViewAs: noop,
+        teams: TEAMS_THREE,
+        loading: false,
+        error: null,
+        reload: noop,
+      }}
+    />
+  ),
+
   'shell-loading': () => (
     <Shell
       authValue={baseAuth(JAY_EMAIL)}

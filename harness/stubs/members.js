@@ -179,3 +179,95 @@ export async function updateProfileName({ profileId, fullName } = {}) {
   }
   return { id: profileId, full_name: String(fullName ?? '').trim() }
 }
+
+// Task D additions: the two exports the "Waiting for access" section on
+// Accounts calls. Their absence blanked EVERY scenario for the whole of
+// Task B/C — harness/main.jsx statically imports every screen, so an
+// unresolved named import from this file is a module-resolution failure for
+// the entire bundle, not just for Accounts. tests/harness-stubs.test.js now
+// compares every stub's exports against the real module it is aliased to, so
+// this cannot silently recur — it fails `npx vitest run` instead.
+
+// The unattached signups: profiles rows with NO membership. `pn-janice`
+// mirrors the real account that started this plan (signed up by magic link,
+// no name collected, zero memberships), `pn-omar` has a name, and
+// `pn-stranger` is the nobody-recognises-them case the UI copy is about.
+const PENDING_PROFILES = [
+  { id: 'pn-janice', full_name: '', email: 'janice.muir@yahoo.com', created_at: '2026-08-03T11:37:00Z' },
+  { id: 'pn-omar', full_name: 'Omar Farooq', email: 'omar.farooq@adhq.example', created_at: '2026-07-30T08:12:00Z' },
+  { id: 'pn-stranger', full_name: null, email: 'someone@example.com', created_at: '2026-07-21T19:04:00Z' },
+]
+
+// Mirrors the real listPendingProfiles, INCLUDING the part that misleads:
+// it returns every profile the caller can read, NOT just the pending ones.
+// For an admin that is the union of three RLS policies — own row, everyone
+// with a membership in this club, everyone anywhere with none — and the
+// screen is what subtracts listClubMembers()'s profile_ids. So this stub
+// deliberately returns the member profiles TOO: a stub that returned only
+// the unattached rows would make the screen's subtraction untestable and
+// would hide the feature's highest-risk bug (every member listed as
+// "waiting"). Newest first, matching the real .order('created_at', desc).
+//
+// ?pending=none returns only the member profiles, so the "Nobody is waiting
+// for access" empty state is screenshot-able. ?pendingThrow=1 rejects, which
+// under the screen's Promise.allSettled must cost only this section (the
+// member list still renders). ?pendingDelay=<ms> follows the same convention
+// as every other knob in this file.
+export async function listPendingProfiles() {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('pendingDelay') || 0)
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (params.get('pendingThrow') === '1') {
+    throw new Error('permission denied for table profiles')
+  }
+
+  const memberProfiles = []
+  const seen = new Set()
+  MEMBERS.forEach((member) => {
+    if (seen.has(member.profile_id)) return
+    seen.add(member.profile_id)
+    memberProfiles.push({
+      id: member.profile_id,
+      full_name: member.profiles.full_name,
+      email: member.profiles.email,
+      created_at: member.created_at,
+    })
+  })
+
+  const rows =
+    params.get('pending') === 'none' ? memberProfiles : [...PENDING_PROFILES, ...memberProfiles]
+
+  return rows.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+}
+
+// Mirrors the real grantMembership, including both halves of its role/team
+// rule (role 'admin' coerces team_id to null; any other role with no teamId
+// throws BEFORE the network call), so the screen's inline refusal path is
+// reachable from the harness without a live insert. Same ?writeDelay/
+// ?writeThrow knobs as the other writers above.
+export async function grantMembership({ profileId, clubId, role, teamId, playerId } = {}) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('writeDelay') || 0)
+
+  if (!profileId) throw new Error('grantMembership needs a profileId.')
+  if (!clubId) throw new Error('grantMembership needs a clubId.')
+  if (role !== 'admin' && !teamId) throw new Error('Choose an age group for this role.')
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (params.get('writeThrow') === '1') {
+    throw new Error(
+      "We couldn't give that person access. You may not have permission to manage members.",
+    )
+  }
+
+  return {
+    id: `mm-granted-${profileId}`,
+    profile_id: profileId,
+    club_id: clubId,
+    role,
+    team_id: role === 'admin' ? null : teamId ?? null,
+    player_id: playerId ?? null,
+    created_at: '2026-08-03T12:00:00Z',
+  }
+}
