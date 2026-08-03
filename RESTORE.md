@@ -6,11 +6,10 @@ Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold c
 **v1 MVP (22 of 22 tasks) complete and live at `app.adhjrt.com`. Post-v1 refinement is
 underway** (desktop-focused work: bulk player import, roster/schedule tables, theme/brand
 update, and — as of 3 Aug 2026 — the Club Overview Dashboard, the admin **Accounts**
-screen and the **view-as preview** switcher. See
-`docs/superpowers/plans/2026-08-03-club-overview-dashboard.md`,
-`docs/superpowers/plans/2026-08-03-view-as-and-accounts.md` and the ledgers under
-`.superpowers/sdd/`). **718 tests passing, build clean** as of the latest commit on
-`build/v1-mvp`.
+screen, the **view-as preview** switcher, the **"Waiting for access"** section for
+people who sign up without an invite, and the first-login name prompt. See the plans
+under `docs/superpowers/plans/2026-08-03-*` and the ledgers under `.superpowers/sdd/`).
+**774 tests passing, build clean** as of the latest commit on `build/v1-mvp`.
 
 ### Two rulings from 3 Aug 2026 worth reading before touching auth or roles
 
@@ -385,6 +384,46 @@ components in Chromium at 375px and 1280px via `harness/`. It has caught defects
 screen that jsdom could not see — Task 17 caught a hard-reload navigation bug, Task 18 caught
 the StrictMode hang and branding gap above. Screenshots are git-ignored — regenerate them,
 don't commit them.
+
+### Migration `admin_can_see_pending_profiles` (3 Aug 2026)
+
+`private.can_admin_see_pending(_profile uuid)` + policy `profile read pending`, so an
+admin can see people who signed up but hold **no membership**. Without it they are
+invisible: the Accounts screen lists memberships, and `profile read club admin` only
+exposes people who already share a club with you.
+
+**Signing up does not grant access, and nothing used to tell you it happened.** Magic-link
+signup writes `auth.users` + `profiles` (via trigger) but no membership; only
+`accept_invite` writes one. Public signup is open, so anyone with the URL can create a
+login. They read zero rows from every table — every SELECT policy requires a membership —
+so it is contained, but **close signup or add approval before pointing
+abudhabiquins.com at the app**.
+
+Both lookups in the helper are `security definer` on purpose: under the caller's own RLS
+an admin only sees memberships in their own club, so a profile belonging solely to another
+club would read as "unattached" and leak.
+
+**Verify RLS by simulating a real JWT, not via the MCP service role** — service role has a
+null `auth.uid()`, so every `auth.uid()`-based policy returns false and the result *looks*
+like a clean negative test while proving nothing:
+
+```sql
+begin;
+select set_config('request.jwt.claims','{"sub":"<user-uuid>","role":"authenticated"}',true);
+set local role authenticated;
+select count(*) from public.profiles;   -- or whatever you're checking
+rollback;
+```
+
+Verified this way: admin sees 3 profiles, a genuine coach sees 1, an unattached signup
+sees 1. (The coach case first read 3 — because that account turned out to be a *second
+admin*. Check what a test account actually is before trusting a negative result.)
+
+**Two admins currently exist.** `jayjmuir@yahoo.com` holds `admin`/`team_id` null even
+though its invite was for `coach` on a team. `accept_invite` is correct (it inserts the
+invite's own role verbatim — read in full to confirm), so that row was altered afterwards,
+almost certainly by running `docs/first-admin.md`'s bootstrap SQL against it. If that
+account was meant to be a coach test account, it is not testing what you think.
 
 ### Migration `profiles_email_and_admin_access` (3 Aug 2026)
 
