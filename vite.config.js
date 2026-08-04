@@ -2,6 +2,21 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Vitest only defaults NODE_ENV to 'test' when NODE_ENV is UNSET. One of the
+// two dev PCs (cafnet) has NODE_ENV=production set machine-wide, and the
+// failure that causes is loud but deeply misleading: Vite resolves React's
+// PRODUCTION build, act() is unavailable, and all 535 React Testing Library
+// tests fail with "act(...) is not supported in production builds of React"
+// while the pure-JS tests pass. Nothing points at NODE_ENV. (The same variable
+// also makes `npm install` silently omit devDependencies — including vitest
+// itself — so use `npm install --include=dev` on that machine.)
+//
+// Test runs are never production builds, so overriding here is safe. Scoped to
+// VITEST so `npm run build` still sees the real NODE_ENV.
+if (process.env.VITEST && process.env.NODE_ENV === 'production') {
+  process.env.NODE_ENV = 'test'
+}
+
 // npm test                 -> unit tests only (default), never touches the network
 // npm run test:integration -> only *.integration.test.{js,jsx} files
 const isIntegration = process.env.VITEST_MODE === 'integration'

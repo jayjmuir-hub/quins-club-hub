@@ -94,6 +94,22 @@ silently reconnected to the *other* machine mid-session. The two clone paths dif
 (`C:\Users\jayjm\...` vs `C:\Users\Jay\...`), so assuming the wrong one wastes a round trip
 at best and edits a stale tree at worst.
 
+**`cafnet` has `NODE_ENV=production` set machine-wide.** This breaks the dev workflow in two
+ways that both look like something else entirely:
+
+1. **`npm install` silently omits devDependencies** — npm resolves `omit=dev` from
+   `NODE_ENV`. A plain `npm install` there removed 492 packages including vitest itself, and
+   the next `npm test` said `'vitest' is not recognized`. Use **`npm install --include=dev`**
+   on that machine.
+2. **`npm test` used to fail 535 of 900 tests** with `act(...) is not supported in production
+   builds of React`, because Vitest only defaults `NODE_ENV` to `test` when it is *unset*, so
+   Vite resolved React's production build. Nothing in the output points at `NODE_ENV`.
+   `vite.config.js` now forces `NODE_ENV=test` when `VITEST` is set, so this is handled —
+   don't remove that guard. `npm run build` deliberately still sees the real `NODE_ENV`.
+
+Verified on cafnet 4 Aug 2026: `npm test` → 900 passed (37 files), `npm run build` clean,
+with ambient `NODE_ENV=production` and no manual override.
+
 #### Getting code from a cloud sandbox onto a PC — do NOT relay bytes by hand
 
 This cost most of a session on 4 Aug 2026 and nearly lost the work. **Never pass file
