@@ -36,12 +36,15 @@ describe('Login screen', () => {
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
   })
 
-  it('names the app and gives one-sentence invite-only context', () => {
+  it('names the app and points at the request flow rather than a dead end', () => {
     render(<Login />)
 
     expect(screen.getByText('Abu Dhabi Harlequins')).toBeInTheDocument()
     expect(screen.getByText('Quins Club Hub')).toBeInTheDocument()
-    expect(screen.getByText(/invite-only/i)).toBeInTheDocument()
+    // Deliberately NOT "invite-only ... ask your club admin" any more: an
+    // account with no membership can now ask for access from inside the app.
+    expect(screen.getByText(/ask them to on the next screen/i)).toBeInTheDocument()
+    expect(screen.queryByText(/invite-only/i)).toBeNull()
   })
 
   it('renders the crest with a meaningful alt and without a cropping object-fit class', () => {

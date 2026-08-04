@@ -94,9 +94,17 @@ export default function Login({ authError = null }) {
         <p className="mt-1 text-center text-xs font-semibold uppercase tracking-widest text-ink-faint">
           Quins Club Hub
         </p>
+        {/* This used to say "invite-only ... ask your club admin", which was
+            true when signing in without an invite was a dead end. It now
+            sends people hunting for an admin through some channel the app
+            knows nothing about, when the app will take their request directly
+            — see src/components/RequestAccess.jsx. Signing in is still not
+            the same as getting access: an account with no membership reads
+            zero rows from every table. */}
         <p className="mt-4 text-center text-sm leading-relaxed text-ink-faint">
-          Quins Club Hub is invite-only for Abu Dhabi Harlequins members — ask
-          your club admin if you don&apos;t have access yet.
+          Quins Club Hub is for Abu Dhabi Harlequins members. Sign in below — if
+          the club hasn&apos;t set your account up yet, you can ask them to on
+          the next screen.
         </p>
 
         {status === 'sent' ? (

@@ -884,8 +884,17 @@ just in jsdom.
 
 ## Outstanding, needs Jay
 
-- **Google OAuth client credentials** for Supabase -> Auth -> Providers. Task 4's code is
-  done and waiting on them; magic-link sign-in works today without this.
+- ~~Google OAuth client credentials~~ — **done, and this note was stale for a while.**
+  Verified live on 4 Aug 2026: `GET /auth/v1/authorize?provider=google` on the project
+  302s to `accounts.google.com` with a real configured client id, so the "Continue with
+  Google" button on the login screen is a working route, not a dead control. Google
+  sign-in is exactly as open as the magic link — same `auth.users` row, same profile
+  trigger, same zero memberships — so the approval gate covers both identically.
+
+  **Onboarding trap worth knowing:** `accept_invite` matches on EMAIL. Invite someone at
+  `jane@work.com` and they sign in with Google as `jane@gmail.com`, and the invite will
+  not match their account — they land in the access-request queue instead. Nothing is
+  broken when that happens, but it looks like a failure to the person it happens to.
 - ~~First-admin SQL~~ — **done.** Jay signed in and ran the Task 19 bootstrap SQL himself;
   verified live as admin in the real app.
 - ~~Netlify deploy~~ — **done.** Live at `app.adhjrt.com`, auto-deploys from `build/v1-mvp`.

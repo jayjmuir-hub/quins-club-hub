@@ -105,7 +105,7 @@ describe('App', () => {
 
     expect(screen.getByText('Abu Dhabi Harlequins')).toBeInTheDocument()
     expect(screen.getByText('Quins Club Hub')).toBeInTheDocument()
-    expect(screen.getByText(/invite-only/i)).toBeInTheDocument()
+    expect(screen.getByText(/ask them to on the next screen/i)).toBeInTheDocument()
   })
 
   it('renders the dashboard at / when signed in', () => {
