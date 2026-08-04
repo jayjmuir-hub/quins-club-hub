@@ -767,6 +767,74 @@ describe('PlayerDetail wiring', () => {
     expect(within(dialog).queryByText('Role')).toBeNull()
   })
 
+  it('puts the Call and Email actions on the main contact only', async () => {
+    listParentsMock.mockResolvedValue([
+      {
+        id: 'pp-1',
+        full_name: 'Sara Fletcher',
+        relationship: 'Mother',
+        email: 'sara@example.com',
+        phone: '+971502001000',
+        is_primary: true,
+      },
+      {
+        id: 'pp-2',
+        full_name: 'Mark Fletcher',
+        relationship: 'Step-father',
+        email: 'mark@example.com',
+        phone: '+971559887766',
+        is_primary: false,
+      },
+    ])
+
+    await openDetail(COACH_U14)
+    const dialog = screen.getByRole('dialog')
+    await within(dialog).findByText('Mark Fletcher')
+
+    // One pair, not one per parent (4 Aug 2026).
+    expect(within(dialog).getAllByRole('link', { name: /call/i })).toHaveLength(1)
+    expect(within(dialog).getByRole('link', { name: /call/i })).toHaveAttribute(
+      'href',
+      'tel:+971502001000',
+    )
+    // The second parent keeps their details, and their number is still a
+    // tappable tel: link -- it is only the button pair that is reserved.
+    expect(within(dialog).getByRole('link', { name: '+971 55 988 7766' })).toHaveAttribute(
+      'href',
+      'tel:+971559887766',
+    )
+  })
+
+  it('falls back to the first parent when none is flagged as main contact', async () => {
+    listParentsMock.mockResolvedValue([
+      {
+        id: 'pp-1',
+        full_name: 'Sara Fletcher',
+        relationship: 'Mother',
+        phone: '+971502001000',
+        is_primary: false,
+      },
+      {
+        id: 'pp-2',
+        full_name: 'Mark Fletcher',
+        relationship: 'Step-father',
+        phone: '+971559887766',
+        is_primary: false,
+      },
+    ])
+
+    await openDetail(COACH_U14)
+    const dialog = screen.getByRole('dialog')
+    await within(dialog).findByText('Mark Fletcher')
+
+    // Rows predating is_primary must not leave the sheet with no actions.
+    expect(within(dialog).getAllByRole('link', { name: /call/i })).toHaveLength(1)
+    expect(within(dialog).getByRole('link', { name: /call/i })).toHaveAttribute(
+      'href',
+      'tel:+971502001000',
+    )
+  })
+
   it('lays parent contact out like the player contact block, with Call and Email', async () => {
     listParentsMock.mockResolvedValue([
       {

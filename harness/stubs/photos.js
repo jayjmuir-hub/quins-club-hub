@@ -37,3 +37,7 @@ export async function deletePlayerPhoto() {}
 export function clearPhotoUrlCache() {}
 
 export const PHOTO_BUCKET = 'player-photos'
+
+export async function setOwnPlayerPhoto(playerId, photoPath) {
+  return { id: playerId, photo_path: photoPath }
+}

@@ -145,6 +145,57 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 
 
 -- ---------------------------------------------------------------------
+-- public.set_own_player_photo(uuid, text)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+--
+-- WHY A FUNCTION AND NOT A POLICY, because this is the one someone will want
+-- to "simplify" later: RLS grants access to ROWS, not COLUMNS. An
+-- owner-update policy on public.players would let a parent write full_name,
+-- position, jersey_num and - fatally - team_id, making "move my child into
+-- another squad" an RLS-approved write. Column GRANTs cannot help either:
+-- they attach to the ROLE, and coaches and parents are both `authenticated`.
+-- And no policy can express "unchanged except photo_path", because USING sees
+-- the old row and WITH CHECK the new one, and nothing sees both.
+--
+-- So: SECURITY DEFINER with a hard-coded column list. Two explicit guards,
+-- because a definer function bypasses RLS and nothing else is protecting the
+-- row - ownership, and that the key lives in this player's OWN folder (else
+-- an owner could point photo_path at another player's object and read it back
+-- through the signed-URL route).
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_own_player_photo(_player uuid, _photo_path text)
+ RETURNS players
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  updated public.players;
+begin
+  if not private.is_own_player(_player) then
+    raise exception 'You can only change a photo for your own player.'
+      using errcode = '42501';
+  end if;
+
+  if _photo_path is not null and private.photo_player(_photo_path) is distinct from _player then
+    raise exception 'That photo does not belong to this player.'
+      using errcode = '42501';
+  end if;
+
+  update public.players
+     set photo_path = _photo_path
+   where id = _player
+  returning * into updated;
+
+  return updated;
+end;
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION public.set_own_player_photo(uuid, text) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
 -- private.can_admin_see_pending(uuid)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres}
 -- ---------------------------------------------------------------------
@@ -440,8 +491,9 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO authenticated;
 
 
 -- =====================================================================
--- Complete inventory as captured (14 functions):
+-- Complete inventory as captured (15 functions):
 --   public.accept_invite(uuid)                  SECURITY DEFINER, VOLATILE
+--   public.set_own_player_photo(uuid, text)     SECURITY DEFINER, VOLATILE
 --   private.can_admin_see_pending(uuid)         SECURITY DEFINER, STABLE
 --   private.can_edit_team(uuid)                 SECURITY DEFINER, STABLE
 --   private.can_manage_invite(uuid)             SECURITY DEFINER, STABLE
@@ -456,5 +508,6 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO authenticated;
 --   private.photo_team(text)                    SECURITY DEFINER, STABLE
 --   private.shares_admin_club(uuid)             SECURITY DEFINER, STABLE
 --
--- There are NO functions left in `public` other than accept_invite.
+-- The only functions in `public` are accept_invite and set_own_player_photo;
+-- everything else lives in `private`.
 -- =====================================================================

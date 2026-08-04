@@ -7,10 +7,11 @@ import RosterTable from '../components/RosterTable.jsx'
 import TeamPills, { ALL_TEAMS_ID } from '../components/TeamPills.jsx'
 import PlayerDetail from './PlayerDetail.jsx'
 import PlayerForm from './PlayerForm.jsx'
+import MyPlayerForm from './MyPlayerForm.jsx'
 import PlayerImport from './PlayerImport.jsx'
 import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canEditTeam, isAdmin, isOwnPlayer, roleLabel, visibleTeams } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import { signPhotoUrls } from '../data/photos.js'
@@ -357,6 +358,12 @@ export default function Roster() {
   // is what actually enforces this; getting it wrong here can only hide a
   // control, never authorise a write.
   const canEditSelected = selectedPlayer ? canEditTeam(memberships, selectedPlayer.team_id) : false
+  // A parent/player of THIS player, who is not already a coach of the squad.
+  // Gates only whether the self-service form is offered; RLS and
+  // set_own_player_photo() are what permit the writes.
+  const canEditOwnSelected = selectedPlayer
+    ? isOwnPlayer(memberships, selectedPlayer.id)
+    : false
   const refresh = () => setReloadToken((token) => token + 1)
 
   // One squad is more useful named than counted; several are more useful
@@ -508,7 +515,9 @@ export default function Roster() {
           team={teamsById.get(selectedPlayer.team_id)}
           onClose={() => setSelectedPlayerId(null)}
           canEdit={canEditSelected}
+          canEditOwn={canEditOwnSelected}
           onEdit={(player) => setFormState({ player })}
+          onEditOwn={(player) => setFormState({ player, own: true })}
           onDeleted={() => {
             setSelectedPlayerId(null)
             refresh()
@@ -527,9 +536,21 @@ export default function Roster() {
         />
       )}
 
-      {formState && (
+      {formState && !formState.own && (
         <PlayerForm
           player={formState.player}
+          onClose={() => {
+            setFormState(null)
+            setSelectedPlayerId(null)
+          }}
+          onSaved={refresh}
+        />
+      )}
+
+      {formState?.own && (
+        <MyPlayerForm
+          player={formState.player}
+          team={teamsById.get(formState.player.team_id)}
           onClose={() => {
             setFormState(null)
             setSelectedPlayerId(null)

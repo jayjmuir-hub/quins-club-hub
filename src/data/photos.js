@@ -145,6 +145,33 @@ export async function uploadPlayerPhoto(playerId, file) {
  * mid-scroll, and an error box where a face should be is worse than a
  * monogram.
  */
+/**
+ * Records a photo path against a player the CALLER OWNS (their own child, or
+ * themselves), via the set_own_player_photo RPC.
+ *
+ * Deliberately not a plain `update players set photo_path`. RLS grants access
+ * to rows, not columns, so an owner-update policy on public.players would let
+ * a parent write full_name, position, jersey_num and — fatally — team_id,
+ * making "move my child into another squad" an RLS-approved write. The RPC
+ * has a hard-coded column list, so photo_path is the only thing it can touch
+ * whatever this function sends. See
+ * db/migrations/20260804_self_service_profile.sql.
+ *
+ * Coaches and admins never come through here: they have a normal row-level
+ * update and use upsertPlayer like they always did.
+ */
+export async function setOwnPlayerPhoto(playerId, photoPath) {
+  if (!playerId) throw new Error('setOwnPlayerPhoto needs a player_id.')
+
+  const { data, error } = await supabase.rpc('set_own_player_photo', {
+    _player: playerId,
+    _photo_path: photoPath ?? null,
+  })
+
+  if (error) throw error
+  return data ?? null
+}
+
 export async function signPhotoUrl(path) {
   if (!path) return null
 

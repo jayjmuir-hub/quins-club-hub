@@ -2,8 +2,8 @@
 -- db/schema/policies.sql
 -- CAPTURE of every row-level-security policy on the `public` schema of
 -- Supabase project lusmshimxdcxpnrktlgz (quins-club-hub), 2026-08-03,
--- re-captured 2026-08-04 after the player_parents + photos migration and
--- again after the access_requests migration the same day.
+-- re-captured 2026-08-04 after the player_parents + photos migration, the
+-- access_requests migration, and the self-service profile migration.
 --
 -- SCOPE WIDENED 2026-08-04: this file now also records the two policies on
 -- `storage.objects` for the `player-photos` bucket (last section). The
@@ -180,6 +180,18 @@ CREATE POLICY "contact read" ON public.player_contacts
    FROM players
   WHERE (players.id = player_contacts.player_id))) OR private.is_own_player(player_id)));
 
+-- Self-service, added 4 Aug 2026: the OWNER (a parent of this player, or the
+-- player themselves) may edit their own contact row. PERMISSIVE, so it ORs
+-- with "contact edit" above rather than narrowing it.
+--
+-- WITH CHECK repeats the predicate deliberately: without it an owner could
+-- UPDATE their row and set player_id to another child, moving their contact
+-- details onto somebody else's record.
+CREATE POLICY "contact edit own" ON public.player_contacts
+  AS PERMISSIVE FOR ALL TO public
+  USING (private.is_own_player(player_id))
+  WITH CHECK (private.is_own_player(player_id));
+
 CREATE POLICY "contact edit" ON public.player_contacts
   AS PERMISSIVE FOR ALL TO public
   USING (private.can_edit_team(( SELECT players.team_id
@@ -204,6 +216,14 @@ CREATE POLICY "parent read" ON public.player_parents
   USING ((private.can_edit_team(( SELECT p.team_id
    FROM players p
   WHERE (p.id = player_parents.player_id))) OR private.is_own_player(player_id)));
+
+-- Same self-service addition, same reasoning, on the parent rows. A parent
+-- keeping their own household's details current is the most common correction
+-- anyone will make in this app.
+CREATE POLICY "parent edit own" ON public.player_parents
+  AS PERMISSIVE FOR ALL TO public
+  USING (private.is_own_player(player_id))
+  WITH CHECK (private.is_own_player(player_id));
 
 CREATE POLICY "parent edit" ON public.player_parents
   AS PERMISSIVE FOR ALL TO public
@@ -301,8 +321,10 @@ CREATE POLICY "team manage" ON public.teams
 -- `OR private.is_own_player(private.photo_player(name))`, i.e. exactly the
 -- shape of "parent read" above.
 --
--- WRITE has WITH CHECK as well as USING, so a coach cannot upload INTO
--- another squad's folder.
+-- WRITE is coaches/admins of the squad OR the player's own account (the
+-- is_own_player arm added 4 Aug 2026 for self-service). WITH CHECK as well as
+-- USING, so neither a coach nor an owner can upload INTO another player's
+-- folder.
 --
 -- Both depend on private.photo_team(name) parsing the FIRST path segment
 -- as the player id — the "<player_id>/<timestamp>.<ext>" key format is
@@ -314,8 +336,8 @@ CREATE POLICY "player photo read" ON storage.objects
 
 CREATE POLICY "player photo write" ON storage.objects
   AS PERMISSIVE FOR ALL TO authenticated
-  USING (((bucket_id = 'player-photos'::text) AND private.can_edit_team(private.photo_team(name))))
-  WITH CHECK (((bucket_id = 'player-photos'::text) AND private.can_edit_team(private.photo_team(name))));
+  USING (((bucket_id = 'player-photos'::text) AND (private.can_edit_team(private.photo_team(name)) OR private.is_own_player(private.photo_player(name)))))
+  WITH CHECK (((bucket_id = 'player-photos'::text) AND (private.can_edit_team(private.photo_team(name)) OR private.is_own_player(private.photo_player(name)))));
 
 
 -- ---------------------------------------------------------------------

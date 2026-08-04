@@ -133,6 +133,17 @@ function ParentsBlock({ playerId }) {
 
   if (parents.length === 0) return null
 
+  // Call/Email actions go on the MAIN CONTACT only (Jay, 4 Aug 2026). With a
+  // pair on every parent the sheet became mostly buttons, and the second set
+  // pushed the details themselves below the fold. The numbers are still
+  // there and still tappable on every row -- it is the heavyweight action
+  // pair that is reserved for the one person you'd actually ring first.
+  //
+  // Falls back to the first row when nothing is flagged primary, which is
+  // possible for rows created before is_primary existed. The database orders
+  // primary-first, so the first row is the right guess.
+  const mainContactId = (parents.find((parent) => parent.is_primary) ?? parents[0])?.id ?? null
+
   return (
     <div className="mb-4">
       <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
@@ -170,7 +181,7 @@ function ParentsBlock({ playerId }) {
             </KeyValue>
           )}
 
-          {(parent.phone || parent.email) && (
+          {parent.id === mainContactId && (parent.phone || parent.email) && (
             <div className="mt-3 flex gap-2">
               {parent.phone && (
                 <a href={telHref(parent.phone)} className={PRIMARY_ACTION}>
@@ -294,15 +305,33 @@ function ContactBlock({ playerId }) {
 const FOOTER_BUTTON =
   'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
 
-function FooterActions({ player, canEdit, onEdit, onDeleted }) {
+function FooterActions({ player, canEdit, canEditOwn, onEdit, onEditOwn, onDeleted }) {
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState(null)
 
-  // Nothing at all for someone who can't edit. Not being able to change a
-  // player is the expected, unremarkable state for almost everyone who opens
-  // this sheet; saying so in a banner every single time treats the normal
-  // case as an exception worth interrupting for.
+  // A parent or the player themselves gets ONE action, not the coach's pair:
+  // they can update the photo, contact details and parent rows, and they
+  // cannot delete a player. Wording avoids "Edit" so it doesn't read as the
+  // same power a coach has.
+  if (!canEdit && canEditOwn) {
+    return (
+      <div className="mt-5 border-t border-line pt-4">
+        <button
+          type="button"
+          onClick={() => onEditOwn?.(player)}
+          className={`${FOOTER_BUTTON} w-full bg-brand text-white hover:bg-brand-deep`}
+        >
+          Update details
+        </button>
+      </div>
+    )
+  }
+
+  // Nothing at all for anyone else. Not being able to change a player is the
+  // expected, unremarkable state for almost everyone who opens this sheet;
+  // saying so in a banner every single time treats the normal case as an
+  // exception worth interrupting for.
   if (!canEdit) return null
 
   function handleDelete() {
@@ -376,7 +405,16 @@ function FooterActions({ player, canEdit, onEdit, onDeleted }) {
   )
 }
 
-export default function PlayerDetail({ player, team, onClose, canEdit = false, onEdit, onDeleted }) {
+export default function PlayerDetail({
+  player,
+  team,
+  onClose,
+  canEdit = false,
+  canEditOwn = false,
+  onEdit,
+  onEditOwn,
+  onDeleted,
+}) {
   const teamName = team?.name ?? 'Not set'
   const position = player.position || 'Not set'
 
@@ -419,7 +457,14 @@ export default function PlayerDetail({ player, team, onClose, canEdit = false, o
           withholds rather than exposes. */}
       {allowsOwnContact(team?.name) && <ContactBlock playerId={player.id} />}
 
-      <FooterActions player={player} canEdit={canEdit} onEdit={onEdit} onDeleted={onDeleted} />
+      <FooterActions
+        player={player}
+        canEdit={canEdit}
+        canEditOwn={canEditOwn}
+        onEdit={onEdit}
+        onEditOwn={onEditOwn}
+        onDeleted={onDeleted}
+      />
     </Sheet>
   )
 }

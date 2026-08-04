@@ -88,6 +88,22 @@ export function roleLabel(memberships) {
 }
 
 /**
+ * Does the caller hold a parent/player membership for THIS player?
+ *
+ * The client-side mirror of private.is_own_player(uuid), and it decides only
+ * whether to offer the self-service form. RLS and
+ * public.set_own_player_photo() are what actually permit the writes, so
+ * getting this wrong could hide the form from someone entitled to it, but
+ * could never let anyone write a record they don't own.
+ */
+export function isOwnPlayer(memberships, playerId) {
+  if (!memberships || !playerId) return false
+  return memberships.some(
+    (m) => m.player_id === playerId && (m.role === 'parent' || m.role === 'player'),
+  )
+}
+
+/**
  * Deduplicated list of player_id values from parent/player membership rows,
  * ignoring nulls. For a parent this is their child(ren); for a player it is
  * themselves.
