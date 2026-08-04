@@ -27,9 +27,12 @@
 -- contact details is still worth recording (you know who to ask for);
 -- a contact detail with nobody attached to it is not.
 --
--- `relationship` is free text with a UI suggestion list, not an enum or a
--- CHECK constraint: Jay's call, and an enum would need a migration every
--- time a family turns up in a shape nobody predicted.
+-- `relationship` is text with no enum and no CHECK constraint. The UI
+-- restricts it to a FIXED list — Mother, Father, Step-mother, Step-father,
+-- Aunt, Uncle, Grandmother, Grandfather, Guardian — with no free entry
+-- (Jay's ruling, 4 Aug 2026, closing the earlier "suggestion list" idea).
+-- The constraint deliberately lives in the UI, not the database, so
+-- widening the list is a one-line UI change rather than a migration.
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.player_parents (
   id            uuid        NOT NULL DEFAULT gen_random_uuid(),
@@ -141,10 +144,15 @@ ON CONFLICT (id) DO UPDATE
 -- operation. The guard makes a malformed key return NULL instead, and a
 -- NULL team id makes can_see_team/can_edit_team false, so a junk path is
 -- refused rather than blowing up.
+-- search_path is pinned here to match live. It was pinned on the database
+-- after this file was first written but the file was not updated, so for a
+-- day re-applying this migration would have silently un-pinned it. Corrected
+-- 4 Aug 2026 during the db/schema/ re-capture — do not drop it again.
 CREATE OR REPLACE FUNCTION private.photo_player(_key text)
  RETURNS uuid
  LANGUAGE sql
  IMMUTABLE
+ SET search_path TO 'pg_catalog', 'public'
 AS $function$
   select case
     when split_part(_key, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'

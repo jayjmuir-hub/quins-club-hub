@@ -9,7 +9,14 @@ update, and — as of 3 Aug 2026 — the Club Overview Dashboard, the admin **Ac
 screen, the **view-as preview** switcher, the **"Waiting for access"** section for
 people who sign up without an invite, and the first-login name prompt. See the plans
 under `docs/superpowers/plans/2026-08-03-*` and the ledgers under `.superpowers/sdd/`).
-**816 tests passing, build clean** as of the latest commit on `build/v1-mvp`. Multiple age groups/children per person (incl. parents with 3-5 kids) landed 3 Aug — see `.superpowers/sdd/multi-access/progress.md`.
+**900 tests passing, build clean** as of `ae45aac` on `build/v1-mvp` (4 Aug 2026). Multiple age groups/children per person (incl. parents with 3-5 kids) landed 3 Aug — see `.superpowers/sdd/multi-access/progress.md`.
+
+**Shipped 4 Aug 2026 — player parents, head-shot photos, phone country picker**
+(`b980ace` + `ae45aac`, 25 files, +3,090/−116). Live and verified on `app.adhjrt.com`.
+New `player_parents` table, `players.photo_path`, private `player-photos` storage bucket.
+See "Migration `player_parents` + head-shot photos" below for the schema, the RLS shape and
+the product rulings Jay locked in — those rulings are fixed decisions, not defaults to
+re-litigate.
 
 ### Two rulings from 3 Aug 2026 worth reading before touching auth or roles
 
@@ -52,7 +59,7 @@ Never put the `sb_secret_…` key in this repo or in a chat.
 Verify:
 
 ```bash
-npm test        # expect 535 passing across 23 files
+npm test        # expect 900 passing (as of ae45aac, 4 Aug 2026)
 npm run build   # expect clean
 ```
 
@@ -82,7 +89,39 @@ the reliable one.
 
 **Two PCs use this project — `jay-pc` (user `jayjm`) and `cafnet` (user `Jay`).** Always
 `git pull` before starting work on either. GitHub is what keeps them in sync; nothing else
-does.
+does. **Run `hostname` first, every session** — the Desktop Commander bridge flaps and has
+silently reconnected to the *other* machine mid-session. The two clone paths differ
+(`C:\Users\jayjm\...` vs `C:\Users\Jay\...`), so assuming the wrong one wastes a round trip
+at best and edits a stale tree at worst.
+
+#### Getting code from a cloud sandbox onto a PC — do NOT relay bytes by hand
+
+This cost most of a session on 4 Aug 2026 and nearly lost the work. **Never pass file
+content (especially base64) through the model's output to reconstruct it on the other
+side.** Two attempts corrupted silently — 43,296 bytes expected, 42,718 written, ~578
+dropped mid-stream with no error anywhere. It was caught only by an MD5 check that was
+almost skipped. Google Drive's `create_file` has the same shape and the same risk.
+
+The route that works, when the bridge cannot move a file directly:
+
+1. In the sandbox: `git bundle create <file> <base>..<branch>` — a *thin* bundle, ~48 KB
+   for a two-commit feature rather than 1.9 MB for full history.
+2. Upload to a temp file host. `litterbox.catbox.moe` (72h expiry) worked from the sandbox;
+   `tmpfiles.org` works but expires in ~60 min and needs a fake `.zip` extension; `0x0.st`
+   and catbox proper both rejected sandbox uploads.
+3. **Download it back into the sandbox and verify it is byte-identical before handing the
+   URL to the PC.** This is the step that turns "probably fine" into "verified".
+4. On the PC: `curl -L -o`, then `certutil -hashfile <file> MD5` against the reference
+   hash, then `git bundle verify`, then `git pull ..\<file> <branch>`, then `git push`.
+
+Windows gotchas seen doing this: a first `curl` with `-s` looked like a silent failure when
+the host was just slow — re-run verbosely before concluding anything; and
+`interact_with_process` errors if the process already exited, so start a fresh command
+rather than trying to read from a dead one.
+
+**Commit and push durable work in the session that produces it.** The sandbox, chat
+attachments and temp links all expire. GitHub is the only thing that survives, and no other
+session can see work that never reached it.
 
 **Every Cowork/Claude session — not just the two PCs — runs in its own throwaway cloud
 sandbox, separate from every other session.** GitHub is the *only* thing connecting any of
@@ -384,6 +423,50 @@ components in Chromium at 375px and 1280px via `harness/`. It has caught defects
 screen that jsdom could not see — Task 17 caught a hard-reload navigation bug, Task 18 caught
 the StrictMode hang and branding gap above. Screenshots are git-ignored — regenerate them,
 don't commit them.
+
+### Migration `player_parents` + head-shot photos (applied 3 Aug, shipped 4 Aug 2026)
+
+File: `db/migrations/20260803_player_parents_and_photos.sql`. Adds `public.player_parents`,
+`public.players.photo_path`, and a **private** storage bucket `player-photos` (5 MB cap,
+`image/jpeg|png|webp` only) with two policies on `storage.objects` driven by two new
+helpers, `private.photo_player(text)` and `private.photo_team(text)`.
+
+**RLS shape.** `player_parents` mirrors `player_contacts` byte for byte — read =
+`can_edit_team(player's team)` OR `is_own_player`, edit = `can_edit_team` only. Parent
+details are the same class of safeguarding-sensitive data, so they get the same boundary
+rather than a second one to reason about. A parent sees their own child's parent rows and
+nobody else's. **Photo read is deliberately looser** — `can_see_team`, i.e. squad-wide,
+matching `players`' own read policy, because the photo sits beside a name that audience can
+already see. Jay approved that explicitly. Tightening it is a documented one-line swap; the
+exact change is written out in the migration and in `db/schema/policies.sql`.
+
+**The object key format is load-bearing security, not a naming convention.**
+`<player_id>/<timestamp>.<ext>` — the storage policies parse the first path segment as the
+player id to find the squad. Change the key format and you silently change who can read
+photos. The uuid regex guard in `photo_player` matters too: `'not-a-uuid'::uuid` *raises*
+rather than returning null, and inside a policy that surfaces an error on every unrelated
+storage operation.
+
+**Product rulings Jay locked in — fixed decisions, not defaults:**
+
+- Relationship dropdown is a **fixed** list: Mother, Father, Step-mother, Step-father,
+  Aunt, Uncle, Grandmother, Grandfather, Guardian. No free text, no additions. The
+  database column is plain `text` on purpose so widening the list stays a UI change.
+- "At least one parent" **warns, never blocks**. ~159 existing players have no parent rows;
+  a hard rule would make every one of them unsaveable and break the bulk importer.
+- Own contact fields (email/phone on the player) only for **U13+** —
+  `src/lib/ageGroup.js`, `OWN_CONTACT_MIN_AGE = 13`. Senior sides count as adult. It
+  **fails closed** on a missing/unparseable squad name.
+- Phones stored **E.164**, default country AE, formatted nationally on display.
+  Deliberately *not* formatted as-you-type — that reintroduced a caret-jump bug.
+- Photos are client-resized to a 600px square JPEG at q0.82 before upload (~4 MB → ~40 KB).
+  Signed URLs are cached for the session and **cleared on `signOut`**.
+
+New runtime deps: `flag-icons@7`, `libphonenumber-js@1`.
+
+**`saveParents` is delete-then-write, not atomic.** A failure between the two leaves the
+player with no parent rows. Acceptable today (single-editor, low frequency); if it ever
+matters, move it into a Postgres function.
 
 ### Migration `admin_can_see_pending_profiles` (3 Aug 2026)
 
@@ -737,6 +820,15 @@ just in jsdom.
   `adhjrt.com` root-domain project this one must never touch.
 - **Inviting committee members** — next manual step, whenever Jay's ready: More → Invite a
   member, inside the live app. No SQL needed for this or any future invite.
+- **Close or gate public signup — HARD BLOCKER before `abudhabiquins.com` cutover.** Anyone
+  with the URL can create a login today. They read zero rows (every SELECT policy needs a
+  membership) so it is contained, but it must not survive the move to the club's own domain.
+  Not started.
+- **`jayjmuir@yahoo.com` holds a full admin membership** it was probably never meant to have
+  (see the `admin_can_see_pending_profiles` section). Jay can fix this himself from the
+  Accounts screen; until then any "a coach can't see X" test using that account is invalid.
+- **`jay-pc`'s clone was left one push behind** at `2244f0a` on 4 Aug (cafnet did that day's
+  pushes). `git pull` there before doing anything on that machine.
 
 ## Infrastructure facts
 

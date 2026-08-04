@@ -1,7 +1,14 @@
 -- =====================================================================
 -- db/schema/policies.sql
 -- CAPTURE of every row-level-security policy on the `public` schema of
--- Supabase project lusmshimxdcxpnrktlgz (quins-club-hub), 2026-08-03.
+-- Supabase project lusmshimxdcxpnrktlgz (quins-club-hub), 2026-08-03,
+-- re-captured 2026-08-04 after the player_parents + photos migration.
+--
+-- SCOPE WIDENED 2026-08-04: this file now also records the two policies on
+-- `storage.objects` for the `player-photos` bucket (last section). The
+-- README's capture query filters `schemaname = 'public'` and would have
+-- missed them entirely — run it for `storage` as well, or they drift
+-- invisibly, which is the exact failure this directory exists to prevent.
 --
 -- This is a CAPTURE, not a migration. Do not run this file. See README.md.
 --
@@ -11,11 +18,15 @@
 -- explicit TO clause was given; scoping is done entirely inside the
 -- expressions via auth.uid() / auth.jwt()). Every helper referenced lives
 -- in the `private` schema — see functions.sql.
+--
+-- EXCEPTION: the two `storage.objects` policies at the end are TO
+-- authenticated, not {public}. That is deliberate — on a storage bucket
+-- the anon role is a real caller, not a theoretical one.
 -- =====================================================================
 
 
 -- ---------------------------------------------------------------------
--- RLS enabled state — all ten public tables
+-- RLS enabled state — all eleven public tables
 -- (relrowsecurity = true, relforcerowsecurity = false on every one)
 -- ---------------------------------------------------------------------
 ALTER TABLE public.availability    ENABLE ROW LEVEL SECURITY;
@@ -25,6 +36,7 @@ ALTER TABLE public.invite_targets  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invites         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.memberships     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.player_contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.player_parents  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.players         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.teams           ENABLE ROW LEVEL SECURITY;
@@ -146,6 +158,31 @@ CREATE POLICY "contact edit" ON public.player_contacts
 
 
 -- ---------------------------------------------------------------------
+-- player_parents  (2 policies — a deliberate byte-for-byte mirror of
+--                  player_contacts above: same two policies, same
+--                  predicates, same helpers. Parent details are the same
+--                  class of safeguarding-sensitive data, so they get the
+--                  same boundary rather than a second one to reason about.
+--                  A parent sees their own child's parent rows and NOBODY
+--                  else's, including other parents in the same squad.)
+-- ---------------------------------------------------------------------
+CREATE POLICY "parent read" ON public.player_parents
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((private.can_edit_team(( SELECT p.team_id
+   FROM players p
+  WHERE (p.id = player_parents.player_id))) OR private.is_own_player(player_id)));
+
+CREATE POLICY "parent edit" ON public.player_parents
+  AS PERMISSIVE FOR ALL TO public
+  USING (private.can_edit_team(( SELECT p.team_id
+   FROM players p
+  WHERE (p.id = player_parents.player_id))))
+  WITH CHECK (private.can_edit_team(( SELECT p.team_id
+   FROM players p
+  WHERE (p.id = player_parents.player_id))));
+
+
+-- ---------------------------------------------------------------------
 -- players  (2 policies)
 -- ---------------------------------------------------------------------
 CREATE POLICY "player read" ON public.players
@@ -210,6 +247,42 @@ CREATE POLICY "team manage" ON public.teams
   AS PERMISSIVE FOR ALL TO public
   USING (private.is_admin(club_id))
   WITH CHECK (private.is_admin(club_id));
+
+
+-- ---------------------------------------------------------------------
+-- storage.objects — bucket `player-photos`  (2 policies)
+--
+-- NOT in the `public` schema, so the README's capture query misses these.
+-- Recorded here anyway; re-capture them alongside the public ones.
+--
+-- The bucket is PRIVATE (public = false, 5 MB cap, allowed MIME types
+-- image/jpeg, image/png, image/webp). These are head shots of children: a
+-- public bucket would hand out a permanent unauthenticated URL for every
+-- one, with no expiry and no way to revoke short of deleting the file.
+--
+-- READ is `can_see_team` — squad-wide, matching public.players' own
+-- "player read" policy, because the photo sits beside the name in the
+-- roster and the name is already visible to exactly that audience.
+-- Jay approved this deliberately. TO TIGHTEN to coaches/admins plus the
+-- player's own account, swap can_see_team for can_edit_team and add
+-- `OR private.is_own_player(private.photo_player(name))`, i.e. exactly the
+-- shape of "parent read" above.
+--
+-- WRITE has WITH CHECK as well as USING, so a coach cannot upload INTO
+-- another squad's folder.
+--
+-- Both depend on private.photo_team(name) parsing the FIRST path segment
+-- as the player id — the "<player_id>/<timestamp>.<ext>" key format is
+-- load-bearing security, not a naming convention. See functions.sql.
+-- ---------------------------------------------------------------------
+CREATE POLICY "player photo read" ON storage.objects
+  AS PERMISSIVE FOR SELECT TO authenticated
+  USING (((bucket_id = 'player-photos'::text) AND private.can_see_team(private.photo_team(name))));
+
+CREATE POLICY "player photo write" ON storage.objects
+  AS PERMISSIVE FOR ALL TO authenticated
+  USING (((bucket_id = 'player-photos'::text) AND private.can_edit_team(private.photo_team(name))))
+  WITH CHECK (((bucket_id = 'player-photos'::text) AND private.can_edit_team(private.photo_team(name))));
 
 
 -- ---------------------------------------------------------------------

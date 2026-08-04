@@ -1,7 +1,9 @@
 -- =====================================================================
 -- db/schema/tables.sql
 -- CAPTURE of the live `public` schema tables in Supabase project
--- lusmshimxdcxpnrktlgz (quins-club-hub), taken 2026-08-03.
+-- lusmshimxdcxpnrktlgz (quins-club-hub), taken 2026-08-03 and re-captured
+-- 2026-08-04 after db/migrations/20260803_player_parents_and_photos.sql
+-- (adds public.player_parents and public.players.photo_path).
 --
 -- This is a CAPTURE, not a migration. Do not run this file. See README.md
 -- in this directory.
@@ -9,7 +11,7 @@
 -- Sources: information_schema.columns, pg_constraint + pg_get_constraintdef,
 --          pg_indexes, pg_class.relrowsecurity, obj_description.
 --
--- All ten tables have RLS ENABLED (relrowsecurity = true) and none have
+-- All eleven tables have RLS ENABLED (relrowsecurity = true) and none have
 -- FORCE ROW LEVEL SECURITY (relforcerowsecurity = false, i.e. the table
 -- owner still bypasses RLS). Policies live in policies.sql.
 -- =====================================================================
@@ -80,6 +82,12 @@ CREATE TABLE public.players (
   position    text,
   is_captain  boolean              DEFAULT false,
   created_at  timestamptz          DEFAULT now(),
+  -- Object key inside the PRIVATE `player-photos` storage bucket, e.g.
+  -- "<player_id>/1754236800000.jpg". NOT a URL — the bucket is private, so
+  -- a stored URL would be a signed one with an expiry baked in. The app
+  -- signs a fresh short-lived URL from this path on read. The leading
+  -- "<player_id>/" segment is load-bearing: the storage policies parse it.
+  photo_path  text,
   CONSTRAINT players_pkey         PRIMARY KEY (id),
   CONSTRAINT players_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
   CONSTRAINT players_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
@@ -99,6 +107,44 @@ CREATE TABLE public.player_contacts (
   CONSTRAINT player_contacts_player_id_fkey FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 ALTER TABLE public.player_contacts ENABLE ROW LEVEL SECURITY;
+
+
+-- ---------------------------------------------------------------------
+-- player_parents  (N parent/carer rows per player — added 2026-08-03,
+--                  safeguarding-sensitive, same class as player_contacts)
+--
+-- Deliberately a table and not mother_*/father_* columns: the club has
+-- single parents, step-parents, guardians and same-sex parents, and a
+-- grandmother typed into a column called "father" is data that lies.
+--
+-- NO "at least one parent" constraint, deliberately (Jay's ruling: warn,
+-- never block). ~159 existing players have no parent rows; a NOT NULL-
+-- style rule would make every one of them unsaveable and break the bulk
+-- importer. The warning lives in the UI.
+--
+-- `relationship` is free text at the database level. The UI restricts it
+-- to a FIXED list (Mother, Father, Step-mother, Step-father, Aunt, Uncle,
+-- Grandmother, Grandfather, Guardian) — Jay's ruling, no free entry, no
+-- additions. Kept as text rather than an enum so widening the list is a
+-- UI change, not a migration.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.player_parents (
+  id            uuid        NOT NULL DEFAULT gen_random_uuid(),
+  player_id     uuid        NOT NULL,
+  full_name     text        NOT NULL,
+  relationship  text,
+  email         text,
+  phone         text,
+  is_primary    boolean              DEFAULT false,
+  sort_order    integer              DEFAULT 0,
+  created_at    timestamptz          DEFAULT now(),
+  CONSTRAINT player_parents_pkey           PRIMARY KEY (id),
+  CONSTRAINT player_parents_player_id_fkey FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+  CONSTRAINT player_parents_name_not_blank CHECK ((btrim(full_name) <> ''::text))
+);
+ALTER TABLE public.player_parents ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX player_parents_player_id_idx ON public.player_parents USING btree (player_id);
 
 
 -- ---------------------------------------------------------------------

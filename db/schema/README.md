@@ -9,13 +9,22 @@ Several of them would not even apply cleanly (they contain `CREATE TABLE` for ta
 that already exist, and grants recorded as-found).
 
 Captured from Supabase project `lusmshimxdcxpnrktlgz` (`quins-club-hub`), Postgres 17,
-on **2026-08-03**.
+on **2026-08-03**, re-captured **2026-08-04** after
+`db/migrations/20260803_player_parents_and_photos.sql`.
+
+> **The 4 Aug re-capture was late, and that is the lesson.** The migration shipped on
+> 3 Aug and these files were not re-captured with it, so for a day the repo's "snapshot of
+> the live database" was missing an entire table, a column, four policies and two
+> functions — and `git diff` had nothing to say about any of it. It also hid a real drift:
+> `private.photo_player` had its `search_path` pinned live but not in the migration file,
+> so re-applying the committed migration would have un-pinned it. Step 2 below is not
+> optional bookkeeping; it is the only thing that makes step 3 mean anything.
 
 | File | Contents |
 |---|---|
 | `tables.sql` | Every `public` table: columns, types, nullability, defaults, PKs, FKs, CHECKs, indexes, and RLS-enabled state. Includes explicit notes where an expected unique constraint is **absent**. |
-| `policies.sql` | Every RLS policy on every `public` table, with command and USING / WITH CHECK expressions. |
-| `functions.sql` | Full `pg_get_functiondef()` output for all 11 functions in `public` and `private`, plus their EXECUTE grants from `proacl`. |
+| `policies.sql` | Every RLS policy on every `public` table, **plus the two on `storage.objects` for the `player-photos` bucket**, with command and USING / WITH CHECK expressions. |
+| `functions.sql` | Full `pg_get_functiondef()` output for all 13 functions in `public` and `private`, plus their EXECUTE grants from `proacl`. |
 | `triggers.sql` | The two triggers on `auth.users`. (There are none on any `public` table.) |
 
 ## Why this directory exists
@@ -76,8 +85,16 @@ FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = 'public' AND c.relkind IN ('r','p','v','m');
 
 -- policies.sql
-SELECT tablename, policyname, permissive, roles, cmd, qual, with_check
-FROM pg_policies WHERE schemaname = 'public' ORDER BY tablename, cmd, policyname;
+-- NOTE: 'public' alone is NOT enough. The player-photos bucket's policies live on
+-- storage.objects, in the `storage` schema — captured since 2026-08-04.
+SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
+FROM pg_policies
+WHERE schemaname = 'public'
+   OR (schemaname = 'storage' AND tablename = 'objects')
+ORDER BY schemaname, tablename, cmd, policyname;
+
+-- ...and the bucket's own settings, which are a row in storage.buckets, not a policy:
+SELECT id, public, file_size_limit, allowed_mime_types FROM storage.buckets;
 
 -- functions.sql
 SELECT n.nspname, p.proname, pg_get_function_identity_arguments(p.oid),

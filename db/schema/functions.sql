@@ -338,6 +338,54 @@ GRANT EXECUTE ON FUNCTION private.is_own_player(uuid) TO anon;  -- inert: anon h
 
 
 -- ---------------------------------------------------------------------
+-- private.photo_player(text)
+-- proacl: {=X/postgres,postgres=X/postgres,authenticated=X/postgres}
+-- NOTE: unlike every other helper here, this one still carries the default
+-- PUBLIC execute grant (the leading `=X/postgres`). Recorded as found, not
+-- changed. It is inert in practice — `private` has no USAGE for anon — and
+-- the function is pure text parsing with no table access.
+-- NOTE: `SET search_path TO 'pg_catalog', 'public'` is present live but is
+-- ABSENT from db/migrations/20260803_player_parents_and_photos.sql as it
+-- was first committed. The migration file was corrected on 4 Aug 2026 to
+-- match; re-applying the old file would have silently un-pinned it.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.photo_player(_key text)
+ RETURNS uuid
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+  select case
+    when split_part(_key, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    then split_part(_key, '/', 1)::uuid
+    else null
+  end;
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.photo_player(text) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.photo_team(text)
+-- proacl: {=X/postgres,postgres=X/postgres,authenticated=X/postgres}
+-- Same default-PUBLIC-grant note as photo_player above.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.photo_team(_key text)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select p.team_id from public.players p
+   where p.id = private.photo_player(_key);
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.photo_team(text) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
 -- private.shares_admin_club(uuid)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres}
 -- ---------------------------------------------------------------------
@@ -362,7 +410,7 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO authenticated;
 
 
 -- =====================================================================
--- Complete inventory as captured (11 functions):
+-- Complete inventory as captured (13 functions):
 --   public.accept_invite(uuid)                  SECURITY DEFINER, VOLATILE
 --   private.can_admin_see_pending(uuid)         SECURITY DEFINER, STABLE
 --   private.can_edit_team(uuid)                 SECURITY DEFINER, STABLE
@@ -373,6 +421,8 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO authenticated;
 --   private.is_admin(uuid)                      SECURITY DEFINER, STABLE
 --   private.is_own_invite(uuid)                 SECURITY DEFINER, STABLE
 --   private.is_own_player(uuid)                 SECURITY DEFINER, STABLE
+--   private.photo_player(text)                  INVOKER,          IMMUTABLE
+--   private.photo_team(text)                    SECURITY DEFINER, STABLE
 --   private.shares_admin_club(uuid)             SECURITY DEFINER, STABLE
 --
 -- There are NO functions left in `public` other than accept_invite.
