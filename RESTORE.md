@@ -955,6 +955,22 @@ just in jsdom.
 
 ## Outstanding, needs Jay
 
+- **Auth email is still Supabase's built-in service — 2/hour, no SLA, not for production.
+  DO NOT INVITE THE COMMITTEE UNTIL THIS IS DONE.** The replacement is built and deployed
+  (`supabase/functions/send-email`, Microsoft Graph via the Send Email Hook) but is INERT
+  until Jay does the Entra/M365/Supabase steps. Full runbook: `docs/email-and-domain.md`.
+
+  Why not Supabase custom SMTP: it is password-only, and the club's mail is Microsoft 365,
+  where basic-auth SMTP is retired for tenants at the end of December 2026. Graph OAuth has
+  no deadline, and the tournament app at `adhjrt.com` has run exactly this pattern in
+  production for months (`netlify/functions/_email.js` in that repo).
+
+- **Club Hub is moving to its own domain, app AND email together** (Jay's call, 4 Aug 2026):
+  `adhjrt` is a once-a-year tournament brand and the Club Hub is year-round. **Do the move
+  BEFORE inviting anyone** — this is a PWA, and a home-screen install is pinned to its
+  origin, so a later move costs every member a delete-and-reinstall. Steps in
+  `docs/email-and-domain.md`.
+
 - ~~Google OAuth client credentials~~ — **done, and this note was stale for a while.**
   Verified live on 4 Aug 2026: `GET /auth/v1/authorize?provider=google` on the project
   302s to `accounts.google.com` with a real configured client id, so the "Continue with
