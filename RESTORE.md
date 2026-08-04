@@ -9,7 +9,17 @@ update, and — as of 3 Aug 2026 — the Club Overview Dashboard, the admin **Ac
 screen, the **view-as preview** switcher, the **"Waiting for access"** section for
 people who sign up without an invite, and the first-login name prompt. See the plans
 under `docs/superpowers/plans/2026-08-03-*` and the ledgers under `.superpowers/sdd/`).
-**914 tests passing, build clean** on `build/v1-mvp` (4 Aug 2026). Multiple age groups/children per person (incl. parents with 3-5 kids) landed 3 Aug — see `.superpowers/sdd/multi-access/progress.md`.
+**940 tests passing, build clean** on `build/v1-mvp` (4 Aug 2026). Multiple age groups/children per person (incl. parents with 3-5 kids) landed 3 Aug — see `.superpowers/sdd/multi-access/progress.md`.
+
+**Shipped 4 Aug 2026 — calendar subscription feed.** `calendar_tokens`, three RPCs, and a
+`calendar` Edge Function serving iCalendar. See "Migration `calendar_feed`" below.
+
+**Shipped 4 Aug 2026 — self-service profile editing.** Parents and players maintain their own
+photo, contact row and parent rows. See "Migration `self_service_profile`" — and read the
+column-vs-row note there before touching it.
+
+**Shipped 4 Aug 2026 — the scope banner is gone** from every screen for every role, and the
+player sheet leads with a large photo. Nothing about permissions changed.
 
 **Shipped 4 Aug 2026 — the signup approval gate.** `access_requests` + the
 `RequestAccess` screen + dismiss/restore on the Accounts screen. See "Migration
@@ -444,6 +454,67 @@ components in Chromium at 375px and 1280px via `harness/`. It has caught defects
 screen that jsdom could not see — Task 17 caught a hard-reload navigation bug, Task 18 caught
 the StrictMode hang and branding gap above. Screenshots are git-ignored — regenerate them,
 don't commit them.
+
+### Migration `self_service_profile` (4 Aug 2026)
+
+File: `db/migrations/20260804_self_service_profile.sql`. Owner policies on
+`player_contacts` and `player_parents`, an `is_own_player` arm on the photo storage write,
+and `public.set_own_player_photo()`.
+
+**READ THIS BEFORE "SIMPLIFYING" IT INTO A POLICY.** The obvious implementation is another
+PERMISSIVE policy on `public.players` scoped by `is_own_player`. That is a real hole: **RLS
+grants access to ROWS, not COLUMNS**, so it would let a parent write every column on their
+child's row — `full_name`, `position`, `jersey_num` and, fatally, **`team_id`**. Moving
+their own child into another age group would become an RLS-*approved* write, widening
+everything `is_own_player`-adjacent with it. Column GRANTs cannot help (they attach to the
+ROLE, and coaches and parents are both `authenticated`), and no policy can express
+"unchanged except photo_path" — USING sees the old row, WITH CHECK the new one, nothing sees
+both. Hence a SECURITY DEFINER function with a hard-coded column list.
+
+That function has **two** guards, and the second is not decoration: you own the player, AND
+the key lives in that player's own folder. Without the second, an owner could point
+`photo_path` at another player's object and read it back through the signed-URL route.
+
+`MyPlayerForm` is a separate screen, not a restricted mode on `PlayerForm`. The
+club-controlled fields do not exist in the component, so there is no path — not disabled,
+not hidden — through which they could be written. That is convenience; the database is the
+boundary.
+
+**Verified with simulated JWTs as a real parent:** own contact/parents/photo allowed; rename
+own child 0 rows; move own child's squad 0 rows; another player's contact 0 rows; parent row
+for another player refused; the RPC refused for a non-owned player and for a foreign folder
+key.
+
+### Migration `calendar_feed` (4 Aug 2026)
+
+File: `db/migrations/20260804_calendar_feed.sql`, plus `supabase/functions/calendar`
+(deployed with **verify_jwt off**).
+
+**A calendar client cannot sign in.** It fetches a URL on a timer with no cookies, no
+Authorization header and no way to refresh. **The URL is the credential.** Everything follows:
+the token is a random uuid (not the profile id — a feed keyed on anything enumerable is no
+protection), one per person, revocable, and the feed returns only what that person can
+already see. Reset DELETEs and re-inserts, so the old token dies the instant the new one
+exists — no grace period, because that is how a revoked link keeps working.
+
+**The Edge Function holds the ANON key only** and could not read a fixture on its own. All
+authorisation is in `public.calendar_events_for_token()`, which is a **line-by-line mirror of
+`private.can_see_team`** with the profile resolved from the token instead of `auth.uid()`.
+**If `can_see_team` changes, that function must change with it.** The duplication is the price
+of a caller with no JWT; reimplementing scoping in TypeScript would put it somewhere nothing
+tests.
+
+An unknown token returns **zero rows, not an error** — distinguishing "no such token" from
+"token with no fixtures" is an oracle for guessing tokens. So a bad token yields an empty
+calendar with a 200, deliberately.
+
+**ICS details that bite:** folding is 75 **octets** not characters (counting characters splits
+UTF-8 mid-sequence); backslash/semicolon/comma are structural and must be escaped or a venue
+like "Zayed Sports City, Abu Dhabi" truncates silently; CRLF is required or strict clients
+reject the whole calendar; UIDs must be stable or every refresh duplicates every event.
+
+The token is minted **lazily**, only when someone opens the sheet — minting on Schedule render
+would create a live bearer credential for every member who never wanted one.
 
 ### Migration `access_requests` — the signup approval gate (4 Aug 2026)
 
