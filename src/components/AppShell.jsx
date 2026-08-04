@@ -158,7 +158,7 @@ export default function AppShell({ children }) {
             1. It is the core move of the "A+" theme — brand identity lives on
                the chrome (masthead + bottom tab bar) so the data surfaces
                underneath can stay light and stay readable on a phone in Abu
-               Dhabi daylight. See docs/design-system.md §2.
+               Dhabi daylight. See claude/specs/design-system.md §2.
             2. It retires a whole class of contrast problem. The old red->green
                gradient painted across the FULL viewport width while the content
                column is centred and max-1120px, so which gradient colour sat

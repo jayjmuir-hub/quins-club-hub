@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 
 // Task 5 browser verification for the view-as switcher and the admin Accounts
-// screen (plan: docs/superpowers/plans/2026-08-03-view-as-and-accounts.md).
+// screen (plan: claude/plans/2026-08-03-view-as-and-accounts.md).
 // Desktop-only at 1280x900: both features are gated at the 820px `desktop:`
 // breakpoint (the switcher trigger and the /accounts nav item), so phone width
 // has nothing to add that the jsdom class assertions do not already cover.

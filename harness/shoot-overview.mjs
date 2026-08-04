@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 
 // Task 5 visual verification for the Overview screen (see the plan's Task 5:
-// docs/superpowers/plans/2026-08-03-club-overview-dashboard.md). Same
+// claude/plans/2026-08-03-club-overview-dashboard.md). Same
 // pattern as shoot-dashboard.mjs, but desktop-only: Overview is a desktop-
 // only screen by design (gated at the `desktop:` Tailwind breakpoint in
 // Nav.jsx/AppShell.jsx), so there is nothing meaningful to screenshot at

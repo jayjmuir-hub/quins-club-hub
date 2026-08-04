@@ -9,10 +9,10 @@ Supabase Row-Level Security.
 | Read this | For |
 |---|---|
 | `RESTORE.md` | **Start here.** Session resume, what's built, deployment status, "rulings that cost real effort to discover", infrastructure facts, and what's outstanding |
-| `docs/plans/quins-v1-mvp.md` | The implementation plan |
-| `docs/design-system.md` | The visual spec |
-| `docs/deploy.md`, `docs/email-and-domain.md`, `docs/first-admin.md` | Operational procedures |
-| `docs/e2e-roles.md`, `docs/accessibility.md` | Test and a11y contracts |
+| `claude/archive/quins-v1-mvp.md` | The implementation plan |
+| `claude/specs/design-system.md` | The visual spec |
+| `claude/runbooks/deploy.md`, `claude/runbooks/email-and-domain.md`, `claude/runbooks/first-admin.md` | Operational procedures |
+| `claude/runbooks/e2e-roles.md`, `claude/specs/accessibility.md` | Test and a11y contracts |
 | `claude/state-of-play.md` | Where things stand TODAY, and what is blocked on whom. The volatile half — `RESTORE.md` holds the durable truth |
 | `claude/writing-to-github-from-claude.md` | The exact push route, and the ways it has failed |
 

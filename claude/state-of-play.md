@@ -42,7 +42,7 @@ table, a column, four policies and two functions — and that re-capture surface
 **Auth email is still Supabase's built-in service: 2 messages/hour, no SLA, explicitly not
 for production. DO NOT INVITE THE COMMITTEE UNTIL THIS IS DONE.** The replacement is built
 and deployed but inert until Jay completes the Microsoft 365 / Entra / Supabase steps in
-`docs/email-and-domain.md`.
+`claude/runbooks/email-and-domain.md`.
 
 **Domain move pending.** Jay has bought `adhquins-clubhub.com`. The app AND the email move
 there together — an email from one domain linking to another is the pattern people are
@@ -66,10 +66,10 @@ is Jay's.
 - Audit trail deferred; `access_requests.decided_by/at` is a first fragment.
 - Single-club assumption in `clubId` derivation, `is_admin_anywhere()` and
   `can_admin_see_pending()` — revisit together if a second club ever appears.
-- Stale docs: `docs/e2e-roles.md`, `deploy.md`, `first-admin.md` still mention Wild Apricot.
+- Stale docs: `claude/runbooks/e2e-roles.md`, `deploy.md`, `first-admin.md` still mention Wild Apricot.
   The real plan is integration with the club's new AWS site.
 - Doc reorganisation (`claude/specs/`, `plans/`, `runbooks/`) discussed, deliberately NOT
-  done — it costs a ~60-file comment sweep because `docs/design-system.md` alone is cited in
+  done — it costs a ~60-file comment sweep because `claude/specs/design-system.md` alone is cited in
   29 files. Do it when nothing else is in flight, or not at all.
 
 ## Machines

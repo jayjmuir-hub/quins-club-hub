@@ -4,7 +4,7 @@ import { getMyProfile, updateProfileName } from '../data/members.js'
 import { useAuth } from '../lib/auth.jsx'
 
 // First-login display-name prompt (plan Task C:
-// docs/superpowers/plans/2026-08-03-pending-access.md).
+// claude/plans/2026-08-03-pending-access.md).
 //
 // Magic-link sign-up collects no name and nothing else in the app ever sets
 // one, so every account starts with `full_name = ''` and shows up to admins

@@ -8,7 +8,7 @@ underway** (desktop-focused work: bulk player import, roster/schedule tables, th
 update, and — as of 3 Aug 2026 — the Club Overview Dashboard, the admin **Accounts**
 screen, the **view-as preview** switcher, the **"Waiting for access"** section for
 people who sign up without an invite, and the first-login name prompt. See the plans
-under `docs/superpowers/plans/2026-08-03-*` and the ledgers under `.superpowers/sdd/`).
+under `claude/plans/2026-08-03-*` and the ledgers under `.superpowers/sdd/`).
 **940 tests passing, build clean** on `build/v1-mvp` (4 Aug 2026). Multiple age groups/children per person (incl. parents with 3-5 kids) landed 3 Aug — see `.superpowers/sdd/multi-access/progress.md`.
 
 **Shipped 4 Aug 2026 — calendar subscription feed.** `calendar_tokens`, three RPCs, and a
@@ -161,7 +161,7 @@ session can see work that never reached it.
 sandbox, separate from every other session.** GitHub is the *only* thing connecting any of
 them. Anything written but not committed exists only in that one session's sandbox and is
 gone the moment the session ends — this already happened once (see the "Prior art note" in
-`docs/superpowers/specs/2026-08-03-club-overview-dashboard-design.md`: a real planning doc,
+`claude/specs/2026-08-03-club-overview-dashboard-design.md`: a real planning doc,
 `desktop-spec.md`, was written in a different session, referenced by several commit messages,
 and never committed — now unrecoverable). **The fix: commit and push anything durable —
 specs, plans, docs, not just code — before a session ends, regardless of which PC or session
@@ -207,14 +207,14 @@ The v1 MVP is deployed and working end to end, not just built:
 - **Supabase Auth URL Configuration:** Site URL = `https://app.adhjrt.com`, Redirect URLs =
   `https://app.adhjrt.com/**` and `https://quins-club-hub.netlify.app/**` (kept as a fallback).
   Confirmed persisted and correct.
-- **First admin:** Jay signed in via magic link and ran the `docs/first-admin.md` SQL himself.
+- **First admin:** Jay signed in via magic link and ran the `claude/runbooks/first-admin.md` SQL himself.
   Verified live, through the real app (not just the database) — Dashboard loads, role badge
   reads "Admin", Admin overview lists all 15 age groups, "Invite a member" button present.
 - This trial is on `adhjrt.com` deliberately, per the original plan — committee-only, unlisted
   URL, not linked from anywhere public yet.
 
-**Strategic change — no Wild Apricot import.** Earlier plans (see `docs/e2e-roles.md`,
-`docs/deploy.md`, `docs/first-admin.md`) assumed real player data would eventually come from a
+**Strategic change — no Wild Apricot import.** Earlier plans (see `claude/runbooks/e2e-roles.md`,
+`claude/runbooks/deploy.md`, `claude/runbooks/first-admin.md`) assumed real player data would eventually come from a
 Wild Apricot member export off `abudhabiquins.com`. That's no longer the plan: **the club's new
 website is being built separately on AWS**, and Quins Club Hub will integrate with *that* site
 instead once it exists — not with Wild Apricot. Those docs' Wild Apricot mentions are now stale
@@ -275,7 +275,7 @@ of this note; low-risk, can happen whenever convenient.
   features going forward unless there's a real need — they have no AWS-native equivalent and
   would need reworking at migration time. Flag it in-session if a feature seems to want one,
   rather than reaching for it silently.
-- Keep RLS policies documented as they're added (`docs/e2e-roles.md` and the migration files
+- Keep RLS policies documented as they're added (`claude/runbooks/e2e-roles.md` and the migration files
   already do this) — that documentation is the actual migration spec later.
 - **Do not build a speculative multi-backend abstraction layer now.** Explicitly decided
   against — premature for a migration that's ~6 months out and not yet spec'd by the AWS dev's
@@ -290,7 +290,7 @@ and scope Option C properly as its own plan — don't start it earlier based on 
 ## Task 22 — End-to-end role + a11y verification, release docs — COMPLETE (final task)
 
 The v1 MVP plan is now fully built (22 of 22 tasks). Task 22 added three new docs
-(`docs/accessibility.md`, `docs/e2e-roles.md`, `docs/deploy.md`) and fixed real bugs found by
+(`claude/specs/accessibility.md`, `claude/runbooks/e2e-roles.md`, `claude/runbooks/deploy.md`) and fixed real bugs found by
 empirical browser verification rather than trusting the brief's own hand-calculated hypothesis:
 
 - **Header gradient contrast (confirmed real, fixed).** Verified with real headless Chromium
@@ -304,7 +304,7 @@ empirical browser verification rather than trusting the brief's own hand-calcula
   from `100%` to `300%` (keeps the visible portion within the red family at any viewport width);
   changed the badge/active-pill fill to `bg-black/[.22]` (darkens instead of lightens) and gave
   inactive nav pills their own `bg-black/[.1]` fill (previously none at all). Re-measured after:
-  4.74-8.49:1 across all 8 widths. Full numbers in `docs/accessibility.md` §1.
+  4.74-8.49:1 across all 8 widths. Full numbers in `claude/specs/accessibility.md` §1.
 - **Skip-to-content link** (design-system.md §8's one confirmed-still-open gap) — added to
   `AppShell.jsx`, verified with real Tab/Enter keypresses in Playwright (first-focusable,
   genuinely hidden until focus, Enter moves real keyboard focus to `<main>`, not just the
@@ -316,10 +316,10 @@ empirical browser verification rather than trusting the brief's own hand-calcula
   icon `aria-label`s, `role="alert"`, calendar day cells as real buttons,
   `prefers-reduced-motion`) checked out as already correct.
 - **A live infrastructure finding worth knowing for the deploy step**: checked the Netlify MCP
-  while writing `docs/deploy.md` and confirmed `adhjrt.com`'s bare root domain is **already
+  while writing `claude/runbooks/deploy.md` and confirmed `adhjrt.com`'s bare root domain is **already
   serving a different, unrelated Netlify project** of Jay's (`serene-gingersnap-1d0eb6` — a
   tournament/registration app, from a different GitHub repo `jayjmuir-hub/adhjrt`, not this one).
-  `docs/deploy.md` flags this explicitly: the Quins Club Hub trial must use a genuine subdomain
+  `claude/runbooks/deploy.md` flags this explicitly: the Quins Club Hub trial must use a genuine subdomain
   (e.g. `app.adhjrt.com`) on a **new, separate** Netlify site, never reusing or overwriting that
   existing project.
 
@@ -338,7 +338,7 @@ and a bad RLS predicate fails silently (wrong rows, no error) rather than loudly
 "Database schema changes" below for the exact shape and a real gotcha worth remembering for
 Task 21 (RLS hardening) or any future `SECURITY DEFINER` function.
 
-Task 19 added `docs/first-admin.md` — the exact SQL for Jay to run himself (not something this
+Task 19 added `claude/runbooks/first-admin.md` — the exact SQL for Jay to run himself (not something this
 build automates — see the doc's own reasoning) after his first sign-in, to grant himself
 `admin`. This was docs-only (no app code, no tests, no review loop or browser check — those
 gates exist for code, not a static SQL doc), but the controller caught a real bug in its own
@@ -430,8 +430,8 @@ branding (fixed with a small crest + name addition, without touching the AppShel
 routing).
 
 Task 19 (First-admin bootstrap) is next and is **docs-only, no app code**: create
-`docs/first-admin.md` documenting the exact SQL to grant Jay `admin` after his first sign-in
-(see `docs/plans/quins-v1-mvp.md`, Task 19), plus how to verify he then sees all 15 teams.
+`claude/runbooks/first-admin.md` documenting the exact SQL to grant Jay `admin` after his first sign-in
+(see `claude/archive/quins-v1-mvp.md`, Task 19), plus how to verify he then sees all 15 teams.
 This does not need the full subagent-driven-development task loop (no code, no tests to
 review) — a single pass of writing the doc, having it reviewed against the plan text and the
 live schema (the `memberships` table's actual columns/constraints), is proportionate.
@@ -445,7 +445,7 @@ back to doing it by hand: extract a task's plan section directly into
 `.superpowers/sdd/quins-v1-mvp/review-<base7>..<head7>.diff` — same naming convention the
 scripts used. The ledger/workspace layout doesn't depend on the scripts existing.
 
-The plan is `docs/plans/quins-v1-mvp.md`; the visual spec is `docs/design-system.md` (597
+The plan is `claude/archive/quins-v1-mvp.md`; the visual spec is `claude/specs/design-system.md` (597
 lines, extracted from the approved prototype — implementers build from it without reading
 the prototype HTML).
 
@@ -652,7 +652,7 @@ admin*. Check what a test account actually is before trusting a negative result.
 **Two admins currently exist.** `jayjmuir@yahoo.com` holds `admin`/`team_id` null even
 though its invite was for `coach` on a team. `accept_invite` is correct (it inserts the
 invite's own role verbatim — read in full to confirm), so that row was altered afterwards,
-almost certainly by running `docs/first-admin.md`'s bootstrap SQL against it. If that
+almost certainly by running `claude/runbooks/first-admin.md`'s bootstrap SQL against it. If that
 account was meant to be a coach test account, it is not testing what you think.
 
 ### Migration `profiles_email_and_admin_access` (3 Aug 2026)
@@ -1024,7 +1024,7 @@ just in jsdom.
 - **Auth email is still Supabase's built-in service — 2/hour, no SLA, not for production.
   DO NOT INVITE THE COMMITTEE UNTIL THIS IS DONE.** The replacement is built and deployed
   (`supabase/functions/send-email`, Microsoft Graph via the Send Email Hook) but is INERT
-  until Jay does the Entra/M365/Supabase steps. Full runbook: `docs/email-and-domain.md`.
+  until Jay does the Entra/M365/Supabase steps. Full runbook: `claude/runbooks/email-and-domain.md`.
 
   Why not Supabase custom SMTP: it is password-only, and the club's mail is Microsoft 365,
   where basic-auth SMTP is retired for tenants at the end of December 2026. Graph OAuth has
@@ -1035,7 +1035,7 @@ just in jsdom.
   `adhjrt` is a once-a-year tournament brand and the Club Hub is year-round. **Do the move
   BEFORE inviting anyone** — this is a PWA, and a home-screen install is pinned to its
   origin, so a later move costs every member a delete-and-reinstall. Steps in
-  `docs/email-and-domain.md`.
+  `claude/runbooks/email-and-domain.md`.
 
 - ~~Google OAuth client credentials~~ — **done, and this note was stale for a while.**
   Verified live on 4 Aug 2026: `GET /auth/v1/authorize?provider=google` on the project

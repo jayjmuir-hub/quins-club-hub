@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 
 // Task D browser verification for the pending-access plan
-// (docs/superpowers/plans/2026-08-03-pending-access.md): the "Waiting for
+// (claude/plans/2026-08-03-pending-access.md): the "Waiting for
 // access" section on Accounts (Task B) and the first-login name prompt
 // (Task C). Desktop only at 1280x900 — /accounts is reachable only past the
 // 820px `desktop:` breakpoint, and the name prompt's Sheet is width-agnostic.

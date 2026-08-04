@@ -60,7 +60,7 @@ Reuses `src/lib/scope.js` exactly as every other screen does:
   Dashboard.
 
 RLS is unchanged and remains the actual enforcement boundary, exactly as documented in
-`docs/e2e-roles.md`. This screen requests data scoped by `teamIds` the same way Dashboard,
+`claude/runbooks/e2e-roles.md`. This screen requests data scoped by `teamIds` the same way Dashboard,
 Schedule, and Roster already do; a bug in this screen's own filtering could only ever narrow
 what's shown, never widen it, because the database policies decide the real limits regardless
 of what the UI asks for.

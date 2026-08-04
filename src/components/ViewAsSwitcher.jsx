@@ -144,7 +144,7 @@ export function ViewAsBanner() {
       data-testid="view-as-banner"
       role="status"
       // brand-deep (#b3141a) is this theme's dark club red — the token the
-      // retheme mapped the old #8E1526 "plum" onto (docs/design-system.md
+      // retheme mapped the old #8E1526 "plum" onto (claude/specs/design-system.md
       // §2's mapping table). White on it measures 6.93:1. A raw hex here
       // would fail tests/theme.test.js's no-literals rule.
       className="bg-brand-deep text-white"

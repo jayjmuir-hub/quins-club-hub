@@ -14,7 +14,7 @@ import { eventDate, sortByStart } from '../lib/eventFormat.js'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 
 // Desktop-only organizer screen (design spec:
-// docs/superpowers/specs/2026-08-03-club-overview-dashboard-design.md).
+// claude/specs/2026-08-03-club-overview-dashboard-design.md).
 // Reached only via the desktop-only, role-gated Nav item (Task 4) — this
 // component itself does not re-check width or role; by the time it renders,
 // Nav/App.jsx have already decided who gets here. Scoping is still enforced

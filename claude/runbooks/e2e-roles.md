@@ -15,7 +15,7 @@ data in this build (the Wild Apricot import is a separate, later, out-of-scope s
 run of it end-to-end: the actual RLS policies (verified live against the Supabase project by
 Tasks 16/21, cited below), the actual client-side scoping helpers (`src/lib/scope.js`), and the
 actual UI behaviour exercised by the existing test suite (535 unit tests) plus this task's own
-browser verification (`docs/accessibility.md` §2 for the keyboard/focus side of things).
+browser verification (`claude/specs/accessibility.md` §2 for the keyboard/focus side of things).
 
 Every item below is written as a concrete, falsifiable step — do this, then you should see
 exactly that, not a vague goal — so it's obvious the moment something doesn't match.
@@ -24,7 +24,7 @@ exactly that, not a vague goal — so it's obvious the moment something doesn't 
 
 ## Prerequisite accounts
 
-Before running this checklist, set up (via Task 19's `docs/first-admin.md` and Task 18's invite
+Before running this checklist, set up (via Task 19's `claude/runbooks/first-admin.md` and Task 18's invite
 flow, both already built):
 
 1. One **admin** account (Jay's own, via the first-admin SQL step).
@@ -153,7 +153,7 @@ the club's real usage ever needs the two to diverge in the future — today, the
 ## What this checklist does NOT cover
 
 - It assumes the accounts above already exist — creating them (magic-link/OAuth sign-in, the
-  first-admin SQL step, sending/accepting invites) is covered by `docs/first-admin.md` and the
+  first-admin SQL step, sending/accepting invites) is covered by `claude/runbooks/first-admin.md` and the
   Task 18 invite flow's own in-app UI, not repeated here.
 - It does not include a Wild Apricot data-import verification pass — that's a separate, later,
   out-of-scope step per `RESTORE.md`.

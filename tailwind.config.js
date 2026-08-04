@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 
 // THEME: adhjrt brand system, "A+" variant — light content well, dark brand
-// chrome. See docs/design-system.md §2 for the full rationale.
+// chrome. See claude/specs/design-system.md §2 for the full rationale.
 //
 // Every colour in the app resolves through one of the semantic groups below.
 // Components must never carry a raw hex (no `bg-[#f5f4f3]`) — that was the

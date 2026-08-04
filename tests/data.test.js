@@ -1405,7 +1405,7 @@ describe('grantMembership', () => {
 
 // --- grantMemberships -----------------------------------------------------
 
-// The multi-access grant (docs/superpowers/specs/2026-08-03-multi-access-design.md).
+// The multi-access grant (claude/specs/2026-08-03-multi-access-design.md).
 // One person legitimately holds several membership rows — two children in
 // different age groups, two coached squads, coach-and-also-parent — and
 // memberships has no unique constraint, so the "don't write the same row

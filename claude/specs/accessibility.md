@@ -7,8 +7,8 @@ contrast risk and the missing skip-to-content link. It exists alongside — not 
 scattered inline comments cited throughout: this doc points at the real file:line where each
 ratio was computed, rather than duplicating that reasoning somewhere it can drift out of sync.
 
-File split rationale: this is its own file, `docs/accessibility.md`, rather than a section of
-`docs/e2e-roles.md`. The two documents serve different audiences and different moments —
+File split rationale: this is its own file, `claude/specs/accessibility.md`, rather than a section of
+`claude/runbooks/e2e-roles.md`. The two documents serve different audiences and different moments —
 `e2e-roles.md` is a checklist Jay runs once real accounts exist, to prove role/scoping
 behaviour; this document is a standing reference for anyone (Jay, a future contributor, a future
 Claude session) who needs to know "is this colour pairing safe to use for text" or "has the

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
 // Unit tests for the first-login display-name prompt (plan Task C:
-// docs/superpowers/plans/2026-08-03-pending-access.md). Exercised through
+// claude/plans/2026-08-03-pending-access.md). Exercised through
 // AppShell, because half of what the prompt has to get right is *where* it
 // shows: never for a user with zero memberships (they already get the "no
 // access yet" screen), only once memberships have loaded.

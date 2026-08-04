@@ -16,7 +16,7 @@ export const FEATURES = {
   // `availability` table, its RLS policies, and the realtime subscription
   // are untouched and still covered by tests/availability.test.jsx.
   //
-  // docs/e2e-roles.md's Availability/RSVP-realtime sections and part of
+  // claude/runbooks/e2e-roles.md's Availability/RSVP-realtime sections and part of
   // tests/schedule.test.jsx assume this is on — both say so inline. Flip
   // this back to true to re-enable, no other change needed.
   availability: false,

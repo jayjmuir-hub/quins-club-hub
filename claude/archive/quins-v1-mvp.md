@@ -148,7 +148,7 @@
 - [ ] Implement admin invite UI + accept screen. Commit.
 
 ### Task 19: First-admin bootstrap
-**Files:** Create `docs/first-admin.md`.
+**Files:** Create `claude/runbooks/first-admin.md`.
 - [ ] Document the exact SQL to grant Jay `admin` after his first sign-in, plus how to verify he sees all 15 teams. (No app code.)
 
 ## Phase G — PWA, security, release
@@ -166,7 +166,7 @@
 - [ ] Verify roles still scope correctly. Commit.
 
 ### Task 22: End-to-end role + a11y verification, release
-**Files:** Create `docs/e2e-roles.md` (checklist) + any fixes it turns up.
+**Files:** Create `claude/runbooks/e2e-roles.md` (checklist) + any fixes it turns up.
 - [ ] Write the end-to-end checklist: admin / coach / parent accounts, scoping, edit-gating, contact hiding, RSVP realtime.
 - [ ] Accessibility pass: visible keyboard focus, `prefers-reduced-motion` respected, contrast AA on the brand palette (document the accessible red/green pairings actually used for text).
 - [ ] Document the deploy + domain steps (Netlify env vars, `adhjrt.com` trial subdomain, Supabase allowed redirect URLs). Commit.

@@ -1,6 +1,6 @@
 # Implementation plan — view-as switcher + admin Accounts screen
 
-Spec: `docs/superpowers/specs/2026-08-03-view-as-and-accounts-design.md`
+Spec: `claude/specs/2026-08-03-view-as-and-accounts-design.md`
 
 Two independent tracks. A (1→2) is the view-as switcher; B (3→4) is Accounts.
 They touch disjoint files and can run in parallel. Task 5 verifies both.

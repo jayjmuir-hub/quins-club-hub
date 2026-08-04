@@ -141,7 +141,7 @@ describe('AppShell', () => {
   // Task 22: skip-to-content link (the one confirmed-open gap left by
   // design-system.md §8). jsdom can't tell us whether sr-only actually hides
   // it visually or whether focus-visible ring colours render correctly —
-  // that's what the real-browser Playwright pass in docs/accessibility.md
+  // that's what the real-browser Playwright pass in claude/specs/accessibility.md
   // §2 is for. What jsdom *can* verify, and is worth pinning here so a
   // future change can't silently regress it: it exists, is the first
   // element AppShell renders, points at the right target, and that target

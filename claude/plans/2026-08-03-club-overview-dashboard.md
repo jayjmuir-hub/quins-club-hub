@@ -16,7 +16,7 @@
 - Follow the throw-on-error data-access convention used by every existing module in `src/data/` (never `{data, error}` tuples — throw on error, return `[]`/`null` for legitimate empty results).
 - No player-count "target squad size" threshold — show real counts only (see spec's Non-goals).
 - Activity feed is explicitly out of scope (Phase 2, separate spec later).
-- Full spec: `docs/superpowers/specs/2026-08-03-club-overview-dashboard-design.md`.
+- Full spec: `claude/specs/2026-08-03-club-overview-dashboard-design.md`.
 
 ---
 
@@ -456,7 +456,7 @@ import { clubToday, eventDate, sortByStart } from '../lib/eventFormat.js'
 import { isAdmin, visibleTeams } from '../lib/scope.js'
 
 // Desktop-only organizer screen (design spec:
-// docs/superpowers/specs/2026-08-03-club-overview-dashboard-design.md).
+// claude/specs/2026-08-03-club-overview-dashboard-design.md).
 // Reached only via the desktop-only, role-gated Nav item (Task 4) — this
 // component itself does not re-check width or role; by the time it renders,
 // Nav/App.jsx have already decided who gets here. Scoping is still enforced
