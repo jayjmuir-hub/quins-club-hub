@@ -297,6 +297,36 @@ GRANT EXECUTE ON FUNCTION private.is_admin(uuid) TO anon;  -- inert: anon has no
 
 
 -- ---------------------------------------------------------------------
+-- private.is_admin_anywhere()
+-- proacl: {=X/postgres,postgres=X/postgres,authenticated=X/postgres}
+-- Carries the default PUBLIC execute grant, as photo_player/photo_team do.
+-- Recorded as found.
+--
+-- CLUB-BLIND ON PURPOSE, and the only helper here that is. A person with no
+-- membership has no club, cannot read clubs or teams, and therefore cannot
+-- put a club_id on their own access request — so the admin side of that table
+-- cannot be club-scoped the way private.is_admin(club_id) is everywhere else.
+-- Same shape and same single-club assumption as can_admin_see_pending above.
+-- If a second club is ever added, those two need revisiting together.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_admin_anywhere()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from memberships m
+     where m.profile_id = auth.uid()
+       and m.role = 'admin'
+  );
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.is_admin_anywhere() TO authenticated;
+
+
+-- ---------------------------------------------------------------------
 -- private.is_own_invite(uuid)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres}
 -- ---------------------------------------------------------------------
@@ -410,7 +440,7 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO authenticated;
 
 
 -- =====================================================================
--- Complete inventory as captured (13 functions):
+-- Complete inventory as captured (14 functions):
 --   public.accept_invite(uuid)                  SECURITY DEFINER, VOLATILE
 --   private.can_admin_see_pending(uuid)         SECURITY DEFINER, STABLE
 --   private.can_edit_team(uuid)                 SECURITY DEFINER, STABLE
@@ -419,6 +449,7 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO authenticated;
 --   private.handle_new_user()                   SECURITY DEFINER, VOLATILE
 --   private.handle_user_email_change()          SECURITY DEFINER, VOLATILE
 --   private.is_admin(uuid)                      SECURITY DEFINER, STABLE
+--   private.is_admin_anywhere()                 SECURITY DEFINER, STABLE
 --   private.is_own_invite(uuid)                 SECURITY DEFINER, STABLE
 --   private.is_own_player(uuid)                 SECURITY DEFINER, STABLE
 --   private.photo_player(text)                  INVOKER,          IMMUTABLE

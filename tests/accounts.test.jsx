@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Unit tests for src/screens/Accounts.jsx (design spec 2026-08-03 §2).
@@ -15,6 +15,9 @@ const listClubMembersMock = vi.fn()
 const listPendingProfilesMock = vi.fn()
 const grantMembershipsMock = vi.fn()
 const listPlayersMock = vi.fn()
+const listAccessRequestsMock = vi.fn()
+const dismissAccessRequestMock = vi.fn()
+const restoreAccessRequestMock = vi.fn()
 const updateMembershipRoleMock = vi.fn()
 const deleteMembershipMock = vi.fn()
 const updateProfileNameMock = vi.fn()
@@ -40,6 +43,13 @@ vi.mock('../src/data/members.js', () => ({
 // this screen now touches players.js too.
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
+}))
+
+// The approval gate: who asked for access, and who has been dismissed.
+vi.mock('../src/data/accessRequests.js', () => ({
+  listAccessRequests: (...args) => listAccessRequestsMock(...args),
+  dismissAccessRequest: (...args) => dismissAccessRequestMock(...args),
+  restoreAccessRequest: (...args) => restoreAccessRequestMock(...args),
 }))
 
 // Import after vi.mock so this binds to the mocked modules.
@@ -219,6 +229,17 @@ beforeEach(() => {
   listClubMembersMock.mockResolvedValue(MEMBER_ROWS)
   listPendingProfilesMock.mockResolvedValue(PROFILE_ROWS)
   listPlayersMock.mockResolvedValue(PLAYERS)
+  // Default: nobody has asked and nobody has been dismissed, so the waiting
+  // list behaves exactly as it did before this feature existed.
+  listAccessRequestsMock.mockResolvedValue([])
+  dismissAccessRequestMock.mockImplementation(async ({ profileId, decidedBy }) => ({
+    id: `req-${profileId}`,
+    profile_id: profileId,
+    note: null,
+    status: 'dismissed',
+    decided_by: decidedBy,
+  }))
+  restoreAccessRequestMock.mockResolvedValue(undefined)
   // Mirrors grantMemberships: one returned row per requested row, with the
   // data layer's admin coercion (team_id null) applied.
   grantMembershipsMock.mockImplementation(async (rows) =>
@@ -652,14 +673,129 @@ describe('Accounts — waiting for access', () => {
     expect(within(section).getByText(/signed up 3 Aug 2026/)).toBeInTheDocument()
   })
 
-  it('offers no reject or dismiss control, and says why', async () => {
+  it('offers a dismiss control per person, and says it is reversible', async () => {
     setup()
 
     await screen.findByText('Sara Coach')
     const section = waitingSection()
 
-    expect(within(section).queryByRole('button', { name: /dismiss|reject|decline|ignore/i })).toBeNull()
-    expect(within(section).getByText(/nothing to turn down/i)).toBeInTheDocument()
+    // One per waiting person, not one for the section.
+    expect(within(section).getAllByRole('button', { name: /^dismiss$/i })).toHaveLength(
+      within(section).getAllByTestId('waiting-person').length,
+    )
+    expect(within(section).getByText(/does not delete their login/i)).toBeInTheDocument()
+  })
+
+  it('dismisses a person, passing the acting admin, and drops them off the list', async () => {
+    const user = userEvent.setup()
+    setup()
+
+    await screen.findByText('Sara Coach')
+    expect(within(waitingSection()).getAllByTestId('waiting-person')).toHaveLength(2)
+
+    const janice = within(waitingSection())
+      .getAllByTestId('waiting-person')
+      .find((card) => within(card).queryByText(/janice@example\.com/))
+    await user.click(within(janice).getByRole('button', { name: /^dismiss$/i }))
+
+    await waitFor(() =>
+      expect(dismissAccessRequestMock).toHaveBeenCalledWith({
+        profileId: 'profile-janice',
+        decidedBy: SELF_ID,
+      }),
+    )
+    await waitFor(() =>
+      expect(within(waitingSection()).getAllByTestId('waiting-person')).toHaveLength(1),
+    )
+    expect(screen.queryByText(/janice@example\.com/)).not.toBeInTheDocument()
+  })
+
+  it('surfaces a failed dismiss inline and keeps the person on the list', async () => {
+    const user = userEvent.setup()
+    dismissAccessRequestMock.mockRejectedValue(new Error('Network is down'))
+    setup()
+
+    await screen.findByText('Sara Coach')
+    const before = within(waitingSection()).getAllByTestId('waiting-person').length
+
+    await user.click(within(waitingSection()).getAllByRole('button', { name: /^dismiss$/i })[0])
+
+    expect(await screen.findByText('Network is down')).toBeInTheDocument()
+    expect(within(waitingSection()).getAllByTestId('waiting-person')).toHaveLength(before)
+  })
+
+  it('shows what someone said about themselves, badges them, and lists them first', async () => {
+    // The raw signup asked; Janice did not. listPendingProfiles hands them
+    // over newest-first, which puts Janice (3 Aug) ahead of Raw (2 Aug), so
+    // Raw rendering first can only be because asking outranks merely having
+    // signed in.
+    listAccessRequestsMock.mockResolvedValue([
+      {
+        id: 'req-raw',
+        profile_id: 'profile-raw',
+        note: 'Parent of Sam Muir, U10',
+        status: 'pending',
+        created_at: '2026-08-04T09:00:00Z',
+      },
+    ])
+
+    setup()
+
+    await screen.findByText('Sara Coach')
+    const cards = within(waitingSection()).getAllByTestId('waiting-person')
+
+    expect(within(cards[0]).getByText('Raw Recruit')).toBeInTheDocument()
+    expect(within(cards[0]).getByTestId('asked-badge')).toBeInTheDocument()
+    expect(within(cards[0]).getByTestId('request-note')).toHaveTextContent(
+      'Parent of Sam Muir, U10',
+    )
+    // The people who never asked carry neither.
+    expect(within(cards[1]).queryByTestId('asked-badge')).toBeNull()
+    expect(within(cards[1]).queryByTestId('request-note')).toBeNull()
+  })
+
+  it('hides dismissed people from the waiting list and can restore them', async () => {
+    const user = userEvent.setup()
+    listAccessRequestsMock.mockResolvedValue([
+      {
+        id: 'req-janice',
+        profile_id: 'profile-janice',
+        note: null,
+        status: 'dismissed',
+        created_at: '2026-08-04T09:00:00Z',
+      },
+    ])
+
+    setup()
+
+    await screen.findByText('Sara Coach')
+    expect(screen.queryByText(/janice@example\.com/)).not.toBeInTheDocument()
+
+    // Collapsed by default — dismissing is meant to clear the list.
+    await user.click(screen.getByRole('button', { name: /show dismissed \(1\)/i }))
+    const dismissedSection = screen.getByTestId('dismissed-requests')
+    expect(within(dismissedSection).getByText(/janice@example\.com/)).toBeInTheDocument()
+
+    await user.click(within(dismissedSection).getByRole('button', { name: /^restore$/i }))
+
+    await waitFor(() =>
+      expect(restoreAccessRequestMock).toHaveBeenCalledWith({ profileId: 'profile-janice' }),
+    )
+    // Back in the waiting list, and the dismissed section is gone with it.
+    await waitFor(() => expect(screen.getByText(/janice@example\.com/)).toBeInTheDocument())
+    expect(screen.queryByTestId('dismissed-requests')).toBeNull()
+  })
+
+  it('still shows everyone waiting when the requests read fails', async () => {
+    // Fails OPEN on purpose: losing the notes is an inconvenience, hiding a
+    // person who is genuinely waiting is not.
+    listAccessRequestsMock.mockRejectedValue(new Error('nope'))
+
+    setup()
+
+    await screen.findByText('Sara Coach')
+    expect(within(waitingSection()).getAllByTestId('waiting-person')).toHaveLength(2)
+    expect(screen.queryByTestId('dismissed-requests')).toBeNull()
   })
 
   it('renders an empty state, not a bare heading, when nobody is waiting', async () => {

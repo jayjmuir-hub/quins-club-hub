@@ -16,6 +16,8 @@ const useAuthMock = vi.fn()
 const useMembershipsMock = vi.fn()
 const getMyProfileMock = vi.fn()
 const updateProfileNameMock = vi.fn()
+const getMyAccessRequestMock = vi.fn()
+const createAccessRequestMock = vi.fn()
 
 vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => useAuthMock(),
@@ -28,6 +30,15 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 vi.mock('../src/data/members.js', () => ({
   getMyProfile: (...args) => getMyProfileMock(...args),
   updateProfileName: (...args) => updateProfileNameMock(...args),
+}))
+
+// The zero-membership branch of AppShell now renders RequestAccess, which
+// reads the caller's own access request. Mocked so this file never reaches a
+// real Supabase client; the request-access behaviour itself is covered by
+// tests/request-access.test.jsx.
+vi.mock('../src/data/accessRequests.js', () => ({
+  getMyAccessRequest: (...args) => getMyAccessRequestMock(...args),
+  createAccessRequest: (...args) => createAccessRequestMock(...args),
 }))
 
 // Import after vi.mock so these bind to the mocked modules.
@@ -63,6 +74,9 @@ beforeEach(() => {
   useMembershipsMock.mockReset()
   getMyProfileMock.mockReset()
   updateProfileNameMock.mockReset()
+  getMyAccessRequestMock.mockReset()
+  createAccessRequestMock.mockReset()
+  getMyAccessRequestMock.mockResolvedValue(null)
   window.localStorage.clear()
 
   useAuthMock.mockReturnValue({
@@ -108,7 +122,12 @@ describe('NamePrompt', () => {
 
     expect(await screen.findByText(/jay@example.com/)).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(getMyProfileMock).not.toHaveBeenCalled()
+    // getMyProfile IS called on this path now — RequestAccess reads it to
+    // prefill the name on the access-request form, since a request attached
+    // to "No name yet" is one no admin can act on. What must not happen is
+    // the NAME PROMPT firing on top of it, which the dialog assertion above
+    // is what actually checks.
+    expect(screen.getByRole('button', { name: /request access/i })).toBeInTheDocument()
   })
 
   it('saves the name via updateProfileName and closes', async () => {

@@ -2,7 +2,8 @@
 -- db/schema/policies.sql
 -- CAPTURE of every row-level-security policy on the `public` schema of
 -- Supabase project lusmshimxdcxpnrktlgz (quins-club-hub), 2026-08-03,
--- re-captured 2026-08-04 after the player_parents + photos migration.
+-- re-captured 2026-08-04 after the player_parents + photos migration and
+-- again after the access_requests migration the same day.
 --
 -- SCOPE WIDENED 2026-08-04: this file now also records the two policies on
 -- `storage.objects` for the `player-photos` bucket (last section). The
@@ -26,9 +27,10 @@
 
 
 -- ---------------------------------------------------------------------
--- RLS enabled state — all eleven public tables
+-- RLS enabled state — all twelve public tables
 -- (relrowsecurity = true, relforcerowsecurity = false on every one)
 -- ---------------------------------------------------------------------
+ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.availability    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clubs           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events          ENABLE ROW LEVEL SECURITY;
@@ -40,6 +42,37 @@ ALTER TABLE public.player_parents  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.players         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.teams           ENABLE ROW LEVEL SECURITY;
+
+
+-- ---------------------------------------------------------------------
+-- access_requests  (3 policies — the approval gate)
+--
+-- Note what is ABSENT: the OWNER has no UPDATE and no DELETE policy. That
+-- absence, plus the UNIQUE key on profile_id, is what stops a dismissed
+-- person re-opening their own request. Re-opening is an admin action.
+--
+-- The `status = 'pending'` clause in the insert policy's WITH CHECK is
+-- load-bearing: any status value the client controls is a value it can
+-- choose, so pinning it here means every write that sets 'dismissed' is an
+-- admin write.
+--
+-- The admin policy is FOR ALL because all four verbs are genuinely used:
+-- SELECT the queue, INSERT a dismissal for someone who never asked, UPDATE an
+-- existing request to dismissed, DELETE to restore someone dismissed by
+-- mistake.
+-- ---------------------------------------------------------------------
+CREATE POLICY "access request admin" ON public.access_requests
+  AS PERMISSIVE FOR ALL TO public
+  USING (private.is_admin_anywhere())
+  WITH CHECK (private.is_admin_anywhere());
+
+CREATE POLICY "access request insert own" ON public.access_requests
+  AS PERMISSIVE FOR INSERT TO public
+  WITH CHECK (((profile_id = auth.uid()) AND (status = 'pending'::text)));
+
+CREATE POLICY "access request read own" ON public.access_requests
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((profile_id = auth.uid()));
 
 
 -- ---------------------------------------------------------------------

@@ -9,7 +9,12 @@ update, and — as of 3 Aug 2026 — the Club Overview Dashboard, the admin **Ac
 screen, the **view-as preview** switcher, the **"Waiting for access"** section for
 people who sign up without an invite, and the first-login name prompt. See the plans
 under `docs/superpowers/plans/2026-08-03-*` and the ledgers under `.superpowers/sdd/`).
-**900 tests passing, build clean** as of `ae45aac` on `build/v1-mvp` (4 Aug 2026). Multiple age groups/children per person (incl. parents with 3-5 kids) landed 3 Aug — see `.superpowers/sdd/multi-access/progress.md`.
+**914 tests passing, build clean** on `build/v1-mvp` (4 Aug 2026). Multiple age groups/children per person (incl. parents with 3-5 kids) landed 3 Aug — see `.superpowers/sdd/multi-access/progress.md`.
+
+**Shipped 4 Aug 2026 — the signup approval gate.** `access_requests` + the
+`RequestAccess` screen + dismiss/restore on the Accounts screen. See "Migration
+`access_requests`" below, and read the finding in it before anyone suggests "just turn
+signup off" again.
 
 **Shipped 4 Aug 2026 — player parents, head-shot photos, phone country picker**
 (`b980ace` + `ae45aac`, 25 files, +3,090/−116). Live and verified on `app.adhjrt.com`.
@@ -440,6 +445,58 @@ screen that jsdom could not see — Task 17 caught a hard-reload navigation bug,
 the StrictMode hang and branding gap above. Screenshots are git-ignored — regenerate them,
 don't commit them.
 
+### Migration `access_requests` — the signup approval gate (4 Aug 2026)
+
+File: `db/migrations/20260804_access_requests.sql`. Adds `public.access_requests` and
+`private.is_admin_anywhere()`.
+
+**READ THIS BEFORE PROPOSING "just close signup".** Signup cannot simply be turned off.
+Invites are accepted at `/accept-invite/:token`, which sits behind `RequireAuth` — the
+invitee must already have a session to accept one. Flipping Supabase's "allow new users to
+sign up" would therefore kill the invite flow for **every new member**, not just for
+strangers. Closing signup at the auth layer needs admin-side user creation through a
+service-role Edge Function, which is a separate build. The gate is approval, not exclusion.
+
+**What actually protects club data is unchanged**, and it is not this feature: an account
+with no membership reads ZERO rows from every table, because every SELECT policy bottoms
+out in a memberships row for `auth.uid()`. What was missing was the admin's side. The
+"Waiting for access" list is derived by SUBTRACTION (every profile an admin can read, minus
+everyone who already has a membership), so every stranger who ever signed in sat in it
+permanently, indistinguishable from a real member mid-invite, with no way to clear them.
+
+**Shape.** One row per profile (`profile_id` is UNIQUE), `status` in
+`('pending','dismissed')`. There is deliberately **no 'granted' status** — granted access
+*is* a memberships row, and the screen already subtracts members out; a second record of the
+same fact would only give the two a way to disagree.
+
+**The anti-spam mechanism is an ABSENCE.** The owner gets a SELECT policy and an INSERT
+policy and nothing else — no UPDATE, no DELETE. Combined with the UNIQUE key, a dismissed
+person cannot flip their own row back to `pending`, cannot delete it and try again, and
+cannot insert a second one. Re-opening the door is an admin action. If you ever add an
+owner-side UPDATE policy "for convenience", you have removed the gate.
+
+The `status = 'pending'` clause in the insert policy's WITH CHECK is load-bearing for the
+same reason: any status value a client can send is a value it can choose.
+
+**Verified server-side with simulated JWTs** (not the MCP service role, whose `auth.uid()`
+is null and makes every negative test look green): a dismissed owner's UPDATE and DELETE
+both affect 0 rows while they can still read their own row; inserting for another profile
+and self-inserting `status='dismissed'` are both refused outright; a second request hits the
+unique key; a non-admin sees exactly one row and an admin sees all of them.
+
+**`private.is_admin_anywhere()` is club-blind on purpose** — a requester has no club, so
+they cannot put a `club_id` on their own row and the admin policies cannot be club-scoped.
+Same single-club assumption as `can_admin_see_pending`; if a second club is ever added,
+those two need revisiting together.
+
+**Restore DELETES the row** rather than setting it back to `pending`. A reversed dismissal
+did not turn into a request the person made; marking it pending would invent one and then be
+indistinguishable from the real thing.
+
+**Both admin-side reads fail OPEN.** A failed `listAccessRequests()` costs the notes and the
+dismissals, not the screen — everyone reappears in the waiting list. Noisier is the correct
+direction to fail; hiding someone genuinely waiting is not.
+
 ### Migration `player_parents` + head-shot photos (applied 3 Aug, shipped 4 Aug 2026)
 
 File: `db/migrations/20260803_player_parents_and_photos.sql`. Adds `public.player_parents`,
@@ -836,10 +893,13 @@ just in jsdom.
   `adhjrt.com` root-domain project this one must never touch.
 - **Inviting committee members** — next manual step, whenever Jay's ready: More → Invite a
   member, inside the live app. No SQL needed for this or any future invite.
-- **Close or gate public signup — HARD BLOCKER before `abudhabiquins.com` cutover.** Anyone
-  with the URL can create a login today. They read zero rows (every SELECT policy needs a
-  membership) so it is contained, but it must not survive the move to the club's own domain.
-  Not started.
+- ~~Close or gate public signup~~ — **done 4 Aug 2026, as an APPROVAL gate.** Signup is
+  still open and cannot be closed without breaking invites (see the migration section
+  below); what changed is that an account with no membership now asks for access, and an
+  admin approves or dismisses it. Two things are still worth doing before the
+  `abudhabiquins.com` cutover, neither blocking: nobody is emailed when a request arrives,
+  so Jay has to look at the Accounts screen; and there is no rate limit on how many
+  strangers can create logins, only on what each can do (nothing).
 - **`jayjmuir@yahoo.com` holds a full admin membership** it was probably never meant to have
   (see the `admin_can_see_pending_profiles` section). Jay can fix this himself from the
   Accounts screen; until then any "a coach can't see X" test using that account is invalid.

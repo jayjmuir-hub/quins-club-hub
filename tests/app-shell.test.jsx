@@ -17,6 +17,21 @@ vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => useAuthMock(),
 }))
 
+// The zero-membership branch renders RequestAccess, which reads the caller's
+// own profile and access request. Mocked here so those tests exercise the
+// real "you can ask for access" screen deterministically rather than
+// whatever a failed network call happens to render. The request-access
+// behaviour itself is covered by tests/request-access.test.jsx.
+vi.mock('../src/data/members.js', () => ({
+  getMyProfile: (...args) => getMyProfileMock(...args),
+  updateProfileName: (...args) => updateProfileNameMock(...args),
+}))
+
+vi.mock('../src/data/accessRequests.js', () => ({
+  getMyAccessRequest: (...args) => getMyAccessRequestMock(...args),
+  createAccessRequest: (...args) => createAccessRequestMock(...args),
+}))
+
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
@@ -25,6 +40,10 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 import AppShell from '../src/components/AppShell.jsx'
 
 const signOutMock = vi.fn()
+const getMyProfileMock = vi.fn()
+const updateProfileNameMock = vi.fn()
+const getMyAccessRequestMock = vi.fn()
+const createAccessRequestMock = vi.fn()
 
 const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
 
@@ -62,7 +81,13 @@ beforeEach(() => {
   useAuthMock.mockReset()
   useMembershipsMock.mockReset()
   signOutMock.mockReset()
-  useAuthMock.mockReturnValue({ user: { email: 'jay@example.com' }, signOut: signOutMock })
+  useAuthMock.mockReturnValue({
+    user: { id: 'user-1', email: 'jay@example.com' },
+    signOut: signOutMock,
+  })
+  getMyAccessRequestMock.mockResolvedValue(null)
+  getMyProfileMock.mockResolvedValue({ id: 'user-1', full_name: '', email: 'jay@example.com' })
+  createAccessRequestMock.mockResolvedValue({ id: 'req-1', status: 'pending' })
 })
 
 describe('AppShell', () => {
@@ -206,12 +231,12 @@ describe('AppShell', () => {
     expect(hasClassToken(screen.getByTestId('error-message'), 'text-brand-deep')).toBe(true)
   })
 
-  it('renders a zero-membership message with the signed-in email instead of routed content', () => {
+  it('renders a zero-membership message with the signed-in email instead of routed content', async () => {
     useMembershipsMock.mockReturnValue(loaded({ memberships: [] }))
 
     renderShell()
 
-    expect(screen.getByText(/jay@example.com/)).toBeInTheDocument()
+    expect(await screen.findByText(/jay@example.com/)).toBeInTheDocument()
     expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
   })
@@ -222,7 +247,7 @@ describe('AppShell', () => {
     const user = userEvent.setup()
 
     renderShell()
-    await user.click(screen.getByRole('button', { name: /sign out/i }))
+    await user.click(await screen.findByRole('button', { name: /sign out/i }))
 
     expect(signOutMock).toHaveBeenCalledTimes(1)
   })
@@ -233,7 +258,7 @@ describe('AppShell', () => {
     const user = userEvent.setup()
 
     renderShell()
-    await user.click(screen.getByRole('button', { name: /sign out/i }))
+    await user.click(await screen.findByRole('button', { name: /sign out/i }))
 
     expect(await screen.findByText(/network unreachable/i)).toBeInTheDocument()
   })

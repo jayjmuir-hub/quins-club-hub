@@ -3,7 +3,8 @@
 -- CAPTURE of the live `public` schema tables in Supabase project
 -- lusmshimxdcxpnrktlgz (quins-club-hub), taken 2026-08-03 and re-captured
 -- 2026-08-04 after db/migrations/20260803_player_parents_and_photos.sql
--- (adds public.player_parents and public.players.photo_path).
+-- (public.player_parents, public.players.photo_path) and
+-- db/migrations/20260804_access_requests.sql (public.access_requests).
 --
 -- This is a CAPTURE, not a migration. Do not run this file. See README.md
 -- in this directory.
@@ -11,7 +12,7 @@
 -- Sources: information_schema.columns, pg_constraint + pg_get_constraintdef,
 --          pg_indexes, pg_class.relrowsecurity, obj_description.
 --
--- All eleven tables have RLS ENABLED (relrowsecurity = true) and none have
+-- All twelve tables have RLS ENABLED (relrowsecurity = true) and none have
 -- FORCE ROW LEVEL SECURITY (relforcerowsecurity = false, i.e. the table
 -- owner still bypasses RLS). Policies live in policies.sql.
 -- =====================================================================
@@ -145,6 +146,39 @@ CREATE TABLE public.player_parents (
 ALTER TABLE public.player_parents ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX player_parents_player_id_idx ON public.player_parents USING btree (player_id);
+
+
+-- ---------------------------------------------------------------------
+-- access_requests  (the approval gate in front of open signup - 4 Aug 2026)
+--
+-- ONE row per profile. The UNIQUE key is the anti-spam mechanism, not
+-- housekeeping: combined with the deliberate ABSENCE of an owner-side UPDATE
+-- or DELETE policy (see policies.sql), a dismissed person cannot flip their
+-- own row back to 'pending', delete it and try again, or insert a second one.
+--
+-- No 'granted' status, on purpose. Granted access IS a memberships row, and
+-- the Accounts screen already subtracts members out of the waiting list. A
+-- second record of the same fact would only give the two a way to disagree.
+--
+-- decided_by is ON DELETE SET NULL, not CASCADE: deleting the admin who
+-- dismissed a request must not delete the dismissal and quietly resurrect the
+-- request.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.access_requests (
+  id          uuid        NOT NULL DEFAULT gen_random_uuid(),
+  profile_id  uuid        NOT NULL,
+  note        text,
+  status      text        NOT NULL DEFAULT 'pending'::text,
+  created_at  timestamptz          DEFAULT now(),
+  decided_at  timestamptz,
+  decided_by  uuid,
+  CONSTRAINT access_requests_pkey            PRIMARY KEY (id),
+  CONSTRAINT access_requests_profile_id_key  UNIQUE (profile_id),
+  CONSTRAINT access_requests_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT access_requests_decided_by_fkey FOREIGN KEY (decided_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT access_requests_status_check    CHECK ((status = ANY (ARRAY['pending'::text, 'dismissed'::text])))
+);
+ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
 
 
 -- ---------------------------------------------------------------------

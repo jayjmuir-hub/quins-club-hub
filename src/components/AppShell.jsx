@@ -5,6 +5,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import Nav from './Nav.jsx'
 import NamePrompt from './NamePrompt.jsx'
+import RequestAccess from './RequestAccess.jsx'
 import { ViewAsBanner, ViewAsSwitcher } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 
@@ -91,22 +92,14 @@ function ErrorState({ error, reload }) {
 
 // A signed-in user with zero membership rows reads zero rows from every
 // RLS-scoped table, including teams — so with no explicit handling here the
-// app would otherwise just look blank. This is the first thing Jay himself
-// sees after his first sign-in, before the make-me-admin SQL runs, so the
-// tone is "you're in, hang tight" rather than an error.
-function NoMembershipState({ email, signOut }) {
-  return (
-    <div className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-line bg-surface-card p-6 text-center shadow-card">
-      <h2 className="text-lg font-extrabold text-ink">You&apos;re signed in</h2>
-      <p className="mt-2 text-sm leading-relaxed text-ink-faint">
-        Your account isn&apos;t linked to a squad yet. Ask a club admin to send
-        you an invite for <strong className="text-ink">{email}</strong>,
-        then sign in again to get access.
-      </p>
-      <SignOutControl signOut={signOut} className="mt-5" />
-    </div>
-  )
-}
+// app would otherwise just look blank.
+//
+// This used to be a static "ask a club admin for an invite" card, which was a
+// dead end: it told someone to go and find an admin through some channel the
+// app knew nothing about, and every person who ever hit it stayed in the
+// admin's waiting list forever with no way to be cleared. RequestAccess
+// replaces it with the approval gate — see
+// db/migrations/20260804_access_requests.sql.
 
 export default function AppShell({ children }) {
   const { user, signOut } = useAuth()
@@ -256,7 +249,9 @@ export default function AppShell({ children }) {
         {loading && <LoadingState />}
         {!loading && error && <ErrorState error={error} reload={reload} />}
         {!loading && !error && memberships.length === 0 && (
-          <NoMembershipState email={user?.email} signOut={signOut} />
+          <RequestAccess userId={user?.id} email={user?.email}>
+            <SignOutControl signOut={signOut} className="mt-5" />
+          </RequestAccess>
         )}
         {ready && (
           <>

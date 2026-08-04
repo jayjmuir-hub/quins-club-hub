@@ -12,6 +12,11 @@ import {
   updateMembershipRole,
   updateProfileName,
 } from '../data/members.js'
+import {
+  dismissAccessRequest,
+  listAccessRequests,
+  restoreAccessRequest,
+} from '../data/accessRequests.js'
 import { listPlayers } from '../data/players.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -152,6 +157,13 @@ export default function Accounts() {
   // above) —
   // NOT the pending set. `waiting` below is the pending set.
   const [profiles, setProfiles] = useState([])
+  // access_requests rows: both the people who actively ASKED for access and
+  // the dismissals an admin has already made (including dismissals of people
+  // who never asked). One row per profile - see src/data/accessRequests.js.
+  const [requests, setRequests] = useState([])
+  // Per-profile dismiss/restore state, keyed by profile id.
+  const [triageState, setTriageState] = useState({})
+  const [showDismissed, setShowDismissed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
@@ -219,8 +231,8 @@ export default function Accounts() {
     // subtract, so a failed member read hides the waiting section entirely
     // (handled at the render site) rather than showing every member as
     // "waiting".
-    Promise.allSettled([listClubMembers(), listPendingProfiles()])
-      .then(([membersResult, profilesResult]) => {
+    Promise.allSettled([listClubMembers(), listPendingProfiles(), listAccessRequests()])
+      .then(([membersResult, profilesResult, requestsResult]) => {
         if (!mounted) return
         if (membersResult.status === 'fulfilled') {
           setMembers(membersResult.value)
@@ -229,6 +241,11 @@ export default function Accounts() {
           setMembers([])
         }
         setProfiles(profilesResult.status === 'fulfilled' ? profilesResult.value : [])
+        // Same reasoning as the profiles read: a failed requests read costs
+        // the notes and the dismissals, not the screen. It fails OPEN, which
+        // is the safe direction here - everyone reappears in the waiting
+        // list, which is noisier but never hides someone genuinely waiting.
+        setRequests(requestsResult.status === 'fulfilled' ? requestsResult.value : [])
       })
       .finally(() => {
         if (mounted) setLoading(false)
@@ -276,9 +293,30 @@ export default function Accounts() {
   // membership, so the first filter already removes them, but not if the
   // member list came back short.
   const memberProfileIds = new Set(members.map((member) => member.profile_id).filter(Boolean))
-  const waiting = profiles.filter(
+  const unattached = profiles.filter(
     (profile) => !memberProfileIds.has(profile.id) && profile.id !== user?.id,
   )
+
+  // The triage layer on top of that subtraction. `access_requests` holds one
+  // row per profile and answers two different questions from the same table:
+  // who ASKED (status 'pending', with their note), and who this admin has
+  // already waved away (status 'dismissed') - including strangers who never
+  // asked at all, which is the case the old screen had no answer for.
+  const requestByProfile = new Map(requests.map((row) => [row.profile_id, row]))
+  const dismissedIds = new Set(
+    requests.filter((row) => row.status === 'dismissed').map((row) => row.profile_id),
+  )
+
+  // Someone who asked outranks someone who merely signed in: the first is a
+  // person standing there waiting, the second might be nobody at all. Array
+  // sort is stable, so newest-first survives inside each group.
+  const waiting = unattached
+    .filter((profile) => !dismissedIds.has(profile.id))
+    .sort(
+      (a, b) =>
+        Number(Boolean(requestByProfile.get(b.id))) - Number(Boolean(requestByProfile.get(a.id))),
+    )
+  const dismissed = unattached.filter((profile) => dismissedIds.has(profile.id))
 
   // Counted from the full club-wide list, so the guard holds even if the
   // caller's other admin row is rendered in some block further down.
@@ -288,6 +326,52 @@ export default function Accounts() {
 
   function isOwnLastAdmin(member) {
     return member.profile_id === user?.id && member.role === 'admin' && ownAdminCount <= 1
+  }
+
+  function patchTriage(profileId, patch) {
+    setTriageState((prev) => ({ ...prev, [profileId]: { ...prev[profileId], ...patch } }))
+  }
+
+  // Dismiss and restore both write access_requests and then patch local state
+  // rather than refetching: the waiting list is derived from three lists, and
+  // a full reload to move one card would flash the whole screen.
+  async function dismiss(profile) {
+    patchTriage(profile.id, { saving: true, error: null })
+    try {
+      const row = await dismissAccessRequest({ profileId: profile.id, decidedBy: user?.id })
+      // A null row means the write succeeded but the read-back didn't come
+      // through. Falling back to a synthetic row keeps the screen honest
+      // about what the database now says, instead of leaving the person
+      // sitting in the list as though nothing happened.
+      const next = row ?? {
+        id: `pending:${profile.id}`,
+        profile_id: profile.id,
+        status: 'dismissed',
+        note: requestByProfile.get(profile.id)?.note ?? null,
+        created_at: requestByProfile.get(profile.id)?.created_at ?? null,
+      }
+      setRequests((prev) => [next, ...prev.filter((item) => item.profile_id !== profile.id)])
+      patchTriage(profile.id, { saving: false, error: null })
+    } catch (err) {
+      patchTriage(profile.id, {
+        saving: false,
+        error: err.message || "Couldn't dismiss this person. Try again.",
+      })
+    }
+  }
+
+  async function restore(profile) {
+    patchTriage(profile.id, { saving: true, error: null })
+    try {
+      await restoreAccessRequest({ profileId: profile.id })
+      setRequests((prev) => prev.filter((item) => item.profile_id !== profile.id))
+      patchTriage(profile.id, { saving: false, error: null })
+    } catch (err) {
+      patchTriage(profile.id, {
+        saving: false,
+        error: err.message || "Couldn't restore this person. Try again.",
+      })
+    }
   }
 
   function patchRow(id, patch) {
@@ -517,9 +601,10 @@ export default function Accounts() {
           </h3>
           <p className={`mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
             Anyone can create a login with their email address, but they see nothing at all in
-            the app until an admin gives them access. These people have signed up and have no
-            access yet — they haven&apos;t asked for anything, and nothing is waiting on you
-            unless you recognise them.
+            the app until an admin gives them access. People who asked for access are listed
+            first, with whatever they said about themselves. Anyone you don&apos;t recognise can
+            be dismissed — that only clears them off this list, it doesn&apos;t delete their
+            login, and you can undo it below.
           </p>
 
           {waiting.length === 0 ? (
@@ -531,6 +616,8 @@ export default function Accounts() {
               <div className="mt-2.5 flex flex-col gap-3">
                 {waiting.map((profile) => {
                   const state = grantState[profile.id] ?? {}
+                  const triage = triageState[profile.id] ?? {}
+                  const request = requestByProfile.get(profile.id)
                   const displayName = profile.full_name?.trim() || 'No name yet'
                   const label = profile.email || displayName
                   const signedUp = formatJoined(profile.created_at)
@@ -549,11 +636,32 @@ export default function Accounts() {
                       </span>
 
                       <div className="min-w-0">
-                        <span className="block text-[15px] font-bold text-ink">{displayName}</span>
+                        <span className="block text-[15px] font-bold text-ink">
+                          {displayName}
+                          {request && (
+                            <span
+                              data-testid="asked-badge"
+                              className="ml-2 rounded-pill bg-brand/10 px-2 py-0.5 align-middle text-[11px] font-bold uppercase tracking-[0.06em] text-brand-deep"
+                            >
+                              Asked
+                            </span>
+                          )}
+                        </span>
                         <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
                           {profile.email ?? 'No email on file'}
                           {signedUp ? ` · signed up ${signedUp}` : ''}
                         </span>
+                        {/* Their own words. This is the whole reason the
+                            request row exists: "Parent of Sam Muir, U10" is
+                            what makes an unknown email actionable. */}
+                        {request?.note && (
+                          <span
+                            data-testid="request-note"
+                            className={`mt-1 block text-[12.5px] italic leading-relaxed ${MUTED_ON_PAPER}`}
+                          >
+                            “{request.note}”
+                          </span>
+                        )}
                       </div>
 
                       <span className="flex-1" />
@@ -576,19 +684,106 @@ export default function Accounts() {
                         submitLabel="Give access"
                         onSubmit={(rows) => grant(profile, rows)}
                       />
+
+                      <div className="flex flex-col items-end gap-1">
+                        {triage.error && (
+                          <span
+                            role="alert"
+                            className="text-[12px] font-semibold text-brand-deep"
+                          >
+                            {triage.error}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => dismiss(profile)}
+                          disabled={Boolean(triage.saving)}
+                          className="rounded-[9px] border border-line px-2.5 py-1.5 text-[13px] font-bold text-ink-muted transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                        >
+                          {triage.saving ? 'Dismissing…' : 'Dismiss'}
+                        </button>
+                      </div>
                     </Card>
                   )
                 })}
               </div>
 
-              {/* Said rather than offered as a control — see the comment on
-                  the "Waiting for access" block at the top of this file. */}
               <p className={`mt-2 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
-                There&apos;s nothing to turn down here. If you don&apos;t recognise someone,
-                leave them alone — with no access they can already see nothing, and they stay on
-                this list. Closing an account itself isn&apos;t something this screen can do.
+                Dismissing someone is safe and reversible: with no access they could already see
+                nothing, and dismissing only takes them off this list. It does not delete their
+                login — closing an account itself isn&apos;t something this screen can do.
               </p>
             </>
+          )}
+        </section>
+      )}
+
+      {/* Dismissed people. Collapsed by default and hidden entirely when the
+          list is empty: the point of dismissing is to get someone out of the
+          way. But "out of the way" must not mean "unrecoverable" — an admin
+          who dismisses the wrong person needs a route back, and no other
+          screen lists these people at all. Restoring DELETES the dismissal
+          rather than marking it pending, so nobody is credited with a request
+          they never made (see src/data/accessRequests.js). */}
+      {!isFirstLoad && !error && dismissed.length > 0 && (
+        <section data-testid="dismissed-requests" className="mb-5">
+          <button
+            type="button"
+            onClick={() => setShowDismissed((open) => !open)}
+            aria-expanded={showDismissed}
+            className={`text-[12.5px] font-bold underline decoration-line underline-offset-4 transition hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${MUTED_ON_PAPER}`}
+          >
+            {showDismissed ? 'Hide' : 'Show'} dismissed ({dismissed.length})
+          </button>
+
+          {showDismissed && (
+            <div className="mt-2.5 flex flex-col gap-3">
+              {dismissed.map((profile) => {
+                const triage = triageState[profile.id] ?? {}
+                const request = requestByProfile.get(profile.id)
+                const displayName = profile.full_name?.trim() || 'No name yet'
+
+                return (
+                  <Card
+                    key={profile.id}
+                    data-testid="dismissed-person"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[14px] py-3 opacity-80"
+                  >
+                    <div className="min-w-0">
+                      <span className="block text-[15px] font-bold text-ink">{displayName}</span>
+                      <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
+                        {profile.email ?? 'No email on file'}
+                      </span>
+                      {request?.note && (
+                        <span
+                          className={`mt-1 block text-[12.5px] italic leading-relaxed ${MUTED_ON_PAPER}`}
+                        >
+                          “{request.note}”
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="flex-1" />
+
+                    <div className="flex flex-col items-end gap-1">
+                      {triage.error && (
+                        <span role="alert" className="text-[12px] font-semibold text-brand-deep">
+                          {triage.error}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => restore(profile)}
+                        disabled={Boolean(triage.saving)}
+                        className="rounded-[9px] border border-line px-2.5 py-1.5 text-[13px] font-bold text-ink-muted transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                      >
+                        {triage.saving ? 'Restoring…' : 'Restore'}
+                      </button>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
           )}
         </section>
       )}
