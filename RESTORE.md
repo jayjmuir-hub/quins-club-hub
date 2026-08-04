@@ -82,6 +82,9 @@ npm run build   # expect clean
 
 ## Pushing changes back
 
+**Full procedure, with the failure modes that have actually bitten:
+`claude/writing-to-github-from-claude.md`.** Summary below.
+
 **The cloud sandbox has no GitHub credentials and must not be given any.** Pushes go
 through a PC.
 
@@ -780,6 +783,69 @@ Read `db/schema/README.md` first. The essentials:
 **`.superpowers/sdd/.gitignore` gets reset to `*` by tooling, repeatedly.** It silently
 untracks the whole ledger. Do not fight it — stage the workspace with
 `git add -f .superpowers/sdd/quins-v1-mvp/` every time.
+
+---
+
+## How this codebase actually behaves
+
+Things that are true, non-obvious, and have already cost someone an hour. Every entry is
+something a session discovered by hitting it.
+
+**The roster is TWO components.** Cards on mobile (`data-testid="player-row"`), a table on
+desktop (`data-testid="roster-table-row"`). BOTH are in the DOM at every width with one
+CSS-hidden — so a selector matching both picks the hidden one and the click silently does
+nothing. On desktop the row click edits position/age group/captain IN PLACE; the detail
+sheet opens from a separate **"Open"** button in the last column.
+
+**`PhoneInput` takes `country` + `national` + `onCountryChange` + `onNationalChange`** —
+not `value`/`onChange`. Phones are stored E.164 and split for editing with
+`splitPhone`/`joinPhone` (`src/lib/phone.js`). Formatting is deliberately NOT applied
+as-you-type; that reintroduced a caret-jump bug.
+
+**The test suite needs `.env`, which is gitignored.** A fresh clone fails with "Missing
+required Supabase env var(s)" until you create it — values in "Start a session" above.
+Delete it before committing.
+
+**jsdom applies no Tailwind.** Any test asserting "this is visible" proves nothing about
+real rendering. Assert class tokens, and verify anything visual in Chromium via `harness/`.
+
+**jsdom has no `URL.createObjectURL`.** Touching a file input without the stub in
+`src/test/setup.js` throws inside an effect and React unmounts the ENTIRE tree — an empty
+`<body>` and an error mentioning nothing about object URLs.
+
+**`harness/` stubs must mirror the real modules, and `tests/harness-stubs.test.js` enforces
+it.** Add an alias in `harness/vite.config.js` without a matching stub — or add an export to
+a real data module without adding it to the stub — and every harness scenario goes dark at
+once, because `harness/main.jsx` imports every screen into one bundle.
+
+**The harness needs a stub for anything AppShell imports TRANSITIVELY.** `AppShell` →
+`RequestAccess` → `data/accessRequests.js` → the real Supabase client, which throws on
+missing env vars before a single pixel renders.
+
+**The pinned Playwright expects a Chromium build a cloud sandbox may not have.** Launch with
+an explicit `executablePath` rather than downloading a second copy — see
+`harness/shoot-playerdetail.mjs`.
+
+**`composite IS NOT NULL` is only true when EVERY field is non-null.** A perfectly good
+`players` row reads as null because `jersey_num` is empty. This made a working RPC look
+broken. Test a FIELD, not the row.
+
+**A temp table created before `set local role` is unreadable afterwards.** In an RLS
+verification script, `create temp table` as one role then `set local role anon` gives
+"permission denied" until you `grant select` explicitly.
+
+**`private.can_see_team` has a hand-copied twin.** `public.calendar_events_for_token`
+restates the same visibility rule against a token-resolved profile, because a calendar
+client has no JWT and `auth.uid()` is unavailable. **CHANGE ONE, CHANGE BOTH.**
+
+**RLS grants access to ROWS, not COLUMNS.** This is why `players.photo_path` is written by
+`set_own_player_photo()` and not by an owner policy: a row-level owner policy on `players`
+would hand a parent `team_id` as well. Don't "simplify" it back into a policy.
+
+**Netlify serves `dist/` from a Vite build — the repo root is NOT served.** (Unlike the
+adhjrt tournament repo, where the root IS the deployed site. Rules copied from there about
+scratch files in the repo root do not apply here for that reason. The `git add -A` rule
+still does, for the `.env` reason.)
 
 ---
 

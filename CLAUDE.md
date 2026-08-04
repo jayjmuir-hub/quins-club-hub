@@ -13,6 +13,8 @@ Supabase Row-Level Security.
 | `docs/design-system.md` | The visual spec |
 | `docs/deploy.md`, `docs/email-and-domain.md`, `docs/first-admin.md` | Operational procedures |
 | `docs/e2e-roles.md`, `docs/accessibility.md` | Test and a11y contracts |
+| `claude/state-of-play.md` | Where things stand TODAY, and what is blocked on whom. The volatile half — `RESTORE.md` holds the durable truth |
+| `claude/writing-to-github-from-claude.md` | The exact push route, and the ways it has failed |
 
 Do not restate any of that here. A second copy is a copy that drifts.
 
