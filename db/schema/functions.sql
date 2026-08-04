@@ -145,6 +145,114 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 
 
 -- ---------------------------------------------------------------------
+-- public.calendar_events_for_token(_token uuid)
+-- proacl: {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres}
+--
+-- Granted to ANON on purpose: the caller is a calendar client with no session
+-- and no JWT, reached through the `calendar` Edge Function which holds only
+-- the anon key. Every authorisation decision therefore lives here.
+--
+-- The visibility rule is a line-by-line MIRROR of private.can_see_team, with
+-- the profile resolved from the token instead of auth.uid(). IF can_see_team
+-- CHANGES, THIS MUST CHANGE WITH IT — that duplication is the price of a
+-- caller with no JWT.
+--
+-- An unknown or revoked token returns zero rows rather than raising: an error
+-- distinguishing "no such token" from "token with no fixtures" is an oracle
+-- for guessing tokens.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.calendar_events_for_token(_token uuid)
+ RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, competition text, starts_at timestamp with time zone, team_name text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select e.id, e.type, e.title, e.opponent, e.home, e.venue, e.competition,
+         e.starts_at, t.name as team_name
+  from public.events e
+  join public.teams t on t.id = e.team_id
+  where exists (
+    select 1
+    from public.calendar_tokens ct
+    join public.memberships m on m.profile_id = ct.profile_id
+    where ct.token = _token
+      and (
+        (m.role = 'admin' and m.club_id = t.club_id)
+        or m.team_id = e.team_id
+      )
+  )
+  and e.starts_at > now() - interval '6 months'
+  order by e.starts_at;
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION public.calendar_events_for_token(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.calendar_events_for_token(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.my_calendar_token() and public.reset_my_calendar_token()
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+--
+-- SECURITY INVOKER (note the absence of SECURITY DEFINER): the
+-- "calendar token own" policy is already exactly right, so a definer would
+-- add nothing except a way to get it wrong.
+--
+-- Reset DELETEs and re-inserts rather than updating in place, so the old
+-- token stops working the instant the new one exists.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.my_calendar_token()
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare
+  existing uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in first.' using errcode = '42501';
+  end if;
+
+  select token into existing from public.calendar_tokens where profile_id = auth.uid();
+  if existing is not null then
+    return existing;
+  end if;
+
+  insert into public.calendar_tokens (profile_id) values (auth.uid())
+  returning token into existing;
+
+  return existing;
+end;
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION public.my_calendar_token() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.reset_my_calendar_token()
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare
+  fresh uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in first.' using errcode = '42501';
+  end if;
+
+  delete from public.calendar_tokens where profile_id = auth.uid();
+  insert into public.calendar_tokens (profile_id) values (auth.uid())
+  returning token into fresh;
+
+  return fresh;
+end;
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION public.reset_my_calendar_token() TO authenticated;
+
+
+-- ---------------------------------------------------------------------
 -- public.set_own_player_photo(uuid, text)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres}
 --
@@ -491,9 +599,12 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO authenticated;
 
 
 -- =====================================================================
--- Complete inventory as captured (15 functions):
+-- Complete inventory as captured (18 functions):
 --   public.accept_invite(uuid)                  SECURITY DEFINER, VOLATILE
 --   public.set_own_player_photo(uuid, text)     SECURITY DEFINER, VOLATILE
+--   public.calendar_events_for_token(uuid)      SECURITY DEFINER, STABLE
+--   public.my_calendar_token()                  INVOKER,          VOLATILE
+--   public.reset_my_calendar_token()            INVOKER,          VOLATILE
 --   private.can_admin_see_pending(uuid)         SECURITY DEFINER, STABLE
 --   private.can_edit_team(uuid)                 SECURITY DEFINER, STABLE
 --   private.can_manage_invite(uuid)             SECURITY DEFINER, STABLE
@@ -508,6 +619,6 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO authenticated;
 --   private.photo_team(text)                    SECURITY DEFINER, STABLE
 --   private.shares_admin_club(uuid)             SECURITY DEFINER, STABLE
 --
--- The only functions in `public` are accept_invite and set_own_player_photo;
--- everything else lives in `private`.
+-- `public` holds accept_invite, set_own_player_photo and the three calendar
+-- functions; everything else lives in `private`.
 -- =====================================================================

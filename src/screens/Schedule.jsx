@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
@@ -407,15 +408,21 @@ export default function Schedule() {
           <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Schedule &amp; fixtures</h2>
           <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
         </div>
-        {canEditAnything && (
-          <button
-            type="button"
-            onClick={() => setFormState({ event: null })}
-            className="shrink-0 rounded-[11px] bg-brand px-3.5 py-2 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-          >
-            Add event
-          </button>
-        )}
+        {/* "Add to calendar" sits beside "Add event" and is for EVERYONE — a
+            parent subscribing to their child's fixtures is the main case, not
+            an organiser one. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <CalendarSubscribe />
+          {canEditAnything && (
+            <button
+              type="button"
+              onClick={() => setFormState({ event: null })}
+              className="shrink-0 rounded-[11px] bg-brand px-3.5 py-2 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              Add event
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-3 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

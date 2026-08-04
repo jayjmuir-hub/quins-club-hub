@@ -12,7 +12,7 @@
 -- Sources: information_schema.columns, pg_constraint + pg_get_constraintdef,
 --          pg_indexes, pg_class.relrowsecurity, obj_description.
 --
--- All twelve tables have RLS ENABLED (relrowsecurity = true) and none have
+-- All thirteen tables have RLS ENABLED (relrowsecurity = true) and none have
 -- FORCE ROW LEVEL SECURITY (relforcerowsecurity = false, i.e. the table
 -- owner still bypasses RLS). Policies live in policies.sql.
 -- =====================================================================
@@ -179,6 +179,27 @@ CREATE TABLE public.access_requests (
   CONSTRAINT access_requests_status_check    CHECK ((status = ANY (ARRAY['pending'::text, 'dismissed'::text])))
 );
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
+
+
+-- ---------------------------------------------------------------------
+-- calendar_tokens  (subscription feed credentials - 4 Aug 2026)
+--
+-- Each row IS a bearer credential: whoever holds the token can read that
+-- person's fixtures with no login, because a calendar client cannot sign in.
+-- Hence a random uuid rather than the profile id (a feed keyed on something
+-- enumerable would be no protection), one row per person, and a reset path
+-- that DELETEs and re-inserts so the old token dies the moment the new one
+-- exists.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.calendar_tokens (
+  profile_id  uuid        NOT NULL,
+  token       uuid        NOT NULL DEFAULT gen_random_uuid(),
+  created_at  timestamptz          DEFAULT now(),
+  CONSTRAINT calendar_tokens_pkey            PRIMARY KEY (profile_id),
+  CONSTRAINT calendar_tokens_token_key       UNIQUE (token),
+  CONSTRAINT calendar_tokens_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+ALTER TABLE public.calendar_tokens ENABLE ROW LEVEL SECURITY;
 
 
 -- ---------------------------------------------------------------------

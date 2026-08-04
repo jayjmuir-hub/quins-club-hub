@@ -12,7 +12,8 @@ Captured from Supabase project `lusmshimxdcxpnrktlgz` (`quins-club-hub`), Postgr
 on **2026-08-03**, re-captured **2026-08-04** after
 `db/migrations/20260803_player_parents_and_photos.sql`, and again the same day after
 `db/migrations/20260804_access_requests.sql` and
-`db/migrations/20260804_self_service_profile.sql`.
+`db/migrations/20260804_self_service_profile.sql`, and
+`db/migrations/20260804_calendar_feed.sql`.
 
 > **The 4 Aug re-capture was late, and that is the lesson.** The migration shipped on
 > 3 Aug and these files were not re-captured with it, so for a day the repo's "snapshot of
@@ -26,7 +27,7 @@ on **2026-08-03**, re-captured **2026-08-04** after
 |---|---|
 | `tables.sql` | Every `public` table: columns, types, nullability, defaults, PKs, FKs, CHECKs, indexes, and RLS-enabled state. Includes explicit notes where an expected unique constraint is **absent**. |
 | `policies.sql` | Every RLS policy on every `public` table, **plus the two on `storage.objects` for the `player-photos` bucket**, with command and USING / WITH CHECK expressions. |
-| `functions.sql` | Full `pg_get_functiondef()` output for all 15 functions in `public` and `private`, plus their EXECUTE grants from `proacl`. |
+| `functions.sql` | Full `pg_get_functiondef()` output for all 18 functions in `public` and `private`, plus their EXECUTE grants from `proacl`. |
 | `triggers.sql` | The two triggers on `auth.users`. (There are none on any `public` table.) |
 
 ## Why this directory exists

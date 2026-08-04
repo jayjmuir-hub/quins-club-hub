@@ -27,11 +27,12 @@
 
 
 -- ---------------------------------------------------------------------
--- RLS enabled state — all twelve public tables
+-- RLS enabled state — all thirteen public tables
 -- (relrowsecurity = true, relforcerowsecurity = false on every one)
 -- ---------------------------------------------------------------------
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.availability    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.calendar_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clubs           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invite_targets  ENABLE ROW LEVEL SECURITY;
@@ -101,6 +102,19 @@ CREATE POLICY "avail coach manage" ON public.availability
   WITH CHECK (private.can_edit_team(( SELECT events.team_id
    FROM events
   WHERE (events.id = availability.event_id))));
+
+
+-- ---------------------------------------------------------------------
+-- calendar_tokens  (1 policy)
+--
+-- Own row only. There is deliberately NO admin policy: an admin has no reason
+-- to read someone else's feed URL, and a table of live bearer credentials is
+-- the last place to widen read access for convenience.
+-- ---------------------------------------------------------------------
+CREATE POLICY "calendar token own" ON public.calendar_tokens
+  AS PERMISSIVE FOR ALL TO public
+  USING ((profile_id = auth.uid()))
+  WITH CHECK ((profile_id = auth.uid()));
 
 
 -- ---------------------------------------------------------------------
