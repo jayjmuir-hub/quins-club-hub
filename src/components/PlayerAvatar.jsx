@@ -62,6 +62,9 @@ export default function PlayerAvatar({
     sm: 'h-10 w-10 rounded-[12px] text-[14px]',
     md: 'h-14 w-14 rounded-[14px] text-[20px]',
     lg: 'h-20 w-20 rounded-[18px] text-[26px]',
+    // Detail hero only. Big enough that a face is actually a face rather
+    // than a thumbnail, which is the point of having head shots at all.
+    xl: 'h-28 w-28 rounded-[22px] text-[34px]',
   }[size]
 
   const shared = `${dimensions} shrink-0 overflow-hidden ${className}`

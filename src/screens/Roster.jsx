@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import Badge from '../components/Badge.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
-import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import RosterTable from '../components/RosterTable.jsx'
 import TeamPills, { ALL_TEAMS_ID } from '../components/TeamPills.jsx'
@@ -366,15 +365,6 @@ export default function Roster() {
 
   return (
     <section>
-      {!admin && (
-        <ScopeNote tone={canEditAnything ? 'coach' : 'parent'}>
-          <b>
-            {roleLabel(memberships)} view{canEditAnything ? '' : ' · read-only'}.
-          </b>{' '}
-          You&apos;re seeing {teamNames || 'no squads'} — every other age group is hidden.
-        </ScopeNote>
-      )}
-
       {/* design-system.md §5.3: the section head carries an "Add" button on
           the right for admin/coach. It is absent, not disabled, for everyone
           else — and it only exists at all now that Task 15's form does. */}

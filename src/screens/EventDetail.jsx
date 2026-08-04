@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Chip from '../components/Chip.jsx'
-import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { deleteEvent } from '../data/events.js'
@@ -24,12 +23,12 @@ import {
 // `open` prop to thread through and no hidden-but-present DOM.
 //
 // Footer actions (design-system.md §5.5): Edit + Delete for a user who can
-// edit this event's squad, a read-only scope note for everyone else. Delete
+// edit this event's squad, and NOTHING for everyone else. Delete
 // is two-step — the confirm replaces the buttons in place rather than using
 // a native confirm(), which is unstyled, unannounced and untestable in the
 // browser check. `canEdit` is passed in rather than computed here: this
 // component stays presentational and the screen already holds memberships
-// (the same split ScopeNote uses).
+// (the same split EventDetail and PlayerDetail both use).
 
 const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
 
@@ -184,15 +183,10 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState(null)
 
-  if (!canEdit) {
-    return (
-      <div className="mt-5">
-        <ScopeNote tone="parent">
-          <b>Read-only.</b> Only a coach or club admin can change this event.
-        </ScopeNote>
-      </div>
-    )
-  }
+  // Nothing for someone who can't edit — see PlayerDetail's FooterActions.
+  // Not being able to change a fixture is the ordinary state for most people
+  // opening this sheet, not an exception worth a banner every time.
+  if (!canEdit) return null
 
   function handleDelete() {
     setDeleting(true)

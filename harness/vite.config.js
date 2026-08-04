@@ -39,6 +39,15 @@ export default defineConfig({
       },
       // Roster/PlayerDetail (Task 12) reach Supabase through this one.
       { find: /^\.\.\/data\/players\.js$/, replacement: path.resolve(__dirname, 'stubs/players.js') },
+      // PlayerDetail's Parents block and PlayerAvatar's URL signing (4 Aug).
+      { find: /^\.\.\/data\/parents\.js$/, replacement: path.resolve(__dirname, 'stubs/parents.js') },
+      { find: /^\.\.\/data\/photos\.js$/, replacement: path.resolve(__dirname, 'stubs/photos.js') },
+      // RequestAccess (4 Aug) — AppShell imports it, so without this the
+      // harness cannot boot at all without Supabase env vars.
+      {
+        find: /^\.\.\/data\/accessRequests\.js$/,
+        replacement: path.resolve(__dirname, 'stubs/accessRequests.js'),
+      },
       // Admin (Task 17) reaches Supabase through this one.
       { find: /^\.\.\/data\/members\.js$/, replacement: path.resolve(__dirname, 'stubs/members.js') },
     ],

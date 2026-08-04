@@ -76,6 +76,10 @@ const COACH_TWO = [
 ]
 const PARENT = [{ id: 'm-p', role: 'parent', team_id: 't-u14', player_id: 'p-1' }]
 
+function hasClassToken(element, token) {
+  return element.className.split(/\s+/).includes(token)
+}
+
 const EXISTING_PLAYER = {
   id: 'p-1',
   club_id: CLUB_ID,
@@ -724,12 +728,84 @@ describe('PlayerDetail wiring', () => {
     expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
-  it('tells a parent it is read-only instead of offering the buttons', async () => {
+  it('puts the name, position and age group beside a large photo, not under it', async () => {
+    await openDetail(COACH_U14)
+    const dialog = screen.getByRole('dialog')
+
+    // The hero is a row: avatar first, then a single text column carrying all
+    // three facts. Previously the avatar sat above the name and Position/Age
+    // group were ALSO repeated as key/value rows underneath (4 Aug 2026).
+    const heading = within(dialog).getByRole('heading', { name: 'Dhruv Ramachandran' })
+    const textColumn = heading.parentElement
+    const hero = textColumn.parentElement
+    expect(hasClassToken(hero, 'flex')).toBe(true)
+    expect(hasClassToken(hero, 'items-center')).toBe(true)
+
+    // The avatar is the hero's first child and is the xl size, not lg.
+    const avatar = hero.firstElementChild
+    expect(avatar).not.toBe(textColumn)
+    expect(hasClassToken(avatar, 'h-28')).toBe(true)
+    expect(hasClassToken(avatar, 'w-28')).toBe(true)
+
+    expect(within(textColumn).getByText('Flanker')).toBeInTheDocument()
+    expect(within(textColumn).getByText('U14')).toBeInTheDocument()
+
+    // The duplicated key/value rows are gone.
+    expect(within(dialog).queryByText('Age group')).toBeNull()
+  })
+
+  it('still states captaincy as a word, now that the Role row is gone', async () => {
+    await openDetail(COACH_U14)
+    const dialog = screen.getByRole('dialog')
+
+    // The fixture IS a captain. Captaincy used to be a "Role" key/value row;
+    // that row went with Position and Age group, so the fact has to survive
+    // somewhere readable — and as a word, never the prototype's "©" glyph,
+    // which screen readers announce as "copyright".
+    expect(within(dialog).getByText('Captain')).toBeInTheDocument()
+    expect(within(dialog).queryByText('©')).toBeNull()
+    expect(within(dialog).queryByText('Role')).toBeNull()
+  })
+
+  it('lays parent contact out like the player contact block, with Call and Email', async () => {
+    listParentsMock.mockResolvedValue([
+      {
+        id: 'pp-1',
+        full_name: 'Sara Fletcher',
+        relationship: 'Mother',
+        email: 'sara@example.com',
+        phone: '+971502001000',
+        is_primary: true,
+      },
+    ])
+
+    await openDetail(COACH_U14)
+    const dialog = screen.getByRole('dialog')
+
+    expect(await within(dialog).findByText('Sara Fletcher')).toBeInTheDocument()
+    expect(within(dialog).getByText('Mother · main contact')).toBeInTheDocument()
+    // Labelled rows, the same shape the player's own contact block uses.
+    expect(within(dialog).getAllByText('Phone').length).toBeGreaterThan(0)
+    expect(within(dialog).getAllByText('Email').length).toBeGreaterThan(0)
+    // ...and the same two actions.
+    expect(within(dialog).getByRole('link', { name: /call/i })).toHaveAttribute(
+      'href',
+      'tel:+971502001000',
+    )
+    expect(within(dialog).getByRole('link', { name: /^email$/i })).toHaveAttribute(
+      'href',
+      'mailto:sara@example.com',
+    )
+  })
+
+  it('offers a parent no buttons, and no read-only banner in their place', async () => {
     await openDetail(PARENT)
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
-    expect(within(dialog).getByText(/read-only|can't change/i)).toBeInTheDocument()
+    // The absence of the buttons IS the message; the banner that used to sit
+    // here said nothing the empty footer didn't already (4 Aug 2026).
+    expect(within(dialog).queryByText(/read-only|can't change/i)).toBeNull()
   })
 
   it('opens the edit form prefilled from the player', async () => {

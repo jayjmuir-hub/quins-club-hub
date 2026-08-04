@@ -19,20 +19,21 @@ const T2 = 't2' // U14 Boys
 // judged fairly, and a third pill exercises the pill row's overflow at 375px.
 const T3 = 't3' // U16 Boys
 
-const P = (id, team_id, full_name, position, is_captain = false) => ({
+const P = (id, team_id, full_name, position, is_captain = false, photo_path = null) => ({
   id,
   team_id,
   full_name,
   position,
   is_captain,
+  photo_path,
 })
 
 export const PLAYERS = [
   // U12 Boys — covers Forwards, Backs and Other.
-  P('p1', T1, 'Aaron Whitfield', 'Prop'),
+  P('p1', T1, 'Aaron Whitfield', 'Prop', false, 'p1/1754300000000.jpg'),
   P('p2', T1, 'Bilal Haddad', 'Hooker'),
   P('p3', T1, 'Charlie Nguyen-Fitzgerald', 'Lock'),
-  P('p4', T1, 'Dhruv Ramachandran', 'Flanker', true),
+  P('p4', T1, 'Dhruv Ramachandran', 'Flanker', true, 'p4/1754300000001.jpg'),
   P('p5', T1, 'Eoin O’Sullivan', 'Number 8'),
   P('p6', T1, 'Faisal Al Mansoori', 'Scrum-half'),
   P('p7', T1, 'Gabriel Santos', 'Fly-half'),

@@ -441,7 +441,7 @@ describe('Dashboard — upcoming list and last result', () => {
     expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
-  it('tells a parent the detail sheet is read-only instead', async () => {
+  it('gives a parent no actions and no read-only banner in their place', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
     renderDashboard()
 
@@ -450,7 +450,9 @@ describe('Dashboard — upcoming list and last result', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
-    expect(within(dialog).getByText(/read-only/i)).toBeInTheDocument()
+    // The absence of an Edit button IS the message. Saying "read-only" as
+    // well told people something they could already see (4 Aug 2026).
+    expect(within(dialog).queryByText(/read-only/i)).toBeNull()
   })
 
   it('opens the edit form from the detail sheet', async () => {

@@ -511,12 +511,14 @@ describe('EventDetail wiring', () => {
     expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
-  it('tells a parent it is read-only instead of offering the buttons', async () => {
+  it('offers a parent no buttons, and no read-only banner in their place', async () => {
     await openDetail(PARENT)
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
-    expect(within(dialog).getByText(/read-only|can't change/i)).toBeInTheDocument()
+    // The absence of the buttons IS the message; the banner that used to sit
+    // here said nothing the empty footer didn't already (4 Aug 2026).
+    expect(within(dialog).queryByText(/read-only|can't change/i)).toBeNull()
   })
 
   it('opens the edit form prefilled from the event', async () => {

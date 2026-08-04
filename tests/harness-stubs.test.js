@@ -33,6 +33,9 @@ const ALIASES = [
   ['harness/stubs/availability.js', 'src/data/availability.js'],
   ['harness/stubs/players.js', 'src/data/players.js'],
   ['harness/stubs/members.js', 'src/data/members.js'],
+  ['harness/stubs/parents.js', 'src/data/parents.js'],
+  ['harness/stubs/photos.js', 'src/data/photos.js'],
+  ['harness/stubs/accessRequests.js', 'src/data/accessRequests.js'],
 ]
 
 function read(relative) {

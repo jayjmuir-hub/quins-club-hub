@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
-import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import TeamPills, { ALL_TEAMS_ID, PillButton } from '../components/TeamPills.jsx'
 import Availability from './Availability.jsx'
@@ -400,15 +399,6 @@ export default function Schedule() {
 
   return (
     <section>
-      {!admin && (
-        <ScopeNote tone={canEditAnything ? 'coach' : 'parent'}>
-          <b>
-            {roleLabel(memberships)} view{canEditAnything ? '' : ' · read-only'}.
-          </b>{' '}
-          You&apos;re seeing {teamNames || 'no squads'} — every other age group is hidden.
-        </ScopeNote>
-      )}
-
       {/* design-system.md §5.2: the section head carries an "Add" button on
           the right for admin/coach. It is absent, not disabled, for everyone
           else — and it only exists at all now that Task 14's form does. */}

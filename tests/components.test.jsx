@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Unit tests for the Task 9 shared UI primitives (src/components/{Card,Chip,
-// Sheet,Badge,TeamPills,ScopeNote,Empty,Spinner}.jsx). These are pure
+// Sheet,Badge,TeamPills,Empty,Spinner}.jsx). These are pure
 // presentational components — no network, no router, no auth context.
 //
 // jsdom does not apply Tailwind's generated CSS, so assertions that a
@@ -18,7 +18,6 @@ import Chip from '../src/components/Chip.jsx'
 import Sheet from '../src/components/Sheet.jsx'
 import Badge from '../src/components/Badge.jsx'
 import TeamPills, { ALL_TEAMS_ID } from '../src/components/TeamPills.jsx'
-import ScopeNote from '../src/components/ScopeNote.jsx'
 import Empty from '../src/components/Empty.jsx'
 import Spinner from '../src/components/Spinner.jsx'
 
@@ -168,18 +167,6 @@ describe('Spinner', () => {
   it('accepts a custom accessible label', () => {
     render(<Spinner label="Loading fixtures…" />)
     expect(screen.getByRole('status', { name: 'Loading fixtures…' })).toBeInTheDocument()
-  })
-})
-
-describe('ScopeNote', () => {
-  it('renders its message as passed children, without computing scope itself', () => {
-    render(<ScopeNote tone="parent">You&apos;re seeing your squads only</ScopeNote>)
-    expect(screen.getByText("You're seeing your squads only")).toBeInTheDocument()
-  })
-
-  it('defaults to the coach tone when no tone is given', () => {
-    render(<ScopeNote>Some scope message</ScopeNote>)
-    expect(screen.getByText('Some scope message')).toBeInTheDocument()
   })
 })
 

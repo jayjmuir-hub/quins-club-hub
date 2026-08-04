@@ -456,23 +456,29 @@ describe('Roster — contrast', () => {
   })
 })
 
-describe('Roster — scope note', () => {
-  it('tells a coach which squads they are seeing', async () => {
+describe('Roster — no scope banner', () => {
+  it('shows no scope or read-only banner to a coach', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
 
     setup()
 
     await screen.findByText('Tom Fletcher')
-    expect(screen.getByText(/you're seeing u10/i)).toBeInTheDocument()
+      // The scope banner was removed on 4 Aug 2026 (Jay's call): being scoped
+      // to your own squads is expected behaviour for every role, not an
+      // exception worth a banner on every screen. Asserted as an ABSENCE so
+      // it cannot quietly come back.
+    expect(screen.queryByText(/you're seeing/i)).toBeNull()
+    expect(screen.queryByText(/read-only/i)).toBeNull()
   })
 
-  it('tells a parent their view is read-only', async () => {
+  it('shows no scope or read-only banner to a parent either', async () => {
     useMembershipsMock.mockReturnValue(memberships(PARENT))
 
     setup()
 
     await screen.findByText('Tom Fletcher')
-    expect(screen.getByText(/read-only/i)).toBeInTheDocument()
+    expect(screen.queryByText(/read-only/i)).toBeNull()
+    expect(screen.queryByText(/every other age group is hidden/i)).toBeNull()
   })
 
   it('shows no scope note to an admin', async () => {

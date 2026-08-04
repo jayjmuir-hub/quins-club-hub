@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
-import ScopeNote from '../components/ScopeNote.jsx'
 import { deletePlayer, getPlayerContact } from '../data/players.js'
 import { listParents } from '../data/parents.js'
 import { allowsOwnContact } from '../lib/ageGroup.js'
@@ -23,12 +22,12 @@ import PlayerAvatar from '../components/PlayerAvatar.jsx'
 // deliberately departs from it.
 //
 // Footer actions (design-system.md §5.7, Task 15): Edit + Delete for a user
-// who can edit this player's squad, a read-only scope note for everyone else.
+// who can edit this player's squad, and nothing at all for everyone else.
 // Delete is two-step — the confirm replaces the buttons in place rather than
 // using a native confirm(), which is unstyled, unannounced and untestable in
 // the browser check. `canEdit` is passed in rather than computed here: this
 // component stays presentational and Roster already holds memberships (the
-// same split ScopeNote and EventDetail use).
+// same split EventDetail uses).
 //
 // The footer sits OUTSIDE ContactBlock, unlike the Call/Email row which sits
 // inside it. That difference is deliberate and safeguarding-relevant: Call
@@ -140,6 +139,10 @@ function ParentsBlock({ playerId }) {
         {parents.length === 1 ? 'Parent' : 'Parents'}
       </h4>
 
+      {/* Laid out exactly like ContactBlock below: labelled Phone/Email rows
+          and then the Call/Email actions. Parent details are the numbers
+          somebody actually needs at 7am on a Saturday, so they get the same
+          treatment as the player's own — not a denser, different one. */}
       {parents.map((parent) => (
         <div key={parent.id} className="border-b border-line py-3 last:border-b-0">
           <div className="flex items-baseline justify-between gap-3">
@@ -153,20 +156,35 @@ function ParentsBlock({ playerId }) {
           </div>
 
           {parent.phone && (
-            <a
-              className="mt-1 block text-[14.5px] font-semibold text-accent-ink underline"
-              href={telHref(parent.phone)}
-            >
-              {formatPhone(parent.phone)}
-            </a>
+            <KeyValue label="Phone">
+              <a className="text-accent-ink underline" href={telHref(parent.phone)}>
+                {formatPhone(parent.phone)}
+              </a>
+            </KeyValue>
           )}
           {parent.email && (
-            <a
-              className="mt-0.5 block break-all text-[14.5px] font-semibold text-accent-ink underline"
-              href={`mailto:${parent.email}`}
-            >
-              {parent.email}
-            </a>
+            <KeyValue label="Email">
+              <a className="break-all text-accent-ink underline" href={`mailto:${parent.email}`}>
+                {parent.email}
+              </a>
+            </KeyValue>
+          )}
+
+          {(parent.phone || parent.email) && (
+            <div className="mt-3 flex gap-2">
+              {parent.phone && (
+                <a href={telHref(parent.phone)} className={PRIMARY_ACTION}>
+                  <PhoneIcon className="h-4 w-4" aria-hidden="true" />
+                  Call
+                </a>
+              )}
+              {parent.email && (
+                <a href={`mailto:${parent.email}`} className={GHOST_ACTION}>
+                  <MailIcon className="h-4 w-4" aria-hidden="true" />
+                  Email
+                </a>
+              )}
+            </div>
           )}
         </div>
       ))}
@@ -281,15 +299,11 @@ function FooterActions({ player, canEdit, onEdit, onDeleted }) {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState(null)
 
-  if (!canEdit) {
-    return (
-      <div className="mt-5">
-        <ScopeNote tone="parent">
-          <b>Read-only.</b> Only a coach or club admin can change this player.
-        </ScopeNote>
-      </div>
-    )
-  }
+  // Nothing at all for someone who can't edit. Not being able to change a
+  // player is the expected, unremarkable state for almost everyone who opens
+  // this sheet; saying so in a banner every single time treats the normal
+  // case as an exception worth interrupting for.
+  if (!canEdit) return null
 
   function handleDelete() {
     setDeleting(true)
@@ -373,18 +387,25 @@ export default function PlayerDetail({ player, team, onClose, canEdit = false, o
           suffixed a captain's name with "©"; that glyph is announced as
           "copyright" by screen readers and carries no meaning on its own, so
           captaincy is stated in the Role row below instead. */}
-      <div className="-mx-[18px] -mt-4 mb-4 bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] px-[18px] py-[22px] text-white">
-        <PlayerAvatar player={player} size="lg" className="mb-3" />
-        <h3 className="text-[22px] font-bold leading-tight">{player.full_name}</h3>
-        <p className="mt-1 text-sm font-semibold text-white/[.85]">
-          {position} · {teamName}
-        </p>
-      </div>
-
-      <div className="mb-4">
-        <KeyValue label="Position">{position}</KeyValue>
-        <KeyValue label="Age group">{teamName}</KeyValue>
-        <KeyValue label="Role">{player.is_captain ? 'Captain' : 'Player'}</KeyValue>
+      <div className="-mx-[18px] -mt-4 mb-4 flex items-center gap-4 bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] px-[18px] py-[22px] text-white">
+        <PlayerAvatar player={player} size="xl" />
+        {/* min-w-0 so a long name truncates inside the flex row instead of
+            pushing the photo off the sheet. */}
+        <div className="min-w-0">
+          <h3 className="text-[22px] font-bold leading-tight">{player.full_name}</h3>
+          <p className="mt-1 text-sm font-semibold text-white/[.85]">{position}</p>
+          <p className="text-sm font-semibold text-white/[.85]">{teamName}</p>
+          {/* Captaincy used to live in a "Role" key/value row below, because
+              the prototype's "©" suffix is announced as "copyright" and means
+              nothing on its own. The row went with Position and Age group
+              when those moved up here; this keeps the fact visible and still
+              reads as a word rather than a glyph. */}
+          {player.is_captain && (
+            <span className="mt-2 inline-block rounded-pill bg-white/20 px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-[0.06em]">
+              Captain
+            </span>
+          )}
+        </div>
       </div>
 
       <ParentsBlock playerId={player.id} />

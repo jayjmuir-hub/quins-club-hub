@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
-import ScopeNote from '../components/ScopeNote.jsx'
 import Spinner from '../components/Spinner.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
@@ -445,15 +444,6 @@ export default function Dashboard() {
           the document outline intact for screen readers without changing the
           approved design. */}
       <h2 className="sr-only">Dashboard</h2>
-
-      {!admin && (
-        <ScopeNote tone={canEdit ? 'coach' : 'parent'}>
-          <b>
-            {roleLabel(memberships)} view{canEdit ? '' : ' · read-only'}.
-          </b>{' '}
-          You&apos;re seeing {teamNames || 'no squads'} — every other age group is hidden.
-        </ScopeNote>
-      )}
 
       {nextFixture && (
         <NextFixtureHero
