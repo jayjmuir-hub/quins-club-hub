@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 // Unit tests for src/App.jsx (Task 6: auth gate + routing; Task 8: shell
 // composition). useAuth and useMemberships are both mocked so this exercises
@@ -54,14 +55,24 @@ vi.mock('../src/data/events.js', () => ({
 vi.mock('../src/data/players.js', () => ({
   listPlayers: () => new Promise(() => {}),
   getPlayerContact: () => new Promise(() => {}),
+  // /admin/club (AdminClub) and the Accounts tab both read players.js.
+  listContactsForPlayers: () => new Promise(() => {}),
 }))
 
-// Same treatment for "/more", which renders the real Admin screen as of
-// Task 17. The Admin screen's own behaviour (the not-authorised gate,
-// loading/empty/error, teams/players/members) is covered by
-// tests/admin.test.jsx; here it only has to be the thing "/more" renders.
+// "/more" renders the real More screen (admin-dashboard plan, 2026-08-05),
+// which makes no query at all — these member mocks are here for the /admin
+// routes, whose Accounts tab is the real Accounts.jsx. Those screens' own
+// behaviour is covered by tests/more.test.jsx,
+// tests/admin-dashboard.test.jsx and tests/accounts.test.jsx; here they only
+// have to be the thing each route renders.
 vi.mock('../src/data/members.js', () => ({
   listClubMembers: () => new Promise(() => {}),
+  listPendingProfiles: () => new Promise(() => {}),
+  grantMemberships: () => new Promise(() => {}),
+  updateMembershipRole: () => new Promise(() => {}),
+  deleteMembership: () => new Promise(() => {}),
+  updateProfileName: () => new Promise(() => {}),
+  createInvite: () => new Promise(() => {}),
   // /accept-invite/:token (Task 18) renders the real AcceptInvite screen,
   // which calls this on mount. Never resolving keeps that test focused on
   // routing/reachability, not on AcceptInvite's own behaviour (covered by
@@ -73,14 +84,25 @@ vi.mock('../src/data/members.js', () => ({
   getMyProfile: () => new Promise(() => {}),
 }))
 
+// The Accounts tab's approval gate reads these on mount.
+vi.mock('../src/data/accessRequests.js', () => ({
+  listAccessRequests: () => new Promise(() => {}),
+  getMyAccessRequest: () => new Promise(() => {}),
+  createAccessRequest: () => new Promise(() => {}),
+  dismissAccessRequest: () => new Promise(() => {}),
+  restoreAccessRequest: () => new Promise(() => {}),
+}))
+
 // Import after vi.mock so this binds to the mocked modules.
 import App from '../src/App.jsx'
+
+const signOutMock = vi.fn()
 
 const signedIn = {
   session: { user: { id: 'u1' } },
   user: { id: 'u1', email: 'jay@example.com' },
   loading: false,
-  signOut: vi.fn(),
+  signOut: signOutMock,
 }
 const membershipsLoaded = {
   memberships: [{ role: 'admin', team_id: null }],
@@ -93,9 +115,22 @@ const membershipsLoaded = {
 beforeEach(() => {
   useAuthMock.mockReset()
   useMembershipsMock.mockReset()
+  signOutMock.mockReset()
+  signOutMock.mockResolvedValue(undefined)
   useMembershipsMock.mockReturnValue(membershipsLoaded)
   window.history.pushState({}, '', '/')
 })
+
+const PARENT = {
+  ...membershipsLoaded,
+  memberships: [{ role: 'parent', team_id: 'team-u10', player_id: 'p1' }],
+  teams: [{ id: 'team-u10', name: 'U10', sort_order: 5 }],
+}
+const COACH = {
+  ...membershipsLoaded,
+  memberships: [{ role: 'coach', team_id: 'team-u10' }],
+  teams: [{ id: 'team-u10', name: 'U10', sort_order: 5 }],
+}
 
 describe('App', () => {
   it('renders the Login screen when there is no session', () => {
@@ -134,26 +169,24 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: /roster/i })).toBeInTheDocument()
   })
 
-  it('renders the admin screen at /more when signed in as an admin', () => {
+  it('renders the More screen at /more when signed in', () => {
     window.history.pushState({}, '', '/more')
     useAuthMock.mockReturnValue(signedIn)
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /admin overview/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument()
   })
 
-  it('renders a not-authorised message at /more for a non-admin', () => {
+  it('renders the More screen at /more for a non-admin too, with no not-authorised card', () => {
     window.history.pushState({}, '', '/more')
     useAuthMock.mockReturnValue(signedIn)
-    useMembershipsMock.mockReturnValue({
-      ...membershipsLoaded,
-      memberships: [{ role: 'coach', team_id: 'team-u10' }],
-    })
+    useMembershipsMock.mockReturnValue(COACH)
 
     render(<App />)
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/not authorised/i)
+    expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument()
+    expect(screen.queryByText(/not authorised/i)).not.toBeInTheDocument()
   })
 
   it('redirects an unknown path to / when signed in', () => {
@@ -181,5 +214,95 @@ describe('App', () => {
 
     expect(screen.getByRole('status', { name: /accepting your invite/i })).toBeInTheDocument()
     expect(screen.queryByText(/isn't linked to a squad yet/i)).not.toBeInTheDocument()
+  })
+})
+
+// Routing for the back-end dashboard (admin-dashboard plan, 2026-08-05).
+// These go through the REAL router and the REAL screens, which is the only
+// place the redirects and the child-route mounting can be observed at all —
+// tests/admin-dashboard.test.jsx stubs the Accounts tab, so this is where
+// the real Accounts.jsx is proved reachable.
+describe('App — /admin', () => {
+  it('redirects bare /admin to the Accounts tab', () => {
+    window.history.pushState({}, '', '/admin')
+    useAuthMock.mockReturnValue(signedIn)
+
+    render(<App />)
+
+    expect(window.location.pathname).toBe('/admin/accounts')
+    expect(screen.getByRole('link', { name: 'Club' })).toBeInTheDocument()
+  })
+
+  it('mounts the real Accounts screen on the Accounts tab', () => {
+    window.history.pushState({}, '', '/admin/accounts')
+    useAuthMock.mockReturnValue(signedIn)
+
+    render(<App />)
+
+    // Accounts.jsx's own first-load spinner — a stub or a wrong mount would
+    // not produce it.
+    expect(screen.getByRole('status', { name: /loading accounts/i })).toBeInTheDocument()
+  })
+
+  it('mounts the Club tab at /admin/club', () => {
+    window.history.pushState({}, '', '/admin/club')
+    useAuthMock.mockReturnValue(signedIn)
+
+    render(<App />)
+
+    expect(screen.getByRole('status', { name: /loading the club overview/i })).toBeInTheDocument()
+  })
+
+  // Jay has /accounts bookmarked. It must land somewhere useful, not fall
+  // through the catch-all to the dashboard.
+  it('redirects the old /accounts URL to /admin/accounts', () => {
+    window.history.pushState({}, '', '/accounts')
+    useAuthMock.mockReturnValue(signedIn)
+
+    render(<App />)
+
+    expect(window.location.pathname).toBe('/admin/accounts')
+    expect(screen.getByRole('status', { name: /loading accounts/i })).toBeInTheDocument()
+  })
+
+  it('refuses /admin for a coach', () => {
+    window.history.pushState({}, '', '/admin/accounts')
+    useAuthMock.mockReturnValue(signedIn)
+    useMembershipsMock.mockReturnValue(COACH)
+
+    render(<App />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/not authorised/i)
+    expect(screen.queryByRole('link', { name: 'Club' })).not.toBeInTheDocument()
+  })
+
+  it('no longer resolves /overview', () => {
+    window.history.pushState({}, '', '/overview')
+    useAuthMock.mockReturnValue(signedIn)
+
+    render(<App />)
+
+    expect(window.location.pathname).toBe('/')
+    expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
+  })
+})
+
+// ⚠️ THE REGRESSION GUARD for this whole plan, end to end through the real
+// App: AppShell renders the app's only sign-out control on /more and nowhere
+// else, so any change that redirects /more into the admin-only /admin locks
+// every parent, player and coach out of signing out. A parent is used here
+// deliberately — the role with no management route to fall back on.
+describe('App — a parent can still sign out', () => {
+  it('signs out from /more', async () => {
+    const user = userEvent.setup()
+    window.history.pushState({}, '', '/more')
+    useAuthMock.mockReturnValue(signedIn)
+    useMembershipsMock.mockReturnValue(PARENT)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /sign out/i }))
+
+    expect(signOutMock).toHaveBeenCalledTimes(1)
   })
 })

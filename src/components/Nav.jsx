@@ -85,12 +85,15 @@ function linkClassName({ isActive }) {
   ].join(' ')
 }
 
-// `canManage` (admin OR coach) gates Overview; `canManageAccounts` (admin
-// only) gates Accounts. Deliberately two props rather than one: Accounts
-// edits roles and revokes access, which coaches must not reach, so reusing
-// canManage here would show a coach a link to a screen that then refuses
-// them — and would be one rename away from actually exposing it.
-export default function Nav({ canManage = false, canManageAccounts = false }) {
+// `canManageClub` (admin ONLY) gates the single Admin pill.
+//
+// This replaced two props (admin-dashboard plan, 2026-08-05): `canManage`
+// (admin OR coach) for an Overview pill, and `canManageAccounts` (admin
+// only) for an Accounts pill. /overview is deleted and /accounts now lives
+// as a tab inside /admin, so there is one destination and one gate. There is
+// deliberately no coach-visible pill here: everything behind /admin edits
+// roles and revokes access, which coaches must not reach.
+export default function Nav({ canManageClub = false }) {
   return (
     // The bar is dark chrome so the app is bookended in near-black — masthead
     // at the top, tab bar at the bottom, light content well between. The
@@ -112,31 +115,19 @@ export default function Nav({ canManage = false, canManageAccounts = false }) {
           <span>{label}</span>
         </NavLink>
       ))}
-      {canManage && (
+      {canManageClub && (
         <NavLink
-          to="/overview"
-          // Desktop-only regardless of canManage: `hidden` keeps it out of
-          // the mobile tab bar's grid-cols-4 layout entirely (display:none
+          to="/admin"
+          // Desktop-only regardless of canManageClub: `hidden` keeps it out
+          // of the mobile tab bar's grid-cols-4 layout entirely (display:none
           // removes it from grid flow, so the bar still shows exactly 4
           // visible cells on phone), `desktop:flex` brings it back as a
           // fifth pill in the desktop row, matching every other item's
-          // `desktop:flex-row` shape from linkClassName.
+          // `desktop:flex-row` shape from linkClassName. Managing the club is
+          // a sit-down-at-a-laptop task, not a pitch-side one.
           className={(state) => `${linkClassName(state)} hidden desktop:flex`}
         >
-          <span>Overview</span>
-        </NavLink>
-      )}
-      {canManageAccounts && (
-        <NavLink
-          to="/accounts"
-          // Desktop-only for the same reason as Overview above: `hidden`
-          // keeps it out of the mobile tab bar's grid-cols-4 layout entirely,
-          // `desktop:flex` brings it back as another pill in the desktop row.
-          // Managing accounts is a sit-down-at-a-laptop task, not a
-          // pitch-side one.
-          className={(state) => `${linkClassName(state)} hidden desktop:flex`}
-        >
-          <span>Accounts</span>
+          <span>Admin</span>
         </NavLink>
       )}
     </nav>

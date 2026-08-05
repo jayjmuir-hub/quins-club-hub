@@ -272,6 +272,29 @@ describe('AppShell', () => {
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
   })
 
+  // ⚠️ The regression guard for the admin-dashboard plan. /more used to be
+  // an admin-only screen, and the temptation when building /admin is to
+  // redirect /more into it — which would take the ONLY sign-out control in
+  // the app away from every parent, player and coach. A parent, specifically,
+  // because they are the role with no management route to fall back on.
+  // tests/app.test.jsx proves the same thing through the real App and router.
+  it('a parent can sign out from the More route', async () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({
+        memberships: [{ role: 'parent', team_id: 't1', player_id: 'p1' }],
+        teams: [{ id: 't1', name: 'U12 Boys', sort_order: 4 }],
+      }),
+    )
+    signOutMock.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+
+    renderShell('/more', <h1>More</h1>)
+
+    await user.click(screen.getByRole('button', { name: /sign out/i }))
+
+    expect(signOutMock).toHaveBeenCalledTimes(1)
+  })
+
   it('does not show a More sign-out control on other routes', () => {
     useMembershipsMock.mockReturnValue(loaded())
 
@@ -281,16 +304,32 @@ describe('AppShell', () => {
   })
 })
 
-describe('AppShell — Overview nav gating (Task 4)', () => {
-  it('passes canManage=true to Nav for an admin', () => {
+describe('AppShell — Admin nav gating (admin-dashboard plan, 2026-08-05)', () => {
+  it('passes canManageClub=true to Nav for an admin', () => {
     useMembershipsMock.mockReturnValue(loaded())
 
     renderShell()
 
-    expect(screen.getByRole('link', { name: 'Overview' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/admin')
   })
 
-  it('does not pass canManage=true for a parent', () => {
+  // The old `canManage` was admin OR coach, because it gated /overview.
+  // /overview is gone and /admin is admin-only, so a coach now gets no
+  // management pill at all.
+  it('does not offer the Admin pill to a coach', () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({
+        memberships: [{ role: 'coach', team_id: 't1' }],
+        teams: [{ id: 't1', name: 'U12 Boys', sort_order: 4 }],
+      }),
+    )
+
+    renderShell()
+
+    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument()
+  })
+
+  it('does not offer the Admin pill to a parent', () => {
     useMembershipsMock.mockReturnValue(
       loaded({
         memberships: [{ role: 'parent', team_id: 't1', player_id: 'p1' }],
@@ -300,6 +339,15 @@ describe('AppShell — Overview nav gating (Task 4)', () => {
 
     renderShell()
 
+    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument()
+  })
+
+  it('offers no Overview or Accounts pill to anyone any more', () => {
+    useMembershipsMock.mockReturnValue(loaded())
+
+    renderShell()
+
     expect(screen.queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Accounts' })).not.toBeInTheDocument()
   })
 })

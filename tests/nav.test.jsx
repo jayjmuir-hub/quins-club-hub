@@ -71,44 +71,36 @@ describe('Nav', () => {
   })
 })
 
-describe('Nav — Overview link (Task 4)', () => {
-  it('does not render an Overview link when canManage is false (default)', () => {
+// One Admin pill replaces the old pair (admin-dashboard plan, 2026-08-05):
+// the Overview pill (admin OR coach, gated on `canManage`) and the Accounts
+// pill (admin only, gated on `canManageAccounts`). /overview is deleted and
+// /accounts is now a tab inside /admin, so there is one destination and one
+// gate. NAV_ITEMS is deliberately still exactly four — the Admin pill is a
+// conditional desktop-only extra, not a tab-bar item, so the "exactly Home,
+// Schedule, Roster, More" assertion above still holds.
+describe('Nav — Admin pill', () => {
+  it('does not render an Admin link when canManageClub is false (default)', () => {
     renderNav()
-    expect(screen.queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument()
   })
 
-  it('renders an Overview link, hidden on mobile, when canManage is true', () => {
-    renderNav('/', { canManage: true })
+  it('renders an Admin link, hidden on mobile, when canManageClub is true', () => {
+    renderNav('/', { canManageClub: true })
 
-    const link = screen.getByRole('link', { name: 'Overview' })
+    const link = screen.getByRole('link', { name: 'Admin' })
     expect(link).toBeInTheDocument()
-    expect(link).toHaveAttribute('href', '/overview')
+    expect(link).toHaveAttribute('href', '/admin')
     expect(link.className).toMatch(/\bhidden\b/)
     expect(link.className).toMatch(/desktop:flex/)
   })
-})
 
-// Accounts is admin-only, unlike Overview (admin OR coach), so it gets its
-// own prop. NAV_ITEMS is deliberately still exactly four — like Overview,
-// Accounts is a conditional desktop-only extra rather than a tab-bar item,
-// so the "exactly Home, Schedule, Roster, More" assertion above still holds.
-describe('Nav — Accounts link (design spec 2026-08-03 §2)', () => {
-  it('does not render an Accounts link by default', () => {
-    renderNav()
+  // The two retired pills. Nothing should be able to bring them back by
+  // passing the old prop names — a stale caller must render no pill at all
+  // rather than silently linking to a route that no longer exists.
+  it('never renders an Overview or Accounts pill, whatever props are passed', () => {
+    renderNav('/', { canManage: true, canManageAccounts: true, canManageClub: true })
+
+    expect(screen.queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Accounts' })).not.toBeInTheDocument()
-  })
-
-  it('does not render an Accounts link for a coach (canManage alone is not enough)', () => {
-    renderNav('/', { canManage: true })
-    expect(screen.queryByRole('link', { name: 'Accounts' })).not.toBeInTheDocument()
-  })
-
-  it('renders an Accounts link, hidden on mobile, when canManageAccounts is true', () => {
-    renderNav('/', { canManage: true, canManageAccounts: true })
-
-    const link = screen.getByRole('link', { name: 'Accounts' })
-    expect(link).toHaveAttribute('href', '/accounts')
-    expect(link.className).toMatch(/\bhidden\b/)
-    expect(link.className).toMatch(/desktop:flex/)
   })
 })
