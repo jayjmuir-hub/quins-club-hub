@@ -69,6 +69,30 @@ const DAY = 24 * 60 * 60 * 1000
 
 const days = (n) => new Date(Date.now() + n * DAY).toISOString()
 
+// The displayed month follows the CLUB's today (Abu Dhabi), not the runner's.
+// Those differ for the last four hours of every UTC day, so deriving the
+// expectation from `new Date()` would flake nightly. Computed independently of
+// src/lib/eventFormat.js, so the assertions are not just the implementation
+// agreeing with itself.
+//
+// At module scope rather than inside one describe: both the calendar-tab suite
+// and the day-sheet suite need it, and a second copy is a thing that drifts.
+const dubaiToday = () => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Dubai',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(new Date())
+  const get = (type) => Number(parts.find((part) => part.type === type).value)
+  return { year: get('year'), month: get('month') - 1, day: get('day') }
+}
+
+// Month names are read off a UTC-anchored instant so they never depend on the
+// process zone either.
+const monthName = (year, month) =>
+  new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', month: 'long' }).format(Date.UTC(year, month, 1))
+
 const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
 const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
 const TEAMS = [TEAM_FIRST_XV, TEAM_U10] // deliberately unsorted; visibleTeams sorts
@@ -347,21 +371,9 @@ describe('Schedule — calendar tab', () => {
   // deriving the expectation from `new Date()` would flake nightly. This
   // computes the reference independently of src/lib/eventFormat.js, so the
   // assertions are not just the implementation agreeing with itself.
-  const dubaiToday = () => {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Dubai',
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-    }).formatToParts(new Date())
-    const get = (type) => Number(parts.find((part) => part.type === type).value)
-    return { year: get('year'), month: get('month') - 1, day: get('day') }
-  }
-
-  // Month names are read off a UTC-anchored instant so they never depend on
-  // the process zone either.
-  const monthName = (year, month) =>
-    new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', month: 'long' }).format(Date.UTC(year, month, 1))
+  // dubaiToday() and monthName() now live at module scope (search upward for
+  // them) so the day-sheet suite can use the same reference implementation
+  // rather than keeping a second copy in step by hand.
 
   const monthLabel = (offset = 0) => {
     const { year, month } = dubaiToday()
@@ -594,6 +606,96 @@ describe('Schedule — calendar tab', () => {
     await user.click(screen.getByRole('button', { name: 'Calendar' }))
 
     expect(screen.queryByRole('button', { name: 'All' })).not.toBeInTheDocument()
+  })
+})
+
+// Task 23. Tapping a cell used to open dayEvents[0] and swallow the rest;
+// empty cells did nothing at all. These prove the sheet that replaced that.
+describe('Schedule — calendar day sheet (Task 23)', () => {
+  // Mid-month so the fixtures can never roll into a neighbouring month and
+  // turn one of these into an accidental month-boundary test.
+  const dayAt = (hour = 13) => {
+    const { year, month } = dubaiToday()
+    return { year, month, iso: new Date(Date.UTC(year, month, 15, hour - 4)).toISOString() }
+  }
+
+  const openDay = async (user, dayNumber, name) => {
+    await user.click(screen.getByRole('button', { name: 'Calendar' }))
+    await user.click(screen.getByRole('button', { name: new RegExp(`^${dayNumber} ${name},`) }))
+  }
+
+  it('lists EVERY event on a day, not just the first', async () => {
+    const { year, month, iso } = dayAt(13)
+    listEventsMock.mockResolvedValue([
+      { ...UPCOMING_MATCH, id: 'e1', starts_at: iso, opponent: 'Dubai Exiles' },
+      { ...UPCOMING_MATCH, id: 'e2', starts_at: iso, opponent: 'Al Ain Amblers' },
+      { ...UPCOMING_MATCH, id: 'e3', starts_at: iso, opponent: 'Bahrain' },
+    ])
+
+    const { user } = setup()
+    await screen.findAllByText(/Dubai Exiles/)
+    await openDay(user, 15, monthName(year, month))
+
+    // Scoped to the sheet on purpose. The month's fixture list under the grid
+    // also names every event, so an unscoped query would pass even if the
+    // sheet rendered nothing at all.
+    const sheet = within(await screen.findByRole('dialog'))
+
+    // The regression this feature fixes: two of these three were previously
+    // unreachable from the calendar, despite their dots being drawn.
+    expect(sheet.getByText(/Dubai Exiles/)).toBeInTheDocument()
+    expect(sheet.getByText(/Al Ain Amblers/)).toBeInTheDocument()
+    expect(sheet.getByText(/Bahrain/)).toBeInTheDocument()
+  })
+
+  it('opens on an EMPTY day too, and offers to add an event there', async () => {
+    const { year, month } = dubaiToday()
+    listEventsMock.mockResolvedValue([])
+
+    const { user } = setup()
+    await user.click(await screen.findByRole('button', { name: 'Calendar' }))
+    await user.click(screen.getByRole('button', { name: new RegExp(`^15 ${monthName(year, month)}, no events`) }))
+
+    // Scoped: the screen header carries its own Add event button, so an
+    // unscoped query would pass whether or not the sheet offered one.
+    const sheet = within(await screen.findByRole('dialog'))
+    expect(sheet.getByText('Nothing on this day.')).toBeInTheDocument()
+    expect(sheet.getByRole('button', { name: 'Add event' })).toBeInTheDocument()
+  })
+
+  it('does not offer Add event to someone who cannot manage fixtures', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    const { year, month } = dubaiToday()
+    listEventsMock.mockResolvedValue([])
+
+    const { user } = setup()
+    await user.click(await screen.findByRole('button', { name: 'Calendar' }))
+    await user.click(screen.getByRole('button', { name: new RegExp(`^15 ${monthName(year, month)}, no events`) }))
+
+    // The sheet still opens — a parent may legitimately want to see what is
+    // on. What they must not get is the way to write to it.
+    const sheet = within(await screen.findByRole('dialog'))
+    expect(sheet.getByText('Nothing on this day.')).toBeInTheDocument()
+    expect(sheet.queryByRole('button', { name: 'Add event' })).not.toBeInTheDocument()
+  })
+
+  it('prefills the event form with the day that was tapped', async () => {
+    const { year, month } = dubaiToday()
+    listEventsMock.mockResolvedValue([])
+
+    const { user } = setup()
+    await user.click(await screen.findByRole('button', { name: 'Calendar' }))
+    await user.click(screen.getByRole('button', { name: new RegExp(`^15 ${monthName(year, month)}, no events`) }))
+    const sheet = within(await screen.findByRole('dialog'))
+    await user.click(sheet.getByRole('button', { name: 'Add event' }))
+
+    // The whole point of opening the form from a cell: the date is already
+    // known, so the user should never have to retype it. Asserted as the
+    // CLUB's 15th — a form that defaulted to today, or that let the browser
+    // zone shift the day, fails here.
+    const pad = (n) => String(n).padStart(2, '0')
+    const dateField = await screen.findByLabelText(/date/i)
+    expect(dateField).toHaveValue(`${year}-${pad(month + 1)}-15`)
   })
 })
 

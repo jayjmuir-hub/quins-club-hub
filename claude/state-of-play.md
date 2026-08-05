@@ -20,13 +20,20 @@ the current phase — usability work driven by Jay actually using it, not new in
 ⚠️ **AUTH EMAIL IS DEAD.** Not degraded — nothing is delivered at all. See below.
 **DO NOT INVITE THE COMMITTEE.**
 
-⚠️ **The deployed `send-email` Edge Function is NOT in git.** Supabase has the Microsoft
-Graph version; `origin/build/v1-mvp` still has the Resend version (`df03d67`). The repo is
-the one that is wrong. Recovery instructions in
-`claude/decisions/2026-08-05-microsoft-graph-and-5.7.708.md`.
+~~The deployed `send-email` Edge Function is NOT in git.~~ **Resolved 5 Aug (`a9e8492`)** —
+the deployed Microsoft Graph version was pulled verbatim from Supabase and committed. Both
+fixes (`v1,whsec_` and `/auth/v1`) are in the repo. Recovery procedure, should it drift
+again, is in `claude/decisions/2026-08-05-microsoft-graph-and-5.7.708.md`.
 
-**940 tests passing, build clean**, on `build/v1-mvp`. Netlify auto-deploys on push to that
+**944 tests passing, build clean**, on `build/v1-mvp`. Netlify auto-deploys on push to that
 branch. `main` holds only the initial scaffold commit.
+
+⚠️ **`NODE_ENV=production` is set machine-wide on BOTH PCs, not just cafnet.** Confirmed on
+`jay-pc` 5 Aug 2026. A plain `npm install` on either machine silently drops dev dependencies
+including vitest — the symptom is `'vite' is not recognized`. **Always
+`npm install --include=dev`.** Vitest itself is handled in `vite.config.js`; this one cannot
+be. Also on jay-pc: PowerShell's execution policy blocks `npm.ps1`, so run npm from `cmd`,
+not PowerShell.
 
 ## Shipped 4 Aug 2026
 
