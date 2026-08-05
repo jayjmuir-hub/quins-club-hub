@@ -6,14 +6,20 @@
 // way — this hook approach sends over plain HTTPS, no SMTP credentials
 // anywhere.
 //
-// PROVIDER: Resend, via a single HTTPS POST with an API key
-// (`Authorization: Bearer re_...`). Decided 5 Aug 2026, reversing the
-// 4 Aug decision to run this through Microsoft Graph on a new tenant — see
-// claude/decisions/2026-08-05-resend.md for the reasoning and what was
-// dropped. This used to call Microsoft Graph (`getToken` + `sendMail`
-// against `login.microsoftonline.com` / `graph.microsoft.com`); if you're
-// reading old context that mentions `MS_TENANT_ID` / `MS_CLIENT_ID` /
-// `MS_CLIENT_SECRET`, that's why — those env vars are gone.
+// PROVIDER: Microsoft Graph `sendMail`, with an OAuth client-credentials
+// token. Decided 5 Aug 2026, reversing that morning's switch to Resend — Jay
+// bought Microsoft 365 for this domain, so club mailboxes and app mail now
+// live in one place. Tenant `quinsclubhub.onmicrosoft.com`; the app
+// registration is "Quins Club Hub — auth email" with Mail.Send granted as an
+// APPLICATION permission.
+//
+// WARNING: MS_CLIENT_SECRET EXPIRES 4 Aug 2028. When it lapses the symptom is
+// that nobody can sign in, with no error surfaced anywhere useful. Check for
+// `invalid_client` from the token call before looking anywhere else.
+//
+// WARNING: Mail.Send as an application permission lets this app send as ANY
+// mailbox in the tenant. It MUST stay scoped by New-ApplicationAccessPolicy
+// to noreply@adhquins-clubhub.com alone.
 //
 // It also removes the reason this was urgent: Supabase's built-in email
 // service is capped at 2 messages per hour with no delivery SLA, which cannot
@@ -27,7 +33,9 @@
 // mail — fail closed, always.
 
 const HOOK_SECRET = Deno.env.get('SEND_EMAIL_HOOK_SECRET') ?? ''
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
+const TENANT = Deno.env.get('MS_TENANT_ID') ?? ''
+const CLIENT_ID = Deno.env.get('MS_CLIENT_ID') ?? ''
+const CLIENT_SECRET = Deno.env.get('MS_CLIENT_SECRET') ?? ''
 const MAIL_FROM = Deno.env.get('MAIL_FROM') ?? ''
 const REPLY_TO = Deno.env.get('REPLY_TO') ?? ''
 
@@ -111,37 +119,57 @@ async function verify(request: Request, body: string): Promise<boolean> {
     .some((candidate) => timingSafeEqual(candidate, expected))
 }
 
-/* ---------------- Resend ---------------- */
+/* ---------------- Microsoft Graph ---------------- */
+
+async function getToken(): Promise<string> {
+  const response = await fetch(`https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      scope: 'https://graph.microsoft.com/.default',
+      grant_type: 'client_credentials',
+    }),
+  })
+
+  const data = await response.json()
+  if (!response.ok || !data.access_token) {
+    // Deliberately does not log the body — it can echo parts of the secret.
+    // The error code alone diagnoses it:
+    //   invalid_client      -> wrong or EXPIRED secret (expires 4 Aug 2028)
+    //   unauthorized_client -> admin consent was never granted
+    throw new Error(`Graph token request failed (${response.status}): ${data.error ?? 'unknown'}`)
+  }
+  return data.access_token
+}
 
 async function sendMail(to: string, subject: string, html: string): Promise<void> {
-  const body: Record<string, unknown> = {
-    from: MAIL_FROM,
-    to: [to],
+  const token = await getToken()
+
+  const message: Record<string, unknown> = {
     subject,
-    html,
+    body: { contentType: 'HTML', content: html },
+    toRecipients: [{ emailAddress: { address: to } }],
   }
   // Optional: without it, a reply to a sign-in email vanishes into a mailbox
   // nobody reads, which is worse than no reply address at all.
-  if (REPLY_TO) body.reply_to = REPLY_TO
+  if (REPLY_TO) message.replyTo = [{ emailAddress: { address: REPLY_TO } }]
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(MAIL_FROM)}/sendMail`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, saveToSentItems: false }),
     },
-    body: JSON.stringify(body),
-  })
+  )
 
   if (!response.ok) {
-    // Deliberately does not log the body on 401/403 — a misconfigured key
-    // can otherwise echo account details into logs. The status alone
-    // diagnoses it:
-    //   401 -> wrong or revoked RESEND_API_KEY
-    //   403 -> MAIL_FROM's domain isn't verified in Resend yet
-    //   422 -> malformed request (bad address, missing field)
-    //   429 -> the free-tier rate limit (100/day) was hit
-    throw new Error(`Resend sendMail failed (${response.status}): ${await response.text()}`)
+    //   401 -> token rejected
+    //   403 -> ApplicationAccessPolicy excludes MAIL_FROM, or consent missing
+    //   404 -> the MAIL_FROM mailbox does not exist in this tenant
+    throw new Error(`Graph sendMail failed (${response.status}): ${await response.text()}`)
   }
 }
 
@@ -193,8 +221,18 @@ function render(email: string, data: EmailData): { subject: string; html: string
   // The hook hands over a token_hash, not a finished link — the URL has to be
   // assembled here. Getting this wrong produces an email whose button silently
   // fails, so it is built once, in one place.
+  //
+  // BUG FIXED 5 Aug 2026: `site_url` arrives with `/auth/v1` ALREADY on the
+  // end, so appending `/auth/v1/verify` produced `/auth/v1/auth/v1/verify`.
+  // That path misses the API gateway's route exemption for verify links, so
+  // instead of signing anyone in it answered
+  //   {"message":"No API key found in request"}
+  // Every sign-in email sent between the hook going live and this fix had a
+  // dead button. Normalise the base first so it is correct whichever shape
+  // Supabase sends.
+  const base = data.site_url.replace(/\/+$/, '').replace(/\/auth\/v1$/, '')
   const verifyUrl =
-    `${data.site_url}/auth/v1/verify` +
+    `${base}/auth/v1/verify` +
     `?token=${encodeURIComponent(data.token_hash)}` +
     `&type=${encodeURIComponent(data.email_action_type)}` +
     `&redirect_to=${encodeURIComponent(data.redirect_to)}`
@@ -287,8 +325,8 @@ Deno.serve(async (request) => {
     })
   }
 
-  if (!RESEND_API_KEY || !MAIL_FROM) {
-    console.error('send-email: Resend is not configured')
+  if (!TENANT || !CLIENT_ID || !CLIENT_SECRET || !MAIL_FROM) {
+    console.error('send-email: Microsoft Graph is not configured')
     return new Response(
       JSON.stringify({ error: { message: 'Email is not configured.' } }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },

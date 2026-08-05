@@ -10,3 +10,8 @@ coverage
 screenshots
 preview.log
 _to_delete/
+
+# Ad-hoc base64 blobs used to move patches between the two PCs.
+# Never commit these - this repo is PUBLIC.
+_transfer.b64
+*.b64
