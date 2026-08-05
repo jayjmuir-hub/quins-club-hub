@@ -303,3 +303,23 @@ export function clubDateTimeInputs(date) {
     time: `${pad(f.hour)}:${pad(f.minute)}`,
   }
 }
+
+/**
+ * "Zayed Sports City, Abu Dhabi · Pitch 2" — where the event is, as one
+ * line, for the compact places that already showed the venue and have room
+ * for one string and not two (FixtureRow, Dashboard's hero, the schedule
+ * table's Venue cell).
+ *
+ * Returns '' when neither is set, so callers keep using the same
+ * `{line && ...}` guard they used for `event.venue` and an event with no
+ * venue renders exactly as it did before this existed. EventDetail
+ * deliberately does NOT use this — it has the room to show Venue and Pitch
+ * as separate labelled rows, which is more useful when you are standing in
+ * a car park looking for pitch 4.
+ */
+export function venueLine(event) {
+  const venue = (event?.venue ?? '').trim()
+  const pitch = (event?.pitch ?? '').trim()
+  if (venue && pitch) return `${venue} · ${pitch}`
+  return venue || pitch || ''
+}

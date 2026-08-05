@@ -8,6 +8,7 @@ import {
   resultLabel,
   resultOutcome,
   resultScore,
+  venueLine,
 } from '../lib/eventFormat.js'
 
 // Fixture / event row (design-system.md §4.13) — "the single most-reused
@@ -75,10 +76,10 @@ export function FixtureRow({ event, teamName, onSelect }) {
             <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
             {formatTime(date)}
           </span>
-          {event.venue && (
+          {venueLine(event) && (
             <span className="flex items-center gap-1">
               <PinIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              {event.venue}
+              {venueLine(event)}
             </span>
           )}
         </span>

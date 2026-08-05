@@ -297,6 +297,12 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
         </KeyValue>
         <KeyValue label="Age group">{team?.name ?? 'Not set'}</KeyValue>
         <KeyValue label="Venue">{event.venue || 'To be confirmed'}</KeyValue>
+        {/* Only when set. Unlike Venue, which falls back to "To be
+            confirmed" because every event has one somewhere, a pitch is
+            genuinely optional — a social has none, and every event created
+            before this column existed has none either. A row reading
+            "Pitch — " on all of them would be noise. */}
+        {event.pitch && <KeyValue label="Pitch">{event.pitch}</KeyValue>}
         {event.type === 'match' && event.competition && (
           <KeyValue label="Competition">{event.competition}</KeyValue>
         )}

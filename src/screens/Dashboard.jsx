@@ -17,6 +17,7 @@ import {
   formatTime,
   hasResult,
   sortByStart,
+  venueLine,
 } from '../lib/eventFormat.js'
 
 // Home / dashboard (design-system.md §5.1): scope note, next-fixture hero,
@@ -204,10 +205,10 @@ function NextFixtureHero({ event, teamName, now }) {
           <ClockIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
           {formatTime(date)}
         </span>
-        {event.venue && (
+        {venueLine(event) && (
           <span className="flex items-center gap-1.5">
             <PinIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-            {event.venue}
+            {venueLine(event)}
           </span>
         )}
         {/* The prototype's hero carries a .chip.home / .chip.away badge here

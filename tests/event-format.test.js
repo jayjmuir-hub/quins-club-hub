@@ -15,6 +15,7 @@ import {
   resultOutcome,
   resultScore,
   sortByStart,
+  venueLine,
 } from '../src/lib/eventFormat.js'
 
 // Direct tests for src/lib/eventFormat.js — pure, import-free helpers, so
@@ -501,5 +502,41 @@ describe('clubDateTimeInputs', () => {
   it('returns empty strings for a missing or unparseable date', () => {
     expect(clubDateTimeInputs(null)).toEqual({ date: '', time: '' })
     expect(clubDateTimeInputs(new Date('nope'))).toEqual({ date: '', time: '' })
+  })
+})
+
+// venueLine — "where is it", as one string, for the compact places that
+// already showed event.venue and have room for one line and not two.
+describe('venueLine', () => {
+  it('joins the venue and the pitch', () => {
+    expect(venueLine({ venue: 'Zayed Sports City', pitch: 'Pitch 2' })).toBe(
+      'Zayed Sports City · Pitch 2',
+    )
+  })
+
+  it('returns the venue unchanged when there is no pitch', () => {
+    // The compatibility case that matters: every event created before the
+    // pitch column existed has pitch undefined, and must render exactly as
+    // it did before.
+    expect(venueLine({ venue: 'Zayed Sports City' })).toBe('Zayed Sports City')
+    expect(venueLine({ venue: 'Zayed Sports City', pitch: null })).toBe('Zayed Sports City')
+    expect(venueLine({ venue: 'Zayed Sports City', pitch: '   ' })).toBe('Zayed Sports City')
+  })
+
+  it('returns the pitch alone when there is no venue', () => {
+    expect(venueLine({ venue: null, pitch: 'Pitch 2' })).toBe('Pitch 2')
+  })
+
+  it('returns an empty string when there is neither, so callers can guard on it', () => {
+    expect(venueLine({})).toBe('')
+    expect(venueLine({ venue: null, pitch: null })).toBe('')
+    expect(venueLine(null)).toBe('')
+    expect(venueLine(undefined)).toBe('')
+  })
+
+  it('trims, so a stray space cannot produce a dangling separator', () => {
+    expect(venueLine({ venue: '  Zayed Sports City ', pitch: ' Pitch 2 ' })).toBe(
+      'Zayed Sports City · Pitch 2',
+    )
   })
 })

@@ -135,6 +135,7 @@ function initialValues(event, editableTeams, initialDate = null) {
       teamId: fallbackTeamId,
       home: true,
       venue: DEFAULT_VENUE,
+      pitch: '',
       competition: '',
       resultUs: '',
       resultThem: '',
@@ -151,6 +152,7 @@ function initialValues(event, editableTeams, initialDate = null) {
     teamId: teamIds.includes(event.team_id) ? event.team_id : fallbackTeamId,
     home: event.home !== false,
     venue: event.venue ?? '',
+    pitch: event.pitch ?? '',
     competition: event.competition ?? '',
     resultUs: event.result_us == null ? '' : String(event.result_us),
     resultThem: event.result_them == null ? '' : String(event.result_them),
@@ -198,6 +200,26 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
   const [repeatDays, setRepeatDays] = useState([])
   const [repeatUntil, setRepeatUntil] = useState('')
   const [excluded, setExcluded] = useState([])
+
+  // --- Extra age groups (create-time only) ---------------------------
+  // Squads BESIDES the one in the Age group dropdown that should get their
+  // own copy of this session. Deliberately modelled as "the primary squad
+  // plus extras" rather than as one flat multi-select: the dropdown stays
+  // exactly what it was, so every existing caller and test of the Age group
+  // field is untouched, and the asymmetry is honest about what actually
+  // happens — each squad gets a SEPARATE, independent event row.
+  //
+  // Why separate rows and not one event with many teams: team_id drives RLS
+  // on `events` AND on `availability` (which reaches through to
+  // events.team_id to decide who may read an RSVP), plus listEvents' team
+  // filter, the calendar feed, Schedule, Dashboard and FixtureRow. A
+  // many-to-many event would be a rewrite of the read path and of the
+  // security boundary; a fan-out is additive and changes neither.
+  //
+  // The cost of that choice, stated plainly: a score or a venue change is
+  // one edit per squad. group_id exists so "apply to every squad in this
+  // session" can be added later without a migration.
+  const [extraTeamIds, setExtraTeamIds] = useState([])
   // Guards against a double submit landing two inserts: `saving` state is
   // async, this is not.
   const inFlight = useRef(false)
@@ -256,6 +278,22 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
     ? values.teamId
     : editableTeams[0]?.id ?? ''
 
+  // The squads offered as extras: everything editable except the one already
+  // chosen in the dropdown. Recomputed from `teamId` every render, so moving
+  // the dropdown to a squad that was ticked as an extra cannot leave it
+  // counted twice.
+  const otherTeams = editing ? [] : editableTeams.filter((team) => team.id !== teamId)
+  const extras = extraTeamIds.filter((id) => otherTeams.some((team) => team.id === id))
+  // Primary first, then extras in the club's sort order — the row order the
+  // insert will use, so what the button counts is what gets written.
+  const targetTeamIds = [teamId, ...otherTeams.filter((t) => extras.includes(t.id)).map((t) => t.id)]
+  const multiSquad = targetTeamIds.length > 1
+
+  const toggleExtraTeam = (id) =>
+    setExtraTeamIds((current) =>
+      current.includes(id) ? current.filter((existing) => existing !== id) : [...current, id],
+    )
+
   // A user with nothing they can edit should not be shown a form whose Save
   // button the database is guaranteed to refuse. This is defensive — every
   // entry point already gates on the same check — so it explains rather than
@@ -302,19 +340,53 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
       return
     }
 
-    const team = editableTeams.find((candidate) => candidate.id === teamId)
-    const payload = {
-      ...(editing ? { id: event.id } : null),
-      ...(team?.club_id ? { club_id: team.club_id } : null),
-      team_id: teamId,
+    // ⚠️ THE ROW-COUNT GUARD. Extra squads and repeating are each row
+    // multipliers; together they multiply each other. A term of Tuesday
+    // training across 15 squads is ~1,500 rows from one form submission,
+    // with no undo built. Refuse the combination outright rather than
+    // capping or truncating — the same reasoning as generateSeriesDates
+    // throwing on a range over a year instead of quietly writing less than
+    // was asked for. The Repeats section also says so on screen before the
+    // user gets here; this is the guard, that is the courtesy.
+    if (multiSquad && repeating) {
+      setError(
+        new Error(
+          'Repeating is one age group at a time. Untick the extra age groups, or clear the repeat.',
+        ),
+      )
+      return
+    }
+
+    // Everything except the squad-specific bits. Built once and stamped per
+    // team below, so a fanned-out session cannot end up with a different
+    // venue or kick-off time on one squad's copy than on another's.
+    const common = {
       type: values.type,
       title: isMatch ? null : values.title.trim(),
       opponent: isMatch ? values.opponent.trim() : null,
       home: isMatch ? values.home : null,
       venue: values.venue.trim() || null,
+      pitch: values.pitch.trim() || null,
       competition: isMatch ? values.competition.trim() || null : null,
       starts_at,
       ...(isMatch ? parseScore(values.resultUs, values.resultThem) : { result_us: null, result_them: null }),
+    }
+
+    // club_id comes from the team being written to, not from the primary
+    // squad, so a fan-out stays correct if the club ever holds more than one
+    // club_id (see the single-club assumption logged in state-of-play.md).
+    const rowFor = (id) => {
+      const team = editableTeams.find((candidate) => candidate.id === id)
+      return {
+        ...(team?.club_id ? { club_id: team.club_id } : null),
+        ...common,
+        team_id: id,
+      }
+    }
+
+    const payload = {
+      ...(editing ? { id: event.id } : null),
+      ...rowFor(teamId),
     }
 
     inFlight.current = true
@@ -332,13 +404,22 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
     // and on the jsdom global in the test runner, and a fallback that
     // silently produced a non-unique id would defeat the point of the column.
     const seriesId = repeating ? crypto.randomUUID() : null
+    // Same rule, same reason, for the multi-squad fan-out: ONE group_id read
+    // once outside the map. Per-row ids would give three one-squad "groups"
+    // that look identical in the schedule and are useless to the feature the
+    // column exists for. The two are mutually exclusive by the guard above,
+    // so a row never carries both.
+    const groupId = multiSquad ? crypto.randomUUID() : null
+
     const rows = repeating
       ? seriesDates.map((date) => ({
           ...payload,
           starts_at: clubWallTimeToUtc(date, values.time),
           series_id: seriesId,
         }))
-      : null
+      : multiSquad
+        ? targetTeamIds.map((id) => ({ ...rowFor(id), group_id: groupId }))
+        : null
 
     // onSaved's contract stays "one saved event" — every caller uses it as a
     // refresh trigger and ignores the argument, and widening it to an array
@@ -489,6 +570,17 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
               className={inputClasses(false)}
             />
 
+            {/* Said here, before submit, because the refusal on Save is
+                otherwise a surprise arriving after the work of ticking
+                things. The submit-time check in handleSubmit is the actual
+                guard — this is the warning. */}
+            {multiSquad && (
+              <p className="mt-2 rounded-[9px] bg-warn-bg px-3 py-2 text-[12.5px] text-ink">
+                Repeating is one age group at a time. Untick the extra age groups below to repeat
+                this one.
+              </p>
+            )}
+
             {repeatDays.length === 0 || !repeatUntil ? (
               <p className="mt-2 text-[12.5px] text-ink-muted">
                 Pick the days it runs on and a date to run until, and you&apos;ll get one event for
@@ -557,6 +649,46 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
           </select>
         </div>
 
+        {/* Extra age groups. Create-time only, and only when there is
+            actually another squad to offer — a coach of one squad never sees
+            this at all. Each ticked squad gets its OWN event row, sharing a
+            group_id; nothing here makes one event belong to several teams.
+            Same chip styling as the Repeats weekdays, so the two
+            row-multiplying controls on this form look like each other. */}
+        {otherTeams.length > 0 && (
+          <fieldset className={FIELD}>
+            <legend className={LABEL}>Also add for</legend>
+            <div className="flex flex-wrap gap-2">
+              {otherTeams.map((team) => {
+                const on = extras.includes(team.id)
+                return (
+                  <label key={team.id}>
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => toggleExtraTeam(team.id)}
+                      className="peer sr-only"
+                    />
+                    <span
+                      className={[
+                        'block cursor-pointer select-none rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2',
+                        on ? SEG_OPTION_ON : SEG_OPTION_OFF,
+                      ].join(' ')}
+                    >
+                      {team.name}
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+            <p className="mt-2 text-[12.5px] text-ink-muted">
+              {multiSquad
+                ? `Each age group gets its own event — ${targetTeamIds.length} in total. Change one later and the others stay as they are.`
+                : 'Tick any other age groups joining this session. Each gets its own event.'}
+            </p>
+          </fieldset>
+        )}
+
         {isMatch && (
           <Segmented
             legend="Home or away"
@@ -580,6 +712,26 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
             value={values.venue}
             onChange={setFromInput('venue')}
             placeholder={DEFAULT_VENUE}
+            className={inputClasses(false)}
+          />
+        </div>
+
+        {/* Pitch. Free text, like Venue, and for the same reason: there is
+            no pitches table and this deliberately does not invent one. A
+            managed list would be worth having the day someone wants clash
+            detection ("Pitch 2 already has U12 at 18:00"), which needs a
+            controlled vocabulary to compare against — free text cannot do
+            it. Until then a text box costs one nullable column. */}
+        <div className={FIELD}>
+          <label className={LABEL} htmlFor="event-pitch">
+            Pitch
+          </label>
+          <input
+            id="event-pitch"
+            type="text"
+            value={values.pitch}
+            onChange={setFromInput('pitch')}
+            placeholder="e.g. Pitch 2"
             className={inputClasses(false)}
           />
         </div>
@@ -662,7 +814,11 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
                 ? // Naming the number on the button is the last chance to
                   // notice that "until 2036" produced 500 rows.
                   `Add ${seriesDates.length} ${seriesDates.length === 1 ? 'event' : 'events'}`
-                : 'Add event'}
+                : multiSquad
+                  ? // Same reason: the last chance to notice that five squads
+                    // are ticked, not the two that were meant.
+                    `Add ${targetTeamIds.length} events`
+                  : 'Add event'}
         </button>
       </form>
     </Sheet>

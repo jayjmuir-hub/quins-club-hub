@@ -8,6 +8,7 @@ import {
   hasResult,
   resultOutcome,
   resultScore,
+  venueLine,
 } from '../lib/eventFormat.js'
 
 // The desktop schedule table (desktop-spec.md §5.2). Rendered at `wide`
@@ -169,7 +170,7 @@ export default function ScheduleTable({ events, teamsById, onSelect, emptyMessag
                   </td>
 
                   <td className={`${CELL} text-ink-muted`}>
-                    {event.venue || <span className="text-ink-faint">—</span>}
+                    {venueLine(event) || <span className="text-ink-faint">—</span>}
                   </td>
 
                   <td className={`${CELL} whitespace-nowrap`}>
