@@ -1,9 +1,15 @@
 import { useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
-import { upsertEvent } from '../data/events.js'
+import { insertEvents, upsertEvent } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { clubDateTimeInputs, clubToday, clubWallTimeToUtc, eventDate } from '../lib/eventFormat.js'
+import {
+  WEEKDAYS,
+  generateSeriesDates,
+  parseDateInput,
+  weekdayOf,
+} from '../lib/recurrence.js'
 
 // The event add/edit form (design-system.md §5.6), opened in the shared
 // Sheet from Schedule's "Add event" button and from EventDetail's "Edit".
@@ -49,6 +55,23 @@ const DEFAULT_VENUE = 'Zayed Sports City, Abu Dhabi'
 
 function inputClasses(invalid) {
   return [INPUT_BASE, invalid ? 'border-brand-deep' : 'border-line'].join(' ')
+}
+
+// "Tue 11 Aug" for one generated date. Built from the parsed numbers and a
+// literal month list rather than toLocaleDateString, for the same reason the
+// generator itself avoids Date: a preview row must name the club's day, not
+// the reader's, and here there is no instant to attach a timeZone option to
+// — the value is a bare calendar date, which is exactly what we want to show.
+const MONTH_LABELS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]
+
+function seriesDateLabel(value) {
+  const parts = parseDateInput(value)
+  if (!parts) return value
+  const weekday = WEEKDAYS.find((day) => day.value === weekdayOf(parts))?.label ?? ''
+  return `${weekday} ${parts.day} ${MONTH_LABELS[parts.month - 1]}`
 }
 
 function Segmented({ legend, name, options, value, onChange }) {
@@ -165,6 +188,16 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
   const [invalid, setInvalid] = useState({})
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
+
+  // --- Repeats (create-time only) ------------------------------------
+  // getDay() numbers of the weekdays ticked, the last date the series may
+  // run to, and the generated dates the user has UNticked in the preview.
+  // Exclusions are held as dates rather than indexes so that changing the
+  // weekdays or the end date can't silently move which occurrence is
+  // skipped — a stale exclusion simply stops matching anything.
+  const [repeatDays, setRepeatDays] = useState([])
+  const [repeatUntil, setRepeatUntil] = useState('')
+  const [excluded, setExcluded] = useState([])
   // Guards against a double submit landing two inserts: `saving` state is
   // async, this is not.
   const inFlight = useRef(false)
@@ -174,6 +207,44 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
 
   const isMatch = values.type === 'match'
   const editing = Boolean(event?.id)
+
+  // Repeating is a CREATE-time feature. Editing an existing event never
+  // shows the section, and this flag makes that structural rather than a
+  // matter of remembering to check `editing` at every use site: with no
+  // section rendered the state stays at its defaults, so `repeating` is
+  // false and the save path below is the ordinary single-event one.
+  const repeating = !editing && repeatDays.length > 0 && Boolean(repeatUntil)
+
+  // The generated dates, and any error from generating them. generateSeriesDates
+  // throws on a range over a year rather than truncating, so the throw is
+  // caught here and shown as a message instead of taking the sheet down.
+  const { previewDates, previewError } = useMemo(() => {
+    if (!repeating) return { previewDates: [], previewError: null }
+    try {
+      return {
+        previewDates: generateSeriesDates(values.date, repeatDays, repeatUntil),
+        previewError: null,
+      }
+    } catch (err) {
+      return { previewDates: [], previewError: err }
+    }
+  }, [repeating, values.date, repeatDays, repeatUntil])
+
+  // What will actually be written: the preview minus whatever the user has
+  // unticked. The preview IS the guard against Ramadan, Eid, half-term and
+  // summer — generating blind and deleting the strays afterwards is the same
+  // manual slog this feature exists to remove, in reverse.
+  const seriesDates = previewDates.filter((date) => !excluded.includes(date))
+
+  const toggleWeekday = (day) =>
+    setRepeatDays((current) =>
+      current.includes(day) ? current.filter((d) => d !== day) : [...current, day],
+    )
+
+  const toggleDate = (date) =>
+    setExcluded((current) =>
+      current.includes(date) ? current.filter((d) => d !== date) : [...current, date],
+    )
 
   // Reconcile the chosen squad against the live editable list on every
   // render rather than trusting the stored value — the same thing Schedule
@@ -219,6 +290,18 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
       return
     }
 
+    // A repeat that generates nothing is a mistake, not an empty save — an
+    // end date before the start, or every date unticked. Say so rather than
+    // quietly creating the single event the user did not ask for.
+    if (previewError) {
+      setError(previewError)
+      return
+    }
+    if (repeating && seriesDates.length === 0) {
+      setError(new Error('That repeat produces no sessions. Check the days and the end date.'))
+      return
+    }
+
     const team = editableTeams.find((candidate) => candidate.id === teamId)
     const payload = {
       ...(editing ? { id: event.id } : null),
@@ -238,7 +321,31 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
     setSaving(true)
     setError(null)
 
-    upsertEvent(payload)
+    // ONE series_id, generated here and stamped on every row, so "cancel all
+    // remaining in this series" can be added later without a migration. Read
+    // once OUTSIDE the map — a crypto.randomUUID() call inside it would give
+    // every occurrence its own id and quietly produce 34 one-event "series",
+    // which looks identical in the schedule and is useless to the feature the
+    // column exists for.
+    //
+    // No polyfill: crypto.randomUUID is on every browser this app supports
+    // and on the jsdom global in the test runner, and a fallback that
+    // silently produced a non-unique id would defeat the point of the column.
+    const seriesId = repeating ? crypto.randomUUID() : null
+    const rows = repeating
+      ? seriesDates.map((date) => ({
+          ...payload,
+          starts_at: clubWallTimeToUtc(date, values.time),
+          series_id: seriesId,
+        }))
+      : null
+
+    // onSaved's contract stays "one saved event" — every caller uses it as a
+    // refresh trigger and ignores the argument, and widening it to an array
+    // for this one path would be a change they'd all have to absorb.
+    const write = rows ? insertEvents(rows).then((saved) => saved[0] ?? null) : upsertEvent(payload)
+
+    write
       .then((saved) => {
         onSaved?.(saved)
         onClose?.()
@@ -337,6 +444,99 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
         <p id="event-time-note" className="-mt-2 mb-3.5 text-[12.5px] text-ink-muted">
           Times are Abu Dhabi time.
         </p>
+
+        {/* Repeats. Create-time only — an existing event has occurrences
+            around it that editing this one must not silently rewrite, so
+            editing shows nothing here at all. Every occurrence is a real,
+            independent event row; see the header of src/lib/recurrence.js. */}
+        {!editing && (
+          <fieldset className="mb-3.5 rounded-[11px] border-[1.5px] border-line p-3">
+            <legend className={`${LABEL} px-1`}>Repeats</legend>
+
+            <div className="mb-3 flex flex-wrap gap-2">
+              {WEEKDAYS.map((day) => {
+                const on = repeatDays.includes(day.value)
+                return (
+                  <label key={day.value}>
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => toggleWeekday(day.value)}
+                      className="peer sr-only"
+                    />
+                    <span
+                      className={[
+                        'block cursor-pointer select-none rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2',
+                        on ? SEG_OPTION_ON : SEG_OPTION_OFF,
+                      ].join(' ')}
+                    >
+                      {day.label}
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+
+            <label className={LABEL} htmlFor="event-repeat-until">
+              Repeat until
+            </label>
+            <input
+              id="event-repeat-until"
+              type="date"
+              value={repeatUntil}
+              min={values.date || undefined}
+              onChange={(domEvent) => setRepeatUntil(domEvent.target.value)}
+              className={inputClasses(false)}
+            />
+
+            {repeatDays.length === 0 || !repeatUntil ? (
+              <p className="mt-2 text-[12.5px] text-ink-muted">
+                Pick the days it runs on and a date to run until, and you&apos;ll get one event for
+                each. Leave this alone for a one-off.
+              </p>
+            ) : previewError ? (
+              <p
+                role="alert"
+                className="mt-2 rounded-[9px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+              >
+                {previewError.message}
+              </p>
+            ) : (
+              <>
+                {/* The count is of what is TICKED, not what was generated —
+                    it has to agree with the Save button and with the number
+                    of rows actually written. */}
+                <p className="mt-3 mb-1.5 text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+                  {seriesDates.length === 1 ? '1 session' : `${seriesDates.length} sessions`}
+                </p>
+                <p className="mb-2 text-[12.5px] text-ink-muted">
+                  Untick any that fall in a holiday, Ramadan or a break.
+                </p>
+                <ul className="max-h-56 overflow-y-auto rounded-[9px] border border-line">
+                  {previewDates.map((date) => (
+                    <li key={date} className="border-b border-line last:border-b-0">
+                      <label className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={!excluded.includes(date)}
+                          onChange={() => toggleDate(date)}
+                          className="h-4 w-4 accent-brand"
+                        />
+                        <span
+                          className={
+                            excluded.includes(date) ? 'text-ink-faint line-through' : 'text-ink'
+                          }
+                        >
+                          {seriesDateLabel(date)}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </fieldset>
+        )}
 
         <div className={FIELD}>
           <label className={LABEL} htmlFor="event-team">
@@ -454,7 +654,15 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
           disabled={saving}
           className="w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? 'Saving…' : editing ? 'Save changes' : 'Add event'}
+          {saving
+            ? 'Saving…'
+            : editing
+              ? 'Save changes'
+              : repeating && !previewError && seriesDates.length > 0
+                ? // Naming the number on the button is the last chance to
+                  // notice that "until 2036" produced 500 rows.
+                  `Add ${seriesDates.length} ${seriesDates.length === 1 ? 'event' : 'events'}`
+                : 'Add event'}
         </button>
       </form>
     </Sheet>

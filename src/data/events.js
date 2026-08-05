@@ -88,6 +88,32 @@ export async function upsertEvent(event) {
   return data
 }
 
+const REFUSED_BATCH =
+  "We couldn't save those sessions. You may not have permission to change this squad's fixtures."
+
+/**
+ * Inserts many events in ONE statement and returns the saved rows.
+ *
+ * One statement, not a loop of upsertEvent calls, because a term of training
+ * is all-or-nothing: Postgres runs a multi-row INSERT in a single implicit
+ * transaction, so a row the database refuses rolls the whole batch back
+ * rather than leaving a coach with the first nine Tuesdays created and the
+ * rest missing — a half-created term is worse than a failed one, because
+ * nobody can tell by looking that it is incomplete.
+ *
+ * Same refusal reporting as upsertEvent, with one addition: RLS filters rows
+ * out of the RETURNING clause individually, so "fewer rows came back than we
+ * sent" is also a refusal, not a success.
+ */
+export async function insertEvents(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return []
+
+  const { data, error } = await supabase.from('events').insert(rows).select()
+  if (error) throw error
+  if (!data || data.length !== rows.length) throw new Error(REFUSED_BATCH)
+  return data
+}
+
 /**
  * Deletes one event by id. Resolves with nothing on success and throws when
  * the delete failed or removed nothing.

@@ -28,7 +28,13 @@ vi.mock('../src/lib/supabase.js', () => ({
 }))
 
 import { supabase } from '../src/lib/supabase.js'
-import { listEvents, subscribeEvents, upsertEvent, deleteEvent } from '../src/data/events.js'
+import {
+  listEvents,
+  subscribeEvents,
+  upsertEvent,
+  insertEvents,
+  deleteEvent,
+} from '../src/data/events.js'
 import {
   listPlayers,
   getPlayerContact,
@@ -311,6 +317,66 @@ describe('upsertEvent', () => {
     supabase.from.mockReturnValue(builder)
 
     await expect(upsertEvent({ id: 'e-1', type: 'match', team_id: 'not-mine' })).rejects.toThrow(
+      /permission|not allowed|couldn.t save/i,
+    )
+  })
+})
+
+// --- insertEvents ---------------------------------------------------------
+
+// Repeating events. Bulk-creating a term of training goes through ONE
+// multi-row insert, so Postgres's implicit transaction makes a refusal
+// all-or-nothing rather than leaving half a term created.
+describe('insertEvents', () => {
+  it('sends every row in a single insert call', async () => {
+    const rows = [
+      { team_id: 't1', type: 'training', starts_at: '2026-08-11T14:00:00.000Z', series_id: 's1' },
+      { team_id: 't1', type: 'training', starts_at: '2026-08-13T14:00:00.000Z', series_id: 's1' },
+    ]
+    const saved = rows.map((row, i) => ({ ...row, id: `e${i}` }))
+    const { builder, calls } = createQueryBuilder({ data: saved })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await insertEvents(rows)
+
+    expect(supabase.from).toHaveBeenCalledWith('events')
+    // ONE call carrying the array — not one call per row. A loop of inserts
+    // is exactly what this function exists to avoid.
+    expect(builder.insert).toHaveBeenCalledTimes(1)
+    expect(calls.insert[0][0]).toEqual(rows)
+    expect(builder.select).toHaveBeenCalled()
+    expect(result).toEqual(saved)
+  })
+
+  it('does not query at all for an empty or missing list', async () => {
+    expect(await insertEvents([])).toEqual([])
+    expect(await insertEvents(undefined)).toEqual([])
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('violates check constraint') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(insertEvents([{ team_id: 't1' }])).rejects.toThrow('violates check constraint')
+  })
+
+  it('throws when fewer rows come back than were sent (an RLS refusal)', async () => {
+    // RLS filters rows out of RETURNING individually, so a short result is a
+    // refusal even though PostgREST reports no error. Two sent, one back.
+    const { builder } = createQueryBuilder({ data: [{ id: 'e0' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(insertEvents([{ team_id: 't1' }, { team_id: 'not-mine' }])).rejects.toThrow(
+      /permission|not allowed|couldn.t save/i,
+    )
+  })
+
+  it('throws when nothing comes back at all', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(insertEvents([{ team_id: 't1' }])).rejects.toThrow(
       /permission|not allowed|couldn.t save/i,
     )
   })

@@ -226,6 +226,16 @@ export async function upsertEvent(event) {
   return { id: event?.id ?? 'e-new', ...event }
 }
 
+// Repeating events. Recorded as ONE 'insert-many' entry carrying the whole
+// batch, mirroring the real module's single multi-row insert — so a browser
+// check can see both the number of rows and that they share one series_id.
+export async function insertEvents(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return []
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'insert-many', payload: rows })
+  return rows.map((row, index) => ({ id: `e-series-${index}`, ...row }))
+}
+
 export async function deleteEvent(id) {
   window.__writes = window.__writes || []
   window.__writes.push({ op: 'delete', id })
