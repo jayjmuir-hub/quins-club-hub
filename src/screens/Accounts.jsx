@@ -44,9 +44,15 @@ import { initials } from '../lib/playerFormat.js'
 
 const MUTED_ON_PAPER = 'text-ink-muted'
 
+// Order matches AccessBuilder's list and ROLE_PRECEDENCE in scope.js.
+// 'manager' (Team Manager) and 'medic' grant exactly what 'coach' grants —
+// see SQUAD_STAFF_ROLES — so switching a row between the three changes the
+// label and nothing else about what that person can do.
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'coach', label: 'Coach' },
+  { value: 'manager', label: 'Team Manager' },
+  { value: 'medic', label: 'Medic' },
   { value: 'parent', label: 'Parent' },
   { value: 'player', label: 'Player' },
 ]

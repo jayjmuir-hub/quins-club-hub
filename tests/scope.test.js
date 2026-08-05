@@ -5,6 +5,8 @@ import {
   isAdmin,
   roleLabel,
   childPlayerIds,
+  SQUAD_STAFF_ROLES,
+  isSquadStaffRole,
 } from '../src/lib/scope.js'
 
 // Unit tests for src/lib/scope.js (Task 7: pure membership/scope helpers) and
@@ -531,5 +533,99 @@ describe('acceptInvite', () => {
     })
 
     await expect(acceptInvite('tok-abc')).rejects.toThrow('This invite has already been used.')
+  })
+})
+
+// Team Manager ('manager') and Medic ('medic'), added 5 Aug 2026. Both are
+// IDENTICAL to 'coach' in what they may do — the distinction is documentary,
+// so the club can record who fills which job.
+describe('SQUAD_STAFF_ROLES', () => {
+  // ⚠️ THE MIRROR TEST. This exact set is duplicated in
+  // private.can_edit_team() in the database
+  // (db/migrations/20260805_roles_manager_and_medic.sql). Nothing in
+  // JavaScript can check the SQL, so this pins the JS side hard: changing it
+  // fails here, and the failure message is the reminder that a migration has
+  // to change too. The SQL is the real boundary — drift can hide a squad from
+  // someone entitled to it, but can never let a write through that RLS refuses.
+  it('is exactly coach, manager and medic', () => {
+    expect(SQUAD_STAFF_ROLES).toEqual(['coach', 'manager', 'medic'])
+  })
+
+  it('recognises each of them, and nothing else', () => {
+    expect(isSquadStaffRole('coach')).toBe(true)
+    expect(isSquadStaffRole('manager')).toBe(true)
+    expect(isSquadStaffRole('medic')).toBe(true)
+
+    expect(isSquadStaffRole('admin')).toBe(false)
+    expect(isSquadStaffRole('parent')).toBe(false)
+    expect(isSquadStaffRole('player')).toBe(false)
+    expect(isSquadStaffRole(undefined)).toBe(false)
+    expect(isSquadStaffRole('')).toBe(false)
+  })
+})
+
+describe('canEditTeam — manager and medic are exactly a coach', () => {
+  // Parameterised on the set itself, so a role added to SQUAD_STAFF_ROLES
+  // without the matching rights is caught here rather than in production.
+  it.each(SQUAD_STAFF_ROLES)('lets a %s edit the squad they are attached to', (role) => {
+    const memberships = [{ id: 'm1', role, team_id: 'team-u12' }]
+    expect(canEditTeam(memberships, 'team-u12')).toBe(true)
+  })
+
+  it.each(SQUAD_STAFF_ROLES)('does NOT let a %s edit a squad they are not attached to', (role) => {
+    const memberships = [{ id: 'm1', role, team_id: 'team-u12' }]
+    expect(canEditTeam(memberships, 'team-u14')).toBe(false)
+  })
+
+  it.each(SQUAD_STAFF_ROLES)('still refuses a %s a null team, like the coach guard does', (role) => {
+    const memberships = [{ id: 'm1', role, team_id: null }]
+    expect(canEditTeam(memberships, null)).toBe(false)
+  })
+
+  it('leaves parents and players read-only, whatever else changed', () => {
+    expect(canEditTeam([{ role: 'parent', team_id: 'team-u12', player_id: 'p1' }], 'team-u12')).toBe(false)
+    expect(canEditTeam([{ role: 'player', team_id: 'team-u12', player_id: 'p1' }], 'team-u12')).toBe(false)
+  })
+})
+
+describe('roleLabel — the new roles', () => {
+  it('names a manager "Team Manager" and a medic "Medic"', () => {
+    expect(roleLabel([{ role: 'manager', team_id: 'team-u12' }])).toBe('Team Manager')
+    expect(roleLabel([{ role: 'medic', team_id: 'team-u12' }])).toBe('Medic')
+  })
+
+  // Jay's ruling 5 Aug: nobody is expected to hold both. The order is
+  // therefore arbitrary, but it must be STABLE — an unstable one would make
+  // the masthead label flicker between roles as rows load in any order.
+  it('picks one label by precedence: admin > coach > manager > medic > parent > player', () => {
+    const all = [
+      { role: 'player', team_id: 't' },
+      { role: 'parent', team_id: 't' },
+      { role: 'medic', team_id: 't' },
+      { role: 'manager', team_id: 't' },
+      { role: 'coach', team_id: 't' },
+      { role: 'admin', team_id: null },
+    ]
+    expect(roleLabel(all)).toBe('Admin')
+    expect(roleLabel(all.slice(0, 5))).toBe('Coach')
+    expect(roleLabel(all.slice(0, 4))).toBe('Team Manager')
+    expect(roleLabel(all.slice(0, 3))).toBe('Medic')
+    expect(roleLabel(all.slice(0, 2))).toBe('Parent')
+  })
+
+  it('does not treat a manager or medic as an admin', () => {
+    expect(isAdmin([{ role: 'manager', team_id: 'team-u12' }])).toBe(false)
+    expect(isAdmin([{ role: 'medic', team_id: 'team-u12' }])).toBe(false)
+  })
+})
+
+describe('visibleTeams — the new roles see their own squad', () => {
+  it.each(SQUAD_STAFF_ROLES)('gives a %s the squad on their membership row, and no other', (role) => {
+    const teams = [
+      { id: 'team-u12', name: 'U12', sort_order: 7 },
+      { id: 'team-u14', name: 'U14', sort_order: 9 },
+    ]
+    const visible = visibleTeams([{ role, team_id: 'team-u12' }], teams)
+    expect(visible.map((t) => t.name)).toEqual(['U12'])
   })
 })

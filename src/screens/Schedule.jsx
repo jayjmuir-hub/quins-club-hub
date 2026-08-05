@@ -11,7 +11,7 @@ import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canEditTeam, isAdmin, isSquadStaffRole, roleLabel, visibleTeams } from '../lib/scope.js'
 import { clubDayParts, clubToday, eventDate, hasResult, sortByStart } from '../lib/eventFormat.js'
 import ScheduleTable from '../components/ScheduleTable.jsx'
 import { useMediaQuery, WIDE_QUERY } from '../lib/useMediaQuery.js'
@@ -431,7 +431,11 @@ export default function Schedule() {
   const isFirstLoad = loading && events.length === 0
 
   const admin = isAdmin(memberships)
-  const canEditAnything = admin || memberships.some((membership) => membership.role === 'coach')
+  // Squad staff, not just coaches: team managers and medics hold the same
+  // rights (SQUAD_STAFF_ROLES in src/lib/scope.js, mirrored by
+  // private.can_edit_team). Asking the helper rather than testing the string
+  // is what stops the next role needing an edit here.
+  const canEditAnything = admin || memberships.some((membership) => isSquadStaffRole(membership.role))
   const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
   // A stored team filter can outlive the team it names: memberships reload,

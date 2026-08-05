@@ -315,9 +315,12 @@ const REFUSED_MEMBERSHIP_DELETE =
 const REFUSED_PROFILE =
   "We couldn't save that name. You may not have permission to change this member's details."
 
-// Mirrors the memberships_role_check constraint on the live table
-// (role IN admin/coach/parent/player), verified directly rather than assumed.
-const ROLES = ['admin', 'coach', 'parent', 'player']
+// Kept in step with the memberships_role_check CHECK constraint
+// (db/migrations/20260805_roles_manager_and_medic.sql). This is a friendly
+// client-side guard only — the constraint is what actually refuses a bad
+// value, so a value missing here can block a legitimate write but nothing
+// here can smuggle one past the database.
+const ROLES = ['admin', 'coach', 'manager', 'medic', 'parent', 'player']
 
 /**
  * Changes one membership's role and/or team, returning the updated row.

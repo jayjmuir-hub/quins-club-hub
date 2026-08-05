@@ -1062,9 +1062,13 @@ describe('updateMembershipRole', () => {
     expect(supabase.from).not.toHaveBeenCalled()
   })
 
-  it('refuses a role outside the four the database allows', async () => {
+  it('refuses a role outside the set the database allows', async () => {
     await expect(
-      updateMembershipRole({ membershipId: 'm-1', role: 'manager', teamId: 't-12' }),
+      // Was 'manager' until 5 Aug 2026, when 'manager' became a REAL role
+      // (Team Manager) and this anchor rotted — the call started succeeding
+      // and the test failed for the wrong reason. Repointed at a value that
+      // is not a role and is not going to become one.
+      updateMembershipRole({ membershipId: 'm-1', role: 'chairman', teamId: 't-12' }),
     ).rejects.toThrow(/role/i)
     expect(supabase.from).not.toHaveBeenCalled()
   })
@@ -1429,9 +1433,11 @@ describe('grantMembership', () => {
     expect(supabase.from).not.toHaveBeenCalled()
   })
 
-  it('refuses a role outside the four the database allows', async () => {
+  it('refuses a role outside the set the database allows', async () => {
     await expect(
-      grantMembership({ profileId: 'pr-new', clubId: 'c-1', role: 'manager', teamId: 't-12' }),
+      // See the note on updateMembershipRole above: 'manager' is a real role
+      // as of 5 Aug 2026, so this anchor was repointed rather than removed.
+      grantMembership({ profileId: 'pr-new', clubId: 'c-1', role: 'chairman', teamId: 't-12' }),
     ).rejects.toThrow(/role/i)
     expect(supabase.from).not.toHaveBeenCalled()
   })
@@ -1591,7 +1597,7 @@ describe('grantMemberships', () => {
     ).rejects.toThrow(/age group/i)
 
     await expect(
-      grantMemberships([{ profileId: 'pr-1', clubId: 'c-1', role: 'manager', teamId: 't-u14' }]),
+      grantMemberships([{ profileId: 'pr-1', clubId: 'c-1', role: 'chairman', teamId: 't-u14' }]),
     ).rejects.toThrow(/role/i)
 
     await expect(

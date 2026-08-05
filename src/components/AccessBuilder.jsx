@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import PlayerPicker from './PlayerPicker.jsx'
+import { isSquadStaffRole } from '../lib/scope.js'
 
 // Builds a SET of access rows for one person, ready for grantMemberships().
 //
@@ -43,9 +44,14 @@ export const CHILD_WITHOUT_TEAM =
   "That player isn't in an age group yet, so there's nothing to give access to. Put them in a squad on the roster first."
 export const DUPLICATE_ACCESS = 'They already have that access, so there is nothing to add.'
 
+// 'manager' (Team Manager) and 'medic' sit next to 'coach' because they are
+// the same kind of grant: pick the person, pick one or more age groups. They
+// grant identical rights — see SQUAD_STAFF_ROLES in src/lib/scope.js.
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'coach', label: 'Coach' },
+  { value: 'manager', label: 'Team Manager' },
+  { value: 'medic', label: 'Medic' },
   { value: 'parent', label: 'Parent' },
   { value: 'player', label: 'Player' },
 ]
@@ -99,7 +105,7 @@ export default function AccessBuilder({
   // exception, so it is opt-in rather than a mode switch of equal weight.
   const childMode = role === 'parent' && !noRoster
   const needsPlayers = childMode || role === 'player'
-  const needsTeams = role === 'coach' || (role === 'parent' && noRoster)
+  const needsTeams = isSquadStaffRole(role) || (role === 'parent' && noRoster)
 
   // The player list is ~315 rows and most grants never look at it, so the
   // screen loads it lazily and only when a builder actually asks. Idempotent
@@ -139,7 +145,7 @@ export default function AccessBuilder({
       return { rows: [{ role: 'admin', teamId: null, playerId: null }] }
     }
 
-    if (role === 'coach' || (role === 'parent' && noRoster)) {
+    if (isSquadStaffRole(role) || (role === 'parent' && noRoster)) {
       if (teamIds.length === 0) return { error: NO_TEAM_CHOSEN }
       return { rows: teamIds.map((teamId) => ({ role, teamId, playerId: null })) }
     }

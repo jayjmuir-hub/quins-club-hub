@@ -90,6 +90,13 @@ export function ViewAsSwitcher() {
       </button>
 
       <Sheet open={open} onClose={() => setOpen(false)} title="View as">
+        {/* Deliberately still only Coach and Parent, not one persona per
+            role. 'manager' and 'medic' grant EXACTLY what 'coach' grants
+            (SQUAD_STAFF_ROLES in src/lib/scope.js), so a "Team Manager of
+            U12" persona would render a pixel-identical preview to "Coach of
+            U12" — 30 extra buttons across 15 squads showing nothing new.
+            personaRoleLabel() goes through roleLabel(), so if a persona for
+            one of them is ever added it will already be labelled correctly. */}
         <p className="mb-4 text-[13px] leading-relaxed text-ink-muted">
           Preview how the app looks for a coach or parent in one age group.
           This filters what this browser displays; your own access is

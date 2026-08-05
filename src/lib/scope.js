@@ -3,14 +3,43 @@
 // makes a network call or reads global state.
 //
 // Data model reminder (see memberships table): role is one of
-// 'admin' | 'coach' | 'parent' | 'player'. An admin row has team_id = null
-// (admin is club-wide, not team-scoped) — every other role has a team_id.
-// One person can hold several membership rows (several roles/teams at once).
+// 'admin' | 'coach' | 'manager' | 'medic' | 'parent' | 'player'. An admin row
+// has team_id = null (admin is club-wide, not team-scoped) — every other role
+// has a team_id. One person can hold several membership rows (several
+// roles/teams at once).
 
-const ROLE_PRECEDENCE = ['admin', 'coach', 'parent', 'player']
+/**
+ * The squad-level STAFF roles: everyone who may edit a squad they are
+ * attached to. 'manager' (shown as "Team Manager") and 'medic' were added
+ * 5 Aug 2026 and are IDENTICAL to 'coach' in what they may do — the
+ * distinction is documentary, so the club can record who fills which job.
+ *
+ * ⚠️ This list MIRRORS private.can_edit_team() in the database
+ * (db/migrations/20260805_roles_manager_and_medic.sql). The two must stay in
+ * step, and tests/scope.test.js pins the exact set so a change here without a
+ * migration is caught. The SQL is the real boundary; this list only decides
+ * what the UI offers, so drift can hide a squad from someone entitled to it
+ * but can never let a write through that RLS would refuse.
+ *
+ * A future staff role is one entry here plus one line in that migration —
+ * nothing else in the app tests for 'coach' directly.
+ */
+export const SQUAD_STAFF_ROLES = ['coach', 'manager', 'medic']
+
+/** True if this role may edit the squad its membership row points at. */
+export function isSquadStaffRole(role) {
+  return SQUAD_STAFF_ROLES.includes(role)
+}
+
+// Precedence decides the ONE label shown for someone holding several rows.
+// Jay's ruling 5 Aug: nobody is expected to hold both coach and manager, so
+// the order between the staff roles is arbitrary but must be stable.
+const ROLE_PRECEDENCE = ['admin', 'coach', 'manager', 'medic', 'parent', 'player']
 const ROLE_LABELS = {
   admin: 'Admin',
   coach: 'Coach',
+  manager: 'Team Manager',
+  medic: 'Medic',
   parent: 'Parent',
   player: 'Player',
 }
@@ -55,9 +84,10 @@ export function visibleTeams(memberships, allTeams) {
 
 /**
  * True if the given memberships grant edit rights on teamId: admins can edit
- * any team, coaches can edit only the teams they coach. Parents and players
- * can never edit. A null/undefined teamId always returns false, even for an
- * admin — see the guard comment below for why.
+ * any team; coaches, team managers and medics can edit only the squads they
+ * are attached to (SQUAD_STAFF_ROLES). Parents and players can never edit. A
+ * null/undefined teamId always returns false, even for an admin — see the
+ * guard comment below for why.
  */
 export function canEditTeam(memberships, teamId) {
   // Guard first, before the admin short-circuit: a null/undefined teamId
@@ -71,13 +101,14 @@ export function canEditTeam(memberships, teamId) {
   if (teamId == null) return false
   if (!memberships) return false
   if (isAdmin(memberships)) return true
-  return memberships.some((m) => m.role === 'coach' && m.team_id === teamId)
+  return memberships.some((m) => isSquadStaffRole(m.role) && m.team_id === teamId)
 }
 
 /**
  * Single human-readable label for the highest role held, precedence
- * admin > coach > parent > player. 'No access yet' when there are no
- * membership rows at all (e.g. an invited-but-not-yet-accepted user).
+ * admin > coach > manager > medic > parent > player. 'No access yet' when
+ * there are no membership rows at all (e.g. an invited-but-not-yet-accepted
+ * user).
  */
 export function roleLabel(memberships) {
   if (!memberships || memberships.length === 0) return 'No access yet'

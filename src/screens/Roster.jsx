@@ -11,7 +11,7 @@ import MyPlayerForm from './MyPlayerForm.jsx'
 import PlayerImport from './PlayerImport.jsx'
 import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, isAdmin, isOwnPlayer, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canEditTeam, isAdmin, isOwnPlayer, isSquadStaffRole, roleLabel, visibleTeams } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import { signPhotoUrls } from '../data/photos.js'
@@ -263,7 +263,11 @@ export default function Roster() {
   const isFirstLoad = loading && players.length === 0
 
   const admin = isAdmin(memberships)
-  const canEditAnything = admin || memberships.some((membership) => membership.role === 'coach')
+  // Squad staff, not just coaches: team managers and medics hold the same
+  // rights (SQUAD_STAFF_ROLES in src/lib/scope.js, mirrored by
+  // private.can_edit_team). Asking the helper rather than testing the string
+  // is what stops the next role needing an edit here.
+  const canEditAnything = admin || memberships.some((membership) => isSquadStaffRole(membership.role))
   const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
   const normalisedQuery = query.trim().toLowerCase()

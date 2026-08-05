@@ -28,9 +28,17 @@
 //     #f0ecf2) measures 4.07:1, under the 4.5:1 AA text threshold at this
 //     10px bold size. Foreground darkened to #5c5854 (~6.0:1).
 
+// 'manager' and 'medic' (added 5 Aug 2026) share the coach tone on purpose:
+// all three are squad staff with identical rights (SQUAD_STAFF_ROLES in
+// src/lib/scope.js), so giving each its own colour would imply a difference
+// in access that does not exist. The WORD is what distinguishes them, which
+// is exactly what Jay asked for — a distinct category, not distinct
+// permissions. 'player' has no entry and falls to NEUTRAL_TONE, as before.
 const TONES = {
   admin: 'bg-brand text-white',
   coach: 'bg-info-bg text-accent-ink',
+  manager: 'bg-info-bg text-accent-ink',
+  medic: 'bg-info-bg text-accent-ink',
   parent: 'bg-warn-bg text-warn-ink',
   captain: 'bg-warn-bg text-warn-ink',
 }
