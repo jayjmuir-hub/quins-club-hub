@@ -3,6 +3,7 @@ import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
+import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import TeamPills, { ALL_TEAMS_ID, PillButton } from '../components/TeamPills.jsx'
 import Availability from './Availability.jsx'
@@ -128,7 +129,11 @@ function FixtureList({ events, teamsById, onSelect, emptyMessage }) {
   )
 }
 
-function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
+// `onSelect` (an event id) is still needed for the fixture list rendered under
+// the grid; `onSelectDay` (a day number) is the grid's own handler. They are
+// separate because tapping a cell no longer means "open an event" — it means
+// "open that day".
+function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect, onSelectDay }) {
   const { year, month: monthIndex } = month
   const firstOfMonth = monthAnchor(year, monthIndex)
   const leadingBlanks = firstOfMonth.getUTCDay()
@@ -220,21 +225,30 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
               isToday ? 'border-brand shadow-[inset_0_0_0_1px_theme(colors.brand.DEFAULT)]' : 'border-line',
             ].join(' ')
 
-            if (dayEvents.length === 0) {
-              return (
-                <div key={dayNumber} data-testid="calendar-day" className={cellClasses}>
-                  {dayNumber}
-                </div>
-              )
-            }
+            // EVERY cell is a <button> as of Task 23, not just populated
+            // ones. Two reasons, and the second is the one that mattered:
+            //
+            //  1. A day with no events still has an action now — open the
+            //     day and add one — so an inert <div> would be a lie.
+            //  2. It collapses the two variants into one. The CELL_LAYOUT
+            //     note above exists because a <button> and a <div> lay their
+            //     content out differently under Chromium's UA stylesheet,
+            //     and the two had to be kept in lockstep by hand. With a
+            //     single variant there is nothing left to drift.
+            const monthName = firstOfMonth.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long' })
+            const eventCount = dayEvents.length
+            const label =
+              eventCount === 0
+                ? `${dayNumber} ${monthName}, no events`
+                : `${dayNumber} ${monthName}, ${eventCount} ${eventCount === 1 ? 'event' : 'events'}`
 
             return (
               <button
                 key={dayNumber}
                 type="button"
                 data-testid="calendar-day"
-                onClick={() => onSelect(dayEvents[0].id)}
-                aria-label={`${dayNumber} ${firstOfMonth.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long' })}, ${dayEvents.length} ${dayEvents.length === 1 ? 'event' : 'events'}`}
+                onClick={() => onSelectDay(dayNumber)}
+                aria-label={label}
                 className={`${cellClasses} transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
               >
                 {dayNumber}
@@ -273,6 +287,60 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect }) {
   )
 }
 
+// Formats { year, month, day } as the ISO yyyy-mm-dd the event form's date
+// input expects. Built by hand from the numbers rather than via a Date, so it
+// cannot be dragged into the reader's zone on the way through.
+function isoDay({ year, month, day }) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${year}-${pad(month + 1)}-${pad(day)}`
+}
+
+// Opened by tapping any calendar cell (Task 23). Replaces the old behaviour,
+// which opened dayEvents[0] directly — that silently swallowed every event
+// after the first, so a Saturday with three age groups playing showed three
+// dots, opened one fixture, and gave you no route to the other two.
+//
+// Deliberately shown for empty days too. "Nothing on, add something" is the
+// answer to the question the tap asked, and it is the only place in the app
+// where the date is already known when the form opens.
+function DaySheet({ day, events, teamsById, canManage, onClose, onSelectEvent, onAddEvent }) {
+  const title = monthAnchor(day.year, day.month, day.day).toLocaleDateString(undefined, {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+
+  return (
+    <Sheet open onClose={onClose} title={title}>
+      {events.length === 0 ? (
+        <Empty message="Nothing on this day." />
+      ) : (
+        <div className="overflow-hidden rounded-[11px] border border-line">
+          {events.map((event) => (
+            <FixtureRow
+              key={event.id}
+              event={event}
+              teamName={teamsById.get(event.team_id)?.name}
+              onSelect={onSelectEvent}
+            />
+          ))}
+        </div>
+      )}
+
+      {canManage && (
+        <button
+          type="button"
+          onClick={onAddEvent}
+          className="mt-3.5 w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-extrabold text-white transition hover:bg-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+        >
+          Add event
+        </button>
+      )}
+    </Sheet>
+  )
+}
+
 export default function Schedule() {
   const { memberships, teams } = useMemberships()
 
@@ -289,6 +357,11 @@ export default function Schedule() {
   const [teamFilter, setTeamFilter] = useState(readStoredFilter)
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [month, setMonth] = useState(currentClubMonth)
+  // null = no day sheet. Otherwise { year, month, day } for the tapped cell.
+  // Carries its own year/month rather than just the day number so that paging
+  // the calendar behind an open sheet cannot silently repoint it at a
+  // different month's 8th.
+  const [selectedDay, setSelectedDay] = useState(null)
   // null = the form is closed. { event: null } = adding; { event } = editing.
   // A wrapper object rather than the event itself, so "add" is distinguishable
   // from "closed" without a second boolean that could drift out of sync.
@@ -512,6 +585,37 @@ export default function Schedule() {
           events={events}
           teamsById={teamsById}
           onSelect={setSelectedEventId}
+          onSelectDay={(dayNumber) => setSelectedDay({ ...month, day: dayNumber })}
+        />
+      )}
+
+      {/* The day sheet sits below the detail and form sheets in precedence:
+          opening a fixture from it replaces it rather than stacking. */}
+      {selectedDay && !selectedEvent && !formState && (
+        <DaySheet
+          day={selectedDay}
+          events={sortByStart(
+            events.filter((event) => {
+              const parts = clubDayParts(eventDate(event))
+              return (
+                parts.year === selectedDay.year &&
+                parts.month === selectedDay.month &&
+                parts.day === selectedDay.day
+              )
+            }),
+            'asc',
+          )}
+          teamsById={teamsById}
+          canManage={canEditAnything}
+          onClose={() => setSelectedDay(null)}
+          onSelectEvent={(id) => {
+            setSelectedEventId(id)
+            setSelectedDay(null)
+          }}
+          onAddEvent={() => {
+            setFormState({ event: null, date: isoDay(selectedDay) })
+            setSelectedDay(null)
+          }}
         />
       )}
 
@@ -537,6 +641,7 @@ export default function Schedule() {
       {formState && (
         <EventForm
           event={formState.event}
+          initialDate={formState.date ?? null}
           onClose={() => {
             setFormState(null)
             setSelectedEventId(null)

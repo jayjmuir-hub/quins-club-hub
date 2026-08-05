@@ -398,7 +398,11 @@ describe('Schedule — calendar tab', () => {
 
       const name = monthName(year, month)
       expect(screen.getByRole('button', { name: `16 ${name}, 1 event` })).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: new RegExp(`^15 ${name},`) })).not.toBeInTheDocument()
+      // Every cell is a button as of Task 23, so "the 15th is not a button"
+      // no longer distinguishes an empty day from a populated one. Repointed
+      // at the count in the label instead, which still fails loudly if the
+      // grid buckets by the browser's day and drags this fixture back a cell.
+      expect(screen.getByRole('button', { name: `15 ${name}, no events` })).toBeInTheDocument()
     })
   })
 
@@ -503,16 +507,27 @@ describe('Schedule — calendar tab', () => {
     await user.click(screen.getByRole('button', { name: 'Calendar' }))
 
     const cells = screen.getAllByTestId('calendar-day')
-    const populated = cells.filter((cell) => cell.tagName === 'BUTTON')
-    const empty = cells.filter((cell) => cell.tagName === 'DIV')
 
-    // Guard the guard: if the month ever rendered only one variant, the
+    // As of Task 23 every cell is a <button>, because every day is actionable
+    // — a day with no events opens to "add one". This assertion is the point
+    // of the test now: the original mismatch was a <button> and a <div> laying
+    // their content out differently under Chromium's UA stylesheet, so proving
+    // there is only ever ONE tag is what forecloses that whole class of bug.
+    expect(cells.every((cell) => cell.tagName === 'BUTTON')).toBe(true)
+
+    // Split on the label rather than the tag, so both visual states are still
+    // covered: a populated cell also renders the dot row, which an empty one
+    // does not, and that is the remaining way the two could drift.
+    const empty = cells.filter((cell) => /, no events$/.test(cell.getAttribute('aria-label') ?? ''))
+    const populated = cells.filter((cell) => !/, no events$/.test(cell.getAttribute('aria-label') ?? ''))
+
+    // Guard the guard: if the month ever rendered only one state, the
     // comparison below would pass vacuously.
     expect(populated.length).toBeGreaterThan(0)
     expect(empty.length).toBeGreaterThan(0)
 
     // `flex` overrides the UA's centred button layout; `items-start` and
-    // `justify-start` then place the number top-left in both variants.
+    // `justify-start` then place the number top-left in both states.
     const alignmentTokens = ['relative', 'flex', 'items-start', 'justify-start', 'text-left', 'p-[5px]']
     alignmentTokens.forEach((token) => {
       expect(populated.every((cell) => hasClassToken(cell, token))).toBe(true)

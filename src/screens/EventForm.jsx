@@ -89,7 +89,14 @@ function Segmented({ legend, name, options, value, onChange }) {
 // defaults to the club's today (design-system.md §7: "not new Date()") and
 // the time is left blank — a kick-off time is something the coach must
 // actually choose, and a prefilled one would quietly become wrong.
-function initialValues(event, editableTeams) {
+// `initialDate` is an ISO yyyy-mm-dd string for the CLUB's day, supplied when
+// the form is opened from a calendar cell so the date the user tapped is the
+// date they get. It is ignored when editing an existing event, whose own date
+// always wins. Only ever a plain string — never a Date — for the same reason
+// the calendar grid is built from numbers: a Date would re-read the browser's
+// zone and could land the event on the wrong day for a reader outside Abu
+// Dhabi. See CLUB_TIME_ZONE in src/lib/eventFormat.js.
+function initialValues(event, editableTeams, initialDate = null) {
   const teamIds = editableTeams.map((team) => team.id)
   const fallbackTeamId = teamIds[0] ?? ''
 
@@ -100,7 +107,7 @@ function initialValues(event, editableTeams) {
       type: 'match',
       title: '',
       opponent: '',
-      date: `${today.year}-${pad(today.month + 1)}-${pad(today.day)}`,
+      date: initialDate ?? `${today.year}-${pad(today.month + 1)}-${pad(today.day)}`,
       time: '',
       teamId: fallbackTeamId,
       home: true,
@@ -141,7 +148,7 @@ function parseScore(us, them) {
   return { result_us: nus, result_them: nthem }
 }
 
-export default function EventForm({ event = null, onClose, onSaved }) {
+export default function EventForm({ event = null, initialDate = null, onClose, onSaved }) {
   const { memberships, teams } = useMemberships()
 
   // Teams this user may actually write to. For an admin that is every team;
@@ -154,7 +161,7 @@ export default function EventForm({ event = null, onClose, onSaved }) {
     [memberships, teams],
   )
 
-  const [values, setValues] = useState(() => initialValues(event, editableTeams))
+  const [values, setValues] = useState(() => initialValues(event, editableTeams, initialDate))
   const [invalid, setInvalid] = useState({})
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
