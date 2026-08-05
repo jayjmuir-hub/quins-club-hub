@@ -53,17 +53,41 @@ creates a group whose only member is the sending mailbox.
      -Members noreply@adhquins-clubhub.com
    ```
 
-4. Apply the policy:
+4. ⚠️ **Read the group's REAL address. Do not assume it.**
+
+   ```powershell
+   Get-DistributionGroup -Identity quins-auth-senders | Format-List PrimarySmtpAddress
+   ```
+
+   A new group takes the tenant's **default** domain, which here is
+   `quinsclubhub.onmicrosoft.com` — **not** the custom domain, even though its only
+   member is on the custom domain. Assuming `@adhquins-clubhub.com` on 5 Aug 2026
+   produced:
+
+   ```
+   New-ApplicationAccessPolicy: The identity of the policy scope could not be resolved.
+   ```
+
+   The group's own address is irrelevant to what this does — it is just a container the
+   policy points at, and nobody ever emails it. What matters is its *member*.
+
+5. Apply the policy, using the address step 4 actually printed:
 
    ```powershell
    New-ApplicationAccessPolicy `
      -AppId bec2ed8e-4174-466d-b6ad-7f701534d67a `
-     -PolicyScopeGroupId quins-auth-senders@adhquins-clubhub.com `
+     -PolicyScopeGroupId quins-auth-senders@quinsclubhub.onmicrosoft.com `
      -AccessRight RestrictAccess `
      -Description "Restrict Quins Club Hub auth email to the noreply mailbox"
    ```
 
-5. **Verify it allows the mailbox it should:**
+   Success prints `AccessRight : RestrictAccess` and `IsValid : True`.
+
+6. **Wait 30 minutes** before testing. Policy changes take that long to propagate, and
+   until they do BOTH tests below still read `Granted` — which looks exactly like a
+   failed policy.
+
+7. **Verify it allows the mailbox it should:**
 
    ```powershell
    Test-ApplicationAccessPolicy `
@@ -73,7 +97,7 @@ creates a group whose only member is the sending mailbox.
 
    Expect `AccessCheckResult : Granted`.
 
-6. ⚠️ **Verify it REFUSES one it should not.** This is the step that actually proves the
+8. ⚠️ **Verify it REFUSES one it should not.** This is the step that actually proves the
    policy — step 5 alone would pass even if the policy had not applied:
 
    ```powershell
@@ -85,7 +109,7 @@ creates a group whose only member is the sending mailbox.
    Expect `AccessCheckResult : Denied`. **If this says Granted, the policy is not in
    force** — do not treat the job as done.
 
-7. Disconnect:
+9. Disconnect:
 
    ```powershell
    Disconnect-ExchangeOnline -Confirm:$false
