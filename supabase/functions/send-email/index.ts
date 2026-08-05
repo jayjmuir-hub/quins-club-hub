@@ -2,11 +2,18 @@
 // Hook, so sign-in links come from the club rather than from Supabase.
 //
 // WHY THIS EXISTS AND NOT CUSTOM SMTP: Supabase's custom SMTP is
-// password-only, and the club's mail is Microsoft 365, where basic-auth SMTP
-// is being retired (tenants keep it only to the end of December 2026).
-// Microsoft Graph with OAuth client credentials has no such deadline, and it
-// is the pattern the tournament app at adhjrt.com has already run in
-// production for months (see netlify/functions/_email.js in that repo).
+// password-only, and doesn't fit the free sending providers cleanly either
+// way — this hook approach sends over plain HTTPS, no SMTP credentials
+// anywhere.
+//
+// PROVIDER: Resend, via a single HTTPS POST with an API key
+// (`Authorization: Bearer re_...`). Decided 5 Aug 2026, reversing the
+// 4 Aug decision to run this through Microsoft Graph on a new tenant — see
+// claude/decisions/2026-08-05-resend.md for the reasoning and what was
+// dropped. This used to call Microsoft Graph (`getToken` + `sendMail`
+// against `login.microsoftonline.com` / `graph.microsoft.com`); if you're
+// reading old context that mentions `MS_TENANT_ID` / `MS_CLIENT_ID` /
+// `MS_CLIENT_SECRET`, that's why — those env vars are gone.
 //
 // It also removes the reason this was urgent: Supabase's built-in email
 // service is capped at 2 messages per hour with no delivery SLA, which cannot
@@ -20,10 +27,9 @@
 // mail — fail closed, always.
 
 const HOOK_SECRET = Deno.env.get('SEND_EMAIL_HOOK_SECRET') ?? ''
-const TENANT = Deno.env.get('MS_TENANT_ID') ?? ''
-const CLIENT_ID = Deno.env.get('MS_CLIENT_ID') ?? ''
-const CLIENT_SECRET = Deno.env.get('MS_CLIENT_SECRET') ?? ''
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const MAIL_FROM = Deno.env.get('MAIL_FROM') ?? ''
+const REPLY_TO = Deno.env.get('REPLY_TO') ?? ''
 
 // Replay window for the webhook timestamp. Standard Webhooks recommends five
 // minutes; a captured request older than this is refused even with a valid
@@ -96,51 +102,37 @@ async function verify(request: Request, body: string): Promise<boolean> {
     .some((candidate) => timingSafeEqual(candidate, expected))
 }
 
-/* ---------------- Microsoft Graph ---------------- */
-
-async function getToken(): Promise<string> {
-  const response = await fetch(`https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      scope: 'https://graph.microsoft.com/.default',
-      grant_type: 'client_credentials',
-    }),
-  })
-
-  const data = await response.json()
-  if (!response.ok || !data.access_token) {
-    // Deliberately does not log the body — it can echo parts of the secret.
-    // The code alone diagnoses it:
-    //   invalid_client -> wrong or EXPIRED secret
-    //   unauthorized_client / later 403 -> admin consent never granted
-    throw new Error(`Graph token request failed (${response.status}): ${data.error ?? 'unknown'}`)
-  }
-  return data.access_token
-}
+/* ---------------- Resend ---------------- */
 
 async function sendMail(to: string, subject: string, html: string): Promise<void> {
-  const token = await getToken()
-  const response = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(MAIL_FROM)}/sendMail`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: {
-          subject,
-          body: { contentType: 'HTML', content: html },
-          toRecipients: [{ emailAddress: { address: to } }],
-        },
-        saveToSentItems: false,
-      }),
+  const body: Record<string, unknown> = {
+    from: MAIL_FROM,
+    to: [to],
+    subject,
+    html,
+  }
+  // Optional: without it, a reply to a sign-in email vanishes into a mailbox
+  // nobody reads, which is worse than no reply address at all.
+  if (REPLY_TO) body.reply_to = REPLY_TO
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
     },
-  )
+    body: JSON.stringify(body),
+  })
 
   if (!response.ok) {
-    throw new Error(`Graph sendMail failed (${response.status}): ${await response.text()}`)
+    // Deliberately does not log the body on 401/403 — a misconfigured key
+    // can otherwise echo account details into logs. The status alone
+    // diagnoses it:
+    //   401 -> wrong or revoked RESEND_API_KEY
+    //   403 -> MAIL_FROM's domain isn't verified in Resend yet
+    //   422 -> malformed request (bad address, missing field)
+    //   429 -> the free-tier rate limit (100/day) was hit
+    throw new Error(`Resend sendMail failed (${response.status}): ${await response.text()}`)
   }
 }
 
@@ -273,8 +265,8 @@ Deno.serve(async (request) => {
     })
   }
 
-  if (!TENANT || !CLIENT_ID || !CLIENT_SECRET || !MAIL_FROM) {
-    console.error('send-email: Graph is not configured')
+  if (!RESEND_API_KEY || !MAIL_FROM) {
+    console.error('send-email: Resend is not configured')
     return new Response(
       JSON.stringify({ error: { message: 'Email is not configured.' } }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },

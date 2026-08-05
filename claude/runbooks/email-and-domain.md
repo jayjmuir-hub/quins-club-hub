@@ -1,7 +1,14 @@
 # Club email + the Club Hub domain — runbook
 
 Everything Jay has to do by hand, in order. Claude cannot create accounts, enter
-passwords, or handle the client secret — those steps are marked **YOU**.
+passwords, or handle the API key — those steps are marked **YOU**.
+
+> **5 Aug 2026 — provider switched to Resend.** This used to be a Microsoft 365 /
+> Entra / Graph runbook. Jay reversed that decision the same week it was made — see
+> `claude/decisions/2026-08-05-resend.md` for the full reasoning, including why the
+> Microsoft path looked right for a day and what changed. If you're reading old
+> context (`MS_TENANT_ID`, Entra app registration, a new US-country tenant), that
+> plan is dead. Don't resume it without reading that doc first.
 
 ## Why this shape
 
@@ -10,82 +17,82 @@ passwords, or handle the client secret — those steps are marked **YOU**.
 onboard a club of 300, and it is why nobody should be invited until this is done.
 
 **Why not Supabase custom SMTP.** It is password-only — host, port, username, password.
-The club's mail is Microsoft 365, where **basic-auth SMTP is being retired** (tenants keep
-it only until the end of December 2026, new tenants blocked from January 2027). Wiring
-Supabase to M365 over SMTP would buy a few months and then fail in the worst possible way:
-nobody can sign in, because magic links silently stop being delivered.
+Resend supports SMTP too, but the HTTPS API is simpler, is what the Send Email Hook
+expects to call, and needs no credential rotation story of its own — the API key doesn't
+expire on a clock the way an Entra client secret does.
 
-**What we do instead.** Microsoft Graph with OAuth client credentials, called from a
-Supabase **Send Email Hook**. No deadline, no new vendor, no SMTP. It is also the pattern
-the tournament app at `adhjrt.com` has run in production for months — see
-`netlify/functions/_email.js` in that repo.
+**What we do instead.** Resend, called from a Supabase **Send Email Hook** over plain
+HTTPS with an API key. No tenant, no OAuth dance, no client secret with a 24-month clock.
 
 ## Decisions already made
 
-- Club Hub gets its **own domain**, separate from the once-a-year `adhjrt` tournament.
-- **Both the app and the email live on it.** An email from one domain linking to another is
-  the exact pattern people are taught to distrust.
-- Do the move **before inviting the committee**. This is a PWA: a home-screen install is
-  pinned to its origin, so moving domains later means everyone deletes and reinstalls.
-  Right now the only install is Jay's.
+- Club Hub gets its **own domain**, separate from the once-a-year `adhjrt` tournament:
+  `adhquins-clubhub.com`, already bought.
+- **Email sends from a subdomain of it**, `send.adhquins-clubhub.com`, not the root.
+  Two reasons: it's the pattern Resend's own setup wizard defaults to, and it keeps the
+  root domain's DNS untouched — no risk of ending up with two `v=spf1` TXT records at
+  `@`, which is a spec violation (PermError) that silently breaks SPF for everything
+  else at the root. The relaxed DMARC alignment already published at
+  `_dmarc.adhquins-clubhub.com` (`adkim=r; aspf=r`) means a subdomain sender still
+  passes DMARC. **Leave that alignment relaxed** — if anyone ever tightens it to `s`,
+  subdomain sending breaks.
+- **The app moves to this domain too, before anyone is invited.** An email from one
+  domain linking to sign-in on another is the exact pattern people are taught to
+  distrust, and this is a PWA — a home-screen install is pinned to its origin, so a
+  later move costs every member a delete-and-reinstall. Right now the only install is
+  Jay's.
+- Reply-To starts as Jay's own address. Easy to change later; not on the sending path.
 
 ---
 
-## 1. YOU — buy the domain
+## 1. YOU — sign up for Resend
 
-Whatever you settle on. Lead with the club name: "Club Hub" alone is trademarked (Anytime
-Fitness) and crowded, which is why the branding note says always to prefix it.
+**Use your own personal email, not a Microsoft/work account** — this has nothing to do
+with the M365 tenant and shouldn't get tangled with it.
 
-## 2. YOU — add it to your existing Microsoft 365 tenant
+Go to resend.com → sign up. Free tier: 3,000 emails/month, **100/day**, 1 verified
+domain, 30-day log retention. That ceiling is fine for a club of 300 doing sign-ins and
+occasional announcements; if it ever binds, the fallback noted in the decision doc is
+Amazon SES.
 
-You do **not** need a second M365 subscription. A tenant holds hundreds of domains.
+## 2. YOU — add the sending domain
 
-1. Microsoft 365 admin → **Settings → Domains → Add domain**
-2. Verify ownership with the TXT record it gives you (GoDaddy DNS)
-3. Add the DNS records it asks for. **MX only if you want to receive mail** on this domain;
-   **SPF and DKIM you want regardless** — a new domain starts with no keys and no sending
-   reputation, and unsigned auth mail gets filtered.
-4. Enable **DKIM** for the new domain (Defender portal → Email & collaboration → Policies →
-   Threat policies → Email authentication settings → DKIM), then publish the two CNAMEs it
-   generates.
+Resend dashboard → **Domains → Add Domain**.
 
-## 3. YOU — create the sender mailbox
+- Domain: **`send.adhquins-clubhub.com`** (the subdomain, not the root — see above).
+- Region: pick the one closest to your users if asked; doesn't matter much for
+  transactional mail latency.
 
-Create the sender as a **shared mailbox** — free, no licence needed, and the same thing the
-tournament app already sends from.
+Resend will show you a small set of DNS records to publish — typically an MX and a TXT
+for SPF, and a TXT (or CNAME) for DKIM, all scoped to the `send.` subdomain.
 
-Microsoft 365 admin → **Teams & groups → Shared mailboxes → Add**, on the new domain.
+## 3. YOU — publish the records in GoDaddy DNS
 
-Give it a real destination for replies: people **will** reply to a sign-in email, and a
-reply that vanishes is worse than no reply address at all.
+**In GoDaddy DNS** for `adhquins-clubhub.com` (`ns43`/`ns44.domaincontrol.com`), add
+each record Resend showed you, exactly as given — host/name, type, value. They'll be
+named things like `send` and `resend._domainkey.send`, not `@`, because they belong to
+the subdomain.
 
-## 4. YOU — Entra app registration
+**Do not touch the existing `@` records** (`v=spf1 include:spf.em.secureserver.net ?all`
+and the rest) — those are GoDaddy's registrar boilerplate on the root, unrelated to this
+and safe to leave alone.
 
-A **separate** registration from the tournament's is recommended: one secret per system, so
-an expiry or a leak takes down one thing rather than both.
+Wait 10–30 minutes for propagation, then back in Resend click **Verify**. If it doesn't
+verify within an hour, recheck the exact record values — a missing or extra character in
+a DKIM TXT value is the most common cause.
 
-1. entra.microsoft.com → **App registrations → New registration**, single tenant, no
-   redirect URI
-2. **API permissions → Microsoft Graph → APPLICATION permissions → `Mail.Send` → Add**,
-   then **Grant admin consent**. The status must read *Granted* or every send returns 403.
-3. **Certificates & secrets → New client secret.** The Value is shown **once**.
-4. **Record the expiry in a calendar reminder.** When a secret expires, email stops
-   *silently* — nothing else breaks, so nobody notices until someone can't sign in.
+## 4. YOU — create an API key
 
-### Do this bit, it is not optional housekeeping
+Resend dashboard → **API Keys → Create API Key**.
 
-`Mail.Send` as an *application* permission lets that app send as **any mailbox in the
-tenant**. Restrict each registration to its own sender:
+- Name it something identifiable, e.g. `quins-club-hub-send-email`.
+- Permission: **Sending access** only if Resend offers a scoped option — no reason for
+  this key to be able to manage domains or other account settings.
+- The value is shown **once**. Copy it now.
 
-```powershell
-New-ApplicationAccessPolicy -AppId <client-id> `
-  -PolicyScopeGroupId <the sender mailbox or a mail-enabled security group> `
-  -AccessRight RestrictAccess -Description "Quins Club Hub auth email"
-```
-
-The tournament app's own source flags this as outstanding for its registration too. With two
-apps in the tenant it matters more, not less: a leaked secret otherwise sends as anyone at
-your domains.
+Unlike the Microsoft path, this key doesn't have a fixed expiry — no calendar reminder
+needed for it to silently lapse. It's still a live credential: if it ever leaks, revoke
+it from this same screen and issue a new one.
 
 ## 5. YOU — set the Edge Function secrets
 
@@ -93,11 +100,14 @@ Supabase dashboard → **Edge Functions → Secrets**:
 
 | Name | Value |
 |---|---|
-| `MS_TENANT_ID` | Directory (tenant) ID |
-| `MS_CLIENT_ID` | Application (client) ID |
-| `MS_CLIENT_SECRET` | the secret's Value |
-| `MAIL_FROM` | the shared mailbox address |
+| `RESEND_API_KEY` | the key from step 4 |
+| `MAIL_FROM` | a sending address on the verified subdomain, e.g. `Abu Dhabi Harlequins <hello@send.adhquins-clubhub.com>` |
+| `REPLY_TO` | Jay's own email address, so replies to a sign-in email land somewhere real |
 | `SEND_EMAIL_HOOK_SECRET` | generated in step 6 — paste it here too |
+
+If any old `MS_TENANT_ID` / `MS_CLIENT_ID` / `MS_CLIENT_SECRET` secrets exist from the
+abandoned Microsoft path, delete them — dead credentials sitting in the secrets list are
+just something to accidentally rotate wrong later.
 
 **Never put any of these in this repo.** The repo is public.
 
@@ -117,7 +127,8 @@ function **refuses everything** if the secret is unset, rather than sending unve
 ## 7. YOU — point the app at the new domain
 
 1. Netlify → the `quins-club-hub` site → **Domain management → Add domain**, then follow its
-   DNS instructions.
+   DNS instructions. This is the app's own subdomain (e.g. `app.adhquins-clubhub.com`),
+   separate from the `send.` subdomain Resend uses — they don't conflict.
 2. Supabase → **Authentication → URL Configuration**: set **Site URL** to the new origin, and
    add `https://<new-domain>/**` to **Redirect URLs**. Keep the old ones during the switch so
    links already in inboxes still work.
@@ -127,14 +138,16 @@ function **refuses everything** if the secret is unset, rather than sending unve
 
 ## 8. Verify before telling anyone
 
-- Sign in with a magic link. The email must come **from the club address**, look like the
-  club, and its link must land on the **new** domain.
+- Sign in with a magic link. The email must come **from the club's `send.` address**,
+  look like the club, and its link must land on the **new** app domain.
 - Check it does **not** land in spam — new domain, so this is the real risk. Send to a
-  Gmail, an Outlook.com and an iCloud address if you can.
+  Gmail, an Outlook.com and an iCloud address if you can, and read the
+  `Authentication-Results` header on the received message (not just which folder it
+  landed in) — it will say `spf=pass`/`dkim=pass` if the DNS records actually took.
 - Confirm the app still loads, signs in and shows the roster on the new origin.
 - Reinstall the PWA from the new domain and delete the old install.
-- Send more than two emails within an hour. That is the old ceiling; it should no longer
-  exist.
+- Send more than two emails within an hour. That is the old Supabase ceiling; it should
+  no longer exist. Stay well under the Resend 100/day ceiling while testing.
 
 ---
 
@@ -142,8 +155,9 @@ function **refuses everything** if the secret is unset, rather than sending unve
 
 - `supabase/functions/send-email/index.ts` — the hook. Verifies the Standard Webhooks
   signature (constant-time, with a five-minute replay window), builds the verify URL from
-  the `token_hash` the hook provides, renders the club-voiced template, and sends via Graph.
-  Fails closed if the secret or the Graph config is missing.
+  the `token_hash` the hook provides, renders the club-voiced template, and sends via a
+  single HTTPS POST to `api.resend.com`. Fails closed if the secret or `RESEND_API_KEY` /
+  `MAIL_FROM` is missing.
 - Templates for magic link / signup, recovery, email change and invite. Plain HTML on
   purpose: no images, no external CSS, no tracking pixel — it is a sign-in email, it should
   load instantly on one bar of signal and give a spam filter nothing to dislike.
@@ -152,8 +166,9 @@ function **refuses everything** if the secret is unset, rather than sending unve
 
 | Symptom | Cause |
 |---|---|
-| Every send 401s | `SEND_EMAIL_HOOK_SECRET` doesn't match the one in the Hooks screen |
-| `invalid_client` in the logs | Wrong secret, or the secret **expired** |
-| 403 from Graph | Admin consent was never granted, or an application access policy excludes this sender |
-| Mail sends but lands in spam | DKIM not enabled for the new domain, or SPF missing |
+| Every send 401s (from Supabase, at the hook) | `SEND_EMAIL_HOOK_SECRET` doesn't match the one in the Hooks screen |
+| Resend call itself 401s | `RESEND_API_KEY` wrong or revoked |
+| Resend call 403s | `MAIL_FROM`'s domain isn't verified yet in Resend — recheck step 3 |
+| Resend call 429s | the 100/day free-tier cap was hit |
+| Mail sends but lands in spam | DKIM/SPF records from step 2 not fully propagated or not verified — recheck in Resend's dashboard |
 | Nothing arrives and nothing logs | The hook isn't enabled — Supabase is still sending its own |

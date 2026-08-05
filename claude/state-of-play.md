@@ -31,7 +31,7 @@ All live, deployed, and verified in the deployed bundle.
 | Scope/read-only banner removed everywhere; player sheet reworked | `3a512c5` |
 | Self-service profile editing for parents and players | `dd0d5c9` |
 | Calendar subscription feed for Google/Apple | `7f533fd` |
-| Club-branded auth email via Microsoft Graph (built, NOT yet switched on) | `23cedc8` |
+| Club-branded auth email, now via Resend (built, NOT yet switched on) | `23cedc8`, updated 5 Aug |
 
 Earlier the same day: `db/schema/` re-captured after it was found to be missing an entire
 table, a column, four policies and two functions — and that re-capture surfaced real drift
@@ -41,8 +41,9 @@ table, a column, four policies and two functions — and that re-capture surface
 
 **Auth email is still Supabase's built-in service: 2 messages/hour, no SLA, explicitly not
 for production. DO NOT INVITE THE COMMITTEE UNTIL THIS IS DONE.** The replacement is built
-and deployed but inert until Jay completes the Microsoft 365 / Entra / Supabase steps in
-`claude/runbooks/email-and-domain.md`.
+and deployed but inert until Jay completes the Resend / GoDaddy DNS / Supabase steps in
+`claude/runbooks/email-and-domain.md`. (Provider switched from Microsoft Graph to Resend
+5 Aug 2026 — `claude/decisions/2026-08-05-resend.md`.)
 
 **Domain move pending.** Jay has bought `adhquins-clubhub.com`. The app AND the email move
 there together — an email from one domain linking to another is the pattern people are
@@ -74,6 +75,17 @@ is Jay's.
 
 ## Machines
 
-`jay-pc` (user `jayjm`) is behind at `2244f0a` and needs a `git pull`. `cafnet` (user `Jay`)
-is current. **Run `hostname` first, every session** — the bridge flaps and has silently
-reconnected to the other PC mid-session, and the clone paths differ.
+`jay-pc` (user `jayjm`) verified 5 Aug 2026 at `3c6b12c`, matching `origin/build/v1-mvp` —
+no longer behind. `cafnet` (user `Jay`) last confirmed current 4 Aug; not re-checked since.
+**Run `hostname` first, every session** — the bridge flaps and has silently reconnected to
+the other PC mid-session, and the clone paths differ.
+
+⚠️ **jay-pc's working tree has `core.fileMode` drift**: before this session's commit, every
+tracked file showed as locally modified — full-file rewrite in `git diff`, executable bit
+flipped 100644→100755 on files that should never be executable. Root cause not fully
+diagnosed (likely OneDrive sync or an editor touching the exec bit; Windows checkouts
+should normally run `core.fileMode=false` since NTFS doesn't model the POSIX bit the same
+way). **Set to `false` in this session, 5 Aug**, which stops the mode noise; the CRLF/LF
+content drift on files this session didn't touch is still there. **Do not run
+`git add -A` on this machine until that's cleaned up** — it already wasn't allowed, but this
+is why the rule exists, made concrete.

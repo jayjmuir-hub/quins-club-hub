@@ -1023,13 +1023,17 @@ just in jsdom.
 
 - **Auth email is still Supabase's built-in service — 2/hour, no SLA, not for production.
   DO NOT INVITE THE COMMITTEE UNTIL THIS IS DONE.** The replacement is built and deployed
-  (`supabase/functions/send-email`, Microsoft Graph via the Send Email Hook) but is INERT
-  until Jay does the Entra/M365/Supabase steps. Full runbook: `claude/runbooks/email-and-domain.md`.
+  (`supabase/functions/send-email`, **Resend** via the Send Email Hook) but is INERT until
+  Jay does the Resend/GoDaddy-DNS/Supabase steps. Full runbook: `claude/runbooks/email-and-domain.md`.
 
-  Why not Supabase custom SMTP: it is password-only, and the club's mail is Microsoft 365,
-  where basic-auth SMTP is retired for tenants at the end of December 2026. Graph OAuth has
-  no deadline, and the tournament app at `adhjrt.com` has run exactly this pattern in
-  production for months (`netlify/functions/_email.js` in that repo).
+  Why not Supabase custom SMTP: it is password-only and buys nothing here either way — the
+  hook approach sends over plain HTTPS with an API key, no SMTP credentials anywhere.
+
+  **Provider history:** this ran on Microsoft Graph until 5 Aug 2026, when Jay reversed the
+  4 Aug decision to stand up a whole new Microsoft 365 tenant for it — see
+  `claude/decisions/2026-08-05-resend.md`. If you find old context mentioning
+  `MS_TENANT_ID`/`MS_CLIENT_ID`/`MS_CLIENT_SECRET`, Entra app registrations, or a new US
+  tenant for Club Hub mail, that plan is dead; don't resume it without rereading that doc.
 
 - **Club Hub is moving to its own domain, app AND email together** (Jay's call, 4 Aug 2026):
   `adhjrt` is a once-a-year tournament brand and the Club Hub is year-round. **Do the move
