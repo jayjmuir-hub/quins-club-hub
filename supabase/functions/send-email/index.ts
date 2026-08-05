@@ -81,7 +81,16 @@ async function verify(request: Request, body: string): Promise<boolean> {
   const age = Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp))
   if (!Number.isFinite(age) || age > TOLERANCE_SECONDS) return false
 
-  const secret = HOOK_SECRET.startsWith('whsec_') ? HOOK_SECRET.slice(6) : HOOK_SECRET
+  // Supabase's Send Email Hook secret is shown as `v1,whsec_<base64>` — a
+  // Standard Webhooks version tag ("v1,") in front of the usual "whsec_"
+  // prefix. Stripping only a leading "whsec_" (the plain Standard Webhooks
+  // format) leaves "v1," on the front, which corrupts the base64 and makes
+  // every request fail closed with a raw 500 before it even reaches the
+  // signature comparison. Strip up to and including whichever "whsec_" is
+  // found, wherever it starts, so both the bare and Supabase-prefixed forms
+  // decode correctly.
+  const whsecIndex = HOOK_SECRET.indexOf('whsec_')
+  const secret = whsecIndex >= 0 ? HOOK_SECRET.slice(whsecIndex + 'whsec_'.length) : HOOK_SECRET
   const key = await crypto.subtle.importKey(
     'raw',
     base64ToBytes(secret),
@@ -254,7 +263,20 @@ Deno.serve(async (request) => {
   // signed.
   const raw = await request.text()
 
-  if (!(await verify(request, raw))) {
+  // verify() can throw (e.g. a malformed HOOK_SECRET that isn't valid base64)
+  // rather than just returning false. Catch that here so a bad secret fails
+  // closed as an ordinary 401 like any other verification failure, instead of
+  // an unhandled exception that Deno turns into a bodyless 500 with no clue
+  // in our own logs about why.
+  let verified: boolean
+  try {
+    verified = await verify(request, raw)
+  } catch (error) {
+    console.error('send-email: verification threw:', error instanceof Error ? error.message : error)
+    verified = false
+  }
+
+  if (!verified) {
     // No detail to the caller. Whether the secret is missing, the timestamp is
     // stale or the signature is wrong is not something an unverified caller
     // gets to learn.
