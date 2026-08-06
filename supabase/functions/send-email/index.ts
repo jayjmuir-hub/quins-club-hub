@@ -6,36 +6,59 @@
 // way — this hook approach sends over plain HTTPS, no SMTP credentials
 // anywhere.
 //
-// PROVIDER: Microsoft Graph `sendMail`, with an OAuth client-credentials
-// token. Decided 5 Aug 2026, reversing that morning's switch to Resend — Jay
-// bought Microsoft 365 for this domain, so club mailboxes and app mail now
-// live in one place. Tenant `quinsclubhub.onmicrosoft.com`; the app
-// registration is "Quins Club Hub — auth email" with Mail.Send granted as an
-// APPLICATION permission.
+// PROVIDER: Resend, via a single HTTPS POST with an API key
+// (`Authorization: Bearer re_...`). Reinstated 6 Aug 2026, reversing the 5 Aug
+// switch to Microsoft Graph.
 //
-// WARNING: MS_CLIENT_SECRET EXPIRES 4 Aug 2028. When it lapses the symptom is
-// that nobody can sign in, with no error surfaced anywhere useful. Check for
-// `invalid_client` from the token call before looking anywhere else.
+// ⚠️ WHY IT WAS REVERSED, so nobody "fixes" it back: the Microsoft path was
+// built correctly and works right up to the point Exchange refuses to let the
+// message leave. Every send failed with
+//   550 5.7.708 Access denied, traffic not accepted from this IP
+// which is Microsoft's outbound restriction on a BRAND-NEW tenant, applied
+// before the tenant had ever sent anything. Graph returns 200; the message
+// dies after Submit. No setting fixes it — only a support ticket, raised
+// 5 Aug and still open. The result was worse than what it replaced: Resend
+// delivered (to spam), Microsoft delivered nothing at all.
 //
-// WARNING: Mail.Send as an application permission lets this app send as ANY
-// mailbox in the tenant. It MUST stay scoped by New-ApplicationAccessPolicy
-// to noreply@adhquins-clubhub.com alone.
+// ⚠️ Sending as `admin@<tenant>.onmicrosoft.com` is NOT a workaround, and was
+// considered and rejected on 6 Aug. 5.7.708 is scoped to the tenant's outbound
+// IP, not the domain, so it would not route around the block — and since
+// mid-2025 Microsoft caps MOERA (`*.onmicrosoft.com`) outbound to external
+// recipients at 100 messages per TENANT per rolling 24 hours (NDR 550 5.7.236),
+// fully rolled out by June 2026. One invite wave to 300 parents would exhaust
+// a day's quota for the whole tenant.
+//
+// ⚠️ MAIL_FROM MUST BE ON `send.adhquins-clubhub.com`, NOT the root domain.
+// The subdomain is what is verified in Resend; a root-domain address returns
+// 403. Root DMARC must also stay RELAXED (`adkim=r; aspf=r`) or subdomain
+// sending fails alignment — verified still relaxed on 6 Aug. Do not tighten it.
+//
+// The Microsoft Graph implementation (`getToken` + `sendMail` against
+// `login.microsoftonline.com` / `graph.microsoft.com`) is in git history at
+// `a9e8492` if the block is ever lifted and it is wanted back. ⚠️ Take the
+// PROVIDER half only — the signature verification and the site_url
+// normalisation below are shared, current, and were each an expensive bug.
 //
 // It also removes the reason this was urgent: Supabase's built-in email
 // service is capped at 2 messages per hour with no delivery SLA, which cannot
 // onboard a club of 300.
 //
-// SECURITY: this endpoint runs with verify_jwt OFF, because Supabase Auth
-// calls it server-to-server with no user JWT. It is therefore PUBLICLY
-// REACHABLE, and the ONLY thing standing between the internet and "send mail
-// as the club to any address" is the signature check below. If SEND_EMAIL_HOOK_SECRET
-// is unset the function refuses every request rather than sending unverified
+// ⚠️ SECURITY: this endpoint MUST stay deployed with verify_jwt OFF, because
+// Supabase Auth calls it server-to-server with no user JWT — with JWT
+// verification on, every hook call is rejected at the gateway before reaching
+// this code and NOBODY CAN SIGN IN. It is therefore PUBLICLY REACHABLE, and
+// the ONLY thing standing between the internet and "send mail as the club to
+// any address" is the signature check below. If SEND_EMAIL_HOOK_SECRET is
+// unset the function refuses every request rather than sending unverified
 // mail — fail closed, always.
+//
+// ⚠️ Deploying via the Supabase MCP `deploy_edge_function` tool DEFAULTS
+// verify_jwt back to TRUE. It was silently re-enabled that way on 6 Aug and had
+// to be redeployed. Always pass verify_jwt: false explicitly, and read it back
+// from the deploy response before assuming the deploy was clean.
 
 const HOOK_SECRET = Deno.env.get('SEND_EMAIL_HOOK_SECRET') ?? ''
-const TENANT = Deno.env.get('MS_TENANT_ID') ?? ''
-const CLIENT_ID = Deno.env.get('MS_CLIENT_ID') ?? ''
-const CLIENT_SECRET = Deno.env.get('MS_CLIENT_SECRET') ?? ''
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const MAIL_FROM = Deno.env.get('MAIL_FROM') ?? ''
 const REPLY_TO = Deno.env.get('REPLY_TO') ?? ''
 
@@ -119,57 +142,38 @@ async function verify(request: Request, body: string): Promise<boolean> {
     .some((candidate) => timingSafeEqual(candidate, expected))
 }
 
-/* ---------------- Microsoft Graph ---------------- */
-
-async function getToken(): Promise<string> {
-  const response = await fetch(`https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      scope: 'https://graph.microsoft.com/.default',
-      grant_type: 'client_credentials',
-    }),
-  })
-
-  const data = await response.json()
-  if (!response.ok || !data.access_token) {
-    // Deliberately does not log the body — it can echo parts of the secret.
-    // The error code alone diagnoses it:
-    //   invalid_client      -> wrong or EXPIRED secret (expires 4 Aug 2028)
-    //   unauthorized_client -> admin consent was never granted
-    throw new Error(`Graph token request failed (${response.status}): ${data.error ?? 'unknown'}`)
-  }
-  return data.access_token
-}
+/* ---------------- Resend ---------------- */
 
 async function sendMail(to: string, subject: string, html: string): Promise<void> {
-  const token = await getToken()
-
-  const message: Record<string, unknown> = {
+  const body: Record<string, unknown> = {
+    from: MAIL_FROM,
+    to: [to],
     subject,
-    body: { contentType: 'HTML', content: html },
-    toRecipients: [{ emailAddress: { address: to } }],
+    html,
   }
   // Optional: without it, a reply to a sign-in email vanishes into a mailbox
   // nobody reads, which is worse than no reply address at all.
-  if (REPLY_TO) message.replyTo = [{ emailAddress: { address: REPLY_TO } }]
+  if (REPLY_TO) body.reply_to = REPLY_TO
 
-  const response = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(MAIL_FROM)}/sendMail`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, saveToSentItems: false }),
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
     },
-  )
+    body: JSON.stringify(body),
+  })
 
   if (!response.ok) {
-    //   401 -> token rejected
-    //   403 -> ApplicationAccessPolicy excludes MAIL_FROM, or consent missing
-    //   404 -> the MAIL_FROM mailbox does not exist in this tenant
-    throw new Error(`Graph sendMail failed (${response.status}): ${await response.text()}`)
+    // The response body is included because, unlike the Graph token call, it
+    // carries no credential material — only a reason. The status alone is
+    // usually enough:
+    //   401 -> wrong or revoked RESEND_API_KEY
+    //   403 -> MAIL_FROM's domain isn't verified in Resend. Check it is on
+    //          send.adhquins-clubhub.com and NOT the root domain.
+    //   422 -> malformed request (bad address, missing field)
+    //   429 -> free-tier limit: 100/day, 3,000/month
+    throw new Error(`Resend sendMail failed (${response.status}): ${await response.text()}`)
   }
 }
 
@@ -325,8 +329,8 @@ Deno.serve(async (request) => {
     })
   }
 
-  if (!TENANT || !CLIENT_ID || !CLIENT_SECRET || !MAIL_FROM) {
-    console.error('send-email: Microsoft Graph is not configured')
+  if (!RESEND_API_KEY || !MAIL_FROM) {
+    console.error('send-email: Resend is not configured')
     return new Response(
       JSON.stringify({ error: { message: 'Email is not configured.' } }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },
