@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { markSessionExpired } from './sessionExpired.js'
 
 // Single-responsibility Supabase client for the app. No auth helpers, no
 // query helpers, no retry logic — those belong to later tasks.
@@ -167,6 +168,12 @@ export const sessionGuard = createSessionGuard({
     //
     // Deliberately NOT 'global': a stale tab must not revoke the session on
     // someone's phone.
+    //
+    // Leave a note first, so the login screen can say WHY. Verified live on
+    // 6 Aug 2026 that without this the person is simply thrown to a login
+    // screen mid-task with no explanation — the right outcome, presented as
+    // though the app had broken.
+    markSessionExpired()
     if (nativeSignOut) nativeSignOut({ scope: 'local' }).catch(() => {})
   },
 })

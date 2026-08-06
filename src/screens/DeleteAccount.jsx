@@ -191,7 +191,9 @@ export default function DeleteAccount() {
               <p className="mb-3 text-[14px] font-semibold leading-relaxed text-ink">
                 Sign in below and you&apos;ll come straight back here to finish.
               </p>
-              <Login />
+              {/* embedded — no full-screen dark backdrop, no second <h1>.
+                  This page already provides both. */}
+              <Login embedded />
             </div>
           )}
         </>

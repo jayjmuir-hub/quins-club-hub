@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
+import { takeSessionExpired } from '../lib/sessionExpired.js'
 import crest from '../assets/crest.png'
 
 // Login screen: the first thing an uninvited or signed-out visitor sees.
@@ -43,18 +44,65 @@ const RATE_LIMITED = /rate limit|too many requests|429/i
 const RATE_LIMIT_MESSAGE =
   'Lots of people are signing in right now. Wait a couple of minutes and try again — or use Continue with Google if that’s your email.'
 
+// ⚠️ SECOND ENTRY, ADDED 6 AUG 2026 FOR A WALL WE KNOW WE WILL HIT.
+//
+// Resend's free tier sends 100 emails per DAY — read off the account, not
+// guessed (Settings -> Usage, "Daily limit 5 / 100"). 143 people need magic
+// links, so the cap is reachable on day one of any rollout.
+//
+// When it trips, Resend returns 429 daily_quota_exceeded, the Send Email Auth
+// Hook returns 500, and GoTrue hands the browser
+// "Unexpected status code returned from hook: 500" — which contains no "rate
+// limit", no "429", and nothing else RATE_LIMITED matches. Untranslated, a
+// parent reads that and concludes the app is broken.
+//
+// NOT hypothetical: it happened on 6 Aug 2026 at 04:44 and is in the auth logs.
+//
+// Deliberately vaguer than the rate-limit copy above. This same error covers
+// every way the mail hook can fail, and promising "wait a couple of minutes"
+// would be a lie if the real cause is the daily cap, which resets at midnight
+// UTC. Google is offered first because for half the club it works instantly
+// and sends no email at all.
+const EMAIL_SEND_FAILED = /status code returned from hook|unexpected_failure/i
+
+const EMAIL_SEND_FAILED_MESSAGE =
+  'We couldn’t send your sign-in link just now. If your email is a Gmail address, use Continue with Google below — it works straight away. Otherwise try again later, or contact the club.'
+
+// ⚠️ Deliberately a narrow allow-list, not a general error prettifier — see
+// the header comment. Two entries, both for failures a parent can neither
+// understand nor act on. Everything else keeps its real message.
 export function friendlyAuthError(error, fallback) {
   const raw = typeof error?.message === 'string' ? error.message : ''
   if (RATE_LIMITED.test(raw)) return RATE_LIMIT_MESSAGE
+  if (EMAIL_SEND_FAILED.test(raw)) return EMAIL_SEND_FAILED_MESSAGE
   return raw || fallback
 }
 
-export default function Login({ authError = null }) {
+// Set by the session guard in src/lib/supabase.js at the moment it catches a
+// silent downgrade to anon (commit c80f51e). Before this, that guard threw
+// people to the login screen mid-task with no explanation whatsoever — the
+// outcome was right and the experience read as the app breaking.
+const SESSION_EXPIRED_MESSAGE =
+  'You were signed out because your session expired. Sign in again and carry on where you left off.'
+
+// `embedded` — render as a plain card inside somebody else's page, instead of
+// as the whole screen. Used by /delete-account, which is public and therefore
+// has to offer sign-in itself. Without it the full-screen dark panel lands in
+// the middle of a light page and the result reads as two pages stitched
+// together — which is the first thing a Play reviewer sees.
+//
+// It also drops the crest, the club name and the intro paragraph. Not for
+// tidiness: the host page already carries an <h1>, and a second one is wrong
+// for anyone using a screen reader to navigate by heading.
+export default function Login({ authError = null, embedded = false }) {
   const { signInWithEmail, signInWithGoogle } = useAuth()
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState('idle') // 'idle' | 'sending' | 'sent'
   const [error, setError] = useState(null)
   const [staleAuthError, setStaleAuthError] = useState(authError)
+  // Lazy initialiser, so the flag is taken exactly once per mount rather than
+  // on every render.
+  const [sessionExpired, setSessionExpired] = useState(() => takeSessionExpired())
 
   useEffect(() => {
     setStaleAuthError(authError)
@@ -62,11 +110,14 @@ export default function Login({ authError = null }) {
 
   const sending = status === 'sending'
   const displayedError =
-    error ?? (staleAuthError ? `That sign-in link didn't work: ${staleAuthError}` : null)
+    error ??
+    (staleAuthError ? `That sign-in link didn't work: ${staleAuthError}` : null) ??
+    (sessionExpired ? SESSION_EXPIRED_MESSAGE : null)
 
   async function handleEmailSubmit(event) {
     event.preventDefault()
     setStaleAuthError(null)
+    setSessionExpired(false)
 
     const trimmed = email.trim()
     if (!trimmed || !EMAIL_PATTERN.test(trimmed)) {
@@ -87,6 +138,7 @@ export default function Login({ authError = null }) {
 
   async function handleGoogleClick() {
     setStaleAuthError(null)
+    setSessionExpired(false)
     setError(null)
     setStatus('sending')
     try {
@@ -105,43 +157,49 @@ export default function Login({ authError = null }) {
     setError(null)
   }
 
-  return (
-    // Dark chrome, matching the masthead. This used to be the same red->green
-    // gradient the header carried, which on a FULL-SCREEN element runs all the
-    // way to pure #3bd070 in the corner — 2.01:1 against the white text sitting
-    // on it. Near-black is 19.54:1 and needs no width-dependent caveats.
-    <div className="harlequin relative flex min-h-screen items-center justify-center overflow-hidden bg-chrome-grad px-4 py-10">
-      <div className="brand-rule absolute inset-x-0 top-0" />
-      {/* relative z-10 so the card sits above `.harlequin`'s decorative
-          diagonals — that pseudo-element is absolutely positioned, and
-          positioned boxes paint over non-positioned siblings. */}
-      <div className="relative z-10 w-full max-w-[380px] rounded-card border border-line bg-surface-card p-6 shadow-card sm:p-8">
-        {/* crest.png is 370x400 (portrait) — object-contain keeps its native
-            aspect ratio inside the square box instead of stretching to fill
-            it (see AppShell's header badge for the same fix/reasoning). */}
-        <img
-          src={crest}
-          alt="Abu Dhabi Harlequins crest"
-          className="mx-auto h-20 w-20 object-contain"
-        />
-        <h1 className="mt-4 text-center text-xl font-extrabold tracking-tight text-ink">
-          Abu Dhabi Harlequins
-        </h1>
-        <p className="mt-1 text-center text-xs font-semibold uppercase tracking-widest text-ink-faint">
-          Quins Club Hub
-        </p>
-        {/* This used to say "invite-only ... ask your club admin", which was
-            true when signing in without an invite was a dead end. It now
-            sends people hunting for an admin through some channel the app
-            knows nothing about, when the app will take their request directly
-            — see src/components/RequestAccess.jsx. Signing in is still not
-            the same as getting access: an account with no membership reads
-            zero rows from every table. */}
-        <p className="mt-4 text-center text-sm leading-relaxed text-ink-faint">
-          Quins Club Hub is for Abu Dhabi Harlequins members. Sign in below — if
-          the club hasn&apos;t set your account up yet, you can ask them to on
-          the next screen.
-        </p>
+  const card = (
+    /* relative z-10 so the card sits above `.harlequin`'s decorative
+       diagonals — that pseudo-element is absolutely positioned, and
+       positioned boxes paint over non-positioned siblings. Embedded, there is
+       no such backdrop, so neither the z-index, the shadow nor the width cap
+       applies: the host page owns the layout. */
+    <div
+      className={
+        embedded
+          ? 'w-full rounded-card border border-line bg-surface-card p-6'
+          : 'relative z-10 w-full max-w-[380px] rounded-card border border-line bg-surface-card p-6 shadow-card sm:p-8'
+      }
+    >
+      {!embedded && (
+        <>
+          {/* crest.png is 370x400 (portrait) — object-contain keeps its native
+              aspect ratio inside the square box instead of stretching to fill
+              it (see AppShell's header badge for the same fix/reasoning). */}
+          <img
+            src={crest}
+            alt="Abu Dhabi Harlequins crest"
+            className="mx-auto h-20 w-20 object-contain"
+          />
+          <h1 className="mt-4 text-center text-xl font-extrabold tracking-tight text-ink">
+            Abu Dhabi Harlequins
+          </h1>
+          <p className="mt-1 text-center text-xs font-semibold uppercase tracking-widest text-ink-faint">
+            Quins Club Hub
+          </p>
+          {/* This used to say "invite-only ... ask your club admin", which was
+              true when signing in without an invite was a dead end. It now
+              sends people hunting for an admin through some channel the app
+              knows nothing about, when the app will take their request directly
+              — see src/components/RequestAccess.jsx. Signing in is still not
+              the same as getting access: an account with no membership reads
+              zero rows from every table. */}
+          <p className="mt-4 text-center text-sm leading-relaxed text-ink-faint">
+            Quins Club Hub is for Abu Dhabi Harlequins members. Sign in below —
+            if the club hasn&apos;t set your account up yet, you can ask them to
+            on the next screen.
+          </p>
+        </>
+      )}
 
         {status === 'sent' ? (
           <div className="mt-6">
@@ -212,7 +270,19 @@ export default function Login({ authError = null }) {
             </button>
           </form>
         )}
-      </div>
+    </div>
+  )
+
+  if (embedded) return card
+
+  return (
+    // Dark chrome, matching the masthead. This used to be the same red->green
+    // gradient the header carried, which on a FULL-SCREEN element runs all the
+    // way to pure #3bd070 in the corner — 2.01:1 against the white text sitting
+    // on it. Near-black is 19.54:1 and needs no width-dependent caveats.
+    <div className="harlequin relative flex min-h-screen items-center justify-center overflow-hidden bg-chrome-grad px-4 py-10">
+      <div className="brand-rule absolute inset-x-0 top-0" />
+      {card}
     </div>
   )
 }
