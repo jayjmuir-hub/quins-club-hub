@@ -1,0 +1,39 @@
+-- Applied to Supabase as `grant_anon_execute_on_two_profile_helpers`, 6 Aug 2026.
+--
+-- Stops a signed-out (or token-expired) request throwing raw Postgres at a user.
+--
+-- Reported live: a user clicking Save on the name prompt saw
+--   "permission denied for function shares_admin_club"
+--
+-- Reproduced server-side as the `anon` role, in a rolled-back transaction:
+--   select -> 42501 permission denied for function can_admin_see_pending
+--   update -> 42501 permission denied for function shares_admin_club
+--
+-- The SAME statements as `authenticated` with that user's uid succeeded, so
+-- neither RLS nor the new profiles_sync_name trigger was at fault. The request
+-- simply arrived without a valid JWT.
+--
+-- These two were the ONLY private helpers on the profiles policies missing an
+-- anon grant. is_admin, can_see_team, can_edit_team and is_own_player all had
+-- one already, which is why no other screen ever produced this error. The
+-- INCONSISTENCY was the bug, not the permission.
+--
+-- WHY THIS IS SAFE, because "grant to anon" deserves suspicion:
+-- both are STABLE SECURITY DEFINER and both bottom out in
+--   mine.profile_id = auth.uid()
+-- With no JWT, auth.uid() is null, the EXISTS matches nothing, and the function
+-- returns FALSE. An anon caller can now EVALUATE the policy and is still
+-- refused BY it. Granting EXECUTE is not granting access; the function's own
+-- auth.uid() test is the control.
+--
+-- Verified after applying, as anon, rolled back:
+--   select -> no error, rows visible = 0
+--   update -> no error, rows updated = 0
+--
+-- ⚠️ THIS DOES NOT FIX THE ROOT CAUSE. It converts a raw 42501 into a clean
+-- refusal. Something made an in-app request arrive as `anon` while the UI
+-- believed the user was signed in, and that is STILL OPEN. At rollout it would
+-- present as "it says I'm signed in but nothing saves". See
+-- claude/state-of-play.md.
+grant execute on function private.shares_admin_club(uuid) to anon;
+grant execute on function private.can_admin_see_pending(uuid) to anon;
