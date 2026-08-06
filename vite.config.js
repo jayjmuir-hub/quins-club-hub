@@ -59,11 +59,11 @@ export default defineConfig({
         // this is chrome (#0c0c0e), not the brand red — a red status bar above
         // a black masthead reads as a rendering bug. Keep in sync with the
         // <meta name="theme-color"> in index.html.
-        theme_color: '#0c0c0e',
+        theme_color: '#0a0a0a',
         // Splash-screen background shown while the app loads on first launch.
         // Matches the app's page surface so there's no colour flash before the
         // CSS paints.
-        background_color: '#eef0f3',
+        background_color: '#f3f3f3',
         display: 'standalone',
         start_url: '/',
         scope: '/',

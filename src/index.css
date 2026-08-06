@@ -27,28 +27,28 @@
    Tailwind to read from CSS vars costs more than it saves at this size.
    ------------------------------------------------------------------------ */
 :root {
-  --surface: #eef0f3;
+  --surface: #f3f3f3;
   --surface-card: #ffffff;
-  --surface-sunk: #e6e9ee;
-  --surface-mute: #f2f4f7;
+  --surface-sunk: #ebebeb;
+  --surface-mute: #f7f7f7;
 
   --ink: #101116;
   --ink-muted: #565c67;
   --ink-faint: #636974;
 
-  --line: #dfe2e8;
-  --line-strong: #ccd1da;
+  --line: #e5e5e5;
+  --line-strong: #d4d4d4;
 
-  --brand: #e11b22;
-  --brand-deep: #b3141a;
-  --brand-ink: #b3141a;
+  --brand: #c8102e;
+  --brand-deep: #a30d25;
+  --brand-ink: #c8102e;
 
-  --accent: #3bd070;
+  --accent: #2a9d55;
   --accent-mid: #1f9d4d;
   --accent-ink: #157f3c;
 
-  --chrome: #0c0c0e;
-  --chrome-raised: #151517;
+  --chrome: #0a0a0a;
+  --chrome-raised: #121212;
 }
 
 @layer base {

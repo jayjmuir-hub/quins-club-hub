@@ -75,7 +75,11 @@ describe('PWA production build output', () => {
     // Chrome near-black, not the brand red: theme_color tints the OS/browser
     // chrome to blend with the top of the page, and the top of the page is the
     // dark masthead. See the note in vite.config.js.
-    expect(manifest.theme_color).toBe('#0c0c0e')
+    // #0a0a0a since the 6 Aug 2026 re-point at the club redesign — still the
+    // chrome near-black, just the new one. The value must equal the masthead
+    // colour, not merely be dark: a mismatch shows as a seam between the OS
+    // status bar and the top of the app.
+    expect(manifest.theme_color).toBe('#0a0a0a')
   })
 
   it('manifest declares start_url and scope covering the whole app', () => {

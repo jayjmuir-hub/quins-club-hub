@@ -11,28 +11,31 @@
 // previously written into component comments by hand. Numbers in comments go
 // stale silently; a script that fails the build does not.
 
+// ⚠️ MIRRORS tailwind.config.js. Change one, change both. Re-pointed at the
+// current club redesign (abudhabiquinspreview.xyz) on 6 Aug 2026.
 const T = {
-  surface: '#eef0f3',
+  surface: '#f3f3f3',
   surfaceCard: '#ffffff',
-  surfaceSunk: '#e6e9ee',
-  surfaceMute: '#f2f4f7',
+  surfaceSunk: '#ebebeb',
+  surfaceMute: '#f7f7f7',
   ink: '#101116',
   inkMuted: '#565c67',
   inkFaint: '#636974',
-  line: '#dfe2e8',
-  brand: '#e11b22',
-  brandDeep: '#b3141a',
-  brandInk: '#b3141a',
-  accent: '#3bd070',
+  line: '#e5e5e5',
+  brand: '#c8102e',
+  brandDeep: '#a30d25',
+  brandInk: '#c8102e',
+  accent: '#2a9d55',
   accentMid: '#1f9d4d',
   accentInk: '#157f3c',
   accentBg: '#e6f7ec',
-  chrome: '#0c0c0e',
-  chromeRaised: '#151517',
+  chrome: '#0a0a0a',
+  chromeRaised: '#121212',
   chromeMuted: '#8b9099',
-  brandOnDark: '#ff8f8f',
+  brandOnDark: '#ff2d4a',
   // bg-brand/20 composited over chrome — the role pill's real fill.
-  rolePill: '#370f12',
+  // Recomputed for the new brand + chrome: mix(#0a0a0a, #c8102e, .2).
+  rolePill: '#300b11',
   danger: '#c2352c',
   dangerBg: '#fdeceb',
   warn: '#c98a12',
@@ -105,9 +108,9 @@ for (const [fg, bg, where, min] of PAIRS) {
 // Gradients: sample across the full width. A band that passes at both stops can
 // still fail in the middle, and vice versa.
 const GRADIENTS = [
-  ['stat-band', [[0, '#e11b22'], [0.52, '#c23a30'], [1, '#157f3c']], T.white, 4.5],
-  ['hero-grad', [[0, '#b3141a'], [1, '#e11b22']], T.white, 4.5],
-  ['chrome-grad', [[0, '#151517'], [1, '#0c0c0e']], T.white, 4.5],
+  ['stat-band', [[0, '#c8102e'], [0.52, '#a83a30'], [1, '#157f3c']], T.white, 4.5],
+  ['hero-grad', [[0, '#a30d25'], [1, '#c8102e']], T.white, 4.5],
+  ['chrome-grad', [[0, '#121212'], [1, '#0a0a0a']], T.white, 4.5],
 ]
 console.log('\nGRADIENTS (sampled every 5%)')
 for (const [name, stops, fg, min] of GRADIENTS) {

@@ -9,33 +9,67 @@
 // change a 20-file archaeology exercise. The rule now: if you need a colour,
 // it has a name here, or it doesn't go in.
 //
-// Canonical brand values are lifted from the club website
-// (adhquins-website-redesign): red #e11b22, green #3bd070, near-black #0c0c0e,
-// panels #14151a/#151517, Anton + Barlow + Barlow Condensed.
+// Canonical brand values are lifted from the club website. RE-POINTED 6 Aug
+// 2026 at the current redesign (abudhabiquinspreview.xyz), which moved off the
+// values the previous one used (red #e11b22, green #3bd070, near-black
+// #0c0c0e). Read off the live site's computed CSS custom properties, not
+// sampled from a screenshot.
+//
+// ⚠️ THE SITE HAS TWO REDS AND THE DIFFERENCE MATTERS.
+//   light mode  --primary: #c8102e
+//   dark mode   --primary: #ff2d4a
+// #ff2d4a is the one you see on the homepage, and it is the WRONG one for this
+// app's light surfaces: white text on it measures 3.67:1, a hard AA failure,
+// and it would have landed on every primary button in the app. It is correct
+// only against near-black, where it makes 5.40:1 — so it lives on `brand.onDark`
+// and nowhere else.
+//
+// #c8102e is a straight improvement on the #e11b22 it replaces: 5.88:1 with
+// white vs 4.79:1. It is also now AA as text in its own right, so `brand.ink`
+// no longer needs to be a separate darker value.
+//
+// Greys moved from blue-tinted (#eef0f3) to the site's neutral family
+// (#f3f3f3 / #e5e5e5). Typography is deliberately NOT changed here — the site
+// uses Inter throughout, this app uses Anton + Barlow + Barlow Condensed, and
+// swapping them changes text WIDTH on every nav item, button and title. That
+// is a separate, sweep-the-whole-app job.
+//
+// ⚠️ scripts/contrast-check.mjs keeps its own copy of these values. Change one,
+// change both, and run `node scripts/contrast-check.mjs`.
 //
 // CONTRAST: every value used as text is measured against the surface it
-// actually sits on, and the ratio is noted inline. The raw brand red and green
-// are NOT AA-safe as small text on white (#e11b22 = 4.0:1, #3bd070 = 1.9:1),
-// which is why `brand.ink` and `accent.ink` exist as the text-safe variants.
-// Use `brand`/`accent` for fills and decoration, `*.ink` when it is type.
+// actually sits on, and the ratio is noted inline. The raw brand green is
+// still NOT AA-safe as small text on white (#2a9d55 = 3.5:1), which is why
+// `accent.ink` exists. Use `accent` for fills and decoration, `accent.ink`
+// when it is type. The red no longer needs that split, but `brand.ink` is
+// kept as a name so the ~40 call sites do not all have to change.
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
       colors: {
         // --- surfaces: the light content well -------------------------------
+        // The club site's page is pure #ffffff and separates its cards with a
+        // 1px #e5e5e5 border alone. This app keeps a tinted well because it
+        // stacks far more cards than a marketing page does, and white-on-white
+        // would leave a screen of hairlines. The tint moved from blue-grey to
+        // the site's NEUTRAL grey family, which is most of the visual match.
         surface: {
-          DEFAULT: '#eef0f3', // page background
+          DEFAULT: '#f3f3f3', // page background — the site's --muted
           card: '#ffffff', // cards, sheets, dialogs
-          sunk: '#e6e9ee', // hover / inset / pressed
-          mute: '#f2f4f7', // very light fills, zebra rows
+          // #ebebeb, not #e8e8e8: at #e8e8e8 the tertiary-text pair measured
+          // 4.51:1, which clears AA by 0.01 and would fail on any later nudge.
+          sunk: '#ebebeb', // hover / inset / pressed
+          mute: '#f7f7f7', // very light fills, zebra rows
         },
 
         // --- type ------------------------------------------------------------
+        // Unchanged by the re-point — these were measured against the greys
+        // and still clear AA on the new ones (re-verified, see below).
         ink: {
-          DEFAULT: '#101116', // 16.51:1 on surface — primary text
-          muted: '#565c67', //  5.89:1 on surface — labels, secondary
-          // 4.84:1 on surface / 5.52:1 on card / 4.54:1 on sunk. The first
+          DEFAULT: '#101116', // 16.99:1 on surface — primary text
+          muted: '#565c67', //  6.06:1 on surface — labels, secondary
+          // 4.98:1 on surface / 5.52:1 on card / 4.63:1 on sunk. The first
           // pass used #6f7681, which cleared 4.5:1 on white but only managed
           // 4.01:1 on the page background — caught by scripts/contrast-check.
           faint: '#636974', // tertiary, placeholders, row subtitles
@@ -43,33 +77,36 @@ export default {
         },
 
         // --- hairlines --------------------------------------------------------
+        // The site's border token exactly. Its cards are white with this
+        // hairline and a 16px radius — which is already what Card.jsx renders.
         line: {
-          DEFAULT: '#dfe2e8',
-          strong: '#ccd1da',
+          DEFAULT: '#e5e5e5',
+          strong: '#d4d4d4',
         },
 
         // --- brand red --------------------------------------------------------
         brand: {
-          DEFAULT: '#e11b22', // 4.79:1 with white — the website's red. Fills.
-          // Hover/pressed on a red fill goes DARKER, at 6.93:1 with white.
-          // The old app went lighter on hover (#C21F32 -> #D62A3D); against
-          // the new, brighter brand red any lighter hover lands under 4.5:1
-          // (a #f0343a variant measured 3.99:1), so all 15 hover states now
-          // resolve here instead. Darker-on-hover is also the conventional
-          // affordance — the old direction was the odd one out.
-          deep: '#b3141a',
-          ink: '#b3141a', //  6.93:1 on card — red AS TEXT. Never use DEFAULT.
-          // Red as text on the DARK chrome — the light end of the ramp, since
-          // brand.ink would be near-invisible there. 7.73:1 on the role pill's
-          // composited fill (bg-brand/20 over #0c0c0e = #370f12), 8.91:1 on
-          // flat chrome.
-          onDark: '#ff8f8f',
+          DEFAULT: '#c8102e', // 5.88:1 with white — the site's LIGHT-mode red.
+          // Hover/pressed on a red fill goes DARKER, at 7.95:1 with white.
+          // Darker-on-hover is the conventional affordance; the pre-retheme
+          // app went lighter, which was the odd one out.
+          deep: '#a30d25',
+          // Kept as a name, but no longer a different colour: #c8102e is
+          // itself AA as text (5.88:1 on card, 5.30:1 on the page). The old
+          // split existed because #e11b22 was not.
+          ink: '#c8102e',
+          // Red as text on the DARK chrome. This is the site's own dark-mode
+          // red — 5.40:1 on flat chrome, 4.85:1 on the role pill's composited
+          // fill (bg-brand/20 over #0a0a0a = #300b11). The previous value was
+          // a washed-out pink (#ff8f8f) invented to clear contrast against the
+          // old red; the site supplies a real one, so use it.
+          onDark: '#ff2d4a',
         },
 
         // --- brand green ------------------------------------------------------
         accent: {
-          DEFAULT: '#3bd070', // the website's green. Decoration only on light.
-          mid: '#1f9d4d', // icons, borders, medium-weight marks
+          DEFAULT: '#2a9d55', // the site's green. Decoration only on light.
+          mid: '#1f9d4d', // icons, borders, medium-weight marks (3.51:1)
           ink: '#157f3c', //  5.08:1 on card — green AS TEXT.
           bg: '#e6f7ec', // success surface
         },
@@ -78,10 +115,10 @@ export default {
         // The A+ move. Identity lives on the chrome so the data surfaces can
         // stay light and readable pitch-side in daylight.
         chrome: {
-          DEFAULT: '#0c0c0e',
-          raised: '#151517',
+          DEFAULT: '#0a0a0a', // the site's --background
+          raised: '#121212', // the site's dark --card
           ink: '#ffffff',
-          muted: '#8b9099', // 6.09:1 on chrome — idle tab labels
+          muted: '#8b9099', // 6.17:1 on chrome — idle tab labels
         },
 
         // --- states -----------------------------------------------------------
@@ -110,15 +147,15 @@ export default {
       backgroundImage: {
         // The website's signature red -> green gradient hairline. Decorative
         // only; no text ever sits on it, so full-saturation green is safe here.
-        'brand-rule': 'linear-gradient(90deg,#e11b22,#3bd070)',
-        // The stat band. NOTE the green stop is #157f3c, not #3bd070 — white
-        // text on the raw green end measures 2.01:1, a hard AA failure. This
-        // formulation holds >=4.79:1 across the band's full width. The vivid
+        'brand-rule': 'linear-gradient(90deg,#c8102e,#2a9d55)',
+        // The stat band. NOTE the green stop is #157f3c, not the brand green —
+        // white text on raw #2a9d55 measures 3.47:1, an AA failure. This
+        // formulation holds >=5.08:1 across the band's full width. The vivid
         // green still appears, as the `brand-rule` hairline above the band.
-        'stat-band': 'linear-gradient(90deg,#e11b22 0%,#c23a30 52%,#157f3c 100%)',
+        'stat-band': 'linear-gradient(90deg,#c8102e 0%,#a83a30 52%,#157f3c 100%)',
         // Masthead + hero fills.
-        'chrome-grad': 'linear-gradient(180deg,#151517,#0c0c0e)',
-        'hero-grad': 'linear-gradient(135deg,#b3141a,#e11b22)',
+        'chrome-grad': 'linear-gradient(180deg,#121212,#0a0a0a)',
+        'hero-grad': 'linear-gradient(135deg,#a30d25,#c8102e)',
       },
 
       boxShadow: {
@@ -130,7 +167,7 @@ export default {
         // key must not collide with a colour key.
         masthead: '0 2px 18px rgba(0,0,0,.45)',
         tabbar: '0 -4px 22px rgba(0,0,0,.35)',
-        'brand-glow': '0 6px 20px rgba(225,27,34,.42)',
+        'brand-glow': '0 6px 20px rgba(200,16,46,.42)',
       },
 
       borderRadius: {
