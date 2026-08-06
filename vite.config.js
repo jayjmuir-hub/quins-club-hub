@@ -103,6 +103,17 @@ export default defineConfig({
         // to draw a flag it has never shown before is an acceptable trade,
         // since the field still works and the number still saves offline.
         globIgnores: ['**/flags/**', '**/assets/*-flag*.svg'],
+        // /calendar.ics is a Netlify proxy to the Supabase edge function, not
+        // a route in this app. Workbox's navigateFallback answers ANY
+        // same-origin navigation it does not recognise with index.html, so
+        // without this denylist an installed user opening their own feed URL
+        // in the browser gets the app's HTML instead of their calendar --
+        // which looks exactly like a broken feed and is untraceable from the
+        // server, because the service worker answers before the request ever
+        // leaves the device. Calendar clients (Google, Apple) are unaffected
+        // either way: they fetch from their own servers, where no service
+        // worker exists. This protects the human sanity-checking the link.
+        navigateFallbackDenylist: [/^\/calendar\.ics$/],
         // Runtime caching for Supabase REST reads (schedule/roster/dashboard data) so a
         // previously-loaded screen still shows its last-seen data when offline. Auth
         // endpoints and mutations (POST/PATCH/DELETE) are intentionally NOT cached —

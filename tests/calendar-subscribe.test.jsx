@@ -46,14 +46,33 @@ describe('CalendarSubscribe', () => {
     expect(myCalendarTokenMock).not.toHaveBeenCalled()
   })
 
-  it('shows the feed URL, built from the Supabase project URL', async () => {
+  it('shows the feed URL on our own domain', async () => {
     const user = userEvent.setup()
     render(<CalendarSubscribe />)
     await user.click(screen.getByRole('button', { name: /add to calendar/i }))
 
     const url = await screen.findByTestId('calendar-url')
     expect(myCalendarTokenMock).toHaveBeenCalledTimes(1)
-    expect(url).toHaveTextContent(`/functions/v1/calendar?token=${TOKEN}`)
+    expect(url).toHaveTextContent(
+      `https://adhquins-clubhub.com/calendar.ics?token=${TOKEN}`,
+    )
+  })
+
+  // The assertion above would still pass if the URL ALSO carried the Supabase
+  // project reference somewhere, so state it as a prohibition too. This is the
+  // point of the whole change: a subscribed calendar URL can never be altered
+  // remotely, so a Supabase hostname that reaches one parent is permanent.
+  it('never exposes the Supabase project hostname in a subscribable link', async () => {
+    const user = userEvent.setup()
+    render(<CalendarSubscribe />)
+    await user.click(screen.getByRole('button', { name: /add to calendar/i }))
+
+    const url = await screen.findByTestId('calendar-url')
+    expect(url.textContent).not.toMatch(/supabase\.co/)
+    expect(url.textContent).not.toMatch(/functions\/v1/)
+
+    const apple = screen.getByRole('link', { name: /add on apple/i })
+    expect(apple.getAttribute('href')).not.toMatch(/supabase\.co/)
   })
 
   it('offers Apple a webcal: link, which is what makes it one tap', async () => {

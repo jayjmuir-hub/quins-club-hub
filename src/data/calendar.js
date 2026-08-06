@@ -23,14 +23,30 @@ export async function resetMyCalendarToken() {
 }
 
 /**
- * Built from VITE_SUPABASE_URL rather than hard-coded, so it follows the
- * project if it ever moves — unlike the service worker's runtimeCaching
- * pattern, which cannot (see vite.config.js).
+ * The public origin the feed is advertised under.
+ *
+ * ⚠️ HARD-CODED ON PURPOSE, and NOT derived from window.location.origin.
+ * Whatever hostname someone subscribes to is welded into their Google or Apple
+ * account permanently — a subscribed calendar URL cannot be changed remotely.
+ * Deriving it from the current origin would mint permanent links pointing at
+ * `app.adhjrt.com` for anyone who happened to arrive on the old alias, which
+ * is a domain we may delete, and at a deploy-preview URL from a preview build.
+ * A link that outlives its hostname is the whole failure this constant exists
+ * to prevent, so it names the canonical domain and nothing else.
+ *
+ * ⚠️ If the app's domain ever changes, changing this does NOT migrate anyone
+ * already subscribed. It only fixes links minted afterwards. Keep the old
+ * domain resolving.
+ *
+ * The path is served by a Netlify PROXY to the Supabase edge function — see
+ * the /calendar.ics rule in netlify.toml, which is what keeps the Supabase
+ * project reference out of the URL.
  */
+const CALENDAR_ORIGIN = 'https://adhquins-clubhub.com'
+
 export function calendarFeedUrl(token) {
   if (!token) return null
-  const base = import.meta.env.VITE_SUPABASE_URL
-  return `${base}/functions/v1/calendar?token=${token}`
+  return `${CALENDAR_ORIGIN}/calendar.ics?token=${token}`
 }
 
 /**
