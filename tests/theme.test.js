@@ -69,9 +69,13 @@ describe('theme integrity', () => {
     const families = new Set(
       [...css.matchAll(/font-family\s*:\s*['"]?([^;'"]+)/g)].map((m) => m[1].trim())
     )
-    expect(families).toContain('Anton')
-    expect(families).toContain('Barlow')
-    expect(families).toContain('Barlow Condensed')
+    // One family since 6 Aug 2026 — Anton, Barlow and Barlow Condensed were
+    // replaced by Inter to match the club redesign, and all seven of their
+    // woff2 files deleted.
+    expect(families).toContain('Inter')
+    expect(families).not.toContain('Anton')
+    expect(families).not.toContain('Barlow')
+    expect(families).not.toContain('Barlow Condensed')
 
     for (const m of css.matchAll(/url\(['"]?\/fonts\/([^)'"]+)/g)) {
       expect(
@@ -80,13 +84,32 @@ describe('theme integrity', () => {
       ).toBe(true)
     }
 
-    // Barlow Condensed must be present at both weights rule 2 depends on.
-    for (const w of ['600', '700']) {
+    // ⚠️ EVERY WEIGHT THE APP CAN ASK FOR MUST HAVE AN @font-face.
+    // 900 is the one that matters most and is the easiest to lose: it exists
+    // only for .font-display, and if it went missing the browser would
+    // synthesise a fake heavy from 400 rather than raise an error — every
+    // screen title subtly wrong, nothing in the console.
+    for (const w of ['400', '500', '600', '700', '800', '900']) {
       expect(
-        new RegExp(`font-family:\\s*['"]?Barlow Condensed['"]?[\\s\\S]{0,200}?font-weight:\\s*${w}`).test(css) ||
-          new RegExp(`font-weight:\\s*${w}[\\s\\S]{0,200}?font-family:\\s*['"]?Barlow Condensed`).test(css),
-        `no Barlow Condensed @font-face at weight ${w}`
+        new RegExp(`font-weight:\\s*${w};`).test(css),
+        `no Inter @font-face at weight ${w}`
       ).toBe(true)
     }
+  })
+
+  // Rule 4: the display face must be heavy.
+  //
+  // ⚠️ THE SINGLE MOST DANGEROUS LINE IN THIS CHANGE. .font-display used to
+  // set font-weight: 400, because Anton ships one weight. Inter's 400 is body
+  // text. Leaving that line as it was would have turned every screen title,
+  // the masthead club name and every stat numeral into regular-weight type —
+  // silently, with nothing to catch it but a screenshot.
+  it('sets a heavy weight on the display face', () => {
+    const css = readFileSync(path.join(projectRoot, 'src', 'index.css'), 'utf8')
+    const rule = css.match(/\.font-display[^{]*\{[^}]*\}/)
+    expect(rule, '.font-display rule not found').toBeTruthy()
+    const weight = rule[0].match(/font-weight:\s*(\d+)/)
+    expect(weight, '.font-display sets no font-weight').toBeTruthy()
+    expect(Number(weight[1])).toBeGreaterThanOrEqual(800)
   })
 })

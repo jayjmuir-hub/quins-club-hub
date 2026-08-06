@@ -1,4 +1,4 @@
-/* Self-hosted Anton / Barlow / Barlow Condensed. Imported before Tailwind so
+/* Self-hosted Inter (was Anton / Barlow / Barlow Condensed). Imported before Tailwind so
    the @font-face rules land at the top of the output sheet. These are the same
    woff2 subsets the club website serves — no Google Fonts request at runtime,
    which also means no third-party call from a pitch-side phone on bad signal. */
@@ -58,15 +58,34 @@
     line-height: 1.6;
   }
 
-  /* Anton renders optically large and sits high on the baseline. Tightening
-     leading and nudging tracking here means every display element gets the
-     website's proportions without each component re-specifying them. */
+  /* The display face. Anton until 6 Aug 2026, Inter since.
+   *
+   * ⚠️ THE WEIGHT IS THE WHOLE POINT OF THIS RULE. It used to say 400,
+   * because Anton ships exactly one weight and asking for 700 made the
+   * browser fake a bold. Inter's 400 is BODY TEXT — leaving that line alone
+   * would have silently turned every screen title, the club name in the
+   * masthead and every stat numeral into regular-weight type. Nothing would
+   * error; the app would just look wrong everywhere at once.
+   *
+   * Tracking flipped sign for the same reason. Anton is a narrow poster face
+   * that needs opening up (+0.01em); Inter at 900 is wide and needs pulling
+   * in, which is also what the club site does with its headlines. */
   .font-display,
   h1.font-display,
   h2.font-display {
     line-height: 0.94;
-    letter-spacing: 0.01em;
-    font-weight: 400; /* Anton ships one weight; asking for 700 fakes it */
+    letter-spacing: -0.02em;
+    font-weight: 900;
+  }
+
+  /* Labels: nav, buttons, eyebrows, column headers. Barlow Condensed carried
+     these on width alone; Inter is not condensed, so the label quality now
+     comes from weight and tracking. Callers already apply uppercase and
+     their own tracking — this only guarantees the weight, because
+     `font-condensed` used to imply 600/700 by virtue of those being the only
+     cuts bundled. */
+  .font-condensed {
+    font-weight: 700;
   }
 
   /* ---------------------------------------------------------------------

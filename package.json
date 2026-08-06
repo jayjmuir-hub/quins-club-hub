@@ -11,6 +11,7 @@
     "test:integration": "VITEST_MODE=integration vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
     "@supabase/supabase-js": "^2.45.0",
     "flag-icons": "^7.5.0",
     "libphonenumber-js": "^1.13.10",

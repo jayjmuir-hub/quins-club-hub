@@ -127,21 +127,32 @@ export default {
         info: { DEFAULT: '#2f5fa8', bg: '#e9f1fb' },
       },
 
+      // ONE FAMILY NOW. The club redesign uses Inter throughout, and as of
+      // 6 Aug 2026 so does this app — Anton, Barlow and Barlow Condensed are
+      // gone, and their seven woff2 files with them.
+      //
+      // The three names are KEPT rather than collapsed to one. ~200 call sites
+      // say `font-display` or `font-condensed`, and those names still carry
+      // meaning: they mark which type is a title and which is a label, and
+      // src/index.css hangs the weight and tracking for each off them. Merging
+      // them into `font-sans` would have meant editing every one of those call
+      // sites to re-add weights by hand, and losing the distinction.
+      //
+      // ⚠️ WIDTH. Barlow Condensed was CONDENSED and Inter is not. Measured in
+      // a real browser at 700: 'HARLEQUINS' is 177px in Barlow Condensed and
+      // 233px in Barlow — Inter is wider still. Every nav item, button label,
+      // eyebrow and column header therefore takes more horizontal room than it
+      // did. That is the real cost of this change and it is why it needed a
+      // pass over every screen at both breakpoints, not just a config edit.
       fontFamily: {
-        // Barlow is the workhorse: all body copy, form labels, table rows.
-        sans: ['Barlow', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        // Anton is DISPLAY ONLY — screen titles, stat numerals, date chips.
-        // It has no lowercase rhythm and .92 leading; it is wrong on anything
-        // you have to read quickly. Do not put it on a form label.
-        display: ['Anton', 'Impact', 'sans-serif'],
-        // Barlow Condensed: nav, buttons, eyebrows, stat labels.
-        // WARNING: only the 600 and 700 cuts are bundled (public/fonts). CSS
-        // does not error on a missing weight — it quietly renders the next
-        // family in the stack — so `font-condensed` WITHOUT font-semibold or
-        // font-bold silently falls back to Barlow. Always pair the two.
-        // Verified in a real browser: at 700, 'HARLEQUINS' measures 177px in
-        // Barlow Condensed vs 233px in Barlow, so a regression is visible.
-        condensed: ['Barlow Condensed', 'Barlow', 'sans-serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        // Titles and stat numerals. Weight comes from .font-display in
+        // src/index.css (900) — do not add font-bold at the call site.
+        display: ['Inter', 'system-ui', 'sans-serif'],
+        // Nav, buttons, eyebrows, stat labels. No longer literally condensed;
+        // the callers' uppercase + letter-spacing still make it read as a
+        // label rather than body copy.
+        condensed: ['Inter', 'system-ui', 'sans-serif'],
       },
 
       backgroundImage: {
