@@ -2,6 +2,41 @@
   command = "npm run build"
   publish = "dist"
 
+# The calendar subscription feed, served from our own domain.
+#
+# WHY THIS EXISTS. The feed is the only URL this app hands to a HUMAN to paste
+# into another application. Everything else Supabase serves is fetched by our
+# own JavaScript, where the hostname is invisible. Without this rule people
+# subscribe to
+#   https://lusmshimxdcxpnrktlgz.supabase.co/functions/v1/calendar?token=...
+# and that address is then welded into their Google or Apple account forever.
+#
+# ⚠️ A SUBSCRIBED CALENDAR URL CANNOT BE CHANGED REMOTELY. There is no
+# mechanism to update it — if the Supabase project ever moves, is restored into
+# a new project, or the functions hostname changes, every subscribed calendar
+# in the club silently stops updating and the only remedy is asking several
+# hundred parents to re-subscribe by hand. Owning the hostname is what keeps
+# that a config change instead of a club-wide email.
+#
+# ⚠️ status = 200 IS THE WHOLE POINT — it makes Netlify PROXY the request
+# server-side. A 301/302 would just hand the client the Supabase URL, and
+# calendar clients that follow and remember the final address would end up
+# pinned to it anyway, which is the exact thing this rule prevents.
+#
+# ⚠️ MUST STAY ABOVE THE SPA CATCH-ALL. Netlify applies the first matching
+# rule; the /* rule below would otherwise answer this with index.html.
+#
+# force = true so a stray dist/calendar.ics could never shadow the proxy.
+#
+# The query string (?token=...) is forwarded by Netlify because the
+# destination has none of its own. Verified live against the real feed, not
+# assumed — see claude/state-of-play.md.
+[[redirects]]
+  from = "/calendar.ics"
+  to = "https://lusmshimxdcxpnrktlgz.supabase.co/functions/v1/calendar"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
