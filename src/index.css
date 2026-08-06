@@ -68,6 +68,48 @@
     letter-spacing: 0.01em;
     font-weight: 400; /* Anton ships one weight; asking for 700 fakes it */
   }
+
+  /* ---------------------------------------------------------------------
+     PRESS FEEDBACK.
+
+     The app had NONE. A scan of all 72 source files found zero `active:`
+     states, zero transforms and zero `group-hover:` — 94 `transition`
+     usages, every one of them a colour fade. Nothing in the app moved when
+     you pushed it. The club site presses everything it can
+     (`active:scale-[0.97]`, 44 occurrences).
+
+     It lives here, as one base rule, rather than on each button, because
+     THERE IS NO SHARED BUTTON COMPONENT — every button in the app carries
+     its own ad-hoc class string, so there is no single place to add this
+     short of editing dozens of files. Extracting a real <Button> is the
+     proper fix and is a separate job; this gets the behaviour now without
+     a 39-file sweep.
+
+     ⚠️ SPECIFICITY, AND WHY THE TRANSITION LISTS COLOURS TOO.
+     `button:not(:disabled)` scores 0,1,1 — :not() takes its argument's
+     specificity — which BEATS a single utility class like
+     `.transition-colors` (0,1,0). So this rule wins on any button that
+     carries one. A bare `transition: transform ...` here would therefore
+     have silently reset transition-property to transform alone and killed
+     the hover colour fade on every button in the app. The colour properties
+     are listed explicitly to keep both.
+     --------------------------------------------------------------------- */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    transition:
+      transform 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+      background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+      border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+      color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  button:not(:disabled):active,
+  [role='button']:not([aria-disabled='true']):active {
+    /* 0.97 is the site's own value for full-size controls. Deliberately
+       uniform here: the site varies it 0.97/0.98/0.985 by control size, but
+       that needs a per-component decision this rule cannot make. */
+    transform: scale(0.97);
+  }
 }
 
 @layer components {
@@ -92,7 +134,11 @@
     pointer-events: none;
     background:
       linear-gradient(135deg, transparent 49%, rgba(255, 255, 255, 0.12) 50%),
-      linear-gradient(45deg, transparent 49%, rgba(59, 208, 112, 0.26) 50%);
+      /* The brand green. ⚠️ Written as decimal rgb(), which is why the
+         re-point's hex search for "3bd070" walked straight past it — this
+         diagonal was still the OLD green for one commit. Search for both
+         forms when changing a colour. */
+      linear-gradient(45deg, transparent 49%, rgba(42, 157, 85, 0.26) 50%);
   }
 }
 
@@ -108,5 +154,15 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* ⚠️ The block above only kills DURATIONS. The press transform would
+     still fire — instantly, which is a jump rather than a movement and is
+     exactly what someone asking for reduced motion is trying to avoid. The
+     colour change on :active still happens, so the control still responds;
+     it just doesn't move. */
+  button:not(:disabled):active,
+  [role='button']:not([aria-disabled='true']):active {
+    transform: none !important;
   }
 }
