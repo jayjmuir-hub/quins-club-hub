@@ -112,7 +112,14 @@ describe('Login screen', () => {
   })
 
   it('renders a visible, announced error when signInWithEmail throws', async () => {
-    signInWithEmail.mockRejectedValue(new Error('rate limited'))
+    // ⚠️ SECOND REPOINTED ANCHOR (6 Aug 2026), same cause as the one in the
+    // authError block below. 'rate limited' was an arbitrary string here too,
+    // and friendlyAuthError() now translates it — which would have made this
+    // test assert the wrong thing while still looking correct. What it is
+    // really about is that an error reaches the user in an announced
+    // role="alert" region, so it is repointed at a message that passes
+    // through untouched.
+    signInWithEmail.mockRejectedValue(new Error('Email address is invalid'))
     const user = userEvent.setup()
     render(<Login />)
 
@@ -120,7 +127,7 @@ describe('Login screen', () => {
     await user.click(screen.getByRole('button', { name: /email me a link/i }))
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('rate limited')
+    expect(alert).toHaveTextContent('Email address is invalid')
   })
 
   it('disables the submit button while sending', async () => {
@@ -211,7 +218,14 @@ describe('Login screen authError prop', () => {
   })
 
   it('does not resurrect the passed-in authError alongside a fresh error from a failed retry', async () => {
-    signInWithEmail.mockRejectedValue(new Error('rate limited'))
+    // ⚠️ ANCHOR REPOINTED, NOT DELETED (6 Aug 2026). This used to reject with
+    // `new Error('rate limited')`, chosen as an arbitrary error string. It
+    // stopped being arbitrary the moment friendlyAuthError() started
+    // translating anything matching /rate limit/i — the test would then pass
+    // or fail for a reason unrelated to what it is actually about, which is
+    // that a FRESH error replaces the stale authError. Repointed at an error
+    // the helper passes through untouched.
+    signInWithEmail.mockRejectedValue(new Error('Email address is invalid'))
     const user = userEvent.setup()
     render(<Login authError="Email link is invalid or has expired" />)
 
@@ -219,7 +233,81 @@ describe('Login screen authError prop', () => {
     await user.click(screen.getByRole('button', { name: /email me a link/i }))
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('rate limited')
+    expect(alert).toHaveTextContent('Email address is invalid')
     expect(alert).not.toHaveTextContent("didn't work")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The rate-limit translation.
+//
+// Supabase's ceiling on auth emails (Authentication → Rate Limits) is the one
+// failure a normal parent will actually meet, because the rollout invites a
+// whole age group at once. GoTrue returns the bare string "email rate limit
+// exceeded" and this screen used to render it verbatim.
+//
+// ⚠️ Live value read from the dashboard on 6 Aug 2026: **2 emails/hour**, not
+// the 30 the docs quote for custom SMTP — this project uses a Send Email Auth
+// Hook, which Supabase does not treat as custom SMTP. So this path is not
+// hypothetical; it is reachable on the third sign-in of any hour.
+// ---------------------------------------------------------------------------
+describe('Login — rate-limit message', () => {
+  it('replaces the raw Supabase text with something a parent can act on', async () => {
+    signInWithEmail.mockRejectedValue(new Error('email rate limit exceeded'))
+    const user = userEvent.setup()
+    render(<Login />)
+
+    await user.type(screen.getByLabelText(/email/i), 'jay@example.com')
+    await user.click(screen.getByRole('button', { name: /email me a link/i }))
+
+    const alert = await screen.findByRole('alert')
+    // The raw string must not survive: it reads as an accusation, names no
+    // remedy, and gives no hint that waiting fixes it.
+    expect(alert).not.toHaveTextContent('email rate limit exceeded')
+    // Waiting IS the fix, so the copy has to say so...
+    expect(alert).toHaveTextContent(/wait a couple of minutes/i)
+    // ...and it has to point at the path that costs no email at all, which is
+    // the whole reason this is survivable.
+    expect(alert).toHaveTextContent(/continue with google/i)
+  })
+
+  it('recognises the 429 wording too, not just the one phrase', async () => {
+    signInWithEmail.mockRejectedValue(new Error('Request failed: 429 Too Many Requests'))
+    const user = userEvent.setup()
+    render(<Login />)
+
+    await user.type(screen.getByLabelText(/email/i), 'jay@example.com')
+    await user.click(screen.getByRole('button', { name: /email me a link/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/wait a couple of minutes/i)
+  })
+
+  it('leaves every other auth error exactly as it was', async () => {
+    // The helper is a narrow allow-list on purpose. A general error
+    // prettifier would swallow messages that are more useful raw — to the
+    // user AND to whoever they forward the screenshot to.
+    signInWithEmail.mockRejectedValue(new Error('Signups not allowed for this instance'))
+    const user = userEvent.setup()
+    render(<Login />)
+
+    await user.type(screen.getByLabelText(/email/i), 'jay@example.com')
+    await user.click(screen.getByRole('button', { name: /email me a link/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Signups not allowed for this instance')
+    expect(alert).not.toHaveTextContent(/wait a couple of minutes/i)
+  })
+
+  it('still falls back when the error carries no message at all', async () => {
+    signInWithEmail.mockRejectedValue(new Error(''))
+    const user = userEvent.setup()
+    render(<Login />)
+
+    await user.type(screen.getByLabelText(/email/i), 'jay@example.com')
+    await user.click(screen.getByRole('button', { name: /email me a link/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /something went wrong sending the link/i,
+    )
   })
 })

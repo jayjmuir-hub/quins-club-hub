@@ -16,6 +16,39 @@ import crest from '../assets/crest.png'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+// The ONE auth error worth translating, because it is the one a normal person
+// will actually meet and the raw text is actively harmful.
+//
+// Supabase enforces a per-project ceiling on auth emails (Authentication →
+// Rate Limits). When it trips, GoTrue returns 429 with the bare string
+// "email rate limit exceeded", and this screen used to render that verbatim.
+// To a parent it reads as an accusation, names no remedy, and gives no hint
+// that waiting fixes it — so they message the club instead of trying again
+// ninety seconds later. Hitting the ceiling is survivable; that message is
+// what turned it into a support request.
+//
+// ⚠️ NOT HYPOTHETICAL. The live value read from the dashboard on 6 Aug 2026
+// is **2 emails/hour** — the built-in-provider default, NOT the 30 the docs
+// quote for custom SMTP, because this project sends via a Send Email Auth
+// Hook and Supabase does not count that as custom SMTP. On 2/hour this path
+// is reachable on the third sign-in of any hour.
+//
+// ⚠️ Deliberately a narrow allow-list, not a general error prettifier. Every
+// other auth failure keeps its real message: "Email address is invalid",
+// "Signups not allowed", and the rest are all things where the true text is
+// more useful than anything generic, to the user AND to whoever they forward
+// the screenshot to.
+const RATE_LIMITED = /rate limit|too many requests|429/i
+
+const RATE_LIMIT_MESSAGE =
+  'Lots of people are signing in right now. Wait a couple of minutes and try again — or use Continue with Google if that’s your email.'
+
+export function friendlyAuthError(error, fallback) {
+  const raw = typeof error?.message === 'string' ? error.message : ''
+  if (RATE_LIMITED.test(raw)) return RATE_LIMIT_MESSAGE
+  return raw || fallback
+}
+
 export default function Login({ authError = null }) {
   const { signInWithEmail, signInWithGoogle } = useAuth()
   const [email, setEmail] = useState('')
@@ -47,7 +80,7 @@ export default function Login({ authError = null }) {
       await signInWithEmail(trimmed)
       setStatus('sent')
     } catch (err) {
-      setError(err.message || 'Something went wrong sending the link. Try again.')
+      setError(friendlyAuthError(err, 'Something went wrong sending the link. Try again.'))
       setStatus('idle')
     }
   }
@@ -59,7 +92,10 @@ export default function Login({ authError = null }) {
     try {
       await signInWithGoogle()
     } catch (err) {
-      setError(err.message || 'Something went wrong signing in with Google. Try again.')
+      // Google sends no email, so it cannot be rate-limited this way — routed
+      // through the same helper anyway so the two buttons can never drift into
+      // treating the same error differently.
+      setError(friendlyAuthError(err, 'Something went wrong signing in with Google. Try again.'))
       setStatus('idle')
     }
   }
