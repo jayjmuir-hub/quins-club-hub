@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Badge from './Badge.jsx'
 import Card from './Card.jsx'
+import PlayerAvatar from './PlayerAvatar.jsx'
 import { POSITIONS } from '../lib/positions.js'
 import { upsertPlayer } from '../data/players.js'
 
@@ -58,7 +59,19 @@ function compare(a, b, key, teamsById) {
   return String(av).localeCompare(String(bv))
 }
 
-export default function RosterTable({ players, teams, teamsById, canEditTeam, onSelect, onPatch }) {
+// `photoUrls` is the same batch-signed map the mobile list uses, keyed by
+// players.photo_path — signing per row would fire one request per player on
+// every roster load. Optional: with no map the avatars fall back to monograms,
+// which is what 314 of the club's 315 players show anyway today.
+export default function RosterTable({
+  players,
+  teams,
+  teamsById,
+  canEditTeam,
+  onSelect,
+  onPatch,
+  photoUrls,
+}) {
   const [sort, setSort] = useState({ key: 'full_name', dir: 'asc' })
   // Per-row, keyed by player id: the field currently in flight, and the last
   // refusal message. Kept here rather than in Roster because nothing outside
@@ -151,7 +164,40 @@ export default function RosterTable({ players, teams, teamsById, canEditTeam, on
               return (
                 <tr key={player.id} data-testid="roster-table-row" className="hover:bg-surface-mute">
                   <td className={`${BODY_CELL} font-bold`}>
-                    <span data-testid="table-player-name">{player.full_name}</span>
+                    {/* The name opens the player. Before this, the ONLY way in
+                        was the "Open" button in the last column — roughly 950px
+                        to the right of the name being aimed at, which is a long
+                        way to travel to act on the thing you are already
+                        pointing at.
+
+                        ⚠️ The NAME is the button, not the row. Three cells in
+                        this row contain their own controls (two selects and the
+                        captain toggle); a row-level click handler would fire
+                        when someone changes a player's age group, and open a
+                        detail panel on top of the edit they just made. */}
+                    <button
+                      type="button"
+                      onClick={() => onSelect(player.id)}
+                      className="flex items-center gap-2.5 rounded-[8px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    >
+                      {/* aria-hidden inside PlayerAvatar: the monogram restates
+                          the name sitting right beside it. The gradient is
+                          passed in because the component's own background is
+                          bg-white/20 — designed for the dark mobile row, and
+                          all but invisible on a white table cell. */}
+                      <PlayerAvatar
+                        player={player}
+                        url={player.photo_path ? photoUrls?.[player.photo_path] : undefined}
+                        size="xs"
+                        className="bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-white"
+                      />
+                      <span
+                        data-testid="table-player-name"
+                        className="underline-offset-[3px] hover:underline"
+                      >
+                        {player.full_name}
+                      </span>
+                    </button>
                     {/* The refusal lands in the row that caused it, not in a
                         toast that scrolls away from a long table. */}
                     {error && (

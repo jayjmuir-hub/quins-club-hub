@@ -496,6 +496,7 @@ export default function Roster() {
           canEditTeam={(teamId) => canEditTeam(memberships, teamId)}
           onSelect={setSelectedPlayerId}
           onPatch={patchPlayer}
+          photoUrls={photoUrls}
         />
       )}
 

@@ -59,6 +59,12 @@ export default function PlayerAvatar({
   }, [path, url])
 
   const dimensions = {
+    // Table rows only. `sm` (40px) is taller than a dense table row's text
+    // and would add ~14px to every one of them — on a 53-player squad that is
+    // most of a screen of extra scrolling to show 53 monograms. 32px fits
+    // inside the existing row height, so the table gains faces without
+    // getting longer.
+    xs: 'h-8 w-8 rounded-[10px] text-[11px]',
     sm: 'h-10 w-10 rounded-[12px] text-[14px]',
     md: 'h-14 w-14 rounded-[14px] text-[20px]',
     lg: 'h-20 w-20 rounded-[18px] text-[26px]',

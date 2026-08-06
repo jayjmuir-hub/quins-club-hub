@@ -25,6 +25,16 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+// The photo bucket is private, so a viewable URL has to be signed. Mocked
+// here because the table now renders faces: without it the photo test would
+// reach for the network. The no-photo tests never call it — Roster skips the
+// signing effect entirely when no player has a photo_path.
+vi.mock('../src/data/photos.js', () => ({
+  signPhotoUrl: vi.fn().mockResolvedValue('https://signed.example/single.jpg'),
+  signPhotoUrls: vi.fn(async (paths) =>
+    Object.fromEntries(paths.map((p) => [p, `https://signed.example/${p.split('/').pop()}`]))),
+}))
+
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
   getPlayerContact: vi.fn().mockResolvedValue(null),
@@ -263,5 +273,89 @@ describe('RosterTable — permissions', () => {
     await screen.findByTestId('roster-table')
     expect(screen.queryByLabelText(/^Position for/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Captain:/ })).not.toBeInTheDocument()
+  })
+})
+
+// Added 6 Aug 2026. Before this, the name was inert text and the ONLY way into
+// a player was the "Open" button in the last column — on a full-width table
+// that is most of a screen away from the name being aimed at. The table also
+// showed no faces at all, while the mobile list had shown them all along.
+describe('RosterTable — opening a player from the name', () => {
+  it('opens the player when the name is clicked', async () => {
+    const user = userEvent.setup()
+    render(<Roster />)
+    await screen.findByTestId('roster-table')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    // Exact string, not /Tom Fletcher/: the captain toggle in the same row is
+    // labelled "Captain: Tom Fletcher" and a loose pattern matches both. The
+    // monogram is aria-hidden, so this button's accessible name is the name
+    // alone — which is also the assertion that the avatar has not started
+    // announcing itself as "TF Tom Fletcher".
+    await user.click(screen.getByRole('button', { name: 'Tom Fletcher' }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('does NOT open the player when an inline control is used', async () => {
+    // ⚠️ The injected fault for the test above, and the reason the NAME is the
+    // button rather than the row. A row-level click handler passes the test
+    // above and then fires on every inline edit — opening a detail sheet on
+    // top of the age group somebody just changed.
+    const user = userEvent.setup()
+    render(<Roster />)
+    await screen.findByTestId('roster-table')
+
+    await user.selectOptions(screen.getByLabelText('Age group for Tom Fletcher'), 'team-u12')
+
+    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('still opens from the Open button', async () => {
+    // The old route stays. Removing it would be a second, unasked-for change.
+    const user = userEvent.setup()
+    render(<Roster />)
+    await screen.findByTestId('roster-table')
+
+    const tomRow = rows().find((r) => within(r).queryByText('Tom Fletcher'))
+    await user.click(within(tomRow).getByRole('button', { name: 'Open' }))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+})
+
+describe('RosterTable — the face beside the name', () => {
+  it('shows the monogram when a player has no photo', async () => {
+    // 314 of the club's 315 players are in exactly this state today, so this
+    // is the normal rendering, not the fallback-nobody-sees.
+    render(<Roster />)
+    await screen.findByTestId('roster-table')
+
+    const tomRow = rows().find((r) => within(r).queryByText('Tom Fletcher'))
+    expect(within(tomRow).getByText('TF')).toBeInTheDocument()
+    // ⚠️ querySelector, not getByRole('img'): PlayerAvatar renders alt="" on
+    // purpose (the name is right beside it), and an empty alt strips the img
+    // role. A role-based query here would report "no image" whether the photo
+    // rendered or not, and would pass for the wrong reason.
+    expect(tomRow.querySelector('img')).toBeNull()
+  })
+
+  it('renders the real photo when one exists', async () => {
+    // The point of this test is the WIRING: RosterTable only receives
+    // photoUrls because Roster now passes it. Drop that prop and the monogram
+    // above still renders, so only this test fails.
+    listPlayersMock.mockResolvedValue([{ ...TOM, photo_path: 'players/p1.jpg' }, AMY])
+
+    render(<Roster />)
+    await screen.findByTestId('roster-table')
+
+    const tomRow = await waitFor(() => {
+      const row = rows().find((r) => within(r).queryByText('Tom Fletcher'))
+      expect(row.querySelector('img')).not.toBeNull()
+      return row
+    })
+    expect(tomRow.querySelector('img')).toHaveAttribute('src', 'https://signed.example/p1.jpg')
+    expect(within(tomRow).queryByText('TF')).not.toBeInTheDocument()
   })
 })
