@@ -289,6 +289,17 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
   const targetTeamIds = [teamId, ...otherTeams.filter((t) => extras.includes(t.id)).map((t) => t.id)]
   const multiSquad = targetTeamIds.length > 1
 
+  // Extras AND a repeat is refused outright (see the row-count guard in
+  // handleSubmit). Naming it here so the SUBMIT BUTTON can tell the truth:
+  // before this existed the label read "Add 14 events" — the series count —
+  // for a combination that adds nothing at all, because the series branch of
+  // the label was evaluated first and neither branch knew about the guard.
+  //
+  // ⚠️ The guard in handleSubmit is NOT redundant now the button is disabled.
+  // It is the thing that actually prevents the write, and disabling a button
+  // is a UI courtesy, not a control. Keep both.
+  const blockedByRowGuard = multiSquad && repeating
+
   const toggleExtraTeam = (id) =>
     setExtraTeamIds((current) =>
       current.includes(id) ? current.filter((existing) => existing !== id) : [...current, id],
@@ -803,22 +814,29 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
 
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || blockedByRowGuard}
           className="w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving
             ? 'Saving…'
             : editing
               ? 'Save changes'
-              : repeating && !previewError && seriesDates.length > 0
-                ? // Naming the number on the button is the last chance to
-                  // notice that "until 2036" produced 500 rows.
-                  `Add ${seriesDates.length} ${seriesDates.length === 1 ? 'event' : 'events'}`
-                : multiSquad
-                  ? // Same reason: the last chance to notice that five squads
-                    // are ticked, not the two that were meant.
-                    `Add ${targetTeamIds.length} events`
-                  : 'Add event'}
+              : blockedByRowGuard
+                ? // ⚠️ MUST come before the series branch. That branch counts
+                  // the series and would promise "Add 14 events" for a
+                  // combination that writes nothing — the defect this fixes.
+                  // The label names the way OUT, not the problem, because the
+                  // Repeats section already states the problem above.
+                  'Untick the extras, or clear the repeat'
+                : repeating && !previewError && seriesDates.length > 0
+                  ? // Naming the number on the button is the last chance to
+                    // notice that "until 2036" produced 500 rows.
+                    `Add ${seriesDates.length} ${seriesDates.length === 1 ? 'event' : 'events'}`
+                  : multiSquad
+                    ? // Same reason: the last chance to notice that five squads
+                      // are ticked, not the two that were meant.
+                      `Add ${targetTeamIds.length} events`
+                    : 'Add event'}
         </button>
       </form>
     </Sheet>

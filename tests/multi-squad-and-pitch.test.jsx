@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Two things that ship together because they are the same form change:
@@ -237,6 +237,13 @@ describe('Also add for — what it writes', () => {
 })
 
 describe('Also add for — the row-count guard', () => {
+  // The submit button is DISABLED for this combination, so the guard in
+  // handleSubmit can no longer be reached by clicking. That guard is still the
+  // thing that actually prevents the write — a disabled button is a courtesy,
+  // not a control — so it is exercised here by submitting the form directly.
+  //
+  // ⚠️ Do NOT delete this in favour of the disabled-button test below. This is
+  // the anchor for the guard itself; that one is the anchor for the label.
   it('refuses extras combined with a repeat, and writes nothing at all', async () => {
     const { user, onSaved } = renderForm()
 
@@ -245,7 +252,7 @@ describe('Also add for — the row-count guard', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Tue' }))
     await user.type(screen.getByLabelText('Repeat until'), '2026-12-15')
 
-    await user.click(screen.getByRole('button', { name: /add/i }))
+    fireEvent.submit(screen.getByRole('button', { name: /untick the extras/i }).closest('form'))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/one age group at a time/i)
     // The point of the guard is the rows that DON'T get written: two squads
@@ -253,6 +260,29 @@ describe('Also add for — the row-count guard', () => {
     expect(insertEventsMock).not.toHaveBeenCalled()
     expect(upsertEventMock).not.toHaveBeenCalled()
     expect(onSaved).not.toHaveBeenCalled()
+  })
+
+  // Regression: the button used to read "Add 14 events" — the SERIES count —
+  // for a combination that adds nothing at all, because the series branch of
+  // the label was evaluated before the multi-squad branch and neither knew
+  // about the guard. A button must not promise a number it will refuse to
+  // deliver.
+  it('does not promise a count it will refuse to deliver', async () => {
+    const { user } = renderForm()
+
+    await fillTraining(user)
+    await user.click(screen.getByRole('checkbox', { name: 'Tue' }))
+    await user.type(screen.getByLabelText('Repeat until'), '2026-12-15')
+
+    // Alone, the repeat is legitimate and the button names the series count.
+    expect(screen.getByRole('button', { name: /^Add \d+ events$/ })).toBeEnabled()
+
+    // Adding an extra squad makes the combination unsaveable.
+    await user.click(screen.getByRole('checkbox', { name: 'U14' }))
+
+    expect(screen.queryByRole('button', { name: /^Add \d+ events$/ })).not.toBeInTheDocument()
+    const submit = screen.getByRole('button', { name: /untick the extras, or clear the repeat/i })
+    expect(submit).toBeDisabled()
   })
 
   it('warns in the Repeats section before the user reaches Save', async () => {
