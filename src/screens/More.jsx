@@ -82,6 +82,37 @@ export default function More() {
         </div>
       )}
 
+      {/* Account — the IN-APP half of Google Play's account deletion
+          requirement (the other half is the public /delete-account URL, which
+          is the same screen). Deliberately a link out to that page rather
+          than a delete button here: one implementation of a destructive
+          action, not two that can drift apart.
+
+          Not styled as a danger button. This sits directly above sign-out,
+          and a red "Delete" next to "Sign out" is a mis-tap waiting to
+          happen on a phone — the confirmation lives on the page itself. */}
+      <SectionTitle>Account</SectionTitle>
+      <Card className="overflow-hidden">
+        <Link
+          to="/privacy"
+          className="flex items-center justify-between gap-3 border-b border-line px-[14px] py-[11px] transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+        >
+          <span className="text-[15px] font-bold text-ink">Privacy policy</span>
+          <span aria-hidden="true" className="text-[15px] text-ink-faint">
+            ›
+          </span>
+        </Link>
+        <Link
+          to="/delete-account"
+          className="flex items-center justify-between gap-3 px-[14px] py-[11px] transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+        >
+          <span className="text-[15px] font-bold text-ink">Delete your account</span>
+          <span aria-hidden="true" className="text-[15px] text-ink-faint">
+            ›
+          </span>
+        </Link>
+      </Card>
+
       {/* Sign out is rendered by AppShell below this, on this route only.
           See the header comment — do not add a second one here. */}
     </section>

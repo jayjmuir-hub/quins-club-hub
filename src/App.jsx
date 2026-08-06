@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import RequireAuth from './components/RequireAuth.jsx'
 import { MembershipProvider } from './lib/memberships.jsx'
 import AppShell from './components/AppShell.jsx'
@@ -10,8 +10,25 @@ import AdminDashboard from './screens/AdminDashboard.jsx'
 import AdminClub from './screens/AdminClub.jsx'
 import Accounts from './screens/Accounts.jsx'
 import AcceptInvite from './screens/AcceptInvite.jsx'
+import Privacy from './screens/Privacy.jsx'
+import DeleteAccount from './screens/DeleteAccount.jsx'
 
 // Routing (admin-dashboard plan, 2026-08-05).
+//
+// ⚠️ THERE ARE NOW TWO GROUPS: PUBLIC AND SIGNED-IN. Everything used to sit
+// inside <RequireAuth>, which meant the app had no page a signed-out person
+// could read at all. That became a blocker on 6 Aug 2026: Google Play requires
+// a privacy policy and an account-deletion route that are reachable WITHOUT an
+// account, because a Play reviewer opens both cold, and so does a parent who
+// cannot remember which email they signed up with.
+//
+// The signed-in group is wrapped by a PATHLESS LAYOUT ROUTE (`<Route
+// element={<Authed/>}>`). That is the react-router idiom for "apply this
+// wrapper to these children", and it is used here specifically because it
+// leaves every existing path string untouched — nesting a second <Routes>
+// under a `path="*"` would have made all of them relative and rewritten the
+// lot. The catch-all redirect stays INSIDE the group, so an unknown URL still
+// lands a signed-out visitor on the login screen exactly as before.
 //
 // "/more" renders the real More screen — for EVERY role, not just admins.
 // It used to render Admin.jsx, which meant a parent, player or coach opening
@@ -38,37 +55,55 @@ import AcceptInvite from './screens/AcceptInvite.jsx'
 // (rather than one <AppShell> around a single nested <Routes>) is what makes
 // it possible for this one route to opt out of that gate entirely, without
 // teaching AppShell itself about a specific path.
+
+// The signed-in half of the app, as a layout. RequireAuth renders Login in
+// place when there is no session, preserving the URL.
+function Authed() {
+  return (
+    <RequireAuth>
+      <MembershipProvider>
+        <Outlet />
+      </MembershipProvider>
+    </RequireAuth>
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <RequireAuth>
-        <MembershipProvider>
-          <Routes>
-            <Route path="/accept-invite/:token" element={<AcceptInvite />} />
-            <Route path="/" element={<AppShell><Dashboard /></AppShell>} />
-            <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
-            <Route path="/roster" element={<AppShell><Roster /></AppShell>} />
-            <Route path="/more" element={<AppShell><More /></AppShell>} />
+      <Routes>
+        {/* PUBLIC — no session required, and no MembershipProvider either.
+            Both of these are linked from the Play Store listing and must
+            render for someone who has never signed in. */}
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/delete-account" element={<DeleteAccount />} />
 
-            {/* Admin-only, desktop-only. AdminDashboard gates on isAdmin()
-                against the EFFECTIVE membership set and renders <Outlet/>,
-                so both tabs below inherit the gate — typing
-                /admin/accounts as a coach gets the same "not authorised"
-                card as /admin itself. */}
-            <Route path="/admin" element={<AppShell><AdminDashboard /></AppShell>}>
-              <Route index element={<Navigate to="/admin/accounts" replace />} />
-              <Route path="accounts" element={<Accounts />} />
-              <Route path="club" element={<AdminClub />} />
-            </Route>
+        {/* SIGNED-IN */}
+        <Route element={<Authed />}>
+          <Route path="/accept-invite/:token" element={<AcceptInvite />} />
+          <Route path="/" element={<AppShell><Dashboard /></AppShell>} />
+          <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
+          <Route path="/roster" element={<AppShell><Roster /></AppShell>} />
+          <Route path="/more" element={<AppShell><More /></AppShell>} />
 
-            {/* Old bookmarked URL. A plain redirect, not a duplicate mount:
-                Accounts must exist in exactly one place. */}
-            <Route path="/accounts" element={<Navigate to="/admin/accounts" replace />} />
+          {/* Admin-only, desktop-only. AdminDashboard gates on isAdmin()
+              against the EFFECTIVE membership set and renders <Outlet/>,
+              so both tabs below inherit the gate — typing
+              /admin/accounts as a coach gets the same "not authorised"
+              card as /admin itself. */}
+          <Route path="/admin" element={<AppShell><AdminDashboard /></AppShell>}>
+            <Route index element={<Navigate to="/admin/accounts" replace />} />
+            <Route path="accounts" element={<Accounts />} />
+            <Route path="club" element={<AdminClub />} />
+          </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </MembershipProvider>
-      </RequireAuth>
+          {/* Old bookmarked URL. A plain redirect, not a duplicate mount:
+              Accounts must exist in exactly one place. */}
+          <Route path="/accounts" element={<Navigate to="/admin/accounts" replace />} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
     </BrowserRouter>
   )
 }
