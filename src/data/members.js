@@ -122,9 +122,14 @@ export async function listPendingProfiles() {
 export async function getMyProfile(userId) {
   if (!userId) throw new Error('getMyProfile needs a user id.')
 
+  // first_name/last_name/name_confirmed_at are what the sign-in name gate
+  // reads. name_confirmed_at is the one that decides whether the gate opens:
+  // a populated first_name proves only that a name ARRIVED (Google supplies
+  // one, and the profiles_sync_name trigger splits it on insert), never that
+  // the person agreed with it.
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, email, created_at')
+    .select('id, full_name, first_name, last_name, name_confirmed_at, email, created_at')
     .eq('id', userId)
     .maybeSingle()
 
@@ -292,6 +297,80 @@ export async function createInvite({
 export async function acceptInvite(token) {
   const { data, error } = await supabase.rpc('accept_invite', { _token: token })
   if (error) throw error
+  return data
+}
+
+/**
+ * Claims the squads the roster already lists this person against, via the
+ * `claim_roster_access` SECURITY DEFINER RPC.
+ *
+ * This is how PARENTS get access. It replaces the emailed invite for them
+ * entirely; `createInvite`/`acceptInvite` above stay in service for staff,
+ * whose roles cannot be derived from roster data.
+ *
+ * Takes NO arguments, and that is the security property, not an omission. The
+ * RPC reads the caller's email from `auth.users` server-side. An email
+ * parameter would let any signed-in person claim any family's access by typing
+ * their address — the roster is not a secret.
+ *
+ * Returns an ARRAY of the memberships created, exactly like `acceptInvite`: a
+ * parent of two children in different age groups gets two rows. An EMPTY array
+ * is a completely normal answer and means one of two things, which the caller
+ * cannot distinguish and should not try to:
+ *   - the signed-in address is not on the roster, or
+ *   - this account already holds access, so the RPC declined to touch it
+ *     (it only ever runs for an account with zero memberships, so that revoked
+ *     access is never silently resurrected).
+ *
+ * Safe to call more than once: the second call returns [] rather than
+ * duplicating anything, guarded both by that zero-membership check and by the
+ * `memberships_unique_grant` index underneath it.
+ */
+export async function claimRosterAccess() {
+  const { data, error } = await supabase.rpc('claim_roster_access')
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Saves the first/family name the person entered themselves, and records that
+ * they entered it.
+ *
+ * Distinct from `updateProfileName` above, which writes `full_name` and is what
+ * an ADMIN uses to fix someone else's name from the Accounts screen. This one
+ * is the person speaking for themselves, and it is the only writer of
+ * `name_confirmed_at`.
+ *
+ * ⚠️ `full_name` is NOT written here. The `profiles_sync_name` trigger rebuilds
+ * it from first/last, so writing it too would be sending a value the database
+ * is about to overwrite — and if the two ever disagreed, the one that lost
+ * would depend on trigger ordering rather than on intent.
+ *
+ * A blank family name is allowed; a blank first name is not. Plenty of people
+ * have one name, and forcing them to invent a second is worse than storing
+ * null. `full_name` comes out as just the first name in that case, which is
+ * what every screen then displays.
+ */
+export async function updateProfileNames({ profileId, firstName, lastName } = {}) {
+  if (!profileId) throw new Error('updateProfileNames needs a profileId.')
+
+  const first = typeof firstName === 'string' ? firstName.trim() : ''
+  const last = typeof lastName === 'string' ? lastName.trim() : ''
+  if (!first) throw new Error('Enter your first name.')
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      first_name: first,
+      last_name: last || null,
+      name_confirmed_at: new Date().toISOString(),
+    })
+    .eq('id', profileId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(REFUSED_PROFILE)
   return data
 }
 

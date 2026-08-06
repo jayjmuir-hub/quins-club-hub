@@ -17,13 +17,17 @@ import userEvent from '@testing-library/user-event'
 // mocked so nothing here can reach a real Supabase client.
 
 const getMyProfileMock = vi.fn()
-const updateProfileNameMock = vi.fn()
+// Repointed 6 Aug 2026: this screen now writes first/family name via
+// updateProfileNames (which also stamps name_confirmed_at), not full_name via
+// updateProfileName. Renamed rather than duplicated — a mock for the old
+// function would sit here forever, always uncalled, always passing.
+const updateProfileNamesMock = vi.fn()
 const getMyAccessRequestMock = vi.fn()
 const createAccessRequestMock = vi.fn()
 
 vi.mock('../src/data/members.js', () => ({
   getMyProfile: (...args) => getMyProfileMock(...args),
-  updateProfileName: (...args) => updateProfileNameMock(...args),
+  updateProfileNames: (...args) => updateProfileNamesMock(...args),
 }))
 
 vi.mock('../src/data/accessRequests.js', () => ({
@@ -48,8 +52,18 @@ function renderIt(props = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   getMyAccessRequestMock.mockResolvedValue(null)
-  getMyProfileMock.mockResolvedValue({ id: USER_ID, full_name: '', email: EMAIL })
-  updateProfileNameMock.mockImplementation(async ({ fullName }) => ({ full_name: fullName }))
+  getMyProfileMock.mockResolvedValue({
+    id: USER_ID,
+    full_name: '',
+    first_name: null,
+    last_name: null,
+    name_confirmed_at: null,
+    email: EMAIL,
+  })
+  updateProfileNamesMock.mockImplementation(async ({ firstName, lastName }) => ({
+    first_name: firstName,
+    last_name: lastName || null,
+  }))
   createAccessRequestMock.mockImplementation(async ({ profileId, note }) => ({
     id: 'req-1',
     profile_id: profileId,
@@ -60,13 +74,45 @@ beforeEach(() => {
 
 describe('RequestAccess', () => {
   it('offers the form to someone who has never asked, and prefills their name', async () => {
-    getMyProfileMock.mockResolvedValue({ id: USER_ID, full_name: 'Nina Newcomer' })
+    getMyProfileMock.mockResolvedValue({
+      id: USER_ID,
+      full_name: 'Nina Newcomer',
+      first_name: 'Nina',
+      last_name: 'Newcomer',
+    })
 
     renderIt()
 
     expect(await screen.findByRole('button', { name: /request access/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/your name/i)).toHaveValue('Nina Newcomer')
+    expect(screen.getByLabelText(/first name/i)).toHaveValue('Nina')
+    expect(screen.getByLabelText(/family name/i)).toHaveValue('Newcomer')
     expect(screen.getByText(EMAIL)).toBeInTheDocument()
+  })
+
+  // The blurb added 6 Aug 2026. Its job is to stop someone who expected to be
+  // let straight in from concluding they have done something wrong, and to
+  // offer the fix most of them can apply themselves. Asserted because it is
+  // the entire reason this screen exists under roster onboarding — copy that
+  // silently regresses to "ask an admin" is a support-request generator.
+  it('reassures a non-matched person and names the address that failed', async () => {
+    renderIt()
+
+    await screen.findByRole('button', { name: /request access/i })
+    expect(screen.getByText(/nothing has gone wrong/i)).toBeInTheDocument()
+    expect(screen.getByText(/different email for you/i)).toBeInTheDocument()
+    expect(screen.getByText(EMAIL)).toBeInTheDocument()
+  })
+
+  it('does not promise an email it cannot send', async () => {
+    getMyAccessRequestMock.mockResolvedValue({ id: 'ar-1', status: 'pending', note: null })
+
+    renderIt()
+
+    // The old copy said "We'll email <address> once someone has approved it".
+    // Nothing in this app sends that message — see the comment in
+    // RequestAccess.jsx. This asserts the promise stays retracted.
+    expect(await screen.findByText(/request is with the club/i)).toBeInTheDocument()
+    expect(screen.queryByText(/we'll email/i)).not.toBeInTheDocument()
   })
 
   it('saves the name before the request, then confirms it was sent', async () => {
@@ -74,14 +120,16 @@ describe('RequestAccess', () => {
     renderIt()
 
     await screen.findByRole('button', { name: /request access/i })
-    await user.type(screen.getByLabelText(/your name/i), 'Nina Newcomer')
+    await user.type(screen.getByLabelText(/first name/i), 'Nina')
+    await user.type(screen.getByLabelText(/family name/i), 'Newcomer')
     await user.type(screen.getByLabelText(/who are you at the club/i), 'Parent of Sam, U10')
     await user.click(screen.getByRole('button', { name: /request access/i }))
 
     await waitFor(() =>
-      expect(updateProfileNameMock).toHaveBeenCalledWith({
+      expect(updateProfileNamesMock).toHaveBeenCalledWith({
         profileId: USER_ID,
-        fullName: 'Nina Newcomer',
+        firstName: 'Nina',
+        lastName: 'Newcomer',
       }),
     )
     expect(createAccessRequestMock).toHaveBeenCalledWith({
@@ -103,8 +151,8 @@ describe('RequestAccess', () => {
     await screen.findByRole('button', { name: /request access/i })
     await user.click(screen.getByRole('button', { name: /request access/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/enter your name/i)
-    expect(updateProfileNameMock).not.toHaveBeenCalled()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/enter your first name/i)
+    expect(updateProfileNamesMock).not.toHaveBeenCalled()
     expect(createAccessRequestMock).not.toHaveBeenCalled()
   })
 
@@ -114,7 +162,7 @@ describe('RequestAccess', () => {
     renderIt()
 
     await screen.findByRole('button', { name: /request access/i })
-    await user.type(screen.getByLabelText(/your name/i), 'Nina Newcomer')
+    await user.type(screen.getByLabelText(/first name/i), 'Nina')
     await user.click(screen.getByRole('button', { name: /request access/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Network is down')
@@ -151,7 +199,7 @@ describe('RequestAccess', () => {
     // for the owner, plus a UNIQUE key), so offering the form here would be
     // offering a control that cannot work.
     expect(screen.queryByRole('button', { name: /request access/i })).toBeNull()
-    expect(screen.queryByLabelText(/your name/i)).toBeNull()
+    expect(screen.queryByLabelText(/first name/i)).toBeNull()
   })
 
   it('falls back to a plain message, not a form, when the request read fails', async () => {
@@ -171,7 +219,7 @@ describe('RequestAccess', () => {
     renderIt()
 
     expect(await screen.findByRole('button', { name: /request access/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/your name/i)).toHaveValue('')
+    expect(screen.getByLabelText(/first name/i)).toHaveValue('')
   })
 
   it('offers sign-out in every state — nobody gets trapped', async () => {

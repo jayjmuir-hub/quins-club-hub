@@ -42,7 +42,16 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
-export function Sheet({ open, onClose, title, children }) {
+// `dismissible` defaults to true, so every existing caller is unchanged.
+// Passing false removes ALL THREE exits at once — the X, Escape, and the
+// backdrop click. It has to be all three: a gate with two of them closed is
+// not a gate, it is a gate with a side door, and which door a given person
+// finds is a matter of whether they use a keyboard.
+//
+// Used by NamePrompt, the sign-in name gate. Do not reach for it to make an
+// ordinary form feel important; a modal a user cannot leave is a trap unless
+// completing it is genuinely the only way forward.
+export function Sheet({ open, onClose, title, children, dismissible = true }) {
   const titleId = useId()
   const panelRef = useRef(null)
   const triggerRef = useRef(null)
@@ -60,6 +69,11 @@ export function Sheet({ open, onClose, title, children }) {
   // open/close transition regardless of the caller's callback identity.
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+  // Same latest-ref treatment, and for the same reason: the keydown handler is
+  // installed once per open/close transition, so reading `dismissible` from
+  // the closure would freeze whatever it was at open time.
+  const dismissibleRef = useRef(dismissible)
+  dismissibleRef.current = dismissible
 
   useEffect(() => {
     if (!open) return undefined
@@ -76,7 +90,9 @@ export function Sheet({ open, onClose, title, children }) {
     function handleKeyDown(event) {
       if (event.key === 'Escape') {
         event.stopPropagation()
-        onCloseRef.current()
+        // Still stopPropagation on a non-dismissible sheet: the keypress must
+        // not fall through to whatever is behind the scrim either.
+        if (dismissibleRef.current) onCloseRef.current()
         return
       }
 
@@ -122,7 +138,7 @@ export function Sheet({ open, onClose, title, children }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(24,10,20,0.5)] backdrop-blur-[2px] animate-scrim-fade-in motion-reduce:animate-none desktop:items-center"
-      onClick={onClose}
+      onClick={dismissible ? onClose : undefined}
     >
       <div
         ref={panelRef}
@@ -145,16 +161,18 @@ export function Sheet({ open, onClose, title, children }) {
           <h3 id={titleId} className="text-[18px] font-extrabold text-ink">
             {title}
           </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-mute text-ink outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
+          {dismissible && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-mute text-ink outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          )}
         </div>
         {/* Bottom padding adds env(safe-area-inset-bottom) on top of the
             base 16px (design-system.md §3: "tab bar and FAB bottom offsets

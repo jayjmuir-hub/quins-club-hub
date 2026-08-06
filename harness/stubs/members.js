@@ -154,16 +154,79 @@ export async function deleteMembership(membershipId) {
 // before. ?blankName=1 returns a profile with no name, so the first-login
 // name prompt is screenshot-able; by default the signed-in user is named and
 // the prompt stays shut.
+// ?unconfirmedName=1 opens the sign-in name GATE (name_confirmed_at null).
+// It is deliberately separate from ?blankName=1: the gate's whole point is
+// that a populated-but-unconfirmed name still has to be confirmed, so the two
+// knobs together make the Google case (prefilled, confirmable) and the
+// magic-link case (empty, typed) both screenshot-able.
 export async function getMyProfile(userId) {
   if (!userId) throw new Error('getMyProfile needs a user id.')
   const params = new URLSearchParams(window.location.search)
   const blank = params.get('blankName') === '1'
+  const unconfirmed = params.get('unconfirmedName') === '1'
   return {
     id: userId,
     full_name: blank ? '' : 'Jay Muir',
+    first_name: blank ? '' : 'Jay',
+    last_name: blank ? '' : 'Muir',
+    name_confirmed_at: unconfirmed ? null : '2026-08-06T09:00:00Z',
     email: 'jayjmuir@gmail.com',
     created_at: '2026-01-05T09:00:00Z',
   }
+}
+
+// Mirrors the real updateProfileNames: the person naming THEMSELVES in the
+// sign-in gate, which is also the only writer of name_confirmed_at. Distinct
+// from updateProfileName below, which is an admin renaming someone else.
+export async function updateProfileNames({ profileId, firstName, lastName } = {}) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('writeDelay') || 0)
+
+  if (!profileId) throw new Error('updateProfileNames needs a profileId.')
+  const first = String(firstName ?? '').trim()
+  const last = String(lastName ?? '').trim()
+  if (!first) throw new Error('Enter your first name.')
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (params.get('writeThrow') === '1') {
+    throw new Error(
+      "We couldn't save that name. You may not have permission to change this member's details.",
+    )
+  }
+
+  return {
+    id: profileId,
+    first_name: first,
+    last_name: last || null,
+    // Mirrors the profiles_sync_name trigger, so anything reading full_name
+    // back from this stub sees what the database would actually have stored.
+    full_name: [first, last].filter(Boolean).join(' '),
+    name_confirmed_at: '2026-08-06T12:00:00Z',
+  }
+}
+
+// Mirrors the real claimRosterAccess. Takes no arguments, exactly like the
+// real one — the RPC reads the caller's email server-side, and a stub that
+// accepted an email here would quietly misrepresent the security property
+// that makes the whole feature safe.
+//
+// Returns [] by default, which is the honest common case for the harness (the
+// stub user already has memberships, so the real RPC would decline). ?claim=2
+// returns two rows, the sibling-in-two-age-groups case.
+export async function claimRosterAccess() {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('claimDelay') || 0)
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (params.get('claimThrow') === '1') {
+    throw new Error('permission denied for function claim_roster_access')
+  }
+  if (params.get('claim') !== '2') return []
+
+  return [
+    { id: 'mm-claim-1', profile_id: 'pr-new', club_id: 'club-1', role: 'parent', team_id: 't1', player_id: 'p1', created_at: '2026-08-06T12:00:00Z' },
+    { id: 'mm-claim-2', profile_id: 'pr-new', club_id: 'club-1', role: 'parent', team_id: 't2', player_id: 'p2', created_at: '2026-08-06T12:00:00Z' },
+  ]
 }
 
 export async function updateProfileName({ profileId, fullName } = {}) {

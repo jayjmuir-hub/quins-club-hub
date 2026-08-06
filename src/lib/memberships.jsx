@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from './auth.jsx'
 import { supabase } from './supabase'
-import { loadMyMemberships } from '../data/members.js'
+import { claimRosterAccess, loadMyMemberships } from '../data/members.js'
 import { isAdmin } from './scope.js'
 
 // Membership/teams context: loads the current user's membership rows and the
@@ -90,6 +90,11 @@ export function MembershipProvider({ children }) {
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
   const [viewAsState, setViewAsState] = useState(readStoredViewAs)
+  // Which user id we have already offered roster auto-onboarding to. A ref,
+  // not state, because changing it must not itself cause a render — and
+  // because the ONLY thing it exists to prevent is calling the RPC twice for
+  // the same person in one session. See the claim block in the effect below.
+  const claimAttemptedFor = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -98,6 +103,9 @@ export function MembershipProvider({ children }) {
       // Sign-out must not leak a preview into the next person's login.
       setViewAsState(null)
       writeStoredViewAs(null)
+      // ...nor a "we already tried to onboard this person" flag, or the next
+      // person to sign in on a shared laptop would never be offered it.
+      claimAttemptedFor.current = null
       setMemberships([])
       setTeams([])
       setError(null)
@@ -111,8 +119,55 @@ export function MembershipProvider({ children }) {
     setError(null)
 
     Promise.all([loadMyMemberships(), loadTeams()])
-      .then(([membershipRows, teamRows]) => {
+      .then(async ([membershipRows, teamRows]) => {
         if (!mounted) return
+
+        // --- Roster auto-onboarding -------------------------------------
+        // A signed-in person with NO access is the one case worth a second
+        // round trip: the club roster may already list them against their
+        // children, in which case they should never have to ask anyone.
+        // See db/migrations/20260806_claim_roster_access.sql.
+        //
+        // Gated on zero memberships, so the overwhelmingly common path (an
+        // existing member loading the app) costs nothing at all.
+        const userId = session?.user?.id ?? null
+        if (membershipRows.length === 0 && claimAttemptedFor.current !== userId) {
+          // Marked BEFORE awaiting, not after: two effect runs can overlap
+          // (React 18 StrictMode double-invokes in development, and a token
+          // refresh can retrigger this), and marking afterwards would let
+          // both through.
+          claimAttemptedFor.current = userId
+
+          let claimed = []
+          try {
+            claimed = await claimRosterAccess()
+          } catch {
+            // Deliberately swallowed. A failed claim is not an error state:
+            // it is indistinguishable, to this person, from not being on the
+            // roster — and the honest outcome for both is the same
+            // RequestAccess screen, which offers them a way forward. Turning
+            // a transient network blip into a red error page would take that
+            // away.
+          }
+          if (!mounted) return
+
+          if (claimed.length > 0) {
+            // Re-read rather than using what the RPC returned. It returns bare
+            // membership rows; every screen here expects them joined to teams,
+            // and `teams` itself was EMPTY a moment ago — RLS showed this
+            // person no squads because they held no membership. Both have to
+            // be fetched again now that they do.
+            const [freshMemberships, freshTeams] = await Promise.all([
+              loadMyMemberships(),
+              loadTeams(),
+            ])
+            if (!mounted) return
+            setMemberships(freshMemberships)
+            setTeams(freshTeams)
+            return
+          }
+        }
+
         setMemberships(membershipRows)
         setTeams(teamRows)
       })

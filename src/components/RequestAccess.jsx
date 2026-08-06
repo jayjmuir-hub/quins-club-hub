@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getMyProfile, updateProfileName } from '../data/members.js'
+import { getMyProfile, updateProfileNames } from '../data/members.js'
 import { createAccessRequest, getMyAccessRequest } from '../data/accessRequests.js'
 
 // What a signed-in account with NO membership sees. Replaces the older
@@ -44,7 +44,8 @@ export default function RequestAccess({ userId, email, children }) {
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
 
-  const [name, setName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -75,8 +76,12 @@ export default function RequestAccess({ userId, email, children }) {
         } else {
           setLoadFailed(true)
         }
-        if (profileResult.status === 'fulfilled' && profileResult.value?.full_name) {
-          setName(profileResult.value.full_name)
+        // Prefill from first/last, which a Google sign-in populates via
+        // private.handle_new_user + private.sync_profile_name. Someone who
+        // matched nothing on the roster has usually still arrived with a name.
+        if (profileResult.status === 'fulfilled' && profileResult.value) {
+          setFirstName(String(profileResult.value.first_name ?? ''))
+          setLastName(String(profileResult.value.last_name ?? ''))
         }
       })
       .finally(() => {
@@ -91,9 +96,9 @@ export default function RequestAccess({ userId, email, children }) {
   async function handleSubmit(event) {
     event.preventDefault()
 
-    const trimmedName = name.trim()
-    if (!trimmedName) {
-      setError('Enter your name so the club knows who is asking.')
+    const first = firstName.trim()
+    if (!first) {
+      setError('Enter your first name so the club knows who is asking.')
       return
     }
 
@@ -103,7 +108,16 @@ export default function RequestAccess({ userId, email, children }) {
       // Name first, and awaited: the admin's waiting list renders
       // profiles.full_name, so a request that arrives attached to "Unnamed
       // member" is a request nobody can act on.
-      await updateProfileName({ profileId: userId, fullName: trimmedName })
+      //
+      // updateProfileNames (not updateProfileName) so this also stamps
+      // name_confirmed_at. They have just told us their name in their own
+      // words — being made to type it again in the sign-in gate the moment an
+      // admin grants them access would be absurd.
+      await updateProfileNames({
+        profileId: userId,
+        firstName: first,
+        lastName: lastName.trim(),
+      })
       const created = await createAccessRequest({ profileId: userId, note })
       setRequest(created)
     } catch (err) {
@@ -138,10 +152,18 @@ export default function RequestAccess({ userId, email, children }) {
   if (request) {
     return (
       <Shell title="Request sent">
+        {/* ⚠️ This used to say "We'll email <address> once someone has
+            approved it". THE APP SENDS NO SUCH EMAIL — the only mail it ever
+            sends is the sign-in link the person requests themselves, and
+            nobody is notified on approval in either direction (see
+            claude/state-of-play.md, "Nobody is emailed when an access request
+            arrives"). Promising a notification that never arrives is worse
+            than promising nothing: it tells someone to stop checking. */}
         <p className="mt-2 text-center text-sm leading-relaxed text-ink-faint">
-          Your request is with the club. We&apos;ll email{' '}
-          <strong className="text-ink">{email}</strong> once someone has
-          approved it — you don&apos;t need to do anything else.
+          Your request is with the club and someone will connect{' '}
+          <strong className="text-ink">{email}</strong> to the right age groups.
+          There&apos;s nothing else for you to do — next time you sign in, if
+          your squads are showing, you&apos;re in.
         </p>
         {request.note && (
           <p className="mt-3 rounded-[11px] bg-surface px-3 py-2 text-sm italic leading-relaxed text-ink-muted">
@@ -171,11 +193,38 @@ export default function RequestAccess({ userId, email, children }) {
   }
 
   return (
-    <Shell title="Ask the club for access">
+    <Shell title="Let&apos;s get you connected">
+      {/* This copy is doing real work, so it is worth saying why it is shaped
+          the way it is.
+
+          Under roster auto-onboarding most people never see this screen at
+          all — they sign in and their squads appear. Reaching this screen
+          means the address they signed in with is not the one the club holds
+          for their child, which is COMMON and is nobody's mistake. Someone in
+          that position, expecting to be let straight in, will assume they have
+          done something wrong.
+
+          So: reassure first, then offer the fix they can apply themselves
+          (sign in with the other address), then the fallback that needs an
+          admin. Naming the address is the load-bearing detail — without it,
+          "we couldn't find you" is unactionable, and with it most people spot
+          the problem instantly. */}
       <p className="mt-2 text-center text-sm leading-relaxed text-ink-faint">
         You&apos;re signed in as <strong className="text-ink">{email}</strong>,
-        but your account isn&apos;t linked to a squad yet. Tell the club who you
-        are and an admin will set you up.
+        and we couldn&apos;t find that address on the club roster yet.
+      </p>
+
+      <p className="mt-3 rounded-[11px] bg-surface px-3 py-2.5 text-sm leading-relaxed text-ink-muted">
+        <strong className="text-ink">Nothing has gone wrong.</strong> Usually it
+        just means the club has a different email for you. If you have another
+        address you&apos;ve used with the Quins, sign out and sign in with that
+        one — you&apos;ll go straight through.
+      </p>
+
+      <p className="mt-3 text-center text-sm leading-relaxed text-ink-faint">
+        If not, tell us who you are below and we&apos;ll connect you to the
+        right age groups from our end. You don&apos;t need to do anything else,
+        and you won&apos;t lose your place.
       </p>
 
       <form className="mt-5" onSubmit={handleSubmit} noValidate>
@@ -188,19 +237,39 @@ export default function RequestAccess({ userId, email, children }) {
           </p>
         )}
 
+        {/* Two fields, matching the sign-in name gate rather than the single
+            box this screen used to have — the same person can meet both, and
+            being asked for "your name" here and "first / family name" there
+            reads as two different questions. */}
         <label
-          htmlFor="request-name"
+          htmlFor="request-first-name"
           className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-faint"
         >
-          Your name
+          First name
         </label>
         <input
-          id="request-name"
-          name="name"
+          id="request-first-name"
+          name="firstName"
           type="text"
-          autoComplete="name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
+          autoComplete="given-name"
+          value={firstName}
+          onChange={(event) => setFirstName(event.target.value)}
+          className="w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand"
+        />
+
+        <label
+          htmlFor="request-last-name"
+          className="mb-1.5 mt-4 block text-xs font-bold uppercase tracking-wide text-ink-faint"
+        >
+          Family name <span className="font-semibold normal-case">(optional)</span>
+        </label>
+        <input
+          id="request-last-name"
+          name="lastName"
+          type="text"
+          autoComplete="family-name"
+          value={lastName}
+          onChange={(event) => setLastName(event.target.value)}
           className="w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand"
         />
 

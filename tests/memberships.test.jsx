@@ -17,6 +17,9 @@ vi.mock('../src/lib/auth.jsx', () => ({
 vi.mock('../src/lib/supabase.js', () => ({
   supabase: {
     from: vi.fn(),
+    // Added 6 Aug 2026 for roster auto-onboarding: the provider now calls the
+    // claim_roster_access RPC for a user with no memberships.
+    rpc: vi.fn(),
   },
 }))
 
@@ -375,5 +378,117 @@ describe('MembershipProvider view-as preview', () => {
 
     getItem.mockRestore()
     setItem.mockRestore()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Roster auto-onboarding
+// (claude/decisions/2026-08-06-roster-auto-onboarding.md).
+//
+// The provider calls claim_roster_access for a signed-in user holding NO
+// memberships, and re-reads if anything was granted. The RPC itself is proved
+// against the live database in a rolled-back transaction — see the migration.
+// What is tested HERE is only the wiring, and the wiring has three ways to be
+// wrong that matter:
+//   - calling it for someone who already has access (a wasted round trip on
+//     every load for every existing member, i.e. the common path)
+//   - not re-reading afterwards (squads granted but the app still blank,
+//     because `teams` was empty under RLS a moment ago)
+//   - letting a failure become an error screen instead of RequestAccess
+// ---------------------------------------------------------------------------
+describe('MembershipProvider — roster auto-onboarding', () => {
+  function mockClaim(rows) {
+    supabase.rpc.mockResolvedValue({ data: rows, error: null })
+  }
+
+  // Local to this block: renderAs() lives inside the view-as describe and is
+  // not in scope here.
+  function renderProvider() {
+    return render(
+      <MembershipProvider>
+        <Harness />
+      </MembershipProvider>,
+    )
+  }
+
+  beforeEach(() => {
+    supabase.rpc.mockReset()
+    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
+    mockClaim([])
+  })
+
+  it('does not call the RPC at all when the user already has access', async () => {
+    mockFrom({ memberships: [MEMBERSHIP_ROW], teams: [TEAM_ROW] })
+    renderProvider()
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+
+  it('calls claim_roster_access for a user with no memberships', async () => {
+    mockFrom({ memberships: [], teams: [] })
+    renderProvider()
+
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('claim_roster_access'))
+  })
+
+  it('re-reads memberships AND teams after a successful claim', async () => {
+    // First pass returns nothing (RLS shows a memberless user no squads); the
+    // second must return both. Re-reading teams is the part most likely to be
+    // forgotten, and forgetting it leaves the app rendering with no squads.
+    let call = 0
+    supabase.from.mockImplementation((table) => ({
+      select: vi.fn().mockImplementation(async () => {
+        if (table === 'memberships') {
+          return { data: call > 0 ? [MEMBERSHIP_ROW] : [], error: null }
+        }
+        return { data: call > 0 ? [TEAM_ROW] : [], error: null }
+      }),
+    }))
+    supabase.rpc.mockImplementation(async () => {
+      call = 1
+      return { data: [MEMBERSHIP_ROW], error: null }
+    })
+
+    renderProvider()
+
+    await waitFor(() => expect(screen.getByTestId('memberships')).toHaveTextContent('m-1'))
+    expect(screen.getByTestId('teams')).toHaveTextContent('U12')
+  })
+
+  it('leaves memberships empty when nothing matched, without erroring', async () => {
+    mockFrom({ memberships: [], teams: [] })
+    mockClaim([])
+    renderProvider()
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    expect(screen.getByTestId('memberships')).toHaveTextContent('[]')
+    // Empty memberships is what makes AppShell render RequestAccess. An error
+    // here would replace that with a red retry screen and no way forward.
+    expect(screen.getByTestId('error')).toHaveTextContent('none')
+  })
+
+  it('swallows a failed claim rather than turning it into an error screen', async () => {
+    mockFrom({ memberships: [], teams: [] })
+    supabase.rpc.mockRejectedValue(new Error('permission denied for function'))
+    renderProvider()
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    expect(screen.getByTestId('error')).toHaveTextContent('none')
+    expect(screen.getByTestId('memberships')).toHaveTextContent('[]')
+  })
+
+  it('tries once per user, not once per render', async () => {
+    // The guard is a ref keyed on the user id. Without it, every reload — and
+    // every StrictMode double-invoke — would fire another RPC.
+    mockFrom({ memberships: [], teams: [] })
+    const user = userEvent.setup()
+    renderProvider()
+
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledTimes(1))
+    await user.click(screen.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
   })
 })
