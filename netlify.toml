@@ -41,3 +41,42 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Security response headers.
+#
+# Before this block the only one Netlify sent was its default HSTS. This app
+# holds children's names, dates of birth, parent contact numbers and
+# photographs, so the baseline matters more than it would for a brochure site.
+#
+# ⚠️ CSP HERE IS *ONLY* frame-ancestors, and that is deliberate. CSP directives
+# are independent — a policy that names one directive restricts that one and
+# leaves everything else alone. A real content policy for this app needs a
+# tested connect-src (Supabase REST, Auth, Storage and the edge functions) and
+# style-src, and getting it wrong breaks the app SILENTLY for anyone whose
+# service worker has already cached a page. That is a separate, tested job.
+#
+# X-Frame-Options duplicates frame-ancestors for older browsers that do not
+# honour the CSP directive. Both say the same thing: this app is never framed.
+# Nothing in src/ renders an iframe, so nothing legitimate breaks.
+#
+# ⚠️ Referrer-Policy is NOT boilerplate here. The magic-link and calendar-feed
+# URLs both carry a BEARER TOKEN IN THE QUERY STRING. Without a policy, a
+# browser may put the whole URL — token included — in the Referer header of an
+# outbound request. strict-origin-when-cross-origin sends only the origin
+# off-site, so the token cannot leak that way.
+#
+# ⚠️ camera IS DELIBERATELY ABSENT from Permissions-Policy. Nothing calls
+# getUserMedia and the photo field is a plain <input type="file"> with no
+# `capture` attribute, so restricting it would buy almost nothing — while the
+# parent-adds-a-photo-from-their-phone flow has never been smoke-tested on a
+# real device. Do not add `camera=()` until that test has been done; a silent
+# break there would look like "the app won't take my photo" and nobody would
+# connect it to a header.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "frame-ancestors 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), payment=(), usb=()"
