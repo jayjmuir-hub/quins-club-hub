@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
@@ -257,12 +258,15 @@ function QuickActions({ canEdit, readOnlyRole }) {
   return (
     <Card data-testid="quick-actions" className="p-[14px]">
       <div className="flex flex-col gap-2.5">
-        <Link to="/schedule" className={BUTTON_GHOST}>
+        {/* These two GO somewhere, which is exactly the case the club site
+            marks with its rotating arrow badge. Save/Cancel buttons do not
+            get one — see Button.jsx. */}
+        <Button as={Link} to="/schedule" variant="secondary" full arrow>
           {canEdit ? 'View full schedule' : 'View schedule'}
-        </Link>
-        <Link to="/roster" className={BUTTON_GHOST}>
+        </Button>
+        <Button as={Link} to="/roster" variant="secondary" full arrow>
           View team list
-        </Link>
+        </Button>
 
         {/* The role noun comes from roleLabel(), the same source as the scope
             note at the top of this screen. Hardcoding "parent" here told a

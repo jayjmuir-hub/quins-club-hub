@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
+import Button from '../components/Button.jsx'
 import { takeSessionExpired } from '../lib/sessionExpired.js'
 import crest from '../assets/crest.png'
 
@@ -209,13 +210,14 @@ export default function Login({ authError = null, embedded = false }) {
               <strong className="text-ink">{email.trim()}</strong>. Open it
               on this device to continue.
             </p>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={handleUseDifferentEmail}
-              className="mt-5 w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-brand transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              full
+              className="mt-5"
             >
               Use a different email
-            </button>
+            </Button>
           </div>
         ) : (
           <form className="mt-6" onSubmit={handleEmailSubmit} noValidate>
@@ -246,13 +248,9 @@ export default function Login({ authError = null, embedded = false }) {
               className="w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand"
             />
 
-            <button
-              type="submit"
-              disabled={sending}
-              className="mt-4 w-full rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            >
+            <Button type="submit" disabled={sending} full className="mt-4">
               {sending ? 'Sending…' : 'Email me a link'}
-            </button>
+            </Button>
 
             <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-ink-faint">
               <span className="h-px flex-1 bg-line" />
@@ -260,14 +258,18 @@ export default function Login({ authError = null, embedded = false }) {
               <span className="h-px flex-1 bg-line" />
             </div>
 
-            <button
-              type="button"
+            {/* text-ink, not the variant's brand red: this is a neutral
+                alternative to the primary action above, and two red controls
+                stacked would read as two primary buttons. */}
+            <Button
+              variant="secondary"
               onClick={handleGoogleClick}
               disabled={sending}
-              className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-ink transition hover:border-brand disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              full
+              className="!text-ink"
             >
               Continue with Google
-            </button>
+            </Button>
           </form>
         )}
     </div>
