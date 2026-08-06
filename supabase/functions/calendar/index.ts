@@ -73,6 +73,7 @@ type Event = {
   opponent: string | null
   home: boolean | null
   venue: string | null
+  pitch: string | null
   competition: string | null
   starts_at: string
   team_name: string | null
@@ -87,6 +88,27 @@ function summaryFor(event: Event): string {
   }
   if (event.title) return `${squad} — ${event.title}`
   return event.type === 'training' ? `${squad} training` : `${squad} — club event`
+}
+
+/**
+ * Where the event is, as one line, for LOCATION.
+ *
+ * ⚠️ DUPLICATES venueLine() in src/lib/eventFormat.js, deliberately and
+ * unavoidably: that module is browser JavaScript bundled by Vite, this is a
+ * standalone Deno function deployed separately, and there is no shared build
+ * between them. Keep the two in step by hand — a parent reading "Pitch 3" in
+ * the app and something different in their calendar is the failure this
+ * comment exists to prevent. tests/event-format.test.js pins the app side.
+ *
+ * The pitch goes in LOCATION rather than DESCRIPTION because LOCATION is what
+ * a phone shows under the event title without opening it, and "which pitch"
+ * is the one thing a parent standing at a 12-pitch venue actually needs.
+ */
+function locationFor(event: Event): string {
+  const venue = (event.venue ?? '').trim()
+  const pitch = (event.pitch ?? '').trim()
+  if (venue && pitch) return `${venue} · ${pitch}`
+  return venue || pitch || ''
 }
 
 // No end time is stored, so one is assumed rather than emitting a zero-length
@@ -114,7 +136,8 @@ function toVEvent(event: Event, stamp: string): string[] {
     `DTEND:${icsStamp(end)}`,
     `SUMMARY:${escapeText(summaryFor(event))}`,
   ]
-  if (event.venue) lines.push(`LOCATION:${escapeText(event.venue)}`)
+  const location = locationFor(event)
+  if (location) lines.push(`LOCATION:${escapeText(location)}`)
   if (description.length) lines.push(`DESCRIPTION:${escapeText(description.join(' · '))}`)
   lines.push('END:VEVENT')
   return lines
