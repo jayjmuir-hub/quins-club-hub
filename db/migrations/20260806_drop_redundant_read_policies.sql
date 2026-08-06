@@ -1,0 +1,50 @@
+-- Applied to Supabase as "drop_redundant_read_policies", 6 Aug 2026.
+--
+-- Drops two RLS policies that granted nothing the surviving policies do not.
+--
+-- On player_contacts the three PERMISSIVE policies were:
+--   contact edit      ALL     can_edit_team(<player's team>)   -- A
+--   contact edit own  ALL     is_own_player(player_id)         -- B
+--   contact read      SELECT  A OR B
+-- ALL includes SELECT, so on a read all three applied and were OR'd together:
+--   A OR B OR (A OR B)  ==  A OR B
+-- "contact read" was therefore exactly the OR of the other two and could never
+-- widen or narrow access. Same shape on player_parents.
+--
+-- ⚠️ SAFE FOR WRITES BY CONSTRUCTION, not merely by measurement: both dropped
+-- policies are cmd=SELECT with no WITH CHECK, so they cannot have been granting
+-- INSERT/UPDATE/DELETE to anyone. The ALL policies that do govern writes are
+-- untouched.
+--
+-- ⚠️ THE REDUNDANCY IS MUTUAL, AND THE TWO SIDES ARE NOT INTERCHANGEABLE.
+-- Dropping "contact edit own" instead would ALSO leave reads unchanged (because
+-- "contact read" covers them) -- but it would remove a parent's ability to EDIT
+-- their own contact row. The read-only policy is the safe one to remove. This
+-- was found the hard way: it was the first fault injected, and it produced NO
+-- difference, which is what exposed the mutual redundancy.
+--
+-- HOW IT WAS VERIFIED, before applying:
+-- In a rolled-back transaction, an md5 of every visible ROW (not just a count)
+-- was snapshotted for an admin, a parent, a player and a stranger, before and
+-- after the drop. All eight comparisons identical, with the counts themselves
+-- discriminating: 315 / 2 / 1 / 0.
+-- The harness was then proved by injecting a REAL fault -- dropping
+-- "contact read" AND "contact edit own" together, removing both of a parent's
+-- read paths -- which moved the parent 2 -> 0 while the admin held at 315.
+--
+-- ⚠️ WHAT THIS DID *NOT* BUY: any measurable speed.
+-- The plan predicate does simplify from four terms to two, and the planner's
+-- estimated cost halves (1783 -> 1029). But a paired benchmark in one session,
+-- 30 warm runs each way, found no difference at all:
+--     3 policies: avg 8.64 ms, median 8.60 ms
+--     2 policies: avg 8.62 ms, median 8.54 ms
+-- OR short-circuits, so the duplicated terms were never actually evaluated.
+-- Keep this change for the smaller policy surface and the quieter linter, NOT
+-- because it made anything faster.
+--
+-- ⚠️ AND BEWARE THE NUMBER THAT STARTED THIS. An EXPLAIN ANALYZE of the same
+-- query reported 33.9 ms; the real warm cost is ~8.6 ms. Per-row timing
+-- instrumentation on a 315-iteration nested loop inflated it ~4x. Do not size
+-- an optimisation from EXPLAIN ANALYZE wall time on this schema -- benchmark it.
+drop policy "contact read" on public.player_contacts;
+drop policy "parent read"  on public.player_parents;
