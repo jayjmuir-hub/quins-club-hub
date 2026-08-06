@@ -45,7 +45,31 @@ export function AuthProvider({ children }) {
   async function signInWithEmail(email) {
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      // ⚠️ COME BACK TO THE PAGE THEY STARTED ON, not the site root.
+      //
+      // This used to be window.location.origin, which drops the path — and
+      // that quietly broke the ONE journey where the path is the whole point.
+      // An invitee opens /accept-invite/<token>, RequireAuth renders Login in
+      // place (URL preserved), they request a link... and the magic link
+      // returned them to "/", where a person with zero memberships is shown
+      // the REQUEST ACCESS gate. An invited parent being asked to request
+      // access is the wrong screen, and the invite only completed if they
+      // went back to the original message and tapped the link a second time.
+      //
+      // Deliberately origin + pathname + search, NOT window.location.href:
+      // the HASH is where Supabase puts #access_token=... and
+      // #error_description=..., and echoing a stale fragment back into the
+      // next magic link is at best confusing and at worst leaks a token into
+      // an email.
+      //
+      // Requires the deep path to be allow-listed in Supabase Auth → URL
+      // Configuration → Redirect URLs, or Supabase silently falls back to the
+      // Site URL and this change looks like it did nothing.
+      // `https://adhquins-clubhub.com/**` is present — verified 6 Aug 2026.
+      options: {
+        emailRedirectTo:
+          window.location.origin + window.location.pathname + window.location.search,
+      },
     })
     if (error) throw error
   }
@@ -53,7 +77,15 @@ export function AuthProvider({ children }) {
   async function signInWithGoogle() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      // Same reasoning as signInWithEmail above: an invitee who signs in with
+      // Google from /accept-invite/<token> must come back to that page, not
+      // to "/". Kept identical to the magic-link case on purpose — two
+      // sign-in buttons on one screen that land you in different places is
+      // the kind of difference nobody notices until it is a support request.
+      options: {
+        redirectTo:
+          window.location.origin + window.location.pathname + window.location.search,
+      },
     })
     if (error) throw error
   }

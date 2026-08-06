@@ -141,7 +141,10 @@ describe('AuthProvider / useAuth', () => {
     expect(unsubscribeMock).toHaveBeenCalledTimes(1)
   })
 
-  it('signInWithEmail calls signInWithOtp with the email and the app origin as emailRedirectTo', async () => {
+  // These two used to assert window.location.origin. They now assert the
+  // CURRENT PAGE, because sending people back to "/" broke the invite journey
+  // (see the deep-link tests below and the comment in src/lib/auth.jsx).
+  it('signInWithEmail calls signInWithOtp with the email and the current page as emailRedirectTo', async () => {
     const user = userEvent.setup()
     await renderHarness()
 
@@ -149,11 +152,14 @@ describe('AuthProvider / useAuth', () => {
 
     expect(supabase.auth.signInWithOtp).toHaveBeenCalledWith({
       email: 'jay@example.com',
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo:
+          window.location.origin + window.location.pathname + window.location.search,
+      },
     })
   })
 
-  it('signInWithGoogle calls signInWithOAuth with provider google and the app origin as redirectTo', async () => {
+  it('signInWithGoogle calls signInWithOAuth with provider google and the current page as redirectTo', async () => {
     const user = userEvent.setup()
     await renderHarness()
 
@@ -161,7 +167,64 @@ describe('AuthProvider / useAuth', () => {
 
     expect(supabase.auth.signInWithOAuth).toHaveBeenCalledWith({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: {
+        redirectTo:
+          window.location.origin + window.location.pathname + window.location.search,
+      },
+    })
+  })
+
+  // ⚠️ THE REGRESSION GUARD. An invitee opens /accept-invite/<token> and signs
+  // in from there. If the redirect drops the path they land on "/" with zero
+  // memberships, are shown the REQUEST ACCESS gate, and the invite only
+  // completes if they go back and tap the original link a second time.
+  describe('signing in from a deep link', () => {
+    const ORIGINAL_URL = window.location.href
+
+    afterEach(() => {
+      window.history.replaceState(null, '', ORIGINAL_URL)
+    })
+
+    it('returns a magic-link recipient to the page they started on, not the site root', async () => {
+      window.history.replaceState(null, '', '/accept-invite/9f3c1d20-token?ref=whatsapp')
+      const user = userEvent.setup()
+      await renderHarness()
+
+      await user.click(screen.getByRole('button', { name: /send magic link/i }))
+
+      const { options } = supabase.auth.signInWithOtp.mock.calls[0][0]
+      expect(options.emailRedirectTo).toBe(
+        `${window.location.origin}/accept-invite/9f3c1d20-token?ref=whatsapp`,
+      )
+      expect(options.emailRedirectTo).not.toBe(window.location.origin)
+    })
+
+    it('returns a Google sign-in from a deep link to that same page', async () => {
+      window.history.replaceState(null, '', '/accept-invite/9f3c1d20-token')
+      const user = userEvent.setup()
+      await renderHarness()
+
+      await user.click(screen.getByRole('button', { name: /sign in with google/i }))
+
+      expect(supabase.auth.signInWithOAuth.mock.calls[0][0].options.redirectTo).toBe(
+        `${window.location.origin}/accept-invite/9f3c1d20-token`,
+      )
+    })
+
+    // The hash is where Supabase puts #access_token=... and
+    // #error_description=..., so it must never be echoed back into the next
+    // magic link — at best confusing, at worst a token in an email.
+    it('never carries the URL fragment into the redirect', async () => {
+      window.history.replaceState(null, '', '/accept-invite/tok#access_token=SECRET123')
+      const user = userEvent.setup()
+      await renderHarness()
+
+      await user.click(screen.getByRole('button', { name: /send magic link/i }))
+
+      const { options } = supabase.auth.signInWithOtp.mock.calls[0][0]
+      expect(options.emailRedirectTo).toBe(`${window.location.origin}/accept-invite/tok`)
+      expect(options.emailRedirectTo).not.toContain('SECRET123')
+      expect(options.emailRedirectTo).not.toContain('#')
     })
   })
 
