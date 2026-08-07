@@ -68,9 +68,31 @@ export function ViewAsSwitcher() {
     setOpen(false)
   }
 
+  // ⚠️ THE VISIBLE LABEL DROPS "Viewing as", THE ACCESSIBLE NAME KEEPS IT.
+  //
+  // Jay, 7 Aug 2026: the club wordmark read "ABU DHABI HARLE…" at 1442px.
+  // Measured in the harness at the masthead's 1120px cap (admin previewing as
+  // a coach, account name showing): the wordmark got 226px and needed 257.
+  // This trigger was 202px of that row, and every character of it is ALREADY
+  // on screen — ViewAsBanner sits directly above saying "Preview — viewing as
+  // Coach, U13. Data shown is filtered in your browser only." The masthead was
+  // restating the banner and charging the wordmark for it.
+  //
+  // ⚠️ A WIDER SCREEN CANNOT FIX THAT. The row is max-w-[1120px], so every
+  // viewport at or above ~1152px gives it exactly the same space.
+  //
+  // Shortening alone would not have been enough, which is why max-w/truncate
+  // is on the button below: "Coach, U13" is short, but "Coach, Senior Men 2nd
+  // XV" is LONGER than the string this replaced, so the squad name has to be
+  // bounded or the same bug returns for one squad instead of all of them.
   const triggerLabel = viewAs
-    ? `Viewing as ${personaRoleLabel(viewAs.role)}, ${teamName(teams, viewAs.teamId)}`
+    ? `${personaRoleLabel(viewAs.role)}, ${teamName(teams, viewAs.teamId)}`
     : 'View as'
+
+  // The full sentence still reaches screen readers, and a title gives sighted
+  // users the untruncated text on hover. Losing "viewing as" from the
+  // accessible name would leave a button announced as just "Coach, U13".
+  const triggerAria = viewAs ? `Change preview — currently viewing as ${triggerLabel}` : 'View as'
 
   return (
     <>
@@ -84,7 +106,15 @@ export function ViewAsSwitcher() {
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="hidden shrink-0 items-center gap-1.5 rounded-pill bg-white/10 px-3 py-1 font-condensed text-[13px] font-bold uppercase tracking-[0.08em] text-white outline-none transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome desktop:flex"
+        aria-label={triggerAria}
+        title={triggerAria}
+        // ⚠️ max-w-[16ch] + truncate is what stops this being a bug again for
+        // one squad. Without a bound, "Coach, Senior Men 2nd XV" is wider than
+        // the string this replaced, and the club wordmark — the ONLY item in
+        // the masthead row that is not shrink-0 — absorbs the whole overflow
+        // and truncates instead. Bounding the variable-length thing keeps the
+        // fixed-length wordmark whole at every squad name.
+        className="hidden max-w-[16ch] shrink-0 items-center gap-1.5 truncate rounded-pill bg-white/10 px-3 py-1 font-condensed text-[13px] font-bold uppercase tracking-[0.08em] text-white outline-none transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome desktop:block"
       >
         {triggerLabel}
       </button>

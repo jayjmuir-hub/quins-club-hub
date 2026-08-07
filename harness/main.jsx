@@ -6,10 +6,20 @@ import Login from '../src/screens/Login.jsx'
 import Schedule from '../src/screens/Schedule.jsx'
 import Roster from '../src/screens/Roster.jsx'
 import Dashboard from '../src/screens/Dashboard.jsx'
-import Overview from '../src/screens/Overview.jsx'
+// ⚠️ REPOINTED, NOT DELETED (7 Aug 2026). src/screens/Overview.jsx was
+// removed in 2e26d35 when its content folded into the single /admin
+// dashboard — and this import was not updated, so the ENTIRE harness has
+// failed to boot ever since with "Failed to resolve import
+// ../src/screens/Overview.jsx". Every scenario in this file, not just the two
+// overview ones. That is the whole browser-verification anchor dead, silently,
+// because nothing in `npm test` or `npm run build` loads harness/main.jsx.
+// Found while trying to measure the masthead for Jay's truncation report.
+import AdminDashboard from '../src/screens/AdminDashboard.jsx'
 import PlayerForm from '../src/screens/PlayerForm.jsx'
 import Availability from '../src/screens/Availability.jsx'
-import Admin from '../src/screens/Admin.jsx'
+// ⚠️ Same rot as the line above: src/screens/Admin.jsx became AdminClub.jsx.
+// Aliased back to `Admin` so the scenario bodies below don't need touching.
+import Admin from '../src/screens/AdminClub.jsx'
 import Accounts from '../src/screens/Accounts.jsx'
 import AcceptInvite from '../src/screens/AcceptInvite.jsx'
 import { PLAYERS } from './stubs/players.js'
@@ -205,22 +215,26 @@ const scenarios = {
   // so upcoming fixtures (e6/e7, both within the 14-day window of the repo's
   // pinned "today") and roster gaps (p4 has no contact row, per players.js's
   // stub) render with real, reused fixture data rather than new ones.
+  // Route is /admin now, not /overview. The coach variant is kept even though
+  // AdminDashboard is admin-only in the real app: the point of the scenario is
+  // to render the screen for a non-admin and see what it does, which is
+  // exactly the case a route guard would hide.
   'overview-admin': () => (
     <Shell
-      route="/overview"
+      route="/admin"
       authValue={baseAuth(JAY_EMAIL)}
       membershipValue={{ memberships: ADMIN_MEMBERSHIPS, teams: TEAMS, loading: false, error: null, reload: noop }}
     >
-      <Overview />
+      <AdminDashboard />
     </Shell>
   ),
   'overview-coach': () => (
     <Shell
-      route="/overview"
+      route="/admin"
       authValue={baseAuth(COACH_EMAIL)}
       membershipValue={{ memberships: COACH_MEMBERSHIPS, teams: TEAMS, loading: false, error: null, reload: noop }}
     >
-      <Overview />
+      <AdminDashboard />
     </Shell>
   ),
 

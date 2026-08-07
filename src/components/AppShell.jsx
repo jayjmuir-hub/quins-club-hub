@@ -110,6 +110,14 @@ export default function AppShell({ children }) {
 
   const isMoreRoute = location.pathname === '/more'
   const ready = !loading && !error && memberships.length > 0
+  // ⚠️ DO NOT gate this on `viewAs` to win masthead space. Tried, reverted
+  // (7 Aug 2026). tests/view-as.test.jsx reads this pill to prove the
+  // EFFECTIVE membership set really is the previewed one — the anti-soft-lock
+  // check — and the View-as banner cannot stand in for it, because the banner
+  // renders from the `viewAs` selection itself and would still say "Parent"
+  // if the effective set had not actually changed. Hiding the pill during a
+  // preview deletes the only observable that distinguishes those two.
+  // The truncation it was meant to fix is handled in ViewAsSwitcher instead.
   const showRole = !loading && !error
   const currentRoleLabel = roleLabel(memberships)
   // The old admin-OR-coach `canManage` boolean is gone with /overview

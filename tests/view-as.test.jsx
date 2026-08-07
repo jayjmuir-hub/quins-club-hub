@@ -117,18 +117,57 @@ describe('ViewAsSwitcher trigger', () => {
     expect(screen.queryByTestId('view-as-trigger')).not.toBeInTheDocument()
   })
 
-  it('is desktop-only: hidden below the 820px breakpoint, flex at and above it', () => {
+  it('is desktop-only: hidden below the 820px breakpoint, shown at and above it', () => {
     renderShell(ctx())
 
     const trigger = screen.getByTestId('view-as-trigger')
     expect(hasClassToken(trigger, 'hidden')).toBe(true)
-    expect(hasClassToken(trigger, 'desktop:flex')).toBe(true)
+    // `desktop:block`, not `desktop:flex` — truncate needs a block box, and a
+    // flex container ignores text-overflow on its children.
+    expect(hasClassToken(trigger, 'desktop:block')).toBe(true)
   })
 
   it('names the current persona once a preview is active', () => {
     renderShell(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
 
-    expect(screen.getByTestId('view-as-trigger')).toHaveTextContent('Viewing as Coach, U12 Boys')
+    // ⚠️ The VISIBLE text no longer says "Viewing as" (7 Aug 2026). That
+    // prefix was pure restatement of the banner directly above it, and the
+    // masthead was charging the club wordmark 202px for it — measured in the
+    // harness, the wordmark got 226px of the 257 it needs and rendered
+    // "ABU DHABI HARLE…". The persona itself still has to be here.
+    expect(screen.getByTestId('view-as-trigger')).toHaveTextContent('Coach, U12 Boys')
+  })
+
+  // The injected fault for the test above: dropping the prefix from the
+  // visible label must NOT drop it from the accessible name, or the control
+  // is announced as the bare string "Coach, U12 Boys" with nothing saying it
+  // is a preview or that activating it changes one.
+  it('keeps the full sentence in the accessible name', () => {
+    renderShell(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
+
+    const trigger = screen.getByTestId('view-as-trigger')
+    expect(trigger).toHaveAccessibleName(/currently viewing as Coach, U12 Boys/i)
+    expect(trigger).toHaveAttribute('title', expect.stringMatching(/viewing as/i))
+  })
+
+  // ⚠️ THE BOUND IS THE ACTUAL FIX, not the shortened string. "Coach, Senior
+  // Men 2nd XV" is LONGER than the "Viewing as Coach, U13" it replaced, so
+  // without a cap the same truncation returns for the club's longest squad
+  // names. Measured in the harness at the masthead's 1120px cap: unbounded,
+  // that squad took the trigger to 324px and the wordmark down to 104px;
+  // bounded it is 120px and the wordmark keeps all 257.
+  //
+  // jsdom applies no CSS, so this pins the tokens, as the masthead breakpoint
+  // and PhoneInput regressions do.
+  it('bounds its own width so the club wordmark never absorbs the overflow', () => {
+    renderShell(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
+
+    const trigger = screen.getByTestId('view-as-trigger')
+    expect(hasClassToken(trigger, 'max-w-[16ch]')).toBe(true)
+    expect(hasClassToken(trigger, 'truncate')).toBe(true)
+    // shrink-0 as well: the cap bounds the maximum, this stops flexbox
+    // squeezing it to nothing on a narrow desktop and reflowing the row.
+    expect(hasClassToken(trigger, 'shrink-0')).toBe(true)
   })
 })
 

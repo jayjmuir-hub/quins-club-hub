@@ -28,6 +28,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // count is asserted too.
 const ALIASES = [
   ['harness/stubs/auth.jsx', 'src/lib/auth.jsx'],
+  // auth.jsx is aliased TWICE, from two different specifier texts — these
+  // rules match the import string, not the resolved file, so '../lib/auth.jsx'
+  // (importers in src/screens, src/components) and './auth.jsx' (importers
+  // inside src/lib itself, e.g. useMyProfile.js) each need their own rule.
+  // Listed twice so the count below stays honest; the export-mirror check
+  // simply runs against the same pair a second time, which is harmless.
+  ['harness/stubs/auth.jsx', 'src/lib/auth.jsx'],
   ['harness/stubs/memberships.jsx', 'src/lib/memberships.jsx'],
   ['harness/stubs/events.js', 'src/data/events.js'],
   ['harness/stubs/availability.js', 'src/data/availability.js'],

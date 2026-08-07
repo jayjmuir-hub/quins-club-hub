@@ -21,10 +21,33 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // touching src/ at all.
 export default defineConfig({
   root: __dirname,
+  // ⚠️ envDir must be the REPO ROOT, because `root` above is harness/ and Vite
+  // loads .env relative to `root`. Without this the harness boots to a blank
+  // page: src/lib/supabase.js throws "Missing required Supabase env var(s)" at
+  // module scope, and more of src/ reaches it directly than the alias list
+  // below stubs out. Nothing here ever talks to Supabase — the data modules
+  // are all aliased to stubs — the module just refuses to be IMPORTED without
+  // the vars present. (7 Aug 2026, found while repointing the two rotted
+  // screen imports in main.jsx.)
+  envDir: path.resolve(__dirname, '..'),
   plugins: [react()],
   resolve: {
     alias: [
       { find: /^\.\.\/lib\/auth\.jsx$/, replacement: path.resolve(__dirname, 'stubs/auth.jsx') },
+      // ⚠️ './auth.jsx' as well as '../lib/auth.jsx', and the difference is
+      // not cosmetic. These aliases match SPECIFIER TEXT, so they only catch
+      // importers sitting one directory below src/. src/lib/useMyProfile.js
+      // (added 6 Aug for the greeting and the masthead account button) lives
+      // IN src/lib, so it writes './auth.jsx' and slipped straight past the
+      // rule above — pulling in the REAL auth module while AppShell had the
+      // stub, i.e. two different React contexts, and every scenario died with
+      // "useAuth must be used within an AuthProvider".
+      //
+      // Specifier-text matching is what makes this harness cheap (it never
+      // touches src/), and this is its standing cost: a new importer at a
+      // different depth silently escapes. Anchored with ^ and $ so it cannot
+      // match stubs/auth.jsx's own imports and recurse.
+      { find: /^\.\/auth\.jsx$/, replacement: path.resolve(__dirname, 'stubs/auth.jsx') },
       {
         find: /^\.\.\/lib\/memberships\.jsx$/,
         replacement: path.resolve(__dirname, 'stubs/memberships.jsx'),
