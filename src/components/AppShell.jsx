@@ -244,7 +244,7 @@ export default function AppShell({ children }) {
               to="/more"
               data-testid="account-button"
               aria-label={firstName ? `My account, ${firstName}` : 'My account'}
-              className="ml-1 flex shrink-0 items-center gap-2 rounded-pill py-1 pl-1 pr-1 text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 desktop:pr-3"
+              className="ml-1 flex shrink-0 items-center gap-2 rounded-pill py-1 pl-1 pr-1 text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 wide:pr-3"
             >
               <span
                 aria-hidden="true"
@@ -252,12 +252,18 @@ export default function AppShell({ children }) {
               >
                 {(firstName || user?.email || '?').trim().charAt(0).toUpperCase()}
               </span>
-              {/* The name is desktop-only. On a phone the masthead already
-                  carries the crest, the club name and the role, and adding a
-                  name pushes the row past its width — the initial alone is
-                  still a 28px tap target. */}
+              {/* ⚠️ `wide` (1280px), NOT `desktop` (820px). Shipped as
+                  desktop: first and it TRUNCATED THE CLUB NAME to "ABU DHABI
+                  HARLE…" at ~1114px — caught on production, not in jsdom,
+                  which applies no CSS and so cannot see a layout overflow.
+
+                  The masthead row is crest + club name + role pill + this +
+                  ViewAsSwitcher + five nav items, and Inter is wider than the
+                  Barlow Condensed it replaced. There was no slack left to
+                  spend. The initial alone is still a 28px tap target, so
+                  below 1280px this loses only the name. */}
               {firstName && (
-                <span className="hidden max-w-[9ch] truncate font-condensed text-[13px] font-bold uppercase tracking-[0.08em] desktop:inline">
+                <span className="hidden max-w-[9ch] truncate font-condensed text-[13px] font-bold uppercase tracking-[0.08em] wide:inline">
                   {firstName}
                 </span>
               )}

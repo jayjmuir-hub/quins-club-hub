@@ -402,10 +402,14 @@ describe('AppShell — my account button', () => {
     expect(link.textContent).toContain('J')
   })
 
-  it('hides the name below the desktop breakpoint but keeps the initial', async () => {
-    // Same jsdom limitation the role-label tests work around: check the class
-    // token, since jsdom applies no real CSS. The masthead already carries the
-    // crest, club name and role on a phone; the name does not fit too.
+  it('shows the name only at the WIDE breakpoint, not merely desktop', async () => {
+    // ⚠️ REGRESSION TEST. Shipped as `desktop:inline` (820px) and it truncated
+    // the club name to "ABU DHABI HARLE…" at ~1114px on production. jsdom
+    // applies no real CSS, so no test could have caught the overflow itself —
+    // this pins the breakpoint token that was wrong instead.
+    //
+    // `desktop:inline` must be ABSENT, not just `wide:inline` present:
+    // asserting only the latter would still pass if both were applied.
     useMembershipsMock.mockReturnValue(loaded())
     getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
 
@@ -414,6 +418,7 @@ describe('AppShell — my account button', () => {
     const link = await screen.findByTestId('account-button')
     const nameEl = within(link).getByText('Jay')
     expect(hasClassToken(nameEl, 'hidden')).toBe(true)
-    expect(hasClassToken(nameEl, 'desktop:inline')).toBe(true)
+    expect(hasClassToken(nameEl, 'wide:inline')).toBe(true)
+    expect(hasClassToken(nameEl, 'desktop:inline')).toBe(false)
   })
 })
