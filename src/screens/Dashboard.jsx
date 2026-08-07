@@ -458,24 +458,43 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Three cells in one band at every width. The old 2-up mobile grid
+      {/* STAFF ONLY (Jay, 6 Aug 2026). Hidden from anyone who cannot edit —
+          in practice parents and players.
+          
+          These three numbers are a management summary: how big is the squad,
+          how much is left to play, how many groups am I responsible for. A
+          parent has one child and already knows the answer to all three, so
+          the band was three tiles of noise at the top of the screen they see
+          most. It was never a privacy problem — the values are scoped, and a
+          parent saw "Players in view: 12", not the club's 315 — it was just
+          useless to them.
+
+          Gated on canEdit rather than on a role name so it follows the
+          permission that already exists: add a role later and it lands on the
+          correct side automatically. Coaches, managers, medics and admins
+          keep it.
+
+          What replaces it for parents is deliberately nothing, for now.
+
+          Three cells in one band at every width. The old 2-up mobile grid
           needed the third tile to span both columns to avoid a ragged
           half-width tile; a single 3-column band has no ragged case, so that
-          special-casing is gone. The labels are Barlow Condensed precisely so
-          three of them fit across a narrow phone without wrapping. */}
-      <StatBand>
-        <StatTile
-          testId="stat-players"
-          value={players.length}
-          label={admin ? 'Registered players' : 'Players in view'}
-        />
-        <StatTile testId="stat-fixtures" value={toPlay.length} label="Fixtures to play" />
-        <StatTile
-          testId="stat-groups"
-          value={scopedTeams.length}
-          label={admin ? 'Age groups' : 'Your groups'}
-        />
-      </StatBand>
+          special-casing is gone. */}
+      {canEdit && (
+        <StatBand>
+          <StatTile
+            testId="stat-players"
+            value={players.length}
+            label={admin ? 'Registered players' : 'Players in view'}
+          />
+          <StatTile testId="stat-fixtures" value={toPlay.length} label="Fixtures to play" />
+          <StatTile
+            testId="stat-groups"
+            value={scopedTeams.length}
+            label={admin ? 'Age groups' : 'Your groups'}
+          />
+        </StatBand>
+      )}
 
       {/* Mobile: one column, stacked in DOM order (upcoming, quick actions,
           last result). Desktop: 1.15fr / .85fr two-column grid

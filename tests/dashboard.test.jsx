@@ -397,11 +397,56 @@ describe('Dashboard — stats', () => {
   })
 
   it('labels the tiles as the user’s own slice when they are not an admin', async () => {
+    // Default role here is COACH — an editor, so the band still renders.
     renderDashboard()
     await screen.findByTestId('stat-players')
 
     expect(screen.getByTestId('stat-players')).toHaveTextContent(/players in view/i)
     expect(screen.getByTestId('stat-groups')).toHaveTextContent(/your groups/i)
+  })
+
+  // Staff only, from 6 Aug 2026. Squad size, fixtures left and group count are
+  // a management summary; a parent has one child and knows all three already.
+  describe('is staff-only', () => {
+    it.each([
+      ['a parent', PARENT],
+      ['a player', PLAYER],
+    ])('hides the whole band from %s', async (_label, memberships) => {
+      useMembershipsMock.mockReturnValue(membershipValue(memberships))
+
+      renderDashboard()
+      // Wait for a sibling that always renders, so this cannot pass simply by
+      // asserting absence before the screen has loaded anything at all.
+      await screen.findByTestId('quick-actions')
+
+      expect(screen.queryByTestId('stat-players')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('stat-fixtures')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('stat-groups')).not.toBeInTheDocument()
+    })
+
+    it.each([
+      ['a coach', COACH],
+      ['an admin', ADMIN],
+    ])('still shows it to %s', async (_label, memberships) => {
+      // ⚠️ The injected fault for the pair above: without these, deleting the
+      // band outright would pass every hiding test.
+      useMembershipsMock.mockReturnValue(membershipValue(memberships))
+
+      renderDashboard()
+      expect(await screen.findByTestId('stat-players')).toBeInTheDocument()
+      expect(screen.getByTestId('stat-fixtures')).toBeInTheDocument()
+      expect(screen.getByTestId('stat-groups')).toBeInTheDocument()
+    })
+
+    it('leaves the rest of the parent home screen intact', async () => {
+      // Removing the band must not take the fixture hero or the upcoming list
+      // with it — those are the reason a parent opens this screen.
+      useMembershipsMock.mockReturnValue(membershipValue(PARENT))
+
+      renderDashboard()
+      expect(await screen.findByTestId('upcoming-list')).toBeInTheDocument()
+      expect(screen.getByTestId('quick-actions')).toBeInTheDocument()
+    })
   })
 })
 
@@ -552,7 +597,12 @@ describe('Dashboard — quick actions', () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
 
     renderDashboard()
-    await screen.findByTestId('stat-players')
+    // ⚠️ Waits on quick-actions, NOT stat-players. The stat band is staff-only
+    // from 6 Aug 2026, so for every read-only role in this block it never
+    // appears and a findByTestId('stat-players') just times out. These tests
+    // were using the band as a proxy for "the screen has loaded"; the thing
+    // they actually assert on is the right signal.
+    await screen.findByTestId('quick-actions')
 
     expect(actionNames()).toEqual(['View schedule', 'View team list'])
     expect(screen.getByText(/signed in as a parent/i)).toBeInTheDocument()
@@ -564,7 +614,7 @@ describe('Dashboard — quick actions', () => {
     useMembershipsMock.mockReturnValue(membershipValue(PLAYER))
 
     renderDashboard()
-    await screen.findByTestId('stat-players')
+    await screen.findByTestId('quick-actions')
 
     expect(actionNames()).toEqual(['View schedule', 'View team list'])
     expect(screen.getByText(/signed in as a player/i)).toBeInTheDocument()
@@ -577,7 +627,7 @@ describe('Dashboard — quick actions', () => {
     listPlayersMock.mockResolvedValue([])
 
     renderDashboard()
-    await screen.findByTestId('stat-players')
+    await screen.findByTestId('quick-actions')
 
     // canEditTeam refuses a null team_id, so this coach gets the read-only
     // card rather than an action pointing at a form with no squad to pick.
@@ -589,7 +639,7 @@ describe('Dashboard — quick actions', () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
 
     renderDashboard()
-    await screen.findByTestId('stat-players')
+    await screen.findByTestId('quick-actions')
 
     expect(screen.getByRole('link', { name: /schedule/i })).toHaveAttribute('href', '/schedule')
     expect(screen.getByRole('link', { name: /team list/i })).toHaveAttribute('href', '/roster')
