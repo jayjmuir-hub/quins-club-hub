@@ -160,14 +160,18 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 -- An unknown or revoked token returns zero rows rather than raising: an error
 -- distinguishing "no such token" from "token with no fixtures" is an oracle
 -- for guessing tokens.
+--
+-- ⚠️ CHANGED 2026-08-05 (calendar_feed_returns_pitch): `pitch` added to both
+-- the RETURNS TABLE signature and the select list, so a subscribed calendar
+-- shows which pitch. Nothing else about the visibility rule changed.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.calendar_events_for_token(_token uuid)
- RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, competition text, starts_at timestamp with time zone, team_name text)
+ RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, team_name text)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  select e.id, e.type, e.title, e.opponent, e.home, e.venue, e.competition,
+  select e.id, e.type, e.title, e.opponent, e.home, e.venue, e.pitch, e.competition,
          e.starts_at, t.name as team_name
   from public.events e
   join public.teams t on t.id = e.team_id
@@ -329,6 +333,12 @@ GRANT EXECUTE ON FUNCTION private.can_admin_see_pending(uuid) TO authenticated;
 -- ---------------------------------------------------------------------
 -- private.can_edit_team(uuid)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,anon=X/postgres}
+--
+-- ⚠️ CHANGED 2026-08-05 (roles_manager_and_medic): the squad-staff test was
+-- `m.role = 'coach'` and is now `m.role in ('coach','manager','medic')`. All
+-- three grant IDENTICAL rights — the word is the only thing distinguishing
+-- them. Mirrored client-side by SQUAD_STAFF_ROLES in src/lib/scope.js:
+-- CHANGE ONE, CHANGE BOTH.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.can_edit_team(_team uuid)
  RETURNS boolean
@@ -339,7 +349,7 @@ AS $function$
   select exists (select 1 from memberships m
     where m.profile_id = auth.uid()
       and ((m.role = 'admin' and m.club_id = (select club_id from teams where id = _team))
-           or (m.role = 'coach' and m.team_id = _team)));
+           or (m.role in ('coach','manager','medic') and m.team_id = _team)));
 $function$
 ;
 
@@ -619,6 +629,239 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO authenticated;
 --   private.photo_team(text)                    SECURITY DEFINER, STABLE
 --   private.shares_admin_club(uuid)             SECURITY DEFINER, STABLE
 --
--- `public` holds accept_invite, set_own_player_photo and the three calendar
--- functions; everything else lives in `private`.
+-- ADDED 2026-08-05 to 2026-08-07, appended at the end of this file:
+--   public.claim_roster_access()                SECURITY DEFINER, VOLATILE
+--   public.delete_my_account()                  SECURITY DEFINER, VOLATILE
+--   public.set_own_player_gender(uuid,text)     SECURITY DEFINER, VOLATILE
+--   private.sync_profile_name()                 INVOKER,          VOLATILE
+--
+-- `public` holds accept_invite, set_own_player_photo, the three calendar
+-- functions and the three above; everything else lives in `private`.
 -- =====================================================================
+
+
+-- #####################################################################
+-- ##   ADDED 2026-08-05 .. 2026-08-07 — captured 2026-08-07          ##
+-- #####################################################################
+
+
+-- ---------------------------------------------------------------------
+-- public.claim_roster_access()  — ONBOARDING, SECURITY-RELEVANT
+-- proacl: {=X/postgres,postgres=X/postgres,anon=X/postgres,
+--          authenticated=X/postgres,service_role=X/postgres}
+--
+-- How parents self-onboard: grants the caller the squads their email already
+-- appears against in player_contacts. No invite is sent to anyone.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.claim_roster_access()
+ RETURNS SETOF memberships
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  caller_email text;
+begin
+  -- Fail-safe guard, matching the four existing anon-callable SECURITY DEFINER
+  -- functions in this schema.
+  if auth.uid() is null then
+    raise exception 'You must be signed in.' using errcode = '42501';
+  end if;
+
+  select email into caller_email from auth.users where id = auth.uid();
+  if nullif(btrim(caller_email), '') is null then
+    raise exception 'Your account has no email address.' using errcode = '42501';
+  end if;
+
+  -- ⚠️ ONLY for accounts that hold NO access at all.
+  --
+  -- Running this on every sign-in would automatically pick up a newly-rostered
+  -- sibling, which is genuinely useful — but it would ALSO silently resurrect
+  -- access an admin had deliberately revoked, with no record that it happened.
+  -- Re-granting revoked access is the worse failure, so it is refused here.
+  -- Auto-adding siblings needs a ledger of what was granted automatically;
+  -- that is separate work, deliberately not smuggled in here.
+  if exists (select 1 from public.memberships m where m.profile_id = auth.uid()) then
+    return;
+  end if;
+
+  return query
+  insert into public.memberships (profile_id, club_id, team_id, role, player_id)
+  select auth.uid(),
+         p.club_id,
+         p.team_id,
+         -- ⚠️ teams.is_senior, never teams.name. A squad rename must not be
+         -- able to hand an adult a 'parent' role.
+         case when t.is_senior then 'player' else 'parent' end,
+         p.id
+  from public.player_contacts c
+  join public.players p on p.id = c.player_id
+  join public.teams   t on t.id = p.team_id
+  where lower(btrim(c.email)) = lower(btrim(caller_email))
+  -- Belt and braces against a double-submit racing the zero-membership guard
+  -- above. memberships_unique_grant is what actually makes this safe.
+  on conflict do nothing
+  returning *;
+end;
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION public.claim_roster_access() TO anon;
+GRANT EXECUTE ON FUNCTION public.claim_roster_access() TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.delete_my_account()  — DESTRUCTIVE, SECURITY-CRITICAL
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+--
+-- NOTE: NOT granted to anon, unlike most functions here.
+-- search_path is pinned to '' (not 'public'), so references are fully
+-- qualified on purpose.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.delete_my_account()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  me uuid := auth.uid();
+  other_admins int;
+begin
+  -- Same fail-safe shape as every other SECURITY DEFINER function here: an
+  -- unauthenticated caller gets a loud 42501, not a silent no-op.
+  if me is null then
+    raise exception 'You must be signed in to delete your account.'
+      using errcode = '42501';
+  end if;
+
+  -- ⚠️ THE LAST ADMIN CANNOT LEAVE. Without this, one tap makes the club
+  -- permanently unadministerable: nobody can approve access requests, add
+  -- fixtures, or promote a replacement, and there is no way back through the
+  -- app at all. Refusing is recoverable; the alternative is not.
+  select count(*) into other_admins
+  from public.memberships
+  where role = 'admin'
+    and profile_id <> me;
+
+  if other_admins = 0 then
+    raise exception 'You are the only admin. Make someone else an admin first, then delete your account.'
+      using errcode = 'P0001';
+  end if;
+
+  -- Cut the three NO ACTION references loose. Club records, kept.
+  update public.events       set created_by = null where created_by = me;
+  update public.invites      set created_by = null where created_by = me;
+  update public.availability set updated_by = null where updated_by = me;
+
+  -- One delete. auth.users -> profiles -> memberships / access_requests /
+  -- calendar_tokens, plus auth's own sessions and identities.
+  delete from auth.users where id = me;
+end;
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION public.delete_my_account() TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.set_own_player_gender(uuid, text)
+-- proacl: {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,
+--          service_role=X/postgres}
+--
+-- Same shape as set_own_player_photo: RLS grants access to ROWS, not COLUMNS,
+-- so a row-level owner policy on players would hand a parent team_id as well.
+-- ⚠️ Fails safe for anon via private.is_own_player(), which cannot match a
+-- NULL auth.uid() — a DIFFERENT mechanism from the explicit `auth.uid() is
+-- null` guard used elsewhere, same outcome (42501).
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_own_player_gender(_player uuid, _gender text)
+ RETURNS players
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  updated public.players;
+begin
+  if not private.is_own_player(_player) then
+    raise exception 'You can only change details for your own player.'
+      using errcode = '42501';
+  end if;
+
+  if _gender is not null and _gender not in ('male', 'female') then
+    raise exception 'Gender must be male or female.'
+      using errcode = '22023';
+  end if;
+
+  update public.players
+     set gender = _gender
+   where id = _player
+  returning * into updated;
+
+  return updated;
+end;
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION public.set_own_player_gender(uuid, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.set_own_player_gender(uuid, text) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.sync_profile_name()  — TRIGGER FUNCTION
+-- proacl: NULL (no explicit grants; invoked by the trigger)
+--
+-- ⚠️ NOT SECURITY DEFINER. Runs as the caller.
+-- search_path pinned to '' on 2026-08-07 —
+-- db/migrations/20260807_sync_profile_name_search_path.sql. Safe with '' because
+-- the body touches no schema-qualified object, only pg_catalog builtins.
+--
+-- ⚠️ KNOWN BUG, recorded not fixed: a single-word full_name yields
+-- last_name = that same word, which the comment below says must not happen.
+-- The `if new.first_name is null` guard is dead code — stripping the final
+-- word from a one-word string leaves it unchanged, not empty. Latent; no live
+-- row has hit it. Detail and fix in claude/state-of-play.md.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.sync_profile_name()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare
+  fn text := nullif(btrim(new.first_name), '');
+  ln text := nullif(btrim(new.last_name), '');
+  full_in text := nullif(btrim(new.full_name), '');
+  names_changed boolean;
+  full_changed boolean;
+begin
+  if tg_op = 'INSERT' then
+    names_changed := (fn is not null or ln is not null);
+    full_changed  := (full_in is not null);
+  else
+    names_changed := (new.first_name is distinct from old.first_name)
+                  or (new.last_name  is distinct from old.last_name);
+    full_changed  := (new.full_name  is distinct from old.full_name);
+  end if;
+
+  -- first/last win when both changed in one statement: they are the explicit
+  -- input, full_name is the derived display value.
+  if names_changed and (fn is not null or ln is not null) then
+    new.full_name := btrim(concat_ws(' ', fn, ln));
+    new.first_name := fn;
+    new.last_name  := ln;
+  elsif full_changed and full_in is not null then
+    new.full_name  := full_in;
+    new.first_name := nullif(btrim(regexp_replace(full_in, '\s+\S+$', '')), '');
+    new.last_name  := nullif(btrim(regexp_replace(full_in, '^.*\s', '')), '');
+    -- a single-word name is a first name with no family name, not the reverse
+    if new.first_name is null then
+      new.first_name := full_in;
+      new.last_name  := null;
+    end if;
+  end if;
+
+  return new;
+end;
+$function$
+;

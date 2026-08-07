@@ -9,11 +9,15 @@
 -- public, private and auth, excluding tgisinternal (FK enforcement
 -- triggers) — verbatim.
 --
--- Result: exactly TWO triggers exist, both on auth.users. There are NO
--- triggers on any `public` or `private` table. In particular there is no
--- updated_at maintenance trigger anywhere — availability.updated_at is
--- only ever set by its DEFAULT now() on insert and by the application
--- explicitly on update.
+-- ⚠️ RE-CAPTURED 2026-08-07: THIS FILE'S HEADLINE CLAIM IS NO LONGER TRUE.
+-- It said "exactly TWO triggers exist, both on auth.users. There are NO
+-- triggers on any `public` or `private` table." There are now THREE, and the
+-- third IS on a public table: profiles_sync_name on public.profiles, added
+-- 2026-08-06 with the split first/last name work. See the end of this file.
+--
+-- Still true: there is no updated_at maintenance trigger anywhere —
+-- availability.updated_at is only ever set by its DEFAULT now() on insert and
+-- by the application explicitly on update.
 --
 -- Both are enabled in ORIGIN mode (tgenabled = 'O').
 --
@@ -54,3 +58,29 @@ CREATE TRIGGER on_auth_user_email_updated
   FOR EACH ROW
   WHEN (((old.email)::text IS DISTINCT FROM (new.email)::text))
   EXECUTE FUNCTION private.handle_user_email_change();
+
+
+-- ---------------------------------------------------------------------
+-- public.profiles → profiles_sync_name          ADDED 2026-08-06
+--
+-- Keeps full_name in step with first_name / last_name in BOTH directions, so
+-- callers may write either side. first/last win when both change in one
+-- statement: they are the explicit input, full_name is the derived display
+-- value.
+--
+-- ⚠️ NOT SECURITY DEFINER — plain LANGUAGE plpgsql, so it runs as the caller.
+-- (claude/state-of-play.md called it SECURITY DEFINER on 7 Aug; that was
+-- wrong.) Its search_path was pinned to '' on 2026-08-07 —
+-- db/migrations/20260807_sync_profile_name_search_path.sql.
+--
+-- ⚠️ KNOWN BUG, recorded not fixed: a SINGLE-WORD full_name comes back out
+-- with last_name set to the same word, which the function's own comment says
+-- must not happen. The `if new.first_name is null` guard never fires, because
+-- stripping the last word off a one-word string leaves the string unchanged
+-- rather than empty. Latent — no live row has hit it — but it fires the first
+-- time someone types one word into the name gate. Detail and fix in
+-- claude/state-of-play.md.
+-- ---------------------------------------------------------------------
+CREATE TRIGGER profiles_sync_name
+  BEFORE INSERT OR UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION private.sync_profile_name();

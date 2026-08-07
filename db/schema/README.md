@@ -9,12 +9,31 @@ Several of them would not even apply cleanly (they contain `CREATE TABLE` for ta
 that already exist, and grants recorded as-found).
 
 Captured from Supabase project `lusmshimxdcxpnrktlgz` (`quins-club-hub`), Postgres 17,
-on **2026-08-03**, re-captured **2026-08-04** after
+on **2026-08-03**, **re-captured 2026-08-07** (see below), and before that
+**2026-08-04** after
 `db/migrations/20260803_player_parents_and_photos.sql`, and again the same day after
 `db/migrations/20260804_access_requests.sql` and
 `db/migrations/20260804_self_service_profile.sql`, and
 `db/migrations/20260804_calendar_feed.sql`.
 
+> ## ⚠️ It happened again, worse, and was caught on 7 Aug 2026
+>
+> These files went from **4 Aug to 7 Aug** — three days and roughly **14
+> migrations** — with no re-capture. The 7 Aug re-capture had to absorb: four
+> new functions, two changed function bodies, eight new columns, two new
+> indexes, a widened CHECK constraint, two dropped policies and a new trigger.
+>
+> **Nothing unintended was found** — every delta traced to a known migration.
+> But that is luck, not process: a single unintended change hidden in a delta
+> that size would not have been spotted, and finding one is the entire purpose
+> of this directory. **The diff is only useful while it is small enough to
+> read.** Re-capture with the migration, not three days later.
+>
+> The one that would have been easiest to miss: `tables.sql` carried a block
+> headed **"DELIBERATE ABSENCE OF A UNIQUE CONSTRAINT"** on `memberships` —
+> and a unique index had been added on 6 Aug. The file was asserting the
+> opposite of the truth about a constraint that governs duplicate access rows.
+>
 > **The 4 Aug re-capture was late, and that is the lesson.** The migration shipped on
 > 3 Aug and these files were not re-captured with it, so for a day the repo's "snapshot of
 > the live database" was missing an entire table, a column, four policies and two
@@ -27,8 +46,8 @@ on **2026-08-03**, re-captured **2026-08-04** after
 |---|---|
 | `tables.sql` | Every `public` table: columns, types, nullability, defaults, PKs, FKs, CHECKs, indexes, and RLS-enabled state. Includes explicit notes where an expected unique constraint is **absent**. |
 | `policies.sql` | Every RLS policy on every `public` table, **plus the two on `storage.objects` for the `player-photos` bucket**, with command and USING / WITH CHECK expressions. |
-| `functions.sql` | Full `pg_get_functiondef()` output for all 18 functions in `public` and `private`, plus their EXECUTE grants from `proacl`. |
-| `triggers.sql` | The two triggers on `auth.users`. (There are none on any `public` table.) |
+| `functions.sql` | Full `pg_get_functiondef()` output for all 22 functions in `public` and `private`, plus their EXECUTE grants from `proacl`. |
+| `triggers.sql` | The three triggers: two on `auth.users`, and `profiles_sync_name` on `public.profiles` (added 6 Aug 2026). ⚠️ This row said "there are none on any `public` table" until 7 Aug. |
 
 ## Why this directory exists
 

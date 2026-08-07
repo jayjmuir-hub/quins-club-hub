@@ -152,13 +152,15 @@ the rows back.**
   `first_name = last_name`), so this is latent, not live. It will fire the first time
   a parent types one word into the name gate. Fix is to test the *split*, not
   `first_name`: `if position(' ' in full_in) = 0 then last_name := null`.
-- ⚠️ **`db/schema/` was last captured on 4 Aug (`7f533fd`) and is badly stale.** It
-  contains none of `claim_roster_access`, `delete_my_account`, `set_own_player_gender`
-  or `sync_profile_name`. **This matters more than an ordinary stale doc**: per
-  `RESTORE.md`'s "Changing the schema safely", the capture exists so a re-capture that
-  shows unintended changes reveals drift — and that is exactly how the repeated
-  `accept_invite` reversion was caught. **A capture three days and ~14 migrations
-  behind cannot do that job.** Re-capture and commit alongside the next migration.
+- ✅ **`db/schema/` RE-CAPTURED 7 Aug** after three days and ~14 migrations. **Nothing
+  unintended was found** — all 22 function bodies now match live byte-for-byte, all 31
+  policy expressions verified against the catalogue, and every delta traced to a known
+  migration. ⚠️ **That is luck, not process**: one unintended change hidden in a delta
+  that size would not have been spotted, which is the whole job. **Re-capture WITH the
+  migration.** The near-miss worth remembering: `tables.sql` carried a block headed
+  "DELIBERATE ABSENCE OF A UNIQUE CONSTRAINT" on `memberships` while a unique index had
+  existed since 6 Aug — the file asserted the opposite of the truth about a constraint
+  governing duplicate access rows.
 - A parent has never signed out in a real browser, and the phone-width note has never
   been rendered. The RLS-refusal path is still mock-only for both events features.
 - `saveParents` is delete-then-write, not atomic.

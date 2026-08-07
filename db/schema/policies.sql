@@ -15,6 +15,11 @@
 --
 -- Source: pg_policies, pg_class.relrowsecurity.
 --
+-- RE-CAPTURED 2026-08-07. Live count is 31 public policies + the 2 on
+-- storage.objects. The only delta since 4 Aug is the removal of "contact read"
+-- and "parent read" (commit c70be86) — every other policy's USING / WITH CHECK
+-- expression was compared against the live catalogue and is unchanged.
+--
 -- Every policy is PERMISSIVE and applies to role {public} (i.e. no
 -- explicit TO clause was given; scoping is done entirely inside the
 -- expressions via auth.uid() / auth.jwt()). Every helper referenced lives
@@ -188,11 +193,17 @@ CREATE POLICY "memb manage" ON public.memberships
 --                   their own player's contact row, coaches/admins see
 --                   the teams they can edit)
 -- ---------------------------------------------------------------------
-CREATE POLICY "contact read" ON public.player_contacts
-  AS PERMISSIVE FOR SELECT TO public
-  USING ((private.can_edit_team(( SELECT players.team_id
-   FROM players
-  WHERE (players.id = player_contacts.player_id))) OR private.is_own_player(player_id)));
+-- ⚠️ DROPPED 2026-08-06 (commit c70be86). "contact read" was EXACTLY the OR of
+-- the two ALL policies already covering this table, so removing it changed
+-- nothing a caller can observe. Recorded rather than deleted because the
+-- redundancy is MUTUAL AND THE TWO SIDES ARE NOT INTERCHANGEABLE: dropping the
+-- read-only policy is safe, dropping "contact edit own" would silently remove a
+-- parent's ability to EDIT their own contact row. A fault injection that found
+-- NOTHING is what established that. Do not "restore" this policy.
+--
+-- CREATE POLICY "contact read" ON public.player_contacts
+--   AS PERMISSIVE FOR SELECT TO public
+--   USING ((private.can_edit_team(...) OR private.is_own_player(player_id)));
 
 -- Self-service, added 4 Aug 2026: the OWNER (a parent of this player, or the
 -- player themselves) may edit their own contact row. PERMISSIVE, so it ORs
@@ -225,11 +236,11 @@ CREATE POLICY "contact edit" ON public.player_contacts
 --                  A parent sees their own child's parent rows and NOBODY
 --                  else's, including other parents in the same squad.)
 -- ---------------------------------------------------------------------
-CREATE POLICY "parent read" ON public.player_parents
-  AS PERMISSIVE FOR SELECT TO public
-  USING ((private.can_edit_team(( SELECT p.team_id
-   FROM players p
-  WHERE (p.id = player_parents.player_id))) OR private.is_own_player(player_id)));
+-- ⚠️ DROPPED 2026-08-06 (commit c70be86), same reasoning as "contact read".
+--
+-- CREATE POLICY "parent read" ON public.player_parents
+--   AS PERMISSIVE FOR SELECT TO public
+--   USING ((private.can_edit_team(...) OR private.is_own_player(player_id)));
 
 -- Same self-service addition, same reasoning, on the parent rows. A parent
 -- keeping their own household's details current is the most common correction

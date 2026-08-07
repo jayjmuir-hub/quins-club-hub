@@ -10,6 +10,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 7 Aug 2026
 
+- `f7ffa60` — Pinned `search_path` on `sync_profile_name`; the last non-noise security
+  advisor finding. Testing it surfaced a latent single-word-name bug. `[skip ci]`
 - `3c6fbbf` — `npm run docs:check` + CI: six documentation rules that can now fail a
   build. Fixed five dead pointers, a removed component cited in a live a11y contract,
   three stale runbooks and seven missing plan status lines. `[skip ci]`

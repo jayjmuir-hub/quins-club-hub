@@ -12,6 +12,13 @@
 -- Sources: information_schema.columns, pg_constraint + pg_get_constraintdef,
 --          pg_indexes, pg_class.relrowsecurity, obj_description.
 --
+-- RE-CAPTURED 2026-08-07 after the 5-7 Aug migrations. ⚠️ This file had gone
+-- three days and ~14 migrations without a re-capture, which is exactly the
+-- lapse the 4 Aug note below warns about. Deltas applied: teams.is_senior,
+-- profiles.first_name / last_name / name_confirmed_at, players.gender (+CHECK),
+-- events.series_id / pitch / group_id (+partial index), and the memberships
+-- unique index that reverses this file's own "DELIBERATE ABSENCE" note.
+--
 -- All thirteen tables have RLS ENABLED (relrowsecurity = true) and none have
 -- FORCE ROW LEVEL SECURITY (relforcerowsecurity = false, i.e. the table
 -- owner still bypasses RLS). Policies live in policies.sql.
@@ -43,6 +50,13 @@ CREATE TABLE public.teams (
   club_id     uuid    NOT NULL,
   name        text    NOT NULL,
   sort_order  integer          DEFAULT 0,
+  -- Added 2026-08-06 (teams_is_senior). NOT NULL DEFAULT false, so every
+  -- existing squad became a youth squad and the senior sides were flipped
+  -- explicitly. ⚠️ Load-bearing for onboarding: claim_roster_access() reads
+  -- this, NEVER teams.name, to decide whether a roster match makes someone a
+  -- 'player' or a 'parent'. Renaming a squad must not be able to hand an adult
+  -- a parent role.
+  is_senior   boolean NOT NULL DEFAULT false,
   CONSTRAINT teams_pkey    PRIMARY KEY (id),
   CONSTRAINT teams_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
 );
@@ -61,6 +75,17 @@ CREATE TABLE public.profiles (
   full_name   text,
   created_at  timestamptz          DEFAULT now(),
   email       text,
+  -- Added 2026-08-06 (profiles_first_and_last_name + backfill). full_name is
+  -- KEPT as the display value and stays in sync with these two via the
+  -- profiles_sync_name trigger — see triggers.sql. Write either side; the
+  -- trigger reconciles. first/last win when both change in one statement.
+  first_name        text,
+  last_name         text,
+  -- Added 2026-08-06 (profiles_name_confirmed_at). NULL means the person has
+  -- not yet confirmed their own name, and the app shows a hard gate before
+  -- letting them in. ⚠️ The migration deliberately stamped all four existing
+  -- profiles as confirmed, so to see the gate you must NULL it by hand.
+  name_confirmed_at timestamptz,
   CONSTRAINT profiles_pkey   PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
@@ -89,9 +114,13 @@ CREATE TABLE public.players (
   -- signs a fresh short-lived URL from this path on read. The leading
   -- "<player_id>/" segment is load-bearing: the storage policies parse it.
   photo_path  text,
+  -- Added 2026-08-07 (player_gender). Nullable on purpose: "not recorded" is a
+  -- real state and is not the same as either value.
+  gender      text,
   CONSTRAINT players_pkey         PRIMARY KEY (id),
   CONSTRAINT players_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
-  CONSTRAINT players_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+  CONSTRAINT players_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+  CONSTRAINT players_gender_check CHECK (((gender IS NULL) OR (gender = ANY (ARRAY['male'::text, 'female'::text]))))
 );
 ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
 
@@ -205,12 +234,24 @@ ALTER TABLE public.calendar_tokens ENABLE ROW LEVEL SECURITY;
 -- ---------------------------------------------------------------------
 -- memberships  (role links: admin / coach / parent / player)
 --
--- !! DELIBERATE ABSENCE OF A UNIQUE CONSTRAINT !!
--- There is NO unique constraint on (profile_id, club_id, role), nor on
--- (profile_id, club_id, team_id, role). The only unique index is the
--- primary key on a fresh uuid. DUPLICATE MEMBERSHIP ROWS FOR ONE PERSON
--- ARE POSSIBLE and have occurred in practice (one was created by an
--- `ON CONFLICT DO NOTHING` that could not conflict on anything).
+-- !! NO LONGER ABSENT — a unique index was added 2026-08-06 !!
+-- ⚠️ This block said "DELIBERATE ABSENCE OF A UNIQUE CONSTRAINT" until the
+-- 7 Aug re-capture. `memberships_unique_grant` now exists:
+--
+--   CREATE UNIQUE INDEX memberships_unique_grant ON public.memberships
+--     USING btree (profile_id, club_id, role, team_id, player_id)
+--     NULLS NOT DISTINCT
+--
+-- NULLS NOT DISTINCT is the load-bearing part: without it two admin rows
+-- (team_id NULL, player_id NULL) would still both be allowed, because in
+-- standard SQL every NULL differs from every other NULL. It is what makes
+-- claim_roster_access()'s `on conflict do nothing` actually able to conflict.
+--
+-- The original warning, kept because the reasoning still applies to any
+-- FUTURE constraint: duplicate membership rows for one person were possible
+-- and DID occur (one was created by an `ON CONFLICT DO NOTHING` that could
+-- not conflict on anything). The live data was de-duplicated before the index
+-- could be created.
 -- Application code guards against this: the Accounts screen groups by
 -- profile_id rather than rendering one row per membership, and
 -- accept_invite() uses SELECT DISTINCT when fanning out invite_targets.
@@ -233,9 +274,15 @@ CREATE TABLE public.memberships (
   CONSTRAINT memberships_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
   CONSTRAINT memberships_team_id_fkey    FOREIGN KEY (team_id)    REFERENCES teams(id)    ON DELETE CASCADE,
   CONSTRAINT memberships_player_id_fkey  FOREIGN KEY (player_id)  REFERENCES players(id)  ON DELETE SET NULL,
-  CONSTRAINT memberships_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'parent'::text, 'player'::text])))
+  -- ⚠️ 'manager' and 'medic' added 2026-08-05 (roles_manager_and_medic). This
+  -- file listed only four roles until the 7 Aug re-capture.
+  CONSTRAINT memberships_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text, 'medic'::text, 'parent'::text, 'player'::text])))
 );
 ALTER TABLE public.memberships ENABLE ROW LEVEL SECURITY;
+
+-- Added 2026-08-06 (memberships_unique_grant). See the note above.
+CREATE UNIQUE INDEX memberships_unique_grant ON public.memberships
+  USING btree (profile_id, club_id, role, team_id, player_id) NULLS NOT DISTINCT;
 
 
 -- ---------------------------------------------------------------------
@@ -256,6 +303,15 @@ CREATE TABLE public.events (
   result_them  integer,
   created_by   uuid,
   created_at   timestamptz          DEFAULT now(),
+  -- Added 2026-08-05. ⚠️ series_id was applied to the live database by
+  -- migration 20260805133133 and has NO file in db/migrations/ — Supabase's
+  -- migration list is authoritative, that directory is a partial mirror.
+  -- group_id and series_id are deliberately never both set on one row:
+  -- group_id ties one session shared across several age groups, series_id
+  -- ties one repeating session across dates.
+  series_id    uuid,
+  pitch        text,
+  group_id     uuid,
   CONSTRAINT events_pkey          PRIMARY KEY (id),
   CONSTRAINT events_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
   CONSTRAINT events_team_id_fkey    FOREIGN KEY (team_id)    REFERENCES teams(id)    ON DELETE CASCADE,
@@ -263,6 +319,10 @@ CREATE TABLE public.events (
   CONSTRAINT events_type_check      CHECK ((type = ANY (ARRAY['match'::text, 'training'::text, 'social'::text])))
 );
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+
+-- Added 2026-08-05. Partial: only rows that belong to a series are indexed.
+CREATE INDEX events_series_id_idx ON public.events USING btree (series_id)
+  WHERE (series_id IS NOT NULL);
 
 
 -- ---------------------------------------------------------------------
