@@ -4,15 +4,23 @@ import Spinner from '../components/Spinner.jsx'
 import PhotoField from '../components/PhotoField.jsx'
 import ParentsEditor from '../components/ParentsEditor.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
-import { getPlayerContact, upsertContact } from '../data/players.js'
+import Segmented from '../components/Segmented.jsx'
+import { getPlayerContact, setOwnPlayerGender, upsertContact } from '../data/players.js'
+import { GENDERS } from '../lib/gender.js'
 import { listParents, saveParents } from '../data/parents.js'
 import { deletePlayerPhoto, forgetPhotoUrl, setOwnPlayerPhoto, uploadPlayerPhoto } from '../data/photos.js'
 import { allowsOwnContact } from '../lib/ageGroup.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 
 // The self-service form: what a PARENT or the PLAYER themselves can change on
-// their own record (Jay's scope, 4 Aug 2026) — the photo, the player's own
-// contact details, and the parent/carer rows.
+// their own record — the photo, the player's own contact details, the
+// parent/carer rows (Jay's scope, 4 Aug 2026), and gender (added 7 Aug 2026).
+//
+// Gender is the odd one out and is worth naming: it is a column on
+// public.players, the same table holding the club-controlled fields this
+// screen refuses to show. It is editable here anyway because Jay scoped it
+// that way, and it is safe because it does not travel through this table's
+// RLS at all — see the setOwnPlayerGender note in handleSubmit.
 //
 // Deliberately a separate screen from PlayerForm rather than a "restricted
 // mode" flag on it. PlayerForm edits name, position, age group and captaincy;
@@ -49,6 +57,11 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
   const [phoneNational, setPhoneNational] = useState('')
   const [email, setEmail] = useState('')
   const [parents, setParents] = useState([])
+  // Seeded from the row the roster already loaded — unlike the contact
+  // details, gender is on public.players itself and came back with the
+  // player, so there is nothing to fetch. null when never recorded, which is
+  // most players; Segmented renders that as both buttons off.
+  const [gender, setGender] = useState(player.gender ?? null)
 
   useEffect(() => {
     let mounted = true
@@ -97,6 +110,22 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
         }
       }
 
+      // Gender goes through its own RPC, and only when it actually changed.
+      //
+      // ⚠️ NOT upsertPlayer. The caller here holds no write on public.players
+      // — `player edit` is gated on can_edit_team — so an ordinary update
+      // would affect zero rows and be reported as a permission refusal. The
+      // RPC is SECURITY DEFINER with a hard-coded column list, so it cannot
+      // be talked into writing team_id. See setOwnPlayerGender in
+      // src/data/players.js and db/migrations/20260807_player_gender.sql.
+      //
+      // The equality guard is not just an optimisation: without it, every
+      // save by a parent whose child has no gender recorded would send null
+      // and pointlessly exercise a privileged write path.
+      if ((player.gender ?? null) !== (gender ?? null)) {
+        await setOwnPlayerGender(player.id, gender)
+      }
+
       if (showOwnContact) {
         await upsertContact({
           player_id: player.id,
@@ -136,9 +165,13 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
               club-controlled fields as disabled boxes. A greyed-out "Age
               group" invites someone to try to change it and then wonder why
               they can't. */}
+          {/* Lists exactly what this form writes. Kept in step with the
+              fields below on purpose: it is the only thing telling a parent
+              why "Age group" isn't here, and a stale list would have them
+              hunting for a field that doesn't exist. */}
           <p className="mb-4 text-[12.5px] leading-relaxed text-ink-muted">
-            You can update the photo, contact details and parents here. Name, position and age
-            group are set by the club — ask a coach if any of those are wrong.
+            You can update the photo, gender, contact details and parents here. Name, position and
+            age group are set by the club — ask a coach if any of those are wrong.
           </p>
 
           <PhotoField
@@ -155,6 +188,22 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
             }}
             disabled={saving}
           />
+
+          {/* No squad-mismatch note here, unlike PlayerForm. This form cannot
+              change the squad, so the only thing a parent could do about a
+              mismatch is un-answer the question — and the arrangement is the
+              club's business, not theirs to be warned about. */}
+          <div className="mt-5">
+            <Segmented
+              legend="Gender"
+              name="my-player-gender"
+              options={GENDERS}
+              value={gender}
+              onChange={setGender}
+              disabled={saving}
+              className="mb-0"
+            />
+          </div>
 
           {/* The U13 rule (src/lib/ageGroup.js): an under-13 has no direct
               contact route in the app, so these fields are absent rather than

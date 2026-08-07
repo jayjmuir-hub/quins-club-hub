@@ -16,6 +16,7 @@
 // the team is unknown or unwritable, but that is a *reporting* convenience so
 // the preview can grey the row out. RLS is what actually refuses the insert.
 import { canonicalPosition } from './positions.js'
+import { canonicalGender } from './gender.js'
 
 // Word-joiner, BOM, non-breaking space and the smart quote family. Excel and
 // Word insert these silently and they are invisible in the preview, so a name
@@ -80,6 +81,7 @@ const HEADER_WORDS = new Set([
   'name', 'full name', 'fullname', 'player', 'player name',
   'position', 'pos',
   'team', 'age group', 'agegroup', 'squad', 'group',
+  'gender', 'sex', 'm/f',
 ])
 
 function looksLikeHeader(cells) {
@@ -131,7 +133,9 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam } = {}) {
       return
     }
 
-    const [nameCell = '', positionCell = '', teamCell = ''] = cells
+    // Gender is the FOURTH column and is optional, so an existing three-column
+    // paste keeps working unchanged — destructuring a missing cell gives ''.
+    const [nameCell = '', positionCell = '', teamCell = '', genderCell = ''] = cells
     const errors = []
 
     const fullName = nameCell.trim()
@@ -145,6 +149,20 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam } = {}) {
     if (positionCell.trim() !== '') {
       position = canonicalPosition(positionCell)
       if (position === null) errors.push(`"${positionCell.trim()}" is not a position`)
+    }
+
+    // Gender is optional and follows position's rule exactly: a blank cell is
+    // fine and stores null, but a value that is PRESENT and unrecognised is a
+    // mistake worth reporting rather than silently dropping.
+    //
+    // ⚠️ Silently dropping it would be the worst outcome available here. A
+    // spreadsheet column of "Y"/"N", or one where the club used "1"/"2",
+    // would import several hundred players with gender null and report total
+    // success — and nobody would notice until someone tried to filter by it.
+    let gender = null
+    if (genderCell.trim() !== '') {
+      gender = canonicalGender(genderCell)
+      if (gender === null) errors.push(`"${genderCell.trim()}" is not male or female`)
     }
 
     // Team is required: players.team_id is NOT NULL.
@@ -163,6 +181,7 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam } = {}) {
       lineNo,
       full_name: fullName,
       position,
+      gender,
       team_id: team?.id ?? null,
       teamName: team?.name ?? teamCell.trim(),
       errors,
@@ -207,5 +226,10 @@ export function toInsertRows(parsed, { clubId }) {
       team_id: row.team_id,
       full_name: row.full_name,
       position: row.position,
+      // null when the column was blank or absent, which the CHECK constraint
+      // allows. Never '' — players_gender_check refuses the empty string, and
+      // a whole 300-row insert is one statement, so a single '' would abort
+      // the entire import (see insertPlayers in src/data/players.js).
+      gender: row.gender ?? null,
     }))
 }

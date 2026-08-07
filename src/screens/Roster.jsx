@@ -13,6 +13,7 @@ import { listPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, isOwnPlayer, isSquadStaffRole, roleLabel, visibleTeams } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
+import { GENDERS, genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import { signPhotoUrls } from '../data/photos.js'
 import { useMediaQuery, DESKTOP_QUERY } from '../lib/useMediaQuery.js'
@@ -146,8 +147,13 @@ function PlayerRow({ player, teamName, photoUrl, onSelect }) {
           </span>
           {player.is_captain && <Badge tone="captain">Capt</Badge>}
         </span>
+        {/* Gender is appended, not given its own line, and is omitted
+            entirely when not recorded — which is most players. A third line
+            reading "Not recorded" on two thirds of a 53-player squad is
+            noise, and a blank one is worse. */}
         <span className="mt-0.5 block text-[12.5px] text-ink-faint">
           {player.position || 'Position not set'} · {teamName}
+          {genderLabel(player.gender) ? ` · ${genderLabel(player.gender)}` : ''}
         </span>
       </span>
 
@@ -194,6 +200,12 @@ export default function Roster() {
 
   const [query, setQuery] = useState('')
   const [teamFilter, setTeamFilter] = useState(readStoredFilter)
+  // 'all' | 'male' | 'female'. Deliberately NOT persisted to localStorage the
+  // way the team filter is. The team filter is persisted because a coach's
+  // squad is a standing preference; a gender filter is a one-off question
+  // ("who are the girls in this group") and a sticky one would leave someone
+  // convinced players had gone missing on their next visit.
+  const [genderFilter, setGenderFilter] = useState('all')
   const [selectedPlayerId, setSelectedPlayerId] = useState(null)
   // null when the add/edit sheet is closed; { player } when open (player is
   // null for "add"). An object rather than a boolean so opening the form for
@@ -288,9 +300,36 @@ export default function Roster() {
   // already applied) made every unselected pill read "· 0" the moment any pill
   // was clicked, so the row asserted the rest of the club was empty, and "All"
   // misstated what clicking it would show.
-  const matchingSearch = players.filter((player) =>
-    matchesQuery(player, teamsById.get(player.team_id)?.name ?? '', normalisedQuery),
+  //
+  // The gender filter is folded in HERE, alongside the search, rather than
+  // applied later with the team pill. Both narrow the set the user is asking
+  // about; the pill selects within it. Applying gender after the pill counts
+  // were computed would make the counts describe a set the list no longer
+  // shows.
+  const matchingSearch = players.filter(
+    (player) =>
+      matchesQuery(player, teamsById.get(player.team_id)?.name ?? '', normalisedQuery) &&
+      (genderFilter === 'all' || player.gender === genderFilter),
   )
+
+  // How many players the gender filter is currently hiding BECAUSE THEY HAVE
+  // NO VALUE, as opposed to because they are the other gender. Reported below
+  // the pills whenever it is non-zero.
+  //
+  // ⚠️ This is the honest half of the feature and is not optional. Almost
+  // every player has gender null today, so "Female" on a 53-player squad may
+  // legitimately show 2 rows — and without this line that reads as "this
+  // squad has 2 girls", not "this squad has 2 recorded girls and 49 players
+  // nobody has answered for". Those are very different statements to put in
+  // front of a coach picking a team.
+  const hiddenUnrecorded =
+    genderFilter === 'all'
+      ? 0
+      : players.filter(
+          (player) =>
+            !player.gender &&
+            matchesQuery(player, teamsById.get(player.team_id)?.name ?? '', normalisedQuery),
+        ).length
 
   const visible =
     activeFilter === ALL_TEAMS_ID
@@ -445,6 +484,49 @@ export default function Roster() {
             onChange={persistFilter}
           />
         </div>
+      )}
+
+      {/* Gender filter. A radio group, not a row of buttons: the three
+          options are mutually exclusive and a screen reader should announce
+          it as one control with a current selection, which aria-pressed
+          buttons do not. Rendered unconditionally — unlike the team pills,
+          which hide when there is only one squad — because a single squad is
+          exactly where "show me the girls" is most useful. */}
+      <fieldset className="mb-3">
+        <legend className="sr-only">Filter by gender</legend>
+        <div className="flex gap-2">
+          {[{ value: 'all', label: 'All' }, ...GENDERS].map((option) => (
+            <label key={option.value}>
+              <input
+                type="radio"
+                name="roster-gender-filter"
+                value={option.value}
+                checked={genderFilter === option.value}
+                onChange={() => setGenderFilter(option.value)}
+                className="peer sr-only"
+              />
+              <span
+                className={[
+                  'block cursor-pointer select-none rounded-pill border-[1.5px] px-3.5 py-1.5 text-[13px] transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2',
+                  genderFilter === option.value
+                    ? 'border-brand bg-surface-mute font-bold text-brand-deep'
+                    : 'border-line bg-surface-card font-semibold text-ink',
+                ].join(' ')}
+              >
+                {option.label}
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      {/* See hiddenUnrecorded above. This line is what stops a filtered count
+          being read as a fact about the squad. */}
+      {hiddenUnrecorded > 0 && (
+        <p data-testid="gender-unrecorded-note" className={`mb-3 text-[12.5px] ${MUTED_ON_PAPER}`}>
+          {hiddenUnrecorded} {hiddenUnrecorded === 1 ? 'player has' : 'players have'} no gender
+          recorded and {hiddenUnrecorded === 1 ? 'is' : 'are'} not shown.
+        </p>
       )}
 
       {isFirstLoad && (

@@ -4,6 +4,7 @@ import { insertPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { parsePlayerPaste, toInsertRows } from '../lib/playerImport.js'
+import { genderLabel } from '../lib/gender.js'
 
 // Bulk player import (desktop-spec.md §5.1). The reason this exists: the club
 // has 15 squads and the app has no players in it, because entering them one
@@ -19,7 +20,10 @@ import { parsePlayerPaste, toInsertRows } from '../lib/playerImport.js'
 const LABEL = 'mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-faint'
 const CELL = 'border-t border-line px-2.5 py-1.5 text-[13px] align-top'
 
-const EXAMPLE = 'Tom Fletcher\tFlanker\tU10\nAmy Rose\tWing\tU12'
+// Four columns, and the second line deliberately shows the "M"/"F" shorthand
+// rather than spelling both out — a placeholder that only ever showed the
+// long form would suggest the short one is not accepted.
+const EXAMPLE = 'Tom Fletcher\tFlanker\tU10\tM\nAmy Rose\tWing\tU12\tF'
 
 export default function PlayerImport({ onClose, onImported }) {
   const { memberships, teams } = useMemberships()
@@ -76,9 +80,10 @@ export default function PlayerImport({ onClose, onImported }) {
               Paste from a spreadsheet
             </label>
             <p className="mb-2 text-[13px] leading-relaxed text-ink-muted">
-              One player per line: <b>name, position, age group</b>. Copy the three columns
+              One player per line: <b>name, position, age group, gender</b>. Copy the columns
               straight out of Excel or Sheets — a header row is ignored, and blank lines are
-              skipped. Position can be left empty.
+              skipped. Position and gender can be left empty, and gender can be left off
+              altogether. Gender accepts Male/Female, M/F or Boy/Girl.
             </p>
             <textarea
               id="import-paste"
@@ -122,6 +127,7 @@ export default function PlayerImport({ onClose, onImported }) {
                       <th scope="col" className={`${CELL} border-t-0 bg-surface-sunk text-left text-[11px] uppercase tracking-[.5px] text-ink-muted`}>Name</th>
                       <th scope="col" className={`${CELL} border-t-0 bg-surface-sunk text-left text-[11px] uppercase tracking-[.5px] text-ink-muted`}>Position</th>
                       <th scope="col" className={`${CELL} border-t-0 bg-surface-sunk text-left text-[11px] uppercase tracking-[.5px] text-ink-muted`}>Age group</th>
+                      <th scope="col" className={`${CELL} border-t-0 bg-surface-sunk text-left text-[11px] uppercase tracking-[.5px] text-ink-muted`}>Gender</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -142,6 +148,11 @@ export default function PlayerImport({ onClose, onImported }) {
                         </td>
                         <td className={`${CELL} text-ink-muted`}>{row.position || '—'}</td>
                         <td className={`${CELL} text-ink-muted`}>{row.teamName || '—'}</td>
+                        {/* The canonical stored value, not the pasted text —
+                            so a paste of "M" previews as "Male" and the user
+                            can see the mapping happened before committing to
+                            a several-hundred-row insert. */}
+                        <td className={`${CELL} text-ink-muted`}>{genderLabel(row.gender) || '—'}</td>
                       </tr>
                     ))}
                   </tbody>

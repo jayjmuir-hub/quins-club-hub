@@ -337,6 +337,11 @@ describe('PlayerForm — saving a new player', () => {
       full_name: 'Tom Fletcher',
       position: 'Flanker',
       is_captain: true,
+      // Nobody touched the gender buttons in this test, so the payload must
+      // carry an explicit null. toEqual is exact, which is what makes this
+      // assertion worth having: it catches the field being dropped from the
+      // payload AND it catching a default value being invented.
+      gender: null,
     })
     // No id on an insert, and never a jersey number.
     expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('id')

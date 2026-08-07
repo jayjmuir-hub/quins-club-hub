@@ -149,6 +149,18 @@ export async function deletePlayer(id) {
   window.__writes.push({ op: 'delete', table: 'players', id })
 }
 
+// The parent self-service gender write (7 Aug 2026). Recorded as an `rpc` op,
+// not an `update` on players, because that distinction IS the thing worth
+// checking in the browser: a parent saving MyPlayerForm must never produce an
+// ordinary players update — that path is gated on can_edit_team and would be
+// refused. See set_own_player_gender in
+// db/migrations/20260807_player_gender.sql.
+export async function setOwnPlayerGender(playerId, gender) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'rpc', fn: 'set_own_player_gender', playerId, gender })
+  return { id: playerId, gender }
+}
+
 // Harness gap found (and fixed) while verifying Task 5: src/screens/
 // PlayerImport.jsx imports insertPlayers from src/data/players.js, and
 // Roster.jsx imports PlayerImport.jsx, so main.jsx's static import of

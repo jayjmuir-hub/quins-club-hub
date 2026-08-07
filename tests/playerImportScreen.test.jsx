@@ -144,7 +144,11 @@ describe('Import — writing', () => {
     await user.click(screen.getByTestId('import-submit'))
 
     await waitFor(() => expect(insertPlayersMock).toHaveBeenCalledWith([
-      { club_id: 'club-1', team_id: 'team-u10', full_name: 'Tom Fletcher', position: 'Flanker' },
+      // gender null: this paste has three columns, so the fourth is absent
+      // and must arrive as null — NOT '' and NOT missing. The database's
+      // players_gender_check refuses the empty string, and a bulk insert is a
+      // single statement, so one '' would abort all 300 rows.
+      { club_id: 'club-1', team_id: 'team-u10', full_name: 'Tom Fletcher', position: 'Flanker', gender: null },
     ]))
   })
 

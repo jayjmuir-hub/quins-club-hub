@@ -11,6 +11,8 @@ import { joinPhone, splitPhone } from '../lib/phone.js'
 import ParentsEditor from '../components/ParentsEditor.jsx'
 import PhotoField from '../components/PhotoField.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
+import Segmented from '../components/Segmented.jsx'
+import { GENDERS, squadMismatch } from '../lib/gender.js'
 
 // The player add/edit form (design-system.md §5.8), opened in the shared
 // Sheet from Roster's "Add player" button and from PlayerDetail's "Edit".
@@ -66,13 +68,10 @@ const FIELD = 'mb-3.5'
 const INPUT_BASE =
   'w-full rounded-[11px] border-[1.5px] bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition placeholder:text-ink-faint focus:border-brand'
 
-// design-system.md §4.18, matching EventForm: the radio stays a real,
-// focusable input (sr-only, not display:none) and the checked look is driven
-// from React state rather than the CSS `:has()` selector.
-const SEG_OPTION_BASE =
-  'block cursor-pointer select-none rounded-[11px] border-[1.5px] px-2 py-2.5 text-center text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2'
-const SEG_OPTION_ON = 'border-brand bg-surface-mute font-bold text-brand-deep'
-const SEG_OPTION_OFF = 'border-line font-semibold text-ink'
+// The segmented control moved to src/components/Segmented.jsx on 7 Aug 2026,
+// when the gender buttons needed the identical control in MyPlayerForm. Its
+// design-system.md §4.18 reasoning — real focusable radio, label/span rather
+// than button — moved with it and is stated there.
 
 // POSITIONS moved to src/lib/positions.js when the bulk importer arrived and
 // needed to validate pasted positions against exactly the same set this form
@@ -82,40 +81,6 @@ const SEG_OPTION_OFF = 'border-line font-semibold text-ink'
 
 function inputClasses(invalid) {
   return [INPUT_BASE, invalid ? 'border-brand-deep' : 'border-line'].join(' ')
-}
-
-function Segmented({ legend, name, options, value, onChange }) {
-  return (
-    <fieldset className={FIELD}>
-      <legend className={LABEL}>{legend}</legend>
-      {/* An explicit flex row of equal-width blocks. The options are
-          <label>/<span> pairs rather than <button>s on purpose — a button
-          used as a layout box inherits Chromium's UA content-centring,
-          which jsdom cannot see. */}
-      <div className="flex gap-2">
-        {options.map((option) => (
-          <label key={option.value} className="flex-1">
-            <input
-              type="radio"
-              name={name}
-              value={option.value}
-              checked={value === option.value}
-              onChange={() => onChange(option.value)}
-              className="peer sr-only"
-            />
-            <span
-              className={[
-                SEG_OPTION_BASE,
-                value === option.value ? SEG_OPTION_ON : SEG_OPTION_OFF,
-              ].join(' ')}
-            >
-              {option.label}
-            </span>
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  )
 }
 
 // The player half of the form's initial state, derived once per mount. The
@@ -133,6 +98,11 @@ function initialValues(player, editableTeams) {
     // falling through to "the first team" is not acceptable here.
     teamId: player ? player.team_id : fallbackTeamId,
     isCaptain: player?.is_captain === true,
+    // ⚠️ null, not '' and not a default choice. players.gender is nullable
+    // and almost every existing player has no value; defaulting the buttons
+    // to Male would silently record an answer nobody gave the first time a
+    // coach opened any player to fix a phone number.
+    gender: player?.gender ?? null,
     // The player's own number is held split (country + national) for the same
     // reason the parent rows are — see src/components/PhoneInput.jsx.
     phoneCountry: splitPhone('').country,
@@ -374,6 +344,12 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       full_name: fullName,
       position: values.position || null,
       is_captain: values.isCaptain,
+      // `?? null` rather than `|| null` so the value is written through
+      // exactly as held. Both happen to behave the same for the two strings
+      // and null this field can hold, but `||` would also convert a future
+      // falsy-but-meaningful value, and this is a column with a CHECK
+      // constraint that refuses ''.
+      gender: values.gender ?? null,
     }
 
     const phone = joinPhone(values.phoneCountry, values.phoneNational)
@@ -490,6 +466,16 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   const selectedTeam = editableTeams.find((candidate) => candidate.id === teamId)
   const ownContactAllowed = allowsOwnContact(selectedTeam?.name)
 
+  // Advisory only, and computed from the SELECTED squad rather than the
+  // player's stored one so switching the age-group dropdown updates the note
+  // straight away. squadMismatch returns null for an unrecorded gender and
+  // for every youth squad — see src/lib/gender.js for why it fails open.
+  //
+  // ⚠️ Deliberately NOT wired into `invalid` or the submit guard. The club
+  // has four women in "Senior Men 2nd XV" today; making this block a save
+  // would leave those four players uneditable by anybody.
+  const mismatch = squadMismatch(values.gender, selectedTeam?.name)
+
   return (
     <Sheet open onClose={onClose} title={editing ? 'Edit player' : 'Add player'}>
       {/* noValidate: this form does its own validation and reports it in a
@@ -568,6 +554,31 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             ))}
           </select>
         </div>
+
+        {/* Sits directly under Age group so the mismatch note below lands
+            next to the squad it is talking about. No "Not set" option: Jay
+            chose two buttons, so an existing player with no gender recorded
+            shows both OFF and there is no way back to null from this form
+            once one is picked. That is the accepted trade — see the null
+            discussion in db/migrations/20260807_player_gender.sql. */}
+        <Segmented
+          legend="Gender"
+          name="player-gender"
+          options={GENDERS}
+          value={values.gender}
+          onChange={set('gender')}
+          disabled={saving}
+          className="mb-2"
+        />
+
+        {/* Advisory, never blocking. bg-warn-bg (not danger) and phrased as a
+            check rather than a correction, because a woman in a men's squad
+            is a real arrangement at this club and not an error to fix. */}
+        {mismatch && (
+          <p className="mb-3.5 rounded-[11px] bg-warn-bg px-3 py-2.5 text-[12.5px] text-ink">
+            {mismatch}
+          </p>
+        )}
 
         {/* Contact details: a different table, a different policy, a
             different write. See the safeguarding notes at the top. */}

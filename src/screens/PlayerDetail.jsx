@@ -4,6 +4,7 @@ import { deletePlayer, getPlayerContact } from '../data/players.js'
 import { listParents } from '../data/parents.js'
 import { allowsOwnContact } from '../lib/ageGroup.js'
 import { formatPhone } from '../lib/phone.js'
+import { genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 
 // The player detail sheet (design-system.md §5.7): a branded hero carrying
@@ -417,6 +418,12 @@ export default function PlayerDetail({
 }) {
   const teamName = team?.name ?? 'Not set'
   const position = player.position || 'Not set'
+  // null when never recorded, and the badge below is then not rendered at
+  // all. Deliberately NOT 'Not set' the way position is: position has an
+  // editable control everyone expects to find, whereas a "Gender: Not set"
+  // line on a child's record reads as an omission somebody ought to correct
+  // — on hundreds of players, to no one's benefit.
+  const gender = genderLabel(player.gender)
 
   return (
     <Sheet open onClose={onClose} title="Player">
@@ -438,10 +445,25 @@ export default function PlayerDetail({
               nothing on its own. The row went with Position and Age group
               when those moved up here; this keeps the fact visible and still
               reads as a word rather than a glyph. */}
-          {player.is_captain && (
-            <span className="mt-2 inline-block rounded-pill bg-white/20 px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-[0.06em]">
-              Captain
-            </span>
+          {/* Captain and gender share one wrapping row so a captain with a
+              gender recorded doesn't push the hero taller on a narrow phone.
+              Each pill appears only if its value does. */}
+          {(player.is_captain || gender) && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {player.is_captain && (
+                <span className="inline-block rounded-pill bg-white/20 px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-[0.06em]">
+                  Captain
+                </span>
+              )}
+              {gender && (
+                <span
+                  data-testid="player-gender"
+                  className="inline-block rounded-pill bg-white/20 px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-[0.06em]"
+                >
+                  {gender}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>

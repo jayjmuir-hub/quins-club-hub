@@ -171,7 +171,7 @@ describe('toInsertRows', () => {
   it('emits only valid rows, shaped for the players table', () => {
     const r = parse('Tom Fletcher\tProp\tU10\nBad\tWinger\tU10')
     expect(toInsertRows(r, { clubId: 'club-1' })).toEqual([
-      { club_id: 'club-1', team_id: 'team-u10', full_name: 'Tom Fletcher', position: 'Prop' },
+      { club_id: 'club-1', gender: null, team_id: 'team-u10', full_name: 'Tom Fletcher', position: 'Prop' },
     ])
   })
 

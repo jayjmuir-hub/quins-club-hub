@@ -3,17 +3,26 @@ import Badge from './Badge.jsx'
 import Card from './Card.jsx'
 import PlayerAvatar from './PlayerAvatar.jsx'
 import { POSITIONS } from '../lib/positions.js'
+import { GENDERS } from '../lib/gender.js'
 import { upsertPlayer } from '../data/players.js'
 
 // The desktop roster table (desktop-spec.md §5.1). Rendered INSTEAD of the
 // mobile card list, not alongside it — see src/lib/useMediaQuery.js for why
 // that switch is made in JS rather than with a `desktop:` class.
 //
-// Three columns are editable in place: position, age group and captain. Those
-// are the fields that change during a season; everything else still goes
-// through PlayerForm, which is where validation, contacts and the two-table
-// save sequence already live. There is deliberately no jersey column — the
-// club does not use squad numbers (src/lib/playerFormat.js).
+// Four columns are editable in place: position, gender, age group and
+// captain. Those are the fields that change during a season; everything else
+// still goes through PlayerForm, which is where validation, contacts and the
+// two-table save sequence already live. There is deliberately no jersey
+// column — the club does not use squad numbers (src/lib/playerFormat.js).
+//
+// Gender was added here as well as to the form (7 Aug 2026) because it is the
+// one field the club has to fill in for ~300 existing players from scratch,
+// and doing that through a sheet that opens, saves and closes per player is
+// several hundred round trips of clicking. The inline select is the bulk
+// path. Note this writes via upsertPlayer, i.e. the ordinary can_edit_team
+// policy — the parent self-service RPC is not involved and this table is
+// never shown to a parent as editable.
 //
 // Access control is not enforced here. `canEditTeam` decides whether a cell
 // renders as a control or as text, so a mistake can only make the UI
@@ -33,6 +42,7 @@ const INLINE_CONTROL =
 const SORTABLE = [
   { key: 'full_name', label: 'Name' },
   { key: 'position', label: 'Position' },
+  { key: 'gender', label: 'Gender' },
   { key: 'team', label: 'Age group' },
   { key: 'is_captain', label: 'Captain' },
 ]
@@ -49,9 +59,11 @@ function compare(a, b, key, teamsById) {
     // this is stated rather than left to whatever true > false does.
     return (b.is_captain ? 1 : 0) - (a.is_captain ? 1 : 0)
   }
-  // Empty positions sort last in either direction rather than leading the
-  // table with a block of "—", which is never what someone sorting by
-  // position is looking for.
+  // Empty positions — and empty genders, which is currently most of the club
+  // — sort last in either direction rather than leading the table with a
+  // block of "—", which is never what someone sorting by that column is
+  // looking for. It also makes "sort by gender" the fastest way to find the
+  // players still needing one: they collect at the bottom, both directions.
   const av = a[key] ?? ''
   const bv = b[key] ?? ''
   if (av === '' && bv !== '') return 1
@@ -126,7 +138,7 @@ export default function RosterTable({
       <div className="max-h-[70vh] overflow-auto">
         <table className="w-full border-collapse" data-testid="roster-table">
           <caption className="sr-only">
-            Club roster. Position, age group and captain can be changed in place.
+            Club roster. Position, gender, age group and captain can be changed in place.
           </caption>
           <thead>
             <tr>
@@ -223,6 +235,34 @@ export default function RosterTable({
                       </select>
                     ) : (
                       <span className="px-2 text-ink-muted">{player.position || 'Not set'}</span>
+                    )}
+                  </td>
+
+                  <td className={BODY_CELL}>
+                    {editable ? (
+                      <select
+                        className={INLINE_CONTROL}
+                        aria-label={`Gender for ${player.full_name}`}
+                        value={player.gender ?? ''}
+                        disabled={busy === 'gender'}
+                        // '' back to null, not ''. players_gender_check
+                        // refuses the empty string outright, so sending it
+                        // would be a constraint violation rather than a
+                        // clear. Unlike PlayerForm's two buttons, this
+                        // control CAN return a player to not-recorded —
+                        // which is the undo path for a mis-click during the
+                        // ~300-player backfill this column exists for.
+                        onChange={(event) => save(player, 'gender', event.target.value || null)}
+                      >
+                        <option value="">Not set</option>
+                        {GENDERS.map((g) => (
+                          <option key={g.value} value={g.value}>{g.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="px-2 text-ink-muted">
+                        {GENDERS.find((g) => g.value === player.gender)?.label ?? 'Not set'}
+                      </span>
                     )}
                   </td>
 

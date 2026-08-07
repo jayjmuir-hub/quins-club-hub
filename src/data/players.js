@@ -115,6 +115,35 @@ export async function upsertPlayer(player) {
   return data
 }
 
+/**
+ * Records a gender against a player the CALLER OWNS (their own child, or
+ * themselves), via the set_own_player_gender RPC.
+ *
+ * ⚠️ NOT `upsertPlayer({ id, gender })`. A parent holds no write on
+ * public.players at all — the only write policy is `player edit`, gated on
+ * can_edit_team — so that call would come back with zero rows and surface as
+ * REFUSED_PLAYER. Adding an owner-update policy to fix that is the trap:
+ * RLS grants access to ROWS, not COLUMNS, so it would hand the parent
+ * team_id as well and make "move my child into another squad" a legitimate
+ * write. The RPC has a hard-coded column list, so gender is the only thing
+ * it can touch whatever this function sends. Exactly the same shape and
+ * reasoning as setOwnPlayerPhoto in src/data/photos.js.
+ *
+ * Coaches and admins never come through here: they have a normal row-level
+ * update and use upsertPlayer.
+ */
+export async function setOwnPlayerGender(playerId, gender) {
+  if (!playerId) throw new Error('setOwnPlayerGender needs a player_id.')
+
+  const { data, error } = await supabase.rpc('set_own_player_gender', {
+    _player: playerId,
+    _gender: gender ?? null,
+  })
+
+  if (error) throw error
+  return data ?? null
+}
+
 const REFUSED_BULK =
   "We couldn't add those players. You may not have permission to change one of those squads."
 
