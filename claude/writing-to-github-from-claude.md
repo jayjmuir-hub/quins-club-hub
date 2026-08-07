@@ -16,7 +16,7 @@ The repo is public, so a cloud session clones it and works locally at full speed
 ```bash
 git clone https://github.com/jayjmuir-hub/quins-club-hub.git
 cd quins-club-hub && git checkout build/v1-mvp && npm install
-# create .env (see RESTORE.md "Start a session") — the test suite needs it
+# create .env (see claude/runbooks/session-and-push.md) — the test suite needs it
 # ...work, test, commit...
 rm -f .env                       # gitignored, but never risk it
 git bundle create /tmp/x.bundle <base-sha>..HEAD

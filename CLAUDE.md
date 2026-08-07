@@ -31,9 +31,18 @@ in the one place that always travels is the opposite problem.
    `rev-list` count above answers this question.**
 3. **`claude/state-of-play.md`** — where things STAND today, and what is
    blocked on whom. The volatile half.
-4. **`RESTORE.md`** — what is TRUE about the codebase. Architecture, schema,
-   RLS, "how this codebase actually behaves", and the rulings that cost real
-   effort to discover. The durable half.
+4. **`RESTORE.md`** — what is TRUE about the codebase. "How this codebase
+   actually behaves", and the rulings that cost real effort to discover.
+   The durable half.
+
+**That is the whole reading order — four items, and step 2 is a command.**
+⚠️ It was ~1,100 lines on 7 Aug because `RESTORE.md` had a second document
+glued onto its end and a runbook at its front. Those are now
+`claude/schema-history.md` and `claude/runbooks/session-and-push.md`, and
+**neither is in the reading order** — open them when the task is theirs.
+Nothing was deleted. **Keep it that way: a fact that every session must
+read belongs in the four above; a fact one session in ten needs belongs in
+the table below.**
 
 **Precedence: the code wins, then `RESTORE.md`, then `state-of-play.md`,
 then this file.** Anything else in `claude/` is history, not instruction.
@@ -50,15 +59,19 @@ line elsewhere, it is stale — fix it, don't obey it.
 | `claude/plans/` | Feature plans, dated. Superseded by the code once shipped |
 | `claude/handoffs/` | Session records, dated. **History, not instruction** — a handoff describes a moment and goes stale by design. Useful for the traps, not for current state |
 | `claude/specs/design-system.md`, `claude/specs/accessibility.md` | The visual and a11y contracts |
+| `claude/schema-history.md` | **The reasoning behind each migration**, which the SQL does not carry. Read the relevant section before changing a policy. Reference — do not trust its status lines |
+| `claude/runbooks/session-and-push.md` | How to start a session, and the summary push procedure. Read before you push |
 | `claude/runbooks/deploy.md`, `email-and-domain.md`, `first-admin.md`, `e2e-roles.md`, `scope-mail-send.md` | Operational procedures |
 | `claude/writing-to-github-from-claude.md` | The exact push route, and the ways it has failed |
 | `claude/archive/quins-v1-mvp.md` | The original implementation plan. History |
 | `claude/changelog.md` | What changed, when |
 
 ⚠️ **`claude/runbooks/defederate-m365.md` is OBSOLETE. Do not follow it.**
-Defederation was examined in full on 4 Aug and is dead; the tombstone in
-`claude/decisions/` says why, with evidence. Do not re-open it, and do not
-propose buying an M365 licence — same session, same verdict.
+Defederation was examined in full on 4 Aug and is dead. ⚠️ **This pointer
+said "the tombstone in `claude/decisions/`" until 7 Aug 2026 and there is
+no such file** — the evidence is in `claude/handoffs/2026-08-04-email-domain.md`,
+and the obsolete runbook itself carries the detail. Do not re-open it, and
+do not propose buying an M365 licence — same session, same verdict.
 
 ## ⚠️ The rules that must reach you wherever you are running
 
