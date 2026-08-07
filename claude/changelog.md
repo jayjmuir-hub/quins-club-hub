@@ -10,6 +10,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 7 Aug 2026
 
+- `6a96d4c` — Re-captured `db/schema/` after three days and ~14 migrations of drift.
+  Nothing unintended found; `tables.sql` had been asserting the opposite of the truth
+  about the `memberships` unique index. `[skip ci]`
 - `f7ffa60` — Pinned `search_path` on `sync_profile_name`; the last non-noise security
   advisor finding. Testing it surfaced a latent single-word-name bug. `[skip ci]`
 - `3c6fbbf` — `npm run docs:check` + CI: six documentation rules that can now fail a
