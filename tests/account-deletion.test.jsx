@@ -174,6 +174,27 @@ describe('/privacy', () => {
     expect(screen.getByText(/a child does not sign in/i)).toBeInTheDocument()
   })
 
+  it('describes squad visibility truthfully, not as "own children only"', () => {
+    // ⚠️ THIS WAS WRONG AND LIVE. The policy said "A parent sees only their
+    // own children". The RLS policies say otherwise: `players`, `events` and
+    // `availability` are readable by anyone holding a membership row for that
+    // squad, so a U15 parent sees all 53 children's names, photos and
+    // availability. Only player_contacts and player_parents are restricted to
+    // is_own_player.
+    //
+    // The sharing is deliberate — it is what a team sheet is. The policy
+    // describing the opposite is the problem, because that is the document a
+    // parent would point at if they objected.
+    renderScreen(<Privacy />)
+
+    expect(screen.queryByText(/a parent sees only their own children/i)).toBeNull()
+    expect(screen.getByText(/names, photographs and availability of the rest/i)).toBeInTheDocument()
+    // The half that IS restricted must still be stated plainly.
+    expect(
+      screen.getByText(/nobody can see another family's phone number, email address or account/i),
+    ).toBeInTheDocument()
+  })
+
   it('links to the deletion route, because the policy promises it', () => {
     renderScreen(<Privacy />)
     const links = screen.getAllByRole('link', { name: /delete/i })

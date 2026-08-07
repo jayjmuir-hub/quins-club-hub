@@ -17,7 +17,11 @@ import { Link } from 'react-router-dom'
 // ⚠️ PLACEHOLDERS Jay must confirm before this is relied on are marked
 // CONFIRM in the text. This was drafted by an assistant, not a lawyer.
 
-const LAST_UPDATED = '6 August 2026'
+// ⚠️ BUMP THIS whenever the wording below changes in a way that affects what
+// the club is telling people it does. A privacy policy whose date never moves
+// gives a reader no way to tell whether what they read last season still
+// applies. Moved to 7 Aug 2026 for the "who can see what" correction.
+const LAST_UPDATED = '7 August 2026'
 
 function H2({ children }) {
   return (
@@ -125,10 +129,29 @@ export default function Privacy() {
         club does not require one, and you can ask for your child&apos;s to be
         removed at any time.
       </P>
+      {/* ⚠️ CORRECTED 7 Aug 2026. This paragraph used to say "A parent sees
+          only their own children", which was FALSE and had been live since
+          the policy was written.
+
+          What the database actually allows, checked against the RLS policies
+          rather than the code: `players`, `events` and `availability` are all
+          readable by anyone with a membership row for that squad — so every
+          parent in U15 can see all 53 children's names, photos and
+          availability answers. Only `player_contacts` and `player_parents`
+          are restricted to `is_own_player`, which is where the "only their
+          own children" idea came from.
+
+          That sharing is deliberate and is what makes a team sheet work. The
+          problem was the policy describing the opposite, which is the
+          document a parent would point at if they objected. */}
       <P>
-        Who can see what is limited by role. A coach sees only their own squad.
-        A parent sees only their own children. Player photographs are stored
-        privately and are never publicly readable.
+        Who can see what is limited by role. A coach, manager or medic sees
+        their own squad, including contact details. A parent or player sees
+        the contact details for their own child only — but they also see the
+        names, photographs and availability of the rest of that child&apos;s
+        squad, which is what makes a team sheet work. Nobody can see another
+        family&apos;s phone number, email address or account. Player
+        photographs are stored privately and are never publicly readable.
       </P>
 
       <H2>Where it is stored</H2>
