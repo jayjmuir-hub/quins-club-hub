@@ -128,6 +128,29 @@ export function eventTitle(event) {
 }
 
 /**
+ * The eyebrow above the dashboard hero: "Next fixture", "Next training",
+ * "Next social" or "Next up".
+ *
+ * ⚠️ THIS EXISTS BECAUSE THE HERO LIED. The hero picks the next MATCH and
+ * falls back to the next event of any type when there is no match coming —
+ * a deliberate design, so the screen is never empty out of season. But the
+ * eyebrow was the hardcoded string "Next fixture", so a training session
+ * appeared under a heading calling it a fixture. Spotted by Jay on 6 Aug
+ * 2026, on the live dashboard, where the only upcoming event in the whole
+ * club was a training session.
+ *
+ * "Fixture" is not a loose synonym for "event" in rugby — it means a match
+ * against another side, which is exactly the thing a parent is checking for.
+ */
+export function nextEventLabel(event) {
+  if (event?.type === 'match') return 'Next fixture'
+  if (event?.type === 'training') return 'Next training'
+  if (event?.type === 'social') return 'Next social'
+  // Unknown or missing type: say something true rather than guess.
+  return 'Next up'
+}
+
+/**
  * Parses a timestamptz string into a Date, or null if it's missing or
  * unparseable — callers render a dash rather than "Invalid Date".
  */

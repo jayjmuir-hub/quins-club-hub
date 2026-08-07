@@ -345,6 +345,31 @@ describe('Dashboard — next fixture hero', () => {
     expect(within(countdown).getByTestId('countdown-minutes')).toHaveTextContent('0')
   })
 
+  it('does not call a training session a fixture', async () => {
+    // ⚠️ FOUND ON PRODUCTION by Jay, 6 Aug 2026. The hero prefers the next
+    // MATCH and falls back to any event when none is coming — correct — but
+    // the eyebrow was the hardcoded string "Next fixture", so the club's only
+    // upcoming event, a training session, was announced as a fixture.
+    // "Fixture" means a match against another side; it is not a synonym for
+    // "event", and a fixture is exactly what a parent scans for.
+    listEventsMock.mockResolvedValue([SOONER_TRAINING])
+
+    renderDashboard()
+    const hero = await screen.findByTestId('next-fixture')
+
+    expect(hero).toHaveTextContent(/next training/i)
+    expect(hero).not.toHaveTextContent(/next fixture/i)
+  })
+
+  it('still calls a real match a fixture', async () => {
+    // The injected fault for the test above: relabelling everything to
+    // "Next up" would pass it while losing the word that matters.
+    listEventsMock.mockResolvedValue([NEXT_MATCH])
+
+    renderDashboard()
+    expect(await screen.findByTestId('next-fixture')).toHaveTextContent(/next fixture/i)
+  })
+
   it('falls back to the next event of any type when no match is upcoming', async () => {
     listEventsMock.mockResolvedValue([SOONER_TRAINING, LAST_RESULT])
 

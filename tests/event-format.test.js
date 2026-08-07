@@ -11,6 +11,7 @@ import {
   formatLongDate,
   formatTime,
   hasResult,
+  nextEventLabel,
   resultLabel,
   resultOutcome,
   resultScore,
@@ -89,6 +90,42 @@ describe('resultOutcome / resultLabel / resultScore', () => {
 
   it('formats the score with an en dash, matching the prototype', () => {
     expect(resultScore(scored(31, 19))).toBe('31–19')
+  })
+})
+
+describe('nextEventLabel', () => {
+  // ⚠️ The bug this fixes: the dashboard hero picks the next MATCH and falls
+  // back to any event when none is coming — but the eyebrow was hardcoded
+  // "Next fixture", so a training session announced itself as a fixture.
+  // Found live, where the club's only upcoming event was training.
+  it('calls a match a fixture', () => {
+    expect(nextEventLabel({ type: 'match' })).toBe('Next fixture')
+  })
+
+  it('does NOT call a training session a fixture', () => {
+    expect(nextEventLabel({ type: 'training' })).toBe('Next training')
+    expect(nextEventLabel({ type: 'training' })).not.toMatch(/fixture/i)
+  })
+
+  it('does NOT call a social a fixture', () => {
+    expect(nextEventLabel({ type: 'social' })).toBe('Next social')
+    expect(nextEventLabel({ type: 'social' })).not.toMatch(/fixture/i)
+  })
+
+  it.each([[undefined], [null], [{}], [{ type: 'unknown' }]])(
+    'says something true rather than guessing for %s',
+    (event) => {
+      const label = nextEventLabel(event)
+      expect(label).toBe('Next up')
+      expect(label).not.toMatch(/fixture|training|social/i)
+    },
+  )
+
+  it('only ever says "fixture" for a match', () => {
+    // The whole point, stated as one assertion.
+    const saysFixture = ['match', 'training', 'social', 'unknown', undefined]
+      .filter((type) => /fixture/i.test(nextEventLabel({ type })))
+    expect(saysFixture).toEqual(['match'])
   })
 })
 

@@ -18,6 +18,7 @@ import {
   formatLongDate,
   formatTime,
   hasResult,
+  nextEventLabel,
   sortByStart,
   venueLine,
 } from '../lib/eventFormat.js'
@@ -187,8 +188,13 @@ function NextFixtureHero({ event, teamName, now }) {
       data-testid="next-fixture"
       className="harlequin relative mb-4 overflow-hidden rounded-card bg-hero-grad p-[18px] text-white shadow-card"
     >
+      {/* ⚠️ Reflects the event's TYPE. This was hardcoded "Next fixture",
+          which made a training session announce itself as a fixture whenever
+          no match was coming — and the fallback to any event type is
+          deliberate, so that is the normal out-of-season state, not a rare
+          one. See nextEventLabel in src/lib/eventFormat.js. */}
       <div className="relative z-10 font-condensed text-[14px] font-bold uppercase tracking-[0.18em] opacity-95">
-        Next fixture{teamName ? ` · ${teamName}` : ''}
+        {nextEventLabel(event)}{teamName ? ` · ${teamName}` : ''}
       </div>
 
       {/* Anton. This is the page's opening statement and the one piece of type
