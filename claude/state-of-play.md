@@ -31,7 +31,7 @@ Current phase is post-v1 refinement: usability work driven by Jay using the app,
 new infrastructure.
 
 ⚠️ **No test count here, and none anywhere else either.** Previous editions carried
-944, 978, 1057 and 1157 and every one rotted within days; a bare "55 test files" was
+944, 978, 1057 and 1157 and every one rotted within days; a bare "55 test files" was <!-- count-ok -->
 sitting directly above this warning until 7 Aug, contradicting it. **Run `npm test`.**
 
 ⚠️ **`npm install` needs `--include=dev` on both PCs** — the reason, and the rest of
@@ -143,8 +143,11 @@ the rows back.**
 - A parent has never signed out in a real browser, and the phone-width note has never
   been rendered. The RLS-refusal path is still mock-only for both events features.
 - `saveParents` is delete-then-write, not atomic.
-- Stale docs: `claude/runbooks/e2e-roles.md`, `deploy.md` and `first-admin.md` still
-  mention Wild Apricot. The real plan is integration with the club's new AWS site.
+- ✅ **Stale runbooks FIXED 7 Aug.** `deploy.md`, `e2e-roles.md` and `first-admin.md`
+  described a world with no roster data and a club site the app had to work around.
+  All three now carry a status banner and corrected sections. The integration target
+  is the club's new AWS site — `claude/plans/2026-08-03-future-aws-migration.md`.
+  ⚠️ **`npm run docs:check` now fails the build if that terminology comes back.**
 - Single-club assumption in `clubId` derivation, `is_admin_anywhere()` and
   `can_admin_see_pending()` — revisit together if a second club ever appears.
 - ⚠️ **`private.sync_profile_name` has a mutable `search_path`** — the one security
@@ -166,10 +169,10 @@ the rows back.**
   in the repo, and `src/screens/EventForm.jsx` writes the column it adds. **The 6 Aug
   edition of this file carried this warning; the 7 Aug rewrite dropped it and the
   audit put it back.** Detail in `claude/schema-history.md`.
-- ⚠️ **`claude/changelog.md` stops at 4 Aug** while `CLAUDE.md` advertises it as "what
-  changed, when". The domain move, Resend, the session guard, the theme work and
-  gender are all missing — three days of shipped work. Backfill it from `git log` or
-  drop the claim; do not leave it half-true.
+- ✅ **`claude/changelog.md` backfilled 7 Aug** and now enforced: `npm run docs:check`
+  fails if a commit is missing or cites a SHA that is not a commit. ⚠️ **The changelog
+  is allowed to be exactly one commit behind** — a commit cannot cite its own SHA — so
+  the NEXT commit must always catch it up.
 
 ## Checked and genuinely fine — do not "fix" these
 

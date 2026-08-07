@@ -8,14 +8,20 @@
 > checklist are all still fully valid — re-run this doc as-is once the flag is flipped back.
 
 This is the checklist to run once real `admin` / `coach` / `parent` (and, where the club treats
-them separately, `player`) accounts actually exist — after the Task 19 first-admin bootstrap step
-and the Task 18 invite flow have been used to create them. There is no seeded real membership
-data in this build (the Wild Apricot import is a separate, later, out-of-scope step per
-`RESTORE.md`), so this checklist was written and grounded against three things instead of a live
-run of it end-to-end: the actual RLS policies (verified live against the Supabase project by
-Tasks 16/21, cited below), the actual client-side scoping helpers (`src/lib/scope.js`), and the
-actual UI behaviour exercised by the existing test suite (535 unit tests) plus this task's own
-browser verification (`claude/specs/accessibility.md` §2 for the keyboard/focus side of things).
+them separately, `player`) accounts actually exist.
+
+⚠️ **When this was written there was no roster data at all. There is now** — the club roster
+is loaded, and parents self-onboard by roster match rather than by invite (see
+`claude/decisions/2026-08-06-roster-auto-onboarding.md`). The membership rows are still
+thin, so **check `claude/state-of-play.md` for what actually exists before assuming a role
+is available to test with.** ⚠️ It also records one account holding an admin membership it
+was probably never meant to have, which invalidates any "a coach cannot see X" test run
+with it.
+
+**This checklist was never run end to end.** It was grounded against three things instead:
+the actual RLS policies (verified live against the Supabase project), the client-side
+scoping helpers (`src/lib/scope.js`), and the UI behaviour exercised by the test suite plus
+a browser pass (`claude/specs/accessibility.md` §2 for keyboard and focus).
 
 Every item below is written as a concrete, falsifiable step — do this, then you should see
 exactly that, not a vague goal — so it's obvious the moment something doesn't match.
@@ -155,8 +161,9 @@ the club's real usage ever needs the two to diverge in the future — today, the
 - It assumes the accounts above already exist — creating them (magic-link/OAuth sign-in, the
   first-admin SQL step, sending/accepting invites) is covered by `claude/runbooks/first-admin.md` and the
   Task 18 invite flow's own in-app UI, not repeated here.
-- It does not include a Wild Apricot data-import verification pass — that's a separate, later,
-  out-of-scope step per `RESTORE.md`.
+- It does not include a roster data-import verification pass. ⚠️ **The roster has since been
+  imported** — `src/screens/PlayerImport.jsx` exists and the tables are populated. Counts and
+  per-squad gaps live in `claude/state-of-play.md`, not here.
 - Contact-detail visibility for **admin** specifically (sees everyone's) vs **coach** (sees only
   their own team's, via the `can_edit_team` clause) vs **parent/player** (sees only their own
   child's/themselves, via `is_own_player`) is the full picture of `player_contacts`' RLS as

@@ -1,5 +1,8 @@
 # Plan: future AWS migration
 
+**STATUS: NOT SHIPPED — future work.** Nothing here is built. The club's new AWS
+site is the integration target; this is the thinking, not a commitment.
+
 *Moved out of `RESTORE.md` on 7 Aug 2026. `RESTORE.md` is what is TRUE about
 the codebase; a future plan is not that. Content below is unchanged.*
 

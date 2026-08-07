@@ -169,3 +169,30 @@ nowhere near the cause. **This paragraph is the single home for that fact**;
 **Stack:** Vite + React, Tailwind, Supabase (Postgres 17, ref
 `lusmshimxdcxpnrktlgz`), Netlify (project `quins-club-hub`). `npm test` is
 vitest; `npm run build` is the production build.
+
+## ⚠️ `npm run docs:check` — the rules that can fail a build
+
+**Run it before committing anything under `claude/`, and after editing this
+file.** `scripts/docs-check.mjs`, no dependencies, also runs in GitHub
+Actions on every push. It enforces six things that were previously enforced
+by whoever remembered:
+
+1. **Every `claude/…`, `src/…`, `db/…` path named in a doc resolves.**
+   A line saying `(project)` is exempt — some docs deliberately live in the
+   Claude project because this repo is public.
+2. **Every changelog SHA is a real commit, and no commit is missing.**
+   ⚠️ **The changelog may be exactly one commit behind** — a commit cannot
+   cite its own SHA — so the next commit must catch it up.
+3. **No test counts** in `CLAUDE.md`, `RESTORE.md`, `state-of-play.md`,
+   `schema-history.md`, the runbooks or the specs. Every count ever written
+   into these rotted within days. Mark a line `<!-- count-ok -->` to exempt.
+4. **No `git add -A` in a runnable example** — rule 1, which `RESTORE.md`'s
+   own push example broke until 7 Aug 2026.
+5. **Every file in `claude/plans/` states whether it shipped.**
+6. **No retired terminology** creeping back. Mark `<!-- stale-ok -->` when a
+   line is deliberately retiring the term.
+
+**Each check was verified by breaking it on purpose and confirming it fails
+(rule 6 — a check that has never failed is not a check).** `claude/handoffs/`,
+`claude/plans/` and `claude/archive/` are treated as history throughout: they
+describe a moment and are allowed to.

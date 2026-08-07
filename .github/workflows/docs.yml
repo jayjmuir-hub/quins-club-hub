@@ -1,0 +1,37 @@
+name: Docs
+
+# The documentation checks that used to be done by hand, and were therefore
+# done only when someone remembered. See scripts/docs-check.mjs for why each
+# check exists — every one of them corresponds to a real mistake found on
+# 7 Aug 2026.
+#
+# NOTE: this runs on docs-only commits too. `[skip ci]` in a commit message
+# suppresses the NETLIFY build (a deploy), not this workflow — and that is the
+# point, because docs-only commits are exactly the ones this checks.
+
+on:
+  push:
+    branches: [build/v1-mvp]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # REQUIRED. The changelog coverage check walks history back to a
+          # baseline commit; a shallow clone cannot see it and the check
+          # reports itself as skipped rather than passing silently.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # No `npm ci` on purpose: docs-check has zero dependencies and reads only
+      # the filesystem and `git`. Installing would make a docs check depend on
+      # the lockfile resolving, which is an unrelated way to fail.
+      - name: Check documentation integrity
+        run: node scripts/docs-check.mjs

@@ -10,6 +10,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 7 Aug 2026
 
+- `c3c038b` — One home per machine fact (NODE_ENV was wrong in two of three files),
+  refreshed the Machines table, backfilled this changelog. `[skip ci]`
 - `1f75dae` — Audited `state-of-play.md` against the live database: six claims corrected,
   four gaps added. `[skip ci]`
 - `f6b45bd` — Split `RESTORE.md`; reading order 1,115 → 732 lines. Fixed a `git add -A`

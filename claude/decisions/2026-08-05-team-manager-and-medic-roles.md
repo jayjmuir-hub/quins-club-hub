@@ -138,7 +138,7 @@ been any membership row rather than the role specifically.
 The club currently has **no coach rows at all** — memberships are 2 admin, 2 parent,
 1 player. Nobody holds a squad-staff role of any kind, and new people can only be
 brought in by invite, which needs outbound email. **Auth email is dead** (see
-`claude/handoff-2026-08-05-m365.md`). So Team Manager and Medic are ready and
+`claude/handoffs/2026-08-05-m365.md`). So Team Manager and Medic are ready and
 correct, and unusable by anyone new until that is fixed.
 
 An admin can still grant either role to someone who **already has an account**, from

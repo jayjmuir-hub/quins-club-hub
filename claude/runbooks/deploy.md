@@ -1,7 +1,20 @@
 # Quins Club Hub — Deploy & domain setup
 
-This is the last piece of the v1 MVP build: exact steps to get the app live for the committee
-trial on `adhjrt.com`, and later at `abudhabiquins.com`. Per this project's own constraint,
+⚠️ **STATUS: THIS DEPLOY HAS HAPPENED.** The app is live at
+**`https://adhquins-clubhub.com`** on Netlify (project `quins-club-hub`, branch
+`build/v1-mvp`, auto-deploy on push). `app.adhjrt.com` is a working alias, deliberately
+kept. **Read this as the record of how it was set up and what each setting means — not
+as a checklist to run.** Current deploy state is in `claude/state-of-play.md`.
+
+⚠️ **The `abudhabiquins.com` end-state below was superseded.** The club's own site moved
+on, and the integration target is now the club's new AWS site — see
+`claude/plans/2026-08-03-future-aws-migration.md`. Sections 2 and 5 have been corrected;
+the rest still describes what was actually done.
+
+---
+
+This was the last piece of the v1 MVP build: exact steps to get the app live for the committee
+trial on `adhjrt.com`. Per this project's own constraint,
 Claude designs and writes exact instructions; **Jay does the account setup, DNS changes, and the
 actual "Deploy" clicks** — none of that can be done from this build session. Each step below
 states plainly which side it's on.
@@ -39,14 +52,15 @@ it's still project configuration tied to your Supabase account).
 
 ## 2. Static hosting — Netlify (or Vercel/Cloudflare Pages/your existing host)
 
-`RESTORE.md`'s locked-in plan names Netlify, Vercel, or Cloudflare Pages (any free tier is large
-enough for this app), or Jay's own existing web host if it accepts a plain file upload —
-`abudhabiquins.com` itself runs on Wild Apricot, which does **not** fit that description (Wild
-Apricot doesn't host arbitrary static site builds), so the trial goes on `adhjrt.com`, a domain
-Jay separately owns, on one of the free static hosts. These instructions use Netlify as the
-concrete example since it's the simplest "connect a GitHub repo, get a URL" path for this kind of
-app, but the same three build settings (build command, publish directory, environment variables)
-apply verbatim to Vercel or Cloudflare Pages if Jay prefers either of those instead.
+**Netlify was chosen and is what runs today** — project `quins-club-hub`, connected to the
+GitHub repo, building `build/v1-mvp` on push. Vercel and Cloudflare Pages were the
+alternatives and would have taken the same three build settings (build command, publish
+directory, environment variables) verbatim; nothing below is Netlify-specific except the
+dashboard wording.
+
+⚠️ **This section used to explain why the club's own site could not host the app.** That
+reasoning is obsolete — the app has its own domain, `adhquins-clubhub.com`, and the club
+site is a separate concern. Do not reintroduce a dependency on it.
 
 **Jay's steps (Netlify example):**
 
@@ -154,10 +168,12 @@ this is purely a re-pointing exercise, not a rebuild or a data migration:
 
 **Jay's steps:**
 
-1. Repeat §3's DNS + host "custom domain" steps for the new domain/subdomain instead of
-   `adhjrt.com` (`abudhabiquins.com` itself runs on Wild Apricot, so this almost certainly means a
-   subdomain like `app.abudhabiquins.com`, with Wild Apricot's own DNS management used to add the
-   CNAME, rather than moving the whole domain's hosting).
+1. Repeat §3's DNS + host "custom domain" steps for the new domain or subdomain.
+   ⚠️ **What actually happened instead:** the app moved to its own domain,
+   `adhquins-clubhub.com`, on 5 Aug 2026 — see `claude/decisions/2026-08-05-domain-move.md`.
+   ⚠️ **`CALENDAR_ORIGIN` in `src/data/calendar.js` is hard-coded to that origin and a
+   subscribed calendar URL cannot be changed remotely once a parent holds one**, so any
+   future move is additive (keep the old host answering) and never a swap.
 2. Repeat §4's Supabase step: update `Site URL` to the new domain, add it to `Redirect URLs`
    (there's no need to remove the old `adhjrt.com` entry immediately — leaving both live for a
    short overlap period is harmless and avoids breaking sign-in for anyone who still has an old
@@ -177,7 +193,7 @@ this is purely a re-pointing exercise, not a rebuild or a data migration:
 | Connecting the GitHub repo to the host | **Jay** (repo is already public and ready) |
 | Pasting the two environment variable values | **Jay** (values provided in §1 above) |
 | Build command / publish directory | **Already correct in this repo** — `npm run build` / `dist`, nothing to change |
-| DNS record changes (`adhjrt.com`, later `abudhabiquins.com`/Wild Apricot) | **Jay** |
+| DNS record changes (`adhquins-clubhub.com`, and the `adhjrt.com` alias) | **Jay** |
 | Clicking "Deploy" / adding a custom domain in the host's dashboard | **Jay** |
 | Supabase Authentication → URL Configuration changes | **Jay** (exact values provided in §4 above) |
 | Everything else (app code, database schema, RLS, this documentation) | **Claude**, already done |

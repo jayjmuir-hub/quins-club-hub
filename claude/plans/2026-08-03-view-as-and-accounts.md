@@ -1,5 +1,10 @@
 # Implementation plan — view-as switcher + admin Accounts screen
 
+**STATUS: SHIPPED.** `src/components/ViewAsSwitcher.jsx` and
+`src/screens/Accounts.jsx`. ⚠️ **The code is authoritative — this plan is why, not
+what.** See also the two View-As rulings at the top of `RESTORE.md`: the switcher
+is a cosmetic preview, never a security boundary.
+
 Spec: `claude/specs/2026-08-03-view-as-and-accounts-design.md`
 
 Two independent tracks. A (1→2) is the view-as switcher; B (3→4) is Accounts.

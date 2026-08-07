@@ -179,7 +179,7 @@ rather than show fourteen blank cells.
 
 ## Parked by Jay, raise only if asked
 
-- **Google Play release** — plan in `claude/plan-google-play-release.md`.
+- **Google Play release** — plan in `claude/plans/2026-08-06-google-play-release.md`.
   "Bring it back up when I specifically ask." Blockers recorded there: the
   12-testers/14-day rule for personal accounts, and that a Play reviewer
   cannot sign in (magic-link only; Google requires "reusable login

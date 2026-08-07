@@ -1,5 +1,10 @@
 # Club Overview Dashboard Implementation Plan
 
+**STATUS: SHIPPED.** The dashboard is `src/screens/Dashboard.jsx`, later joined by
+`AdminDashboard.jsx`. ⚠️ **The code is authoritative — this plan is why, not what.**
+File names here (`src/screens/Overview.jsx`, `tests/overview.test.jsx`) were the
+intended ones and are NOT what shipped; do not go looking for them.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give admins, coaches, and age-group managers a new desktop-only "Overview" screen showing, across every team they're allowed to see: upcoming fixtures, RSVP status per fixture, and roster gaps.

@@ -82,7 +82,7 @@ assigning a pitch. **Nothing was built for it.**
 
 Still open, and purely cosmetic: whether the word "Manager" should appear in the UI
 for those people. That would mean a display-only label, not a `ROLE_PRECEDENCE`
-entry. See also `claude/plan-admin-dashboard.md` § "Why 'organizer' was dropped".
+entry. See also `claude/plans/2026-08-05-admin-dashboard.md` § "Why 'organizer' was dropped".
 
 ## Schema
 

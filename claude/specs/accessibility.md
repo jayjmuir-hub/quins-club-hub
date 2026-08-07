@@ -33,8 +33,8 @@ each entry states which threshold applies and whether it's already-existing docu
 | white/85% | header/hero gradient's `quinsRed` end | 4.63:1 | 4.5:1 (normal) | **Pass** | `src/screens/EventDetail.jsx:286-287` |
 | white/70% | header/hero gradient's `quinsRed` end | 3.55:1 | 4.5:1 (normal) | **Fail** (not shipped — comment records why it was rejected in favour of 85%) | `src/screens/EventDetail.jsx:288-289` |
 | `quinsGreen` `#7DC351` as **text** | white | ~1.9:1 | any text threshold | **Fail outright** — never used as text/foreground anywhere in the codebase, only as a gradient/block-fill background colour | `src/components/Chip.jsx:8-9` |
-| `#c9861a` (warn/amber) | `#fbf1dd` | ~2.71:1 | 3:1 (non-text minimum) | **Fail** | `src/components/Chip.jsx:22-23`, `src/components/Badge.jsx:25`, `src/components/ScopeNote.jsx:33` |
-| `#8a5a12` (darkened warn) | `#fbf1dd` | ~5.3:1 | 4.5:1 (normal) | **Pass** — the actual shipped foreground wherever the warn/amber background is used with text | `src/components/Chip.jsx:24`, `src/components/Badge.jsx:26`, `src/components/ScopeNote.jsx:37` |
+| `#c9861a` (warn/amber) | `#fbf1dd` | ~2.71:1 | 3:1 (non-text minimum) | **Fail** | `src/components/Chip.jsx:22-23`, `src/components/Badge.jsx:25` (also `ScopeNote.jsx`, since removed) |
+| `#8a5a12` (darkened warn) | `#fbf1dd` | ~5.3:1 | 4.5:1 (normal) | **Pass** — the actual shipped foreground wherever the warn/amber background is used with text | `src/components/Chip.jsx:24`, `src/components/Badge.jsx:26` (also `ScopeNote.jsx`, since removed) |
 | `--good` `#2F9E4F` | `--good-bg` `#e7f6ea` | 3.06:1 | 4.5:1 (normal) | **Fail** | `src/components/Chip.jsx:43` |
 | `--sky-deep` (win chip's actual foreground) | `--good-bg` | ~4.6:1 | 4.5:1 (normal) | **Pass** — the shipped pairing | `src/components/Chip.jsx:44-45` |
 | `--bad` `#d1483b` | `--bad-bg` `#fbeae8` | 3.84:1 | 4.5:1 (normal) | **Fail** | `src/components/Chip.jsx:46` |
@@ -202,7 +202,7 @@ harness files (`dev-harness.html`/`dev-harness.jsx`) were deleted before this wo
   fails AA and is never fixed to pass on its own — it's used only for a border/icon-adjacent
   decorative accent, never as the sole conveyor of meaning, with the actual foreground text
   always swapped to the darkened `#8a5a12` (~5.3:1) wherever text renders on that background.
-  Confirmed by reading `Badge.jsx`'s and `ScopeNote.jsx`'s own comments — this is a pre-existing,
+  Confirmed by reading `Badge.jsx`'s and the since-removed `ScopeNote.jsx`'s own comments — this is a pre-existing,
   already-adjudicated tradeoff, restated here rather than re-litigated.
 - **Colour-as-sole-differentiator** (chip colours for match/training/social, win/loss/draw) is
   always paired with the label text itself, so this is the same "minor/acceptable, not a hard

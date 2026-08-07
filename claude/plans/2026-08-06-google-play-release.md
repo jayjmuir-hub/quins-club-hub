@@ -1,5 +1,8 @@
 # Getting Quins Club Hub onto the Google Play Store
 
+**STATUS: NOT SHIPPED — planned.** No release has been made. The PWA reinstall
+note in `claude/state-of-play.md` is a prerequisite.
+
 Written 6 Aug 2026. Decisions taken this session: **personal** developer
 account, **TWA** packaging.
 

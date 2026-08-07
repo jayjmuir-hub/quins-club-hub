@@ -111,9 +111,11 @@ normal, RLS-gated path. Confirm that part by using the app itself, not more SQL:
    - An **"Invite a member"** button (Task 18) — this is now your normal path for adding every
      coach, parent, and player from here on; you never need to touch this SQL Editor again for
      that.
-5. Go to **Schedule** and **Roster** — both should show content across all 15 age groups (or an
-   empty state, since there's no real fixture/player data seeded yet — that's expected until
-   the Wild Apricot import happens), not the "no memberships yet" message.
+5. Go to **Schedule** and **Roster** — both should show content across all 15 age groups, not
+   the "no memberships yet" message. ⚠️ **When this was written there was no player data and
+   an empty state was the expected result. The roster has since been imported**, so an admin
+   should now see real players; an empty Roster is a symptom, not the expected state. One
+   squad genuinely is empty — `claude/state-of-play.md` says which.
 
 If any of the above still shows "not authorised" or "not linked to a squad yet" after a refresh,
 double-check Step 1's `profile_id` was pasted correctly (a stray missing character or an extra

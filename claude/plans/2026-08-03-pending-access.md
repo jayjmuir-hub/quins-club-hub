@@ -1,5 +1,8 @@
 # Plan — pending access requests + first-login name prompt
 
+**STATUS: SHIPPED.** `src/components/RequestAccess.jsx` plus the `access_requests`
+migration. ⚠️ **The code is authoritative — this plan is why, not what.**
+
 Follows on from `2026-08-03-view-as-and-accounts.md`. Raised when Jay signed up
 with a second email and found the account nowhere in the app.
 

@@ -1,5 +1,10 @@
 # Plan: repeating events
 
+**STATUS: SHIPPED** in `562b92c` — `src/screens/EventForm.jsx` stamps one
+`series_id` across the generated rows. ⚠️ **The code is authoritative.** Note the
+gap recorded in `claude/state-of-play.md`: there is still no way to edit or cancel
+a whole series.
+
 *Agreed with Jay 5 Aug 2026. NOT STARTED — build this at the start of a fresh session.*
 
 ## The problem

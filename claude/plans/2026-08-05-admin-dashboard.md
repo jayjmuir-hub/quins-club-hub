@@ -1,5 +1,8 @@
 # Plan: back-end dashboard for admins
 
+**STATUS: SHIPPED** in `2e26d35` — `src/screens/AdminDashboard.jsx` and
+`AdminClub.jsx`. ⚠️ **The code is authoritative — this plan is why, not what.**
+
 Agreed with Jay 5 Aug 2026. **BUILT AND SHIPPED 5 Aug 2026 — commit `2e26d35` on
 `build/v1-mvp`.** All six build steps done, all eight tests written and proved against an
 injected fault. 978/978 passing, build clean. See "What shipped" at the bottom for the two

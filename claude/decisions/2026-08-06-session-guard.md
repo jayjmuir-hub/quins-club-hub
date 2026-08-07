@@ -1,7 +1,7 @@
 # Decision — the session guard (6 Aug 2026)
 
 **Commit `c80f51e` on `build/v1-mvp`.** Closes §1 of
-`claude/handoff-2026-08-06-roster-onboarding.md` — "why did the request arrive
+`claude/handoffs/2026-08-06-roster-onboarding.md` — "why did the request arrive
 as `anon`".
 
 ---

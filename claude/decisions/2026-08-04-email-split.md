@@ -2,7 +2,7 @@
 
 **Date:** 4 August 2026 · **Status:** decided by Jay
 **Supersedes:** the "OPEN DECISION — sending provider" section of
-`claude/handoff-2026-08-04-email-domain.md`
+`claude/handoffs/2026-08-04-email-domain.md`
 
 > ⚠️ **This document was rewritten twice on the day it was written.** An earlier version
 > recommended a split — M365 for mailboxes, Resend for the app. That recommendation was
