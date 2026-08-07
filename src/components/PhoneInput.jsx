@@ -70,7 +70,15 @@ export default function PhoneInput({
             // pair, but a screen-reader user tabbing onto the select needs to
             // know this one picks a country.
             aria-label={`${label} country`}
-            className={`${CONTROL_BASE} w-[124px] appearance-none border-line py-[11px] pl-11 pr-2 font-semibold`}
+            // ⚠️ text-transparent IS THE FIX, NOT A FLOURISH. `appearance-none`
+            // removes the dropdown arrow but NOT the selected option's text, so
+            // the control was painting its own "+971 United Arab Emirates"
+            // underneath the overlay span below, which paints "+971" as well.
+            // At 124px the two collided and read "+971+971" — obvious on a
+            // phone, present at every width. Hiding the select's own text and
+            // keeping the overlay gives the tidy "+971" the overlay was added
+            // for in the first place.
+            className={`${CONTROL_BASE} w-[124px] appearance-none border-line py-[11px] pl-11 pr-2 font-semibold text-transparent`}
             value={country}
             disabled={disabled}
             onChange={(event) => onCountryChange?.(event.target.value)}
@@ -79,14 +87,25 @@ export default function PhoneInput({
               // The option text carries the dial code so the closed select
               // reads "+971" and the open list stays searchable by name —
               // typing "uni" jumps to United Arab Emirates natively.
-              <option key={c.code} value={c.code}>
+              // ⚠️ text-ink is REQUIRED, not inherited styling. The select is
+              // text-transparent to hide its collapsed value; on desktop
+              // Firefox and some Chromium builds an <option> inherits the
+              // select's colour, which would render all 245 countries
+              // invisible in the open list. Stating it here cannot be
+              // inherited away.
+              <option key={c.code} value={c.code} className="text-ink">
                 +{c.dial} {c.name}
               </option>
             ))}
           </select>
           {/* Shown over the select so the collapsed control reads as a tidy
-              "+971" rather than the full country name, which would truncate. */}
-          <span className="pointer-events-none absolute right-2.5 text-[15px] font-bold text-ink">
+              "+971" rather than the full country name, which would truncate.
+
+              left-11 matches the select's own pl-11, so the dial code sits
+              exactly where the hidden text would have started — directly after
+              the flag. It was right-2.5, which put it hard against the right
+              edge with a gap in the middle once the select's text was hidden. */}
+          <span className="pointer-events-none absolute left-11 text-[15px] font-bold text-ink">
             {dial ? `+${dial}` : ''}
           </span>
         </div>
