@@ -1,39 +1,28 @@
-# Quins Club Hub — resume here
+# Quins Club Hub — what is TRUE about this codebase
 
-**Single source of truth: https://github.com/jayjmuir-hub/quins-club-hub (public).**
-Branch `build/v1-mvp` is the live work. `main` holds only the initial scaffold commit.
+**This file is the DURABLE half.** How the code actually behaves, the rulings that
+cost real effort to discover, and the schema history. It should not need editing
+because a status changed.
 
-**v1 MVP (22 of 22 tasks) complete and live at `app.adhjrt.com`. Post-v1 refinement is
-underway** (desktop-focused work: bulk player import, roster/schedule tables, theme/brand
-update, and — as of 3 Aug 2026 — the Club Overview Dashboard, the admin **Accounts**
-screen, the **view-as preview** switcher, the **"Waiting for access"** section for
-people who sign up without an invite, and the first-login name prompt. See the plans
-under `claude/plans/2026-08-03-*` and the ledgers under `.superpowers/sdd/`).
-**940 tests passing, build clean** on `build/v1-mvp` (4 Aug 2026). Multiple age groups/children per person (incl. parents with 3-5 kids) landed 3 Aug — see `.superpowers/sdd/multi-access/progress.md`.
+⚠️ **STATUS DOES NOT LIVE HERE.** Where things stand today — what is shipped, what is
+blocked, test counts, which domain is live, which clone is behind — is
+`claude/state-of-play.md`. This file previously carried all of that and went badly
+stale: on 7 Aug 2026 it was still announcing a domain move that had completed two days
+earlier, a test count four revisions old, and **"DO NOT INVITE THE COMMITTEE"** over an
+email blocker that no longer existed. Because `CLAUDE.md` ranks this file ABOVE
+`state-of-play.md`, the most authoritative document was the most wrong one.
 
-**Shipped 4 Aug 2026 — calendar subscription feed.** `calendar_tokens`, three RPCs, and a
-`calendar` Edge Function serving iCalendar. See "Migration `calendar_feed`" below.
+**If you are about to write a date, a count, a deploy id or a "currently" into this
+file — it belongs in `state-of-play.md` instead.**
 
-**Shipped 4 Aug 2026 — self-service profile editing.** Parents and players maintain their own
-photo, contact row and parent rows. See "Migration `self_service_profile`" — and read the
-column-vs-row note there before touching it.
+Reading order and precedence are in `CLAUDE.md`. Single source of truth for the code is
+https://github.com/jayjmuir-hub/quins-club-hub (public). Branch `build/v1-mvp` is the
+live work; `main` holds only the initial scaffold commit.
 
-**Shipped 4 Aug 2026 — the scope banner is gone** from every screen for every role, and the
-player sheet leads with a large photo. Nothing about permissions changed.
+---
 
-**Shipped 4 Aug 2026 — the signup approval gate.** `access_requests` + the
-`RequestAccess` screen + dismiss/restore on the Accounts screen. See "Migration
-`access_requests`" below, and read the finding in it before anyone suggests "just turn
-signup off" again.
+## Two rulings worth reading before touching auth or roles
 
-**Shipped 4 Aug 2026 — player parents, head-shot photos, phone country picker**
-(`b980ace` + `ae45aac`, 25 files, +3,090/−116). Live and verified on `app.adhjrt.com`.
-New `player_parents` table, `players.photo_path`, private `player-photos` storage bucket.
-See "Migration `player_parents` + head-shot photos" below for the schema, the RLS shape and
-the product rulings Jay locked in — those rulings are fixed decisions, not defaults to
-re-litigate.
-
-### Two rulings from 3 Aug 2026 worth reading before touching auth or roles
 
 1. **"View as" is a cosmetic preview, not a security boundary.** RLS scopes on the real
    `auth.uid()`, so an admin previewing as a coach still *receives* club-wide rows — the
@@ -45,6 +34,9 @@ re-litigate.
    `memberships`.** Previewing as a parent makes `isAdmin(memberships)` false. If the
    exit control were gated on the effective set, the admin could only escape by clearing
    localStorage. This is the single highest-risk line in that feature.
+
+---
+
 
 ---
 
@@ -169,19 +161,11 @@ started it.**
 
 ---
 
-## What's built
 
-| Phase | Tasks | State |
-|---|---|---|
-| **A — Scaffold** | 1 scaffold, 2 Supabase client | done |
-| **B — Auth & scope** | 3+4 auth context, 5 login screen, 6 auth gate + router, 7 scope helpers | done |
-| **C — Shell & design system** | 8 app shell + nav, 9 shared UI primitives | done |
-| **D — Read features** | 10 data-access, 11 schedule, 12 roster, 13 dashboard | done |
-| **E — Write features** | 14 event form, 15 player form, 16 availability RSVPs | done |
-| **F — Admin** | 17 admin overview, 18 invite flow, 19 first-admin doc | done |
-| **G — Release** | 20 PWA, 21 RLS hardening, 22 E2E + a11y + deploy docs | done — **all 22 tasks complete** |
+---
 
-Every completed task passed a spec-compliance and code-quality review; several needed fix
+## Toolchain — locked in
+
 rounds, all closed by a scoped re-review. The ledger at
 `.superpowers/sdd/quins-v1-mvp/progress.md` records every ruling, fix round and deferred
 minor, and it is committed to this repo — a resuming session gets it from the clone.
@@ -194,269 +178,285 @@ tests only and never touches the network; `npm run test:integration` runs the
 
 ---
 
-## Deployment status — LIVE
-
-The v1 MVP is deployed and working end to end, not just built:
-
-- **Hosting:** Netlify project `quins-club-hub`, connected to GitHub, branch
-  `build/v1-mvp`, auto-deploys on push.
-- **Domain:** `app.adhjrt.com` (a subdomain of Jay's own `adhjrt.com`, which was already on
-  Netlify DNS, so no manual CNAME was needed). The bare root `adhjrt.com` is a **separate,
-  unrelated** Netlify project (`serene-gingersnap-1d0eb6`, a tournament/registration app) —
-  do not touch that one; this app only owns the `app.` subdomain.
-- **Supabase Auth URL Configuration:** Site URL = `https://app.adhjrt.com`, Redirect URLs =
-  `https://app.adhjrt.com/**` and `https://quins-club-hub.netlify.app/**` (kept as a fallback).
-  Confirmed persisted and correct.
-- **First admin:** Jay signed in via magic link and ran the `claude/runbooks/first-admin.md` SQL himself.
-  Verified live, through the real app (not just the database) — Dashboard loads, role badge
-  reads "Admin", Admin overview lists all 15 age groups, "Invite a member" button present.
-- This trial is on `adhjrt.com` deliberately, per the original plan — committee-only, unlisted
-  URL, not linked from anywhere public yet.
-
-**Strategic change — no Wild Apricot import.** Earlier plans (see `claude/runbooks/e2e-roles.md`,
-`claude/runbooks/deploy.md`, `claude/runbooks/first-admin.md`) assumed real player data would eventually come from a
-Wild Apricot member export off `abudhabiquins.com`. That's no longer the plan: **the club's new
-website is being built separately on AWS**, and Quins Club Hub will integrate with *that* site
-instead once it exists — not with Wild Apricot. Those docs' Wild Apricot mentions are now stale
-and should be revisited when the AWS integration shape is known; nothing has been changed there
-yet as of this note.
-
-**Next phase:** refining app functionality and usability based on real use, not new
-infrastructure work. No further deploy/account-setup steps are currently blocking.
 
 ---
 
-## Future AWS migration — confirmed plan, ~6 months out (as of 3 Aug 2026)
+## How this codebase actually behaves
 
-This is a real, confirmed end goal, not speculation — capturing it so no future session forgets
-or has to re-derive it from scratch.
+Things that are true, non-obvious, and have already cost someone an hour. Every entry is
+something a session discovered by hitting it.
 
-**The plan, in two phases, both explicitly agreed with Jay:**
+**The roster is TWO components.** Cards on mobile (`data-testid="player-row"`), a table on
+desktop (`data-testid="roster-table-row"`). BOTH are in the DOM at every width with one
+CSS-hidden — so a selector matching both picks the hidden one and the click silently does
+nothing. On desktop the row click edits position/age group/captain IN PLACE; the detail
+sheet opens from a separate **"Open"** button in the last column.
 
-1. **Now → next ~6 months:** stay exactly on the current stack (Supabase + Netlify). Get the
-   app fully functional within ~2 weeks of this note, then keep refining functionality/
-   usability based on real committee/season use. This is the active phase — treat it as the
-   priority, not the migration below.
-2. **~6 months out:** full migration to a backend entirely on AWS, run by the developer
-   building the club's new main website. This was deliberately chosen as **Option C** (full
-   backend rebuild, not just a hosting swap) out of three options discussed — the reasoning
-   Jay gave: the new site's dev wants to manage everything under one AWS setup, and the new
-   site is already building its own parent/player registration logins — so a single unified
-   identity + backend is the real goal, not just "an AWS address."
+**`PhoneInput` takes `country` + `national` + `onCountryChange` + `onNationalChange`** —
+not `value`/`onChange`. Phones are stored E.164 and split for editing with
+`splitPhone`/`joinPhone` (`src/lib/phone.js`). Formatting is deliberately NOT applied
+as-you-type; that reintroduced a caret-jump bug.
 
-**What Option C actually requires when that migration happens (do not underestimate this):**
-Supabase isn't just a database — it bundles Postgres, Auth, Row-Level Security enforcement, and
-Realtime. AWS has no drop-in equivalent for RLS specifically; "who can see/edit what" (14
-policies, currently enforced *by the database itself*, hardened in Task 21) would have to be
-rewritten as application-layer authorization code (Lambda/API Gateway or similar) against
-RDS/Cognito. This is a genuine second build project, comparable in scope to the original
-22-task plan for this app — not a config change, and not something to attempt casually or
-early. Scope it properly with the AWS dev once their stack is real, rather than guessing now.
+**The test suite needs `.env`, which is gitignored.** A fresh clone fails with "Missing
+required Supabase env var(s)" until you create it — values in "Start a session" above.
+Delete it before committing.
 
-**A cheaper alternative was raised and explicitly rejected in favour of full migration:**
-Supabase Auth supports federating with an external OIDC provider (e.g. Cognito), which would
-give one login across both systems without a backend rewrite. Worth knowing this exists as a
-fallback if the full AWS migration ever stalls or timelines slip — it's a real, much smaller
-project that solves the "two logins" problem on its own. Sources confirmed live as of this
-note: https://supabase.com/docs/guides/auth/custom-oauth-providers,
-https://supabase.com/features/custom-oidc-providers.
+**jsdom applies no Tailwind.** Any test asserting "this is visible" proves nothing about
+real rendering. Assert class tokens, and verify anything visual in Chromium via `harness/`.
 
-**Also raised, and worth doing independently of the AWS timeline:** transferring the current
-Supabase project and Netlify site from Jay's personal accounts to club-owned accounts. Both
-platforms support project/site transfer natively (no rebuild) — this solves "not tied to my
-personal card/email" on its own, separately from whether Option C ever happens. Not yet done as
-of this note; low-risk, can happen whenever convenient.
+**jsdom has no `URL.createObjectURL`.** Touching a file input without the stub in
+`src/test/setup.js` throws inside an effect and React unmounts the ENTIRE tree — an empty
+`<body>` and an error mentioning nothing about object URLs.
 
-**Cheap practices to follow between now and the migration, agreed with Jay, that don't slow the
-2-week goal:**
-- Keep every Supabase call behind `src/lib` (already the established pattern) — this is what
-  makes "swap the backend" mean "rewrite one layer," not "rewrite the app."
-- Avoid leaning on Supabase-only mechanisms (Realtime subscriptions, Edge Functions) for new
-  features going forward unless there's a real need — they have no AWS-native equivalent and
-  would need reworking at migration time. Flag it in-session if a feature seems to want one,
-  rather than reaching for it silently.
-- Keep RLS policies documented as they're added (`claude/runbooks/e2e-roles.md` and the migration files
-  already do this) — that documentation is the actual migration spec later.
-- **Do not build a speculative multi-backend abstraction layer now.** Explicitly decided
-  against — premature for a migration that's ~6 months out and not yet spec'd by the AWS dev's
-  actual stack choices.
+**`harness/` stubs must mirror the real modules, and `tests/harness-stubs.test.js` enforces
+it.** Add an alias in `harness/vite.config.js` without a matching stub — or add an export to
+a real data module without adding it to the stub — and every harness scenario goes dark at
+once, because `harness/main.jsx` imports every screen into one bundle.
 
-**Trigger for starting to scope the real migration:** once the AWS site's dev has a concrete
-stack decided (Cognito vs. something else, Amplify vs. custom, etc.), bring that to a session
-and scope Option C properly as its own plan — don't start it earlier based on guesses.
+**The harness needs a stub for anything AppShell imports TRANSITIVELY.** `AppShell` →
+`RequestAccess` → `data/accessRequests.js` → the real Supabase client, which throws on
+missing env vars before a single pixel renders.
 
----
+**The pinned Playwright expects a Chromium build a cloud sandbox may not have.** Launch with
+an explicit `executablePath` rather than downloading a second copy — see
+`harness/shoot-playerdetail.mjs`.
 
-## Task 22 — End-to-end role + a11y verification, release docs — COMPLETE (final task)
+**`composite IS NOT NULL` is only true when EVERY field is non-null.** A perfectly good
+`players` row reads as null because `jersey_num` is empty. This made a working RPC look
+broken. Test a FIELD, not the row.
 
-The v1 MVP plan is now fully built (22 of 22 tasks). Task 22 added three new docs
-(`claude/specs/accessibility.md`, `claude/runbooks/e2e-roles.md`, `claude/runbooks/deploy.md`) and fixed real bugs found by
-empirical browser verification rather than trusting the brief's own hand-calculated hypothesis:
+**A temp table created before `set local role` is unreadable afterwards.** In an RLS
+verification script, `create temp table` as one role then `set local role anon` gives
+"permission denied" until you `grant select` explicitly.
 
-- **Header gradient contrast (confirmed real, fixed).** Verified with real headless Chromium
-  (Playwright, `/opt/pw-browsers`) at 8 real widths (820-3440px), reading actual composited
-  pixel colours, not CSS introspection. Found TWO separate AA failures: (1) the brief's own
-  hypothesis — the rightmost nav pill near the gradient's green end at narrow desktop widths,
-  measured 2.32-2.36:1 before the fix; (2) a second, previously-unknown one — the role badge
-  and active nav pill's `bg-white/[.16]` fill actually *reduces* contrast (a white overlay
-  lightens the red underneath it), measuring 4.06-4.46:1 (under 4.5:1) at every width tested,
-  regardless of the green-stop issue. Fixed both: moved the gradient's final `quinsGreen` stop
-  from `100%` to `300%` (keeps the visible portion within the red family at any viewport width);
-  changed the badge/active-pill fill to `bg-black/[.22]` (darkens instead of lightens) and gave
-  inactive nav pills their own `bg-black/[.1]` fill (previously none at all). Re-measured after:
-  4.74-8.49:1 across all 8 widths. Full numbers in `claude/specs/accessibility.md` §1.
-- **Skip-to-content link** (design-system.md §8's one confirmed-still-open gap) — added to
-  `AppShell.jsx`, verified with real Tab/Enter keypresses in Playwright (first-focusable,
-  genuinely hidden until focus, Enter moves real keyboard focus to `<main>`, not just the
-  viewport).
-- **One real, previously-unknown a11y gap found and fixed**: `Availability.jsx`'s In/Maybe/Out
-  toggle buttons had no `focus-visible:ring` at all — found by checking every `<button>` in
-  `src/screens`/`src/components`, not by trusting the brief's "already everywhere" claim.
-- Everything else the brief flagged as "verify, don't trust" (Sheet's focus trap/Escape/restore,
-  icon `aria-label`s, `role="alert"`, calendar day cells as real buttons,
-  `prefers-reduced-motion`) checked out as already correct.
-- **A live infrastructure finding worth knowing for the deploy step**: checked the Netlify MCP
-  while writing `claude/runbooks/deploy.md` and confirmed `adhjrt.com`'s bare root domain is **already
-  serving a different, unrelated Netlify project** of Jay's (`serene-gingersnap-1d0eb6` — a
-  tournament/registration app, from a different GitHub repo `jayjmuir-hub/adhjrt`, not this one).
-  `claude/runbooks/deploy.md` flags this explicitly: the Quins Club Hub trial must use a genuine subdomain
-  (e.g. `app.adhjrt.com`) on a **new, separate** Netlify site, never reusing or overwriting that
-  existing project.
+**`private.can_see_team` has a hand-copied twin.** `public.calendar_events_for_token`
+restates the same visibility rule against a token-resolved profile, because a calendar
+client has no JWT and `auth.uid()` is unavailable. **CHANGE ONE, CHANGE BOTH.**
 
-537/537 tests (2 new, for the skip link), build clean. Full detail:
-`.superpowers/sdd/quins-v1-mvp/task-22-report.md`.
+**RLS grants access to ROWS, not COLUMNS.** This is why `players.photo_path` is written by
+`set_own_player_photo()` and not by an owner policy: a row-level owner policy on `players`
+would hand a parent `team_id` as well. Don't "simplify" it back into a policy.
+
+**Netlify serves `dist/` from a Vite build — the repo root is NOT served.** (Unlike the
+adhjrt tournament repo, where the root IS the deployed site. Rules copied from there about
+scratch files in the repo root do not apply here for that reason. The `git add -A` rule
+still does, for the `.env` reason.)
 
 ---
 
-## Resume at Task 22 (historical — pre-Task-22 state, kept for context)
+**⚠️ `accept_invite` matches on EMAIL, and that is an onboarding trap.** Invite someone
+at `jane@work.com`, they sign in with Google as `jane@gmail.com`, and the invite does not
+match their account — they land in the access-request queue instead. Nothing is broken
+when that happens, but it looks like a failure to the person it happens to.
 
-Phase F is now FULLY COMPLETE (17 admin overview, 18 invite flow, 19 first-admin bootstrap
-doc). Task 18 added a new `invites` table + RLS + a `SECURITY DEFINER accept_invite(token)`
-RPC — **applied directly by the controller against the live Supabase project, not by an
-implementer subagent**, because this was the first task in the build to touch the database,
-and a bad RLS predicate fails silently (wrong rows, no error) rather than loudly. See
-"Database schema changes" below for the exact shape and a real gotcha worth remembering for
-Task 21 (RLS hardening) or any future `SECURITY DEFINER` function.
+## Rulings that cost real effort to discover — don't rediscover them
 
-Task 19 added `claude/runbooks/first-admin.md` — the exact SQL for Jay to run himself (not something this
-build automates — see the doc's own reasoning) after his first sign-in, to grant himself
-`admin`. This was docs-only (no app code, no tests, no review loop or browser check — those
-gates exist for code, not a static SQL doc), but the controller caught a real bug in its own
-first draft before committing: the draft used `ON CONFLICT DO NOTHING` to make the admin-grant
-insert safe to run twice, but `memberships` has no unique constraint on
-`(profile_id, club_id, role)` — only a PK on a fresh uuid every insert, which never conflicts
-— so that statement would have silently created a SECOND admin row if ever run twice, not
-no-op'd as claimed. Fixed with `INSERT ... SELECT ... WHERE NOT EXISTS (...)`, which is
-genuinely idempotent. Verified live before writing: `auth.users` currently has zero rows (Jay
-hasn't signed in yet — the doc's "sign in first" framing isn't hypothetical), and the club/
-memberships schema details the doc references (club id `00000000-...000ad`, nullable
-`team_id`/`player_id`) were checked against the live database, not assumed from memory.
+**RLS is stricter than the plan assumed.** Every SELECT policy — `teams`, `clubs`,
+`events`, `players`, `availability` — requires a `memberships` row matching `auth.uid()`.
+A signed-in user with zero memberships reads **zero rows from every table, including
+`teams`** — no error, just empty. Correct for an invite-only club app; the database was not
+changed. The app renders an explicit "you're signed in but not linked to a squad yet" state
+instead of a blank screen.
 
-Task 20 (PWA) started Phase G and is now **complete** (commit `256718b`). Added
-`vite-plugin-pwa`, configured `manifest` (name/short_name "Quins"/theme_color `#C21F32`/
-display standalone/icons split any-vs-maskable using the existing, unmodified icon files) and
-`workbox.runtimeCaching` (`NetworkFirst` on `GET /rest/v1/*` only, excluding auth and all
-mutations, 1-day expiration). `src/sw-register.js` registers via `virtual:pwa-register` with
-`registerType: 'prompt'` (deliberate — no silent mid-session code swap under an open form);
-`updateSW` is exported for a future in-app "update available" toast, not built yet (console-only
-for v1, a self-flagged, accepted gap). `index.html` ended up byte-identical — the plugin
-auto-injects its own manifest `<link>` tag, so a manual one would have duplicated it.
+**Admin memberships have `team_id = NULL`** — admin is club-wide. The `teams` read policy
+matches on `club_id`, so an admin still sees all 15 teams. `visibleTeams` special-cases
+admin rather than collecting `team_id` values.
 
-**Self-caught bug worth remembering for any future Workbox config:** a `urlPattern` function's
-outer-scope `const` reference (`SUPABASE_HOST`, declared in `vite.config.js`) is invisible to the
-*built* service worker — Workbox stringifies and re-executes `urlPattern` functions inside
-`dist/sw.js`, which does not share the build-time module scope, so the constant would have been
-`undefined` at runtime. Only visible by reading the real generated `dist/sw.js`, not the plugin
-config object — exactly why `tests/pwa-build.test.js` shells out to a real `vite build` rather
-than asserting on config. Fixed by inlining the hostname as a string literal.
+**`canEditTeam(memberships, null)` returns `false`, even for an admin.** Deliberate, and a
+knowing departure from the plan's literal wording. A null team id means "we don't know which
+team", and the safe answer to "may I edit an unknown team?" is no. `events.team_id` and
+`players.team_id` are both NOT NULL, so only a bug or a partial load reaches that path.
+There is a comment in `scope.js` saying so — don't "fix" it back.
 
-Controller-side verification for this task used **Playwright against a real `vite build` +
-`vite preview`**, not the usual Chromium-harness screen render (this task added no visible
-screen) and not the `claude-in-chrome` MCP tools (those drive the *user's own desktop Chrome*,
-which cannot reach a `localhost` preview server running inside the cloud sandbox — confirmed the
-wrong tool for this kind of check before falling back to the sandbox's pre-installed
-`/opt/pw-browsers/chromium-1194` directly). Confirmed live: the manifest `<link>` resolves and
-parses correctly, the service worker registers and reaches `ready`, a reload leaves the page
-genuinely controlled by the service worker, and a real `context.setOffline(true)` reload still
-renders the app shell from precache instead of a browser offline error page. 535/535 tests,
-build clean, 0 fix rounds needed.
+**`listEvents({teamIds: []})` returns `[]` without querying.** An empty array means "no
+teams, show nothing", not "no filter, show everything". One keystroke apart, opposite in
+consequence: a user with no squads would otherwise see the whole club.
 
-Task 21 (RLS hardening) is now **complete** — controller-applied, no app code, no
-implementer/reviewer loop (there was no diff for one to review). Moved `is_admin`,
-`can_see_team`, `can_edit_team`, `is_own_player`, `handle_new_user` out of `public` into a new
-`private` schema (not in Supabase's exposed-schemas list, so nothing in it is reachable via
-`/rest/v1/rpc/...` regardless of grants) with byte-identical bodies, re-pointed all 14 RLS
-policies and the `on_auth_user_created` trigger, and dropped the old `public` copies.
-`accept_invite` deliberately stayed in `public` — it's the one function meant to be called from
-the frontend via `supabase.rpc(...)`, and was already correctly locked down since Task 18.
+**A fixture is a "result" when a score is present, not when its date has passed.** The
+prototype used this rule. A match played last week with no score entered is still Upcoming.
 
-**Self-caught regression, fixed same session:** the first draft of the migration also revoked
-`anon`'s `EXECUTE` on the four moved helpers, as defense-in-depth beyond what the task asked
-for. This broke real behaviour — several policies (`team manage`, `memb manage`, `player edit`,
-etc.) are `FOR ALL`, so they're OR'd into SELECT-policy evaluation alongside each table's read
-policy; when Postgres hits a function `anon` can't execute while evaluating that OR'd
-expression, it raises `permission denied for function ...` instead of resolving that disjunct
-to `false`. Previously `anon` had this EXECUTE implicitly via Supabase's default-privilege
-auto-grant (the exact gotcha Task 18 documented) — so unauthenticated requests always got
-silent empty results, never errors, which is what `tests/supabase.integration.test.js` pins.
-Caught by actually running `npm run test:integration` against the live project with the real
-anon key (the sandbox's `.env` holds a placeholder `sb_publishable_dummy...` value, not a real
-one — fetched the genuine key via `get_publishable_keys` for verification instead). Fixed with
-a same-session follow-up migration restoring `anon`'s `EXECUTE` on the four helpers only
-(never `handle_new_user`, which is trigger-only). The actual fix — schema-level unreachability
-— was untouched by this correction and still holds: confirmed via direct `curl` with the real
-anon key that `POST /rest/v1/rpc/is_admin` now 404s (function not found by PostgREST at all),
-while `GET /rest/v1/teams|players|availability` as `anon` still return `200 []`, identical to
-pre-migration behaviour. See "Database schema changes" below for the full detail.
+**A selected team pill must be reconciled against live scope.** Both Schedule and Roster
+derive `activeFilter = teamIds.includes(teamFilter) ? teamFilter : ALL_TEAMS_ID`. Without it,
+a membership reload that drops the selected team leaves the list filtered to nothing — and
+below two teams both screens hide the pill row entirely, so there is no "All" pill to click
+as a manual recovery.
 
-535/535 tests, build clean (this task touched zero frontend files — the diff is entirely
-server-side SQL, verified live rather than through the app's own mocked test suite).
+**Pill counts come from the search-only set, never the team-filtered set.** Otherwise every
+unselected pill reads "· 0" the moment any pill is clicked.
 
-`src/App.jsx` was restructured from one shared `<AppShell><Routes>...</Routes></AppShell>` to
-each route wrapping its own `<AppShell>` individually, so `/accept-invite/:token` could exist
-as a sibling route OUTSIDE any `AppShell` — `AppShell` refuses to render its routed content at
-all until `memberships.length > 0`, which a fresh invitee doesn't have until they accept. This
-was a real, confirmed-live bug the restructuring fixes (a naive route nested inside the old
-single-`AppShell` structure would have been permanently unreachable for exactly the people who
-need it most). The independent browser check specifically stress-tested cross-route navigation
-after this restructuring (16 sampled frames across 4 real nav clicks, a 24-click rapid-nav
-stress test) and found it CLEAN — no remount flash, no stale active-nav frame, no focus loss,
-no extra crest network requests. It did catch two real defects: `AcceptInvite` hung forever
-under React StrictMode/`npm run dev` only (a `mounted` ref's cleanup fired on StrictMode's
-throwaway first mount, permanently discarding the real in-flight `acceptInvite` promise's
-result — confirmed absent in a production build, fixed by relying solely on `calledRef`), and
-the invite-accept screen — the first screen a brand-new member ever sees — had zero club
-branding (fixed with a small crest + name addition, without touching the AppShell-avoidance
-routing).
+**Never render a loading state for `getPlayerContact`.** Render nothing until a row arrives.
+A spinner there put an aria-live "Loading contact details…" announcement in front of a parent
+who is not permitted to see them.
 
-Task 19 (First-admin bootstrap) is next and is **docs-only, no app code**: create
-`claude/runbooks/first-admin.md` documenting the exact SQL to grant Jay `admin` after his first sign-in
-(see `claude/archive/quins-v1-mvp.md`, Task 19), plus how to verify he then sees all 15 teams.
-This does not need the full subagent-driven-development task loop (no code, no tests to
-review) — a single pass of writing the doc, having it reviewed against the plan text and the
-live schema (the `memberships` table's actual columns/constraints), is proportionate.
+**Distinguish first load from refresh.** `setLoading(true)` on every refetch flashes a
+spinner over already-rendered content — Schedule uses a derived `isFirstLoad`, EventDetail a
+`settledForEvent` ref (an empty availability list is a legitimate steady state there).
 
-**Tooling note:** the `superpowers` plugin (subagent-driven-development's `task-brief`/
-`review-package`/`sdd-workspace` scripts) disappeared from disk mid-Task-17 after an MCP
-reconnect churn — re-invoking the skill failed with "Unknown skill." If this recurs, fall
-back to doing it by hand: extract a task's plan section directly into
-`.superpowers/sdd/quins-v1-mvp/task-N-brief.md`, and build review diffs with `git log
---oneline`/`git diff --stat`/`git diff -U10` redirected to
-`.superpowers/sdd/quins-v1-mvp/review-<base7>..<head7>.diff` — same naming convention the
-scripts used. The ledger/workspace layout doesn't depend on the scripts existing.
+**A `<button>` used as a layout box inherits Chromium's UA content-centring**, which no jsdom
+test can see. Task 11's calendar shipped with populated day cells floating 66px below their
+empty neighbours at desktop width. Set layout explicitly on any interactive non-text element.
 
-The plan is `claude/archive/quins-v1-mvp.md`; the visual spec is `claude/specs/design-system.md` (597
-lines, extracted from the approved prototype — implementers build from it without reading
-the prototype HTML).
+**The club does not use jersey numbers.** `players.jersey_num` stays in the schema (nullable,
+harmless, available if a senior side ever wants it) but nothing in the UI reads it. Roster rows
+and the PlayerDetail hero show initials instead, via `src/lib/playerFormat.js`. Never add a
+jersey field to the event/player forms.
 
-Execution method: `superpowers:subagent-driven-development` (or its manual equivalent above)
-— one implementer subagent per task, then a spec+quality review, then a scoped re-review of
-any fixes, then a ledger entry. Tasks 11 onward added a further gate that has earned its
-place every time: an **independent controller-side browser pass**, rendering the real
-components in Chromium at 375px and 1280px via `harness/`. It has caught defects on every
-screen that jsdom could not see — Task 17 caught a hard-reload navigation bug, Task 18 caught
-the StrictMode hang and branding gap above. Screenshots are git-ignored — regenerate them,
-don't commit them.
+**All event times are forced to Abu Dhabi time (`Asia/Dubai`), always** — a deliberate,
+twice-reviewed decision, not a leftover default. One club, one ground: "20:00" must always mean
+20:00 at Zayed Sports City, regardless of the viewer's browser timezone. Route every date/time
+formatter through `src/lib/eventFormat.js`'s Dubai-anchored functions — never `toLocale*` with
+an implicit zone, never a hardcoded `+04:00` offset (use the IANA zone via `Intl`'s `timeZone`
+option; offsets are a derived fact and the wrong abstraction). Calendar day-bucketing and any
+"today" highlight must also be computed in club-local days, not the browser's. **Any test
+touching this must prove zone-independence, not assume it** — pin a fixed instant and
+demonstrate the same output under a hostile `TZ` (e.g. `America/New_York`); a test that only
+passes because the runner sits in UTC is not evidence. This exact failure mode has shipped
+twice already, hiding in tests that *looked* zone-safe.
+
+**"Upcoming" and "not yet scored" are two different questions that happen to look similar.**
+Schedule's Upcoming *tab* deliberately shows unscored events regardless of date — a match still
+needing a score stays visible until someone scores it. That's correct and must not change.
+Dashboard's "what's coming up" list and its stat tile want something different: chronologically
+future events (`starts_at > now`), because trainings and socials can never have a score and
+would otherwise sit in "Upcoming" forever. Don't collapse these two back into one filter — they
+were split apart on purpose in Task 13.
+
+**Task 14's event form must interpret an entered date and time as Abu Dhabi time** when it
+builds the `starts_at` value. A naive `new Date(\`${d}T${t}\`)` resolves in the browser's zone,
+so a coach entering 20:00 from outside the UAE would write a 23:00 (or worse) Abu Dhabi
+kick-off. This is the mirror image of the read-side timezone fix and is easy to miss.
+
+**`getPlayerContact` uses `.maybeSingle()`, not `.single()`.** Zero rows is the normal
+outcome for a parent — RLS hides contacts from them. `.single()` throws on zero rows, which
+would turn a safeguarding feature into a crash.
+
+**`auth.users` already has an `on_auth_user_created` trigger** calling `handle_new_user()`,
+which creates the `profiles` row. No app-side profile creation needed.
+
+**Contrast:** `quinsGreen #7DC351` on white is ~1.9:1 and fails AA for text — gradient stop
+or block fill only. Error text uses `quinsRedDark #8E1526` (~7.9:1). The neutral chip's text
+was darkened to `#5c5854` (6.04:1) because the design system's `--muted` on the chip
+background was 4.07:1, under the threshold. `--muted #77726e` also fails on the **paper**
+background `#f5f4f3` (4.33:1) while passing on white inside a card (4.75:1) — on-paper text
+uses `#5c5854` (6.42:1).
+
+**A component that states a safeguarding invariant must enforce it itself.** Task 15's
+`PlayerForm` claimed "a null contact row here can only mean nothing recorded yet, never
+withheld" — true only because *something else* (`Roster.jsx`) gated who could open the form
+for which player. The form's own gate was coarser ("has any editable squad"). Fixed by
+folding the per-player check directly into the component that makes the claim:
+`Boolean(player) && !canEditTeam(memberships, player.team_id)`. Nothing leaked — RLS and
+Roster's gating were both already correct — but don't split "asserts" from "enforces" across
+files again.
+
+**Contact disclosure copy must match the real RLS predicate, not the intuitive one.** The
+read policy is `can_edit_team(...) OR is_own_player(player_id)` — the linked player can read
+their own contact row, not just coaches/admins. Copy shown to whoever is entering a minor's
+guardian details must name both.
+
+**Writing a player's contact details is two separate calls, never one.** `upsertPlayer` then
+`upsertContact` — so a partial failure (player saved, contact rejected) is surfaced distinctly
+rather than silently rolled into one ambiguous error.
+
+**Delete confirmation is a two-step inline control, never a native `confirm()`.** A native
+dialog blocks the event loop and hangs Playwright's browser check dead — established in
+Task 14, reused in Task 15's player delete.
+
+**Squad reassignment on edit must fall back to the entity's own team, not the first editable
+one.** `editableTeams[0]` as a fallback silently reassigns whoever is being edited to a coach's
+first squad the moment the form opens. Reconcile against the entity's actual `team_id` instead.
+Fixed in `PlayerForm.jsx`; `EventForm.jsx` has the identical shape and has NOT been fixed —
+it's a separate file and a separate decision, deliberately left alone in Task 15's fix round.
+
+**Conventions set by earlier tasks:** data-access functions **throw** on error, never return
+`{data, error}` tuples, and return `[]` not `null`. `src/lib/scope.js` holds only pure
+functions with zero imports. Screens catch and render errors in a `role="alert"` region.
+Data modules never import React.
+
+**A screen that must be reachable before a user has any memberships cannot live inside
+`AppShell`.** `AppShell` deliberately refuses to render its routed content at all until
+`memberships.length > 0` (showing `NoMembershipState` instead) — correct for every normal
+screen, but it means any future screen aimed at a membership-less user (Task 18's
+`/accept-invite/:token` is the first, and likely not the last — an invite-decline flow, an
+"invalid invite" landing page, etc. would have the same shape) must be routed as a sibling
+OUTSIDE `AppShell`, per-route now that `src/App.jsx` wraps each route in its own `<AppShell>`
+individually rather than one shared instance around a shared `<Routes>`. Don't nest a new
+"pre-membership" screen inside an `AppShell`-wrapped route and expect it to be reachable.
+
+**React 18 StrictMode's dev-only double-invoke can permanently break a non-idempotent effect
+if a `mounted`-ref guard and a `calledRef`-style once-only guard fight each other.** Task 18's
+`AcceptInvite` hung forever in `npm run dev` (never in a production build) because the
+StrictMode mount→cleanup→remount cycle set `mounted = false` in the throwaway first mount's
+cleanup, and the guarded second mount declined to start a new call — so the real in-flight
+promise's result got silently discarded by the `if (!mounted) return` check with nothing left
+to ever flip `mounted` back. The fix was to drop the `mounted` flag and rely solely on the
+once-only guard, since the underlying call (`accept_invite`) is deliberately not safely
+re-callable anyway. Any future one-shot side-effecting screen (payment confirmation, a
+one-time RPC) should be built with this in mind, and tested by literally rendering under a
+real `<React.StrictMode>` wrapper in RTL — jsdom/RTL doesn't do this by default, so a normal
+test render won't catch it.
+
+---
+
+**⚠️ A Workbox `urlPattern` function cannot see build-time module scope.** Workbox
+stringifies and re-executes those functions inside `dist/sw.js`, which does not share
+`vite.config.js`'s scope — an outer-scope `const` (e.g. `SUPABASE_HOST`) is `undefined`
+at runtime. Only visible by reading the real generated `dist/sw.js`, never the plugin
+config object. **This is why `tests/pwa-build.test.js` shells out to a real `vite build`
+rather than asserting on config.** Fixed by inlining the hostname as a string literal.
+
+## Two bugs worth knowing about, because the tests didn't catch them
+
+**jsdom does not apply Tailwind's CSS.** Any test asserting "this is visible" proves nothing
+about real rendering. This hid a role label that was CSS-hidden on every phone while
+`getByText('Coach')` passed happily. The fix was to assert on class tokens directly, and to
+render the real components in Chromium via `harness/` as a controller-side check. That
+browser pass also caught the club crest being squashed flat by `object-fit: fill` in a
+square badge.
+
+**The bottom-sheet modal ate keystrokes.** `Sheet` had `onClose` in a `useEffect` dependency
+array; every parent re-render gave it a new identity, re-running the effect, whose cleanup
+stole focus back to the trigger. Typing "Tom" into a field inside a sheet produced "T".
+Every add/edit form in Tasks 14-16 opens in a `Sheet`, so this would have broken all of
+them. Fixed with the latest-ref pattern and pinned by a regression test verified to fail
+against the pre-fix code.
+
+Both are the same lesson: for anything visual or focus-related, verify in a browser, not
+just in jsdom.
+
+---
+
+
+---
+
+## Infrastructure facts
+
+- **Netlify:** project `quins-club-hub`, connected to GitHub, branch `build/v1-mvp`,
+  auto-deploys on push.
+- ⚠️ **`adhjrt.com`'s bare root is a DIFFERENT, unrelated Netlify project**
+  (`serene-gingersnap-1d0eb6`) — a tournament/registration app built from the separate
+  repo `jayjmuir-hub/adhjrt`. **Never reuse, overwrite or reconfigure it.** This app owns
+  the `app.` subdomain only.
+- **Supabase Auth URL Configuration** must list every origin the app is served from.
+  Redirect URLs have historically included `https://quins-club-hub.netlify.app/**` as a
+  fallback. ⚠️ A magic link opened on an origin that is not listed fails at the redirect,
+  not at the send — check this before blaming the mail provider.
+
+- **Supabase:** project `quins-club-hub`, ref `lusmshimxdcxpnrktlgz`, region
+  `ap-northeast-1`, Postgres 17, status `ACTIVE_HEALTHY`. A second project `adhjrt-app`
+  (`nnlfjbnoiyqcvxwbwsjf`) exists and is **not** used by this app.
+- **This repo is public.** Nothing secret is committed: `.env` is ignored, no `sb_secret_`
+  or `service_role` string appears in any tracked file. Security rests on Supabase RLS, not
+  on the code being hidden. Keep it that way.
+
+---
+
+# Schema and migration history
+
+**Reference, not instruction.** The migrations themselves are in `db/migrations/` and
+the captured schema is in `db/schema/` — those are authoritative. What follows is the
+REASONING behind each one, which the SQL does not carry. Read it before changing a
+policy; do not trust its status lines.
 
 ### Migration `self_service_profile` (4 Aug 2026)
 
@@ -786,297 +786,3 @@ untracks the whole ledger. Do not fight it — stage the workspace with
 
 ---
 
-## How this codebase actually behaves
-
-Things that are true, non-obvious, and have already cost someone an hour. Every entry is
-something a session discovered by hitting it.
-
-**The roster is TWO components.** Cards on mobile (`data-testid="player-row"`), a table on
-desktop (`data-testid="roster-table-row"`). BOTH are in the DOM at every width with one
-CSS-hidden — so a selector matching both picks the hidden one and the click silently does
-nothing. On desktop the row click edits position/age group/captain IN PLACE; the detail
-sheet opens from a separate **"Open"** button in the last column.
-
-**`PhoneInput` takes `country` + `national` + `onCountryChange` + `onNationalChange`** —
-not `value`/`onChange`. Phones are stored E.164 and split for editing with
-`splitPhone`/`joinPhone` (`src/lib/phone.js`). Formatting is deliberately NOT applied
-as-you-type; that reintroduced a caret-jump bug.
-
-**The test suite needs `.env`, which is gitignored.** A fresh clone fails with "Missing
-required Supabase env var(s)" until you create it — values in "Start a session" above.
-Delete it before committing.
-
-**jsdom applies no Tailwind.** Any test asserting "this is visible" proves nothing about
-real rendering. Assert class tokens, and verify anything visual in Chromium via `harness/`.
-
-**jsdom has no `URL.createObjectURL`.** Touching a file input without the stub in
-`src/test/setup.js` throws inside an effect and React unmounts the ENTIRE tree — an empty
-`<body>` and an error mentioning nothing about object URLs.
-
-**`harness/` stubs must mirror the real modules, and `tests/harness-stubs.test.js` enforces
-it.** Add an alias in `harness/vite.config.js` without a matching stub — or add an export to
-a real data module without adding it to the stub — and every harness scenario goes dark at
-once, because `harness/main.jsx` imports every screen into one bundle.
-
-**The harness needs a stub for anything AppShell imports TRANSITIVELY.** `AppShell` →
-`RequestAccess` → `data/accessRequests.js` → the real Supabase client, which throws on
-missing env vars before a single pixel renders.
-
-**The pinned Playwright expects a Chromium build a cloud sandbox may not have.** Launch with
-an explicit `executablePath` rather than downloading a second copy — see
-`harness/shoot-playerdetail.mjs`.
-
-**`composite IS NOT NULL` is only true when EVERY field is non-null.** A perfectly good
-`players` row reads as null because `jersey_num` is empty. This made a working RPC look
-broken. Test a FIELD, not the row.
-
-**A temp table created before `set local role` is unreadable afterwards.** In an RLS
-verification script, `create temp table` as one role then `set local role anon` gives
-"permission denied" until you `grant select` explicitly.
-
-**`private.can_see_team` has a hand-copied twin.** `public.calendar_events_for_token`
-restates the same visibility rule against a token-resolved profile, because a calendar
-client has no JWT and `auth.uid()` is unavailable. **CHANGE ONE, CHANGE BOTH.**
-
-**RLS grants access to ROWS, not COLUMNS.** This is why `players.photo_path` is written by
-`set_own_player_photo()` and not by an owner policy: a row-level owner policy on `players`
-would hand a parent `team_id` as well. Don't "simplify" it back into a policy.
-
-**Netlify serves `dist/` from a Vite build — the repo root is NOT served.** (Unlike the
-adhjrt tournament repo, where the root IS the deployed site. Rules copied from there about
-scratch files in the repo root do not apply here for that reason. The `git add -A` rule
-still does, for the `.env` reason.)
-
----
-
-## Rulings that cost real effort to discover — don't rediscover them
-
-**RLS is stricter than the plan assumed.** Every SELECT policy — `teams`, `clubs`,
-`events`, `players`, `availability` — requires a `memberships` row matching `auth.uid()`.
-A signed-in user with zero memberships reads **zero rows from every table, including
-`teams`** — no error, just empty. Correct for an invite-only club app; the database was not
-changed. The app renders an explicit "you're signed in but not linked to a squad yet" state
-instead of a blank screen.
-
-**Admin memberships have `team_id = NULL`** — admin is club-wide. The `teams` read policy
-matches on `club_id`, so an admin still sees all 15 teams. `visibleTeams` special-cases
-admin rather than collecting `team_id` values.
-
-**`canEditTeam(memberships, null)` returns `false`, even for an admin.** Deliberate, and a
-knowing departure from the plan's literal wording. A null team id means "we don't know which
-team", and the safe answer to "may I edit an unknown team?" is no. `events.team_id` and
-`players.team_id` are both NOT NULL, so only a bug or a partial load reaches that path.
-There is a comment in `scope.js` saying so — don't "fix" it back.
-
-**`listEvents({teamIds: []})` returns `[]` without querying.** An empty array means "no
-teams, show nothing", not "no filter, show everything". One keystroke apart, opposite in
-consequence: a user with no squads would otherwise see the whole club.
-
-**A fixture is a "result" when a score is present, not when its date has passed.** The
-prototype used this rule. A match played last week with no score entered is still Upcoming.
-
-**A selected team pill must be reconciled against live scope.** Both Schedule and Roster
-derive `activeFilter = teamIds.includes(teamFilter) ? teamFilter : ALL_TEAMS_ID`. Without it,
-a membership reload that drops the selected team leaves the list filtered to nothing — and
-below two teams both screens hide the pill row entirely, so there is no "All" pill to click
-as a manual recovery.
-
-**Pill counts come from the search-only set, never the team-filtered set.** Otherwise every
-unselected pill reads "· 0" the moment any pill is clicked.
-
-**Never render a loading state for `getPlayerContact`.** Render nothing until a row arrives.
-A spinner there put an aria-live "Loading contact details…" announcement in front of a parent
-who is not permitted to see them.
-
-**Distinguish first load from refresh.** `setLoading(true)` on every refetch flashes a
-spinner over already-rendered content — Schedule uses a derived `isFirstLoad`, EventDetail a
-`settledForEvent` ref (an empty availability list is a legitimate steady state there).
-
-**A `<button>` used as a layout box inherits Chromium's UA content-centring**, which no jsdom
-test can see. Task 11's calendar shipped with populated day cells floating 66px below their
-empty neighbours at desktop width. Set layout explicitly on any interactive non-text element.
-
-**The club does not use jersey numbers.** `players.jersey_num` stays in the schema (nullable,
-harmless, available if a senior side ever wants it) but nothing in the UI reads it. Roster rows
-and the PlayerDetail hero show initials instead, via `src/lib/playerFormat.js`. Never add a
-jersey field to the event/player forms.
-
-**All event times are forced to Abu Dhabi time (`Asia/Dubai`), always** — a deliberate,
-twice-reviewed decision, not a leftover default. One club, one ground: "20:00" must always mean
-20:00 at Zayed Sports City, regardless of the viewer's browser timezone. Route every date/time
-formatter through `src/lib/eventFormat.js`'s Dubai-anchored functions — never `toLocale*` with
-an implicit zone, never a hardcoded `+04:00` offset (use the IANA zone via `Intl`'s `timeZone`
-option; offsets are a derived fact and the wrong abstraction). Calendar day-bucketing and any
-"today" highlight must also be computed in club-local days, not the browser's. **Any test
-touching this must prove zone-independence, not assume it** — pin a fixed instant and
-demonstrate the same output under a hostile `TZ` (e.g. `America/New_York`); a test that only
-passes because the runner sits in UTC is not evidence. This exact failure mode has shipped
-twice already, hiding in tests that *looked* zone-safe.
-
-**"Upcoming" and "not yet scored" are two different questions that happen to look similar.**
-Schedule's Upcoming *tab* deliberately shows unscored events regardless of date — a match still
-needing a score stays visible until someone scores it. That's correct and must not change.
-Dashboard's "what's coming up" list and its stat tile want something different: chronologically
-future events (`starts_at > now`), because trainings and socials can never have a score and
-would otherwise sit in "Upcoming" forever. Don't collapse these two back into one filter — they
-were split apart on purpose in Task 13.
-
-**Task 14's event form must interpret an entered date and time as Abu Dhabi time** when it
-builds the `starts_at` value. A naive `new Date(\`${d}T${t}\`)` resolves in the browser's zone,
-so a coach entering 20:00 from outside the UAE would write a 23:00 (or worse) Abu Dhabi
-kick-off. This is the mirror image of the read-side timezone fix and is easy to miss.
-
-**`getPlayerContact` uses `.maybeSingle()`, not `.single()`.** Zero rows is the normal
-outcome for a parent — RLS hides contacts from them. `.single()` throws on zero rows, which
-would turn a safeguarding feature into a crash.
-
-**`auth.users` already has an `on_auth_user_created` trigger** calling `handle_new_user()`,
-which creates the `profiles` row. No app-side profile creation needed.
-
-**Contrast:** `quinsGreen #7DC351` on white is ~1.9:1 and fails AA for text — gradient stop
-or block fill only. Error text uses `quinsRedDark #8E1526` (~7.9:1). The neutral chip's text
-was darkened to `#5c5854` (6.04:1) because the design system's `--muted` on the chip
-background was 4.07:1, under the threshold. `--muted #77726e` also fails on the **paper**
-background `#f5f4f3` (4.33:1) while passing on white inside a card (4.75:1) — on-paper text
-uses `#5c5854` (6.42:1).
-
-**A component that states a safeguarding invariant must enforce it itself.** Task 15's
-`PlayerForm` claimed "a null contact row here can only mean nothing recorded yet, never
-withheld" — true only because *something else* (`Roster.jsx`) gated who could open the form
-for which player. The form's own gate was coarser ("has any editable squad"). Fixed by
-folding the per-player check directly into the component that makes the claim:
-`Boolean(player) && !canEditTeam(memberships, player.team_id)`. Nothing leaked — RLS and
-Roster's gating were both already correct — but don't split "asserts" from "enforces" across
-files again.
-
-**Contact disclosure copy must match the real RLS predicate, not the intuitive one.** The
-read policy is `can_edit_team(...) OR is_own_player(player_id)` — the linked player can read
-their own contact row, not just coaches/admins. Copy shown to whoever is entering a minor's
-guardian details must name both.
-
-**Writing a player's contact details is two separate calls, never one.** `upsertPlayer` then
-`upsertContact` — so a partial failure (player saved, contact rejected) is surfaced distinctly
-rather than silently rolled into one ambiguous error.
-
-**Delete confirmation is a two-step inline control, never a native `confirm()`.** A native
-dialog blocks the event loop and hangs Playwright's browser check dead — established in
-Task 14, reused in Task 15's player delete.
-
-**Squad reassignment on edit must fall back to the entity's own team, not the first editable
-one.** `editableTeams[0]` as a fallback silently reassigns whoever is being edited to a coach's
-first squad the moment the form opens. Reconcile against the entity's actual `team_id` instead.
-Fixed in `PlayerForm.jsx`; `EventForm.jsx` has the identical shape and has NOT been fixed —
-it's a separate file and a separate decision, deliberately left alone in Task 15's fix round.
-
-**Conventions set by earlier tasks:** data-access functions **throw** on error, never return
-`{data, error}` tuples, and return `[]` not `null`. `src/lib/scope.js` holds only pure
-functions with zero imports. Screens catch and render errors in a `role="alert"` region.
-Data modules never import React.
-
-**A screen that must be reachable before a user has any memberships cannot live inside
-`AppShell`.** `AppShell` deliberately refuses to render its routed content at all until
-`memberships.length > 0` (showing `NoMembershipState` instead) — correct for every normal
-screen, but it means any future screen aimed at a membership-less user (Task 18's
-`/accept-invite/:token` is the first, and likely not the last — an invite-decline flow, an
-"invalid invite" landing page, etc. would have the same shape) must be routed as a sibling
-OUTSIDE `AppShell`, per-route now that `src/App.jsx` wraps each route in its own `<AppShell>`
-individually rather than one shared instance around a shared `<Routes>`. Don't nest a new
-"pre-membership" screen inside an `AppShell`-wrapped route and expect it to be reachable.
-
-**React 18 StrictMode's dev-only double-invoke can permanently break a non-idempotent effect
-if a `mounted`-ref guard and a `calledRef`-style once-only guard fight each other.** Task 18's
-`AcceptInvite` hung forever in `npm run dev` (never in a production build) because the
-StrictMode mount→cleanup→remount cycle set `mounted = false` in the throwaway first mount's
-cleanup, and the guarded second mount declined to start a new call — so the real in-flight
-promise's result got silently discarded by the `if (!mounted) return` check with nothing left
-to ever flip `mounted` back. The fix was to drop the `mounted` flag and rely solely on the
-once-only guard, since the underlying call (`accept_invite`) is deliberately not safely
-re-callable anyway. Any future one-shot side-effecting screen (payment confirmation, a
-one-time RPC) should be built with this in mind, and tested by literally rendering under a
-real `<React.StrictMode>` wrapper in RTL — jsdom/RTL doesn't do this by default, so a normal
-test render won't catch it.
-
----
-
-## Two bugs worth knowing about, because the tests didn't catch them
-
-**jsdom does not apply Tailwind's CSS.** Any test asserting "this is visible" proves nothing
-about real rendering. This hid a role label that was CSS-hidden on every phone while
-`getByText('Coach')` passed happily. The fix was to assert on class tokens directly, and to
-render the real components in Chromium via `harness/` as a controller-side check. That
-browser pass also caught the club crest being squashed flat by `object-fit: fill` in a
-square badge.
-
-**The bottom-sheet modal ate keystrokes.** `Sheet` had `onClose` in a `useEffect` dependency
-array; every parent re-render gave it a new identity, re-running the effect, whose cleanup
-stole focus back to the trigger. Typing "Tom" into a field inside a sheet produced "T".
-Every add/edit form in Tasks 14-16 opens in a `Sheet`, so this would have broken all of
-them. Fixed with the latest-ref pattern and pinned by a regression test verified to fail
-against the pre-fix code.
-
-Both are the same lesson: for anything visual or focus-related, verify in a browser, not
-just in jsdom.
-
----
-
-## Outstanding, needs Jay
-
-- **Auth email is still Supabase's built-in service — 2/hour, no SLA, not for production.
-  DO NOT INVITE THE COMMITTEE UNTIL THIS IS DONE.** The replacement is built and deployed
-  (`supabase/functions/send-email`, **Resend** via the Send Email Hook) but is INERT until
-  Jay does the Resend/GoDaddy-DNS/Supabase steps. Full runbook: `claude/runbooks/email-and-domain.md`.
-
-  Why not Supabase custom SMTP: it is password-only and buys nothing here either way — the
-  hook approach sends over plain HTTPS with an API key, no SMTP credentials anywhere.
-
-  **Provider history:** this ran on Microsoft Graph until 5 Aug 2026, when Jay reversed the
-  4 Aug decision to stand up a whole new Microsoft 365 tenant for it — see
-  `claude/decisions/2026-08-05-resend.md`. If you find old context mentioning
-  `MS_TENANT_ID`/`MS_CLIENT_ID`/`MS_CLIENT_SECRET`, Entra app registrations, or a new US
-  tenant for Club Hub mail, that plan is dead; don't resume it without rereading that doc.
-
-- **Club Hub is moving to its own domain, app AND email together** (Jay's call, 4 Aug 2026):
-  `adhjrt` is a once-a-year tournament brand and the Club Hub is year-round. **Do the move
-  BEFORE inviting anyone** — this is a PWA, and a home-screen install is pinned to its
-  origin, so a later move costs every member a delete-and-reinstall. Steps in
-  `claude/runbooks/email-and-domain.md`.
-
-- ~~Google OAuth client credentials~~ — **done, and this note was stale for a while.**
-  Verified live on 4 Aug 2026: `GET /auth/v1/authorize?provider=google` on the project
-  302s to `accounts.google.com` with a real configured client id, so the "Continue with
-  Google" button on the login screen is a working route, not a dead control. Google
-  sign-in is exactly as open as the magic link — same `auth.users` row, same profile
-  trigger, same zero memberships — so the approval gate covers both identically.
-
-  **Onboarding trap worth knowing:** `accept_invite` matches on EMAIL. Invite someone at
-  `jane@work.com` and they sign in with Google as `jane@gmail.com`, and the invite will
-  not match their account — they land in the access-request queue instead. Nothing is
-  broken when that happens, but it looks like a failure to the person it happens to.
-- ~~First-admin SQL~~ — **done.** Jay signed in and ran the Task 19 bootstrap SQL himself;
-  verified live as admin in the real app.
-- ~~Netlify deploy~~ — **done.** Live at `app.adhjrt.com`, auto-deploys from `build/v1-mvp`.
-  See "Deployment status" above for the full picture, including the separate
-  `adhjrt.com` root-domain project this one must never touch.
-- **Inviting committee members** — next manual step, whenever Jay's ready: More → Invite a
-  member, inside the live app. No SQL needed for this or any future invite.
-- ~~Close or gate public signup~~ — **done 4 Aug 2026, as an APPROVAL gate.** Signup is
-  still open and cannot be closed without breaking invites (see the migration section
-  below); what changed is that an account with no membership now asks for access, and an
-  admin approves or dismisses it. Two things are still worth doing before the
-  `abudhabiquins.com` cutover, neither blocking: nobody is emailed when a request arrives,
-  so Jay has to look at the Accounts screen; and there is no rate limit on how many
-  strangers can create logins, only on what each can do (nothing).
-- **`jayjmuir@yahoo.com` holds a full admin membership** it was probably never meant to have
-  (see the `admin_can_see_pending_profiles` section). Jay can fix this himself from the
-  Accounts screen; until then any "a coach can't see X" test using that account is invalid.
-- **`jay-pc`'s clone was left one push behind** at `2244f0a` on 4 Aug (cafnet did that day's
-  pushes). `git pull` there before doing anything on that machine.
-
-## Infrastructure facts
-
-- **Supabase:** project `quins-club-hub`, ref `lusmshimxdcxpnrktlgz`, region
-  `ap-northeast-1`, Postgres 17, status `ACTIVE_HEALTHY`. A second project `adhjrt-app`
-  (`nnlfjbnoiyqcvxwbwsjf`) exists and is **not** used by this app.
-- **This repo is public.** Nothing secret is committed: `.env` is ignored, no `sb_secret_`
-  or `service_role` string appears in any tracked file. Security rests on Supabase RLS, not
-  on the code being hidden. Keep it that way.
