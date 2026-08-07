@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 // Unit tests for src/screens/More.jsx (admin-dashboard plan, 2026-08-05).
@@ -14,13 +14,49 @@ import { MemoryRouter } from 'react-router-dom'
 // /more is now for everyone.
 
 const useMembershipsMock = vi.fn()
+const listPlayersMock = vi.fn()
+const listContactsForPlayersMock = vi.fn()
+const listParentsForPlayersMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+// ⚠️ THE "NO NETWORK FROM THIS SCREEN" CONTRACT CHANGED ON 6 AUG 2026.
+// More now shows the person's own details and their linked players, so it
+// reads the profile row, the players, their contacts and their parent rows.
+// The header comment above is kept as history; these mocks are the new
+// reality. Everything is still deterministic and nothing leaves the process.
+vi.mock('../src/lib/auth.jsx', () => ({
+  useAuth: () => ({ user: { id: 'user-1', email: 'jay@example.com' } }),
+}))
+
+vi.mock('../src/data/members.js', () => ({
+  getMyProfile: vi.fn().mockResolvedValue({ id: 'user-1', first_name: 'Jay', last_name: 'Muir' }),
+}))
+
+vi.mock('../src/data/players.js', () => ({
+  listPlayers: (...a) => listPlayersMock(...a),
+  listContactsForPlayers: (...a) => listContactsForPlayersMock(...a),
+}))
+
+vi.mock('../src/data/parents.js', () => ({
+  listParentsForPlayers: (...a) => listParentsForPlayersMock(...a),
+}))
+
+// The calendar card is a shared component with its own suite
+// (tests/calendar-subscribe.test.jsx); stubbed so its network is not this
+// file's problem.
+vi.mock('../src/data/calendar.js', () => ({
+  calendarFeedUrl: () => 'https://example.test/calendar.ics?token=t',
+  calendarWebcalUrl: () => 'webcal://example.test/calendar.ics?token=t',
+  myCalendarToken: vi.fn().mockResolvedValue('t'),
+  resetMyCalendarToken: vi.fn(),
+}))
+
 // Import after vi.mock so this binds to the mocked module.
 import More from '../src/screens/More.jsx'
+import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
 const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
 const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
@@ -44,7 +80,101 @@ function renderMore() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Module-level cache — see the note in tests/dashboard.test.jsx.
+  clearMyProfileCache()
   useMembershipsMock.mockReturnValue(memberships(ADMIN))
+  // Default: nothing linked. Individual tests opt in to players.
+  listPlayersMock.mockResolvedValue([])
+  listContactsForPlayersMock.mockResolvedValue({})
+  listParentsForPlayersMock.mockResolvedValue({})
+})
+
+// Added 6 Aug 2026 (Jay): "they should be able to see their info and any
+// related player info too."
+describe('More — your own details', () => {
+  it('shows the name and email the club holds', async () => {
+    renderMore()
+    expect(await screen.findByTestId('your-name')).toHaveTextContent('Jay Muir')
+    expect(screen.getByTestId('your-email')).toHaveTextContent('jay@example.com')
+  })
+})
+
+describe('More — your players', () => {
+  const PLAYER = {
+    id: 'p1',
+    full_name: 'Tom Muir',
+    team_id: 'team-u10',
+    position: 'Flanker',
+    photo_path: null,
+  }
+
+  it('lists the player this account is attached to', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    listPlayersMock.mockResolvedValue([PLAYER])
+
+    renderMore()
+
+    const card = await screen.findByTestId('your-player')
+    expect(within(card).getByText('Tom Muir')).toBeInTheDocument()
+    expect(within(card).getByText(/U10 · Flanker/)).toBeInTheDocument()
+  })
+
+  it('shows the contact and parent rows the club holds', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    listPlayersMock.mockResolvedValue([PLAYER])
+    listContactsForPlayersMock.mockResolvedValue({ p1: { phone: '+971501234567', email: 'tom@example.com' } })
+    listParentsForPlayersMock.mockResolvedValue({
+      p1: [{ id: 'pa1', full_name: 'Jay Muir', relationship: 'Father', phone: '+971509876543' }],
+    })
+
+    renderMore()
+    const card = await screen.findByTestId('your-player')
+    expect(within(card).getByText('tom@example.com')).toBeInTheDocument()
+    expect(within(card).getByText(/Jay Muir/)).toBeInTheDocument()
+    expect(within(card).getByText('Father')).toBeInTheDocument()
+  })
+
+  it('says NOTHING when the contact row is withheld', async () => {
+    // ⚠️ SAFEGUARDING, and the same rule PlayerDetail already follows.
+    // player_contacts is a separate table precisely so RLS can withhold it.
+    // A "contact details are hidden" note would confirm to someone who
+    // cannot see the data that there IS data to see. So: no row, no note,
+    // no lock icon.
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    listPlayersMock.mockResolvedValue([PLAYER])
+    listContactsForPlayersMock.mockResolvedValue({})
+
+    renderMore()
+    const card = await screen.findByTestId('your-player')
+    expect(within(card).queryByText(/hidden|restricted|not available|no contact/i)).toBeNull()
+    expect(within(card).queryByText('Phone')).toBeNull()
+  })
+
+  it('shows no players card at all for a coach with no child at the club', async () => {
+    // An empty "Your players" heading implies something is missing.
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    listPlayersMock.mockResolvedValue([PLAYER])
+
+    renderMore()
+    await screen.findByTestId('your-name')
+
+    expect(screen.queryByTestId('your-player')).not.toBeInTheDocument()
+    expect(screen.queryByText(/your player/i)).not.toBeInTheDocument()
+  })
+
+  it('does not offer edit controls of its own', async () => {
+    // ⚠️ Editing lives in the existing self-service flow, which the database
+    // restricts to photo, contact and parent rows. A second implementation
+    // here could drift from that and offer a write RLS refuses.
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    listPlayersMock.mockResolvedValue([PLAYER])
+
+    renderMore()
+    const card = await screen.findByTestId('your-player')
+
+    expect(within(card).queryByRole('textbox')).toBeNull()
+    expect(within(card).getByRole('link', { name: /view or change/i })).toHaveAttribute('href', '/roster')
+  })
 })
 
 describe('More — for every role', () => {

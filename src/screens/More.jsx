@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom'
 import Card from '../components/Card.jsx'
+import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
+import YourPlayers from '../components/YourPlayers.jsx'
+import { useAuth } from '../lib/auth.jsx'
+import useMyProfile from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 
@@ -19,9 +23,14 @@ import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 // signing out. tests/app.test.jsx pins this with a parent actually clicking
 // it.
 //
-// No data fetch here on purpose. Everything shown is already in
-// useMemberships() — re-querying teams or members would be a network round
-// trip for data the provider loaded once at session start.
+// ⚠️ THIS SCREEN USED TO MAKE NO QUERY AT ALL, and that was written here as
+// a contract. It no longer holds: as of 6 Aug 2026 it reads the caller's
+// profile row (name), and YourPlayers reads the linked players, their
+// contact rows and their parent rows. The role and squad list still come
+// free from useMemberships().
+//
+// The rule that survives is the reason behind the old one: do not re-query
+// anything the membership provider already loaded.
 
 function SectionTitle({ children }) {
   return (
@@ -33,6 +42,8 @@ function SectionTitle({ children }) {
 
 export default function More() {
   const { memberships, teams } = useMemberships()
+  const { user } = useAuth()
+  const { profile } = useMyProfile()
   const admin = isAdmin(memberships)
   const squads = visibleTeams(memberships, teams)
 
@@ -42,8 +53,27 @@ export default function More() {
         <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">More</h2>
       </div>
 
-      <SectionTitle>Your access</SectionTitle>
+      {/* Added 6 Aug 2026 (Jay): the More screen showed a role, a squad list
+          and two links, so "what does the club actually hold about me?" had
+          no answer anywhere in the app. Name and email come from the profile
+          row and the session — both already loaded, no extra round trip. */}
+      <SectionTitle>You</SectionTitle>
       <Card className="overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-line px-[14px] py-[11px]">
+          <span className="text-[15px] font-bold text-ink">Name</span>
+          <span data-testid="your-name" className="text-[12.5px] font-semibold text-ink-muted">
+            {/* ⚠️ Not every account has a name. A magic-link sign-in has none
+                until NamePrompt is answered, and NamePrompt is skippable, so
+                this says so plainly rather than rendering an empty row. */}
+            {[profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Not set yet'}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-3 border-b border-line px-[14px] py-[11px]">
+          <span className="text-[15px] font-bold text-ink">Email</span>
+          <span data-testid="your-email" className="truncate text-[12.5px] font-semibold text-ink-muted">
+            {user?.email ?? '—'}
+          </span>
+        </div>
         <div className="flex items-center justify-between gap-3 border-b border-line px-[14px] py-[11px]">
           <span className="text-[15px] font-bold text-ink">Role</span>
           <span data-testid="your-role" className="text-[12.5px] font-semibold text-ink-muted">
@@ -58,6 +88,18 @@ export default function More() {
               : squads.map((team) => team.name).join(' · ')}
           </p>
         </div>
+      </Card>
+
+      {/* Renders nothing at all for a coach or admin with no child at the
+          club — an empty "Your players" card would imply something missing. */}
+      <YourPlayers memberships={memberships} teams={teams} />
+
+      {/* The .ics feed already existed but lived only on Schedule. This is
+          where someone comes looking for "my stuff", so it belongs here too;
+          the component is shared, not copied. */}
+      <SectionTitle>Your calendar</SectionTitle>
+      <Card className="p-[14px]">
+        <CalendarSubscribe />
       </Card>
 
       {/* Admins only, and desktop only. /admin is a wide, table-heavy screen
