@@ -27,6 +27,19 @@ import { formatPhone } from '../lib/phone.js'
 // cannot see the data that there is data to see. Same rule PlayerDetail
 // already follows; see its header comment.
 
+// Group rows that carry a player_id into { [playerId]: rows }. Tolerates a
+// map being passed in as well, so a future data-layer change to either
+// function cannot silently blank this panel again.
+function byPlayer(rows) {
+  if (!rows) return {}
+  if (!Array.isArray(rows)) return rows
+  return rows.reduce((acc, row) => {
+    if (!row?.player_id) return acc
+    ;(acc[row.player_id] ||= []).push(row)
+    return acc
+  }, {})
+}
+
 function Row({ label, value }) {
   if (!value) return null
   return (
@@ -69,8 +82,15 @@ export default function YourPlayers({ memberships = [], teams = [] }) {
       .then(([allPlayers, contactRows, parentRows]) => {
         if (!active) return
         setPlayers((allPlayers ?? []).filter((p) => playerIds.includes(p.id)))
-        setContacts(contactRows ?? {})
-        setParents(parentRows ?? {})
+        // ⚠️ BOTH OF THESE RETURN ARRAYS, NOT MAPS. Shipped once assuming
+        // `contacts[playerId]`, which on an array is silently `undefined` —
+        // so the contact and parent rows rendered as nothing at all, in
+        // production, while every test passed. The tests passed BECAUSE the
+        // mocks returned the map shape I had assumed rather than the array
+        // the real function returns. Mock the shape the code under test
+        // actually receives.
+        setContacts(byPlayer(contactRows))
+        setParents(byPlayer(parentRows))
       })
       .catch(() => {
         // Silent: this is a supplementary panel, not the reason the screen
@@ -102,7 +122,8 @@ export default function YourPlayers({ memberships = [], teams = [] }) {
       </h3>
       {players.map((player) => {
         const team = teams.find((t) => t.id === player.team_id)
-        const contact = contacts[player.id] ?? null
+        // player_contacts is one row per player, so take the first.
+        const contact = (contacts[player.id] ?? [])[0] ?? null
         const theirParents = parents[player.id] ?? []
 
         return (
@@ -124,13 +145,18 @@ export default function YourPlayers({ memberships = [], teams = [] }) {
             <div className="mt-2.5">
               <Row label="Phone" value={contact?.phone ? formatPhone(contact.phone) : null} />
               <Row label="Email" value={contact?.email ?? null} />
+              {/* ⚠️ NAME ONLY, NO PHONE. listParentsForPlayers selects
+                  id/player_id/full_name/relationship/is_primary — it does NOT
+                  return phone or email. Rendering parent.phone here printed
+                  nothing and looked like a missing value rather than a field
+                  that was never fetched. Widening that shared query to feed
+                  this panel would pull more contact data into every caller
+                  that uses it, so the panel shows what the query returns. */}
               {theirParents.map((parent) => (
                 <Row
                   key={parent.id}
                   label={parent.relationship || 'Parent'}
-                  value={[parent.full_name, parent.phone ? formatPhone(parent.phone) : null]
-                    .filter(Boolean)
-                    .join(' · ')}
+                  value={parent.full_name}
                 />
               ))}
             </div>

@@ -84,9 +84,16 @@ beforeEach(() => {
   clearMyProfileCache()
   useMembershipsMock.mockReturnValue(memberships(ADMIN))
   // Default: nothing linked. Individual tests opt in to players.
+  //
+  // ⚠️ ARRAYS, NOT MAPS, BECAUSE THAT IS WHAT THE REAL FUNCTIONS RETURN.
+  // The first version of these mocks returned `{}` keyed by player id —
+  // the shape the component's author assumed. Every test passed and the
+  // panel shipped blank to production, because on a real array
+  // `contacts[playerId]` is undefined. A mock that encodes the assumption
+  // instead of the contract tests nothing.
   listPlayersMock.mockResolvedValue([])
-  listContactsForPlayersMock.mockResolvedValue({})
-  listParentsForPlayersMock.mockResolvedValue({})
+  listContactsForPlayersMock.mockResolvedValue([])
+  listParentsForPlayersMock.mockResolvedValue([])
 })
 
 // Added 6 Aug 2026 (Jay): "they should be able to see their info and any
@@ -122,16 +129,54 @@ describe('More — your players', () => {
   it('shows the contact and parent rows the club holds', async () => {
     useMembershipsMock.mockReturnValue(memberships(PARENT))
     listPlayersMock.mockResolvedValue([PLAYER])
-    listContactsForPlayersMock.mockResolvedValue({ p1: { phone: '+971501234567', email: 'tom@example.com' } })
-    listParentsForPlayersMock.mockResolvedValue({
-      p1: [{ id: 'pa1', full_name: 'Jay Muir', relationship: 'Father', phone: '+971509876543' }],
-    })
+    // Exactly the row shapes the real queries return — player_id on each row,
+    // and NO phone/email on a parent row, because listParentsForPlayers
+    // selects id, player_id, full_name, relationship, is_primary and nothing
+    // else.
+    listContactsForPlayersMock.mockResolvedValue([
+      { player_id: 'p1', phone: '+971501234567', email: 'tom@example.com' },
+    ])
+    listParentsForPlayersMock.mockResolvedValue([
+      { id: 'pa1', player_id: 'p1', full_name: 'Jay Muir', relationship: 'Father', is_primary: true },
+    ])
 
     renderMore()
     const card = await screen.findByTestId('your-player')
     expect(within(card).getByText('tom@example.com')).toBeInTheDocument()
-    expect(within(card).getByText(/Jay Muir/)).toBeInTheDocument()
+    expect(within(card).getByText('Jay Muir')).toBeInTheDocument()
     expect(within(card).getByText('Father')).toBeInTheDocument()
+    // The phone is formatted, not printed raw.
+    expect(within(card).getByText('+971 50 123 4567')).toBeInTheDocument()
+  })
+
+  it('groups rows by player when two children are linked', async () => {
+    // ⚠️ The regression test for the shipped bug: with an ARRAY of rows
+    // covering two players, each card must get its own. The broken version
+    // rendered neither.
+    useMembershipsMock.mockReturnValue(
+      memberships([
+        { id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' },
+        { id: 'm4', role: 'parent', team_id: 'team-u10', player_id: 'p2' },
+      ]),
+    )
+    listPlayersMock.mockResolvedValue([
+      PLAYER,
+      { id: 'p2', full_name: 'Sam Muir', team_id: 'team-u10', position: null, photo_path: null },
+    ])
+    listContactsForPlayersMock.mockResolvedValue([
+      { player_id: 'p1', phone: null, email: 'tom@example.com' },
+      { player_id: 'p2', phone: null, email: 'sam@example.com' },
+    ])
+
+    renderMore()
+    const cards = await screen.findAllByTestId('your-player')
+    expect(cards).toHaveLength(2)
+
+    const tom = cards.find((c) => within(c).queryByText('Tom Muir'))
+    const sam = cards.find((c) => within(c).queryByText('Sam Muir'))
+    expect(within(tom).getByText('tom@example.com')).toBeInTheDocument()
+    expect(within(tom).queryByText('sam@example.com')).toBeNull()
+    expect(within(sam).getByText('sam@example.com')).toBeInTheDocument()
   })
 
   it('says NOTHING when the contact row is withheld', async () => {
@@ -142,7 +187,7 @@ describe('More — your players', () => {
     // no lock icon.
     useMembershipsMock.mockReturnValue(memberships(PARENT))
     listPlayersMock.mockResolvedValue([PLAYER])
-    listContactsForPlayersMock.mockResolvedValue({})
+    listContactsForPlayersMock.mockResolvedValue([])
 
     renderMore()
     const card = await screen.findByTestId('your-player')
