@@ -153,9 +153,19 @@ function StatTile({ testId, value, label, className = '' }) {
 // Wraps the tiles in the gradient band plus the vivid brand-rule hairline.
 // The hairline is where the full-saturation #3bd070 lives now — it carries no
 // text, so it is free to be as bright as the website's.
+//
+// ⚠️ mt-[18px] IS LOAD-BEARING, AND IT IS HERE BECAUSE THIS BLOCK HAS NO
+// TITLE. Every other block on this screen gets its top gap from BlockTitle's
+// own mt-[18px]; the stat band is the only one with no heading above it, so
+// nothing was supplying one. It looked fine until 6 Aug only because the band
+// used to sit directly under the fixture hero and was living off the hero's
+// mb-4 — an accident, not a rule. Putting the fortnight strip between them
+// removed that donor and the band ended up flush against the strip's card,
+// with the two touching. The value matches BlockTitle exactly so the band
+// lines up with every other block boundary on the screen.
 function StatBand({ children }) {
   return (
-    <div className="overflow-hidden rounded-card shadow-card">
+    <div className="mt-[18px] overflow-hidden rounded-card shadow-card">
       <div className="brand-rule" />
       <div className="grid grid-cols-3 bg-stat-band">{children}</div>
     </div>

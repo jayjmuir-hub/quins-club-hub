@@ -442,6 +442,31 @@ describe('Dashboard — stats', () => {
     expect(screen.getByTestId('stat-groups')).toHaveTextContent('2')
   })
 
+  // ⚠️ SPACING, PINNED AS A CLASS TOKEN. jsdom applies no CSS, so nothing
+  // here can measure the gap — this asserts the token the gap depends on, the
+  // same approach the masthead breakpoint and PhoneInput overlap regressions
+  // use.
+  //
+  // The defect this guards: every other block on the dashboard takes its top
+  // gap from BlockTitle's mt-[18px], and the stat band is the only block with
+  // no heading. It was silently living off the fixture hero's mb-4 until the
+  // fortnight strip was inserted between them, at which point the band sat
+  // flush against the strip's card with the two touching. Nothing failed —
+  // that is exactly why it needs a token assertion rather than trusting the
+  // layout to stay accidentally correct.
+  it('gives the stat band its own top gap, since no BlockTitle supplies one', async () => {
+    renderDashboard()
+    await screen.findByTestId('stat-players')
+
+    // The band is the tile's grid parent's parent (tile -> grid -> band root).
+    const band = screen.getByTestId('stat-players').parentElement.parentElement
+    expect(band.className).toContain('mt-[18px]')
+    // And it really is the band, not some other ancestor that happens to
+    // carry a margin — without this the assertion above would pass on any
+    // wrapper.
+    expect(band.className).toContain('rounded-card')
+  })
+
   it('labels the tiles for the whole club when the user is an admin', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(ADMIN))
 
