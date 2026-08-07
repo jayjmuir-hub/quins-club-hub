@@ -10,6 +10,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 7 Aug 2026
 
+- `3c6fbbf` — `npm run docs:check` + CI: six documentation rules that can now fail a
+  build. Fixed five dead pointers, a removed component cited in a live a11y contract,
+  three stale runbooks and seven missing plan status lines. `[skip ci]`
 - `c3c038b` — One home per machine fact (NODE_ENV was wrong in two of three files),
   refreshed the Machines table, backfilled this changelog. `[skip ci]`
 - `1f75dae` — Audited `state-of-play.md` against the live database: six claims corrected,

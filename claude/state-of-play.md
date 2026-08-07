@@ -140,6 +140,25 @@ the rows back.**
   7 Aug; it is status, so it belongs here.)
 - **No rate limit on account creation** — only on what an account can do, which
   without a membership is nothing. Verified 7 Aug: no rate-limiting code in `src/`.
+- ⚠️ **`sync_profile_name` mangles a SINGLE-WORD name, and its own comment says it
+  should not.** The comment reads "a single-word name is a first name with no family
+  name, not the reverse", but the guard that implements it never fires: for `Single`,
+  `regexp_replace(full_in, '\s+\S+$', '')` finds nothing to strip and returns
+  `Single`, so `first_name` is never null and the `if first_name is null` branch is
+  dead. Result: **`first_name = 'Single'` AND `last_name = 'Single'`.**
+  ⚠️ **Pre-existing, NOT caused by the search_path change** — proved by running an
+  unpinned copy of the original function side by side on 7 Aug; identical output.
+  **No real row has hit it yet** (all 5 profiles have two-word names, 0 with
+  `first_name = last_name`), so this is latent, not live. It will fire the first time
+  a parent types one word into the name gate. Fix is to test the *split*, not
+  `first_name`: `if position(' ' in full_in) = 0 then last_name := null`.
+- ⚠️ **`db/schema/` was last captured on 4 Aug (`7f533fd`) and is badly stale.** It
+  contains none of `claim_roster_access`, `delete_my_account`, `set_own_player_gender`
+  or `sync_profile_name`. **This matters more than an ordinary stale doc**: per
+  `RESTORE.md`'s "Changing the schema safely", the capture exists so a re-capture that
+  shows unintended changes reveals drift — and that is exactly how the repeated
+  `accept_invite` reversion was caught. **A capture three days and ~14 migrations
+  behind cannot do that job.** Re-capture and commit alongside the next migration.
 - A parent has never signed out in a real browser, and the phone-width note has never
   been rendered. The RLS-refusal path is still mock-only for both events features.
 - `saveParents` is delete-then-write, not atomic.
@@ -150,9 +169,11 @@ the rows back.**
   ⚠️ **`npm run docs:check` now fails the build if that terminology comes back.**
 - Single-club assumption in `clubId` derivation, `is_admin_anywhere()` and
   `can_admin_see_pending()` — revisit together if a second club ever appears.
-- ⚠️ **`private.sync_profile_name` has a mutable `search_path`** — the one security
-  advisor finding that is NOT on the "noise" list below, and it was in neither this
-  file nor `RESTORE.md` until 7 Aug. `BEFORE INSERT OR UPDATE` on `profiles`.
+- ✅ **`private.sync_profile_name` `search_path` PINNED 7 Aug** —
+  `db/migrations/20260807_sync_profile_name_search_path.sql`. `proconfig` read back,
+  trigger re-tested on a throwaway probe table, and `function_search_path_mutable` is
+  gone from `get_advisors`. **Every remaining security warning is now on the
+  "noise" list below.** `BEFORE INSERT OR UPDATE` on `profiles`.
   ❌ **This entry said "a `SECURITY DEFINER` trigger function" in commit `1f75dae`
   and that was wrong** — `pg_get_functiondef` shows plain `LANGUAGE plpgsql` with no
   `SECURITY DEFINER`, so it runs as the caller. **I asserted the property instead of

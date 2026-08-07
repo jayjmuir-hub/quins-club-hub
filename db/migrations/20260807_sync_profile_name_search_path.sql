@@ -1,0 +1,27 @@
+-- Pin the search_path on the profiles name-sync trigger function.
+-- Applied to the live project 7 Aug 2026 as migration
+-- `20260807xxxxxx sync_profile_name_pin_search_path`.
+--
+-- WHY: `function_search_path_mutable` was the one Supabase security advisor
+-- finding on this project NOT covered by the "these warnings are noise" list in
+-- claude/state-of-play.md. A function with a mutable search_path resolves
+-- unqualified names against whatever the caller has set.
+--
+-- WHY NO BODY CHANGE IS NEEDED: the body references no schema-qualified object
+-- and no non-catalog function — only nullif, btrim, concat_ws, regexp_replace
+-- and the NEW/OLD records. pg_catalog stays on the search path whatever
+-- search_path is set to, so all of those still resolve with search_path = ''.
+--
+-- ⚠️ THIS FUNCTION IS **NOT** SECURITY DEFINER. claude/state-of-play.md called
+-- it one on 7 Aug in commit 1f75dae and that was wrong — pg_get_functiondef
+-- shows plain `LANGUAGE plpgsql`, so it runs as the caller. Pinning the path is
+-- still correct; the stakes are just lower than that entry implied.
+--
+-- VERIFIED, not assumed:
+--   * proconfig read back as {"search_path=\"\""}.
+--   * The trigger still fires and still computes, tested on a throwaway probe
+--     table in `private` rather than on real `profiles` rows: first/last ->
+--     full_name, and full_name -> first/last including the multi-word case
+--     ("Mary Jane Watson" -> "Mary Jane" / "Watson"). Probe dropped afterwards.
+--   * `function_search_path_mutable` no longer appears in get_advisors.
+alter function private.sync_profile_name() set search_path = '';
