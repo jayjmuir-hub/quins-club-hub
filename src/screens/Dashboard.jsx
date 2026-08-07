@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Greeting from '../components/Greeting.jsx'
+import UpcomingStrip from '../components/UpcomingStrip.jsx'
 import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -468,6 +469,19 @@ export default function Dashboard() {
           now={now}
         />
       )}
+
+      {/* The fortnight glance (option C of the three Jay compared). Fed the
+          SCOPED event list, so a parent sees their child's squad and a coach
+          sees theirs — the dots follow the same visibility rules as every
+          other number on this screen.
+
+          Shown to everyone, not gated like the stat band: "what is on in the
+          next two weeks" is the one question every role opens this app to
+          answer. */}
+      <BlockTitle>Next two weeks</BlockTitle>
+      <Card>
+        <UpcomingStrip events={toPlay} now={now} onSelect={(event) => setSelectedEventId(event.id)} />
+      </Card>
 
       {/* STAFF ONLY (Jay, 6 Aug 2026). Hidden from anyone who cannot edit —
           in practice parents and players.
