@@ -7,9 +7,17 @@ the code win and this file is stale.**
 Split by VOLATILITY, not topic: anything that changes week to week lives here, so
 `RESTORE.md` never has to be edited because a status changed.
 
-*Last updated: 7 Aug 2026. Rewritten against the CODE, not against the previous
-edition of this file — the 5 Aug version had gone badly stale and was still telling
-sessions that auth email was dead and that a Manager role did not exist. Both false.*
+*Last updated: 7 Aug 2026, second session. Rewritten earlier that day against the
+CODE, not against the previous edition — the 5 Aug version had gone badly stale and
+was still telling sessions that auth email was dead and that a Manager role did not
+exist. Both false.*
+
+*Then **audited claim by claim against the code and the live database** in a second
+session. 20 claims confirmed, 6 corrected, 4 gaps added — each correction is marked
+inline with what it used to say, so the next session can see which way the drift ran.
+⚠️ **The pattern worth noticing: every wrong claim was a rotted MEASUREMENT, never a
+wrong ruling.** Counts, row totals and "there is exactly one X" all decayed within
+days; the reasoning never did. **Re-measure numbers, trust the rulings.***
 
 ## Where things stand
 
@@ -47,8 +55,13 @@ twice.**
 shadow DOM contains every digit 0-9 per column.** Text extraction and `aria-label`
 both return nonsense. **Read that page from a screenshot, or expand the row.**
 
-**143 parents need magic links.** At 100/day that is two days minimum, and
+**146 parents need magic links.** At 100/day that is two days minimum, and
 realistically three once retries and mistyped addresses are counted.
+
+⚠️ **This said 143 until 7 Aug, from a Gmail count of 136 that was never re-measured.**
+Counted live against `player_contacts` on 7 Aug: **279 distinct roster addresses, 133
+of them Gmail** (`279 − 133 = 146`). 62 more are Outlook/Hotmail/Live/MSN — the 22%
+that a Microsoft OAuth button would take off email entirely.
 
 ### ⚠️ Hitting the cap does not look like a limit
 
@@ -134,19 +147,52 @@ the rows back.**
   mention Wild Apricot. The real plan is integration with the club's new AWS site.
 - Single-club assumption in `clubId` derivation, `is_admin_anywhere()` and
   `can_admin_see_pending()` — revisit together if a second club ever appears.
+- ⚠️ **`private.sync_profile_name` has a mutable `search_path`** — the one security
+  advisor finding that is NOT on the "noise" list below, and it was in neither this
+  file nor `RESTORE.md` until 7 Aug. It is a `SECURITY DEFINER` trigger function on
+  `profiles`. Low risk given who can write to that table, and a one-line fix
+  (`set search_path = ''`), but it is real and currently unowned.
+- ⚠️ **`db/migrations/` holds 17 files against 51 applied migrations.** Supabase's own
+  list is authoritative. `events_series_id` (`20260805133133`) is applied with no file
+  in the repo, and `src/screens/EventForm.jsx` writes the column it adds. **The 6 Aug
+  edition of this file carried this warning; the 7 Aug rewrite dropped it and the
+  audit put it back.** Detail in `claude/schema-history.md`.
+- ⚠️ **`claude/changelog.md` stops at 4 Aug** while `CLAUDE.md` advertises it as "what
+  changed, when". The domain move, Resend, the session guard, the theme work and
+  gender are all missing — three days of shipped work. Backfill it from `git log` or
+  drop the claim; do not leave it half-true.
 
 ## Checked and genuinely fine — do not "fix" these
 
 - **`player-photos` bucket is PRIVATE.** Every table in `public` has RLS enabled.
-- Anon-executable `SECURITY DEFINER` functions all fail safe on explicit
-  `auth.uid() is null` guards raising `42501`. **These advisor warnings are noise.**
-- **The 19 unindexed foreign keys.** Every table is 5-315 rows. `auth_rls_initplan`
-  is marginal too.
+  Both re-verified live 7 Aug.
+- Anon-executable `SECURITY DEFINER` functions all fail safe. **These advisor warnings
+  are noise.** ⚠️ **But not by the mechanism this file claimed** — it said "all on
+  explicit `auth.uid() is null` guards", and only `claim_roster_access` uses that.
+  Checked live 7 Aug:
+  - `claim_roster_access` — explicit `auth.uid() is null` → `42501`.
+  - `set_own_player_gender`, `set_own_player_photo` — guard on
+    `private.is_own_player()`, which matches `memberships.profile_id = auth.uid()`;
+    anon gets no row, so it returns false and the function raises `42501`. Fail-safe,
+    different route.
+  - ⚠️ `calendar_events_for_token` — **no uid guard at all, deliberately.** It is the
+    calendar feed; anon is the point and the token is the gate. **Do not "fix" it to
+    match the others.**
+- **The 18 unindexed foreign keys.** (This file said 19; the advisor and a catalogue
+  query both say 18.) Tables run 0-316 rows — `availability` 0, `players` 316,
+  `player_contacts` 315. `auth_rls_initplan` is marginal too.
 - ⚠️ **Do not size an optimisation from `EXPLAIN ANALYZE` on this schema** — wall time
   is inflated roughly 4x. A 33.9 ms figure was really ~8.6 ms warm. Benchmark it.
-- **Nothing in the app or database sends email of its own accord.** Proved 6 Aug: one
-  `mailto:` in `src/`, zero user triggers on the relevant tables, and `pg_net`, `http`
-  and `pg_cron` are not installed, so the database cannot make an outbound HTTP call.
+- **Nothing in the app or database sends email of its own accord.** ⚠️ **The conclusion
+  holds but two of the three evidence lines had rotted by 7 Aug** — re-measured:
+  - **7 `mailto:` links in `src/`**, not one: `PlayerDetail.jsx` ×5, `DeleteAccount.jsx`,
+    `Privacy.jsx`. All user-initiated anchors; none sends anything by itself.
+  - **One user trigger, not zero:** `profiles_sync_name` on `profiles`, calling
+    `private.sync_profile_name` — added by the split-name work on 6 Aug. It syncs
+    `name` from first/last and sends nothing.
+  - `pg_net`, `http` and `pg_cron` are **still not installed**, so the database cannot
+    make an outbound HTTP call at all. That is the line the conclusion actually rests
+    on, and it is the one that held.
 - **`_transfer.b64` is gone and `.gitignore` covers it.** Resolved; it was flagged in
   this file for days after the fact.
 
