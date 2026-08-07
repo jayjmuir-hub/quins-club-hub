@@ -28,6 +28,22 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+// The greeting added on 6 Aug 2026 pulls in useAuth and the profile row, so
+// this screen now needs both. Without them every test in this file fails at
+// render — useAuth throws outside its provider, and getMyProfile would reach
+// for the network.
+vi.mock('../src/lib/auth.jsx', () => ({
+  useAuth: () => ({ user: { id: 'user-1', email: 'jay@example.com' } }),
+}))
+
+vi.mock('../src/data/members.js', () => ({
+  getMyProfile: vi.fn().mockResolvedValue({
+    id: 'profile-1',
+    first_name: 'Jay',
+    last_name: 'Muir',
+  }),
+}))
+
 vi.mock('../src/data/events.js', () => ({
   listEvents: (...args) => listEventsMock(...args),
   subscribeEvents: (...args) => subscribeEventsMock(...args),
@@ -52,6 +68,7 @@ vi.mock('../src/data/availability.js', () => ({
 
 // Import after vi.mock so this binds to the mocked modules.
 import Dashboard from '../src/screens/Dashboard.jsx'
+import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
 // 2026-07-20T09:00 Abu Dhabi — the prototype's own demo "now"
 // (design-system.md §4.11), so the fixture below reproduces the documented
@@ -182,6 +199,10 @@ let nowSpy
 let setIntervalSpy
 
 beforeEach(() => {
+  // ⚠️ useMyProfile caches at MODULE level, keyed by user id, so without this
+  // the first test's profile leaks into every later one and a test that
+  // expects no name would still see "Jay".
+  clearMyProfileCache()
   nowSpy = vi.spyOn(Date, 'now').mockReturnValue(NOW)
   setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
   useMembershipsMock.mockReset()

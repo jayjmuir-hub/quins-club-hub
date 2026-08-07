@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
+import Greeting from '../components/Greeting.jsx'
 import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -449,6 +450,10 @@ export default function Dashboard() {
           the document outline intact for screen readers without changing the
           approved design. */}
       <h2 className="sr-only">Dashboard</h2>
+
+      {/* Sits above the fixture hero so the first thing on the screen is
+          addressed to the person, not to the club. */}
+      <Greeting />
 
       {nextFixture && (
         <NextFixtureHero

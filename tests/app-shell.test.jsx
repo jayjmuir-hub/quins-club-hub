@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -38,6 +38,7 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 
 // Import after vi.mock so this binds to the mocked modules.
 import AppShell from '../src/components/AppShell.jsx'
+import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
 const signOutMock = vi.fn()
 const getMyProfileMock = vi.fn()
@@ -78,6 +79,10 @@ function hasClassToken(element, token) {
 }
 
 beforeEach(() => {
+  // ⚠️ useMyProfile caches at module level keyed by user id. Without this the
+  // first test's profile leaks into every later one, and the no-name case
+  // would still render a name.
+  clearMyProfileCache()
   useAuthMock.mockReset()
   useMembershipsMock.mockReset()
   signOutMock.mockReset()
@@ -349,5 +354,66 @@ describe('AppShell — Admin nav gating (admin-dashboard plan, 2026-08-05)', () 
 
     expect(screen.queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Accounts' })).not.toBeInTheDocument()
+  })
+})
+
+// Added 6 Aug 2026. Before this the only route to your own account was
+// knowing that "More" contained it.
+describe('AppShell — my account button', () => {
+  it('points at /more', async () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
+
+    renderShell()
+
+    const link = await screen.findByTestId('account-button')
+    expect(link).toHaveAttribute('href', '/more')
+  })
+
+  it('names the person for a screen reader', async () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
+
+    renderShell()
+
+    expect(await screen.findByRole('link', { name: 'My account, Jay' })).toBeInTheDocument()
+  })
+
+  it('still says My account when there is no name', async () => {
+    // ⚠️ A magic-link sign-in has no name until NamePrompt is answered, and
+    // NamePrompt is skippable. An aria-label of "My account, " would be worse
+    // than useless.
+    useMembershipsMock.mockReturnValue(loaded())
+    getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: null })
+
+    renderShell()
+
+    expect(await screen.findByRole('link', { name: 'My account' })).toBeInTheDocument()
+  })
+
+  it('falls back to the email initial when there is no name', async () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: null })
+
+    renderShell()
+
+    // jay@example.com -> J. Never an empty circle.
+    const link = await screen.findByTestId('account-button')
+    expect(link.textContent).toContain('J')
+  })
+
+  it('hides the name below the desktop breakpoint but keeps the initial', async () => {
+    // Same jsdom limitation the role-label tests work around: check the class
+    // token, since jsdom applies no real CSS. The masthead already carries the
+    // crest, club name and role on a phone; the name does not fit too.
+    useMembershipsMock.mockReturnValue(loaded())
+    getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
+
+    renderShell()
+
+    const link = await screen.findByTestId('account-button')
+    const nameEl = within(link).getByText('Jay')
+    expect(hasClassToken(nameEl, 'hidden')).toBe(true)
+    expect(hasClassToken(nameEl, 'desktop:inline')).toBe(true)
   })
 })

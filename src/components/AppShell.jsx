@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
+import useMyProfile from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin, roleLabel } from '../lib/scope.js'
 import Nav from './Nav.jsx'
@@ -103,6 +104,7 @@ function ErrorState({ error, reload }) {
 
 export default function AppShell({ children }) {
   const { user, signOut } = useAuth()
+  const { firstName } = useMyProfile()
   const { memberships, loading, error, reload } = useMemberships()
   const location = useLocation()
 
@@ -223,6 +225,43 @@ export default function AppShell({ children }) {
                 {currentRoleLabel}
               </span>
             )}
+
+            {/* MY ACCOUNT (Jay, 6 Aug 2026). Before this, the only way to
+                reach your own account was to know that "More" contained it —
+                the delete-account control, the calendar link and sign-out were
+                all behind a nav item named after nothing in particular.
+
+                This is a LINK to /more, not a dropdown menu. A popover needs
+                outside-click, Escape, focus return and a scrim that does not
+                fight the sticky masthead's z-40, and none of that earns its
+                keep while the destination is a single short screen. If /more
+                grows, this becomes the menu.
+
+                The initial, not a photo: `players.photo_path` holds head shots
+                of PLAYERS, and the signed-in person is usually a parent or a
+                coach who has no photo anywhere in the system. */}
+            <Link
+              to="/more"
+              data-testid="account-button"
+              aria-label={firstName ? `My account, ${firstName}` : 'My account'}
+              className="ml-1 flex shrink-0 items-center gap-2 rounded-pill py-1 pl-1 pr-1 text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 desktop:pr-3"
+            >
+              <span
+                aria-hidden="true"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/15 text-[12px] font-extrabold"
+              >
+                {(firstName || user?.email || '?').trim().charAt(0).toUpperCase()}
+              </span>
+              {/* The name is desktop-only. On a phone the masthead already
+                  carries the crest, the club name and the role, and adding a
+                  name pushes the row past its width — the initial alone is
+                  still a 28px tap target. */}
+              {firstName && (
+                <span className="hidden max-w-[9ch] truncate font-condensed text-[13px] font-bold uppercase tracking-[0.08em] desktop:inline">
+                  {firstName}
+                </span>
+              )}
+            </Link>
 
             {/* Gates on realMemberships inside the component itself, never on
                 the effective `memberships` destructured above — see
