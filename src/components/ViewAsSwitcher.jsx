@@ -96,10 +96,16 @@ export function ViewAsSwitcher() {
 
   return (
     <>
-      {/* Desktop-only in CSS, not JS: `hidden desktop:flex` at the 820px
-          breakpoint, exactly how Nav.jsx gates the Overview item. The
-          preview is a desk-bound admin tool (spec §1) and the masthead has
-          no room for it on a phone. */}
+      {/* ⚠️ STYLED FOR A LIGHT SURFACE, NOT THE DARK CHROME. This was
+          bg-white/10 + text-white while it lived in the masthead; rendered
+          unchanged on the Admin screen (7 Aug 2026) that is white-on-near-
+          white and effectively invisible. It now matches the Admin tab pills
+          directly beneath it — surface-card fill, brand text, inset hairline.
+
+          Still `hidden desktop:block` even though its only parent is already
+          desktop-only. Belt and braces on purpose: the preview is a
+          desk-bound admin tool (spec §1), and that rule should survive this
+          component being rendered somewhere else later. */}
       <button
         type="button"
         data-testid="view-as-trigger"
@@ -108,13 +114,13 @@ export function ViewAsSwitcher() {
         aria-expanded={open}
         aria-label={triggerAria}
         title={triggerAria}
-        // ⚠️ max-w-[16ch] + truncate is what stops this being a bug again for
-        // one squad. Without a bound, "Coach, Senior Men 2nd XV" is wider than
-        // the string this replaced, and the club wordmark — the ONLY item in
-        // the masthead row that is not shrink-0 — absorbs the whole overflow
-        // and truncates instead. Bounding the variable-length thing keeps the
-        // fixed-length wordmark whole at every squad name.
-        className="hidden max-w-[16ch] shrink-0 items-center gap-1.5 truncate rounded-pill bg-white/10 px-3 py-1 font-condensed text-[13px] font-bold uppercase tracking-[0.08em] text-white outline-none transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome desktop:block"
+        // max-w-[16ch] + truncate is kept from the masthead version. It is no
+        // longer load-bearing for the club wordmark — this control is not in
+        // that row any more — but "Coach, Senior Men 2nd XV" is a long thing
+        // to put in a pill beside a heading, and a bounded control keeps the
+        // Admin header from reflowing as the persona changes. The full text
+        // is in aria-label and title either way.
+        className="hidden max-w-[16ch] shrink-0 truncate rounded-pill bg-surface-card px-4 py-2 text-sm font-bold text-brand shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT)] outline-none transition hover:bg-surface-mute focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 desktop:block"
       >
         {triggerLabel}
       </button>

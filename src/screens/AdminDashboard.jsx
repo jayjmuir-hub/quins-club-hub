@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import Card from '../components/Card.jsx'
+import { ViewAsSwitcher } from '../components/ViewAsSwitcher.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin } from '../lib/scope.js'
 
@@ -36,6 +37,40 @@ function NotAuthorised() {
   )
 }
 
+// ⚠️ A REAL ADMIN WHO IS PREVIEWING MUST NOT GET "Not authorised", and this
+// branch is what makes the switcher's new home workable at all.
+//
+// The gate below reads the EFFECTIVE membership set, so the instant an admin
+// picks a persona they stop being an admin as far as this screen is
+// concerned — the screen they just used the control ON disappears, taking
+// the control with it. Without this branch, changing persona would mean Exit
+// preview, then re-pick: two steps for what used to be one, a straight
+// downgrade from the masthead version.
+//
+// So: still an admin really, just previewing. Say so, and keep the switcher
+// on screen. This is NOT a hole in the gate — it renders no club data, only
+// the control, and it is reached only when isAdmin(realMemberships) is true,
+// which is the same predicate ViewAsSwitcher itself uses to decide whether
+// to render anything.
+function PreviewingNotice() {
+  return (
+    <section>
+      <h2 className="sr-only">Admin</h2>
+      <Card className="p-6 text-center">
+        <h3 className="text-base font-extrabold text-ink">You&apos;re previewing the app</h3>
+        <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-ink-muted">
+          Admin tools are hidden while you preview, because you are seeing the app as
+          someone else sees it. Change who you are previewing below, or use Exit preview
+          at the top of the screen to come back.
+        </p>
+        <div className="mt-4 flex justify-center">
+          <ViewAsSwitcher />
+        </div>
+      </Card>
+    </section>
+  )
+}
+
 const TABS = [
   { to: '/admin/accounts', label: 'Accounts' },
   { to: '/admin/club', label: 'Club' },
@@ -52,9 +87,16 @@ function tabClassName({ isActive }) {
 }
 
 export default function AdminDashboard() {
-  const { memberships } = useMemberships()
+  const { memberships, realMemberships, viewAs } = useMemberships()
 
-  if (!isAdmin(memberships)) return <NotAuthorised />
+  if (!isAdmin(memberships)) {
+    // Order matters: the previewing case is a strict subset of "not an admin
+    // by the effective set", so it has to be tested first or it can never be
+    // reached. realMemberships is what makes it safe — a coach who typed the
+    // URL fails it and still gets the original wording.
+    if (viewAs && isAdmin(realMemberships ?? [])) return <PreviewingNotice />
+    return <NotAuthorised />
+  }
 
   return (
     <section>
@@ -78,8 +120,26 @@ export default function AdminDashboard() {
       </Card>
 
       <div className="hidden desktop:block">
-        <div className="mb-3.5 mt-1">
+        {/* ViewAsSwitcher lives HERE, not in the masthead (moved 7 Aug 2026,
+            Jay's call). The masthead could not fit an admin's full row at its
+            1120px cap and was truncating the club wordmark to "ABU DHABI
+            HARLE…" — the reasoning is written out in full at its old call
+            site in AppShell.jsx.
+
+            This screen is the right home for it regardless: the control is
+            admin-only, used occasionally rather than constantly, and this
+            screen is already gated to admins AND already desktop-only, which
+            is exactly the switcher's own audience and its own width rule.
+
+            ⚠️ Starting a preview from here immediately removes this screen —
+            the /admin gate reads the EFFECTIVE membership set, so previewing
+            as a coach drops the admin's own access to it. That is correct and
+            is the whole point of the preview, and it is not a trap: the
+            ViewAsBanner AppShell still renders at every width carries the
+            Exit button, so the way back never depended on this screen. */}
+        <div className="mb-3.5 mt-1 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Admin</h2>
+          <ViewAsSwitcher />
         </div>
 
         <nav aria-label="Admin sections" className="mb-4 flex gap-2">

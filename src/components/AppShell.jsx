@@ -7,7 +7,9 @@ import { isAdmin, roleLabel } from '../lib/scope.js'
 import Nav from './Nav.jsx'
 import NamePrompt from './NamePrompt.jsx'
 import RequestAccess from './RequestAccess.jsx'
-import { ViewAsBanner, ViewAsSwitcher } from './ViewAsSwitcher.jsx'
+// ViewAsBanner only — the switcher itself moved to the Admin screen on
+// 7 Aug 2026. See the long note at its old call site below.
+import { ViewAsBanner } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
@@ -277,10 +279,33 @@ export default function AppShell({ children }) {
               )}
             </Link>
 
-            {/* Gates on realMemberships inside the component itself, never on
-                the effective `memberships` destructured above — see
-                ViewAsSwitcher.jsx's header comment. */}
-            <ViewAsSwitcher />
+            {/* ⚠️ ViewAsSwitcher USED TO BE HERE, AND MUST NOT COME BACK.
+                Moved to the Admin screen on 7 Aug 2026 (Jay's call).
+
+                The masthead row cannot fit an admin's full complement at its
+                max-w-[1120px] cap. Measured in the harness, admin, not
+                previewing, account name showing:
+
+                  crest 46 | role pill 75 | account 77 | View-as 84 | nav 492
+                  club wordmark gets 238px, needs 257 -> "ABU DHABI HARLE..."
+
+                The admin nav is 492px against a coach's 395 — the ADMIN item
+                is most of the difference — and the wordmark is the only item
+                in this row without shrink-0, so it absorbs every overflow.
+
+                ⚠️ A WIDER SCREEN CANNOT FIX IT: the row is capped, so every
+                viewport at or above ~1152px has exactly this much space.
+
+                Two cheaper-looking fixes were measured and REJECTED because
+                they only fix today's screenshot: dropping the account name
+                (41px) and shrinking the wordmark to 19px both leave 0px slack
+                and break again the moment an admin previews a squad with a
+                long name. Removing this control leaves 77px.
+
+                It belongs on /admin anyway: it is an admin-only tool used
+                occasionally, that screen is already desktop-only, and
+                ViewAsBanner below still gives one-click Exit from anywhere,
+                so nobody can get stranded in a preview. */}
 
             {/* Admin is admin-only, and gates on the EFFECTIVE membership
                 set (the same one AdminDashboard itself reads), so an admin
