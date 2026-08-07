@@ -56,22 +56,25 @@ Resend returns `429 daily_quota_exceeded` -> the Send Email Auth Hook returns 50
 GoTrue returns `500 unexpected_failure`, message
 `"Unexpected status code returned from hook: 500"`.
 
-`friendlyAuthError` in `src/screens/Login.jsx` matches
-`/rate limit|too many requests|429/i` — and that string contains none of them. **So a
-parent sees raw internal text and concludes the app is broken.** This happened to Jay
-at 04:44 on 6 Aug and is in the auth logs.
+The rate-limit pattern `/rate limit|too many requests|429/i` does **not** match that
+string — it contains none of those words. So the message a parent sees depends
+entirely on a second, separate pattern.
 
-**Two ways out, not yet decided:**
+✅ **`friendlyAuthError` ALREADY handles this.** `src/screens/Login.jsx:67` carries
+`EMAIL_SEND_FAILED = /status code returned from hook|unexpected_failure/i` alongside
+the rate-limit pattern, so a parent past the cap gets a readable message, not raw
+internal text. ⚠️ **The 6 Aug edition of this file said the fix was still outstanding
+and that claim was carried forward unverified on 7 Aug. It was wrong both times.**
+The raw text was seen by Jay at 04:44 on 6 Aug and is in the auth logs; the fix
+landed after that.
+
+**Two ways out of the cap itself, not yet decided:**
 
 1. **Pay-as-you-go**, $0.90 per 1,000 emails — the whole rollout is roughly **$0.15**.
    Removes the cliff entirely. Needs a card on the account: **a purchase, so Jay does
    it, not the assistant.**
 2. **Stagger by age group** and stay under the cap — free, but stretches the rollout
    across several days and leaves the cliff in place for anyone who retries.
-
-Either way, **`friendlyAuthError` should learn the hook-500 string first**, or the
-first person past the cap generates a support request nobody can diagnose from the
-screenshot.
 
 ## Shipped 6-7 Aug 2026
 
@@ -117,7 +120,13 @@ the rows back.**
 - **Nobody is emailed when an access request arrives** — Jay checks the Accounts tab.
   ⚠️ This gets busier under roster-match onboarding, since every non-matching address
   lands there. The "Request sent" screen no longer promises an approval email.
-- No rate limit on account creation.
+- ⚠️ **`jayjmuir@yahoo.com` holds a full admin membership it was probably never meant
+  to have.** Jay can fix this himself from the Accounts screen. **Until then, any
+  "a coach cannot see X" test using that account is invalid** — it is an admin.
+  (Carried over from `RESTORE.md`'s "Outstanding" section when that was removed on
+  7 Aug; it is status, so it belongs here.)
+- **No rate limit on account creation** — only on what an account can do, which
+  without a membership is nothing. Verified 7 Aug: no rate-limiting code in `src/`.
 - A parent has never signed out in a real browser, and the phone-width note has never
   been rendered. The RLS-refusal path is still mock-only for both events features.
 - `saveParents` is delete-then-write, not atomic.
