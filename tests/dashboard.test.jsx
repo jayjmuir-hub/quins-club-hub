@@ -336,13 +336,27 @@ describe('Dashboard — next fixture hero', () => {
     expect(within(await screen.findByTestId('next-fixture')).getByText('Away')).toBeInTheDocument()
   })
 
-  it('counts down to the kick-off instant', async () => {
+  it('shows no countdown', async () => {
+    // Removed 6 Aug 2026 (Jay). Three boxes reading "24 / 7 / 54" is
+    // precision nobody asked for when the next event is a training session
+    // three weeks out, and the date and time sit directly above it.
     renderDashboard()
+    await screen.findByTestId('next-fixture')
 
-    const countdown = await screen.findByTestId('countdown')
-    expect(within(countdown).getByTestId('countdown-days')).toHaveTextContent('4')
-    expect(within(countdown).getByTestId('countdown-hours')).toHaveTextContent('8')
-    expect(within(countdown).getByTestId('countdown-minutes')).toHaveTextContent('0')
+    expect(screen.queryByTestId('countdown')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('countdown-days')).not.toBeInTheDocument()
+  })
+
+  it('still shows the date and time the countdown sat under', async () => {
+    // ⚠️ The injected fault for the test above. The countdown and the
+    // kick-off line were the same block; deleting one line too many took
+    // `const date = eventDate(event)` with it and crashed the whole screen —
+    // 34 tests red. This asserts the useful half survived.
+    renderDashboard()
+    const hero = await screen.findByTestId('next-fixture')
+
+    expect(within(hero).getByText(/Jul 24, 2026/)).toBeInTheDocument()
+    expect(within(hero).getByText(/5:00 PM/)).toBeInTheDocument()
   })
 
   it('does not call a training session a fixture', async () => {
@@ -389,22 +403,18 @@ describe('Dashboard — next fixture hero', () => {
     expect(screen.queryByTestId('next-fixture')).not.toBeInTheDocument()
   })
 
-  it('only runs the once-a-minute countdown tick while there is a hero', async () => {
-    // Filtered to the countdown's own 60s delay so nothing React or RTL
+  it('runs no once-a-minute tick at all any more', async () => {
+    // Filtered to the old countdown's 60s delay so nothing React or RTL
     // schedules internally can make this pass by accident.
     const ticks = () =>
       setIntervalSpy.mock.calls.filter(([, delay]) => delay === 60 * 1000).length
 
-    const { unmount } = renderDashboard()
-    await screen.findByTestId('next-fixture')
-    expect(ticks()).toBe(1)
-    unmount()
-
-    setIntervalSpy.mockClear()
-    listEventsMock.mockResolvedValue([LAST_RESULT])
+    // ⚠️ NOW ZERO EVEN WITH A HERO. The timer existed only to keep the
+    // countdown honest; with the countdown gone, nothing on this screen
+    // changes minute by minute, so a phone left on the dashboard should not
+    // be re-rendering the whole thing once a minute for no visible effect.
     renderDashboard()
-    await screen.findByText(/no upcoming fixtures/i)
-    // Nothing to count down to, so nothing to re-render the dashboard for.
+    await screen.findByTestId('next-fixture')
     expect(ticks()).toBe(0)
   })
 

@@ -162,27 +162,23 @@ function StatBand({ children }) {
   )
 }
 
-function CountdownBox({ testId, value, label }) {
-  return (
-    <div className="flex-1 rounded-[10px] bg-white/[.16] py-2 text-center">
-      <b data-testid={testId} className="block font-display text-[26px] font-normal leading-none">
-        {value}
-      </b>
-      {/* font-semibold is load-bearing: only the 600 and 700 cuts of Barlow
-          Condensed are bundled, so a condensed element left at the default
-          400 silently renders in the fallback face instead. */}
-      <span className="mt-1 block font-condensed text-[12px] font-semibold uppercase tracking-[1px] opacity-90">
-        {label}
-      </span>
-    </div>
-  )
-}
-
 // design-system.md §4.11. Two-stop plum -> maroon gradient, white text
 // throughout (>= 5.9:1 against the lighter maroon end).
-function NextFixtureHero({ event, teamName, now }) {
+//
+// The days/hrs/min countdown that used to sit at the bottom of this hero was
+// removed on 6 Aug 2026 (Jay: "we don't need the countdown clock to the next
+// event, i don't think we really need it anywhere"). It was the prototype's
+// idea of a hero, and it makes sense for a cup final; for a club whose next
+// event is usually a training session 24 days out, three boxes reading
+// "24 / 7 / 54" is precision nobody asked for. The date and time are right
+// above it and are what people actually read.
+//
+// ⚠️ Its removal also took the once-a-minute re-render with it — see the
+// `now` state in Dashboard. That timer existed ONLY to tick this display.
+function NextFixtureHero({ event, teamName }) {
+  // Still needed after the countdown went: this is what the date and time
+  // lines below render from.
   const date = eventDate(event)
-  const { days, hours, minutes } = countdownParts(date.getTime(), now)
 
   return (
     <div
@@ -239,12 +235,6 @@ function NextFixtureHero({ event, teamName, now }) {
           every line — the club has one home ground, so a parent reading from
           abroad needs to know which clock these are on. */}
       <p className="mt-2 text-[11.5px] opacity-80">All times are Abu Dhabi time.</p>
-
-      <div data-testid="countdown" className="mt-3.5 flex gap-2.5">
-        <CountdownBox testId="countdown-days" value={days} label="Days" />
-        <CountdownBox testId="countdown-hours" value={hours} label="Hrs" />
-        <CountdownBox testId="countdown-minutes" value={minutes} label="Min" />
-      </div>
     </div>
   )
 }
@@ -310,11 +300,9 @@ export default function Dashboard() {
   // is no "adding" case here.
   const [formState, setFormState] = useState(null)
 
-  // The countdown is recomputed on render, and re-rendered once a minute so
-  // that a phone left on this screen doesn't sit showing a stale "3 Min" for
-  // an hour. The timer itself is started further down, once we know whether
-  // there is a hero to tick for.
-  const [now, setNow] = useState(() => Date.now())
+  // Captured once at mount. Used only to decide which day the fortnight
+  // strip marks as today — see the note where the timer used to live.
+  const [now] = useState(() => Date.now())
 
   // Both reads go out together and land together: the stat tiles mix counts
   // from each, so settling them independently would show a half-filled grid.
@@ -399,17 +387,17 @@ export default function Dashboard() {
   // back to the next event of any type (design-system.md §4.11).
   const nextFixture = toPlay.find((event) => event.type === 'match') ?? toPlay[0] ?? null
 
-  // Gated on the hero existing: with nothing to count down to there is
-  // nothing for a tick to change, and an ungated timer re-renders the whole
-  // dashboard every 60s for no visible effect. The dependency is a boolean,
-  // not the event, so a realtime refetch that returns the same next fixture
-  // doesn't restart the interval.
-  const hasCountdown = nextFixture != null
-  useEffect(() => {
-    if (!hasCountdown) return undefined
-    const id = setInterval(() => setNow(Date.now()), MINUTE)
-    return () => clearInterval(id)
-  }, [hasCountdown])
+  // ⚠️ NO TIMER HERE ANY MORE. A once-a-minute setInterval used to re-render
+  // this whole screen so the hero's countdown stayed honest. The countdown
+  // was removed on 6 Aug 2026 and the timer went with it: nothing left on
+  // this screen changes minute by minute, so a phone sitting on the
+  // dashboard now re-renders only when the data actually changes.
+  //
+  // What that costs: `now` is captured when the screen mounts, so the
+  // fortnight strip's "today" cell will not roll over at midnight for
+  // someone who leaves the app open across it. Accepted — a phone re-mounts
+  // this screen on almost any wake — and cheaper than a timer running all
+  // night to move one red highlight one cell.
 
   const upcoming = toPlay.slice(0, 5)
 
@@ -466,7 +454,6 @@ export default function Dashboard() {
         <NextFixtureHero
           event={nextFixture}
           teamName={teamsById.get(nextFixture.team_id)?.name}
-          now={now}
         />
       )}
 
