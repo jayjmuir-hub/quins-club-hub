@@ -1,135 +1,178 @@
 # State of play
 
-**Read this first, then `git log`.** Never answer from memory about current state — Jay
-works from two PCs and work lands between sessions.
+**Entry point per `CLAUDE.md` step 3.** Where things STAND. `RESTORE.md` is what is
+TRUE about the codebase. **If this file and `RESTORE.md` disagree, `RESTORE.md` and
+the code win and this file is stale.**
 
-This file is where things STAND. **`RESTORE.md` is what is TRUE** about the codebase, and
-`CLAUDE.md` is the short pointer that travels everywhere. If this file and `RESTORE.md`
-disagree, `RESTORE.md` and the code win and this file is stale.
+Split by VOLATILITY, not topic: anything that changes week to week lives here, so
+`RESTORE.md` never has to be edited because a status changed.
 
-Split by VOLATILITY, not by topic: anything that changes week to week lives here, so
-`RESTORE.md` never has to be edited just because a status changed.
-
-*Last updated: 5 Aug 2026, end of day.*
+*Last updated: 7 Aug 2026. Rewritten against the CODE, not against the previous
+edition of this file — the 5 Aug version had gone badly stale and was still telling
+sessions that auth email was dead and that a Manager role did not exist. Both false.*
 
 ## Where things stand
 
-**v1 MVP complete (22/22) and live at `https://adhquins-clubhub.com`.** Post-v1 refinement is
-the current phase — usability work driven by Jay actually using it, not new infrastructure.
+**v1 MVP complete and live at `https://adhquins-clubhub.com`** (Let's Encrypt cert,
+expires 3 Nov 2026). `app.adhjrt.com` remains a working alias, deliberately not
+removed. ⚠️ **adhquins-clubhub.com is the canonical origin** — `CALENDAR_ORIGIN` in
+`src/data/calendar.js` is hard-coded to it, and a subscribed calendar URL cannot be
+changed remotely once a parent holds one.
 
-⚠️ **AUTH EMAIL IS DEAD.** Not degraded — nothing is delivered at all. See below.
-**DO NOT INVITE THE COMMITTEE.**
+Current phase is post-v1 refinement: usability work driven by Jay using the app, not
+new infrastructure.
 
-~~The deployed `send-email` Edge Function is NOT in git.~~ **Resolved 5 Aug (`a9e8492`)** —
-the deployed Microsoft Graph version was pulled verbatim from Supabase and committed. Both
-fixes (`v1,whsec_` and `/auth/v1`) are in the repo. Recovery procedure, should it drift
-again, is in `claude/decisions/2026-08-05-microsoft-graph-and-5.7.708.md`.
+**55 test files.** ⚠️ **Do not quote a test COUNT in this file.** Previous editions
+carried 944, 978, 1057 and 1157 at various points and every one of them rotted within
+days. Run `npm test` if you need the number.
 
-**944 tests passing, build clean**, on `build/v1-mvp`. Netlify auto-deploys on push to that
-branch. `main` holds only the initial scaffold commit.
+⚠️ **`NODE_ENV=production` is set machine-wide on BOTH PCs** — a plain `npm install`
+silently drops dev dependencies including vitest, and the symptom is
+`'vite' is not recognized`. Always `npm install --include=dev`. On jay-pc,
+PowerShell's execution policy also blocks `npm.ps1`; run npm from `cmd`.
 
-⚠️ **`NODE_ENV=production` is set machine-wide on BOTH PCs, not just cafnet.** Confirmed on
-`jay-pc` 5 Aug 2026. A plain `npm install` on either machine silently drops dev dependencies
-including vitest — the symptom is `'vite' is not recognized`. **Always
-`npm install --include=dev`.** Vitest itself is handled in `vite.config.js`; this one cannot
-be. Also on jay-pc: PowerShell's execution policy blocks `npm.ps1`, so run npm from `cmd`,
-not PowerShell.
+## ⛔ The rollout blocker: Resend's daily send cap
 
-## Shipped 4 Aug 2026
+**Auth email is on Resend.** `supabase/functions/send-email/index.ts` line 9 is the
+source of truth — `PROVIDER: Resend`. The Microsoft Graph version exists in git
+history only. **The 5.7.708 Exchange block that dominated 5 Aug is no longer on the
+critical path. Do not re-open it.**
 
-All live, deployed, and verified in the deployed bundle.
+⚠️ **The remaining wall is Resend's free daily cap.** Last read off the account
+(Settings → Usage, row expanded) it was **100/day**; monthly is a non-issue.
+**Re-read it before planning a rollout — this number has been wrong in this file
+twice.**
 
-| What | Commit |
+⚠️ **Resend's usage figures are rendered by a `number-flow-react` web component whose
+shadow DOM contains every digit 0-9 per column.** Text extraction and `aria-label`
+both return nonsense. **Read that page from a screenshot, or expand the row.**
+
+**143 parents need magic links.** At 100/day that is two days minimum, and
+realistically three once retries and mistyped addresses are counted.
+
+### ⚠️ Hitting the cap does not look like a limit
+
+Resend returns `429 daily_quota_exceeded` -> the Send Email Auth Hook returns 500 ->
+GoTrue returns `500 unexpected_failure`, message
+`"Unexpected status code returned from hook: 500"`.
+
+`friendlyAuthError` in `src/screens/Login.jsx` matches
+`/rate limit|too many requests|429/i` — and that string contains none of them. **So a
+parent sees raw internal text and concludes the app is broken.** This happened to Jay
+at 04:44 on 6 Aug and is in the auth logs.
+
+**Two ways out, not yet decided:**
+
+1. **Pay-as-you-go**, $0.90 per 1,000 emails — the whole rollout is roughly **$0.15**.
+   Removes the cliff entirely. Needs a card on the account: **a purchase, so Jay does
+   it, not the assistant.**
+2. **Stagger by age group** and stay under the cap — free, but stretches the rollout
+   across several days and leaves the cliff in place for anyone who retries.
+
+Either way, **`friendlyAuthError` should learn the hook-500 string first**, or the
+first person past the cap generates a support request nobody can diagnose from the
+screenshot.
+
+## Shipped 6-7 Aug 2026
+
+Ten migrations landed in `db/migrations/`: `claim_roster_access`,
+`delete_my_account`, `drop_redundant_read_policies`,
+`grant_anon_execute_on_two_profile_helpers`, `memberships_unique_grant`,
+`profiles_backfill_split_names`, `profiles_first_and_last_name`,
+`profiles_name_confirmed_at`, `teams_is_senior`, `player_gender`.
+
+| What | Where it lives |
 |---|---|
-| Signup approval gate (`access_requests`, RequestAccess screen, Dismiss/Restore) | `aea42df` |
-| Login copy — stopped sending people to find an admin out of band | `da2811a` |
-| Scope/read-only banner removed everywhere; player sheet reworked | `3a512c5` |
-| Self-service profile editing for parents and players | `dd0d5c9` |
-| Calendar subscription feed for Google/Apple | `7f533fd` |
-| Club-branded auth email — ⚠️ **since moved to Microsoft Graph and now BLOCKED** | `23cedc8`, `a2565d6`, `df03d67` |
+| Team Manager + Medic roles | `src/lib/scope.js` — `SQUAD_STAFF_ROLES`, one exported set |
+| Roster-match auto-onboarding | `claim_roster_access`; `src/data/members.js`, `src/lib/memberships.jsx` |
+| Account deletion + privacy policy | `20260806_delete_my_account.sql`, `src/App.jsx` |
+| Session guard | `src/lib/supabase.js` |
+| Calendar feed on our own domain | `src/data/calendar.js` |
+| Baseline security headers | `netlify.toml` |
+| Gender on a player | `src/lib/gender.js`, `20260807_player_gender.sql` |
+| Theme, typography, home screen, More | `src/` — Inter replaced Anton + Barlow |
+| Split first/last name on profiles | `profiles_first_and_last_name` + backfill |
 
-Earlier the same day: `db/schema/` re-captured after it was found to be missing an entire
-table, a column, four policies and two functions — and that re-capture surfaced real drift
-(`private.photo_player` had `search_path` pinned live but not in the committed migration).
+⚠️ **Verify security headers from inside a browser, never `curl` alone.** The service
+worker served `index.html` from cache WITHOUT them: `curl` showed all five, a real
+browser showed `x-frame-options: null`. Re-checked 6 Aug on the new build —
+`X-Frame-Options: DENY` and `frame-ancestors 'none'` are both present in-browser.
 
-## What is blocked, and on whom
+⚠️ **`navigateFallbackDenylist: [/^\/calendar\.ics$/]` is load-bearing** — without it
+the service worker answers the feed with `index.html`. And on this site **a 200 is
+not proof a file exists**: the SPA catch-all answers any unknown path with
+`index.html`. Check `content-type`.
 
-**Auth email is BLOCKED on Microsoft.** Every application-submitted send fails with
-`550 5.7.708 Service unavailable. Access denied, traffic not accepted from this IP`.
-The Edge Function returns 200 — Graph accepts the message — and Exchange Online then
-refuses to let it leave. Nothing is delivered. Support case **2608050030005980**, opened
-5 Aug, replied to with test evidence the same day.
-
-**The block is on the application send path, not the tenant.** This was proved, not
-assumed: the same mailbox delivers fine via Outlook on the web and fails via Graph. Full
-writeup, including what that rules out, in
-`claude/decisions/2026-08-05-microsoft-graph-and-5.7.708.md`. An earlier conclusion that
-this was a blanket new-tenant restriction with "nothing wrong on our side" was **wrong**.
-
-**Resend is the fallback and is still fully configured** — domain verified, DKIM/SPF/MX
-present, and `RESEND_API_KEY` still set in Supabase. A rollback is one function redeploy.
-⚠️ **The `/auth/v1` fix must be ported into the Resend version first** or you ship mail
-that delivers with a dead button. See `claude/decisions/2026-08-05-resend.md`.
-
-**If auth email throws an unexplained 500**, check the `v1,whsec_` bug class first — a
-bodyless 500 with nothing useful in `get_logs` almost certainly means the Edge Function's
-own Logs tab in the Supabase dashboard (not the Invocations/API log the MCP tool surfaces)
-has the real exception. Detail in `claude/decisions/2026-08-05-resend.md`.
-
-**Domain move DONE and verified 5 Aug.** The app is live at
-`https://adhquins-clubhub.com` with a valid Let's Encrypt certificate (expires 3 Nov 2026).
-DNS moved from GoDaddy to Netlify DNS. `app.adhjrt.com` remains a working alias and was
-deliberately not removed. Full writeup and the DNS traps in
-`claude/decisions/2026-08-05-domain-move.md`.
-
-**Still to do before anyone is invited:** lift 5.7.708 → verify DKIM → send a real magic
-link and confirm it arrives, is not in spam, **the button signs you in**, and
-`Authentication-Results` shows `dkim=pass` → reinstall the PWA from the new domain and
-delete the old install → apply `New-ApplicationAccessPolicy`.
+⚠️ **A Postgres self-assignment (`set x = x`) does NOT fire a `distinct from` check.**
+A migration doing exactly this reported success and changed nothing on 6 Aug. **Read
+the rows back.**
 
 ## Open, not blocking
 
-- Nobody is emailed when an access request arrives — Jay has to look at the Accounts screen.
-- No rate limit on account creation (only on what an account can do, which is nothing).
-- Smoke tests outstanding on a real phone: parents/photos, the access gate, self-service
-  editing, the calendar feed.
-- `/more` (Admin) and `/accounts` overlap — `/more`'s member list duplicates what
-  `/accounts` does properly. Suggested: strip the list, move Invite next to Accounts.
-  Raised, not approved. `/overview` is genuinely separate and should stay.
-- "Managers" — Jay mentioned the role; it does not exist (admin/coach/parent/player).
-  Unresolved whether it's a real role or shorthand for coaches.
+- No way to edit or cancel a whole group or series. `group_id` and `series_id` are
+  both in place as the hook.
+- A managed pitch list is the precondition for clash detection.
+- Nothing in the UI distinguishes a Medic from a Coach, because there is no
+  difference in access. That is deliberate — the word is what distinguishes them.
+- **Nobody is emailed when an access request arrives** — Jay checks the Accounts tab.
+  ⚠️ This gets busier under roster-match onboarding, since every non-matching address
+  lands there. The "Request sent" screen no longer promises an approval email.
+- No rate limit on account creation.
+- A parent has never signed out in a real browser, and the phone-width note has never
+  been rendered. The RLS-refusal path is still mock-only for both events features.
 - `saveParents` is delete-then-write, not atomic.
-- No index on `memberships.profile_id`.
-- Audit trail deferred; `access_requests.decided_by/at` is a first fragment.
+- Stale docs: `claude/runbooks/e2e-roles.md`, `deploy.md` and `first-admin.md` still
+  mention Wild Apricot. The real plan is integration with the club's new AWS site.
 - Single-club assumption in `clubId` derivation, `is_admin_anywhere()` and
   `can_admin_see_pending()` — revisit together if a second club ever appears.
-- Stale docs: `claude/runbooks/e2e-roles.md`, `deploy.md`, `first-admin.md` still mention Wild Apricot.
-  The real plan is integration with the club's new AWS site.
-- ~~Doc reorganisation deliberately NOT done~~ — **this was stale and is now resolved.**
-  `8713025` did the reorganisation, and the comment sweep went with it. Measured 5 Aug
-  2026: **0 stale `docs/*.md` citations** across `src/` and `claude/`, and
-  `claude/specs/design-system.md` is cited in 2 files, not the ~29 this entry feared.
-  The cost estimate that justified deferring the work was wrong by an order of magnitude.
-  Nothing outstanding here.
+
+## Checked and genuinely fine — do not "fix" these
+
+- **`player-photos` bucket is PRIVATE.** Every table in `public` has RLS enabled.
+- Anon-executable `SECURITY DEFINER` functions all fail safe on explicit
+  `auth.uid() is null` guards raising `42501`. **These advisor warnings are noise.**
+- **The 19 unindexed foreign keys.** Every table is 5-315 rows. `auth_rls_initplan`
+  is marginal too.
+- ⚠️ **Do not size an optimisation from `EXPLAIN ANALYZE` on this schema** — wall time
+  is inflated roughly 4x. A 33.9 ms figure was really ~8.6 ms warm. Benchmark it.
+- **Nothing in the app or database sends email of its own accord.** Proved 6 Aug: one
+  `mailto:` in `src/`, zero user triggers on the relevant tables, and `pg_net`, `http`
+  and `pg_cron` are not installed, so the database cannot make an outbound HTTP call.
+- **`_transfer.b64` is gone and `.gitignore` covers it.** Resolved; it was flagged in
+  this file for days after the fact.
 
 ## Machines
 
-`jay-pc` (user `jayjm`) verified 5 Aug 2026 at `5025497`, matching `origin/build/v1-mvp` —
-no longer behind. `cafnet` (user `Jay`) last confirmed current 4 Aug; not re-checked since.
+`cafnet` (user `Jay`) · `jay-pc` (user `jayjm`). **Run `hostname` first, every
+session** — the bridge flaps and has silently reconnected to the other PC
+mid-session, and the clone paths differ.
 
-**Run `hostname` first, every session** — the bridge flaps and has silently reconnected to
-the other PC mid-session, and the clone paths differ.
+**7 Aug:** cafnet was found **16 commits behind** origin with a clean working tree,
+and was fast-forwarded to `bb6aca6`. jay-pc's last confirmed state was `5025497` on
+5 Aug and has not been re-checked since. ⚠️ **Assume nothing about either clone.
+Measure with `git rev-list --left-right --count`** — see `CLAUDE.md` reading-order
+step 2 for why no other probe answers this.
 
-⚠️ **Untracked file in the repo root: `_transfer.b64`** (14,548 bytes, 3 Aug). Not in
-`.gitignore`. Contents unexamined. **This repo is PUBLIC** — check what it is and either
-ignore it or delete it, before a careless `git add` sweeps it in.
+⚠️ **jay-pc had `core.fileMode` drift** — every tracked file showing as locally
+modified, exec bit flipped 100644 -> 100755. Set to `false` on 5 Aug, which stops the
+mode noise; CRLF/LF content drift on files that session did not touch may remain.
 
-⚠️ **jay-pc's working tree has `core.fileMode` drift**: before this session's commit, every
-tracked file showed as locally modified — full-file rewrite in `git diff`, executable bit
-flipped 100644→100755 on files that should never be executable. Root cause not fully
-diagnosed (likely OneDrive sync or an editor touching the exec bit; Windows checkouts
-should normally run `core.fileMode=false` since NTFS doesn't model the POSIX bit the same
-way). **Set to `false` in this session, 5 Aug**, which stops the mode noise; the CRLF/LF
-content drift on files this session didn't touch is still there. **Do not run
-`git add -A` on this machine until that's cleaned up** — it already wasn't allowed, but this
-is why the rule exists, made concrete.
+## ⚠️ Documentation debt — check this before trusting `claude/`
+
+Seventeen decision documents, session handoffs, plans and one runbook were written
+into the Claude project's uploaded files during 4-7 Aug and **never committed to the
+repo**. They were restored to `claude/decisions/`, `claude/handoffs/`, `claude/plans/`
+and `claude/runbooks/` on 7 Aug.
+
+**The lesson, which is the point of recording this:** `CLAUDE.md` points a session at
+`claude/decisions/` as "the rulings". For three days that folder held three files
+while a dozen rulings lived somewhere a cloned repo could not see. **A document that
+is not in the repo does not exist.** Write the file in the same breath as making the
+decision, and commit it in the same breath as writing it.
+
+⚠️ **Several of the restored documents carry status lines that were true when written
+and are not now** — for example `2026-08-06-roster-auto-onboarding.md` opens with
+"BUILT AND VERIFIED. NOT PUSHED." Those commits are long since pushed. They were
+committed as-is rather than silently edited, because a decision record is a record of
+a moment. **Trust this file and the code for current state; trust the decisions for
+reasoning.**

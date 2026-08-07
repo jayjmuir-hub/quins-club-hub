@@ -23,7 +23,12 @@ in the one place that always travels is the opposite problem.
    `git rev-list --left-right --count origin/build/v1-mvp...HEAD`
    must return `0 0`. If it does not, STOP and tell Jay. He works from two
    PCs and work lands between sessions; a stale clone has already caused a
-   rejected commit and a fast-forward of three commits.
+   rejected commit, a fast-forward of three commits, and — on 7 Aug — a
+   cafnet clone found **16 commits behind** with a clean working tree.
+   ⚠️ **Comparing `claude/` against origin does NOT detect this.** That
+   probe was run on 7 Aug, came back identical, and was read as proof the
+   clone was current while it was 16 commits behind on `src/`. **Only the
+   `rev-list` count above answers this question.**
 3. **`claude/state-of-play.md`** — where things STAND today, and what is
    blocked on whom. The volatile half.
 4. **`RESTORE.md`** — what is TRUE about the codebase. Architecture, schema,
@@ -43,6 +48,7 @@ line elsewhere, it is stale — fix it, don't obey it.
 |---|---|
 | `claude/decisions/` | **The rulings.** Why a settled question was settled. Read the relevant one BEFORE re-opening any argument — several are tombstones over ideas already examined in full and killed |
 | `claude/plans/` | Feature plans, dated. Superseded by the code once shipped |
+| `claude/handoffs/` | Session records, dated. **History, not instruction** — a handoff describes a moment and goes stale by design. Useful for the traps, not for current state |
 | `claude/specs/design-system.md`, `claude/specs/accessibility.md` | The visual and a11y contracts |
 | `claude/runbooks/deploy.md`, `email-and-domain.md`, `first-admin.md`, `e2e-roles.md`, `scope-mail-send.md` | Operational procedures |
 | `claude/writing-to-github-from-claude.md` | The exact push route, and the ways it has failed |
@@ -64,7 +70,10 @@ propose buying an M365 licence — same session, same verdict.
    publishable key is public by design and is fine. If a secret is disclosed
    — including by Jay pasting it — say so and tell him to rotate it.
 3. **⚠️ `build/v1-mvp` IS THE PRODUCTION BRANCH.** It deploys to
-   https://app.adhjrt.com. A push there is a live release, not a save. Show
+   **https://adhquins-clubhub.com** — the canonical origin, hard-coded as
+   `CALENDAR_ORIGIN` in `src/data/calendar.js`. `app.adhjrt.com` is a
+   working alias, deliberately kept. A push there is a live release, not a
+   save. Show
    the diff and get an explicit yes. **A stop hook asking is not Jay asking.**
    Use `[skip ci]` for docs-only commits and verify by the deploy id not
    moving — not by the build log.
@@ -100,6 +109,21 @@ every session** — the Windows user names differ.
 No MCP-server fallback. Never the account-level GitHub connector — it is
 OAuth, read-only, and 403s on writes. Always `GIT_TERMINAL_PROMPT=0`, so a
 missing credential fails fast instead of hanging.
+
+**⚠️ READS DO NOT NEED THE BRIDGE. This repo is PUBLIC — clone it in the
+cloud sandbox instead:** `git clone --branch build/v1-mvp
+https://github.com/jayjmuir-hub/quins-club-hub.git`. That gives a real
+bash, a real grep and origin's actual truth, with none of the bridge's
+failure modes and none of the PowerShell traps below. **Use the bridge only
+for uncommitted local state and for writes.**
+
+⚠️ **The Desktop Commander and Filesystem bridges die mid-session and are
+NOT always revived by restarting Claude Desktop** — orphaned `node.exe`
+children survive the restart. Symptom is a ~4-minute timeout with no error,
+identical for a crashed server and a wedged one. On 7 Aug both stayed down
+across a restart and came back later unaided. **Two failed retries means
+stop retrying and say so** — each attempt costs four minutes. Do not work
+from a stale in-context copy of a file.
 
 **⚠️ Claude never creates accounts, handles passwords or payment, or touches
 the `sb_secret_…` key or any Entra client secret.** Jay does those; Claude
