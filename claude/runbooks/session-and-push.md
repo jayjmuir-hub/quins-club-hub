@@ -76,28 +76,25 @@ the reliable one.
 
 **Two PCs use this project — `jay-pc` (user `jayjm`) and `cafnet` (user `Jay`).** Always
 `git pull` before starting work on either. GitHub is what keeps them in sync; nothing else
-does. **Run `hostname` first, every session** — the Desktop Commander bridge flaps and has
-silently reconnected to the *other* machine mid-session. The two clone paths differ
-(`C:\Users\jayjm\...` vs `C:\Users\Jay\...`), so assuming the wrong one wastes a round trip
-at best and edits a stale tree at worst.
+does. **Run `hostname` first** — the bridge flaps and has silently reconnected to the
+*other* machine mid-session. ⚠️ **The clone paths and the rest of the machine rules are in
+`CLAUDE.md`, which is the single home for them — this line is a reminder, not a copy.**
+Which clone is currently behind is in `claude/state-of-play.md`.
 
+⚠️ **`npm install` needs `--include=dev` on BOTH PCs** — both have
+`NODE_ENV=production` set machine-wide, so a plain `npm install` silently drops vitest.
+**The full explanation is in `CLAUDE.md`.** It is repeated here only as far as the
+command, because getting it wrong costs a confusing hour and this is the file you are
+reading when you install.
 
-**`cafnet` has `NODE_ENV=production` set machine-wide.** This breaks the dev workflow
-in two ways that both look like something else entirely:
+⚠️ **This section said "cafnet" until 7 Aug 2026, in three files at once, because the
+fact was copied rather than measured.** `set NODE_ENV` on jay-pc returns `production`.
+See `CLAUDE.md` rule 8.
 
-1. **`npm install` silently omits devDependencies** — npm resolves `omit=dev` from
-   `NODE_ENV`. A plain `npm install` there removed 492 packages including vitest itself,
-   and the next `npm test` said `'vitest' is not recognized`. Use
-   **`npm install --include=dev`** on that machine.
-2. **`npm test` used to fail most of the suite** with `act(...) is not supported in
-   production builds of React`, because Vitest only defaults `NODE_ENV` to `test` when it
-   is *unset*, so Vite resolved React's production build. Nothing in the output points at
-   `NODE_ENV`. `vite.config.js` now forces `NODE_ENV=test` when `VITEST` is set, so this
-   is handled — don't remove that guard. `npm run build` deliberately still sees the real
-   `NODE_ENV`.
-
-⚠️ **This was verified on cafnet with a pass count and a date, both of which rotted.**
-The behaviour is durable; the numbers were not. Run the suite.
+The second half of the same trap is already handled in-repo: `vite.config.js` forces
+`NODE_ENV=test` when `VITEST` is set, so `npm test` no longer resolves React's
+production build and fails with `act(...) is not supported`. **Don't remove that
+guard.** `npm run build` deliberately still sees the real `NODE_ENV`.
 
 #### Getting code from a cloud sandbox onto a PC — do NOT relay bytes by hand
 

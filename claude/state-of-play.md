@@ -30,14 +30,14 @@ changed remotely once a parent holds one.
 Current phase is post-v1 refinement: usability work driven by Jay using the app, not
 new infrastructure.
 
-**55 test files.** ⚠️ **Do not quote a test COUNT in this file.** Previous editions
-carried 944, 978, 1057 and 1157 at various points and every one of them rotted within
-days. Run `npm test` if you need the number.
+⚠️ **No test count here, and none anywhere else either.** Previous editions carried
+944, 978, 1057 and 1157 and every one rotted within days; a bare "55 test files" was
+sitting directly above this warning until 7 Aug, contradicting it. **Run `npm test`.**
 
-⚠️ **`NODE_ENV=production` is set machine-wide on BOTH PCs** — a plain `npm install`
-silently drops dev dependencies including vitest, and the symptom is
-`'vite' is not recognized`. Always `npm install --include=dev`. On jay-pc,
-PowerShell's execution policy also blocks `npm.ps1`; run npm from `cmd`.
+⚠️ **`npm install` needs `--include=dev` on both PCs** — the reason, and the rest of
+the machine environment, is in `CLAUDE.md` under "Facts worth having". **One home;
+do not restate it here.** (On jay-pc PowerShell's execution policy also blocks
+`npm.ps1` — run npm from `cmd`.)
 
 ## ⛔ The rollout blocker: Resend's daily send cap
 
@@ -149,9 +149,18 @@ the rows back.**
   `can_admin_see_pending()` — revisit together if a second club ever appears.
 - ⚠️ **`private.sync_profile_name` has a mutable `search_path`** — the one security
   advisor finding that is NOT on the "noise" list below, and it was in neither this
-  file nor `RESTORE.md` until 7 Aug. It is a `SECURITY DEFINER` trigger function on
-  `profiles`. Low risk given who can write to that table, and a one-line fix
-  (`set search_path = ''`), but it is real and currently unowned.
+  file nor `RESTORE.md` until 7 Aug. `BEFORE INSERT OR UPDATE` on `profiles`.
+  ❌ **This entry said "a `SECURITY DEFINER` trigger function" in commit `1f75dae`
+  and that was wrong** — `pg_get_functiondef` shows plain `LANGUAGE plpgsql` with no
+  `SECURITY DEFINER`, so it runs as the caller. **I asserted the property instead of
+  reading it, in the same commit that corrected six other people's unmeasured claims.**
+  That makes it lower risk than stated, not higher.
+  **The fix is one line and needs no body change:**
+  `alter function private.sync_profile_name() set search_path = '';`
+  Safe because the body references no schema-qualified object and no non-catalog
+  function — only `nullif`, `btrim`, `concat_ws`, `regexp_replace` and `NEW`/`OLD`,
+  and `pg_catalog` stays on the path whatever `search_path` is set to.
+  **Not applied — a live schema change needs Jay's yes.**
 - ⚠️ **`db/migrations/` holds 17 files against 51 applied migrations.** Supabase's own
   list is authoritative. `events_series_id` (`20260805133133`) is applied with no file
   in the repo, and `src/screens/EventForm.jsx` writes the column it adds. **The 6 Aug
@@ -198,14 +207,18 @@ the rows back.**
 
 ## Machines
 
-`cafnet` (user `Jay`) · `jay-pc` (user `jayjm`). **Run `hostname` first, every
-session** — the bridge flaps and has silently reconnected to the other PC
-mid-session, and the clone paths differ.
+Machine rules — clone paths, `hostname`, `NODE_ENV` — live in `CLAUDE.md`. **Only
+volatile clone STATE belongs here**, and it is stale the moment either PC is touched.
 
-**7 Aug:** cafnet was found **16 commits behind** origin with a clean working tree,
-and was fast-forwarded to `bb6aca6`. jay-pc's last confirmed state was `5025497` on
-5 Aug and has not been re-checked since. ⚠️ **Assume nothing about either clone.
-Measure with `git rev-list --left-right --count`** — see `CLAUDE.md` reading-order
+**Measured 7 Aug, second session:**
+
+| Clone | State |
+|---|---|
+| **jay-pc** (`jayjm`) | **`1f75dae`, `0 0` with origin, clean.** Found 4 behind at `bf1d884`, fast-forwarded, and both of that session's commits were made and pushed from it |
+| **cafnet** (`Jay`) | **`bb6aca6`, and now ~19 behind.** Fast-forwarded there earlier on 7 Aug after being found 16 behind; not touched since, because the bridge was on jay-pc |
+
+⚠️ **Assume nothing about either clone — these two rows rot on the next push.**
+Measure with `git rev-list --left-right --count`; see `CLAUDE.md` reading-order
 step 2 for why no other probe answers this.
 
 ⚠️ **jay-pc had `core.fileMode` drift** — every tracked file showing as locally

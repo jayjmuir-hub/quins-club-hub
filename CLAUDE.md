@@ -106,6 +106,15 @@ do not propose buying an M365 licence — same session, same verdict.
    uncommitted work.
 7. **If a rot-detecting anchor can no longer be triggered, repoint it —
    never delete it.**
+8. **⚠️ Measure a machine fact on the machine before you write it down, and
+   never copy one between files.** Every documented environment claim that
+   turned out wrong here was written from one PC and propagated by copying:
+   `NODE_ENV` said "cafnet" in three files while jay-pc had it too, and a
+   clone's state has been asserted from memory more than once. **`hostname`,
+   `set NODE_ENV`, `git config --get <key>`, `git rev-list --left-right
+   --count` — run the command, paste the answer.** The same rule that
+   applies to counts (see `state-of-play.md`) applies to machines: a fact
+   worth recording is worth measuring, and one copy of it beats three.
 
 ## Facts worth having before you touch anything
 
@@ -142,11 +151,20 @@ from a stale in-context copy of a file.
 the `sb_secret_…` key or any Entra client secret.** Jay does those; Claude
 writes the exact click-by-click steps.
 
-**⚠️ cafnet has `NODE_ENV=production` set machine-wide.** A plain
-`npm install` there silently removes dev dependencies including vitest — use
-`npm install --include=dev`. Vitest itself is handled in `vite.config.js`
-(commit `5a39f5d`); the install side cannot be fixed in-repo. Without this,
-most of the suite fails with an error that points at React, not at the cause.
+**⚠️ BOTH PCs have `NODE_ENV=production` set machine-wide — cafnet AND
+jay-pc.** A plain `npm install` on either silently removes dev dependencies
+including vitest; use **`npm install --include=dev`** every time. Vitest
+itself is handled in `vite.config.js` (commit `5a39f5d`); the install side
+cannot be fixed in-repo. Without this, most of the suite fails with an error
+that points at React, not at the cause.
+
+⚠️ **This said "cafnet" only, in three files, until 7 Aug 2026.** It was
+written from one machine and copied to the others without being re-checked.
+`set NODE_ENV` on jay-pc returns `production` — measured 7 Aug. Anyone
+trusting the old wording would have run a plain `npm install` on jay-pc and
+lost vitest, with a symptom (`'vite' is not recognized`) that points
+nowhere near the cause. **This paragraph is the single home for that fact**;
+`state-of-play.md` and `claude/runbooks/session-and-push.md` point here.
 
 **Stack:** Vite + React, Tailwind, Supabase (Postgres 17, ref
 `lusmshimxdcxpnrktlgz`), Netlify (project `quins-club-hub`). `npm test` is
