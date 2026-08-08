@@ -817,11 +817,18 @@ GRANT EXECUTE ON FUNCTION public.set_own_player_gender(uuid, text) TO authentica
 -- db/migrations/20260807_sync_profile_name_search_path.sql. Safe with '' because
 -- the body touches no schema-qualified object, only pg_catalog builtins.
 --
--- ⚠️ KNOWN BUG, recorded not fixed: a single-word full_name yields
--- last_name = that same word, which the comment below says must not happen.
--- The `if new.first_name is null` guard is dead code — stripping the final
--- word from a one-word string leaves it unchanged, not empty. Latent; no live
--- row has hit it. Detail and fix in claude/state-of-play.md.
+-- ✅ The single-word-name bug is FIXED as of 8 Aug 2026 —
+-- db/migrations/20260808_sync_profile_name_single_word.sql. The old code
+-- derived first_name, then tested `if new.first_name is null`, which a
+-- one-word input can never satisfy: stripping a non-existent final word
+-- leaves the string unchanged, not empty. So 'Ahmed' produced
+-- first_name = last_name = 'Ahmed'. It now tests the SPLIT instead.
+-- ⚠️ It was NOT a rare gate case. NamePrompt.jsx:96 writes first/last
+-- separately and takes the branch that never splits; the branch that does
+-- is reached by private.handle_new_user(), which seeds full_name from the
+-- identity provider's display name on EVERY signup.
+-- Verified live on a probe table, and the old derivation was re-run inline
+-- on the same inputs to prove the check could fail.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.sync_profile_name()
  RETURNS trigger
@@ -852,12 +859,15 @@ begin
     new.last_name  := ln;
   elsif full_changed and full_in is not null then
     new.full_name  := full_in;
-    new.first_name := nullif(btrim(regexp_replace(full_in, '\s+\S+$', '')), '');
-    new.last_name  := nullif(btrim(regexp_replace(full_in, '^.*\s', '')), '');
-    -- a single-word name is a first name with no family name, not the reverse
-    if new.first_name is null then
+
+    -- THE FIX. Decide on the split BEFORE deriving either name.
+    if position(' ' in full_in) = 0 then
+      -- a single-word name is a first name with no family name, not the reverse
       new.first_name := full_in;
       new.last_name  := null;
+    else
+      new.first_name := nullif(btrim(regexp_replace(full_in, '\s+\S+$', '')), '');
+      new.last_name  := nullif(btrim(regexp_replace(full_in, '^.*\s', '')), '');
     end if;
   end if;
 

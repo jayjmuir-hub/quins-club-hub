@@ -140,7 +140,18 @@ the rows back.**
   7 Aug; it is status, so it belongs here.)
 - **No rate limit on account creation** — only on what an account can do, which
   without a membership is nothing. Verified 7 Aug: no rate-limiting code in `src/`.
-- ⚠️ **`sync_profile_name` mangles a SINGLE-WORD name, and its own comment says it
+- ✅ **`sync_profile_name` single-word-name bug FIXED and APPLIED 8 Aug** —
+  `db/migrations/20260808_sync_profile_name_single_word.sql`, applied live as
+  `sync_profile_name_single_word`. Verified on a throwaway probe table: `Ahmed` →
+  `first_name='Ahmed'`, `last_name=null`; `Ahmed Khan` → `Ahmed`/`Khan`;
+  `Jan van der Berg` → `Jan van der`/`Berg`; the explicit first/last branch
+  untouched. The `search_path=""` pin survived the `CREATE OR REPLACE`
+  (`proconfig` read back), and `prosecdef` is still `false`.
+  ⚠️ **The old derivation was re-run inline on the same inputs to prove the check
+  could fail** — it returned `Ahmed`/`Ahmed` with the guard evaluating `false`, so
+  the pass above means something. `db/schema/functions.sql` re-captured with it.
+  **The history below is kept because the way this was mis-described is the lesson.**
+  ⚠️ **`sync_profile_name` mangled a SINGLE-WORD name, and its own comment said it
   should not.** The comment reads "a single-word name is a first name with no family
   name, not the reverse", but the guard that implements it never fires: for `Single`,
   `regexp_replace(full_in, '\s+\S+$', '')` finds nothing to strip and returns

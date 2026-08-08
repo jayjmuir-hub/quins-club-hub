@@ -10,6 +10,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
+- `5ac7714` — Changelog catch-up for `eb8c385`, and recorded the catch-up regress.
+  `[skip ci]`
 - `eb8c385` — **`main` is now the production branch, not `build/v1-mvp`.** `main` was a
   strict ancestor (`0 25`), so a fast-forward. Updated the 8 hard-coded branch references
   across 5 instruction-bearing files — `.github/workflows/docs.yml` being the one that
@@ -18,6 +20,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the single-word-name bug fires from `handle_new_user()` on every signup, not from the name
   gate, and the `search_path` bullet still said "Not applied" under its own PINNED heading.
   `[skip ci]`
+  ⚠️ **That "not applied to the live database" is now out of date: it WAS applied later
+  the same day** — see the entry above it. Left as written, because the commit message it
+  summarises said the same thing and was true when written.
 
 ## 7 Aug 2026
 
