@@ -239,9 +239,27 @@ describe('NamePrompt — the sign-in name gate', () => {
     expect(screen.getByText('Routed content')).toBeInTheDocument()
   })
 
-  it('never shows to someone with no access — they get RequestAccess instead', async () => {
-    useMembershipsMock.mockReturnValue(loaded({ memberships: [] }))
+  // ⚠️ REPOINTED 8 Aug 2026, and the reason matters more than the edit. The
+  // zero-membership branch of AppShell used to render RequestAccess directly;
+  // it now renders AddYourPlayer first, with RequestAccess as the secondary
+  // route behind a button (parent self-registration). So the old
+  // `waitFor(getMyAccessRequestMock called)` could never resolve, and the
+  // assertion after it would never have run.
+  //
+  // The point of the test is unchanged: the name gate must never appear over a
+  // screen that is telling somebody they have no access. Both zero-access
+  // screens are checked now, because the gate would be equally wrong on either.
+  it('never shows to someone with no access — on either zero-access screen', async () => {
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue(
+      loaded({ memberships: [], teams: [{ id: 't1', name: 'U13', sort_order: 1 }] }),
+    )
     renderShell()
+
+    expect(await screen.findByRole('button', { name: /add my player/i })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: GATE_TITLE })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /not adding a player/i }))
 
     await waitFor(() => expect(getMyAccessRequestMock).toHaveBeenCalled())
     expect(screen.queryByRole('dialog', { name: GATE_TITLE })).not.toBeInTheDocument()

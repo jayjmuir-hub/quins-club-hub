@@ -10,6 +10,10 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
+- `212022b` — **The pending membership state, `register_my_player`, and an RLS harness.**
+  Measured the danger first: a brand-new parent could see the WHOLE squad. `can_see_team`
+  now requires `status='active'`; a new `is_attached_to_team` gates fixtures only.
+  `db/tests/rls-pending-membership.sql` is safe to re-run on production. `[skip ci]`
 - `dc7d900` — **Event end time, additional info, and cancelling the rest of a series.**
   The calendar had been inventing an end time; it now uses the real one. The edge-function
   change was INERT until `calendar_events_for_token()`'s `RETURNS TABLE` was widened — the

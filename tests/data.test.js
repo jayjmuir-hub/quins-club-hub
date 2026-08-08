@@ -22,6 +22,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('../src/lib/supabase.js', () => ({
   supabase: {
     from: vi.fn(),
+    rpc: vi.fn(),
     channel: vi.fn(),
     removeChannel: vi.fn(),
   },
@@ -72,6 +73,8 @@ import {
   grantMemberships,
   getMyProfile,
   createInvite,
+  registerMyPlayer,
+  approveMembership,
 } from '../src/data/members.js'
 
 // `count` is separate from `data` because a head:true count request resolves
@@ -119,6 +122,7 @@ function createChannel() {
 
 beforeEach(() => {
   supabase.from.mockReset()
+  supabase.rpc.mockReset()
   supabase.channel.mockReset()
   supabase.removeChannel.mockReset()
 })
@@ -1963,5 +1967,114 @@ describe('createInvite (multi-target)', () => {
     ).rejects.toThrow(/permission|couldn.t send/i)
 
     expect(supabase.from).toHaveBeenCalledTimes(1)
+  })
+})
+
+// --- registerMyPlayer -------------------------------------------------
+//
+// Parent self-registration (8 Aug 2026, spec
+// claude/decisions/2026-08-08-parent-self-registration.md). This is the one
+// function in this module that turns a Postgres error into a sentence rather
+// than re-throwing it, so its tests are about the MAPPING as much as the
+// query.
+
+describe('registerMyPlayer', () => {
+  it('calls the RPC with exactly the two parameters it takes, and returns the pending row', async () => {
+    const membership = {
+      id: 'mm-1',
+      profile_id: 'user-1',
+      team_id: 't-u13',
+      role: 'parent',
+      status: 'pending',
+    }
+    supabase.rpc.mockResolvedValue({ data: membership, error: null })
+
+    const result = await registerMyPlayer('Sam Muir', 't-u13')
+
+    // ⚠️ TWO ARGUMENTS, AND THE ABSENT ONES ARE THE POINT. There is no
+    // club id (it is derived from the team server-side, so a caller cannot
+    // point the membership at a different club from the player) and no email
+    // (it is read from auth.users, so a typed address is never evidence).
+    // Asserting the exact object is what stops either being added later
+    // without somebody having to justify it.
+    expect(supabase.rpc).toHaveBeenCalledWith('register_my_player', {
+      p_full_name: 'Sam Muir',
+      p_team_id: 't-u13',
+    })
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    expect(result).toEqual(membership)
+  })
+
+  // ⚠️ THE MAPPING IS KEYED ON error.code, NEVER ON MESSAGE TEXT. Each case
+  // below therefore ships a DELIBERATELY WRONG message alongside the right
+  // code: if anything ever starts matching on prose, these fail, because the
+  // prose here says nothing the mapping could match on.
+  const CASES = [
+    ['42501', 'unconfirmed email', /confirm your email/i],
+    ['22023', 'blank name, over-long name, or unknown team', /name is filled in|age group/i],
+    ['42901', 'five already pending', /waiting to be approved/i],
+  ]
+
+  it.each(CASES)('maps %s (%s) to a human sentence', async (code, _why, expected) => {
+    supabase.rpc.mockResolvedValue({
+      data: null,
+      error: { code, message: 'raw postgres text nobody should be matching on' },
+    })
+
+    await expect(registerMyPlayer('Sam Muir', 't-u13')).rejects.toThrow(expected)
+  })
+
+  it('keeps the code on the thrown error, so a caller can branch without reading words', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: { code: '42901', message: 'too many' } })
+
+    await expect(registerMyPlayer('Sam Muir', 't-u13')).rejects.toMatchObject({ code: '42901' })
+  })
+
+  // A code the mapping has never heard of — a constraint violation, a
+  // connection reset, a future raise. Falling back to Postgres's own message
+  // is better than a generic apology: it is at least true, and it is what
+  // gets pasted into a support message.
+  it('falls back to the database message for an unmapped code', async () => {
+    supabase.rpc.mockResolvedValue({
+      data: null,
+      error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+    })
+
+    await expect(registerMyPlayer('Sam Muir', 't-u13')).rejects.toThrow(/duplicate key/i)
+  })
+})
+
+// --- approveMembership ------------------------------------------------
+
+describe('approveMembership', () => {
+  it('updates only the status column, on one row, and reads it back', async () => {
+    const { builder, calls } = createQueryBuilder({ data: { id: 'mm-1', status: 'active' } })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await approveMembership('mm-1')
+
+    expect(supabase.from).toHaveBeenCalledWith('memberships')
+    // ⚠️ ONLY `status`. Role, team_id and player_id were decided when the
+    // parent registered; an approval that also rewrote any of them would be
+    // silently changing what an admin thought they were agreeing to.
+    expect(calls.update).toEqual([[{ status: 'active' }]])
+    expect(calls.eq).toEqual([['id', 'mm-1']])
+    expect(result).toEqual({ id: 'mm-1', status: 'active' })
+  })
+
+  // The silent-refusal shape every write in this module has to handle:
+  // `memb manage` is private.is_admin(club_id), so a non-admin's UPDATE
+  // matches zero rows and PostgREST calls that a success. Without the
+  // read-back the screen would report an approval that never happened.
+  it('treats a zero-row response as the refusal it is', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(approveMembership('mm-1')).rejects.toThrow(/only a club admin/i)
+  })
+
+  it('refuses to query at all without a membership id', async () => {
+    await expect(approveMembership(undefined)).rejects.toThrow(/needs a membershipId/i)
+    expect(supabase.from).not.toHaveBeenCalled()
   })
 })

@@ -25,6 +25,11 @@ vi.mock('../src/lib/auth.jsx', () => ({
 vi.mock('../src/data/members.js', () => ({
   getMyProfile: (...args) => getMyProfileMock(...args),
   updateProfileName: (...args) => updateProfileNameMock(...args),
+  // AddYourPlayer (the zero-membership primary route since 8 Aug 2026) calls
+  // this. Its own behaviour is covered by
+  // tests/parent-self-registration.test.jsx; here it only has to exist so
+  // nothing in this file can reach a real Supabase client.
+  registerMyPlayer: (...args) => registerMyPlayerMock(...args),
 }))
 
 vi.mock('../src/data/accessRequests.js', () => ({
@@ -45,6 +50,7 @@ const getMyProfileMock = vi.fn()
 const updateProfileNameMock = vi.fn()
 const getMyAccessRequestMock = vi.fn()
 const createAccessRequestMock = vi.fn()
+const registerMyPlayerMock = vi.fn()
 
 const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
 
@@ -236,14 +242,52 @@ describe('AppShell', () => {
     expect(hasClassToken(screen.getByTestId('error-message'), 'text-brand-deep')).toBe(true)
   })
 
-  it('renders a zero-membership message with the signed-in email instead of routed content', async () => {
-    useMembershipsMock.mockReturnValue(loaded({ memberships: [] }))
+  // ⚠️ REPOINTED 8 Aug 2026. The zero-membership branch used to render
+  // RequestAccess, whose copy names the signed-in address — hence the old
+  // /jay@example.com/ assertion. It now renders AddYourPlayer first (parent
+  // self-registration), and that screen deliberately does NOT lead with the
+  // email: the question it asks is "who is your player", not "why didn't we
+  // recognise you". The address still appears on the secondary route, which
+  // the test below reaches.
+  //
+  // The invariant this test actually exists for is unchanged and still
+  // asserted: routed content stays hidden, and sign-out stays reachable from
+  // whatever a person with no access is shown.
+  it('offers the add-your-player route instead of routed content, with a way out', async () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({ memberships: [], teams: [{ id: 't-u13', name: 'U13', sort_order: 3 }] }),
+    )
 
     renderShell()
 
-    expect(await screen.findByText(/jay@example.com/)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /add my player/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/player's full name/i)).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'U13' })).toBeInTheDocument()
     expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+  })
+
+  // The secondary route, and the reason it is kept: not everybody signing in
+  // is a parent. A coach or a committee member has no child to register, and
+  // before self-registration this screen was the only way in for them.
+  it('keeps the ask-the-club route reachable, and reversible', async () => {
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue(
+      loaded({ memberships: [], teams: [{ id: 't-u13', name: 'U13', sort_order: 3 }] }),
+    )
+
+    renderShell()
+
+    await user.click(await screen.findByRole('button', { name: /not adding a player/i }))
+
+    expect(await screen.findByText(/jay@example.com/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /request access/i })).toBeInTheDocument()
+    expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
+
+    // Back again. Someone who opened this by mistake must not have to sign out
+    // and in to reach the form they actually wanted.
+    await user.click(screen.getByRole('button', { name: /add a player instead/i }))
+    expect(await screen.findByRole('button', { name: /add my player/i })).toBeInTheDocument()
   })
 
   it('sign-out from the zero-membership state calls signOut', async () => {

@@ -56,7 +56,12 @@ export async function listClubMembers() {
   if (shouldThrow) {
     throw new Error('permission denied for table memberships')
   }
-  return [...MEMBERS]
+  // ?pendingMemberships=1 adds the self-registered, not-yet-approved rows —
+  // see PENDING_MEMBERSHIPS at the foot of this file for why they are opt-in
+  // rather than part of MEMBERS.
+  return params.get('pendingMemberships') === '1'
+    ? [...MEMBERS, ...PENDING_MEMBERSHIPS]
+    : [...MEMBERS]
 }
 
 // Task 18 additions, following the same ?<name>Delay=/<name>Throw= knob
@@ -379,4 +384,90 @@ export async function grantMemberships(rows) {
     ...row,
     created_at: '2026-08-03T12:00:00Z',
   }))
+}
+
+// ── Parent self-registration, 8 Aug 2026 ──────────────────────────────────
+// Mirrors src/data/members.js's two new exports. As every note above says: a
+// missing export here is a module-resolution failure that blanks EVERY
+// scenario, not just the new one, because harness/main.jsx statically imports
+// every screen. tests/harness-stubs.test.js is what stops that recurring
+// silently.
+
+// The self-registered, not-yet-approved rows. Deliberately OPT-IN behind
+// ?pendingMemberships=1 rather than baked into MEMBERS: every existing
+// scenario's screenshots are taken against that list, and quietly adding two
+// rows to it would move the counts in the header of the Accounts screen and
+// invalidate a shelf of reference images to serve one new section.
+//
+// `mp2` belongs to pr-priya, who ALREADY holds an active parent row (mm4).
+// That is the second-child case, and it is the one that proves the screen
+// splits by ROW rather than by person: she has to appear in the approval
+// queue and in the main list at the same time.
+const PENDING_MEMBERSHIPS = [
+  { id: 'mp1', profile_id: 'pr-newparent', role: 'parent', team_id: 't2', player_id: 'p90', status: 'pending', created_at: '2026-08-08T07:15:00Z', profiles: { full_name: 'Hannah Okafor', email: 'hannah.okafor@example.com' }, teams: { name: 'U14 Boys' }, players: { full_name: 'Chidi Okafor' } },
+  { id: 'mp2', profile_id: 'pr-priya', role: 'parent', team_id: 't3', player_id: 'p91', status: 'pending', created_at: '2026-08-08T08:40:00Z', profiles: { full_name: 'Priya Nair', email: 'priya@adhq.example' }, teams: { name: 'U16 Boys' }, players: { full_name: 'Meera Nair' } },
+]
+
+// Mirrors the real registerMyPlayer, INCLUDING the part that matters: it
+// takes a name and a team and nothing else. A stub that accepted a club id or
+// an email would misrepresent the security property the whole feature rests
+// on — both are read server-side, never from the caller.
+//
+// ?registerThrow=<code> reproduces one of the RPC's raises by CODE, which is
+// what the real screen keys on: 42501 (email not confirmed), 22023 (bad name
+// or unknown age group), 42901 (five already pending). The message returned
+// matches src/data/members.js's REGISTER_MESSAGES, so the alert is
+// screenshot-able without a live database.
+export async function registerMyPlayer(fullName, teamId) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('registerDelay') || 0)
+  const code = params.get('registerThrow')
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+
+  if (code) {
+    const messages = {
+      42501:
+        'Please confirm your email address before adding a player. Check your inbox for the ' +
+        'confirmation link from when you signed up, then try again.',
+      22023:
+        "We couldn't use those details. Check the player's name is filled in and no longer " +
+        'than 80 characters, and pick an age group from the list. If the list looks out of ' +
+        'date, reload the page.',
+      42901:
+        "You already have players waiting to be approved, so we haven't added another. " +
+        'The club will review them — please wait rather than adding more.',
+    }
+    const error = new Error(messages[code] ?? 'Something went wrong.')
+    error.code = code
+    throw error
+  }
+
+  return {
+    id: 'mm-registered-1',
+    profile_id: 'pr-newparent',
+    club_id: 'club-1',
+    role: 'parent',
+    team_id: teamId,
+    player_id: 'p-registered-1',
+    status: 'pending',
+    created_at: '2026-08-08T09:00:00Z',
+    full_name: fullName,
+  }
+}
+
+// Mirrors the real approveMembership. ?writeThrow=1 gives the admin-only
+// refusal, which is the honest failure here: `memb manage` is
+// private.is_admin(club_id), so a coach's update matches zero rows.
+export async function approveMembership(membershipId) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('writeDelay') || 0)
+
+  if (!membershipId) throw new Error('approveMembership needs a membershipId.')
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (params.get('writeThrow') === '1') {
+    throw new Error("We couldn't approve that person. Only a club admin can approve access.")
+  }
+
+  return { id: membershipId, status: 'active' }
 }

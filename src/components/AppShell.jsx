@@ -3,9 +3,10 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin, roleLabel } from '../lib/scope.js'
+import { isAdmin, isPendingOnly, roleLabel } from '../lib/scope.js'
 import Nav from './Nav.jsx'
 import NamePrompt from './NamePrompt.jsx'
+import AddYourPlayer from './AddYourPlayer.jsx'
 import RequestAccess from './RequestAccess.jsx'
 // ViewAsBanner only — the switcher itself moved to the Admin screen on
 // 7 Aug 2026. See the long note at its old call site below.
@@ -93,6 +94,41 @@ function ErrorState({ error, reload }) {
   )
 }
 
+// What a person WAITING FOR APPROVAL sees above the app — and it is above the
+// app, not instead of it.
+//
+// ⚠️ DO NOT TURN THIS INTO A GATE. A pending member can genuinely use most of
+// the app: `event read` is private.is_attached_to_team (any status), and
+// `player read`/`avail read` both carry an is_own_player clause, so the
+// database really does return their child, the squad's fixtures, and their own
+// availability. Blocking the app behind a "please wait" card would throw all
+// of that away and reduce the pending state to a slower version of no access —
+// which is precisely what the design exists to avoid. See
+// db/migrations/20260808_membership_pending_status.sql.
+//
+// The last sentence is load-bearing and unglamorous: NOBODY IS EMAILED when
+// someone is waiting. That gap already existed for access requests and is
+// worse here, because with no seeded roster every parent queues. Telling
+// someone to sit tight when no notification will ever arrive is how a person
+// waits a fortnight for a screen nobody is looking at.
+function PendingApprovalBanner() {
+  return (
+    <div
+      data-testid="pending-approval"
+      role="status"
+      className="mb-4 rounded-2xl border border-line bg-surface-card px-4 py-3.5 shadow-card"
+    >
+      <p className="text-[15px] font-extrabold text-ink">Waiting to be approved</p>
+      <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">
+        Your player is with the club. You can see their fixtures and set their
+        availability now — the rest of the squad appears once a club admin has
+        approved you. Nobody is emailed automatically, so if nothing has changed in
+        a few days, mention it to your coach or team manager.
+      </p>
+    </div>
+  )
+}
+
 // A signed-in user with zero membership rows reads zero rows from every
 // RLS-scoped table, including teams — so with no explicit handling here the
 // app would otherwise just look blank.
@@ -101,14 +137,25 @@ function ErrorState({ error, reload }) {
 // dead end: it told someone to go and find an admin through some channel the
 // app knew nothing about, and every person who ever hit it stayed in the
 // admin's waiting list forever with no way to be cleared. RequestAccess
-// replaces it with the approval gate — see
-// db/migrations/20260804_access_requests.sql.
+// replaced it with the approval gate — see
+// db/migrations/20260804_access_requests.sql — and since 8 Aug 2026
+// AddYourPlayer sits in FRONT of it as the primary route (parent
+// self-registration, spec claude/decisions/2026-08-08-parent-self-registration.md).
+// Both are still mounted: registering a child is what most people are here to
+// do, but a coach or a committee member has no child to register and must not
+// be stranded on a form that does not describe them.
 
 export default function AppShell({ children }) {
   const { user, signOut } = useAuth()
   const { firstName } = useMyProfile()
-  const { memberships, loading, error, reload } = useMemberships()
+  const { memberships, teams, loading, error, reload } = useMemberships()
   const location = useLocation()
+  // Which of the two zero-membership routes is showing. State, not a route:
+  // both are dead ends by nature and a URL for either would be a page someone
+  // could bookmark and return to after they had access. Resets on reload,
+  // which is correct — the question "are you adding a player?" is asked fresh
+  // every time somebody arrives with no access.
+  const [askingForAccess, setAskingForAccess] = useState(false)
 
   const isMoreRoute = location.pathname === '/more'
   const ready = !loading && !error && memberships.length > 0
@@ -122,6 +169,12 @@ export default function AppShell({ children }) {
   // The truncation it was meant to fix is handled in ViewAsSwitcher instead.
   const showRole = !loading && !error
   const currentRoleLabel = roleLabel(memberships)
+  // Reads the EFFECTIVE membership set, like every other gate in this file, so
+  // an admin previewing a squad is never told they are waiting for approval.
+  // (isPendingOnly returns false for a synthetic preview row anyway — see its
+  // note in scope.js — but gating on the same set as everything else means
+  // that safety net is never the only thing holding it up.)
+  const pendingOnly = ready && isPendingOnly(memberships)
   // The old admin-OR-coach `canManage` boolean is gone with /overview
   // (admin-dashboard plan, 2026-08-05). There is one management destination
   // now — /admin — and it is admin-only, so the nav gate is just isAdmin().
@@ -322,13 +375,42 @@ export default function AppShell({ children }) {
       >
         {loading && <LoadingState />}
         {!loading && error && <ErrorState error={error} reload={reload} />}
-        {!loading && !error && memberships.length === 0 && (
+        {!loading && !error && memberships.length === 0 && !askingForAccess && (
+          <AddYourPlayer
+            teams={teams}
+            // ⚠️ THE RELOAD IS NOT OPTIONAL. register_my_player creates the
+            // membership server-side; this provider holds a snapshot taken
+            // before it existed, and nothing pushes the new row to it. Without
+            // this the parent submits successfully and stays on the form,
+            // which reads as "it didn't work" — and the obvious response is to
+            // submit again, which is how somebody reaches the five-pending
+            // limit without ever meaning to.
+            onRegistered={reload}
+            onAskForAccess={() => setAskingForAccess(true)}
+          >
+            <SignOutControl signOut={signOut} className="mt-5" />
+          </AddYourPlayer>
+        )}
+        {!loading && !error && memberships.length === 0 && askingForAccess && (
           <RequestAccess userId={user?.id} email={user?.email}>
+            {/* A way back. Someone who opened this by mistake, or who read it
+                and realised they do have a child to register, must not have to
+                sign out and in again to reach the other route. */}
+            <button
+              type="button"
+              onClick={() => setAskingForAccess(false)}
+              className="mt-4 w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-brand transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              Add a player instead
+            </button>
             <SignOutControl signOut={signOut} className="mt-5" />
           </RequestAccess>
         )}
         {ready && (
           <>
+            {/* Above the routed screen, never in place of it — see the note on
+                PendingApprovalBanner. */}
+            {pendingOnly && <PendingApprovalBanner />}
             {/* First-login display-name prompt (plan Task C). Deliberately
                 inside the `ready` branch: a signed-up user with zero
                 memberships already gets NoMembershipState, and a name prompt

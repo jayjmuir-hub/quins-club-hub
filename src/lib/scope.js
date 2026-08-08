@@ -53,6 +53,36 @@ export function isAdmin(memberships) {
 }
 
 /**
+ * True when the person holds membership rows and EVERY one of them is still
+ * pending approval — the self-registered parent who has added a child and is
+ * waiting for a club admin (see
+ * db/migrations/20260808_membership_pending_status.sql).
+ *
+ * Deliberately "every", not "some". Someone who already has one approved squad
+ * and has just registered a second child is a normal, fully-working member;
+ * putting a "waiting to be approved" banner across their whole app would be
+ * wrong. This state is for the person for whom nothing yet works properly.
+ *
+ * ⚠️ Zero memberships is FALSE, not true. That person has registered nothing
+ * and is waiting for nobody — they get the "add your player" screen, which is
+ * a different state with a different answer.
+ *
+ * ⚠️ A "view as" preview is also FALSE, and that rests on one strict equals:
+ * syntheticMemberships() in src/lib/memberships.jsx builds a row with no
+ * `status` field at all, so `undefined === 'pending'` is false. That is the
+ * right answer — an admin previewing a squad is not pending — but if this ever
+ * becomes a truthiness or `!= 'active'` check, an admin previewing as a parent
+ * gets told they are waiting for approval.
+ *
+ * Like everything in this file this decides only what the UI shows. RLS is
+ * what actually withholds the squad from a pending member.
+ */
+export function isPendingOnly(memberships) {
+  if (!memberships || memberships.length === 0) return false
+  return memberships.every((m) => m.status === 'pending')
+}
+
+/**
  * Teams the given memberships grant visibility into.
  * Admins see every team in allTeams (their membership row has team_id null,
  * so it can't be used to look up teams — admin visibility is club-wide by

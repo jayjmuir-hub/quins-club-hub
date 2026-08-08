@@ -332,6 +332,135 @@ export async function claimRosterAccess() {
   return data ?? []
 }
 
+// ── register_my_player: the RPC's error codes, turned into sentences ───────
+//
+// ⚠️ KEYED ON `error.code`, NEVER ON THE MESSAGE TEXT. The Postgres messages
+// are perfectly usable English (they were written to be), but matching on
+// prose means a reworded RAISE in a future migration silently drops every
+// caller into the generic fallback — and nothing fails, so nobody finds out.
+// The codes are part of the function's contract; see the `using errcode =`
+// lines in db/migrations/20260808_register_my_player.sql.
+//
+// Each code covers more than one raise, so the wording below has to be true
+// of every raise that carries it:
+//
+//   42501  three raises: not signed in / no email on the account / email not
+//          confirmed. The first is unreachable from this app — RequireAuth
+//          guarantees a session before any screen calling this can render —
+//          and the second cannot happen for a password signup, so in practice
+//          this is ALWAYS the unconfirmed-email case. The sentence leads with
+//          that and stays true of the other two.
+//   22023  three raises: blank name, name over 80 characters, unknown team.
+//          The first two are also checked in the form before it submits, so
+//          reaching here usually means the age-group list the browser is
+//          holding no longer matches the database.
+//   42901  one raise: five pending registrations already. This is the one a
+//          parent is most likely to hit by accident (a double submit that did
+//          not look like it worked), so it says what to do rather than just
+//          refusing.
+const REGISTER_MESSAGES = {
+  42501:
+    'Please confirm your email address before adding a player. Check your inbox for the ' +
+    'confirmation link from when you signed up, then try again.',
+  22023:
+    "We couldn't use those details. Check the player's name is filled in and no longer than " +
+    '80 characters, and pick an age group from the list. If the list looks out of date, ' +
+    'reload the page.',
+  42901:
+    "You already have players waiting to be approved, so we haven't added another. " +
+    'The club will review them — please wait rather than adding more.',
+}
+
+const REGISTER_FALLBACK = "We couldn't add that player. Try again in a moment."
+
+/**
+ * Registers the caller's own player and returns the new PENDING membership row.
+ *
+ * This is the self-registration path (spec:
+ * claude/decisions/2026-08-08-parent-self-registration.md). It wraps
+ * `public.register_my_player`, a SECURITY DEFINER function, because a parent
+ * has no INSERT rights on `players` and must not be given any — RLS grants
+ * rows, not columns, so an owner-insert policy on players would hand them
+ * `team_id`, the column that decides whose children they can see.
+ *
+ * ⚠️ TWO ARGUMENTS, AND NO MORE. There is deliberately no club id and no email
+ * parameter:
+ *   - the club is derived from the team, server-side. A caller-supplied club
+ *     could point the membership at a different club from the player, and
+ *     every visibility check downstream assumes those agree;
+ *   - the contact email is read from `auth.users`, server-side — the same
+ *     property that makes claim_roster_access safe. An address someone typed
+ *     is not evidence of anything.
+ *
+ * The membership comes back with `status = 'pending'`: the person can see
+ * their own child and the squad's fixtures, and nothing else, until an admin
+ * approves them (see approveMembership below).
+ *
+ * Errors are re-thrown as an Error with a human sentence, chosen by
+ * `error.code` (see REGISTER_MESSAGES). `.code` is preserved on the thrown
+ * error so a caller that wants to branch on the reason still can without
+ * going anywhere near the wording.
+ */
+export async function registerMyPlayer(fullName, teamId) {
+  const { data, error } = await supabase.rpc('register_my_player', {
+    p_full_name: fullName,
+    p_team_id: teamId,
+  })
+
+  if (error) {
+    const friendly = new Error(REGISTER_MESSAGES[error.code] ?? error.message ?? REGISTER_FALLBACK)
+    friendly.code = error.code
+    throw friendly
+  }
+
+  return data
+}
+
+// Same silent-refusal shape as every other write in this module: `memb manage`
+// is `private.is_admin(club_id)`, so a non-admin's UPDATE matches zero rows and
+// PostgREST reports that as a successful empty response rather than an error.
+// The read-back is what turns it into something the screen can show.
+//
+// ⚠️ A COACH GETS THIS MESSAGE, and that is correct today. `memb manage` is
+// admin-only — there is no coach clause in it — and `memb read` is
+// `profile_id = auth.uid() OR is_admin(club_id)`, so a coach cannot even SEE a
+// pending membership for their own squad, let alone approve one. The spec
+// (claude/decisions/2026-08-08-parent-self-registration.md §5) assumed "coach
+// or admin"; the database says admin only. Verified against the live policies
+// on 8 Aug 2026, not assumed.
+const REFUSED_MEMBERSHIP_APPROVE =
+  "We couldn't approve that person. Only a club admin can approve access."
+
+/**
+ * Approves one PENDING membership by flipping its status to 'active', and
+ * returns the updated row.
+ *
+ * That single column is the whole approval: `private.can_see_team` requires
+ * `status = 'active'`, so this is the moment the person stops seeing only
+ * their own child and starts seeing the squad. Nothing else about the row
+ * changes — the role, team and linked player were all decided when the parent
+ * registered.
+ *
+ * Deliberately NOT expressed as a generic "set status" writer. There is no
+ * un-approve: moving an active row back to pending would half-revoke someone
+ * in a way no screen explains, and the existing revoke (deleteMembership) is
+ * the honest way to take access away.
+ */
+export async function approveMembership(membershipId) {
+  if (!membershipId) throw new Error('approveMembership needs a membershipId.')
+
+  const { data, error } = await supabase
+    .from('memberships')
+    .update({ status: 'active' })
+    .eq('id', membershipId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(REFUSED_MEMBERSHIP_APPROVE)
+  return data
+}
+
 /**
  * Saves the first/family name the person entered themselves, and records that
  * they entered it.

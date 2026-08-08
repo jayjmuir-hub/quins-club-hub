@@ -5,6 +5,7 @@ import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import {
+  approveMembership,
   deleteMembership,
   grantMemberships,
   listClubMembers,
@@ -97,6 +98,54 @@ const LAST_ADMIN_REFUSAL =
 // is used both here and on each existing person's block below.
 const NO_CLUB_KNOWN =
   "We couldn't work out which club to add them to. Reload the page and try again."
+
+// ══ THE THIRD CATEGORY: "waiting to be approved" ═══════════════════════════
+// (parent self-registration, 8 Aug 2026. Spec:
+// claude/decisions/2026-08-08-parent-self-registration.md)
+//
+// This screen already had two kinds of person and they came from two different
+// tables:
+//
+//   HAS ACCESS      memberships rows          -> the blocks at the bottom
+//   ASKED FOR ACCESS access_requests rows     -> "Waiting for access"
+//
+// A self-registered parent is NEITHER, and putting them in either list is
+// wrong in a way that matters:
+//
+//   - they hold a REAL memberships row, so the "Waiting for access" section
+//     will never show them. That section is driven by listPendingProfiles()
+//     MINUS everyone with a membership, and this person has one. Nothing had
+//     to change for that to be true — it is why they would otherwise have been
+//     invisible;
+//   - but their row is status='pending', which means they have essentially no
+//     access: private.can_see_team requires 'active'. Listing them among the
+//     people who "have access" would tell an admin the opposite of the truth,
+//     and would put them under a Revoke button when what they need is Approve.
+//
+// So: their own section, ABOVE "Waiting for access", and the main list below
+// is filtered to ACTIVE rows only. Above, because this queue is the more
+// actionable of the two — a pending row is a named child in a named age group
+// with a confirmed email behind it, whereas a "waiting for access" row can be
+// a stranger who signed up and typed nothing.
+//
+// ⚠️ A PERSON CAN BE IN TWO PLACES AT ONCE, and that is correct. An approved
+// parent who registers a second child has one active row and one pending row:
+// they appear in the main list (with the access they really have) and in this
+// queue (for the child still waiting). Filtering by ROW, not by person, is
+// what makes that come out right.
+//
+// ⚠️ ADMIN ONLY, NOT "COACH OR ADMIN". The spec assumed a coach could approve
+// their own squad. The database disagrees, and it is the database that
+// decides: `memb manage` is private.is_admin(club_id) with no coach clause, so
+// a coach's UPDATE matches zero rows; and `memb read` is
+// `profile_id = auth.uid() OR private.is_admin(club_id)`, so a coach cannot
+// even SEE a pending membership belonging to someone else. Both read from the
+// live database on 8 Aug 2026. This screen is already admin-gated, so nothing
+// here needs to change for that — but do not add a coach entry point without
+// changing those two policies first, or it will render an empty queue and a
+// button that silently does nothing.
+const PENDING_APPROVAL_NOTE =
+  'Parents add their own player and land here. Until you approve them they can see their own child and the squad’s fixtures — enough to set availability — and nothing else: not the squad roster, not other families’ contact details. Approving gives them the same view as everyone else in that age group.'
 
 function NotAuthorised() {
   return (
@@ -290,7 +339,14 @@ export default function Accounts() {
 
   if (!admin) return <NotAuthorised />
 
-  const groups = groupByProfile(members)
+  // Split by ROW, not by person — see THE THIRD CATEGORY above. `status` is
+  // compared against 'pending' rather than 'active' so a row from before the
+  // column existed, or one that somehow came back without it, is treated as
+  // real access rather than being quietly hidden from the main list.
+  const activeMembers = members.filter((member) => member.status !== 'pending')
+  const pendingMembers = members.filter((member) => member.status === 'pending')
+
+  const groups = groupByProfile(activeMembers)
   const isFirstLoad = loading && members.length === 0
 
   // THE subtraction. listPendingProfiles() returns everyone the admin can
@@ -323,6 +379,19 @@ export default function Accounts() {
         Number(Boolean(requestByProfile.get(b.id))) - Number(Boolean(requestByProfile.get(a.id))),
     )
   const dismissed = unattached.filter((profile) => dismissedIds.has(profile.id))
+
+  // People whose ONLY rows are pending. They own a login and are not in
+  // `waiting` (they have a membership, so the subtraction above removed them),
+  // so without this the login count at the top of the screen would not count
+  // them at all — and that count has already been believed and acted on once
+  // when it was wrong (see the note beside it).
+  const activeProfileIds = new Set(activeMembers.map((member) => member.profile_id).filter(Boolean))
+  const pendingOnlyCount = new Set(
+    pendingMembers
+      .map((member) => member.profile_id)
+      .filter((id) => Boolean(id) && !activeProfileIds.has(id)),
+  ).size
+  const loginCount = groups.length + pendingOnlyCount + waiting.length + dismissed.length
 
   // Counted from the full club-wide list, so the guard holds even if the
   // caller's other admin row is rendered in some block further down.
@@ -434,6 +503,31 @@ export default function Accounts() {
         error: err?.message || "We couldn't remove that access.",
         saving: false,
         confirming: false,
+      })
+    }
+  }
+
+  /**
+   * Approves one self-registered parent: `status` pending -> active. That one
+   * column is the whole grant, because private.can_see_team requires 'active'.
+   *
+   * Patches the row in place rather than refetching. The updated row then
+   * fails the `status === 'pending'` filter above, so it leaves the approval
+   * queue and appears in that person's block in the main list on the same
+   * render — which is exactly what an admin expects to see happen, and costs
+   * no round trip. Shares rowState with the main list's rows: a membership is
+   * in one section or the other, never both, so the keys cannot collide.
+   */
+  async function approve(member) {
+    patchRow(member.id, { saving: true, error: null })
+    try {
+      const updated = await approveMembership(member.id)
+      patchMember(member.id, { status: updated.status })
+      patchRow(member.id, { saving: false })
+    } catch (err) {
+      patchRow(member.id, {
+        saving: false,
+        error: err?.message || "We couldn't approve that person.",
       })
     }
   }
@@ -589,11 +683,16 @@ export default function Accounts() {
             up again on a surviving login is a no-op that sends nothing.
             REVOKING ACCESS DOES NOT DELETE A LOGIN, and nothing in this app
             can — see the note under "Waiting for access". */}
+        {/* ⚠️ "with access" and "access rows" both count ACTIVE rows only. A
+            pending row is not access — private.can_see_team refuses it — and
+            counting it here would restate exactly the confusion the note above
+            is about, in the same sentence that admits to it. The login count
+            still includes people whose only rows are pending: they do have a
+            login, they just cannot use it yet. */}
         <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
-          {groups.length} with access · {members.length}{' '}
-          {members.length === 1 ? 'access row' : 'access rows'} ·{' '}
-          {groups.length + waiting.length + dismissed.length}{' '}
-          {groups.length + waiting.length + dismissed.length === 1 ? 'login' : 'logins'}
+          {groups.length} with access · {activeMembers.length}{' '}
+          {activeMembers.length === 1 ? 'access row' : 'access rows'} · {loginCount}{' '}
+          {loginCount === 1 ? 'login' : 'logins'}
         </p>
       </div>
 
@@ -608,6 +707,102 @@ export default function Accounts() {
         <Card className="flex justify-center py-10">
           <Spinner label="Loading accounts…" />
         </Card>
+      )}
+
+      {/* The third category — see THE THIRD CATEGORY at the top of this file.
+          Rendered ABOVE "Waiting for access" because a pending row is the more
+          actionable of the two: a named child, in a named age group, behind a
+          confirmed email address.
+
+          Shown only when there is something in it. The other two sections
+          always render because their empty state carries a fact an admin needs
+          ("anyone who signs up will appear here"); this one would only be
+          telling them that the thing that has not happened has not happened. */}
+      {!isFirstLoad && !error && pendingMembers.length > 0 && (
+        <section data-testid="pending-approvals" className="mb-5">
+          <h3 className="text-[16px] font-extrabold tracking-[-0.2px] text-ink">
+            Players waiting to be approved
+          </h3>
+          <p className={`mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
+            {PENDING_APPROVAL_NOTE}
+          </p>
+
+          <div className="mt-2.5 flex flex-col gap-3">
+            {pendingMembers.map((member) => {
+              const state = rowState[member.id] ?? {}
+              const personName = member.profiles?.full_name?.trim() || 'No name yet'
+              const playerName = member.players?.full_name ?? 'Unnamed player'
+              const teamName = member.team_id
+                ? teamsById.get(member.team_id)?.name ?? member.teams?.name ?? null
+                : null
+              const registered = formatJoined(member.created_at)
+
+              return (
+                <Card
+                  key={member.id}
+                  data-testid="pending-membership"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[14px] py-3"
+                >
+                  <span
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-surface-mute text-[12px] font-extrabold tracking-[.5px] text-ink-muted"
+                    aria-hidden="true"
+                  >
+                    {initials(playerName)}
+                  </span>
+
+                  <div className="min-w-0">
+                    {/* The CHILD leads, not the parent. This is the decision an
+                        admin is actually making — "is this a real U13 player?"
+                        — and the answer usually comes from recognising the
+                        name on the team sheet. The adult and their address are
+                        the corroboration, on the line below. */}
+                    <span className="block text-[15px] font-bold text-ink">
+                      {playerName}
+                      {teamName && (
+                        <span className={`ml-2 text-[12.5px] font-semibold ${MUTED_ON_PAPER}`}>
+                          {teamName}
+                        </span>
+                      )}
+                    </span>
+                    <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
+                      Added by {personName}
+                      {member.profiles?.email ? ` · ${member.profiles.email}` : ''}
+                      {registered ? ` · ${registered}` : ''}
+                    </span>
+                  </div>
+
+                  <span className="flex-1" />
+
+                  <button
+                    type="button"
+                    aria-label={`Approve ${playerName} for ${personName}`}
+                    disabled={Boolean(state.saving)}
+                    onClick={() => approve(member)}
+                    className="rounded-[9px] bg-brand px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                  >
+                    {state.saving ? 'Approving…' : 'Approve'}
+                  </button>
+
+                  {/* No "reject" button, deliberately, and for the same reason
+                      the waiting list has no delete: revoking is what removing
+                      this person means, and that control already exists on
+                      their row once they are approved. A separate reject here
+                      would be a second way to delete a membership, with its own
+                      confirm step and its own bugs. */}
+
+                  {state.error && (
+                    <span
+                      role="alert"
+                      className="basis-full text-[12.5px] font-semibold text-brand-deep"
+                    >
+                      {state.error}
+                    </span>
+                  )}
+                </Card>
+              )
+            })}
+          </div>
+        </section>
       )}
 
       {/* Hidden while the member list is missing: without it there is nothing
@@ -959,8 +1154,16 @@ export default function Accounts() {
                     className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-surface-mute px-[14px] py-2.5"
                   >
                     {/* `existing` is what makes the duplicate guard possible:
-                        the rows this person already holds. The database has no
-                        unique constraint to fall back on. */}
+                        the rows this person already holds.
+
+                        ⚠️ ACTIVE **AND** PENDING. The group itself is
+                        active-only (see THE THIRD CATEGORY at the top of this
+                        file), but memberships_unique_grant does not include
+                        `status` — so a grant identical to a row still awaiting
+                        approval is refused by the database with a 23505 the
+                        admin cannot interpret. Passing the pending rows in
+                        turns that into the builder's own "they already have
+                        this" message, before any network call. */}
                     <AccessBuilder
                       label={displayName}
                       teams={sortedTeams}
@@ -968,7 +1171,12 @@ export default function Accounts() {
                       playersLoading={playersLoading}
                       playersError={playersError}
                       onNeedPlayers={loadPlayers}
-                      existing={group.memberships}
+                      existing={[
+                        ...group.memberships,
+                        ...pendingMembers.filter(
+                          (member) => member.profile_id === group.profileId,
+                        ),
+                      ]}
                       saving={Boolean(grantState[`add:${group.key}`]?.saving)}
                       error={grantState[`add:${group.key}`]?.error}
                       submitLabel="Add access"
