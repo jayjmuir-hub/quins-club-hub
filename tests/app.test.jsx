@@ -140,7 +140,11 @@ describe('App', () => {
 
     expect(screen.getByText('Abu Dhabi Harlequins')).toBeInTheDocument()
     expect(screen.getByText('Quins Club Hub')).toBeInTheDocument()
-    expect(screen.getByText(/ask them to on the next screen/i)).toBeInTheDocument()
+    // Repointed 8 Aug 2026: the intro copy changed with the password rebuild
+    // (claude/decisions/2026-08-08-parent-self-registration.md). What this
+    // test is about is unchanged — a signed-out visitor gets the Login screen,
+    // not a blank page.
+    expect(screen.getByText(/create an account to\s+get started/i)).toBeInTheDocument()
   })
 
   it('renders the dashboard at / when signed in', () => {

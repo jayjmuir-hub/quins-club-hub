@@ -10,6 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
+- `40ba837` — Recorded the mothball rulings: hide the magic-link and Google buttons but
+  keep the code, no feature flags, `claim_roster_access` stays live rather than
+  mothballed, old roster data deleted not archived. `[skip ci]`
+- `70182cc` — **Decision: parents self-register, and a `pending` membership state.** Spec
+  for the U13/U16/U18 pilot. Records why the pending state must exist — `can_see_team()`
+  is squad-wide, so immediate access on a self-declared age group would expose that
+  squad's children — and two silent failures found while writing it. `[skip ci]`
 - `0342003` — Recorded the branch flip as verified; refreshed the Machines table.
   `[skip ci]`
 - `39d6c06` — Applied the `sync_profile_name` single-word fix live and re-captured

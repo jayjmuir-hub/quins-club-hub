@@ -90,6 +90,74 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }
 
+  // ── Password auth, added 8 Aug 2026 ────────────────────────────────────
+  // See claude/decisions/2026-08-08-parent-self-registration.md. Parents now
+  // self-register rather than being matched against a pre-seeded roster, so
+  // the app needs sign-up, password sign-in and password reset. The magic-link
+  // and Google functions above are DELIBERATELY LEFT INTACT — only their
+  // buttons are hidden. Do not delete them.
+  //
+  // ⚠️ Magic link cannot actually be switched off. Supabase has no setting to
+  // disable email SIGN-IN (only sign-up), and an email identity can always use
+  // either route. Hiding the button is a UI decision, not a security boundary.
+
+  async function signUpWithPassword(email, password) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      // Same reasoning as signInWithEmail above: come back to the page they
+      // started on, and never echo the hash back.
+      options: {
+        emailRedirectTo:
+          window.location.origin + window.location.pathname + window.location.search,
+      },
+    })
+    if (error) throw error
+
+    // ⚠️ SIGNING UP WITH AN ALREADY-REGISTERED EMAIL DOES NOT ERROR.
+    // GoTrue returns 200 with an OBFUSCATED user — a plausible-looking user
+    // object whose `identities` array is EMPTY — and sends no email. That is
+    // deliberate on Supabase's part: erroring would confirm to anyone asking
+    // that a given address has an account here, which for this app means
+    // confirming a named family are club members.
+    //
+    // So we must NOT surface "that email is already taken". We return a flag,
+    // and the screen shows the same "check your email" copy either way with a
+    // visible route to sign in or reset instead. Telling the truth here is the
+    // leak.
+    const alreadyRegistered =
+      Array.isArray(data?.user?.identities) && data.user.identities.length === 0
+
+    // A session only comes back if email confirmation is OFF. It is ON
+    // (dashboard, verified 8 Aug 2026), so this should always be null — it is
+    // returned so the caller can branch rather than assume.
+    return { alreadyRegistered, session: data?.session ?? null }
+  }
+
+  async function signInWithPassword(email, password) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+  }
+
+  async function sendPasswordReset(email) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // Absolute path, NOT origin + pathname: a reset link is opened from an
+      // email, often on a different device, and must always land on the one
+      // screen that can set a new password.
+      //
+      // ⚠️ Requires /reset-password in Supabase Auth → URL Configuration →
+      // Redirect URLs, or Supabase silently falls back to the Site URL and the
+      // person arrives holding a recovery session with nowhere to use it.
+      redirectTo: window.location.origin + '/reset-password',
+    })
+    if (error) throw error
+  }
+
+  async function updatePassword(password) {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+  }
+
   async function signOut() {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
@@ -105,6 +173,10 @@ export function AuthProvider({ children }) {
     loading,
     signInWithEmail,
     signInWithGoogle,
+    signUpWithPassword,
+    signInWithPassword,
+    sendPasswordReset,
+    updatePassword,
     signOut,
   }
 

@@ -66,7 +66,14 @@ describe('/delete-account — signed out', () => {
     // The real Login screen, rendered in place — not a link to it, because a
     // link would send them somewhere that forgets why they came.
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
+    // Repointed 8 Aug 2026: the Google button is mothballed behind
+    // SHOW_PASSWORDLESS, so sign-in here is email + password. Unchanged
+    // intent — a usable sign-in, in place, on this page.
+    expect(screen.getByLabelText('Password')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^sign in$/i })).toBeInTheDocument()
+    // ...and NOT an invitation to join, on the page someone uses to leave.
+    // See claude/decisions/2026-08-08-parent-self-registration.md.
+    expect(screen.queryByRole('button', { name: /create account/i })).toBeNull()
   })
 
   it('offers no delete control at all without a session', () => {

@@ -2,78 +2,122 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
 import Button from '../components/Button.jsx'
 import { takeSessionExpired } from '../lib/sessionExpired.js'
+import { checkPassword } from '../lib/password.js'
 import crest from '../assets/crest.png'
 
 // Login screen: the first thing an uninvited or signed-out visitor sees.
-// No router dependency (renders standalone) and no sign-up, password,
-// "remember me", extra social providers, or membership/role logic — those
-// are explicitly out of scope for this screen.
+// No router dependency — it renders standalone, and RequireAuth swaps it in
+// place of whatever page was requested so the URL survives.
+//
+// ⚠️ REBUILT 8 AUG 2026 AROUND EMAIL + PASSWORD.
+// See claude/decisions/2026-08-08-parent-self-registration.md. Parents now
+// create their own account instead of being matched against a pre-seeded
+// roster, so this screen carries sign-up, sign-in and password reset.
 //
 // `authError` is optional: RequireAuth passes it in when the visitor arrived
 // via a failed magic-link/OAuth redirect (e.g. an expired link), so this
 // screen can explain why they're back here instead of showing a blank form.
-// It shares the same alert region as this screen's own errors, and is
-// cleared the moment the user starts a fresh attempt so it can't reappear
-// alongside (or instead of) a new error.
+// It shares the same alert region as this screen's own errors, and is cleared
+// the moment the user starts a fresh attempt so it can't reappear alongside
+// (or instead of) a new error.
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// The ONE auth error worth translating, because it is the one a normal person
-// will actually meet and the raw text is actively harmful.
+// ⚠️ THE PASSWORDLESS ROUTES ARE HIDDEN, NOT REMOVED.
 //
-// Supabase enforces a per-project ceiling on auth emails (Authentication →
-// Rate Limits). When it trips, GoTrue returns 429 with the bare string
-// "email rate limit exceeded", and this screen used to render that verbatim.
-// To a parent it reads as an accusation, names no remedy, and gives no hint
-// that waiting fixes it — so they message the club instead of trying again
-// ninety seconds later. Hitting the ceiling is survivable; that message is
-// what turned it into a support request.
+// Jay's ruling, 8 Aug 2026: mothball magic link and Google by hiding the
+// buttons and keeping the code. `signInWithEmail` and `signInWithGoogle` in
+// src/lib/auth.jsx are untouched and still work. Flip this to `true` to bring
+// both back — that is the entire revival procedure.
 //
-// ⚠️ NOT HYPOTHETICAL. The live value read from the dashboard on 6 Aug 2026
-// is **2 emails/hour** — the built-in-provider default, NOT the 30 the docs
-// quote for custom SMTP, because this project sends via a Send Email Auth
-// Hook and Supabase does not count that as custom SMTP. On 2/hour this path
-// is reachable on the third sign-in of any hour.
+// ⚠️ This is a UI decision, NOT a security boundary. Supabase has no setting
+// that disables email SIGN-IN (only sign-up), and an account with an email
+// identity can always request a magic link via the API whatever this screen
+// renders. Do not describe passwords as "the only way in".
+const SHOW_PASSWORDLESS = false
+
+// ── Error translation ──────────────────────────────────────────────────────
 //
 // ⚠️ Deliberately a narrow allow-list, not a general error prettifier. Every
 // other auth failure keeps its real message: "Email address is invalid",
 // "Signups not allowed", and the rest are all things where the true text is
 // more useful than anything generic, to the user AND to whoever they forward
 // the screenshot to.
+
+// Supabase enforces a per-project ceiling on auth emails (Authentication →
+// Rate Limits). When it trips, GoTrue returns 429 with the bare string "email
+// rate limit exceeded", and this screen used to render that verbatim. To a
+// parent it reads as an accusation, names no remedy, and gives no hint that
+// waiting fixes it — so they message the club instead of trying again ninety
+// seconds later.
+//
+// ⚠️ THE CEILING IS 200/HOUR, measured on the dashboard 8 Aug 2026. This
+// comment said "2 emails/hour" until then, quoting a 6 Aug reading, and that
+// figure was repeated as a live blocker across three documents for two days
+// after it had been raised. Re-read the dashboard; do not trust this number.
 const RATE_LIMITED = /rate limit|too many requests|429/i
 
 const RATE_LIMIT_MESSAGE =
-  'Lots of people are signing in right now. Wait a couple of minutes and try again — or use Continue with Google if that’s your email.'
+  'Lots of people are signing in right now. Wait a couple of minutes and try again.'
 
-// ⚠️ SECOND ENTRY, ADDED 6 AUG 2026 FOR A WALL WE KNOW WE WILL HIT.
-//
-// Resend's free tier sends 100 emails per DAY — read off the account, not
-// guessed (Settings -> Usage, "Daily limit 5 / 100"). 143 people need magic
-// links, so the cap is reachable on day one of any rollout.
-//
-// When it trips, Resend returns 429 daily_quota_exceeded, the Send Email Auth
-// Hook returns 500, and GoTrue hands the browser
-// "Unexpected status code returned from hook: 500" — which contains no "rate
-// limit", no "429", and nothing else RATE_LIMITED matches. Untranslated, a
-// parent reads that and concludes the app is broken.
+// Resend's free tier sends 100 emails per DAY. When it trips, Resend returns
+// 429 daily_quota_exceeded, the Send Email Auth Hook returns 500, and GoTrue
+// hands the browser "Unexpected status code returned from hook: 500" — which
+// contains no "rate limit", no "429", and nothing else RATE_LIMITED matches.
+// Untranslated, a parent reads that and concludes the app is broken.
 //
 // NOT hypothetical: it happened on 6 Aug 2026 at 04:44 and is in the auth logs.
 //
 // Deliberately vaguer than the rate-limit copy above. This same error covers
 // every way the mail hook can fail, and promising "wait a couple of minutes"
 // would be a lie if the real cause is the daily cap, which resets at midnight
-// UTC. Google is offered first because for half the club it works instantly
-// and sends no email at all.
+// UTC.
 const EMAIL_SEND_FAILED = /status code returned from hook|unexpected_failure/i
 
 const EMAIL_SEND_FAILED_MESSAGE =
-  'We couldn’t send your sign-in link just now. If your email is a Gmail address, use Continue with Google below — it works straight away. Otherwise try again later, or contact the club.'
+  'We couldn’t send that email just now. Please try again in a few minutes, or contact the club if it keeps happening.'
 
-// ⚠️ Deliberately a narrow allow-list, not a general error prettifier — see
-// the header comment. Two entries, both for failures a parent can neither
-// understand nor act on. Everything else keeps its real message.
+// ── Password-era errors, added 8 Aug 2026 ──────────────────────────────────
+// Matched on GoTrue's `code` field first, because a stable code beats
+// pattern-matching English prose. The message regexes are a fallback for
+// older supabase-js responses that carry no code.
+
+// The raw text, measured by probing the live signup endpoint on 8 Aug 2026:
+//
+//   "Password should contain at least one character of each:
+//    abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789,
+//    !@#$%^&*()_+-=[]{};'\:"|<>?,./`~."
+//
+// It enumerates all four character sets every single time, even when only one
+// is missing, so it cannot tell a person what is actually wrong. The live
+// checklist under the password field is the real fix; this is the safety net
+// for the case where our rules and the dashboard have drifted apart.
+const WEAK_PASSWORD_MESSAGE =
+  'That password doesn’t meet the requirements. Check the list below the password box.'
+
+// "Invalid login credentials" is accurate and unhelpful. The overwhelmingly
+// common cause during onboarding is not a wrong password — it is someone who
+// registered and never opened the confirmation email, or who is trying to sign
+// in before creating an account at all.
+const INVALID_CREDENTIALS_MESSAGE =
+  'That email and password don’t match. If you’ve just registered, check your inbox for the confirmation email first — your account isn’t active until you open it.'
+
+const EMAIL_NOT_CONFIRMED_MESSAGE =
+  'Please open the confirmation email we sent you before signing in. Check your spam folder if it isn’t there.'
+
 export function friendlyAuthError(error, fallback) {
   const raw = typeof error?.message === 'string' ? error.message : ''
+  const code = typeof error?.code === 'string' ? error.code : ''
+
+  if (code === 'weak_password' || /password should (be|contain)/i.test(raw)) {
+    return WEAK_PASSWORD_MESSAGE
+  }
+  if (code === 'email_not_confirmed' || /email not confirmed/i.test(raw)) {
+    return EMAIL_NOT_CONFIRMED_MESSAGE
+  }
+  if (code === 'invalid_credentials' || /invalid login credentials/i.test(raw)) {
+    return INVALID_CREDENTIALS_MESSAGE
+  }
   if (RATE_LIMITED.test(raw)) return RATE_LIMIT_MESSAGE
   if (EMAIL_SEND_FAILED.test(raw)) return EMAIL_SEND_FAILED_MESSAGE
   return raw || fallback
@@ -86,6 +130,45 @@ export function friendlyAuthError(error, fallback) {
 const SESSION_EXPIRED_MESSAGE =
   'You were signed out because your session expired. Sign in again and carry on where you left off.'
 
+const FIELD =
+  'w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand'
+const LABEL = 'mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-faint'
+
+// The live checklist. Rendered as a list rather than a single "password must
+// contain…" sentence so a person can see WHICH part they are missing — the
+// thing GoTrue's own message conspicuously fails to tell them.
+//
+// aria-live="polite" so a screen reader announces items turning green as they
+// type, rather than the sighted user getting feedback nobody else does.
+function PasswordChecklist({ password }) {
+  const { rules } = checkPassword(password)
+  return (
+    <ul className="mt-2 space-y-1" aria-live="polite">
+      {rules.map((rule) => (
+        <li
+          key={rule.id}
+          // Unmet rules are the darker of the two: they are the ones the
+          // person still has to act on. Both clear AA on the card
+          // (ink-muted 6.06:1, ink-faint 5.52:1) — checked, not assumed.
+          className={
+            'flex items-center gap-2 text-xs ' +
+            (rule.met ? 'text-ink-faint' : 'text-ink-muted')
+          }
+        >
+          {/* The tick/dot is decorative — the met/not-met state is carried in
+              the visually-hidden text below, because colour and glyph alone
+              are not accessible. */}
+          <span aria-hidden="true" className={rule.met ? 'text-brand' : 'text-line'}>
+            {rule.met ? '✓' : '•'}
+          </span>
+          <span>{rule.label}</span>
+          <span className="sr-only">{rule.met ? ' — done' : ' — still needed'}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 // `embedded` — render as a plain card inside somebody else's page, instead of
 // as the whole screen. Used by /delete-account, which is public and therefore
 // has to offer sign-in itself. Without it the full-screen dark panel lands in
@@ -95,10 +178,25 @@ const SESSION_EXPIRED_MESSAGE =
 // It also drops the crest, the club name and the intro paragraph. Not for
 // tidiness: the host page already carries an <h1>, and a second one is wrong
 // for anyone using a screen reader to navigate by heading.
+//
+// ⚠️ EMBEDDED ALSO FORCES SIGN-IN ONLY. /delete-account is reached by someone
+// on their way OUT; offering them "Create an account" on that page is absurd,
+// and the tab strip would be the most prominent thing on it.
 export default function Login({ authError = null, embedded = false }) {
-  const { signInWithEmail, signInWithGoogle } = useAuth()
+  const {
+    signInWithEmail,
+    signInWithGoogle,
+    signUpWithPassword,
+    signInWithPassword,
+    sendPasswordReset,
+  } = useAuth()
+
+  const [mode, setMode] = useState('signin') // 'signin' | 'signup' | 'forgot'
   const [email, setEmail] = useState('')
-  const [status, setStatus] = useState('idle') // 'idle' | 'sending' | 'sent'
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  // 'idle' | 'busy' | 'confirm-sent' | 'reset-sent' | 'link-sent'
+  const [status, setStatus] = useState('idle')
   const [error, setError] = useState(null)
   const [staleAuthError, setStaleAuthError] = useState(authError)
   // Lazy initialiser, so the flag is taken exactly once per mount rather than
@@ -109,16 +207,41 @@ export default function Login({ authError = null, embedded = false }) {
     setStaleAuthError(authError)
   }, [authError])
 
-  const sending = status === 'sending'
+  const busy = status === 'busy'
+  const signingUp = mode === 'signup' && !embedded
+  const forgotting = mode === 'forgot'
+
   const displayedError =
     error ??
     (staleAuthError ? `That sign-in link didn't work: ${staleAuthError}` : null) ??
     (sessionExpired ? SESSION_EXPIRED_MESSAGE : null)
 
-  async function handleEmailSubmit(event) {
-    event.preventDefault()
+  const passwordOk = checkPassword(password).valid
+  // Submit stays disabled until the client rules pass, so in the normal case
+  // the parent never meets GoTrue's 422 at all. Sign-IN does not gate on this:
+  // someone whose existing password predates a rule change must still be able
+  // to get in, and refusing to submit would lock them out with no explanation.
+  const canSubmit = signingUp ? passwordOk : true
+
+  function clearBanners() {
     setStaleAuthError(null)
     setSessionExpired(false)
+    setError(null)
+  }
+
+  function switchMode(next) {
+    setMode(next)
+    setStatus('idle')
+    clearBanners()
+    // Password is deliberately NOT carried between modes. Someone who typed a
+    // password into "sign in", failed, and switched to "create account" should
+    // be making a fresh decision, not silently reusing a guess.
+    setPassword('')
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    clearBanners()
 
     const trimmed = email.trim()
     if (!trimmed || !EMAIL_PATTERN.test(trimmed)) {
@@ -126,11 +249,74 @@ export default function Login({ authError = null, embedded = false }) {
       return
     }
 
-    setError(null)
-    setStatus('sending')
+    // ⚠️ A PRESENCE check, not a rules check — the two are different and the
+    // distinction is the point. `canSubmit` deliberately does NOT gate sign-in
+    // on the password rules (see above: an existing password that predates a
+    // rule change must still work). But submitting an EMPTY password sends a
+    // real request that returns invalid_credentials, which this screen
+    // translates into "if you've just registered, check your inbox…" —
+    // confidently wrong advice for someone who simply left the box blank.
+    if (!forgotting && password.length === 0) {
+      setError('Enter your password.')
+      return
+    }
+
+    setStatus('busy')
+    try {
+      if (forgotting) {
+        await sendPasswordReset(trimmed)
+        setStatus('reset-sent')
+        return
+      }
+
+      if (signingUp) {
+        const { alreadyRegistered } = await signUpWithPassword(trimmed, password)
+        // ⚠️ We do NOT branch the copy on `alreadyRegistered`. Saying "you
+        // already have an account" confirms to anyone who asks that a given
+        // address is a club member. The flag exists so this decision is
+        // visible and deliberate rather than accidental — the "already have an
+        // account?" link on the confirmation panel is the way out for the
+        // person who genuinely forgot.
+        void alreadyRegistered
+        setStatus('confirm-sent')
+        return
+      }
+
+      await signInWithPassword(trimmed, password)
+      // On success the auth listener in AuthProvider swaps the session and
+      // RequireAuth renders the real page. Nothing to do here — deliberately
+      // no setStatus('idle'), because this component is about to unmount and
+      // setting state on the way out is a warning in the console.
+    } catch (err) {
+      setError(
+        friendlyAuthError(
+          err,
+          forgotting
+            ? 'Something went wrong sending the reset email. Try again.'
+            : signingUp
+              ? 'Something went wrong creating your account. Try again.'
+              : 'Something went wrong signing in. Try again.',
+        ),
+      )
+      setStatus('idle')
+    }
+  }
+
+  // ── The mothballed passwordless handlers ────────────────────────────────
+  // Unreachable while SHOW_PASSWORDLESS is false. Kept wired up so flipping
+  // that constant is genuinely the whole revival, with nothing else to
+  // reconnect. See the note on the constant.
+  async function handleMagicLink() {
+    clearBanners()
+    const trimmed = email.trim()
+    if (!trimmed || !EMAIL_PATTERN.test(trimmed)) {
+      setError('Enter a valid email address.')
+      return
+    }
+    setStatus('busy')
     try {
       await signInWithEmail(trimmed)
-      setStatus('sent')
+      setStatus('link-sent')
     } catch (err) {
       setError(friendlyAuthError(err, 'Something went wrong sending the link. Try again.'))
       setStatus('idle')
@@ -138,24 +324,78 @@ export default function Login({ authError = null, embedded = false }) {
   }
 
   async function handleGoogleClick() {
-    setStaleAuthError(null)
-    setSessionExpired(false)
-    setError(null)
-    setStatus('sending')
+    clearBanners()
+    setStatus('busy')
     try {
       await signInWithGoogle()
     } catch (err) {
-      // Google sends no email, so it cannot be rate-limited this way — routed
-      // through the same helper anyway so the two buttons can never drift into
-      // treating the same error differently.
       setError(friendlyAuthError(err, 'Something went wrong signing in with Google. Try again.'))
       setStatus('idle')
     }
   }
 
-  function handleUseDifferentEmail() {
-    setStatus('idle')
-    setError(null)
+  // ── Panels shown instead of the form once something has been sent ───────
+
+  const sentPanel = (heading, body, showSignInLink) => (
+    <div className="mt-6">
+      <h2 className="text-center text-base font-bold text-ink">{heading}</h2>
+      <p className="mt-2 text-center text-sm text-ink-faint">{body}</p>
+      <Button
+        variant="secondary"
+        onClick={() => {
+          // ⚠️ The second arm is only reachable with SHOW_PASSWORDLESS on, and
+          // it used to call switchMode(mode) — which does not clear `email`,
+          // so a button labelled "Use a different email" returned you to the
+          // form with the same address still in it. Harmless while mothballed;
+          // it would have bitten whoever revived magic link.
+          if (showSignInLink) {
+            switchMode('signin')
+          } else {
+            setEmail('')
+            switchMode(mode)
+          }
+        }}
+        full
+        className="mt-5"
+      >
+        {showSignInLink ? 'Back to sign in' : 'Use a different email'}
+      </Button>
+    </div>
+  )
+
+  let panel = null
+  if (status === 'confirm-sent') {
+    panel = sentPanel(
+      'Check your email',
+      <>
+        We’ve sent a confirmation link to <strong className="text-ink">{email.trim()}</strong>.
+        Open it to activate your account, then come back and sign in.
+        {/* The way out for someone who already had an account: GoTrue sends
+            them nothing at all, and we cannot say so without leaking. */}
+        <span className="mt-2 block">
+          Already had an account? Nothing will arrive — just sign in, or reset your password.
+        </span>
+      </>,
+      true,
+    )
+  } else if (status === 'reset-sent') {
+    panel = sentPanel(
+      'Check your email',
+      <>
+        If there’s an account for <strong className="text-ink">{email.trim()}</strong>, we’ve
+        sent a link to set a new password.
+      </>,
+      true,
+    )
+  } else if (status === 'link-sent') {
+    panel = sentPanel(
+      'Check your email',
+      <>
+        We’ve sent a sign-in link to <strong className="text-ink">{email.trim()}</strong>. Open
+        it on this device to continue.
+      </>,
+      false,
+    )
   }
 
   const card = (
@@ -187,40 +427,46 @@ export default function Login({ authError = null, embedded = false }) {
           <p className="mt-1 text-center text-xs font-semibold uppercase tracking-widest text-ink-faint">
             Quins Club Hub
           </p>
-          {/* This used to say "invite-only ... ask your club admin", which was
-              true when signing in without an invite was a dead end. It now
-              sends people hunting for an admin through some channel the app
-              knows nothing about, when the app will take their request directly
-              — see src/components/RequestAccess.jsx. Signing in is still not
-              the same as getting access: an account with no membership reads
-              zero rows from every table. */}
           <p className="mt-4 text-center text-sm leading-relaxed text-ink-faint">
-            Quins Club Hub is for Abu Dhabi Harlequins members. Sign in below —
-            if the club hasn&apos;t set your account up yet, you can ask them to
-            on the next screen.
+            Quins Club Hub is for Abu Dhabi Harlequins members. Create an account to
+            get started, or sign in if you already have one.
           </p>
         </>
       )}
 
-        {status === 'sent' ? (
-          <div className="mt-6">
-            <h2 className="text-center text-base font-bold text-ink">Check your email</h2>
-            <p className="mt-2 text-center text-sm text-ink-faint">
-              We&apos;ve sent a sign-in link to{' '}
-              <strong className="text-ink">{email.trim()}</strong>. Open it
-              on this device to continue.
-            </p>
-            <Button
-              variant="secondary"
-              onClick={handleUseDifferentEmail}
-              full
-              className="mt-5"
+      {panel ?? (
+        <>
+          {/* Tab strip. Hidden when embedded — see the note on the component. */}
+          {!embedded && !forgotting && (
+            <div
+              role="tablist"
+              aria-label="Sign in or create an account"
+              className="mt-6 grid grid-cols-2 gap-1 rounded-[11px] bg-surface-sunk p-1"
             >
-              Use a different email
-            </Button>
-          </div>
-        ) : (
-          <form className="mt-6" onSubmit={handleEmailSubmit} noValidate>
+              {[
+                ['signin', 'Sign in'],
+                ['signup', 'Create account'],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === value}
+                  onClick={() => switchMode(value)}
+                  className={
+                    'rounded-[8px] px-3 py-2 text-sm font-bold transition ' +
+                    (mode === value
+                      ? 'bg-surface-card text-ink shadow-card'
+                      : 'text-ink-faint')
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <form className="mt-4" onSubmit={handleSubmit} noValidate>
             {displayedError && (
               <p
                 role="alert"
@@ -230,10 +476,13 @@ export default function Login({ authError = null, embedded = false }) {
               </p>
             )}
 
-            <label
-              htmlFor="login-email"
-              className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-faint"
-            >
+            {forgotting && (
+              <p className="mb-4 text-sm text-ink-faint">
+                Enter your email address and we’ll send you a link to set a new password.
+              </p>
+            )}
+
+            <label htmlFor="login-email" className={LABEL}>
               Email address
             </label>
             <input
@@ -245,33 +494,92 @@ export default function Login({ authError = null, embedded = false }) {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand"
+              className={FIELD}
             />
 
-            <Button type="submit" disabled={sending} full className="mt-4">
-              {sending ? 'Sending…' : 'Email me a link'}
+            {!forgotting && (
+              <div className="mt-4">
+                <div className="flex items-baseline justify-between">
+                  <label htmlFor="login-password" className={LABEL}>
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink-faint underline"
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <input
+                  id="login-password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  // new-password on sign-up tells a password manager to OFFER
+                  // to generate one; current-password on sign-in tells it to
+                  // fill. Getting these the wrong way round is why managers
+                  // sometimes overwrite a saved entry.
+                  autoComplete={signingUp ? 'new-password' : 'current-password'}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className={FIELD}
+                />
+                {signingUp && <PasswordChecklist password={password} />}
+              </div>
+            )}
+
+            <Button type="submit" disabled={busy || !canSubmit} full className="mt-4">
+              {busy
+                ? 'Please wait…'
+                : forgotting
+                  ? 'Email me a reset link'
+                  : signingUp
+                    ? 'Create account'
+                    : 'Sign in'}
             </Button>
 
-            <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              <span className="h-px flex-1 bg-line" />
-              or
-              <span className="h-px flex-1 bg-line" />
-            </div>
+            {!signingUp && (
+              <button
+                type="button"
+                onClick={() => switchMode(forgotting ? 'signin' : 'forgot')}
+                className="mt-3 w-full text-center text-sm font-semibold text-ink-faint underline"
+              >
+                {forgotting ? 'Back to sign in' : 'Forgot password?'}
+              </button>
+            )}
 
-            {/* text-ink, not the variant's brand red: this is a neutral
-                alternative to the primary action above, and two red controls
-                stacked would read as two primary buttons. */}
-            <Button
-              variant="secondary"
-              onClick={handleGoogleClick}
-              disabled={sending}
-              full
-              className="!text-ink"
-            >
-              Continue with Google
-            </Button>
+            {/* ⚠️ MOTHBALLED — see SHOW_PASSWORDLESS at the top of this file.
+                Flip that constant to bring both routes back. */}
+            {SHOW_PASSWORDLESS && !forgotting && (
+              <>
+                <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                  <span className="h-px flex-1 bg-line" />
+                  or
+                  <span className="h-px flex-1 bg-line" />
+                </div>
+
+                <Button variant="secondary" onClick={handleMagicLink} disabled={busy} full>
+                  Email me a link instead
+                </Button>
+
+                {/* text-ink, not the variant's brand red: this is a neutral
+                    alternative to the primary action above, and two red
+                    controls stacked would read as two primary buttons. */}
+                <Button
+                  variant="secondary"
+                  onClick={handleGoogleClick}
+                  disabled={busy}
+                  full
+                  className="mt-3 !text-ink"
+                >
+                  Continue with Google
+                </Button>
+              </>
+            )}
           </form>
-        )}
+        </>
+      )}
     </div>
   )
 

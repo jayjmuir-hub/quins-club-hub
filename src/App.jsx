@@ -12,6 +12,7 @@ import Accounts from './screens/Accounts.jsx'
 import AcceptInvite from './screens/AcceptInvite.jsx'
 import Privacy from './screens/Privacy.jsx'
 import DeleteAccount from './screens/DeleteAccount.jsx'
+import ResetPassword from './screens/ResetPassword.jsx'
 
 // Routing (admin-dashboard plan, 2026-08-05).
 //
@@ -77,6 +78,14 @@ export default function App() {
             render for someone who has never signed in. */}
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/delete-account" element={<DeleteAccount />} />
+
+        {/* Where a password-reset link lands. PUBLIC on purpose, but not
+            unauthenticated in practice: the emailed link carries a recovery
+            session in the hash, which supabase-js consumes on load. It sits
+            outside <Authed> for the same reason /accept-invite sits outside
+            AppShell — a parent with no squad yet would otherwise be shown the
+            request-access gate instead of the form they were sent here for. */}
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* SIGNED-IN */}
         <Route element={<Authed />}>
