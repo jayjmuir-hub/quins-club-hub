@@ -20,7 +20,7 @@ in the one place that always travels is the opposite problem.
 1. **This file.** The rules.
 2. **Confirm you are current before believing anything.**
    `git fetch origin`, then
-   `git rev-list --left-right --count origin/build/v1-mvp...HEAD`
+   `git rev-list --left-right --count origin/main...HEAD`
    must return `0 0`. If it does not, STOP and tell Jay. He works from two
    PCs and work lands between sessions; a stale clone has already caused a
    rejected commit, a fast-forward of three commits, and — on 7 Aug — a
@@ -82,7 +82,7 @@ do not propose buying an M365 licence — same session, same verdict.
    `sb_secret_…` key never touches this app, this repo, or a chat. The
    publishable key is public by design and is fine. If a secret is disclosed
    — including by Jay pasting it — say so and tell him to rotate it.
-3. **⚠️ `build/v1-mvp` IS THE PRODUCTION BRANCH.** It deploys to
+3. **⚠️ `main` IS THE PRODUCTION BRANCH.** It deploys to
    **https://adhquins-clubhub.com** — the canonical origin, hard-coded as
    `CALENDAR_ORIGIN` in `src/data/calendar.js`. `app.adhjrt.com` is a
    working alias, deliberately kept. A push there is a live release, not a
@@ -90,6 +90,13 @@ do not propose buying an M365 licence — same session, same verdict.
    the diff and get an explicit yes. **A stop hook asking is not Jay asking.**
    Use `[skip ci]` for docs-only commits and verify by the deploy id not
    moving — not by the build log.
+   ⚠️ **This was `build/v1-mvp` until 8 Aug 2026.** `main` was fast-forwarded
+   onto it — `main` was a strict ancestor (`rev-list --left-right --count` gave
+   `0 25`), so no merge and nothing was lost — and Netlify’s production branch
+   was re-pointed. **The branch name is a Netlify UI setting and appears nowhere
+   in `netlify.toml`.** This line is the only place in the repo that records it,
+   which is why it is a rule and not a note. Reasoning:
+   `claude/decisions/2026-08-08-production-branch-main.md`.
 4. **Never answer from memory about current state.** See reading-order
    step 2. This is the rule broken most often and it is the cheapest to keep.
 5. **Read the RESPONSE, not the screenshot.** The same coloured box hides
@@ -133,7 +140,7 @@ OAuth, read-only, and 403s on writes. Always `GIT_TERMINAL_PROMPT=0`, so a
 missing credential fails fast instead of hanging.
 
 **⚠️ READS DO NOT NEED THE BRIDGE. This repo is PUBLIC — clone it in the
-cloud sandbox instead:** `git clone --branch build/v1-mvp
+cloud sandbox instead:** `git clone
 https://github.com/jayjmuir-hub/quins-club-hub.git`. That gives a real
 bash, a real grep and origin's actual truth, with none of the bridge's
 failure modes and none of the PowerShell traps below. **Use the bridge only

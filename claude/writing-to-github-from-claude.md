@@ -15,7 +15,7 @@ The repo is public, so a cloud session clones it and works locally at full speed
 
 ```bash
 git clone https://github.com/jayjmuir-hub/quins-club-hub.git
-cd quins-club-hub && git checkout build/v1-mvp && npm install
+cd quins-club-hub && npm install    # main is the default and production branch
 # create .env (see claude/runbooks/session-and-push.md) — the test suite needs it
 # ...work, test, commit...
 rm -f .env                       # gitignored, but never risk it
@@ -43,7 +43,7 @@ certutil -hashfile %TEMP%\x.bundle MD5      REM must match the sandbox's md5sum
 git bundle verify %TEMP%\x.bundle
 git pull --ff-only %TEMP%\x.bundle HEAD
 npm test && npm run build
-git push origin build/v1-mvp
+git push origin main
 ```
 
 ## Things that will bite you

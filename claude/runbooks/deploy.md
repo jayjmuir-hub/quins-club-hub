@@ -2,7 +2,7 @@
 
 ⚠️ **STATUS: THIS DEPLOY HAS HAPPENED.** The app is live at
 **`https://adhquins-clubhub.com`** on Netlify (project `quins-club-hub`, branch
-`build/v1-mvp`, auto-deploy on push). `app.adhjrt.com` is a working alias, deliberately
+`main`, auto-deploy on push — `build/v1-mvp` until 8 Aug 2026). `app.adhjrt.com` is a working alias, deliberately
 kept. **Read this as the record of how it was set up and what each setting means — not
 as a checklist to run.** Current deploy state is in `claude/state-of-play.md`.
 
@@ -53,7 +53,7 @@ it's still project configuration tied to your Supabase account).
 ## 2. Static hosting — Netlify (or Vercel/Cloudflare Pages/your existing host)
 
 **Netlify was chosen and is what runs today** — project `quins-club-hub`, connected to the
-GitHub repo, building `build/v1-mvp` on push. Vercel and Cloudflare Pages were the
+GitHub repo, building `main` on push. Vercel and Cloudflare Pages were the
 alternatives and would have taken the same three build settings (build command, publish
 directory, environment variables) verbatim; nothing below is Netlify-specific except the
 dashboard wording.
@@ -69,8 +69,8 @@ site is a separate concern. Do not reintroduce a dependency on it.
 2. "Add new site" → "Import an existing project" → connect the
    `github.com/jayjmuir-hub/quins-club-hub` repo (already public, per `RESTORE.md`) → authorize
    Netlify's GitHub access.
-3. Branch to deploy: `build/v1-mvp` (not `main` — `main` only holds the initial scaffold commit,
-   per `RESTORE.md`).
+3. Branch to deploy: `main`. ⚠️ **This step said `build/v1-mvp` until 8 Aug 2026**, when
+   `main` was fast-forwarded onto that branch and Netlify re-pointed at it.
 4. Build settings:
    - Build command: `npm run build`
    - Publish directory: `dist`

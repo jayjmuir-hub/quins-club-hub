@@ -15,8 +15,10 @@ email blocker that no longer existed. Because `CLAUDE.md` ranks this file ABOVE
 file — it belongs in `state-of-play.md` instead.**
 
 Reading order and precedence are in `CLAUDE.md`. Single source of truth for the code is
-https://github.com/jayjmuir-hub/quins-club-hub (public). Branch `build/v1-mvp` is the
-live work; `main` holds only the initial scaffold commit.
+https://github.com/jayjmuir-hub/quins-club-hub (public). Branch `main` is the live
+work and the production branch. ⚠️ **Until 8 Aug 2026 that was `build/v1-mvp`,
+and `main` held only early scaffold history** — an old clone or an old document may
+still say so.
 
 **Two things that used to live here now have their own files, because neither is
 "how the code behaves":**
@@ -373,8 +375,9 @@ untracks the whole ledger. Do not fight it — stage the workspace with
 
 ## Infrastructure facts
 
-- **Netlify:** project `quins-club-hub`, connected to GitHub, branch `build/v1-mvp`,
-  auto-deploys on push.
+- **Netlify:** project `quins-club-hub`, connected to GitHub, branch `main`,
+  auto-deploys on push. ⚠️ **The branch is a Netlify UI setting, not `netlify.toml`**
+  — it cannot be discovered from a clone. `CLAUDE.md` rule 3 is its home.
 - ⚠️ **`adhjrt.com`'s bare root is a DIFFERENT, unrelated Netlify project**
   (`serene-gingersnap-1d0eb6`) — a tournament/registration app built from the separate
   repo `jayjmuir-hub/adhjrt`. **Never reuse, overwrite or reconfigure it.** This app owns

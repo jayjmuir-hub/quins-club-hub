@@ -149,8 +149,14 @@ the rows back.**
   ⚠️ **Pre-existing, NOT caused by the search_path change** — proved by running an
   unpinned copy of the original function side by side on 7 Aug; identical output.
   **No real row has hit it yet** (all 5 profiles have two-word names, 0 with
-  `first_name = last_name`), so this is latent, not live. It will fire the first time
-  a parent types one word into the name gate. Fix is to test the *split*, not
+  `first_name = last_name`), so this is latent, not live. ⚠️ **The claim that it fires "the first time a parent
+  types one word into the name gate" is WRONG, and it mattered** — `NamePrompt.jsx:96`
+  calls `updateProfileNames({firstName, lastName})`, which takes the FIRST/LAST branch
+  of the trigger, where no split happens. The gate cannot reach the bug. What reaches
+  it is `private.handle_new_user()` (`db/schema/functions.sql:414`), which inserts
+  `full_name` from `raw_user_meta_data->>'full_name'` — the provider display name — on
+  **every new signup**, taking the full_name branch. So this is on the signup path for
+  all 146 parents, not a rare gate case. Fix is to test the *split*, not
   `first_name`: `if position(' ' in full_in) = 0 then last_name := null`.
 - ✅ **`db/schema/` RE-CAPTURED 7 Aug** after three days and ~14 migrations. **Nothing
   unintended was found** — all 22 function bodies now match live byte-for-byte, all 31
@@ -186,7 +192,10 @@ the rows back.**
   Safe because the body references no schema-qualified object and no non-catalog
   function — only `nullif`, `btrim`, `concat_ws`, `regexp_replace` and `NEW`/`OLD`,
   and `pg_catalog` stays on the path whatever `search_path` is set to.
-  **Not applied — a live schema change needs Jay's yes.**
+  ❌ **This bullet ended with "Not applied — a live schema change needs Jay's yes"
+  until 8 Aug, four lines under its own ✅ PINNED heading.** It was leftover from the
+  pre-fix edition. The pin IS applied — `functions.sql` shows `SET search_path TO ''`.
+  **A file whose job is catching stale claims contradicted itself inside one bullet.**
 - ⚠️ **`db/migrations/` holds 17 files against 51 applied migrations.** Supabase's own
   list is authoritative. `events_series_id` (`20260805133133`) is applied with no file
   in the repo, and `src/screens/EventForm.jsx` writes the column it adds. **The 6 Aug

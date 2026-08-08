@@ -14,8 +14,7 @@ order — read it when you are about to start or about to push.
 ```bash
 git clone https://github.com/jayjmuir-hub/quins-club-hub.git
 cd quins-club-hub
-git checkout build/v1-mvp
-npm install
+npm install    # main is the default branch and the production branch
 ```
 
 The repo is public and read-only-cloneable from anywhere, so a Cowork cloud session
@@ -60,7 +59,7 @@ Desktop Commander without ever handling the token:
 
 ```bash
 cd C:\Users\<you>\GitHub\quins-club-hub
-git pull --ff-only origin build/v1-mvp
+git pull --ff-only origin main
 # ...apply changes...
 
 # ⚠️ STAGE EXPLICIT PATHS. Never `git add -A` — CLAUDE.md rule 1. `.env` is
@@ -68,7 +67,7 @@ git pull --ff-only origin build/v1-mvp
 # Supabase key in a public repo. This example said `git add -A` until 7 Aug 2026.
 git add path/to/file another/path
 git commit -m "..."
-git push origin build/v1-mvp
+git push origin main
 ```
 **Do not rely on the Claude GitHub *connector*.** It returned `Bad credentials` across
 multiple sessions and is a different credential from the PC's git. The PC route above is
