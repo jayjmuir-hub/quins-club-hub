@@ -129,7 +129,12 @@ export async function getMyProfile(userId) {
   // the person agreed with it.
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, first_name, last_name, name_confirmed_at, email, created_at')
+    // `phone` was added to public.profiles on 8 Aug 2026 so that a member with
+    // no linked player has at least one fact about themselves they can record.
+    // Selected HERE rather than by a second query because useMyProfile already
+    // caches this row per user id — /more reads the phone straight out of that
+    // cache, at the cost of one more column on a row it was fetching anyway.
+    .select('id, full_name, first_name, last_name, name_confirmed_at, email, phone, created_at')
     .eq('id', userId)
     .maybeSingle()
 
@@ -503,6 +508,71 @@ export async function updateProfileNames({ profileId, firstName, lastName } = {}
   return data
 }
 
+/**
+ * Saves the two things a member may change about THEMSELVES: their name and
+ * their phone number. Written for the "You" card on /more (Jay, 8 Aug 2026).
+ *
+ * WHY THIS EXISTS AT ALL. Until now the only self-service editing in the app
+ * was MyPlayerForm, reached from a linked player. A parent whose membership
+ * has `player_id = null` — the shape you get when an admin grants access by
+ * hand rather than through registration — has no linked player, so
+ * YourPlayers renders nothing and that person could edit literally nothing
+ * about themselves anywhere in the app.
+ *
+ * ⚠️ THE PHONE IS ON THE PROFILE, NOT ON THE PLAYER (Jay's ruling, 8 Aug
+ * 2026). `player_contacts.phone` is how you reach the CHILD; this is how you
+ * reach the PERSON SIGNED IN, who is frequently not a player at all. Storage
+ * format is the same E.164 string the rest of the app uses, produced by
+ * joinPhone() in the caller — see src/lib/phone.js. Null, never '', when the
+ * field is cleared: an empty string would sort and compare as a real value.
+ *
+ * ⚠️ THIS DELIBERATELY CANNOT WRITE `email`, AND NEITHER CAN ANYTHING ELSE.
+ * RLS grants ROWS, not columns, so `profile update own` used to let a person
+ * rewrite `profiles.email` and desync it from the address they actually sign
+ * in with — which is the address an admin reads on the Accounts screen when
+ * deciding whether to approve a stranger. Column privileges for
+ * `authenticated` are now an allow-list: full_name, first_name, last_name,
+ * name_confirmed_at, phone. Adding `email` to the object below would not
+ * quietly succeed, it would fail the whole update — which is the correct
+ * outcome, and the reason no email field exists on the form.
+ *
+ * `name_confirmed_at` is written for the same reason updateProfileNames
+ * writes it: this is the person stating their own name, which is exactly what
+ * that column records. Someone who fills this card in should not then be
+ * asked the same question by NamePrompt on next sign-in.
+ */
+export async function updateMyProfile({ profileId, firstName, lastName, phone } = {}) {
+  if (!profileId) throw new Error('updateMyProfile needs a profileId.')
+
+  const first = typeof firstName === 'string' ? firstName.trim() : ''
+  const last = typeof lastName === 'string' ? lastName.trim() : ''
+  // Same rule as updateProfileNames: a blank family name is fine (plenty of
+  // people have one name), a blank first name is not — full_name is rebuilt
+  // from these by the profiles_sync_name trigger, and a blank one renders as
+  // an account with no name anywhere in the app.
+  if (!first) throw new Error('Enter your first name.')
+
+  const trimmedPhone = typeof phone === 'string' ? phone.trim() : ''
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      first_name: first,
+      last_name: last || null,
+      phone: trimmedPhone || null,
+      name_confirmed_at: new Date().toISOString(),
+    })
+    .eq('id', profileId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  // A refusal is a successful zero-row response, not an error — the same
+  // silent-refusal shape every other writer in this module reads back.
+  if (!data) throw new Error(REFUSED_MY_PROFILE)
+  return data
+}
+
 // Same silent-refusal mechanism as REFUSED_INVITE above, against the two
 // tables the Accounts screen writes to. The `memb manage` policy on
 // memberships (ALL, USING+WITH CHECK private.is_admin(club_id)) and
@@ -522,6 +592,11 @@ const REFUSED_MEMBERSHIP_DELETE =
   "We couldn't remove that member's access. You may not have permission to manage members."
 const REFUSED_PROFILE =
   "We couldn't save that name. You may not have permission to change this member's details."
+// Separate wording for the self-service card on /more: the message above is
+// written for an admin editing SOMEBODY ELSE, and telling a parent they may
+// not have permission to change "this member's details" when the member is
+// themselves reads as a bug.
+const REFUSED_MY_PROFILE = "We couldn't save your details. Try again."
 
 // Kept in step with the memberships_role_check CHECK constraint
 // (db/migrations/20260805_roles_manager_and_medic.sql). This is a friendly

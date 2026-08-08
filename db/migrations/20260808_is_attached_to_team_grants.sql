@@ -1,0 +1,25 @@
+-- FIX: grants for private.is_attached_to_team().
+--
+-- Applied live as `20260808161025 is_attached_to_team_grants`, minutes after
+-- `membership_pending_status` created the function.
+--
+-- ⚠️ THIS FIXED A PRODUCTION OUTAGE I CAUSED. The function was created with
+--     revoke execute on function private.is_attached_to_team(uuid) from public;
+-- and no explicit grants. The "event read" policy calls it, so EVERY events
+-- query started failing:
+--
+--     42501: permission denied for function is_attached_to_team
+--
+-- THE CONCEPT, because it is easy to get wrong again: an RLS policy expression
+-- is evaluated AS THE QUERYING USER, not as the table owner. A helper a policy
+-- calls must therefore be EXECUTE-able by that user. `security definer` governs
+-- what the function may do once it runs; it does not grant the right to run it.
+--
+-- The four existing private helpers all carry {postgres, authenticated, anon}.
+-- Matching them exactly rather than inventing a tighter set: the function
+-- returns false for anon anyway (auth.uid() is null), and an asymmetric grant
+-- among five sibling helpers is the kind of difference that becomes a mystery.
+--
+-- It broke LOUDLY, which is why the very first run of
+-- db/tests/rls-pending-membership.sql caught it rather than a parent.
+grant execute on function private.is_attached_to_team(uuid) to authenticated, anon;

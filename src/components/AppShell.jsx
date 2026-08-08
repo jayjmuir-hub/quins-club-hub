@@ -251,20 +251,77 @@ export default function AppShell({ children }) {
                 something anyone reads at speed. `truncate` because Anton is
                 wide and the name is long — on a narrow phone it would
                 otherwise push the nav off the row. */}
-            <div className="relative min-w-0">
+            {/* ⚠️ `overflow-hidden` is a TAP-TARGET guard, not a cosmetic one.
+                Reported with the wrap above (8 Aug 2026): "tapping the initial
+                only works from the home tab". The masthead is rendered
+                identically on every route — nothing in this file is
+                route-conditional except the sign-out block far below — so a
+                genuinely route-dependent account button does not exist, and
+                the working theory was that this block was painting over the
+                account Link to its right and swallowing the taps.
+
+                It was not, and the honest answer is written here so nobody
+                re-derives it: this is a flex item with `min-w-0`, so it is
+                sized by the flex algorithm and never wider than the space it
+                is given; the wrap was the browser fitting the text INSIDE that
+                width, not spilling out of it. What the wrap did do is make
+                this block three lines tall next to a 36px circle, which is a
+                mis-tap waiting to happen, and on /more the link points at the
+                page you are already on and so does nothing visible at all.
+                Those two together are the whole of the report.
+
+                The clip stays anyway: it makes "this block cannot paint over
+                the account button" a property of the container instead of
+                something that holds only while both children happen to carry
+                `truncate`. That is the class of bug jsdom cannot see, so it is
+                worth making structural. */}
+            <div className="relative min-w-0 overflow-hidden">
               <h1 className="truncate font-display text-[19px] uppercase leading-none tracking-[0.02em] desktop:text-[21px]">
                 Abu Dhabi Harlequins
               </h1>
-              <p className="flex items-baseline gap-1 font-condensed text-[13px] font-semibold uppercase tracking-[1.6px] text-white/70">
+              {/* ⚠️ ONE LINE, AND IT MUST STAY ONE LINE. `truncate` here is
+                  white-space:nowrap + overflow:hidden + ellipsis on the whole
+                  subtitle, and the spans inside are plain inline text.
+
+                  This was `flex items-baseline gap-1` with the wordmark in an
+                  un-shrinkable span, and on 8 Aug 2026 a parent on a ~400px
+                  Android phone got:
+
+                      ABU DHABI HARLEQ…
+                      QUINS CLUB      · PARE…
+                      HUB
+
+                  The reason is the flex line, not the widths: a flex line does
+                  not wrap (`flex-wrap: nowrap`), so when the row squeezed this
+                  block the only way the first span could give ground was to
+                  BREAK ITS OWN TEXT — "Quins Club" / "Hub" — while the role
+                  span, being `truncate`, could shrink to nothing and so
+                  absorbed none of the squeeze. Inline text in a single
+                  nowrap/ellipsis line cannot do that: it clips at the right
+                  edge with an ellipsis, which is what the h1 above already
+                  does and what a masthead is supposed to do.
+
+                  jsdom applies no CSS and cannot see a wrap, so no test in
+                  this repo could have caught the original — same blind spot as
+                  the `wide:` vs `desktop:` note at the account link below. The
+                  test that exists pins the class tokens instead. */}
+              <p className="truncate font-condensed text-[13px] font-semibold uppercase tracking-[1.6px] text-white/70">
                 <span>Quins Club Hub</span>
                 {/* Mobile-only compact role indicator (decision 6: the role
                     label has no breakpoint qualifier, and mobile is the
                     primary case for a pitch-side club app). The desktop badge
                     below covers >=820px; this covers below it, so the role is
-                    never CSS-hidden at any width. */}
+                    never CSS-hidden at any width.
+
+                    ⚠️ The separator lives INSIDE this span, and the span is no
+                    longer `truncate`. Both follow from the line above: a gap
+                    needs a flex parent, and a nested overflow:hidden inside an
+                    ellipsised line would clip its own text a second time. The
+                    parent's ellipsis covers it. */}
                 {showRole && (
-                  <span data-testid="role-label-mobile" className="truncate desktop:hidden">
-                    · {currentRoleLabel}
+                  <span data-testid="role-label-mobile" className="desktop:hidden">
+                    {' · '}
+                    {currentRoleLabel}
                   </span>
                 )}
               </p>

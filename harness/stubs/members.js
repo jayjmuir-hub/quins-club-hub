@@ -176,6 +176,10 @@ export async function getMyProfile(userId) {
     last_name: blank ? '' : 'Muir',
     name_confirmed_at: unconfirmed ? null : '2026-08-06T09:00:00Z',
     email: 'jayjmuir@gmail.com',
+    // profiles.phone, added 8 Aug 2026 for the editable You card on /more.
+    // ?blankPhone=1 gives the never-recorded case, which is what almost every
+    // real row looks like today.
+    phone: params.get('blankPhone') === '1' ? null : '+971501234567',
     created_at: '2026-01-05T09:00:00Z',
   }
 }
@@ -207,6 +211,39 @@ export async function updateProfileNames({ profileId, firstName, lastName } = {}
     // back from this stub sees what the database would actually have stored.
     full_name: [first, last].filter(Boolean).join(' '),
     name_confirmed_at: '2026-08-06T12:00:00Z',
+  }
+}
+
+// Mirrors the real updateMyProfile: the You card on /more, where a member
+// changes their own name and phone. Deliberately writes NEITHER email nor
+// anything membership-shaped, for the same reason the real one does not —
+// `authenticated` holds column privileges on profiles for full_name,
+// first_name, last_name, name_confirmed_at and phone only, and a stub that
+// accepted an email here would misrepresent exactly the property that
+// closing that hole was for.
+export async function updateMyProfile({ profileId, firstName, lastName, phone } = {}) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('writeDelay') || 0)
+
+  if (!profileId) throw new Error('updateMyProfile needs a profileId.')
+  const first = String(firstName ?? '').trim()
+  const last = String(lastName ?? '').trim()
+  if (!first) throw new Error('Enter your first name.')
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (params.get('writeThrow') === '1') {
+    throw new Error("We couldn't save your details. Try again.")
+  }
+
+  const trimmedPhone = String(phone ?? '').trim()
+  return {
+    id: profileId,
+    first_name: first,
+    last_name: last || null,
+    // Mirrors the profiles_sync_name trigger, as updateProfileNames does.
+    full_name: [first, last].filter(Boolean).join(' '),
+    phone: trimmedPhone || null,
+    name_confirmed_at: '2026-08-08T12:00:00Z',
   }
 }
 

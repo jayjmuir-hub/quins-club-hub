@@ -466,3 +466,136 @@ describe('AppShell — my account button', () => {
     expect(hasClassToken(nameEl, 'desktop:inline')).toBe(false)
   })
 })
+
+// ⚠️ REPORTED FROM A REAL PHONE, 8 Aug 2026. A parent on a ~400px Android
+// device saw the masthead render as:
+//
+//     ABU DHABI HARLEQ…
+//     QUINS CLUB      · PARE…
+//     HUB
+//
+// The subtitle was a flex row (`flex items-baseline gap-1`) whose first span
+// had no nowrap and no shrink-0, so when the masthead squeezed it the only way
+// that span could give ground was to break its own text — while the role span,
+// being `truncate`, could shrink to zero and absorbed none of the squeeze.
+//
+// ⚠️ NONE OF THE TESTS BELOW WOULD HAVE CAUGHT THE ORIGINAL. jsdom applies no
+// CSS, has no layout, and cannot tell a wrapped line from an unwrapped one —
+// exactly the blind spot recorded on the account link's `wide:` vs `desktop:`
+// test above. What they pin is the class tokens and the DOM shape that decide
+// the behaviour once real CSS applies, which is the most jsdom can do.
+describe('AppShell — the masthead subtitle is ONE line', () => {
+  it('is a single truncating line, not a flex row that can break mid-phrase', () => {
+    useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'parent', team_id: 't1' }] }))
+
+    renderShell()
+
+    const subtitle = screen.getByText('Quins Club Hub').closest('p')
+
+    // `truncate` is white-space:nowrap + overflow:hidden + ellipsis. nowrap is
+    // the half that makes the wrap impossible; the ellipsis is what the line
+    // does instead when it runs out of room.
+    expect(hasClassToken(subtitle, 'truncate')).toBe(true)
+    // The flex row is the mechanism the bug needed. Its absence is the fix, so
+    // assert the absence rather than only the presence of the replacement —
+    // `truncate` on a flex container would still let the inner span wrap.
+    expect(hasClassToken(subtitle, 'flex')).toBe(false)
+  })
+
+  it('reads as one line of text, wordmark then role', () => {
+    useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'parent', team_id: 't1' }] }))
+
+    renderShell()
+
+    const subtitle = screen.getByText('Quins Club Hub').closest('p')
+    // The separator moved inside the role span when the flex `gap-1` went, so
+    // this also guards against losing the spaces around it and rendering
+    // "Quins Club Hub·Parent".
+    expect(subtitle.textContent).toBe('Quins Club Hub · Parent')
+  })
+
+  it('still carries the mobile role label, still hidden only at the desktop breakpoint', () => {
+    // ⚠️ The fix must not quietly drop either of these. The role has to be
+    // visible SOMEWHERE at every width: the desktop pill covers >=820px and
+    // this covers below it, so a bare `hidden` here would leave a phone with
+    // no role label at all — the Task 8 review finding, all over again.
+    useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'parent', team_id: 't1' }] }))
+
+    renderShell()
+
+    const mobileRole = screen.getByTestId('role-label-mobile')
+    expect(mobileRole).toHaveTextContent('Parent')
+    expect(hasClassToken(mobileRole, 'hidden')).toBe(false)
+    expect(hasClassToken(mobileRole, 'desktop:hidden')).toBe(true)
+  })
+})
+
+// The second half of the same report: "tapping the initial only works from the
+// home tab". The working theory was that the block to its left was overflowing
+// and painting over it.
+//
+// ⚠️ IT WAS NOT, and these tests record what was actually found. Nothing in
+// AppShell's masthead is route-conditional — the only path-dependent branch in
+// the file is the sign-out block, which renders inside <main> on /more — so the
+// account button is byte-for-byte the same element on every route. The two
+// things that ARE true: the wrap made this block three lines tall beside a 36px
+// circle, which is a mis-tap waiting to happen; and on /more the link points at
+// the page you are already on, so it does nothing visible. Fixing the wrap
+// addresses the first, and the second is not a bug.
+//
+// jsdom cannot answer "is this element covered by another one" — it has no
+// layout. What it CAN pin is the three structural facts the overlap theory
+// turned on, which is what these do.
+describe('AppShell — the account button on a route that is not home', () => {
+  it('renders and points at /more from /roster, exactly as it does from /', async () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
+
+    renderShell('/roster')
+
+    const link = await screen.findByTestId('account-button')
+    expect(link).toHaveAttribute('href', '/more')
+    expect(link).toHaveAccessibleName('My account, Jay')
+  })
+
+  it('renders an IDENTICAL account button on /roster and on /', async () => {
+    // The strongest thing jsdom can say about "it only works from home": if
+    // the element is the same markup on both routes, no route-conditional
+    // rendering can be the cause. This fails the moment somebody makes the
+    // button — or its position in the masthead — depend on the path.
+    useMembershipsMock.mockReturnValue(loaded())
+    getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
+
+    const home = renderShell('/')
+    await screen.findByRole('link', { name: 'My account, Jay' })
+    const fromHome = home.container.querySelector('[data-testid="account-button"]').outerHTML
+    home.unmount()
+
+    const roster = renderShell('/roster')
+    await screen.findByRole('link', { name: 'My account, Jay' })
+    const fromRoster = roster.container.querySelector('[data-testid="account-button"]').outerHTML
+
+    expect(fromRoster).toBe(fromHome)
+  })
+
+  it('keeps the club-name block clipped, and painting BEFORE the account button', async () => {
+    // The two structural guards against the overlap theory ever becoming true.
+    //
+    // `min-w-0` lets the block be sized by the flex algorithm and `overflow-hidden`
+    // clips whatever is inside it, so it cannot paint outside its own box
+    // whatever its children do. And it is an EARLIER sibling, so in a stack of
+    // untransformed, unpositioned flex items the account button paints last —
+    // meaning even a spill would not take the taps.
+    useMembershipsMock.mockReturnValue(loaded())
+    getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
+
+    const { container } = renderShell('/roster')
+    const link = await screen.findByTestId('account-button')
+    const nameBlock = container.querySelector('h1').parentElement
+
+    expect(hasClassToken(nameBlock, 'min-w-0')).toBe(true)
+    expect(hasClassToken(nameBlock, 'overflow-hidden')).toBe(true)
+    // Node.DOCUMENT_POSITION_FOLLOWING === 4: the link comes after the block.
+    expect(nameBlock.compareDocumentPosition(link) & 4).toBeTruthy()
+  })
+})

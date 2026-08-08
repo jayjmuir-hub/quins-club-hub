@@ -10,6 +10,10 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
+- `7765ebe` — **Parents register their own player and wait for approval.** `team read`
+  had to be widened or the age-group dropdown was permanently empty for exactly the
+  person who needed it. Approval is ADMIN-only, not "coach or admin" as the spec assumed.
+  1317 tests.
 - `212022b` — **The pending membership state, `register_my_player`, and an RLS harness.**
   Measured the danger first: a brand-new parent could see the WHOLE squad. `can_see_team`
   now requires `status='active'`; a new `is_attached_to_team` gates fixtures only.

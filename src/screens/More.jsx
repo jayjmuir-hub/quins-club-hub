@@ -1,10 +1,14 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
+import PhoneInput from '../components/PhoneInput.jsx'
 import YourPlayers from '../components/YourPlayers.jsx'
+import { updateMyProfile } from '../data/members.js'
 import { useAuth } from '../lib/auth.jsx'
-import useMyProfile from '../lib/useMyProfile.js'
+import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import { joinPhone, splitPhone } from '../lib/phone.js'
 import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 
 // The "More" tab, for EVERYONE (admin-dashboard plan, 2026-08-05).
@@ -40,6 +44,207 @@ function SectionTitle({ children }) {
   )
 }
 
+// Matches MyPlayerForm's field styling rather than inventing a second one —
+// text-base/16px on the input specifically, because iOS Safari zooms the whole
+// page when a focused input is smaller than 16px.
+const FIELD =
+  'w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none transition focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
+const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
+
+// A read-only row in the You card, for the facts a person can look at but not
+// change. Same shape the whole card used to have.
+function ReadOnlyRow({ label, value, testId, className = '' }) {
+  return (
+    <div className={`flex items-center justify-between gap-3 ${className}`}>
+      <span className="text-[15px] font-bold text-ink">{label}</span>
+      <span data-testid={testId} className="truncate text-[12.5px] font-semibold text-ink-muted">
+        {value}
+      </span>
+    </div>
+  )
+}
+
+// THE "YOU" CARD — the only place a member can change anything about
+// THEMSELVES (Jay, 8 Aug 2026).
+//
+// ⚠️ WHY IT EXISTS. This card was four read-only rows. That was survivable
+// only while every member reached MyPlayerForm through a linked player — and
+// a membership granted by hand by an admin has `player_id = null`, so
+// YourPlayers renders nothing for that person and there was no editable field
+// anywhere in the app for them. A parent reported exactly that.
+//
+// ⚠️ THE EDITABLE SCOPE IS NAME AND PHONE. NOTHING ELSE. Not because the form
+// is polite about it — because `authenticated` holds column privileges on
+// public.profiles for exactly full_name, first_name, last_name,
+// name_confirmed_at and phone. `email` is NOT in that list, on purpose: RLS
+// grants rows, not columns, so the own-row update policy previously let
+// somebody rewrite the address an admin reads on the Accounts screen when
+// approving a stranger. Role and squads are decided by membership rows, which
+// this caller cannot write at all. Adding an input for any of them would
+// produce a form that fails on save.
+//
+// The phone belongs HERE and not on the player record: player_contacts.phone
+// is how you reach the CHILD, this is how you reach the person signed in.
+function YouCard({ profile, email, role, squads }) {
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  // Phone is stored E.164 and edited as country + national digits, the same
+  // split MyPlayerForm, PlayerForm and the parent rows use. splitPhone keeps
+  // an unparseable number's digits rather than blanking the box.
+  const [phoneCountry, setPhoneCountry] = useState(() => splitPhone('').country)
+  const [phoneNational, setPhoneNational] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const [saved, setSaved] = useState(false)
+
+  // ⚠️ SEED ONCE PER PROFILE, NOT ON EVERY PROFILE OBJECT. useMyProfile
+  // resolves asynchronously, so the first render has no row and the fields
+  // must fill in when it arrives — but re-seeding on any later change would
+  // throw away whatever the person had typed.
+  //
+  // ⚠️ AND THE FIELDS ARE DISABLED UNTIL IT ARRIVES (`ready`). Without that
+  // there is a real, if short, window in which someone lands on /more, starts
+  // typing their name into an empty box, and has it overwritten the moment the
+  // row comes back — on a slow pitch-side connection that window is not
+  // theoretical. A box that is briefly disabled is a straightforward thing to
+  // see; text that rewrites itself under your fingers is not.
+  const ready = Boolean(profile?.id)
+  const seededFor = useRef(null)
+  useEffect(() => {
+    if (!profile?.id || seededFor.current === profile.id) return
+    seededFor.current = profile.id
+    setFirstName(profile.first_name ?? '')
+    setLastName(profile.last_name ?? '')
+    const split = splitPhone(profile.phone ?? '')
+    setPhoneCountry(split.country)
+    setPhoneNational(split.national)
+  }, [profile])
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setSaving(true)
+    setError(null)
+    setSaved(false)
+
+    try {
+      const updated = await updateMyProfile({
+        profileId: profile.id,
+        firstName,
+        lastName,
+        // joinPhone returns null for an empty box, which is what clears the
+        // column. It never refuses an odd-looking number — PhoneInput warns
+        // beside the field instead (see src/lib/phone.js).
+        phone: joinPhone(phoneCountry, phoneNational),
+      })
+      // The masthead initial and the dashboard greeting read this cache, and
+      // it is never invalidated by itself (see useMyProfile's header note).
+      // Priming it is the documented escape hatch. ⚠️ It does NOT re-render
+      // the components already holding the old row — those update on the next
+      // mount — so this fixes "my new name is still wrong after I navigate",
+      // not "the masthead changed as I hit save".
+      primeMyProfileCache(profile.id, updated)
+      setSaved(true)
+    } catch (err) {
+      setError(err.message || "We couldn't save your details. Try again.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card className="p-[14px]">
+      <form onSubmit={handleSubmit}>
+        {error && (
+          <p
+            role="alert"
+            className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+          >
+            {error}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-3 desktop:flex-row">
+          <div className="flex-1">
+            <label className={LABEL} htmlFor="your-first-name">
+              First name
+            </label>
+            <input
+              id="your-first-name"
+              type="text"
+              autoComplete="given-name"
+              className={FIELD}
+              value={firstName}
+              disabled={saving || !ready}
+              onChange={(event) => setFirstName(event.target.value)}
+            />
+          </div>
+          <div className="flex-1">
+            {/* "Family name", the wording NamePrompt already uses. A blank one
+                is allowed and saved as null — plenty of people have one name. */}
+            <label className={LABEL} htmlFor="your-last-name">
+              Family name
+            </label>
+            <input
+              id="your-last-name"
+              type="text"
+              autoComplete="family-name"
+              className={FIELD}
+              value={lastName}
+              disabled={saving || !ready}
+              onChange={(event) => setLastName(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <PhoneInput
+            id="your-phone"
+            country={phoneCountry}
+            national={phoneNational}
+            onCountryChange={setPhoneCountry}
+            onNationalChange={setPhoneNational}
+            disabled={saving || !ready}
+          />
+        </div>
+
+        <div className="mt-3.5 flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={saving || !ready}
+            className="rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          {saved && !saving && (
+            // role="status", not role="alert": a confirmation is not an
+            // interruption, and this is the whole feedback a person gets that
+            // the save landed.
+            <span role="status" className="text-[13px] font-semibold text-ink-muted">
+              Saved
+            </span>
+          )}
+        </div>
+
+        {/* ⚠️ READ-ONLY, AND THEY MUST STAY READ-ONLY. Email is the address
+            this account signs in with and an admin approves on; role and
+            squads are membership rows the caller cannot write. Rendered as
+            text rather than as disabled inputs — a greyed-out box invites
+            someone to try. */}
+        <div className="mt-4 space-y-2.5 border-t border-line pt-3.5">
+          <ReadOnlyRow label="Email" value={email ?? '—'} testId="your-email" />
+          <ReadOnlyRow label="Role" value={role} testId="your-role" />
+          <div>
+            <span className="text-[15px] font-bold text-ink">Squads you can see</span>
+            <p data-testid="your-squads" className="mt-1 text-[12.5px] font-semibold text-ink-muted">
+              {squads.length === 0 ? 'No squads yet.' : squads.map((team) => team.name).join(' · ')}
+            </p>
+          </div>
+        </div>
+      </form>
+    </Card>
+  )
+}
+
 export default function More() {
   const { memberships, teams } = useMemberships()
   const { user } = useAuth()
@@ -56,39 +261,18 @@ export default function More() {
       {/* Added 6 Aug 2026 (Jay): the More screen showed a role, a squad list
           and two links, so "what does the club actually hold about me?" had
           no answer anywhere in the app. Name and email come from the profile
-          row and the session — both already loaded, no extra round trip. */}
+          row and the session — both already loaded, no extra round trip.
+
+          ⚠️ EDITABLE SINCE 8 AUG 2026, and the four read-only rows are now
+          two. See YouCard above for why, and for the exact reason email is
+          not one of them. */}
       <SectionTitle>You</SectionTitle>
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between gap-3 border-b border-line px-[14px] py-[11px]">
-          <span className="text-[15px] font-bold text-ink">Name</span>
-          <span data-testid="your-name" className="text-[12.5px] font-semibold text-ink-muted">
-            {/* ⚠️ Not every account has a name. A magic-link sign-in has none
-                until NamePrompt is answered, and NamePrompt is skippable, so
-                this says so plainly rather than rendering an empty row. */}
-            {[profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Not set yet'}
-          </span>
-        </div>
-        <div className="flex items-center justify-between gap-3 border-b border-line px-[14px] py-[11px]">
-          <span className="text-[15px] font-bold text-ink">Email</span>
-          <span data-testid="your-email" className="truncate text-[12.5px] font-semibold text-ink-muted">
-            {user?.email ?? '—'}
-          </span>
-        </div>
-        <div className="flex items-center justify-between gap-3 border-b border-line px-[14px] py-[11px]">
-          <span className="text-[15px] font-bold text-ink">Role</span>
-          <span data-testid="your-role" className="text-[12.5px] font-semibold text-ink-muted">
-            {roleLabel(memberships)}
-          </span>
-        </div>
-        <div className="px-[14px] py-[11px]">
-          <span className="text-[15px] font-bold text-ink">Squads you can see</span>
-          <p data-testid="your-squads" className="mt-1 text-[12.5px] font-semibold text-ink-muted">
-            {squads.length === 0
-              ? 'No squads yet.'
-              : squads.map((team) => team.name).join(' · ')}
-          </p>
-        </div>
-      </Card>
+      <YouCard
+        profile={profile}
+        email={user?.email}
+        role={roleLabel(memberships)}
+        squads={squads}
+      />
 
       {/* Renders nothing at all for a coach or admin with no child at the
           club — an empty "Your players" card would imply something missing. */}

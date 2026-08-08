@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
 // Unit tests for src/screens/More.jsx (admin-dashboard plan, 2026-08-05).
@@ -14,6 +15,8 @@ import { MemoryRouter } from 'react-router-dom'
 // /more is now for everyone.
 
 const useMembershipsMock = vi.fn()
+const getMyProfileMock = vi.fn()
+const updateMyProfileMock = vi.fn()
 const listPlayersMock = vi.fn()
 const listContactsForPlayersMock = vi.fn()
 const listParentsForPlayersMock = vi.fn()
@@ -32,7 +35,10 @@ vi.mock('../src/lib/auth.jsx', () => ({
 }))
 
 vi.mock('../src/data/members.js', () => ({
-  getMyProfile: vi.fn().mockResolvedValue({ id: 'user-1', first_name: 'Jay', last_name: 'Muir' }),
+  getMyProfile: (...a) => getMyProfileMock(...a),
+  // The You card's writer (8 Aug 2026). Mocked, like every other data
+  // function in this file — nothing here reaches a Supabase client.
+  updateMyProfile: (...a) => updateMyProfileMock(...a),
 }))
 
 vi.mock('../src/data/players.js', () => ({
@@ -94,14 +100,37 @@ beforeEach(() => {
   listPlayersMock.mockResolvedValue([])
   listContactsForPlayersMock.mockResolvedValue([])
   listParentsForPlayersMock.mockResolvedValue([])
+  // The profile row the You card fills itself in from. `phone` has been on
+  // this row since 8 Aug 2026; null is the normal case — nobody has one yet.
+  getMyProfileMock.mockResolvedValue({
+    id: 'user-1',
+    first_name: 'Jay',
+    last_name: 'Muir',
+    email: 'jay@example.com',
+    phone: null,
+  })
+  updateMyProfileMock.mockImplementation(async (fields) => ({
+    id: 'user-1',
+    first_name: fields.firstName,
+    last_name: fields.lastName,
+    phone: fields.phone,
+  }))
 })
 
 // Added 6 Aug 2026 (Jay): "they should be able to see their info and any
 // related player info too."
 describe('More — your own details', () => {
   it('shows the name and email the club holds', async () => {
+    // ⚠️ The name used to be a read-only row with data-testid="your-name".
+    // It is two inputs since 8 Aug 2026 (see the You-card suite at the foot of
+    // this file for why), so the same fact is now asserted on their values.
+    // The email is still text, and must stay text.
     renderMore()
-    expect(await screen.findByTestId('your-name')).toHaveTextContent('Jay Muir')
+    // ⚠️ findByDisplayValue, not findByLabelText: the inputs exist on the
+    // first render and are filled in when the profile row resolves, so
+    // querying by label alone returns them EMPTY and asserts nothing.
+    expect(await screen.findByDisplayValue('Jay')).toBe(screen.getByLabelText('First name'))
+    expect(screen.getByLabelText('Family name')).toHaveValue('Muir')
     expect(screen.getByTestId('your-email')).toHaveTextContent('jay@example.com')
   })
 })
@@ -201,7 +230,7 @@ describe('More — your players', () => {
     listPlayersMock.mockResolvedValue([PLAYER])
 
     renderMore()
-    await screen.findByTestId('your-name')
+    await screen.findByDisplayValue('Jay')
 
     expect(screen.queryByTestId('your-player')).not.toBeInTheDocument()
     expect(screen.queryByText(/your player/i)).not.toBeInTheDocument()
@@ -312,5 +341,161 @@ describe('More — what it deliberately does NOT do', () => {
     renderMore()
 
     expect(screen.queryByRole('button', { name: /sign out/i })).not.toBeInTheDocument()
+  })
+})
+
+// ⚠️ REPORTED BY A REAL PARENT, 8 Aug 2026: "I can't change anything about
+// myself." She was right. /more showed Name, Email, Role and Squads, all
+// read-only, with no phone field at all, and the only self-service form in the
+// app (MyPlayerForm) is reached THROUGH a linked player — so a membership
+// granted by hand by an admin, which carries `player_id = null`, left that
+// person with no editable field anywhere in the product.
+//
+// Jay's rulings, which these tests exist to hold: the phone is a fact about
+// the PERSON so it lives on public.profiles, not on the child's contact row;
+// and the editable scope is NAME AND PHONE, nothing else.
+describe('More — the You card is editable', () => {
+  const user = () => userEvent.setup()
+
+  it('fills itself in from the profile row', async () => {
+    getMyProfileMock.mockResolvedValue({
+      id: 'user-1',
+      first_name: 'Janice',
+      last_name: 'Bell',
+      email: 'janice@example.com',
+      phone: '+971501234567',
+    })
+
+    renderMore()
+
+    expect(await screen.findByDisplayValue('Janice')).toBe(screen.getByLabelText('First name'))
+    expect(screen.getByLabelText('Family name')).toHaveValue('Bell')
+  })
+
+  it('round-trips a stored E.164 number through the country/number split', async () => {
+    // ⚠️ THE STORED SHAPE IS E.164 AND THE EDITED SHAPE IS TWO FIELDS. This is
+    // the seam splitPhone/joinPhone exist for (src/lib/phone.js) and the one
+    // place a copy-paste of this card could silently get it wrong — writing
+    // "501234567" with the country dropped, or "+971+971501234567".
+    getMyProfileMock.mockResolvedValue({
+      id: 'user-1',
+      first_name: 'Janice',
+      last_name: 'Bell',
+      phone: '+971501234567',
+    })
+
+    renderMore()
+
+    // In: the split. AE from the +971, digits in the box without it.
+    expect(await screen.findByDisplayValue('501234567')).toBe(screen.getByLabelText('Phone'))
+    expect(screen.getByLabelText('Phone country')).toHaveValue('AE')
+
+    // Out: the join, unchanged by the round trip.
+    await user().click(screen.getByRole('button', { name: 'Save' }))
+    expect(updateMyProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: '+971501234567' }),
+    )
+  })
+
+  it('saves the name and phone the person typed, and says so', async () => {
+    renderMore()
+
+    const first = await screen.findByDisplayValue('Jay')
+    await user().clear(first)
+    await user().type(first, 'Janice')
+    await user().clear(screen.getByLabelText('Family name'))
+    await user().type(screen.getByLabelText('Family name'), 'Bell')
+    await user().type(screen.getByLabelText('Phone'), '501234567')
+
+    await user().click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(updateMyProfileMock).toHaveBeenCalledTimes(1)
+    expect(updateMyProfileMock).toHaveBeenCalledWith({
+      profileId: 'user-1',
+      firstName: 'Janice',
+      lastName: 'Bell',
+      // Typed as national digits on the default UAE country, stored as E.164.
+      phone: '+971501234567',
+    })
+    // The whole feedback a person gets that it landed.
+    expect(await screen.findByText('Saved')).toBeInTheDocument()
+  })
+
+  it('clears the phone to null rather than to an empty string', async () => {
+    // An empty string is a value: it sorts, it compares, and it makes
+    // "has a phone number" true. Null is the honest absence.
+    getMyProfileMock.mockResolvedValue({
+      id: 'user-1',
+      first_name: 'Janice',
+      last_name: 'Bell',
+      phone: '+971501234567',
+    })
+
+    renderMore()
+    await user().clear(await screen.findByDisplayValue('501234567'))
+    await user().click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(updateMyProfileMock).toHaveBeenCalledWith(expect.objectContaining({ phone: null }))
+  })
+
+  it('shows what went wrong when the save is refused', async () => {
+    updateMyProfileMock.mockRejectedValue(new Error("We couldn't save your details. Try again."))
+
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+    await user().click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't save your details/i)
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument()
+  })
+
+  it('does NOT let anyone edit their email', async () => {
+    // ⚠️ THIS IS A SECURITY TEST, NOT A LAYOUT ONE. RLS grants rows, not
+    // columns, so the own-row update policy on profiles once let a person
+    // rewrite profiles.email and desync it from the address they actually sign
+    // in with — which is the address an admin reads on the Accounts screen when
+    // deciding whether to approve a stranger. `authenticated` now holds column
+    // privileges on full_name, first_name, last_name, name_confirmed_at and
+    // phone only, so an email input here would be a field that always fails to
+    // save. It stays text.
+    renderMore()
+
+    await screen.findByDisplayValue('Jay')
+
+    expect(screen.getByTestId('your-email')).toHaveTextContent('jay@example.com')
+    expect(screen.queryByLabelText(/email/i)).toBeNull()
+    expect(document.querySelector('input[type="email"]')).toBeNull()
+    // Belt and braces: no control anywhere on the screen is holding the
+    // address as an editable value, whatever it happens to be labelled.
+    const editable = screen.queryAllByRole('textbox')
+    expect(editable.map((el) => el.value)).not.toContain('jay@example.com')
+  })
+
+  it('does NOT let anyone edit their role or their squads', async () => {
+    // Both are decided by membership rows, which this caller cannot write at
+    // all — `memb manage` is is_admin(club_id). An input for either would be a
+    // control the database refuses.
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+
+    expect(screen.getByTestId('your-role')).toHaveTextContent('Parent')
+    expect(screen.getByTestId('your-squads')).toHaveTextContent('U10')
+    expect(screen.queryByLabelText(/role/i)).toBeNull()
+    expect(screen.queryByLabelText(/squad/i)).toBeNull()
+    expect(screen.queryByRole('combobox', { name: /role|squad/i })).toBeNull()
+  })
+
+  it('sends nothing but the name and phone', async () => {
+    // The allow-list, restated as a test. Any extra key here is a column the
+    // client has no privilege on, and the whole update would fail — so an
+    // over-eager `...profile` spread must not creep into the submit handler.
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+    await user().click(screen.getByRole('button', { name: 'Save' }))
+
+    const [fields] = updateMyProfileMock.mock.calls[0]
+    expect(Object.keys(fields).sort()).toEqual(['firstName', 'lastName', 'phone', 'profileId'])
   })
 })
