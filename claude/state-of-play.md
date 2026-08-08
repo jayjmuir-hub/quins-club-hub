@@ -52,7 +52,38 @@ the machine environment, is in `CLAUDE.md` under "Facts worth having". **One hom
 do not restate it here.** (On jay-pc PowerShell's execution policy also blocks
 `npm.ps1` — run npm from `cmd`.)
 
-## ⛔ The rollout blocker: Resend's daily send cap
+## ✅ Sign-in is EMAIL + PASSWORD as of 8 Aug 2026, live
+
+`e3fbc60`. Parents create an account with email and password; **magic link and Google are
+HIDDEN, not removed** — `SHOW_PASSWORDLESS` in `src/screens/Login.jsx` is the whole
+revival. `/reset-password` is a new public route. Decision and full reasoning:
+`claude/decisions/2026-08-08-parent-self-registration.md`.
+
+⚠️ **Magic link cannot actually be disabled.** Supabase has no setting for email
+*sign-in*, only sign-up. Do not tell anyone passwords are the only way in.
+
+⚠️ **Nothing in the app can delete a LOGIN.** Revoking access removes a membership;
+dismissing clears a list. The auth user survives both, can still sign in, and — because
+GoTrue answers a repeat signup with 200 and sends nothing — **cannot register again and
+gets no error either.** Only the Supabase dashboard or SQL can delete a login. This cost
+an hour on 8 Aug. **The pre-pilot wipe must include `auth.users`.**
+
+## ⚠️ Rollout email caps — NOT currently blocking anything
+
+**Both figures below only bite at onboarding, and onboarding is deferred until the
+identity question settles. Zero parents are onboarded; there were 5 logins on 8 Aug and
+3 were deleted, leaving Jay's 2.**
+
+✅ **Supabase's auth-email ceiling is 200/hour**, measured 8 Aug. ❌ **Three documents
+said 2/hour and "not yet done", and a session repeated that to Jay as the live blocker
+four minutes into a conversation.** See the correction at the top of
+`claude/decisions/2026-08-06-roster-auto-onboarding.md`. **Re-read the dashboard.**
+
+⚠️ **Password signup raises email volume, it does not lower it.** Magic links only needed
+sending to the ~50% not on Gmail; everyone needs a confirmation email. Budget ~1 per
+parent, plus resets.
+
+## Resend's daily send cap
 
 **Auth email is on Resend.** `supabase/functions/send-email/index.ts` line 9 is the
 source of truth — `PROVIDER: Resend`. The Microsoft Graph version exists in git
@@ -146,11 +177,11 @@ the rows back.**
 - **Nobody is emailed when an access request arrives** — Jay checks the Accounts tab.
   ⚠️ This gets busier under roster-match onboarding, since every non-matching address
   lands there. The "Request sent" screen no longer promises an approval email.
-- ⚠️ **`jayjmuir@yahoo.com` holds a full admin membership it was probably never meant
-  to have.** Jay can fix this himself from the Accounts screen. **Until then, any
-  "a coach cannot see X" test using that account is invalid** — it is an admin.
-  (Carried over from `RESTORE.md`'s "Outstanding" section when that was removed on
-  7 Aug; it is status, so it belongs here.)
+- ✅ **`jayjmuir@yahoo.com` is Jay's DELIBERATE backup admin account.** Confirmed by him
+  on 8 Aug. ❌ **This entry said the admin membership was "probably never meant to have"
+  and told sessions to get it removed — an inference nobody had checked, carried for
+  days.** The only part that survives: **any "a coach cannot see X" test using that
+  account is invalid**, because it is an admin. Use a purpose-made account instead.
 - **No rate limit on account creation** — only on what an account can do, which
   without a membership is nothing. Verified 7 Aug: no rate-limiting code in `src/`.
 - ✅ **`sync_profile_name` single-word-name bug FIXED and APPLIED 8 Aug** —

@@ -10,8 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
-- `649072f` — **Email + password sign-up, sign-in and reset** (branch
-  `feat/password-auth`, not on `main`). Step 1 of the self-registration decision; touches
+- `e3fbc60` — **Copy fix, and password auth is now LIVE on `main`.** Two screens stopped
+  asserting things the app cannot know: the Accounts header said "2 people" while five
+  logins existed (it counts people WITH ACCESS, not accounts), and Login's post-signup
+  panel claimed an email had been sent when a repeat signup sends nothing. Both traced to
+  one incident. `1244` tests, fault-injected.
+- `6198ea6` — Empty commit to trigger the first branch deploy. Netlify only builds on a
+  push event, so enabling branch deploys does not retroactively build a branch that was
+  already pushed — the preview URL 404'd until this landed.
+- `649072f` — **Email + password sign-up, sign-in and reset.** Step 1 of the self-registration decision; touches
   no RLS. New `src/lib/password.js` mirrors the live Supabase policy so a parent sees a
   live checklist instead of GoTrue's 422, which enumerates all four character sets every
   time and therefore never says which one is missing. Magic link and Google hidden behind

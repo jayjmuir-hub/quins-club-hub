@@ -112,7 +112,21 @@ the search can find something known to be present.**
 take another 22% off, and the tenant + app registration already exist — but that tenant
 has caused enough pain that it is deliberately off the critical path.
 
-## ⛔ THE EMAIL CEILING IS 2/HOUR, AND THE ROLLOUT IS BLOCKED ON IT
+## ✅ RESOLVED — the email ceiling is 200/hour. This section is history.
+
+⚠️ **Read this before the section below.** The ceiling was raised to **200/hour** at some
+point after 6 Aug; measured on the dashboard on **8 Aug 2026**. The "NOT YET DONE — needs
+a human" line further down was true when written and stopped being true without anyone
+updating it.
+
+**It cost real time.** On 8 Aug a session read this heading, repeated "2/hour is the
+rollout blocker" to Jay four minutes into the conversation, and kept asserting it for
+another hour — including inside a new decision document that told him to go and change a
+setting that was already changed. **Every wrong claim on this project has been a rotted
+MEASUREMENT, never a wrong ruling.** Re-read the dashboard; the reasoning below is still
+sound, the number is not.
+
+## ⛔ THE EMAIL CEILING IS 2/HOUR, AND THE ROLLOUT IS BLOCKED ON IT — ❌ SUPERSEDED, see above
 
 **Read off the dashboard, not from docs, 6 Aug 2026:**
 Authentication → Rate Limits → *"Rate limit for sending emails"* = **2 emails/h**.
