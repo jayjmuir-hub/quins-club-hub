@@ -10,8 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
+- `dc7d900` — **Event end time, additional info, and cancelling the rest of a series.**
+  The calendar had been inventing an end time; it now uses the real one. The edge-function
+  change was INERT until `calendar_events_for_token()`'s `RETURNS TABLE` was widened — the
+  same failure that hid the pitch for a day. 1290 tests.
 - `ae96828` — Corrected three rotted claims (the 200/hour email ceiling, the yahoo backup
   admin, the rollout-blocker framing) and recorded that password auth is live. `[skip ci]`
+- `5917386` — Recorded the test-data wipe and the three things it taught us. `[skip ci]`
 - **8 Aug, no commit — LIVE DATABASE CHANGE.** Test data wiped: 316 players, 315
   contacts, 17 events, 1 invite. Seeded 6 obviously-fake players on U16 as a fixture for
   the pending-state RLS work. `U15` renamed to `U16`, duplicate empty `U16` deleted
