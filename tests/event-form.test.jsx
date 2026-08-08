@@ -77,6 +77,9 @@ const EXISTING_MATCH = {
   venue: 'Zayed Sports City, Abu Dhabi',
   competition: 'UAE Youth League',
   starts_at: '2026-07-30T16:00:00.000Z',
+  // 20:00–22:00 Abu Dhabi. See the ends_at note on the multi-squad fixture:
+  // the null-ends_at edit path is covered separately, below.
+  ends_at: '2026-07-30T18:00:00.000Z',
   result_us: null,
   result_them: null,
 }
@@ -223,6 +226,7 @@ describe('EventForm — validation', () => {
 
     expect(screen.getByLabelText('Opponent')).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByLabelText('Time')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('End time')).toHaveAttribute('aria-invalid', 'true')
     // Venue is prefilled and optional — it must not be flagged.
     expect(screen.getByLabelText('Venue')).not.toHaveAttribute('aria-invalid', 'true')
   })
@@ -233,10 +237,173 @@ describe('EventForm — validation', () => {
 
     await user.click(screen.getByRole('radio', { name: 'Training' }))
     await user.type(screen.getByLabelText('Time'), '17:30')
+    await user.type(screen.getByLabelText('End time'), '19:00')
     await user.click(screen.getByRole('button', { name: /add event/i }))
 
     expect(upsertEventMock).not.toHaveBeenCalled()
     expect(screen.getByLabelText('Title')).toHaveAttribute('aria-invalid', 'true')
+  })
+})
+
+// --- end time (8 Aug 2026) ------------------------------------------------
+//
+// REQUIRED in the form, NULLABLE in the database — see
+// db/migrations/20260808_event_end_time_and_notes.sql for why those two are
+// not in conflict. The form is the only place the requirement exists, so
+// these tests are the only thing holding it.
+
+describe('EventForm — end time', () => {
+  it('offers an end time next to the start time', () => {
+    renderForm()
+    expect(screen.getByLabelText('Time')).toBeInTheDocument()
+    expect(screen.getByLabelText('End time')).toBeInTheDocument()
+  })
+
+  it('refuses to save without one, however complete the rest of the form is', async () => {
+    const user = userEvent.setup()
+    const { onSaved } = renderForm()
+
+    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
+    await user.type(screen.getByLabelText('Time'), '20:00')
+    // ...and no end time.
+    await user.click(screen.getByRole('button', { name: /add event/i }))
+
+    expect(upsertEventMock).not.toHaveBeenCalled()
+    expect(onSaved).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('End time')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('alert')).toHaveTextContent(/fill in|before saving/i)
+  })
+
+  it('refuses an end BEFORE the start, and says which rule was broken', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
+    await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '18:00')
+    await user.click(screen.getByRole('button', { name: /add event/i }))
+
+    expect(upsertEventMock).not.toHaveBeenCalled()
+    // Not "fill in the highlighted fields" — the field IS filled in. The
+    // database's events_ends_after_starts CHECK is the real boundary, but it
+    // surfaces as a raw 23514 that means nothing to a coach.
+    expect(screen.getByRole('alert')).toHaveTextContent(/end time must be after the start/i)
+    expect(screen.getByLabelText('End time')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('refuses an end EQUAL to the start — a zero-length event is not an event', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
+    await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '20:00')
+    await user.click(screen.getByRole('button', { name: /add event/i }))
+
+    expect(upsertEventMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/end time must be after the start/i)
+  })
+
+  it('writes ends_at as ABU DHABI wall-clock, like starts_at', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
+    await user.clear(screen.getByLabelText('Date'))
+    await user.type(screen.getByLabelText('Date'), '2026-07-30')
+    await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
+    await user.click(screen.getByRole('button', { name: /add event/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    const written = upsertEventMock.mock.calls[0][0]
+    // 20:00–22:00 Abu Dhabi. This file runs under America/New_York, where the
+    // naive construction would give 2026-07-31T02:00:00.000Z for the end.
+    expect(written.starts_at).toBe('2026-07-30T16:00:00.000Z')
+    expect(written.ends_at).toBe('2026-07-30T18:00:00.000Z')
+  })
+
+  it('prefills the end time when editing an event that has one', async () => {
+    renderForm({ event: EXISTING_MATCH })
+    // 18:00Z is 22:00 in Abu Dhabi and 14:00 in New York.
+    expect(screen.getByLabelText('End time')).toHaveValue('22:00')
+  })
+
+  it('opens blank on an event with no ends_at, and then requires one to save', async () => {
+    // ⚠️ THE ORDINARY CASE FOR EVERY EVENT CREATED BEFORE 8 AUG 2026, and for
+    // anything a future external fixture feed sends. Editing one must not
+    // show "Invalid Date", and must not save until an end time is supplied.
+    const user = userEvent.setup()
+    renderForm({ event: { ...EXISTING_MATCH, ends_at: null } })
+
+    expect(screen.getByLabelText('End time')).toHaveValue('')
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    expect(upsertEventMock).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('End time')).toHaveAttribute('aria-invalid', 'true')
+
+    await user.type(screen.getByLabelText('End time'), '22:00')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({
+      id: 'e-1',
+      ends_at: '2026-07-30T18:00:00.000Z',
+    })
+  })
+})
+
+// --- notes (8 Aug 2026) ---------------------------------------------------
+
+describe('EventForm — additional info', () => {
+  it('saves what was typed', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
+    await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
+    await user.type(
+      screen.getByLabelText('Additional info'),
+      'Meet at the gate 30 minutes before.',
+    )
+    await user.click(screen.getByRole('button', { name: /add event/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
+    expect(upsertEventMock.mock.calls[0][0].notes).toBe('Meet at the gate 30 minutes before.')
+  })
+
+  it('is optional, and writes null rather than an empty string', async () => {
+    // Same rule as pitch: '' would render an "Additional info" heading over
+    // nothing on the detail sheet and an empty DESCRIPTION line in the feed.
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
+    await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
+    await user.click(screen.getByRole('button', { name: /add event/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
+    expect(upsertEventMock.mock.calls[0][0].notes).toBeNull()
+  })
+
+  it('caps the length rather than letting an essay reach the calendar feed', () => {
+    renderForm()
+    expect(screen.getByLabelText('Additional info')).toHaveAttribute('maxlength', '500')
+  })
+
+  it('prefills when editing, and can be cleared back to null', async () => {
+    const user = userEvent.setup()
+    renderForm({ event: { ...EXISTING_MATCH, notes: 'Bring both kits.' } })
+
+    expect(screen.getByLabelText('Additional info')).toHaveValue('Bring both kits.')
+
+    await user.clear(screen.getByLabelText('Additional info'))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
+    expect(upsertEventMock.mock.calls[0][0].notes).toBeNull()
   })
 })
 
@@ -249,6 +416,7 @@ describe('EventForm — saving', () => {
     await user.clear(screen.getByLabelText('Date'))
     await user.type(screen.getByLabelText('Date'), '2026-07-30')
     await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
     await user.click(screen.getByRole('button', { name: /add event/i }))
 
     await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
@@ -276,6 +444,7 @@ describe('EventForm — saving', () => {
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
     await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
     await user.click(screen.getByRole('button', { name: /add event/i }))
 
     await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
@@ -288,6 +457,7 @@ describe('EventForm — saving', () => {
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
     await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
     await user.type(screen.getByLabelText('Quins score'), '0')
     await user.type(screen.getByLabelText('Opposition score'), '0')
     await user.click(screen.getByRole('button', { name: /add event/i }))
@@ -302,6 +472,7 @@ describe('EventForm — saving', () => {
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
     await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
     await user.type(screen.getByLabelText('Quins score'), '31')
     await user.click(screen.getByRole('button', { name: /add event/i }))
 
@@ -317,6 +488,7 @@ describe('EventForm — saving', () => {
     await user.type(screen.getByLabelText('Title'), 'U14 Contact & Conditioning')
     await user.selectOptions(screen.getByLabelText('Age group'), 't-u14')
     await user.type(screen.getByLabelText('Time'), '17:30')
+    await user.type(screen.getByLabelText('End time'), '19:00')
     await user.click(screen.getByRole('button', { name: /add event/i }))
 
     await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
@@ -372,6 +544,7 @@ describe('EventForm — saving', () => {
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
     await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
     await user.click(screen.getByRole('button', { name: /add event/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -394,6 +567,7 @@ describe('EventForm — saving', () => {
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
     await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
     await user.click(screen.getByRole('button', { name: /add event/i }))
 
     const button = await screen.findByRole('button', { name: /saving/i })
@@ -412,6 +586,7 @@ describe('EventForm — saving', () => {
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
     await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
     const button = screen.getByRole('button', { name: /add event/i })
     await user.click(button)
     await user.click(screen.getByRole('button', { name: /saving/i }))
@@ -480,6 +655,7 @@ describe('Schedule wiring', () => {
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
     await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
     // Schedule's trigger button and the form's submit button now share the
     // "Add event" name (the trigger used to say "Add fixture"), so scope this
     // to the open sheet rather than matching both.

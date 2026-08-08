@@ -10,6 +10,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
+- `ae96828` — Corrected three rotted claims (the 200/hour email ceiling, the yahoo backup
+  admin, the rollout-blocker framing) and recorded that password auth is live. `[skip ci]`
 - **8 Aug, no commit — LIVE DATABASE CHANGE.** Test data wiped: 316 players, 315
   contacts, 17 events, 1 invite. Seeded 6 obviously-fake players on U16 as a fixture for
   the pending-state RLS work. `U15` renamed to `U16`, duplicate empty `U16` deleted

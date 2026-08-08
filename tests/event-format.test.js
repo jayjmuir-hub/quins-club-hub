@@ -7,9 +7,11 @@ import {
   clubWallTimeToUtc,
   dateBoxParts,
   eventDate,
+  eventEndDate,
   eventTitle,
   formatLongDate,
   formatTime,
+  formatTimeRange,
   hasResult,
   nextEventLabel,
   resultLabel,
@@ -575,5 +577,79 @@ describe('venueLine', () => {
     expect(venueLine({ venue: '  Zayed Sports City ', pitch: ' Pitch 2 ' })).toBe(
       'Zayed Sports City · Pitch 2',
     )
+  })
+})
+
+// --- ends_at (8 Aug 2026) -------------------------------------------------
+//
+// db/migrations/20260808_event_end_time_and_notes.sql added a real end time,
+// nullable on purpose. The nullable half is the half worth testing hardest:
+// every event created before that date has no ends_at, and so does anything
+// a future external fixture feed sends, so "no end time" is an ordinary
+// state the UI must render, not an error case.
+
+describe('eventEndDate', () => {
+  it('parses ends_at into a Date', () => {
+    const date = eventEndDate({ ends_at: '2026-07-30T18:00:00.000Z' })
+    expect(date).toBeInstanceOf(Date)
+    expect(date.toISOString()).toBe('2026-07-30T18:00:00.000Z')
+  })
+
+  it('is null when there is no ends_at at all', () => {
+    // The ordinary case for every event created before the column existed.
+    expect(eventEndDate({ starts_at: '2026-07-30T16:00:00.000Z' })).toBeNull()
+    expect(eventEndDate({ ends_at: null })).toBeNull()
+    expect(eventEndDate(null)).toBeNull()
+    expect(eventEndDate(undefined)).toBeNull()
+  })
+
+  it('is null rather than an Invalid Date for junk', () => {
+    expect(eventEndDate({ ends_at: 'not a date' })).toBeNull()
+  })
+
+  it('reads ends_at and NOT starts_at', () => {
+    // The two are one character apart and the wrong one would still parse.
+    const date = eventEndDate({
+      starts_at: '2026-07-30T16:00:00.000Z',
+      ends_at: '2026-07-30T18:00:00.000Z',
+    })
+    expect(date.toISOString()).toBe('2026-07-30T18:00:00.000Z')
+  })
+})
+
+describe('formatTimeRange', () => {
+  // 14:00Z = 18:00 in Dubai, 15:30Z = 19:30 — a training session.
+  const start = new Date('2026-08-11T14:00:00.000Z')
+  const end = new Date('2026-08-11T15:30:00.000Z')
+
+  it('renders both ends around an en dash', () => {
+    const rendered = formatTimeRange(start, end)
+    // Composed from formatTime so the assertion survives any locale, and
+    // still fails if the range stops naming both ends or loses the dash.
+    expect(rendered).toBe(`${formatTime(start)} – ${formatTime(end)}`)
+    expect(rendered).toMatch(/\b0?6:00\b|\b18:00\b/)
+    expect(rendered).toMatch(/\b0?7:30\b|\b19:30\b/)
+    expect(rendered).toContain('–')
+  })
+
+  it('renders BOTH ends in Abu Dhabi time under every process zone', () => {
+    const rendered = HOSTILE_ZONES.map((zone) => withTimeZone(zone, () => formatTimeRange(start, end)))
+    expect(new Set(rendered).size).toBe(1)
+    // 18:00–19:30 Dubai. Specifically not the 14:00/10:00 the raw UTC
+    // instant or a New York reading would give.
+    expect(rendered[0]).not.toMatch(/\b(14:00|10:00)\b/)
+  })
+
+  it('falls back to the start alone when there is no end time', () => {
+    // ⚠️ The common case, not the edge one — and it must NOT invent an end
+    // from the calendar feed's per-type duration guess.
+    expect(formatTimeRange(start, null)).toBe(formatTime(start))
+    expect(formatTimeRange(start, undefined)).toBe(formatTime(start))
+    expect(formatTimeRange(start, null)).not.toContain('–')
+  })
+
+  it('keeps the "time to be confirmed" copy when there is no start', () => {
+    expect(formatTimeRange(null, end)).toBe('Time to be confirmed')
+    expect(formatTimeRange(null, null)).toBe('Time to be confirmed')
   })
 })

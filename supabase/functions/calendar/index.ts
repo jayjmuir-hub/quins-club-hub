@@ -76,6 +76,18 @@ type Event = {
   pitch: string | null
   competition: string | null
   starts_at: string
+  // Both added 8 Aug 2026 (db/migrations/20260808_event_end_time_and_notes.sql).
+  //
+  // ⚠️ OPTIONAL IN THIS TYPE ON PURPOSE. These rows come from
+  // calendar_events_for_token(), and it is that function's RETURNS TABLE —
+  // not this file — that decides which columns actually leave the database.
+  // The pitch was missing from the feed for a day in Aug 2026 for exactly
+  // that reason, and no amount of editing this file fixed it; see
+  // db/migrations/20260805_calendar_feed_pitch.sql. Until the matching
+  // migration is applied these arrive `undefined`, so everything below must
+  // fall back rather than emit "undefined" into a subscribed calendar.
+  ends_at?: string | null
+  notes?: string | null
   team_name: string | null
 }
 
@@ -111,20 +123,53 @@ function locationFor(event: Event): string {
   return venue || pitch || ''
 }
 
-// No end time is stored, so one is assumed rather than emitting a zero-length
-// event, which some clients render as an unreadable sliver. Deliberately
-// generous for a match: nobody leaves a fixture after exactly an hour.
+// ⚠️ THE FALLBACK, NOT THE ANSWER. DTEND is required by every calendar
+// client, and until 8 Aug 2026 there was no end time in the database at all,
+// so one was assumed rather than emitting a zero-length event (which some
+// clients render as an unreadable sliver). Deliberately generous for a
+// match: nobody leaves a fixture after exactly an hour.
+//
+// events.ends_at now carries the truth where anyone has entered it, and
+// endFor() below prefers it. KEEP THIS ANYWAY — the column is nullable on
+// purpose (see the migration: a future external fixture feed may not supply
+// an end time, and a NOT NULL there means a hard insert failure on data we
+// cannot fix), and every event created before that date has no end either.
+// Deleting this guess would mean no DTEND at all for those, which is a
+// broken feed rather than an approximate one.
 const DURATION_MINUTES: Record<string, number> = { match: 120, training: 90, social: 120 }
+
+/**
+ * The event's end: the stored one when there is one, otherwise the per-type
+ * guess above.
+ *
+ * An unparseable or backwards ends_at falls back too. The
+ * events_ends_after_starts CHECK should make that impossible — but this runs
+ * against whatever the database actually holds, and a DTEND at or before
+ * DTSTART is rendered differently and uniformly wrongly across clients,
+ * which is the failure the check exists to prevent in the first place.
+ */
+function endFor(event: Event, start: Date): Date {
+  if (event.ends_at) {
+    const stored = new Date(event.ends_at)
+    if (!Number.isNaN(stored.getTime()) && stored.getTime() > start.getTime()) return stored
+  }
+  return new Date(start.getTime() + (DURATION_MINUTES[event.type] ?? 90) * 60_000)
+}
 
 function toVEvent(event: Event, stamp: string): string[] {
   const start = new Date(event.starts_at)
-  const end = new Date(start.getTime() + (DURATION_MINUTES[event.type] ?? 90) * 60_000)
+  const end = endFor(event, start)
 
   const description: string[] = []
   if (event.competition) description.push(event.competition)
   if (event.type === 'match' && event.opponent) {
     description.push(event.home ? 'Home' : 'Away')
   }
+  // Last, so the fixed facts (competition, home/away) stay at the front of
+  // the line a phone truncates. escapeText() below handles the newlines a
+  // coach may have typed — DESCRIPTION is a single ICS content line, and a
+  // raw newline inside it truncates the property in strict clients.
+  if (event.notes) description.push(event.notes)
 
   const lines = [
     'BEGIN:VEVENT',

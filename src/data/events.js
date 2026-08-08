@@ -123,3 +123,87 @@ export async function deleteEvent(id) {
   if (error) throw error
   if (!data || data.length === 0) throw new Error(REFUSED_DELETE)
 }
+
+// --- Deleting a repeating series --------------------------------------
+//
+// FUTURE OCCURRENCES ONLY — Jay's ruling, 8 Aug 2026. "Delete the series"
+// means this occurrence and every LATER one; the ones already played stay,
+// because they carry results and availability history that nobody asked to
+// throw away. A coach cancelling the rest of a term does not mean "erase
+// the eight sessions the squad already turned up to".
+//
+// The filter is therefore `series_id = x AND starts_at >= the chosen
+// occurrence's start`. It is a >= and not a >, so the occurrence the coach
+// is looking at goes too — which is what "this and all later sessions" says
+// on the button.
+//
+// ⚠️ SCOPE: series_id ONLY. group_id (the multi-squad fan-out) is
+// deliberately NOT handled here — Jay deferred it on 8 Aug 2026. Deleting
+// across squads is a different question with a different blast radius (one
+// squad's coach reaching into another squad's fixtures, where RLS really
+// would make the delete genuinely partial rather than all-or-nothing). Do
+// not quietly widen this to group_id.
+
+/**
+ * How many events a deleteSeriesFrom(seriesId, fromStartsAt) is about to
+ * try to remove, so the confirm step can name the number BEFORE anything
+ * happens.
+ *
+ * ⚠️ THIS IS A READ AND THE DELETE IS A WRITE, AND THE TWO ARE GOVERNED BY
+ * DIFFERENT POLICIES — reading events is can_see_team, changing them is
+ * can_edit_team. So this count is an upper bound on what the delete can
+ * achieve, never a promise. That is exactly why deleteSeriesFrom hands its
+ * rows back and the caller compares the two; see the note there.
+ *
+ * head: true, so this is a COUNT and not a download of the rows.
+ */
+export async function countSeriesFrom(seriesId, fromStartsAt) {
+  if (!seriesId || !fromStartsAt) return 0
+
+  const { count, error } = await supabase
+    .from('events')
+    .select('id', { count: 'exact', head: true })
+    .eq('series_id', seriesId)
+    .gte('starts_at', fromStartsAt)
+
+  if (error) throw error
+  return count ?? 0
+}
+
+/**
+ * Deletes the occurrence starting at `fromStartsAt` and every later one in
+ * the same series. Returns THE ROWS ACTUALLY DELETED — the caller needs the
+ * count, not a boolean.
+ *
+ * ⚠️ A PARTIAL DELETE LOOKS EXACTLY LIKE A SUCCESSFUL ONE. RLS does not
+ * raise on a row it will not let you touch; it filters that row out of the
+ * statement, and PostgREST returns 200 with whatever survived. Ten asked
+ * for, three deleted, no error anywhere. This codebase has already been
+ * bitten by precisely that shape once — the silent anon downgrade the
+ * session guard in src/lib/supabase.js exists to catch, where a signed-in
+ * request quietly became an anon one and the affected statements came back
+ * as perfectly successful zero-row responses (proved live on production
+ * 6 Aug 2026, both HTTP 200, no error body either way). The lesson recorded
+ * there is the one applied here: **a write that reports no error has not
+ * thereby reported success — count the rows.**
+ *
+ * A series is single-squad, so all-or-nothing is what SHOULD happen. This
+ * function refuses to assume it. It hands the rows back and EventDetail
+ * compares that count against the number it put on the button, saying so
+ * plainly when they disagree rather than closing the sheet on a job half
+ * done.
+ *
+ * Zero rows back is a flat refusal and throws, same as deleteEvent.
+ */
+export async function deleteSeriesFrom(seriesId, fromStartsAt) {
+  const { data, error } = await supabase
+    .from('events')
+    .delete()
+    .eq('series_id', seriesId)
+    .gte('starts_at', fromStartsAt)
+    .select()
+
+  if (error) throw error
+  if (!data || data.length === 0) throw new Error(REFUSED_DELETE)
+  return data
+}

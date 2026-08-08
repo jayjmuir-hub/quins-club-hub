@@ -89,6 +89,16 @@ export const EVENTS = [
     home: null,
     competition: null,
     starts_at: '2026-07-28T15:30:00Z',
+    // 19:30–21:00 Abu Dhabi. ends_at and notes arrived 8 Aug 2026; both are
+    // nullable, so the fixtures below deliberately leave them off — the
+    // browser check needs to see BOTH an event that has them and the many
+    // that do not, because the detail sheet and the calendar feed each
+    // behave differently in the two cases.
+    ends_at: '2026-07-28T17:00:00Z',
+    notes: 'Meet at the gate 30 minutes before. Bring both kits.',
+    // Shared with e12: the two make a repeating series, so the detail
+    // sheet's "This and N later sessions" delete can be exercised.
+    series_id: 's-u12-training',
     result_us: null,
     result_them: null,
   },
@@ -167,6 +177,8 @@ export const EVENTS = [
     home: null,
     competition: null,
     starts_at: '2026-08-06T15:30:00Z',
+    ends_at: '2026-08-06T17:00:00Z',
+    series_id: 's-u12-training',
     result_us: null,
     result_them: null,
   },
@@ -239,4 +251,25 @@ export async function insertEvents(rows) {
 export async function deleteEvent(id) {
   window.__writes = window.__writes || []
   window.__writes.push({ op: 'delete', id })
+}
+
+// Deleting a series, future occurrences only (8 Aug 2026). The count and the
+// delete are separate calls in the real module for a reason — the count is a
+// READ (can_see_team) and the delete is a WRITE (can_edit_team), so they can
+// legitimately disagree — and they stay separate here so the browser check
+// sees the same two-step the app performs.
+export async function countSeriesFrom(seriesId, fromStartsAt) {
+  if (!seriesId || !fromStartsAt) return 0
+  return EVENTS.filter(
+    (event) => event.series_id === seriesId && event.starts_at >= fromStartsAt,
+  ).length
+}
+
+export async function deleteSeriesFrom(seriesId, fromStartsAt) {
+  const rows = EVENTS.filter(
+    (event) => event.series_id === seriesId && event.starts_at >= fromStartsAt,
+  )
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'delete-series', seriesId, fromStartsAt, count: rows.length })
+  return rows
 }

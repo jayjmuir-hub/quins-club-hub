@@ -67,6 +67,11 @@ const EXISTING_TRAINING = {
   pitch: 'Pitch 4',
   competition: null,
   starts_at: '2026-08-11T14:00:00.000Z',
+  // 18:00–19:30 Abu Dhabi. Carried on the fixture so the edit tests below
+  // exercise the ordinary case; ends_at became a REQUIRED form field on
+  // 8 Aug 2026, so an edit of a fixture without one cannot be saved until a
+  // value is typed (that case has its own test in tests/event-form.test.jsx).
+  ends_at: '2026-08-11T15:30:00.000Z',
   result_us: null,
   result_them: null,
 }
@@ -94,6 +99,7 @@ async function fillTraining(user) {
   await user.clear(date)
   await user.type(date, '2026-08-11')
   await user.type(screen.getByLabelText('Time'), '18:00')
+  await user.type(screen.getByLabelText('End time'), '19:30')
 }
 
 beforeEach(() => {
@@ -197,6 +203,11 @@ describe('Also add for — what it writes', () => {
     // new Date('2026-08-11T18:00') would give under this file's New York zone.
     rows.forEach((row) => expect(row.starts_at).toBe('2026-08-11T14:00:00.000Z'))
     expect(new Set(rows.map((row) => row.starts_at)).size).toBe(1)
+    // The end time fans out too (8 Aug 2026). A squad copy without one would
+    // fall back to the calendar feed's per-type duration guess while its
+    // sibling showed the real finish — the same session ending at two
+    // different times in two parents' calendars.
+    rows.forEach((row) => expect(row.ends_at).toBe('2026-08-11T15:30:00.000Z'))
   })
 
   it('carries the same details onto every squad, and each squad its own club_id', async () => {

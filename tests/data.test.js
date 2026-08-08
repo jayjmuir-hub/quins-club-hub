@@ -34,6 +34,8 @@ import {
   upsertEvent,
   insertEvents,
   deleteEvent,
+  countSeriesFrom,
+  deleteSeriesFrom,
 } from '../src/data/events.js'
 import {
   listPlayers,
@@ -72,7 +74,11 @@ import {
   createInvite,
 } from '../src/data/members.js'
 
-function createQueryBuilder({ data = null, error = null } = {}) {
+// `count` is separate from `data` because a head:true count request resolves
+// with { data: null, count, error } — the count arrives in its own field and a
+// builder that only carried `data` could not express the shape countSeriesFrom
+// actually reads.
+function createQueryBuilder({ data = null, error = null, count = null } = {}) {
   const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [], upsert: [] }
   const builder = {}
   const chain = (name) =>
@@ -100,7 +106,7 @@ function createQueryBuilder({ data = null, error = null } = {}) {
   builder.maybeSingle = vi.fn(() => Promise.resolve({ data, error }))
   // Real PostgrestFilterBuilder instances are thenable so `await query`
   // resolves without an explicit terminal method — mirror that here.
-  builder.then = (resolve, reject) => Promise.resolve({ data, error }).then(resolve, reject)
+  builder.then = (resolve, reject) => Promise.resolve({ data, error, count }).then(resolve, reject)
   return { builder, calls }
 }
 
@@ -410,6 +416,110 @@ describe('deleteEvent', () => {
     supabase.from.mockReturnValue(builder)
 
     await expect(deleteEvent('e-1')).rejects.toThrow(/permission|not allowed|couldn.t delete/i)
+  })
+})
+
+// --- countSeriesFrom / deleteSeriesFrom -----------------------------------
+//
+// "Delete this and all later sessions" (Jay's ruling, 8 Aug 2026: FUTURE
+// ONLY). The two halves are tested together because the pair is the feature:
+// the count is what the confirm button promises, the delete is what actually
+// happened, and the whole point is that the caller compares them.
+
+describe('countSeriesFrom', () => {
+  it('counts the series from this occurrence forward, without downloading the rows', async () => {
+    const { builder, calls } = createQueryBuilder({ count: 13 })
+    supabase.from.mockReturnValue(builder)
+
+    const total = await countSeriesFrom('s-1', '2026-08-11T14:00:00.000Z')
+
+    expect(supabase.from).toHaveBeenCalledWith('events')
+    // head:true — a COUNT, not a fetch of every row in the term.
+    expect(calls.select[0]).toEqual(['id', { count: 'exact', head: true }])
+    expect(calls.eq[0]).toEqual(['series_id', 's-1'])
+    // ⚠️ gte, not gt: the occurrence being looked at goes too, which is what
+    // the button says. And gte on starts_at, not on anything else — a filter
+    // on the wrong column would count the whole series, past included.
+    expect(calls.gte[0]).toEqual(['starts_at', '2026-08-11T14:00:00.000Z'])
+    expect(total).toBe(13)
+  })
+
+  it('reports zero rather than null when the count comes back empty', async () => {
+    const { builder } = createQueryBuilder({ count: null })
+    supabase.from.mockReturnValue(builder)
+
+    expect(await countSeriesFrom('s-1', '2026-08-11T14:00:00.000Z')).toBe(0)
+  })
+
+  it('does not query at all without both a series and a start', async () => {
+    expect(await countSeriesFrom(null, '2026-08-11T14:00:00.000Z')).toBe(0)
+    expect(await countSeriesFrom('s-1', null)).toBe(0)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('network down') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(countSeriesFrom('s-1', '2026-08-11T14:00:00.000Z')).rejects.toThrow('network down')
+  })
+})
+
+describe('deleteSeriesFrom', () => {
+  it('deletes this occurrence and every later one in the series', async () => {
+    const deleted = [{ id: 'e-1' }, { id: 'e-2' }, { id: 'e-3' }]
+    const { builder, calls } = createQueryBuilder({ data: deleted })
+    supabase.from.mockReturnValue(builder)
+
+    const rows = await deleteSeriesFrom('s-1', '2026-08-11T14:00:00.000Z')
+
+    expect(supabase.from).toHaveBeenCalledWith('events')
+    expect(builder.delete).toHaveBeenCalledTimes(1)
+    expect(calls.eq[0]).toEqual(['series_id', 's-1'])
+    expect(calls.gte[0]).toEqual(['starts_at', '2026-08-11T14:00:00.000Z'])
+    // ⚠️ .select() is not decoration: without it PostgREST returns no rows
+    // and the caller cannot tell a full delete from a partial one.
+    expect(builder.select).toHaveBeenCalled()
+    expect(rows).toEqual(deleted)
+  })
+
+  it('never filters on group_id — the multi-squad delete was deferred', async () => {
+    // Jay deferred deleting across squads on 8 Aug 2026. A group_id filter
+    // creeping in here would silently widen the blast radius from one
+    // squad's term to every squad that shared the session.
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'e-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await deleteSeriesFrom('s-1', '2026-08-11T14:00:00.000Z')
+
+    expect(calls.eq.map(([column]) => column)).toEqual(['series_id'])
+  })
+
+  it('hands back the rows it actually deleted, not a boolean', async () => {
+    // The caller counts them against what it told the user it would delete.
+    // RLS filters refused rows out of the statement without raising, so a
+    // short result is the only evidence a partial delete ever leaves.
+    const { builder } = createQueryBuilder({ data: [{ id: 'e-1' }, { id: 'e-2' }] })
+    supabase.from.mockReturnValue(builder)
+
+    const rows = await deleteSeriesFrom('s-1', '2026-08-11T14:00:00.000Z')
+    expect(rows).toHaveLength(2)
+  })
+
+  it('throws the Supabase error rather than returning a tuple', async () => {
+    const { builder } = createQueryBuilder({ error: new Error('network down') })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(deleteSeriesFrom('s-1', '2026-08-11T14:00:00.000Z')).rejects.toThrow('network down')
+  })
+
+  it('throws when nothing was deleted at all (a flat RLS refusal)', async () => {
+    const { builder } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(deleteSeriesFrom('s-1', '2026-08-11T14:00:00.000Z')).rejects.toThrow(
+      /permission|not allowed|couldn.t delete/i,
+    )
   })
 })
 

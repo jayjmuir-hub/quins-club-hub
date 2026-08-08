@@ -79,6 +79,7 @@ async function fillTuesdayThursdaySeries(user) {
   await user.clear(date)
   await user.type(date, '2026-08-11')
   await user.type(screen.getByLabelText('Time'), '18:00')
+  await user.type(screen.getByLabelText('End time'), '19:30')
 
   await user.click(screen.getByRole('checkbox', { name: 'Tue' }))
   await user.click(screen.getByRole('checkbox', { name: 'Thu' }))
@@ -166,6 +167,37 @@ describe('saving a series', () => {
       expect(row.id).toBeUndefined()
     }
   })
+
+  it('gives every occurrence its OWN ends_at, at the same club wall-clock', async () => {
+    // ⚠️ THE TRAP THIS TEST EXISTS FOR. ends_at has to be converted against
+    // EACH occurrence's date, exactly as starts_at is. Computing one end
+    // instant and reusing it across the series would give the first session
+    // a 90-minute finish and every later one an end BEFORE its own start —
+    // which the events_ends_after_starts CHECK rejects as a raw 23514, and
+    // because insertEvents sends the term as one statement, the whole term
+    // fails on the strength of the second row.
+    const { user } = renderForm()
+    await fillTuesdayThursdaySeries(user)
+    await user.click(screen.getByRole('button', { name: 'Add 4 events' }))
+
+    await waitFor(() => expect(insertEventsMock).toHaveBeenCalledTimes(1))
+    const rows = insertEventsMock.mock.calls[0][0]
+
+    // 18:00–19:30 Abu Dhabi on each of the four dates. This file runs under
+    // America/New_York.
+    expect(rows.map((row) => row.ends_at)).toEqual([
+      '2026-08-11T15:30:00.000Z',
+      '2026-08-13T15:30:00.000Z',
+      '2026-08-18T15:30:00.000Z',
+      '2026-08-20T15:30:00.000Z',
+    ])
+    // Four distinct ends — not one repeated, which is the failure mode.
+    expect(new Set(rows.map((row) => row.ends_at)).size).toBe(4)
+    // And each end is after its own start, by the same 90 minutes.
+    rows.forEach((row) => {
+      expect(Date.parse(row.ends_at) - Date.parse(row.starts_at)).toBe(90 * 60 * 1000)
+    })
+  })
 })
 
 describe('unticking a date', () => {
@@ -215,6 +247,7 @@ describe('one-off events are untouched', () => {
     await user.clear(date)
     await user.type(date, '2026-08-11')
     await user.type(screen.getByLabelText('Time'), '18:00')
+  await user.type(screen.getByLabelText('End time'), '19:30')
 
     await user.click(screen.getByRole('button', { name: 'Add event' }))
 
@@ -233,6 +266,7 @@ describe('one-off events are untouched', () => {
     await user.clear(date)
     await user.type(date, '2026-08-11')
     await user.type(screen.getByLabelText('Time'), '18:00')
+  await user.type(screen.getByLabelText('End time'), '19:30')
     await user.click(screen.getByRole('checkbox', { name: 'Tue' }))
 
     await user.click(screen.getByRole('button', { name: 'Add event' }))

@@ -3,13 +3,14 @@ import Sheet from '../components/Sheet.jsx'
 import Chip from '../components/Chip.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
-import { deleteEvent } from '../data/events.js'
+import { countSeriesFrom, deleteEvent, deleteSeriesFrom } from '../data/events.js'
 import { FEATURES } from '../lib/features.js'
 import {
   eventDate,
+  eventEndDate,
   eventTitle,
   formatLongDate,
-  formatTime,
+  formatTimeRange,
   hasResult,
   resultLabel,
   resultOutcome,
@@ -178,10 +179,62 @@ function AvailabilitySummary({ eventId }) {
 const FOOTER_BUTTON =
   'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
 
+// --- Deleting a repeating series ---------------------------------------
+//
+// Jay's ruling, 8 Aug 2026: "future only". Deleting a series from here means
+// THIS occurrence and every later one. The ones already played stay put —
+// they carry results and availability history, and a coach cancelling the
+// rest of a term is not asking to erase the sessions the squad turned up to.
+// The filter lives in deleteSeriesFrom(); read the comment above it.
+//
+// ⚠️ SCOPE: series_id only. The multi-squad group_id fan-out is deliberately
+// NOT offered here — Jay deferred it the same day. An event with a group_id
+// and no series_id gets exactly the single-event confirm it had before.
+
+function seriesLaterLabel(later) {
+  return later === 1 ? 'This and 1 later session' : `This and ${later} later sessions`
+}
+
 function FooterActions({ event, canEdit, onEdit, onDeleted }) {
   const [confirming, setConfirming] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  // null when idle, otherwise which delete is in flight — the two buttons
+  // must be able to say "Deleting…" independently.
+  const [deleting, setDeleting] = useState(null)
   const [error, setError] = useState(null)
+  // A short delete is NOT an error: rows really were removed and the sheet
+  // must not claim otherwise in either direction. Held apart from `error`
+  // so it can be worded and toned differently.
+  const [shortfall, setShortfall] = useState(null)
+  // How many events the series delete is about to attempt: this occurrence
+  // plus the later ones. null while counting, 'failed' when the count
+  // itself did not come back.
+  const [seriesTotal, setSeriesTotal] = useState(null)
+
+  const seriesId = event.series_id ?? null
+
+  // Counted only once the user has actually asked to delete — opening an
+  // event is the common action and must not fire an extra query for a
+  // confirm step nobody reached. Re-runs if the sheet is confirmed again
+  // after a cancel, which is right: someone else may have changed the
+  // series in between.
+  useEffect(() => {
+    if (!confirming || !seriesId) return undefined
+    let mounted = true
+    setSeriesTotal(null)
+    countSeriesFrom(seriesId, event.starts_at)
+      .then((count) => {
+        if (mounted) setSeriesTotal(count)
+      })
+      .catch(() => {
+        // ⚠️ NO COUNT MEANS NO SERIES BUTTON (see the render below), rather
+        // than a button promising "all later sessions" and a result nobody
+        // can check. The single-event delete is still offered.
+        if (mounted) setSeriesTotal('failed')
+      })
+    return () => {
+      mounted = false
+    }
+  }, [confirming, seriesId, event.starts_at])
 
   // Nothing for someone who can't edit — see PlayerDetail's FooterActions.
   // Not being able to change a fixture is the ordinary state for most people
@@ -189,16 +242,54 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
   if (!canEdit) return null
 
   function handleDelete() {
-    setDeleting(true)
+    setDeleting('one')
     setError(null)
+    setShortfall(null)
     deleteEvent(event.id)
       .then(() => onDeleted?.(event))
       .catch((err) => {
         setError(err)
-        setDeleting(false)
+        setDeleting(null)
         setConfirming(false)
       })
   }
+
+  function handleDeleteSeries() {
+    setDeleting('series')
+    setError(null)
+    setShortfall(null)
+    deleteSeriesFrom(seriesId, event.starts_at)
+      .then((rows) => {
+        // ⚠️ THE POINT OF THE WHOLE COUNT. RLS refuses a row by filtering it
+        // out of the statement, not by raising — so a delete that removed
+        // three of ten arrives here as a success with no error anywhere.
+        // Exactly the shape that caught this codebase out once already (the
+        // silent anon downgrade behind the session guard in
+        // src/lib/supabase.js, where signed-in requests quietly became anon
+        // ones and returned successful zero-row responses). Compare what
+        // came back against the number this sheet PUT ON THE BUTTON, and
+        // say so when they disagree rather than closing on "done".
+        if (rows.length !== seriesTotal) {
+          setShortfall({ asked: seriesTotal, deleted: rows.length })
+          setDeleting(null)
+          setConfirming(false)
+          return
+        }
+        onDeleted?.(event)
+      })
+      .catch((err) => {
+        setError(err)
+        setDeleting(null)
+        setConfirming(false)
+      })
+  }
+
+  const counting = Boolean(seriesId) && seriesTotal === null
+  const laterCount = typeof seriesTotal === 'number' ? seriesTotal - 1 : null
+  // Only worth offering when there IS a later one. On the last occurrence of
+  // a series "this and all later sessions" and "just this one" are the same
+  // action wearing two labels, which is how someone taps the wrong one.
+  const offerSeries = Boolean(seriesId) && (counting || (laterCount != null && laterCount > 0))
 
   return (
     <div className="mt-5 border-t border-line pt-4">
@@ -211,16 +302,39 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
         </p>
       )}
 
+      {shortfall && (
+        <p
+          role="alert"
+          className="mb-3 rounded-[11px] bg-warn-bg px-3 py-2.5 text-sm font-semibold text-ink"
+        >
+          {`We tried to delete ${shortfall.asked} sessions and ${shortfall.deleted} went. `}
+          The rest are still there — you may not be able to change all of them. Check the schedule
+          before telling anyone the sessions are off.
+        </p>
+      )}
+
       {confirming ? (
         <div>
           <p className="mb-3 text-sm font-semibold text-ink">
             Delete this event? This can&apos;t be undone.
           </p>
-          <div className="flex gap-2.5">
+          {seriesId && (
+            <p className="mb-3 text-[12.5px] text-ink-muted">
+              This is part of a repeating series. Sessions that have already started stay as they
+              are — they hold results and availability.
+            </p>
+          )}
+          {seriesId && seriesTotal === 'failed' && (
+            <p className="mb-3 text-[12.5px] text-ink-muted">
+              We couldn&apos;t check how many other sessions are in this series, so only this one
+              can be deleted right now.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2.5">
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              disabled={deleting}
+              disabled={Boolean(deleting)}
               className={`${FOOTER_BUTTON} border-[1.5px] border-line bg-surface-card text-ink hover:bg-surface-mute`}
             >
               Keep it
@@ -228,11 +342,27 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
             <button
               type="button"
               onClick={handleDelete}
-              disabled={deleting}
+              disabled={Boolean(deleting)}
               className={`${FOOTER_BUTTON} bg-brand-deep text-white hover:bg-brand`}
             >
-              {deleting ? 'Deleting…' : 'Yes, delete'}
+              {deleting === 'one' ? 'Deleting…' : seriesId ? 'Just this one' : 'Yes, delete'}
             </button>
+            {offerSeries && (
+              <button
+                type="button"
+                onClick={handleDeleteSeries}
+                // Disabled until the count lands, so the button can never be
+                // pressed while its own label is still a guess.
+                disabled={Boolean(deleting) || counting}
+                className={`${FOOTER_BUTTON} basis-full bg-brand-deep text-white hover:bg-brand`}
+              >
+                {deleting === 'series'
+                  ? 'Deleting…'
+                  : counting
+                    ? 'Counting the rest of the series…'
+                    : seriesLaterLabel(laterCount)}
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -259,6 +389,10 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
 
 export default function EventDetail({ event, team, onClose, canEdit = false, onEdit, onDeleted, onOpenAvailability }) {
   const date = eventDate(event)
+  // Null for every event created before 8 Aug 2026, and formatTimeRange
+  // renders the start alone for those — see its comment. Nothing here
+  // substitutes the calendar feed's per-type duration guess.
+  const endDate = eventEndDate(event)
   const Icon = TYPE_ICONS[event.type] ?? WhistleIcon
   const typeLabel = TYPE_LABELS[event.type] ?? 'Event'
   const played = hasResult(event)
@@ -285,7 +419,7 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
             --muted-on-paper rule (#5c5854, not #77726e) doesn't apply here:
             this sits on the gradient, not on paper. */}
         <p className="mt-1 text-sm font-semibold text-white/[.85]">
-          {formatLongDate(date)} · {formatTime(date)}
+          {formatLongDate(date)} · {formatTimeRange(date, endDate)}
           {date && <span className="font-normal"> · Abu Dhabi time</span>}
         </p>
       </div>
@@ -307,6 +441,24 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
           <KeyValue label="Competition">{event.competition}</KeyValue>
         )}
       </div>
+
+      {/* Additional info (8 Aug 2026). Only when set, for the same reason
+          Pitch is: most events have none and a permanent empty heading is
+          noise. NOT a KeyValue row — those are one short value on one line,
+          and this is free text that can run to a paragraph, so it gets its
+          own block with the heading above rather than a value squeezed
+          right-aligned against a label.
+          whitespace-pre-line keeps the line breaks a coach typed into the
+          textarea; without it "Kit list:\n- gumshield\n- boots" collapses
+          into one run-on line. */}
+      {event.notes && (
+        <div className="mb-4">
+          <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
+            Additional info
+          </h4>
+          <p className="whitespace-pre-line text-[14.5px] text-ink">{event.notes}</p>
+        </div>
+      )}
 
       {played ? (
         <div>

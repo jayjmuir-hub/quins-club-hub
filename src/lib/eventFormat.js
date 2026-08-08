@@ -161,6 +161,21 @@ export function eventDate(event) {
 }
 
 /**
+ * The same for ends_at — the column added 8 Aug 2026 (see
+ * db/migrations/20260808_event_end_time_and_notes.sql). Separate from
+ * eventDate() rather than a parameterised one, because the two are NOT
+ * interchangeable at the call sites: a missing starts_at is a broken row,
+ * whereas a missing ends_at is the ordinary state of every event created
+ * before that migration and of anything a future external fixture feed
+ * sends us. Callers must be able to tell those apart.
+ */
+export function eventEndDate(event) {
+  if (!event?.ends_at) return null
+  const date = new Date(event.ends_at)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+/**
  * The three lines of the fixture row's date box (design-system.md §4.13):
  * short month, day of month, short weekday.
  */
@@ -187,6 +202,31 @@ export function formatTime(date) {
     hour: 'numeric',
     minute: '2-digit',
   })
+}
+
+/**
+ * "6:00 PM – 7:30 PM" — a start and a finish, for the detail sheet header.
+ *
+ * ⚠️ FALLS BACK TO THE START ALONE WHEN THERE IS NO END, and that is the
+ * common case, not the edge one: `ends_at` is nullable on purpose (the
+ * migration explains why — an external fixture feed that cannot supply one
+ * must not hard-fail), so every event created before 8 Aug 2026 renders
+ * exactly as it did before this function existed. Do NOT "fix" this by
+ * substituting the calendar feed's per-type duration guess: that guess is a
+ * defensible way to fill a required ICS field, and an indefensible thing to
+ * show a parent as though the club had said it.
+ *
+ * A spaced en dash, matching resultScore()'s en dash — a hyphen between two
+ * times reads as a typo on screen, and an unspaced dash between "6:00 PM"
+ * and "7:30 PM" runs the two together at this size.
+ *
+ * Both halves go through formatTime, so both are Abu Dhabi wall-clock and a
+ * zone bug can never reach one end without reaching the other.
+ */
+export function formatTimeRange(start, end) {
+  if (!start) return formatTime(null)
+  if (!end) return formatTime(start)
+  return `${formatTime(start)} – ${formatTime(end)}`
 }
 
 /**

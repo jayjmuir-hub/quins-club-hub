@@ -3,7 +3,13 @@ import Sheet from '../components/Sheet.jsx'
 import { insertEvents, upsertEvent } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
-import { clubDateTimeInputs, clubToday, clubWallTimeToUtc, eventDate } from '../lib/eventFormat.js'
+import {
+  clubDateTimeInputs,
+  clubToday,
+  clubWallTimeToUtc,
+  eventDate,
+  eventEndDate,
+} from '../lib/eventFormat.js'
 import {
   WEEKDAYS,
   generateSeriesDates,
@@ -132,28 +138,42 @@ function initialValues(event, editableTeams, initialDate = null) {
       opponent: '',
       date: initialDate ?? `${today.year}-${pad(today.month + 1)}-${pad(today.day)}`,
       time: '',
+      endTime: '',
       teamId: fallbackTeamId,
       home: true,
       venue: DEFAULT_VENUE,
       pitch: '',
       competition: '',
+      notes: '',
       resultUs: '',
       resultThem: '',
     }
   }
 
   const { date, time } = clubDateTimeInputs(eventDate(event))
+  // ⚠️ PREFILLS BLANK WHEN ends_at IS NULL, AND THAT IS A REAL CASE, not a
+  // defensive one: the column arrived on 8 Aug 2026 and is nullable on
+  // purpose, so every event created before it — and anything a future
+  // external fixture feed sends — has no end time. Editing one of those must
+  // open cleanly on a blank field and then be REQUIRED to fill it in, which
+  // is what handleSubmit's endTime check does. eventEndDate returns null for
+  // a missing or unparseable value, and clubDateTimeInputs(null) is
+  // {date:'', time:''}, so nothing here can produce "Invalid Date" in a time
+  // input.
+  const { time: endTime } = clubDateTimeInputs(eventEndDate(event))
   return {
     type: event.type ?? 'match',
     title: event.title ?? '',
     opponent: event.opponent ?? '',
     date,
     time,
+    endTime,
     teamId: teamIds.includes(event.team_id) ? event.team_id : fallbackTeamId,
     home: event.home !== false,
     venue: event.venue ?? '',
     pitch: event.pitch ?? '',
     competition: event.competition ?? '',
+    notes: event.notes ?? '',
     resultUs: event.result_us == null ? '' : String(event.result_us),
     resultThem: event.result_them == null ? '' : String(event.result_them),
   }
@@ -325,9 +345,31 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
     if (inFlight.current) return
 
     const starts_at = clubWallTimeToUtc(values.date, values.time)
+    // Both ends are built from the SAME date field and the same club-zone
+    // conversion, so an event runs on one club calendar day.
+    //
+    // ⚠️ KNOWN LIMIT, stated rather than guessed at: an event that runs past
+    // midnight (a social finishing at 00:30) cannot be entered — its end
+    // lands before its start and the check below refuses it. The alternative
+    // was to roll the end onto the next day whenever it looked earlier than
+    // the start, which silently turns a mistyped 08:00 (meant 20:00) into a
+    // fourteen-hour fixture in every parent's calendar. Refusing is wrong in
+    // a rare case and visible; rolling over is wrong in a common case and
+    // invisible. If Jay wants after-midnight events, the honest fix is an
+    // end-DATE field, not a rule that infers one.
+    const ends_at = clubWallTimeToUtc(values.date, values.endTime)
+    // Instant comparison, not a string one. Both are UTC ISO strings today so
+    // a lexicographic compare would happen to work — and would stop working
+    // the day either side gained an offset or a different precision.
+    const endsAfterStart =
+      Boolean(starts_at && ends_at) && Date.parse(ends_at) > Date.parse(starts_at)
+
     const nextInvalid = {
       date: !values.date,
       time: !values.time || !starts_at,
+      // REQUIRED (Jay's ruling, 8 Aug 2026) even though the column is
+      // nullable — see the migration for why those two are not in conflict.
+      endTime: !values.endTime || !ends_at || !endsAfterStart,
       teamId: !teamId,
       opponent: isMatch && !values.opponent.trim(),
       title: !isMatch && !values.title.trim(),
@@ -335,7 +377,20 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
     setInvalid(nextInvalid)
 
     if (Object.values(nextInvalid).some(Boolean)) {
-      setError(new Error('Fill in the highlighted fields before saving.'))
+      // The ordering failure gets its own message. "Fill in the highlighted
+      // fields" is a lie when the field IS filled in, and the database's own
+      // guard — the events_ends_after_starts CHECK, which is the real
+      // boundary — surfaces as a raw 23514 that means nothing to a coach.
+      const orderingIsTheOnlyProblem =
+        Boolean(values.endTime && ends_at && starts_at && !endsAfterStart) &&
+        Object.entries(nextInvalid).every(([key, bad]) => !bad || key === 'endTime')
+      setError(
+        new Error(
+          orderingIsTheOnlyProblem
+            ? 'The end time must be after the start time.'
+            : 'Fill in the highlighted fields before saving.',
+        ),
+      )
       return
     }
 
@@ -379,7 +434,17 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
       venue: values.venue.trim() || null,
       pitch: values.pitch.trim() || null,
       competition: isMatch ? values.competition.trim() || null : null,
+      // Optional, and empty means NULL rather than '' — EventDetail and the
+      // calendar feed both test it for truthiness, and an empty string would
+      // render an "Additional info" heading over nothing.
+      notes: values.notes.trim() || null,
       starts_at,
+      // Overwritten per occurrence in the series branch below. Left here so
+      // the ONE-OFF and the MULTI-SQUAD fan-out both carry it without a
+      // second place to remember: rowFor() spreads `common`, so every fanned
+      // -out squad copy gets the same end time as the primary by
+      // construction, not by being told to.
+      ends_at,
       ...(isMatch ? parseScore(values.resultUs, values.resultThem) : { result_us: null, result_them: null }),
     }
 
@@ -426,6 +491,16 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
       ? seriesDates.map((date) => ({
           ...payload,
           starts_at: clubWallTimeToUtc(date, values.time),
+          // ⚠️ RECOMPUTED PER OCCURRENCE, exactly like starts_at, and NOT
+          // carried over from `payload`. The whole series is "the same wall
+          // clock on each date", so the end has to be converted against ITS
+          // OWN date: reusing one ends_at would give every session the first
+          // date's finish, i.e. a two-hour training on 11 Aug and a
+          // minus-168-hour one on 18 Aug — which the events_ends_after_starts
+          // CHECK would reject as a raw 23514 on a batch insert, taking the
+          // whole term down with it. Same trap as the offset lookup in
+          // clubWallTimeToUtc: a time is only meaningful against a date.
+          ends_at: clubWallTimeToUtc(date, values.endTime),
           series_id: seriesId,
         }))
       : multiSquad
@@ -501,20 +576,26 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
           </div>
         )}
 
+        {/* Date on its own row, then the two times side by side.
+            End time joined this form on 8 Aug 2026, and the obvious layout
+            — three columns — was rejected: on a 360px phone that leaves each
+            control around 100px, and a native date input needs roughly 120px
+            before Chrome starts clipping the year. Grouping the two times
+            also says what they are, which is one thing with two ends. */}
+        <div className={FIELD}>
+          <label className={LABEL} htmlFor="event-date">
+            Date
+          </label>
+          <input
+            id="event-date"
+            type="date"
+            value={values.date}
+            onChange={setFromInput('date')}
+            aria-invalid={invalid.date ? 'true' : undefined}
+            className={inputClasses(invalid.date)}
+          />
+        </div>
         <div className={FIELD_ROW}>
-          <div>
-            <label className={LABEL} htmlFor="event-date">
-              Date
-            </label>
-            <input
-              id="event-date"
-              type="date"
-              value={values.date}
-              onChange={setFromInput('date')}
-              aria-invalid={invalid.date ? 'true' : undefined}
-              className={inputClasses(invalid.date)}
-            />
-          </div>
           <div>
             <label className={LABEL} htmlFor="event-time">
               Time
@@ -527,6 +608,25 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
               aria-invalid={invalid.time ? 'true' : undefined}
               aria-describedby="event-time-note"
               className={inputClasses(invalid.time)}
+            />
+          </div>
+          <div>
+            {/* REQUIRED. The column is nullable — see the migration — but
+                every event created HERE gets an end time, because the only
+                other answer available to the calendar feed is a per-type
+                guess (match 120, training 90) that has been quietly landing
+                in parents' phones since the feed shipped. */}
+            <label className={LABEL} htmlFor="event-end-time">
+              End time
+            </label>
+            <input
+              id="event-end-time"
+              type="time"
+              value={values.endTime}
+              onChange={setFromInput('endTime')}
+              aria-invalid={invalid.endTime ? 'true' : undefined}
+              aria-describedby="event-time-note"
+              className={inputClasses(invalid.endTime)}
             />
           </div>
         </div>
@@ -802,6 +902,37 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
             </p>
           </>
         )}
+
+        {/* Additional info (8 Aug 2026). OPTIONAL, and last before Save,
+            because it is the one field with no fixed shape — "meet at the
+            gate 30 minutes before", "bring both kits". It goes to the event
+            sheet AND into the calendar feed's DESCRIPTION, so it reaches a
+            parent who never opens the app.
+            ⚠️ SQUAD-VISIBLE, NOT PRIVATE — same wording as the column
+            comment in the migration. Anyone who can see the event can read
+            it, including through a calendar subscription URL, so the hint
+            below says so rather than leaving a coach to assume otherwise.
+            maxLength is a courtesy limit, not a constraint: `notes` is
+            unbounded `text` in Postgres, and 500 characters is about as much
+            as an ICS DESCRIPTION can carry before it stops being read. */}
+        <div className={FIELD}>
+          <label className={LABEL} htmlFor="event-notes">
+            Additional info
+          </label>
+          <textarea
+            id="event-notes"
+            rows={3}
+            maxLength={500}
+            value={values.notes}
+            onChange={setFromInput('notes')}
+            aria-describedby="event-notes-note"
+            placeholder="e.g. Meet at the gate 30 minutes before. Bring both kits."
+            className={`${inputClasses(false)} resize-y`}
+          />
+          <p id="event-notes-note" className="mt-1.5 text-[12.5px] text-ink-muted">
+            Optional. Shown on the event and in anyone&apos;s subscribed calendar.
+          </p>
+        </div>
 
         {error && (
           <p
