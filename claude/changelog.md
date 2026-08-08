@@ -10,6 +10,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
+- `39d6c06` — Applied the `sync_profile_name` single-word fix live and re-captured
+  `db/schema/functions.sql` with it. Verified on a probe table and fault-injected against
+  the old derivation. `[skip ci]`
 - `5ac7714` — Changelog catch-up for `eb8c385`, and recorded the catch-up regress.
   `[skip ci]`
 - `eb8c385` — **`main` is now the production branch, not `build/v1-mvp`.** `main` was a

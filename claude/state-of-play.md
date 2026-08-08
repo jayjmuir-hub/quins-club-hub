@@ -30,6 +30,19 @@ changed remotely once a parent holds one.
 Current phase is post-v1 refinement: usability work driven by Jay using the app, not
 new infrastructure.
 
+✅ **`main` is the production branch as of 8 Aug 2026** — GitHub default branch and
+Netlify production branch both re-pointed and verified. Deploy `6a76ee63` built from
+`main@HEAD` and published; all five security headers confirmed **in a real browser with
+the service worker controlling the page**, not from `curl`. Reasoning:
+`claude/decisions/2026-08-08-production-branch-main.md`; the rule is `CLAUDE.md` rule 3.
+
+⚠️ **`build/v1-mvp` STILL EXISTS and is at the same SHA. That is a trap, not a safety
+net.** Netlify's branch-deploy setting is "Deploy only the production branch", so
+`build/v1-mvp` no longer builds anything — the real rollback is republishing an earlier
+deploy from Netlify's deploy list, not the branch. Two branches at one SHA is the same
+shape as every other drift this file records: **the next person to push to the wrong one
+gets a silent no-op.** Delete it once Jay is happy.
+
 ⚠️ **No test count here, and none anywhere else either.** Previous editions carried
 944, 978, 1057 and 1157 and every one rotted within days; a bare "55 test files" was <!-- count-ok -->
 sitting directly above this warning until 7 Aug, contradicting it. **Run `npm test`.**
@@ -256,12 +269,12 @@ the rows back.**
 Machine rules — clone paths, `hostname`, `NODE_ENV` — live in `CLAUDE.md`. **Only
 volatile clone STATE belongs here**, and it is stale the moment either PC is touched.
 
-**Measured 7 Aug, second session:**
+**Measured 8 Aug** (⚠️ both rows are now about `main`, not `build/v1-mvp`):
 
 | Clone | State |
 |---|---|
-| **jay-pc** (`jayjm`) | **`1f75dae`, `0 0` with origin, clean.** Found 4 behind at `bf1d884`, fast-forwarded, and both of that session's commits were made and pushed from it |
-| **cafnet** (`Jay`) | **`bb6aca6`, and now ~19 behind.** Fast-forwarded there earlier on 7 Aug after being found 16 behind; not touched since, because the bridge was on jay-pc |
+| **jay-pc** (`jayjm`) | **On `main` at `39d6c06`, `0 0` with origin, clean.** Started the session on `build/v1-mvp` at `066df2c`, `0 0`. All four of this session's commits were made and pushed from it |
+| **cafnet** (`Jay`) | **UNMEASURED — the bridge was on jay-pc all session.** Last seen `bb6aca6` on 7 Aug, which is now ~24 behind, **and it is checked out on `build/v1-mvp`, which is no longer the production branch.** It needs `git fetch origin && git checkout main` before anything else happens there. ⚠️ **This row is a memory, not a measurement** — `CLAUDE.md` rule 8 says do not write a machine fact you did not measure on the machine, so treat it as a to-do, not a state |
 
 ⚠️ **Assume nothing about either clone — these two rows rot on the next push.**
 Measure with `git rev-list --left-right --count`; see `CLAUDE.md` reading-order
