@@ -365,18 +365,45 @@ export default function Login({ authError = null, embedded = false }) {
 
   let panel = null
   if (status === 'confirm-sent') {
-    panel = sentPanel(
-      'Check your email',
-      <>
-        We’ve sent a confirmation link to <strong className="text-ink">{email.trim()}</strong>.
-        Open it to activate your account, then come back and sign in.
-        {/* The way out for someone who already had an account: GoTrue sends
-            them nothing at all, and we cannot say so without leaking. */}
-        <span className="mt-2 block">
-          Already had an account? Nothing will arrive — just sign in, or reset your password.
-        </span>
-      </>,
-      true,
+    // ⚠️ THIS PANEL MUST NEVER CLAIM AN EMAIL WAS DEFINITELY SENT.
+    //
+    // Signing up with an address that already has a login is a no-op: GoTrue
+    // answers 200 with an obfuscated user and sends NOTHING. We cannot say
+    // "that email is taken" — that would confirm to anyone asking that a named
+    // family are club members — so from here the two outcomes are
+    // indistinguishable and the copy has to hold both.
+    //
+    // ⚠️ IT DID NOT, AND IT COST AN HOUR ON 8 AUG 2026. This opened with "We've
+    // sent a confirmation link to X" and put the caveat in a second sentence.
+    // Jay — who wrote the spec for this behaviour — read the first line, waited
+    // for an email that was never coming, and reported it as a fault. A parent
+    // has no chance. Lead with the condition, and give BOTH ways out equal
+    // weight, because the app genuinely does not know which one applies.
+    panel = (
+      <div className="mt-6">
+        <h2 className="text-center text-base font-bold text-ink">Check your email</h2>
+        <p className="mt-2 text-center text-sm text-ink-faint">
+          If <strong className="text-ink">{email.trim()}</strong> is new, we’ve sent a
+          confirmation link — open it to activate your account.
+        </p>
+        <p className="mt-2 text-center text-sm text-ink-faint">
+          <strong className="text-ink">
+            If that address already has an account, nothing will arrive.
+          </strong>{' '}
+          Sign in below, or reset your password if you’ve forgotten it.
+        </p>
+        <Button variant="secondary" onClick={() => switchMode('signin')} full className="mt-5">
+          Back to sign in
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => switchMode('forgot')}
+          full
+          className="mt-3 !text-ink"
+        >
+          Reset my password
+        </Button>
+      </div>
     )
   } else if (status === 'reset-sent') {
     panel = sentPanel(

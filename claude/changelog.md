@@ -10,6 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
+- `649072f` — **Email + password sign-up, sign-in and reset** (branch
+  `feat/password-auth`, not on `main`). Step 1 of the self-registration decision; touches
+  no RLS. New `src/lib/password.js` mirrors the live Supabase policy so a parent sees a
+  live checklist instead of GoTrue's 422, which enumerates all four character sets every
+  time and therefore never says which one is missing. Magic link and Google hidden behind
+  `SHOW_PASSWORDLESS`, code intact. Two review bugs fixed rather than worked around:
+  `ResetPassword`'s one-way `linkDead` latch, and sign-in with an empty password advising
+  the parent to check an inbox.
 - `40ba837` — Recorded the mothball rulings: hide the magic-link and Google buttons but
   keep the code, no feature flags, `claim_roster_access` stays live rather than
   mothballed, old roster data deleted not archived. `[skip ci]`

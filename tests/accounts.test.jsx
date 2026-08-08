@@ -540,7 +540,13 @@ describe('Accounts — revoking access', () => {
     await user.click(screen.getByRole('button', { name: /yes, revoke ali parent/i }))
 
     expect(deleteMembershipMock).toHaveBeenCalledWith('mem-ali')
-    expect(await screen.findByText(/2 people/i)).toBeInTheDocument()
+    // ⚠️ This asserted /2 people/i until 8 Aug 2026. The header now reads
+    // "2 with access", because "people" was being read as "accounts" and it is
+    // not — it counts people WITH ACCESS. Revoking Ali does not delete his
+    // login; he drops out of this count and into "Waiting for access", and the
+    // logins total below stays put. That distinction cost an hour of debugging
+    // a confirmation email that was never going to be sent.
+    expect(await screen.findByText(/2 with access/i)).toBeInTheDocument()
     expect(screen.getAllByTestId('account-person')).toHaveLength(2)
 
     // He was holding his ONLY membership, so revoking it leaves him with a
@@ -551,6 +557,37 @@ describe('Accounts — revoking access', () => {
     expect(
       within(screen.getByTestId('waiting-for-access')).getByText('Ali Parent'),
     ).toBeInTheDocument()
+  })
+
+  // ── The logins count, added 8 Aug 2026 ──────────────────────────────────
+  //
+  // WHY THIS EXISTS: on 8 Aug this screen showed "2 people" while five logins
+  // existed — three of them revoked or dismissed. Jay read that as "there are
+  // two accounts", signed up again with an address that already had a login,
+  // and got no confirmation email, because GoTrue answers a repeat signup with
+  // 200 and sends nothing. Nothing was broken; the count was just answering a
+  // different question from the one being asked of it.
+  //
+  // The header now carries BOTH numbers so the gap between them is visible.
+  it('counts logins separately from people with access, including dismissed ones', async () => {
+    setup()
+
+    await screen.findByText('Sara Coach')
+
+    // The fixture has people with access plus unattached profiles (waiting and
+    // dismissed). The logins total must include every one of them — a login
+    // that has been revoked or dismissed still exists and can still sign in.
+    const withAccess = screen.getAllByTestId('account-person').length
+    expect(await screen.findByText(new RegExp(`${withAccess} with access`, 'i'))).toBeInTheDocument()
+
+    const header = screen.getByText(/with access/i).textContent
+    const loginsMatch = header.match(/(\d+)\s+logins?/i)
+    expect(loginsMatch, `expected a logins count in "${header}"`).not.toBeNull()
+
+    // The whole point: logins is GREATER than people-with-access whenever
+    // anyone is waiting or dismissed. If these two ever match in this fixture
+    // the count has stopped measuring what it claims to.
+    expect(Number(loginsMatch[1])).toBeGreaterThan(withAccess)
   })
 
   it('removes only the confirmed row of a person who holds several', async () => {

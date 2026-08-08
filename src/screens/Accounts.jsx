@@ -579,9 +579,21 @@ export default function Accounts() {
     <section>
       <div className="mb-3.5 mt-1">
         <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Accounts</h2>
+        {/* ⚠️ SHOWS BOTH NUMBERS ON PURPOSE, and the second one is the point.
+            This read "{n} people · {n} access rows", which everybody — including
+            Jay, who built the thing — took to mean "there are n accounts". It
+            does not. It counts people WITH ACCESS. On 8 Aug 2026 the screen said
+            "2 people" while five logins existed, three of them revoked or
+            dismissed; the consequence was an hour spent debugging a
+            confirmation email that was never going to be sent, because signing
+            up again on a surviving login is a no-op that sends nothing.
+            REVOKING ACCESS DOES NOT DELETE A LOGIN, and nothing in this app
+            can — see the note under "Waiting for access". */}
         <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
-          {groups.length} {groups.length === 1 ? 'person' : 'people'} · {members.length}{' '}
-          {members.length === 1 ? 'access row' : 'access rows'}
+          {groups.length} with access · {members.length}{' '}
+          {members.length === 1 ? 'access row' : 'access rows'} ·{' '}
+          {groups.length + waiting.length + dismissed.length}{' '}
+          {groups.length + waiting.length + dismissed.length === 1 ? 'login' : 'logins'}
         </p>
       </div>
 
@@ -611,6 +623,19 @@ export default function Accounts() {
             first, with whatever they said about themselves. Anyone you don&apos;t recognise can
             be dismissed — that only clears them off this list, it doesn&apos;t delete their
             login, and you can undo it below.
+          </p>
+          {/* Added 8 Aug 2026. The sentence above already said dismissing does
+              not delete a login, and it still was not enough — the count at the
+              top of the screen said "2 people" and that is what got believed.
+              This spells out the consequence rather than the mechanism, because
+              the consequence is the bit that bites: a surviving login cannot
+              sign up again, so the person gets no email and no error. */}
+          <p className={`mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
+            <strong className="font-bold">Revoking access doesn&apos;t delete a login
+            either</strong>, and nothing in this app can — only the Supabase dashboard.
+            Someone whose access you revoked can still sign in; they just see nothing.
+            If they try to register again they get no email and no error, because the
+            login already exists.
           </p>
 
           {waiting.length === 0 ? (

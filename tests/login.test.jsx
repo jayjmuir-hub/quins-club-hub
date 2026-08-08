@@ -301,6 +301,18 @@ describe('Login screen — creating an account', () => {
       .parentElement
     expect(within(panel).getByText('newparent@example.com')).toBeInTheDocument()
     expect(panel).toHaveTextContent(/open it to activate your account/i)
+
+    // ⚠️ MUST NOT ASSERT THAT AN EMAIL WAS SENT. Added 8 Aug 2026 after this
+    // panel opened with "We've sent a confirmation link to X" and the caveat
+    // came second. Jay read the first line, waited for an email that a repeat
+    // signup never produces, and reported a fault. The copy has to hold both
+    // outcomes because the app cannot tell which one happened.
+    expect(panel.textContent).not.toMatch(/we[’']ve sent a confirmation link to/i)
+    expect(panel).toHaveTextContent(/if .* is new/i)
+
+    // Both ways out, equally weighted — the app does not know which applies.
+    expect(within(panel).getByRole('button', { name: /back to sign in/i })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: /reset my password/i })).toBeInTheDocument()
   })
 
   it('says exactly the same thing when the email is ALREADY registered', async () => {
