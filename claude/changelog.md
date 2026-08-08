@@ -8,8 +8,24 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 8 Aug 2026
+
+- `eb8c385` — **`main` is now the production branch, not `build/v1-mvp`.** `main` was a
+  strict ancestor (`0 25`), so a fast-forward. Updated the 8 hard-coded branch references
+  across 5 instruction-bearing files — `.github/workflows/docs.yml` being the one that
+  would have failed silently. Added `db/migrations/20260808_sync_profile_name_single_word.sql`
+  (**not applied to the live database**), and corrected two stale `state-of-play.md` claims:
+  the single-word-name bug fires from `handle_new_user()` on every signup, not from the name
+  gate, and the `search_path` bullet still said "Not applied" under its own PINNED heading.
+  `[skip ci]`
+
 ## 7 Aug 2026
 
+- `066df2c` — Changelog catch-up for `6a96d4c`. `[skip ci]`
+  ⚠️ **A catch-up commit needs its own catch-up.** The coverage check exempts only `HEAD`,
+  so every "catch up the changelog" commit becomes an unlisted `HEAD~1` the moment anything
+  lands after it. This entry was added on 8 Aug when exactly that happened. **When you write
+  a catch-up commit, list the PREVIOUS catch-up in it too, or the regress just moves along.**
 - `6a96d4c` — Re-captured `db/schema/` after three days and ~14 migrations of drift.
   Nothing unintended found; `tables.sql` had been asserting the opposite of the truth
   about the `memberships` unique index. `[skip ci]`
