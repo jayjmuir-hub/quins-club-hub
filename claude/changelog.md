@@ -10,6 +10,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
+- `0342003` — Recorded the branch flip as verified; refreshed the Machines table.
+  `[skip ci]`
 - `39d6c06` — Applied the `sync_profile_name` single-word fix live and re-captured
   `db/schema/functions.sql` with it. Verified on a probe table and fault-injected against
   the old derivation. `[skip ci]`
