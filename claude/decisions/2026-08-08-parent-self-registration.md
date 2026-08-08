@@ -148,6 +148,42 @@ nothing. **Recorded so nobody later reads this flow as the intended end state.**
 - Anything that lets a parent grant themselves `status='active'`.
 - Bulk invites. Killed 6 Aug — a bulk send that fails, fails silently.
 
+## Mothballing the old sign-in — Jay's rulings, 8 Aug
+
+**Magic link and Google: hide the buttons, keep the code.** `signInWithEmail` and
+`signInWithGoogle` in `src/lib/auth.jsx` stay untouched and functional; `Login.jsx`
+stops rendering the buttons behind one constant. Revival is deleting a condition.
+
+⚠️ **Magic link cannot actually be turned off, so do not tell parents passwords are the
+only way in.** Supabase has no switch to disable email *sign-in* — only *signup* — and
+the docs are explicit that "a user with an email or phone identity will be able to sign
+in with either a password or passwordless method". The endpoint stays live for every
+account whatever the UI shows. Not a hole; the same mailbox either way. But it means
+"we moved to passwords" is a UI statement, not a security boundary.
+
+**`claim_roster_access` stays LIVE, not mothballed.** With `player_contacts` empty it
+matches nothing, returns zero rows, and `memberships.jsx` falls through to
+self-registration. It is already a no-op. Leaving the call in place means that when the
+club site eventually feeds a roster, matching resumes on its own — no flag, no dead
+code, no revival step. **Do not "tidy" this call away.**
+
+**No feature flags for the two onboarding paths.** An untested second code path is
+broken on the day you need it. The repo is public and the history is intact, so
+`git show 70182cc:src/screens/Login.jsx` is a more reliable archive than a flag nobody
+exercises.
+
+**The old roster data is deleted, NOT archived.** Jay's ruling: the import was wrong and
+the data is stale, so keeping 316 rows of out-of-date children's records is a liability
+rather than a safety net. ⚠️ **If anyone ever does decide to export it: not into this
+repo.** `jayjmuir-hub/quins-club-hub` is public, and a CSV of names, dates of birth and
+parent phone numbers is permanently readable in git history even if the next commit
+deletes it.
+
+⚠️ **Do not wipe until immediately before onboarding.** The stale roster is useless as a
+pilot but necessary as a development fixture — proving that a `pending` parent cannot
+see a squad roster requires a squad roster to exist. Wiping early removes the only thing
+the RLS work can be tested against.
+
 ## Build order
 
 1. Password sign-up / sign-in / reset in `Login.jsx`. Touches no RLS — safe to ship first.
