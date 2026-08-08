@@ -68,6 +68,47 @@ GoTrue answers a repeat signup with 200 and sends nothing — **cannot register 
 gets no error either.** Only the Supabase dashboard or SQL can delete a login. This cost
 an hour on 8 Aug. **The pre-pilot wipe must include `auth.users`.**
 
+## 🧹 THE TEST DATA IS GONE — wiped 8 Aug 2026
+
+The stale import (316 players, 315 contacts) and 17 test events were deleted. <!-- count-ok: a historical record of what the wipe removed, fixed in time by definition -->
+
+⚠️ **The table below is a SNAPSHOT taken at the moment of the wipe, and `npm run
+docs:check` flagged it on the way in — correctly.** Every count in this file's history
+has rotted. **Do not cite these; run the query.** They are here to say what the wipe DID,
+not what the database currently holds:
+
+```sql
+select 'players' t, count(*) from public.players
+union all select 'teams', count(*) from public.teams;   -- etc.
+```
+
+| | |
+|---|---|
+| players | **6**, all named `Test Player One…Six`, all on U16 | <!-- count-ok -->
+| player_contacts | 6, all `@example.invalid` — a reserved TLD that can never receive mail | <!-- count-ok -->
+| events / availability / invites | 0 | <!-- count-ok -->
+| teams | **14** — `U15` renamed to `U16`, the duplicate empty `U16` deleted |
+| auth.users / profiles / memberships | 2 / 2 / 2 — Jay's two admins |
+| calendar_tokens | 1, **KEPT** |
+
+⚠️ **The six players are a FIXTURE for the pending-state RLS work, not real data.**
+Without a squad roster there is nothing for the pending state to hide, so the thing the
+whole design exists to prevent cannot be tested. **Delete them before the pilot.**
+
+⚠️ **`calendar_tokens` was deliberately NOT deleted.** It is Jay's own feed. A subscribed
+calendar URL cannot be changed remotely — dropping the token would have silently stopped
+his calendar updating with no remedy but re-subscribing by hand.
+
+⚠️ **`invites` and `invite_targets` are `ON DELETE NO ACTION` against `teams` and
+`players`.** Both rows pointed at the empty U16, so deleting that team failed until they
+were removed first. **Anyone scripting the pre-pilot wipe will hit this.** Order:
+events → players → invite_targets → invites → teams.
+
+⚠️ **Storage is NOT wiped by SQL.** `delete from storage.objects` raises
+`42501 Direct deletion from storage tables is not allowed. Use the Storage API instead.`
+One orphaned player photo survived the wipe for exactly this reason and had to be removed
+by hand from the dashboard. **A wipe script cannot clear `player-photos`.**
+
 ## ⚠️ Rollout email caps — NOT currently blocking anything
 
 **Both figures below only bite at onboarding, and onboarding is deferred until the
@@ -278,7 +319,11 @@ the rows back.**
     calendar feed; anon is the point and the token is the gate. **Do not "fix" it to
     match the others.**
 - **The 18 unindexed foreign keys.** (This file said 19; the advisor and a catalogue
-  query both say 18.) Tables run 0-316 rows — `availability` 0, `players` 316,
+  query both say 18.) ⚠️ **The row counts that made this negligible are GONE as of the
+  8 Aug wipe** — `players` is now 6, not 316. The conclusion still holds (an index on an
+  empty table is pointless), but **re-measure before citing this once real data lands**:
+  a 300-row table and a 3,000-row one are different arguments. Counts when written:
+  `availability` 0, `players` 316,
   `player_contacts` 315. `auth_rls_initplan` is marginal too.
 - ⚠️ **Do not size an optimisation from `EXPLAIN ANALYZE` on this schema** — wall time
   is inflated roughly 4x. A 33.9 ms figure was really ~8.6 ms warm. Benchmark it.

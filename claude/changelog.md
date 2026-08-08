@@ -10,6 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 8 Aug 2026
 
+- **8 Aug, no commit — LIVE DATABASE CHANGE.** Test data wiped: 316 players, 315
+  contacts, 17 events, 1 invite. Seeded 6 obviously-fake players on U16 as a fixture for
+  the pending-state RLS work. `U15` renamed to `U16`, duplicate empty `U16` deleted
+  (14 teams). Jay's 2 logins, 2 memberships and his calendar token kept. Three things
+  learned and recorded in `state-of-play.md`: `invites`/`invite_targets` are
+  `NO ACTION` and block a team delete; `storage.objects` refuses SQL deletion outright;
+  and nothing in the app can delete a login.
 - `e3fbc60` — **Copy fix, and password auth is now LIVE on `main`.** Two screens stopped
   asserting things the app cannot know: the Accounts header said "2 people" while five
   logins existed (it counts people WITH ACCESS, not accounts), and Login's post-signup
