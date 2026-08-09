@@ -10,6 +10,10 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 9 Aug 2026
 
+- `d9dc63f` — **Four indexes and an `availability` policy merge, for 700 players not 6.**
+  ⚠️ LIVE DATABASE CHANGE. See the entry above this list's date heading in
+  `claude/schema-history.md` for the reasoning; the equivalence proof is
+  `db/tests/rls-availability-equivalence.sql`.
 - `5332eff` — **Cold-start tested the handoff, and fixed what it could not answer.**
   A fresh agent given only the handoff rated it 6/10. ⚠️ **The branch trap:** this clone
   sat on a local branch named `feat/password-auth` at `main`'s tip, and
