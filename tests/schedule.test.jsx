@@ -63,7 +63,7 @@ vi.mock('../src/data/players.js', () => ({
 }))
 
 // Import after vi.mock so this binds to the mocked modules.
-import Schedule from '../src/screens/Schedule.jsx'
+import Schedule, { ALL_TYPES_ID, filterByType } from '../src/screens/Schedule.jsx'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -176,6 +176,12 @@ const unsubscribeEvents = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // ⚠️ jsdom's localStorage is ONE store for the whole file. Both schedule
+  // filters persist to it, so without this a test that clicks "Training" or a
+  // team pill leaves that filter set for every test that runs after it — and
+  // the failure would land in an unrelated test, which is the expensive kind
+  // to chase.
+  window.localStorage.clear()
   featuresMock.availability = true
   useMembershipsMock.mockReturnValue(memberships(ADMIN))
   listEventsMock.mockResolvedValue(ALL_EVENTS)
@@ -1000,5 +1006,234 @@ describe('Schedule — availability flag off (real default as of 2026-07-29)', (
 
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText('31–19')).toBeInTheDocument()
+  })
+})
+
+// ══ THE EVENT-TYPE FILTER (9 Aug 2026) ══════════════════════════════════
+// "In upcoming we should have a option to view matches, training, or socials"
+// — and, asked directly, EVERYONE sees it, not just admin/coach. A parent
+// asking "when is the next training?" is the main case for it.
+//
+// Two halves, tested separately on purpose:
+//   1. filterByType — the whole of the logic, tested as a pure function.
+//   2. the screen — that the pills are wired to it, that the row appears only
+//      on Upcoming, and that the filter survives a reload.
+describe('filterByType — the filter itself', () => {
+  it('returns everything for the All pill', () => {
+    expect(filterByType(ALL_EVENTS, ALL_TYPES_ID)).toBe(ALL_EVENTS)
+  })
+
+  it('keeps only the matching type', () => {
+    const trainings = filterByType(ALL_EVENTS, 'training')
+    expect(trainings).toEqual([UPCOMING_TRAINING])
+  })
+
+  it('narrows to matches without dropping any of them', () => {
+    // Three of the four fixtures are matches. A filter that returned two would
+    // still look right on screen.
+    expect(filterByType(ALL_EVENTS, 'match').map((event) => event.id)).toEqual([
+      RESULT_WIN.id,
+      PLAYED_NO_SCORE.id,
+      UPCOMING_MATCH.id,
+    ])
+  })
+
+  // ⚠️ A FILTER ID WE DON'T RECOGNISE SHOWS EVERYTHING, NOT NOTHING. A stale
+  // value in localStorage from an older build, or a type we later rename,
+  // must not present as "the club has nothing on".
+  it('shows everything rather than nothing for an unknown filter', () => {
+    expect(filterByType(ALL_EVENTS, 'tour')).toBe(ALL_EVENTS)
+    expect(filterByType(ALL_EVENTS, '')).toBe(ALL_EVENTS)
+    expect(filterByType(ALL_EVENTS, null)).toBe(ALL_EVENTS)
+    expect(filterByType(ALL_EVENTS, undefined)).toBe(ALL_EVENTS)
+  })
+
+  it('never throws on junk', () => {
+    expect(filterByType(null, 'match')).toEqual([])
+    expect(filterByType(undefined, 'match')).toEqual([])
+    expect(filterByType([null], 'match')).toEqual([])
+  })
+})
+
+describe('Schedule — the event-type filter row', () => {
+  const typePill = (name) => screen.getByRole('button', { name })
+
+  it('narrows Upcoming to training when Training is picked', async () => {
+    const { user } = setup()
+
+    // Both upcoming fixtures first, so the assertion after the click is a
+    // change rather than a state that was already true.
+    expect(await screen.findByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+    expect(screen.getByText('Senior squad training')).toBeInTheDocument()
+
+    await user.click(typePill('Training'))
+
+    expect(screen.getByText('Senior squad training')).toBeInTheDocument()
+    expect(screen.queryByText('Quins vs Dubai Exiles')).not.toBeInTheDocument()
+    // The past-dated no-score match counts as Upcoming (a result is a score,
+    // not an elapsed date) — so it is a match the type filter must also remove.
+    expect(screen.queryByText('Quins vs Bahrain Warriors')).not.toBeInTheDocument()
+  })
+
+  it('narrows Upcoming to matches when Matches is picked', async () => {
+    const { user } = setup()
+    expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
+
+    await user.click(typePill('Matches'))
+
+    expect(screen.getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+    expect(screen.queryByText('Senior squad training')).not.toBeInTheDocument()
+  })
+
+  it('brings everything back when Everything is picked again', async () => {
+    const { user } = setup()
+    expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
+
+    await user.click(typePill('Matches'))
+    expect(screen.queryByText('Senior squad training')).not.toBeInTheDocument()
+
+    await user.click(typePill('Everything'))
+    expect(screen.getByText('Senior squad training')).toBeInTheDocument()
+    expect(screen.getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+  })
+
+  it('marks the picked pill as pressed and the others as not', async () => {
+    const { user } = setup()
+    expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
+
+    await user.click(typePill('Socials'))
+
+    expect(typePill('Socials')).toHaveAttribute('aria-pressed', 'true')
+    expect(typePill('Everything')).toHaveAttribute('aria-pressed', 'false')
+    expect(typePill('Matches')).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  // ⚠️ "No upcoming fixtures yet" under a Socials filter reads as "the club
+  // has nothing on" when there are two fixtures sitting behind the filter.
+  it('says which filter emptied the list, not that there is nothing on', async () => {
+    const { user } = setup()
+    expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
+
+    await user.click(typePill('Socials'))
+
+    expect(screen.getByText(/no upcoming socials/i)).toBeInTheDocument()
+    expect(screen.queryByText('No upcoming fixtures yet.')).not.toBeInTheDocument()
+  })
+
+  it('is shown to a parent, not just to admin and coaches', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    setup()
+
+    expect(await screen.findByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+    expect(typePill('Training')).toBeInTheDocument()
+    expect(typePill('Socials')).toBeInTheDocument()
+  })
+
+  // Results is by definition the fixtures carrying a score, so a "Training"
+  // pill there would always empty the list; the calendar deliberately shows
+  // the whole scope, same as the team filter.
+  it('is absent on Results and on Calendar', async () => {
+    const { user } = setup()
+    expect(await screen.findByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Results' }))
+    expect(screen.queryByRole('button', { name: 'Everything' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Socials' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Calendar' }))
+    expect(screen.queryByRole('button', { name: 'Everything' })).not.toBeInTheDocument()
+  })
+
+  it('does not filter Results, which keeps its scored fixture', async () => {
+    const { user } = setup()
+    expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
+
+    await user.click(typePill('Training'))
+    await user.click(screen.getByRole('button', { name: 'Results' }))
+
+    expect(screen.getByText('Quins vs Al Ain Amblers')).toBeInTheDocument()
+  })
+
+  it('survives a reload, like the team filter', async () => {
+    const { user, unmount } = setup()
+    expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
+
+    await user.click(typePill('Training'))
+    unmount()
+
+    setup()
+    expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
+    expect(screen.queryByText('Quins vs Dubai Exiles')).not.toBeInTheDocument()
+    expect(typePill('Training')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  // ⚠️ A STORED VALUE THAT MATCHES NO EVENT TYPE must not strand the user on
+  // an empty list. This is the shape a renamed type, or an older build's key,
+  // actually arrives in.
+  it('ignores a stored filter that is not one of the pills', async () => {
+    window.localStorage.setItem('quins.schedule.typeFilter', 'tour')
+    setup()
+
+    expect(await screen.findByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+    expect(screen.getByText('Senior squad training')).toBeInTheDocument()
+    expect(typePill('Everything')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  // ⚠️ THE READ IS THE DANGEROUS SIDE. Safari with cookies blocked throws on
+  // localStorage access, and this read happens in a useState initialiser —
+  // i.e. during render. Uncaught, it does not degrade the filter, it takes
+  // the whole Schedule screen down with a blank page.
+  it('still renders when localStorage.getItem throws, as it does in Safari with cookies blocked', async () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('SecurityError')
+    })
+    try {
+      setup()
+
+      expect(await screen.findByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+      expect(typePill('Everything')).toHaveAttribute('aria-pressed', 'true')
+    } finally {
+      getItem.mockRestore()
+    }
+  })
+
+  // The write side. An uncaught throw here would NOT visibly break the filter
+  // — setTypeFilter has already run by then, so the list is right either way —
+  // which is exactly why it needs asserting on the error itself rather than on
+  // the screen. An earlier version of this test checked the list, passed with
+  // the try/catch deliberately removed, and was therefore decoration.
+  it('swallows a localStorage.setItem throw instead of raising it', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError')
+    })
+    // jsdom reports a throw inside an event listener as a window 'error'
+    // event rather than propagating it to the caller, so the click below
+    // resolves cleanly whether or not the throw was handled.
+    const onError = vi.fn()
+    window.addEventListener('error', onError)
+    try {
+      const { user } = setup()
+      expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
+
+      await user.click(typePill('Training'))
+
+      expect(onError).not.toHaveBeenCalled()
+      expect(screen.queryByText('Quins vs Dubai Exiles')).not.toBeInTheDocument()
+    } finally {
+      window.removeEventListener('error', onError)
+      setItem.mockRestore()
+    }
+  })
+})
+
+describe('Schedule — the section heading', () => {
+  // Jay, 9 Aug 2026: "that area should say schedule, not schedule and
+  // fixtures". The old wording said the same thing twice.
+  it('reads "Schedule", not "Schedule & fixtures"', async () => {
+    setup()
+
+    const heading = await screen.findByRole('heading', { name: 'Schedule' })
+    expect(heading).toBeInTheDocument()
+    expect(screen.queryByText(/schedule\s*&\s*fixtures/i)).not.toBeInTheDocument()
   })
 })

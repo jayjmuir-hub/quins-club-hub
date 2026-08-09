@@ -30,9 +30,61 @@ function readStoredFilter() {
   }
 }
 
-// Schedule & fixtures (design-system.md §5.2): scope note, section head,
-// Upcoming/Results/Calendar sub-tabs, a team filter, then the list or the
-// month grid. Reads events once for the whole visible scope and filters in
+// ══ THE EVENT-TYPE FILTER (Upcoming only) ═══════════════════════════════
+// "Everything" plus one pill per event type, so a parent can ask "when is
+// training?" without reading past six fixtures. Its own storage key, and
+// deliberately NOT folded into the team filter's: which squad you want to see
+// and which kind of event you want to see are independent questions, and one
+// key holding both would make clearing either one clear the other.
+export const ALL_TYPES_ID = 'all'
+
+// `empty` matters as much as `label`. With one message for all four pills, a
+// parent who filters to Training and reads "No upcoming fixtures yet" is being
+// told the club has nothing on — when in fact there are six matches sitting
+// behind the filter they just set.
+const TYPE_FILTERS = [
+  { id: ALL_TYPES_ID, label: 'Everything', empty: 'No upcoming fixtures yet.' },
+  { id: 'match', label: 'Matches', empty: 'No upcoming matches. Try Everything to see what else is on.' },
+  { id: 'training', label: 'Training', empty: 'No upcoming training. Try Everything to see what else is on.' },
+  { id: 'social', label: 'Socials', empty: 'No upcoming socials. Try Everything to see what else is on.' },
+]
+
+const TYPE_FILTER_KEY = 'quins.schedule.typeFilter'
+
+// Valid ids only. A stored value is attacker-free but not trustworthy — an old
+// build, a hand-edited localStorage, or a type we later rename all leave a
+// string in there that matches no event, and the screen would show an empty
+// list with no pill selected and no way back to "Everything".
+const TYPE_IDS = TYPE_FILTERS.map((filter) => filter.id)
+
+function readStoredTypeFilter() {
+  try {
+    const stored = window.localStorage.getItem(TYPE_FILTER_KEY)
+    return TYPE_IDS.includes(stored) ? stored : ALL_TYPES_ID
+  } catch {
+    return ALL_TYPES_ID
+  }
+}
+
+/**
+ * Narrow a list of events to one type.
+ *
+ * Exported for tests: this is the whole behaviour of the filter, and testing
+ * it here is what makes the screen test a check on the wiring rather than on
+ * the logic. An unrecognised filter returns everything — never an empty list,
+ * which would read to the user as "there is no training" rather than "this
+ * filter is broken".
+ */
+export function filterByType(events, typeFilter) {
+  if (!Array.isArray(events)) return []
+  if (!typeFilter || !TYPE_IDS.includes(typeFilter) || typeFilter === ALL_TYPES_ID) return events
+  return events.filter((event) => event?.type === typeFilter)
+}
+
+// Schedule (design-system.md §5.2 calls it "Schedule & fixtures"; renamed on
+// screen 9 Aug 2026 — the head said the same thing twice): scope note, section
+// head, Upcoming/Results/Calendar sub-tabs, a team filter, an event-type
+// filter on Upcoming, then the list or the month grid. Reads events once for the whole visible scope and filters in
 // memory — the scope is at most 15 teams' worth of fixtures, so refetching
 // on every pill tap would add latency and flicker for nothing.
 //
@@ -355,6 +407,7 @@ export default function Schedule() {
 
   const [tab, setTab] = useState('upcoming')
   const [teamFilter, setTeamFilter] = useState(readStoredFilter)
+  const [typeFilter, setTypeFilter] = useState(readStoredTypeFilter)
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [month, setMonth] = useState(currentClubMonth)
   // null = no day sheet. Otherwise { year, month, day } for the tapped cell.
@@ -450,7 +503,16 @@ export default function Schedule() {
 
   const visible =
     activeFilter === ALL_TEAMS_ID ? events : events.filter((event) => event.team_id === activeFilter)
-  const upcoming = sortByStart(visible.filter((event) => !hasResult(event)), 'asc')
+  // The type filter applies to Upcoming ONLY, which is what was asked for and
+  // is also the only place it means anything: Results is by definition the
+  // fixtures that have a score on them, so filtering it to "Training" would
+  // always be empty.
+  const upcoming = sortByStart(
+    filterByType(visible.filter((event) => !hasResult(event)), typeFilter),
+    'asc',
+  )
+  const upcomingEmpty =
+    TYPE_FILTERS.find((filter) => filter.id === typeFilter)?.empty ?? TYPE_FILTERS[0].empty
   const results = sortByStart(visible.filter(hasResult), 'desc')
 
   // Derive the open event from the live list rather than storing the row
@@ -475,6 +537,16 @@ export default function Schedule() {
     }
   }
 
+  const persistTypeFilter = (next) => {
+    setTypeFilter(next)
+    try {
+      window.localStorage.setItem(TYPE_FILTER_KEY, next)
+    } catch {
+      // Same as above: Safari private mode throws on setItem, and a filter
+      // that can't be remembered still has to work right now.
+    }
+  }
+
   return (
     <section>
       {/* design-system.md §5.2: the section head carries an "Add" button on
@@ -482,7 +554,7 @@ export default function Schedule() {
           else — and it only exists at all now that Task 14's form does. */}
       <div className="mb-3.5 mt-1 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Schedule &amp; fixtures</h2>
+          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Schedule</h2>
           <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
         </div>
         {/* "Add to calendar" sits beside "Add event" and is for EVERYONE — a
@@ -520,6 +592,24 @@ export default function Schedule() {
         </div>
       )}
 
+      {/* Event-type filter: Upcoming only, and for EVERYONE — a parent asking
+          "when is the next training?" is the main case, not an organiser one.
+          Same PillButton as the sub-tabs above, labelled so the two rows can't
+          be confused with each other by a screen reader. */}
+      {tab === 'upcoming' && (
+        <div
+          role="group"
+          aria-label="Filter by event type"
+          className="mb-4 flex gap-2 overflow-x-auto desktop:flex-wrap desktop:overflow-x-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {TYPE_FILTERS.map(({ id, label }) => (
+            <PillButton key={id} active={typeFilter === id} onClick={() => persistTypeFilter(id)}>
+              {label}
+            </PillButton>
+          ))}
+        </div>
+      )}
+
       {isFirstLoad && (
         <Card className="flex justify-center py-10">
           <Spinner />
@@ -552,14 +642,14 @@ export default function Schedule() {
             events={upcoming}
             teamsById={teamsById}
             onSelect={setSelectedEventId}
-            emptyMessage="No upcoming fixtures yet."
+            emptyMessage={upcomingEmpty}
           />
         ) : (
           <FixtureList
             events={upcoming}
             teamsById={teamsById}
             onSelect={setSelectedEventId}
-            emptyMessage="No upcoming fixtures yet."
+            emptyMessage={upcomingEmpty}
           />
         )
       )}
