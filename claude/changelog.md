@@ -10,6 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 9 Aug 2026
 
+- `6df8ee5` — **`db/schema/` re-captured against live, and nine claims in `RESTORE.md`
+  corrected.** ⚠️ The 7 Aug capture's "Nothing unintended was found" was **wrong**: two
+  objects live since 5 Aug had no line in the files, and `invites_role_check` asserted four
+  roles when the database has had six. Plus five `proacl` lines that did not match, three
+  attributable to no migration — and **Postgres keeps no timestamp for a GRANT**, so that
+  cannot be settled from the catalogue. ⚠️ **`db/schema/` captures no table or column
+  grants**, and **`apply_migration` strips `--` comments before executing**. In `RESTORE.md`:
+  "an admin sees all 15 teams" (wrong policy, wrong count), "zero memberships reads zero
+  rows including `teams`" (false since 8 Aug), and "CHANGE ONE, CHANGE BOTH" on
+  `can_see_team` — **that mirror is broken deliberately** and the old line invited a "fix".
 - `c1a223c` — **The 9 Aug handoff, and three decision records that were never committed.**
   ⚠️ All three of that day's decision records existed only in the Claude project — the same
   failure this repo records against 4-7 Aug, caught by `docs:check` flagging a broken path
