@@ -45,6 +45,51 @@ const ROLE_LABELS = {
 }
 
 /**
+ * The roles that may APPROVE a pending registration for a squad.
+ *
+ * ⚠️ SHORTER THAN SQUAD_STAFF_ROLES ON PURPOSE. Medic is a squad staff role —
+ * a medic can see and edit players, which is the point of it — but admitting a
+ * stranger to a children's squad is not a medical decision. Jay's ruling,
+ * 9 Aug 2026: coach and team manager.
+ *
+ * Mirrors `private.can_approve_team` in
+ * db/migrations/20260809_squad_staff_approval.sql, which is the real boundary.
+ * If this list ever gains a role the SQL has not, the UI offers an Approve
+ * button the database then refuses — annoying. If the SQL gains one this list
+ * has not, the person simply never sees the queue — safe. Change both.
+ */
+export const APPROVER_ROLES = ['coach', 'manager']
+
+/**
+ * Whether this person may approve registrations for at least one squad, and is
+ * therefore worth showing an approvals screen to at all.
+ *
+ * Admin anywhere counts. A parent or player never does — including a parent of
+ * a child in the squad, which is the case that would turn the whole pending
+ * design into theatre.
+ */
+export function canApproveAnything(memberships) {
+  if (!memberships) return false
+  return memberships.some(
+    (m) => m.role === 'admin' || (APPROVER_ROLES.includes(m.role) && m.team_id != null),
+  )
+}
+
+/**
+ * Whether this person may approve for ONE specific squad.
+ *
+ * ⚠️ `teamId == null` is refused BEFORE the admin check, matching canEditTeam
+ * directly below. A membership row with no team is an admin row; treating a
+ * missing team id as "any team" would make a null on a pending row approvable
+ * by anybody who happened to be an admin of some other club.
+ */
+export function canApproveTeam(memberships, teamId) {
+  if (!memberships || teamId == null) return false
+  if (isAdmin(memberships)) return true
+  return memberships.some((m) => APPROVER_ROLES.includes(m.role) && m.team_id === teamId)
+}
+
+/**
  * True if any membership row has role 'admin'.
  */
 export function isAdmin(memberships) {

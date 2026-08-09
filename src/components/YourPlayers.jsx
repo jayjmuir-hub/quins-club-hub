@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import Card from './Card.jsx'
 import PlayerAvatar from './PlayerAvatar.jsx'
+import MyPlayerForm from '../screens/MyPlayerForm.jsx'
 import { listPlayers, listContactsForPlayers } from '../data/players.js'
 import { listParentsForPlayers } from '../data/parents.js'
 import { formatPhone } from '../lib/phone.js'
@@ -13,13 +13,27 @@ import { formatPhone } from '../lib/phone.js'
 // delete your account in the more section, they should be able to see their
 // info and any related player info too."
 //
-// ⚠️ THIS SHOWS. IT DOES NOT EDIT. A parent or player can already change the
-// photo, the player's contact row and the parent rows — that self-service
-// flow exists, is deliberately scoped so it cannot touch name, position, age
-// group or captaincy, and is covered by tests/self-service.test.jsx.
-// Rebuilding those forms here would mean two implementations of a write the
-// database restricts on purpose, free to drift apart. So every row links to
-// the existing screen instead.
+// ⚠️ THIS SHOWS. IT DOES NOT EDIT — and that is still true. Editing opens
+// MyPlayerForm, the SAME component the roster opens, rather than a second set
+// of fields living here. Two implementations of a write the database restricts
+// on purpose would be free to drift apart, and the one nobody is looking at
+// would be the one that drifted.
+//
+// ⚠️ CHANGED 9 Aug 2026 (Jay): this used to be `<Link to="/roster">`. It
+// dumped a parent on the squad list with no player id and no state, and they
+// then had to find their own child and click through two more steps to reach
+// the form they had already asked for. The button now opens MyPlayerForm in
+// place. It is the identical component with identical props — Roster passes
+// `{ player, team, onClose, onSaved }` and so does this — so there is no
+// second code path to keep in step, only a second place it can be opened
+// from.
+//
+// ⚠️ A component importing a SCREEN inverts this repo's directory convention,
+// and that is a deliberate call rather than an oversight. MyPlayerForm renders
+// its own Sheet and loads its own contact and parent rows; it depends on
+// nothing in Roster. Moving it to src/components/ would be the tidier fix and
+// would touch Roster, PlayerDetail and four test files for no behaviour
+// change, so it is left where it is and named here instead.
 //
 // ⚠️ A MISSING CONTACT RENDERS NOTHING — NOT "hidden", NOT a lock icon.
 // player_contacts is a separate table precisely so RLS can withhold it, and
@@ -61,6 +75,14 @@ export default function YourPlayers({ memberships = [], teams = [] }) {
   const [contacts, setContacts] = useState({})
   const [parents, setParents] = useState({})
   const [loaded, setLoaded] = useState(false)
+  // The player whose form is open, or null. Holds the ROW, not an id: the
+  // form needs the whole player and this component already has it.
+  const [editing, setEditing] = useState(null)
+  // ⚠️ Bumped after a save so the effect below re-runs. Without it the panel
+  // still shows the phone number the parent just changed, because the effect
+  // is keyed only on which players and squads exist — neither of which a save
+  // alters. The panel would look like it had ignored them.
+  const [reloadToken, setReloadToken] = useState(0)
 
   const teamIds = [...new Set(memberships.map((m) => m?.team_id).filter(Boolean))]
   const teamKey = teamIds.join(',')
@@ -106,7 +128,7 @@ export default function YourPlayers({ memberships = [], teams = [] }) {
       active = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, teamKey])
+  }, [key, teamKey, reloadToken])
 
   // Nothing to say for a coach or an admin with no child at the club — and
   // an empty "Your players" card would imply something is missing.
@@ -161,16 +183,32 @@ export default function YourPlayers({ memberships = [], teams = [] }) {
               ))}
             </div>
 
-            {/* Straight to the screen where editing already lives. */}
-            <Link
-              to="/roster"
-              className="mt-3 flex items-center justify-center gap-2 rounded-btn border-[1.5px] border-line bg-surface-card px-4 py-2 text-[13px] font-bold text-brand transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            {/* Opens the same form the roster opens, for THIS player, here. */}
+            <button
+              type="button"
+              onClick={() => setEditing(player)}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-btn border-[1.5px] border-line bg-surface-card px-4 py-2 text-[13px] font-bold text-brand transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               View or change these details
-            </Link>
+            </button>
           </Card>
         )
       })}
+
+      {/* ⚠️ ONE sheet for the whole list, outside the map. Rendering it inside
+          would mount a MyPlayerForm per player — each running its own contact
+          and parent queries on mount — for a panel where at most one can be
+          open. The team is looked up the same way the card above does it;
+          MyPlayerForm needs it to decide whether the player may hold their own
+          contact details (the U13 rule) and whether a gender is required. */}
+      {editing && (
+        <MyPlayerForm
+          player={editing}
+          team={teams.find((t) => t.id === editing.team_id)}
+          onClose={() => setEditing(null)}
+          onSaved={() => setReloadToken((n) => n + 1)}
+        />
+      )}
     </>
   )
 }

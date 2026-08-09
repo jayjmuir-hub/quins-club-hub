@@ -2086,34 +2086,51 @@ describe('registerMyPlayer', () => {
 // --- approveMembership ------------------------------------------------
 
 describe('approveMembership', () => {
-  it('updates only the status column, on one row, and reads it back', async () => {
-    const { builder, calls } = createQueryBuilder({ data: { id: 'mm-1', status: 'active' } })
-    supabase.from.mockReturnValue(builder)
+  // ⚠️ AN RPC SINCE 9 Aug 2026, NOT A TABLE UPDATE. Jay asked for coaches and
+  // team managers to approve for their own age groups. The obvious way is to
+  // widen the `memb manage` policy — but it is `FOR ALL`, and RLS grants ROWS
+  // NOT COLUMNS, so that would also hand every coach role changes (including
+  // to admin), squad reassignment and revocation. public.approve_membership is
+  // SECURITY DEFINER with `status` as a literal in its SET list, so there is no
+  // parameter through which anything else can be written.
+  it('calls the RPC with the membership id and nothing else', async () => {
+    supabase.rpc.mockResolvedValue({ data: { id: 'mm-1', status: 'active' }, error: null })
 
     const result = await approveMembership('mm-1')
 
-    expect(supabase.from).toHaveBeenCalledWith('memberships')
-    // ⚠️ ONLY `status`. Role, team_id and player_id were decided when the
-    // parent registered; an approval that also rewrote any of them would be
-    // silently changing what an admin thought they were agreeing to.
-    expect(calls.update).toEqual([[{ status: 'active' }]])
-    expect(calls.eq).toEqual([['id', 'mm-1']])
+    expect(supabase.rpc).toHaveBeenCalledWith('approve_membership', {
+      p_membership_id: 'mm-1',
+    })
+    // ⚠️ NEVER THE TABLE. If this ever goes red because someone "simplified"
+    // it back to .from('memberships').update(...), the approval works only for
+    // admins again — silently, because a coach's UPDATE matches zero rows and
+    // PostgREST reports that as a success.
+    expect(supabase.from).not.toHaveBeenCalled()
     expect(result).toEqual({ id: 'mm-1', status: 'active' })
   })
 
-  // The silent-refusal shape every write in this module has to handle:
-  // `memb manage` is private.is_admin(club_id), so a non-admin's UPDATE
-  // matches zero rows and PostgREST calls that a success. Without the
-  // read-back the screen would report an approval that never happened.
-  it('treats a zero-row response as the refusal it is', async () => {
-    const { builder } = createQueryBuilder({ data: null })
-    supabase.from.mockReturnValue(builder)
+  // The RPC RAISES on refusal rather than matching zero rows, and its sentence
+  // is written for the person reading it, so it is passed through untouched.
+  it('passes the database refusal through verbatim', async () => {
+    supabase.rpc.mockResolvedValue({
+      data: null,
+      error: { code: '42501', message: 'You can only approve players for your own age groups.' },
+    })
 
-    await expect(approveMembership('mm-1')).rejects.toThrow(/only a club admin/i)
+    await expect(approveMembership('mm-1')).rejects.toThrow(/your own age groups/i)
   })
 
-  it('refuses to query at all without a membership id', async () => {
+  it('keeps the code on the thrown error', async () => {
+    supabase.rpc.mockResolvedValue({
+      data: null,
+      error: { code: '42704', message: 'That registration no longer exists.' },
+    })
+
+    await expect(approveMembership('mm-1')).rejects.toMatchObject({ code: '42704' })
+  })
+
+  it('refuses to call at all without a membership id', async () => {
     await expect(approveMembership(undefined)).rejects.toThrow(/needs a membershipId/i)
-    expect(supabase.from).not.toHaveBeenCalled()
+    expect(supabase.rpc).not.toHaveBeenCalled()
   })
 })

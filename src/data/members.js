@@ -449,8 +449,13 @@ export async function registerMyPlayer(fullName, teamId, gender = null) {
 // (claude/decisions/2026-08-08-parent-self-registration.md §5) assumed "coach
 // or admin"; the database says admin only. Verified against the live policies
 // on 8 Aug 2026, not assumed.
+// ⚠️ NO LONGER REACHABLE, AND KEPT ANYWAY — see approveMembership below. The
+// function now calls an RPC that RAISES on refusal instead of silently
+// matching zero rows, so this string is a fallback for an RPC that somehow
+// returns nothing at all. Deleting it would leave that case throwing
+// `undefined`.
 const REFUSED_MEMBERSHIP_APPROVE =
-  "We couldn't approve that person. Only a club admin can approve access."
+  "We couldn't approve that person. Ask a club admin if that looks wrong."
 
 /**
  * Approves one PENDING membership by flipping its status to 'active', and
@@ -466,18 +471,40 @@ const REFUSED_MEMBERSHIP_APPROVE =
  * un-approve: moving an active row back to pending would half-revoke someone
  * in a way no screen explains, and the existing revoke (deleteMembership) is
  * the honest way to take access away.
+ *
+ * ⚠️ AN RPC SINCE 9 Aug 2026, NOT A TABLE UPDATE, AND THAT IS THE WHOLE POINT.
+ * Jay asked for coaches and team managers to approve for their own age groups.
+ * The obvious way to do that is to widen the `memb manage` policy — but read
+ * what it is first: `FOR ALL USING private.is_admin(club_id)`. FOR ALL, and
+ * RLS grants ROWS not COLUMNS, so widening it would also hand every coach the
+ * ability to change a member's ROLE (including to admin), move them to another
+ * squad, and DELETE access. public.approve_membership is SECURITY DEFINER with
+ * `status` as a literal in the SET list, so there is no parameter through which
+ * anything else could be written.
+ *
+ * ⚠️ AND IT FIXES A BUG THE OLD SHAPE WOULD HAVE HAD. The table update read the
+ * row back with `.select()`. A coach's new read policy only shows PENDING rows,
+ * so the moment they approved one it would leave their view, the read-back
+ * would return nothing, and a successful approval would have been reported to
+ * them as a refusal. The RPC returns the row from inside SECURITY DEFINER,
+ * where that policy does not apply.
  */
 export async function approveMembership(membershipId) {
   if (!membershipId) throw new Error('approveMembership needs a membershipId.')
 
-  const { data, error } = await supabase
-    .from('memberships')
-    .update({ status: 'active' })
-    .eq('id', membershipId)
-    .select()
-    .maybeSingle()
+  const { data, error } = await supabase.rpc('approve_membership', {
+    p_membership_id: membershipId,
+  })
 
-  if (error) throw error
+  if (error) {
+    // The RPC's own sentences are written for the person reading them — "You
+    // can only approve players for your own age groups." — so they are passed
+    // through rather than replaced. Same reasoning as the 22004 case in
+    // registerMyPlayer above.
+    const friendly = new Error(error.message || REFUSED_MEMBERSHIP_APPROVE)
+    friendly.code = error.code
+    throw friendly
+  }
   if (!data) throw new Error(REFUSED_MEMBERSHIP_APPROVE)
   return data
 }

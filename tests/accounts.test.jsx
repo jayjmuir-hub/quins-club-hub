@@ -312,13 +312,54 @@ describe('Accounts — authorisation gate', () => {
     expect(await screen.findByRole('heading', { name: /accounts/i })).toBeInTheDocument()
   })
 
-  it('renders a not-authorised message for a coach, and issues no query', async () => {
+  // ⚠️ CHANGED 9 Aug 2026 (Jay: coaches and managers approve for their own age
+  // groups). A coach used to be refused this screen outright. They now get the
+  // approvals view — and NOTHING else on it.
+  it('gives a coach the approvals view, not the accounts screen', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH))
 
     setup()
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/not authorised/i)
-    expect(listClubMembersMock).not.toHaveBeenCalled()
+    expect(await screen.findByRole('heading', { name: /approvals/i })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).toBeNull()
+    // The queue needs the pending rows, so the members read DOES happen now.
+    expect(listClubMembersMock).toHaveBeenCalled()
+  })
+
+  // ⚠️ THE LIST THIS ASSERTS IS THE POINT OF THE WHOLE SEPARATE RETURN. Every
+  // one of these is a club-administration control, and `memb manage` is still
+  // admin-only in the database — so a leak here shows a coach a button that
+  // fails rather than one that works, but it is still a lie about what they
+  // may do.
+  it('shows a coach none of the club-administration controls', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+
+    setup()
+    await screen.findByRole('heading', { name: /approvals/i })
+
+    expect(screen.queryByTestId('account-person')).toBeNull()
+    expect(screen.queryByTestId('waiting-for-access')).toBeNull()
+    expect(screen.queryByTestId('dismissed-requests')).toBeNull()
+    expect(screen.queryByRole('button', { name: /revoke/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /add access/i })).toBeNull()
+    expect(screen.queryByRole('combobox')).toBeNull()
+    // ⚠️ AND NOT THE COUNTS. "n with access · n logins" is computed from rows
+    // a coach cannot read, so it would render zeros and read as "this club has
+    // no members" — a falsehood stated as a fact.
+    expect(screen.queryByText(/with access/i)).toBeNull()
+    expect(screen.queryByText(/logins?$/i)).toBeNull()
+  })
+
+  it('issues only the members read for a coach, not the two admin-only reads', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+
+    setup()
+    await screen.findByRole('heading', { name: /approvals/i })
+
+    // Both are gated on is_admin_anywhere in the database and would come back
+    // empty — three round trips to learn nothing, on a screen with one section.
+    expect(listPendingProfilesMock).not.toHaveBeenCalled()
+    expect(listAccessRequestsMock).not.toHaveBeenCalled()
   })
 
   it('renders a not-authorised message for a parent, and issues no query', async () => {
@@ -333,7 +374,7 @@ describe('Accounts — authorisation gate', () => {
   // The view-as preview (spec §1) swaps the EFFECTIVE membership set for a
   // synthetic coach/parent row while realMemberships still says admin.
   // Accounts gates on the effective set on purpose, so previewing hides it.
-  it('hides itself while a real admin previews as a coach', async () => {
+  it('shows a previewing admin the COACH view, not the admin one', async () => {
     useMembershipsMock.mockReturnValue({
       ...memberships(ADMIN),
       memberships: [{ id: 'view-as', role: 'coach', team_id: 'team-u10', player_id: null }],
@@ -342,8 +383,11 @@ describe('Accounts — authorisation gate', () => {
 
     setup()
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/not authorised/i)
-    expect(listClubMembersMock).not.toHaveBeenCalled()
+    // Gating on the EFFECTIVE set is what makes the preview honest: an admin
+    // checking what a coach sees gets what a coach sees. Before 9 Aug that was
+    // a not-authorised card, because that WAS what a coach saw.
+    expect(await screen.findByRole('heading', { name: /approvals/i })).toBeInTheDocument()
+    expect(screen.queryByTestId('account-person')).toBeNull()
   })
 })
 

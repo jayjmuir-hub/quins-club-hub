@@ -21,7 +21,7 @@ import {
 import { listPlayers } from '../data/players.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin } from '../lib/scope.js'
+import { canApproveAnything, isAdmin } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 
 // Admin Accounts screen (design spec 2026-08-03 §2): view and edit who has
@@ -134,16 +134,28 @@ const NO_CLUB_KNOWN =
 // queue (for the child still waiting). Filtering by ROW, not by person, is
 // what makes that come out right.
 //
-// ⚠️ ADMIN ONLY, NOT "COACH OR ADMIN". The spec assumed a coach could approve
-// their own squad. The database disagrees, and it is the database that
-// decides: `memb manage` is private.is_admin(club_id) with no coach clause, so
-// a coach's UPDATE matches zero rows; and `memb read` is
-// `profile_id = auth.uid() OR private.is_admin(club_id)`, so a coach cannot
-// even SEE a pending membership belonging to someone else. Both read from the
-// live database on 8 Aug 2026. This screen is already admin-gated, so nothing
-// here needs to change for that — but do not add a coach entry point without
-// changing those two policies first, or it will render an empty queue and a
-// button that silently does nothing.
+// ⚠️ NO LONGER ADMIN ONLY — CHANGED 9 Aug 2026 (Jay: "coaches and managers
+// should approve for their age groups only").
+//
+// The previous note here said the database disagreed with the spec, and it was
+// right at the time: `memb manage` had no coach clause and `memb read` would
+// not even show a coach someone else's pending row. Both were true, and the
+// warning it ended with — do not add a coach entry point without changing the
+// policies first — is exactly what was done.
+//
+// db/migrations/20260809_squad_staff_approval.sql adds THREE narrow things and
+// deliberately does not widen `memb manage`, which is FOR ALL and would have
+// handed every coach role changes and revocation along with approval:
+//   * private.can_approve_team  — admin anywhere, or coach/manager of THAT
+//     squad. ⚠️ NOT medic: approval is a shorter list than editing.
+//   * two SELECT policies scoped to status = 'pending' — a coach sees the rows
+//     and the names they are being asked to judge, and nothing else. The row
+//     leaves their view once approved, which is correct.
+//   * public.approve_membership() — SECURITY DEFINER, `status` a literal in
+//     the SET list, so no parameter can reach any other column.
+//
+// Proven live in db/tests/rls-squad-staff-approval.sql, including that a
+// parent cannot approve THEMSELVES.
 const PENDING_APPROVAL_NOTE =
   'Parents add their own player and land here. Until you approve them they can see their own child and the squad’s fixtures — enough to set availability — and nothing else: not the squad roster, not other families’ contact details. Approving gives them the same view as everyone else in that age group.'
 
@@ -154,8 +166,8 @@ function NotAuthorised() {
       <Card role="alert" className="p-6 text-center">
         <h3 className="text-base font-extrabold text-brand-deep">Not authorised</h3>
         <p className="mt-2 text-sm leading-relaxed text-brand-deep">
-          This page is for club admins only. If you think you should have access, ask a
-          current admin to check your account.
+          This page is for club admins, coaches and team managers. If you think you
+          should have access, ask a current admin to check your account.
         </p>
       </Card>
     </section>
@@ -202,10 +214,122 @@ function formatJoined(value) {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+/**
+ * The approval queue. ONE component, rendered by both the admin screen and the
+ * coach/manager screen, so the card a coach taps Approve on is byte-identical
+ * to the one an admin taps.
+ *
+ * ⚠️ THE LIST IS NOT FILTERED HERE. `memb read squad staff pending` narrows it
+ * in the database — a coach's query returns only pending rows on squads they
+ * may approve. A client-side filter as well would be a second rule free to
+ * disagree with the first, and the wrong one would be the one nobody tested.
+ */
+function PendingApprovals({ members, teamsById, rowState, onApprove }) {
+  return (
+    <section data-testid="pending-approvals" className="mb-5">
+      <h3 className="text-[16px] font-extrabold tracking-[-0.2px] text-ink">
+        Players waiting to be approved
+      </h3>
+      <p className={`mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
+        {PENDING_APPROVAL_NOTE}
+      </p>
+
+      <div className="mt-2.5 flex flex-col gap-3">
+        {members.map((member) => {
+          const state = rowState[member.id] ?? {}
+          const personName = member.profiles?.full_name?.trim() || 'No name yet'
+          const playerName = member.players?.full_name ?? 'Unnamed player'
+          const teamName = member.team_id
+            ? teamsById.get(member.team_id)?.name ?? member.teams?.name ?? null
+            : null
+          const registered = formatJoined(member.created_at)
+
+          return (
+            <Card
+              key={member.id}
+              data-testid="pending-membership"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[14px] py-3"
+            >
+              <span
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-surface-mute text-[12px] font-extrabold tracking-[.5px] text-ink-muted"
+                aria-hidden="true"
+              >
+                {initials(playerName)}
+              </span>
+
+              <div className="min-w-0">
+                {/* The CHILD leads, not the parent. This is the decision being
+                    made — "is this a real U13 player?" — and the answer usually
+                    comes from recognising the name on the team sheet. The adult
+                    and their address are the corroboration, on the line below.
+                    That is even more true for a coach than for an admin: the
+                    coach is the one who knows the squad. */}
+                <span className="block text-[15px] font-bold text-ink">
+                  {playerName}
+                  {teamName && (
+                    <span className={`ml-2 text-[12.5px] font-semibold ${MUTED_ON_PAPER}`}>
+                      {teamName}
+                    </span>
+                  )}
+                </span>
+                <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
+                  Added by {personName}
+                  {member.profiles?.email ? ` \u00b7 ${member.profiles.email}` : ''}
+                  {registered ? ` \u00b7 ${registered}` : ''}
+                </span>
+              </div>
+
+              <span className="flex-1" />
+
+              <button
+                type="button"
+                aria-label={`Approve ${playerName} for ${personName}`}
+                disabled={Boolean(state.saving)}
+                onClick={() => onApprove(member)}
+                className="rounded-[9px] bg-brand px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              >
+                {state.saving ? 'Approving\u2026' : 'Approve'}
+              </button>
+
+              {/* No "reject" button, deliberately, and for the same reason the
+                  waiting list has no delete: revoking is what removing this
+                  person means, and that control already exists on their row
+                  once they are approved. A separate reject here would be a
+                  second way to delete a membership, with its own confirm step
+                  and its own bugs. ⚠️ It would also be the one control on this
+                  card a coach must NOT have — `memb manage` is admin-only —
+                  so adding it means gating it, not just building it. */}
+
+              {state.error && (
+                <span
+                  role="alert"
+                  className="basis-full text-[12.5px] font-semibold text-brand-deep"
+                >
+                  {state.error}
+                </span>
+              )}
+            </Card>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 export default function Accounts() {
   const { memberships, teams } = useMemberships()
   const { user } = useAuth()
   const admin = isAdmin(memberships)
+  // ⚠️ TWO GATES NOW, AND THEY ARE NOT THE SAME QUESTION.
+  //   admin    — the whole screen: the member list, roles, squads, invites,
+  //              revocation, the waiting-for-access list.
+  //   approver — the approval queue ONLY. A coach or team manager sees that
+  //              section and nothing else on this page.
+  // Everything below that is admin-only must keep testing `admin`, not
+  // `approver`. The database refuses a coach either way — every admin-only
+  // write here is behind `memb manage`, which is still is_admin(club_id) — so
+  // a slip shows a coach a control that fails rather than one that works.
+  const approver = canApproveAnything(memberships)
 
   const [members, setMembers] = useState([])
   // Every profile the admin can read (see the "Waiting for access" block
@@ -271,8 +395,9 @@ export default function Accounts() {
   }, [])
 
   useEffect(() => {
-    // A non-admin issues no query at all — same shape as Admin.jsx's effect.
-    if (!admin) return undefined
+    // Nobody who can neither administer nor approve issues a query at all —
+    // same shape as Admin.jsx's effect.
+    if (!admin && !approver) return undefined
 
     let mounted = true
     setLoading(true)
@@ -286,7 +411,16 @@ export default function Accounts() {
     // subtract, so a failed member read hides the waiting section entirely
     // (handled at the render site) rather than showing every member as
     // "waiting".
-    Promise.allSettled([listClubMembers(), listPendingProfiles(), listAccessRequests()])
+    // ⚠️ A COACH ISSUES ONE READ, NOT THREE. listPendingProfiles and
+    // listAccessRequests are gated on is_admin_anywhere in the database, so a
+    // coach would get empty arrays — correct, but three round trips to learn
+    // it, on a screen that for them has exactly one section. The `admin`
+    // branch is what keeps those two reads honest rather than defensive.
+    Promise.allSettled([
+      listClubMembers(),
+      admin ? listPendingProfiles() : Promise.resolve([]),
+      admin ? listAccessRequests() : Promise.resolve([]),
+    ])
       .then(([membersResult, profilesResult, requestsResult]) => {
         if (!mounted) return
         if (membersResult.status === 'fulfilled') {
@@ -309,7 +443,7 @@ export default function Accounts() {
     return () => {
       mounted = false
     }
-  }, [admin, reloadToken])
+  }, [admin, approver, reloadToken])
 
   const sortedTeams = useMemo(
     () =>
@@ -337,7 +471,7 @@ export default function Accounts() {
     [memberships, teams],
   )
 
-  if (!admin) return <NotAuthorised />
+  if (!admin && !approver) return <NotAuthorised />
 
   // Split by ROW, not by person — see THE THIRD CATEGORY above. `status` is
   // compared against 'pending' rather than 'active' so a row from before the
@@ -669,6 +803,75 @@ export default function Accounts() {
     }
   }
 
+  // ── THE COACH / TEAM MANAGER VIEW ──────────────────────────────────────
+  //
+  // A separate, earlier return rather than a dozen `{admin && ...}` guards
+  // sprinkled through the admin screen below. Two reasons, and the second is
+  // the one that matters:
+  //
+  //   1. Every count in the header — "n with access", "n access rows",
+  //      "n logins" — is computed from rows a coach cannot read. They would
+  //      render as zero and read as "the club has no members", which is a
+  //      falsehood presented as a fact. The whole point of the note beside
+  //      those counts is that a wrong number here has already cost an hour.
+  //   2. A missed guard in a long JSX tree is invisible. Here, anything a
+  //      coach must not see is simply not in this return.
+  //
+  // The database refuses them either way — every write below is behind
+  // `memb manage`, still is_admin(club_id) — so a slip would show a control
+  // that fails rather than one that works. This is the readable belt to that
+  // braces.
+  if (!admin) {
+    return (
+      <section>
+        <div className="mb-3.5 mt-1">
+          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Approvals</h2>
+          <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
+            {pendingMembers.length === 0
+              ? 'Nobody is waiting for your age groups.'
+              : `${pendingMembers.length} waiting for your age groups`}
+          </p>
+        </div>
+
+        {isFirstLoad && (
+          <Card className="flex justify-center py-10">
+            <Spinner label="Loading approvals…" />
+          </Card>
+        )}
+
+        {!isFirstLoad && error && (
+          <Card role="alert" className="p-4 text-[13px] font-semibold text-brand-deep">
+            We couldn&apos;t load the approvals. Try again in a moment.
+          </Card>
+        )}
+
+        {!isFirstLoad && !error && pendingMembers.length === 0 && (
+          <Card className="p-6 text-center">
+            <p className={`text-sm leading-relaxed ${MUTED_ON_PAPER}`}>
+              When a parent registers a player in one of your age groups, they appear
+              here for you to approve.
+            </p>
+          </Card>
+        )}
+
+        {/* ⚠️ NO CLIENT-SIDE FILTER ON teamsById OR ON THE CALLER'S SQUADS.
+            The list is already exactly their squads' pending rows — the
+            "memb read squad staff pending" policy is what narrows it, in the
+            database, and a second filter here would be a place for the two to
+            disagree. If this list ever shows a squad they do not coach, the
+            policy is wrong and that is what needs fixing. */}
+        {!isFirstLoad && !error && pendingMembers.length > 0 && (
+          <PendingApprovals
+            members={pendingMembers}
+            teamsById={teamsById}
+            rowState={rowState}
+            onApprove={approve}
+          />
+        )}
+      </section>
+    )
+  }
+
   return (
     <section>
       <div className="mb-3.5 mt-1">
@@ -719,90 +922,12 @@ export default function Accounts() {
           ("anyone who signs up will appear here"); this one would only be
           telling them that the thing that has not happened has not happened. */}
       {!isFirstLoad && !error && pendingMembers.length > 0 && (
-        <section data-testid="pending-approvals" className="mb-5">
-          <h3 className="text-[16px] font-extrabold tracking-[-0.2px] text-ink">
-            Players waiting to be approved
-          </h3>
-          <p className={`mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
-            {PENDING_APPROVAL_NOTE}
-          </p>
-
-          <div className="mt-2.5 flex flex-col gap-3">
-            {pendingMembers.map((member) => {
-              const state = rowState[member.id] ?? {}
-              const personName = member.profiles?.full_name?.trim() || 'No name yet'
-              const playerName = member.players?.full_name ?? 'Unnamed player'
-              const teamName = member.team_id
-                ? teamsById.get(member.team_id)?.name ?? member.teams?.name ?? null
-                : null
-              const registered = formatJoined(member.created_at)
-
-              return (
-                <Card
-                  key={member.id}
-                  data-testid="pending-membership"
-                  className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[14px] py-3"
-                >
-                  <span
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-surface-mute text-[12px] font-extrabold tracking-[.5px] text-ink-muted"
-                    aria-hidden="true"
-                  >
-                    {initials(playerName)}
-                  </span>
-
-                  <div className="min-w-0">
-                    {/* The CHILD leads, not the parent. This is the decision an
-                        admin is actually making — "is this a real U13 player?"
-                        — and the answer usually comes from recognising the
-                        name on the team sheet. The adult and their address are
-                        the corroboration, on the line below. */}
-                    <span className="block text-[15px] font-bold text-ink">
-                      {playerName}
-                      {teamName && (
-                        <span className={`ml-2 text-[12.5px] font-semibold ${MUTED_ON_PAPER}`}>
-                          {teamName}
-                        </span>
-                      )}
-                    </span>
-                    <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
-                      Added by {personName}
-                      {member.profiles?.email ? ` · ${member.profiles.email}` : ''}
-                      {registered ? ` · ${registered}` : ''}
-                    </span>
-                  </div>
-
-                  <span className="flex-1" />
-
-                  <button
-                    type="button"
-                    aria-label={`Approve ${playerName} for ${personName}`}
-                    disabled={Boolean(state.saving)}
-                    onClick={() => approve(member)}
-                    className="rounded-[9px] bg-brand px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-                  >
-                    {state.saving ? 'Approving…' : 'Approve'}
-                  </button>
-
-                  {/* No "reject" button, deliberately, and for the same reason
-                      the waiting list has no delete: revoking is what removing
-                      this person means, and that control already exists on
-                      their row once they are approved. A separate reject here
-                      would be a second way to delete a membership, with its own
-                      confirm step and its own bugs. */}
-
-                  {state.error && (
-                    <span
-                      role="alert"
-                      className="basis-full text-[12.5px] font-semibold text-brand-deep"
-                    >
-                      {state.error}
-                    </span>
-                  )}
-                </Card>
-              )
-            })}
-          </div>
-        </section>
+        <PendingApprovals
+          members={pendingMembers}
+          teamsById={teamsById}
+          rowState={rowState}
+          onApprove={approve}
+        />
       )}
 
       {/* Hidden while the member list is missing: without it there is nothing

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Tests for the wide-screen schedule table (desktop-spec.md §5.2). The
@@ -198,5 +198,73 @@ describe('ScheduleTable — empty', () => {
     render(<Schedule />)
     expect(await screen.findByText('No upcoming fixtures yet.')).toBeInTheDocument()
     expect(screen.queryByTestId('schedule-table')).not.toBeInTheDocument()
+  })
+})
+
+describe('ScheduleTable — the date cell', () => {
+  it('leads with the day of the week', async () => {
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+
+    // 2030-03-10T15:30:00Z is 7:30 PM in Abu Dhabi on Sunday 10 March.
+    // ⚠️ The WEEKDAY is the assertion. "Which nights do we train?" is the
+    // question a season of fixtures is actually scanned for, and it was
+    // answerable only by counting rows before this.
+    const dates = screen.getAllByTestId('schedule-date').map((n) => n.textContent)
+    expect(dates[0]).toMatch(/^Sun/)
+    expect(dates[0]).toMatch(/10/)
+    expect(dates[1]).toMatch(/^Thu/)
+  })
+
+  // ⚠️ THE ZONE, NOT THE WORDING. This cell used to format itself inline with
+  // a hardcoded 'Asia/Dubai' — the one bit of date arithmetic in a file whose
+  // header says it does none. 15:30 UTC is 19:30 in Abu Dhabi and still the
+  // SAME calendar day; 20:30 UTC would be the next day there and the previous
+  // one in London. If this ever reads "Sat" the zone has been lost.
+  it('reads the club calendar day, not the browser\'s', async () => {
+    listEventsMock.mockResolvedValue([
+      { ...FUTURE_TRAINING, id: 'e-late', starts_at: '2030-03-10T20:30:00Z' },
+    ])
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+
+    // 20:30 UTC on Sunday = 00:30 MONDAY in Abu Dhabi.
+    expect(screen.getByTestId('schedule-date')).toHaveTextContent(/^Mon/)
+  })
+})
+
+describe('ScheduleTable — opening a row', () => {
+  it('opens the event when the row itself is clicked, not only the Open button', async () => {
+    const user = userEvent.setup()
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+
+    await user.click(screen.getAllByTestId('schedule-table-row')[0])
+    expect(await screen.findByRole('dialog')).toHaveTextContent(/Skills session/)
+  })
+
+  it('still opens from the Open button, and only once', async () => {
+    const user = userEvent.setup()
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+
+    // ⚠️ The button is inside the clickable row, so without stopPropagation
+    // both handlers fire for one click. Harmless while the handler only
+    // assigns state — and a double submit the moment it does anything else.
+    await user.click(screen.getAllByRole('button', { name: 'Open' })[0])
+    expect(await screen.findByRole('dialog')).toHaveTextContent(/Skills session/)
+  })
+
+  // The row is a mouse convenience. The keyboard path must stay the button —
+  // a <tr> is not focusable and giving it role="button" would strip the row
+  // semantics that make the cells mean anything to a screen reader.
+  it('keeps a real focusable control in the row', async () => {
+    render(<Schedule />)
+    await screen.findByTestId('schedule-table')
+
+    const row = screen.getAllByTestId('schedule-table-row')[0]
+    expect(row).not.toHaveAttribute('role', 'button')
+    expect(row).not.toHaveAttribute('tabindex')
+    expect(within(row).getByRole('button', { name: 'Open' })).toBeInTheDocument()
   })
 })

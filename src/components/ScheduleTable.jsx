@@ -4,6 +4,7 @@ import Chip from './Chip.jsx'
 import {
   eventDate,
   eventTitle,
+  formatTableDate,
   formatTime,
   hasResult,
   resultOutcome,
@@ -135,12 +136,26 @@ export default function ScheduleTable({ events, teamsById, onSelect, emptyMessag
               const outcome = hasResult(event) ? resultOutcome(event) : null
 
               return (
-                <tr key={event.id} data-testid="schedule-table-row" className="hover:bg-surface-mute">
+                <tr
+                  key={event.id}
+                  data-testid="schedule-table-row"
+                  // ⚠️ NOT a <button> wrapper and not role="button" on the row.
+                  // A <tr> may only contain <td>, so wrapping is invalid HTML,
+                  // and role="button" on a row would strip its row semantics
+                  // from a screen reader — losing the column headers that make
+                  // the cells mean anything. The row is a convenience for a
+                  // mouse; the real, focusable, keyboard-reachable control is
+                  // the Open button in the last cell, which stays.
+                  onClick={() => onSelect(event.id)}
+                  className="cursor-pointer hover:bg-surface-mute"
+                >
                   <td className={`${CELL} whitespace-nowrap`}>
+                    {/* Was formatted inline here with a hardcoded 'Asia/Dubai'
+                        — the one piece of date arithmetic in a file whose
+                        header says it does none. Now formatTableDate, which
+                        also adds the weekday. */}
                     <span data-testid="schedule-date" className="font-bold">
-                      {date.toLocaleDateString('en-GB', {
-                        day: '2-digit', month: 'short', timeZone: 'Asia/Dubai',
-                      })}
+                      {formatTableDate(date)}
                     </span>
                     <span className="ml-2 text-[13px] text-ink-faint">{formatTime(date)}</span>
                   </td>
@@ -182,7 +197,15 @@ export default function ScheduleTable({ events, teamsById, onSelect, emptyMessag
                   <td className={`${CELL} text-right`}>
                     <button
                       type="button"
-                      onClick={() => onSelect(event.id)}
+                      // stopPropagation: without it the row handler fires too,
+                      // calling onSelect twice for one click. Harmless today
+                      // (it sets the same id) but it is the kind of thing that
+                      // becomes a double-submit the moment the handler does
+                      // anything but assign state.
+                      onClick={(clickEvent) => {
+                        clickEvent.stopPropagation()
+                        onSelect(event.id)
+                      }}
                       className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       Open

@@ -9,7 +9,7 @@ import { useAuth } from '../lib/auth.jsx'
 import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { joinPhone, splitPhone } from '../lib/phone.js'
-import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canApproveAnything, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 
 // The "More" tab, for EVERYONE (admin-dashboard plan, 2026-08-05).
 //
@@ -277,6 +277,34 @@ export default function More() {
       {/* Renders nothing at all for a coach or admin with no child at the
           club — an empty "Your players" card would imply something missing. */}
       <YourPlayers memberships={memberships} teams={teams} />
+
+      {/* ⚠️ THE COACH'S AND TEAM MANAGER'S ONLY WAY IN (Jay, 9 Aug 2026).
+          The Admin pill in the tab bar is admin-only AND desktop-only, so
+          without this a coach has no route to the approvals queue from a
+          phone — which is exactly where they will be when a parent registers.
+
+          Not shown to admins: they already have the Admin pill, and a second
+          entry point to a screen they can reach from the nav is clutter. The
+          screen itself gates independently, so this only decides who is
+          OFFERED it. */}
+      {!admin && canApproveAnything(memberships) && (
+        <>
+          <SectionTitle>Manage</SectionTitle>
+          <Card className="p-[14px]">
+            <Link
+              to="/approvals"
+              className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand"
+            >
+              <span>Players waiting to be approved</span>
+              <span aria-hidden="true">›</span>
+            </Link>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+              Parents who have registered a player in your age groups, waiting for you
+              to let them in.
+            </p>
+          </Card>
+        </>
+      )}
 
       {/* The .ics feed already existed but lived only on Schedule. This is
           where someone comes looking for "my stuff", so it belongs here too;

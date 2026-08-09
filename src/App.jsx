@@ -106,6 +106,23 @@ export default function App() {
             <Route path="club" element={<AdminClub />} />
           </Route>
 
+          {/* THE COACH / TEAM MANAGER APPROVALS ROUTE (Jay, 9 Aug 2026).
+              Deliberately OUTSIDE /admin, and that is not a stylistic choice:
+              AdminDashboard gates on isAdmin() and renders <Outlet/>, so a
+              coach opening /admin/accounts would hit the parent's
+              not-authorised card and never reach Accounts at all.
+
+              ⚠️ NOT desktop-only, unlike /admin. Approving a registration is
+              a two-second decision a coach makes on a phone, and the whole
+              screen is a list of cards with one button each — the reason
+              /admin is desktop-only (wide, table-heavy) does not apply.
+
+              Accounts self-gates: an admin who lands here gets their full
+              accounts screen, a coach or manager gets the approvals queue,
+              and anyone else gets not-authorised. One component, one gate,
+              rather than a second copy of the queue that could drift. */}
+          <Route path="/approvals" element={<AppShell><Accounts /></AppShell>} />
+
           {/* Old bookmarked URL. A plain redirect, not a duplicate mount:
               Accounts must exist in exactly one place. */}
           <Route path="/accounts" element={<Navigate to="/admin/accounts" replace />} />

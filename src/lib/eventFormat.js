@@ -230,6 +230,36 @@ export function formatTimeRange(start, end) {
 }
 
 /**
+ * "Mon 01 Sept" — the desktop schedule table's date cell.
+ *
+ * ⚠️ THIS EXISTS BECAUSE ScheduleTable.jsx WAS DOING IT ITSELF. It called
+ * `date.toLocaleDateString('en-GB', { day, month, timeZone: 'Asia/Dubai' })`
+ * inline — the one place in that file that hardcoded the zone string instead
+ * of using CLUB_TIME_ZONE, contradicting its own header comment ("This file
+ * therefore does no date arithmetic of its own"). A typo there would have
+ * shifted the club's calendar in one column and nowhere else, which is
+ * precisely the bug that comment exists to prevent.
+ *
+ * The weekday leads because that is what someone scanning a season is
+ * actually looking for: "which nights do we train?" is a more common question
+ * than "what is the date of the fourth session?".
+ *
+ * ⚠️ LOCALE IS `undefined`, NOT 'en-GB'. Every other formatter in this file
+ * takes the browser's locale and pins only the ZONE; hardcoding en-GB here
+ * would make this the one date in the app that ignores the reader's settings.
+ * (en-GB renders September as "Sept", en-US as "Sep" — either is fine.)
+ */
+export function formatTableDate(date) {
+  if (!date) return 'Date TBC'
+  return date.toLocaleDateString(undefined, {
+    timeZone: CLUB_TIME_ZONE,
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+  })
+}
+
+/**
  * "Fri, 24 Jul 2026" — the long form used in the detail sheet header,
  * always the Abu Dhabi calendar date.
  */

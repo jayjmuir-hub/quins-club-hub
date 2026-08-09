@@ -41,13 +41,33 @@ vi.mock('../src/data/members.js', () => ({
   updateMyProfile: (...a) => updateMyProfileMock(...a),
 }))
 
+// ⚠️ THESE MODULES NOW HAVE A SECOND CONSUMER. Since 9 Aug the "view or
+// change these details" button opens MyPlayerForm in place rather than
+// navigating to /roster, and that form loads its OWN contact and parent rows
+// on mount. A vi.mock factory replaces the whole module, so any export it
+// omits is undefined — which surfaces as "listParents is not a function"
+// thrown inside a passive effect, not as a missing mock.
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
   listContactsForPlayers: (...a) => listContactsForPlayersMock(...a),
+  getPlayerContact: async () => null,
+  upsertContact: async () => ({}),
+  setOwnPlayerGender: async () => ({}),
 }))
 
 vi.mock('../src/data/parents.js', () => ({
   listParentsForPlayers: (...a) => listParentsForPlayersMock(...a),
+  listParents: async () => [],
+  saveParents: async () => [],
+}))
+
+vi.mock('../src/data/photos.js', () => ({
+  PHOTO_BUCKET: 'player-photos',
+  playerPhotoUrl: async () => null,
+  uploadPlayerPhoto: async () => 'path',
+  setOwnPlayerPhoto: async () => ({}),
+  deletePlayerPhoto: async () => {},
+  forgetPhotoUrl: () => {},
 }))
 
 // The calendar card is a shared component with its own suite
@@ -239,7 +259,8 @@ describe('More — your players', () => {
   it('does not offer edit controls of its own', async () => {
     // ⚠️ Editing lives in the existing self-service flow, which the database
     // restricts to photo, contact and parent rows. A second implementation
-    // here could drift from that and offer a write RLS refuses.
+    // here could drift from that and offer a write RLS refuses. The button
+    // below opens THAT form; it does not reimplement it.
     useMembershipsMock.mockReturnValue(memberships(PARENT))
     listPlayersMock.mockResolvedValue([PLAYER])
 
@@ -247,7 +268,48 @@ describe('More — your players', () => {
     const card = await screen.findByTestId('your-player')
 
     expect(within(card).queryByRole('textbox')).toBeNull()
-    expect(within(card).getByRole('link', { name: /view or change/i })).toHaveAttribute('href', '/roster')
+    expect(within(card).getByRole('button', { name: /view or change/i })).toBeInTheDocument()
+  })
+
+  // ⚠️ CHANGED 9 Aug 2026 (Jay). This used to be a <Link to="/roster">, which
+  // dropped a parent on the squad list with no player id and no state — they
+  // then had to find their own child and click through two more steps to reach
+  // the form they had already asked for.
+  it('opens the player form in place instead of navigating to the roster', async () => {
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    listPlayersMock.mockResolvedValue([PLAYER])
+
+    renderMore()
+    const card = await screen.findByTestId('your-player')
+
+    // No href to follow. The old failure was silent: the link "worked", it
+    // just landed somewhere else.
+    expect(within(card).queryByRole('link', { name: /view or change/i })).toBeNull()
+
+    await user.click(within(card).getByRole('button', { name: /view or change/i }))
+    expect(await screen.findByRole('dialog')).toHaveTextContent(/Tom Muir/i)
+  })
+
+  it('opens the form for the player whose card was clicked', async () => {
+    // With two children the id has to travel with the click. A single shared
+    // sheet that always opened the first player would pass every test above.
+    const user = userEvent.setup()
+    const sibling = { ...PLAYER, id: 'p-2', full_name: 'Ruby Muir' }
+    useMembershipsMock.mockReturnValue(
+      memberships([
+        ...PARENT,
+        { id: 'm-p2', role: 'parent', team_id: PLAYER.team_id, player_id: 'p-2', club_id: 'club-1' },
+      ]),
+    )
+    listPlayersMock.mockResolvedValue([PLAYER, sibling])
+
+    renderMore()
+    const cards = await screen.findAllByTestId('your-player')
+    expect(cards).toHaveLength(2)
+
+    await user.click(within(cards[1]).getByRole('button', { name: /view or change/i }))
+    expect(await screen.findByRole('dialog')).toHaveTextContent(/Ruby/i)
   })
 })
 
@@ -497,5 +559,59 @@ describe('More — the You card is editable', () => {
 
     const [fields] = updateMyProfileMock.mock.calls[0]
     expect(Object.keys(fields).sort()).toEqual(['firstName', 'lastName', 'phone', 'profileId'])
+  })
+})
+
+// ── The approvals entry point (Jay, 9 Aug 2026) ────────────────────────
+//
+// ⚠️ THIS IS A COACH'S ONLY ROUTE TO THE QUEUE FROM A PHONE. The Admin pill in
+// the tab bar is admin-only AND desktop-only ("hidden desktop:flex"), so
+// without this link a coach standing on a pitch has no way in at all. That is
+// the failure this block exists to catch, and it is invisible in a browser at
+// laptop width.
+describe('More — the approvals link', () => {
+  const COACH_U10 = [{ id: 'm-c', role: 'coach', team_id: 'team-u10', club_id: 'club-1' }]
+  const MANAGER_U10 = [{ id: 'm-m', role: 'manager', team_id: 'team-u10', club_id: 'club-1' }]
+  const MEDIC_U10 = [{ id: 'm-md', role: 'medic', team_id: 'team-u10', club_id: 'club-1' }]
+
+  const approvalsLink = () => screen.queryByRole('link', { name: /waiting to be approved/i })
+
+  it('offers it to a coach', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH_U10))
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+    expect(approvalsLink()).toHaveAttribute('href', '/approvals')
+  })
+
+  it('offers it to a team manager', async () => {
+    useMembershipsMock.mockReturnValue(memberships(MANAGER_U10))
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+    expect(approvalsLink()).toHaveAttribute('href', '/approvals')
+  })
+
+  // Medic is a squad staff role and may EDIT this squad's players. Approval is
+  // deliberately a shorter list — Jay, 9 Aug 2026.
+  it('does not offer it to a medic', async () => {
+    useMembershipsMock.mockReturnValue(memberships(MEDIC_U10))
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+    expect(approvalsLink()).toBeNull()
+  })
+
+  it('does not offer it to a parent', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+    expect(approvalsLink()).toBeNull()
+  })
+
+  // An admin already has the Admin pill in the nav. A second door to the same
+  // screen is clutter, not access.
+  it('does not duplicate it for an admin, who has the Admin pill', async () => {
+    useMembershipsMock.mockReturnValue(memberships(ADMIN))
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+    expect(approvalsLink()).toBeNull()
   })
 })

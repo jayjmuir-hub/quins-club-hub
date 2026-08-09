@@ -545,24 +545,20 @@ describe('Accounts — the approval queue', () => {
     ).toBeInTheDocument()
   })
 
-  // ⚠️ A COACH CANNOT APPROVE. `memb manage` is private.is_admin(club_id),
-  // with no coach clause, so a coach's UPDATE matches zero rows and PostgREST
-  // reports that as a success — which is why approveMembership reads the row
-  // back and throws. The screen has to show that refusal rather than moving
-  // the card as though it had worked. (A coach cannot reach this screen at all
-  // today; this is about the message being right if the gate is ever widened
-  // before the policy is.)
-  it('leaves the row in the queue when the write is refused', async () => {
+  // The refusal now comes from the RPC, which RAISES rather than matching zero
+  // rows — see approveMembership in src/data/members.js. Its sentence is passed
+  // through untouched, so this asserts the row STAYS rather than the wording.
+  it('leaves the row in the queue when the approval is refused', async () => {
     const user = userEvent.setup()
     approveMembershipMock.mockRejectedValue(
-      new Error("We couldn't approve that person. Only a club admin can approve access."),
+      new Error('You can only approve players for your own age groups.'),
     )
     renderAccounts()
 
     const queue = await screen.findByTestId('pending-approvals')
     await user.click(within(queue).getByRole('button', { name: /approve chidi okafor/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/only a club admin/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/your own age groups/i)
     expect(screen.getByTestId('pending-membership')).toBeInTheDocument()
   })
 
@@ -572,5 +568,78 @@ describe('Accounts — the approval queue', () => {
 
     await screen.findByTestId('waiting-for-access')
     expect(screen.queryByTestId('pending-approvals')).not.toBeInTheDocument()
+  })
+
+  // ── The coach / team manager view (Jay, 9 Aug 2026) ──────────────────
+  //
+  // ⚠️ WHAT THE SCREEN OFFERS IS NOT THE BOUNDARY. private.can_approve_team is,
+  // and db/tests/rls-squad-staff-approval.sql proves it live — including that a
+  // parent cannot approve themselves. These tests are about what a coach SEES:
+  // the queue and nothing else, and no misleading numbers.
+  describe('for a coach or team manager', () => {
+    const COACH_U13 = [
+      { id: 'mem-coach', role: 'coach', team_id: TEAM_U13.id, club_id: CLUB_ID, status: 'active' },
+    ]
+    const MANAGER_U13 = [
+      { id: 'mem-mgr', role: 'manager', team_id: TEAM_U13.id, club_id: CLUB_ID, status: 'active' },
+    ]
+
+    it('shows a coach the queue and lets them approve', async () => {
+      const user = userEvent.setup()
+      useMembershipsMock.mockReturnValue({ memberships: COACH_U13, teams: TEAMS })
+      // The database hands a coach only their own squads' pending rows — the
+      // admin's own membership is not among them.
+      listClubMembersMock.mockResolvedValue([HANNAH_PENDING])
+      renderAccounts()
+
+      const queue = await screen.findByTestId('pending-approvals')
+      await user.click(within(queue).getByRole('button', { name: /approve chidi okafor/i }))
+
+      await waitFor(() => expect(approveMembershipMock).toHaveBeenCalledWith(HANNAH_PENDING.id))
+    })
+
+    it('shows a team manager the same thing', async () => {
+      useMembershipsMock.mockReturnValue({ memberships: MANAGER_U13, teams: TEAMS })
+      listClubMembersMock.mockResolvedValue([HANNAH_PENDING])
+      renderAccounts()
+
+      expect(await screen.findByTestId('pending-approvals')).toBeInTheDocument()
+    })
+
+    // ⚠️ MEDIC IS DELIBERATELY EXCLUDED. can_edit_team includes medic — they
+    // may edit players on the squad, which is the point of the role — but
+    // admitting a stranger to a children's squad is not a medical decision.
+    it('refuses a medic, though a medic may edit that very squad', async () => {
+      useMembershipsMock.mockReturnValue({
+        memberships: [{ id: 'mem-medic', role: 'medic', team_id: TEAM_U13.id, club_id: CLUB_ID }],
+        teams: TEAMS,
+      })
+      renderAccounts()
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/not authorised/i)
+    })
+
+    it('refuses a parent of a child in that very squad', async () => {
+      // The case that would make the whole pending design theatre.
+      useMembershipsMock.mockReturnValue({
+        memberships: [
+          { id: 'mem-p', role: 'parent', team_id: TEAM_U13.id, player_id: 'p-x', club_id: CLUB_ID },
+        ],
+        teams: TEAMS,
+      })
+      renderAccounts()
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/not authorised/i)
+    })
+
+    it('tells a coach with an empty queue that it is empty, rather than showing nothing', async () => {
+      useMembershipsMock.mockReturnValue({ memberships: COACH_U13, teams: TEAMS })
+      listClubMembersMock.mockResolvedValue([])
+      renderAccounts()
+
+      // A blank screen reads as broken. The empty state says what will appear
+      // here and when.
+      expect(await screen.findByText(/when a parent registers a player/i)).toBeInTheDocument()
+    })
   })
 })
