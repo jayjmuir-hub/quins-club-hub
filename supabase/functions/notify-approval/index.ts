@@ -5,26 +5,26 @@
 // Jay, 9 Aug 2026: "need emails alerting them and admins of approvals waiting",
 // immediate rather than a daily digest.
 //
-// ══ WHY A TRIGGER AND NOT A CALL FROM THE APP ═══════════════════════════
+// == WHY A TRIGGER AND NOT A CALL FROM THE APP ==
 // The registration itself is a SECURITY DEFINER function
 // (public.register_my_player) reachable by any signed-in stranger with a
 // confirmed email. A notification the CLIENT fires is one the client can skip
-// — not a security hole, but it would make "the club is always told" a claim
+// - not a security hole, but it would make "the club is always told" a claim
 // that depends on the browser finishing a second request. The trigger is on
 // the row.
 //
-// ⚠️ IT MUST NEVER BE ABLE TO FAIL THE REGISTRATION. pg_net.http_post queues
+// !! IT MUST NEVER BE ABLE TO FAIL THE REGISTRATION. pg_net.http_post queues
 // the request and returns an id immediately; it does not wait for a response
 // and cannot raise into the caller's transaction. So a dead endpoint, an
-// expired Resend key or a 500 in here costs an email and nothing else — the
+// expired Resend key or a 500 in here costs an email and nothing else - the
 // parent's player is still registered and still shows in the queue on screen.
 // That ordering is deliberate: the SCREEN is the source of truth, the email is
 // a prompt to go and look at it.
 //
-// ══ SECURITY ════════════════════════════════════════════════════════════
-// ⚠️ MUST be deployed with verify_jwt: false. Postgres calls it with no user
+// == SECURITY ==
+// !! MUST be deployed with verify_jwt: false. Postgres calls it with no user
 // JWT; with verification on, the gateway rejects every call before this code
-// runs and no email is ever sent — silently, because pg_net does not care what
+// runs and no email is ever sent - silently, because pg_net does not care what
 // came back. The same trap the send-email function documents.
 //
 // It is therefore PUBLICLY REACHABLE, and the only thing between the internet
@@ -32,22 +32,22 @@
 // APPROVAL_NOTIFY_SECRET is unset the function refuses every request rather
 // than sending unauthenticated mail.
 //
-// ⚠️ THE REQUEST BODY IS NOT TRUSTED FOR CONTENT. The caller supplies one
+// !! THE REQUEST BODY IS NOT TRUSTED FOR CONTENT. The caller supplies one
 // membership id and nothing else. Every name, address and squad in the email
 // is read back from the database here, with the service role. A body carrying
 // its own "send this text to these addresses" would be an open relay wearing
 // a shared secret.
 //
-// ══ THE VOLUME PROBLEM, STATED RATHER THAN DISCOVERED LATER ═════════════
+// == THE VOLUME PROBLEM, STATED RATHER THAN DISCOVERED LATER ==
 // Resend's free tier is 100 emails/day, 3,000/month.
 //
 // ONE Resend call per registration, with every recipient in `bcc`. Not one per
 // recipient: with two admins and two coaches on a squad that would be four
-// emails per registration, and a 100-player onboarding weekend would be 400 —
+// emails per registration, and a 100-player onboarding weekend would be 400 -
 // four times the daily cap, and the failures would land on whoever registered
 // last. Bcc'd, the same weekend costs 100 sends, which is exactly the cap.
 //
-// ⚠️ SO A BIG ONBOARDING DAY CAN STILL HIT IT. A 429 from Resend is logged and
+// !! SO A BIG ONBOARDING DAY CAN STILL HIT IT. A 429 from Resend is logged and
 // swallowed; the registration is unaffected and the queue on the Accounts
 // screen is unaffected. If the club onboards in one weekend, either stagger it
 // or move Resend to a paid tier first. This is a known ceiling, not a bug to
@@ -63,8 +63,8 @@ const NOTIFY_SECRET = Deno.env.get('APPROVAL_NOTIFY_SECRET') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
-// Where the email sends people. Not a link to the pending row — there is no
-// such URL — but to the screen that lists everything waiting.
+// Where the email sends people. Not a link to the pending row - there is no
+// such URL - but to the screen that lists everything waiting.
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://adhquins-clubhub.com'
 
 /* ---------------- helpers ---------------- */
@@ -77,7 +77,7 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
-// ⚠️ CONSTANT TIME. A plain `a === b` on a secret leaks its length and, in
+// !! CONSTANT TIME. A plain `a === b` on a secret leaks its length and, in
 // principle, its prefix through timing. The cost here is a few microseconds.
 function timingSafeEqual(a: string, b: string): boolean {
   const enc = new TextEncoder()
@@ -105,10 +105,15 @@ async function db(path: string): Promise<any[]> {
   return await response.json()
 }
 
-async function sendMail(bcc: string[], subject: string, html: string): Promise<void> {
+async function sendMail(bcc: string[], subject: string, html: string, text: string): Promise<void> {
   const body: Record<string, unknown> = {
     from: MAIL_FROM,
-    // ⚠️ `to` IS THE SENDER, recipients are in bcc. Resend requires a `to`,
+    // !! BOTH PARTS, ALWAYS. Resend sends multipart/alternative when `text` is
+    // present; HTML-only mail scores worse with filters. This one has to reach
+    // volunteers during an onboarding weekend, so it gets the same treatment as
+    // the auth mail - see the note on plainText below.
+    text,
+    // !! `to` IS THE SENDER, recipients are in bcc. Resend requires a `to`,
     // and putting the first coach there would single them out as the person
     // being asked while everyone else was merely copied. Addressing it to the
     // club makes the ask collective, which is what it is.
@@ -133,9 +138,46 @@ async function sendMail(bcc: string[], subject: string, html: string): Promise<v
     //   403 -> MAIL_FROM's domain is not verified. It must be on
     //          send.adhquins-clubhub.com, NOT the root domain.
     //   429 -> free-tier limit: 100/day, 3,000/month. See the volume note at
-    //          the top of this file — this is a known ceiling.
+    //          the top of this file - this is a known ceiling.
     throw new Error(`Resend failed (${response.status}): ${await response.text()}`)
   }
+}
+
+/**
+ * The plain-text half.
+ *
+ * !! NOT ESCAPED, deliberately - template() runs the same values through
+ * escapeHtml because they land in markup; doing it here would show a reader
+ * `&amp;` in the body of the mail.
+ *
+ * !! AND NO "the button below": there is no button in a plain-text part, and an
+ * instruction pointing at something not present reads as a broken email.
+ */
+function plainText(
+  playerName: string,
+  teamName: string,
+  parentName: string,
+  parentEmail: string,
+): string {
+  return [
+    'ABU DHABI HARLEQUINS',
+    '',
+    'Someone is waiting to be approved',
+    '',
+    `${parentName} has registered ${playerName} in ${teamName}.`,
+    '',
+    "Until someone approves them they can see their own child and the squad's",
+    'fixtures - enough to set availability - and nothing else. Not the squad',
+    "roster, not other families' contact details.",
+    '',
+    `Registered with ${parentEmail}`,
+    '',
+    'Review it in the Club Hub:',
+    `${APP_URL}/approvals`,
+    '',
+    "You're getting this because you're a coach, team manager or admin for this",
+    'age group.',
+  ].join('\n')
 }
 
 function template(playerName: string, teamName: string, parentName: string, parentEmail: string): string {
@@ -151,7 +193,7 @@ function template(playerName: string, teamName: string, parentName: string, pare
       </p>
       <p style="margin:0 0 20px;font-size:14px;line-height:1.55;color:#5c5854;">
         Until someone approves them they can see their own child and the squad's
-        fixtures — enough to set availability — and nothing else. Not the squad
+        fixtures - enough to set availability - and nothing else. Not the squad
         roster, not other families' contact details.
       </p>
       <p style="margin:0 0 20px;font-size:14px;line-height:1.55;color:#5c5854;">
@@ -176,7 +218,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   // Fail closed. An unset secret means every request is refused, rather than
   // the endpoint quietly becoming open to the internet.
   if (!NOTIFY_SECRET) {
-    console.error('APPROVAL_NOTIFY_SECRET is not set — refusing every request.')
+    console.error('APPROVAL_NOTIFY_SECRET is not set - refusing every request.')
     return new Response('not configured', { status: 503 })
   }
 
@@ -195,8 +237,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (!membershipId) return new Response('bad request', { status: 400 })
 
   try {
-    // ── The registration. Everything below is read here, not taken from the
-    //    request body — see the security note at the top.
+    // -- The registration. Everything below is read here, not taken from the
+    //    request body - see the security note at the top.
     const rows = await db(
       `memberships?id=eq.${encodeURIComponent(membershipId)}` +
         '&select=id,status,club_id,team_id,profiles(full_name,email),players(full_name),teams(name)',
@@ -207,19 +249,19 @@ Deno.serve(async (request: Request): Promise<Response> => {
       return new Response('not found', { status: 404 })
     }
 
-    // ⚠️ RE-CHECKED, not assumed from the trigger's WHEN clause. An approval
+    // !! RE-CHECKED, not assumed from the trigger's WHEN clause. An approval
     // racing the notification is unlikely but the email would be actively
-    // wrong — telling four volunteers to go and action something that has
+    // wrong - telling four volunteers to go and action something that has
     // already been actioned.
     if (membership.status !== 'pending') {
       return new Response(JSON.stringify({ skipped: 'no longer pending' }), { status: 200 })
     }
 
-    // ── Who to tell: every admin in the club, plus the coaches and team
+    // -- Who to tell: every admin in the club, plus the coaches and team
     //    managers of THIS squad. Deliberately the same list as
-    //    private.can_approve_team — the people who can act on it.
+    //    private.can_approve_team - the people who can act on it.
     //
-    // ⚠️ NOT medic, matching the approval rule. A medic cannot approve, so an
+    // !! NOT medic, matching the approval rule. A medic cannot approve, so an
     // email asking them to would be an instruction they cannot follow.
     const [admins, squadStaff] = await Promise.all([
       db(
@@ -242,27 +284,30 @@ Deno.serve(async (request: Request): Promise<Response> => {
       // Not an error: a club with no admin and no coach on that squad is a
       // configuration problem, and sending nothing is the correct outcome.
       // Logged because it means somebody's registration will sit unseen.
-      console.error(`no recipients for membership ${membershipId} — nobody will be told`)
+      console.error(`no recipients for membership ${membershipId} - nobody will be told`)
       return new Response(JSON.stringify({ sent: 0 }), { status: 200 })
     }
 
+    // One set of values, both renderings - so the plain-text part, which almost
+    // nobody looks at, cannot drift from the HTML.
+    const playerName = membership.players?.full_name ?? 'A new player'
+    const teamName = membership.teams?.name ?? 'their age group'
+    const parentName = membership.profiles?.full_name?.trim() || 'Someone'
+    const parentEmail = membership.profiles?.email ?? 'an address we could not read'
+
     await sendMail(
       recipients,
-      `Approval needed: ${membership.players?.full_name ?? 'a new player'} in ${membership.teams?.name ?? 'a squad'}`,
-      template(
-        membership.players?.full_name ?? 'A new player',
-        membership.teams?.name ?? 'their age group',
-        membership.profiles?.full_name?.trim() || 'Someone',
-        membership.profiles?.email ?? 'an address we could not read',
-      ),
+      `Approval needed: ${playerName} in ${teamName}`,
+      template(playerName, teamName, parentName, parentEmail),
+      plainText(playerName, teamName, parentName, parentEmail),
     )
 
     return new Response(JSON.stringify({ sent: recipients.length }), { status: 200 })
   } catch (error) {
-    // ⚠️ 500 IS THE END OF IT. pg_net does not retry and nothing is waiting on
+    // !! 500 IS THE END OF IT. pg_net does not retry and nothing is waiting on
     // this response, so the only consequence is that no email went out. The
-    // log line is the ONLY record — read it at Edge Functions → notify-approval
-    // → Logs (the Logs tab, not Invocations; the MCP get_logs query shows only
+    // log line is the ONLY record - read it at Edge Functions -> notify-approval
+    // -> Logs (the Logs tab, not Invocations; the MCP get_logs query shows only
     // the HTTP access log, which is how a 500 went undiagnosed for an hour on
     // 5 Aug).
     console.error('notify-approval failed:', error instanceof Error ? error.message : error)

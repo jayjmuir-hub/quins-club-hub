@@ -8,11 +8,25 @@
 // 403. Root DMARC must also stay RELAXED (`adkim=r; aspf=r`) or subdomain
 // sending fails alignment. Do not tighten it.
 //
-// !! DNS, CHECKED LIVE 9 Aug 2026 AND INCOMPLETE. Resend asks for three
-// records on send.adhquins-clubhub.com; only DKIM was ever published.
-// The SPF TXT and the bounce MX are MISSING, so SPF resolves to `none` for
-// the envelope domain while DMARC says p=quarantine - which is why mail was
-// landing in Yahoo's junk. Add the two records from Resend's own domain page.
+// !! DNS IS COMPLETE AND CORRECT - verified live 9 Aug 2026. All three records
+// are published and Resend reports the domain Verified:
+//
+//   TXT  send.send.adhquins-clubhub.com  v=spf1 include:amazonses.com ~all
+//   MX   send.send.adhquins-clubhub.com  10 feedback-smtp.ap-northeast-1.amazonses.com
+//   TXT  resend._domainkey.send.adhquins-clubhub.com  p=MIGfMA0...
+//
+// !! NOTE THE DOUBLE `send`, because it cost an hour. Resend puts the bounce /
+// envelope domain ONE LEVEL BELOW the sending domain, so a domain of
+// `send.adhquins-clubhub.com` has its MAIL FROM at
+// `send.send.adhquins-clubhub.com`. An earlier pass queried SPF and MX at
+// `send.adhquins-clubhub.com`, got NoAnswer, and reported the records as
+// MISSING - a wrong diagnosis reached by looking in one place and not checking
+// it was the right place. Jay's screenshot of the Resend dashboard is what
+// corrected it.
+//
+// Alignment is fine either way: DKIM signs as send.adhquins-clubhub.com,
+// matching the From domain, and the envelope domain shares the organisational
+// domain, which relaxed DMARC (aspf=r) accepts. DMARC passes on BOTH.
 //
 // !! SECURITY: this endpoint MUST stay deployed with verify_jwt OFF, because
 // Supabase Auth calls it server-to-server with no user JWT - with JWT
@@ -128,12 +142,16 @@ async function verify(request: Request, body: string): Promise<boolean> {
 
 /* ---------------- Resend ---------------- */
 
-async function sendMail(to: string, subject: string, html: string): Promise<void> {
+async function sendMail(to: string, subject: string, html: string, text: string): Promise<void> {
   const body: Record<string, unknown> = {
     from: MAIL_FROM,
     to: [to],
     subject,
     html,
+    // !! BOTH PARTS, ALWAYS. Resend sends multipart/alternative when `text` is
+    // present. HTML-only mail scores worse with filters, and it is also what a
+    // plain-text client or a screen reader falls back to.
+    text,
   }
   // Optional: without it, a reply to a sign-in email vanishes into a mailbox
   // nobody reads, which is worse than no reply address at all.
@@ -171,12 +189,59 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
+const FOOTER =
+  "This link expires shortly and can only be used once. If you didn't ask for it, " +
+  'you can ignore this email - nobody can get into your account without it.'
+
+/**
+ * The plain-text half of every email.
+ *
+ * !! MULTIPART, NOT HTML-ONLY (added 9 Aug 2026). A message with no text/plain
+ * alternative is a small but real spam signal, and it was the last technical
+ * lever left after the link domain and the copy were fixed - the DNS turned
+ * out to be correct all along, so reputation and content are all that remain.
+ *
+ * !! THE VALUES ARE NOT ESCAPED HERE, and that is the point rather than an
+ * oversight. layout() runs them through escapeHtml because they land in
+ * markup; doing the same in plain text would show a reader `&amp;` and
+ * `&quot;` in the body of the mail.
+ *
+ * !! NO COPY MAY SAY "the button below". There is no button in a plain-text
+ * part, and an instruction that refers to something not present reads as a
+ * broken email. Every intro was reworded to "the link below", which is true in
+ * both halves - the HTML control is a link wearing a button's clothes.
+ *
+ * Returned by layout() alongside the HTML so both are produced from one set of
+ * inputs. Two functions taking the same arguments would be two things to
+ * remember to change, and the plain-text one - which almost nobody looks at -
+ * would be the one left stale.
+ */
+function plainText(heading: string, intro: string, actionUrl: string, actionLabel: string): string {
+  return [
+    'ABU DHABI HARLEQUINS',
+    '',
+    heading,
+    '',
+    intro,
+    '',
+    `${actionLabel}:`,
+    actionUrl,
+    '',
+    FOOTER,
+  ].join('\n')
+}
+
 // Deliberately plain HTML: no images, no external CSS, no tracking pixel.
 // This is a sign-in email - it should look like one, load instantly on a phone
 // with one bar of signal, and give a spam filter nothing to dislike.
-function layout(heading: string, intro: string, actionUrl: string, actionLabel: string): string {
+function layout(
+  heading: string,
+  intro: string,
+  actionUrl: string,
+  actionLabel: string,
+): { html: string; text: string } {
   const url = escapeHtml(actionUrl)
-  return `<!doctype html>
+  const html = `<!doctype html>
 <html>
   <body style="margin:0;padding:24px;background:#f5f4f3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;">
     <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:14px;padding:28px;">
@@ -191,11 +256,13 @@ function layout(heading: string, intro: string, actionUrl: string, actionLabel: 
       </p>
       <p style="margin:0 0 24px;font-size:12px;line-height:1.5;word-break:break-all;color:#5c5854;">${url}</p>
       <p style="margin:0;padding-top:16px;border-top:1px solid #e6e3e1;font-size:12px;line-height:1.6;color:#77726e;">
-        This link expires shortly and can only be used once. If you didn't ask for it, you can ignore this email - nobody can get into your account without it.
+        ${escapeHtml(FOOTER)}
       </p>
     </div>
   </body>
 </html>`
+
+  return { html, text: plainText(heading, intro, actionUrl, actionLabel) }
 }
 
 type EmailData = {
@@ -205,7 +272,7 @@ type EmailData = {
   site_url: string
 }
 
-function render(email: string, data: EmailData): { subject: string; html: string } {
+function render(email: string, data: EmailData): { subject: string; html: string; text: string } {
   // == THE LINK POINTS AT THE CLUB'S OWN DOMAIN (changed 9 Aug 2026) ==
   //
   // It used to point at `https://<project-ref>.supabase.co/auth/v1/verify`.
@@ -261,9 +328,9 @@ function render(email: string, data: EmailData): { subject: string; html: string
     case 'signup':
       return {
         subject: 'Confirm your email address',
-        html: layout(
+        ...layout(
           'Confirm your email address',
-          `Tap the button below to confirm ${email} and finish setting up your Quins Club Hub account. You'll sign in with the password you just chose.`,
+          `Confirm ${email} to finish setting up your Quins Club Hub account. You'll sign in with the password you just chose.`,
           verifyUrl,
           'Confirm my email',
         ),
@@ -278,9 +345,9 @@ function render(email: string, data: EmailData): { subject: string; html: string
     case 'email':
       return {
         subject: 'Your Quins Club Hub sign-in link',
-        html: layout(
+        ...layout(
           'Sign in to Quins Club Hub',
-          `Tap the button below to sign in as ${email}.`,
+          `Use the link below to sign in as ${email}.`,
           verifyUrl,
           'Sign in',
         ),
@@ -288,9 +355,9 @@ function render(email: string, data: EmailData): { subject: string; html: string
     case 'recovery':
       return {
         subject: 'Get back into Quins Club Hub',
-        html: layout(
+        ...layout(
           'Get back into your account',
-          `Use the button below to get back into Quins Club Hub as ${email}.`,
+          `Use the link below to get back into Quins Club Hub as ${email}.`,
           verifyUrl,
           'Continue',
         ),
@@ -298,7 +365,7 @@ function render(email: string, data: EmailData): { subject: string; html: string
     case 'email_change':
       return {
         subject: 'Confirm your new email address',
-        html: layout(
+        ...layout(
           'Confirm your new email address',
           `Confirm that ${email} should be the address you use for Quins Club Hub.`,
           verifyUrl,
@@ -308,7 +375,7 @@ function render(email: string, data: EmailData): { subject: string; html: string
     case 'invite':
       return {
         subject: "You've been invited to Quins Club Hub",
-        html: layout(
+        ...layout(
           "You've been invited",
           'Abu Dhabi Harlequins has invited you to Quins Club Hub - the club schedule, roster and availability in one place.',
           verifyUrl,
@@ -318,9 +385,9 @@ function render(email: string, data: EmailData): { subject: string; html: string
     default:
       return {
         subject: 'Quins Club Hub',
-        html: layout(
+        ...layout(
           'Quins Club Hub',
-          'Use the button below to continue.',
+          'Use the link below to continue.',
           verifyUrl,
           'Continue',
         ),
@@ -374,8 +441,8 @@ Deno.serve(async (request) => {
     const data: EmailData = payload.email_data
     if (!email || !data?.token_hash) throw new Error('Malformed hook payload')
 
-    const { subject, html } = render(email, data)
-    await sendMail(email, subject, html)
+    const { subject, html, text } = render(email, data)
+    await sendMail(email, subject, html, text)
 
     // An empty object is the hook's "handled, don't send anything yourself".
     return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
