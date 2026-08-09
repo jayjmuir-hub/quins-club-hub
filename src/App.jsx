@@ -13,6 +13,7 @@ import AcceptInvite from './screens/AcceptInvite.jsx'
 import Privacy from './screens/Privacy.jsx'
 import DeleteAccount from './screens/DeleteAccount.jsx'
 import ResetPassword from './screens/ResetPassword.jsx'
+import AuthConfirm from './screens/AuthConfirm.jsx'
 
 // Routing (admin-dashboard plan, 2026-08-05).
 //
@@ -86,6 +87,17 @@ export default function App() {
             AppShell — a parent with no squad yet would otherwise be shown the
             request-access gate instead of the form they were sent here for. */}
         <Route path="/reset-password" element={<ResetPassword />} />
+
+        {/* Where every emailed auth link now lands (9 Aug 2026). PUBLIC and
+            genuinely unauthenticated — the whole point is that it runs BEFORE
+            there is a session, redeems the token_hash, and only then decides
+            where to send the person.
+
+            ⚠️ It must sit outside <Authed>. Inside, the auth gate would bounce
+            a not-yet-confirmed visitor to sign-in and the token would never be
+            redeemed — which is the same class of mistake /reset-password and
+            /accept-invite are both already positioned to avoid. */}
+        <Route path="/auth/confirm" element={<AuthConfirm />} />
 
         {/* SIGNED-IN */}
         <Route element={<Authed />}>

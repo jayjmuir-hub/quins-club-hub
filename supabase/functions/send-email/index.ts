@@ -1,66 +1,50 @@
-// Auth email sender — replaces Supabase's built-in mail via the Send Email
+// Auth email sender - replaces Supabase's built-in mail via the Send Email
 // Hook, so sign-in links come from the club rather than from Supabase.
 //
-// WHY THIS EXISTS AND NOT CUSTOM SMTP: Supabase's custom SMTP is
-// password-only, and doesn't fit the free sending providers cleanly either
-// way — this hook approach sends over plain HTTPS, no SMTP credentials
-// anywhere.
+// PROVIDER: Resend, via a single HTTPS POST with an API key.
 //
-// PROVIDER: Resend, via a single HTTPS POST with an API key
-// (`Authorization: Bearer re_...`). Reinstated 6 Aug 2026, reversing the 5 Aug
-// switch to Microsoft Graph.
-//
-// ⚠️ WHY IT WAS REVERSED, so nobody "fixes" it back: the Microsoft path was
-// built correctly and works right up to the point Exchange refuses to let the
-// message leave. Every send failed with
-//   550 5.7.708 Access denied, traffic not accepted from this IP
-// which is Microsoft's outbound restriction on a BRAND-NEW tenant, applied
-// before the tenant had ever sent anything. Graph returns 200; the message
-// dies after Submit. No setting fixes it — only a support ticket, raised
-// 5 Aug and still open. The result was worse than what it replaced: Resend
-// delivered (to spam), Microsoft delivered nothing at all.
-//
-// ⚠️ Sending as `admin@<tenant>.onmicrosoft.com` is NOT a workaround, and was
-// considered and rejected on 6 Aug. 5.7.708 is scoped to the tenant's outbound
-// IP, not the domain, so it would not route around the block — and since
-// mid-2025 Microsoft caps MOERA (`*.onmicrosoft.com`) outbound to external
-// recipients at 100 messages per TENANT per rolling 24 hours (NDR 550 5.7.236),
-// fully rolled out by June 2026. One invite wave to 300 parents would exhaust
-// a day's quota for the whole tenant.
-//
-// ⚠️ MAIL_FROM MUST BE ON `send.adhquins-clubhub.com`, NOT the root domain.
+// !! MAIL_FROM MUST BE ON `send.adhquins-clubhub.com`, NOT the root domain.
 // The subdomain is what is verified in Resend; a root-domain address returns
 // 403. Root DMARC must also stay RELAXED (`adkim=r; aspf=r`) or subdomain
-// sending fails alignment — verified still relaxed on 6 Aug. Do not tighten it.
+// sending fails alignment. Do not tighten it.
 //
-// The Microsoft Graph implementation (`getToken` + `sendMail` against
-// `login.microsoftonline.com` / `graph.microsoft.com`) is in git history at
-// `a9e8492` if the block is ever lifted and it is wanted back. ⚠️ Take the
-// PROVIDER half only — the signature verification and the site_url
-// normalisation below are shared, current, and were each an expensive bug.
+// !! DNS, CHECKED LIVE 9 Aug 2026 AND INCOMPLETE. Resend asks for three
+// records on send.adhquins-clubhub.com; only DKIM was ever published.
+// The SPF TXT and the bounce MX are MISSING, so SPF resolves to `none` for
+// the envelope domain while DMARC says p=quarantine - which is why mail was
+// landing in Yahoo's junk. Add the two records from Resend's own domain page.
 //
-// It also removes the reason this was urgent: Supabase's built-in email
-// service is capped at 2 messages per hour with no delivery SLA, which cannot
-// onboard a club of 300.
-//
-// ⚠️ SECURITY: this endpoint MUST stay deployed with verify_jwt OFF, because
-// Supabase Auth calls it server-to-server with no user JWT — with JWT
+// !! SECURITY: this endpoint MUST stay deployed with verify_jwt OFF, because
+// Supabase Auth calls it server-to-server with no user JWT - with JWT
 // verification on, every hook call is rejected at the gateway before reaching
 // this code and NOBODY CAN SIGN IN. It is therefore PUBLICLY REACHABLE, and
 // the ONLY thing standing between the internet and "send mail as the club to
 // any address" is the signature check below. If SEND_EMAIL_HOOK_SECRET is
 // unset the function refuses every request rather than sending unverified
-// mail — fail closed, always.
+// mail - fail closed, always.
 //
-// ⚠️ Deploying via the Supabase MCP `deploy_edge_function` tool DEFAULTS
+// !! Deploying via the Supabase MCP `deploy_edge_function` tool DEFAULTS
 // verify_jwt back to TRUE. It was silently re-enabled that way on 6 Aug and had
 // to be redeployed. Always pass verify_jwt: false explicitly, and read it back
 // from the deploy response before assuming the deploy was clean.
+//
+// !! WHY NOT MICROSOFT GRAPH, so nobody "fixes" it back: that path was built
+// correctly and works right up to the point Exchange refuses to let the
+// message leave. Every send failed with
+//   550 5.7.708 Access denied, traffic not accepted from this IP
+// which is Microsoft's outbound restriction on a BRAND-NEW tenant, applied
+// before the tenant had ever sent anything. Graph returns 200; the message
+// dies after Submit. No setting fixes it. The implementation is in git history
+// at `a9e8492` if the block is ever lifted.
 
 const HOOK_SECRET = Deno.env.get('SEND_EMAIL_HOOK_SECRET') ?? ''
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const MAIL_FROM = Deno.env.get('MAIL_FROM') ?? ''
 const REPLY_TO = Deno.env.get('REPLY_TO') ?? ''
+// Where the app lives. Every link in every auth email is built on this, NOT on
+// Supabase's site_url - see the note in render(). Falls back to production so
+// an unset variable cannot put the project ref back in front of people.
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://adhquins-clubhub.com'
 
 // Replay window for the webhook timestamp. Standard Webhooks recommends five
 // minutes; a captured request older than this is refused even with a valid
@@ -112,7 +96,7 @@ async function verify(request: Request, body: string): Promise<boolean> {
   const age = Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp))
   if (!Number.isFinite(age) || age > TOLERANCE_SECONDS) return false
 
-  // Supabase's Send Email Hook secret is shown as `v1,whsec_<base64>` — a
+  // Supabase's Send Email Hook secret is shown as `v1,whsec_<base64>` - a
   // Standard Webhooks version tag ("v1,") in front of the usual "whsec_"
   // prefix. Stripping only a leading "whsec_" (the plain Standard Webhooks
   // format) leaves "v1," on the front, which corrupts the base64 and makes
@@ -166,7 +150,7 @@ async function sendMail(to: string, subject: string, html: string): Promise<void
 
   if (!response.ok) {
     // The response body is included because, unlike the Graph token call, it
-    // carries no credential material — only a reason. The status alone is
+    // carries no credential material - only a reason. The status alone is
     // usually enough:
     //   401 -> wrong or revoked RESEND_API_KEY
     //   403 -> MAIL_FROM's domain isn't verified in Resend. Check it is on
@@ -188,7 +172,7 @@ function escapeHtml(value: string): string {
 }
 
 // Deliberately plain HTML: no images, no external CSS, no tracking pixel.
-// This is a sign-in email — it should look like one, load instantly on a phone
+// This is a sign-in email - it should look like one, load instantly on a phone
 // with one bar of signal, and give a spam filter nothing to dislike.
 function layout(heading: string, intro: string, actionUrl: string, actionLabel: string): string {
   const url = escapeHtml(actionUrl)
@@ -207,7 +191,7 @@ function layout(heading: string, intro: string, actionUrl: string, actionLabel: 
       </p>
       <p style="margin:0 0 24px;font-size:12px;line-height:1.5;word-break:break-all;color:#5c5854;">${url}</p>
       <p style="margin:0;padding-top:16px;border-top:1px solid #e6e3e1;font-size:12px;line-height:1.6;color:#77726e;">
-        This link expires shortly and can only be used once. If you didn't ask for it, you can ignore this email — nobody can get into your account without it.
+        This link expires shortly and can only be used once. If you didn't ask for it, you can ignore this email - nobody can get into your account without it.
       </p>
     </div>
   </body>
@@ -222,34 +206,81 @@ type EmailData = {
 }
 
 function render(email: string, data: EmailData): { subject: string; html: string } {
-  // The hook hands over a token_hash, not a finished link — the URL has to be
-  // assembled here. Getting this wrong produces an email whose button silently
-  // fails, so it is built once, in one place.
+  // == THE LINK POINTS AT THE CLUB'S OWN DOMAIN (changed 9 Aug 2026) ==
   //
-  // BUG FIXED 5 Aug 2026: `site_url` arrives with `/auth/v1` ALREADY on the
-  // end, so appending `/auth/v1/verify` produced `/auth/v1/auth/v1/verify`.
-  // That path misses the API gateway's route exemption for verify links, so
-  // instead of signing anyone in it answered
-  //   {"message":"No API key found in request"}
-  // Every sign-in email sent between the hook going live and this fix had a
-  // dead button. Normalise the base first so it is correct whichever shape
-  // Supabase sends.
-  const base = data.site_url.replace(/\/+$/, '').replace(/\/auth\/v1$/, '')
+  // It used to point at `https://<project-ref>.supabase.co/auth/v1/verify`.
+  // That worked, and it cost us twice:
+  //
+  //   1. SPAM. The mail is FROM send.adhquins-clubhub.com and every link in it
+  //      pointed at supabase.co. Sender domain != link domain is a textbook
+  //      phishing signature, and Gmail, Outlook and Yahoo all weight it
+  //      heavily. A real confirmation landed in Yahoo's junk on 9 Aug.
+  //   2. TRUST. The project ref reads as `lusmshimxdcxpnrktlgz` - precisely
+  //      the kind of hostname people are taught not to click.
+  //
+  // !! NOTHING EVER FORCED THE OLD SHAPE. The hook hands over a `token_hash`,
+  // not a finished URL, so the destination was always ours to choose. The link
+  // now goes to /auth/confirm on the app's own domain, which redeems the token
+  // with verifyOtp and then routes the person onward. See
+  // src/screens/AuthConfirm.jsx.
+  //
+  // !! APP_URL, NOT `site_url`. Supabase's site_url is the API origin
+  // (`https://<ref>.supabase.co/auth/v1`) - using it here is what put the
+  // project ref in front of people in the first place. If APP_URL is unset the
+  // fallback is the production domain rather than the Supabase one, so a
+  // missing env var can never silently reintroduce the bug this replaced.
+  //
+  // !! `next`, NOT `redirect_to`. AuthConfirm validates it as a same-origin
+  // PATH before redirecting - see safeNext() there. A link on the club's own
+  // domain that signs someone in and then bounces them anywhere the URL says
+  // would be an open redirect wearing the club's reputation.
+  //
+  // KEPT FOR THE RECORD - the bug the old line carried, in case anyone ever
+  // reinstates a direct verify URL: `site_url` arrives with `/auth/v1` ALREADY
+  // on the end, so appending `/auth/v1/verify` produced
+  // `/auth/v1/auth/v1/verify`. That path misses the API gateway's route
+  // exemption and answered `{"message":"No API key found in request"}`. Every
+  // sign-in email sent between the hook going live and 5 Aug had a dead button.
+  const appBase = (APP_URL || 'https://adhquins-clubhub.com').replace(/\/+$/, '')
   const verifyUrl =
-    `${base}/auth/v1/verify` +
-    `?token=${encodeURIComponent(data.token_hash)}` +
+    `${appBase}/auth/confirm` +
+    `?token_hash=${encodeURIComponent(data.token_hash)}` +
     `&type=${encodeURIComponent(data.email_action_type)}` +
-    `&redirect_to=${encodeURIComponent(data.redirect_to)}`
+    `&next=${encodeURIComponent(data.redirect_to || '/')}`
 
   switch (data.email_action_type) {
+    // !! SIGNUP IS ITS OWN TEMPLATE SINCE 9 Aug 2026. It used to share the
+    // magic-link one, which was correct when magic links WERE the sign-in
+    // method - and became wrong the moment password auth landed on 8 Aug and
+    // SHOW_PASSWORDLESS was switched off. Every parent who created an account
+    // with a password was then told, by name, "you won't need a password".
+    //
+    // Jay spotted it in a real email during the pilot preparation. It is also
+    // poor for deliverability: "you won't need a password" is exactly the
+    // phrasing credential-phishing uses.
     case 'signup':
+      return {
+        subject: 'Confirm your email address',
+        html: layout(
+          'Confirm your email address',
+          `Tap the button below to confirm ${email} and finish setting up your Quins Club Hub account. You'll sign in with the password you just chose.`,
+          verifyUrl,
+          'Confirm my email',
+        ),
+      }
+
+    // The passwordless paths. Still reachable server-side, and still correct
+    // wording FOR THEM - SHOW_PASSWORDLESS in src/screens/Login.jsx hides the
+    // button that starts this flow, but the flow itself was mothballed rather
+    // than deleted (Jay's ruling, 8 Aug) and the code must stay honest about
+    // what it does if it is ever switched back on.
     case 'magiclink':
     case 'email':
       return {
         subject: 'Your Quins Club Hub sign-in link',
         html: layout(
           'Sign in to Quins Club Hub',
-          `Tap the button below to sign in as ${email}. You won't need a password.`,
+          `Tap the button below to sign in as ${email}.`,
           verifyUrl,
           'Sign in',
         ),
@@ -279,7 +310,7 @@ function render(email: string, data: EmailData): { subject: string; html: string
         subject: "You've been invited to Quins Club Hub",
         html: layout(
           "You've been invited",
-          'Abu Dhabi Harlequins has invited you to Quins Club Hub — the club schedule, roster and availability in one place.',
+          'Abu Dhabi Harlequins has invited you to Quins Club Hub - the club schedule, roster and availability in one place.',
           verifyUrl,
           'Accept the invitation',
         ),
