@@ -726,3 +726,39 @@ describe('Dashboard — quick actions', () => {
     expect(screen.getByRole('link', { name: /team list/i })).toHaveAttribute('href', '/roster')
   })
 })
+
+// ── Mobile spacing above Quick actions ─────────────────────────────────
+//
+// Jay, from a phone, 9 Aug 2026: "the training event overlaps with the quick
+// actions area".
+//
+// ⚠️ jsdom APPLIES NO CSS AND HAS NO LAYOUT, so nothing in this file can see
+// the bug or prove the fix. What follows pins the CLASS TOKENS that produce
+// the behaviour once real CSS applies, and the reasoning lives here so a
+// future tidy-up that removes them has to argue with it.
+//
+// THE MEASUREMENT, taken with Playwright at 390px against the harness:
+//     before   gap above the "Quick actions" heading = 0px
+//     after    gap = 18px, matching every other block on the screen
+//     desktop  unchanged either way
+//
+// THE CAUSE. BlockTitle carries `first:mt-0` so the two COLUMN headings line
+// up when the dashboard is side by side. "Quick actions" is the first child of
+// the second column, so it takes that reset — right on desktop, wrong once the
+// columns stack, where it left the heading flush against the Upcoming card.
+describe('Dashboard — the second column needs its own gap on mobile', () => {
+  it('separates the quick-actions column from Upcoming below the desktop breakpoint', async () => {
+    renderDashboard()
+    const quickCard = await screen.findByTestId('quick-actions')
+
+    // The wrapper is the heading's grandparent: Card -> div(column).
+    const column = quickCard.parentElement
+    const classes = column.className
+
+    // ⚠️ BOTH TOKENS OR NEITHER. mt-[18px] alone would double the gap on
+    // desktop, where the columns are side by side and first:mt-0 already
+    // handles it; desktop:mt-0 alone does nothing.
+    expect(classes).toContain('mt-[18px]')
+    expect(classes).toContain('desktop:mt-0')
+  })
+})

@@ -543,7 +543,16 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div>
+        {/* ⚠️ mt-[18px] ON MOBILE ONLY, and it is not decoration.
+            BlockTitle carries `first:mt-0` so the two COLUMN headings line up
+            on desktop. "Quick actions" is the first child of this div, so it
+            gets that reset — correct side by side, wrong once the columns
+            stack, where it left the heading flush against the bottom of the
+            Upcoming card with ZERO separation. Measured at 390px: 0px gap,
+            against 18px everywhere else on the screen. Reported by Jay from a
+            phone as "the training event overlaps with the quick actions area".
+            desktop:mt-0 hands the spacing back to first:mt-0 at width. */}
+        <div className="mt-[18px] desktop:mt-0">
           <BlockTitle>Quick actions</BlockTitle>
           <QuickActions canEdit={canEdit} readOnlyRole={readOnlyRole} />
 
