@@ -3,6 +3,8 @@ import AccessBuilder from '../components/AccessBuilder.jsx'
 import Badge from '../components/Badge.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
+import PhoneInput from '../components/PhoneInput.jsx'
+import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import {
   approveMembership,
@@ -11,7 +13,7 @@ import {
   listClubMembers,
   listPendingProfiles,
   updateMembershipRole,
-  updateProfileName,
+  updateMemberProfile,
 } from '../data/members.js'
 import {
   dismissAccessRequest,
@@ -23,6 +25,7 @@ import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canApproveAnything, isAdmin } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
+import { joinPhone, splitPhone } from '../lib/phone.js'
 
 // Admin Accounts screen (design spec 2026-08-03 §2): view and edit who has
 // access to the club — display name, role, age group, and revoking access.
@@ -158,6 +161,10 @@ const NO_CLUB_KNOWN =
 // parent cannot approve THEMSELVES.
 const PENDING_APPROVAL_NOTE =
   'Parents add their own player and land here. Until you approve them they can see their own child and the squad’s fixtures — enough to set availability — and nothing else: not the squad roster, not other families’ contact details. Approving gives them the same view as everyone else in that age group.'
+
+const SHEET_LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
+const SHEET_INPUT =
+  'w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
 
 function NotAuthorised() {
   return (
@@ -316,6 +323,107 @@ function PendingApprovals({ members, teamsById, rowState, onApprove }) {
   )
 }
 
+/**
+ * Name and phone for ONE person, as an admin sees them.
+ *
+ * ⚠️ EMAIL IS RENDERED AND NOT EDITABLE, and that is a database fact rather
+ * than a UI preference. It is the login identity, and the column grants for
+ * `authenticated` (db/migrations/20260808_profile_phone_and_column_grants.sql)
+ * are an allow-list that excludes it — an update including `email` fails the
+ * WHOLE statement, so a field for it would break saving the name as well.
+ * That allow-list exists because RLS grants ROWS, not COLUMNS, and without it
+ * anyone could rewrite profiles.email and desync it from the address they
+ * actually sign in with. Which is the address an admin reads on this very
+ * screen when deciding whether to approve a stranger.
+ *
+ * ⚠️ FIRST AND FAMILY NAME, NOT `full_name`. The screen used to edit the
+ * legacy single column; full_name is rebuilt from these two by the
+ * profiles_sync_name trigger. Editing the derived value directly is how the
+ * two drift apart.
+ */
+function PersonDetailsForm({ group, state, onChange, onSave }) {
+  const draft = state ?? {}
+
+  return (
+    <div>
+      <label className={SHEET_LABEL} htmlFor="person-first-name">
+        First name
+      </label>
+      <input
+        id="person-first-name"
+        type="text"
+        value={draft.firstName ?? ''}
+        disabled={Boolean(draft.saving)}
+        onChange={(event) => onChange({ firstName: event.target.value, saved: false })}
+        className={SHEET_INPUT}
+      />
+
+      <label className={`${SHEET_LABEL} mt-3.5`} htmlFor="person-last-name">
+        Family name
+      </label>
+      <input
+        id="person-last-name"
+        type="text"
+        value={draft.lastName ?? ''}
+        disabled={Boolean(draft.saving)}
+        onChange={(event) => onChange({ lastName: event.target.value, saved: false })}
+        className={SHEET_INPUT}
+      />
+
+      <div className="mt-3.5">
+        {/* The same split control the rest of the app uses, so an admin typing
+            a number here produces the identical E.164 string a parent typing it
+            on /more would — and PhoneInput's own "that doesn't look right"
+            warning comes with it, free. It renders its own label; a second one
+            here would be announced twice. */}
+        <PhoneInput
+          id="person-phone"
+          country={draft.phoneCountry ?? splitPhone('').country}
+          national={draft.phoneNational ?? ''}
+          disabled={Boolean(draft.saving)}
+          onCountryChange={(value) => onChange({ phoneCountry: value, saved: false })}
+          onNationalChange={(value) => onChange({ phoneNational: value, saved: false })}
+        />
+      </div>
+
+      <div className="mt-3.5">
+        <span className={SHEET_LABEL}>Email</span>
+        <p data-testid="sheet-email" className="text-[14px] font-semibold text-ink">
+          {group.email ?? 'No email on file'}
+        </p>
+        <p className={`mt-1 text-[12px] leading-relaxed ${MUTED_ON_PAPER}`}>
+          This is the address they sign in with. It can&apos;t be changed here — they
+          change it themselves, or an admin does it in Supabase.
+        </p>
+      </div>
+
+      {draft.error && (
+        <p role="alert" className="mt-3 text-[12.5px] font-semibold text-brand-deep">
+          {draft.error}
+        </p>
+      )}
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          disabled={Boolean(draft.saving)}
+          onClick={onSave}
+          className="rounded-[9px] bg-brand px-3.5 py-2 text-[13px] font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+        >
+          {draft.saving ? 'Saving\u2026' : 'Save details'}
+        </button>
+        {/* Said out loud, because the sheet stays open after a save and
+            otherwise nothing on screen changes to confirm it worked. */}
+        {draft.saved && !draft.saving && (
+          <span role="status" className={`text-[12.5px] font-semibold ${MUTED_ON_PAPER}`}>
+            Saved
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Accounts() {
   const { memberships, teams } = useMemberships()
   const { user } = useAuth()
@@ -352,8 +460,23 @@ export default function Accounts() {
   // "really revoke?" confirm step. The confirm is an inline state rather than
   // window.confirm — this project does not trigger browser modal dialogs.
   const [rowState, setRowState] = useState({})
-  // Per-profile name editing, keyed by profile id.
-  const [nameEdit, setNameEdit] = useState({})
+  // ⚠️ THE INLINE NAME EDITOR IS GONE, and so is its state and its writer.
+  // It wrote the LEGACY `full_name` column directly; the sheet writes
+  // first_name and last_name, and full_name is rebuilt from those two by the
+  // profiles_sync_name trigger. Keeping both would have left two ways to set a
+  // name, one of them editing the derived value — which is exactly how the two
+  // drift apart. `updateProfileName` still exists in src/data/members.js with
+  // its own tests; nothing in the app calls it any more.
+  //
+  // An earlier draft of this change kept saveName "in case", with a comment
+  // claiming it was still exercised. It was not: a review found no control
+  // that could reach it.
+  // Which person's Edit sheet is open, keyed the same way groups are.
+  const [editingKey, setEditingKey] = useState(null)
+  // Draft first name / family name / phone per person, keyed by group key.
+  // Seeded when the sheet opens, not on mount: seeding all of them would build
+  // a draft for every member of the club on every render of this screen.
+  const [profileEdit, setProfileEdit] = useState({})
   // Per-grant-form state, keyed by profile id for a waiting person and by
   // `add:<profile id>` for the "Add access" builder on an existing person:
   // whether the insert is in flight, and the last refusal. WHAT is being
@@ -482,6 +605,58 @@ export default function Accounts() {
 
   const groups = groupByProfile(activeMembers)
   const isFirstLoad = loading && members.length === 0
+
+  // ⚠️ LOOKED UP FROM `groups` EVERY RENDER RATHER THAN HELD IN STATE. The
+  // sheet must show what the list shows: saveProfileDetails patches `members`,
+  // groups is derived from it, and a snapshot taken when the sheet opened would
+  // keep displaying the name that was there before the save.
+  const editingGroup = editingKey ? groups.find((g) => g.key === editingKey) ?? null : null
+  // ⚠️ ITS OWN BINDING, and the reason is a crash that shipped in the first
+  // draft of the sheet. The access rows carry aria-labels built from
+  // `displayName`, and when they lived on the list card that name came from
+  // `const displayName = group.name ?? …` INSIDE the groups.map callback.
+  // Moving the rows into the sheet moved them out of that closure, where
+  // nothing declared it — React threw ReferenceError and unmounted the whole
+  // screen, so clicking any account blanked the page. Caught by a test, not by
+  // reading it back.
+  const editingName = editingGroup?.name ?? 'Unnamed member'
+
+  /**
+   * Opens the sheet AND seeds the draft from the row.
+   *
+   * ⚠️ SEEDED HERE, NOT IN AN EFFECT AND NOT ON MOUNT. An effect keyed on
+   * editingKey would run after the first paint, so the fields would flash
+   * empty and then fill — which on a slow phone reads as "the club has no
+   * phone number for this person". Seeding every group on mount would instead
+   * build a draft for every member of the club on every render of this screen.
+   *
+   * The existing draft is kept if there is one, so re-opening a sheet the
+   * admin closed mid-edit does not silently discard what they typed.
+   */
+  function openEditor(group) {
+    setProfileEdit((prev) => {
+      if (prev[group.key]) return prev
+      const profile = group.memberships[0]?.profiles ?? {}
+      const split = splitPhone(profile.phone ?? '')
+      return {
+        ...prev,
+        [group.key]: {
+          // Falls back to splitting full_name only when first_name is empty —
+          // the rows that predate the first/last columns. Everything after
+          // that reads the real columns.
+          firstName: profile.first_name ?? (group.name ?? '').split(' ')[0] ?? '',
+          lastName:
+            profile.last_name ?? (group.name ?? '').split(' ').slice(1).join(' ') ?? '',
+          phoneCountry: split.country,
+          phoneNational: split.national,
+          saving: false,
+          error: null,
+          saved: false,
+        },
+      }
+    })
+    setEditingKey(group.key)
+  }
 
   // THE subtraction. listPendingProfiles() returns everyone the admin can
   // read; only the ids with no membership row are actually waiting. The
@@ -766,42 +941,85 @@ export default function Accounts() {
     })
   }
 
-  async function saveName(group) {
-    const draft = nameEdit[group.key]
-    if (!draft) return
+  /**
+   * Saves the three things an admin may change about someone else.
+   *
+   * ⚠️ updateMemberProfile, NOT updateMyProfile. The difference is one column:
+   * updateMyProfile also writes `name_confirmed_at`, which records THE PERSON
+   * STATING THEIR OWN NAME and is what stops NamePrompt asking them again. An
+   * admin typing a name here is not that, and writing it would silence a
+   * question that should still be asked.
+   */
+  async function saveProfileDetails(group) {
+    const draft = profileEdit[group.key]
+    if (!draft || !group.profileId) return
 
-    setNameEdit((prev) => ({ ...prev, [group.key]: { ...draft, saving: true, error: null } }))
+    // ⚠️ CHECKED HERE AS WELL AS IN updateMemberProfile, and not as belt and
+    // braces. `full_name` is rebuilt from first + last by the
+    // profiles_sync_name trigger, so a blank first name renders as an account
+    // with no name ANYWHERE in the app — including in the approval queue, where
+    // "No name yet" is what a coach is asked to judge a stranger by.
+    //
+    // Client-side because every other form in this app refuses the obvious
+    // mistake without spending a round trip on it, and because the data layer's
+    // message ("Enter a first name.") is the one shown either way.
+    if (!String(draft.firstName ?? '').trim()) {
+      setProfileEdit((prev) => ({
+        ...prev,
+        [group.key]: { ...prev[group.key], saving: false, saved: false, error: 'Enter a first name.' },
+      }))
+      return
+    }
+
+    setProfileEdit((prev) => ({
+      ...prev,
+      [group.key]: { ...draft, saving: true, error: null, saved: false },
+    }))
+
     try {
-      const updated = await updateProfileName({
+      const updated = await updateMemberProfile({
         profileId: group.profileId,
-        fullName: draft.value,
+        firstName: draft.firstName,
+        lastName: draft.lastName,
+        phone: joinPhone(draft.phoneCountry, draft.phoneNational),
       })
-      // One profile, potentially several membership rows — the new name has
-      // to land on every one of them, which is exactly why the name lives on
-      // profiles rather than on memberships.
+
+      // One profile, potentially several membership rows — the new details
+      // have to land on every one of them, which is exactly why they live on
+      // profiles rather than on memberships. Every membership row for this profile carries the same embedded profile object, so all of them are patched.
       setMembers((prev) =>
         prev.map((member) =>
           member.profile_id === group.profileId
-            ? { ...member, profiles: { ...member.profiles, full_name: updated.full_name } }
+            ? {
+                ...member,
+                profiles: {
+                  ...member.profiles,
+                  full_name: updated.full_name,
+                  first_name: updated.first_name,
+                  last_name: updated.last_name,
+                  phone: updated.phone,
+                },
+              }
             : member,
         ),
       )
-      setNameEdit((prev) => {
-        const next = { ...prev }
-        delete next[group.key]
-        return next
-      })
+      setProfileEdit((prev) => ({
+        ...prev,
+        [group.key]: { ...prev[group.key], saving: false, error: null, saved: true },
+      }))
     } catch (err) {
-      setNameEdit((prev) => ({
+      setProfileEdit((prev) => ({
         ...prev,
         [group.key]: {
           ...prev[group.key],
           saving: false,
-          error: err?.message || "We couldn't save that name.",
+          saved: false,
+          error: err?.message || "We couldn't save those details.",
         },
       }))
     }
   }
+
 
   // ── THE COACH / TEAM MANAGER VIEW ──────────────────────────────────────
   //
@@ -1164,12 +1382,27 @@ export default function Accounts() {
       {!isFirstLoad && !error && groups.length > 0 && (
         <div className="flex flex-col gap-3">
           {groups.map((group) => {
-            const draft = nameEdit[group.key]
             const displayName = group.name ?? 'Unnamed member'
+            // One line summarising the access rows, so the list still answers
+            // "what is this person?" without opening anything.
+            const summary = group.memberships
+              .map((member) => {
+                const label = ROLE_OPTIONS.find((option) => option.value === member.role)?.label ?? member.role
+                const team = member.team_id ? teamsById.get(member.team_id)?.name : null
+                return team ? `${label} · ${team}` : label
+              })
+              .join(' · ')
 
             return (
               <Card key={group.key} data-testid="account-person" className="overflow-hidden">
-                <div className="flex flex-wrap items-center gap-3 border-b border-line px-[14px] py-3">
+                {/* ⚠️ THE WHOLE ROW OPENS THE EDITOR, and there is still a real
+                    focusable button inside it. Same reasoning as the schedule
+                    table: the row is a mouse convenience, the button is the
+                    keyboard and screen-reader path. */}
+                <div
+                  onClick={() => openEditor(group)}
+                  className="flex cursor-pointer flex-wrap items-center gap-3 px-[14px] py-3 hover:bg-surface-mute"
+                >
                   <span
                     className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[12px] font-extrabold tracking-[.5px] text-white"
                     aria-hidden="true"
@@ -1178,94 +1411,87 @@ export default function Accounts() {
                   </span>
 
                   <div className="min-w-0 flex-1">
-                    {draft ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          type="text"
-                          aria-label={`Display name for ${displayName}`}
-                          value={draft.value}
-                          disabled={draft.saving}
-                          onChange={(event) =>
-                            setNameEdit((prev) => ({
-                              ...prev,
-                              [group.key]: { ...prev[group.key], value: event.target.value },
-                            }))
-                          }
-                          className="rounded-[8px] border border-line bg-surface-card px-2 py-1 text-[14.5px] font-bold text-ink focus:border-brand focus-visible:outline-none"
-                        />
-                        <button
-                          type="button"
-                          disabled={draft.saving}
-                          onClick={() => saveName(group)}
-                          className="rounded-[8px] bg-brand px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-brand-deep disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-                        >
-                          {draft.saving ? 'Saving…' : 'Save name'}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={draft.saving}
-                          onClick={() =>
-                            setNameEdit((prev) => {
-                              const next = { ...prev }
-                              delete next[group.key]
-                              return next
-                            })
-                          }
-                          className="rounded-[8px] px-2 py-1.5 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span data-testid="account-name" className="text-[15px] font-bold text-ink">
-                          {displayName}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label={`Edit name for ${displayName}`}
-                          onClick={() =>
-                            setNameEdit((prev) => ({
-                              ...prev,
-                              [group.key]: { value: group.name ?? '', saving: false, error: null },
-                            }))
-                          }
-                          className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                        >
-                          Edit name
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Read-only on purpose (see the header comment). */}
-                    <span data-testid="account-email" className={`mt-0.5 block text-[12.5px] ${MUTED_ON_PAPER}`}>
+                    <span data-testid="account-name" className="block text-[15px] font-bold text-ink">
+                      {displayName}
+                    </span>
+                    <span data-testid="account-email" className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
                       {group.email ?? 'No email on file'}
                     </span>
-
-                    {draft?.error && (
-                      <span role="alert" className="mt-1 block text-[12.5px] font-semibold text-brand-deep">
-                        {draft.error}
+                    {summary && (
+                      <span data-testid="account-summary" className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
+                        {summary}
                       </span>
                     )}
                   </div>
 
-                  {group.memberships.length > 1 && (
-                    <span className={`text-[12px] font-semibold ${MUTED_ON_PAPER}`}>
-                      {group.memberships.length} access rows
-                    </span>
-                  )}
+                  <button
+                    type="button"
+                    aria-label={`Edit ${displayName}`}
+                    onClick={(clickEvent) => {
+                      // Without this the row handler fires too and the sheet is
+                      // opened twice for one click — harmless while it only
+                      // assigns state, and a double submit the moment it does
+                      // anything else.
+                      clickEvent.stopPropagation()
+                      openEditor(group)
+                    }}
+                    className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
-                  {/* THE control this whole change exists for. Without it,
-                      giving a parent a second child's age group — or giving a
-                      coach a parent row for their own kid — means revoking
-                      what they have and granting it again from scratch.
-                      Hidden for a group with no profile id: a row whose join
-                      came back partial has nobody to add access for. */}
-                  {group.profileId && !adding[group.key] && (
+      {/* ── THE EDIT PERSON SHEET (Jay, 9 Aug 2026) ──────────────────────
+          "admins need the ability to click on account and change all details,
+          except the email, i don't see any ability to do this in the accounts
+          section" — and he was right: the screen wrote the legacy `full_name`
+          and had no phone control at all, though the column grants from 8 Aug
+          have permitted first_name, last_name and phone since the day they
+          landed. The permission existed; the fields did not.
+
+          Everything about a person is in one place now: their name, their
+          phone, every access row with its role and squad, and Add access.
+          Email is shown and NOT editable — it is the login identity, and the
+          column grants for `authenticated` exclude it, so a form field for it
+          would fail the whole update rather than quietly succeeding. */}
+      {editingGroup && (
+        <Sheet
+          open
+          onClose={() => setEditingKey(null)}
+          title={`Edit ${editingGroup.name ?? 'member'}`}
+        >
+          <PersonDetailsForm
+            group={editingGroup}
+            state={profileEdit[editingGroup.key]}
+            onChange={(patch) =>
+              setProfileEdit((prev) => ({
+                ...prev,
+                [editingGroup.key]: { ...prev[editingGroup.key], ...patch },
+              }))
+            }
+            onSave={() => saveProfileDetails(editingGroup)}
+          />
+
+          <div className="mt-5">
+            <h4 className="mb-2 text-[12.5px] font-extrabold uppercase tracking-[.4px] text-ink-muted">
+              Access
+            </h4>
+
+                {/* The avatar, the inline name editor and the email that used
+                    to live here are gone: PersonDetailsForm above is all three,
+                    editable, in one place. Only Add access survives from this
+                    header — it belongs with the access rows it adds to. */}
+                <div className="mb-2 flex justify-end">
+                  {editingGroup.profileId && !adding[editingGroup.key] && (
                     <button
                       type="button"
-                      aria-label={`Add access for ${displayName}`}
-                      onClick={() => setAdding((prev) => ({ ...prev, [group.key]: true }))}
+                      aria-label={`Add access for ${editingName}`}
+                      onClick={() => setAdding((prev) => ({ ...prev, [editingGroup.key]: true }))}
                       className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       Add access
@@ -1273,7 +1499,7 @@ export default function Accounts() {
                   )}
                 </div>
 
-                {adding[group.key] && (
+                {adding[editingGroup.key] && (
                   <div
                     data-testid="add-access"
                     className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-surface-mute px-[14px] py-2.5"
@@ -1290,26 +1516,26 @@ export default function Accounts() {
                         turns that into the builder's own "they already have
                         this" message, before any network call. */}
                     <AccessBuilder
-                      label={displayName}
+                      label={editingName}
                       teams={sortedTeams}
                       players={players}
                       playersLoading={playersLoading}
                       playersError={playersError}
                       onNeedPlayers={loadPlayers}
                       existing={[
-                        ...group.memberships,
+                        ...editingGroup.memberships,
                         ...pendingMembers.filter(
-                          (member) => member.profile_id === group.profileId,
+                          (member) => member.profile_id === editingGroup.profileId,
                         ),
                       ]}
-                      saving={Boolean(grantState[`add:${group.key}`]?.saving)}
-                      error={grantState[`add:${group.key}`]?.error}
+                      saving={Boolean(grantState[`add:${editingGroup.key}`]?.saving)}
+                      error={grantState[`add:${editingGroup.key}`]?.error}
                       submitLabel="Add access"
-                      onSubmit={(rows) => addAccess(group, rows)}
+                      onSubmit={(rows) => addAccess(editingGroup, rows)}
                       onCancel={() =>
                         setAdding((prev) => {
                           const next = { ...prev }
-                          delete next[group.key]
+                          delete next[editingGroup.key]
                           return next
                         })
                       }
@@ -1317,12 +1543,12 @@ export default function Accounts() {
                   </div>
                 )}
 
-                {group.memberships.map((member) => {
+                {editingGroup.memberships.map((member) => {
                   const state = rowState[member.id] ?? {}
                   const teamName = member.team_id
                     ? teamsById.get(member.team_id)?.name ?? member.teams?.name ?? null
                     : null
-                  const rowLabel = `${displayName} (${teamName ?? 'club-wide'})`
+                  const rowLabel = `${editingName} (${teamName ?? 'club-wide'})`
                   const joined = formatJoined(member.created_at)
 
                   return (
@@ -1415,7 +1641,7 @@ export default function Accounts() {
                             onClick={() => revoke(member)}
                             className="rounded-[8px] bg-brand-deep px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-brand disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                           >
-                            {state.saving ? 'Removing…' : `Yes, revoke ${displayName}`}
+                            {state.saving ? 'Removing…' : `Yes, revoke ${editingName}`}
                           </button>
                           <button
                             type="button"
@@ -1449,10 +1675,8 @@ export default function Accounts() {
                     </div>
                   )
                 })}
-              </Card>
-            )
-          })}
-        </div>
+          </div>
+        </Sheet>
       )}
     </section>
   )

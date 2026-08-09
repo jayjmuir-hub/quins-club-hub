@@ -21,6 +21,10 @@ const restoreAccessRequestMock = vi.fn()
 const updateMembershipRoleMock = vi.fn()
 const deleteMembershipMock = vi.fn()
 const updateProfileNameMock = vi.fn()
+// ⚠️ NEW 9 Aug 2026. The sheet's details form writes first_name/last_name/phone
+// through updateMemberProfile; updateProfileName (the legacy full_name writer)
+// no longer has a control anywhere on this screen.
+const updateMemberProfileMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -37,6 +41,7 @@ vi.mock('../src/data/members.js', () => ({
   updateMembershipRole: (...args) => updateMembershipRoleMock(...args),
   deleteMembership: (...args) => deleteMembershipMock(...args),
   updateProfileName: (...args) => updateProfileNameMock(...args),
+  updateMemberProfile: (...args) => updateMemberProfileMock(...args),
 }))
 
 // The child picker reads the WHOLE roster (listPlayers with no teamIds), so
@@ -260,12 +265,55 @@ beforeEach(() => {
   }))
   deleteMembershipMock.mockResolvedValue(undefined)
   updateProfileNameMock.mockImplementation(async ({ fullName }) => ({ full_name: fullName.trim() }))
+  updateMemberProfileMock.mockImplementation(async ({ firstName, lastName, phone }) => ({
+    first_name: firstName?.trim() ?? null,
+    last_name: lastName?.trim() ?? null,
+    full_name: [firstName, lastName].map((part) => part?.trim()).filter(Boolean).join(' '),
+    phone: phone ?? null,
+  }))
 })
 
 function setup() {
   const user = userEvent.setup()
   const utils = render(<Accounts />)
   return { user, ...utils }
+}
+
+// ⚠️ THE ACCESS CONTROLS MOVED INTO A SHEET on 9 Aug 2026 (Jay: "admins need
+// the ability to click on account and change all details, except the email").
+// Role, age group, linked player, Revoke and Add access are no longer on the
+// list — the list is a summary, and opening a person is what reveals them.
+//
+// Every test below that touches those controls opens the sheet first through
+// this helper. It deliberately does NOT weaken any assertion: the same testids
+// and the same aria-labels are asserted, one click later.
+async function openPerson(user, name) {
+  const card = screen
+    .getAllByTestId('account-person')
+    .find((block) => within(block).queryByText(name))
+  if (!card) throw new Error(`No account card for "${name}" — check the fixture.`)
+  await user.click(within(card).getByRole('button', { name: `Edit ${name}` }))
+  return screen.findByRole('dialog')
+}
+
+// Only ONE sheet can be open at a time, so any assertion that used to span two
+// people is now open → assert → close → open the next. Sheet's own close
+// control (its X); Escape works too.
+async function closePerson(user) {
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+}
+
+// Sums the membership rows across every person, one sheet at a time — the
+// replacement for the old screen-wide getAllByTestId('account-membership').
+async function countMembershipRows(user, names) {
+  let total = 0
+  for (const name of names) {
+    const dialog = await openPerson(user, name)
+    total += within(dialog).getAllByTestId('account-membership').length
+    await closePerson(user)
+  }
+  return total
 }
 
 // Finds the rendered membership row whose role/age-group controls carry the
@@ -393,12 +441,14 @@ describe('Accounts — authorisation gate', () => {
 
 describe('Accounts — list', () => {
   it('renders each person with their name, email, role and age group', async () => {
-    setup()
+    const { user } = setup()
 
     expect(await screen.findByText('Sara Coach')).toBeInTheDocument()
     expect(screen.getByText('sara@example.com')).toBeInTheDocument()
     expect(screen.getByText('Ali Parent')).toBeInTheDocument()
     expect(screen.getByText('ali@example.com')).toBeInTheDocument()
+
+    await openPerson(user, 'Ali Parent')
 
     // Age group is an editable select holding the member's current team.
     expect(roleSelect('Ali Parent (U12 Boys)')).toHaveValue('parent')
@@ -408,19 +458,24 @@ describe('Accounts — list', () => {
   // Task 5: the "Linked player" column the spec's column list asks for
   // (Name · Email · Role · Age group · Linked player · Joined). It is fed by
   // listClubMembers' players(full_name) embed.
+  // Ali's row and Jay's row belong to two different people, so they can no
+  // longer be read in one pass: this opens Ali, asserts, closes, opens Jay.
   it('shows the linked player’s name, and a placeholder when there is none', async () => {
-    setup()
+    const { user } = setup()
 
     await screen.findByText('Sara Coach')
 
-    const aliRow = screen
+    const aliDialog = await openPerson(user, 'Ali Parent')
+    const aliRow = within(aliDialog)
       .getAllByTestId('account-membership')
       .find((row) => within(row).queryByLabelText('Role for Ali Parent (U12 Boys)'))
     expect(within(aliRow).getByTestId('account-linked-player')).toHaveTextContent('Omar Ali')
+    await closePerson(user)
 
     // An admin row has no player to link to — that is normal, so it reads as
     // an em dash rather than anything that looks like missing data.
-    const jayRow = screen
+    const jayDialog = await openPerson(user, 'Jay Muir')
+    const jayRow = within(jayDialog)
       .getAllByTestId('account-membership')
       .find((row) => within(row).queryByLabelText('Role for Jay Muir (club-wide)'))
     expect(within(jayRow).getByTestId('account-linked-player')).toHaveTextContent('—')
@@ -432,28 +487,29 @@ describe('Accounts — list', () => {
     // current policies, but a partial join or a deleted player would produce
     // it, and showing the raw uuid instead would mean nothing to anyone.
     listClubMembersMock.mockResolvedValue([{ ...ALI_PARENT, players: null }])
-    setup()
+    const { user } = setup()
 
     await screen.findByText('Ali Parent')
-    expect(screen.getByTestId('account-linked-player')).toHaveTextContent('Unknown player')
+    const dialog = await openPerson(user, 'Ali Parent')
+    expect(within(dialog).getByTestId('account-linked-player')).toHaveTextContent('Unknown player')
   })
 
+  // The four rows span three people and one sheet opens at a time, so the
+  // total is summed sheet by sheet. Sara's card also no longer carries a
+  // "2 access rows" label — her sheet holding exactly two rows says the same.
   it('groups a person with several membership rows into one block', async () => {
-    setup()
+    const { user } = setup()
 
     await screen.findByText('Sara Coach')
 
     // Three people, four membership rows.
     expect(screen.getAllByTestId('account-person')).toHaveLength(3)
-    expect(screen.getAllByTestId('account-membership')).toHaveLength(4)
+    expect(await countMembershipRows(user, ['Jay Muir', 'Sara Coach', 'Ali Parent'])).toBe(4)
     // Sara's name appears once, not once per row.
     expect(screen.getAllByText('Sara Coach')).toHaveLength(1)
 
-    const saraBlock = screen
-      .getAllByTestId('account-person')
-      .find((block) => within(block).queryByText('Sara Coach'))
-    expect(within(saraBlock).getAllByTestId('account-membership')).toHaveLength(2)
-    expect(within(saraBlock).getByText(/2 access rows/i)).toBeInTheDocument()
+    const saraDialog = await openPerson(user, 'Sara Coach')
+    expect(within(saraDialog).getAllByTestId('account-membership')).toHaveLength(2)
   })
 
   it('shows the email as plain text, with a note that passwords are self-serve', async () => {
@@ -490,6 +546,7 @@ describe('Accounts — changing access', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
+    await openPerson(user, 'Ali Parent')
     await user.selectOptions(roleSelect('Ali Parent (U12 Boys)'), 'coach')
 
     expect(updateMembershipRoleMock).toHaveBeenCalledWith({
@@ -503,6 +560,7 @@ describe('Accounts — changing access', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
+    await openPerson(user, 'Ali Parent')
     await user.selectOptions(screen.getByLabelText('Age group for Ali Parent (U12 Boys)'), 'team-u10')
 
     expect(updateMembershipRoleMock).toHaveBeenCalledWith({
@@ -516,6 +574,7 @@ describe('Accounts — changing access', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
+    await openPerson(user, 'Ali Parent')
     await user.selectOptions(roleSelect('Ali Parent (U12 Boys)'), 'admin')
 
     expect(updateMembershipRoleMock).toHaveBeenCalledWith({
@@ -536,28 +595,38 @@ describe('Accounts — changing access', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
+    await openPerson(user, 'Ali Parent')
     await user.selectOptions(roleSelect('Ali Parent (U12 Boys)'), 'coach')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/choose an age group/i)
   })
 
+  // ⚠️ REWRITTEN, not just re-pointed. The inline "Edit name" control and its
+  // single "Display name" field no longer exist anywhere: the sheet edits
+  // first/family name and writes updateMemberProfile, not updateProfileName.
   it('edits a display name once for a person with several rows', async () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.click(screen.getByRole('button', { name: /edit name for sara coach/i }))
-    const input = screen.getByLabelText('Display name for Sara Coach')
-    await user.clear(input)
-    await user.type(input, 'Sara Hughes')
-    await user.click(screen.getByRole('button', { name: /save name/i }))
+    const dialog = await openPerson(user, 'Sara Coach')
+    const firstName = within(dialog).getByLabelText('First name')
+    const lastName = within(dialog).getByLabelText('Family name')
+    await user.clear(firstName)
+    await user.type(firstName, 'Sara')
+    await user.clear(lastName)
+    await user.type(lastName, 'Hughes')
+    await user.click(within(dialog).getByRole('button', { name: /save details/i }))
 
-    expect(updateProfileNameMock).toHaveBeenCalledWith({
+    expect(updateMemberProfileMock).toHaveBeenCalledWith({
       profileId: 'profile-sara',
-      fullName: 'Sara Hughes',
+      firstName: 'Sara',
+      lastName: 'Hughes',
+      phone: null,
     })
     expect(await screen.findByText('Sara Hughes')).toBeInTheDocument()
     // Still one person, still two rows — the rename didn't split the block.
     expect(screen.getAllByTestId('account-person')).toHaveLength(3)
+    expect(within(dialog).getAllByTestId('account-membership')).toHaveLength(2)
   })
 })
 
@@ -566,6 +635,7 @@ describe('Accounts — revoking access', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
+    await openPerson(user, 'Ali Parent')
     await user.click(screen.getByLabelText('Revoke access for Ali Parent (U12 Boys)'))
 
     expect(screen.getByText(/remove this access\?/i)).toBeInTheDocument()
@@ -580,6 +650,7 @@ describe('Accounts — revoking access', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
+    await openPerson(user, 'Ali Parent')
     await user.click(screen.getByLabelText('Revoke access for Ali Parent (U12 Boys)'))
     await user.click(screen.getByRole('button', { name: /yes, revoke ali parent/i }))
 
@@ -634,16 +705,23 @@ describe('Accounts — revoking access', () => {
     expect(Number(loginsMatch[1])).toBeGreaterThan(withAccess)
   })
 
+  // The "3 rows left" total is club-wide, so it is re-counted a sheet at a
+  // time once Sara's own sheet has shown her surviving row.
   it('removes only the confirmed row of a person who holds several', async () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.click(screen.getByLabelText('Revoke access for Sara Coach (U10)'))
-    await user.click(screen.getByRole('button', { name: /yes, revoke sara coach/i }))
+    const dialog = await openPerson(user, 'Sara Coach')
+    await user.click(within(dialog).getByLabelText('Revoke access for Sara Coach (U10)'))
+    await user.click(within(dialog).getByRole('button', { name: /yes, revoke sara coach/i }))
 
     expect(deleteMembershipMock).toHaveBeenCalledWith('mem-sara-coach')
     expect(await screen.findByText('Sara Coach')).toBeInTheDocument()
-    expect(screen.getAllByTestId('account-membership')).toHaveLength(3)
+    await waitFor(() =>
+      expect(within(dialog).getAllByTestId('account-membership')).toHaveLength(1),
+    )
+    await closePerson(user)
+    expect(await countMembershipRows(user, ['Jay Muir', 'Sara Coach', 'Ali Parent'])).toBe(3)
   })
 })
 
@@ -652,6 +730,7 @@ describe('Accounts — last-admin guard', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
+    await openPerson(user, 'Jay Muir')
     await user.click(screen.getByLabelText('Revoke access for Jay Muir (club-wide)'))
     await user.click(screen.getByRole('button', { name: /yes, revoke jay muir/i }))
 
@@ -664,6 +743,7 @@ describe('Accounts — last-admin guard', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
+    await openPerson(user, 'Jay Muir')
     await user.selectOptions(roleSelect('Jay Muir (club-wide)'), 'coach')
 
     expect(updateMembershipRoleMock).not.toHaveBeenCalled()
@@ -680,6 +760,7 @@ describe('Accounts — last-admin guard', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
+    await openPerson(user, 'Jay Muir')
     const jayRows = screen.getAllByLabelText('Role for Jay Muir (club-wide)')
     expect(jayRows).toHaveLength(2)
 
@@ -701,6 +782,7 @@ describe('Accounts — last-admin guard', () => {
     const { user } = setup()
 
     await screen.findByText('Ali Parent')
+    await openPerson(user, 'Ali Parent')
     await user.click(screen.getByLabelText('Revoke access for Ali Parent (club-wide)'))
     await user.click(screen.getByRole('button', { name: /yes, revoke ali parent/i }))
 
@@ -905,11 +987,14 @@ describe('Accounts — waiting for access', () => {
     ])
 
     // Moved, not duplicated: gone from the waiting list, present in the main
-    // one, with no reload.
-    expect(await screen.findByLabelText('Role for Raw Recruit (U10)')).toHaveValue('coach')
+    // one, with no reload. The granted row's controls are in his sheet now, so
+    // the list assertions run first and the row is checked after opening him.
+    expect(await screen.findByText('Raw Recruit')).toBeInTheDocument()
     expect(within(waitingSection()).getAllByTestId('waiting-person')).toHaveLength(1)
     expect(screen.getAllByTestId('account-person')).toHaveLength(4)
     expect(listClubMembersMock).toHaveBeenCalledTimes(1)
+    const dialog = await openPerson(user, 'Raw Recruit')
+    expect(within(dialog).getByLabelText('Role for Raw Recruit (U10)')).toHaveValue('coach')
   })
 
   it('grants an admin with no age group control at all', async () => {
@@ -925,7 +1010,9 @@ describe('Accounts — waiting for access', () => {
     expect(grantMembershipsMock).toHaveBeenCalledWith([
       { profileId: 'profile-raw', clubId: CLUB_ID, role: 'admin', teamId: null, playerId: null },
     ])
-    expect(await screen.findByLabelText('Role for Raw Recruit (club-wide)')).toHaveValue('admin')
+    expect(await screen.findByText('Raw Recruit')).toBeInTheDocument()
+    const dialog = await openPerson(user, 'Raw Recruit')
+    expect(within(dialog).getByLabelText('Role for Raw Recruit (club-wide)')).toHaveValue('admin')
   })
 
   it('refuses to grant without a role, before any network call', async () => {
@@ -1034,16 +1121,16 @@ describe('Accounts — access builder', () => {
     ])
 
     // Both rows land in the list, with the linked-player column populated from
-    // the roster already in hand rather than a re-query.
-    expect(await screen.findByLabelText('Role for Raw Recruit (U10)')).toHaveValue('parent')
-    expect(screen.getByLabelText('Role for Raw Recruit (U12 Boys)')).toHaveValue('parent')
+    // the roster already in hand rather than a re-query. The card's old
+    // "2 access rows" label is gone — his sheet holding two rows says it.
+    expect(await screen.findByText('Raw Recruit')).toBeInTheDocument()
     expect(listClubMembersMock).toHaveBeenCalledTimes(1)
-    const rawBlock = screen
-      .getAllByTestId('account-person')
-      .find((block) => within(block).queryByText('Raw Recruit'))
-    expect(within(rawBlock).getByText(/2 access rows/i)).toBeInTheDocument()
-    expect(within(rawBlock).getByText('Zara Ali')).toBeInTheDocument()
-    expect(within(rawBlock).getByText('Omar Ali')).toBeInTheDocument()
+    const rawSheet = await openPerson(user, 'Raw Recruit')
+    expect(within(rawSheet).getByLabelText('Role for Raw Recruit (U10)')).toHaveValue('parent')
+    expect(within(rawSheet).getByLabelText('Role for Raw Recruit (U12 Boys)')).toHaveValue('parent')
+    expect(within(rawSheet).getAllByTestId('account-membership')).toHaveLength(2)
+    expect(within(rawSheet).getByText('Zara Ali')).toBeInTheDocument()
+    expect(within(rawSheet).getByText('Omar Ali')).toBeInTheDocument()
   })
 
   // The age group is DERIVED from the child. Asking for it as well would let
@@ -1131,8 +1218,10 @@ describe('Accounts — access builder', () => {
       { profileId: 'profile-raw', clubId: CLUB_ID, role: 'coach', teamId: 'team-u10', playerId: null },
       { profileId: 'profile-raw', clubId: CLUB_ID, role: 'coach', teamId: 'team-u12', playerId: null },
     ])
-    expect(await screen.findByLabelText('Role for Raw Recruit (U10)')).toHaveValue('coach')
-    expect(screen.getByLabelText('Role for Raw Recruit (U12 Boys)')).toHaveValue('coach')
+    expect(await screen.findByText('Raw Recruit')).toBeInTheDocument()
+    const dialog = await openPerson(user, 'Raw Recruit')
+    expect(within(dialog).getByLabelText('Role for Raw Recruit (U10)')).toHaveValue('coach')
+    expect(within(dialog).getByLabelText('Role for Raw Recruit (U12 Boys)')).toHaveValue('coach')
   })
 
   it('player is a single choice, with the age group taken from the player', async () => {
@@ -1168,13 +1257,17 @@ describe('Accounts — access builder', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/at least one child/i)
   })
 
+  // "Add access" is inside Sara's sheet now. Her old "3 access rows" label is
+  // gone (three rows in her sheet says it), and the club-wide 5-row total is
+  // summed a sheet at a time.
   it('adds a second access row to an existing person without revoking the first', async () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
     // Sara already coaches U10. She also has a child in U10 — a mixed-role
     // person, which the database has always allowed and the UI never offered.
-    await user.click(screen.getByRole('button', { name: /add access for sara coach/i }))
+    const dialog = await openPerson(user, 'Sara Coach')
+    await user.click(within(dialog).getByRole('button', { name: /add access for sara coach/i }))
     await chooseRole(user, 'Sara Coach', 'parent')
     await screen.findByRole('checkbox', { name: /Zara Ali/ })
     await pickPlayer(user, 'Sara Coach', 'Zara Ali')
@@ -1192,17 +1285,21 @@ describe('Accounts — access builder', () => {
 
     // Her existing two rows are untouched; the new one joins them in the same
     // block, and the builder closes.
-    expect(await screen.findByText(/3 access rows/i)).toBeInTheDocument()
+    await waitFor(() =>
+      expect(within(dialog).getAllByTestId('account-membership')).toHaveLength(3),
+    )
     expect(deleteMembershipMock).not.toHaveBeenCalled()
-    expect(screen.getAllByTestId('account-membership')).toHaveLength(5)
     expect(screen.queryByTestId('add-access')).toBeNull()
+    await closePerson(user)
+    expect(await countMembershipRows(user, ['Jay Muir', 'Sara Coach', 'Ali Parent'])).toBe(5)
   })
 
   it('refuses to add a row the person already holds', async () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.click(screen.getByRole('button', { name: /add access for sara coach/i }))
+    const dialog = await openPerson(user, 'Sara Coach')
+    await user.click(within(dialog).getByRole('button', { name: /add access for sara coach/i }))
     await chooseRole(user, 'Sara Coach', 'coach')
     // She is already coach of U10 — same role, same team, same (null) player.
     await tickAgeGroup(user, 'Sara Coach', 'U10')
@@ -1228,7 +1325,8 @@ describe('Accounts — access builder', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.click(screen.getByRole('button', { name: /add access for jay muir/i }))
+    const dialog = await openPerson(user, 'Jay Muir')
+    await user.click(within(dialog).getByRole('button', { name: /add access for jay muir/i }))
     await chooseRole(user, 'Jay Muir', 'admin')
     await submitAccess(user, 'Add access', 'Jay Muir')
 
@@ -1240,8 +1338,9 @@ describe('Accounts — access builder', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.click(screen.getByRole('button', { name: /add access for ali parent/i }))
-    expect(screen.getByTestId('add-access')).toBeInTheDocument()
+    const dialog = await openPerson(user, 'Ali Parent')
+    await user.click(within(dialog).getByRole('button', { name: /add access for ali parent/i }))
+    expect(within(dialog).getByTestId('add-access')).toBeInTheDocument()
 
     await user.click(within(screen.getByTestId('add-access')).getByRole('button', { name: /cancel/i }))
 
@@ -1322,17 +1421,16 @@ describe('Accounts — access builder', () => {
       { profileId: 'profile-raw', clubId: CLUB_ID, role: 'parent', teamId: 'team-u16', playerId: 'player-zaid' },
     ])
 
-    // And all five land in the list as one person with five access rows.
-    const rawBlock = (await screen.findAllByTestId('account-person')).find((block) =>
-      within(block).queryByText('Raw Recruit'),
-    )
-    expect(within(rawBlock).getByText(/5 access rows/i)).toBeInTheDocument()
-    expect(within(rawBlock).getAllByTestId('account-membership')).toHaveLength(5)
+    // And all five land in the list as one person with five access rows —
+    // read in his sheet, since the card's "5 access rows" label is gone.
+    await screen.findByText('Raw Recruit')
+    const rawSheet = await openPerson(user, 'Raw Recruit')
+    expect(within(rawSheet).getAllByTestId('account-membership')).toHaveLength(5)
     for (const child of HADDADS) {
-      expect(within(rawBlock).getByText(child.full_name)).toBeInTheDocument()
+      expect(within(rawSheet).getByText(child.full_name)).toBeInTheDocument()
     }
     for (const team of ['U8', 'U10', 'U12 Boys', 'U14', 'U16']) {
-      expect(screen.getByLabelText(`Role for Raw Recruit (${team})`)).toHaveValue('parent')
+      expect(within(rawSheet).getByLabelText(`Role for Raw Recruit (${team})`)).toHaveValue('parent')
     }
   })
 
@@ -1344,13 +1442,152 @@ describe('Accounts — access builder', () => {
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
-    await user.click(screen.getByRole('button', { name: /add access for sara coach/i }))
+    const dialog = await openPerson(user, 'Sara Coach')
+    await user.click(within(dialog).getByRole('button', { name: /add access for sara coach/i }))
     await chooseRole(user, 'Sara Coach', 'coach')
     await tickAgeGroup(user, 'Sara Coach', 'U12 Boys')
     await submitAccess(user, 'Add access', 'Sara Coach')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/may not have permission/i)
-    expect(screen.getAllByTestId('account-membership')).toHaveLength(4)
-    expect(screen.getByTestId('add-access')).toBeInTheDocument()
+    expect(within(dialog).getByTestId('add-access')).toBeInTheDocument()
+    // The club-wide "still 4 rows" total has to be counted a sheet at a time,
+    // so it is checked after the open builder has been asserted on.
+    expect(within(dialog).getAllByTestId('account-membership')).toHaveLength(2)
+    await closePerson(user)
+    expect(await countMembershipRows(user, ['Jay Muir', 'Sara Coach', 'Ali Parent'])).toBe(4)
+  })
+})
+
+// ── The Edit person sheet (Jay, 9 Aug 2026) ────────────────────────────
+//
+// "admins need the ability to click on account and change all details, except
+// the email, i don't see any ability to do this in the accounts section" — and
+// he was right. The screen wrote the LEGACY `full_name` column and had no
+// phone control at all, though the column grants from 8 Aug have permitted
+// first_name, last_name and phone since the day they landed. The permission
+// existed; the fields did not.
+describe('Accounts — the edit person sheet', () => {
+  it('opens from the row itself, not only from the Edit button', async () => {
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+
+    const card = screen
+      .getAllByTestId('account-person')
+      .find((block) => within(block).queryByText('Sara Coach'))
+    await user.click(within(card).getByText('Sara Coach'))
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent(/Edit Sara Coach/i)
+  })
+
+  // ⚠️ THE CRASH THIS PINS. The access rows carry aria-labels built from the
+  // person's name. While they lived on the list card that name came from a
+  // `const displayName = …` inside the groups.map callback; moving them into
+  // the sheet moved them OUT of that closure, and nothing declared it there.
+  // React threw ReferenceError and unmounted the whole screen — clicking any
+  // account blanked the page. It shipped in the first draft and was caught
+  // here, not by reading the code back.
+  it('renders the access rows without crashing the screen', async () => {
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+    const dialog = await openPerson(user, 'Sara Coach')
+
+    expect(within(dialog).getAllByTestId('account-membership')).toHaveLength(2)
+    expect(within(dialog).getByLabelText('Role for Sara Coach (U10)')).toBeInTheDocument()
+    // The screen is still there. A ReferenceError inside render takes the
+    // whole tree with it, so this is the assertion that actually caught it.
+    expect(screen.getAllByTestId('account-person')).toHaveLength(3)
+  })
+
+  // The whole point of the change: a control that did not exist anywhere.
+  it('saves a phone number, which the screen previously could not set at all', async () => {
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+    const dialog = await openPerson(user, 'Sara Coach')
+
+    // ⚠️ EXACT LABEL. PhoneInput renders a "Phone country" select as well, so
+    // /phone/i matches two controls and the typing lands nowhere useful.
+    await user.type(within(dialog).getByLabelText('Phone'), '501234567')
+    await user.click(within(dialog).getByRole('button', { name: /save details/i }))
+
+    await waitFor(() =>
+      expect(updateMemberProfileMock).toHaveBeenCalledWith(
+        expect.objectContaining({ profileId: 'profile-sara', phone: '+971501234567' }),
+      ),
+    )
+  })
+
+  // ⚠️ NOT A UI PREFERENCE — A DATABASE FACT. `email` is the login identity and
+  // the column grants for `authenticated` are an allow-list that excludes it,
+  // so an update including it fails the WHOLE statement. A field for it would
+  // break saving the name as well.
+  it('shows the email and offers no way to edit it', async () => {
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+    const dialog = await openPerson(user, 'Sara Coach')
+
+    expect(within(dialog).getByTestId('sheet-email')).toHaveTextContent('sara@example.com')
+    expect(within(dialog).queryByLabelText(/email/i)).toBeNull()
+  })
+
+  it('refuses a blank first name rather than writing one', async () => {
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+    const dialog = await openPerson(user, 'Sara Coach')
+
+    await user.clear(within(dialog).getByLabelText('First name'))
+    await user.click(within(dialog).getByRole('button', { name: /save details/i }))
+
+    // full_name is rebuilt from these two by the profiles_sync_name trigger, so
+    // a blank first name renders as an account with no name anywhere in the app
+    // — including in the approval queue, where "No name yet" is what a coach is
+    // asked to judge a stranger by.
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/first name/i)
+    // Refused before the request, like every other form in this app.
+    expect(updateMemberProfileMock).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a refused save and leaves the sheet open on the typed values', async () => {
+    const { user } = setup()
+    updateMemberProfileMock.mockRejectedValue(new Error('Network is down'))
+    await screen.findByText('Sara Coach')
+    const dialog = await openPerson(user, 'Sara Coach')
+
+    await user.clear(within(dialog).getByLabelText('First name'))
+    await user.type(within(dialog).getByLabelText('First name'), 'Saeeda')
+    await user.click(within(dialog).getByRole('button', { name: /save details/i }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Network is down')
+    // Sending them back to retype it is how a network blip becomes lost work.
+    expect(within(dialog).getByLabelText('First name')).toHaveValue('Saeeda')
+  })
+
+  // ⚠️ THE ONE THAT WOULD OTHERWISE ROT SILENTLY. updateMyProfile also writes
+  // `name_confirmed_at`, which records THE PERSON STATING THEIR OWN NAME and is
+  // what stops NamePrompt asking them again on next sign-in. An admin typing a
+  // name into an admin screen is not that, so this must not write it.
+  it('does not record an admin-typed name as the person confirming it', async () => {
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+    const dialog = await openPerson(user, 'Sara Coach')
+
+    await user.click(within(dialog).getByRole('button', { name: /save details/i }))
+
+    await waitFor(() => expect(updateMemberProfileMock).toHaveBeenCalled())
+    const payload = updateMemberProfileMock.mock.calls[0][0]
+    expect(payload).not.toHaveProperty('name_confirmed_at')
+  })
+
+  it('keeps what an admin typed if they close the sheet and reopen it', async () => {
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+    let dialog = await openPerson(user, 'Sara Coach')
+
+    await user.clear(within(dialog).getByLabelText('First name'))
+    await user.type(within(dialog).getByLabelText('First name'), 'Saeeda')
+    await closePerson(user)
+
+    dialog = await openPerson(user, 'Sara Coach')
+    // Re-seeding on every open would silently discard a half-finished edit.
+    expect(within(dialog).getByLabelText('First name')).toHaveValue('Saeeda')
   })
 })

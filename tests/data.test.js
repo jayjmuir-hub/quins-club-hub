@@ -1076,15 +1076,20 @@ describe('setAvailability', () => {
 // `profiles_email_and_admin_access`; a regression to `profiles(full_name)`
 // would leave the Accounts screen with an empty Email column and no error.
 describe('listClubMembers select shape', () => {
-  it('embeds profiles(full_name, email), teams(name) and players(full_name)', async () => {
+  it('embeds the profile columns the Edit person sheet edits, plus teams and players', async () => {
     const { builder } = createQueryBuilder({ data: [] })
     supabase.from.mockReturnValue(builder)
 
     await listClubMembers()
 
     expect(supabase.from).toHaveBeenCalledWith('memberships')
+    // ⚠️ first_name, last_name and phone added 9 Aug 2026. They were already
+    // WRITABLE by an admin — the column grants from 8 Aug list them — but the
+    // screen had no way to READ them, so it edited the legacy `full_name` and
+    // had no phone control at all. A regression to the old embed leaves the
+    // sheet's fields blank and, worse, saving then writes those blanks back.
     expect(builder.select).toHaveBeenCalledWith(
-      '*, profiles(full_name, email), teams(name), players(full_name)',
+      '*, profiles(full_name, first_name, last_name, email, phone), teams(name), players(full_name)',
     )
   })
 

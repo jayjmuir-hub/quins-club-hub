@@ -473,6 +473,17 @@ describe('Accounts — the approval queue', () => {
     return render(<Accounts />)
   }
 
+  // ⚠️ THE ACCESS CONTROLS MOVED INTO A SHEET on 9 Aug 2026: the list is a
+  // summary, and Role / Age group / Revoke only exist once a person is opened.
+  async function openPerson(user, name) {
+    const card = screen
+      .getAllByTestId('account-person')
+      .find((block) => within(block).queryByText(name))
+    if (!card) throw new Error(`No account card for "${name}" — check the fixture.`)
+    await user.click(within(card).getByRole('button', { name: `Edit ${name}` }))
+    return screen.findByRole('dialog')
+  }
+
   beforeEach(() => {
     useMembershipsMock.mockReturnValue({ memberships: ADMIN, teams: TEAMS })
     useAuthMock.mockReturnValue({ user: { id: 'profile-jay' }, signOut: vi.fn() })
@@ -540,8 +551,9 @@ describe('Accounts — the approval queue', () => {
     await waitFor(() => expect(screen.queryByTestId('pending-approvals')).not.toBeInTheDocument())
     const blocks = screen.getAllByTestId('account-person')
     expect(blocks).toHaveLength(2)
+    const dialog = await openPerson(user, 'Hannah Okafor')
     expect(
-      screen.getByRole('button', { name: /revoke access for hannah okafor/i }),
+      within(dialog).getByRole('button', { name: /revoke access for hannah okafor/i }),
     ).toBeInTheDocument()
   })
 

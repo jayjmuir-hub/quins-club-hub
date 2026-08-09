@@ -271,6 +271,39 @@ export async function claimRosterAccess() {
   ]
 }
 
+// Mirrors the real updateMemberProfile: an ADMIN editing someone else's first
+// name, family name and phone from the Edit person sheet.
+//
+// ⚠️ IT DOES NOT RETURN name_confirmed_at, and that omission mirrors the real
+// one. updateMyProfile writes that column because it records THE PERSON
+// STATING THEIR OWN NAME; an admin typing a name into an admin screen is not
+// that, and writing it would silence a NamePrompt that should still be asked.
+export async function updateMemberProfile({ profileId, firstName, lastName, phone } = {}) {
+  const params = new URLSearchParams(window.location.search)
+  const delay = Number(params.get('writeDelay') || 0)
+  const shouldThrow = params.get('writeThrow') === '1'
+
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  if (shouldThrow) {
+    throw new Error(
+      "We couldn't save those details. You may not have permission to change this member's details.",
+    )
+  }
+
+  const first = String(firstName ?? '').trim()
+  const last = String(lastName ?? '').trim()
+  if (!first) throw new Error('Enter a first name.')
+
+  return {
+    id: profileId,
+    first_name: first,
+    last_name: last || null,
+    // Mirrors the profiles_sync_name trigger, as updateProfileNames does.
+    full_name: [first, last].filter(Boolean).join(' '),
+    phone: String(phone ?? '').trim() || null,
+  }
+}
+
 export async function updateProfileName({ profileId, fullName } = {}) {
   const params = new URLSearchParams(window.location.search)
   const delay = Number(params.get('writeDelay') || 0)

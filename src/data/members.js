@@ -59,7 +59,18 @@ export async function loadMyMemberships() {
 export async function listClubMembers() {
   const { data, error } = await supabase
     .from('memberships')
-    .select('*, profiles(full_name, email), teams(name), players(full_name)')
+    // ⚠️ first_name, last_name and phone added 9 Aug 2026 for the Edit person
+    // sheet. They were already WRITABLE by an admin — the column grants from
+    // 8 Aug list them — but the screen had no way to read them, so it edited
+    // the legacy `full_name` and had no phone control at all.
+    //
+    // `email` is read and never written. It is the login identity; the column
+    // grants for `authenticated` deliberately exclude it, so an update
+    // including it fails the whole statement rather than quietly desyncing the
+    // address an admin reads when deciding whether to approve a stranger.
+    .select(
+      '*, profiles(full_name, first_name, last_name, email, phone), teams(name), players(full_name)',
+    )
   if (error) throw error
   return data ?? []
 }
@@ -613,6 +624,58 @@ export async function updateMyProfile({ profileId, firstName, lastName, phone } 
   // A refusal is a successful zero-row response, not an error — the same
   // silent-refusal shape every other writer in this module reads back.
   if (!data) throw new Error(REFUSED_MY_PROFILE)
+  return data
+}
+
+/**
+ * What an ADMIN may change about someone else: first name, family name, phone.
+ *
+ * ⚠️ NOT updateMyProfile WITH A DIFFERENT ID, and the difference is one column.
+ * updateMyProfile writes `name_confirmed_at`, because that column records THE
+ * PERSON STATING THEIR OWN NAME — it is what stops NamePrompt asking them
+ * again on next sign-in. An admin typing a name into an admin screen is not
+ * that person confirming it, and writing the column here would silence a
+ * prompt that should still be asked. So this function does not write it, and
+ * that omission is the entire reason it exists separately.
+ *
+ * ⚠️ AND IT STILL CANNOT WRITE `email`. Column privileges for `authenticated`
+ * are an allow-list (full_name, first_name, last_name, name_confirmed_at,
+ * phone); adding email would fail the whole update rather than quietly
+ * succeeding. The screen shows it read-only for that reason, not as a UI
+ * preference.
+ *
+ * The row-level permission is `profile update club admin`
+ * (private.shares_admin_club(id)). A non-admin's UPDATE matches zero rows and
+ * PostgREST reports that as a success, so the row is read back — the same
+ * silent-refusal shape as every other writer here.
+ */
+export async function updateMemberProfile({ profileId, firstName, lastName, phone } = {}) {
+  if (!profileId) throw new Error('updateMemberProfile needs a profileId.')
+
+  const first = typeof firstName === 'string' ? firstName.trim() : ''
+  const last = typeof lastName === 'string' ? lastName.trim() : ''
+  // A blank family name is fine — plenty of people have one name. A blank
+  // first name is not: full_name is rebuilt from these by the
+  // profiles_sync_name trigger, and a blank one renders as an account with no
+  // name anywhere in the app.
+  if (!first) throw new Error('Enter a first name.')
+
+  const trimmedPhone = typeof phone === 'string' ? phone.trim() : ''
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      first_name: first,
+      last_name: last || null,
+      // Null, never '': an empty string sorts and compares as a real value.
+      phone: trimmedPhone || null,
+    })
+    .eq('id', profileId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(REFUSED_PROFILE)
   return data
 }
 
