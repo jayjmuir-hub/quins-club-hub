@@ -214,9 +214,10 @@ special-cases admin rather than collecting `team_id` values.
 
 ❌ **The reasoning this used to give was wrong twice over.** It said the `teams` read
 policy "matches on `club_id`, so an admin still sees all **15** teams". The policy stopped
-matching on `club_id` on 8 Aug (it is now `auth.uid() is not null`), and there are **18**
-squads since 9 Aug — 15 youth plus three senior sides that were never in the 15.
-**Do not put a squad count back into this file**; `db/migrations/20260809_age_groups_rename.sql`
+matching on `club_id` on 8 Aug (it is now `auth.uid() is not null`), and the squad count
+had changed — the three senior sides were never inside the "15" it named.
+⚠️ **Do not put a squad count back into this file** — including in a sentence explaining
+why the last one was wrong, which is what the 9 Aug correction did; `db/migrations/20260809_age_groups_rename.sql`
 holds the guard and `claude/decisions/2026-08-09-single-gender-squads.md` the list.
 
 **`canEditTeam(memberships, null)` returns `false`, even for an admin.** Deliberate, and a
@@ -354,7 +355,8 @@ it's a separate file and a separate decision, deliberately left alone in Task 15
 
 **A screen that must be reachable before a user has any memberships cannot live inside
 `AppShell`.** `AppShell` deliberately refuses to render its routed content at all until
-`memberships.length > 0` (showing `NoMembershipState` instead) — correct for every normal
+`memberships.length > 0` (showing `AddYourPlayer`, or `RequestAccess` on the opt-in
+second branch) — correct for every normal
 screen, but it means any future screen aimed at a membership-less user (Task 18's
 `/accept-invite/:token` is the first, and likely not the last — an invite-decline flow, an
 "invalid invite" landing page, etc. would have the same shape) must be routed as a sibling

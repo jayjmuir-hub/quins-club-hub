@@ -144,8 +144,22 @@ twice.**
 shadow DOM contains every digit 0-9 per column.** Text extraction and `aria-label`
 both return nonsense. **Read that page from a screenshot, or expand the row.**
 
-**146 parents need magic links.** At 100/day that is two days minimum, and
-realistically three once retries and mistyped addresses are counted.
+⚠️ **THE ROLLOUT NUMBERS BELOW ARE DERIVED FROM A TABLE THAT NO LONGER HAS ROWS IN IT,
+and they say "magic links" when sign-in has been email + password since 8 Aug.** Flagged
+9 Aug; NOT re-measured, because there is nothing left to measure them against. They are
+kept only as an order-of-magnitude sketch of the rollout, and **must not be used to plan
+one**.
+
+⚠️ **AND NOBODY HAS RECORDED WHERE THE REAL ROSTER LIVES NOW.** The 8 Aug wipe deleted
+316 players and 315 contacts; every rollout number on this page was counted from
+`player_contacts` on 7 Aug, the day before. **A rollout is blocked on re-importing the
+roster from wherever it actually is — and no document in this repo says where that is,
+in what format, or who does it. Ask Jay before planning anything downstream of it.**
+
+~~146 parents need magic links.~~ At 100/day that would be two days minimum, and
+realistically three once retries and mistyped addresses are counted. **Every parent now
+needs a confirmation email instead**, so the volume is comparable and the conclusion
+about the cap survives even though the number does not.
 
 ⚠️ **This said 143 until 7 Aug, from a Gmail count of 136 that was never re-measured.**
 Counted live against `player_contacts` on 7 Aug: **279 distinct roster addresses, 133

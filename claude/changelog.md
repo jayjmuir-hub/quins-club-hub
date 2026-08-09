@@ -10,6 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 9 Aug 2026
 
+- `f561736` — **The handoff was describing a world two commits old.** It listed
+  `db/schema/` as stale and the `Greeting.jsx` magic-link comment as open after `6df8ee5`
+  had closed both. ⚠️ Also recorded that **a shallow clone (`--depth`) implies
+  `--single-branch`** — a session using one saw only `origin/main` and reported
+  `build/v1-mvp` deleted. It was not.
 - `6df8ee5` — **`db/schema/` re-captured against live, and nine claims in `RESTORE.md`
   corrected.** ⚠️ The 7 Aug capture's "Nothing unintended was found" was **wrong**: two
   objects live since 5 Aug had no line in the files, and `invites_role_check` asserted four
