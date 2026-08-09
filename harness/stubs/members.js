@@ -41,7 +41,14 @@ const MEMBERS = [
 // actually calls it — but a stub that is missing an export its real module
 // has is exactly the drift that took down EVERY scenario once before
 // (players.js/insertPlayers), so the mirror is kept complete on purpose.
-export async function loadMyMemberships() {
+// ⚠️ TAKES A profileId SINCE 9 Aug 2026, mirroring the real function. The real
+// one used to select with no filter and rely on RLS, which for an ADMIN
+// returns the whole club — so "my memberships" included everyone else's. The
+// harness never hit it (these fixtures are one person's rows), but a stub whose
+// signature drifts from the module it replaces is the drift this file exists to
+// prevent.
+export async function loadMyMemberships(profileId) {
+  if (!profileId) throw new Error('loadMyMemberships needs a profileId.')
   return MEMBERS.map(({ profiles, teams, players, ...row }) => row)
 }
 

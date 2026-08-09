@@ -118,7 +118,11 @@ export function MembershipProvider({ children }) {
     setLoading(true)
     setError(null)
 
-    Promise.all([loadMyMemberships(), loadTeams()])
+    // ⚠️ session.user.id, NOT "whatever RLS lets through". `memb read` is
+    // (profile_id = auth.uid() OR is_admin(club_id)), so an unfiltered read
+    // hands an ADMIN the whole club's memberships — and this provider's output
+    // is what every screen treats as "mine". See loadMyMemberships.
+    Promise.all([loadMyMemberships(session.user.id), loadTeams()])
       .then(async ([membershipRows, teamRows]) => {
         if (!mounted) return
 
@@ -158,7 +162,7 @@ export function MembershipProvider({ children }) {
             // person no squads because they held no membership. Both have to
             // be fetched again now that they do.
             const [freshMemberships, freshTeams] = await Promise.all([
-              loadMyMemberships(),
+              loadMyMemberships(session.user.id),
               loadTeams(),
             ])
             if (!mounted) return

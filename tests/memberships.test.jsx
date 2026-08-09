@@ -53,12 +53,18 @@ function Harness() {
 function mockFrom({ memberships, membershipsError, teams, teamsError } = {}) {
   supabase.from.mockImplementation((table) => {
     if (table === 'memberships') {
-      return {
-        select: vi.fn().mockResolvedValue({
-          data: membershipsError ? null : (memberships ?? [MEMBERSHIP_ROW]),
-          error: membershipsError ?? null,
-        }),
+      // ⚠️ .select().eq() SINCE 9 Aug 2026, mirroring the real query.
+      // loadMyMemberships used to select with no filter and trust RLS to scope
+      // it — but `memb read` is (profile_id = auth.uid() OR is_admin(club_id)),
+      // so for an ADMIN it returned the whole club as "my memberships". This
+      // mock resolved on .select() and would keep passing either way, which is
+      // why the bug reached production: the provider's own tests could not see
+      // the difference between a scoped read and an unscoped one.
+      const result = {
+        data: membershipsError ? null : (memberships ?? [MEMBERSHIP_ROW]),
+        error: membershipsError ?? null,
       }
+      return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue(result) }) }
     }
     if (table === 'teams') {
       return {
@@ -437,14 +443,25 @@ describe('MembershipProvider — roster auto-onboarding', () => {
     // second must return both. Re-reading teams is the part most likely to be
     // forgotten, and forgetting it leaves the app rendering with no squads.
     let call = 0
-    supabase.from.mockImplementation((table) => ({
-      select: vi.fn().mockImplementation(async () => {
-        if (table === 'memberships') {
-          return { data: call > 0 ? [MEMBERSHIP_ROW] : [], error: null }
+    supabase.from.mockImplementation((table) => {
+      // memberships goes through .select().eq(); teams through .select().
+      if (table === 'memberships') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockImplementation(async () => ({
+              data: call > 0 ? [MEMBERSHIP_ROW] : [],
+              error: null,
+            })),
+          }),
         }
-        return { data: call > 0 ? [TEAM_ROW] : [], error: null }
-      }),
-    }))
+      }
+      return {
+        select: vi.fn().mockImplementation(async () => ({
+          data: call > 0 ? [TEAM_ROW] : [],
+          error: null,
+        })),
+      }
+    })
     supabase.rpc.mockImplementation(async () => {
       call = 1
       return { data: [MEMBERSHIP_ROW], error: null }

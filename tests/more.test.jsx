@@ -749,3 +749,93 @@ describe('More — the You card is read-only until Edit', () => {
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
   })
 })
+
+// ── "Your players" must mean YOUR players ──────────────────────────────
+//
+// Jay, 9 Aug 2026, signed in as admin: "it is showing two of the test players
+// in my account? because i am admin? will this show like that also for coaches
+// and managers? seems like a bug".
+//
+// It was. loadMyMemberships() selected from `memberships` with NO filter and a
+// comment claiming RLS scoped it to the caller. `memb read` is
+// (profile_id = auth.uid() OR is_admin(club_id)) — for an ADMIN the second
+// clause matches every row in the club, so the provider handed every screen
+// the whole club's memberships as though they were the signed-in person's own.
+//
+// ⚠️ These tests pass membership arrays directly, so they pin the CONSUMER's
+// contract: a row belongs to you only if it carries your player_id. The
+// query-level fix is asserted in tests/scope.test.js. Both halves are needed —
+// the query one alone would not have caught a screen that widened the rule.
+describe('More — whose players are "Your players"', () => {
+  // Its own fixture: the PLAYER above is scoped to another describe block.
+  const A_PLAYER = {
+    id: 'p1',
+    full_name: 'Tom Muir',
+    team_id: 'team-u10',
+    position: 'Flanker',
+    photo_path: null,
+  }
+  const A_PARENT = [
+    { id: 'm-p', role: 'parent', team_id: 'team-u10', player_id: 'p1', club_id: 'club-1' },
+  ]
+
+  it('shows nothing for an admin with no children at the club', async () => {
+    // The exact shape of Jay's account: admin, no team, no linked player.
+    useMembershipsMock.mockReturnValue(
+      memberships([{ id: 'm-a', role: 'admin', team_id: null, player_id: null, club_id: 'club-1' }]),
+    )
+    listPlayersMock.mockResolvedValue([A_PLAYER])
+
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+
+    expect(screen.queryByTestId('your-player')).not.toBeInTheDocument()
+    expect(screen.queryByText(/your players?/i)).not.toBeInTheDocument()
+  })
+
+  it('shows nothing for a coach who has no child at the club', async () => {
+    useMembershipsMock.mockReturnValue(
+      memberships([
+        { id: 'm-c', role: 'coach', team_id: 'team-u10', player_id: null, club_id: 'club-1' },
+      ]),
+    )
+    listPlayersMock.mockResolvedValue([A_PLAYER])
+
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+
+    // A coach can SEE thirty children on the roster and none of them are
+    // theirs. Only a row carrying a player_id makes a player yours.
+    expect(screen.queryByTestId('your-player')).not.toBeInTheDocument()
+  })
+
+  // ⚠️ WHERE THE CROSS-PERSON PROTECTION ACTUALLY LIVES, stated here because
+  // the obvious test to write at this level is a lie.
+  //
+  // Jay asked whether coaches would see the same thing he did. Since the
+  // squad-approval policy landed earlier the same day, a coach CAN read other
+  // people's pending membership rows for their squads — and those rows carry a
+  // player_id. This component cannot defend against that: handed a parent row,
+  // it has no way to tell whose it is, and adding a role filter would not help
+  // because the rows in question ARE parent rows.
+  //
+  // What makes it safe is that the array never contains them: loadMyMemberships
+  // now filters `.eq('profile_id', …)` rather than trusting RLS to scope a read
+  // that, for an admin, matches the whole club. That is asserted in
+  // tests/scope.test.js — "scopes the query to ONE profile, which RLS alone
+  // does not do". If that test is ever deleted, this panel is the screen where
+  // the consequence shows up first.
+  // (No test here on purpose. `expect(true).toBe(true)` would be decoration —
+  // a green mark that can never go red. The comment is the artefact.)
+
+  it('still shows a parent their own child', async () => {
+    // The rule is "a row carrying MY player_id", not "no rows ever" — this is
+    // the case the panel exists for.
+    useMembershipsMock.mockReturnValue(memberships(A_PARENT))
+    listPlayersMock.mockResolvedValue([A_PLAYER])
+
+    renderMore()
+
+    expect(await screen.findByTestId('your-player')).toBeInTheDocument()
+  })
+})

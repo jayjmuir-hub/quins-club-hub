@@ -1,17 +1,62 @@
 import { supabase } from '../lib/supabase'
 
-// Data access for the memberships table. RLS already restricts rows to the
-// calling user, so no user id argument is needed here. Follows the
-// throw-on-error convention set by src/lib/supabase.js and src/lib/auth.jsx
-// — callers get a thrown Error, never a {data, error} tuple.
+// Data access for the memberships table. Follows the throw-on-error convention
+// set by src/lib/supabase.js and src/lib/auth.jsx — callers get a thrown Error,
+// never a {data, error} tuple.
+//
+// ⚠️ THIS HEADER USED TO SAY "RLS already restricts rows to the calling user,
+// so no user id argument is needed here." THAT WAS FALSE, and it was false in
+// the one case that matters. See loadMyMemberships below.
 
 /**
- * Loads the current user's membership rows, each joined to its team.
+ * Loads ONE PERSON'S membership rows, each joined to its team.
+ *
+ * ⚠️ THE PROFILE ID IS REQUIRED, AND RLS IS NOT A SUBSTITUTE FOR IT.
+ *
+ * This function used to select with no filter at all, on the stated assumption
+ * that the row policy scoped it to the caller. Read what `memb read` actually
+ * is:
+ *
+ *     USING ((profile_id = auth.uid()) OR private.is_admin(club_id))
+ *
+ * For an ADMIN the second clause is true of EVERY ROW IN THE CLUB. So
+ * "my memberships" returned the whole club's memberships, and every consumer
+ * of the memberships provider was handed other people's access as though it
+ * were the signed-in person's own. Found 9 Aug 2026 by Jay, who opened his own
+ * account page and saw two other families' children under "Your players".
+ *
+ * What it actually broke:
+ *   - YourPlayers listed every child in the club who had a parent attached,
+ *     for any admin.
+ *   - Roster's `isOwnPlayer` check opened the restricted SELF-SERVICE form
+ *     instead of the full edit form when an admin clicked a child who had a
+ *     parent.
+ *   - Availability's `childPlayerIds` treated every such child as the admin's
+ *     own.
+ *
+ * ⚠️ AND IT WAS ABOUT TO REACH COACHES. The `memb read squad staff pending`
+ * policy added earlier the same day lets a coach read PENDING membership rows
+ * for their own squads — rows that carry a player_id. Without this fix, the
+ * next parent to self-register would have appeared as the coach's own child on
+ * the coach's account screen.
+ *
  * Returns an array (never null) — empty for a signed-in user with no
  * memberships yet (e.g. an invite that hasn't been accepted).
+ *
+ * RLS is still the boundary; this filter is about asking the right QUESTION.
+ * "Which rows may I see?" and "which rows are mine?" are different questions,
+ * and for an admin they have very different answers.
  */
-export async function loadMyMemberships() {
-  const { data, error } = await supabase.from('memberships').select('*, teams(*)')
+export async function loadMyMemberships(profileId) {
+  // Thrown, not defaulted. A caller with no id would otherwise silently get
+  // the old behaviour back — the club-wide list — which is exactly the bug.
+  if (!profileId) throw new Error('loadMyMemberships needs a profileId.')
+
+  const { data, error } = await supabase
+    .from('memberships')
+    .select('*, teams(*)')
+    .eq('profile_id', profileId)
+
   if (error) throw error
   return data ?? []
 }

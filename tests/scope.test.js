@@ -319,9 +319,21 @@ describe('childPlayerIds', () => {
 })
 
 // --- loadMyMemberships() (src/data/members.js) -----------------------------
-// RLS already restricts rows to the caller, so this takes no user id
-// argument. The convention set by supabase.js/auth.jsx is throw-on-error,
-// not {data, error} tuples — verified below.
+//
+// ⚠️ THIS COMMENT USED TO SAY "RLS already restricts rows to the caller, so
+// this takes no user id argument." It was false, and these tests asserted the
+// broken behaviour — `expect(select).toHaveBeenCalled()` passes whether or not
+// the query is scoped to anybody.
+//
+// `memb read` is (profile_id = auth.uid() OR is_admin(club_id)). For an ADMIN
+// the second clause matches EVERY ROW IN THE CLUB, so an unfiltered read
+// returned the whole club as "my memberships" — and this provider's output is
+// what every screen treats as the signed-in person's own access. Jay found it
+// on 9 Aug 2026 by opening his own account page and seeing two other families'
+// children under "Your players".
+//
+// The convention set by supabase.js/auth.jsx is throw-on-error, not
+// {data, error} tuples — verified below.
 
 vi.mock('../src/lib/supabase.js', () => ({
   supabase: {
@@ -334,37 +346,63 @@ import { supabase } from '../src/lib/supabase.js'
 import { loadMyMemberships, listClubMembers, createInvite, acceptInvite } from '../src/data/members.js'
 
 describe('loadMyMemberships', () => {
+  // Mirrors the real builder: .select() returns something with .eq() on it.
+  function builder(response) {
+    const eq = vi.fn().mockResolvedValue(response)
+    const select = vi.fn().mockReturnValue({ eq })
+    supabase.from.mockReturnValue({ select })
+    return { select, eq }
+  }
+
   it('returns the rows from the memberships table joined to teams', async () => {
     const rows = [
       { id: 'm-1', role: 'coach', team_id: U12.id, player_id: null, teams: U12 },
     ]
-    const select = vi.fn().mockResolvedValue({ data: rows, error: null })
-    supabase.from.mockReturnValue({ select })
+    const { select } = builder({ data: rows, error: null })
 
-    const result = await loadMyMemberships()
+    const result = await loadMyMemberships('user-1')
 
     expect(supabase.from).toHaveBeenCalledWith('memberships')
     expect(select).toHaveBeenCalled()
     expect(result).toEqual(rows)
   })
 
-  it('returns an empty array, never null, when there are no rows', async () => {
-    const select = vi.fn().mockResolvedValue({ data: null, error: null })
-    supabase.from.mockReturnValue({ select })
+  // ⚠️ THE ASSERTION THE OLD TESTS DID NOT MAKE. Without it, an unscoped query
+  // passes every other case in this block — which is exactly what happened.
+  it('scopes the query to ONE profile, which RLS alone does not do', async () => {
+    const { eq } = builder({ data: [], error: null })
 
-    const result = await loadMyMemberships()
+    await loadMyMemberships('user-1')
+
+    expect(eq).toHaveBeenCalledWith('profile_id', 'user-1')
+  })
+
+  // Thrown, not defaulted: a caller that forgets the id would otherwise get
+  // the club-wide list back — silently, and only for admins, which is the
+  // hardest possible shape of bug to notice.
+  it('refuses to query at all without a profile id', async () => {
+    // ⚠️ from.mockClear(), not a bare assertion: `supabase.from` is a module-
+    // level mock shared with every other case in this file, so it carries
+    // calls made by tests that ran before this one. Asserting on it without
+    // clearing tests the order the file happens to run in.
+    supabase.from.mockClear()
+
+    await expect(loadMyMemberships()).rejects.toThrow(/needs a profileId/i)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('returns an empty array, never null, when there are no rows', async () => {
+    builder({ data: null, error: null })
+
+    const result = await loadMyMemberships('user-1')
 
     expect(result).toEqual([])
   })
 
   it('throws rather than swallowing a Supabase error', async () => {
-    const select = vi.fn().mockResolvedValue({
-      data: null,
-      error: new Error('permission denied'),
-    })
-    supabase.from.mockReturnValue({ select })
+    builder({ data: null, error: new Error('permission denied') })
 
-    await expect(loadMyMemberships()).rejects.toThrow('permission denied')
+    await expect(loadMyMemberships('user-1')).rejects.toThrow('permission denied')
   })
 })
 
