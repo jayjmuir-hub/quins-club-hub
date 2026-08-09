@@ -6,7 +6,7 @@ import ParentsEditor from '../components/ParentsEditor.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
 import Segmented from '../components/Segmented.jsx'
 import { getPlayerContact, setOwnPlayerGender, upsertContact } from '../data/players.js'
-import { GENDERS } from '../lib/gender.js'
+import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
 import { listParents, saveParents } from '../data/parents.js'
 import { deletePlayerPhoto, forgetPhotoUrl, setOwnPlayerPhoto, uploadPlayerPhoto } from '../data/photos.js'
 import { allowsOwnContact } from '../lib/ageGroup.js'
@@ -44,6 +44,13 @@ const LABEL = 'mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-f
 
 export default function MyPlayerForm({ player, team, onClose, onSaved }) {
   const showOwnContact = allowsOwnContact(team?.name)
+
+  // ⚠️ Fails OPEN on a missing team, unlike showOwnContact directly above it,
+  // which fails CLOSED. The asymmetry is deliberate and worth the two lines:
+  // if the team row failed to load, refusing every save would leave a parent
+  // with a form that cannot be submitted and no way to find out why, whereas
+  // withholding a child's own contact fields costs nothing.
+  const genderRequired = squadRequiresGender(team?.name)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -92,6 +99,15 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+
+    // ⚠️ CHECKED BEFORE `saving` is set, so a refusal leaves the form exactly
+    // as it was rather than flickering into a saving state and back. Nothing
+    // has been written at this point — the photo upload below is the first
+    // side effect, and it is irreversible from this screen.
+    if (genderRequired && !gender) {
+      setError(genderRequiredMessage(team.name))
+      return
+    }
     setSaving(true)
     setError(null)
 
@@ -189,13 +205,20 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
             disabled={saving}
           />
 
-          {/* No squad-mismatch note here, unlike PlayerForm. This form cannot
-              change the squad, so the only thing a parent could do about a
-              mismatch is un-answer the question — and the arrangement is the
-              club's business, not theirs to be warned about. */}
+          {/* Still no squad-MISMATCH note, and the original reasoning holds:
+              this form cannot change the squad, so the only thing a parent
+              could do about a mismatch is un-answer the question, and the
+              arrangement is the club's business rather than theirs to be
+              warned about.
+
+              ⚠️ The REQUIREMENT is different and is enforced here (Jay, 9 Aug
+              2026). A blank gender on a single-gender squad is refused, and it
+              has to be refused on this form too — this is the form the parents
+              in the pilot actually use, so exempting it would mean the rule
+              applies to everyone except the people filling in the data. */}
           <div className="mt-5">
             <Segmented
-              legend="Gender"
+              legend={genderRequired ? 'Gender (required)' : 'Gender'}
               name="my-player-gender"
               options={GENDERS}
               value={gender}
@@ -204,6 +227,13 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
               className="mb-0"
             />
           </div>
+
+          {genderRequired && !gender && (
+            <p className="mt-2 rounded-[11px] bg-surface px-3 py-2.5 text-[12.5px] text-ink-muted">
+              {team.name} is a single-gender squad, so this one has to be answered
+              before you can save.
+            </p>
+          )}
 
           {/* The U13 rule (src/lib/ageGroup.js): an under-13 has no direct
               contact route in the app, so these fields are absent rather than

@@ -12,7 +12,12 @@ import ParentsEditor from '../components/ParentsEditor.jsx'
 import PhotoField from '../components/PhotoField.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
 import Segmented from '../components/Segmented.jsx'
-import { GENDERS, squadMismatch } from '../lib/gender.js'
+import {
+  GENDERS,
+  genderRequiredMessage,
+  squadMismatch,
+  squadRequiresGender,
+} from '../lib/gender.js'
 
 // The player add/edit form (design-system.md §5.8), opened in the shared
 // Sheet from Roster's "Add player" button and from PlayerDetail's "Edit".
@@ -327,16 +332,38 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
     if (inFlight.current) return
 
     const fullName = values.fullName.trim()
-    const nextInvalid = { fullName: !fullName, teamId: !teamId }
+    const team = editableTeams.find((candidate) => candidate.id === teamId)
+
+    // ⚠️ GENDER IS REQUIRED ON A SINGLE-GENDER SQUAD (Jay, 9 Aug 2026).
+    // Read from the SELECTED squad, so switching the dropdown to U16G Contact
+    // makes the field required immediately rather than at save time.
+    //
+    // This is the only half of the rule that is enforced. A CONTRADICTORY
+    // gender still saves with a warning — see `mismatch` below. Blank does
+    // not, because leaving the question unanswered is otherwise the easiest
+    // way to defeat the warning, and most players have no gender recorded.
+    const genderMissing = squadRequiresGender(team?.name) && !values.gender
+
+    const nextInvalid = { fullName: !fullName, teamId: !teamId, gender: genderMissing }
     setInvalid(nextInvalid)
 
     if (Object.values(nextInvalid).some(Boolean)) {
       setErrorStage('validation')
-      setError(new Error('Fill in the highlighted fields before saving.'))
+      // Named specifically. "Fill in the highlighted fields" is useless for a
+      // radio pair that has no highlight of its own, and the person needs to
+      // know it is the SQUAD that made the field mandatory — otherwise it
+      // reads as the app arbitrarily demanding something it didn't want a
+      // moment ago.
+      setError(
+        new Error(
+          genderMissing && fullName && teamId
+            ? genderRequiredMessage(team.name)
+            : 'Fill in the highlighted fields before saving.',
+        ),
+      )
       return
     }
 
-    const team = editableTeams.find((candidate) => candidate.id === teamId)
     const playerPayload = {
       ...(savedPlayerId ? { id: savedPlayerId } : null),
       ...(team?.club_id ? { club_id: team.club_id } : null),
@@ -469,12 +496,19 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   // Advisory only, and computed from the SELECTED squad rather than the
   // player's stored one so switching the age-group dropdown updates the note
   // straight away. squadMismatch returns null for an unrecorded gender and
-  // for every youth squad — see src/lib/gender.js for why it fails open.
+  // for every Tag / Mixed Contact squad — see src/lib/gender.js.
   //
-  // ⚠️ Deliberately NOT wired into `invalid` or the submit guard. The club
-  // has four women in "Senior Men 2nd XV" today; making this block a save
-  // would leave those four players uneditable by anybody.
+  // ⚠️ Deliberately NOT wired into `invalid` or the submit guard, and that is
+  // Jay's explicit ruling of 9 Aug 2026, not an oversight: a CONTRADICTORY
+  // gender warns and saves; only a BLANK one is refused. The club has had four
+  // women in "Senior Men 2nd XV"; making this block a save would have left
+  // those four players uneditable by anybody, including whoever was trying to
+  // correct them.
   const mismatch = squadMismatch(values.gender, selectedTeam?.name)
+
+  // Whether the squad makes the field mandatory. Drives the asterisk and the
+  // aria-required below; the actual refusal happens in handleSubmit.
+  const genderRequired = squadRequiresGender(selectedTeam?.name)
 
   return (
     <Sheet open onClose={onClose} title={editing ? 'Edit player' : 'Add player'}>
@@ -561,8 +595,12 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             shows both OFF and there is no way back to null from this form
             once one is picked. That is the accepted trade — see the null
             discussion in db/migrations/20260807_player_gender.sql. */}
+        {/* "(required)" goes in the LEGEND rather than beside it, because a
+            fieldset's legend is what a screen reader announces with every
+            radio in the group — a separate asterisk next to it is announced
+            once, or not at all, depending on the reader. */}
         <Segmented
-          legend="Gender"
+          legend={genderRequired ? 'Gender (required)' : 'Gender'}
           name="player-gender"
           options={GENDERS}
           value={values.gender}
@@ -570,6 +608,16 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           disabled={saving}
           className="mb-2"
         />
+
+        {/* Says WHY it is required, before they hit Save rather than after.
+            The person has usually just changed the age group, and a field
+            that silently becomes mandatory reads as the app malfunctioning. */}
+        {genderRequired && !values.gender && (
+          <p className="mb-3.5 rounded-[11px] bg-surface px-3 py-2.5 text-[12.5px] text-ink-muted">
+            {selectedTeam.name} is a single-gender squad, so this one has to be
+            answered.
+          </p>
+        )}
 
         {/* Advisory, never blocking. bg-warn-bg (not danger) and phrased as a
             check rather than a correction, because a woman in a men's squad

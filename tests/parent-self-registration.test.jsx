@@ -106,9 +106,12 @@ const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
 const CLUB_ID = 'club-1'
 const TEAM_U13 = { id: 't-u13', club_id: CLUB_ID, name: 'U13', sort_order: 3 }
 const TEAM_U16 = { id: 't-u16', club_id: CLUB_ID, name: 'U16', sort_order: 6 }
+// A single-gender squad, named exactly as the club names them. Gender is
+// REQUIRED on this one and on nothing else here (Jay, 9 Aug 2026).
+const TEAM_U16G = { id: 't-u16g', club_id: CLUB_ID, name: 'U16G Contact', sort_order: 7 }
 // Deliberately out of order: the form sorts by sort_order, like every other
 // age-group list in the app.
-const TEAMS = [TEAM_U16, TEAM_U13]
+const TEAMS = [TEAM_U16G, TEAM_U16, TEAM_U13]
 
 function shellState(overrides = {}) {
   return {
@@ -176,8 +179,11 @@ describe('Add your player — a signed-in account with no access', () => {
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
+    // The third argument is gender, added 9 Aug 2026. NULL here on purpose:
+    // "U13" is a mixed squad, the form never asked, and it must not invent an
+    // answer. The single-gender squad has its own tests further down.
     await waitFor(() =>
-      expect(registerMyPlayerMock).toHaveBeenCalledWith('Chidi Okafor', TEAM_U13.id),
+      expect(registerMyPlayerMock).toHaveBeenCalledWith('Chidi Okafor', TEAM_U13.id, null),
     )
     expect(registerMyPlayerMock).toHaveBeenCalledTimes(1)
 
@@ -197,7 +203,85 @@ describe('Add your player — a signed-in account with no access', () => {
       'Choose an age group…',
       'U13',
       'U16',
+      'U16G Contact',
     ])
+  })
+
+  // ── Gender on a single-gender squad (Jay, 9 Aug 2026) ─────────────────
+  //
+  // ⚠️ THE RULING HAS TWO HALVES AND THEY POINT DIFFERENT WAYS. A blank gender
+  // is REFUSED; a gender that CONTRADICTS the squad is ALLOWED with a warning.
+  // Tests for both live here so nobody "tidies" the first into the second.
+  describe('gender on a single-gender squad', () => {
+    it('does not ask for gender on a mixed squad', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      // Seven of the club's eighteen squads need this. Asking the other
+      // eleven's families anyway is how an optional question gets answered
+      // wrongly just to get past it.
+      expect(screen.queryByRole('radio', { name: /^female$/i })).not.toBeInTheDocument()
+    })
+
+    it('reveals the field as soon as a single-gender squad is chosen', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
+      expect(screen.getByRole('radio', { name: /^female$/i })).toBeInTheDocument()
+      // Says WHY, naming the squad. A field that silently becomes mandatory
+      // reads as the app malfunctioning.
+      expect(screen.getByText(/U16G Contact is a single-gender squad/i)).toBeInTheDocument()
+    })
+
+    it('refuses a blank gender without spending a round trip', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      await user.type(screen.getByLabelText(/player's full name/i), 'Amara Bello')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/U16G Contact/i)
+      // The database refuses this too (errcode 22004). The client check exists
+      // so the common case does not cost a request — if this ever fires, the
+      // request was never made.
+      expect(registerMyPlayerMock).not.toHaveBeenCalled()
+    })
+
+    it('passes the chosen gender through as the third argument', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      await user.type(screen.getByLabelText(/player's full name/i), 'Amara Bello')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
+      await user.click(screen.getByRole('radio', { name: /^female$/i }))
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      await waitFor(() =>
+        expect(registerMyPlayerMock).toHaveBeenCalledWith('Amara Bello', TEAM_U16G.id, 'female'),
+      )
+    })
+
+    // ⚠️ THE HALF PEOPLE WILL WANT TO "FIX". A male player in U16G Contact is
+    // allowed through. The club has had four women recorded in Senior Men 2nd
+    // XV — a real arrangement, not a data error — and blocking it would make
+    // such a player unrecordable by anyone, including whoever is trying to
+    // correct them. Only ABSENCE is refused.
+    it('lets a contradictory gender through rather than blocking it', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      await user.type(screen.getByLabelText(/player's full name/i), 'Sam Reid')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
+      await user.click(screen.getByRole('radio', { name: /^male$/i }))
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      await waitFor(() =>
+        expect(registerMyPlayerMock).toHaveBeenCalledWith('Sam Reid', TEAM_U16G.id, 'male'),
+      )
+    })
   })
 
   it('will not submit a blank name, and does not spend a round trip finding out', async () => {

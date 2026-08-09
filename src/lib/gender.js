@@ -67,21 +67,83 @@ export function canonicalGender(value) {
 // a warning that is usually wrong is one people learn to click past, which
 // costs more than having no warning at all.
 //
-// Only the senior sides carry gender in their names today:
-//   "Senior Men 1st XV", "Senior Men 2nd XV"  -> male
-//   "Women's XV"                              -> female
+// ⚠️ REWRITTEN 9 Aug 2026. Until the club's real squad list landed, the ONLY
+// named-gender squads were the three senior sides, and every youth group was
+// genuinely mixed — so this failed open on all of them, deliberately. The new
+// list is not like that:
+//
+//   single-gender: U12G QR, U14B Contact, U14G QR, U16B Contact,
+//                  U16G Contact, U18B Contact, U18G Contact,
+//                  Senior Men 1st XV, Senior Men 2nd XV, Women's XV
+//   genuinely mixed: every "Tag" and every "Mixed Contact"
+//
+// The suffix is a single B or G welded to the digits with no separator, which
+// is why it needs its own anchored pattern rather than a substring search.
 // ---------------------------------------------------------------------
+
+// ⚠️ THE SUFFIX MUST TOUCH THE DIGITS, and must be the whole token.
+//
+// `[bg]` immediately after the age number, then a negative lookahead for
+// another letter. Both halves are load-bearing:
+//   - touching the digits is what stops "U6 Tag" reading its "T-a-G" as a
+//     girls' squad. The character after "6" is a space, not b or g, so there
+//     is no match at all.
+//   - the lookahead is what stops a future "U14Boys Development" matching on
+//     "B" and then being classified twice by two different rules.
+const SINGLE_GENDER_SUFFIX = /^u\d{1,2}([bg])(?![a-z])/i
+
+// ⚠️ WORD BOUNDARIES, NOT `includes`. This used to be name.includes('men'),
+// which is true of "Development", "Improvers" and any other word with those
+// three letters in a row — so a squad called "U14 Development" would have been
+// silently classified as a men's side. Nothing was named that yet, which is
+// the only reason it never fired.
+const NAMED_FEMALE = /\b(women|women's|girls)\b/i
+const NAMED_MALE = /\b(men|men's|boys)\b/i
+
+/**
+ * The gender a squad's NAME implies, or null when it implies none.
+ *
+ * Still fails open — an unclassifiable squad expects nothing — but the set of
+ * unclassifiable squads is now only the genuinely mixed ones, which is what
+ * makes it safe to act on the result rather than merely mention it.
+ */
 export function squadExpects(teamName) {
   if (typeof teamName !== 'string') return null
-  const name = teamName.toLowerCase()
 
-  // Checked before the men's test so a hypothetical "Senior Men's & Women's
-  // Touch" would match female first rather than being called a men's squad.
-  // Neither string is a substring of the other today; the ordering is here
-  // so that stays true if someone renames a squad.
-  if (name.includes('women') || name.includes("women's") || name.includes('girls')) return 'female'
-  if (name.includes('men') || name.includes('boys')) return 'male'
+  // Female first, so a hypothetical "Senior Men's & Women's Touch" reads as
+  // female rather than being called a men's squad on the strength of the word
+  // that happens to come first.
+  if (NAMED_FEMALE.test(teamName)) return 'female'
+  if (NAMED_MALE.test(teamName)) return 'male'
+
+  const suffix = teamName.trim().match(SINGLE_GENDER_SUFFIX)
+  if (suffix) return suffix[1].toLowerCase() === 'g' ? 'female' : 'male'
+
   return null
+}
+
+/**
+ * Whether this squad is single-gender, and therefore whether a player being
+ * put into it must have a gender recorded.
+ *
+ * ⚠️ THIS IS THE HALF THAT IS ENFORCED. Jay's ruling, 9 Aug 2026: a mismatch
+ * warns loudly and never blocks, but a BLANK gender in a single-gender squad
+ * is refused. Without that second half the rule is decoration — anyone who
+ * doesn't like the warning defeats it by not answering the question, and the
+ * majority of players have no gender recorded, so "not answering" is the path
+ * of least resistance rather than an unusual act.
+ *
+ * Mixed squads are untouched: "U9 Mixed Contact" and every Tag group take a
+ * blank gender exactly as before.
+ */
+export function squadRequiresGender(teamName) {
+  return squadExpects(teamName) !== null
+}
+
+/** The message for a blank gender on a single-gender squad. Named once so the
+ *  four screens that enforce it cannot drift into saying four different things. */
+export function genderRequiredMessage(teamName) {
+  return `${teamName} is a single-gender squad, so this player's gender has to be recorded.`
 }
 
 /**
@@ -90,15 +152,23 @@ export function squadExpects(teamName) {
  *
  * Returns null — not a warning — in all three of these cases, and each one
  * matters:
- *   - gender not recorded. The majority of players. Warning here would put a
- *     banner on almost every form in the app.
- *   - squad not classifiable. Every youth age group. See squadExpects.
+ *   - gender not recorded. Handled by squadRequiresGender instead, which
+ *     REFUSES rather than warns. Warning here as well would put two messages
+ *     on screen about the same missing answer.
+ *   - squad not classifiable. Every Tag and Mixed Contact group.
  *   - they agree. Obviously.
  *
- * ⚠️ THE RESULT IS ADVISORY AND MUST NEVER BLOCK A SAVE. The club has four
- * women recorded in "Senior Men 2nd XV" right now — that is a real squad
- * arrangement, not a data error, and a hard validation would make those four
- * players uneditable by anyone. It is a note, not a gate.
+ * ⚠️ THE RESULT IS ADVISORY AND MUST NEVER BLOCK A SAVE. Re-confirmed by Jay
+ * on 9 Aug 2026 when the single-gender squads arrived: warn loudly, never
+ * block. The club has had four women recorded in "Senior Men 2nd XV" — a real
+ * squad arrangement, not a data error — and a hard validation would have made
+ * those four players uneditable by anyone, including the person trying to fix
+ * them. It is a note, not a gate.
+ *
+ * ⚠️ Do not "tidy" this by merging it with squadRequiresGender. They answer
+ * different questions and Jay ruled on them SEPARATELY: blank is refused,
+ * contradictory is allowed through with a warning. Collapsing them into one
+ * check loses that distinction and quietly turns the warning into a block.
  */
 export function squadMismatch(gender, teamName) {
   if (!gender) return null

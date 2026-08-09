@@ -3,8 +3,10 @@ import {
   GENDERS,
   canonicalGender,
   genderLabel,
+  genderRequiredMessage,
   squadExpects,
   squadMismatch,
+  squadRequiresGender,
 } from '../src/lib/gender.js'
 
 // src/lib/gender.js is pure, so it is tested with plain strings — no render,
@@ -67,15 +69,49 @@ describe('squadExpects', () => {
     expect(squadExpects("Women's XV")).toBe('female')
   })
 
-  // ⚠️ THE WHOLE POINT. Every youth age group at this club is mixed, and they
-  // are the overwhelming majority of the roster. A rule that guessed "U15
-  // means boys" would fire a false warning on every girl in the youth
-  // section. If this test ever goes red because someone "improved" the
-  // matching, the improvement is the bug.
-  it('expects nothing of any youth age group', () => {
-    for (const name of ['U6', 'U7', 'U10', 'U13', 'U15', 'U16', 'U18 Colts']) {
+  // ⚠️ THE MIXED SQUADS ARE THE ONES WORTH PROTECTING. They are most of the
+  // club, and a rule that guessed "U16 means boys" would fire a false warning
+  // on every girl in the youth section — and, since 9 Aug, would also REFUSE
+  // to save them without a gender. If this goes red because someone
+  // "improved" the matching, the improvement is the bug.
+  it('expects nothing of a Tag or Mixed Contact squad', () => {
+    for (const name of [
+      'U6 Tag', 'U7 Tag', 'U8 Tag',
+      'U9 Mixed Contact', 'U10 Mixed Contact', 'U11 Mixed Contact',
+      'U12 Mixed Contact', 'U13 Mixed Contact',
+    ]) {
       expect(squadExpects(name)).toBeNull()
+      expect(squadRequiresGender(name)).toBe(false)
     }
+  })
+
+  // ⚠️ THE TRAP. "U6 Tag" ends in a G. It is a mixed tag squad, not a girls'
+  // squad, and the only thing separating the two readings is that the suffix
+  // must TOUCH the digits. Delete the anchor and every Tag group in the club
+  // becomes girls-only.
+  it('does not read the G in "Tag" as a girls\' suffix', () => {
+    expect(squadExpects('U6 Tag')).toBeNull()
+    expect(squadExpects('U7 Tag')).toBeNull()
+    expect(squadExpects('U8 Tag')).toBeNull()
+  })
+
+  it('reads the B/G suffix on the single-gender youth squads', () => {
+    expect(squadExpects('U12G QR')).toBe('female')
+    expect(squadExpects('U14B Contact')).toBe('male')
+    expect(squadExpects('U14G QR')).toBe('female')
+    expect(squadExpects('U16B Contact')).toBe('male')
+    expect(squadExpects('U16G Contact')).toBe('female')
+    expect(squadExpects('U18B Contact')).toBe('male')
+    expect(squadExpects('U18G Contact')).toBe('female')
+  })
+
+  // The old implementation was name.includes('men'), which is true of
+  // "Development", "Improvers", "Regimental" and anything else with those
+  // three letters adjacent. Nothing was named that yet, which is the only
+  // reason it never fired. Word boundaries now.
+  it('does not read a word merely CONTAINING "men" as a men\'s squad', () => {
+    expect(squadExpects('U14 Development')).toBeNull()
+    expect(squadExpects('Development Squad')).toBeNull()
   })
 
   it('fails open on an unknown or missing squad name', () => {
@@ -116,10 +152,54 @@ describe('squadMismatch', () => {
     expect(squadMismatch('', 'Senior Men 1st XV')).toBeNull()
   })
 
-  it('says nothing about a youth squad, whatever the gender', () => {
-    expect(squadMismatch('female', 'U15')).toBeNull()
-    expect(squadMismatch('male', 'U15')).toBeNull()
-    expect(squadMismatch('female', 'U18 Colts')).toBeNull()
+  it('says nothing about a mixed squad, whatever the gender', () => {
+    expect(squadMismatch('female', 'U13 Mixed Contact')).toBeNull()
+    expect(squadMismatch('male', 'U13 Mixed Contact')).toBeNull()
+    expect(squadMismatch('female', 'U6 Tag')).toBeNull()
+  })
+
+  // ⚠️ JAY'S RULING, 9 Aug 2026: a mismatch WARNS and never blocks. These
+  // assert the message exists — the screens assert that the save still goes
+  // through, because that is a property of the form, not of this function.
+  it('warns on a B/G youth squad the same way it does on the seniors', () => {
+    expect(squadMismatch('male', 'U16G Contact')).toMatch(/Male player in U16G Contact/)
+    expect(squadMismatch('female', 'U14B Contact')).toMatch(/Female player in U14B Contact/)
+    expect(squadMismatch('female', 'U12G QR')).toBeNull()
+    expect(squadMismatch('male', 'U18B Contact')).toBeNull()
+  })
+})
+
+describe('squadRequiresGender', () => {
+  // The enforced half. Blank gender is REFUSED on these; see
+  // genderRequiredMessage and the four screens that call it.
+  it('is true for every single-gender squad, youth and senior', () => {
+    for (const name of [
+      'U12G QR', 'U14B Contact', 'U14G QR', 'U16B Contact',
+      'U16G Contact', 'U18B Contact', 'U18G Contact',
+      'Senior Men 1st XV', 'Senior Men 2nd XV', "Women's XV",
+    ]) {
+      expect(squadRequiresGender(name)).toBe(true)
+    }
+  })
+
+  it('is false for the mixed squads and for junk', () => {
+    expect(squadRequiresGender('U6 Tag')).toBe(false)
+    expect(squadRequiresGender('U13 Mixed Contact')).toBe(false)
+    // ⚠️ Fails OPEN on an unknown name, unlike allowsOwnContact in
+    // ageGroup.js which fails CLOSED. Different stakes: refusing to save a
+    // player because a team row failed to load would be a dead form, whereas
+    // offering a child's own phone field by accident is a safeguarding
+    // failure. The asymmetry is deliberate and is why it is stated here.
+    expect(squadRequiresGender(undefined)).toBe(false)
+    expect(squadRequiresGender('')).toBe(false)
+    expect(squadRequiresGender('Touch')).toBe(false)
+  })
+})
+
+describe('genderRequiredMessage', () => {
+  it('names the squad, so the person knows which field is the problem', () => {
+    expect(genderRequiredMessage('U16G Contact')).toMatch(/U16G Contact/)
+    expect(genderRequiredMessage('U16G Contact')).toMatch(/gender/i)
   })
 })
 

@@ -185,3 +185,59 @@ describe('toInsertRows', () => {
     expect(toInsertRows(r, { clubId: 'club-1' })).toEqual([])
   })
 })
+
+// ── Gender required on a single-gender squad (Jay, 9 Aug 2026) ──────────
+//
+// ⚠️ WHY THE IMPORTER AND NOT JUST THE FORMS. This is the path that creates
+// players in bulk. A rule enforced on the one-at-a-time form and skipped on
+// the 200-row paste is a rule that applies to almost no rows in practice.
+describe('gender required on a single-gender squad', () => {
+  const SQUADS = [
+    { id: 'team-u6', name: 'U6 Tag' },            // mixed — and ends in a G
+    { id: 'team-u13', name: 'U13 Mixed Contact' },// mixed
+    { id: 'team-u16g', name: 'U16G Contact' },    // girls
+    { id: 'team-1xv', name: 'Senior Men 1st XV' },// men
+  ]
+  const p = (text) => parsePlayerPaste(text, { teams: SQUADS })
+
+  it('rejects a blank gender on a single-gender squad, naming the squad', () => {
+    const r = p('Amara Bello\tProp\tU16G Contact')
+    expect(r.rows[0].ok).toBe(false)
+    expect(r.rows[0].errors.join(' ')).toMatch(/U16G Contact is single-gender/)
+  })
+
+  it('accepts the same row once the gender column is filled in', () => {
+    const r = p('Amara Bello\tProp\tU16G Contact\tF')
+    expect(r.rows[0].errors).toEqual([])
+    expect(r.rows[0].gender).toBe('female')
+  })
+
+  // ⚠️ THE HALF THAT LOOKS LIKE A BUG AND IS NOT. Only ABSENCE is refused. A
+  // contradiction is a real squad arrangement to be looked at, not a parse
+  // failure — and an importer that rejected it would make such a player
+  // impossible to load at all.
+  it('imports a CONTRADICTORY gender rather than rejecting the row', () => {
+    const r = p('Sam Reid\tProp\tU16G Contact\tM')
+    expect(r.rows[0].ok).toBe(true)
+    expect(r.rows[0].gender).toBe('male')
+  })
+
+  it('leaves the mixed squads alone, including the ones whose names end in G', () => {
+    const r = p('Tom Fletcher\tProp\tU6 Tag\nChidi Okafor\tHooker\tU13 Mixed Contact')
+    expect(r.rows.map((row) => row.errors)).toEqual([[], []])
+    expect(r.rows.map((row) => row.gender)).toEqual([null, null])
+  })
+
+  it('applies to the senior sides too, which are also single-gender', () => {
+    expect(p('Joe Bloggs\tProp\tSenior Men 1st XV').rows[0].ok).toBe(false)
+    expect(p('Joe Bloggs\tProp\tSenior Men 1st XV\tM').rows[0].ok).toBe(true)
+  })
+
+  // An unknown squad already fails on its own error. Adding a second,
+  // confusing "gender is required" on top of "that isn't one of your age
+  // groups" would send someone hunting for the wrong problem.
+  it('says nothing about gender when the squad itself is unknown', () => {
+    const r = p('Joe Bloggs\tProp\tU99 Nonsense')
+    expect(r.rows[0].errors.join(' ')).not.toMatch(/gender/i)
+  })
+})

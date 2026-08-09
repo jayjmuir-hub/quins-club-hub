@@ -363,6 +363,9 @@ export async function claimRosterAccess() {
 //          parent is most likely to hit by accident (a double submit that did
 //          not look like it worked), so it says what to do rather than just
 //          refusing.
+//   22004  one raise, added 9 Aug 2026: a blank gender on a single-gender
+//          squad. ⚠️ DELIBERATELY ABSENT FROM THE MAP BELOW — see the note
+//          there. It gets its own code for exactly that reason.
 const REGISTER_MESSAGES = {
   42501:
     'Please confirm your email address before adding a player. Check your inbox for the ' +
@@ -374,6 +377,14 @@ const REGISTER_MESSAGES = {
   42901:
     "You already have players waiting to be approved, so we haven't added another. " +
     'The club will review them — please wait rather than adding more.',
+  // ⚠️ NO 22004 ENTRY, AND THE ABSENCE IS THE POINT. The gender-required guard
+  // raises 22004 rather than joining the three raises under 22023 precisely so
+  // that its server message — which NAMES THE SQUAD ("U16G Contact is a
+  // single-gender squad, so…") — falls through to `error.message` below and
+  // reaches the parent intact. An entry here would replace it with a generic
+  // sentence and throw away the only part that explains why a field they
+  // ignored a moment ago suddenly matters. If you add one, delete the distinct
+  // errcode in the migration too, because it would no longer be doing anything.
 }
 
 const REGISTER_FALLBACK = "We couldn't add that player. Try again in a moment."
@@ -388,8 +399,8 @@ const REGISTER_FALLBACK = "We couldn't add that player. Try again in a moment."
  * rows, not columns, so an owner-insert policy on players would hand them
  * `team_id`, the column that decides whose children they can see.
  *
- * ⚠️ TWO ARGUMENTS, AND NO MORE. There is deliberately no club id and no email
- * parameter:
+ * ⚠️ THREE ARGUMENTS, AND NO MORE. There is deliberately no club id and no
+ * email parameter:
  *   - the club is derived from the team, server-side. A caller-supplied club
  *     could point the membership at a different club from the player, and
  *     every visibility check downstream assumes those agree;
@@ -406,10 +417,15 @@ const REGISTER_FALLBACK = "We couldn't add that player. Try again in a moment."
  * error so a caller that wants to branch on the reason still can without
  * going anywhere near the wording.
  */
-export async function registerMyPlayer(fullName, teamId) {
+export async function registerMyPlayer(fullName, teamId, gender = null) {
   const { data, error } = await supabase.rpc('register_my_player', {
     p_full_name: fullName,
     p_team_id: teamId,
+    // Required by the FUNCTION when the squad is single-gender, optional
+    // otherwise — the rule lives in private.squad_expects_gender, not here, so
+    // this parameter is simply passed through. Defaults to null so a caller
+    // registering into a mixed squad reads the same as it always did.
+    p_gender: gender ?? null,
   })
 
   if (error) {

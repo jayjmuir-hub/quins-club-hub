@@ -1979,7 +1979,7 @@ describe('createInvite (multi-target)', () => {
 // query.
 
 describe('registerMyPlayer', () => {
-  it('calls the RPC with exactly the two parameters it takes, and returns the pending row', async () => {
+  it('calls the RPC with exactly the three parameters it takes, and returns the pending row', async () => {
     const membership = {
       id: 'mm-1',
       profile_id: 'user-1',
@@ -1991,15 +1991,21 @@ describe('registerMyPlayer', () => {
 
     const result = await registerMyPlayer('Sam Muir', 't-u13')
 
-    // ⚠️ TWO ARGUMENTS, AND THE ABSENT ONES ARE THE POINT. There is no
-    // club id (it is derived from the team server-side, so a caller cannot
+    // ⚠️ THREE ARGUMENTS, AND THE ABSENT ONES ARE STILL THE POINT. There is
+    // no club id (it is derived from the team server-side, so a caller cannot
     // point the membership at a different club from the player) and no email
     // (it is read from auth.users, so a typed address is never evidence).
     // Asserting the exact object is what stops either being added later
     // without somebody having to justify it.
+    //
+    // p_gender arrived 9 Aug 2026 and is NULL here on purpose: the caller
+    // passed none, and the function requires one only when the SQUAD is
+    // single-gender. Sending undefined instead would drop the key and change
+    // which Postgres overload PostgREST resolves.
     expect(supabase.rpc).toHaveBeenCalledWith('register_my_player', {
       p_full_name: 'Sam Muir',
       p_team_id: 't-u13',
+      p_gender: null,
     })
     expect(supabase.rpc).toHaveBeenCalledTimes(1)
     expect(result).toEqual(membership)
@@ -2041,6 +2047,39 @@ describe('registerMyPlayer', () => {
     })
 
     await expect(registerMyPlayer('Sam Muir', 't-u13')).rejects.toThrow(/duplicate key/i)
+  })
+
+  // ⚠️ 22004 IS DELIBERATELY UNMAPPED, AND THIS IS THE TEST THAT SAYS SO.
+  //
+  // The gender-required guard raises its own code precisely so its server
+  // message — which NAMES THE SQUAD — falls through to the database text above
+  // and reaches the parent intact. Lumping it in with 22023 would replace it
+  // with a generic sentence about names and age groups, throwing away the only
+  // part that explains why a field they ignored a moment ago now matters.
+  it('passes the single-gender message through verbatim, squad name and all', async () => {
+    supabase.rpc.mockResolvedValue({
+      data: null,
+      error: {
+        code: '22004',
+        message: "U16G Contact is a single-gender squad, so the player's gender has to be recorded.",
+      },
+    })
+
+    await expect(registerMyPlayer('Sam Muir', 't-u16g', null)).rejects.toThrow(
+      /U16G Contact is a single-gender squad/i,
+    )
+  })
+
+  it('sends the gender when one is given', async () => {
+    supabase.rpc.mockResolvedValue({ data: { id: 'mm-1', status: 'pending' }, error: null })
+
+    await registerMyPlayer('Amara Bello', 't-u16g', 'female')
+
+    expect(supabase.rpc).toHaveBeenCalledWith('register_my_player', {
+      p_full_name: 'Amara Bello',
+      p_team_id: 't-u16g',
+      p_gender: 'female',
+    })
   })
 })
 

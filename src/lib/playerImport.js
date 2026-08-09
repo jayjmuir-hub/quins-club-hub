@@ -16,7 +16,7 @@
 // the team is unknown or unwritable, but that is a *reporting* convenience so
 // the preview can grey the row out. RLS is what actually refuses the insert.
 import { canonicalPosition } from './positions.js'
-import { canonicalGender } from './gender.js'
+import { canonicalGender, squadRequiresGender } from './gender.js'
 
 // Word-joiner, BOM, non-breaking space and the smart quote family. Excel and
 // Word insert these silently and they are invisible in the preview, so a name
@@ -175,6 +175,25 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam } = {}) {
       else if (typeof canEditTeam === 'function' && !canEditTeam(team.id)) {
         errors.push(`You can't add players to ${team.name}`)
       }
+    }
+
+    // ⚠️ GENDER IS REQUIRED WHEN THE SQUAD IS SINGLE-GENDER (Jay, 9 Aug 2026).
+    //
+    // Checked HERE, after the team is resolved, because the requirement is a
+    // property of the squad rather than of the cell — a blank gender is
+    // perfectly fine in the eleven mixed squads and is only a problem in the
+    // seven single-gender ones.
+    //
+    // ⚠️ And it is checked in the IMPORTER, not only in the forms, because
+    // this is the path that creates players in bulk. A rule enforced on the
+    // one-at-a-time form and skipped on the 200-row paste is a rule that
+    // applies to almost no rows in practice.
+    //
+    // As everywhere else: only ABSENCE is an error. A row saying "male" in a
+    // girls' squad imports, because a contradiction is a real arrangement to
+    // be looked at rather than a parse failure.
+    if (team && gender === null && genderCell.trim() === '' && squadRequiresGender(team.name)) {
+      errors.push(`${team.name} is single-gender, so gender is required`)
     }
 
     rows.push({

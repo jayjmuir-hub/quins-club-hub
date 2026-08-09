@@ -80,13 +80,21 @@ import Roster from '../src/screens/Roster.jsx'
 const CLUB = 'club-1'
 const TEAM_U14 = { id: 't-u14', club_id: CLUB, name: 'U14', sort_order: 9 }
 const TEAM_MEN = { id: 't-men', club_id: CLUB, name: 'Senior Men 2nd XV', sort_order: 14 }
-const TEAMS = [TEAM_U14, TEAM_MEN]
+// A single-gender YOUTH squad, named exactly as the club names them. Gender is
+// REQUIRED on this one (Jay, 9 Aug 2026); U14 above is mixed and is not.
+const TEAM_U16G = { id: 't-u16g', club_id: CLUB, name: 'U16G Contact', sort_order: 13 }
+const TEAMS = [TEAM_U14, TEAM_U16G, TEAM_MEN]
 
 const base = { club_id: CLUB, position: 'Flanker', is_captain: false, photo_path: null }
 const MY_CHILD = { ...base, id: 'p-mine', team_id: 't-u14', full_name: 'Tyler Muir', gender: null }
 const A_GIRL = { ...base, id: 'p-girl', team_id: 't-u14', full_name: 'Amy Rose', gender: 'female' }
 const A_BOY = { ...base, id: 'p-boy', team_id: 't-u14', full_name: 'Ben Shaw', gender: 'male' }
 const UNKNOWN = { ...base, id: 'p-unk', team_id: 't-u14', full_name: 'Chris Dale', gender: null }
+// In a single-gender squad with NOTHING recorded — the state the requirement
+// exists to stop being saved back unchanged.
+const GIRL_NO_GENDER = {
+  ...base, id: 'p-ng', team_id: 't-u16g', full_name: 'Amara Bello', gender: null,
+}
 const WOMAN_IN_MENS = {
   ...base, id: 'p-wm', team_id: 't-men', full_name: 'Dana Reid', gender: 'female',
 }
@@ -302,5 +310,114 @@ describe('MyPlayerForm — a parent setting it on their own child', () => {
     expect(screen.queryByLabelText('Full name')).toBeNull()
     expect(screen.queryByLabelText('Age group')).toBeNull()
     expect(screen.queryByLabelText('Position')).toBeNull()
+  })
+})
+
+// ── Gender REQUIRED on a single-gender squad (Jay, 9 Aug 2026) ──────────
+//
+// ⚠️ TWO RULES THAT POINT DIFFERENT WAYS, and the whole reason this block
+// exists is so nobody collapses them into one:
+//
+//   BLANK gender on a single-gender squad -> REFUSED
+//   gender that CONTRADICTS the squad     -> ALLOWED, with a warning
+//
+// The second is the one that looks like a bug. It is not: the club has had
+// four women recorded in "Senior Men 2nd XV", and blocking it would make such
+// a player uneditable by anybody, including whoever is trying to correct them.
+const PARENT_OF_GIRL = [
+  { id: 'm-pg', role: 'parent', team_id: 't-u16g', player_id: 'p-ng', club_id: CLUB },
+]
+
+describe('PlayerForm — gender required on a single-gender squad', () => {
+  it('marks the field required and refuses the save, naming the squad', async () => {
+    const user = await renderRoster(ADMIN, [GIRL_NO_GENDER])
+    const dialog = await openSheet(user, 'Amara Bello')
+    await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
+    await screen.findByLabelText('Full name')
+
+    expect(screen.getByText(/Gender \(required\)/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/U16G Contact/i)
+    // Nothing was written. A validation failure that still fires the write is
+    // the failure mode worth pinning here.
+    expect(upsertPlayerMock).not.toHaveBeenCalled()
+  })
+
+  it('saves once the gender is answered', async () => {
+    const user = await renderRoster(ADMIN, [GIRL_NO_GENDER])
+    const dialog = await openSheet(user, 'Amara Bello')
+    await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
+    await screen.findByLabelText('Full name')
+
+    await user.click(inForm('Female'))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
+    expect(upsertPlayerMock.mock.calls[0][0]).toMatchObject({ gender: 'female' })
+  })
+
+  // ⚠️ THE ASYMMETRY. Warns, saves anyway.
+  it('warns about a contradictory gender but still saves it', async () => {
+    const user = await renderRoster(ADMIN, [GIRL_NO_GENDER])
+    const dialog = await openSheet(user, 'Amara Bello')
+    await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
+    await screen.findByLabelText('Full name')
+
+    await user.click(inForm('Male'))
+    expect(screen.getByText(/Male player in U16G Contact/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
+    expect(upsertPlayerMock.mock.calls[0][0]).toMatchObject({ gender: 'male' })
+  })
+
+  it('leaves a mixed squad optional, as it has always been', async () => {
+    const user = await renderRoster(ADMIN, [UNKNOWN])
+    const dialog = await openSheet(user, 'Chris Dale')
+    await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
+    await screen.findByLabelText('Full name')
+
+    expect(screen.queryByText(/Gender \(required\)/i)).toBeNull()
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    // U14 is mixed: a blank gender is a legitimate answer and always was.
+    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
+    expect(upsertPlayerMock.mock.calls[0][0]).toMatchObject({ gender: null })
+  })
+})
+
+describe('MyPlayerForm — gender required on a single-gender squad', () => {
+  // ⚠️ THE PARENT FORM MATTERS MOST. These are the people filling in the data
+  // during the pilot; exempting this screen would mean the rule applies to
+  // everyone except the ones actually typing.
+  it('refuses the save and writes NOTHING, not even the parent rows', async () => {
+    const user = await renderRoster(PARENT_OF_GIRL, [GIRL_NO_GENDER])
+    const dialog = await openSheet(user, 'Amara Bello')
+    await user.click(within(dialog).getByRole('button', { name: /update details/i }))
+    await screen.findByRole('button', { name: /save changes/i })
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/U16G Contact/i)
+    // The guard runs BEFORE the first side effect. saveParents is the last
+    // write in the sequence and the photo upload is the first — if either had
+    // fired, the check is in the wrong place.
+    expect(saveParentsMock).not.toHaveBeenCalled()
+    expect(setOwnPlayerGenderMock).not.toHaveBeenCalled()
+  })
+
+  it('saves through the RPC once the gender is answered', async () => {
+    const user = await renderRoster(PARENT_OF_GIRL, [GIRL_NO_GENDER])
+    const dialog = await openSheet(user, 'Amara Bello')
+    await user.click(within(dialog).getByRole('button', { name: /update details/i }))
+    await screen.findByRole('button', { name: /save changes/i })
+
+    await user.click(inForm('Female'))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(setOwnPlayerGenderMock).toHaveBeenCalledWith('p-ng', 'female'))
+    // Still never the table write — a parent holds no `player edit`.
+    expect(upsertPlayerMock).not.toHaveBeenCalled()
   })
 })

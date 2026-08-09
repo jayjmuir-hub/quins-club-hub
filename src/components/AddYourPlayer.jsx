@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { registerMyPlayer } from '../data/members.js'
+import Segmented from './Segmented.jsx'
+import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
 
 // What a signed-in account with NO membership sees FIRST: add your player.
 //
@@ -67,6 +69,9 @@ function Shell({ title, children }) {
 export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess, children }) {
   const [fullName, setFullName] = useState('')
   const [teamId, setTeamId] = useState('')
+  // null, not '' — matches players.gender, which is nullable and has a CHECK
+  // that refuses the empty string. Most squads never ask for it.
+  const [gender, setGender] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -78,6 +83,11 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
     if (orderDiff !== 0) return orderDiff
     return a.name.localeCompare(b.name)
   })
+
+  // Whether the CHOSEN squad makes gender mandatory, so the field appears the
+  // moment they pick U16G Contact rather than after a rejected submit.
+  const selectedTeam = sortedTeams.find((team) => team.id === teamId)
+  const genderRequired = squadRequiresGender(selectedTeam?.name)
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -96,10 +106,23 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
       return
     }
 
+    // ⚠️ Gender is required only when the SQUAD is single-gender (Jay, 9 Aug
+    // 2026). Mirrors the guard inside register_my_player, which is what
+    // actually enforces it — this exists so the common case does not cost a
+    // round trip, exactly like the name checks above.
+    //
+    // Note the asymmetry with the mismatch rule: a gender that CONTRADICTS the
+    // squad is allowed through here and everywhere else. Only a blank is
+    // refused. Do not "tighten" this into a match check.
+    if (squadRequiresGender(selectedTeam?.name) && !gender) {
+      setError(genderRequiredMessage(selectedTeam.name))
+      return
+    }
+
     setError(null)
     setSubmitting(true)
     try {
-      await registerMyPlayer(name, teamId)
+      await registerMyPlayer(name, teamId, gender)
       // No success state on purpose: reloading the provider gives this person
       // a membership, so AppShell stops rendering this component entirely and
       // shows them the app with the waiting-to-be-approved banner. A
@@ -202,6 +225,28 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
             </option>
           ))}
         </select>
+
+        {/* ⚠️ CONDITIONAL, not always-on. Asking every parent in the club for
+            their child's gender when only seven of the eighteen squads need it
+            is a question most families should never see — and an optional
+            question on a sign-up form is one people answer wrongly to get
+            past it. It appears when the squad demands it, and says why. */}
+        {genderRequired && (
+          <>
+            <p className="mt-4 rounded-[11px] bg-surface px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-muted">
+              {selectedTeam.name} is a single-gender squad, so we need this one.
+            </p>
+            <Segmented
+              legend="Gender (required)"
+              name="register-player-gender"
+              options={GENDERS}
+              value={gender}
+              onChange={setGender}
+              disabled={submitting}
+              className="mt-2"
+            />
+          </>
+        )}
 
         <button
           type="submit"
