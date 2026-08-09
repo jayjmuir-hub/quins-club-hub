@@ -11,6 +11,7 @@ import { listParents, saveParents } from '../data/parents.js'
 import { deletePlayerPhoto, forgetPhotoUrl, setOwnPlayerPhoto, uploadPlayerPhoto } from '../data/photos.js'
 import { allowsOwnContact } from '../lib/ageGroup.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
+import { toEditorRows, toSaveRows } from '../lib/parentRows.js'
 
 // The self-service form: what a PARENT or the PLAYER themselves can change on
 // their own record — the photo, the player's own contact details, the
@@ -80,7 +81,11 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
     Promise.allSettled([listParents(player.id), showOwnContact ? getPlayerContact(player.id) : null])
       .then(([parentsResult, contactResult]) => {
         if (!mounted) return
-        if (parentsResult.status === 'fulfilled') setParents(parentsResult.value ?? [])
+        // !! toEditorRows, NOT the raw rows. ParentsEditor holds a phone as
+        // phoneCountry + phoneNational; handing it the database's single
+        // `phone` string rendered the field BLANK for a parent who had one on
+        // file. See src/lib/parentRows.js for the whole bug.
+        if (parentsResult.status === 'fulfilled') setParents(toEditorRows(parentsResult.value))
         if (contactResult.status === 'fulfilled' && contactResult.value) {
           const split = splitPhone(contactResult.value.phone ?? '')
           setPhoneCountry(split.country)
@@ -150,7 +155,14 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
         })
       }
 
-      await saveParents(player.id, parents)
+      // ⚠️ toSaveRows, NOT the editor rows. This line used to pass them
+      // straight through, and toRow() in src/data/parents.js reads
+      // `parent.phone`. On a NEW editor row that key does not exist, so null
+      // was written; on an EXISTING row it still held the OLD value, so the
+      // parent's edit was discarded in favour of what was already there.
+      // Either way the save reported success. See src/lib/parentRows.js for a
+      // precise account of what it did and did not do.
+      await saveParents(player.id, toSaveRows(parents))
 
       onSaved?.()
       onClose?.()

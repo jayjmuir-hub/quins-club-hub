@@ -419,6 +419,13 @@ describe('More — what it deliberately does NOT do', () => {
 describe('More — the You card is editable', () => {
   const user = () => userEvent.setup()
 
+  // ⚠️ THE CARD IS READ-ONLY UNTIL "Edit" IS PRESSED (Jay, 9 Aug 2026): "could
+  // get messed up with some errant screen taps even though they would need to
+  // hit save". Every test below that edits anything opens the editor first.
+  async function startEditing(u) {
+    await u.click(await screen.findByRole('button', { name: 'Edit' }))
+  }
+
   it('fills itself in from the profile row', async () => {
     getMyProfileMock.mockResolvedValue({
       id: 'user-1',
@@ -446,22 +453,33 @@ describe('More — the You card is editable', () => {
       phone: '+971501234567',
     })
 
+    const u = user()
     renderMore()
 
     // In: the split. AE from the +971, digits in the box without it.
     expect(await screen.findByDisplayValue('501234567')).toBe(screen.getByLabelText('Phone'))
     expect(screen.getByLabelText('Phone country')).toHaveValue('AE')
 
-    // Out: the join, unchanged by the round trip.
-    await user().click(screen.getByRole('button', { name: 'Save' }))
+    // ⚠️ Out via an edit to a DIFFERENT field. Saving an untouched row is no
+    // longer possible — Save only appears once something has changed — so the
+    // property is asserted the way it actually matters: the phone survives an
+    // edit to something else, rather than being re-derived and mangled.
+    await startEditing(u)
+    const first = screen.getByLabelText('First name')
+    await u.clear(first)
+    await u.type(first, 'Janet')
+    await u.click(screen.getByRole('button', { name: 'Save' }))
+
     expect(updateMyProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({ phone: '+971501234567' }),
     )
   })
 
   it('saves the name and phone the person typed, and says so', async () => {
+    const u = user()
     renderMore()
 
+    await startEditing(u)
     const first = await screen.findByDisplayValue('Jay')
     await user().clear(first)
     await user().type(first, 'Janice')
@@ -493,7 +511,9 @@ describe('More — the You card is editable', () => {
       phone: '+971501234567',
     })
 
+    const u = user()
     renderMore()
+    await startEditing(u)
     await user().clear(await screen.findByDisplayValue('501234567'))
     await user().click(screen.getByRole('button', { name: 'Save' }))
 
@@ -503,12 +523,20 @@ describe('More — the You card is editable', () => {
   it('shows what went wrong when the save is refused', async () => {
     updateMyProfileMock.mockRejectedValue(new Error("We couldn't save your details. Try again."))
 
+    const u = user()
     renderMore()
-    await screen.findByDisplayValue('Jay')
-    await user().click(screen.getByRole('button', { name: 'Save' }))
+    await startEditing(u)
+    // Save only exists once something has changed, so there is something to
+    // change. Any field will do; the assertion is about the failure, not this.
+    await u.type(await screen.findByDisplayValue('Jay'), 'ne')
+    await u.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't save your details/i)
     expect(screen.queryByText('Saved')).not.toBeInTheDocument()
+    // ⚠️ AND IT STAYS IN EDIT MODE. Dropping back to read-only on a FAILED
+    // save would hide the values the person typed behind an Edit button, and
+    // they would have to retype them to try again.
+    expect(screen.getByLabelText('First name')).not.toBeDisabled()
   })
 
   it('does NOT let anyone edit their email', async () => {
@@ -553,9 +581,11 @@ describe('More — the You card is editable', () => {
     // The allow-list, restated as a test. Any extra key here is a column the
     // client has no privilege on, and the whole update would fail — so an
     // over-eager `...profile` spread must not creep into the submit handler.
+    const u = user()
     renderMore()
-    await screen.findByDisplayValue('Jay')
-    await user().click(screen.getByRole('button', { name: 'Save' }))
+    await startEditing(u)
+    await u.type(await screen.findByDisplayValue('Jay'), 'ne')
+    await u.click(screen.getByRole('button', { name: 'Save' }))
 
     const [fields] = updateMyProfileMock.mock.calls[0]
     expect(Object.keys(fields).sort()).toEqual(['firstName', 'lastName', 'phone', 'profileId'])
@@ -613,5 +643,109 @@ describe('More — the approvals link', () => {
     renderMore()
     await screen.findByDisplayValue('Jay')
     expect(approvalsLink()).toBeNull()
+  })
+})
+
+// ── The You card is read-only until you say otherwise ──────────────────
+//
+// Jay, 9 Aug 2026: "right now they can just instantly edit the info, could get
+// messed up with some errant screen taps even though they would need to hit
+// save, should be an edit button then save would appear if they make any edits".
+//
+// ⚠️ THE REASON IS SPECIFIC TO THIS SCREEN. /more is opened for the sign-out
+// button, the privacy policy and the calendar link — the reasons people come
+// here are mostly NOT editing. Live inputs at the top of it put three focusable
+// boxes holding someone's real name under a thumb on every visit, for a task
+// they are usually not doing.
+describe('More — the You card is read-only until Edit', () => {
+  const user = () => userEvent.setup()
+
+  it('disables every field and offers no Save until Edit is pressed', async () => {
+    renderMore()
+
+    expect(await screen.findByLabelText('First name')).toBeDisabled()
+    expect(screen.getByLabelText('Family name')).toBeDisabled()
+    expect(screen.getByLabelText('Phone')).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+  })
+
+  it('still SHOWS the values, rather than hiding them behind the button', async () => {
+    // Read-only must not mean invisible: "what does the club hold about me?"
+    // is the question this card exists to answer.
+    renderMore()
+    expect(await screen.findByDisplayValue('Jay')).toBeInTheDocument()
+  })
+
+  it('makes the fields editable when Edit is pressed', async () => {
+    const u = user()
+    renderMore()
+    await u.click(await screen.findByRole('button', { name: 'Edit' }))
+
+    expect(screen.getByLabelText('First name')).not.toBeDisabled()
+    expect(screen.getByLabelText('Phone')).not.toBeDisabled()
+  })
+
+  // ⚠️ JAY'S EXACT ASK: "save would appear if they make any edits". A Save
+  // button that is present but does nothing teaches people that pressing Save
+  // is meaningless — a habit you do not want carried to the screens where it
+  // isn't.
+  it('shows no Save until something has actually changed', async () => {
+    const u = user()
+    renderMore()
+    await u.click(await screen.findByRole('button', { name: 'Edit' }))
+
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+
+    await u.type(screen.getByLabelText('First name'), 'ne')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+  })
+
+  // Compared against the SAVED row, not a snapshot taken when Edit was pressed:
+  // typing a change and undoing it by hand leaves the person where they
+  // started, and offering to save that is offering to write what is already
+  // there.
+  it('withdraws Save again when the change is typed back out', async () => {
+    const u = user()
+    renderMore()
+    await u.click(await screen.findByRole('button', { name: 'Edit' }))
+
+    const first = screen.getByLabelText('First name')
+    await u.type(first, 'ne')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+
+    await u.clear(first)
+    await u.type(first, 'Jay')
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+  })
+
+  it('puts the stored values back when Cancel is pressed', async () => {
+    const u = user()
+    renderMore()
+    await u.click(await screen.findByRole('button', { name: 'Edit' }))
+
+    const first = screen.getByLabelText('First name')
+    await u.clear(first)
+    await u.type(first, 'Nonsense')
+    await u.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    // Cancel means cancel — not "stop editing and keep the half-typed text".
+    expect(screen.getByLabelText('First name')).toHaveValue('Jay')
+    expect(screen.getByLabelText('First name')).toBeDisabled()
+    expect(updateMyProfileMock).not.toHaveBeenCalled()
+  })
+
+  it('returns to read-only after a successful save', async () => {
+    const u = user()
+    renderMore()
+    await u.click(await screen.findByRole('button', { name: 'Edit' }))
+    await u.type(screen.getByLabelText('First name'), 'ne')
+    await u.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByText('Saved')
+    // Leaving the fields live would put the person straight back into the
+    // state this whole change exists to avoid.
+    expect(screen.getByLabelText('First name')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
   })
 })

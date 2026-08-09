@@ -96,6 +96,16 @@ function YouCard({ profile, email, role, squads }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(false)
+  // ⚠️ READ-ONLY UNTIL "Edit" IS PRESSED (Jay, 9 Aug 2026): "could get messed
+  // up with some errant screen taps even though they would need to hit save".
+  //
+  // He is right, and the reason is specific to this screen rather than a
+  // general preference. /more is opened for the sign-out button, the privacy
+  // policy and the calendar link — the reasons people come here are mostly NOT
+  // editing. Live inputs at the top of it mean every visit puts three
+  // focusable text boxes under a thumb on a phone, holding the person's real
+  // name, for a task they are usually not doing.
+  const [editing, setEditing] = useState(false)
 
   // ⚠️ SEED ONCE PER PROFILE, NOT ON EVERY PROFILE OBJECT. useMyProfile
   // resolves asynchronously, so the first render has no row and the fields
@@ -119,6 +129,31 @@ function YouCard({ profile, email, role, squads }) {
     setPhoneCountry(split.country)
     setPhoneNational(split.national)
   }, [profile])
+
+  // ⚠️ COMPARED AGAINST THE SAVED ROW, NOT A SNAPSHOT TAKEN WHEN EDIT WAS
+  // PRESSED. Typing a change and then undoing it by hand leaves the person
+  // exactly where they started, and offering to save that is offering to write
+  // the values that are already there.
+  //
+  // The phone is compared JOINED, because that is the form it is stored in:
+  // comparing the two halves would call a row dirty whenever splitPhone
+  // normalised a legacy number differently from the way it was typed.
+  const dirty =
+    firstName !== (profile?.first_name ?? '') ||
+    lastName !== (profile?.last_name ?? '') ||
+    joinPhone(phoneCountry, phoneNational) !== (profile?.phone ?? null)
+
+  function cancelEditing() {
+    // Put back what is stored, so Cancel means cancel rather than "stop editing
+    // and keep whatever half-typed text is on screen".
+    setFirstName(profile?.first_name ?? '')
+    setLastName(profile?.last_name ?? '')
+    const split = splitPhone(profile?.phone ?? '')
+    setPhoneCountry(split.country)
+    setPhoneNational(split.national)
+    setError(null)
+    setEditing(false)
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -144,6 +179,9 @@ function YouCard({ profile, email, role, squads }) {
       // not "the masthead changed as I hit save".
       primeMyProfileCache(profile.id, updated)
       setSaved(true)
+      // Back to read-only. Leaving the fields live after a save would put the
+      // person straight back in the state this change exists to avoid.
+      setEditing(false)
     } catch (err) {
       setError(err.message || "We couldn't save your details. Try again.")
     } finally {
@@ -174,7 +212,7 @@ function YouCard({ profile, email, role, squads }) {
               autoComplete="given-name"
               className={FIELD}
               value={firstName}
-              disabled={saving || !ready}
+              disabled={saving || !ready || !editing}
               onChange={(event) => setFirstName(event.target.value)}
             />
           </div>
@@ -190,7 +228,7 @@ function YouCard({ profile, email, role, squads }) {
               autoComplete="family-name"
               className={FIELD}
               value={lastName}
-              disabled={saving || !ready}
+              disabled={saving || !ready || !editing}
               onChange={(event) => setLastName(event.target.value)}
             />
           </div>
@@ -203,19 +241,51 @@ function YouCard({ profile, email, role, squads }) {
             national={phoneNational}
             onCountryChange={setPhoneCountry}
             onNationalChange={setPhoneNational}
-            disabled={saving || !ready}
+            disabled={saving || !ready || !editing}
           />
         </div>
 
         <div className="mt-3.5 flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={saving || !ready}
-            className="rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          {saved && !saving && (
+          {!editing && (
+            <button
+              type="button"
+              disabled={!ready}
+              onClick={() => {
+                setSaved(false)
+                setEditing(true)
+              }}
+              className="rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-brand transition hover:border-brand disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              Edit
+            </button>
+          )}
+
+          {/* ⚠️ SAVE APPEARS ONLY ONCE SOMETHING HAS ACTUALLY CHANGED — Jay's
+              wording: "save would appear if they make any edits". A Save
+              button that is present but does nothing teaches people that
+              pressing it is meaningless, which is exactly the habit you do not
+              want on the screens where it isn't. */}
+          {editing && dirty && (
+            <button
+              type="submit"
+              disabled={saving || !ready}
+              className="rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          )}
+
+          {editing && !saving && (
+            <button
+              type="button"
+              onClick={cancelEditing}
+              className="rounded-[11px] px-3 py-2.5 text-sm font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              Cancel
+            </button>
+          )}
+
+          {saved && !saving && !editing && (
             // role="status", not role="alert": a confirmation is not an
             // interruption, and this is the whole feedback a person gets that
             // the save landed.

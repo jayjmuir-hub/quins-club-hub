@@ -8,6 +8,7 @@ import { listParents, saveParents } from '../data/parents.js'
 import { deletePlayerPhoto, forgetPhotoUrl, uploadPlayerPhoto } from '../data/photos.js'
 import { allowsOwnContact } from '../lib/ageGroup.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
+import { toEditorRows, toSaveRows } from '../lib/parentRows.js'
 import ParentsEditor from '../components/ParentsEditor.jsx'
 import PhotoField from '../components/PhotoField.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
@@ -245,20 +246,10 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
     listParents(player.id)
       .then((rows) => {
         if (!mounted) return
-        setParents(
-          rows.map((row) => {
-            const { country, national } = splitPhone(row.phone)
-            return {
-              id: row.id,
-              full_name: row.full_name ?? '',
-              relationship: row.relationship ?? '',
-              email: row.email ?? '',
-              phoneCountry: country,
-              phoneNational: national,
-              is_primary: Boolean(row.is_primary),
-            }
-          }),
-        )
+        // Was inline here. Moved to src/lib/parentRows.js on 9 Aug 2026 —
+        // MyPlayerForm needed the identical conversion, did not have it, and
+        // silently wrote `phone: null` over the club's own record as a result.
+        setParents(toEditorRows(rows))
         setParentsStatus('ready')
       })
       .catch(() => {
@@ -453,17 +444,12 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       // never loaded would delete them.
       if (parentsStatus === 'ready') {
         try {
+          // toSaveRows joins the two phone fields back into one E.164 string.
+          // sort_order is still applied here because it is a property of THIS
+          // list's order, which the shared mapper has no business knowing.
           await saveParents(
             saved.id,
-            parents.map((row, index) => ({
-              id: row.id,
-              full_name: row.full_name,
-              relationship: row.relationship,
-              email: row.email,
-              phone: joinPhone(row.phoneCountry, row.phoneNational),
-              is_primary: row.is_primary,
-              sort_order: index,
-            })),
+            toSaveRows(parents).map((row, index) => ({ ...row, sort_order: index })),
           )
         } catch (err) {
           onSaved?.(saved)

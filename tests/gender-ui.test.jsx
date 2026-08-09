@@ -421,3 +421,115 @@ describe('MyPlayerForm — gender required on a single-gender squad', () => {
     expect(upsertPlayerMock).not.toHaveBeenCalled()
   })
 })
+
+// ── The parent phone round trip (found 9 Aug 2026) ─────────────────────
+//
+// player_parents stores a phone as one E.164 string; ParentsEditor edits it as
+// phoneCountry + phoneNational. PlayerForm converted both ways, inline.
+// MyPlayerForm did NEITHER — it passed raw database rows into the editor and
+// editor rows straight back to saveParents.
+//
+// Result: a stored number never appeared in the field, and a number the parent
+// typed was discarded — written as null on a new row, or beaten by the stale
+// value on an existing one. The save reported success either way.
+//
+// Jay found it by adding a parent phone, saving, and watching it not come back.
+describe('MyPlayerForm — the parent phone must survive a save', () => {
+  const WITH_PHONE = [
+    {
+      id: 'pp-1',
+      player_id: 'p-mine',
+      full_name: 'Hannah Okafor',
+      relationship: 'Mother',
+      email: 'hannah@example.com',
+      phone: '+971501234567',
+      is_primary: true,
+    },
+  ]
+
+  it('shows a stored parent phone instead of a blank box', async () => {
+    listParentsMock.mockResolvedValue(WITH_PHONE)
+    const user = await renderRoster(PARENT, [MY_CHILD])
+    const dialog = await openSheet(user, 'Tyler Muir')
+    await user.click(within(dialog).getByRole('button', { name: /update details/i }))
+    await screen.findByRole('button', { name: /save changes/i })
+
+    // The value, not the label: see the note in the third test about there
+    // being two "Phone" controls on this form.
+    expect(screen.getByDisplayValue('501234567')).toBeInTheDocument()
+  })
+
+  // ⚠️ THE ONE THAT MATTERS. Change NOTHING, press Save, and the number must go
+  // back exactly as it came out. This is the assertion the bug violated.
+  it('writes the same number back when nothing was edited', async () => {
+    listParentsMock.mockResolvedValue(WITH_PHONE)
+    const user = await renderRoster(PARENT, [MY_CHILD])
+    const dialog = await openSheet(user, 'Tyler Muir')
+    await user.click(within(dialog).getByRole('button', { name: /update details/i }))
+    await screen.findByRole('button', { name: /save changes/i })
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(saveParentsMock).toHaveBeenCalled())
+    const [, rows] = saveParentsMock.mock.calls[0]
+    expect(rows[0].phone).toBe('+971501234567')
+  })
+
+  it('saves a phone a parent types for the first time', async () => {
+    listParentsMock.mockResolvedValue([
+      { ...WITH_PHONE[0], phone: null },
+    ])
+    const user = await renderRoster(PARENT, [MY_CHILD])
+    const dialog = await openSheet(user, 'Tyler Muir')
+    await user.click(within(dialog).getByRole('button', { name: /update details/i }))
+    await screen.findByRole('button', { name: /save changes/i })
+
+    // ⚠️ TWO controls are labelled "Phone" on this form — the player's OWN
+    // contact (U14 is over the U13 threshold, so it renders) and the parent's.
+    // The parent's is the second, and it carries its own id so the intent is
+    // explicit rather than positional.
+    const parentPhone = document.getElementById('parent-phone-0')
+    expect(parentPhone).toBeTruthy()
+    await user.type(parentPhone, '501234567')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(saveParentsMock).toHaveBeenCalled())
+    const [, rows] = saveParentsMock.mock.calls[0]
+    expect(rows[0].phone).toBe('+971501234567')
+  })
+})
+
+// ⚠️ THE PRECISE FAILURE, pinned after an earlier version of these tests
+// overstated it. With the old code a row loaded from the database still
+// carried its `phone` key, so an UNTOUCHED save passed the right value
+// through — the number was never destroyed. What broke was the EDIT: the
+// editor writes phoneNational, the stale `phone` key was what got saved, and
+// the parent's change was silently discarded in favour of the old value.
+describe('MyPlayerForm — editing an existing parent phone', () => {
+  it('saves the NEW number, not the one that was already there', async () => {
+    listParentsMock.mockResolvedValue([
+      {
+        id: 'pp-1',
+        player_id: 'p-mine',
+        full_name: 'Hannah Okafor',
+        relationship: 'Mother',
+        email: 'hannah@example.com',
+        phone: '+971501111111',
+        is_primary: true,
+      },
+    ])
+    const user = await renderRoster(PARENT, [MY_CHILD])
+    const dialog = await openSheet(user, 'Tyler Muir')
+    await user.click(within(dialog).getByRole('button', { name: /update details/i }))
+    await screen.findByRole('button', { name: /save changes/i })
+
+    const parentPhone = document.getElementById('parent-phone-0')
+    await user.clear(parentPhone)
+    await user.type(parentPhone, '502222222')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(saveParentsMock).toHaveBeenCalled())
+    const [, rows] = saveParentsMock.mock.calls[0]
+    expect(rows[0].phone).toBe('+971502222222')
+  })
+})
