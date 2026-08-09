@@ -13,9 +13,24 @@
 // render the fields at all rather than rendering them disabled — an empty box
 // invites someone to find a way to fill it.
 
-// Leading "U" then digits, e.g. "U6", "U18 Colts". Anchored at the start so
-// "Senior Men 1st XV" cannot match on its "1".
-const YOUTH_NAME = /^u(\d{1,2})\b/i
+// Leading "U" then digits, e.g. "U6", "U18 Colts", "U12G QR", "U14B Contact".
+// Anchored at the start so "Senior Men 1st XV" cannot match on its "1".
+//
+// ⚠️ THE TRAILING TOKEN IS A NEGATIVE LOOKAHEAD, NOT `\b` (fixed 9 Aug 2026).
+// It used to be /^u(\d{1,2})\b/i. `\b` needs a word boundary after the digits,
+// and in "U12G" a LETTER follows the digits — both word characters, so there is
+// no boundary, no match, and ageBandFromTeamName returned null. allowsOwnContact
+// reads null as "a senior side: adults" and returned TRUE, which would have
+// offered a twelve-year-old girls' squad the child's own email and phone fields
+// — precisely what the rule below forbids.
+//
+// U14B/U14G/U16B/U16G/U18B/U18G failed to parse too. They are all 13 or over, so
+// the answer came out right by accident, which is worse: the fault was invisible
+// in every case except the one that mattered.
+//
+// (?![0-9]) permits a trailing LETTER while still refusing a third DIGIT, so
+// "U123" is not silently read as U12.
+const YOUTH_NAME = /^u(\d{1,2})(?![0-9])/i
 
 /**
  * The age band of a squad as a number, or null when the squad has none.

@@ -46,7 +46,12 @@ values ('00000000-1111-2222-3333-444444444444',
 insert into public.memberships (profile_id, club_id, team_id, role, player_id, status)
 select '00000000-1111-2222-3333-444444444444', t.club_id, t.id, 'parent',
        (select id from public.players where full_name = 'Test Player One'), 'pending'
-from public.teams t where t.name = 'U16';
+-- ⚠️ RENAMED 9 Aug 2026: this squad was 'U16' until the club's real name list
+-- landed. It KEPT ITS ID through the rename, so the 6 players / 26 events
+-- fixture is literally the same rows. If this select matches nothing the
+-- membership insert quietly inserts zero rows and every count below reads 0 —
+-- which looks like a correctly locked-down parent rather than a dead harness.
+from public.teams t where t.name = 'U16B Contact';
 
 select set_config('request.jwt.claims',
        '{"sub":"00000000-1111-2222-3333-444444444444","role":"authenticated"}', true);
