@@ -7,7 +7,11 @@ the code win and this file is stale.**
 Split by VOLATILITY, not topic: anything that changes week to week lives here, so
 `RESTORE.md` never has to be edited because a status changed.
 
-*Last updated: 7 Aug 2026, second session. Rewritten earlier that day against the
+*Last updated: 9 Aug 2026 — a "Shipped 9 Aug" section added and the rows it
+contradicted corrected in place. Everything below that section is from 7 Aug and was
+NOT re-audited on 9 Aug; treat its measurements as two days older than they read.*
+
+*Previously updated: 7 Aug 2026, second session. Rewritten earlier that day against the
 CODE, not against the previous edition — the 5 Aug version had gone badly stale and
 was still telling sessions that auth email was dead and that a Manager role did not
 exist. Both false.*
@@ -87,7 +91,7 @@ union all select 'teams', count(*) from public.teams;   -- etc.
 | players | **6**, all named `Test Player One…Six`, all on U16 | <!-- count-ok -->
 | player_contacts | 6, all `@example.invalid` — a reserved TLD that can never receive mail | <!-- count-ok -->
 | events / availability / invites | 0 | <!-- count-ok -->
-| teams | **14** — `U15` renamed to `U16`, the duplicate empty `U16` deleted |
+| teams | **14** at the time. ⚠️ **Now 18** — renamed and extended 9 Aug, see below |
 | auth.users / profiles / memberships | 2 / 2 / 2 — Jay's two admins |
 | calendar_tokens | 1, **KEPT** |
 
@@ -174,6 +178,77 @@ landed after that.
 2. **Stagger by age group** and stay under the cap — free, but stretches the rollout
    across several days and leaves the cliff in place for anyone who retries.
 
+## Shipped 9 Aug 2026 — ten commits, `e19e21b`..`ebe3b6f`, all live
+
+Full account, including what each one cost to find:
+`claude/handoffs/2026-08-09-session.md`. The index is `claude/changelog.md`.
+
+**The squads are now the real ones: 15 youth + 3 senior.** ⚠️ **Renamed IN PLACE**, so
+ids survived and 6 players, 26 events and 1 membership stayed attached. `teams` is 18,
+not the 14 the wipe snapshot above records. Migration `20260809080107 age_groups_rename`
+aborts unless it ends with exactly 15 youth + 3 senior and no stale name.
+
+⚠️ **A SAFEGUARDING BUG WAS LIVE UNTIL THIS SESSION.** `src/lib/ageGroup.js` matched
+`/^u(\d{1,2})\b/i`. `\b` needs a word boundary after the digits and **a letter is a
+word character**, so `U12G QR` matched nothing, the band came back `null`, and
+`allowsOwnContact` reads `null` as "a senior side: adults" → true. The app offered a
+12-year-old girls' squad the child's own email and phone fields. Fixed with a negative
+lookahead. **The lesson is the null default, not the regex: an unparseable name fell
+through to the least safe answer.**
+
+⚠️ **The single-gender suffix must TOUCH the digits** (`/^u\d{1,2}([bg])(?![a-z])/i`) —
+`U6 Tag` ends in a G. Named squads use word boundaries, because `name.includes('men')`
+is also true of "Development". Blank gender on a single-gender squad is refused; a
+mismatch **warns loudly and never blocks** — Jay's ruling.
+
+**Coaches and Team Managers approve registrations for their own squads only** — not
+medics. ⚠️ **Done as an RPC (`approve_membership`), NOT by widening a policy.**
+`memb manage` is `FOR ALL`, so a coach clause would also have granted role changes
+(including promotion to admin), squad reassignment and deletion. The migration aborts if
+`memb manage` is ever found not to be admin-only. **Do not "simplify" this into a
+policy.**
+
+**Approval emails are live** — one send per registration, recipients in **bcc**,
+immediate. `notify-approval` v3 fails closed if `APPROVAL_NOTIFY_SECRET` is unset.
+Verified end to end on production and the test rows deleted afterwards.
+
+✅ **No emailed link points at `supabase.co` any more.** `/auth/confirm` on our own
+domain redeems the `token_hash` via `verifyOtp`. Sender domain ≠ link domain is a
+textbook phishing signature and was the one concrete spam cause found; the project ref
+also read as "lusmshimxdcxpnrktlgz". Supabase's custom-domain add-on would fix it too at
+~$35/mo on Pro — **rejected on cost, not merit** (the org is on Free). Reasoning:
+`claude/decisions/2026-08-09-auth-links-and-spam.md`. Every email now carries a
+plain-text alternative.
+
+❌ **A WRONG DNS DIAGNOSIS WAS GIVEN TO JAY AND HE NEARLY ACTED ON IT.** A session
+queried SPF/MX at `send.adhquins-clubhub.com`, got `NoAnswer`, and reported the records
+missing. **Resend puts the bounce/envelope domain one level BELOW the sending domain** —
+they live at `send.send.adhquins-clubhub.com` and all three were Verified. His screenshot
+disproved it. **Read the provider's own dashboard before diagnosing its DNS.**
+
+⚠️ **`loadMyMemberships` never filtered by profile id**, so RLS decided the answer — and
+for an admin RLS returns the whole club. Jay saw two test players under "Your players".
+Fixed by an explicit `.eq('profile_id', profileId)`. **Two tests asserted the broken
+behaviour and passed**: one checked only `expect(select).toHaveBeenCalled()`, the other
+mocked `.select()` resolving directly, so neither could tell a scoped read from an
+unscoped one.
+
+Also: an admin **Edit person** sheet (name, phone, role, squads — email deliberately not
+editable), the parent's own card now needs an Edit tap before it becomes a form, the
+parent phone is no longer dropped on save (`src/lib/parentRows.js` is the single
+conversion), the weekday shows in the schedule and a row click opens the detail sheet,
+the dashboard's Quick actions heading has its gap back on mobile, and Upcoming has a
+Matches/Training/Socials filter with the head renamed to "Schedule".
+
+**Migrations applied live 9 Aug:** `20260809080107 age_groups_rename`,
+`20260809083535 register_my_player_gender`, `20260809083640 register_my_player_gender_errcode`,
+`20260809092039 squad_staff_approval`, `20260809093858 notify_pending_membership`.
+**Edge functions:** `send-email` v30, `notify-approval` v3.
+
+⚠️ **`db/schema/` was NOT re-captured for any of them.** The 7 Aug entry below says
+exactly the right thing about why that matters — **re-capture WITH the migration** — and
+this session did not.
+
 ## Shipped 6-7 Aug 2026
 
 Ten migrations landed in `db/migrations/`: `claim_roster_access`,
@@ -215,7 +290,9 @@ the rows back.**
 - A managed pitch list is the precondition for clash detection.
 - Nothing in the UI distinguishes a Medic from a Coach, because there is no
   difference in access. That is deliberate — the word is what distinguishes them.
-- **Nobody is emailed when an access request arrives** — Jay checks the Accounts tab.
+- **Nobody is emailed when an access REQUEST arrives** — Jay checks the Accounts tab.
+  ⚠️ **Not to be confused with the 9 Aug approval emails**, which fire for a pending
+  REGISTRATION. The access-request path still sends nothing.
   ⚠️ This gets busier under roster-match onboarding, since every non-matching address
   lands there. The "Request sent" screen no longer promises an approval email.
 - ✅ **`jayjmuir@yahoo.com` is Jay's DELIBERATE backup admin account.** Confirmed by him
@@ -366,6 +443,14 @@ Seventeen decision documents, session handoffs, plans and one runbook were writt
 into the Claude project's uploaded files during 4-7 Aug and **never committed to the
 repo**. They were restored to `claude/decisions/`, `claude/handoffs/`, `claude/plans/`
 and `claude/runbooks/` on 7 Aug.
+
+⚠️ **AND IT HAPPENED AGAIN ON 9 AUG.** All three of that day's decision records —
+`2026-08-09-single-gender-squads.md`, `2026-08-09-approvals-emails-and-accounts.md`,
+`2026-08-09-auth-links-and-spam.md` — were written into the Claude project and left
+out of the repo until the end of the session, when `npm run docs:check` caught one of
+them as a broken path reference. **The check found it; the process did not.** One of
+them also carried a live secret in plain text, which is why the committed copy names
+the secret and not its value: **this repo is public.**
 
 **The lesson, which is the point of recording this:** `CLAUDE.md` points a session at
 `claude/decisions/` as "the rulings". For three days that folder held three files

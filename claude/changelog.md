@@ -8,8 +8,62 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 9 Aug 2026
+
+- `ebe3b6f` — **Schedule: a Matches/Training/Socials filter on Upcoming**, seen by
+  everyone, and the head renamed to "Schedule". An unrecognised stored filter shows
+  EVERYTHING, never an empty list; each filter carries its own empty message, because one
+  shared "No upcoming fixtures yet" tells a parent who tapped Socials that the club has
+  nothing on.
+- `bd41b13` — **The Quick actions heading had no gap above it on mobile.** `BlockTitle`'s
+  `first:mt-0` is right for the desktop two-column layout and wrong the moment the columns
+  stack. MEASURED with Playwright (0px → 18px at 390px) — **no test in this repo can see
+  this bug**, jsdom has no layout.
+- `08fe678` — **"My memberships" meant "every membership I can read".** `loadMyMemberships`
+  never filtered by profile id, so RLS decided the answer — and for an admin RLS returns
+  the whole club. Jay saw two test players under "Your players". It would have hit coaches
+  and managers the same way.
+- `e03332b` — **The parent phone was lost on save, and the You card now needs an Edit
+  tap.** `player_parents` stores one E.164 string; the editor holds two fields. PlayerForm
+  converted both ways inline, MyPlayerForm did neither. One implementation now, in
+  `src/lib/parentRows.js`. ⚠️ The commit that fixed it also **overstated it** — fault
+  injection proved an untouched save kept the number. Comments corrected.
+- `67cb5a5` — **A plain-text alternative on every email, honest copy, and a corrected DNS
+  diagnosis.** ❌ A session told Jay his SPF/DKIM/DMARC were missing, from a lookup at
+  `send.adhquins-clubhub.com`. **Resend puts the bounce domain one level BELOW the sending
+  domain** — they are at `send.send.…` and were all Verified. He was one step from editing
+  DNS that did not need editing.
+- `fe5a308` — **Auth links now land on the club's own domain.** `/auth/confirm` redeems
+  the `token_hash` with `verifyOtp`, so no email points at `lusmshimxdcxpnrktlgz.supabase.co`
+  any more. Sender domain ≠ link domain is a phishing signature and was the one concrete
+  spam cause found. `safeNext` refuses other origins, lookalike hosts, `//host` and `/\host`.
+- `f7755a9` — **An Edit person sheet** — name, phone, role and squads in one place, email
+  deliberately not editable. ⚠️ The first version **shipped a crash**: `displayName` was
+  declared inside a `.map` callback and the moved rows left that closure, blanking the
+  whole screen.
+- `0b30ebc` — **Squad-scoped approvals, approval emails, the weekday in the schedule, and
+  in-place player edit.** Approval is an RPC, NOT a widened policy: `memb manage` is
+  `FOR ALL`, so a coach clause would also have granted role changes — including to admin —
+  reassignment and deletion. The migration aborts if that policy is ever not admin-only.
+- `0c4dd7b` — **Gender is required on the single-gender squads**, and a mismatch warns
+  loudly without ever blocking. ⚠️ The suffix must TOUCH the digits — `U6 Tag` ends in a G.
+- `e19e21b` — **The real 15 youth + 3 senior squads, and a SAFEGUARDING fix.**
+  `/^u(\d{1,2})\b/i` needs a word boundary after the digits and a letter is a word
+  character, so `U12G QR` matched nothing, the band came back `null`, and `allowsOwnContact`
+  read `null` as "a senior side: adults" — offering a 12-year-old girls' squad the child's
+  own contact fields. Squads renamed IN PLACE so 6 players, 26 events and 1 membership
+  survived.
+
 ## 8 Aug 2026
 
+- `52023db` — **Masthead wrap on a real phone, and a parent can now edit their own name
+  and phone.** ⚠️ **Missed from this file until 9 Aug** — the changelog check caught it.
+  The wordmark broke across two lines because a flex line does not wrap, so the only way
+  the span could give ground was to break its own text. A hypothesis about the tap target
+  was recorded as WRONG rather than quietly dropped. ⚠️ And the hole found while building
+  it: **RLS grants ROWS, NOT COLUMNS**, so "profile update own" let a person rewrite any
+  column on their own profile — including the email an admin reads when approving a
+  stranger. Column privileges are now an explicit allow-list.
 - `7765ebe` — **Parents register their own player and wait for approval.** `team read`
   had to be widened or the age-group dropdown was permanently empty for exactly the
   person who needed it. Approval is ADMIN-only, not "coach or admin" as the spec assumed.
