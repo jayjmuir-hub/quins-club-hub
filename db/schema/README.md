@@ -83,6 +83,18 @@ and before that
 > So a function's WHY lives in the migration file and never in the database, and
 > a re-capture cannot bring it back — which is why several function bodies here
 > are bare while their migrations are heavily commented.
+>
+> ## ⚠️ Re-captured AGAIN the same day — `scale_indexes_and_availability_policy_merge`
+>
+> Four indexes and a policy merge on `availability`, applied 9 Aug after Jay
+> put a number on the club's growth: **600-700 players, possibly double that
+> in parent accounts**. Reasoning is in the migration header; the evidence is
+> `db/tests/rls-availability-equivalence.sql`.
+>
+> ⚠️ **The policy COUNT on `availability` did not change — four before, four
+> after — while the entire set was replaced.** Anything reconciling this
+> directory by counting objects would call the file clean. **Compare
+> expressions, not counts.**
 
 | File | Contents |
 |---|---|

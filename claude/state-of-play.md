@@ -282,6 +282,92 @@ A blind spot in the mechanism, not an oversight.
 ⚠️ **`apply_migration` strips `--` comments before executing**, so a function's reasoning
 lives in the migration file and never in the database. A re-capture cannot bring it back.
 
+## ⚠️ SCALE — Jay put a number on it, 9 Aug 2026
+
+**600-700 players, possibly double that in parent accounts.** Everything in
+this section is free at the 6 test players the database holds today and is not
+free at 700. **Re-read this before planning onboarding.**
+
+### The email cap is the first wall, and the cheapest to remove
+
+Onboarding ~1,400 accounts is roughly **2,200-2,500 emails** — one confirmation
+per account, one approval notice per registration (bcc'd, so one send not four),
+plus retries. Resend free is **100/day and 3,000/month**: that is 22-25 days of
+onboarding with no headroom for a retry wave. **Resend Pro is $20/mo for
+50,000** — the whole rollout is 5% of one month. ⚠️ **A purchase, so Jay does
+it, not the assistant.** Not decided as of 9 Aug.
+
+⚠️ **AND A CEILING MONEY DOES NOT MOVE: Supabase's own auth-email rate limit is
+200/hour** (measured 8 Aug). 1,400 signups is a **7-hour floor** whatever Resend
+allows. Onboarding spans days either way; the only question is 7 hours or 25
+days.
+
+### Supabase Free holds on every axis except one
+
+Measured against the published limits on 9 Aug: **MAU** 50,000 vs ~1,400 (35x
+headroom); **database** 500 MB vs single-digit MB even with ~70,000 availability
+rows; **file storage** 1 GB vs ~28 MB of photos, because `src/lib/imageResize.js`
+already crops to 600px at quality 0.82 and turns a 4 MB phone photo into ~40 KB;
+**edge invocations** 500,000, trivial.
+
+⚠️ **EGRESS IS THE ONE TO WATCH: 5 GB/month.** A 45-player roster load is ~1.8 MB
+of photos, so the free allowance is roughly 2,800 roster loads a month.
+**Measure it before the rollout rather than discovering it.**
+
+### The database work that was done — `scale_indexes_and_availability_policy_merge`
+
+✅ **Applied and verified live 9 Aug.** Four indexes —
+`availability(player_id)`, `memberships(team_id)`, `memberships(player_id)`,
+`players(team_id)` — plus a merge of the four `availability` policies into one
+per command.
+
+⚠️ **`availability(player_id)` was the one real defect.** One row per player per
+event is ~70,000 rows for a season, and every "this player's availability" query
+scanned all of them. **The existing unique index on `(event_id, player_id)` does
+NOT cover it** — Postgres cannot use a composite index when the leading column is
+absent from the predicate, which is what makes the advisor's finding look like a
+false positive.
+
+⚠️ **Of 135 advisor lints, four mattered.** The rest are `club_id` on a
+single-club database (cardinality 1 — the planner would never choose it), a
+15-row `teams` table, audit columns nothing queries, and a 5x role expansion of
+the same finding. **Do not "fix" those.** The 10 `auth_rls_initplan` warnings are
+all on small tables; `availability` and `players` already use the
+`(select auth.uid())` form.
+
+### ⚠️ A GAP FOUND WHILE DOING IT, AND DELIBERATELY NOT FIXED
+
+**`private.can_edit_team` does not check `status`, while `private.can_see_team`
+does** (it gained `status = 'active'` on 8 Aug). So a **PENDING coach, manager or
+medic** passes every policy built on `can_edit_team` — availability, events,
+players, contacts and parent rows.
+
+**It is latent, not live.** No path creates a pending staff membership:
+`register_my_player` hard-codes the role to 'parent' or 'player', and
+`memb manage` is admin-only. Measured 9 Aug: every membership in the database is
+`admin/active` or `parent/active`.
+
+Same class as the `private.is_admin()` gap below. **It belongs in its own change
+with its own harness** — a function five tables' policies call is not something
+to smuggle into an index migration. ⚠️ **It also means the merged `avail read`
+policy has THREE arms that look redundant and are not**: dropping the
+`can_edit_team` one silently removes a pending coach's read, which is what the
+equivalence harness caught on the first attempt.
+
+### The app-level limits, none of them broken today
+
+- **Nothing in `src/data/` uses `.range()` or `.limit()`.** No query is
+  paginated. Accounts pulls every profile with joins; the roster pulls every
+  player.
+- **`Schedule.jsx` loads every event in scope and filters in memory**, reasoning
+  in its own comment that "at most 15 teams' worth of fixtures" makes refetching
+  wasteful. Correct at 26 events; wrong at 18 squads over a season.
+- **Realtime makes that worse**: any insert/update/delete anywhere in scope
+  triggers a full refetch.
+
+All three were right at 6 players and stop being right somewhere between 100 and
+700. They will show up as a slow screen long before anything errors.
+
 ## Shipped 6-7 Aug 2026
 
 Ten migrations landed in `db/migrations/`: `claim_roster_access`,

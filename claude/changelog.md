@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 9 Aug 2026
 
+- `5332eff` — **Cold-start tested the handoff, and fixed what it could not answer.**
+  A fresh agent given only the handoff rated it 6/10. ⚠️ **The branch trap:** this clone
+  sat on a local branch named `feat/password-auth` at `main`'s tip, and
+  `git rev-list --left-right --count` returned `0 0` because it compares SHAs, not branch
+  names. Also a dead pointer telling document-reading sessions to read a commit message,
+  and two contradictions introduced by that morning's own corrections.
+- **9 Aug, LIVE DATABASE CHANGE — `scale_indexes_and_availability_policy_merge`.**
+  Jay: the club is heading for **600-700 players, possibly double in parent
+  accounts**. Four indexes (`availability(player_id)`, `memberships(team_id)`,
+  `memberships(player_id)`, `players(team_id)`) and the four `availability`
+  policies merged into one per command. ⚠️ `availability(player_id)` was the one
+  real defect of 135 advisor lints — ~70,000 rows at full size, and the existing
+  unique index on `(event_id, player_id)` **does not cover it**. ⚠️ The merge was
+  proved equivalent across seven caller types by
+  `db/tests/rls-availability-equivalence.sql`, fault-injected both ways. ⚠️ And
+  it surfaced a latent gap left deliberately unfixed: **`can_edit_team` does not
+  check `status`**, so a pending coach would pass every policy built on it.
 - `f561736` — **The handoff was describing a world two commits old.** It listed
   `db/schema/` as stale and the `Greeting.jsx` magic-link comment as open after `6df8ee5`
   had closed both. ⚠️ Also recorded that **a shallow clone (`--depth`) implies

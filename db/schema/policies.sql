@@ -38,6 +38,28 @@
 -- team-name reads. The helper split is the thing to understand before
 -- reading any policy below — see the block immediately after the RLS list.
 --
+-- RE-CAPTURED AGAIN 2026-08-09, later the same day, after
+-- `scale_indexes_and_availability_policy_merge`
+-- (db/migrations/20260809_scale_indexes_and_availability_policy_merge.sql).
+-- Live count is STILL 33 public policies + the 2 on storage.objects = 35, and
+-- availability still has exactly 4 — but they are not the same 4. Delta:
+--
+--   DROPPED availability "avail coach manage" (FOR ALL)
+--   DROPPED availability "avail read"         (SELECT)
+--   DROPPED availability "avail own insert"   (INSERT)
+--   DROPPED availability "avail own update"   (UPDATE)
+--   ADDED   availability "avail read"         (SELECT)
+--   ADDED   availability "avail write insert" (INSERT)
+--   ADDED   availability "avail write update" (UPDATE)
+--   ADDED   availability "avail write delete" (DELETE)
+--
+-- ⚠️ A COUNT DID NOT MOVE WHILE THE POLICY SET WAS REPLACED WHOLESALE. Four
+-- out, four in. Anything that reconciles this directory by counting rows
+-- would have called this file clean. Read the availability block itself.
+--
+-- Nothing outside `public.availability` changed. Every other policy's
+-- USING / WITH CHECK was re-read from pg_policies and matches this file.
+--
 -- ⚠️ "memb manage" was CHECKED and is UNCHANGED: still
 -- `private.is_admin(club_id)` for both USING and WITH CHECK, still ADMIN-ONLY.
 -- It was NOT widened to coaches. That is deliberate and load-bearing — see
@@ -148,40 +170,104 @@ CREATE POLICY "access request read own" ON public.access_requests
 
 
 -- ---------------------------------------------------------------------
--- availability  (4 policies)
+-- availability  (4 policies — ONE PER COMMAND since 9 Aug 2026)
 -- ---------------------------------------------------------------------
--- CHANGED 2026-08-08 (membership_pending_status). Until then this was
--- `can_see_team(...)` alone, with no is_own_player arm.
+-- ⚠️ ALL FOUR POLICIES ON THIS TABLE WERE REPLACED 2026-08-09 by
+-- `scale_indexes_and_availability_policy_merge`. The count stayed at 4; the
+-- policies are different objects. Do not read the count as "unchanged".
 --
--- The migration calls this one "THE SILENT ONE" and explains why: the two
--- write policies below are `is_own_player`, but the read was `can_see_team`.
--- Once can_see_team required status = 'active', a pending parent would SAVE
--- their child's availability and then not be able to read it back. The write
--- succeeds, the row vanishes, nothing errors. Found by reading the policies,
--- not by testing.
+-- WHAT THIS BLOCK USED TO SAY, and no longer does. Until 9 Aug this section
+-- described FOUR policies covering only THREE commands:
+--
+--     avail coach manage   FOR ALL     can_edit_team(<event's team>)
+--     avail read           SELECT      can_see_team(...) OR is_own_player
+--     avail own insert     INSERT      is_own_player
+--     avail own update     UPDATE      is_own_player
+--
+-- and it carried a note headed "CHANGED 2026-08-08 (membership_pending_status)"
+-- explaining that "avail read" had gained its `OR is_own_player(player_id)`
+-- arm on 8 Aug — the migration called it "THE SILENT ONE": the write policies
+-- were `is_own_player` but the read was `can_see_team` alone, so once
+-- can_see_team required status = 'active', a pending parent would SAVE their
+-- child's availability and then not be able to read it back. The write
+-- succeeds, the row vanishes, nothing errors. That history is still WHY the
+-- is_own_player arm exists in the SELECT policy below — the merge preserved
+-- it deliberately — but the four-policy shape it described is gone.
+--
+-- WHY THE MERGE. Permissive policies are OR'd, and Postgres evaluates EVERY
+-- one of them per candidate row. Under the old shape, SELECT, INSERT and
+-- UPDATE each ran TWO policy expressions — each containing a subquery against
+-- `events` — where one would do. `availability` is the largest table in the
+-- schema (one row per player per event: ~70,000 for a season at the 600-700
+-- players the club is heading for), so that was a straight doubling of
+-- per-row policy work on the worst possible table. Now: one policy per
+-- command, each carrying the full OR'd rule.
+--
+-- ══ THE THREE THINGS THAT MAKE THIS SECTION NON-OBVIOUS ═══════════════
+-- (all three from the migration header — read it before touching these)
+--
+-- ⚠️ 1. THE THREE-ARM SELECT IS NOT REDUNDANT. `can_see_team OR can_edit_team
+-- OR is_own_player` looks like it has a spare arm, because for an ACTIVE
+-- staff member can_edit_team does imply can_see_team. The middle arm is
+-- load-bearing anyway: **private.can_edit_team does NOT check `status` and
+-- private.can_see_team DOES**. Drop it and a PENDING coach silently loses
+-- their read. The first version of this merge did exactly that, and the
+-- harness caught it — `2_coach_pending` went 1 -> 0 on SELECT and
+-- ALLOWED -> NO ROWS on UPDATE and DELETE. Keeping the arm is what makes this
+-- a refactor rather than a behaviour change.
+--
+-- ⚠️ 2. DELETE IS STAFF-ONLY, AND ALWAYS WAS. "avail write delete" is
+-- can_edit_team with NO is_own_player arm. That is not an omission: a parent
+-- was never granted delete under the old shape either (the only FOR ALL
+-- policy was the coach one), and the merge did not grant it. A parent changes
+-- their answer; they do not remove the row. The harness records
+-- `3_parent_active` as NO ROWS on delete both before and after.
+--
+-- ⚠️ 3. THE EQUIVALENCE WAS MEASURED, NOT ARGUED. A policy merge is an
+-- authorisation change wearing a performance hat, and "obviously equivalent"
+-- is how access quietly widens. `db/tests/rls-availability-equivalence.sql`
+-- records what SEVEN kinds of caller can do before the merge, applies it, and
+-- re-records: active coach, pending coach, active parent, pending parent,
+-- unrelated active parent, admin, anon — across SELECT, INSERT, UPDATE and
+-- DELETE. All seven read `same`. If you change anything below, re-run it.
+--
+-- ⚠️ NOT FIXED HERE, and deliberately: `private.can_edit_team` still has no
+-- `status` check while `private.can_see_team` gained one on 8 Aug, so a
+-- PENDING coach/manager/medic can WRITE their squad's availability. It is
+-- latent, not live — no app path creates a pending staff membership — and it
+-- belongs in a change of its own with its own harness. See the migration
+-- header and claude/state-of-play.md.
+--
+-- Expressions below are verbatim from pg_policies as at 9 Aug 2026 (note the
+-- `e` alias, which is how the catalogue renders them).
 CREATE POLICY "avail read" ON public.availability
   AS PERMISSIVE FOR SELECT TO public
-  USING ((private.can_see_team(( SELECT events.team_id
-   FROM events
-  WHERE (events.id = availability.event_id))) OR private.is_own_player(player_id)));
+  USING ((private.can_see_team(( SELECT e.team_id
+   FROM events e
+  WHERE (e.id = availability.event_id))) OR private.can_edit_team(( SELECT e.team_id
+   FROM events e
+  WHERE (e.id = availability.event_id))) OR private.is_own_player(player_id)));
 
-CREATE POLICY "avail own insert" ON public.availability
+CREATE POLICY "avail write insert" ON public.availability
   AS PERMISSIVE FOR INSERT TO public
-  WITH CHECK (private.is_own_player(player_id));
+  WITH CHECK ((private.can_edit_team(( SELECT e.team_id
+   FROM events e
+  WHERE (e.id = availability.event_id))) OR private.is_own_player(player_id)));
 
-CREATE POLICY "avail own update" ON public.availability
+CREATE POLICY "avail write update" ON public.availability
   AS PERMISSIVE FOR UPDATE TO public
-  USING (private.is_own_player(player_id))
-  WITH CHECK (private.is_own_player(player_id));
+  USING ((private.can_edit_team(( SELECT e.team_id
+   FROM events e
+  WHERE (e.id = availability.event_id))) OR private.is_own_player(player_id)))
+  WITH CHECK ((private.can_edit_team(( SELECT e.team_id
+   FROM events e
+  WHERE (e.id = availability.event_id))) OR private.is_own_player(player_id)));
 
-CREATE POLICY "avail coach manage" ON public.availability
-  AS PERMISSIVE FOR ALL TO public
-  USING (private.can_edit_team(( SELECT events.team_id
-   FROM events
-  WHERE (events.id = availability.event_id))))
-  WITH CHECK (private.can_edit_team(( SELECT events.team_id
-   FROM events
-  WHERE (events.id = availability.event_id))));
+CREATE POLICY "avail write delete" ON public.availability
+  AS PERMISSIVE FOR DELETE TO public
+  USING (private.can_edit_team(( SELECT e.team_id
+   FROM events e
+  WHERE (e.id = availability.event_id))));
 
 
 -- ---------------------------------------------------------------------

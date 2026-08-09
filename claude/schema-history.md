@@ -95,6 +95,56 @@ directory's diff.
 
 ---
 
+### Migration `scale_indexes_and_availability_policy_merge` (9 Aug 2026)
+
+Four indexes and a policy merge, prompted by Jay putting a number on growth:
+**600-700 players, possibly double in parent accounts**. Nothing here is a bug
+at 6 players; all of it is a default that stops being right somewhere between
+100 and 700.
+
+⚠️ **`availability(player_id)` was the one real defect.** One row per player per
+event is ~70,000 rows for a season. **The existing unique index on
+`(event_id, player_id)` does not cover a `player_id` lookup** — Postgres cannot
+use a composite index when the leading column is absent from the predicate. That
+is the trap that makes the advisor's finding look like a false positive when you
+glance at the constraint list.
+
+`memberships(team_id)` and `(player_id)` are indexed despite the table being
+small, because **nearly every RLS policy in this schema joins against
+`memberships`** — the scan happens *inside* per-row policy checks on much larger
+tables. High leverage because it is small and hot, not because it is big.
+
+⚠️ **Not `CONCURRENTLY`, deliberately** — a concurrent build cannot run inside a
+transaction and these tables are empty today. **Add any future index on
+`availability` with `CONCURRENTLY`, outside a migration.**
+
+**The merge.** Four permissive policies covered three commands, and permissive
+policies are OR'd with every one evaluated per candidate row — so SELECT, INSERT
+and UPDATE each ran two subquery-bearing expressions where one would do. Now one
+policy per command.
+
+⚠️ **A POLICY MERGE IS AN AUTHORISATION CHANGE WEARING A PERFORMANCE HAT.** It
+was measured, not argued: `db/tests/rls-availability-equivalence.sql` records
+what seven caller types can do before, applies the merge, and re-records. All
+seven identical, across all four commands. Fault-injected both ways — a
+narrowing (`2_coach_pending` 1 → 0) and a widening (`using (true)` → the
+unrelated outsider 0 → 1).
+
+⚠️ **The merged `avail read` has THREE arms and the middle one is load-bearing.**
+`can_see_team OR can_edit_team OR is_own_player` looks redundant — for an ACTIVE
+staff member can_edit_team does imply can_see_team. It is there because
+**`can_edit_team` does NOT check `status` and `can_see_team` DOES**. The first
+version of this merge dropped that arm and the harness caught it. **Do not tidy
+it away.**
+
+⚠️ **The underlying gap is NOT fixed here:** a pending coach/manager/medic still
+passes `can_edit_team` on events, players, contacts and parent rows. Latent —
+nothing creates a pending staff membership today — and recorded in
+`claude/state-of-play.md`. Fixing a function five tables' policies call needs its
+own change and its own harness.
+
+---
+
 ### The 8 Aug 2026 migrations
 
 Not written up here. `20260808151251 event_end_time_and_notes`,

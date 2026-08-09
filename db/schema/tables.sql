@@ -53,6 +53,23 @@
 -- README.md that says "nothing unintended was found" was reached by reading a
 -- delta that was already too big to read. Two objects were missed inside it.
 --
+-- RE-CAPTURED AGAIN 2026-08-09, later the same day, after
+--   20260809_scale_indexes_and_availability_policy_merge
+--                                       → INDEXES (and policies.sql)
+-- Table-level delta applied here: FOUR new plain btree indexes, and nothing
+-- else. No column, type, default, constraint or table changed.
+--
+--   availability_player_id_idx  ON public.availability (player_id)
+--   memberships_team_id_idx     ON public.memberships  (team_id)
+--   memberships_player_id_idx   ON public.memberships  (player_id)
+--   players_team_id_idx         ON public.players      (team_id)
+--
+-- Each is written up against its own table below, and all four are in the
+-- index summary at the foot of this file. ⚠️ That summary previously ended
+-- "Still true: there is NO index on memberships.profile_id, players.team_id,
+-- events.team_id or availability.event_id" — two thirds of that sentence
+-- stopped being true with this migration and it has been rewritten.
+--
 -- Still thirteen tables — no table was added, dropped or renamed since the
 -- 7 Aug capture. All thirteen have RLS ENABLED (relrowsecurity = true) and
 -- none have FORCE ROW LEVEL SECURITY (relforcerowsecurity = false, i.e. the
@@ -188,6 +205,13 @@ CREATE TABLE public.players (
   CONSTRAINT players_gender_check CHECK (((gender IS NULL) OR (gender = ANY (ARRAY['male'::text, 'female'::text]))))
 );
 ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
+
+-- Added 2026-08-09 (scale_indexes_and_availability_policy_merge).
+-- This is the roster screen's default query — "the players in this squad" —
+-- on the most-used page in the app, and without it every load sequentially
+-- scans the whole players table. Free at 6 rows, not free at the 600-700
+-- players the club is heading for.
+CREATE INDEX players_team_id_idx ON public.players USING btree (team_id);
 
 
 -- ---------------------------------------------------------------------
@@ -381,6 +405,23 @@ ALTER TABLE public.memberships ENABLE ROW LEVEL SECURITY;
 CREATE UNIQUE INDEX memberships_unique_grant ON public.memberships
   USING btree (profile_id, club_id, role, team_id, player_id) NULLS NOT DISTINCT;
 
+-- Added 2026-08-09 (scale_indexes_and_availability_policy_merge).
+--
+-- These two look like the least justified indexes in the file — `memberships`
+-- is a small table and stays small (~2,000 rows at full club size). They are
+-- the highest-leverage pair in the migration precisely BECAUSE the table is
+-- small and hot: **nearly every RLS policy in this schema joins against
+-- memberships**, so this scan does not run once per query, it runs INSIDE a
+-- per-row policy check — including on `availability`, which is heading for
+-- ~70,000 rows a season. A 2,000-row seq scan is cheap once and ruinous
+-- 70,000 times.
+--
+-- ⚠️ NOTE what memberships_unique_grant above does NOT do for these: it is a
+-- composite led by profile_id, so it is no use for a team_id or player_id
+-- lookup. Same trap as on availability below.
+CREATE INDEX memberships_team_id_idx   ON public.memberships USING btree (team_id);
+CREATE INDEX memberships_player_id_idx ON public.memberships USING btree (player_id);
+
 
 -- ---------------------------------------------------------------------
 -- events  (fixtures, training, socials)
@@ -465,6 +506,28 @@ CREATE TABLE public.availability (
   CONSTRAINT availability_status_check    CHECK ((status = ANY (ARRAY['in'::text, 'out'::text, 'maybe'::text])))
 );
 ALTER TABLE public.availability ENABLE ROW LEVEL SECURITY;
+
+-- Added 2026-08-09 (scale_indexes_and_availability_policy_merge).
+-- The migration calls this "THE ONE REAL DEFECT" of the four. This is the
+-- largest table in the schema — one row per player per event, ~70,000 rows
+-- for a season at 700 players — and every "this player's availability" query
+-- sequentially scanned all of them.
+--
+-- ⚠️ READ THIS BEFORE DECIDING IT IS REDUNDANT. Glance at the constraint list
+-- above, see `availability_event_id_player_id_key UNIQUE (event_id,
+-- player_id)`, and it is natural to think "player_id is already indexed" and
+-- write the advisor's finding off as a false positive. It is not.
+-- **Postgres cannot use a composite index when the LEADING column is absent
+-- from the predicate.** That unique index is ordered (event_id, player_id):
+-- it serves a lookup on event_id alone, and a lookup on the pair, and does
+-- NOTHING for a lookup on player_id alone. Hence a separate single-column
+-- index. This is the trap; it has caught people before.
+--
+-- ⚠️ Created WITHOUT `CONCURRENTLY`, deliberately — a concurrent build cannot
+-- run inside a transaction and this table has single-digit rows today, so the
+-- lock is milliseconds. **Once the real roster lands, any further index on
+-- this table must use CONCURRENTLY and run OUTSIDE a migration.**
+CREATE INDEX availability_player_id_idx ON public.availability USING btree (player_id);
 
 
 -- ---------------------------------------------------------------------
@@ -565,14 +628,34 @@ CREATE INDEX invite_targets_invite_id_idx ON public.invite_targets USING btree (
 -- was simply never maintained alongside them. A summary that is not
 -- regenerated is worse than no summary.
 --
--- Still true: there is NO index on memberships.profile_id, players.team_id,
--- events.team_id or availability.event_id, all of which are hit by every RLS
--- policy evaluation. Recorded, not changed — the club's data volume is small.
+-- ⚠️ REWRITTEN AGAIN later on 2026-08-09, after
+-- `scale_indexes_and_availability_policy_merge` added four indexes. They are
+-- merged into the list below and marked "(9 Aug)".
+--
+-- ⚠️ THE PARAGRAPH THAT USED TO SIT HERE IS NOW WRONG AND HAS BEEN REPLACED.
+-- It read: "Still true: there is NO index on memberships.profile_id,
+-- players.team_id, events.team_id or availability.event_id, all of which are
+-- hit by every RLS policy evaluation. Recorded, not changed — the club's data
+-- volume is small." Two of those four are now indexed.
+--
+-- What is still true, as at 9 Aug: there is NO index on
+-- `memberships.profile_id`, `events.team_id`, or `availability.event_id`.
+--   - availability.event_id is covered in practice by the LEADING column of
+--     availability_event_id_player_id_key — that is exactly why the mirror
+--     case (player_id) needed its own index and this one does not.
+--   - memberships.profile_id is likewise the leading column of
+--     memberships_unique_grant.
+--   - events.team_id is genuinely unindexed. Recorded, not changed.
+-- Also unindexed by choice: `club_id` on every table (cardinality 1 in a
+-- single-club database — the planner would never choose it) and the audit
+-- columns created_by / updated_by / decided_by. The performance advisor
+-- reports these; the migration header explains why they are not defects.
 -- ---------------------------------------------------------------------
 --   access_requests_pkey                 UNIQUE (id)
 --   access_requests_profile_id_key       UNIQUE (profile_id)
 --   availability_event_id_player_id_key  UNIQUE (event_id, player_id)
 --   availability_pkey                    UNIQUE (id)
+--   availability_player_id_idx           btree (player_id)                (9 Aug)
 --   calendar_tokens_pkey                 UNIQUE (profile_id)
 --   calendar_tokens_token_key            UNIQUE (token)
 --   clubs_pkey                           UNIQUE (id)
@@ -585,10 +668,13 @@ CREATE INDEX invite_targets_invite_id_idx ON public.invite_targets USING btree (
 --   invites_pkey                         UNIQUE (id)
 --   invites_token_key                    UNIQUE (token)
 --   memberships_pkey                     UNIQUE (id)
+--   memberships_player_id_idx            btree (player_id)                (9 Aug)
+--   memberships_team_id_idx              btree (team_id)                  (9 Aug)
 --   memberships_unique_grant             UNIQUE (profile_id, club_id, role, team_id, player_id) NULLS NOT DISTINCT
 --   player_contacts_pkey                 UNIQUE (player_id)
 --   player_parents_pkey                  UNIQUE (id)
 --   player_parents_player_id_idx         btree (player_id)
 --   players_pkey                         UNIQUE (id)
+--   players_team_id_idx                  btree (team_id)                  (9 Aug)
 --   profiles_pkey                        UNIQUE (id)
 --   teams_pkey                           UNIQUE (id)
