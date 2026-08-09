@@ -10,6 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 9 Aug 2026
 
+- **9 Aug — the offline REST cache was not per-person, and a token refresh was
+  unmounting the screen.** Four fixes from a full-codebase review, none of them
+  visible on screen.
+  (1) ⚠️ `vite.config.js` caches `GET /rest/v1/*` in Cache Storage, which is
+  keyed by URL and scoped to the ORIGIN rather than to the person — and
+  `listClubMembers()` produces a byte-identical url for an admin on
+  /admin/accounts and a coach on /approvals. So an admin's club-wide member list
+  (every name, email and phone) sat on a shared club laptop after sign-out, and
+  NetworkFirst would hand it to the next person to open that screen with no
+  signal. `src/lib/apiCache.js` purges it on every sign-out path and on any
+  change of owner. ⚠️ **Deploying this does not purge what is already on club
+  devices** — the owner check on load is what does that, once each device has
+  run this build.
+  (2) `MembershipProvider` keyed its effect on the `session` OBJECT, which
+  supabase-js rebuilds on every token refresh — roughly hourly while the app is
+  open — so the load re-ran, `loading` went true, `AppShell`'s `ready` gate went
+  false, and the routed screen UNMOUNTED under whoever was using it, taking an
+  open EventForm sheet and everything typed into it. Keyed on the uid now.
+  (3) `NamePrompt` never primed `useMyProfile`'s cache, so a first sign-in
+  answered the name gate and then read as nameless — or as the Google name it
+  had just been told was wrong — for the rest of the session.
+  (4) The membership-load error state had no sign-out. It was the one branch of
+  `AppShell` not honouring "someone who cannot get in must always be able to get
+  out".
+- **9 Aug — the unit suite now runs in CI.** `.github/workflows/test.yml`.
+  ⚠️ `main` deploys on push and the only workflow was `docs.yml`, so nothing ran
+  vitest before a release: Netlify's `npm run build` caught a compile error and
+  **nothing at all caught a failing test**. Two things the workflow has to do
+  that are not obvious from reading `package.json` — supply placeholder
+  `VITE_SUPABASE_*` vars, because `src/lib/supabase.js` throws at IMPORT time
+  and ten files otherwise fail to COLLECT rather than to assert; and run
+  `npm run build` first, because `tests/press-feedback.test.js` inspects the
+  built stylesheet in `dist/`.
+- `f42cc23` — **The handoff stopped naming a tip SHA, and gained the scale work.**
 - `d9dc63f` — **Four indexes and an `availability` policy merge, for 700 players not 6.**
   ⚠️ LIVE DATABASE CHANGE. See the entry above this list's date heading in
   `claude/schema-history.md` for the reasoning; the equivalence proof is

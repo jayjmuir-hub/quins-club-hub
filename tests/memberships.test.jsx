@@ -142,6 +142,69 @@ describe('MembershipProvider / useMemberships', () => {
     expect(supabase.from).toHaveBeenCalledWith('teams')
   })
 
+  // ⚠️ REGRESSION GUARD, AND WHAT IT GUARDS IS INVISIBLE ON SCREEN.
+  // AuthProvider calls setSession on every auth event, and supabase-js builds a
+  // NEW session object each time — including on the routine token refresh that
+  // fires roughly hourly for as long as the app is open. This effect used to
+  // depend on that object, so every refresh re-ran the whole load and set
+  // `loading` back to true. That flips AppShell's `ready` gate to false and
+  // UNMOUNTS the routed screen, taking any open sheet and everything typed into
+  // it with no error. Only a rerender with a DIFFERENT OBJECT carrying the SAME
+  // uid can tell the fixed version from the broken one — the two are identical
+  // in every other respect.
+  it('does not reload when the session object changes but the signed-in user does not', async () => {
+    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
+    mockFrom()
+
+    const { rerender } = render(
+      <MembershipProvider>
+        <Harness />
+      </MembershipProvider>,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    const queriesAfterFirstLoad = supabase.from.mock.calls.length
+
+    // A token refresh: same person, new object.
+    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
+    rerender(
+      <MembershipProvider>
+        <Harness />
+      </MembershipProvider>,
+    )
+
+    expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    expect(supabase.from.mock.calls.length).toBe(queriesAfterFirstLoad)
+  })
+
+  // The other half of the guard above: proving it is "reload when the person
+  // changes", not "never reload". A test for the first without the second would
+  // pass just as happily against an effect that had stopped working.
+  it('does reload when the signed-in user actually changes', async () => {
+    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
+    mockFrom()
+
+    const { rerender } = render(
+      <MembershipProvider>
+        <Harness />
+      </MembershipProvider>,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    const queriesAfterFirstLoad = supabase.from.mock.calls.length
+
+    useAuthMock.mockReturnValue({ session: { user: { id: 'u2' } } })
+    rerender(
+      <MembershipProvider>
+        <Harness />
+      </MembershipProvider>,
+    )
+
+    await waitFor(() =>
+      expect(supabase.from.mock.calls.length).toBeGreaterThan(queriesAfterFirstLoad),
+    )
+  })
+
   it('resolves loading to false and sets error when the memberships query fails', async () => {
     useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
     mockFrom({ membershipsError: new Error('permission denied') })

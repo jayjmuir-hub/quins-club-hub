@@ -84,6 +84,18 @@ async function loadTeams() {
 
 export function MembershipProvider({ children }) {
   const { session } = useAuth()
+  // ⚠️ THE EFFECT BELOW KEYS ON THIS, NOT ON `session`, AND THAT IS THE WHOLE
+  // POINT OF THE LINE. AuthProvider calls setSession on every auth event, and
+  // supabase-js hands it a NEW session object each time — including on the
+  // routine token refresh that happens roughly hourly for as long as the app is
+  // open. Depending on the object identity re-ran this entire load on every one
+  // of those, and because the re-run sets `loading` back to true, AppShell's
+  // `ready` gate went false and UNMOUNTED the routed screen underneath whoever
+  // was using it: a coach part-way through the repeating-series EventForm lost
+  // the sheet and everything in it, with no error and nothing on screen to
+  // explain why. The uid is what this load actually depends on, and it does not
+  // change when the token does.
+  const userId = session?.user?.id ?? null
   const [memberships, setMemberships] = useState([])
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
@@ -99,7 +111,7 @@ export function MembershipProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
-    if (!session) {
+    if (!userId) {
       // Sign-out must not leak a preview into the next person's login.
       setViewAsState(null)
       writeStoredViewAs(null)
@@ -118,11 +130,11 @@ export function MembershipProvider({ children }) {
     setLoading(true)
     setError(null)
 
-    // ⚠️ session.user.id, NOT "whatever RLS lets through". `memb read` is
+    // ⚠️ The signed-in uid, NOT "whatever RLS lets through". `memb read` is
     // (profile_id = auth.uid() OR is_admin(club_id)), so an unfiltered read
     // hands an ADMIN the whole club's memberships — and this provider's output
     // is what every screen treats as "mine". See loadMyMemberships.
-    Promise.all([loadMyMemberships(session.user.id), loadTeams()])
+    Promise.all([loadMyMemberships(userId), loadTeams()])
       .then(async ([membershipRows, teamRows]) => {
         if (!mounted) return
 
@@ -134,7 +146,6 @@ export function MembershipProvider({ children }) {
         //
         // Gated on zero memberships, so the overwhelmingly common path (an
         // existing member loading the app) costs nothing at all.
-        const userId = session?.user?.id ?? null
         if (membershipRows.length === 0 && claimAttemptedFor.current !== userId) {
           // Marked BEFORE awaiting, not after: two effect runs can overlap
           // (React 18 StrictMode double-invokes in development, and a token
@@ -162,7 +173,7 @@ export function MembershipProvider({ children }) {
             // person no squads because they held no membership. Both have to
             // be fetched again now that they do.
             const [freshMemberships, freshTeams] = await Promise.all([
-              loadMyMemberships(session.user.id),
+              loadMyMemberships(userId),
               loadTeams(),
             ])
             if (!mounted) return
@@ -186,7 +197,7 @@ export function MembershipProvider({ children }) {
     return () => {
       mounted = false
     }
-  }, [session, reloadToken])
+  }, [userId, reloadToken])
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), [])
 

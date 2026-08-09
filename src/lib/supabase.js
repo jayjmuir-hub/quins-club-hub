@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { markSessionExpired } from './sessionExpired.js'
+import { clearCachedApiResponses } from './apiCache.js'
 
 // Single-responsibility Supabase client for the app. No auth helpers, no
 // query helpers, no retry logic — those belong to later tasks.
@@ -174,6 +175,13 @@ export const sessionGuard = createSessionGuard({
     // screen mid-task with no explanation — the right outcome, presented as
     // though the app had broken.
     markSessionExpired()
+    // The service worker's cached REST responses belong to a session that no
+    // longer exists. Purged HERE as well as in the signOut wrapper below,
+    // because this path deliberately calls nativeSignOut and so never reaches
+    // that wrapper — see the note on it. Not awaited: the sign-out below is the
+    // urgent half, and syncApiCacheOwner() purges again on the next load if
+    // this has not finished.
+    clearCachedApiResponses()
     if (nativeSignOut) nativeSignOut({ scope: 'local' }).catch(() => {})
   },
 })
@@ -206,5 +214,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 nativeSignOut = supabase.auth.signOut.bind(supabase.auth)
 supabase.auth.signOut = async (...args) => {
   sessionGuard.disarm()
+  // ⚠️ THE PURGE GOES HERE, NOT IN AuthProvider's signOut(), and the difference
+  // is which paths it catches. Two callers never touch that function: the
+  // account-deletion flow calls supabase.auth.signOut directly
+  // (src/data/account.js), and the session guard's own cleanup goes through
+  // nativeSignOut above. This wrapper is the one place a deliberate sign-out
+  // cannot get past. clearPhotoUrlCache() sits in AuthProvider for historical
+  // reasons and has the same gap; it is a smaller one, because a signed photo
+  // URL dies within the hour on its own.
+  await clearCachedApiResponses()
   return nativeSignOut(...args)
 }
