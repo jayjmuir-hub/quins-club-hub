@@ -68,10 +68,16 @@ something a session discovered by hitting it.
 ### UI components with a trap in them
 
 **The roster is TWO components.** Cards on mobile (`data-testid="player-row"`), a table on
-desktop (`data-testid="roster-table-row"`). BOTH are in the DOM at every width with one
-CSS-hidden — so a selector matching both picks the hidden one and the click silently does
-nothing. On desktop the row click edits position/age group/captain IN PLACE; the detail
-sheet opens from a separate **"Open"** button in the last column.
+desktop (`data-testid="roster-table-row"`). ❌ **This said BOTH are in the DOM at every
+width with one CSS-hidden. That stopped being true on 29 Jul and the claim survived here
+until 9 Aug.** The switch is made in JS: `useMediaQuery` (`src/lib/useMediaQuery.js`)
+decides, and `Roster.jsx` renders one or the other, never both — precisely so a selector
+cannot match a hidden twin. The two `data-testid` values are still correct.
+
+⚠️ **On desktop the row is NOT the button — the NAME is** (`RosterTable.jsx`), and
+clicking it opens the detail sheet. The **"Open"** button in the last column still exists
+but is no longer the only way in. **Four** columns edit in place — position, age group,
+captain and **gender** (added 7 Aug), not the three this said.
 
 **`PhoneInput` takes `country` + `national` + `onCountryChange` + `onNationalChange`** —
 not `value`/`onChange`. Phones are stored E.164 and split for editing with
@@ -124,7 +130,37 @@ verification script, `create temp table` as one role then `set local role anon` 
 
 **`private.can_see_team` has a hand-copied twin.** `public.calendar_events_for_token`
 restates the same visibility rule against a token-resolved profile, because a calendar
-client has no JWT and `auth.uid()` is unavailable. **CHANGE ONE, CHANGE BOTH.**
+client has no JWT and `auth.uid()` is unavailable.
+
+⚠️ **THE MIRROR IS NOW BROKEN, DELIBERATELY, AND THIS FILE SAID "CHANGE ONE, CHANGE BOTH"
+UNTIL 9 Aug.** `private.can_see_team` gained `and m.status = 'active'` on 8 Aug and the
+calendar function did **not**. The consequence a reader needs: **a PENDING member's
+calendar token still returns their squad's fixtures**, which matches the app (a pending
+parent sees the schedule and not the roster) and is therefore intended. Read both bodies
+in `db/schema/functions.sql` before assuming either is wrong.
+
+**⚠️ "Which rows may I see" is not "which rows are mine".** `loadMyMemberships` had no
+`profile_id` filter, so RLS decided the answer — and `memb read` is
+`(profile_id = auth.uid()) OR private.is_admin(club_id)`, which for an admin is **the
+whole club**. An admin opening their own account saw other people's children listed under
+"Your players", and every coach and manager would have hit the same shape. It now throws
+without a profile id rather than defaulting to whatever the policy allows.
+
+**⚠️ An unparseable name must not fall through to the least safe answer.**
+`src/lib/ageGroup.js` decides whether a player may hold their own email and phone (U13 and
+above may; below U13 may not, and the fields must not render). Its regex was
+`/^u(\d{1,2})\b/i`; `\b` needs a word boundary after the digits and **a letter is a word
+character**, so `U12G QR` matched nothing, the band came back `null`, and
+`allowsOwnContact` reads `null` as "a senior side: adults" → **true**. It is
+`/^u(\d{1,2})(?![0-9])/i` now. **The regex was the symptom; the null default was the
+bug.**
+
+**Gender: blank is REFUSED on a single-gender squad, a MISMATCH is allowed with a loud
+warning.** Two rules pointing opposite ways, and that is deliberate — the club has had
+four women recorded in "Senior Men 2nd XV", and blocking it would make such a player
+uneditable by anybody, including whoever was trying to correct them. ⚠️ **Do not tidy
+these two together.** ⚠️ **And the B/G suffix must TOUCH the digits** — `U6 Tag` ends in a
+G, and a looser pattern makes every Tag squad in the club girls-only.
 
 **RLS grants access to ROWS, not COLUMNS.** This is why `players.photo_path` is written by
 `set_own_player_photo()` and not by an owner policy: a row-level owner policy on `players`
@@ -134,9 +170,15 @@ would hand a parent `team_id` as well. Don't "simplify" it back into a policy.
 ### Auth and onboarding
 
 **⚠️ `accept_invite` matches on EMAIL, and that is an onboarding trap.** Invite someone
-at `jane@work.com`, they sign in with Google as `jane@gmail.com`, and the invite does not
-match their account — they land in the access-request queue instead. Nothing is broken
-when that happens, but it looks like a failure to the person it happens to.
+at `jane@work.com`, they create an account as `jane@gmail.com`, and the invite does not
+match — they land in the access-request queue instead. Nothing is broken when that
+happens, but it looks like a failure to the person it happens to. The email check itself
+is intact (`if lower(inv.email) <> lower(caller_email) then raise exception`).
+
+⚠️ **The illustration used to be "they sign in with Google" and that route is now
+mothballed** — `SHOW_PASSWORDLESS` in `src/screens/Login.jsx` hides both Google and magic
+link as of 8 Aug. The trap now fires on a work-vs-personal address at password signup.
+**Do not read this paragraph as evidence Google sign-in is live.**
 
 ---
 
@@ -144,16 +186,38 @@ when that happens, but it looks like a failure to the person it happens to.
 
 ### Scope and RLS
 
-**RLS is stricter than the plan assumed.** Every SELECT policy — `teams`, `clubs`,
-`events`, `players`, `availability` — requires a `memberships` row matching `auth.uid()`.
-A signed-in user with zero memberships reads **zero rows from every table, including
-`teams`** — no error, just empty. Correct for an invite-only club app; the database was not
-changed. The app renders an explicit "you're signed in but not linked to a squad yet" state
-instead of a blank screen.
+**RLS is stricter than the plan assumed.** Every SELECT policy — `clubs`, `events`,
+`players`, `availability` — requires a `memberships` row matching `auth.uid()`. A signed-in
+user with zero memberships reads **zero rows** from them — no error, just empty.
 
-**Admin memberships have `team_id = NULL`** — admin is club-wide. The `teams` read policy
-matches on `club_id`, so an admin still sees all 15 teams. `visibleTeams` special-cases
-admin rather than collecting `team_id` values.
+❌ **THREE PARTS OF THIS WERE WRONG UNTIL 9 Aug**, all from 8 Aug:
+
+- **`teams` is NO LONGER in that list.** `team read` is now simply
+  `auth.uid() is not null`, so any signed-in account reads **every** team row —
+  `20260808164111 teams_readable_before_registration`. It had to be, or the age-group
+  dropdown was permanently empty for the one person who needed it: a parent registering
+  their child.
+- **"Correct for an invite-only club app" — the club is not invite-only any more.**
+  Parents self-register (`register_my_player`, `src/components/AddYourPlayer.jsx`).
+- **The zero-membership screen is not a "not linked to a squad yet" message.** `AppShell`
+  renders **`AddYourPlayer`** — register your child — with `RequestAccess` as the opt-in
+  second branch. (This file also named a component `NoMembershipState` that has never
+  existed.)
+
+⚠️ **AND THE ASYMMETRY THAT REPLACED IT, which is load-bearing:**
+`private.can_see_team` requires `status = 'active'` and gates **people**;
+`private.is_attached_to_team` accepts any status and gates **fixtures**. So a **pending**
+member sees the schedule and not the roster. That is deliberate. Do not "align" them.
+
+**Admin memberships have `team_id = NULL`** — admin is club-wide. `visibleTeams`
+special-cases admin rather than collecting `team_id` values.
+
+❌ **The reasoning this used to give was wrong twice over.** It said the `teams` read
+policy "matches on `club_id`, so an admin still sees all **15** teams". The policy stopped
+matching on `club_id` on 8 Aug (it is now `auth.uid() is not null`), and there are **18**
+squads since 9 Aug — 15 youth plus three senior sides that were never in the 15.
+**Do not put a squad count back into this file**; `db/migrations/20260809_age_groups_rename.sql`
+holds the guard and `claude/decisions/2026-08-09-single-gender-squads.md` the list.
 
 **`canEditTeam(memberships, null)` returns `false`, even for an admin.** Deliberate, and a
 knowing departure from the plan's literal wording. A null team id means "we don't know which
@@ -240,8 +304,12 @@ Roster's gating were both already correct — but don't split "asserts" from "en
 files again.
 
 **Contact disclosure copy must match the real RLS predicate, not the intuitive one.** The
-read policy is `can_edit_team(...) OR is_own_player(player_id)` — the linked player can read
-their own contact row, not just coaches/admins. Copy shown to whoever is entering a minor's
+effective read permission is `can_edit_team(...) OR is_own_player(player_id)` — the linked
+player can read their own contact row, not just coaches/admins. ⚠️ **This used to name a
+"read policy". There isn't one:** `"contact read"` was dropped on 6 Aug as an exact
+duplicate of the OR of the two `FOR ALL` policies that remain (`"contact edit"` and
+`"contact edit own"`). A commented tombstone in `db/schema/policies.sql` says **do not
+restore it** — the redundancy is mutual but the two sides are not interchangeable. Copy shown to whoever is entering a minor's
 guardian details must name both.
 
 
@@ -384,12 +452,28 @@ untracks the whole ledger. Do not fight it — stage the workspace with
   the `app.` subdomain only.
 - **Supabase Auth URL Configuration** must list every origin the app is served from.
   Redirect URLs have historically included `https://quins-club-hub.netlify.app/**` as a
-  fallback. ⚠️ A magic link opened on an origin that is not listed fails at the redirect,
-  not at the send — check this before blaming the mail provider.
+  fallback. The app still builds `emailRedirectTo` / `redirectTo` from
+  `window.location.origin` (`src/lib/auth.jsx`), and that value comes back to the hook as
+  `data.redirect_to`, which becomes the `next` parameter.
+  ⚠️ **This entry used to say a link "opened on an origin that is not listed fails at the
+  redirect".** Emailed links no longer point at Supabase at all — they go to
+  `/auth/confirm` on our own domain — so the failure mode has changed shape and
+  **nobody has re-established what it now is.** `safeNext` would quietly send an
+  unrecognised `next` to `/`. **Do not trust either version of this sentence without a
+  live check.**
 
 - **Supabase:** project `quins-club-hub`, ref `lusmshimxdcxpnrktlgz`, region
   `ap-northeast-1`, Postgres 17, status `ACTIVE_HEALTHY`. A second project `adhjrt-app`
   (`nnlfjbnoiyqcvxwbwsjf`) exists and is **not** used by this app.
-- **This repo is public.** Nothing secret is committed: `.env` is ignored, no `sb_secret_`
-  or `service_role` string appears in any tracked file. Security rests on Supabase RLS, not
-  on the code being hidden. Keep it that way.
+- **This repo is public.** No secret VALUE is committed and `.env` is ignored. Security
+  rests on Supabase RLS, not on the code being hidden. Keep it that way.
+  ⚠️ **This used to claim "no `sb_secret_` or `service_role` string appears in any tracked
+  file", and that literal test is false** — `service_role` appears ~23 times in
+  `db/schema/functions.sql` alone, all of them `GRANT EXECUTE ... TO service_role`, and
+  `sb_secret_` appears in `CLAUDE.md` as a prohibition. **The security claim holds; the
+  grep does not.** A test written as a string match is one someone will eventually run and
+  wrongly believe.
+  ⚠️ **And the risk is live, not theoretical:** a decision record written on 9 Aug carried
+  the `APPROVAL_NOTIFY_SECRET` value in plain text so the next session could paste it. It
+  lived in the Claude project, not the repo, and was redacted before being committed — but
+  it was one commit from being public.

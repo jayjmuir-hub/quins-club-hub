@@ -12,8 +12,15 @@ import useMyProfile from '../lib/useMyProfile.js'
 // name, a magic-link sign-in does not until NamePrompt is answered — and
 // NamePrompt is skippable. So this must read correctly with no name at all,
 // which is why the comma and the name are one unit that drops together
-// ("Good morning." not "Good morning, ."). Roughly half the club signs in with
-// a magic link, so the nameless case is not an edge case.
+// ("Good morning." not "Good morning, ."). The nameless case is not an edge
+// case: NamePrompt is skippable, and a self-registering parent reaches the
+// dashboard before anyone has typed their name for them.
+//
+// ⚠️ This comment used to justify that with "roughly half the club signs in
+// with a magic link". That stopped being true on 8 Aug 2026 when sign-in
+// became email + password and the magic-link button was hidden. The
+// conclusion survived the reason it was built on, which is the more useful
+// half to keep.
 //
 // Uses the DEVICE clock, not Abu Dhabi time. If a parent is travelling, their
 // own morning is the one that matters — the club's timezone is only correct

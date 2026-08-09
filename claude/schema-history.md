@@ -8,12 +8,112 @@ What follows is the REASONING behind each migration, which the SQL does not carr
 Read the relevant section before changing a policy. **Do not trust its status lines** —
 each one describes the moment it was written.
 
-⚠️ **Neither `db/migrations/` nor this file is a complete record.** Supabase has 51
-applied migrations; `db/migrations/` holds 17 files. The authoritative list is
+⚠️ **Neither `db/migrations/` nor this file is a complete record.** Supabase has **65**
+applied migrations; `db/migrations/` holds **30** files. ⚠️ **This said "51 applied, 17
+files" until 9 Aug** — both numbers rotted within two days, which is the same failure
+every count in these docs has had. **Run `list_migrations` and `ls db/migrations/`;
+do not cite these two.** The authoritative list is
 Supabase's own (`list_migrations`), and the authoritative *definition* of the live
 schema is the capture in `db/schema/` — see "Changing the schema safely" in
 `RESTORE.md`. `events_series_id` (`20260805133133`) is applied with no file in the
 repo; `src/screens/EventForm.jsx` writes the column it adds.
+
+---
+
+### The 9 Aug 2026 migrations (five)
+
+`20260809080107 age_groups_rename`, `20260809083535 register_my_player_gender`,
+`20260809083640 register_my_player_gender_errcode`, `20260809092039 squad_staff_approval`,
+`20260809093858 notify_pending_membership`.
+
+Full reasoning lives in `claude/decisions/2026-08-09-single-gender-squads.md` and
+`claude/decisions/2026-08-09-approvals-emails-and-accounts.md`. What follows is only the
+part a person changing the schema needs in front of them.
+
+**`age_groups_rename` — UPDATE and INSERT, no DDL.** The 11 existing squads were renamed
+**in place** so their ids survived: 6 players, 26 events and 1 membership stayed attached.
+Four new squads inserted. **The guard aborts unless it ends with exactly 15 youth + 3
+senior and no stale name.** ⚠️ Nothing about the `teams` table changed, so
+`db/schema/tables.sql` has nothing to say about this migration — a schema capture cannot
+see a data migration.
+
+**`register_my_player_gender` — the 2-arg version is DROPPED, deliberately.** Postgres
+prefers an exact arity match, so leaving `register_my_player(text, uuid)` in place would
+have kept every two-argument call resolving to the **unchecked** function. The new
+signature is `(text, uuid, text default null)`.
+
+**`register_my_player_gender_errcode` — `22004`, not `22023`.** `src/data/members.js`
+maps `22023` to one generic sentence covering three other guards. The gender-required
+message **names the squad**, which is the entire reason the field became mandatory, so it
+raises `22004` and falls through to the client verbatim. There is a test asserting the
+*absence* of a mapping. **Change the errcode and the parent starts seeing the wrong
+sentence.**
+
+**`squad_staff_approval` — ⚠️ AN RPC, NOT A WIDENED POLICY, AND IT MUST STAY THAT WAY.**
+`memb manage` is `FOR ALL USING private.is_admin(club_id)`. **FOR ALL** means SELECT,
+INSERT, UPDATE and DELETE, and **RLS grants ROWS, NOT COLUMNS** — so a coach clause on
+that policy would also hand every coach the ability to change anyone's `role` on their
+squad (including to `admin`), reassign them to another team, and delete access.
+Approving a registration and administering the club would become one permission.
+
+So the policy is untouched. `public.approve_membership` is `SECURITY DEFINER` with
+`status` as a **literal** in its SET list — there is no parameter through which any other
+column can be written. **The migration's guard ABORTS if `memb manage` is ever found to
+be anything other than admin-only**, because the RPC is pointless the moment coaches can
+write the table directly. Two SELECT policies scoped to `status = 'pending'`
+(`memb read squad staff pending`, `profile read squad staff pending`) let staff see the
+rows and the names they are judging, and nothing else.
+
+⚠️ **`private.can_approve_team` is deliberately NOT `private.can_edit_team`.** Medics
+hold `can_edit_team` — they may edit that squad's players. Admitting a stranger to a
+children's squad is not a medical decision. **Do not simplify one into the other.**
+
+⚠️ **The obvious implementation had a latent bug.** A table UPDATE reading the row back
+with `.select()` would return nothing once the coach's pending-only read policy applied —
+the row leaves their view the instant it is approved — so a **successful approval would
+have been reported to the coach as a refusal**. The RPC returns the row from inside
+`SECURITY DEFINER`, where that policy does not apply.
+
+**`notify_pending_membership` — the first trigger in this project that reaches outside
+the database.** `AFTER INSERT ... WHEN (new.status = 'pending')` → `pg_net` → the
+`notify-approval` edge function → Resend. On the row, not in the client, because a
+client-fired notification is one the client can skip.
+
+⚠️ **Three layers of "this cannot fail a registration":** `net.http_post` queues and
+returns without waiting, the vault lookup warns rather than raises, and the whole trigger
+body is wrapped in `exception when others`. **The consequence is that a broken mail path
+fails SILENTLY into the Postgres log.** The screen is the source of truth; the email is a
+prompt to go and look at it.
+
+⚠️ **`pg_net` queues inside the transaction.** A rollback un-queues the request, and it
+cannot raise into the caller — which is what makes the fail-open design work and also
+what makes it untestable from the caller's side.
+
+⚠️ **This trigger reads `vault.decrypted_secrets` and calls `net.http_post`. Neither
+schema is captured in `db/schema/`**, so changes on either side are invisible to that
+directory's diff.
+
+---
+
+### The 8 Aug 2026 migrations
+
+Not written up here. `20260808151251 event_end_time_and_notes`,
+`20260808154115 calendar_feed_end_time_and_notes`, `20260808160943 membership_pending_status`,
+`20260808161025 is_attached_to_team_grants`, `20260808161245 register_my_player`,
+`20260808164111 teams_readable_before_registration`, `20260808191310 profile_phone_and_column_grants`,
+plus `20260808084615 sync_profile_name_single_word`.
+
+The reasoning is in `claude/decisions/2026-08-08-parent-self-registration.md` and in the
+migration files themselves. **The one thing worth pulling forward**, because four RLS
+policies are unreadable without it: `membership_pending_status` **split the old
+`can_see_team` in two**. `private.can_see_team` now requires `status = 'active'` and
+gates *people*; `private.is_attached_to_team` accepts any status and gates *fixtures*.
+A pending parent can therefore see the schedule and not the roster.
+
+⚠️ **`is_attached_to_team` shipped without its EXECUTE grant and broke every events
+query within minutes**, which is what `is_attached_to_team_grants` exists to fix. **A new
+`private` helper needs `grant execute` to `authenticated` (and usually `anon`) or every
+policy that calls it fails closed.**
 
 ---
 

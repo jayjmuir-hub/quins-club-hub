@@ -19,9 +19,44 @@
 -- events.series_id / pitch / group_id (+partial index), and the memberships
 -- unique index that reverses this file's own "DELIBERATE ABSENCE" note.
 --
--- All thirteen tables have RLS ENABLED (relrowsecurity = true) and none have
--- FORCE ROW LEVEL SECURITY (relforcerowsecurity = false, i.e. the table
--- owner still bypasses RLS). Policies live in policies.sql.
+-- RE-CAPTURED 2026-08-09. Covers the fifteen migrations applied since the
+-- 7 Aug capture, in version order:
+--   20260807153404 sync_profile_name_pin_search_path   (function only)
+--   20260808084615 sync_profile_name_single_word       (function only)
+--   20260808151251 event_end_time_and_notes            → TABLES
+--   20260808154115 calendar_feed_end_time_and_notes    (edge function only)
+--   20260808160943 membership_pending_status           → TABLES
+--   20260808161025 is_attached_to_team_grants          (grants only)
+--   20260808161245 register_my_player                  (function only)
+--   20260808164111 teams_readable_before_registration  (policy only)
+--   20260808191310 profile_phone_and_column_grants     → TABLES
+--   20260809080107 age_groups_rename                   (DATA only, no DDL)
+--   20260809083535 register_my_player_gender           (function only)
+--   20260809083640 register_my_player_gender_errcode   (function only)
+--   20260809092039 squad_staff_approval                (functions + policies)
+--   20260809093858 notify_pending_membership           → TRIGGERS (see
+--                                                       triggers.sql)
+-- Table-level deltas applied here: events.ends_at, events.notes and the
+-- events_ends_after_starts CHECK; memberships.status and its CHECK;
+-- profiles.phone.
+--
+-- ⚠️⚠️ TWO ITEMS BELOW ARE **NOT** EXPLAINED BY ANY OF THE ABOVE. Both are
+-- things the 7 Aug re-capture MISSED, not things that drifted since — both
+-- were created on 5 Aug and this file simply never recorded them:
+--   1. index events_group_id_idx  (migration 20260805150621
+--      events_pitch_and_group_id — see the events block)
+--   2. invites_role_check already contains 'manager' and 'medic' (migration
+--      20260805160320 roles_manager_and_medic widened BOTH role CHECKs; the
+--      7 Aug capture corrected memberships_role_check and left this file
+--      asserting four roles for invites — see the invites block)
+-- Neither is a live drift, and neither is dangerous, but the 7 Aug note in
+-- README.md that says "nothing unintended was found" was reached by reading a
+-- delta that was already too big to read. Two objects were missed inside it.
+--
+-- Still thirteen tables — no table was added, dropped or renamed since the
+-- 7 Aug capture. All thirteen have RLS ENABLED (relrowsecurity = true) and
+-- none have FORCE ROW LEVEL SECURITY (relforcerowsecurity = false, i.e. the
+-- table owner still bypasses RLS). Policies live in policies.sql.
 -- =====================================================================
 
 
@@ -39,7 +74,18 @@ ALTER TABLE public.clubs ENABLE ROW LEVEL SECURITY;
 
 
 -- ---------------------------------------------------------------------
--- teams  (the 15 age groups)
+-- teams  (the club's squads)
+--
+-- ⚠️ This heading read "the 15 age groups" until the 9 Aug re-capture. That
+-- was a ROW COUNT in a schema file and it rotted: migration 20260809080107
+-- (age_groups_rename) renamed most squads and inserted four more. The count
+-- is deliberately not restated here — counts and squad names are data, they
+-- change without a migration touching this file, and the authoritative list
+-- is claude/decisions/2026-08-09-single-gender-squads.md.
+--
+-- ⚠️ age_groups_rename is UPDATE/INSERT only. It changed no column, type,
+-- default, constraint or index on this table. The table itself was NOT
+-- renamed. Nothing below changed on 9 Aug.
 --
 -- NOTE: no unique constraint on (club_id, name). Two teams with the same
 -- name inside one club are possible. Nothing in the app currently creates
@@ -86,6 +132,25 @@ CREATE TABLE public.profiles (
   -- letting them in. ⚠️ The migration deliberately stamped all four existing
   -- profiles as confirmed, so to see the gate you must NULL it by hand.
   name_confirmed_at timestamptz,
+  -- Added 2026-08-08 (profile_phone_and_column_grants). Column comment as
+  -- stored: "The signed-in person's own number, stored E.164. Distinct from
+  -- player_contacts.phone, which is a CHILD's contact details and is
+  -- per-player."
+  --
+  -- ⚠️ THE COLUMN IS THE SMALL HALF OF THAT MIGRATION. The rest is a
+  -- privilege change that does not show up anywhere in this file: UPDATE on
+  -- public.profiles was REVOKED from `authenticated` and re-granted as a
+  -- column list — (full_name, first_name, last_name, name_confirmed_at,
+  -- phone). RLS grants ROWS, NOT COLUMNS, so the "profile update own" policy
+  -- let a person rewrite ANY column on their own row, `email` included; the
+  -- migration records that being proved live on 8 Aug 2026, with
+  -- profiles.email set to another address while auth.users.email stayed
+  -- correct. An admin approving a stranger reads profiles.email as that
+  -- person's login address. It is an allow-list rather than a revoke of
+  -- `email` so that a column added later is not writable by default.
+  -- Grants are not captured in this directory at all — if you audit this
+  -- table, check pg_attribute ACLs, not just the policies.
+  phone             text,
   CONSTRAINT profiles_pkey   PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
@@ -269,6 +334,25 @@ CREATE TABLE public.memberships (
   role        text        NOT NULL,
   player_id   uuid,
   created_at  timestamptz          DEFAULT now(),
+  -- Added 2026-08-08 (membership_pending_status). Column comment as stored:
+  -- "active = full squad visibility. pending = self-registered, awaiting a
+  -- coach or admin. A pending row still attaches the person to the squad
+  -- (fixtures, their own child) but does NOT satisfy private.can_see_team."
+  --
+  -- ⚠️ NOT NULL DEFAULT 'active' is load-bearing for the migration itself,
+  -- not tidiness. The same migration changed private.can_see_team to require
+  -- status = 'active'; had any existing row come out NULL or 'pending', every
+  -- current user would have lost access in the same transaction. The
+  -- migration carries a DO block that ABORTS if it finds a non-active row
+  -- before the function is replaced.
+  --
+  -- Why the state exists at all: can_see_team is squad-WIDE and role-blind,
+  -- so granting access at registration would let anyone who signs up and
+  -- picks an age group read every child's name, date of birth, photo and
+  -- parent phone number in it. Reasoning in
+  -- claude/decisions/2026-08-08-parent-self-registration.md. Do not
+  -- "simplify" this by granting access at registration.
+  status      text        NOT NULL DEFAULT 'active'::text,
   CONSTRAINT memberships_pkey            PRIMARY KEY (id),
   CONSTRAINT memberships_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT memberships_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
@@ -276,11 +360,24 @@ CREATE TABLE public.memberships (
   CONSTRAINT memberships_player_id_fkey  FOREIGN KEY (player_id)  REFERENCES players(id)  ON DELETE SET NULL,
   -- ⚠️ 'manager' and 'medic' added 2026-08-05 (roles_manager_and_medic). This
   -- file listed only four roles until the 7 Aug re-capture.
-  CONSTRAINT memberships_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text, 'medic'::text, 'parent'::text, 'player'::text])))
+  CONSTRAINT memberships_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text, 'medic'::text, 'parent'::text, 'player'::text]))),
+  -- Added 2026-08-08 (membership_pending_status). Two values only, as found;
+  -- there is no 'rejected'/'dismissed' value on this column.
+  CONSTRAINT memberships_status_check     CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text])))
 );
 ALTER TABLE public.memberships ENABLE ROW LEVEL SECURITY;
 
 -- Added 2026-08-06 (memberships_unique_grant). See the note above.
+--
+-- ⚠️ Re-checked live 2026-08-09 and UNCHANGED by membership_pending_status:
+-- `status` is NOT one of the indexed columns. So the index treats a pending
+-- row and an active row for the same (profile, club, role, team, player) as
+-- the SAME grant — a second INSERT collides rather than creating a duplicate.
+-- That is the behaviour the 8 Aug design note asked to be verified
+-- ("a person must not be able to hold a pending and an active row for the
+-- same (profile, team, player)" —
+-- claude/decisions/2026-08-08-parent-self-registration.md). Recorded as
+-- found; adding `status` to this index would silently reverse it.
 CREATE UNIQUE INDEX memberships_unique_grant ON public.memberships
   USING btree (profile_id, club_id, role, team_id, player_id) NULLS NOT DISTINCT;
 
@@ -312,17 +409,42 @@ CREATE TABLE public.events (
   series_id    uuid,
   pitch        text,
   group_id     uuid,
+  -- Added 2026-08-08 (event_end_time_and_notes). Column comments as stored:
+  --   ends_at: "When the event finishes. Required by EventForm, nullable here
+  --   so an external fixture feed cannot hard-fail. NULL falls back to the
+  --   per-type duration guess in supabase/functions/calendar/index.ts."
+  --   notes:   "Free text shown on the event detail sheet and in the calendar
+  --   DESCRIPTION. Written by squad staff for that squad - treat as
+  --   squad-visible, not private."
+  -- The nullability is the point: the app requires an end time, the database
+  -- does not, so the constraint lives where a feed import cannot trip on it.
+  ends_at      timestamptz,
+  notes        text,
   CONSTRAINT events_pkey          PRIMARY KEY (id),
   CONSTRAINT events_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
   CONSTRAINT events_team_id_fkey    FOREIGN KEY (team_id)    REFERENCES teams(id)    ON DELETE CASCADE,
   CONSTRAINT events_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id),
-  CONSTRAINT events_type_check      CHECK ((type = ANY (ARRAY['match'::text, 'training'::text, 'social'::text])))
+  CONSTRAINT events_type_check      CHECK ((type = ANY (ARRAY['match'::text, 'training'::text, 'social'::text]))),
+  -- Added 2026-08-08 (event_end_time_and_notes). Note the `ends_at IS NULL OR`
+  -- arm: a NULL end time stays legal, so the CHECK only ever fires on an end
+  -- time that is actually before or equal to the start.
+  CONSTRAINT events_ends_after_starts CHECK (((ends_at IS NULL) OR (ends_at > starts_at)))
 );
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
 -- Added 2026-08-05. Partial: only rows that belong to a series are indexed.
 CREATE INDEX events_series_id_idx ON public.events USING btree (series_id)
   WHERE (series_id IS NOT NULL);
+
+-- ⚠️ MISSED BY THE 7 AUG RE-CAPTURE, recorded here 2026-08-09. This index was
+-- created on 5 Aug by migration 20260805150621 (events_pitch_and_group_id),
+-- the same migration as pitch and group_id. The 7 Aug header above says
+-- "group_id (+partial index)" — singular — and only events_series_id_idx was
+-- written down. It is not drift: nothing created it outside a migration. It is
+-- an object that existed live for four days with no line in this file, and it
+-- survived a re-capture that was supposed to catch exactly that.
+CREATE INDEX events_group_id_idx ON public.events USING btree (group_id)
+  WHERE (group_id IS NOT NULL);
 
 
 -- ---------------------------------------------------------------------
@@ -380,7 +502,15 @@ CREATE TABLE public.invites (
   CONSTRAINT invites_team_id_fkey    FOREIGN KEY (team_id)    REFERENCES teams(id),
   CONSTRAINT invites_player_id_fkey  FOREIGN KEY (player_id)  REFERENCES players(id),
   CONSTRAINT invites_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id),
-  CONSTRAINT invites_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'parent'::text, 'player'::text])))
+  -- ⚠️ CORRECTED 2026-08-09. This file listed FOUR roles here
+  -- (admin/coach/parent/player) from the original capture right through the
+  -- 7 Aug re-capture. That was WRONG for four days: migration 20260805160320
+  -- (roles_manager_and_medic) widened BOTH role CHECKs on 5 Aug, and only
+  -- memberships_role_check was corrected on 7 Aug. Live has six here, and has
+  -- had since 5 Aug. 'manager' and 'medic' are identical to 'coach' in what
+  -- they may do; the distinction is documentary — see
+  -- claude/decisions/2026-08-05-team-manager-and-medic-roles.md.
+  CONSTRAINT invites_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text, 'medic'::text, 'parent'::text, 'player'::text])))
 );
 ALTER TABLE public.invites ENABLE ROW LEVEL SECURITY;
 
@@ -420,24 +550,45 @@ CREATE INDEX invite_targets_invite_id_idx ON public.invite_targets USING btree (
 
 
 -- ---------------------------------------------------------------------
--- Indexes: complete list in `public` as captured. Note that apart from
--- the primary keys, the only indexes are the two on invites and one on
--- invite_targets. There is NO index on memberships.profile_id,
--- players.team_id, events.team_id or availability.event_id, all of which
--- are hit by every RLS policy evaluation. Recorded, not changed — the
--- club's data volume is small.
+-- Indexes: complete list in `public` as captured 2026-08-09, verbatim from
+-- pg_indexes. (`private` has no tables and therefore no indexes.)
+--
+-- ⚠️ REWRITTEN 2026-08-09. This list had not been touched since the 3 Aug
+-- capture. It was missing SEVEN indexes — access_requests_pkey,
+-- access_requests_profile_id_key, calendar_tokens_pkey,
+-- calendar_tokens_token_key, player_parents_player_id_idx,
+-- memberships_unique_grant, events_series_id_idx — plus
+-- events_group_id_idx, and its opening sentence claimed "apart from the
+-- primary keys, the only indexes are the two on invites and one on
+-- invite_targets", which stopped being true on 4 Aug. Several of those
+-- indexes ARE written up individually elsewhere in this file; the summary
+-- was simply never maintained alongside them. A summary that is not
+-- regenerated is worse than no summary.
+--
+-- Still true: there is NO index on memberships.profile_id, players.team_id,
+-- events.team_id or availability.event_id, all of which are hit by every RLS
+-- policy evaluation. Recorded, not changed — the club's data volume is small.
 -- ---------------------------------------------------------------------
+--   access_requests_pkey                 UNIQUE (id)
+--   access_requests_profile_id_key       UNIQUE (profile_id)
 --   availability_event_id_player_id_key  UNIQUE (event_id, player_id)
 --   availability_pkey                    UNIQUE (id)
+--   calendar_tokens_pkey                 UNIQUE (profile_id)
+--   calendar_tokens_token_key            UNIQUE (token)
 --   clubs_pkey                           UNIQUE (id)
+--   events_group_id_idx                  btree (group_id) WHERE group_id IS NOT NULL
 --   events_pkey                          UNIQUE (id)
+--   events_series_id_idx                 btree (series_id) WHERE series_id IS NOT NULL
 --   invite_targets_invite_id_idx         btree (invite_id)
 --   invite_targets_pkey                  UNIQUE (id)
 --   invites_email_idx                    btree (lower(email))
 --   invites_pkey                         UNIQUE (id)
 --   invites_token_key                    UNIQUE (token)
 --   memberships_pkey                     UNIQUE (id)
+--   memberships_unique_grant             UNIQUE (profile_id, club_id, role, team_id, player_id) NULLS NOT DISTINCT
 --   player_contacts_pkey                 UNIQUE (player_id)
+--   player_parents_pkey                  UNIQUE (id)
+--   player_parents_player_id_idx         btree (player_id)
 --   players_pkey                         UNIQUE (id)
 --   profiles_pkey                        UNIQUE (id)
 --   teams_pkey                           UNIQUE (id)

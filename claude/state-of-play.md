@@ -245,9 +245,28 @@ Matches/Training/Socials filter with the head renamed to "Schedule".
 `20260809092039 squad_staff_approval`, `20260809093858 notify_pending_membership`.
 **Edge functions:** `send-email` v30, `notify-approval` v3.
 
-⚠️ **`db/schema/` was NOT re-captured for any of them.** The 7 Aug entry below says
-exactly the right thing about why that matters — **re-capture WITH the migration** — and
-this session did not.
+✅ **`db/schema/` RE-CAPTURED 9 Aug**, covering everything from 8 Aug onward: 7 new
+functions, 3 changed function bodies, 2 new policies, 4 changed policy expressions, 3 new
+columns, 2 new CHECKs and 1 new trigger. All of it traced to a known migration.
+
+⚠️ **But the re-capture found the 7 AUG PASS HAD MISSED THINGS**, and the 7 Aug entry
+below still says "Nothing unintended was found". Live since 5 Aug and absent from the
+files until 9 Aug: `events_group_id_idx`, and an `invites_role_check` block asserting
+four roles when the database has had six since `roles_manager_and_medic`. Plus five
+`proacl` lines that did not match live, three of them
+(`my_calendar_token`, `reset_my_calendar_token`, `set_own_player_photo`) **not
+attributable to any migration at all** — and **Postgres keeps no timestamp for a GRANT**,
+so "the file was always wrong" and "someone granted these outside a migration" cannot be
+told apart. Recorded in `functions.sql` as judgement, not fact. Detail in
+`db/schema/README.md`.
+
+⚠️ **`db/schema/` DOES NOT CAPTURE GRANTS ON TABLES OR COLUMNS.** The larger half of
+`profile_phone_and_column_grants` — the allow-list standing between a member and
+rewriting someone's login email — **would not show up in any diff of that directory**.
+A blind spot in the mechanism, not an oversight.
+
+⚠️ **`apply_migration` strips `--` comments before executing**, so a function's reasoning
+lives in the migration file and never in the database. A re-capture cannot bring it back.
 
 ## Shipped 6-7 Aug 2026
 
@@ -331,7 +350,12 @@ the rows back.**
   **every new signup**, taking the full_name branch. So this is on the signup path for
   all 146 parents, not a rare gate case. Fix is to test the *split*, not
   `first_name`: `if position(' ' in full_in) = 0 then last_name := null`.
-- ✅ **`db/schema/` RE-CAPTURED 7 Aug** after three days and ~14 migrations. **Nothing
+- ✅ **`db/schema/` RE-CAPTURED 7 Aug** after three days and ~14 migrations. ❌ **The
+  conclusion below — "nothing unintended was found" — WAS WRONG, and the 9 Aug re-capture
+  is what found that out.** Two objects live since 5 Aug had no line in the files, and an
+  existing block asserted the opposite of the truth about `invites_role_check`. The
+  warning that followed it ("that is luck, not process") was right, and understated.
+  **Nothing
   unintended was found** — all 22 function bodies now match live byte-for-byte, all 31
   policy expressions verified against the catalogue, and every delta traced to a known
   migration. ⚠️ **That is luck, not process**: one unintended change hidden in a delta
@@ -369,7 +393,8 @@ the rows back.**
   until 8 Aug, four lines under its own ✅ PINNED heading.** It was leftover from the
   pre-fix edition. The pin IS applied — `functions.sql` shows `SET search_path TO ''`.
   **A file whose job is catching stale claims contradicted itself inside one bullet.**
-- ⚠️ **`db/migrations/` holds 17 files against 51 applied migrations.** Supabase's own
+- ⚠️ **`db/migrations/` holds 30 files against 65 applied migrations** (measured 9 Aug;
+  **it said 17 against 51 two days earlier — do not cite either pair, run the query**). Supabase's own
   list is authoritative. `events_series_id` (`20260805133133`) is applied with no file
   in the repo, and `src/screens/EventForm.jsx` writes the column it adds. **The 6 Aug
   edition of this file carried this warning; the 7 Aug rewrite dropped it and the

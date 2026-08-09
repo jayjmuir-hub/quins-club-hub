@@ -3,7 +3,7 @@
 //
 // WHY THE SQUAD NAME AND NOT A DATE OF BIRTH: the club does not hold DOBs in
 // this app, and `teams` has no age column — just `name` and `sort_order` (see
-// db/schema/tables.sql). The 15 squad names are the only age signal there is,
+// db/schema/tables.sql). The squad names are the only age signal there is,
 // and they are club-controlled, stable, and already the thing every screen
 // groups by. If a DOB column ever lands, `allowsOwnContact` is the one place
 // to re-point; nothing else in the app reasons about age.

@@ -10,6 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 9 Aug 2026
 
+- `c1a223c` — **The 9 Aug handoff, and three decision records that were never committed.**
+  ⚠️ All three of that day's decision records existed only in the Claude project — the same
+  failure this repo records against 4-7 Aug, caught by `docs:check` flagging a broken path
+  reference rather than by anyone noticing. ⚠️ One of them carried a live secret in plain
+  text; **this repo is public**, so the committed copy names the secret and not its value.
+  Also backfilled `52023db` from 8 Aug, which the coverage check caught as missing.
 - `ebe3b6f` — **Schedule: a Matches/Training/Socials filter on Upcoming**, seen by
   everyone, and the head renamed to "Schedule". An unrecognised stored filter shows
   EVERYTHING, never an empty list; each filter carries its own empty message, because one

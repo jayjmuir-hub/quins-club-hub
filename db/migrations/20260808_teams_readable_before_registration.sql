@@ -1,7 +1,22 @@
--- ⚠️⚠️ NOT APPLIED. WRITTEN 8 Aug 2026, WAITING ON JAY. ⚠️⚠️
+-- ✅ APPLIED. Written 8 Aug 2026, applied the same day as `20260808164111`.
+--
+-- ⚠️ THIS HEADER SAID "NOT APPLIED. WAITING ON JAY" UNTIL 9 Aug 2026, and it
+-- was a lie to the next reader for a day. The policy is live and matches this
+-- file; the re-capture in `db/schema/policies.sql` confirmed it against
+-- `pg_policies`. Corrected rather than deleted, because a status line that
+-- rotted is worth seeing: this directory's headers are written at the moment of
+-- writing and nothing updates them when the migration lands.
+--
+-- ⚠️ AND ONE STATEMENT IN THIS FILE DID NOT LAND: the `comment on policy
+-- "team read"` at the end. `obj_description` is null for every policy in the
+-- database, so what ran was not byte-identical to what is committed here.
+-- No security difference — a comment is documentation — but it means this file
+-- and the live database are not the same text.
+--
+-- The original header follows, kept because the reasoning in it is still good:
 --
 -- Every other file in this directory records something that IS in the live
--- database. This one does not. Nothing in the app depends on it having been
+-- database. This one did not, when it was written. Nothing in the app depends on it having been
 -- run, and the "add your player" screen degrades honestly without it — but
 -- that degraded state is the screen refusing to work, so this is a blocker,
 -- not a nicety.

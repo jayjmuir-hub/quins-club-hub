@@ -9,7 +9,8 @@ Several of them would not even apply cleanly (they contain `CREATE TABLE` for ta
 that already exist, and grants recorded as-found).
 
 Captured from Supabase project `lusmshimxdcxpnrktlgz` (`quins-club-hub`), Postgres 17,
-on **2026-08-03**, **re-captured 2026-08-07** (see below), and before that
+on **2026-08-03**, **re-captured 2026-08-07**, **re-captured 2026-08-09** (see below),
+and before that
 **2026-08-04** after
 `db/migrations/20260803_player_parents_and_photos.sql`, and again the same day after
 `db/migrations/20260804_access_requests.sql` and
@@ -42,12 +43,53 @@ on **2026-08-03**, **re-captured 2026-08-07** (see below), and before that
 > so re-applying the committed migration would have un-pinned it. Step 2 below is not
 > optional bookkeeping; it is the only thing that makes step 3 mean anything.
 
+> ## ⚠️ And the 7 Aug capture itself was not clean — found 9 Aug 2026
+>
+> The 7 Aug entry above ends "**Nothing unintended was found**". Re-capturing on
+> 9 Aug found **two objects the 7 Aug pass had missed**, both live since 5 Aug:
+>
+> - **`events_group_id_idx`** — a partial index created by
+>   `20260805150621 events_pitch_and_group_id`. The 7 Aug header mentioned the
+>   column and wrote down only the *other* index. It sat live for four days with
+>   no line in the file.
+> - **`invites_role_check` was asserting the wrong thing.** The file listed four
+>   roles; live has had six since `20260805160320 roles_manager_and_medic`, which
+>   widened *both* role CHECKs. The 7 Aug capture fixed `memberships_role_check`
+>   and left this one wrong.
+>
+> Plus five `proacl` lines in `functions.sql` that did not match live — two
+> traceable to a 6 Aug migration the 7 Aug capture recorded wrongly, and three
+> (`my_calendar_token`, `reset_my_calendar_token`, `set_own_player_photo`) not
+> attributable to any migration at all. **Postgres keeps no timestamp for a
+> GRANT**, so "the file was always wrong" and "someone granted these outside a
+> migration" cannot be told apart from the catalogue. They are recorded in
+> `functions.sql` as judgement, not fact.
+>
+> **This is what "the diff is only useful while it is small enough to read"
+> costs when it is ignored.** The 7 Aug conclusion was reached from a delta
+> already too big to read, and it was wrong. The 9 Aug delta was nine
+> migrations across two days — smaller, and it still took three passes to
+> reconcile.
+>
+> ⚠️ **`db/schema/` DOES NOT CAPTURE GRANTS ON TABLES OR COLUMNS.** The larger
+> half of `20260808191310 profile_phone_and_column_grants` is a column-level
+> `REVOKE`/`GRANT` on `profiles` — the thing standing between a member and
+> rewriting someone's login email — and **nothing in this directory would diff
+> it**. Same for `is_attached_to_team_grants`. That is a real blind spot in the
+> mechanism, not an oversight in a capture.
+>
+> ⚠️ **`apply_migration` STRIPS `--` COMMENTS before executing.** Not one
+> migration row since 8 Aug contains any comment text from its committed `.sql`.
+> So a function's WHY lives in the migration file and never in the database, and
+> a re-capture cannot bring it back — which is why several function bodies here
+> are bare while their migrations are heavily commented.
+
 | File | Contents |
 |---|---|
 | `tables.sql` | Every `public` table: columns, types, nullability, defaults, PKs, FKs, CHECKs, indexes, and RLS-enabled state. Includes explicit notes where an expected unique constraint is **absent**. |
 | `policies.sql` | Every RLS policy on every `public` table, **plus the two on `storage.objects` for the `player-photos` bucket**, with command and USING / WITH CHECK expressions. |
-| `functions.sql` | Full `pg_get_functiondef()` output for all 22 functions in `public` and `private`, plus their EXECUTE grants from `proacl`. |
-| `triggers.sql` | The three triggers: two on `auth.users`, and `profiles_sync_name` on `public.profiles` (added 6 Aug 2026). ⚠️ This row said "there are none on any `public` table" until 7 Aug. |
+| `functions.sql` | Full `pg_get_functiondef()` output for every function in `public` and `private`, plus their EXECUTE grants from `proacl`. ⚠️ This row said "all 22 functions" until 9 Aug, when the count went to 29. **A count in a table of contents is a thing that rots** — the file itself is the inventory. |
+| `triggers.sql` | Every trigger: two on `auth.users`, `profiles_sync_name` on `public.profiles` (6 Aug 2026), and `notify_pending_membership` on `public.memberships` (9 Aug 2026 — the first trigger in this project that reaches OUTSIDE the database). ⚠️ This row said "there are none on any `public` table" until 7 Aug and "the three triggers" until 9 Aug. |
 
 ## Why this directory exists
 
