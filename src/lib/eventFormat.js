@@ -128,6 +128,36 @@ export function eventTitle(event) {
 }
 
 /**
+ * True when an event's stored title says nothing the type chip beside it does
+ * not already say — a training called "Training", a social called "Social".
+ *
+ * ⚠️ THIS EXISTS BECAUSE THE ROW SAID THE SAME WORD TWICE. FixtureRow renders
+ * a type chip and then the title directly beneath it, so a coach who types
+ * "Training" into the title field (which is the obvious thing to type, and
+ * what every seeded session says) gets a green "Training" chip stacked on a
+ * bold "Training" heading. The heaviest type on the row carries the one piece
+ * of information already given immediately above it.
+ *
+ * Suppressing it is not just tidiness: with the title gone, the bold slot in a
+ * list belongs only to the events that have something distinctive to say — a
+ * match, or a session someone bothered to name. Scanning a month for "what is
+ * different this week" becomes reading the bold lines, which is the question
+ * people actually bring to the schedule.
+ *
+ * ⚠️ COMPARES AGAINST THE TYPE, NOT A LIST OF WORDS. "Extra session before
+ * Saracens" is a training and keeps its title, because it is not the word
+ * "training". Only the exact echo is dropped.
+ *
+ * A blank title is FALSE, not true: eventTitle's own fallbacks handle that
+ * case, and conflating the two would hide the fallback as well.
+ */
+export function titleRepeatsType(event) {
+  const title = String(event?.title ?? '').trim().toLowerCase()
+  if (!title) return false
+  return title === String(event?.type ?? '').trim().toLowerCase()
+}
+
+/**
  * The eyebrow above the dashboard hero: "Next fixture", "Next training",
  * "Next social" or "Next up".
  *

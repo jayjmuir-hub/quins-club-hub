@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  titleRepeatsType,
   CLUB_TIME_ZONE,
   clubDateTimeInputs,
   clubDayParts,
@@ -651,5 +652,26 @@ describe('formatTimeRange', () => {
   it('keeps the "time to be confirmed" copy when there is no start', () => {
     expect(formatTimeRange(null, end)).toBe('Time to be confirmed')
     expect(formatTimeRange(null, null)).toBe('Time to be confirmed')
+  })
+})
+
+// titleRepeatsType — see src/lib/eventFormat.js. FixtureRow drops the bold
+// title when it only echoes the type chip sitting directly above it.
+describe('titleRepeatsType', () => {
+  it('is true for the echo a coach naturally types', () => {
+    expect(titleRepeatsType({ type: 'training', title: 'Training' })).toBe(true)
+    expect(titleRepeatsType({ type: 'social', title: '  social  ' })).toBe(true)
+  })
+
+  it('is false for a title that says something the chip does not', () => {
+    // The case that must survive: a named training.
+    expect(titleRepeatsType({ type: 'training', title: 'Extra session before Saracens' })).toBe(false)
+    expect(titleRepeatsType({ type: 'social', title: 'Squad and parents barbecue' })).toBe(false)
+  })
+
+  it('is false for a blank title, so eventTitle keeps its own fallbacks', () => {
+    expect(titleRepeatsType({ type: 'training', title: '' })).toBe(false)
+    expect(titleRepeatsType({ type: 'training', title: null })).toBe(false)
+    expect(titleRepeatsType(undefined)).toBe(false)
   })
 })

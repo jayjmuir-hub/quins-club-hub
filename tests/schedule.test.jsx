@@ -300,7 +300,7 @@ describe('Schedule — team filter', () => {
     await screen.findByText('Quins vs Dubai Exiles')
     expect(screen.getByText('Senior squad training')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'U10' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u10')
 
     expect(screen.getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
     expect(screen.queryByText('Senior squad training')).not.toBeInTheDocument()
@@ -312,7 +312,7 @@ describe('Schedule — team filter', () => {
     setup()
 
     await screen.findByText('Quins vs Dubai Exiles')
-    expect(screen.queryByRole('button', { name: 'All' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /age group/i })).not.toBeInTheDocument()
   })
 
   // Memberships can reload and shrink a user's scope while a pill is
@@ -325,7 +325,7 @@ describe('Schedule — team filter', () => {
     const { user, rerender } = setup()
 
     await screen.findByText('Quins vs Dubai Exiles')
-    await user.click(screen.getByRole('button', { name: 'U10' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u10')
     expect(screen.queryByText('Senior squad training')).not.toBeInTheDocument()
 
     useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', team_id: 'team-1xv' }]))
@@ -607,11 +607,11 @@ describe('Schedule — calendar tab', () => {
     const { user } = setup()
 
     await screen.findByText('Quins vs Dubai Exiles')
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: /age group/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Calendar' }))
 
-    expect(screen.queryByRole('button', { name: 'All' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /age group/i })).not.toBeInTheDocument()
   })
 })
 

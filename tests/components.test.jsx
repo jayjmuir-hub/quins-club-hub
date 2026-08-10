@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Unit tests for the Task 9 shared UI primitives (src/components/{Card,Chip,
-// Sheet,Badge,TeamPills,Empty,Spinner}.jsx). These are pure
+// Sheet,Badge,TeamFilter,Empty,Spinner}.jsx). These are pure
 // presentational components — no network, no router, no auth context.
 //
 // jsdom does not apply Tailwind's generated CSS, so assertions that a
@@ -17,7 +17,7 @@ import Card from '../src/components/Card.jsx'
 import Chip from '../src/components/Chip.jsx'
 import Sheet from '../src/components/Sheet.jsx'
 import Badge from '../src/components/Badge.jsx'
-import TeamPills, { ALL_TEAMS_ID } from '../src/components/TeamPills.jsx'
+import TeamFilter, { ALL_TEAMS_ID } from '../src/components/TeamFilter.jsx'
 import Empty from '../src/components/Empty.jsx'
 import Spinner from '../src/components/Spinner.jsx'
 
@@ -170,84 +170,111 @@ describe('Spinner', () => {
   })
 })
 
-describe('TeamPills', () => {
+describe('TeamFilter', () => {
   const teams = [
     { id: 'u10', name: 'U10' },
     { id: 'u12', name: 'U12' },
   ]
 
-  it('marks the selected pill with aria-pressed and leaves the others unpressed', () => {
-    render(<TeamPills teams={teams} selected="u10" onChange={() => {}} />)
+  // ⚠️ REPOINTED, NOT REWRITTEN. This block asserted a pill row - aria-pressed
+  // on buttons, one click per squad. The control became a <select> on 10 Aug
+  // 2026 because the row reached four wrapped lines at 18 squads (see the
+  // header of src/components/TeamFilter.jsx). Every assertion below is the
+  // same question asked of the new control: what is selected, what does
+  // choosing do, and do the counts still reach the labels.
 
-    expect(screen.getByRole('button', { name: 'U10' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'U12' })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false')
+  it('shows the selected squad as the select value', () => {
+    render(<TeamFilter teams={teams} selected="u10" onChange={() => {}} />)
+    expect(screen.getByRole('combobox', { name: /age group/i })).toHaveValue('u10')
   })
 
-  it('marks the All pill pressed when selected is the ALL_TEAMS_ID sentinel', () => {
-    render(<TeamPills teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} />)
-    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+  it('shows the sentinel as the value when nothing is filtered', () => {
+    render(<TeamFilter teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} />)
+    expect(screen.getByRole('combobox', { name: /age group/i })).toHaveValue(ALL_TEAMS_ID)
   })
 
-  it('calls onChange with the clicked team id', async () => {
+  // ⚠️ A REAL LABEL, NOT aria-label. A pill reading "U10" said what it did; a
+  // select shows only its current value, so without the word beside it a squad
+  // name sitting on a schedule is ambiguous - filter, or heading?
+  it('is labelled, so the value is not mistaken for a heading', () => {
+    render(<TeamFilter teams={teams} selected="u10" onChange={() => {}} />)
+    expect(screen.getByLabelText('Age group')).toBeInTheDocument()
+  })
+
+  it('calls onChange with the chosen team id', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    render(<TeamPills teams={teams} selected="u10" onChange={onChange} />)
+    render(<TeamFilter teams={teams} selected="u10" onChange={onChange} />)
 
-    await user.click(screen.getByRole('button', { name: 'U12' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'u12')
 
     expect(onChange).toHaveBeenCalledWith('u12')
   })
 
-  it('calls onChange with the ALL_TEAMS_ID sentinel when All is clicked', async () => {
+  it('calls onChange with the ALL_TEAMS_ID sentinel when the all option is chosen', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    render(<TeamPills teams={teams} selected="u10" onChange={onChange} />)
+    render(<TeamFilter teams={teams} selected="u10" onChange={onChange} />)
 
-    await user.click(screen.getByRole('button', { name: 'All' }))
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: /age group/i }),
+      ALL_TEAMS_ID,
+    )
 
     expect(onChange).toHaveBeenCalledWith(ALL_TEAMS_ID)
   })
 
-  it('suffixes each label with its count when a counts map is given', () => {
+  // The counts are why the Roster row was tolerable at 18 squads - "which
+  // squads actually have anybody", answered at a glance. They had to survive.
+  it('suffixes each option with its count when a counts map is given', () => {
     const counts = new Map([
       [ALL_TEAMS_ID, 12],
       ['u10', 9],
       ['u12', 3],
     ])
-    render(<TeamPills teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} counts={counts} />)
+    render(<TeamFilter teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} counts={counts} />)
 
-    expect(screen.getByRole('button', { name: 'All · 12' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'U10 · 9' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'U12 · 3' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'All age groups · 12' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'U10 · 9' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'U12 · 3' })).toBeInTheDocument()
   })
 
   it('shows a zero count rather than treating it as absent', () => {
-    render(<TeamPills teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} counts={new Map([['u10', 0]])} />)
+    render(
+      <TeamFilter
+        teams={teams}
+        selected={ALL_TEAMS_ID}
+        onChange={() => {}}
+        counts={new Map([['u10', 0]])}
+      />,
+    )
 
-    expect(screen.getByRole('button', { name: 'U10 · 0' })).toBeInTheDocument()
-    // No entry in the map at all means a bare label — not "· 0".
-    expect(screen.getByRole('button', { name: 'U12' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'U10 · 0' })).toBeInTheDocument()
+    // No entry in the map at all means a bare label - not "· 0".
+    expect(screen.getByRole('option', { name: 'U12' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'All age groups' })).toBeInTheDocument()
   })
 
   it('leaves every label bare when no counts are given', () => {
-    render(<TeamPills teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} />)
+    render(<TeamFilter teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} />)
 
-    expect(screen.getByRole('button', { name: 'U10' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'U10' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'All age groups' })).toBeInTheDocument()
   })
 
   it('renders no broken control for an empty teams array', () => {
-    const { container } = render(<TeamPills teams={[]} selected={ALL_TEAMS_ID} onChange={() => {}} />)
+    const { container } = render(
+      <TeamFilter teams={[]} selected={ALL_TEAMS_ID} onChange={() => {}} />,
+    )
     expect(container).toBeEmptyDOMElement()
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    expect(screen.queryAllByRole('combobox')).toHaveLength(0)
   })
 
   it('renders no broken control when teams is missing entirely', () => {
-    const { container } = render(<TeamPills selected={ALL_TEAMS_ID} onChange={() => {}} />)
+    const { container } = render(<TeamFilter selected={ALL_TEAMS_ID} onChange={() => {}} />)
     expect(container).toBeEmptyDOMElement()
   })
+
 })
 
 describe('Sheet', () => {

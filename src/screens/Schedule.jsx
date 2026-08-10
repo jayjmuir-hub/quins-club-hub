@@ -5,7 +5,7 @@ import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
 import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
-import TeamPills, { ALL_TEAMS_ID, PillButton } from '../components/TeamPills.jsx'
+import TeamFilter, { ALL_TEAMS_ID, PillButton } from '../components/TeamFilter.jsx'
 import Availability from './Availability.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
@@ -584,11 +584,11 @@ export default function Schedule() {
 
       {/* The calendar always shows the user's whole visible scope, so the
           team filter is hidden there (design-system.md §5.2). Below two
-          teams there is nothing to filter between, and TeamPills already
+          teams there is nothing to filter between, and TeamFilter already
           renders nothing for an empty list. */}
       {tab !== 'calendar' && scopedTeams.length > 1 && (
         <div className="mb-4">
-          <TeamPills teams={scopedTeams} selected={activeFilter} onChange={persistFilter} />
+          <TeamFilter teams={scopedTeams} selected={activeFilter} onChange={persistFilter} />
         </div>
       )}
 
