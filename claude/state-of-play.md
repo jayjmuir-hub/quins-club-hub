@@ -291,10 +291,20 @@ Durable. Each cost real time to find.
   Upcoming, so a lookback shorter than a season empties the season-in-review screen
   partway through the season. Jay's question — "in 6 months will I still be able to
   see events from Sept?" — is the headline test in `tests/event-window.test.js`.
-  ⚠️ **STILL OPEN AND STILL NEEDING A DECISION: pagination for an admin on ALL
-  squads.** ~75 events per squad per season × 15 squads over 18 months ≈ 1,690 rows,
-  over `MAX_ROWS` at any window boundary. A window cannot fix it; only pagination
-  can. Everyone else — parent 1–2 squads, coach 1–3 — is comfortably under.
+  ✅ **AND THE ADMIN/ALL-SQUADS CASE IS PAGED** (10 Aug). `listEvents` no longer sends
+  one capped request that threw above 900 rows — `fetchAllPages` in
+  `src/data/limits.js` walks `.range()` until a short page arrives. ⚠️ **The
+  guarantee is unchanged: everything, or a throw. Never some of it.** A second
+  ceiling, `MAX_TOTAL_ROWS` (5,000), stops a runaway loop and is a PRODUCT limit, not
+  a PostgREST one — roughly 3× the club's realistic worst case.
+  ⚠️ **`order` must end in a UNIQUE column and `events` pages by `starts_at, id`.**
+  `.range()` is OFFSET/LIMIT; two events can share a `starts_at` (a Saturday of
+  age-group matches all at 09:00 is normal), and an under-specified sort lets Postgres
+  order tied rows differently between pages — returning one twice and dropping another
+  with no error anywhere.
+  ⚠️ **`listPlayers` still uses the old flat cap.** Fine at 6 players and fine at 700,
+  since both are under 900; it will need the same treatment before the club passes
+  that, and `fetchAllPages` is written to be reused.
 - **`saveParents` is delete-then-write, not atomic.**
 - ✅ **AVAILABILITY / RSVP IS ON — Jay, 10 Aug 2026.** `FEATURES.availability` in
   `src/lib/features.js` is **true**. It was false from 29 Jul because the club was not

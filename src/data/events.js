@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import { withCap, unwrapCapped } from './limits.js'
+import { fetchAllPages } from './limits.js'
 
 // Data access for the events table. RLS already restricts rows to what the
 // calling user's memberships allow (admins get every event, coaches/parents/
@@ -20,24 +20,40 @@ import { withCap, unwrapCapped } from './limits.js'
 export async function listEvents({ teamIds, from, to } = {}) {
   if (Array.isArray(teamIds) && teamIds.length === 0) return []
 
-  let query = supabase.from('events').select('*')
-  if (Array.isArray(teamIds) && teamIds.length > 0) {
-    query = query.in('team_id', teamIds)
+  // ⚠️ PAGED, NOT CAPPED, SINCE 10 Aug 2026. This used to be a single capped
+  // request that THREW above 900 rows. That refusal was right in principle —
+  // a short list that looks complete is worse than an error — but for an admin
+  // viewing all fifteen squads it was simply a broken screen: ~1,690 rows over
+  // the default 18-month window, and no action available short of filtering to
+  // one squad. Paging keeps the guarantee (everything, or a throw — never
+  // some) and removes the wall. See fetchAllPages in ./limits.js.
+  //
+  // ⚠️ A FRESH BUILDER PER PAGE. A PostgREST query builder is single-use once
+  // awaited; handing the same one back would re-send page one forever.
+  const buildQuery = () => {
+    let query = supabase.from('events').select('*')
+    if (Array.isArray(teamIds) && teamIds.length > 0) {
+      query = query.in('team_id', teamIds)
+    }
+    if (from) query = query.gte('starts_at', from)
+    if (to) query = query.lte('starts_at', to)
+    return query
   }
-  if (from) query = query.gte('starts_at', from)
-  if (to) query = query.lte('starts_at', to)
-  query = query.order('starts_at', { ascending: true })
 
-  const { data, error } = await withCap(query)
-  if (error) throw error
-  // ⚠️ THE `from`/`to` WINDOW ABOVE IS THE ANSWER WHEN THIS FIRES, and it has
-  // existed since this function was written — no caller passes one. Every
-  // screen asks for every event in scope and filters in memory, which is fine
-  // at one season and stops being fine at three. See src/data/limits.js.
-  return unwrapCapped(
-    data,
+  // ⚠️ `id` IS THE TIEBREAK AND IT IS LOAD-BEARING, NOT TIDINESS. `.range()`
+  // is OFFSET/LIMIT, and two events can share a `starts_at` — a Saturday of
+  // age-group matches all kicking off at 09:00 is the normal case, not an edge
+  // one. With `starts_at` alone the sort is under-specified, so Postgres may
+  // order those rows differently between two requests and paging would return
+  // one twice and drop another, with no error anywhere.
+  return fetchAllPages(
+    buildQuery,
+    [
+      ['starts_at', { ascending: true }],
+      ['id', { ascending: true }],
+    ],
     'events',
-    'Narrow the date range — listEvents already accepts `from` and `to`.',
+    'Narrow the date range or filter to one squad.',
   )
 }
 

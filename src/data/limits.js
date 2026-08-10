@@ -80,6 +80,82 @@ export function withCap(query, limit = MAX_ROWS) {
  * @param {string} what  what was being listed, for the message
  * @param {string} hint  the specific thing to do about it
  */
+/**
+ * The ceiling on a PAGED read — the point at which we stop fetching and say so
+ * rather than pulling an unbounded amount into a phone's memory.
+ *
+ * ⚠️ THIS IS NOT `MAX_ROWS` AND THE DIFFERENCE MATTERS. `MAX_ROWS` is a
+ * PostgREST constraint: one request cannot exceed `db-max-rows`, so a single
+ * query is capped at 900 and the 901st row is the tripwire. This is a PRODUCT
+ * constraint: paging removes the per-request wall, so something else has to
+ * decide when "a lot of fixtures" becomes "something is wrong". Nothing about
+ * the database changes at 5,000; it is the number past which no human is
+ * reading a schedule and the answer is a narrower filter.
+ *
+ * Sized against the measurement that motivated paging (10 Aug 2026): a squad
+ * running 2.0–2.3 events per active week is ~75 a season, so fifteen squads
+ * over the app's 18-month window is ~1,690. 5,000 is roughly three times the
+ * whole club's realistic worst case — high enough that no legitimate read
+ * meets it, low enough to be a real backstop.
+ */
+export const MAX_TOTAL_ROWS = 5000
+
+/**
+ * Reads every row matching a query, one page at a time.
+ *
+ * ⚠️ WHY PAGING EXISTS AT ALL, given `withCap` already refuses to truncate.
+ * `withCap` makes a too-large answer LOUD, which was the right first move —
+ * a short list that looks complete is the worst outcome. But loud is still
+ * broken: an admin viewing all fifteen squads over the default 18-month window
+ * is ~1,690 rows, so the cap turned their Schedule into an error screen with
+ * no action that fixes it short of filtering to one squad. Paging removes the
+ * per-request wall while keeping the guarantee: **this either returns
+ * everything, or throws. It never returns some of it.**
+ *
+ * ⚠️ THE ORDER ARGUMENT IS NOT OPTIONAL AND IS THE EASIEST THING TO GET WRONG.
+ * `.range()` is OFFSET/LIMIT. Postgres does not promise a stable row order
+ * between two queries that do not fully specify one, so paging an
+ * under-specified sort silently returns the same row on two pages and never
+ * returns another — a schedule with one fixture twice and one missing, and no
+ * error anywhere. Callers therefore pass the sort, and it MUST end in a unique
+ * column: `starts_at` alone is not enough because two events can start at the
+ * same instant, which is exactly what a Saturday morning of age-group matches
+ * looks like.
+ *
+ * @param {() => object} buildQuery  returns a FRESH PostgREST query each call —
+ *   a builder is single-use once awaited, so reusing one silently re-sends the
+ *   first page's range
+ * @param {Array<[string, {ascending?: boolean}]>} order  sort columns, last one unique
+ */
+export async function fetchAllPages(buildQuery, order, what, hint, { page = MAX_ROWS, max = MAX_TOTAL_ROWS } = {}) {
+  const rows = []
+
+  for (let offset = 0; ; offset += page) {
+    let query = buildQuery()
+    for (const [column, options] of order) query = query.order(column, options)
+
+    const { data, error } = await query.range(offset, offset + page - 1)
+    if (error) throw error
+
+    const batch = data ?? []
+    rows.push(...batch)
+
+    // A short page means the end of the rows. An exactly-full one is
+    // ambiguous, so it costs one more request to find out — cheaper than
+    // guessing wrong and dropping the tail.
+    if (batch.length < page) return rows
+
+    if (rows.length >= max) {
+      throw new Error(
+        `Too many ${what} to show at once (more than ${max}). ${hint} ` +
+          `This is a deliberate limit, not a database error: past this point the ` +
+          `list is no longer something anyone reads, and loading it would cost ` +
+          `more than it tells you.`,
+      )
+    }
+  }
+}
+
 export function unwrapCapped(rows, what, hint, limit = MAX_ROWS) {
   const list = rows ?? []
   if (list.length <= limit) return list

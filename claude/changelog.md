@@ -10,6 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — event reads are PAGED, so an admin on all squads is no longer an error
+  screen.** `listEvents` sent one capped request that THREW above 900 rows. That
+  refusal was right in principle — a short list that looks complete is worse than an
+  error — and wrong in practice: fifteen squads over the 18-month window is ~1,690
+  rows, so the cap turned Schedule into an error with no action that fixed it short of
+  filtering to one squad. `fetchAllPages` (`src/data/limits.js`) walks `.range()` until
+  a short page arrives. ⚠️ **The guarantee is unchanged: everything, or a throw. Never
+  some of it.**
+  ⚠️ **`MAX_TOTAL_ROWS` (5,000) is a PRODUCT limit, not a PostgREST one.** `MAX_ROWS`
+  exists because one request cannot exceed `db-max-rows`; paging removes that wall, so
+  something else has to decide when "a lot of fixtures" means "something is wrong".
+  Nothing changes in the database at 5,000 — it is ~3× the club's realistic worst case.
+  ⚠️ **THE SORT MUST END IN A UNIQUE COLUMN, AND THAT IS THE SUBTLE PART.** `.range()`
+  is OFFSET/LIMIT. Two events can share a `starts_at` — a Saturday of age-group matches
+  all kicking off at 09:00 is the normal case — and an under-specified sort lets
+  Postgres order tied rows differently between requests, so one row comes back on two
+  pages and another on none, **with no error anywhere**. `events` therefore pages by
+  `starts_at, id`.
+  ⚠️ **Both traps proven by injected fault**: `range(offset, offset + page)` instead of
+  `- 1` returns 27 rows from 25 (duplicated boundaries), and removing the `id` tiebreak
+  fails the sort assertion. ⚠️ The first attempt at that second injection silently did
+  nothing — a `\n` in the patch script did not match CRLF — and reported green.
+  **An injection that changes no bytes is not a passing test.**
+  ⚠️ `listPlayers` still uses the flat cap; it is under 900 today, and `fetchAllPages`
+  is written to be reused when it is not.
+- `aec8264` — **Edit a whole repeating series, not just cancel it.**
+
 - **10 Aug — a repeating series can be EDITED, not just cancelled.** Deleting a series
   shipped 8 Aug; editing one did not. `EventForm` now offers "Apply to this and every
   later session" when the event has a `series_id`, ⚠️ **defaulting to OFF** — the wider
