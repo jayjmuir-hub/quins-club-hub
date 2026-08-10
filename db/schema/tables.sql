@@ -678,3 +678,55 @@ CREATE INDEX invite_targets_invite_id_idx ON public.invite_targets USING btree (
 --   players_team_id_idx                  btree (team_id)                  (9 Aug)
 --   profiles_pkey                        UNIQUE (id)
 --   teams_pkey                           UNIQUE (id)
+
+
+-- ---------------------------------------------------------------------
+-- attendance  (who actually turned up — added 2026-08-10,
+--              db/migrations/20260810_attendance.sql)
+--
+-- ⚠️ NOT `availability`, AND THE DISTINCTION IS THE WHOLE POINT. availability
+-- is RSVP: INTENT, collected before the event, written by the player or their
+-- parent (is_own_player). attendance is the FACT, recorded afterwards, and
+-- only a coach may write it (can_edit_team). They share a grain — (event,
+-- player) — and nothing else.
+--
+-- A column on `availability` would have been fewer objects and was rejected:
+-- one row with two different write authorities on different columns is a
+-- column-level GRANT problem, and db/schema/grants.sql exists because those
+-- are invisible in every other file in this directory.
+--
+-- ⚠️ `status` HAS THREE VALUES AND THE THIRD IS LOAD-BEARING. An attendance
+-- percentage is present / (present + absent); `excused` is excluded from BOTH
+-- sides so a player away injured or on holiday is not ranked as uncommitted.
+-- Deliberately no 'late' — a fourth state everyone wants and nobody can
+-- define. Widening the CHECK is a one-line migration.
+--
+-- Both FKs CASCADE, unlike invites/invite_targets which are ON DELETE NO
+-- ACTION and give claude/state-of-play.md its wipe-order note. A deleted event
+-- or player should take its register rows with it, which keeps this table out
+-- of that ordering problem entirely.
+--
+-- The UNIQUE is what makes the upsert in src/data/attendance.js safe: taking
+-- the register twice CORRECTS the first answer rather than appending a second,
+-- contradictory row for the same child.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.attendance (
+  id          uuid        NOT NULL DEFAULT gen_random_uuid(),
+  event_id    uuid        NOT NULL,
+  player_id   uuid        NOT NULL,
+  status      text        NOT NULL,
+  recorded_by uuid,
+  recorded_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT attendance_pkey                    PRIMARY KEY (id),
+  CONSTRAINT attendance_event_id_player_id_key  UNIQUE (event_id, player_id),
+  CONSTRAINT attendance_status_check            CHECK (status = ANY (ARRAY['present'::text, 'absent'::text, 'excused'::text])),
+  CONSTRAINT attendance_event_id_fkey           FOREIGN KEY (event_id)    REFERENCES events(id)   ON DELETE CASCADE,
+  CONSTRAINT attendance_player_id_fkey          FOREIGN KEY (player_id)   REFERENCES players(id)  ON DELETE CASCADE,
+  CONSTRAINT attendance_recorded_by_fkey        FOREIGN KEY (recorded_by) REFERENCES profiles(id) ON DELETE SET NULL
+);
+ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
+
+-- The two access paths that exist from day one: the register loads every row
+-- for ONE event, a player's history loads every row for ONE player.
+CREATE INDEX attendance_event_id_idx  ON public.attendance (event_id);
+CREATE INDEX attendance_player_id_idx ON public.attendance (player_id);

@@ -685,3 +685,56 @@ CREATE POLICY "player photo write" ON storage.objects
 -- MEMBERSHIP ON THAT SQUAD, or an approval-scoped pending row (memberships /
 -- profiles, 9 Aug), or ownership of the player.
 -- ---------------------------------------------------------------------
+
+
+-- =====================================================================
+-- attendance  — added 2026-08-10, db/migrations/20260810_attendance.sql
+--
+-- ⚠️ THE READ POLICY IS DELIBERATELY NARROWER THAN THE HOUSE STYLE, and this
+-- is the note that stops somebody "fixing" it. Every other team-scoped table
+-- reads with `can_see_team`, so a parent sees the whole squad. Attendance does
+-- not: "which children miss training, and how often" is a safeguarding-
+-- adjacent fact about somebody else's child and the sort of thing that becomes
+-- touchline gossip. Staff see the squad; a parent sees only their own child.
+--
+-- ⚠️ `is_own_player` APPEARS IN THE READ POLICY AND IN NO WRITE POLICY. A
+-- parent must never mark their own child present — the entire value of an
+-- attendance number is that somebody other than the interested party recorded
+-- it. If it ever appears in a write policy, the feature is worthless.
+--
+-- ⚠️ `private.can_edit_team` DOES NOT CHECK `status`, so a PENDING coach,
+-- manager or medic passes all four of these. Inherited, not introduced —
+-- claude/state-of-play.md records it as latent (no path creates a pending
+-- staff membership) and rules that it belongs in its own change with its own
+-- harness. Fixing it here would silently change every other policy built on
+-- the same helper.
+--
+-- Three write policies rather than one FOR ALL, following the shape the
+-- availability merge settled on 9 Aug: FOR ALL on a table a coach can write is
+-- how deletion gets granted alongside insertion without anybody deciding to.
+--
+-- Verified against live 2026-08-10; harness in db/tests/attendance.sql.
+-- =====================================================================
+
+CREATE POLICY "attendance read" ON public.attendance
+  FOR SELECT USING (
+    private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
+    OR private.is_own_player(player_id)
+  );
+
+CREATE POLICY "attendance write insert" ON public.attendance
+  FOR INSERT WITH CHECK (
+    private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
+  );
+
+CREATE POLICY "attendance write update" ON public.attendance
+  FOR UPDATE USING (
+    private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
+  ) WITH CHECK (
+    private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
+  );
+
+CREATE POLICY "attendance write delete" ON public.attendance
+  FOR DELETE USING (
+    private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
+  );

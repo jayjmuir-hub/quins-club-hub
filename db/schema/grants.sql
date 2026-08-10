@@ -110,12 +110,18 @@
 
 -- ── 2. TABLE-LEVEL GRANTS ──────────────────────────────────────────────────
 --
--- Thirteen tables in `public`. Every one of them grants all eight privileges
+-- Fourteen tables in `public`. Every one of them grants all eight privileges
 -- to all four of `anon`, `authenticated`, `postgres` and `service_role` —
 -- which is exactly what the default privileges above produce — with ONE
 -- exception, and the exception is the whole point of the file.
 --
+-- ⚠️ `attendance` (10 Aug) IS SECTION 1 PROVING ITSELF. Its migration writes no
+-- GRANT at all, and it arrived with all eight privileges for `anon` anyway. The
+-- only thing between that table and anyone holding the project URL is the
+-- `enable row level security` line in the same migration.
+--
 --   access_requests   anon, authenticated, postgres, service_role   ALL 8
+--   attendance        anon, authenticated, postgres, service_role   ALL 8
 --   availability      anon, authenticated, postgres, service_role   ALL 8
 --   calendar_tokens   anon, authenticated, postgres, service_role   ALL 8
 --   clubs             anon, authenticated, postgres, service_role   ALL 8
@@ -201,8 +207,8 @@
 -- Found in the Supabase dashboard on 10 Aug 2026, and it is the most dangerous
 -- thing in this file.
 --
--- **Integrations → Data API → Settings → Exposed tables** lists the thirteen
--- tables in `public`. Twelve carry a green tick. `public.profiles` does not: it
+-- **Integrations → Data API → Settings → Exposed tables** lists the tables in
+-- `public`. All but one carry a green tick. `public.profiles` does not: it
 -- is rendered in AMBER with a warning icon, and its tooltip reads
 --
 --     "This table has custom grants. Select it to override with standard Data
