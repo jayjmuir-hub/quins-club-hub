@@ -266,15 +266,24 @@ Durable. Each cost real time to find.
   handler exists, so a forgetful caller gets no button rather than a lying one.
   Covered by `tests/dashboard-availability.test.jsx`, which mocks the flag ON — the
   reason no existing test caught it is that they all drove Schedule.
-- ⚠️ **THE BUTTONS ARE HALF-MIGRATED, AND THE TWO RADII ARE DELIBERATE.**
-  `src/components/Button.jsx` is used 12 times against **105 raw buttons** with
-  hand-written class strings (measured 10 Aug; also 16 distinct radii, and
-  `rounded-btn` used twice against 117 hardcoded `rounded-[11px]`). The new
-  "Touchline/Sweep" look lives in the component and the token, so it currently
-  restyles those twelve and nothing else. **8px next to 11px is the receipt for
-  unfinished work, not a bug** — it resolves as the 105 are routed through the
-  component. ⚠️ The sweep and bloom are **primary actions only**: on everything
-  they read cheap, and a glowing "Cancel" draws the eye to the destructive choice.
+- ⚠️ **THE BUTTONS ARE HALF-MIGRATED — AND THE FIRST COUNT OF THIS WAS WRONG.**
+  Measured properly 10 Aug: **100 `<button>` elements against 11 uses of
+  `src/components/Button.jsx`.** That part stands, and it is why the new
+  "Touchline/Sweep" look lives in the component and the token.
+  ❌ **What was published and is FALSE: "105 raw buttons carrying the same
+  padding + radius + weight signature", and the implication that
+  `rounded-[11px]`'s 117 occurrences were button radii.** The original grep
+  counted every element with that radius plus padding and called them all
+  buttons. **Only 20 `<button>`s use `rounded-[11px]`; 98 of the occurrences are
+  NOT buttons** — 38 are `<p>` alerts, the rest inputs, panels and cards.
+  ⚠️ **So `rounded-[11px]` is the app's general SURFACE radius, used correctly,
+  not a drifting button token.** The 8px change affects the 11 component buttons;
+  it does not resolve into "one radius everywhere" and was never going to.
+  ⚠️ The wrong figures are in `claude/changelog.md`'s 10 Aug button entry, in
+  PR #16's description and in the commit message of `87c7566`, which cannot be
+  edited. This line is the correction of record.
+  ⚠️ The sweep and bloom are **primary actions only**: on everything they read
+  cheap, and a glowing "Cancel" draws the eye to the destructive choice.
 - **Single-club assumption** in `clubId` derivation, `is_admin_anywhere()` and
   `can_admin_see_pending()`. Revisit together if a second club appears.
 - **The changelog is allowed to be exactly one commit behind** — a commit cannot
