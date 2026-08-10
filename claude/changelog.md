@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — `private.can_edit_team` now checks membership status.**
+  `db/migrations/20260810_can_edit_team_status.sql`. ⚠️ **This overturns a DELIBERATE
+  decision, not an oversight** — `20260808_membership_pending_status.sql` states in as
+  many words that it was "deliberately NOT status-gated", because staff roles are
+  admin-granted and a pending coach cannot arise, so the check "implies a state that
+  has no way of arising, and an unreachable branch is a lie about the model". **That
+  premise is still true.** Jay ruled the other way: **thirteen** policies hang off
+  this function — events, players, player_contacts, player_parents, all four
+  attendance policies, three availability writes, one arm of `avail read`, and the
+  player-photo storage policy — so the day any flow grants staff access through a
+  pending state, all thirteen open at once and nothing in the causing diff looks like
+  access control. The original author's own words were that the check is harmless.
+  ⚠️ **Proved live, both directions**: a pending coach gets `can_edit_team` false,
+  0 players, 0 contacts and a refused insert; flipped to active in the same rolled-back
+  transaction, it becomes true with 4 players and 4 contacts. Without that second half
+  the whole harness would pass while running as the owner with RLS bypassed.
+  ⚠️ **AND A DRAFT OF THAT HARNESS ASSERTED THE WRONG THING.** It expected a pending
+  coach to see 0 events. They see 34, and that is CORRECT: `event read` is gated on
+  `private.is_attached_to_team`, which is status-blind **on purpose** — "fixtures are
+  not sensitive, and a pending parent needs them to be worth signing in at all".
+  Shipping that assertion would have taught a future session to "fix" a working
+  design. **`is_attached_to_team` must stay status-blind.**
+  ⚠️ Consequence, correcting an older note: the `avail read` policy's `can_edit_team`
+  arm is now genuinely redundant rather than only looking it. Left in place.
+- `c4c6491` — **Switch RSVP on.**
+
 - **10 Aug — RSVP is switched on.** `FEATURES.availability` → `true`. Jay's call, after
   asking "where is the availability function?" twice in one day. It was false from
   29 Jul because the club was not ready to rely on digital RSVP — a readiness

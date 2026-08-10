@@ -184,12 +184,24 @@ Durable. Each cost real time to find.
 - ⚠️ **`apply_migration` strips `--` comments before executing.** A function's
   reasoning lives in the migration file and never in the database; a re-capture
   cannot bring it back.
-- ⚠️ **`private.can_edit_team` does not check `status`; `private.can_see_team`
-  does.** So a PENDING coach, manager or medic would pass every policy built on
-  `can_edit_team`. **Latent, not live** — no path creates a pending staff
-  membership. ⚠️ It also means the merged `avail read` policy has THREE arms that
-  look redundant and are not: dropping the `can_edit_team` one silently removes a
-  pending coach's read. Belongs in its own change with its own harness.
+- ✅ **`private.can_edit_team` NOW CHECKS `status`** (10 Aug 2026,
+  `db/migrations/20260810_can_edit_team_status.sql`, harness
+  `db/tests/rls-can-edit-team-status.sql`). ⚠️ **This OVERTURNED a deliberate
+  decision, not an oversight** — the 8 Aug migration said in as many words that it
+  was "deliberately NOT status-gated" because a pending coach cannot arise and "an
+  unreachable branch is a lie about the model". That premise still holds; Jay ruled
+  the other way, on the argument that **thirteen** policies hang off it (events,
+  players, contacts, parents, all four attendance, three availability writes, an arm
+  of `avail read`, and player-photo storage) and would all open at once the day
+  anything grants staff access through a pending state.
+  ⚠️ **Consequence, correcting the old note: the `avail read` policy's `can_edit_team`
+  arm IS now genuinely redundant** (can_edit_team is a strict subset of can_see_team
+  once both require active). Left in place deliberately.
+  ⚠️ **`private.is_attached_to_team` IS STILL STATUS-BLIND AND MUST STAY THAT WAY.**
+  It gates `event read`, and a pending parent seeing fixtures is what makes signing
+  in worth anything before approval. **Measured 10 Aug: a pending coach reads events
+  (34) and cannot read players (0) or contacts (0). All three are correct.** Do not
+  "finish the job" here.
 - **Approval is an RPC (`approve_membership`), NOT a widened policy.** `memb manage`
   is `FOR ALL`, so a coach clause would also grant role changes (including promotion
   to admin), squad reassignment and deletion. The migration aborts if `memb manage`

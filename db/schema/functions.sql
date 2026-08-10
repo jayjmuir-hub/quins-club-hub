@@ -425,6 +425,26 @@ GRANT EXECUTE ON FUNCTION private.can_admin_see_pending(uuid) TO anon;  -- inert
 -- three grant IDENTICAL rights — the word is the only thing distinguishing
 -- them. Mirrored client-side by SQUAD_STAFF_ROLES in src/lib/scope.js:
 -- CHANGE ONE, CHANGE BOTH.
+--
+-- ⚠️ CHANGED 2026-08-10 (can_edit_team_status): `m.status = 'active'` added,
+-- OVERTURNING A DELIBERATE DECISION. 20260808_membership_pending_status.sql
+-- said in as many words that it was "deliberately NOT status-gated here",
+-- because staff roles are admin-granted and a pending coach cannot arise, so
+-- the check "implies a state that has no way of arising, and an unreachable
+-- branch is a lie about the model". That premise is still true. It was
+-- overturned on Jay's instruction, on the argument that thirteen policies
+-- hang off this function — events, players, player_contacts, player_parents,
+-- attendance, availability and the player-photo storage policy — and the day
+-- anything grants staff access through a pending state, all thirteen open at
+-- once with no policy edit to notice. The original author's own words are
+-- that the check is harmless.
+-- Harness: db/tests/rls-can-edit-team-status.sql.
+--
+-- ⚠️ DO NOT "TIDY" THE SAME CHECK INTO private.is_attached_to_team. That one
+-- is status-blind ON PURPOSE — it gates `event read`, and fixtures are
+-- non-sensitive squad context a pending parent needs in order for signing in
+-- to be worth anything. Measured: a pending coach still reads events, and
+-- that is correct.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.can_edit_team(_team uuid)
  RETURNS boolean
@@ -434,6 +454,7 @@ CREATE OR REPLACE FUNCTION private.can_edit_team(_team uuid)
 AS $function$
   select exists (select 1 from memberships m
     where m.profile_id = auth.uid()
+      and m.status = 'active'
       and ((m.role = 'admin' and m.club_id = (select club_id from teams where id = _team))
            or (m.role in ('coach','manager','medic') and m.team_id = _team)));
 $function$
