@@ -31,18 +31,48 @@ const BASE = [
   'disabled:cursor-not-allowed disabled:opacity-60',
 ].join(' ')
 
+// ── The Touchline look, 10 Aug 2026 ────────────────────────────────────────
+//
+// Jay picked it from four directions, then picked "Sweep" from three motion
+// studies of it. Two ideas, and both are about a thumb rather than a mouse:
+//
+//   A WEIGHTED BOTTOM EDGE. 3px of the darker brand under the primary, and a
+//   thicker bottom border on the secondary, so a button reads as a physical
+//   key with a top and a bottom rather than a coloured rectangle. It is what
+//   makes the existing `active:scale(.97)` press (see src/index.css) look like
+//   the key going down instead of the whole control shrinking.
+//
+//   A TALLER TAP TARGET. py-2.5 -> py-3. This app is used standing on a pitch
+//   in Abu Dhabi, one-handed, often wet. 44px is the floor everyone quotes and
+//   the old size sat under it.
+//
+// ⚠️ THE SWEEP AND THE BLOOM ARE ON `primary` ONLY, DELIBERATELY. Applied to
+// everything they stop meaning anything, and a glowing "Cancel" pulls the eye
+// toward the destructive-adjacent choice. `secondary` gets the bloom at a
+// third strength and no sweep; `ghost` gets neither. The CSS itself is in
+// src/index.css — see the comment there for why it is not Tailwind utilities.
 const VARIANTS = {
-  primary: 'bg-brand text-white hover:bg-brand-deep',
+  primary: 'bg-brand text-white hover:bg-brand-deep border-b-[3px] border-brand-deep btn-sweep btn-glow',
   // border-[1.5px] rather than `border`: the hairline reads too thin against a
   // white fill at 1px, which is why every existing secondary button used 1.5.
+  // The bottom edge is thicker than the other three for the same reason the
+  // primary has one at all.
   secondary:
-    'border-[1.5px] border-line bg-surface-card text-brand hover:border-brand',
+    'border-[1.5px] border-b-[3px] border-line bg-surface-card text-ink hover:border-brand hover:text-brand btn-glow-soft',
   ghost: 'text-brand hover:bg-surface-mute',
 }
 
+// ⚠️ 8px, NOT THE 11px THE APP USES EVERYWHERE ELSE. Deliberate, and the
+// mismatch is temporary by design: `rounded-btn` is the token, it is used
+// TWICE, and the identical literal `rounded-[11px]` appears 117 times because
+// the shared component was never adopted. Changing the token to 8px therefore
+// restyles the twelve buttons that go through here and nothing else — which is
+// exactly the point. The 105 hand-rolled ones move as they are routed through
+// this component, and until then the two radii sitting side by side are the
+// visible receipt for work that is not finished.
 const SIZES = {
-  md: 'rounded-btn px-4 py-2.5 text-sm',
-  sm: 'rounded-[8px] px-3 py-1.5 text-[13px]',
+  md: 'rounded-btn px-4 py-3 text-sm',
+  sm: 'rounded-[6px] px-3 py-2 text-[13px]',
 }
 
 // The club site's signature: a circular badge holding an arrow that rotates

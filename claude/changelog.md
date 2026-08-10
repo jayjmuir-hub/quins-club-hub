@@ -10,6 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the buttons got a look, and an audit explaining why they had none.**
+  Jay asked for an audit and a different look; the audit found the reason the look
+  was hard to change. ⚠️ **`src/components/Button.jsx` exists and is used 12 times,
+  against 105 raw buttons still carrying hand-written class strings.** Its own
+  header says it was built to replace "76 hand-written class strings across 26
+  files" — that consolidation was started and never finished, and there are now
+  more hand-rolled buttons than when it was written. ⚠️ **The `rounded-btn` token
+  is used TWICE while its identical literal `rounded-[11px]` appears 117 times**,
+  across 16 distinct radii. So restyling meant editing 34 files, and the next
+  person would add button 106 with its own string. The look chosen ("Touchline",
+  from four directions, then "Sweep" from three motion studies) therefore lands in
+  the COMPONENT and the token only: 8px radius, a weighted 3px bottom edge so a
+  button reads as a key with a top and a bottom, a taller tap target (py-2.5 →
+  py-3, for a wet thumb on a pitch), and on hover a band of light crossing the fill
+  over a bloom of brand red. ⚠️ **Primary actions only** — applied to all 105 it
+  reads cheap and stops meaning anything, and a glowing "Cancel" pulls the eye
+  toward the destructive-adjacent choice; secondary gets a third-strength bloom and
+  no sweep. ⚠️ **The two radii now sit side by side on purpose** — 8px on the twelve
+  buttons that go through the component, 11px on the other 105 — as the visible
+  receipt for work that is not finished. ⚠️ **Tested against the BUILT stylesheet**,
+  like the press-feedback rule, and that caught two things the source would not:
+  the minifier collapses `::after` to `:after` AND rewrites `translateX(…)` to
+  `translate(…)`, so assertions on the authored spelling would have passed in dev
+  and failed only in production. `isolation: isolate` is pinned too — the sweep
+  sits at `z-index: -1` to pass under the label, and without its own stacking
+  context it vanishes behind the button entirely, which debugs as a timing problem.
+  ⚠️ The stale "THERE IS NO SHARED BUTTON COMPONENT" comment in `src/index.css` is
+  repointed rather than deleted, per rule 7.
+- `195bf6f` — **The register: a coach can record who turned up.**
+
 - **10 Aug — the register: a coach can now record who turned up.**
   `src/screens/Register.jsx`, opened from the event detail sheet, ⚠️ **only for
   an event that has already STARTED** — a register for a session that has not

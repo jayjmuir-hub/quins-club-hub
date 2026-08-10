@@ -184,7 +184,7 @@ export default {
       borderRadius: {
         // The website's radii: pills at 100px, buttons ~11px, cards 16px.
         pill: '100px',
-        btn: '11px',
+        btn: '8px', // Touchline, 10 Aug 2026. Was 11px. See src/components/Button.jsx.
         card: '16px',
       },
 
