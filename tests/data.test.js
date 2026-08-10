@@ -29,6 +29,7 @@ vi.mock('../src/lib/supabase.js', () => ({
 }))
 
 import { supabase } from '../src/lib/supabase.js'
+import { MAX_ROWS } from '../src/data/limits.js'
 import {
   listEvents,
   subscribeEvents,
@@ -82,7 +83,7 @@ import {
 // builder that only carried `data` could not express the shape countSeriesFrom
 // actually reads.
 function createQueryBuilder({ data = null, error = null, count = null } = {}) {
-  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], insert: [], update: [], delete: [], upsert: [] }
+  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], limit: [], insert: [], update: [], delete: [], upsert: [] }
   const builder = {}
   const chain = (name) =>
     vi.fn((...args) => {
@@ -95,6 +96,10 @@ function createQueryBuilder({ data = null, error = null, count = null } = {}) {
   builder.lte = chain('lte')
   builder.eq = chain('eq')
   builder.order = chain('order')
+  // The row cap added 10 Aug 2026 (src/data/limits.js). Every list read now
+  // ends in .limit(MAX_ROWS + 1) so a truncated answer cannot arrive looking
+  // complete — see tests/limits.test.js for why the +1 is load-bearing.
+  builder.limit = chain('limit')
   // Write-side chain methods (Task 14). Like the read ones, each records its
   // args and returns the same thenable builder, mirroring the real
   // PostgrestQueryBuilder where .insert()/.update()/.delete() are chainable
@@ -577,6 +582,49 @@ describe('listPlayers', () => {
     const result = await listPlayers()
 
     expect(result).toEqual([])
+  })
+
+  // ⚠️ THE WIRING, not the helper. tests/limits.test.js proves unwrapCapped
+  // behaves; these prove listPlayers/listEvents actually GO THROUGH it. Both
+  // could pass there while these two functions still returned a silently
+  // truncated list — which is the only failure that would matter.
+  describe('the row cap', () => {
+    it('asks the server for one row more than the cap', async () => {
+      const { builder, calls } = createQueryBuilder({ data: [] })
+      supabase.from.mockReturnValue(builder)
+
+      await listPlayers()
+
+      expect(calls.limit).toEqual([[MAX_ROWS + 1]])
+    })
+
+    it('FAULT: throws rather than handing back a truncated roster', async () => {
+      // One row over the cap: the server had more players than we asked for,
+      // so this list is not the whole club. A child missing from a roster that
+      // looks complete is the thing being prevented.
+      const tooMany = Array.from({ length: MAX_ROWS + 1 }, (_, i) => ({ id: `p${i}` }))
+      const { builder } = createQueryBuilder({ data: tooMany })
+      supabase.from.mockReturnValue(builder)
+
+      await expect(listPlayers()).rejects.toThrow(/too many players/i)
+    })
+
+    it('does not throw at exactly the cap', async () => {
+      const exact = Array.from({ length: MAX_ROWS }, (_, i) => ({ id: `p${i}` }))
+      const { builder } = createQueryBuilder({ data: exact })
+      supabase.from.mockReturnValue(builder)
+
+      await expect(listPlayers()).resolves.toHaveLength(MAX_ROWS)
+    })
+
+    it('caps events too, and points at the date window that already exists', async () => {
+      const tooMany = Array.from({ length: MAX_ROWS + 1 }, (_, i) => ({ id: `e${i}` }))
+      const { builder, calls } = createQueryBuilder({ data: tooMany })
+      supabase.from.mockReturnValue(builder)
+
+      await expect(listEvents()).rejects.toThrow(/narrow the date range/i)
+      expect(calls.limit).toEqual([[MAX_ROWS + 1]])
+    })
   })
 
   it('throws rather than swallowing a Supabase error', async () => {

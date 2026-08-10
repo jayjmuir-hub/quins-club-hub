@@ -190,9 +190,27 @@ Durable. Each cost real time to find.
   `content-type`.
 - **No query in `src/data/` is paginated**, `src/screens/Schedule.jsx` loads every
   event in scope and filters in memory, and realtime triggers a full refetch on any
-  change in scope. All three were right at six players and stop being right
-  somewhere between 100 and 700. They will show as a slow screen long before
-  anything errors.
+  change in scope. All three were right at six players and stop being right somewhere
+  between 100 and 700.
+  ⚠️ **"They will show as a slow screen long before anything errors" was WRONG, and
+  wrong in the dangerous direction — corrected 10 Aug.** What waits at the end of an
+  unbounded `select('*')` is a SHORT ANSWER THAT LOOKS COMPLETE: PostgREST applies a
+  `db-max-rows` ceiling and returns the first N rows with HTTP 200 and no indication
+  anything was left out. A roster missing a child, with no error anywhere. The same
+  silence as the zero-row 200 and the empty search read as proof of absence.
+  ✅ **`listEvents` and `listPlayers` now cap and THROW** (`src/data/limits.js`): they
+  ask for one row more than `MAX_ROWS` and refuse to hand back a truncated list.
+  Nothing is faster; the truncation is merely no longer silent.
+  ⚠️ **`db-max-rows` HAS NOT BEEN MEASURED on this project.** It is a PostgREST
+  setting, appears in no catalogue, and no query in this repo can read it — it is in
+  the dashboard under **Settings → API → Max rows**. `MAX_ROWS` is 900 on the
+  assumption of Supabase's documented default of 1000; **if it has been lowered below
+  901 the detector cannot fire.** Measured instead: `authenticated` carries
+  `statement_timeout=8s`, so the far end of this is an 8-second failure, not a hang.
+  ⚠️ **Still open, and needing Jay:** pagination, and a date window on events. Both
+  change what a person SEES — "how far back should the schedule go" is a ruling, not a
+  data-layer detail. `listEvents` has accepted `from`/`to` since it was written and no
+  caller passes one.
 - **`saveParents` is delete-then-write, not atomic.**
 - **Single-club assumption** in `clubId` derivation, `is_admin_anywhere()` and
   `can_admin_see_pending()`. Revisit together if a second club appears.

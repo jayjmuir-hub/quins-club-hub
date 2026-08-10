@@ -10,6 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the unbounded list reads cap, and say so.** ⚠️ **This started as
+  the scale item and found a correction first.** `state-of-play.md` said the
+  unpaginated queries "will show as a slow screen long before anything errors".
+  That is wrong, and wrong in the dangerous direction: what waits at the end of
+  an unbounded `select('*')` is a SHORT ANSWER THAT LOOKS COMPLETE, because
+  PostgREST applies a `db-max-rows` ceiling and returns the first N rows with
+  HTTP 200 and no indication anything was left out — a roster missing a child,
+  with no error anywhere. The same silence as the zero-row 200 that produced the
+  session guard, and the empty search read as proof of absence, twice.
+  `src/data/limits.js` gives `listEvents` and `listPlayers` a cap and makes them
+  THROW rather than return a truncated list. ⚠️ **The +1 is the load-bearing
+  part**: the request asks for one row MORE than the cap, because a plain
+  `.limit(900)` cannot tell "exactly 900" from "more than 900". ⚠️ **And the cap
+  must stay below `db-max-rows`** or PostgREST trims the sentinel first and the
+  detector reads green precisely when it should fire — which is why `MAX_ROWS`
+  is 900 against a documented default of 1000. ⚠️ **`db-max-rows` has NOT been
+  measured on this project** — it is a PostgREST setting no query here can read;
+  it is in the dashboard under Settings → API → Max rows. Measured instead:
+  `authenticated` carries `statement_timeout=8s`. **Nothing got faster, and
+  pagination and a date window on events are deliberately NOT done** — both
+  change what a person sees, and "how far back should the schedule go" is Jay's
+  ruling, not a data-layer detail. `listEvents` has accepted `from`/`to` since it
+  was written and no caller passes one.
+- `cb8d6da` — **A stat that moves, and a fortnight that admits it is empty.**
 - **10 Aug — the stat band's weakest number, and the fortnight strip's empty
   cells.** Both were on the "open, not blocking" list. (1) ⚠️ **The stat band's
   third cell was "Age groups"** — `scopedTeams.length`, a count of how the club
