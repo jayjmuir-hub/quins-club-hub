@@ -10,6 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **11 Aug — the pitch list is the club's REAL pitches: A1-A4, B1, C1-C5, D1-D5.**
+  ⚠️ **The list seeded hours earlier was a list of nothing.** It was derived from
+  whatever text sat in `events.pitch`, and that text was almost entirely SEED DATA:
+  of the 22 allocations, **16 came from the seeded September** — "Pitch 1" through
+  "Pitch 7" and "Clubhouse lawn", fixtures nobody at the club ever played. **A list
+  seeded from data is only as real as the data**, and this one was caught solely
+  because Jay read it and said what the pitches actually are.
+  ⚠️ **The seeded rows were DELETED, not retired** — a deliberate exception to this
+  table's own rule. `is_active` protects pitches that were once real; retiring these
+  would leave eight fictional pitches in the management screen forever.
+  ⚠️ **`Pitch D2` was remapped to `D2`, and it was the only one.** Six real events
+  carried it, **none from the seed**, and it unambiguously means D2. The rest were
+  left: they belong to the seeded September, which is due for deletion before a
+  pilot, and rewriting fixtures about to be thrown away is work performed on rubbish.
+  ⚠️ **Verified after: 16 events still name a pitch outside the list, and ALL 16 are
+  from the seed — zero real fixtures orphaned.**
+  ⚠️ Sort order leaves gaps between the letter blocks (1-3, 11, 21-24, 31-35) so a B2
+  or C5 slots in without renumbering. Alphabetical would order correctly today and
+  break the moment a pitch is named A10.
+  ⚠️ **Applied in two steps**: Jay's first message said A1-A3 and C1-C4, corrected
+  minutes later to A1-A4 and C1-C5. The migration FILE carries the end state so a
+  replay produces all fifteen; Supabase's own list is the authority on what ran.
+- `2ed48b1` — **A managed pitch list, and the clash detection it unblocks.**
+
 - **11 Aug — a managed pitch list, and the clash detection it unblocks.**
   `db/migrations/20260811_pitches.sql`. ⚠️ **This OVERTURNS the 5 Aug decision**,
   which chose "free text beside Venue. No pitches table, no clash detection." That
