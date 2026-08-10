@@ -112,6 +112,17 @@ Durable. Each cost real time to find.
   ⚠️ **Stop raising it.** It is settled, and re-asking a closed question is its own
   kind of rot. Reasoning, and what still has to be true for self-onboarding to work:
   `claude/decisions/2026-08-10-no-roster-import.md`.
+  ✅ **AND THE FIRST THING THAT HAD TO BE TRUE IS NOW TRUE.** Granting **Player**
+  access used to require picking an EXISTING roster player, so a login for a child who
+  was not already on the roster could not be granted at all — which, given no import,
+  is nearly every player. `AccessBuilder` now offers "They're not on the roster yet —
+  add them", CREATES the player and grants against it. ⚠️ **It creates rather than
+  using the parent's `player_id`-null fallback**: `is_own_player` needs a real
+  `player_id`, so a null one would grant an account that could never touch its own
+  availability, photo or gender. ⚠️ **The player is created LAST**, after every
+  refusal, so a rejected grant never leaves an orphan child on the roster.
+  ⚠️ **Found by Jay using the app on 10 Aug**, not by any test — the whole onboarding
+  path is still unexercised by a real second person.
 - Removing the Resend cap is **pay-as-you-go, ~$0.90 per 1,000**. A purchase, so
   **Jay does it, not the assistant.**
 - **`jayjmuir@yahoo.com` is Jay's deliberate backup ADMIN.** Any "a coach cannot see

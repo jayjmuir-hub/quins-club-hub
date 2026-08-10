@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — a Player can be granted access when they are NOT on the roster yet.**
+  Jay created a login for his son and found the only choices were six unrelated
+  `Test Player` rows: no way to add a new player, so the account was ungrantable.
+  ⚠️ **This is the NORMAL case, not an edge one** — the 10 Aug no-roster-import
+  decision settled that parents self-onboard and the old roster most likely never goes
+  in, so almost every player ever granted access will not be on the roster first.
+  ⚠️ **IT CREATES THE PLAYER RATHER THAN REUSING THE PARENT'S FALLBACK, and the
+  difference is not stylistic.** A parent with children off-roster gets age-group rows
+  with `player_id` null. That cannot work for a player: `private.is_own_player` is
+  `m.player_id = _player AND role in ('parent','player')`, so a player membership with
+  a null `player_id` **matches nothing** — the account could never set its own
+  availability, photo or gender. It would look granted and behave like a stranger.
+  ⚠️ **THE PLAYER IS CREATED LAST, after every refusal has passed**, and that ordering
+  is the point: creating first would leave a real child on the roster every time the
+  grant was then refused, and in `players` a stray row is a stray CHILD. Proved by
+  moving the duplicate check after the creation — the test then fails with "a refused
+  grant must not leave a child on the roster".
+  ⚠️ **The membership follows the row the DATABASE returned**, not the id posted to it,
+  so a trigger or default placing the player elsewhere cannot leave the account scoped
+  to a squad the child is not in.
+  ⚠️ **A first draft of that orphan test proved nothing while passing** — its existing
+  row carried a `player_id`, which does not collide with the row as built (`playerId`
+  null), so the refusal never fired. A collision has to match what the duplicate check
+  actually compares.
+- `bfaeb16` — **Page the event reads.**
+
 - **10 Aug — event reads are PAGED, so an admin on all squads is no longer an error
   screen.** `listEvents` sent one capped request that THREW above 900 rows. That
   refusal was right in principle — a short list that looks complete is worse than an
