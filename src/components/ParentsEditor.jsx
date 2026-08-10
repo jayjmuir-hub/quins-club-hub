@@ -1,4 +1,5 @@
 import PhoneInput from './PhoneInput.jsx'
+import Button from './Button.jsx'
 import { RELATIONSHIPS } from '../lib/relationships.js'
 import { DEFAULT_COUNTRY } from '../lib/phone.js'
 
@@ -183,14 +184,9 @@ export default function ParentsEditor({ parents, onChange, disabled = false }) {
         </div>
       ))}
 
-      <button
-        type="button"
-        onClick={add}
-        disabled={disabled}
-        className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:opacity-60"
-      >
+      <Button variant="secondary" full onClick={add} disabled={disabled}>
         Add parent
-      </button>
+      </Button>
     </fieldset>
   )
 }

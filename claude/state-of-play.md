@@ -266,24 +266,57 @@ Durable. Each cost real time to find.
   handler exists, so a forgetful caller gets no button rather than a lying one.
   Covered by `tests/dashboard-availability.test.jsx`, which mocks the flag ON — the
   reason no existing test caught it is that they all drove Schedule.
-- ⚠️ **THE BUTTONS ARE HALF-MIGRATED — AND THE FIRST COUNT OF THIS WAS WRONG.**
-  Measured properly 10 Aug: **100 `<button>` elements against 11 uses of
-  `src/components/Button.jsx`.** That part stands, and it is why the new
-  "Touchline/Sweep" look lives in the component and the token.
-  ❌ **What was published and is FALSE: "105 raw buttons carrying the same
-  padding + radius + weight signature", and the implication that
-  `rounded-[11px]`'s 117 occurrences were button radii.** The original grep
-  counted every element with that radius plus padding and called them all
-  buttons. **Only 20 `<button>`s use `rounded-[11px]`; 98 of the occurrences are
-  NOT buttons** — 38 are `<p>` alerts, the rest inputs, panels and cards.
-  ⚠️ **So `rounded-[11px]` is the app's general SURFACE radius, used correctly,
-  not a drifting button token.** The 8px change affects the 11 component buttons;
-  it does not resolve into "one radius everywhere" and was never going to.
-  ⚠️ The wrong figures are in `claude/changelog.md`'s 10 Aug button entry, in
-  PR #16's description and in the commit message of `87c7566`, which cannot be
-  edited. This line is the correction of record.
+- ✅ **THE BUTTONS ARE ROUTED. The sweep is done, and what stays raw is deliberate.**
+  Every action button in `src/` — anything carrying a fill or a hairline border — goes
+  through `src/components/Button.jsx`, plus three `<Link>`s via `as={Link}`. ⚠️ **The
+  rest stay raw ON PURPOSE and the component's header lists each category**: layout
+  boxes (FixtureRow, Roster's row, Schedule's cells — routing these reintroduces the
+  Chromium UA content-centring bug no jsdom test can see), masthead chrome, toggles
+  and tabs, text links, pills and icons. **Do not "finish the job".** Two variants were
+  added for the destructive cluster that already existed by hand — `danger` (the
+  confirm) and `dangerQuiet` (what arms it), both with no sweep and no bloom.
+  Reasoning: `claude/decisions/2026-08-10-button-routing.md`.
+  ⚠️ **Three defects fell out of the sweep that nothing could have caught:**
+  Schedule's day-sheet "Add event" carried `hover:bg-brand-dark` — **there is no
+  `brand.dark` in `tailwind.config.js`**, it was the only use of that name anywhere in
+  `src`, so Tailwind emitted nothing and that one button had no hover state at all;
+  Dashboard's `BUTTON_BASE`/`BUTTON_GHOST` were both dead; and `FOOTER_BUTTON` in
+  `EventDetail`/`PlayerDetail` would have left `rounded-[11px]` racing `rounded-btn` on
+  equal specificity, since `className` is appended last.
+  ✅ **The sign-in screen WAS measured in a real browser** on deploy-preview-18 at
+  375px, and the routed primary came back exactly as designed: radius **8px**, padding
+  **12px** top and bottom, **47px tall** (the 44px floor was the point), fill
+  `rgb(200,16,46)` over a **3px** `rgb(163,13,37)` bottom edge, no console errors. The
+  controls left raw behaved as intended in the same measurement — the mode tabs sat at
+  36px with no bottom edge, and "Forgot password?" and "Show" had no radius or chrome
+  at all. ⚠️ **The AUTHENTICATED screens have not been looked at**, which is most of
+  the sweep — signing in needs a real account. Dashboard, Schedule, Roster, Accounts
+  and every sheet are still unit-tested only.
+- ⚠️ **THE BUTTON AUDIT WAS PUBLISHED WRONG TWICE, AND THE SECOND TIME WAS THE
+  CORRECTION.** ❌ The original (`87c7566`, PR #16) claimed "105 raw buttons carrying
+  the same padding + radius + weight signature" and read `rounded-[11px]`'s
+  occurrences as drifting button radii; its grep had counted every element with that
+  radius plus padding and called them all buttons. ❌ **The correction that replaced it
+  (`8a83ba6`) published its own figures — "117 occurrences", "only 20 `<button>`s use
+  it", "98 are not buttons" — and re-measurement on 10 Aug during the routing sweep
+  did not reproduce them either.** A straight `grep -o` gives 118 occurrences, and any
+  attempt to count "buttons using it" depends on how you decide where an opening tag
+  ends, which JSX comments containing the text `<button>` quietly break.
+  ✅ **THE DURABLE FACT, WHICH NEEDS NO NUMBER: `rounded-[11px]` is the app's general
+  SURFACE radius — alerts, inputs, panels and cards — used correctly and consistently.
+  It is NOT a drifting button token, it will NOT disappear, and `rounded-btn` at 8px is
+  meant to differ from it.** A control you press should not share a corner with the
+  card it sits on.
+  ⚠️ **The lesson is the one this file's own §How to read already states, and it now
+  has a third instance: every wrong claim here has been a rotted MEASUREMENT.** Both
+  button counts were wrong, both were quoted as evidence, and the second was written
+  while correcting the first. **Stop publishing counts of this.** The invariant is
+  enforced by `tests/button-sweep.test.js` instead, which cannot go stale.
+  ⚠️ The wrong figures are in `claude/changelog.md`'s 10 Aug entries, in PR #16's and
+  PR #17's descriptions and in two commit messages, none of which can be edited.
   ⚠️ The sweep and bloom are **primary actions only**: on everything they read
-  cheap, and a glowing "Cancel" draws the eye to the destructive choice.
+  cheap, and a glowing "Cancel" draws the eye to the destructive choice. The two
+  `danger` variants get neither, for the same reason.
 - **Single-club assumption** in `clubId` derivation, `is_admin_anywhere()` and
   `can_admin_see_pending()`. Revisit together if a second club appears.
 - **The changelog is allowed to be exactly one commit behind** — a commit cannot

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Badge from '../components/Badge.jsx'
+import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -434,21 +435,11 @@ export default function Roster() {
                 anyone does. Hidden rather than disabled on mobile — an
                 always-greyed button just asks a question it can't answer. */}
             {isDesktop && (
-              <button
-                type="button"
-                onClick={() => setImporting(true)}
-                className="rounded-[11px] border-[1.5px] border-line bg-surface-card px-3.5 py-2 text-sm font-bold text-ink transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-              >
+              <Button variant="secondary" onClick={() => setImporting(true)}>
                 Import
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              onClick={() => setFormState({ player: null })}
-              className="rounded-[11px] bg-brand px-3.5 py-2 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            >
-              Add player
-            </button>
+            <Button onClick={() => setFormState({ player: null })}>Add player</Button>
           </div>
         )}
       </div>
@@ -543,13 +534,9 @@ export default function Roster() {
           <p className="mt-2 text-sm leading-relaxed text-brand-deep">
             {error.message || 'Something went wrong. Try again.'}
           </p>
-          <button
-            type="button"
-            onClick={() => setReloadToken((token) => token + 1)}
-            className="mt-4 rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-          >
+          <Button onClick={() => setReloadToken((token) => token + 1)} className="mt-4">
             Try again
-          </button>
+          </Button>
         </Card>
       )}
 

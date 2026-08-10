@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { registerMyPlayer } from '../data/members.js'
 import Segmented from './Segmented.jsx'
+import Button from './Button.jsx'
 import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
 
 // What a signed-in account with NO membership sees FIRST: add your player.
@@ -139,13 +140,9 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
   }
 
   const secondary = (
-    <button
-      type="button"
-      onClick={onAskForAccess}
-      className="mt-4 w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-brand transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-    >
+    <Button variant="secondary" full onClick={onAskForAccess} className="mt-4">
       I&apos;m not adding a player
-    </button>
+    </Button>
   )
 
   if (sortedTeams.length === 0) {
@@ -248,13 +245,9 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
           </>
         )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-4 w-full rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-        >
+        <Button type="submit" full disabled={submitting} className="mt-4">
           {submitting ? 'Adding…' : 'Add my player'}
-        </button>
+        </Button>
       </form>
 
       {/* The old route, kept and kept working. Not everyone signing in is a

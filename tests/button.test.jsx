@@ -101,6 +101,44 @@ describe('Button — variants and rendering', () => {
     expect(screen.getByRole('button').className).toMatch(/bg-brand/)
   })
 
+  // ── The destructive pair ────────────────────────────────────────────────
+  //
+  // Added 10 Aug 2026 with the routing sweep. `danger` and `dangerQuiet` were
+  // not invented for it: every hand-rolled confirm-a-deletion button in the
+  // app was already `bg-brand-deep text-white hover:bg-brand`, and every
+  // button that ARMED one was already bordered with `text-brand-deep`.
+
+  it('⚠️ never sweeps or blooms a destructive button', () => {
+    // The whole reason the pair exists as its own variant. A sweeping,
+    // glowing "Yes, delete" is an animation pulling the eye toward the
+    // irreversible choice — the same argument that keeps the sweep off
+    // `secondary` "Cancel", only with worse consequences.
+    for (const variant of ['danger', 'dangerQuiet']) {
+      const { container } = render(<Button variant={variant}>Yes, delete</Button>)
+      const className = container.querySelector('button').className
+      expect(className, `${variant} must not sweep`).not.toMatch(/btn-sweep/)
+      expect(className, `${variant} must not bloom`).not.toMatch(/btn-glow/)
+    }
+  })
+
+  it('⚠️ goes darker at rest than primary, and lighter on hover', () => {
+    // Inverted against `primary` on purpose. If this ever "drifts" back into
+    // matching primary, the confirm button becomes indistinguishable from
+    // Save at exactly the moment that distinction matters.
+    render(<Button variant="danger">Yes, delete</Button>)
+    const className = screen.getByRole('button').className
+    expect(className).toMatch(/bg-brand-deep/)
+    expect(className).toMatch(/hover:bg-brand(\s|$)/)
+  })
+
+  it('gives the arrow badge a white wash on the solid danger fill', () => {
+    // ⚠️ The badge tints on "is there a solid fill", not on the variant name.
+    // Keying it to the name is what would have left `danger` with a brand
+    // tint that vanishes into its own background.
+    const { container } = render(<Button arrow variant="danger">Go</Button>)
+    expect(container.querySelector('span[aria-hidden="true"]').className).toMatch(/bg-white/)
+  })
+
   it('adds no press classes of its own', () => {
     // ⚠️ Press lives in index.css as a global rule. A second active:scale
     // here would compose into a double transform.

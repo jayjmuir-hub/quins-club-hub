@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Sheet from './Sheet.jsx'
+import Button from './Button.jsx'
 import { getMyProfile, updateProfileNames } from '../data/members.js'
 import { useAuth } from '../lib/auth.jsx'
 import { primeMyProfileCache } from '../lib/useMyProfile.js'
@@ -172,13 +173,9 @@ export default function NamePrompt() {
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-        >
+        <Button type="submit" size="lg" full disabled={saving}>
           {saving ? 'Saving…' : 'Continue'}
-        </button>
+        </Button>
       </form>
     </Sheet>
   )

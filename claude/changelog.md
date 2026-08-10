@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the routing sweep: the app's action buttons now go through `<Button>`.**
+  The work the corrected audit below was meant to justify, done. Every action button
+  in `src/` — anything carrying a fill or a hairline border — is routed; the rest stay
+  raw ON PURPOSE and `src/components/Button.jsx` now lists each category and why
+  (layout boxes, masthead chrome, toggles and tabs, text links, pills and icons).
+  Three `<Link>`s carrying an identical hand-rolled button string went through
+  `as={Link}`. ⚠️ **Two new variants, `danger` and `dangerQuiet`** — not invented,
+  they are the destructive cluster already written by hand across five files, and
+  they deliberately get no sweep and no bloom. Reasoning:
+  `claude/decisions/2026-08-10-button-routing.md`.
+  ⚠️ **Three defects fell out of it that no test could see:** Schedule's day-sheet
+  "Add event" carried `hover:bg-brand-dark`, a token that does NOT exist in
+  `tailwind.config.js` and the only use of that name anywhere in `src` — Tailwind
+  emitted nothing, so that button alone had no hover state at all; Dashboard's
+  `BUTTON_BASE`/`BUTTON_GHOST` were both dead, with `BUTTON_GHOST` referenced nowhere
+  in `src` or `tests`; and `EventDetail`/`PlayerDetail`'s `FOOTER_BUTTON` would have
+  left `rounded-[11px]` racing `rounded-btn` on equal specificity, because `className`
+  is appended last and the winner would have been whichever Tailwind happened to emit
+  second. ⚠️ **`tests/button-sweep.test.js`'s radius test was REPOINTED, NOT DELETED**
+  (`CLAUDE.md` rule 7): its stated exit condition — "delete this when 11px has gone" —
+  could never fire, because 11px is the SURFACE radius and stays. The anchor that
+  actually guards this work now reads the source for a raw button carrying the action
+  signature, with a companion test proving it is not vacuous. Both proven by injected
+  fault, as were the two new variant assertions.
+- `8a83ba6` — **Correct the button counts published in `87c7566`.**
+
 - **10 Aug — ❌ CORRECTION: the button counts published hours earlier were wrong.**
   The 10 Aug button entry below, PR #16 and commit `87c7566` all say "105 raw
   buttons carrying the same padding + radius + weight signature" and lean on

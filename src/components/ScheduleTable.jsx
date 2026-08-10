@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Card from './Card.jsx'
 import Chip from './Chip.jsx'
+import Button from './Button.jsx'
 import {
   eventDate,
   eventTitle,
@@ -195,8 +196,9 @@ export default function ScheduleTable({ events, teamsById, onSelect, emptyMessag
                   </td>
 
                   <td className={`${CELL} text-right`}>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       // stopPropagation: without it the row handler fires too,
                       // calling onSelect twice for one click. Harmless today
                       // (it sets the same id) but it is the kind of thing that
@@ -206,10 +208,9 @@ export default function ScheduleTable({ events, teamsById, onSelect, emptyMessag
                         clickEvent.stopPropagation()
                         onSelect(event.id)
                       }}
-                      className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       Open
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               )

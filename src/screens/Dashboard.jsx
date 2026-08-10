@@ -54,16 +54,16 @@ import {
 // value Schedule.jsx and Roster.jsx use for the same reason.
 const MUTED_ON_PAPER = 'text-ink-muted'
 
-// design-system.md §3: .btn{padding:10px 15px;border-radius:11px}, 14px/700.
-// `flex items-center justify-center` is load-bearing rather than decorative:
-// these are full-width buttons and links used as layout boxes, and a
-// <button>'s content is centred by Chromium's UA stylesheet but an <a>'s is
-// not — so without an explicit layout the two variants would sit differently
-// on the same stack. Declared once here so they cannot drift.
-const BUTTON_BASE =
-  'flex w-full items-center justify-center gap-2 rounded-[11px] px-[15px] py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
-// Ghost: --maroon text on white, 5.93:1, clears AA.
-const BUTTON_GHOST = `${BUTTON_BASE} bg-surface-card text-brand shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT)] hover:bg-surface-mute`
+// ⚠️ `BUTTON_BASE` and `BUTTON_GHOST` LIVED HERE AND WERE BOTH DEAD — removed
+// 10 Aug 2026 during the routing sweep. `BUTTON_GHOST` had no reference
+// anywhere in src or tests, and `BUTTON_BASE` existed only to build it, so the
+// pair had been carrying a six-line comment about a layout concern for markup
+// that no longer existed. Nothing rendered differently when they went.
+//
+// The concern the comment described is real and now lives where it can be
+// enforced: <Button> declares `inline-flex items-center justify-center` in its
+// BASE, so a button and an `as="a"` link lay their content out identically
+// instead of relying on two constants staying in step by hand.
 
 const MINUTE = 60 * 1000
 const HOUR = 60 * MINUTE
@@ -552,13 +552,12 @@ export default function Dashboard() {
           <p className="mt-2 text-sm leading-relaxed text-brand-deep">
             {error.message || 'Something went wrong. Try again.'}
           </p>
-          <button
-            type="button"
+          <Button
             onClick={() => setReloadToken((token) => token + 1)}
-            className="mx-auto mt-4 w-auto rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            className="mx-auto mt-4"
           >
             Try again
-          </button>
+          </Button>
         </Card>
       </section>
     )

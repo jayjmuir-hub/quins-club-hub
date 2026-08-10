@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -31,9 +32,6 @@ function SectionTitle({ children }) {
     </h3>
   )
 }
-
-const LINK_CLASS =
-  'flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-surface-card px-[15px] py-2.5 text-sm font-bold text-brand shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT)] transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
 
 export default function AdminClub() {
   const { teams } = useMemberships()
@@ -116,13 +114,12 @@ export default function AdminClub() {
         <p className="mt-2 text-sm leading-relaxed text-brand-deep">
           {error.message || 'Something went wrong. Try again.'}
         </p>
-        <button
-          type="button"
+        <Button
           onClick={() => setReloadToken((token) => token + 1)}
-          className="mx-auto mt-4 w-auto rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+          className="mx-auto mt-4"
         >
           Try again
-        </button>
+        </Button>
       </Card>
     )
   }
@@ -132,19 +129,17 @@ export default function AdminClub() {
       <SectionTitle>Manage</SectionTitle>
       <Card className="p-[14px]">
         <div className="flex flex-col gap-2.5 desktop:flex-row">
-          <Link to="/roster" className={LINK_CLASS}>
+          {/* `as={Link}` rather than a hand-rolled class string: these sit in a
+              row with the "Invite a member" button below and must match it. */}
+          <Button as={Link} variant="secondary" to="/roster" className="flex-1">
             Manage roster &amp; players
-          </Link>
-          <Link to="/schedule" className={LINK_CLASS}>
+          </Button>
+          <Button as={Link} variant="secondary" to="/schedule" className="flex-1">
             Manage schedule &amp; fixtures
-          </Link>
-          <button
-            type="button"
-            onClick={() => setInviteOpen(true)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[11px] bg-brand px-[15px] py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-          >
+          </Button>
+          <Button onClick={() => setInviteOpen(true)} className="flex-1">
             Invite a member
-          </button>
+          </Button>
         </div>
       </Card>
 

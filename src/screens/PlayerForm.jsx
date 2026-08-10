@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
+import Button from '../components/Button.jsx'
 import { getPlayerContact, upsertContact, upsertPlayer } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
@@ -726,15 +727,16 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           </p>
         )}
 
-        <button
+        <Button
           type="submit"
+          size="lg"
+          full
           // Disabled until the existing contact row has settled: a submit
           // before then would write the still-blank fields over real details.
           disabled={saving || contactLoading || parentsLoading}
-          className="w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Add player'}
-        </button>
+        </Button>
       </form>
     </Sheet>
   )

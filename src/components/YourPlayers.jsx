@@ -5,6 +5,7 @@ import MyPlayerForm from '../screens/MyPlayerForm.jsx'
 import { listPlayers, listContactsForPlayers } from '../data/players.js'
 import { listParentsForPlayers } from '../data/parents.js'
 import { formatPhone } from '../lib/phone.js'
+import Button from './Button.jsx'
 
 // "Your players" on the More screen: what the club actually holds about the
 // child (or children) attached to this account.
@@ -184,13 +185,15 @@ export default function YourPlayers({ memberships = [], teams = [] }) {
             </div>
 
             {/* Opens the same form the roster opens, for THIS player, here. */}
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
+              full
               onClick={() => setEditing(player)}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-btn border-[1.5px] border-line bg-surface-card px-4 py-2 text-[13px] font-bold text-brand transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              className="mt-3"
             >
               View or change these details
-            </button>
+            </Button>
           </Card>
         )
       })}

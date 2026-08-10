@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
@@ -247,17 +248,16 @@ function YouCard({ profile, email, role, squads }) {
 
         <div className="mt-3.5 flex items-center gap-3">
           {!editing && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               disabled={!ready}
               onClick={() => {
                 setSaved(false)
                 setEditing(true)
               }}
-              className="rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-brand transition hover:border-brand disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               Edit
-            </button>
+            </Button>
           )}
 
           {/* ⚠️ SAVE APPEARS ONLY ONCE SOMETHING HAS ACTUALLY CHANGED — Jay's
@@ -266,23 +266,15 @@ function YouCard({ profile, email, role, squads }) {
               pressing it is meaningless, which is exactly the habit you do not
               want on the screens where it isn't. */}
           {editing && dirty && (
-            <button
-              type="submit"
-              disabled={saving || !ready}
-              className="rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            >
+            <Button type="submit" disabled={saving || !ready}>
               {saving ? 'Saving…' : 'Save'}
-            </button>
+            </Button>
           )}
 
           {editing && !saving && (
-            <button
-              type="button"
-              onClick={cancelEditing}
-              className="rounded-[11px] px-3 py-2.5 text-sm font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
+            <Button variant="ghost" onClick={cancelEditing}>
               Cancel
-            </button>
+            </Button>
           )}
 
           {saved && !saving && !editing && (
@@ -396,12 +388,9 @@ export default function More() {
         <div className="hidden desktop:block">
           <SectionTitle>Manage</SectionTitle>
           <Card className="p-[14px]">
-            <Link
-              to="/admin"
-              className="flex items-center justify-center gap-2 rounded-[11px] bg-surface-card px-[15px] py-2.5 text-sm font-bold text-brand shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT)] transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            >
+            <Button as={Link} variant="secondary" full to="/admin">
               Admin
-            </Link>
+            </Button>
           </Card>
         </div>
       )}

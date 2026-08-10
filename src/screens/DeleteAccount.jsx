@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
 import Login from './Login.jsx'
 import { deleteMyAccount } from '../data/account.js'
+import Button from '../components/Button.jsx'
 
 // /delete-account — PUBLIC, and it is both halves of Google Play's account
 // deletion requirement in one screen:
@@ -171,13 +172,21 @@ export default function DeleteAccount() {
                 </p>
               )}
 
-              <button
+              {/* ⚠️ `danger`, not `primary`. This was `bg-brand` — the same red
+                  as "Save changes" — while every other confirm-a-deletion
+                  button in the app was the deeper red. The typed-confirmation
+                  gate above is what ARMS it, so this is the confirm half of a
+                  destructive pair and should look like one. */}
+              <Button
                 type="submit"
+                variant="danger"
+                size="lg"
+                full
                 disabled={!armed || deleting}
-                className="mt-3 w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-3"
               >
                 {deleting ? 'Deleting…' : 'Delete my account'}
-              </button>
+              </Button>
 
               <Link
                 to="/more"

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { signPhotoUrl } from '../data/photos.js'
+import Button from './Button.jsx'
 import { initials } from '../lib/playerFormat.js'
 
 // The head-shot field in PlayerForm: current photo (or a monogram), a button
@@ -99,14 +100,13 @@ export default function PhotoField({
             }}
             aria-label="Choose a photo"
           />
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => inputRef.current?.click()}
             disabled={disabled}
-            className="rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2 text-sm font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:opacity-60"
           >
             {hasPhoto ? 'Change photo' : 'Add photo'}
-          </button>
+          </Button>
 
           {hasPhoto && (
             <button

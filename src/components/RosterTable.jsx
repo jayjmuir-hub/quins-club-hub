@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Badge from './Badge.jsx'
 import Card from './Card.jsx'
 import PlayerAvatar from './PlayerAvatar.jsx'
+import Button from './Button.jsx'
 import { POSITIONS } from '../lib/positions.js'
 import { GENDERS } from '../lib/gender.js'
 import { upsertPlayer } from '../data/players.js'
@@ -308,13 +309,9 @@ export default function RosterTable({
                   </td>
 
                   <td className={`${BODY_CELL} text-right`}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(player.id)}
-                      className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => onSelect(player.id)}>
                       Open
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               )

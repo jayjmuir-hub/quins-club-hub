@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import Button from '../components/Button.jsx'
 import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
@@ -381,14 +382,16 @@ function DaySheet({ day, events, teamsById, canManage, onClose, onSelectEvent, o
         </div>
       )}
 
+      {/* ⚠️ This carried `hover:bg-brand-dark` until 10 Aug 2026. There is no
+          `brand.dark` in tailwind.config.js — only `DEFAULT`, `deep`, `ink` and
+          `onDark` — so Tailwind emitted nothing and this button, alone in the
+          app, had NO hover state. It was the single use of that name anywhere
+          in src, which is exactly how a typo in a class string survives:
+          nothing fails, the button just quietly does less. */}
       {canManage && (
-        <button
-          type="button"
-          onClick={onAddEvent}
-          className="mt-3.5 w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-extrabold text-white transition hover:bg-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-        >
+        <Button size="lg" full onClick={onAddEvent} className="mt-3.5">
           Add event
-        </button>
+        </Button>
       )}
     </Sheet>
   )
@@ -569,13 +572,9 @@ export default function Schedule() {
         <div className="flex shrink-0 items-center gap-2">
           <CalendarSubscribe />
           {canEditAnything && (
-            <button
-              type="button"
-              onClick={() => setFormState({ event: null })}
-              className="shrink-0 rounded-[11px] bg-brand px-3.5 py-2 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            >
+            <Button onClick={() => setFormState({ event: null })} className="shrink-0">
               Add event
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -628,13 +627,9 @@ export default function Schedule() {
           <p className="mt-2 text-sm leading-relaxed text-brand-deep">
             {error.message || 'Something went wrong. Try again.'}
           </p>
-          <button
-            type="button"
-            onClick={() => setReloadToken((token) => token + 1)}
-            className="mt-4 rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-          >
+          <Button onClick={() => setReloadToken((token) => token + 1)} className="mt-4">
             Try again
-          </button>
+          </Button>
         </Card>
       )}
 
