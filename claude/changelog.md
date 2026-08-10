@@ -10,6 +10,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- `b0e9602` — **A Player can be granted access before they are on the roster.**
+
 - **10 Aug — a Player can be granted access when they are NOT on the roster yet.**
   Jay created a login for his son and found the only choices were six unrelated
   `Test Player` rows: no way to add a new player, so the account was ungrantable.

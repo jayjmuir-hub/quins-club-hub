@@ -519,6 +519,28 @@ state; trust the decisions for reasoning.**
 - A managed pitch list is the precondition for clash detection.
 - Nothing in the UI distinguishes a Medic from a Coach, because there is no
   difference in access. Deliberate — the word is what distinguishes them.
+- ⚠️ **A SUPER-ADMIN TIER IS WANTED — decided 10 Aug, NOT YET BUILT.** Candice, Nick
+  and Tracy are ordinary admins and keep full sight of children's data ("trusted
+  volunteers"), but **granting access, and some functions yet to be specified, become
+  super-admin-only**. The tier restricts AUTHORITY, not SIGHT.
+  ⚠️ **It must be a FLAG, not a role value.** Twelve places in the schema test
+  `m.role = 'admin'`; a new role value would have to be added to all twelve, and each
+  is a chance to miss one — where a miss silently strips a super admin of an ordinary
+  power. A boolean makes a super admin an admin, so all twelve keep working.
+  ⚠️ **THE TRAP: `memb manage` is FOR ALL and admin-only, so any admin can already
+  write membership rows** — a naive column lets any admin set it on themselves and
+  the tier is decoration. Needs a COLUMN grant plus a `SECURITY DEFINER` RPC, the
+  same shape as `profiles.email` and `approve_membership`. ⚠️ **The first super admin
+  must be set by hand in SQL**; none can exist to grant it.
+  ⚠️ **Still true and chosen knowingly: each of the three holds every child's name,
+  photo and parent contact details, club-wide, with the power to edit or delete.**
+  Reasoning: `claude/decisions/2026-08-10-role-dashboards.md`.
+- ⚠️ **THE `attendance` TABLE IS EMPTY — measured 10 Aug 2026, zero rows.** The
+  register shipped that day and nobody has taken one. **Anything computed from
+  attendance — a percentage, consecutive absences, a trend, an "at risk" flag — has
+  no data to stand on and no way to have its thresholds judged.** Same trap as the
+  schedule restructure that was designed, agreed and dropped once real data showed it
+  was unnecessary. Take some registers first.
 - **Nobody is emailed when an access REQUEST arrives.** ⚠️ Not to be confused with
   the approval emails, which fire for a pending REGISTRATION.
 - A parent has never signed out in a real browser. The RLS-refusal path is still
