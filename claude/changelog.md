@@ -10,6 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the register: a coach can now record who turned up.**
+  `src/screens/Register.jsx`, opened from the event detail sheet, ⚠️ **only for
+  an event that has already STARTED** — a register for a session that has not
+  happened is a guess, and offering it early is how a squad gets marked present
+  on Tuesday for a Saturday match. ⚠️ **NOT the availability sheet with
+  different words.** There is no per-row `editable`: attendance is coach-only,
+  full stop, because a parent marking their own child present destroys the only
+  thing the number is worth. ⚠️ **"Not recorded" is never a stored row** — it is
+  derived by diffing the squad against the rows that exist, because defaulting
+  to `absent` would manufacture an absence for every session a coach forgot to
+  take, and those would feed the percentage. **"Mark remaining N present"** is
+  the affordance that makes it usable on a touchline (the common case is that
+  nearly everyone came) and it touches only players with NO record yet, so a
+  coach who logs two absences first can sweep the rest without undoing their own
+  work; sequential rather than `Promise.all`, so a failure halfway leaves the
+  earlier writes saved and says so. ⚠️ **No realtime subscription**, unlike the
+  RSVP sheet: a register is taken once by one person, and a list re-sorting
+  under a coach's thumb mid-tap would be worse than stale. ⚠️ **Not behind
+  `FEATURES.availability`** — the 10 Aug ruling was to ship attendance INSTEAD
+  of switching RSVP on, and wiring it to that flag would switch both together.
+  Proved by injecting `canEdit = true`: the two parent tests fail.
+- `714d477` — **`attendance`: the table, the policies and the data layer.**
 - **10 Aug — `attendance`: who actually turned up.** Nothing in the database
   recorded it. ⚠️ **`availability.status` is `in`/`out`/`maybe` — INTENT, not
   attendance** — and it was the only thing resembling the data the brainstormed

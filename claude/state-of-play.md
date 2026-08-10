@@ -157,6 +157,14 @@ Durable. Each cost real time to find.
   true). But the defence-in-depth is one-sided. Recorded rather than changed —
   revoking it is a one-line migration with a real chance of breaking a signup path
   nobody has re-tested.
+- ✅ **The register is live.** `src/screens/Register.jsx`, opened from the event
+  detail sheet on Schedule and the Dashboard, ⚠️ **only for an event that has
+  already STARTED**, and only for someone who can edit the squad. ⚠️ **"Not
+  recorded" is never a stored row** — it is the absence of one. Defaulting to
+  `absent` would manufacture an absence for every session a coach forgot to take,
+  and those would feed the percentage. ⚠️ **It is NOT behind
+  `FEATURES.availability`**: attendance shipped INSTEAD of RSVP, and tying them to
+  one flag would switch both on together.
 - ⚠️ **`availability` IS RSVP, `attendance` IS THE FACT. Do not compute one from
   the other.** `availability.status` is `in`/`out`/`maybe`, set before the event by
   the player or parent; `attendance.status` is `present`/`absent`/`excused`, set

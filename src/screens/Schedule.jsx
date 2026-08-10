@@ -7,6 +7,7 @@ import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import TeamFilter, { ALL_TEAMS_ID, PillButton } from '../components/TeamFilter.jsx'
 import Availability from './Availability.jsx'
+import Register from './Register.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
@@ -424,6 +425,10 @@ export default function Schedule() {
   // event id: Availability only ever opens from within the open detail
   // sheet, for that same fixture, so there is nothing else for it to name.
   const [availabilityOpen, setAvailabilityOpen] = useState(false)
+  // The register (attendance), separate from availability above: the fact
+  // rather than the intent, and coach-only. Same parent-holds-the-state
+  // wiring, so EventDetail never opens a second sheet of its own.
+  const [registerOpen, setRegisterOpen] = useState(false)
 
   // A stored "availability open" flag can outlive the fixture it was opened
   // for: picking a different row from the list underneath sets
@@ -436,6 +441,7 @@ export default function Schedule() {
   // what the "one sheet at a time" comment below relies on.
   useEffect(() => {
     setAvailabilityOpen(false)
+    setRegisterOpen(false)
   }, [selectedEventId])
 
   const [events, setEvents] = useState([])
@@ -713,7 +719,7 @@ export default function Schedule() {
         />
       )}
 
-      {selectedEvent && !formState && !availabilityOpen && (
+      {selectedEvent && !formState && !availabilityOpen && !registerOpen && (
         <EventDetail
           event={selectedEvent}
           team={teamsById.get(selectedEvent.team_id)}
@@ -721,6 +727,7 @@ export default function Schedule() {
           canEdit={canEditSelected}
           onEdit={(event) => setFormState({ event })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
+          onOpenRegister={() => setRegisterOpen(true)}
           onDeleted={() => {
             setSelectedEventId(null)
             refresh()
@@ -756,6 +763,14 @@ export default function Schedule() {
           event={selectedEvent}
           team={teamsById.get(selectedEvent.team_id)}
           onClose={() => setAvailabilityOpen(false)}
+        />
+      )}
+
+      {selectedEvent && registerOpen && !formState && (
+        <Register
+          event={selectedEvent}
+          team={teamsById.get(selectedEvent.team_id)}
+          onClose={() => setRegisterOpen(false)}
         />
       )}
     </section>
