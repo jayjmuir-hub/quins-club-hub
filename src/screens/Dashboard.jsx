@@ -13,9 +13,11 @@ import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
+import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import {
+  clubToday,
   eventDate,
   eventTitle,
   formatLongDate,
@@ -384,6 +386,10 @@ export default function Dashboard() {
   // Captured once at mount. Used only to decide which day the fortnight
   // strip marks as today — see the note where the timer used to live.
   const [now] = useState(() => Date.now())
+  // Anchored once on mount, like `now` directly above and for the same reason:
+  // recomputing it each render would mint a new object and refetch forever
+  // through the effect's dependencies.
+  const [eventWindow] = useState(() => defaultEventWindow(clubToday()))
 
   // Both reads go out together and land together: the stat tiles mix counts
   // from each, so settling them independently would show a half-filled grid.
@@ -392,7 +398,15 @@ export default function Dashboard() {
     setLoading(true)
     setError(null)
 
-    Promise.all([listEvents({ teamIds }), listPlayers({ teamIds })])
+    // ⚠️ The same 18-month window Schedule uses, and for one of the same
+    // reasons: the "matches played with no score" tile counts BACKWARDS over
+    // the season, so a short lookback would quietly stop counting the early
+    // fixtures it exists to chase. Dashboard never navigates months, so unlike
+    // Schedule it needs no widening — the default window is the whole story.
+    Promise.all([
+      listEvents({ teamIds, from: eventWindow.from, to: eventWindow.to }),
+      listPlayers({ teamIds }),
+    ])
       .then(([eventRows, playerRows]) => {
         if (!mounted) return
         setEvents(eventRows)

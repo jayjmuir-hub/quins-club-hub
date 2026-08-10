@@ -232,20 +232,46 @@ describe('Schedule — loading, empty and error states', () => {
 })
 
 describe('Schedule — scoping the query', () => {
-  it('queries only the teams the signed-in user can see', async () => {
+  // ⚠️ STILL AN EXACT MATCH, NOT objectContaining. These assertions caught
+  // "the query asks for more than it should", which is the whole point of a
+  // scoping test — loosening them to allow the date window would also have
+  // allowed a stray filter nobody noticed. The window is named explicitly
+  // instead, so it cannot be dropped either.
+  it('queries only the teams the signed-in user can see, within a date window', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
 
     setup()
 
     await screen.findByText('Quins vs Dubai Exiles')
-    expect(listEventsMock).toHaveBeenCalledWith({ teamIds: ['team-u10'] })
+    expect(listEventsMock).toHaveBeenCalledWith({
+      teamIds: ['team-u10'],
+      from: expect.any(String),
+      to: expect.any(String),
+    })
   })
 
   it('passes every visible team, in display order, for an admin', async () => {
     setup()
 
     await screen.findByText('Quins vs Dubai Exiles')
-    expect(listEventsMock).toHaveBeenCalledWith({ teamIds: ['team-u10', 'team-1xv'] })
+    expect(listEventsMock).toHaveBeenCalledWith({
+      teamIds: ['team-u10', 'team-1xv'],
+      from: expect.any(String),
+      to: expect.any(String),
+    })
+  })
+
+  it('⚠️ never asks for every event ever — the window is always passed', async () => {
+    // The regression this guards: `listEvents` accepted `from`/`to` from the
+    // day it was written and NO caller passed one for weeks, so every screen
+    // asked for every event in scope and relied on the row cap to notice.
+    setup()
+
+    await screen.findByText('Quins vs Dubai Exiles')
+    const [args] = listEventsMock.mock.calls.at(-1)
+    expect(args.from, 'listEvents called with no `from` — unbounded read').toBeTruthy()
+    expect(args.to, 'listEvents called with no `to` — unbounded read').toBeTruthy()
+    expect(Date.parse(args.from)).toBeLessThan(Date.parse(args.to))
   })
 })
 
