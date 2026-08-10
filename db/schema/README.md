@@ -96,6 +96,48 @@ and before that
 > directory by counting objects would call the file clean. **Compare
 > expressions, not counts.**
 
+> ## ✅ Reconciled against live 2026-08-10 — ZERO DRIFT
+>
+> **Not a re-capture.** Nothing had changed, so nothing was rewritten. This entry
+> exists so the last-known-good date moves forward without the files being
+> touched — a reconciliation that finds nothing is still a result, and leaving no
+> record of it is how the next reader ends up re-doing it.
+>
+> Compared live against these files:
+>
+> | Checked | Result |
+> |---|---|
+> | 35 policies (33 `public` + 2 on `storage.objects`) | identical — **expressions**, not counts |
+> | 29 function bodies | identical (live `md5(pg_get_functiondef())` vs the blocks in this directory) |
+> | 29 functions' `prosecdef` and `proconfig` | identical |
+> | 4 triggers | identical |
+> | 25 constraints + 27 indexes | identical |
+> | 13 tables, row security on, none forced | identical |
+> | `player-photos` bucket settings | identical |
+>
+> ⚠️ **`public.accept_invite` STILL CARRIES ITS INCOMPLETE-INVITE GUARD.** Both
+> giveaways named at the bottom of this file are live: the comment
+> `-- Replaces the dropped invites_team_required_unless_admin CHECK.` and the
+> `raise exception 'This invite is incomplete …'` block. That is the regression
+> this whole directory exists to catch, and it has not recurred.
+>
+> Both objects the 7 Aug capture missed are correctly recorded now:
+> `events_group_id_idx` is present, and `invites_role_check` lists all six roles.
+>
+> ⚠️ **STILL NOT COVERED, AND A RE-CAPTURE NEVER WOULD BE:** column- and
+> table-level GRANTs. The blind spot recorded above is unchanged — the thing
+> standing between a member and rewriting `profiles.email` is a column grant, and
+> nothing in this directory diffs it. A clean reconciliation here is **not**
+> evidence that grants are unchanged.
+>
+> Supabase's own security linter was run alongside. Three WARNs, **all three
+> already recorded in this repo**, none new: `private.squad_expects_gender`'s
+> unpinned `search_path` (recorded in `db/schema/functions.sql`), the
+> SECURITY DEFINER functions carrying an `anon` EXECUTE grant (recorded there
+> too, with the fails-closed reasoning for each), and leaked-password protection
+> being off — which `claude/decisions/2026-08-06-roster-auto-onboarding.md`
+> already settled as a paid-plan feature on a free org.
+
 | File | Contents |
 |---|---|
 | `tables.sql` | Every `public` table: columns, types, nullability, defaults, PKs, FKs, CHECKs, indexes, and RLS-enabled state. Includes explicit notes where an expected unique constraint is **absent**. |

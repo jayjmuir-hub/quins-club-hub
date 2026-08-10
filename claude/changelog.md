@@ -8,6 +8,30 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 10 Aug 2026
+
+- **10 Aug — `db/schema/` reconciled against live: ZERO DRIFT.** Not a
+  re-capture; nothing had changed, so nothing was rewritten. 35 policies, 29
+  function bodies, 29 functions' security settings, 4 triggers, 25 constraints,
+  27 indexes, the RLS state of all 13 tables and the `player-photos` bucket
+  settings all matched. ⚠️ **`public.accept_invite` still carries its
+  incomplete-invite guard** — the regression this directory exists to catch has
+  not recurred. Both objects the 7 Aug capture missed (`events_group_id_idx`,
+  `invites_role_check`) are correctly recorded. Supabase's security linter was
+  run alongside and produced nothing this repo had not already written down.
+  ⚠️ **Column and table GRANTs remain uncovered** — a clean reconciliation here
+  is not evidence about them. Recorded in `db/schema/README.md`.
+- `addf3c4` — **The offline REST cache is now scoped to one person, and a token
+  refresh no longer unmounts the routed screen.** Four fixes from a
+  full-codebase review, plus `.github/workflows/test.yml`: `main` deploys on
+  push and the unit suite had never run anywhere but a laptop, so Netlify's
+  `npm run build` caught a compile error and **nothing caught a failing test**.
+  ⚠️ The cache leak was confirmed by inspection on the deploy preview before the
+  fix went in, not only by reading the code — `listClubMembers()` is unfiltered,
+  so its url carries no user identifier and was shared by every caller,
+  admin and coach alike. ⚠️ Deploying does not purge what is already on club
+  devices; the owner check on load does that, once per device.
+
 ## 9 Aug 2026
 
 - **9 Aug — the offline REST cache was not per-person, and a token refresh was
