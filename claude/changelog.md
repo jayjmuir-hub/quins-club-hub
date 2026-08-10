@@ -10,6 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the page header overflowed a phone, and took every screen with it.**
+  Jay, from a phone: "seems buggy, not scaling correctly." ⚠️ **One cause, four
+  symptoms, three screens.** The page-header row is `justify-between` with a title
+  on the left and a **`shrink-0`** action group on the right; `shrink-0` means the
+  buttons never give way, so when the row does not fit it does not clip — **the whole
+  DOCUMENT becomes wider than the viewport.** After that everything sized to the
+  viewport renders short or clipped: the masthead stops reaching the right edge, and
+  an open `Sheet` loses its close button and every field value. ⚠️ **The bottom nav
+  looks fine throughout because it is `fixed`**, which is what makes one bug read as
+  several unrelated ones. Measured in a real browser at 375px against the built
+  stylesheet, because **jsdom reports every width as 0**: the row wanted 368px inside
+  a 339px box, and "Add to calendar" alone is 150px. ⚠️ **PRE-EXISTING — the same
+  probe with the pre-sweep classes is 25px over, against 29px after.** `973df0f`
+  made it visible, not real. Fixed with `flex-wrap` + `min-w-0`, already the house
+  pattern in `AdminDashboard.jsx` and `Register.jsx`; re-probed at 0px overflow.
+  Roster got the same treatment — "Roster & members" is the longest title in the app.
+  ⚠️ **The anchor is a SOURCE check and says so**: `tests/page-header-wrap.test.js`
+  pins the class on every page header and proves its own selector is not blind, but
+  it catches the guard being removed, not a new way of overflowing. A real check
+  needs Playwright in `harness/` and does not exist yet.
+  ⚠️ **This is what the missing browser pass costs**: the sweep shipped green, and
+  the first person to open it on a phone found a layout bug within the hour.
+- `8071428` — **The sweep's live verification proved the previous commit.**
+
 - **10 Aug — ❌ CORRECTION: the routing sweep's "verified on production" claim was
   worthless.** The sign-in screen was measured on the deploy preview and on
   production, everything came back as designed, and it was reported as live
