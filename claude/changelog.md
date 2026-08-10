@@ -10,6 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the stat band's weakest number, and the fortnight strip's empty
+  cells.** Both were on the "open, not blocking" list. (1) ⚠️ **The stat band's
+  third cell was "Age groups"** — `scopedTeams.length`, a count of how the club
+  is CONFIGURED, which changes when somebody adds a squad and therefore
+  approximately never — rendered at 42px inside the loudest element the
+  dashboard has. It is now matches that have been played and carry no score:
+  the same backlog Schedule's Upcoming tab already keeps visible under Task
+  11's ruling, counted. It moves, it is somebody's job, and it appears nowhere
+  else on the screen. ⚠️ **The band's styling is deliberately untouched** — the
+  complaint was that the loudest element carried the weakest data, and the
+  honest fix for that is better data, not quietening the club website's
+  strongest signature. Zero is a real answer on it. (2) **The fortnight strip
+  drew fourteen bordered, dotless cells** when nothing fell in the next two
+  weeks — ~90px of furniture above the fold on a phone, which also read as
+  though it were still loading, because "cells with no dots" and "cells whose
+  dots have not arrived" look identical. It now says "Nothing on in the next
+  two weeks". ⚠️ **A sentence, not `<Empty>`**: the shared empty state is a
+  42px icon with `py-11`, which would have made the nothing-on case taller than
+  the something-on case and given back none of the space. ⚠️ **Three of the
+  strip's own tests were pinning the defect**, asserting fourteen cells for an
+  empty event list — the third time this repo has hit that shape in two days,
+  after "Fixtures to play" and `loadMyMemberships`. They were repointed to keep
+  asking their original questions rather than deleted. Also removed a dead
+  `teamNames` local on the dashboard, computed and never rendered.
+- `a882500` — **Table and column GRANTS are captured and checked.**
 - **10 Aug — table and column GRANTS are captured and checked.** `db/schema/`
   captured tables, policies, functions and triggers and **no table or column
   grants at all**; `state-of-play.md` called it "the one real gap and nothing

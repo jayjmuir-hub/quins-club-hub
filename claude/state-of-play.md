@@ -282,9 +282,17 @@ state; trust the decisions for reasoning.**
 
 ## Open, not blocking
 
-- **The dashboard stat band** — the loudest element on the screen carrying the
+- ~~**The dashboard stat band** — the loudest element on the screen carrying the
   weakest data. **The fortnight strip** renders empty cells above the fold when
-  nothing falls in the next two weeks.
+  nothing falls in the next two weeks.~~ ✅ **Both done 10 Aug.** The band's third
+  cell was "Age groups", a count of how the club is CONFIGURED, at 42px; it is now
+  matches that have been played and have no score — which moves, and is somebody's
+  job. ⚠️ **The band's STYLING is unchanged on purpose**: the complaint was that the
+  loudest element carried the weakest data, and the honest fix for that is better
+  data, not quietening the club website's strongest signature. The strip now says
+  "Nothing on in the next two weeks" instead of drawing fourteen dead cells —
+  ⚠️ **as a sentence, not `<Empty>`**, whose 42px icon and `py-11` would make the
+  nothing-on case TALLER than the something-on case.
 - No way to edit or cancel a whole group or series. `group_id` and `series_id` are
   in place as the hook.
 - A managed pitch list is the precondition for clash detection.

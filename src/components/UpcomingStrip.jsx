@@ -62,6 +62,30 @@ export default function UpcomingStrip({ events = [], now = Date.now(), onSelect 
 
   const days = stripDays(now)
 
+  // ⚠️ THE EMPTY FORTNIGHT. Fourteen bordered cells with no dot on any of them
+  // is not a calendar, it is 90px of furniture — and it sits ABOVE THE FOLD on
+  // a phone, pushing the thing a parent opened the app for further down. The
+  // row also reads as though it is still loading, because "cells with no dots"
+  // and "cells whose dots have not arrived" look identical.
+  //
+  // ⚠️ A SENTENCE, NOT `<Empty>`. The shared empty state is a 42px icon with
+  // py-11 around it — TALLER than the strip it replaces, which would make the
+  // nothing-on case cost more space than the something-on case. The whole
+  // point here is to give the space back.
+  //
+  // Note this says "in the next two weeks" and not "nothing coming up": events
+  // beyond the fortnight are deliberately outside this component's window, and
+  // the Upcoming list directly below is the thing that answers "what is next".
+  const anythingOn = days.some(({ parts }) => byDay.has(dayKey(parts)))
+
+  if (!anythingOn) {
+    return (
+      <p data-testid="upcoming-strip-empty" className="px-2.5 py-4 text-center text-sm text-ink-faint">
+        Nothing on in the next two weeks.
+      </p>
+    )
+  }
+
   return (
     <div
       data-testid="upcoming-strip"

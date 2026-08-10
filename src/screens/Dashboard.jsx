@@ -404,7 +404,6 @@ export default function Dashboard() {
   // Null for anyone who can edit; otherwise the role noun for the read-only
   // explanation, from the same roleLabel() the scope note uses.
   const readOnlyRole = canEdit ? null : roleLabel(memberships).toLowerCase()
-  const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
   // What the Dashboard calls "to play" is a question about the CALENDAR:
   // what is coming up next, and how much of it is there. That is not the same
@@ -443,6 +442,36 @@ export default function Dashboard() {
 
   const results = sortByStart(events.filter(hasResult), 'desc')
   const lastResult = results[0] ?? null
+
+  // ⚠️ REPLACES "AGE GROUPS", WHICH WAS THE WEAKEST NUMBER ON THE SCREEN.
+  // The stat band is the loudest element the dashboard has — a saturated
+  // red-to-green gradient carrying 42px numerals, the club website's strongest
+  // signature — and the third cell was spending all of that on
+  // `scopedTeams.length`. For an admin that read "Age groups 15": a count of
+  // how the club is CONFIGURED, which changes when somebody adds a squad, which
+  // is to say roughly never. It was the one number on the band nobody could act
+  // on, and it was shouting.
+  //
+  // A match that has been played and has no score is the opposite: it moves, it
+  // is somebody's job, and it is invisible everywhere else on this screen. The
+  // rule is already settled and already implemented in Schedule's Upcoming tab
+  // (Task 11): an unscored match stays visible until somebody records it. This
+  // is that same backlog, counted.
+  //
+  // ⚠️ ZERO IS A REAL ANSWER HERE, not a hole in the data — "nothing is waiting
+  // on you" is exactly what a management summary should be able to say. That is
+  // also why it is `<= now` and not `< now`: a match kicking off this second has
+  // not been played yet.
+  //
+  // MATCHES ONLY, for the same reason `fixturesToPlay` is matches only — a
+  // training cannot carry a score, so counting one here would rebuild the
+  // "26 fixtures to play" bug in a new cell.
+  const needsScore = events.filter((event) => {
+    if (event.type !== 'match') return false
+    if (hasResult(event)) return false
+    const date = eventDate(event)
+    return date != null && date.getTime() <= now
+  })
 
   // The hero is just the head of that list, preferring a match and falling
   // back to the next event of any type (design-system.md §4.11).
@@ -535,12 +564,20 @@ export default function Dashboard() {
           in practice parents and players.
           
           These three numbers are a management summary: how big is the squad,
-          how much is left to play, how many groups am I responsible for. A
-          parent has one child and already knows the answer to all three, so
-          the band was three tiles of noise at the top of the screen they see
-          most. It was never a privacy problem — the values are scoped, and a
-          parent saw "Players in view: 12", not the club's 315 — it was just
-          useless to them.
+          how much is left to play, what is waiting on me. A parent has one
+          child and already knows the answer to all three, so the band was
+          three tiles of noise at the top of the screen they see most. It was
+          never a privacy problem — the values are scoped, and a parent saw
+          "Players in view: 12", not the club's 315 — it was just useless to
+          them.
+
+          ⚠️ THE THIRD NUMBER USED TO BE "AGE GROUPS" and was the weakest thing
+          on the screen: a count of how the club is configured, rendered at
+          42px in the loudest element the dashboard has. See `needsScore`
+          above for why an unscored match replaced it. The band's styling is
+          deliberately UNCHANGED — the complaint was that the loudest element
+          carried the weakest data, and the honest fix for that is better data,
+          not quietening the club website's strongest signature.
 
           Gated on canEdit rather than on a role name so it follows the
           permission that already exists: add a role later and it lands on the
@@ -566,9 +603,9 @@ export default function Dashboard() {
             label="Fixtures to play"
           />
           <StatTile
-            testId="stat-groups"
-            value={scopedTeams.length}
-            label={admin ? 'Age groups' : 'Your groups'}
+            testId="stat-needs-score"
+            value={needsScore.length}
+            label="Needs a score"
           />
         </StatBand>
       )}
