@@ -8,6 +8,7 @@ import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
 import Spinner from '../components/Spinner.jsx'
 import Availability from './Availability.jsx'
+import Register from './Register.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
@@ -359,6 +360,9 @@ export default function Dashboard() {
   // Same shape as Schedule's: this screen owns the open/closed state and renders
   // the sheet, rather than EventDetail opening a second one itself.
   const [availabilityOpen, setAvailabilityOpen] = useState(false)
+  // The register (attendance): the fact rather than the intent, coach-only,
+  // and not behind FEATURES.availability. Same parent-holds-the-state wiring.
+  const [registerOpen, setRegisterOpen] = useState(false)
 
   // ⚠️ OPENING A FIXTURE MUST CLEAR THE RSVP SHEET, and this is not tidiness.
   // `availabilityOpen` is screen-level state, not per-event: leave it true after
@@ -368,10 +372,12 @@ export default function Dashboard() {
   // or closes a fixture goes through here or resets it explicitly.
   const openEvent = (id) => {
     setAvailabilityOpen(false)
+    setRegisterOpen(false)
     setSelectedEventId(id)
   }
   const closeEvent = () => {
     setAvailabilityOpen(false)
+    setRegisterOpen(false)
     setSelectedEventId(null)
   }
 
@@ -700,7 +706,7 @@ export default function Dashboard() {
           the Schedule screen only (design-system.md §5.2); the quick-actions
           card above stays as it is until Task 15's player form lands with
           it. */}
-      {selectedEvent && !formState && !availabilityOpen && (
+      {selectedEvent && !formState && !availabilityOpen && !registerOpen && (
         <EventDetail
           event={selectedEvent}
           team={teamsById.get(selectedEvent.team_id)}
@@ -708,6 +714,7 @@ export default function Dashboard() {
           canEdit={canEditTeam(memberships, selectedEvent.team_id)}
           onEdit={(event) => setFormState({ event })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
+          onOpenRegister={() => setRegisterOpen(true)}
           onDeleted={() => {
             closeEvent()
             setReloadToken((token) => token + 1)
@@ -724,6 +731,14 @@ export default function Dashboard() {
           event={selectedEvent}
           team={teamsById.get(selectedEvent.team_id)}
           onClose={() => setAvailabilityOpen(false)}
+        />
+      )}
+
+      {selectedEvent && registerOpen && !formState && (
+        <Register
+          event={selectedEvent}
+          team={teamsById.get(selectedEvent.team_id)}
+          onClose={() => setRegisterOpen(false)}
         />
       )}
 

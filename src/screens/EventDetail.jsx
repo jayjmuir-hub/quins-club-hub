@@ -387,7 +387,16 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
   )
 }
 
-export default function EventDetail({ event, team, onClose, canEdit = false, onEdit, onDeleted, onOpenAvailability }) {
+export default function EventDetail({
+  event,
+  team,
+  onClose,
+  canEdit = false,
+  onEdit,
+  onDeleted,
+  onOpenAvailability,
+  onOpenRegister,
+}) {
   const date = eventDate(event)
   // Null for every event created before 8 Aug 2026, and formatTimeRange
   // renders the start alone for those — see its comment. Nothing here
@@ -502,6 +511,37 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
           )}
         </div>
       ) : null}
+
+      {/* ── The register ────────────────────────────────────────────────
+          Attendance: who actually turned up. Separate from the availability
+          block above in every way that matters — it is the FACT rather than
+          the intent, it is coach-only, and it is NOT behind
+          `FEATURES.availability`, because Jay's 10 Aug ruling was to ship
+          attendance INSTEAD of switching RSVP on.
+
+          ⚠️ ONLY ONCE THE EVENT HAS STARTED. A register for a session that
+          has not happened is not a register, it is a guess — and offering it
+          early is how a coach ends up marking the squad present on Tuesday
+          for a Saturday match. `date` is null for an unparseable starts_at,
+          and the `date &&` guard means those get no button rather than one
+          that compares against NaN and renders unpredictably.
+
+          ⚠️ AND ONLY WHEN A HANDLER EXISTS, for the reason directly above:
+          this same component rendered a dead availability button on the
+          dashboard for weeks because the optional call swallowed the tap. A
+          screen that forgets to pass the handler gets no button. */}
+      {canEdit && onOpenRegister && date && date.getTime() <= Date.now() && (
+        <div className="mt-4">
+          <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Register</h4>
+          <button
+            type="button"
+            onClick={() => onOpenRegister(event)}
+            className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+          >
+            Take the register
+          </button>
+        </div>
+      )}
 
       <FooterActions event={event} canEdit={canEdit} onEdit={onEdit} onDeleted={onDeleted} />
     </Sheet>
