@@ -209,6 +209,30 @@ Durable. Each cost real time to find.
 
 ### The app
 
+- ⚠️ **A `shrink-0` ACTION GROUP IN A PAGE HEADER CAN TAKE THE WHOLE APP WITH IT.**
+  Every screen's header is a `justify-between` row: title left, `shrink-0` buttons
+  right. When it does not fit, the row does not clip — **the DOCUMENT gets wider than
+  the viewport**, and after that every element sized to the viewport renders short or
+  clipped. Schedule did this on 10 Aug: the masthead stopped reaching the right edge
+  and an open `Sheet` lost its close button and every field value, three screens from
+  the cause. ⚠️ **The bottom nav looked perfect throughout because it is `fixed`**,
+  which is what makes one bug read as four. Fixed with `flex-wrap` + `min-w-0`;
+  **`min-w-0` is the load-bearing half** — it lets the title shrink and absorb the
+  row. ⚠️ **Only Schedule was ever broken**: Roster's header was given the same
+  classes for consistency and does not overflow without them.
+  Guarded two ways — `tests/page-header-wrap.test.js` (source, in CI, pins the class)
+  and `harness/check-overflow.mjs` (real Chromium, by hand, measures the thing).
+- ⚠️ **NEVER TRUST A FAULT INJECTION THAT REVERTS PART OF A FIX.** Proving the
+  overflow gate, the first attempt reverted `flex-wrap` but left `min-w-0`, came back
+  green, and was reported to Jay as evidence the fix was unnecessary. **It was
+  evidence of nothing** — the bug had never been restored. The full pre-fix markup
+  fails 8 of 140 pairs. Rule 6 says prove an assertion against an injected fault; this
+  is the corollary — **prove the injection**.
+- ⚠️ **A RESPONSIVE CHECK MUST INCLUDE 360px.** The overflow gate first ran
+  320/375/414 and reported green on the exact screen Jay was holding: Schedule
+  overflowed 53px at 320, **13px at 360**, and nothing at 375. **360 is the commonest
+  Android width** (a 1440px panel at DPR 4). A width list that straddles it is a check
+  that agrees with you.
 - ⚠️ **An unparseable name once fell through to the LEAST SAFE answer.**
   `src/lib/ageGroup.js` used `\b` after the digits; a letter is a word character, so
   `U12G QR` matched nothing, the band came back `null`, and `allowsOwnContact` reads
@@ -294,9 +318,18 @@ Durable. Each cost real time to find.
   measurement merely confirming your own change was applied is not a verification;
   this did not even do that. **The signed-out path contains NOTHING this sweep
   touched, so it is the one place that can never verify it.**
-  ⚠️ **Every screen the sweep changed is behind the login and has still not been
-  looked at** — Dashboard, Schedule, Roster, Accounts and every sheet. Unit-tested
-  only.
+  ✅ **THAT GAP IS NOW PARTLY CLOSED BY A REAL BROWSER GATE.**
+  `harness/check-overflow.mjs` drives all 28 harness scenarios through Chromium at
+  **320/360/375/390/414px** and fails on a document wider than its viewport, naming
+  the offending element. `npm run harness`, then `npm run check:overflow`. It renders
+  the real components against the real stylesheet with stubbed data, so it reaches
+  every screen behind the login **without an account** — which is what made the
+  authenticated screens unverifiable before.
+  ⚠️ **It is not in CI**: Playwright is deliberately not a dependency (~300MB), so
+  this is a gate somebody RUNS before a release, not one that runs itself.
+  ⚠️ **It is layout-only.** It proves nothing about whether the buttons LOOK right —
+  the taller tap target and the 8px corner on Dashboard, Schedule, Roster, Accounts
+  and every sheet are still unlooked-at by a human.
   ⚠️ **AND THE HEADLINE EFFECT IS INVISIBLE ON A PHONE.** The sweep and bloom are
   `hover:` effects, and a touch device has no hover — so on the device this app is
   actually used on, standing on a pitch, what ships is the taller tap target, the 8px
