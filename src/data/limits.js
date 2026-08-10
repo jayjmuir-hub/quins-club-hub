@@ -47,13 +47,17 @@
  * Supabase's documented default `db-max-rows` is 1000, so 900 leaves the
  * request (901) comfortably underneath it.
  *
- * ⚠️ `db-max-rows` HAS NOT BEEN MEASURED ON THIS PROJECT — it is a PostgREST
- * setting and does not appear in `pg_roles`, so no query in this repo can read
- * it. It is in the dashboard under Settings → API → Max rows. If it has been
- * lowered below 901, raise it or lower this; if it has been raised, this is
- * simply more conservative than it needs to be. Measured 10 Aug: `authenticated`
- * carries `statement_timeout=8s`, so the other end of this is an 8-second
- * failure, not an unbounded wait.
+ * ✅ **MEASURED 10 Aug 2026: `db-max-rows` IS 1000 on this project.** So a request
+ * for 901 sits under it and the detector below can fire. Read off the dashboard,
+ * because no query can reach it — it is a PostgREST setting and appears in no
+ * catalogue including `pg_roles`. ⚠️ **THE SETTING HAS MOVED** and is no longer
+ * under Settings → API: it is **Integrations → Data API → Settings → Max rows**.
+ * If it is ever lowered below 901 this stops working SILENTLY — the sentinel row
+ * would be trimmed before it arrived, and every truncated list would then report
+ * itself as complete, which is the exact failure the cap exists to prevent.
+ *
+ * Also measured: `authenticated` carries `statement_timeout=8s`, so the other end
+ * of this is an 8-second failure, not an unbounded wait.
  */
 export const MAX_ROWS = 900
 
