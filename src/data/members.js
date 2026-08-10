@@ -1002,3 +1002,51 @@ export async function updateProfileName({ profileId, fullName } = {}) {
   if (!data) throw new Error(REFUSED_PROFILE)
   return data
 }
+
+// ══ SUPER ADMIN AND PER-ADMIN RIGHTS (10 Aug 2026) ═══════════════════════
+//
+// ⚠️ AN RPC, NOT AN UPDATE, AND NOT BY CHOICE OF STYLE. `authenticated` no
+// longer holds table-level UPDATE on `memberships`: it holds UPDATE on six
+// named columns, and `is_super` and `admin_rights` are not among them. A
+// plain `.update({ is_super })` from here would be refused with 42501.
+//
+// That column grant is the only thing making the tier real. `memb manage` is
+// FOR ALL and admin-only, so ANY ADMIN CAN ALREADY WRITE MEMBERSHIP ROWS,
+// including their own — and RLS cannot help, because a policy authorises the
+// ROW and "an admin may write membership rows in their club" stays true after
+// the row gains the flag. Only a column privilege limits WHICH FIELDS.
+// See db/schema/grants.sql §3.
+//
+// public.set_admin_rights is SECURITY DEFINER so it can write those columns,
+// checks private.is_super_admin() as its first statement, and RAISES rather
+// than returning quietly on either refusal — a silent no-op would look exactly
+// like a successful save on screen, which is the zero-row-200 shape this
+// codebase has been bitten by twice.
+//
+// Harness: db/tests/rls-super-admin.sql.
+
+/**
+ * Sets the super flag and the admin rights on ONE admin membership.
+ *
+ * Only a super admin may call this; anyone else gets a 42501 from the
+ * function itself. Returns the updated membership row.
+ *
+ * @param {string} membershipId
+ * @param {boolean} isSuper
+ * @param {string[]} rights  values from ADMIN_RIGHTS in src/lib/scope.js
+ */
+export async function setAdminRights(membershipId, isSuper, rights) {
+  const { data, error } = await supabase.rpc('set_admin_rights', {
+    _membership_id: membershipId,
+    _is_super: Boolean(isSuper),
+    _rights: rights ?? [],
+  })
+
+  if (error) throw error
+  // The function raises on a missing row, so a null here would mean something
+  // unexpected rather than a refusal — but treat it as a refusal regardless,
+  // because the one thing that must never happen is reporting a save that did
+  // not occur.
+  if (!data) throw new Error('That change was not saved. You may not be a super admin.')
+  return data
+}

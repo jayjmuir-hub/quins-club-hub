@@ -97,6 +97,80 @@ export function isAdmin(memberships) {
   return memberships.some((m) => m.role === 'admin')
 }
 
+// ══ SUPER ADMIN, AND PER-ADMIN RIGHTS (10 Aug 2026) ═══════════════════════
+//
+// ⚠️ A FLAG ON THE MEMBERSHIP, NOT A ROLE VALUE, and the reason is measured:
+// TWELVE places in the schema test `m.role = 'admin'`. A new role value would
+// have to be added to every one, and each is a chance to miss one — where a
+// miss silently strips a super admin of an ordinary admin power. A boolean
+// makes a super admin an admin, so all twelve keep working untouched.
+// Reasoning in full: claude/decisions/2026-08-10-role-dashboards.md.
+//
+// ⚠️ THE RIGHTS GATE SCREENS, NOT DATA, AND THIS IS THE SENTENCE TO RE-READ
+// BEFORE ADDING A FOURTH. Every admin already sees every child's name, photo
+// and contact details — Jay's ruling, 10 Aug: "trusted volunteers". A right
+// decides which specialist DASHBOARD appears; it withholds nothing. This
+// repo's own rule applies: a screen that hides a row is not security. A future
+// right that must genuinely withhold data — finances, safeguarding notes —
+// needs an RLS policy, and hiding the menu item will not do.
+//
+// ⚠️ CHANGE ONE, CHANGE BOTH — the same arrangement SQUAD_STAFF_ROLES has with
+// private.can_edit_team. The database deliberately has NO check constraint on
+// these values (that would mean a migration per job title, for a value that
+// gates a screen and cannot do harm), so this list is the only vocabulary
+// there is. An unrecognised right matches no dashboard and is inert.
+export const ADMIN_RIGHTS = ['youth', 'media', 'pitches']
+
+const ADMIN_RIGHT_LABELS = {
+  youth: 'Youth Manager',
+  media: 'Social Media Manager',
+  pitches: 'Pitch Manager',
+}
+
+/** The human label for a right, or the raw value if it is one we do not know. */
+export function adminRightLabel(right) {
+  return ADMIN_RIGHT_LABELS[right] ?? right
+}
+
+/**
+ * True if any membership row is an ACTIVE admin carrying the super flag.
+ *
+ * ⚠️ `status === 'active'` mirrors private.is_super_admin(). This client check
+ * is a convenience for drawing the UI and is NOT the enforcement — the column
+ * grant on `memberships` and the set_admin_rights RPC are. Anything that must
+ * actually be prevented has to be prevented server-side.
+ */
+export function isSuperAdmin(memberships) {
+  if (!memberships) return false
+  return memberships.some((m) => m.role === 'admin' && m.status === 'active' && m.is_super === true)
+}
+
+/**
+ * Every admin right the person holds, across all their membership rows.
+ *
+ * ⚠️ A SUPER ADMIN IMPLICITLY HOLDS ALL OF THEM. Otherwise Jay would have to
+ * grant himself each new right as he invents it, and the first thing he would
+ * do on finding a dashboard missing is wonder whether the feature shipped.
+ */
+export function adminRights(memberships) {
+  if (!memberships) return []
+  if (isSuperAdmin(memberships)) return [...ADMIN_RIGHTS]
+  const held = new Set()
+  for (const membership of memberships) {
+    if (membership.role !== 'admin' || membership.status !== 'active') continue
+    for (const right of membership.admin_rights ?? []) held.add(right)
+  }
+  // Returned in ADMIN_RIGHTS order rather than the order the database happened
+  // to store them, so a menu built from this cannot reorder itself between
+  // reloads.
+  return ADMIN_RIGHTS.filter((right) => held.has(right))
+}
+
+/** True if the person may see the dashboard behind `right`. */
+export function hasAdminRight(memberships, right) {
+  return adminRights(memberships).includes(right)
+}
+
 /**
  * True when the person holds membership rows and EVERY one of them is still
  * pending approval — the self-registered parent who has added a child and is

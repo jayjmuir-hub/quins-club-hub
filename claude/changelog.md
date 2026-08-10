@@ -10,6 +10,43 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the super-admin tier and per-admin rights. FOUNDATION ONLY: no
+  dashboard uses a right yet.** The model Jay asked for: base admin unchanged
+  (full club data), **admin rights** as ADDITIVE specialist capabilities —
+  Youth Manager, Social Media Manager, Pitch Manager — each intended to unlock
+  a dashboard, and a **super admin** who assigns rights and assigns admin.
+  ⚠️ **A FLAG, NOT A ROLE VALUE, and the reason is measured.** Twelve places in
+  the schema test `m.role = 'admin'`. A new role value needed all twelve, and
+  each is a chance to miss one — where a miss silently strips a super admin of
+  an ordinary power. `memberships.is_super` makes a super admin an admin, so
+  all twelve keep working untouched.
+  ⚠️ **THE PART THAT MAKES IT REAL RATHER THAN THEATRE.** `memb manage` is
+  FOR ALL and admin-only, so **any admin could already write membership rows,
+  including their own** — a plain column would have let any admin set
+  `is_super` on themselves. **RLS cannot close that**: a policy authorises the
+  ROW, and "an admin may write membership rows in their club" is true before
+  and after the row gains the flag. The protection is a COLUMN PRIVILEGE —
+  `authenticated` lost table-level UPDATE on `memberships` and got back six
+  named columns — plus `public.set_admin_rights`, SECURITY DEFINER, which
+  checks the caller first and RAISES rather than returning quietly. Exactly the
+  shape `profiles.email` and `approve_membership` already use.
+  ⚠️ **Proved live in a rolled-back transaction, BOTH directions**: an ordinary
+  admin is refused on the UPDATE path (42501, column privilege), the RPC path
+  and the INSERT path, while still writing the columns it should; a real super
+  admin does all of it and an unknown id is refused rather than reported as
+  saved. Without that second half a build that refuses EVERYONE looks identical.
+  ⚠️ **RIGHTS GATE SCREENS, NOT DATA** — every admin already sees every child's
+  name, photo and contacts. A right decides which dashboard appears; it
+  withholds nothing. **A future right that must genuinely withhold data needs
+  RLS; hiding a menu item is not security.**
+  ⚠️ **The first super admin was set by hand in SQL** (`jayjmuir@gmail.com`),
+  because none can exist to grant it.
+  ⚠️ **A fault injection silently changed no bytes and reported green** — a
+  `
+` against a CRLF file, the second time today. Caught only because the
+  script printed the occurrence count before and after. **Print the count.**
+- `5648530` — **A super-admin TIER, attendance has no data, and why it is a flag.**
+
 - `b0e9602` — **A Player can be granted access before they are on the roster.**
 
 - **10 Aug — a Player can be granted access when they are NOT on the roster yet.**

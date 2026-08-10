@@ -128,7 +128,10 @@
 --   events            anon, authenticated, postgres, service_role   ALL 8
 --   invite_targets    anon, authenticated, postgres, service_role   ALL 8
 --   invites           anon, authenticated, postgres, service_role   ALL 8
---   memberships       anon, authenticated, postgres, service_role   ALL 8
+--   memberships       anon, postgres, service_role                  ALL 8
+--   memberships       authenticated    ← NO table-level UPDATE, as of 10 Aug
+--                                        2026. DELETE, INSERT, MAINTAIN,
+--                                        REFERENCES, SELECT, TRIGGER, TRUNCATE
 --   player_contacts   anon, authenticated, postgres, service_role   ALL 8
 --   player_parents    anon, authenticated, postgres, service_role   ALL 8
 --   players           anon, authenticated, postgres, service_role   ALL 8
@@ -171,6 +174,38 @@
 --   profiles.last_name          authenticated   UPDATE
 --   profiles.name_confirmed_at  authenticated   UPDATE
 --   profiles.phone              authenticated   UPDATE
+--
+--   memberships.profile_id      authenticated   UPDATE
+--   memberships.club_id         authenticated   UPDATE
+--   memberships.team_id         authenticated   UPDATE
+--   memberships.player_id       authenticated   UPDATE
+--   memberships.role            authenticated   UPDATE
+--   memberships.status          authenticated   UPDATE
+--
+-- ⚠️ `memberships` JOINED THIS LIST ON 10 Aug 2026, and for exactly the reason
+-- `profiles.email` is on it. `is_super` and `admin_rights` are NOT granted.
+--
+-- `memb manage` is FOR ALL and admin-only, so ANY ADMIN CAN ALREADY WRITE
+-- MEMBERSHIP ROWS — including their own. Without the revoke, any admin could
+-- set `is_super = true` on themselves and the super-admin tier would be
+-- theatre. **RLS cannot close that**: the policy authorises the ROW, and "an
+-- admin may write membership rows in their club" is true both before and after
+-- the row gains the flag. Only a column privilege limits WHICH FIELDS.
+--
+-- The one write path is `public.set_admin_rights`, SECURITY DEFINER, which
+-- checks `private.is_super_admin()` first and raises rather than returning
+-- quietly — a silent no-op would look exactly like success on screen.
+-- Harness: `db/tests/rls-super-admin.sql`, which proves an ordinary admin is
+-- refused on the UPDATE path, the RPC path AND the INSERT path, that an
+-- ordinary admin can still write the columns it should, and that a real super
+-- admin can do all of it. That last part matters: a build that refuses
+-- EVERYONE looks identical from the ordinary admin's side alone.
+--
+-- ⚠️ INSERT IS NOT COLUMN-RESTRICTED, deliberately — a column grant on INSERT
+-- would block the DEFAULTS too, so an ordinary `insert into memberships (...)`
+-- would fail. The insert path is guarded by the RESTRICTIVE policy
+-- `memb no self promotion` instead, which refuses a new row that arrives
+-- already carrying the flag or any rights.
 --
 -- ⚠️ WHAT IS NOT ON THAT LIST IS THE POINT. `profiles` has eight columns; the
 -- three excluded are:
