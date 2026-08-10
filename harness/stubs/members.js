@@ -548,3 +548,15 @@ export async function approveMembership(membershipId) {
 
   return { id: membershipId, status: 'active' }
 }
+
+// The super-admin write path, mirroring the real module. Records what it was
+// asked to do on window.__writes so the browser check can assert the call
+// without a database — and, importantly, without any of the column grants or
+// the SECURITY DEFINER check that make it real in production. ⚠️ A harness
+// scenario proves the SCREEN wires up; db/tests/rls-super-admin.sql is what
+// proves an ordinary admin cannot actually do this.
+export async function setAdminRights(membershipId, isSuper, rights) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'set-admin-rights', membershipId, isSuper, rights })
+  return { id: membershipId, is_super: Boolean(isSuper), admin_rights: rights ?? [] }
+}
