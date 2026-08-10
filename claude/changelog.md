@@ -10,7 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
-- **10 Aug — the unbounded list reads cap, and say so.** ⚠️ **This started as
+- **10 Aug — the roster-import blocker was closed by Jay, and it was never a
+  blocker.** `state-of-play.md` carried "NOBODY HAS RECORDED WHERE THE REAL ROSTER
+  LIVES … a rollout is blocked on that. Ask Jay" and duly had every session ask
+  him. The question had a false premise: **parents will self-onboard, and the
+  imported roster most likely never goes back in.** ⚠️ **The ruling matters less
+  than what it promotes.** Several things were filed as harmless *because* a bulk
+  import was assumed to be the real path, and are now on the critical path —
+  chiefly that `register_my_player` reads `teams.is_senior` and, with no senior
+  squad, makes every self-registration a PARENT ("dormant, not broken" until it
+  became the primary onboarding route), and that Resend's free cap now sits
+  directly on the rollout while hitting it does not look like a limit.
+  `src/screens/PlayerImport.jsx` is explicitly NOT retired by this — "most likely"
+  is not "never", and it must not be deleted as dead code.
+  `claude/decisions/2026-08-10-no-roster-import.md`.
+- **10 Aug — two things measured in the Supabase dashboard, one of them a trap.**
+  (1) ✅ **`db-max-rows` is 1000**, so `MAX_ROWS` 900 sits under it and the
+  truncation detector added earlier today can actually fire — the assumption the
+  whole guard rested on, now measured rather than assumed. ⚠️ **The setting has
+  moved**: not Settings → API but **Integrations → Data API → Settings**.
+  (2) ⚠️ **THE DASHBOARD OFFERS TO UNDO THE `profiles` COLUMN GRANTS IN ONE CLICK,
+  AND FRAMES IT AS FIXING AN INCONSISTENCY.** Under Exposed tables, twelve of the
+  thirteen `public` tables show a green tick; `profiles` is amber, with the tooltip
+  *"This table has custom grants. Select it to override with standard Data API
+  grants…"*. The "problem" it offers to fix is the protection standing between a
+  club admin and rewriting any member's login email. One click, no confirmation
+  naming what is lost, no test failure, no visible change in the app — the app
+  never attempts that write, so the extra privilege would stay invisible until
+  somebody used it. Recorded in `db/schema/grants.sql` §4 and in
+  `claude/state-of-play.md`: **the amber row is correct and must stay amber.**
+- `4b86646` — **The unbounded list reads cap, and say so.** ⚠️ **This started as
   the scale item and found a correction first.** `state-of-play.md` said the
   unpaginated queries "will show as a slow screen long before anything errors".
   That is wrong, and wrong in the dangerous direction: what waits at the end of

@@ -105,9 +105,13 @@ Durable. Each cost real time to find.
   `500 unexpected_failure`. The rate-limit pattern `/rate limit|too many
   requests|429/i` matches none of those words. `friendlyAuthError` in
   `src/screens/Login.jsx` already handles it via a second pattern.
-- ⚠️ **NOBODY HAS RECORDED WHERE THE REAL ROSTER LIVES.** The 8 Aug wipe deleted the
-  imported roster, and no document in this repo says where it is, in what format, or
-  who re-imports it. **A rollout is blocked on that. Ask Jay.**
+- ✅ **THERE IS NO ROSTER IMPORT, AND THE ROLLOUT IS NOT BLOCKED ON ONE — Jay,
+  10 Aug 2026.** This file said "nobody has recorded where the real roster lives"
+  and told every session to ask him. **Asked and answered: parents will most likely
+  onboard themselves, and the old roster most likely never goes in at all.**
+  ⚠️ **Stop raising it.** It is settled, and re-asking a closed question is its own
+  kind of rot. Reasoning, and what still has to be true for self-onboarding to work:
+  `claude/decisions/2026-08-10-no-roster-import.md`.
 - Removing the Resend cap is **pay-as-you-go, ~$0.90 per 1,000**. A purchase, so
   **Jay does it, not the assistant.**
 - **`jayjmuir@yahoo.com` is Jay's deliberate backup ADMIN.** Any "a coach cannot see
@@ -124,6 +128,16 @@ Durable. Each cost real time to find.
   live and injects the fault to prove it can fail. ⚠️ **Neither sees live from CI**
   — the repo is public, so there are no credentials — so re-capturing WITH the
   migration is still the mechanism, not a formality.
+- ⚠️ **THE SUPABASE DASHBOARD OFFERS TO DESTROY THAT PROTECTION IN ONE CLICK, AND
+  PRESENTS IT AS TIDYING UP.** Under **Integrations → Data API → Settings → Exposed
+  tables**, twelve of the thirteen `public` tables carry a green tick and
+  `public.profiles` is AMBER with a warning: *"This table has custom grants. Select
+  it to override with standard Data API grants for anon, authenticated, and
+  service_role."* ⚠️ **The "problem" it offers to fix IS the protection** — the
+  column grants below. Clicking it hands table-level UPDATE back and undoes them,
+  with no confirmation saying so, no test failing, and no visible change in the app.
+  **Do not click it. The amber row is correct and must stay amber.** Seen 10 Aug;
+  detail in `db/schema/grants.sql` §4.
 - ⚠️ **`profiles.email` is protected by a COLUMN GRANT, not by a policy.** Only five
   columns are updatable by `authenticated`: `full_name`, `first_name`, `last_name`,
   `name_confirmed_at`, `phone`. RLS authorises the ROW — and `profile update club
@@ -201,12 +215,13 @@ Durable. Each cost real time to find.
   ✅ **`listEvents` and `listPlayers` now cap and THROW** (`src/data/limits.js`): they
   ask for one row more than `MAX_ROWS` and refuse to hand back a truncated list.
   Nothing is faster; the truncation is merely no longer silent.
-  ⚠️ **`db-max-rows` HAS NOT BEEN MEASURED on this project.** It is a PostgREST
-  setting, appears in no catalogue, and no query in this repo can read it — it is in
-  the dashboard under **Settings → API → Max rows**. `MAX_ROWS` is 900 on the
-  assumption of Supabase's documented default of 1000; **if it has been lowered below
-  901 the detector cannot fire.** Measured instead: `authenticated` carries
-  `statement_timeout=8s`, so the far end of this is an 8-second failure, not a hang.
+  ✅ **`db-max-rows` IS 1000 — measured 10 Aug off the dashboard**, so `MAX_ROWS`
+  900 (a request for 901) sits under it and the detector can fire. No query can read
+  it; it is a PostgREST setting in no catalogue. ⚠️ **The setting has MOVED** — not
+  Settings → API any more, but **Integrations → Data API → Settings → Max rows**.
+  **If it is ever lowered below 901 the detector stops working silently.** Also
+  measured: `authenticated` carries `statement_timeout=8s`, so the far end of this is
+  an 8-second failure, not a hang.
   ⚠️ **Still open, and needing Jay:** pagination, and a date window on events. Both
   change what a person SEES — "how far back should the schedule go" is a ruling, not a
   data-layer detail. `listEvents` has accepted `from`/`to` since it was written and no

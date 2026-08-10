@@ -194,3 +194,36 @@
 --
 -- Checked by `db/tests/grants.sql`, which asserts this list exactly and fails
 -- loudly on either kind of drift.
+
+
+-- ── 4. ⚠️ THE ONE-CLICK WAY TO DESTROY ALL OF THIS ─────────────────────────
+--
+-- Found in the Supabase dashboard on 10 Aug 2026, and it is the most dangerous
+-- thing in this file.
+--
+-- **Integrations → Data API → Settings → Exposed tables** lists the thirteen
+-- tables in `public`. Twelve carry a green tick. `public.profiles` does not: it
+-- is rendered in AMBER with a warning icon, and its tooltip reads
+--
+--     "This table has custom grants. Select it to override with standard Data
+--      API grants for anon, authenticated, and service_role."
+--
+-- ⚠️ THE "PROBLEM" IT OFFERS TO FIX IS THE PROTECTION ITSELF. `profiles` is
+-- flagged precisely BECAUSE table-level UPDATE was revoked from `authenticated`
+-- and re-granted on five named columns — the thing standing between a club admin
+-- and rewriting any member's login email. Clicking that row to make the amber
+-- warning go away would "override with standard grants", hand table-level UPDATE
+-- straight back, and silently undo section 3 of this file.
+--
+-- ⚠️ AND IT WOULD LOOK LIKE TIDYING UP. The dashboard presents it as an
+-- inconsistency; the row is the only one not matching its neighbours; the fix is
+-- one click, with no confirmation describing what is lost. Nothing in the app
+-- would change, no test would fail, and no error would appear anywhere — this app
+-- never attempts that write, so the extra privilege stays invisible until
+-- somebody uses it.
+--
+-- **DO NOT CLICK IT. The amber row is correct, and must stay amber.**
+--
+-- What would catch it: `db/tests/grants.sql` fails immediately (`authenticated`
+-- can UPDATE profiles.email), and a re-capture would diff section 2 back to a
+-- uniform thirteen. ⚠️ **Both are manual.** Nothing automatic can see a dashboard.
