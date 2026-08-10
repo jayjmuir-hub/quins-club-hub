@@ -1,0 +1,66 @@
+name: Tests
+
+# The unit suite, which until now ran only on somebody's laptop.
+#
+# ⚠️ WHY THIS MATTERS MORE HERE THAN IT WOULD ON AN ORDINARY REPO: `main` is the
+# production branch and Netlify deploys it on push (CLAUDE.md rule 3). Netlify's
+# build command is `npm run build`, so a COMPILE error already blocks a deploy —
+# but a failing TEST did not, and nothing anywhere was checking. A commit that
+# broke the session guard, an RLS-facing data helper or `safeNext()` would have
+# gone green to a live site parents use. This workflow is the gate for that.
+#
+# Deliberately a separate workflow from docs.yml rather than a second job in it:
+# a docs-only commit should not wait on vitest, and a red suite should not
+# present itself as "docs failed".
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # ⚠️ REQUIRED, AND PLACEHOLDERS ON PURPOSE.
+    #
+    # src/lib/supabase.js throws at IMPORT TIME when either of these is missing.
+    # Without them ten test files do not fail an assertion, they fail to COLLECT
+    # — "Missing required Supabase env var(s)" — and a reader of that log would
+    # reasonably conclude the suite is broken rather than unconfigured.
+    #
+    # Placeholders because `npm test` never reaches the network: the integration
+    # suite is a separate vitest mode (`npm run test:integration`, see
+    # vite.config.js) and is not run here. So no real value is needed — and none
+    # should be added, because this repo is public. CLAUDE.md rule 2.
+    env:
+      VITE_SUPABASE_URL: https://placeholder.supabase.co
+      VITE_SUPABASE_ANON_KEY: placeholder-anon-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # ⚠️ --include=dev. Vitest is a devDependency, and an npm that believes
+      # NODE_ENV is production omits those silently — with a symptom
+      # ("'vite' is not recognized") that points nowhere near the cause. The
+      # same trap is documented in CLAUDE.md for the dev machines.
+      - run: npm ci --include=dev
+
+      # ⚠️ BEFORE the tests, and not optional. tests/press-feedback.test.js
+      # inspects the BUILT stylesheet in dist/assets/ — it asserts on the CSS
+      # that actually ships rather than on the Tailwind source, which is the
+      # entire point of it. With no build it fails five assertions, each saying
+      # "run `npm run build` first".
+      #
+      # It also means a build failure is caught here rather than only by
+      # Netlify, which for a pull request is the difference between finding out
+      # now and finding out after merge.
+      - run: npm run build
+
+      - run: npm test

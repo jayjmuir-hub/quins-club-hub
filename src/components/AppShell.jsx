@@ -73,7 +73,10 @@ function LoadingState() {
   )
 }
 
-function ErrorState({ error, reload }) {
+// `children` is the sign-out control, passed in from below exactly as
+// AddYourPlayer and RequestAccess take it — and for the same reason. See the
+// note at the call site.
+function ErrorState({ error, reload, children }) {
   return (
     <div
       role="alert"
@@ -90,6 +93,7 @@ function ErrorState({ error, reload }) {
       >
         Try again
       </button>
+      {children}
     </div>
   )
 }
@@ -431,7 +435,20 @@ export default function AppShell({ children }) {
         className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16 focus:outline-none"
       >
         {loading && <LoadingState />}
-        {!loading && error && <ErrorState error={error} reload={reload} />}
+        {!loading && error && (
+          <ErrorState error={error} reload={reload}>
+            {/* ⚠️ The app's only sign-out control renders on /more behind the
+                `ready` gate, and `ready` is false whenever this branch is. So a
+                membership load that fails and keeps failing — a bad account
+                state rather than a blip — left somebody with no way out of the
+                account at all: "Try again" loops, and no route reaches a
+                sign-out because this shell wraps every one of them. The two
+                zero-membership branches below already carry a sign-out for
+                exactly this reason ("someone who cannot get in must always be
+                able to get out"); this branch was the gap in that rule. */}
+            <SignOutControl signOut={signOut} className="mt-5" />
+          </ErrorState>
+        )}
         {!loading && !error && memberships.length === 0 && !askingForAccess && (
           <AddYourPlayer
             teams={teams}

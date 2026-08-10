@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -46,6 +46,7 @@ vi.mock('../src/data/accessRequests.js', () => ({
 
 // Import after vi.mock so these bind to the mocked modules.
 import AppShell from '../src/components/AppShell.jsx'
+import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
 const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
 
@@ -96,6 +97,10 @@ beforeEach(() => {
   createAccessRequestMock.mockReset()
   getMyAccessRequestMock.mockResolvedValue(null)
   window.localStorage.clear()
+  // useMyProfile's cache is module-level and survives a render, so without this
+  // one test's profile row leaks into the next. Same reason
+  // tests/app-shell.test.jsx clears it.
+  clearMyProfileCache()
 
   useAuthMock.mockReturnValue({
     user: { id: 'u-1', email: 'jay@example.com' },
@@ -186,6 +191,49 @@ describe('NamePrompt — the sign-in name gate', () => {
     )
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: GATE_TITLE })).not.toBeInTheDocument(),
+    )
+  })
+
+  // ⚠️ THE JASON/JAY CASE AGAIN, ONE STEP LATER. The tests above are about what
+  // the gate ASKS; this is about what happens to the answer. useMyProfile
+  // caches the profile row at module level and never invalidates it, so after
+  // the gate saved, every consumer — the masthead account button, the dashboard
+  // greeting — was still holding the row from BEFORE: no name at all for a
+  // password sign-up, and the wrong name for a Google one. Priming the cache is
+  // the documented escape hatch, and src/screens/More.jsx already does it after
+  // its own save.
+  //
+  // ⚠️ WHAT THIS DOES NOT CLAIM. The contract is "the next mount", not "the
+  // masthead changes as you press Continue" — priming replaces the cache entry,
+  // it does not re-render components already holding the old row. So this
+  // remounts, which is what any route change does.
+  it('primes the profile cache, so the name it just took reaches the masthead', async () => {
+    const user = userEvent.setup()
+    updateProfileNamesMock.mockResolvedValue(
+      unconfirmed({
+        full_name: 'Jay Muir',
+        first_name: 'Jay',
+        name_confirmed_at: '2026-08-06T12:00:00Z',
+      }),
+    )
+
+    await openGate()
+    await user.clear(screen.getByLabelText(/first name/i))
+    await user.type(screen.getByLabelText(/first name/i), 'Jay')
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+    await waitFor(() => expect(updateProfileNamesMock).toHaveBeenCalled())
+
+    cleanup()
+    renderShell()
+
+    // Without the prime this reads "My account, Jason" — the name Google
+    // supplied and nobody at this club uses, served from a cache the gate had
+    // just been told was wrong.
+    await waitFor(() =>
+      expect(screen.getByTestId('account-button')).toHaveAttribute(
+        'aria-label',
+        'My account, Jay',
+      ),
     )
   })
 

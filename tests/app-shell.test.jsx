@@ -242,6 +242,27 @@ describe('AppShell', () => {
     expect(hasClassToken(screen.getByTestId('error-message'), 'text-brand-deep')).toBe(true)
   })
 
+  // ⚠️ THE WAY OUT. The app's only sign-out control renders on /more behind the
+  // `ready` gate, and `ready` is false whenever this branch is — so a load
+  // failure that keeps failing (a bad account state rather than a blip) used to
+  // leave somebody with no way out of the account at all: "Try again" loops,
+  // and no route reaches a sign-out because this shell wraps every one of them.
+  // The two zero-membership branches already carry a sign-out for exactly this
+  // reason; this branch was the gap in that rule.
+  it('offers sign-out from the error state, not just "Try again"', async () => {
+    const user = userEvent.setup()
+    signOutMock.mockResolvedValue(undefined)
+    useMembershipsMock.mockReturnValue(
+      loaded({ memberships: [], error: new Error('permission denied') }),
+    )
+
+    renderShell()
+
+    await user.click(screen.getByRole('button', { name: /sign out/i }))
+
+    expect(signOutMock).toHaveBeenCalledTimes(1)
+  })
+
   // ⚠️ REPOINTED 8 Aug 2026. The zero-membership branch used to render
   // RequestAccess, whose copy names the signed-in address — hence the old
   // /jay@example.com/ assertion. It now renders AddYourPlayer first (parent

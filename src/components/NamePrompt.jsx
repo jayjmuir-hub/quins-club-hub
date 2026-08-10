@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Sheet from './Sheet.jsx'
 import { getMyProfile, updateProfileNames } from '../data/members.js'
 import { useAuth } from '../lib/auth.jsx'
+import { primeMyProfileCache } from '../lib/useMyProfile.js'
 
 // The sign-in name gate: first name and family name, asked once, before the
 // app is usable.
@@ -94,7 +95,17 @@ export default function NamePrompt() {
     // Family name is intentionally NOT required. Plenty of people have one
     // name, and a gate nobody can pass is worse than a sortable list.
     updateProfileNames({ profileId, firstName: first, lastName: lastName.trim() })
-      .then(() => {
+      .then((updated) => {
+        // ⚠️ useMyProfile's cache is module-level and never invalidates itself,
+        // and right now it holds the row as it was BEFORE this save. Its own
+        // header reasons that a name is "confirmed once at first sign-in and
+        // effectively never edited after" — true, and it is precisely why this
+        // line is needed rather than why it is not: first sign-in is when the
+        // cached row has no name in it. Without this, the masthead account
+        // button and the dashboard greeting stay nameless for the rest of the
+        // session, having just asked this person to type their name.
+        // src/screens/More.jsx does the same after its own save.
+        primeMyProfileCache(profileId, updated)
         setOpen(false)
       })
       .catch((err) => {

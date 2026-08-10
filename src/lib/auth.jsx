@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { clearPhotoUrlCache } from '../data/photos.js'
+import { syncApiCacheOwner } from './apiCache.js'
 
 // Auth context for the app: current session/user, loading state, and the
 // three sign-in/sign-out actions. No sign-up, password auth, profile
@@ -17,9 +18,17 @@ export function AuthProvider({ children }) {
 
     supabase.auth
       .getSession()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
+        const next = data?.session ?? null
+        // ⚠️ AWAITED, AND BEFORE setSession. This is the cold-start check that
+        // stops one person reading another's cached REST responses off a shared
+        // device (see src/lib/apiCache.js). It has to finish before any screen
+        // can issue a query, and this is the only point where that is
+        // guaranteed: `loading` is cleared in the .finally below, so RequireAuth
+        // is still showing its loading state for the whole of it.
+        await syncApiCacheOwner(next?.user?.id ?? null)
         if (!mounted) return
-        setSession(data?.session ?? null)
+        setSession(next)
       })
       .catch(() => {
         // Swallow here only: loading still resolves to false below so the
@@ -32,6 +41,12 @@ export function AuthProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      // Belt to the braces above: somebody signing in as a different person
+      // within one page life. Not awaited, because that transition always
+      // follows a sign-out, which has already purged synchronously through the
+      // signOut wrapper in src/lib/supabase.js. A token refresh carries the
+      // same uid, so this costs one localStorage read and returns.
+      syncApiCacheOwner(newSession?.user?.id ?? null)
       if (!mounted) return
       setSession(newSession)
     })
