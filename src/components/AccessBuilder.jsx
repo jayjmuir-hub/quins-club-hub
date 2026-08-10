@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import PlayerPicker from './PlayerPicker.jsx'
 import Button from './Button.jsx'
 import { isSquadStaffRole } from '../lib/scope.js'
+import { upsertPlayer } from '../data/players.js'
 
 // Builds a SET of access rows for one person, ready for grantMemberships().
 //
@@ -22,6 +23,19 @@ import { isSquadStaffRole } from '../lib/scope.js'
 //   - parent, children not on the roster yet → falls back to a plain age-group
 //     multi-select with player_id null. Jay asked for this explicitly; without
 //     it a parent whose children have not been imported is ungrantable.
+//   - player, not on the roster yet → CREATES THE PLAYER, then grants against
+//     it. ⚠️ NOT the parent's player_id-null fallback, and the difference is
+//     not stylistic. `private.is_own_player` is
+//     `m.player_id = _player AND role in ('parent','player')`, so a player
+//     membership with a null player_id matches NOTHING: that account could
+//     never set its own availability, its own photo or its own gender. It
+//     would look granted and behave like a stranger. A player has to exist on
+//     the roster to be a player at all.
+//     Reported by Jay 10 Aug 2026, who created a login for his son and found
+//     the only options were six unrelated Test Players. ⚠️ Per the 10 Aug
+//     no-roster-import decision this is the NORMAL case, not an edge one:
+//     parents self-onboard and the old roster most likely never goes in, so
+//     almost every player granted access will not be on the roster yet.
 //   - coach   → AGE GROUPS, one row each.
 //   - player  → one player. team_id is derived from that player exactly as in
 //     the parent/child case.
@@ -40,7 +54,10 @@ export const NO_ROLE_CHOSEN = 'Choose a role for this person.'
 export const NO_TEAM_CHOSEN = 'Choose at least one age group for this role.'
 export const NO_CHILD_CHOSEN =
   "Choose at least one child — or tick “not on the roster yet” and pick age groups instead."
-export const NO_PLAYER_CHOSEN = 'Choose which player this person is.'
+export const NO_PLAYER_CHOSEN =
+  "Choose which player this person is — or tick “not on the roster yet” and add them."
+export const NEW_PLAYER_NEEDS_NAME = 'Give the new player a name.'
+export const NEW_PLAYER_NEEDS_TEAM = 'Choose an age group for the new player.'
 export const CHILD_WITHOUT_TEAM =
   "That player isn't in an age group yet, so there's nothing to give access to. Put them in a squad on the roster first."
 export const DUPLICATE_ACCESS = 'They already have that access, so there is nothing to add.'
@@ -97,6 +114,13 @@ export default function AccessBuilder({
   const [playerIds, setPlayerIds] = useState([])
   const [noRoster, setNoRoster] = useState(false)
   const [localError, setLocalError] = useState(null)
+  // The new-player form, for role 'player' with `noRoster` ticked.
+  const [newPlayerName, setNewPlayerName] = useState('')
+  const [newPlayerTeam, setNewPlayerTeam] = useState('')
+  // Separate from the parent's `saving`: that means "the grant is in flight",
+  // this means "the player row is being created". They are two writes and the
+  // first can fail on its own.
+  const [creating, setCreating] = useState(false)
 
   const teamsById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams])
   const playersById = useMemo(() => new Map(players.map((player) => [player.id, player])), [players])
@@ -105,7 +129,10 @@ export default function AccessBuilder({
   // Children mode is the default for a parent; the age-group fallback is the
   // exception, so it is opt-in rather than a mode switch of equal weight.
   const childMode = role === 'parent' && !noRoster
-  const needsPlayers = childMode || role === 'player'
+  // A player who is not on the roster yet gets the new-player form instead of
+  // the picker — there is nothing to pick.
+  const newPlayerMode = role === 'player' && noRoster
+  const needsPlayers = childMode || (role === 'player' && !noRoster)
   const needsTeams = isSquadStaffRole(role) || (role === 'parent' && noRoster)
 
   // The player list is ~315 rows and most grants never look at it, so the
@@ -124,6 +151,8 @@ export default function AccessBuilder({
     setTeamIds([])
     setPlayerIds([])
     setNoRoster(false)
+    setNewPlayerName('')
+    setNewPlayerTeam('')
     setLocalError(null)
   }
 
@@ -151,6 +180,25 @@ export default function AccessBuilder({
       return { rows: teamIds.map((teamId) => ({ role, teamId, playerId: null })) }
     }
 
+    // A player who is not on the roster yet: the row cannot be built here
+    // because the player does not exist. submit() creates it first and comes
+    // back with a real id — see the note there for why this is not the
+    // parent's player_id-null fallback.
+    if (newPlayerMode) {
+      if (!newPlayerName.trim()) return { error: NEW_PLAYER_NEEDS_NAME }
+      if (!newPlayerTeam) return { error: NEW_PLAYER_NEEDS_TEAM }
+      return {
+        rows: [
+          {
+            role: 'player',
+            teamId: newPlayerTeam,
+            playerId: null,
+            newPlayer: { full_name: newPlayerName.trim(), team_id: newPlayerTeam },
+          },
+        ],
+      }
+    }
+
     // parent (children) and player: the team comes from the player.
     if (playerIds.length === 0) {
       return { error: role === 'player' ? NO_PLAYER_CHOSEN : NO_CHILD_CHOSEN }
@@ -165,7 +213,7 @@ export default function AccessBuilder({
     return { rows }
   }
 
-  function submit() {
+  async function submit() {
     const { rows, error: refusal } = buildRows()
     if (refusal) {
       setLocalError(refusal)
@@ -193,11 +241,38 @@ export default function AccessBuilder({
     }
 
     setLocalError(null)
-    onSubmit?.(unique)
+
+    // ⚠️ THE PLAYER IS CREATED LAST, AFTER EVERY REFUSAL ABOVE HAS PASSED.
+    // Creating it first would leave a real child on the roster every time a
+    // grant was then refused as a duplicate or rejected by RLS — an orphan
+    // nobody asked for, in a table where a stray row is a stray CHILD.
+    // Ordering the checks before the write is the whole reason this is not
+    // simply done inside buildRows().
+    const pending = unique.filter((row) => row.newPlayer)
+    if (pending.length > 0) {
+      setCreating(true)
+      try {
+        for (const row of pending) {
+          const created = await upsertPlayer(row.newPlayer)
+          row.playerId = created.id
+          // Trust the row the database returned rather than the id posted to
+          // it: a trigger or default could legitimately place the player
+          // somewhere else, and the membership must follow the player.
+          row.teamId = created.team_id ?? row.teamId
+        }
+      } catch (creationError) {
+        setLocalError(creationError)
+        return
+      } finally {
+        setCreating(false)
+      }
+    }
+
+    onSubmit?.(unique.map(({ newPlayer, ...row }) => row))
   }
 
   const shownError = localError || error
-  const busy = Boolean(saving)
+  const busy = Boolean(saving) || creating
 
   return (
     <div
@@ -223,7 +298,7 @@ export default function AccessBuilder({
         <span className="px-2 text-[13px] text-ink-muted">All age groups</span>
       )}
 
-      {role === 'parent' && (
+      {(role === 'parent' || role === 'player') && (
         <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-muted">
           <input
             type="checkbox"
@@ -233,11 +308,69 @@ export default function AccessBuilder({
               setNoRoster(event.target.checked)
               setTeamIds([])
               setPlayerIds([])
+              setNewPlayerName('')
+              setNewPlayerTeam('')
               setLocalError(null)
             }}
           />
-          Their children aren&apos;t on the roster yet
+          {/* ⚠️ The two roles read the same and do DIFFERENT things, which is
+              why the wording differs rather than being shared. For a parent it
+              falls back to age groups with no player row. For a player it ADDS
+              the player, because a player membership with a null player_id
+              would fail is_own_player and the account could never touch its
+              own availability. */}
+          {role === 'parent'
+            ? "Their children aren't on the roster yet"
+            : "They're not on the roster yet — add them"}
         </label>
+      )}
+
+      {newPlayerMode && (
+        <fieldset
+          data-testid="new-player-form"
+          className="min-w-0 flex-1 basis-full rounded-[11px] border border-line bg-surface-card p-2.5"
+        >
+          <legend className="mb-1.5 block text-[12px] font-bold uppercase tracking-[.4px] text-ink-muted">
+            {`New player for ${label}`}
+          </legend>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              aria-label={`Name of the new player for ${label}`}
+              placeholder="Full name"
+              value={newPlayerName}
+              disabled={busy}
+              onChange={(domEvent) => {
+                setNewPlayerName(domEvent.target.value)
+                setLocalError(null)
+              }}
+              className="min-w-0 flex-1 rounded-[8px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-[16px] text-ink outline-none transition focus:border-brand"
+            />
+            {/* A select, not the checkbox grid the other roles use: a player is
+                in exactly one age group, and a multi-select would invite the
+                contradiction the parent/child comment warns about. */}
+            <select
+              aria-label={`Age group for the new player for ${label}`}
+              value={newPlayerTeam}
+              disabled={busy}
+              onChange={(domEvent) => {
+                setNewPlayerTeam(domEvent.target.value)
+                setLocalError(null)
+              }}
+              className="rounded-[8px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-[14px] text-ink outline-none transition focus:border-brand"
+            >
+              <option value="">Choose an age group</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="mt-1.5 text-[12.5px] text-ink-muted">
+            Adds them to the roster and links this login to them.
+          </p>
+        </fieldset>
       )}
 
       {needsPlayers && (
