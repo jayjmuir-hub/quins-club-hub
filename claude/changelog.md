@@ -10,6 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the club's name stopped truncating, and the hero stopped
+  repeating itself.** Two instances of one thing: the design was built at a
+  size the club has outgrown.
+  (1) ⚠️ **The masthead rendered "ABU…"** at the `desktop` breakpoint (820px,
+  where the top nav replaces the bottom tab bar) — on every screen, for every
+  role. The 8 Aug note in `tests/app-shell.test.jsx` recorded truncation at
+  ~1114px and fixed the ACCOUNT NAME's breakpoint; the club name itself was
+  left to truncate and was far worse. It is STRUCTURAL: every other item in
+  that row is `shrink-0`, so the wordmark is the only thing that can give and
+  it gives everything — at 840px the row needs ~690px before the wordmark
+  starts, leaving ~150px for something wanting 257. No width setting fixes
+  that. The name is now painted only at `wide`, with "Quins Club Hub" carrying
+  the identity below it. ⚠️ `sr-only`, not `hidden`, so the page keeps exactly
+  one h1 at every width. ⚠️ Shortening it to "Harlequins" or "ADH Quins" was
+  rejected — both invent a wordmark the club does not use.
+  (2) **The dashboard hero said the same word twice**, the same defect fixed in
+  the fixture row: eyebrow "NEXT TRAINING · U16B CONTACT" over a 42px
+  "TRAINING". The squad now moves up into the headline when the title only
+  echoes the type, and out of the eyebrow — so the headline always carries the
+  most specific fact available. ⚠️ **NO TEST COVERED THE BROKEN CASE**, which
+  is why it shipped: every training fixture in `tests/dashboard.test.jsx` is
+  NAMED ("U10 skills session"), while every session in the real database is
+  titled "Training".
+- `fe2fe20` — **Quieter fixture rows, an honest fixture count, and a squad select.**
 - **10 Aug — the squad filter became a select. It was a pill row.**
   design-system.md §4.8 specifies a `.pill-row` here and it was right when it
   was written — against four age groups. At 18 it wrapped to FOUR lines on a

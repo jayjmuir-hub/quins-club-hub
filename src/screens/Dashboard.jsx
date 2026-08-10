@@ -20,6 +20,7 @@ import {
   formatTime,
   hasResult,
   nextEventLabel,
+  titleRepeatsType,
   sortByStart,
   venueLine,
 } from '../lib/eventFormat.js'
@@ -190,6 +191,36 @@ function NextFixtureHero({ event, teamName }) {
   // lines below render from.
   const date = eventDate(event)
 
+  // ══ WHAT THE TWO LINES CARRY, AND WHY IT DEPENDS ON THE EVENT ══════════
+  // The headline slot always takes the MOST SPECIFIC fact available; the
+  // eyebrow takes what is left. For a match that is easy — "QUINS VS DUBAI
+  // EXILES" is unarguably the most specific thing on the card.
+  //
+  // ⚠️ FOR A TRAINING IT USED TO BE A TAUTOLOGY. eventTitle falls back to the
+  // stored title, coaches type "Training" into it (it is the obvious thing to
+  // type, and every session in the database says it), and the eyebrow already
+  // said "NEXT TRAINING". So the largest type on the dashboard restated the
+  // smallest, directly above it — and out of season, when the hero falls back
+  // from "next match" to "next event of any type", that is the NORMAL state
+  // rather than an edge case.
+  //
+  // So when the title only echoes the type (titleRepeatsType — the same rule
+  // FixtureRow uses to drop its bold line), the squad moves UP into the
+  // headline and out of the eyebrow:
+  //
+  //   match            NEXT FIXTURE · U16B CONTACT / QUINS VS DUBAI EXILES
+  //   named training   NEXT TRAINING · U16B CONTACT / EXTRA SESSION BEFORE …
+  //   plain training   NEXT TRAINING               / U16B CONTACT
+  //
+  // ⚠️ FALLS BACK WHEN THERE IS NO SQUAD NAME. teamName is optional here, and
+  // a hero with an empty headline would read as a rendering failure — so with
+  // nothing better to promote it keeps eventTitle's own fallback and accepts
+  // the repetition, which is the lesser of the two.
+  const titleIsEcho = titleRepeatsType(event)
+  const promoteTeam = titleIsEcho && Boolean(teamName)
+  const headline = promoteTeam ? teamName : eventTitle(event)
+  const eyebrow = `${nextEventLabel(event)}${!promoteTeam && teamName ? ` · ${teamName}` : ''}`
+
   return (
     <div
       data-testid="next-fixture"
@@ -201,14 +232,18 @@ function NextFixtureHero({ event, teamName }) {
           deliberate, so that is the normal out-of-season state, not a rare
           one. See nextEventLabel in src/lib/eventFormat.js. */}
       <div className="relative z-10 font-condensed text-[14px] font-bold uppercase tracking-[0.18em] opacity-95">
-        {nextEventLabel(event)}{teamName ? ` · ${teamName}` : ''}
+        {eyebrow}
       </div>
 
-      {/* Anton. This is the page's opening statement and the one piece of type
-          on the dashboard that is meant to be read as a headline rather than
-          scanned, so it gets the display face. */}
+      {/* This is the page's opening statement and the one piece of type on the
+          dashboard meant to be read as a headline rather than scanned, so it
+          gets the display face.
+          ⚠️ IT USED TO REPEAT THE LINE ABOVE IT. For a training the eyebrow
+          read "NEXT TRAINING · U16B CONTACT" and this read "TRAINING" at 42px
+          — the biggest type on the screen restating the smallest. See the
+          headline/eyebrow split above for what each now carries. */}
       <div className="relative z-10 mt-1.5 font-display text-[30px] uppercase leading-[0.94] desktop:text-[42px]">
-        {eventTitle(event)}
+        {headline}
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13.5px] font-semibold">

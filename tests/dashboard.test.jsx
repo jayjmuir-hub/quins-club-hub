@@ -393,6 +393,51 @@ describe('Dashboard — next fixture hero', () => {
     expect(within(hero).getByText('U10 skills session')).toBeInTheDocument()
   })
 
+  // ⚠️ THE CASE NOTHING COVERED, WHICH IS WHY IT SHIPPED. Every training in
+  // this file is NAMED ("U10 skills session"), so the hero always had
+  // something distinctive to put in its headline. In the real database every
+  // session is titled "Training" — the obvious thing for a coach to type — and
+  // the hero then read "NEXT TRAINING · U16B CONTACT" over "TRAINING" at 42px:
+  // the largest type on the dashboard restating the smallest, directly above
+  // it. Out of season, when the hero falls back from "next match" to "next
+  // event of any type", that is the ordinary state and not an edge case.
+  it('promotes the squad into the headline when the title only echoes the type', async () => {
+    listEventsMock.mockResolvedValue([{ ...SOONER_TRAINING, title: 'Training' }])
+
+    renderDashboard()
+    const hero = await screen.findByTestId('next-fixture')
+
+    // The squad is the most specific fact left, so it takes the headline...
+    expect(within(hero).getByText('U10')).toBeInTheDocument()
+    // ...and stops being repeated in the eyebrow beside "Next training".
+    expect(hero).toHaveTextContent(/next training/i)
+    expect(hero).not.toHaveTextContent(/next training · u10/i)
+  })
+
+  it('leaves a NAMED training alone — the squad stays in the eyebrow', async () => {
+    // The other half of the guard. Without this, "always promote the squad"
+    // would pass the test above while throwing away a title a coach wrote.
+    listEventsMock.mockResolvedValue([SOONER_TRAINING])
+
+    renderDashboard()
+    const hero = await screen.findByTestId('next-fixture')
+
+    expect(within(hero).getByText('U10 skills session')).toBeInTheDocument()
+    expect(hero).toHaveTextContent(/next training · u10/i)
+  })
+
+  it('keeps the squad in the eyebrow for a match, whose headline is the opponent', async () => {
+    listEventsMock.mockResolvedValue([NEXT_MATCH])
+
+    renderDashboard()
+    const hero = await screen.findByTestId('next-fixture')
+
+    // NEXT_MATCH is on team-1xv, not U10 — the squad still rides in the
+    // eyebrow because the headline already has the opponent to carry.
+    expect(hero).toHaveTextContent(/next fixture · senior men 1st xv/i)
+    expect(within(hero).getByText('Quins vs Al Ain Amblers')).toBeInTheDocument()
+  })
+
   it('never picks a fixture that has already kicked off, even unscored', async () => {
     listEventsMock.mockResolvedValue([PAST_UNSCORED, LAST_RESULT])
 
