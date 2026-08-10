@@ -7,6 +7,7 @@ import UpcomingStrip from '../components/UpcomingStrip.jsx'
 import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
 import Spinner from '../components/Spinner.jsx'
+import Availability from './Availability.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
@@ -344,6 +345,35 @@ export default function Dashboard() {
   // the form for a NEW event (that lives on the Schedule screen), so there
   // is no "adding" case here.
   const [formState, setFormState] = useState(null)
+  // ⚠️ THE HOME SCREEN COULD NOT REACH AVAILABILITY AT ALL until 10 Aug 2026,
+  // and it did not look like it. EventDetail rendered "Set my availability"
+  // here exactly as it does on Schedule — but this screen never passed
+  // `onOpenAvailability`, and the optional call swallowed the tap. The button
+  // was drawn, tappable, and dead.
+  //
+  // It mattered most to the people least likely to find the other route: a
+  // parent opens the app, sees the next fixture on the dashboard, taps it, and
+  // taps the availability button. Setting an RSVP without going via Schedule is
+  // the common case, not a shortcut.
+  //
+  // Same shape as Schedule's: this screen owns the open/closed state and renders
+  // the sheet, rather than EventDetail opening a second one itself.
+  const [availabilityOpen, setAvailabilityOpen] = useState(false)
+
+  // ⚠️ OPENING A FIXTURE MUST CLEAR THE RSVP SHEET, and this is not tidiness.
+  // `availabilityOpen` is screen-level state, not per-event: leave it true after
+  // closing one fixture and the NEXT fixture tapped skips its detail sheet and
+  // opens straight into that event's availability. The two pieces of state
+  // disagree silently and the screen obeys the stale one. Every path that opens
+  // or closes a fixture goes through here or resets it explicitly.
+  const openEvent = (id) => {
+    setAvailabilityOpen(false)
+    setSelectedEventId(id)
+  }
+  const closeEvent = () => {
+    setAvailabilityOpen(false)
+    setSelectedEventId(null)
+  }
 
   // Captured once at mount. Used only to decide which day the fortnight
   // strip marks as today — see the note where the timer used to live.
@@ -557,7 +587,7 @@ export default function Dashboard() {
           answer. */}
       <BlockTitle>Next two weeks</BlockTitle>
       <Card>
-        <UpcomingStrip events={toPlay} now={now} onSelect={(event) => setSelectedEventId(event.id)} />
+        <UpcomingStrip events={toPlay} now={now} onSelect={(event) => openEvent(event.id)} />
       </Card>
 
       {/* STAFF ONLY (Jay, 6 Aug 2026). Hidden from anyone who cannot edit —
@@ -628,7 +658,7 @@ export default function Dashboard() {
                   key={event.id}
                   event={event}
                   teamName={teamsById.get(event.team_id)?.name}
-                  onSelect={setSelectedEventId}
+                  onSelect={openEvent}
                 />
               ))}
             </Card>
@@ -654,7 +684,7 @@ export default function Dashboard() {
               <FixtureRow
                 event={lastResult}
                 teamName={teamsById.get(lastResult.team_id)?.name}
-                onSelect={setSelectedEventId}
+                onSelect={openEvent}
               />
             ) : (
               <Empty message="No results yet. Scores show here once someone adds them." />
@@ -670,17 +700,30 @@ export default function Dashboard() {
           the Schedule screen only (design-system.md §5.2); the quick-actions
           card above stays as it is until Task 15's player form lands with
           it. */}
-      {selectedEvent && !formState && (
+      {selectedEvent && !formState && !availabilityOpen && (
         <EventDetail
           event={selectedEvent}
           team={teamsById.get(selectedEvent.team_id)}
-          onClose={() => setSelectedEventId(null)}
+          onClose={closeEvent}
           canEdit={canEditTeam(memberships, selectedEvent.team_id)}
           onEdit={(event) => setFormState({ event })}
+          onOpenAvailability={() => setAvailabilityOpen(true)}
           onDeleted={() => {
-            setSelectedEventId(null)
+            closeEvent()
             setReloadToken((token) => token + 1)
           }}
+        />
+      )}
+
+      {/* Closing this returns to the event's detail sheet rather than all the
+          way to the dashboard — the same "drill in and back" flow Schedule
+          uses, and for the same reason: somebody who just set an RSVP wants to
+          glance at the fixture again, not lose their place. */}
+      {selectedEvent && availabilityOpen && !formState && (
+        <Availability
+          event={selectedEvent}
+          team={teamsById.get(selectedEvent.team_id)}
+          onClose={() => setAvailabilityOpen(false)}
         />
       )}
 
@@ -689,7 +732,7 @@ export default function Dashboard() {
           event={formState.event}
           onClose={() => {
             setFormState(null)
-            setSelectedEventId(null)
+            closeEvent()
           }}
           onSaved={() => setReloadToken((token) => token + 1)}
         />
