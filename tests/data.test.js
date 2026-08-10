@@ -29,7 +29,7 @@ vi.mock('../src/lib/supabase.js', () => ({
 }))
 
 import { supabase } from '../src/lib/supabase.js'
-import { MAX_ROWS } from '../src/data/limits.js'
+import { MAX_ROWS, MAX_TOTAL_ROWS } from '../src/data/limits.js'
 import {
   listEvents,
   subscribeEvents,
@@ -83,7 +83,7 @@ import {
 // builder that only carried `data` could not express the shape countSeriesFrom
 // actually reads.
 function createQueryBuilder({ data = null, error = null, count = null } = {}) {
-  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], limit: [], insert: [], update: [], delete: [], upsert: [] }
+  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], limit: [], range: [], insert: [], update: [], delete: [], upsert: [] }
   const builder = {}
   const chain = (name) =>
     vi.fn((...args) => {
@@ -100,6 +100,13 @@ function createQueryBuilder({ data = null, error = null, count = null } = {}) {
   // ends in .limit(MAX_ROWS + 1) so a truncated answer cannot arrive looking
   // complete — see tests/limits.test.js for why the +1 is load-bearing.
   builder.limit = chain('limit')
+  // ⚠️ `.range()` is what PAGED reads end in — added 10 Aug 2026 when
+  // listEvents moved from one capped request to fetchAllPages. It returns the
+  // same thenable builder, so a stub whose `data` is shorter than a page ends
+  // the loop on the first pass, which is every test in this file. A stub
+  // returning exactly a full page would page forever; none does, and
+  // tests/limits.test.js drives the multi-page path against its own mock.
+  builder.range = chain('range')
   // Write-side chain methods (Task 14). Like the read ones, each records its
   // args and returns the same thenable builder, mirroring the real
   // PostgrestQueryBuilder where .insert()/.update()/.delete() are chainable
@@ -148,6 +155,13 @@ describe('listEvents', () => {
     expect(calls.gte).toEqual([])
     expect(calls.lte).toEqual([])
     expect(builder.order).toHaveBeenCalledWith('starts_at', { ascending: true })
+    // ⚠️ AND THE `id` TIEBREAK, which is load-bearing rather than tidiness.
+    // The read is paged with .range() (OFFSET/LIMIT), and two events can share
+    // a starts_at — a Saturday of age-group matches all at 09:00 is normal.
+    // Without a unique final sort key Postgres may order those rows differently
+    // between pages, returning one twice and dropping another silently.
+    expect(builder.order).toHaveBeenCalledWith('id', { ascending: true })
+    expect(calls.range[0]).toEqual([0, 899])
     expect(result).toEqual(rows)
   })
 
@@ -617,13 +631,43 @@ describe('listPlayers', () => {
       await expect(listPlayers()).resolves.toHaveLength(MAX_ROWS)
     })
 
-    it('caps events too, and points at the date window that already exists', async () => {
-      const tooMany = Array.from({ length: MAX_ROWS + 1 }, (_, i) => ({ id: `e${i}` }))
-      const { builder, calls } = createQueryBuilder({ data: tooMany })
+    // ⚠️ EVENTS NO LONGER CAPS — IT PAGES. Changed 10 Aug 2026. This test used
+    // to assert that listEvents THREW above MAX_ROWS. That refusal was right in
+    // principle (a short list that looks complete is worse than an error) and
+    // wrong in practice: an admin viewing all fifteen squads over the default
+    // 18-month window is ~1,690 rows, so the cap turned Schedule into an error
+    // screen with no action that fixed it. The guarantee is unchanged —
+    // everything, or a throw, never some of it.
+    it('⚠️ pages events instead of refusing, and the loop still terminates', async () => {
+      // A stub that NEVER runs out: every page comes back full, which is what
+      // an infinite loop looks like from inside fetchAllPages. The backstop is
+      // the only thing that ends this, so this test is really about the
+      // backstop existing at all.
+      const fullPage = Array.from({ length: MAX_ROWS }, (_, i) => ({ id: `e${i}` }))
+      const { builder, calls } = createQueryBuilder({ data: fullPage })
       supabase.from.mockReturnValue(builder)
 
-      await expect(listEvents()).rejects.toThrow(/narrow the date range/i)
-      expect(calls.limit).toEqual([[MAX_ROWS + 1]])
+      await expect(listEvents()).rejects.toThrow(/too many events/i)
+      // It really did page rather than giving up after one request, and it
+      // stopped at the ceiling rather than running away.
+      expect(calls.range.length).toBeGreaterThan(1)
+      expect(calls.range.length).toBeLessThanOrEqual(Math.ceil(MAX_TOTAL_ROWS / MAX_ROWS) + 1)
+      expect(calls.limit).toEqual([])
+    })
+
+    it('does not refuse a list that would have tripped the old 900 cap', async () => {
+      // The regression that motivated the change: 901 rows used to be an error
+      // screen. A short second page ends the loop.
+      let call = 0
+      const { builder } = createQueryBuilder({ data: [] })
+      builder.range = vi.fn(() => {
+        call += 1
+        const data = call === 1 ? Array.from({ length: MAX_ROWS }, (_, i) => ({ id: `e${i}` })) : [{ id: 'e900' }]
+        return { then: (resolve) => Promise.resolve({ data, error: null }).then(resolve) }
+      })
+      supabase.from.mockReturnValue(builder)
+
+      await expect(listEvents()).resolves.toHaveLength(MAX_ROWS + 1)
     })
   })
 

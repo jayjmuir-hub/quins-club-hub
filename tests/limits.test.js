@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { MAX_ROWS, withCap, unwrapCapped } from '../src/data/limits.js'
+import { MAX_ROWS, withCap, unwrapCapped, fetchAllPages } from '../src/data/limits.js'
 
 // Tests for the row caps on the unbounded list reads.
 //
@@ -71,5 +71,147 @@ describe('unwrapCapped', () => {
   it('honours a caller-supplied limit', () => {
     expect(() => unwrapCapped(rows(3), 'players', 'hint', 2)).toThrow(/more than 2/i)
     expect(unwrapCapped(rows(2), 'players', 'hint', 2)).toHaveLength(2)
+  })
+})
+
+// ── fetchAllPages ────────────────────────────────────────────────────────
+//
+// The paged read that replaced the flat 900-row cap on listEvents. What it
+// guarantees is unchanged from unwrapCapped's: EVERYTHING, OR A THROW. Never
+// some of it, quietly.
+
+describe('fetchAllPages', () => {
+  // A fake PostgREST builder. Records the sort it was given and hands back a
+  // slice of `all` for whatever range it is asked for — which is the only way
+  // to catch the off-by-one that would drop or repeat a row at every page
+  // boundary.
+  function fakeTable(all) {
+    const ranges = []
+    const orders = []
+    const build = () => {
+      const query = {
+        order: (column, options) => {
+          orders.push([column, options])
+          return query
+        },
+        range: (start, end) => {
+          ranges.push([start, end])
+          return Promise.resolve({ data: all.slice(start, end + 1), error: null })
+        },
+      }
+      return query
+    }
+    return { build, ranges, orders }
+  }
+
+  const row = (i) => ({ id: `r${i}` })
+
+  it('returns a single short page without asking for a second', async () => {
+    const { build, ranges } = fakeTable([row(0), row(1)])
+    const out = await fetchAllPages(build, [['id', { ascending: true }]], 'events', 'hint', { page: 10 })
+    expect(out).toHaveLength(2)
+    expect(ranges).toEqual([[0, 9]])
+  })
+
+  it('⚠️ stitches multiple pages together with no row dropped or repeated', async () => {
+    // 25 rows at 10 a page: the boundaries are where an off-by-one in
+    // `range(offset, offset + page - 1)` would show up, and it would show up
+    // as a schedule quietly missing every tenth fixture.
+    const all = Array.from({ length: 25 }, (_, i) => row(i))
+    const { build, ranges } = fakeTable(all)
+
+    const out = await fetchAllPages(build, [['id', { ascending: true }]], 'events', 'hint', { page: 10 })
+
+    expect(out.map((r) => r.id)).toEqual(all.map((r) => r.id))
+    expect(ranges).toEqual([[0, 9], [10, 19], [20, 29]])
+  })
+
+  it('⚠️ costs one extra request when the total is an exact multiple of the page', async () => {
+    // 20 rows at 10 a page. The second page is full, so "are there more?" is
+    // genuinely unanswered and the only honest move is to ask. Guessing "that
+    // was the end" is how the tail goes missing.
+    const all = Array.from({ length: 20 }, (_, i) => row(i))
+    const { build, ranges } = fakeTable(all)
+
+    const out = await fetchAllPages(build, [['id', { ascending: true }]], 'events', 'hint', { page: 10 })
+
+    expect(out).toHaveLength(20)
+    expect(ranges).toHaveLength(3)
+  })
+
+  it('⚠️ applies every sort key, in order, on every page', async () => {
+    // .range() is OFFSET/LIMIT. An under-specified sort lets Postgres order
+    // tied rows differently between requests, so a row arrives on two pages
+    // and another on none — with no error anywhere. The last key must be
+    // unique; this proves both are actually sent, and re-sent per page.
+    const all = Array.from({ length: 15 }, (_, i) => row(i))
+    const { build, orders } = fakeTable(all)
+
+    await fetchAllPages(
+      build,
+      [['starts_at', { ascending: true }], ['id', { ascending: true }]],
+      'events',
+      'hint',
+      { page: 10 },
+    )
+
+    expect(orders).toEqual([
+      ['starts_at', { ascending: true }],
+      ['id', { ascending: true }],
+      ['starts_at', { ascending: true }],
+      ['id', { ascending: true }],
+    ])
+  })
+
+  it('⚠️ terminates on a source that never runs out', async () => {
+    // Every page comes back full for ever — the shape of an infinite loop.
+    // The ceiling is the only thing that ends it.
+    const build = () => {
+      const query = {
+        order: () => query,
+        range: (start, end) =>
+          Promise.resolve({ data: Array.from({ length: end - start + 1 }, (_, i) => row(start + i)), error: null }),
+      }
+      return query
+    }
+
+    await expect(
+      fetchAllPages(build, [['id', { ascending: true }]], 'events', 'Filter to one squad.', {
+        page: 10,
+        max: 35,
+      }),
+    ).rejects.toThrow(/too many events .*more than 35/i)
+  })
+
+  it('names the way out, and says the limit is deliberate', async () => {
+    const build = () => {
+      const query = {
+        order: () => query,
+        range: (start, end) =>
+          Promise.resolve({ data: Array.from({ length: end - start + 1 }, (_, i) => row(start + i)), error: null }),
+      }
+      return query
+    }
+
+    await expect(
+      fetchAllPages(build, [['id', { ascending: true }]], 'events', 'Filter to one squad.', {
+        page: 10,
+        max: 20,
+      }),
+    ).rejects.toThrow(/filter to one squad.*deliberate limit/is)
+  })
+
+  it('throws the database error rather than swallowing it into an empty list', async () => {
+    const build = () => {
+      const query = {
+        order: () => query,
+        range: () => Promise.resolve({ data: null, error: new Error('permission denied') }),
+      }
+      return query
+    }
+
+    await expect(
+      fetchAllPages(build, [['id', { ascending: true }]], 'events', 'hint'),
+    ).rejects.toThrow('permission denied')
   })
 })
