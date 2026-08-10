@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { withCap, unwrapCapped } from './limits.js'
 
 // Data access for the players and player_contacts tables. RLS already
 // restricts rows to what the calling user's memberships allow. player_contacts
@@ -25,9 +26,17 @@ export async function listPlayers({ teamIds } = {}) {
   }
   query = query.order('full_name', { ascending: true })
 
-  const { data, error } = await query
+  const { data, error } = await withCap(query)
   if (error) throw error
-  return data ?? []
+  // ⚠️ THE CLUB-WIDE CALLERS ARE THE ONES THIS IS FOR. Roster and the dashboard
+  // pass `teamIds` and stay small; `Accounts.jsx`, `AdminClub.jsx` and
+  // `InviteForm.jsx` call listPlayers() with NO teamIds on purpose, so they ask
+  // for every player in the club — which is the query that grows to 700.
+  return unwrapCapped(
+    data,
+    'players',
+    'Scope the query to a squad by passing `teamIds`.',
+  )
 }
 
 /**

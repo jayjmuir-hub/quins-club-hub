@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { withCap, unwrapCapped } from './limits.js'
 
 // Data access for the events table. RLS already restricts rows to what the
 // calling user's memberships allow (admins get every event, coaches/parents/
@@ -27,9 +28,17 @@ export async function listEvents({ teamIds, from, to } = {}) {
   if (to) query = query.lte('starts_at', to)
   query = query.order('starts_at', { ascending: true })
 
-  const { data, error } = await query
+  const { data, error } = await withCap(query)
   if (error) throw error
-  return data ?? []
+  // ⚠️ THE `from`/`to` WINDOW ABOVE IS THE ANSWER WHEN THIS FIRES, and it has
+  // existed since this function was written — no caller passes one. Every
+  // screen asks for every event in scope and filters in memory, which is fine
+  // at one season and stops being fine at three. See src/data/limits.js.
+  return unwrapCapped(
+    data,
+    'events',
+    'Narrow the date range — listEvents already accepts `from` and `to`.',
+  )
 }
 
 // Suffixed so concurrent subscriptions (e.g. dashboard + schedule screens
