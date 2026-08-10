@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — a real overflow gate, and the fault injection that nearly discredited a
+  correct fix.** `harness/check-overflow.mjs` drives all 28 harness scenarios through
+  a real Chromium at five phone widths and fails on a document wider than its
+  viewport, naming the outermost offending element rather than just a number. It also
+  refuses to believe a clean result from a scenario that rendered blank.
+  ⚠️ **IT PROVES `6cde750` WAS RIGHT, AFTER A BOTCHED INJECTION SAID OTHERWISE.** The
+  first attempt reverted only `flex-wrap` from Schedule's header, came back green, and
+  was reported to Jay as "the check disproves the fix". **It did not.** The fix is TWO
+  classes and `min-w-0` is the load-bearing one — it lets the title shrink and absorb
+  the row — so leaving it in place never restored the bug. The true pre-fix markup
+  fails **8 of 140 pairs**. **An injected fault only proves a check when it restores
+  the WHOLE original; reverting half a fix tests nothing and reads exactly like a
+  pass.** Rule 6 says prove every new assertion against an injected fault; it now also
+  means prove the injection.
+  ⚠️ **The first width list — 320/375/414 — STRADDLED THE PHONE THAT REPORTED THE
+  BUG.** Schedule overflows 53px at 320 and 13px at 360, and is clean by 375. 360 is
+  the commonest Android width (1440 at DPR 4) and is what Jay was holding. A width
+  list that skips the commonest phone reports green on a visibly broken screen.
+  ⚠️ **Also measured: Roster's header does NOT overflow without its fix.** That half
+  of `6cde750` is house-pattern consistency, not a fix, and must not be described as
+  one. Only Schedule was broken.
+  ⚠️ **Not wired into CI**, deliberately — Playwright is not a dependency of this repo
+  and a ~300MB browser download on every build is not a trade that has been agreed.
+  `npm run harness` then `npm run check:overflow`.
+- `6cde750` — **The page header overflowed a phone, and took every screen with it.**
+
 - **10 Aug — the page header overflowed a phone, and took every screen with it.**
   Jay, from a phone: "seems buggy, not scaling correctly." ⚠️ **One cause, four
   symptoms, three screens.** The page-header row is `justify-between` with a title
