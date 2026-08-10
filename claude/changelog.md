@@ -10,6 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — `claude/state-of-play.md` rewritten, 591 lines to 283, and a session
+  handoff written.** ⚠️ **Its own audit had already found the pattern and this
+  edition is organised around it: every wrong claim in that file's history was a
+  rotted MEASUREMENT, never a wrong ruling.** So the rulings and traps are kept in
+  full and separated out as the durable half; the dated status is short; and no
+  number a query can produce is quoted anywhere — the queries are given instead.
+  What went: the layered history of its own corrections, and the shipped-on-date
+  sections that duplicate this changelog and `claude/handoffs/`.
+  ⚠️ **AND THE REWRITE CAUGHT A CLAIM THAT HAD GONE FALSE.** The file rested
+  "nothing sends email of its own accord" on `pg_net` not being installed. It IS
+  installed (0.20.4, measured), and `private.notify_pending_membership` calls
+  `net.http_post` on every pending membership insert — that is how approval emails
+  fire, and has been since 9 Aug. True when written, carried past the change that
+  falsified it.
 - **10 Aug — the club's name stopped truncating, and the hero stopped
   repeating itself.** Two instances of one thing: the design was built at a
   size the club has outgrown.
