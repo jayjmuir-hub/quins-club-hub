@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — ❌ CORRECTION: the button counts published hours earlier were wrong.**
+  The 10 Aug button entry below, PR #16 and commit `87c7566` all say "105 raw
+  buttons carrying the same padding + radius + weight signature" and lean on
+  `rounded-[11px]` appearing 117 times as evidence of drifting button radii.
+  ⚠️ **The grep behind those figures counted every element with that radius plus
+  padding and called them all buttons.** Measured properly: **100 `<button>`
+  elements, of which only 20 use `rounded-[11px]`**, while **98 of the 117
+  occurrences are not buttons at all** — 38 are `<p>` alerts, the rest inputs,
+  panels and cards. So `rounded-[11px]` is the app's general SURFACE radius, used
+  correctly, and not the drift it was presented as. **The consolidation argument
+  survives on its own numbers (100 vs 11 uses of `Button.jsx`); the radius half of
+  the reasoning does not.** Caught while starting the routing work the wrong
+  figures were meant to justify — the first file opened was full of `<p>` alerts
+  carrying the radius, not buttons. Exactly the rotted-measurement failure this
+  repo's own §How to read notes as the only kind of wrong claim it has ever made.
+- `87c7566` — **The Touchline button, and the audit that explains the two radii.**
+
 - **10 Aug — the buttons got a look, and an audit explaining why they had none.**
   Jay asked for an audit and a different look; the audit found the reason the look
   was hard to change. ⚠️ **`src/components/Button.jsx` exists and is used 12 times,
