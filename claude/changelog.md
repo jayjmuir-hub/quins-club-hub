@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
-- **10 Aug — `db/schema/` reconciled against live: ZERO DRIFT.** Not a
+- **10 Aug — the club-wide contact list is no longer kept on people's devices.**
+  Jay's call: keep the offline copy where it earns its place and drop it where
+  it does not. `addf3c4` purges the cache when the signed-in person changes,
+  which closes the one-device-two-people hole — but it cannot help with a phone
+  left unlocked or a laptop stolen, and for that the answer is not to store the
+  sensitive things at all. KEPT: fixtures, training times, age-group names,
+  squad lists, availability, a player's own contact and parent rows, and the
+  caller's OWN membership and profile rows. DROPPED: the three club-wide admin
+  reads — `listClubMembers` (every family's name, email and phone),
+  `listPendingProfiles`, `listAccessRequests`.
+  ⚠️ **The FILTER is the discriminator, not the table.** `memberships` and
+  `profiles` are each read two ways, once scoped to the caller and once
+  club-wide; excluding by path alone would leave the app unable to render
+  anything offline, because every screen reads the caller's own memberships to
+  know what they may see.
+  ⚠️ **And the match is anchored on `?` or `&`** — a bare
+  `search.includes('id=eq.')` is also satisfied by `club_id=eq.`, so a future
+  club-wide read filtered on some other id column would be silently re-admitted
+  by a check that reads as correct. `tests/pwa-cache-rules.test.js` pins that
+  case. ⚠️ Devices stop holding the list only once each has loaded this build.
+- `37970b9` — **`db/schema/` reconciled against live: ZERO DRIFT.** Not a
   re-capture; nothing had changed, so nothing was rewritten. 35 policies, 29
   function bodies, 29 functions' security settings, 4 triggers, 25 constraints,
   27 indexes, the RLS state of all 13 tables and the `player-photos` bucket

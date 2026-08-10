@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { isCacheableRestGet } from './pwa-cache-rules.js'
 
 // Vitest only defaults NODE_ENV to 'test' when NODE_ENV is UNSET. One of the
 // two dev PCs (cafnet) has NODE_ENV=production set machine-wide, and the
@@ -123,13 +124,17 @@ export default defineConfig({
             // NOTE: this urlPattern function is stringified by Workbox and
             // executed inside the built service worker, which does NOT share
             // this config file's module scope — so the Supabase host must be
-            // a literal here, not a reference to an outer-scope const (see
-            // the file-level comment above for where to update it if the
+            // a literal inside it, not a reference to an outer-scope const
+            // (see the file-level comment above for where to update it if the
             // Supabase project ever moves).
-            urlPattern: ({ url, request }) =>
-              url.hostname === 'lusmshimxdcxpnrktlgz.supabase.co' &&
-              url.pathname.startsWith('/rest/v1/') &&
-              request.method === 'GET',
+            //
+            // ⚠️ It is imported rather than written inline ONLY so the tests
+            // can exercise it against real urls; Workbox stringifies whatever
+            // function it is handed, so the isolation rule is unchanged and
+            // the body still references nothing outside itself. The
+            // exclusions — and why the club-wide admin reads are not stored on
+            // anybody's device — are documented in that file.
+            urlPattern: isCacheableRestGet,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'quins-supabase-rest-get',
