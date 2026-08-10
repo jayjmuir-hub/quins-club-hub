@@ -10,7 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
-- **10 Aug — `[skip ci]` banned, and the deploy skip became a gate.**
+- **10 Aug — table and column GRANTS are captured and checked.** `db/schema/`
+  captured tables, policies, functions and triggers and **no table or column
+  grants at all**; `state-of-play.md` called it "the one real gap and nothing
+  currently checks it", and `db/schema/README.md` had spelled out why it
+  mattered — the larger half of `20260808 profile_phone_and_column_grants` is a
+  column-level revoke on `profiles`, and nothing in that directory would diff
+  it. `db/schema/grants.sql` now captures table grants, column grants and the
+  DEFAULT privileges. ⚠️ **Capturing them turned up three things nobody had
+  written down.** (1) `profiles.email` is protected by a COLUMN GRANT, not a
+  policy: RLS authorises the row and `profile update club admin` authorises an
+  admin against every member row in the club, so the five-column ceiling is the
+  only thing making that not "may rewrite anyone's login email" — and
+  `policies.sql` cannot tell you so. (2) Supabase's default privileges give
+  `anon` full table rights on every new table in `public`, so a table created
+  without RLS is open to anyone with the project URL, and the `create table`
+  does not say so. (3) The 8 Aug revoke was applied to `authenticated` only —
+  `anon` still holds table-level UPDATE on `profiles` and is stopped by RLS
+  alone; measured, no live hole, recorded rather than changed. Checked two ways:
+  `scripts/docs-check.mjs` gained a seventh check that fails the build when a
+  migration grants on a table the capture does not name, and `db/tests/grants.sql`
+  asserts the invariant against live. ⚠️ **Neither sees live from CI** — the repo
+  is public — so re-capturing with the migration is still the mechanism. The
+  docs-check was proved by injecting an uncaptured table grant (caught) and a
+  function grant (correctly ignored); the live assertions were proved
+  non-vacuous read-only, by asking the same probe about a column that IS granted
+  and watching it raise.
+- `77e1f9a` — **The CI-skip token banned, and the deploy skip became a gate.**
   `CLAUDE.md` rule 3 asked for `[skip ci]` on docs-only commits so a
   documentation edit would not publish a release. Protecting `main` the same day
   turned that into a trap: ⚠️ **GitHub Actions honours `[skip ci]` too** — on
