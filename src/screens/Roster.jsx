@@ -419,8 +419,13 @@ export default function Roster() {
       {/* design-system.md §5.3: the section head carries an "Add" button on
           the right for admin/coach. It is absent, not disabled, for everyone
           else — and it only exists at all now that Task 15's form does. */}
-      <div className="mb-3.5 mt-1 flex items-start justify-between gap-3">
-        <div>
+      {/* `flex-wrap` and `min-w-0` for the reason spelled out in Schedule.jsx:
+          the action group is `shrink-0`, so without them a title too long for
+          the remaining space pushes the row past the viewport and every
+          viewport-sized element on the page is clipped with it. This title is
+          the longest of any screen. */}
+      <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Roster &amp; members</h2>
           {/* Describes the scope, not the current filter — the per-group counts
               below already report what the search and pills leave. */}

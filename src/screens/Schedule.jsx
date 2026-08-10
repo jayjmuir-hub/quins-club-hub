@@ -561,8 +561,23 @@ export default function Schedule() {
       {/* design-system.md §5.2: the section head carries an "Add" button on
           the right for admin/coach. It is absent, not disabled, for everyone
           else — and it only exists at all now that Task 14's form does. */}
-      <div className="mb-3.5 mt-1 flex items-start justify-between gap-3">
-        <div>
+      {/* ⚠️ `flex-wrap` IS LOAD-BEARING — WITHOUT IT THIS ROW OVERFLOWS A PHONE
+          AND TAKES THE WHOLE DOCUMENT WITH IT. The action group on the right is
+          `shrink-0` and cannot give way, and "Add to calendar" alone measures
+          150px; at 375px the row wanted 368px inside a 339px content box.
+          ⚠️ The damage is NOT confined to this row: once the document is wider
+          than the viewport, every element sized to the viewport renders short or
+          clipped — the masthead stops reaching the right edge and an open Sheet
+          has its close button and every field value cut off, which reads as four
+          separate bugs on four screens. Measured 10 Aug 2026 against the built
+          stylesheet: 25px of overflow BEFORE the button routing and 29px after,
+          so the routing exposed this rather than caused it.
+          Wrapping costs a taller header on a phone (54px -> 113px) and nothing at
+          all on desktop, where there is room and no wrap occurs.
+          AdminDashboard.jsx and Register.jsx already carry `flex-wrap` on this
+          same row shape — this is the house pattern, not a new idea. */}
+      <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Schedule</h2>
           <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
         </div>
