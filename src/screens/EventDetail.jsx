@@ -474,19 +474,32 @@ export default function EventDetail({ event, team, onClose, canEdit = false, onE
           <AvailabilitySummary eventId={event.id} />
           {/* Everyone gets this button, not just canEdit users: a player or
               parent who cannot edit the FIXTURE still needs to set their own
-              RSVP, and Task 16's brief calls this out explicitly. Schedule
-              holds the "is the RSVP sheet open" state and renders
+              RSVP, and Task 16's brief calls this out explicitly. The PARENT
+              screen holds the "is the RSVP sheet open" state and renders
               src/screens/Availability.jsx from it — the same
               parent-holds-the-state wiring EventForm/PlayerForm already use
               from Schedule/Roster — rather than this component opening a
-              second sheet of its own. */}
+              second sheet of its own.
+
+              ⚠️ AND THAT IS WHY IT IS GATED ON THE HANDLER EXISTING. Until
+              10 Aug 2026 this rendered unconditionally and called
+              `onOpenAvailability?.(event)`. Schedule passed the handler;
+              THE DASHBOARD DID NOT — so on the home screen the button drew
+              itself, invited a tap, and the optional-call swallowed it. A
+              parent tapping "Set my availability" there got silence, which
+              is how "where is the availability function?" gets asked about a
+              feature that shipped. Requiring the prop makes a dead button
+              impossible to render: a screen that forgets it now shows no
+              button rather than a lying one. */}
+          {onOpenAvailability && (
           <button
             type="button"
-            onClick={() => onOpenAvailability?.(event)}
+            onClick={() => onOpenAvailability(event)}
             className="mt-3 w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           >
             {canEdit ? 'View & set availability' : 'Set my availability'}
           </button>
+          )}
         </div>
       ) : null}
 

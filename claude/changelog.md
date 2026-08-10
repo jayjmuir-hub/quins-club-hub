@@ -10,6 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the dashboard's availability button was dead, and the feature is
+  flag-off.** Jay asked where the availability function was. ⚠️ **Answer:
+  `FEATURES.availability` is FALSE** (`src/lib/features.js`, set 29 Jul because the
+  club was not ready to rely on digital RSVP) and **that was written down nowhere**
+  outside the flag's own comment — so the screen, table, policies and tests are all
+  intact and simply hidden. Now recorded in `claude/state-of-play.md`.
+  ⚠️ **The flag was also concealing a real defect.** `EventDetail` rendered "Set my
+  availability" from Schedule AND the Dashboard, but only Schedule passed
+  `onOpenAvailability`, and the call site was `onOpenAvailability?.(event)` — so on
+  the home screen the button drew itself, invited a tap, and the optional call
+  swallowed it. A drawn, tappable, dead button, on the most common path in the app:
+  parent opens the app, taps the next fixture, taps availability. **No test could
+  have caught it** — every availability test drove Schedule. Fixed both ways: the
+  Dashboard now passes the handler and renders the sheet, and the button renders
+  ONLY when a handler exists, so a forgetful caller gets no button instead of a
+  lying one. ⚠️ Also fixed a stale-state bug the wiring introduced —
+  `availabilityOpen` is screen-level, not per-event, so without resetting it the
+  NEXT fixture tapped would skip its detail sheet and open straight into that
+  event's RSVP. `tests/dashboard-availability.test.jsx` mocks the flag ON and pins
+  both; it is a separate file because `tests/dashboard.test.jsx` deliberately runs
+  with the real flag, off.
+- `e83fdbc` — **Jay's roster ruling, and two measurements from the dashboard.**
+
 - **10 Aug — the roster-import blocker was closed by Jay, and it was never a
   blocker.** `state-of-play.md` carried "NOBODY HAS RECORDED WHERE THE REAL ROSTER
   LIVES … a rollout is blocked on that. Ask Jay" and duly had every session ask

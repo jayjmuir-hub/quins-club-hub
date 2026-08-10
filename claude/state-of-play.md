@@ -227,6 +227,21 @@ Durable. Each cost real time to find.
   data-layer detail. `listEvents` has accepted `from`/`to` since it was written and no
   caller passes one.
 - **`saveParents` is delete-then-write, not atomic.**
+- ⚠️ **AVAILABILITY / RSVP IS SWITCHED OFF BY A FLAG, AND NOTHING SAID SO.**
+  `FEATURES.availability` in `src/lib/features.js` is **false**, set 29 Jul 2026
+  because the club was not ready to rely on digital RSVP. It hides EventDetail's two
+  entry points — the summary bar and the "set availability" button — and nothing
+  else: the screen, the table, the policies, the realtime subscription and the tests
+  are all intact, and flipping it needs no other change. **Jay asked "where is the
+  availability function?" on 10 Aug**, which is what an undocumented flag costs.
+- ⚠️ **AND IT WAS HIDING A DEAD BUTTON.** `EventDetail` rendered "Set my
+  availability" from Schedule AND the Dashboard, but only Schedule ever passed
+  `onOpenAvailability`, and the call was `onOpenAvailability?.(event)` — so on the
+  home screen the button drew itself, invited a tap and swallowed it. Fixed 10 Aug:
+  the Dashboard passes the handler, and the button now renders **only** when a
+  handler exists, so a forgetful caller gets no button rather than a lying one.
+  Covered by `tests/dashboard-availability.test.jsx`, which mocks the flag ON — the
+  reason no existing test caught it is that they all drove Schedule.
 - **Single-club assumption** in `clubId` derivation, `is_admin_anywhere()` and
   `can_admin_see_pending()`. Revisit together if a second club appears.
 - **The changelog is allowed to be exactly one commit behind** — a commit cannot
