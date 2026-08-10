@@ -6,6 +6,8 @@
 // styling. Every screen's loading/empty/error contract (see the task-9
 // brief) uses this for the "empty" leg.
 
+import Button from './Button.jsx'
+
 function InboxIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -21,17 +23,7 @@ export function Empty({ message, action }) {
       <InboxIcon className="h-[42px] w-[42px] text-ink-faint opacity-40" aria-hidden="true" />
       <p className="text-sm text-ink-faint">{message}</p>
       {action && (
-        <button
-          type="button"
-          onClick={action.onClick}
-          // Hover is --magenta (#f0343a, design-system.md §1: "Primary
-          // button hover background"), not brand-deep (#b3141a, which the
-          // design system uses elsewhere as the darker gradient-start
-          // colour, not a button hover state).
-          className="rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-        >
-          {action.label}
-        </button>
+        <Button onClick={action.onClick}>{action.label}</Button>
       )}
     </div>
   )

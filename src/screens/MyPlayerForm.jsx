@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
+import Button from '../components/Button.jsx'
 import PhotoField from '../components/PhotoField.jsx'
 import ParentsEditor from '../components/ParentsEditor.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
@@ -285,21 +286,12 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
           </div>
 
           <div className="mt-6 flex gap-2.5">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="flex-1 rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-surface-mute disabled:cursor-not-allowed disabled:opacity-60"
-            >
+            <Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1">
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60"
-            >
+            </Button>
+            <Button type="submit" disabled={saving} className="flex-1">
               {saving ? 'Saving…' : 'Save changes'}
-            </button>
+            </Button>
           </div>
         </form>
       )}

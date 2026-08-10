@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import PlayerPicker from './PlayerPicker.jsx'
+import Button from './Button.jsx'
 import { isSquadStaffRole } from '../lib/scope.js'
 
 // Builds a SET of access rows for one person, ready for grantMemberships().
@@ -288,25 +289,19 @@ export default function AccessBuilder({
 
       <span className="flex-1" />
 
-      <button
-        type="button"
+      <Button
+        size="sm"
         aria-label={`${submitLabel} for ${label}`}
         disabled={busy}
         onClick={submit}
-        className="rounded-[8px] bg-brand px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-brand-deep disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
       >
         {busy ? 'Saving…' : submitLabel}
-      </button>
+      </Button>
 
       {onCancel && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onCancel}
-          className="rounded-[8px] px-2 py-1.5 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-        >
+        <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       )}
 
       {shownError && (

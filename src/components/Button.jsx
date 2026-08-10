@@ -1,26 +1,52 @@
 // The shared button this app never had.
 //
-// WHY IT EXISTS. Until now every button carried its own hand-written class
-// string — 76 of them across 26 files. That is why the app had no press state
-// (commit c5315ba had to add it as a global CSS rule, because there was
-// nowhere else to put it), and why the club site's hover choreography could
-// not be adopted without editing every file. The variants below are not
-// invented: they are the three clusters the existing strings already fall
-// into, counted.
+// WHY IT EXISTS. Every button used to carry its own hand-written class string.
+// That is why the app had no press state (commit c5315ba had to add it as a
+// global CSS rule, because there was nowhere else to put it), and why the club
+// site's hover choreography could not be adopted without editing every file.
+// The variants below are not invented: they are the clusters the existing
+// strings already fell into.
 //
-//   primary   x21   bg-brand, white text, darker on hover
-//   secondary x16   hairline border, card fill, red text, red border on hover
-//   ghost      —    no chrome until hovered; new, for icon/tertiary actions
+//   primary      bg-brand, white text, darker on hover
+//   secondary    hairline border, card fill, red text, red border on hover
+//   ghost        no chrome until hovered; icon and tertiary actions
+//   danger       solid deep red — the CONFIRM half of a destructive pair
+//   dangerQuiet  bordered, red text — the button that ARMS that pair
+//
+// ⚠️ NO COUNTS IN THIS COMMENT, DELIBERATELY. It carried four of them until
+// 10 Aug 2026 and three were wrong — "76 across 26 files", "105 raw buttons",
+// and the claim that `rounded-[11px]`'s occurrences were drifting button
+// radii. That last one was published in a commit message and a merged pull
+// request, neither of which can be edited, and the correction of record is in
+// `claude/state-of-play.md`. The figures were re-measured while writing this
+// and did not match the correction either. `scripts/docs-check.mjs` bans test
+// counts in the DOCS for exactly this reason; nothing bans them in the CODE,
+// so the rule is kept by hand here. **State the invariant and let a test
+// enforce it** — `tests/button-sweep.test.js` does, and unlike a number it
+// cannot quietly go stale.
 //
 // PRESS IS NOT HANDLED HERE. `button:not(:disabled):active` in index.css
 // already scales every button in the app, including these. Adding
 // `active:scale-*` here as well would compose into a double transform.
 //
-// ⚠️ NOT A DESIGN SYSTEM. This deliberately does not cover the pill-shaped
-// chrome buttons in the masthead (ViewAsSwitcher, the role pill) — those live
-// on dark chrome with condensed uppercase type and different contrast rules.
-// Forcing them through one component would mean a variant that shares almost
-// nothing with the other three.
+// ⚠️ NOT A DESIGN SYSTEM, AND SOME `<button>`s ARE MEANT TO STAY RAW. The
+// routing sweep deliberately left these alone — do not "finish the job" by
+// forcing them through here:
+//
+//   - **Layout boxes.** FixtureRow, Roster's player row, Schedule's calendar
+//     cells. A <button> used as a layout box inherits Chromium's UA
+//     content-centring, which no jsdom test can see, and each of these already
+//     carries an explicit layout that overrides it. See RESTORE.md.
+//   - **Masthead chrome.** ViewAsSwitcher's trigger, persona rows and exit
+//     pill live on dark chrome with different contrast rules.
+//   - **Toggles and tabs.** Availability's and Register's segmented controls
+//     and Login's mode tabs are `aria-pressed`/`role="tab"` controls whose
+//     selected state IS their styling.
+//   - **Text links.** "Forgot password?", "Show"/"Hide", "Reset my link",
+//     "Show dismissed" — underlined type, not chrome.
+//   - **Pills and icons.** TeamFilter, PlayerPicker's chips, RosterTable's
+//     captain toggle and sort headers, Sheet's round close, Schedule's month
+//     chevrons.
 
 const BASE = [
   // `group` so the arrow badge can react to hover on the whole control.
@@ -60,20 +86,59 @@ const VARIANTS = {
   secondary:
     'border-[1.5px] border-b-[3px] border-line bg-surface-card text-ink hover:border-brand hover:text-brand btn-glow-soft',
   ghost: 'text-brand hover:bg-surface-mute',
+
+  // ── The destructive pair ────────────────────────────────────────────────
+  //
+  // ⚠️ THESE TWO ARE A PAIR AND THE ORDER OF EVENTS IS THE POINT.
+  // `dangerQuiet` ARMS the action ("Delete"); `danger` CONFIRMS it ("Yes,
+  // delete"). Never use `danger` for the first tap — a solid red button that
+  // deletes on the first press is the whole reason the two-step inline
+  // confirm exists (RESTORE.md: never a native `confirm()`).
+  //
+  // ⚠️ `danger` GOES DARKER-AT-REST AND LIGHTER ON HOVER, the opposite of
+  // `primary`. That is not drift: it is how every hand-rolled confirm button
+  // in this app was already written, and it is what stops the confirm reading
+  // as the friendly default when it sits beside a `secondary` "Keep it".
+  //
+  // ⚠️ NO SWEEP AND NO BLOOM, for the reason the primary comment gives: a
+  // glowing, sweeping "Yes, delete" pulls the eye toward the destructive
+  // choice. The bottom edge uses `border-black/20` rather than a token —
+  // `brand-deep` is already the darkest red in the palette, so there is no
+  // next step down to name, and a flat darkening works on the fill it sits on
+  // without inventing a colour.
+  danger: 'bg-brand-deep text-white hover:bg-brand border-b-[3px] border-black/20',
+  dangerQuiet:
+    'border-[1.5px] border-b-[3px] border-line bg-surface-card text-brand-deep hover:bg-danger-bg',
 }
 
-// ⚠️ 8px, NOT THE 11px THE APP USES EVERYWHERE ELSE. Deliberate, and the
-// mismatch is temporary by design: `rounded-btn` is the token, it is used
-// TWICE, and the identical literal `rounded-[11px]` appears 117 times because
-// the shared component was never adopted. Changing the token to 8px therefore
-// restyles the twelve buttons that go through here and nothing else — which is
-// exactly the point. The 105 hand-rolled ones move as they are routed through
-// this component, and until then the two radii sitting side by side are the
-// visible receipt for work that is not finished.
+// ⚠️ 8px FOR BUTTONS, 11px FOR SURFACES — AND BOTH ARE CORRECT.
+//
+// This comment used to call the mismatch temporary, on the theory that
+// `rounded-[11px]` was a drifting button radius that would disappear once the
+// hand-rolled buttons were routed through here. **It was not, and it will
+// not.** Re-measured 10 Aug 2026: the overwhelming majority of `rounded-[11px]`
+// occurrences are not buttons at all — they are alerts, inputs, panels and
+// cards. `rounded-[11px]` is the app's general SURFACE radius, used correctly
+// and consistently, and it stays.
+//
+// So the two radii sitting side by side are not a receipt for unfinished work.
+// They are the button radius and the surface radius, and they are meant to
+// differ: a control you press should not have the same corner as the card it
+// sits on. `rounded-btn` is the token — change it here, not at a call site.
 const SIZES = {
+  // ⚠️ py-3, not py-2.5. This app is used standing on a pitch, one-handed,
+  // often wet; 44px is the floor and the old size sat under it.
   md: 'rounded-btn px-4 py-3 text-sm',
   sm: 'rounded-[6px] px-3 py-2 text-[13px]',
+  // For the full-width submit at the foot of a form, which was 15px type
+  // everywhere it was hand-rolled. Routing those to `md` would have quietly
+  // shrunk the most important button on the screen.
+  lg: 'rounded-btn px-4 py-3 text-[15px]',
 }
+
+// The variants that paint white type on a solid red fill. Used only by
+// ArrowBadge, and kept beside the variants so the two cannot drift apart.
+const SOLID_FILL = new Set(['primary', 'danger'])
 
 // The club site's signature: a circular badge holding an arrow that rotates
 // 45° on hover (`group-hover:rotate-45`). Their arrow points up-right and
@@ -89,9 +154,11 @@ function ArrowBadge({ variant }) {
       className={[
         'grid h-6 w-6 shrink-0 place-items-center rounded-full',
         'transition-transform duration-300 group-hover:rotate-45',
-        // On the red fill a white wash reads; on the white fill it would be
-        // invisible, so the badge tints with the brand instead.
-        variant === 'primary' ? 'bg-white/20' : 'bg-brand/10',
+        // On a solid red fill a white wash reads; on the white fill it would
+        // be invisible, so the badge tints with the brand instead. Keyed on
+        // "does this variant have a solid fill", not on the variant name —
+        // adding `danger` to the list of names was the bug waiting to happen.
+        SOLID_FILL.has(variant) ? 'bg-white/20' : 'bg-brand/10',
       ].join(' ')}
     >
       <svg

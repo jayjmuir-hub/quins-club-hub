@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Chip from '../components/Chip.jsx'
 import Spinner from '../components/Spinner.jsx'
+import Button from '../components/Button.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { countSeriesFrom, deleteEvent, deleteSeriesFrom } from '../data/events.js'
 import { FEATURES } from '../lib/features.js'
@@ -176,8 +177,14 @@ function AvailabilitySummary({ eventId }) {
   )
 }
 
-const FOOTER_BUTTON =
-  'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
+// ⚠️ LAYOUT ONLY, now that these go through <Button>. It used to carry the
+// radius, padding, weight, transition, focus ring and disabled state as well —
+// every one of which <Button> now supplies. Leaving them here would not have
+// been merely redundant: `className` is appended LAST, so the old
+// `rounded-[11px]` would have raced `rounded-btn` on equal specificity and the
+// winner would have been decided by the order Tailwind happened to emit them.
+// Anything added here must be something Button does not already say.
+const FOOTER_BUTTON = 'flex-1'
 
 // --- Deleting a repeating series ---------------------------------------
 //
@@ -331,56 +338,52 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
             </p>
           )}
           <div className="flex flex-wrap gap-2.5">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => setConfirming(false)}
               disabled={Boolean(deleting)}
-              className={`${FOOTER_BUTTON} border-[1.5px] border-line bg-surface-card text-ink hover:bg-surface-mute`}
+              className={FOOTER_BUTTON}
             >
               Keep it
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="danger"
               onClick={handleDelete}
               disabled={Boolean(deleting)}
-              className={`${FOOTER_BUTTON} bg-brand-deep text-white hover:bg-brand`}
+              className={FOOTER_BUTTON}
             >
               {deleting === 'one' ? 'Deleting…' : seriesId ? 'Just this one' : 'Yes, delete'}
-            </button>
+            </Button>
             {offerSeries && (
-              <button
-                type="button"
+              <Button
+                variant="danger"
                 onClick={handleDeleteSeries}
                 // Disabled until the count lands, so the button can never be
                 // pressed while its own label is still a guess.
                 disabled={Boolean(deleting) || counting}
-                className={`${FOOTER_BUTTON} basis-full bg-brand-deep text-white hover:bg-brand`}
+                className={`${FOOTER_BUTTON} basis-full`}
               >
                 {deleting === 'series'
                   ? 'Deleting…'
                   : counting
                     ? 'Counting the rest of the series…'
                     : seriesLaterLabel(laterCount)}
-              </button>
+              </Button>
             )}
           </div>
         </div>
       ) : (
         <div className="flex gap-2.5">
-          <button
-            type="button"
-            onClick={() => onEdit?.(event)}
-            className={`${FOOTER_BUTTON} bg-brand text-white hover:bg-brand-deep`}
-          >
+          <Button onClick={() => onEdit?.(event)} className={FOOTER_BUTTON}>
             Edit
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="dangerQuiet"
             onClick={() => setConfirming(true)}
-            className={`${FOOTER_BUTTON} border-[1.5px] border-line bg-surface-card text-brand-deep hover:bg-danger-bg`}
+            className={FOOTER_BUTTON}
           >
             Delete
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -501,13 +504,14 @@ export default function EventDetail({
               impossible to render: a screen that forgets it now shows no
               button rather than a lying one. */}
           {onOpenAvailability && (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            full
             onClick={() => onOpenAvailability(event)}
-            className="mt-3 w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            className="mt-3"
           >
             {canEdit ? 'View & set availability' : 'Set my availability'}
-          </button>
+          </Button>
           )}
         </div>
       ) : null}
@@ -533,13 +537,9 @@ export default function EventDetail({
       {canEdit && onOpenRegister && date && date.getTime() <= Date.now() && (
         <div className="mt-4">
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Register</h4>
-          <button
-            type="button"
-            onClick={() => onOpenRegister(event)}
-            className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-          >
+          <Button variant="secondary" full onClick={() => onOpenRegister(event)}>
             Take the register
-          </button>
+          </Button>
         </div>
       )}
 

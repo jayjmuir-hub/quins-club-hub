@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
+import Button from '../components/Button.jsx'
 import { insertPlayers } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
@@ -177,24 +178,14 @@ export default function PlayerImport({ onClose, onImported }) {
           )}
 
           <div className="flex items-center justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-ink transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            >
+            <Button variant="secondary" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleImport}
-              disabled={!canSubmit}
-              data-testid="import-submit"
-              className="rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            >
+            </Button>
+            <Button onClick={handleImport} disabled={!canSubmit} data-testid="import-submit">
               {saving
                 ? 'Adding…'
                 : `Add ${parsed.validCount} ${parsed.validCount === 1 ? 'player' : 'players'}`}
-            </button>
+            </Button>
           </div>
         </div>
       )}

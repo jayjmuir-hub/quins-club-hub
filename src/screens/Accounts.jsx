@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AccessBuilder from '../components/AccessBuilder.jsx'
 import Badge from '../components/Badge.jsx'
+import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
@@ -288,15 +289,14 @@ function PendingApprovals({ members, teamsById, rowState, onApprove }) {
 
               <span className="flex-1" />
 
-              <button
-                type="button"
+              <Button
+                size="sm"
                 aria-label={`Approve ${playerName} for ${personName}`}
                 disabled={Boolean(state.saving)}
                 onClick={() => onApprove(member)}
-                className="rounded-[9px] bg-brand px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
               >
                 {state.saving ? 'Approving\u2026' : 'Approve'}
-              </button>
+              </Button>
 
               {/* No "reject" button, deliberately, and for the same reason the
                   waiting list has no delete: revoking is what removing this
@@ -404,14 +404,9 @@ function PersonDetailsForm({ group, state, onChange, onSave }) {
       )}
 
       <div className="mt-4 flex items-center gap-3">
-        <button
-          type="button"
-          disabled={Boolean(draft.saving)}
-          onClick={onSave}
-          className="rounded-[9px] bg-brand px-3.5 py-2 text-[13px] font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-        >
+        <Button size="sm" disabled={Boolean(draft.saving)} onClick={onSave}>
           {draft.saving ? 'Saving\u2026' : 'Save details'}
-        </button>
+        </Button>
         {/* Said out loud, because the sheet stays open after a save and
             otherwise nothing on screen changes to confirm it worked. */}
         {draft.saved && !draft.saving && (
@@ -1263,14 +1258,14 @@ export default function Accounts() {
                             {triage.error}
                           </span>
                         )}
-                        <button
-                          type="button"
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => dismiss(profile)}
                           disabled={Boolean(triage.saving)}
-                          className="rounded-[9px] border border-line px-2.5 py-1.5 text-[13px] font-bold text-ink-muted transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                         >
                           {triage.saving ? 'Dismissing…' : 'Dismiss'}
-                        </button>
+                        </Button>
                       </div>
                     </Card>
                   )
@@ -1340,14 +1335,14 @@ export default function Accounts() {
                           {triage.error}
                         </span>
                       )}
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => restore(profile)}
                         disabled={Boolean(triage.saving)}
-                        className="rounded-[9px] border border-line px-2.5 py-1.5 text-[13px] font-bold text-ink-muted transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                       >
                         {triage.saving ? 'Restoring…' : 'Restore'}
-                      </button>
+                      </Button>
                     </div>
                   </Card>
                 )
@@ -1363,13 +1358,9 @@ export default function Accounts() {
           <p className="mt-2 text-sm leading-relaxed text-brand-deep">
             {error.message || 'Something went wrong. Try again.'}
           </p>
-          <button
-            type="button"
-            onClick={() => setReloadToken((token) => token + 1)}
-            className="mt-4 rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-          >
+          <Button onClick={() => setReloadToken((token) => token + 1)} className="mt-4">
             Try again
-          </button>
+          </Button>
         </Card>
       )}
 
@@ -1424,8 +1415,9 @@ export default function Accounts() {
                     )}
                   </div>
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     aria-label={`Edit ${displayName}`}
                     onClick={(clickEvent) => {
                       // Without this the row handler fires too and the sheet is
@@ -1435,10 +1427,9 @@ export default function Accounts() {
                       clickEvent.stopPropagation()
                       openEditor(group)
                     }}
-                    className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   >
                     Edit
-                  </button>
+                  </Button>
                 </div>
               </Card>
             )
@@ -1488,14 +1479,14 @@ export default function Accounts() {
                     header — it belongs with the access rows it adds to. */}
                 <div className="mb-2 flex justify-end">
                   {editingGroup.profileId && !adding[editingGroup.key] && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       aria-label={`Add access for ${editingName}`}
                       onClick={() => setAdding((prev) => ({ ...prev, [editingGroup.key]: true }))}
-                      className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       Add access
-                    </button>
+                    </Button>
                   )}
                 </div>
 
@@ -1635,33 +1626,33 @@ export default function Accounts() {
                           <span className="text-[12.5px] font-semibold text-brand-deep">
                             Remove this access?
                           </span>
-                          <button
-                            type="button"
+                          <Button
+                            variant="danger"
+                            size="sm"
                             disabled={Boolean(state.saving)}
                             onClick={() => revoke(member)}
-                            className="rounded-[8px] bg-brand-deep px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-brand disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                           >
                             {state.saving ? 'Removing…' : `Yes, revoke ${editingName}`}
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             disabled={Boolean(state.saving)}
                             onClick={() => patchRow(member.id, { confirming: false })}
-                            className="rounded-[8px] px-2 py-1.5 text-[13px] font-bold text-brand transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                           >
                             Cancel
-                          </button>
+                          </Button>
                         </span>
                       ) : (
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           aria-label={`Revoke access for ${rowLabel}`}
                           disabled={Boolean(state.saving)}
                           onClick={() => patchRow(member.id, { confirming: true, error: null })}
-                          className="rounded-[8px] px-2 py-1 text-[13px] font-bold text-brand transition hover:bg-surface-mute disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         >
                           Revoke access
-                        </button>
+                        </Button>
                       )}
 
                       {state.error && (

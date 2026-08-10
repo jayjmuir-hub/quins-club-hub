@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Sheet from './Sheet.jsx'
+import Button from './Button.jsx'
 import {
   calendarFeedUrl,
   calendarWebcalUrl,
@@ -18,9 +19,6 @@ import {
 // The token is minted LAZILY — only when someone actually opens this sheet.
 // Fetching it on every Schedule render would create a live bearer credential
 // for every member who never wanted one.
-
-const ACTION =
-  'rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
 
 function CalendarIcon(props) {
   return (
@@ -86,14 +84,10 @@ export default function CalendarSubscribe() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={handleOpen}
-        className="inline-flex items-center gap-2 rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-[13px] font-bold text-brand transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-      >
+      <Button variant="secondary" size="sm" onClick={handleOpen}>
         <CalendarIcon className="h-4 w-4" aria-hidden="true" />
         Add to calendar
-      </button>
+      </Button>
 
       {open && (
         <Sheet open onClose={() => setOpen(false)} title="Add to your calendar">
@@ -136,18 +130,15 @@ export default function CalendarSubscribe() {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={handleCopy} className={`${ACTION} bg-brand text-white hover:bg-brand-deep`}>
-                  {copied ? 'Copied' : 'Copy link'}
-                </button>
+                <Button onClick={handleCopy}>{copied ? 'Copied' : 'Copy link'}</Button>
                 {/* webcal: is what makes this one tap on iPhone and Mac. It
                     does nothing useful on Google, which is why the copyable
-                    https URL above is the primary route. */}
-                <a
-                  href={calendarWebcalUrl(token)}
-                  className={`${ACTION} border-[1.5px] border-line bg-surface-card text-brand hover:border-brand`}
-                >
+                    https URL above is the primary route.
+                    `as="a"` is why Button takes a tag at all — this has to be
+                    a real link so the OS handles the scheme. */}
+                <Button as="a" variant="secondary" href={calendarWebcalUrl(token)}>
                   Add on Apple
-                </a>
+                </Button>
               </div>
 
               <div className="mt-6 border-t border-line pt-4 text-sm leading-relaxed text-ink-faint">
@@ -178,22 +169,22 @@ export default function CalendarSubscribe() {
 
                 {confirmingReset ? (
                   <div className="mt-3 flex gap-2.5">
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
                       onClick={() => setConfirmingReset(false)}
                       disabled={loading}
-                      className={`${ACTION} flex-1 border-[1.5px] border-line bg-surface-card text-ink hover:bg-surface-mute`}
+                      className="flex-1"
                     >
                       Keep it
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="danger"
                       onClick={handleReset}
                       disabled={loading}
-                      className={`${ACTION} flex-1 bg-brand-deep text-white hover:bg-brand`}
+                      className="flex-1"
                     >
                       {loading ? 'Resetting…' : 'Yes, reset'}
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   <button

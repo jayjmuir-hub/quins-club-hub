@@ -6,6 +6,7 @@ import { allowsOwnContact } from '../lib/ageGroup.js'
 import { formatPhone } from '../lib/phone.js'
 import { genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
+import Button from '../components/Button.jsx'
 
 // The player detail sheet (design-system.md §5.7): a branded hero carrying
 // the player's initials, a set of key/value rows, and — only when the database
@@ -303,8 +304,10 @@ function ContactBlock({ playerId }) {
   )
 }
 
-const FOOTER_BUTTON =
-  'flex-1 rounded-[11px] px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
+// ⚠️ LAYOUT ONLY — see the identical note in EventDetail.jsx. <Button> supplies
+// the radius, padding, weight, focus ring and disabled state; repeating them
+// here would leave `rounded-[11px]` racing `rounded-btn` on equal specificity.
+const FOOTER_BUTTON = 'flex-1'
 
 function FooterActions({ player, canEdit, canEditOwn, onEdit, onEditOwn, onDeleted }) {
   const [confirming, setConfirming] = useState(false)
@@ -318,13 +321,9 @@ function FooterActions({ player, canEdit, canEditOwn, onEdit, onEditOwn, onDelet
   if (!canEdit && canEditOwn) {
     return (
       <div className="mt-5 border-t border-line pt-4">
-        <button
-          type="button"
-          onClick={() => onEditOwn?.(player)}
-          className={`${FOOTER_BUTTON} w-full bg-brand text-white hover:bg-brand-deep`}
-        >
+        <Button full onClick={() => onEditOwn?.(player)} className={FOOTER_BUTTON}>
           Update details
-        </button>
+        </Button>
       </div>
     )
   }
@@ -366,40 +365,36 @@ function FooterActions({ player, canEdit, canEditOwn, onEdit, onEditOwn, onDelet
             Remove this player? Their contact details go too, and this can&apos;t be undone.
           </p>
           <div className="flex gap-2.5">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => setConfirming(false)}
               disabled={deleting}
-              className={`${FOOTER_BUTTON} border-[1.5px] border-line bg-surface-card text-ink hover:bg-surface-mute`}
+              className={FOOTER_BUTTON}
             >
               Keep them
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="danger"
               onClick={handleDelete}
               disabled={deleting}
-              className={`${FOOTER_BUTTON} bg-brand-deep text-white hover:bg-brand`}
+              className={FOOTER_BUTTON}
             >
               {deleting ? 'Deleting…' : 'Yes, delete'}
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
         <div className="flex gap-2.5">
-          <button
-            type="button"
-            onClick={() => onEdit?.(player)}
-            className={`${FOOTER_BUTTON} bg-brand text-white hover:bg-brand-deep`}
-          >
+          <Button onClick={() => onEdit?.(player)} className={FOOTER_BUTTON}>
             Edit
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="dangerQuiet"
             onClick={() => setConfirming(true)}
-            className={`${FOOTER_BUTTON} border-[1.5px] border-line bg-surface-card text-brand-deep hover:bg-danger-bg`}
+            className={FOOTER_BUTTON}
           >
             Delete
-          </button>
+          </Button>
         </div>
       )}
     </div>

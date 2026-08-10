@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
+import Button from '../components/Button.jsx'
 import { listPlayers } from '../data/players.js'
 import { listAttendance, setAttendance, ATTENDANCE_STATUSES } from '../data/attendance.js'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -210,14 +211,14 @@ export default function Register({ event, team, onClose }) {
               {counts.none > 0 ? ` · ${counts.none} not recorded` : ''}
             </p>
             {canEdit && counts.none > 0 && (
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={markRemainingPresent}
                 disabled={busy}
-                className="rounded-[9px] border-[1.5px] border-line bg-surface-card px-3 py-1.5 text-xs font-bold text-ink transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {sweeping ? 'Marking…' : `Mark remaining ${counts.none} present`}
-              </button>
+              </Button>
             )}
           </div>
 

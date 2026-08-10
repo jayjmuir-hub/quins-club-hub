@@ -12,6 +12,7 @@ import RequestAccess from './RequestAccess.jsx'
 // 7 Aug 2026. See the long note at its old call site below.
 import { ViewAsBanner } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
+import Button from './Button.jsx'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
 // role label, nav) plus the membership-loading gate that decides whether the
@@ -53,14 +54,17 @@ function SignOutControl({ signOut, className = '' }) {
           {error}
         </p>
       )}
-      <button
-        type="button"
+      {/* `full` plus a desktop override: full-width on a phone, shrink-to-fit
+          from the desktop breakpoint up. */}
+      <Button
+        variant="secondary"
+        full
         onClick={handleClick}
         disabled={pending}
-        className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-brand transition hover:border-brand disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 desktop:w-auto"
+        className="desktop:w-auto"
       >
         {pending ? 'Signing out…' : 'Sign out'}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -86,13 +90,9 @@ function ErrorState({ error, reload, children }) {
       <p data-testid="error-message" className="mt-2 text-sm leading-relaxed text-brand-deep">
         {error.message || 'Something went wrong. Try again.'}
       </p>
-      <button
-        type="button"
-        onClick={reload}
-        className="mt-4 rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-      >
+      <Button onClick={reload} className="mt-4">
         Try again
-      </button>
+      </Button>
       {children}
     </div>
   )
@@ -496,13 +496,14 @@ export default function AppShell({ children }) {
             {/* A way back. Someone who opened this by mistake, or who read it
                 and realised they do have a child to register, must not have to
                 sign out and in again to reach the other route. */}
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              full
               onClick={() => setAskingForAccess(false)}
-              className="mt-4 w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-4 py-2.5 text-sm font-bold text-brand transition hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              className="mt-4"
             >
               Add a player instead
-            </button>
+            </Button>
             <SignOutControl signOut={signOut} className="mt-5" />
           </RequestAccess>
         )}

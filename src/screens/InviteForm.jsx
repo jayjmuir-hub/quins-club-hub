@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import AccessBuilder from '../components/AccessBuilder.jsx'
 import Sheet from '../components/Sheet.jsx'
+import Button from '../components/Button.jsx'
 import { createInvite } from '../data/members.js'
 import { listPlayers } from '../data/players.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -214,13 +215,9 @@ export default function InviteForm({ onClose, onSaved }) {
               className={inputClasses(false)}
             />
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full rounded-[11px] bg-brand px-4 py-3 text-[15px] font-bold text-white transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-          >
+          <Button size="lg" full onClick={onClose}>
             Done
-          </button>
+          </Button>
         </div>
       ) : (
         // The submit button lives in AccessBuilder, so this form is never

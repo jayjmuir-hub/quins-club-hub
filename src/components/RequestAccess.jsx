@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getMyProfile, updateProfileNames } from '../data/members.js'
 import { createAccessRequest, getMyAccessRequest } from '../data/accessRequests.js'
+import Button from './Button.jsx'
 
 // What a signed-in account with NO membership sees. Replaces the older
 // "You're signed in / ask a club admin for an invite" dead end.
@@ -289,13 +290,9 @@ export default function RequestAccess({ userId, email, children }) {
           className="w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand"
         />
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-4 w-full rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-        >
+        <Button type="submit" full disabled={submitting} className="mt-4">
           {submitting ? 'Sending…' : 'Request access'}
-        </button>
+        </Button>
       </form>
 
       {children}
