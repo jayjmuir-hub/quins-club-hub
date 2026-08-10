@@ -283,15 +283,26 @@ Durable. Each cost real time to find.
   Dashboard's `BUTTON_BASE`/`BUTTON_GHOST` were both dead; and `FOOTER_BUTTON` in
   `EventDetail`/`PlayerDetail` would have left `rounded-[11px]` racing `rounded-btn` on
   equal specificity, since `className` is appended last.
-  ✅ **The sign-in screen WAS measured in a real browser** on deploy-preview-18 at
-  375px, and the routed primary came back exactly as designed: radius **8px**, padding
-  **12px** top and bottom, **47px tall** (the 44px floor was the point), fill
-  `rgb(200,16,46)` over a **3px** `rgb(163,13,37)` bottom edge, no console errors. The
-  controls left raw behaved as intended in the same measurement — the mode tabs sat at
-  36px with no bottom edge, and "Forgot password?" and "Show" had no radius or chrome
-  at all. ⚠️ **The AUTHENTICATED screens have not been looked at**, which is most of
-  the sweep — signing in needs a real account. Dashboard, Schedule, Roster, Accounts
-  and every sheet are still unit-tested only.
+  ❌ **THE "VERIFIED IN A REAL BROWSER" CLAIM FOR THIS SWEEP WAS WORTHLESS, AND JAY
+  CAUGHT IT BY LOOKING.** The sign-in screen was measured on production and on
+  deploy-preview-18, and everything came back as designed — 8px radius, 12px padding,
+  47px tall, 3px `brand-deep` bottom edge. ⚠️ **But `Login.jsx` was ALREADY routed
+  before this sweep** — one of the three files that already imported `Button` — so
+  that screen is byte-identical before and after, and the look being admired there
+  shipped the day before in `87c7566`/PR #16. **The measurement confirmed the previous
+  commit's work and was cited as evidence for this one.** Rule 6 warns that a
+  measurement merely confirming your own change was applied is not a verification;
+  this did not even do that. **The signed-out path contains NOTHING this sweep
+  touched, so it is the one place that can never verify it.**
+  ⚠️ **Every screen the sweep changed is behind the login and has still not been
+  looked at** — Dashboard, Schedule, Roster, Accounts and every sheet. Unit-tested
+  only.
+  ⚠️ **AND THE HEADLINE EFFECT IS INVISIBLE ON A PHONE.** The sweep and bloom are
+  `hover:` effects, and a touch device has no hover — so on the device this app is
+  actually used on, standing on a pitch, what ships is the taller tap target, the 8px
+  corner and the 3px bottom edge, and nothing moves at all. That is inherent to hover
+  rather than something the sweep got wrong, but it was never written down and it
+  means the motion study chose between three options that only desktop users see.
 - ⚠️ **THE BUTTON AUDIT WAS PUBLISHED WRONG TWICE, AND THE SECOND TIME WAS THE
   CORRECTION.** ❌ The original (`87c7566`, PR #16) claimed "105 raw buttons carrying
   the same padding + radius + weight signature" and read `rounded-[11px]`'s

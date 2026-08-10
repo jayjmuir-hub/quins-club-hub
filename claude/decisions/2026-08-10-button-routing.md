@@ -82,11 +82,21 @@ comment is a claim nobody re-checks; a test is a claim that re-checks itself.**
 - The remaining raw buttons are recorded as deliberate, but nobody has audited
   whether every one of them is still the right control. That is a design
   question, not a consolidation one.
-- ⚠️ **Only the sign-in screen has been seen in a real browser.** Measured on
-  deploy-preview-18 at 375px, the routed primary came back exactly as designed —
-  8px radius, 12px vertical padding, **47px tall** (clearing the 44px floor that
-  motivated the size change), brand fill over a 3px `brand-deep` bottom edge, and
-  no console errors. The deliberately-raw controls beside it were untouched: the
-  mode tabs stayed 36px with no bottom edge, and the text links had no radius or
-  chrome. **Everything behind the login is unit-tested only**, and that is most of
-  the sweep — signing in needs a real account.
+- ❌ **NOTHING THIS SWEEP CHANGED HAS BEEN SEEN IN A REAL BROWSER.** The sign-in
+  screen was measured on the preview and on production and came back exactly as
+  designed — but ⚠️ **`Login.jsx` was already routed before this work**, so that
+  screen is byte-identical before and after and the measurement was evidence for
+  `87c7566`, the previous commit, not for this one. Jay spotted it immediately by
+  looking at the site and saying nothing had changed; he was right. **The
+  signed-out path contains nothing this sweep touched and therefore cannot ever
+  verify it.** Everything the sweep did change is behind the login, and signing in
+  needs a real account.
+  **The lesson generalises past buttons: before citing a live measurement, check
+  that the thing measured is in the diff.**
+- ⚠️ **The sweep and the bloom are `hover:` effects, so they never fire on a
+  phone.** On the device this app is actually used on, what ships is the taller
+  tap target, the 8px corner and the weighted bottom edge — nothing moves. That is
+  inherent to hover, not a mistake in the CSS, but it was never written down, and
+  it means the four directions and three motion studies were chosen between on a
+  desktop for an app used pitch-side. Worth knowing before commissioning more
+  motion work.

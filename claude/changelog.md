@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — ❌ CORRECTION: the routing sweep's "verified on production" claim was
+  worthless.** The sign-in screen was measured on the deploy preview and on
+  production, everything came back as designed, and it was reported as live
+  verification of the sweep. ⚠️ **`src/screens/Login.jsx` was ALREADY routed before
+  the sweep** — one of three files that already imported `Button` — so that screen is
+  byte-identical before and after `973df0f`, and the measurement was evidence for
+  `87c7566`, the commit before it. **Jay caught it in one look**: "I don't see
+  different buttons or really anything different at all." He was right, and on the
+  signed-out path he always would have been — it contains nothing the sweep touched.
+  ⚠️ **Rule 6 says a measurement that merely confirms your own change was applied is
+  not a verification; this did not even do that.** The generalisable lesson:
+  **before citing a live measurement, check the thing measured is in the diff.**
+  ⚠️ Also recorded while correcting this: **the sweep and bloom are `hover:` effects
+  and never fire on a touch device**, so on a phone the whole Touchline change is the
+  taller tap target, the 8px corner and the bottom edge — nothing moves.
+- `973df0f` — **Route the app's buttons through `<Button>`, and what fell out.**
+
 - **10 Aug — the routing sweep: the app's action buttons now go through `<Button>`.**
   The work the corrected audit below was meant to justify, done. Every action button
   in `src/` — anything carrying a fill or a hairline border — is routed; the rest stay
