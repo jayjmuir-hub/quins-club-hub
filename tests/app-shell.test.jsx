@@ -486,6 +486,43 @@ describe('AppShell — my account button', () => {
     expect(hasClassToken(nameEl, 'wide:inline')).toBe(true)
     expect(hasClassToken(nameEl, 'desktop:inline')).toBe(false)
   })
+
+  // ⚠️ THE SAME BUG, ONE LEVEL UP, AND WORSE THAN THE NOTE ABOVE RECORDED.
+  // The test above fixed the ACCOUNT NAME's breakpoint after the club name
+  // truncated at ~1114px. The club name itself was left to truncate: at the
+  // `desktop` breakpoint (820px, where the top nav replaces the bottom tab
+  // bar) it rendered "ABU…" on every screen, for every role.
+  //
+  // It is structural, not a width being slightly off — every other item in
+  // that row is shrink-0, so the wordmark is the only thing that can give and
+  // it gives everything. So the name is painted only at `wide`, and below it
+  // the "Quins Club Hub" line carries the identity.
+  //
+  // jsdom applies no CSS and cannot see an overflow, so this pins the tokens.
+  it('paints the club name only at WIDE, and keeps it in the heading order below', async () => {
+    useMembershipsMock.mockReturnValue(loaded())
+
+    renderShell()
+
+    const wordmark = screen.getByRole('heading', { level: 1, name: 'Abu Dhabi Harlequins' })
+
+    // Hidden visually below `wide`...
+    expect(hasClassToken(wordmark, 'sr-only')).toBe(true)
+    expect(hasClassToken(wordmark, 'wide:not-sr-only')).toBe(true)
+    // ...but never removed from the DOM, so the page has exactly one h1 at
+    // every width and the heading order does not change with the viewport.
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+
+    // ⚠️ `desktop:` must be ABSENT. Re-showing it at 820px is precisely the
+    // mistake this replaces, and asserting only the `wide:` token would pass
+    // with both applied.
+    expect(hasClassToken(wordmark, 'desktop:not-sr-only')).toBe(false)
+
+    // The line that carries the identity below `wide` must NOT be conditional.
+    const tagline = screen.getByText('Quins Club Hub')
+    expect(hasClassToken(tagline, 'sr-only')).toBe(false)
+    expect(hasClassToken(tagline, 'hidden')).toBe(false)
+  })
 })
 
 // ⚠️ REPORTED FROM A REAL PHONE, 8 Aug 2026. A parent on a ~400px Android

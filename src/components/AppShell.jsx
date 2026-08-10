@@ -280,7 +280,33 @@ export default function AppShell({ children }) {
                 `truncate`. That is the class of bug jsdom cannot see, so it is
                 worth making structural. */}
             <div className="relative min-w-0 overflow-hidden">
-              <h1 className="truncate font-display text-[19px] uppercase leading-none tracking-[0.02em] desktop:text-[21px]">
+              {/* ⚠️ PAINTED ONLY WHERE IT FITS — `sr-only` until `wide`.
+                  FIXED 10 Aug 2026. The note below records that this
+                  truncated to "ABU DHABI HARLE…" at ~1114px. It was worse
+                  than that: at the `desktop` breakpoint itself (820px, where
+                  the top nav replaces the bottom tab bar) it rendered "ABU…",
+                  on every screen, for every role.
+
+                  The cause is structural rather than a width being slightly
+                  wrong. Every other item in this row is shrink-0 — crest,
+                  role pill, account, five nav items — so the wordmark is the
+                  only thing that can give, and it gives everything. Measured
+                  at 840px: the row needs ~690px before the wordmark starts,
+                  leaving ~150px for something that wants 257. There is no
+                  width setting that fixes that; the row is simply over-full
+                  between 820 and 1280.
+
+                  So the club name is shown at `wide` and hidden below it,
+                  where "QUINS CLUB HUB" on the line beneath carries the
+                  identity instead — that line is 13px condensed and fits.
+                  ⚠️ `sr-only`, NOT `hidden`: the page keeps exactly one h1 at
+                  every width, so the heading order a screen reader walks does
+                  not change with the viewport.
+
+                  ⚠️ REJECTED: shortening the name to "Harlequins" or "ADH
+                  Quins" below `wide`. Both invent a wordmark the club does
+                  not use, and this file is not the place to coin one. */}
+              <h1 className="sr-only truncate font-display text-[19px] uppercase leading-none tracking-[0.02em] wide:not-sr-only wide:block desktop:text-[21px]">
                 Abu Dhabi Harlequins
               </h1>
               {/* ⚠️ ONE LINE, AND IT MUST STAY ONE LINE. `truncate` here is
