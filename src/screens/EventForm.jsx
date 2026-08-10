@@ -1,7 +1,13 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
+import { listPitches, PITCH_TBD } from '../data/pitches.js'
 import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '../data/events.js'
+
+// The pitch picker's escape hatch. A sentinel rather than '' so "Something
+// else…" stays distinguishable from "No pitch" — they are different answers,
+// and collapsing them would make the free-text box impossible to reach.
+const OTHER_PITCH = '__other__'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import {
@@ -277,6 +283,28 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
   // see the note at the call site for why it is not re-derived from
   // event.starts_at.
   const [originalTime] = useState(() => values.time)
+
+  // The managed pitch list. Loaded once per open sheet — it is a handful of
+  // rows and it must not refetch while somebody is typing.
+  //
+  // ⚠️ A FAILED LOAD IS NOT AN ERROR STATE HERE. If the list cannot be read
+  // the form falls back to the free-text box it had before 11 Aug, which is
+  // strictly better than refusing to let anyone save a fixture because the
+  // pitch table was unreachable.
+  const [pitchNames, setPitchNames] = useState([])
+  useEffect(() => {
+    let mounted = true
+    listPitches()
+      .then((rows) => {
+        if (mounted) setPitchNames(rows.map((row) => row.name))
+      })
+      .catch(() => {
+        if (mounted) setPitchNames([])
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   // The generated dates, and any error from generating them. generateSeriesDates
   // throws on a range over a year rather than truncating, so the throw is
@@ -883,24 +911,55 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
           />
         </div>
 
-        {/* Pitch. Free text, like Venue, and for the same reason: there is
-            no pitches table and this deliberately does not invent one. A
-            managed list would be worth having the day someone wants clash
-            detection ("Pitch 2 already has U12 at 18:00"), which needs a
-            controlled vocabulary to compare against — free text cannot do
-            it. Until then a text box costs one nullable column. */}
+        {/* Pitch. A PICKER as of 11 Aug 2026 — this comment used to explain
+            why it was free text, and the reasoning ("a managed list would be
+            worth having the day someone wants clash detection") is exactly
+            what happened. The list is db/migrations/20260811_pitches.sql.
+
+            ⚠️ THE FREE-TEXT BOX SURVIVES, AND NOT AS A COURTESY. Existing
+            events name pitches that predate the list ("Clubhouse lawn"), and
+            a picker that could not express them would force somebody to
+            either mis-file a fixture or invent a pitch row for a lawn. The
+            select is the fast path; the box is the escape hatch.
+
+            ⚠️ `Pitch TBD` IS ITS OWN OPTION, not a pitch in the list. Jay's
+            ruling: it must keep rendering, because without it nobody can tell
+            "no pitch allocated yet" from "the app didn't say". */}
         <div className={FIELD}>
           <label className={LABEL} htmlFor="event-pitch">
             Pitch
           </label>
-          <input
+          <select
             id="event-pitch"
-            type="text"
-            value={values.pitch}
-            onChange={setFromInput('pitch')}
-            placeholder="e.g. Pitch 2"
+            value={pitchNames.includes(values.pitch) || values.pitch === PITCH_TBD ? values.pitch : OTHER_PITCH}
+            onChange={(domEvent) => {
+              const chosen = domEvent.target.value
+              // Choosing "Something else" must not silently keep the previous
+              // pitch — it clears the box so the person types what they mean.
+              set('pitch')(chosen === OTHER_PITCH ? '' : chosen)
+            }}
             className={inputClasses(false)}
-          />
+          >
+            <option value="">No pitch</option>
+            <option value={PITCH_TBD}>{PITCH_TBD} — not allocated yet</option>
+            {pitchNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+            <option value={OTHER_PITCH}>Something else…</option>
+          </select>
+
+          {!pitchNames.includes(values.pitch) && values.pitch !== PITCH_TBD && (
+            <input
+              type="text"
+              aria-label="Pitch name"
+              value={values.pitch}
+              onChange={setFromInput('pitch')}
+              placeholder="e.g. Clubhouse lawn"
+              className={`${inputClasses(false)} mt-2`}
+            />
+          )}
         </div>
 
         {isMatch && (

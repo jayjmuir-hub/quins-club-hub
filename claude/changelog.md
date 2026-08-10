@@ -8,6 +8,40 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 11 Aug 2026
+
+- **11 Aug — a managed pitch list, and the clash detection it unblocks.**
+  `db/migrations/20260811_pitches.sql`. ⚠️ **This OVERTURNS the 5 Aug decision**,
+  which chose "free text beside Venue. No pitches table, no clash detection." That
+  was the right scope call for one person entering fixtures; Tracy's job IS pitch
+  allocation, and the free text had already drifted — measured 11 Aug: **"Pitch 2"
+  AND "Pitch D2"** both in use, plus "Clubhouse lawn". No clash detector can group
+  by a string somebody retyped.
+  ⚠️ **`events.pitch` STAYS TEXT WITH NO FOREIGN KEY**, and this is the part most
+  likely to be "tidied" later. **`Pitch TBD` is a placeholder, not a pitch** — Jay's
+  ruling, because without it nobody can tell "not allocated yet" from "the app didn't
+  say" — and it is 26 of 48 rows. A foreign key would force it to become a fake pitch
+  row or NULL, and NULL loses the distinction the ruling exists to preserve. The list
+  is a picker source, not a constraint.
+  ⚠️ **The free-text box survives beside the picker, deliberately.** Existing events
+  name things that predate the list, and a picker that could not express "Clubhouse
+  lawn" would force somebody to mis-file a fixture or invent a pitch row for a lawn.
+  ⚠️ **If the pitch list cannot be read, the form falls back to free text** rather
+  than refusing to save. Nobody should be unable to record a match because a lookup
+  table was unreachable.
+  ⚠️ **CLASH DETECTION REPORTS, IT NEVER REFUSES**, and the exemptions are the whole
+  design: a **multi-squad fan-out is not a clash** (one event per squad sharing a
+  `group_id`, on the same pitch at the same time BY CONSTRUCTION — reporting those
+  would make every multi-squad fixture look double-booked and the feature would be off
+  within a week); **touching is not overlapping** (18:00 finish, 18:00 start is how a
+  Saturday runs); **`Pitch TBD` never clashes**; and with a null `ends_at` only an
+  identical start counts, because assuming a duration invents a clash from data nobody
+  entered. Both load-bearing rules proved by injected fault.
+  ⚠️ **A green build did not mean a working screen**: the picker shipped referencing
+  an undefined constant because the patch anchor matched a different file. `npm run
+  build` passed; the unit suite caught it.
+- `f85d90f` — **The screen a super admin uses to assign admin rights.**
+
 ## 10 Aug 2026
 
 - **10 Aug — the screen that assigns admin rights.** `AdminRightsEditor`, rendered

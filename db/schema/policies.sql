@@ -761,3 +761,21 @@ CREATE POLICY "attendance write delete" ON public.attendance
   FOR DELETE USING (
     private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
   );
+
+-- ---------------------------------------------------------------------
+-- pitches  (2 policies — 11 Aug 2026)
+--
+-- Read is open to anyone signed in: a parent sees "Pitch 2" on a fixture and
+-- the name has to mean something. Pitch names are not sensitive.
+--
+-- ⚠️ WRITES ARE ADMIN-ONLY, NOT GATED ON THE `pitches` ADMIN RIGHT, and that
+-- is deliberate. The admin rights added 10 Aug gate SCREENS, not data — every
+-- admin already sees and edits everything, and a right decides which dashboard
+-- appears. Enforcing admin_rights here would make it the first right that is a
+-- real permission, which is a different decision with different consequences.
+-- See claude/decisions/2026-08-10-role-dashboards.md.
+-- ---------------------------------------------------------------------
+CREATE POLICY "pitch read" ON public.pitches
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "pitch manage" ON public.pitches
+  FOR ALL USING (private.is_admin(club_id)) WITH CHECK (private.is_admin(club_id));
