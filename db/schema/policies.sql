@@ -127,10 +127,33 @@ ALTER TABLE public.teams           ENABLE ROW LEVEL SECURITY;
 -- The migration states the principle in one line: "A child's name and photo
 -- are sensitive; a training time is not."
 --
--- ⚠️ `private.can_edit_team` is deliberately NOT status-gated. The migration
--- gives the reason: staff roles are granted by an admin and never
--- self-registered, so a pending coach cannot arise, and adding the check
--- would imply a state that has no way of existing.
+-- ⚠️ `private.can_edit_team` IS NOW STATUS-GATED TOO — changed 10 Aug 2026.
+-- This paragraph said the opposite until then, and the reasoning it recorded
+-- was real: staff roles are admin-granted and never self-registered, so a
+-- pending coach cannot arise, and the check "implies a state that has no way
+-- of existing". That premise still holds.
+--
+-- It was overturned on Jay's instruction, on the argument that THIRTEEN
+-- policies hang off can_edit_team — events, players, player_contacts,
+-- player_parents, all four attendance policies, three availability writes,
+-- one arm of `avail read`, and the player-photo storage policy. The day any
+-- flow grants staff access through a pending state, all thirteen open at once
+-- and nothing in the diff that caused it will look like access control.
+-- Harness: db/tests/rls-can-edit-team-status.sql.
+--
+-- ⚠️ CONSEQUENCE, correcting a warning that was true until now: the merged
+-- `avail read` policy's three arms — can_see_team OR can_edit_team OR
+-- is_own_player — were documented as only LOOKING redundant, because dropping
+-- the can_edit_team arm would remove a pending coach's read. can_edit_team now
+-- implies active, so it is a strict subset of can_see_team and that arm IS
+-- genuinely redundant. LEFT IN PLACE deliberately — it costs a boolean, and
+-- removing it is its own change with its own harness.
+--
+-- ⚠️ `private.is_attached_to_team` REMAINS STATUS-BLIND, ON PURPOSE. Do not
+-- "finish the job" by adding the check there: it gates `event read`, and a
+-- pending parent seeing fixtures and training times is what makes signing in
+-- worth anything before approval. Measured 10 Aug: a pending coach reads
+-- events and cannot read players or contacts. That is correct.
 --
 -- Three read policies below therefore gained an `OR private.is_own_player(...)`
 -- arm on 8 Aug — "player read", "avail read" — or swapped helper entirely
