@@ -214,7 +214,7 @@ describe('Also add for — what it writes', () => {
     const { user } = renderForm()
 
     await fillTraining(user)
-    await user.type(screen.getByLabelText('Pitch'), 'Pitch 3')
+    await user.type(screen.getByLabelText('Pitch name'), 'Pitch 3')
     await user.click(screen.getByRole('checkbox', { name: 'U16' }))
     await user.click(screen.getByRole('button', { name: 'Add 2 events' }))
 
@@ -327,12 +327,22 @@ describe('Also add for — the row-count guard', () => {
   })
 })
 
+// ⚠️ THE PITCH FIELD BECAME A PICKER ON 11 Aug 2026, and these tests moved to
+// the free-text ESCAPE HATCH beside it rather than being deleted. What they
+// check — trimmed on write, null rather than '' when empty, prefilled when
+// editing — is unchanged behaviour that a picker must not break.
+//
+// They land on the escape hatch because `listPitches` is not mocked here, so
+// the load fails and the form falls back to free text. ⚠️ THAT FALLBACK IS
+// DELIBERATE, not an accident of the test setup: if the pitch table cannot be
+// read, a fixture must still be savable. Nobody should be unable to record a
+// match because a lookup table was unreachable.
 describe('Pitch', () => {
   it('writes the trimmed pitch', async () => {
     const { user } = renderForm({ memberships: COACH_ONE })
 
     await fillTraining(user)
-    await user.type(screen.getByLabelText('Pitch'), '  Pitch 2  ')
+    await user.type(screen.getByLabelText('Pitch name'), '  Pitch 2  ')
     await user.click(screen.getByRole('button', { name: 'Add event' }))
 
     await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
@@ -352,9 +362,9 @@ describe('Pitch', () => {
   it('prefills the pitch when editing, and can clear it back to null', async () => {
     const { user } = renderForm({ memberships: COACH_ONE, event: EXISTING_TRAINING })
 
-    expect(screen.getByLabelText('Pitch')).toHaveValue('Pitch 4')
+    expect(screen.getByLabelText('Pitch name')).toHaveValue('Pitch 4')
 
-    await user.clear(screen.getByLabelText('Pitch'))
+    await user.clear(screen.getByLabelText('Pitch name'))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())

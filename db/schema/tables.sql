@@ -730,3 +730,35 @@ ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 -- for ONE event, a player's history loads every row for ONE player.
 CREATE INDEX attendance_event_id_idx  ON public.attendance (event_id);
 CREATE INDEX attendance_player_id_idx ON public.attendance (player_id);
+
+-- ---------------------------------------------------------------------
+-- public.pitches — the managed pitch list (11 Aug 2026)
+--
+-- ⚠️ OVERTURNS the 5 Aug decision "free text beside Venue, no pitches table,
+-- no clash detection". That was the right scope call for the MVP; Tracy's job
+-- IS pitch allocation, and the free text had already drifted — measured
+-- 11 Aug, "Pitch 2" and "Pitch D2" both in use, plus "Clubhouse lawn".
+--
+-- ⚠️ `events.pitch` REMAINS TEXT WITH NO FOREIGN KEY, and this is the part
+-- most likely to be "tidied" later. `Pitch TBD` is a deliberate placeholder
+-- rather than a pitch (Jay's ruling: without it nobody can tell "not allocated
+-- yet" from "the app didn't say") and it is more than half the rows. A foreign
+-- key would force it to become either a fake pitch row or NULL, and NULL loses
+-- the distinction the ruling exists to preserve. The list is a PICKER SOURCE,
+-- not a constraint.
+--
+-- `is_active` retires a pitch without deleting it: deleting would leave last
+-- season's events naming a pitch nobody can look up, and because the column is
+-- text nothing would even complain.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.pitches (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  club_id uuid NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  sort_order integer NOT NULL DEFAULT 0,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (club_id, name)
+);
+ALTER TABLE public.pitches ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS pitches_club_sort_idx ON public.pitches (club_id, sort_order, name);
