@@ -24,6 +24,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `net.http_post` on every pending membership insert — that is how approval emails
   fire, and has been since 9 Aug. True when written, carried past the change that
   falsified it.
+- **10 Aug — the clone check became a gate.** `scripts/session-guard.mjs` plus a
+  SessionStart hook in `.claude/settings.json`: it says so, loudly, when the
+  clone is SHALLOW or BEHIND `origin/main`. ⚠️ **The reasoning matters more than
+  the script.** `CLAUDE.md` reading-order step 2 is the most useful rule in this
+  repo and it keeps being skipped — not defied, skipped, because a rule in prose
+  has to be remembered at exactly the right moment. Four incidents in four days,
+  every one with a written warning already against it. Compare with what stopped
+  the moment `main` was protected: pushing to the wrong branch, force-pushing
+  over work, merging without tests. Those became structural. ⚠️ **It never
+  blocks** — a SessionStart hook that refuses to start is one flaky network call
+  from making the repo unusable, and it is silent when the clone is fine, so it
+  does not become another thing people stop reading.
+- `b96a729` — **The club name stopped truncating, and the hero stopped repeating
+  itself.**
 - **10 Aug — the club's name stopped truncating, and the hero stopped
   repeating itself.** Two instances of one thing: the design was built at a
   size the club has outgrown.
