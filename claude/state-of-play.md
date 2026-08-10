@@ -117,10 +117,32 @@ Durable. Each cost real time to find.
 
 ### Database
 
-- ⚠️ **`db/schema/` DOES NOT CAPTURE TABLE OR COLUMN GRANTS.** The allow-list
-  standing between a member and rewriting `profiles.email` **would not appear in any
-  diff of that directory.** A clean reconciliation says nothing about grants. This is
-  the one real gap and nothing currently checks it.
+- ✅ **TABLE AND COLUMN GRANTS ARE NOW CAPTURED** in `db/schema/grants.sql`, so a
+  clean reconciliation finally means something about them. Checked two ways:
+  `scripts/docs-check.mjs` fails the build if a migration grants on a table the
+  capture does not name, and `db/tests/grants.sql` asserts the invariant against
+  live and injects the fault to prove it can fail. ⚠️ **Neither sees live from CI**
+  — the repo is public, so there are no credentials — so re-capturing WITH the
+  migration is still the mechanism, not a formality.
+- ⚠️ **`profiles.email` is protected by a COLUMN GRANT, not by a policy.** Only five
+  columns are updatable by `authenticated`: `full_name`, `first_name`, `last_name`,
+  `name_confirmed_at`, `phone`. RLS authorises the ROW — and `profile update club
+  admin` authorises an admin against **every member row in the club** — so without
+  that ceiling both UPDATE policies read as "may rewrite anyone's login email".
+  **`policies.sql` cannot tell you this**; `profile update own` reads as "a member
+  may edit their own profile", full stop. Adding a column to `profiles` is therefore
+  a decision: ungranted, a save fails with something that looks exactly like an RLS
+  refusal.
+- ⚠️ **Supabase's DEFAULT privileges give `anon` full table rights on every new table
+  in `public`.** So a table created without RLS is not "unhardened", it is open to
+  anyone with the project URL — and nothing in the `create table` says so. Every
+  table currently has RLS on, and `db/tests/grants.sql` now asserts it.
+- ⚠️ **The column revoke was applied to `authenticated` only; `anon` keeps table-level
+  UPDATE on `profiles`.** Measured 10 Aug: no live hole, because both UPDATE policies
+  are role `PUBLIC` and both fail for a null uid (`id = auth.uid()` is null, not
+  true). But the defence-in-depth is one-sided. Recorded rather than changed —
+  revoking it is a one-line migration with a real chance of breaking a signup path
+  nobody has re-tested.
 - ⚠️ **`apply_migration` strips `--` comments before executing.** A function's
   reasoning lives in the migration file and never in the database; a re-capture
   cannot bring it back.

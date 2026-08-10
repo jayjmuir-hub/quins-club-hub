@@ -256,6 +256,71 @@ function checkStaleTerms(files) {
   }
 }
 
+// ---------------------------------------------------------------- 7. grants capture
+
+// ⚠️ THE BLIND SPOT THIS CLOSES. `db/schema/` captures tables, policies,
+// functions and triggers — and until 10 Aug 2026 it captured no table or column
+// GRANTS at all. `db/schema/README.md` said so plainly: the larger half of
+// `20260808_profile_phone_and_column_grants.sql` is a column-level
+// REVOKE/GRANT on `profiles`, the thing standing between a member and rewriting
+// someone's login email, and NOTHING IN THAT DIRECTORY WOULD DIFF IT.
+//
+// `db/schema/grants.sql` now captures them. This check is what stops that
+// capture rotting the way the README predicted: a migration that grants on a
+// TABLE must be represented there.
+//
+// ⚠️ IT CANNOT SEE THE DATABASE, AND DOES NOT PRETEND TO. CI has no credentials
+// — this repo is public — so real drift between the file and live is still only
+// caught by re-capturing, and by `db/tests/grants.sql` run against live. What
+// this catches is the one failure mode that IS visible from the filesystem, and
+// the one that actually happened: a grant migration landing with no
+// corresponding line in the capture.
+//
+// FUNCTION grants are deliberately out of scope — `functions.sql` has captured
+// `proacl` since 7 Aug, and a second copy of a fact is a copy that drifts. As of
+// this writing every GRANT in `db/migrations/` except one is `on function`.
+const GRANTS_CAPTURE = 'db/schema/grants.sql'
+
+/** SQL with $$-quoted function bodies removed, so `;` splits only statements. */
+function withoutDollarQuotes(sql) {
+  return sql.replace(/\$([a-z_]*)\$[\s\S]*?\$\1\$/gi, '\n')
+}
+
+function checkGrantCapture() {
+  const dir = join(ROOT, 'db/migrations')
+  if (!existsSync(dir)) return
+
+  if (!existsSync(join(ROOT, GRANTS_CAPTURE))) {
+    fail(GRANTS_CAPTURE, 0, 'the grants capture is missing - db/schema/ would no longer diff a table or column GRANT')
+    return
+  }
+  const capture = readFileSync(join(ROOT, GRANTS_CAPTURE), 'utf8')
+
+  for (const name of readdirSync(dir).filter((n) => n.endsWith('.sql'))) {
+    const f = `db/migrations/${name}`
+    const text = withoutDollarQuotes(readFileSync(join(ROOT, f), 'utf8'))
+
+    for (const stmt of text.split(';')) {
+      if (!/^\s*(grant|revoke)\b/i.test(stmt.replace(/^\s*--.*$/gm, ''))) continue
+      // Captured elsewhere, on purpose.
+      if (/\bon\s+(all\s+)?functions?\b/i.test(stmt)) continue
+      if (/\bon\s+(schema|sequence|database|type)\b/i.test(stmt)) continue
+
+      const m = /\bon\s+(?:table\s+)?(?:public\.)?"?([a-z_][a-z0-9_]*)"?/i.exec(stmt)
+      if (!m) continue
+      const table = m[1]
+
+      // A word-boundary match, so `profiles` in the capture would not satisfy a
+      // migration granting on `profiles_audit`.
+      if (!new RegExp(`\\b${table}\\b`).test(capture)) {
+        fail(f, 0,
+          `grants on table "${table}" but ${GRANTS_CAPTURE} never names it - ` +
+          `re-capture the grants, or db/schema/ is again unable to diff them`)
+      }
+    }
+  }
+}
+
 // ---------------------------------------------------------------- run
 
 const files = trackedMarkdown()
@@ -266,6 +331,7 @@ const checks = [
   ['git add -A in examples', () => checkGitAddAll(files)],
   ['plan status lines', () => checkPlanStatus()],
   ['stale terminology', () => checkStaleTerms(files)],
+  ['table and column grants captured', () => checkGrantCapture()],
 ]
 
 console.log(`docs-check: ${files.length} tracked markdown files\n`)

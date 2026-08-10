@@ -1,6 +1,6 @@
 # `db/schema/` — a capture of the live database
 
-These four `.sql` files are a **snapshot of what is actually in the Supabase database
+These five `.sql` files are a **snapshot of what is actually in the Supabase database
 right now**. They are *not* a migration runner, *not* an ORM schema, and *not* the thing
 that creates the database.
 
@@ -71,12 +71,32 @@ and before that
 > migrations across two days — smaller, and it still took three passes to
 > reconcile.
 >
-> ⚠️ **`db/schema/` DOES NOT CAPTURE GRANTS ON TABLES OR COLUMNS.** The larger
-> half of `20260808191310 profile_phone_and_column_grants` is a column-level
+> ✅ **`db/schema/` DID NOT CAPTURE GRANTS ON TABLES OR COLUMNS — CLOSED
+> 10 Aug 2026.** This warning read, correctly, that the larger half of
+> `20260808191310 profile_phone_and_column_grants` is a column-level
 > `REVOKE`/`GRANT` on `profiles` — the thing standing between a member and
-> rewriting someone's login email — and **nothing in this directory would diff
-> it**. Same for `is_attached_to_team_grants`. That is a real blind spot in the
-> mechanism, not an oversight in a capture.
+> rewriting someone's login email — and that **nothing in this directory would
+> diff it**. `grants.sql` now captures table grants, column grants and the
+> DEFAULT privileges, so a re-capture diffs them like anything else.
+>
+> ⚠️ **Kept rather than deleted, and repointed** (`CLAUDE.md` rule 7). Two of
+> the things it warned about are still true and now live in `grants.sql`:
+> Postgres keeps **no timestamp for a GRANT**, so an unintended one cannot be
+> dated or attributed after the fact and a committed snapshot is the only
+> mechanism that answers "did this change"; and reading `policies.sql` alone
+> still tells you nothing about the five-column ceiling on `profile update own`.
+>
+> Two things now check it. `scripts/docs-check.mjs` fails the build when a
+> migration grants on a TABLE that `grants.sql` does not name — the exact
+> omission that happened here, and the only half of the problem visible from the
+> filesystem. `db/tests/grants.sql` asserts the invariant against live and
+> injects the fault to prove it can fail. ⚠️ **Neither can see live from CI**
+> — this repo is public, so there are no credentials — which is why re-capturing
+> with the migration still matters.
+>
+> `is_attached_to_team_grants` was named here too and is a FUNCTION grant:
+> those are captured as `proacl` lines in `functions.sql`, and are deliberately
+> not duplicated into `grants.sql`.
 >
 > ⚠️ **`apply_migration` STRIPS `--` COMMENTS before executing.** Not one
 > migration row since 8 Aug contains any comment text from its committed `.sql`.

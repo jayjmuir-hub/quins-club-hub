@@ -1,0 +1,196 @@
+-- ══════════════════════════════════════════════════════════════════════════
+--  GRANTS — table-level, column-level and default privileges in `public`
+--  Captured from Supabase project lusmshimxdcxpnrktlgz (Postgres 17)
+--  on 2026-08-10.
+--
+--  ⚠️ READ, DO NOT RUN. Like the rest of `db/schema/`, this is a snapshot
+--  written to be diffed. It is not a migration.
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- WHY THIS FILE EXISTS
+--
+-- `db/schema/README.md` carried this warning from 9 Aug 2026:
+--
+--     ⚠️ `db/schema/` DOES NOT CAPTURE GRANTS ON TABLES OR COLUMNS. The larger
+--     half of `20260808191310 profile_phone_and_column_grants` is a
+--     column-level REVOKE/GRANT on `profiles` — the thing standing between a
+--     member and rewriting someone's login email — and nothing in this
+--     directory would diff it.
+--
+-- It was right, and `claude/state-of-play.md` called it "the one real gap …
+-- and nothing currently checks it". This file is that gap closed. A clean
+-- reconciliation of the other four files still says nothing about grants; a
+-- clean reconciliation *including this one* does.
+--
+-- ⚠️ POSTGRES KEEPS NO TIMESTAMP FOR A GRANT. That is why this had to become a
+-- captured file rather than a periodic audit: once an unintended grant exists,
+-- nothing in the catalogue can say when it appeared or who made it. The 9 Aug
+-- capture already hit this with five `proacl` lines in `functions.sql` that
+-- could not be attributed to any migration. A diff against a committed
+-- snapshot is the only mechanism that answers "did this change".
+--
+-- HOW TO RE-CAPTURE. Three queries, in the Supabase SQL editor. Re-run them
+-- with the migration, not three days later — the diff is only useful while it
+-- is small enough to read.
+--
+--   -- 1. table-level
+--   select c.relname,
+--          case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end,
+--          string_agg(a.privilege_type, ', ' order by a.privilege_type)
+--   from pg_class c
+--   join pg_namespace n on n.oid = c.relnamespace
+--   cross join lateral aclexplode(c.relacl) a
+--   where n.nspname = 'public' and c.relkind in ('r','v','m','p','f')
+--   group by 1,2 order by 1,2;
+--
+--   -- 2. column-level
+--   select c.relname, att.attname,
+--          case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end,
+--          string_agg(a.privilege_type, ', ' order by a.privilege_type)
+--   from pg_class c
+--   join pg_namespace n on n.oid = c.relnamespace
+--   join pg_attribute att on att.attrelid = c.oid and att.attnum > 0
+--                        and not att.attisdropped
+--   cross join lateral aclexplode(att.attacl) a
+--   where n.nspname = 'public'
+--   group by 1,2,3 order by 1,2,3;
+--
+--   -- 3. default privileges (what a NEW object will be born with)
+--   select coalesce(n.nspname,'(all)'), d.defaclrole::regrole::text, d.defaclobjtype,
+--          case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end,
+--          string_agg(a.privilege_type, ', ' order by a.privilege_type)
+--   from pg_default_acl d
+--   left join pg_namespace n on n.oid = d.defaclnamespace
+--   cross join lateral aclexplode(d.defaclacl) a
+--   group by 1,2,3,4 order by 1,2,3,4;
+--
+-- ⚠️ FUNCTION `EXECUTE` GRANTS ARE **NOT** HERE. They are captured as `proacl`
+-- lines in `functions.sql` and have been since 7 Aug. Do not duplicate them —
+-- a second copy of a fact is a copy that drifts.
+
+
+-- ── 1. DEFAULT PRIVILEGES ──────────────────────────────────────────────────
+--
+-- ⚠️ THE MOST IMPORTANT BLOCK IN THIS FILE, AND THE LEAST OBVIOUS. Supabase
+-- ships `public` with default privileges that hand `anon` and `authenticated`
+-- FULL table rights on every table created there, from BOTH `postgres` and
+-- `supabase_admin` as granting role:
+--
+--     DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+--
+-- So a new table in `public` is born reachable by an anonymous visitor, and
+-- **RLS is the only thing between it and the internet.** Creating a table and
+-- forgetting `enable row level security` is not a hardening oversight, it is a
+-- public table. Every table in `public` does currently have RLS enabled —
+-- `tables.sql` records that, and it is worth re-reading it as a load-bearing
+-- fact rather than a tidy one.
+--
+-- This is stock Supabase and is NOT something to "fix" here: the whole PostgREST
+-- model depends on those grants existing and RLS doing the filtering. It is
+-- written down because the consequence is invisible from the DDL.
+--
+--   schema  granting role     object      grantee         privileges
+--   public  postgres          tables      anon            ALL 8
+--   public  postgres          tables      authenticated   ALL 8
+--   public  postgres          tables      postgres        ALL 8
+--   public  postgres          tables      service_role    ALL 8
+--   public  supabase_admin    tables      anon            ALL 8
+--   public  supabase_admin    tables      authenticated   ALL 8
+--   public  supabase_admin    tables      postgres        ALL 8
+--   public  supabase_admin    tables      service_role    ALL 8
+--   public  (both)            sequences   anon/auth/pg/sr SELECT, UPDATE, USAGE
+--   public  (both)            functions   anon/auth/pg/sr EXECUTE
+--
+-- ⚠️ `functions … EXECUTE` to `anon` is why every new `SECURITY DEFINER`
+-- function is anon-callable the moment it is created. `state-of-play.md`
+-- records that the anon-executable ones all fail safe, by three different
+-- routes. That is a property of each function body, not of the grants — and
+-- this default is why it has to be checked for every new one.
+
+
+-- ── 2. TABLE-LEVEL GRANTS ──────────────────────────────────────────────────
+--
+-- Thirteen tables in `public`. Every one of them grants all eight privileges
+-- to all four of `anon`, `authenticated`, `postgres` and `service_role` —
+-- which is exactly what the default privileges above produce — with ONE
+-- exception, and the exception is the whole point of the file.
+--
+--   access_requests   anon, authenticated, postgres, service_role   ALL 8
+--   availability      anon, authenticated, postgres, service_role   ALL 8
+--   calendar_tokens   anon, authenticated, postgres, service_role   ALL 8
+--   clubs             anon, authenticated, postgres, service_role   ALL 8
+--   events            anon, authenticated, postgres, service_role   ALL 8
+--   invite_targets    anon, authenticated, postgres, service_role   ALL 8
+--   invites           anon, authenticated, postgres, service_role   ALL 8
+--   memberships       anon, authenticated, postgres, service_role   ALL 8
+--   player_contacts   anon, authenticated, postgres, service_role   ALL 8
+--   player_parents    anon, authenticated, postgres, service_role   ALL 8
+--   players           anon, authenticated, postgres, service_role   ALL 8
+--   teams             anon, authenticated, postgres, service_role   ALL 8
+--
+--   profiles          anon, postgres, service_role                  ALL 8
+--   profiles          authenticated    ← NO UPDATE. DELETE, INSERT, MAINTAIN,
+--                                        REFERENCES, SELECT, TRIGGER, TRUNCATE
+--
+-- "ALL 8" throughout means:
+--   DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+-- (`MAINTAIN` is new in Postgres 17. A capture taken against an older server
+-- will show seven and that is a version difference, not drift.)
+--
+-- ⚠️ THE ASYMMETRY IS DELIBERATE BUT ONE-SIDED, AND WAS NOT WRITTEN DOWN
+-- ANYWHERE UNTIL NOW. `20260808_profile_phone_and_column_grants.sql` revoked
+-- table-level UPDATE on `profiles` from `authenticated` and granted it back on
+-- five named columns. It did NOT revoke it from `anon`, which still holds
+-- table-level UPDATE on `profiles`.
+--
+-- Measured, not assumed: `anon` is stopped by RLS alone. Both UPDATE policies
+-- on `profiles` are role `PUBLIC` — so they do apply to `anon` — and both fail
+-- for a null uid:
+--     profile update own          USING (id = auth.uid())
+--     profile update club admin   USING private.shares_admin_club(id)
+-- `id = null` is null, not true, and an anonymous caller shares no admin club.
+-- So there is no live hole. But the defence-in-depth that `authenticated` has
+-- is absent for `anon`, and the belt is doing the work the braces were added
+-- for. Recorded rather than changed: revoking it is a one-line migration with
+-- a real chance of breaking a signup path nobody has re-tested.
+
+
+-- ── 3. COLUMN-LEVEL GRANTS ─────────────────────────────────────────────────
+--
+-- The only column-level grants in the entire `public` schema. Five columns of
+-- one table, and they exist because table-level UPDATE was taken away above.
+--
+--   profiles.first_name         authenticated   UPDATE
+--   profiles.full_name          authenticated   UPDATE
+--   profiles.last_name          authenticated   UPDATE
+--   profiles.name_confirmed_at  authenticated   UPDATE
+--   profiles.phone              authenticated   UPDATE
+--
+-- ⚠️ WHAT IS NOT ON THAT LIST IS THE POINT. `profiles` has eight columns; the
+-- three excluded are:
+--
+--   id          — the auth user id. The join to `auth.users` and to every
+--                 membership row.
+--   created_at  — audit.
+--   email       — ⚠️ THE ONE THAT MATTERS. This is the login identity. Without
+--                 the revoke, `profile update own` (USING id = auth.uid())
+--                 would let any signed-in member rewrite their own row's email
+--                 — and `profile update club admin` would let a club admin
+--                 rewrite ANY member's. The RLS policy authorises the ROW; only
+--                 the column grant limits WHICH FIELDS. Nothing else in the
+--                 database stops it.
+--
+-- ⚠️ SO THE POLICY LIST AND THE POLICY BODIES CANNOT TELL YOU THIS. Reading
+-- `policies.sql` alone, `profile update own` looks like "a member may edit
+-- their own profile", full stop. The five-column ceiling on that sentence lives
+-- only here and in the migration. That gap is why this file had to exist.
+--
+-- Adding a column to `profiles` therefore has a decision attached: a new column
+-- is NOT updatable by a member until it is granted, and it SHOULD only be
+-- granted if a member editing it is intended. The failure mode is silent in
+-- both directions — an ungranted column makes a save fail with a permission
+-- error that looks like RLS, and an over-granted one hands out a field nobody
+-- meant to expose.
+--
+-- Checked by `db/tests/grants.sql`, which asserts this list exactly and fails
+-- loudly on either kind of drift.
