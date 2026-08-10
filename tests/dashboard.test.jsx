@@ -475,7 +475,7 @@ describe('Dashboard — next fixture hero', () => {
 })
 
 describe('Dashboard — stats', () => {
-  it('counts players in scope, fixtures still to play, and age groups', async () => {
+  it('counts players in scope, fixtures still to play, and matches needing a score', async () => {
     renderDashboard()
     await screen.findByTestId('stat-players')
 
@@ -489,7 +489,45 @@ describe('Dashboard — stats', () => {
     // training twice a week read "26 fixtures to play" with no match entered.
     // NEXT_MATCH is the only one still to come.
     expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('1')
-    expect(screen.getByTestId('stat-groups')).toHaveTextContent('2')
+
+    // ⚠️ REPLACED "AGE GROUPS" (which asserted '2') ON 10 Aug 2026. That tile
+    // counted `scopedTeams.length` — how the club is CONFIGURED — at 42px in
+    // the loudest element on the screen, and it was the one number on the band
+    // nobody could act on.
+    //
+    // ONE, and the fixture list is built so that only one thing can produce it:
+    //   PAST_UNSCORED  past match, no score   <- the only one that counts
+    //   PAST_SOCIAL    past, but a social     <- cannot carry a score
+    //   LAST_RESULT    past match, scored
+    //   OLDER_RESULT   past match, scored
+    //   NEXT_MATCH     a match, but not played yet
+    // So a count of 2 means socials are being counted, 3 means scored matches
+    // are, and 4 means it is not filtering at all.
+    expect(screen.getByTestId('stat-needs-score')).toHaveTextContent('1')
+  })
+
+  it('counts nothing when every played match has a score', async () => {
+    // ⚠️ THE INJECTED FAULT FOR THE TEST ABOVE. Without this, a tile hard-coded
+    // to "1" — or one counting any single past event — passes there and is
+    // wrong everywhere. Zero is a real answer on this band: "nothing is waiting
+    // on you" is what a management summary should be able to say.
+    listEventsMock.mockResolvedValue([NEXT_MATCH, SOONER_TRAINING, PAST_SOCIAL, LAST_RESULT])
+
+    renderDashboard()
+    await screen.findByTestId('stat-needs-score')
+
+    expect(screen.getByTestId('stat-needs-score')).toHaveTextContent('0')
+  })
+
+  it('does not count a match that has not kicked off yet', async () => {
+    // The boundary. `<= now` and not `< now`: a match starting this instant has
+    // not been played, so nobody owes a score for it.
+    listEventsMock.mockResolvedValue([NEXT_MATCH])
+
+    renderDashboard()
+    await screen.findByTestId('stat-needs-score')
+
+    expect(screen.getByTestId('stat-needs-score')).toHaveTextContent('0')
   })
 
   // ⚠️ SPACING, PINNED AS A CLASS TOKEN. jsdom applies no CSS, so nothing
@@ -524,7 +562,6 @@ describe('Dashboard — stats', () => {
     await screen.findByTestId('stat-players')
 
     expect(screen.getByTestId('stat-players')).toHaveTextContent(/registered players/i)
-    expect(screen.getByTestId('stat-groups')).toHaveTextContent(/age groups/i)
   })
 
   it('labels the tiles as the user’s own slice when they are not an admin', async () => {
@@ -533,7 +570,20 @@ describe('Dashboard — stats', () => {
     await screen.findByTestId('stat-players')
 
     expect(screen.getByTestId('stat-players')).toHaveTextContent(/players in view/i)
-    expect(screen.getByTestId('stat-groups')).toHaveTextContent(/your groups/i)
+  })
+
+  // ⚠️ THE ONE LABEL THAT DOES NOT VARY BY ROLE, and deliberately so. "Age
+  // groups"/"Your groups" changed wording because a count of the whole club
+  // and a count of your own squads are different facts. A match with no score
+  // is the same fact either way — it is scoped by what the reader can see, not
+  // reworded — so an admin and a coach get the same words.
+  it('labels the score backlog the same for everyone who can see it', async () => {
+    for (const memberships of [ADMIN, COACH]) {
+      useMembershipsMock.mockReturnValue(membershipValue(memberships))
+      const { unmount } = renderDashboard()
+      expect(await screen.findByTestId('stat-needs-score')).toHaveTextContent(/needs a score/i)
+      unmount()
+    }
   })
 
   // Staff only, from 6 Aug 2026. Squad size, fixtures left and group count are
@@ -552,7 +602,7 @@ describe('Dashboard — stats', () => {
 
       expect(screen.queryByTestId('stat-players')).not.toBeInTheDocument()
       expect(screen.queryByTestId('stat-fixtures')).not.toBeInTheDocument()
-      expect(screen.queryByTestId('stat-groups')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('stat-needs-score')).not.toBeInTheDocument()
     })
 
     it.each([
@@ -566,7 +616,7 @@ describe('Dashboard — stats', () => {
       renderDashboard()
       expect(await screen.findByTestId('stat-players')).toBeInTheDocument()
       expect(screen.getByTestId('stat-fixtures')).toBeInTheDocument()
-      expect(screen.getByTestId('stat-groups')).toBeInTheDocument()
+      expect(screen.getByTestId('stat-needs-score')).toBeInTheDocument()
     })
 
     it('leaves the rest of the parent home screen intact', async () => {
