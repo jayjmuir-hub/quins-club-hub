@@ -10,6 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — a repeating series can be EDITED, not just cancelled.** Deleting a series
+  shipped 8 Aug; editing one did not. `EventForm` now offers "Apply to this and every
+  later session" when the event has a `series_id`, ⚠️ **defaulting to OFF** — the wider
+  choice rewrites a term and there is no undo, so it must be reached for on purpose.
+  ⚠️ **TWO WRITES, BECAUSE THE TIME CANNOT BE THE SAME STATEMENT.** `updateSeriesFrom`
+  sets the date-independent fields (`type`, `title`, `opponent`, `home`, `venue`,
+  `competition`, `pitch`, `notes`) in one PostgREST update. The time cannot work that
+  way — **each occurrence has its own DATE**, so "move to 18:30 for the rest of term"
+  is a different `starts_at` per row. That goes through a new RPC,
+  `public.set_series_time_from`. Client-side it would be N round trips and non-atomic:
+  half a term moved, half not, and nothing on screen saying which.
+  ⚠️ **The RPC is SECURITY INVOKER — the only one in the schema that is, and that is
+  the safety argument.** The UPDATE is evaluated as the caller, so `event edit`
+  (`private.can_edit_team`) filters it exactly as it filters a PostgREST update. It
+  grants nothing. A DEFINER version would have to re-implement that check by hand,
+  including the status gate added hours earlier.
+  ⚠️ **Duration is preserved, not recomputed** — `ends_at` moves with `starts_at`, so a
+  90-minute session stays 90 minutes and a null stays null. Verified live in a
+  rolled-back transaction: three sessions at 18:00, moved from the second onward — the
+  first stayed put and all three stayed 90 minutes.
+  ⚠️ **The field list is opt-in.** Adding a column to `events` does NOT make it
+  series-editable; `starts_at`/`ends_at`, the scores and `team_id` are excluded by
+  name, because the cost of getting it wrong is rewriting a term.
+  ⚠️ **FUTURE ONLY and `>=` not `>`**, matching the delete's ruling: sessions already
+  played keep their results and attendance, and the occurrence being edited moves too.
+  ⚠️ **A fault injection exposed a weak test, and it was fixed rather than accepted.**
+  Swapping `.gte` for `.gt` first failed with "gt is not a function" — red by CRASHING
+  on a missing mock method, which proves the line was touched but not that the test
+  knows what it should say. The mock now supports `gt`, so the same swap fails on the
+  assertion instead. **A test that only crashes is not a test that checks.**
+  ⚠️ `group_id` (multi-squad fan-out) is still deliberately NOT handled, exactly as
+  `deleteSeriesFrom` does not handle it — Jay deferred it 8 Aug.
+- `a72d07b` — **`can_edit_team` checks membership status.**
+
 - **10 Aug — `private.can_edit_team` now checks membership status.**
   `db/migrations/20260810_can_edit_team_status.sql`. ⚠️ **This overturns a DELIBERATE
   decision, not an oversight** — `20260808_membership_pending_status.sql` states in as

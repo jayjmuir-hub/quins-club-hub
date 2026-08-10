@@ -273,3 +273,48 @@ export async function deleteSeriesFrom(seriesId, fromStartsAt) {
   window.__writes.push({ op: 'delete-series', seriesId, fromStartsAt, count: rows.length })
   return rows
 }
+
+// The series EDIT pair, mirroring the real module's split: one statement for
+// the fields whose value is the same on every occurrence, and an RPC for the
+// time, which is computed from each occurrence's own date. Both record what
+// they were asked to do on window.__writes so the browser check can assert the
+// scope without a database.
+export const SERIES_EDITABLE_FIELDS = [
+  'type',
+  'title',
+  'opponent',
+  'home',
+  'venue',
+  'competition',
+  'pitch',
+  'notes',
+]
+
+export async function updateSeriesFrom(seriesId, fromStartsAt, patch) {
+  const fields = Object.fromEntries(
+    Object.entries(patch ?? {}).filter(([key]) => SERIES_EDITABLE_FIELDS.includes(key)),
+  )
+  if (Object.keys(fields).length === 0) return []
+  const rows = EVENTS.filter(
+    (event) => event.series_id === seriesId && event.starts_at >= fromStartsAt,
+  )
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'update-series', seriesId, fromStartsAt, fields, count: rows.length })
+  return rows
+}
+
+export async function setSeriesTimeFrom(seriesId, fromStartsAt, hours, minutes) {
+  const rows = EVENTS.filter(
+    (event) => event.series_id === seriesId && event.starts_at >= fromStartsAt,
+  )
+  window.__writes = window.__writes || []
+  window.__writes.push({
+    op: 'set-series-time',
+    seriesId,
+    fromStartsAt,
+    hours,
+    minutes,
+    count: rows.length,
+  })
+  return rows
+}

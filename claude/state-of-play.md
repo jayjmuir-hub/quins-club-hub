@@ -483,8 +483,18 @@ state; trust the decisions for reasoning.**
   "Nothing on in the next two weeks" instead of drawing fourteen dead cells —
   ⚠️ **as a sentence, not `<Empty>`**, whose 42px icon and `py-11` would make the
   nothing-on case TALLER than the something-on case.
-- No way to edit or cancel a whole group or series. `group_id` and `series_id` are
-  in place as the hook.
+- ✅ **A SERIES can now be edited as well as cancelled** (10 Aug). `EventForm` offers
+  "Apply to this and every later session" when the event has a `series_id`, defaulting
+  OFF. ⚠️ **Two writes**: `updateSeriesFrom` for the date-independent fields, and the
+  RPC `public.set_series_time_from` for the time — which cannot be one PostgREST
+  update because each occurrence has its own DATE. ⚠️ **That RPC is the only SECURITY
+  INVOKER function in the schema, deliberately**: RLS filters the UPDATE as the
+  caller, so it grants nothing. ⚠️ **Field list is opt-in** — a new `events` column is
+  not series-editable until named.
+  ⚠️ **A GROUP (`group_id`, the multi-squad fan-out) still cannot be edited or
+  cancelled as a unit** — deferred by Jay 8 Aug, and neither the delete nor the edit
+  path touches it. Reaching across squads has a different blast radius, because there
+  RLS would make the write genuinely partial rather than all-or-nothing.
 - A managed pitch list is the precondition for clash detection.
 - Nothing in the UI distinguishes a Medic from a Coach, because there is no
   difference in access. Deliberate — the word is what distinguishes them.

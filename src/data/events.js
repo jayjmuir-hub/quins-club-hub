@@ -216,3 +216,97 @@ export async function deleteSeriesFrom(seriesId, fromStartsAt) {
   if (!data || data.length === 0) throw new Error(REFUSED_DELETE)
   return data
 }
+
+// --- Editing a repeating series ----------------------------------------
+//
+// Same ruling as the delete above and the same reasons: FUTURE ONLY
+// (`starts_at >=`, so the occurrence being edited moves too), series_id only,
+// and count the rows rather than trusting a missing error.
+//
+// ⚠️ THE FIELD LIST IS THE WHOLE DESIGN. These are the columns whose value is
+// the SAME on every occurrence, so one UPDATE can set them. Everything else is
+// excluded on purpose:
+//
+//   starts_at / ends_at   per occurrence — each row has its own DATE. One
+//                         value across a series would collapse a term onto a
+//                         single day. Time-of-day goes through
+//                         setSeriesTimeFrom below, which is why it exists.
+//   result_us/them        a score belongs to one match and nothing else.
+//   team_id               moving a series between squads changes who can see
+//                         and edit it. A different question, not answered here.
+//   series_id / group_id  the identity being filtered on.
+//
+// ⚠️ ADDING A COLUMN TO `events` DOES NOT ADD IT HERE, deliberately. A new
+// column is opted IN to series-wide editing, never defaulted in, because the
+// cost of getting it wrong is rewriting a term's worth of rows.
+export const SERIES_EDITABLE_FIELDS = [
+  'type',
+  'title',
+  'opponent',
+  'home',
+  'venue',
+  'competition',
+  'pitch',
+  'notes',
+]
+
+/**
+ * Applies the date-independent fields of `patch` to the occurrence starting at
+ * `fromStartsAt` and every later one in the same series.
+ *
+ * Returns THE ROWS ACTUALLY UPDATED, for the reason deleteSeriesFrom returns
+ * its rows: RLS does not raise on a row it will not let you touch — it filters
+ * that row out of the statement and PostgREST answers 200 with whatever
+ * survived. Ten asked for, three written, no error anywhere.
+ *
+ * Zero rows back is a flat refusal and throws.
+ */
+export async function updateSeriesFrom(seriesId, fromStartsAt, patch) {
+  const fields = Object.fromEntries(
+    Object.entries(patch ?? {}).filter(([key]) => SERIES_EDITABLE_FIELDS.includes(key)),
+  )
+  // Nothing series-wide to write is not an error: the caller may be changing
+  // only the time, which setSeriesTimeFrom handles.
+  if (Object.keys(fields).length === 0) return []
+
+  const { data, error } = await supabase
+    .from('events')
+    .update(fields)
+    .eq('series_id', seriesId)
+    .gte('starts_at', fromStartsAt)
+    .select()
+
+  if (error) throw error
+  if (!data || data.length === 0) throw new Error(REFUSED)
+  return data
+}
+
+/**
+ * Moves the TIME OF DAY of this occurrence and every later one in the series,
+ * keeping each occurrence's own date and its duration.
+ *
+ * ⚠️ AN RPC BECAUSE IT CANNOT BE ONE POSTGREST UPDATE. Every other series-wide
+ * field takes the same value on every row; the time does not — each
+ * occurrence's new `starts_at` is computed from ITS OWN date. Doing that
+ * client-side would be N round trips and non-atomic, leaving half a term at
+ * the old time with nothing on screen saying which half.
+ *
+ * `public.set_series_time_from` is SECURITY INVOKER, so `event edit`
+ * (private.can_edit_team) filters the UPDATE exactly as it filters this one.
+ * The function grants nothing.
+ *
+ * Hours and minutes are CLUB wall-clock (Asia/Dubai), matching the form's time
+ * input — not the reader's zone and not UTC.
+ */
+export async function setSeriesTimeFrom(seriesId, fromStartsAt, hours, minutes) {
+  const { data, error } = await supabase.rpc('set_series_time_from', {
+    _series: seriesId,
+    _from: fromStartsAt,
+    _hh: hours,
+    _mm: minutes,
+  })
+
+  if (error) throw error
+  if (!data || data.length === 0) throw new Error(REFUSED)
+  return data
+}
