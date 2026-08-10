@@ -523,7 +523,22 @@ state; trust the decisions for reasoning.**
   cancelled as a unit** — deferred by Jay 8 Aug, and neither the delete nor the edit
   path touches it. Reaching across squads has a different blast radius, because there
   RLS would make the write genuinely partial rather than all-or-nothing.
-- A managed pitch list is the precondition for clash detection.
+- ✅ **A managed pitch list exists** (`public.pitches`, 11 Aug): **A1-A4, B1, C1-C5,
+  D1-D5** — fifteen, the club's real pitches. Clash detection is built on it
+  (`findPitchClashes` in `src/data/pitches.js`) and **reports rather than refuses** —
+  a multi-squad fan-out sharing a `group_id` is NOT a clash, touching is not
+  overlapping, and `Pitch TBD` never clashes.
+  ⚠️ **`events.pitch` is still TEXT with no foreign key**, on purpose: `Pitch TBD` is
+  a placeholder rather than a pitch and a key would force it to be a fake row or NULL.
+  ⚠️ **The first version of the list was seeded from `events.pitch` and was almost
+  entirely SEED DATA** — 16 of 22 allocations came from the seeded September. Caught
+  only because Jay read the list. **A list seeded from data is only as real as the
+  data.**
+  ⚠️ **16 events still name a pitch outside the list; all 16 are from the seeded
+  September** and go when it does. No real fixture is orphaned.
+  ⚠️ **Still missing: the pitch management screen (add/rename/retire) and the pitch +
+  referee request workflow.** The data layer for both exists; the screens do not, and
+  the request flow needs a ruling on who requests, who approves and who is notified.
 - Nothing in the UI distinguishes a Medic from a Coach, because there is no
   difference in access. Deliberate — the word is what distinguishes them.
 - ⚠️ **A SUPER-ADMIN TIER IS WANTED — decided 10 Aug, NOT YET BUILT.** Candice, Nick
