@@ -10,6 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the screen that assigns admin rights.** `AdminRightsEditor`, rendered
+  under each ADMIN membership in the Accounts editor, **for a super admin only**.
+  Three tickboxes (Youth Manager, Social Media Manager, Pitch Manager) plus a Super
+  admin toggle, saving on every tick rather than behind a Save button that can be
+  forgotten. ⚠️ **Hiding it from an ordinary admin is NOT the enforcement** — the
+  column grant and the `set_admin_rights` RPC are, and this repo's rule stands: a
+  screen that hides a row is not security. The gate exists so an ordinary admin is
+  not offered a control that could only fail.
+  ⚠️ **A REFUSED SAVE PUTS THE TICK BACK.** The write is optimistic, so without the
+  revert somebody walks away certain that Nick is a Pitch Manager while the database
+  disagrees — the lying-UI failure. Proved by deleting the revert: the test fails.
+  ⚠️ **A super admin's boxes show ticked AND disabled**, because a super admin holds
+  every right implicitly and empty boxes would read as "no rights", the opposite of
+  the truth.
+  ⚠️ **Both of Jay's accounts are now super** — `jayjmuir@gmail.com` and the backup
+  `jayjmuir@yahoo.com`. A single super account is one lost password away from needing
+  SQL to recover; the cost is that two accounts can hand out club-wide authority.
+  `reynekeett@gmail.com` is a **legitimate** third admin, confirmed by Jay, ordinary
+  not super — recorded so it is not raised again as a stray.
+  ⚠️ **A fault injection could not be reverted by `git checkout --`** because the
+  file was UNTRACKED, so the restore silently did nothing and left the injected fault
+  in the working tree. Caught by re-grepping for the line afterwards. **Check the
+  restore, not just the injection** — the third variant of this trap today.
+- `10283a9` — **The super-admin tier and per-admin rights (foundation).**
+
 - **10 Aug — the super-admin tier and per-admin rights. FOUNDATION ONLY: no
   dashboard uses a right yet.** The model Jay asked for: base admin unchanged
   (full club data), **admin rights** as ADDITIVE specialist capabilities —

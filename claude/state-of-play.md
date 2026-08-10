@@ -125,8 +125,15 @@ Durable. Each cost real time to find.
   path is still unexercised by a real second person.
 - Removing the Resend cap is **pay-as-you-go, ~$0.90 per 1,000**. A purchase, so
   **Jay does it, not the assistant.**
-- **`jayjmuir@yahoo.com` is Jay's deliberate backup ADMIN.** Any "a coach cannot see
-  X" test using it is invalid. Use a purpose-made account.
+- **`jayjmuir@yahoo.com` is Jay's deliberate backup — and as of 10 Aug 2026 a backup
+  SUPER admin.** Any "a coach cannot see X" test using it is invalid. Use a
+  purpose-made account. ⚠️ **Both of Jay's accounts are super**, on purpose: the flag
+  can only be granted by an existing super admin, so a single super account is one
+  lost password away from needing SQL to recover. ⚠️ **It also means two accounts can
+  hand out club-wide authority**, so the backup is no longer merely a way back in.
+- **`reynekeett@gmail.com` is a THIRD, LEGITIMATE admin — confirmed by Jay 10 Aug**
+  after it was flagged as unrecognised. Ordinary admin, not super. Recorded so the
+  next session does not raise it again as a stray.
 - **No rate limit on account creation** — only on what an account can do, which
   without a membership is nothing.
 
