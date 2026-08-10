@@ -4,7 +4,7 @@ import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import RosterTable from '../components/RosterTable.jsx'
-import TeamPills, { ALL_TEAMS_ID } from '../components/TeamPills.jsx'
+import TeamFilter, { ALL_TEAMS_ID } from '../components/TeamFilter.jsx'
 import PlayerDetail from './PlayerDetail.jsx'
 import PlayerForm from './PlayerForm.jsx'
 import MyPlayerForm from './MyPlayerForm.jsx'
@@ -474,10 +474,12 @@ export default function Roster() {
 
       {scopedTeams.length > 1 && (
         <div className="mb-4">
-          {/* Live counts per pill (design-system.md §4.8, e.g. "U10 · 9"),
+          {/* Live counts on each option (design-system.md §4.8 specifies them
+              on pills, e.g. "U10 · 9"; the row became a select on 10 Aug and
+              they moved into the option labels rather than being dropped),
               computed from the search alone so the row reads as "where did my
               matches land" whichever pill is selected. */}
-          <TeamPills
+          <TeamFilter
             teams={scopedTeams}
             counts={pillCounts}
             selected={activeFilter}

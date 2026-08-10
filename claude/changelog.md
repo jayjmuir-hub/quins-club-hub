@@ -10,7 +10,57 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
-- **10 Aug — the club-wide contact list is no longer kept on people's devices.**
+- **10 Aug — the squad filter became a select. It was a pill row.**
+  design-system.md §4.8 specifies a `.pill-row` here and it was right when it
+  was written — against four age groups. At 18 it wrapped to FOUR lines on a
+  laptop, putting ~150px of filter chrome above the first fixture on Schedule:
+  sub-tabs, four lines of squad pills, then the event-type row. The controls
+  took more of the screen than the thing being controlled. ⚠️ **And most of
+  them led nowhere** — two squads had events, thirteen pills opened an empty
+  list; on Roster the row said so out loud, "U6 Tag · 0" four lines deep.
+  A select is one line at any club size, which is what matters for a club
+  heading to 600-700 players. ⚠️ **The cost, recorded so nobody re-litigates it
+  blind:** one tap to switch squad becomes tap-choose-dismiss. Judged worth it
+  because fifteen pills over three lines is not a control anyone reads. Jay's
+  call. ⚠️ The per-squad COUNTS survived into the option labels — they are why
+  the Roster row was tolerable at all. ⚠️ `PillButton` stays: Schedule's
+  sub-tabs and event-type row are still pill rows and correctly so, at four
+  options each. `TeamPills.jsx` renamed to `src/components/TeamFilter.jsx`.
+- **10 Aug — the three senior squads removed from the live database.**
+  Senior Men 1st XV, Senior Men 2nd XV and Women's XV, all with zero players,
+  events, memberships, invites and invite targets — verified before the delete,
+  so nothing cascaded. 15 age groups now, all youth. ⚠️ **CONSEQUENCE:**
+  `register_my_player` picks 'player' or 'parent' from `teams.is_senior`, so
+  with no senior squad every self-registration now creates a parent. Dormant,
+  not broken — it returns with the first senior side. Restore SQL is in the
+  commit that removed them.
+- **10 Aug — the fixture row stopped saying the same word twice, and a known
+  pitch now reads louder than a TBD one.** A training titled "Training" rendered
+  a green "Training" chip with a bold "Training" heading directly beneath it —
+  the row's two heaviest treatments carrying one fact. `titleRepeatsType` in
+  `src/lib/eventFormat.js` drops the echo, so the bold line in a list belongs
+  only to matches and to sessions somebody named ("Extra session before
+  Saracens" keeps its title). Venue and pitch are now separate elements so a
+  known pitch can sit a step darker. ⚠️ **`Pitch TBD` still renders** — Jay's
+  ruling: without it nobody can tell "no pitch allocated yet" from "the app
+  didn't say", and the calendar feed already argues the same for LOCATION.
+  ⚠️ The KNOWN pitch is darkened rather than the TBD lightened: `ink-faint` is
+  already the lightest AA-safe token on that surface.
+  ⚠️ **A LARGER RESTRUCTURE WAS PROPOSED AND REJECTED ON EVIDENCE.** Grouping
+  the schedule by month with hoisted constants was designed and agreed — then
+  a realistic September was seeded and the existing list read fine, because
+  matches, socials and a second squad break up the trainings on their own. The
+  "wall of identical rows" was an artefact of a database holding one squad and
+  one repeating series. Judge list density against real data, not seed data.
+- **10 Aug — a realistic September seeded into the live database.** Sixteen
+  events for U16B and U16G: four matches across three venues, a named extra
+  session, a barbecue, and one back-dated result so Results and the dashboard's
+  Last result card are not empty. All carry
+  `group_id = 5eed0000-0000-4000-8000-000000000001`, so
+  `delete from events where group_id = '5eed0000-0000-4000-8000-000000000001'`
+  removes every one and touches nothing else. Inserts only — no existing row
+  was modified.
+- `38b82a9` — **The club-wide contact list is no longer kept on people's devices.**
   Jay's call: keep the offline copy where it earns its place and drop it where
   it does not. `addf3c4` purges the cache when the signed-in person changes,
   which closes the one-device-two-people hole — but it cannot help with a phone

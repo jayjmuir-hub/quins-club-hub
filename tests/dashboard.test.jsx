@@ -435,10 +435,15 @@ describe('Dashboard — stats', () => {
     await screen.findByTestId('stat-players')
 
     expect(screen.getByTestId('stat-players')).toHaveTextContent('3')
-    // Only NEXT_MATCH and SOONER_TRAINING are still to come. The two scored
-    // fixtures are results; PAST_UNSCORED and PAST_SOCIAL have already
-    // happened, whether or not anyone can ever score them.
-    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('2')
+    // ⚠️ ONE, NOT TWO — REPOINTED 10 Aug 2026, AND THIS TEST WAS PINNING THE
+    // BUG. It read '2' and its own comment explained why: "Only NEXT_MATCH and
+    // SOONER_TRAINING are still to come." A training is not a fixture. The
+    // tile is labelled "Fixtures to play" and this codebase had already
+    // written the rule down — see nextEventLabel in src/lib/eventFormat.js:
+    // "'Fixture' is not a loose synonym for 'event' in rugby". Live, a squad
+    // training twice a week read "26 fixtures to play" with no match entered.
+    // NEXT_MATCH is the only one still to come.
+    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('1')
     expect(screen.getByTestId('stat-groups')).toHaveTextContent('2')
   })
 
@@ -623,7 +628,11 @@ describe('Dashboard — upcoming list and last result', () => {
     // question.
     expect(titles).not.toContain('Quins vs Dubai Exiles')
 
-    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('2')
+    // ⚠️ The LIST above is still every event type — that is this test's point
+    // and it is unchanged. Only the COUNT narrowed to matches (10 Aug 2026):
+    // of the two future events, "U10 skills session" is a training, so one
+    // fixture is still to play. See the note on the stats test above.
+    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('1')
   })
 
   it('shows the most recent scored fixture as the last result', async () => {

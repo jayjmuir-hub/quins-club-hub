@@ -374,10 +374,39 @@ describe('Pitch', () => {
     expect(screen.queryByText('Pitch')).not.toBeInTheDocument()
   })
 
+  // ⚠️ REPOINTED, NOT WEAKENED. This asserted the single string
+  // "Zayed Sports City, Abu Dhabi · Pitch 4", which was venueLine()'s output.
+  // FixtureRow now renders the two separately so a KNOWN pitch can be set a
+  // step darker than the rest of the meta line — the invariant the test exists
+  // for (the pitch reaches the row alongside its venue) is unchanged, and is
+  // still asserted; only the markup it arrives in has.
   it('rides along with the venue on a fixture row', () => {
     render(<FixtureRow event={EXISTING_TRAINING} teamName="U12" onSelect={vi.fn()} />)
 
-    expect(screen.getByText('Zayed Sports City, Abu Dhabi · Pitch 4')).toBeInTheDocument()
+    expect(screen.getByText('Zayed Sports City, Abu Dhabi')).toBeInTheDocument()
+    expect(screen.getByText('Pitch 4')).toBeInTheDocument()
+  })
+
+  // The point of separating them. A pitch someone can walk to is emphasised;
+  // "Pitch TBD" is a status and stays at the meta line's weight.
+  it('emphasises a known pitch and leaves a TBD one at the meta weight', () => {
+    const { rerender } = render(
+      <FixtureRow event={EXISTING_TRAINING} teamName="U12" onSelect={vi.fn()} />,
+    )
+    expect(screen.getByText('Pitch 4').className).toMatch(/text-ink-muted/)
+
+    rerender(
+      <FixtureRow
+        event={{ ...EXISTING_TRAINING, pitch: 'Pitch TBD' }}
+        teamName="U12"
+        onSelect={vi.fn()}
+      />,
+    )
+    // ⚠️ STILL RENDERED. Jay's ruling: without it nobody can tell "no pitch
+    // allocated yet" from "the app didn't say".
+    const tbd = screen.getByText('Pitch TBD')
+    expect(tbd).toBeInTheDocument()
+    expect(tbd.className).not.toMatch(/text-ink-muted/)
   })
 
   it('leaves a venue-only fixture row exactly as it was', () => {

@@ -390,6 +390,22 @@ export default function Dashboard() {
     }),
     'asc',
   )
+  // ⚠️ MATCHES ONLY, AND THE STAT TILE IS THE ONLY THING THAT USES IT.
+  // "Fixtures to play" counted `toPlay` — every future event — so a squad
+  // training twice a week read "26 fixtures to play" before a single match had
+  // been entered. Jay spotted it on 10 Aug 2026.
+  //
+  // The vocabulary rule was already written down in this codebase and this
+  // screen broke it anyway: nextEventLabel's own comment says "'Fixture' is
+  // not a loose synonym for 'event' in rugby — it means a match against
+  // another side, which is exactly the thing a parent is checking for." The
+  // hero was fixed to respect that on 6 Aug; the tile beneath it was not.
+  //
+  // ⚠️ `toPlay` ITSELF IS UNCHANGED and must stay that way — the fortnight
+  // strip and the Upcoming list both want every event type, and narrowing it
+  // would empty both of training.
+  const fixturesToPlay = toPlay.filter((event) => event.type === 'match')
+
   const results = sortByStart(events.filter(hasResult), 'desc')
   const lastResult = results[0] ?? null
 
@@ -509,7 +525,11 @@ export default function Dashboard() {
             value={players.length}
             label={admin ? 'Registered players' : 'Players in view'}
           />
-          <StatTile testId="stat-fixtures" value={toPlay.length} label="Fixtures to play" />
+          <StatTile
+            testId="stat-fixtures"
+            value={fixturesToPlay.length}
+            label="Fixtures to play"
+          />
           <StatTile
             testId="stat-groups"
             value={scopedTeams.length}

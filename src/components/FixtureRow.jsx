@@ -8,7 +8,7 @@ import {
   resultLabel,
   resultOutcome,
   resultScore,
-  venueLine,
+  titleRepeatsType,
 } from '../lib/eventFormat.js'
 
 // Fixture / event row (design-system.md §4.13) — "the single most-reused
@@ -41,10 +41,22 @@ function PinIcon(props) {
   )
 }
 
+// A pitch is "known" when it names one. Anything a coach types to mean "not
+// decided" is not — matched loosely because the value is free text typed into
+// a form, so "TBC", "tbd" and "Pitch TBD" all arrive in practice.
+function isKnownPitch(value) {
+  const pitch = String(value ?? '').trim().toLowerCase()
+  if (!pitch) return false
+  return !/\b(tbd|tba|tbc)\b/.test(pitch)
+}
+
 export function FixtureRow({ event, teamName, onSelect }) {
   const date = eventDate(event)
   const { month, day, weekday } = dateBoxParts(date)
   const played = hasResult(event)
+  const venue = (event?.venue ?? '').trim()
+  const pitch = (event?.pitch ?? '').trim()
+  const pitchIsKnown = isKnownPitch(pitch)
 
   return (
     <button
@@ -68,19 +80,42 @@ export function FixtureRow({ event, teamName, onSelect }) {
           <Chip type={event.type}>{TYPE_LABELS[event.type] ?? 'Event'}</Chip>
           {teamName && <Chip>{teamName}</Chip>}
         </span>
-        <span data-testid="fixture-title" className="block text-[15.5px] font-extrabold text-ink">
-          {eventTitle(event)}
-        </span>
+        {/* ⚠️ DROPPED WHEN IT ONLY ECHOES THE CHIP ABOVE IT — see
+            titleRepeatsType in src/lib/eventFormat.js. A training called
+            "Training" said the same word twice, in the row's two heaviest
+            treatments, one above the other. With it gone the bold line belongs
+            to matches and to sessions someone actually named, so scanning a
+            month for what is different is reading the bold lines. */}
+        {!titleRepeatsType(event) && (
+          <span data-testid="fixture-title" className="block text-[15.5px] font-extrabold text-ink">
+            {eventTitle(event)}
+          </span>
+        )}
         <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12.5px] text-ink-faint">
           <span className="flex items-center gap-1">
             <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
             {formatTime(date)}
           </span>
-          {venueLine(event) && (
+          {/* ⚠️ VENUE AND PITCH RENDERED SEPARATELY, not through venueLine().
+              A KNOWN pitch is the one thing a parent standing at a 12-pitch
+              complex needs (the same reasoning the calendar feed gives for
+              putting it in LOCATION), so it is set a step darker than the rest
+              of the meta line. "Pitch TBD" stays at the faint weight — it is a
+              status, not a destination, and Jay's ruling is that it must still
+              show: without it nobody can tell "no pitch allocated yet" from
+              "the app didn't say".
+              ⚠️ THE KNOWN PITCH IS DARKENED RATHER THAN THE TBD LIGHTENED.
+              ink-faint is already the lightest AA-safe token on this surface
+              (4.98:1); going below it to create the contrast would buy a visual
+              distinction with a contrast failure. */}
+          {venue && (
             <span className="flex items-center gap-1">
               <PinIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              {venueLine(event)}
+              {venue}
             </span>
+          )}
+          {pitch && (
+            <span className={pitchIsKnown ? 'font-semibold text-ink-muted' : ''}>{pitch}</span>
           )}
         </span>
       </span>

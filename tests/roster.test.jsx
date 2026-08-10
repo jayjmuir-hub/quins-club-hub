@@ -246,7 +246,7 @@ describe('Roster — grouping', () => {
     await screen.findByText('Tom Fletcher')
     expect(groupLabels()).toEqual(['U10', 'Senior Men 1st XV'])
 
-    await user.click(screen.getByRole('button', { name: /^U10/ }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u10')
 
     expect(groupLabels()).toEqual(['Forwards', 'Backs', 'Other'])
     expect(screen.queryByText('Craig Muir')).not.toBeInTheDocument()
@@ -301,16 +301,16 @@ describe('Roster — team filter pill counts', () => {
     const { user } = setup()
 
     await screen.findByText('Tom Fletcher')
-    expect(screen.getByRole('button', { name: 'All · 7' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'U10 · 6' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'All age groups · 7' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'U10 · 6' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /^U10/ }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u10')
 
     // Selecting U10 must not zero out the squads it hides, nor shrink "All"
     // to the size of the current selection.
-    expect(screen.getByRole('button', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'All · 7' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'All age groups · 7' })).toBeInTheDocument()
   })
 
   it('narrows the counts to the search', async () => {
@@ -319,9 +319,9 @@ describe('Roster — team filter pill counts', () => {
     await screen.findByText('Tom Fletcher')
     await user.type(screen.getByRole('searchbox'), 'craig')
 
-    expect(screen.getByRole('button', { name: 'All · 1' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'U10 · 0' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'All age groups · 1' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'U10 · 0' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
   })
 })
 
@@ -335,7 +335,7 @@ describe('Roster — a team filter that outlives its team', () => {
     const { user, rerender } = setup()
 
     await screen.findByText('Tom Fletcher')
-    await user.click(screen.getByRole('button', { name: /^U10/ }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u10')
     expect(screen.queryByText('Craig Muir')).not.toBeInTheDocument()
 
     useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', team_id: 'team-1xv' }]))
