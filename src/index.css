@@ -104,6 +104,15 @@
      proper fix and is a separate job; this gets the behaviour now without
      a 39-file sweep.
 
+     ⚠️ THAT PARAGRAPH IS NOW HALF TRUE, AND THE ROTTED HALF MATTERS.
+     `src/components/Button.jsx` DOES exist. Measured 10 Aug 2026: it is used
+     12 times, against 105 raw buttons still carrying hand-written class
+     strings — plus 16 distinct corner radii, and the `rounded-btn` token used
+     TWICE while its identical literal `rounded-[11px]` appears 117 times. The
+     "separate job" was started and never finished, so this rule is still
+     doing the work for the other 105. Do not delete it when the routing
+     lands — delete it when that count reaches zero.
+
      ⚠️ SPECIFICITY, AND WHY THE TRANSITION LISTS COLOURS TOO.
      `button:not(:disabled)` scores 0,1,1 — :not() takes its argument's
      specificity — which BEATS a single utility class like
@@ -132,6 +141,85 @@
 }
 
 @layer components {
+  /* ---------------------------------------------------------------------
+     THE SWEEP. Jay's pick, 10 Aug 2026, from a motion study of three.
+
+     A band of light crosses the fill once per hover — the sheen off a wet
+     shirt under floodlights — over a bloom of brand red beneath the button,
+     as though its weighted bottom edge had been lit from below.
+
+     ⚠️ PRIMARY ACTIONS ONLY, AND THAT RESTRAINT IS THE DESIGN. Applied to
+     all 105 buttons this reads cheap and stops meaning anything; worse,
+     a glowing "Cancel" draws the eye toward the destructive-adjacent choice.
+     Secondary buttons get the bloom at a third of the strength and no sweep.
+
+     ⚠️ IT LIVES IN CSS, NOT IN TAILWIND UTILITIES, for the reason the press
+     rule above does: it needs a pseudo-element, a keyframe-free transform on
+     that pseudo-element, and an overflow clip that would be four arbitrary
+     variants of soup at the call site. Here it is one name the component
+     applies, and — like the press rule — it can be asserted against the
+     BUILT stylesheet, which is what tests/press-feedback.test.js does.
+
+     ⚠️ `isolation: isolate` IS LOAD-BEARING. The sweep sits at z-index -1 so
+     it passes UNDER the label; without a stacking context of its own it
+     escapes behind the button's own background and never appears.
+     --------------------------------------------------------------------- */
+  .btn-sweep {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .btn-sweep::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      105deg,
+      transparent 35%,
+      rgb(255 255 255 / 0.32) 50%,
+      transparent 65%
+    );
+    transform: translateX(-130%);
+    transition: transform 0.62s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .btn-sweep:hover::after {
+    transform: translateX(130%);
+  }
+
+  /* The bloom. Separate from the sweep so a secondary button can take one
+     without the other. */
+  .btn-glow:hover:not(:disabled) {
+    box-shadow:
+      0 6px 18px -6px rgb(200 16 46 / 0.7),
+      0 2px 0 rgb(200 16 46 / 0.4);
+  }
+
+  .btn-glow-soft:hover:not(:disabled) {
+    box-shadow: 0 6px 16px -8px rgb(200 16 46 / 0.4);
+  }
+
+  /* ⚠️ A DISABLED BUTTON MUST NOT SWEEP. Without this it still lights up on
+     hover while refusing the click, which reads as "working" and is how a
+     saving button gets tapped four times. */
+  .btn-sweep:disabled::after {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn-sweep::after {
+      display: none;
+    }
+    .btn-glow:hover:not(:disabled),
+    .btn-glow-soft:hover:not(:disabled) {
+      /* The bloom stays — it is a colour change, not motion — but loses its
+         easing so nothing animates for someone who asked for that. */
+      transition: none;
+    }
+  }
+
   /* The website's red -> green hairline. Used on the masthead, above the stat
      band, and on top of the bottom tab bar. Decorative only — nothing sits on
      it — so the full-saturation green is safe here. */
