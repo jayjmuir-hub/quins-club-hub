@@ -122,4 +122,25 @@ describe('PWA production build output', () => {
     expect(sw).toMatch(/NetworkFirst/)
     expect(sw).toMatch(/quins-supabase-rest-get/)
   })
+
+  // ⚠️ ASSERTED ON THE BUILT WORKER, NOT ON THE CONFIG. tests/pwa-cache-rules.js
+  // proves the predicate makes the right decisions; this proves the decisions
+  // actually SHIPPED. Workbox stringifies the function into sw.js, and this
+  // file's own header records the time a urlPattern looked perfect in the
+  // config and would have thrown inside the worker. A rule that never reaches
+  // the worker excludes nothing, and nothing else in the suite would notice.
+  it('service worker carries the club-wide-read exclusions, not just the route', () => {
+    const sw = readFileSync(path.join(outDir, 'sw.js'), 'utf-8')
+
+    // ⚠️ SUBSTRING, NOT toMatch, AND THAT IS NOT A STYLE CHOICE. What ships is
+    // the SOURCE of a regex literal, so the worker literally contains the
+    // characters `[?&]profile_id=eq\.` — backslash included. `toMatch(
+    // /profile_id=eq\./)` reads as though it should match that and does not,
+    // because there the `\.` means "a dot" rather than "backslash then dot".
+    // The first draft of this test failed for exactly that reason while the
+    // shipped worker was perfectly correct.
+    expect(sw).toContain('/rest/v1/access_requests')
+    expect(sw).toContain('[?&]profile_id=eq')
+    expect(sw).toContain('[?&]id=eq')
+  })
 })
