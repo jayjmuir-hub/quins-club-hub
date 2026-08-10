@@ -10,6 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — RSVP is switched on.** `FEATURES.availability` → `true`. Jay's call, after
+  asking "where is the availability function?" twice in one day. It was false from
+  29 Jul because the club was not ready to rely on digital RSVP — a readiness
+  judgement, not a defect, and his to withdraw. ⚠️ **The flip needed no other change**,
+  exactly as the flag's comment promised: it gates EventDetail's two entry points and
+  nothing else. The screen, the `availability` table, its policies, the realtime
+  subscription and `tests/availability.test.jsx` were live the whole time it was off.
+  Full suite green on the flip, no test needed rewriting. ⚠️ **Availability is RSVP,
+  the INTENT; attendance is the FACT** — a separate table, a separate screen, and
+  deliberately not behind this flag. Do not compute one from the other.
+  ⚠️ **Nobody has used it in anger** — switched on and unit-tested, not exercised by a
+  real parent.
+- `262d81b` — **A rolling date window, so the event screens stop asking for everything.**
+
 - **10 Aug — the event screens stopped asking for every event ever.** `listEvents` has
   accepted `from`/`to` since it was written and **no caller ever passed one**;
   Schedule and Dashboard now both pass a rolling window from
