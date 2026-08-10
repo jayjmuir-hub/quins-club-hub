@@ -157,6 +157,22 @@ Durable. Each cost real time to find.
   true). But the defence-in-depth is one-sided. Recorded rather than changed —
   revoking it is a one-line migration with a real chance of breaking a signup path
   nobody has re-tested.
+- ⚠️ **`availability` IS RSVP, `attendance` IS THE FACT. Do not compute one from
+  the other.** `availability.status` is `in`/`out`/`maybe`, set before the event by
+  the player or parent; `attendance.status` is `present`/`absent`/`excused`, set
+  after it by a coach. Every "attendance %" feature that reads `availability` is
+  reporting who SAID they would come as who CAME. New 10 Aug 2026.
+- ⚠️ **The attendance PERCENTAGE is `present / (present + absent)`.** `excused` is
+  excluded from BOTH sides on purpose, so a player away injured or on holiday is
+  not ranked as uncommitted. There is deliberately no `late`.
+- ⚠️ **`attendance` reads NARROWER than every other team-scoped table.** Staff see
+  the squad (`can_edit_team`); a parent sees **only their own child**
+  (`is_own_player`) — not `can_see_team`, because "which children miss training,
+  and how often" is safeguarding-adjacent. ⚠️ **`is_own_player` appears in its read
+  policy and in NO write policy**: a parent must never mark their own child
+  present, since the value of the number is that somebody else recorded it. If
+  either of those is ever "corrected" to match the house style, the feature is
+  worthless. Harness: `db/tests/attendance.sql`.
 - ⚠️ **`apply_migration` strips `--` comments before executing.** A function's
   reasoning lives in the migration file and never in the database; a re-capture
   cannot bring it back.

@@ -10,6 +10,37 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — `attendance`: who actually turned up.** Nothing in the database
+  recorded it. ⚠️ **`availability.status` is `in`/`out`/`maybe` — INTENT, not
+  attendance** — and it was the only thing resembling the data the brainstormed
+  AI features assume ("17% attendance", "consecutive absences", "lowest
+  attendance"). Built on it, those would report WHO SAID THEY WOULD COME as WHO
+  CAME: a confident number about a child's commitment, derived from a tickbox
+  their parent ticked a week earlier. ⚠️ **And RSVP is switched off**
+  (`FEATURES.availability`), so that table holds no real intent anyway — hence
+  Jay's ruling to skip RSVP and go straight to attendance, because ticking who
+  turned up is something coaches already do on paper. ⚠️ **A NEW TABLE, NOT A
+  COLUMN ON `availability`**, despite the identical (event, player) grain: the
+  two facts have different WRITE AUTHORITIES — availability is `is_own_player`,
+  attendance is `can_edit_team` — and one row with two write authorities on
+  different columns is a column-grant problem, which this same session spent an
+  afternoon proving invisible. Kept at ROW level, where `policies.sql` can show
+  you. ⚠️ **The read policy is deliberately narrower than the house style**:
+  every other team-scoped table uses `can_see_team`, so a parent sees the squad;
+  here staff see the squad and **a parent sees only their own child**, because
+  "which children miss training, and how often" is safeguarding-adjacent and
+  becomes touchline gossip. ⚠️ **`is_own_player` is in the read policy and in no
+  write policy** — a parent must never mark their own child present, since the
+  whole value of the number is that somebody else recorded it. `status` has
+  three values and the third is load-bearing: the percentage is
+  present/(present+absent) with `excused` excluded from both sides, so a player
+  away injured is not ranked as uncommitted. Applied to live and verified
+  (4 policies, RLS on, 4 indexes, 6 constraints); `db/schema/` re-captured in
+  the same breath, including `grants.sql` — where **the new table proved §1**,
+  arriving with all eight privileges for `anon` from no GRANT statement at all,
+  with `enable row level security` the only thing between it and the internet.
+  Harness in `db/tests/attendance.sql`; data layer carries the row cap.
+- `631dcd9` — **The dashboard's availability button was drawn, tappable and dead.**
 - **10 Aug — the dashboard's availability button was dead, and the feature is
   flag-off.** Jay asked where the availability function was. ⚠️ **Answer:
   `FEATURES.availability` is FALSE** (`src/lib/features.js`, set 29 Jul because the
