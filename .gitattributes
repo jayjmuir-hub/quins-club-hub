@@ -1,0 +1,31 @@
+# ⚠️ THIS FILE EXISTS BECAUSE OF ONE SPECIFIC FAILURE, 10 Aug 2026.
+#
+# `scripts/netlify-ignore.mjs` is imported by `tests/netlify-ignore.test.js`.
+# On Windows git checked it out with CRLF endings, and esbuild — which is what
+# Vitest transforms with — strips a `#!/usr/bin/env node` shebang up to the
+# newline and leaves the `\r` behind. That is not a valid token, so the file
+# failed to parse and the suite reported:
+#
+#     SyntaxError: Invalid or unexpected token
+#     ❯ tests/netlify-ignore.test.js:7:31
+#
+# pointing at the IMPORT LINE IN THE TEST, several files away from the cause,
+# on a line that is blank.
+#
+# ⚠️ THE PART THAT MAKES IT WORTH A FILE: IT IS INVISIBLE IN CI. GitHub Actions
+# runs on Linux and checks out LF, so `test` and `docs-check` both stay green
+# while the suite fails on BOTH of Jay's PCs. That is the mirror image of the
+# usual trap — normally CI is the honest one — and it means a green pull request
+# would be no evidence at all.
+#
+# These are Unix scripts: Netlify runs them on Linux, GitHub Actions runs them on
+# Linux, and nothing about them wants CRLF on any platform. Pinning them to LF
+# removes the whole class rather than the one instance — `session-guard.mjs` and
+# `docs-check.mjs` keep their shebangs and are currently safe only because no
+# test imports them, which is luck rather than design.
+*.mjs text eol=lf
+
+# The same reasoning for the SQL that gets pasted into the Supabase editor and
+# for shell scripts, neither of which has any reason to carry CRLF.
+*.sql text eol=lf
+*.sh  text eol=lf

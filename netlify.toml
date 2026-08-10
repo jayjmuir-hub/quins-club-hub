@@ -2,6 +2,21 @@
   command = "npm run build"
   publish = "dist"
 
+  # Whether this commit needs a deploy at all.
+  #
+  # ⚠️ THIS REPLACED `[skip ci]`, WHICH HAD BECOME UNUSABLE. `CLAUDE.md` rule 3
+  # used to ask for `[skip ci]` in the message of a docs-only commit. GitHub
+  # Actions honours that string too — on `push` and `pull_request`, matching the
+  # head commit — so once `test` and `docs-check` became REQUIRED checks on
+  # 10 Aug 2026, a commit written to the old rule left both checks pending
+  # forever and could not be merged.
+  #
+  # The commit message was answering two questions at once. "Run the checks" and
+  # "publish the site" now have separate answers: the checks always run, and this
+  # decides the deploy from the DIFF rather than from what someone remembered to
+  # type. Reasoning and the exit-code inversion are in the script.
+  ignore = "node scripts/netlify-ignore.mjs"
+
 # The calendar subscription feed, served from our own domain.
 #
 # WHY THIS EXISTS. The feed is the only URL this app hands to a HUMAN to paste
