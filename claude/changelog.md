@@ -10,6 +10,37 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — the event screens stopped asking for every event ever.** `listEvents` has
+  accepted `from`/`to` since it was written and **no caller ever passed one**;
+  Schedule and Dashboard now both pass a rolling window from
+  `src/lib/eventWindow.js`. ⚠️ **A READ FILTER, NOT A RETENTION POLICY — nothing is
+  deleted, ever.** Events outside the window stay in the database, stay in the
+  calendar feed, and stay reachable by paging the calendar, which refetches.
+  ⚠️ **12 MONTHS BACK, AND THE NUMBER CAME FROM JAY'S QUESTION.** The first proposal
+  was 3 months back / 9 forward; he asked "in 6 months will I still be able to see
+  events from Sept?" **The answer was no.** Results is derived from the SAME single
+  fetch as Upcoming, so a 3-month lookback would have emptied the season-in-review
+  screen from February onwards — a lookback shorter than a season is wrong at every
+  point after its first months. 12 back always spans the current season from any
+  point inside it, and needs no season boundary stored anywhere and no annual edit.
+  That question is now `tests/event-window.test.js`'s headline test, and it fails on
+  the rejected proposal.
+  ⚠️ **Paging the calendar past the edge WIDENS the window and refetches** — never
+  renders an unloaded month as an empty one, which is the "short answer that looks
+  complete" failure `limits.js` exists to prevent. Widening rather than moving means
+  it settles instead of trading updates with the fetch effect forever.
+  ⚠️ **The scoping tests were kept EXACT rather than loosened to `objectContaining`**:
+  they existed to catch a query asking for more than it should, and waving the window
+  through would have waved through a stray filter too.
+  ⚠️ **Still open: admin viewing ALL squads.** At ~75 events per squad per season
+  (measured: the two squads with realistic data run 2.0–2.3 per active week), 15
+  squads over 18 months is ~1,690 rows — over `MAX_ROWS` at any boundary. **That is a
+  pagination problem, not a window one.**
+  ⚠️ **`git checkout --` wiped the Schedule half of this mid-session**, exactly as
+  `CLAUDE.md` rule 6 warns: it reverts to the last COMMIT, and the work was
+  uncommitted. Rule 6 says commit before injecting a fault. It was not.
+- `ca79dbb` — **A real overflow gate, and the injection that nearly buried a good fix.**
+
 - **10 Aug — a real overflow gate, and the fault injection that nearly discredited a
   correct fix.** `harness/check-overflow.mjs` drives all 28 harness scenarios through
   a real Chromium at five phone widths and fails on a document wider than its

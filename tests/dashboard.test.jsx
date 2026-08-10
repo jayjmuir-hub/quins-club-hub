@@ -236,7 +236,14 @@ describe('Dashboard — loading, scoping and errors', () => {
     renderDashboard()
     await screen.findByTestId('stat-players')
 
-    expect(listEventsMock).toHaveBeenCalledWith({ teamIds: ['team-u10', 'team-1xv'] })
+    // ⚠️ Exact match kept deliberately — see the note in tests/schedule.test.jsx.
+    // The date window is named rather than waved through with objectContaining,
+    // so it can neither be dropped nor joined by a filter nobody noticed.
+    expect(listEventsMock).toHaveBeenCalledWith({
+      teamIds: ['team-u10', 'team-1xv'],
+      from: expect.any(String),
+      to: expect.any(String),
+    })
     expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u10', 'team-1xv'] })
   })
 
@@ -250,7 +257,11 @@ describe('Dashboard — loading, scoping and errors', () => {
     renderDashboard()
     await screen.findByText(/no upcoming fixtures/i)
 
-    expect(listEventsMock).toHaveBeenCalledWith({ teamIds: [] })
+    expect(listEventsMock).toHaveBeenCalledWith({
+      teamIds: [],
+      from: expect.any(String),
+      to: expect.any(String),
+    })
     expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: [] })
   })
 

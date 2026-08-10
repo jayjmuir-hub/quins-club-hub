@@ -15,6 +15,7 @@ import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, isSquadStaffRole, roleLabel, visibleTeams } from '../lib/scope.js'
 import { clubDayParts, clubToday, eventDate, hasResult, sortByStart } from '../lib/eventFormat.js'
+import { defaultEventWindow, isMonthOutsideWindow, windowCovering } from '../lib/eventWindow.js'
 import ScheduleTable from '../components/ScheduleTable.jsx'
 import { useMediaQuery, WIDE_QUERY } from '../lib/useMediaQuery.js'
 
@@ -414,6 +415,17 @@ export default function Schedule() {
   const [typeFilter, setTypeFilter] = useState(readStoredTypeFilter)
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [month, setMonth] = useState(currentClubMonth)
+  // The date range actually fetched. Starts at the default window (12 months
+  // back, 6 forward — see src/lib/eventWindow.js) and only ever WIDENS, when
+  // the calendar is paged past its edge.
+  //
+  // ⚠️ NOT named `window`: that shadows the global, and this file reads
+  // `window.localStorage` twice at module scope.
+  //
+  // ⚠️ Anchored ONCE, on mount, rather than recomputed each render. Deriving
+  // it inline would mint a new object every render and, through the fetch
+  // effect's dependencies, refetch forever.
+  const [eventWindow, setEventWindow] = useState(() => defaultEventWindow(currentClubMonth()))
   // null = no day sheet. Otherwise { year, month, day } for the tapped cell.
   // Carries its own year/month rather than just the day number so that paging
   // the calendar behind an open sheet cannot silently repoint it at a
@@ -460,7 +472,7 @@ export default function Schedule() {
     setLoading(true)
     setError(null)
 
-    listEvents({ teamIds })
+    listEvents({ teamIds, from: eventWindow.from, to: eventWindow.to })
       .then((rows) => {
         if (mounted) setEvents(rows)
       })
@@ -476,7 +488,23 @@ export default function Schedule() {
     return () => {
       mounted = false
     }
-  }, [teamIds, reloadToken])
+  }, [teamIds, reloadToken, eventWindow.from, eventWindow.to])
+
+  // ⚠️ PAGING THE CALENDAR PAST THE WINDOW MUST REFETCH, NOT RENDER EMPTY.
+  // The calendar can walk to any month; the fetch covers 18. Without this, a
+  // month outside the window draws as a month with no fixtures —
+  // indistinguishable from a quiet one, and exactly the "short answer that
+  // looks complete" failure src/data/limits.js exists to prevent.
+  //
+  // Widening rather than moving means paging back three years and forward
+  // again refetches once, not twice, and never pulls what is already loaded
+  // out from under the Upcoming and Results tabs.
+  useEffect(() => {
+    if (!isMonthOutsideWindow(month, eventWindow)) return
+    setEventWindow((current) =>
+      isMonthOutsideWindow(month, current) ? windowCovering(month, current) : current,
+    )
+  }, [month, eventWindow])
   // Realtime: bump the token and let the effect above refetch. The callback
   // closes over nothing but setReloadToken (a stable state setter), so this
   // subscribes exactly once for the life of the screen, and its cleanup only

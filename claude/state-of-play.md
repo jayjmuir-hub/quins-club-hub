@@ -270,10 +270,19 @@ Durable. Each cost real time to find.
   **If it is ever lowered below 901 the detector stops working silently.** Also
   measured: `authenticated` carries `statement_timeout=8s`, so the far end of this is
   an 8-second failure, not a hang.
-  ⚠️ **Still open, and needing Jay:** pagination, and a date window on events. Both
-  change what a person SEES — "how far back should the schedule go" is a ruling, not a
-  data-layer detail. `listEvents` has accepted `from`/`to` since it was written and no
-  caller passes one.
+  ✅ **THE DATE WINDOW IS DONE — `src/lib/eventWindow.js`, 12 months back and 6
+  forward, rolling.** Schedule and Dashboard both pass it; the "no caller passes one"
+  era is over and a test fails if either stops. ⚠️ **It is a READ FILTER, NOT
+  RETENTION — nothing is deleted, ever**, and events outside it stay in the calendar
+  feed and reachable by paging the calendar, which widens the window and refetches.
+  ⚠️ **12 back is not a taste call**: Results is derived from the SAME fetch as
+  Upcoming, so a lookback shorter than a season empties the season-in-review screen
+  partway through the season. Jay's question — "in 6 months will I still be able to
+  see events from Sept?" — is the headline test in `tests/event-window.test.js`.
+  ⚠️ **STILL OPEN AND STILL NEEDING A DECISION: pagination for an admin on ALL
+  squads.** ~75 events per squad per season × 15 squads over 18 months ≈ 1,690 rows,
+  over `MAX_ROWS` at any window boundary. A window cannot fix it; only pagination
+  can. Everyone else — parent 1–2 squads, coach 1–3 — is comfortably under.
 - **`saveParents` is delete-then-write, not atomic.**
 - ⚠️ **AVAILABILITY / RSVP IS SWITCHED OFF BY A FLAG, AND NOTHING SAID SO.**
   `FEATURES.availability` in `src/lib/features.js` is **false**, set 29 Jul 2026
