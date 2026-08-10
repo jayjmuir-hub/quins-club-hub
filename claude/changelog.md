@@ -10,6 +10,39 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 10 Aug 2026
 
+- **10 Aug — `[skip ci]` banned, and the deploy skip became a gate.**
+  `CLAUDE.md` rule 3 asked for `[skip ci]` on docs-only commits so a
+  documentation edit would not publish a release. Protecting `main` the same day
+  turned that into a trap: ⚠️ **GitHub Actions honours `[skip ci]` too** — on
+  `push` AND `pull_request`, matching the HEAD commit — so it suppressed the
+  now-REQUIRED `test` and `docs-check` runs, the checks sat pending forever, and
+  the pull request could not be merged. ⚠️ **The header comment in
+  `.github/workflows/docs.yml` asserted the opposite in so many words** ("it
+  suppresses the NETLIFY build, not this workflow"), and nothing in the run
+  history could have caught it: every `[skip ci]` commit in this repo predates
+  the workflows, which were created that morning. The commit message was
+  answering two questions at once; they now have separate answers. The checks
+  always run, and `scripts/netlify-ignore.mjs` — wired as `ignore` in
+  `netlify.toml` — decides the deploy from the DIFF. Same move as the clone
+  check: a rule that has to be remembered at exactly the right moment becomes a
+  gate that cannot be forgotten. ⚠️ **Netlify inverts the exit code** (0 CANCELS
+  the build) and a cancelled build reports as a SUCCESS, so being backwards here
+  would stop deploying the app from behind a green deploy list. Hence: the
+  allowlist is deliberately narrower than "everything that cannot reach `dist`",
+  `netlify.toml` is explicitly excluded from it, every uncertain case builds, and
+  the inversion is pinned end-to-end against a throwaway git repo rather than
+  this one's history — which would also have broken under CI's depth-1 checkout.
+  ⚠️ **AND IT TURNED UP A WINDOWS-ONLY TRAP WORTH MORE THAN THE CHANGE.** The new
+  script carried a `#!/usr/bin/env node` shebang and is IMPORTED by its test.
+  Git checks out CRLF on both PCs; esbuild strips the shebang up to the newline
+  and leaves the `\r`, which is not a valid token — so the file failed to parse
+  and the error was reported against the IMPORT LINE IN THE TEST, several files
+  from the cause, on a line that is blank. ⚠️ **CI cannot see it**: Actions runs
+  on Linux and checks out LF, so `test` stays green while the suite fails on
+  both of Jay's PCs — the mirror image of the usual trap, which means a green
+  pull request is no evidence here. `.gitattributes` now pins `*.mjs`, `*.sql`
+  and `*.sh` to LF, removing the class rather than the instance.
+- `87bafba` — **The clone check became a gate rather than a rule.**
 - **10 Aug — `claude/state-of-play.md` rewritten, 591 lines to 283, and a session
   handoff written.** ⚠️ **Its own audit had already found the pattern and this
   edition is organised around it: every wrong claim in that file's history was a

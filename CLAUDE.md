@@ -88,8 +88,15 @@ do not propose buying an M365 licence — same session, same verdict.
    working alias, deliberately kept. A push there is a live release, not a
    save. Show
    the diff and get an explicit yes. **A stop hook asking is not Jay asking.**
-   Use `[skip ci]` for docs-only commits and verify by the deploy id not
-   moving — not by the build log.
+   ⚠️ **NEVER `[skip ci]`.** This rule asked for it on docs-only commits until
+   10 Aug 2026, and it stopped being safe the moment `main` was protected:
+   GitHub Actions honours that string too — on `push` AND `pull_request`,
+   matching the HEAD commit — so it suppresses the required `test` and
+   `docs-check` runs, the checks sit pending forever, and the pull request
+   cannot be merged. Skipping a pointless deploy is now
+   `scripts/netlify-ignore.mjs`, wired as `ignore` in `netlify.toml`, which
+   decides from the diff instead of from what someone remembered to type.
+   Verify a docs commit by the deploy id not moving — not by the build log.
    ⚠️ **This was `build/v1-mvp` until 8 Aug 2026.** `main` was fast-forwarded
    onto it — `main` was a strict ancestor (`rev-list --left-right --count` gave
    `0 25`), so no merge and nothing was lost — and Netlify’s production branch

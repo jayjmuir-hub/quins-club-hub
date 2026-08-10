@@ -176,10 +176,14 @@ Durable. Each cost real time to find.
   `can_admin_see_pending()`. Revisit together if a second club appears.
 - **The changelog is allowed to be exactly one commit behind** — a commit cannot
   cite its own SHA — so the NEXT commit must always catch it up.
-- ⚠️ **`[skip ci]` and the required status checks are in tension.** `CLAUDE.md`
-  rule 3 recommends `[skip ci]` for docs-only commits; it also stops the required
-  workflows running, leaving the checks pending and the PR unmergeable. **Not
-  resolved — `CLAUDE.md` still says the old thing.**
+- ✅ **`[skip ci]` IS NOW BANNED, and the deploy skip is a gate.** It suppressed the
+  required checks as well as the Netlify build — GitHub Actions matches it on the
+  HEAD commit for `push` and `pull_request` alike — leaving a docs-only PR
+  unmergeable. `scripts/netlify-ignore.mjs` decides the deploy from the DIFF
+  instead, wired as `ignore` in `netlify.toml`. ⚠️ **Its exit code is inverted**
+  (0 cancels the build), and a cancelled build reports as a SUCCESS in Netlify's
+  UI — so getting it backwards would stop deploying the site with a green deploy
+  list. That inversion is what the end-to-end tests pin.
 
 ### ⚠️ THE DATABASE DOES MAKE OUTBOUND HTTP CALLS — corrected 10 Aug 2026
 
@@ -289,6 +293,17 @@ Per `CLAUDE.md` rule 8 that is a to-do, not a state — nobody has measured it.
 
 ⚠️ **`npm install` needs `--include=dev` on both PCs.** On jay-pc PowerShell's
 execution policy also blocks `npm.ps1` — run npm from `cmd`.
+
+⚠️ **A SHEBANG IN AN IMPORTED `.mjs` BREAKS THE SUITE ON WINDOWS ONLY.** Git checks
+out CRLF here; esbuild (what Vitest transforms with) strips `#!/usr/bin/env node`
+up to the newline and leaves the `\r`, which is not a valid token. The file fails to
+parse and the error is reported **against the import line in the TEST**, several
+files from the cause, on a line that is blank. ✅ `.gitattributes` now pins `*.mjs`,
+`*.sql` and `*.sh` to LF. ⚠️ **The reason it needed a file rather than a fix: CI
+CANNOT SEE IT.** Actions runs on Linux and checks out LF, so `test` goes green while
+the suite fails on both PCs — the mirror image of the usual trap, and it means a
+green PR is no evidence. `session-guard.mjs` and `docs-check.mjs` keep their
+shebangs and are safe only because nothing imports them.
 
 ⚠️ **jay-pc had `core.fileMode` drift**, set to `false` on 5 Aug. CRLF/LF content
 drift on untouched files may remain.
