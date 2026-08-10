@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
-import { insertEvents, upsertEvent } from '../data/events.js'
+import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import {
@@ -258,6 +258,26 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
   // false and the save path below is the ordinary single-event one.
   const repeating = !editing && repeatDays.length > 0 && Boolean(repeatUntil)
 
+  // ══ EDITING A REPEATING SERIES ══════════════════════════════════════════
+  //
+  // Only offered when editing an event that HAS a series_id. A one-off and a
+  // multi-squad group both get the ordinary single-event save they had before
+  // — group_id is deliberately not handled, exactly as deleteSeriesFrom does
+  // not handle it (Jay deferred it 8 Aug 2026).
+  //
+  // ⚠️ DEFAULTS TO THIS EVENT ONLY, and that is not a coin toss. The wider
+  // choice rewrites every later occurrence, so it has to be the one somebody
+  // reaches for on purpose. A default that quietly edited a term would be
+  // discovered after the fact, and there is no undo.
+  const seriesId = editing ? event?.series_id : null
+  const [applyToSeries, setApplyToSeries] = useState(false)
+  const editingSeries = Boolean(seriesId) && applyToSeries
+  // The time this sheet opened with, captured once. Compared against
+  // values.time to decide whether the series time move is needed at all —
+  // see the note at the call site for why it is not re-derived from
+  // event.starts_at.
+  const [originalTime] = useState(() => values.time)
+
   // The generated dates, and any error from generating them. generateSeriesDates
   // throws on a range over a year rather than truncating, so the throw is
   // caught here and shown as a message instead of taking the sheet down.
@@ -508,10 +528,45 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
         ? targetTeamIds.map((id) => ({ ...rowFor(id), group_id: groupId }))
         : null
 
+    // ⚠️ THE SERIES EDIT IS TWO WRITES, AND THE ORDER MATTERS.
+    // updateSeriesFrom sets the date-independent fields (venue, pitch, title,
+    // type, opponent, competition, notes) in one statement.
+    // setSeriesTimeFrom then moves the time of day, which cannot be the same
+    // statement because each occurrence's new start is computed from its OWN
+    // date — see the RPC's comment in db/migrations.
+    //
+    // Fields first, time second, deliberately: the time move is the one that
+    // reorders the list on screen, so doing it last means a failure between
+    // the two leaves the sessions where they were rather than moved but
+    // otherwise unedited.
+    //
+    // ⚠️ THIS EVENT IS UPDATED BY THE SERIES CALLS THEMSELVES, not separately.
+    // Both filter `starts_at >= this occurrence`, so it is already in range —
+    // an extra upsertEvent would be a second write of the same row and would
+    // fight the time move.
+    const seriesWrite = async () => {
+      await updateSeriesFrom(seriesId, event.starts_at, common)
+      // ⚠️ ONLY WHEN THE TIME ACTUALLY CHANGED, and compared against the
+      // form's OWN initial value rather than re-deriving it from
+      // event.starts_at. initialValues() already converted that instant into
+      // club wall-clock to fill the input; converting it a second time by a
+      // different route is how the two drift and every save starts moving a
+      // whole term by zero minutes.
+      if (values.time !== originalTime) {
+        const [hh, mm] = String(values.time).split(':').map(Number)
+        await setSeriesTimeFrom(seriesId, event.starts_at, hh, mm)
+      }
+      return { ...event, ...common }
+    }
+
     // onSaved's contract stays "one saved event" — every caller uses it as a
     // refresh trigger and ignores the argument, and widening it to an array
     // for this one path would be a change they'd all have to absorb.
-    const write = rows ? insertEvents(rows).then((saved) => saved[0] ?? null) : upsertEvent(payload)
+    const write = editingSeries
+      ? seriesWrite()
+      : rows
+        ? insertEvents(rows).then((saved) => saved[0] ?? null)
+        : upsertEvent(payload)
 
     write
       .then((saved) => {
@@ -934,6 +989,38 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
             Optional. Shown on the event and in anyone&apos;s subscribed calendar.
           </p>
         </div>
+
+        {/* ── Apply to the rest of the series ────────────────────────────
+            Only for an event that HAS a series_id. ⚠️ `<label>`/`<input>`
+            rather than a styled <button>, matching Segmented.jsx and the
+            EventForm radio group above: a button used as a layout box
+            inherits Chromium's UA content-centring, which jsdom cannot see.
+
+            ⚠️ FUTURE ONLY, and it says so on screen rather than in a comment
+            nobody reads. "this and later" is what the write does — sessions
+            already played keep their results and attendance. */}
+        {seriesId && (
+          <div className="mb-3.5 rounded-[11px] border-[1.5px] border-line bg-surface-card p-3">
+            <label className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={applyToSeries}
+                onChange={(domEvent) => setApplyToSeries(domEvent.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+              />
+              <span>
+                <span className="block text-sm font-bold text-ink">
+                  Apply to this and every later session
+                </span>
+                <span className="mt-0.5 block text-[12.5px] leading-relaxed text-ink-muted">
+                  This is a repeating event. Sessions that have already happened are never
+                  changed. The date stays per session — a new time moves them all to that
+                  time, keeping each session&apos;s length.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
 
         {error && (
           <p

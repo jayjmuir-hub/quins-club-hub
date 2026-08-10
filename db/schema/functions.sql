@@ -1510,3 +1510,64 @@ GRANT EXECUTE ON FUNCTION public.approve_membership(uuid) TO authenticated;
 -- and hits the first raise. Recorded as found, per the README.
 GRANT EXECUTE ON FUNCTION public.approve_membership(uuid) TO anon;
 GRANT EXECUTE ON FUNCTION public.approve_membership(uuid) TO service_role;
+
+
+-- ---------------------------------------------------------------------
+-- public.set_series_time_from(uuid, timestamptz, int, int)
+-- proacl: {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- Added 2026-08-10 by migration `set_series_time_from`.
+--
+-- ⚠️ SECURITY INVOKER — the ONLY function in this file that is, and that is
+-- the whole safety argument rather than an oversight. The UPDATE is evaluated
+-- as the caller, so `event edit` (private.can_edit_team) filters it exactly as
+-- it filters a PostgREST update. The function grants nothing. A SECURITY
+-- DEFINER version would have to re-implement that check by hand, including the
+-- status gate added the same day.
+--
+-- WHY IT EXISTS AT ALL. Every other series-wide edit sets the SAME value on
+-- every row and PostgREST does it in one statement. The time cannot: each
+-- occurrence has its own DATE, so "move to 18:30 for the rest of term" is a
+-- different starts_at per row. Client-side that is N round trips and not
+-- atomic — half a term moved, half not, and nothing on screen saying which.
+--
+-- ⚠️ anon HOLDS EXECUTE and that is Supabase's bootstrap default, not intent —
+-- the creating migration revoked from PUBLIC and granted only `authenticated`.
+-- Same pattern already recorded on approve_membership, register_my_player and
+-- set_own_player_gender. It FAILS CLOSED: an anon caller has a null
+-- auth.uid(), so can_edit_team is false, the UPDATE matches nothing, the
+-- function returns an empty set and src/data/events.js throws on zero rows.
+--
+-- ⚠️ FUTURE ONLY (`starts_at >= _from`, inclusive) and series_id ONLY,
+-- matching deleteSeriesFrom and Jay's 8 Aug ruling. Duration is preserved
+-- rather than recomputed: ends_at moves by the same amount as starts_at, so a
+-- 90-minute session stays 90 minutes and a null ends_at stays null. All SET
+-- expressions see the OLD row, which is what makes that safe in one statement.
+-- Verified live 10 Aug 2026 in a rolled-back transaction: three occurrences at
+-- 18:00, moved from the second onward to 18:30 — the first stayed at 18:00 and
+-- all three stayed 90 minutes.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_series_time_from(_series uuid, _from timestamp with time zone, _hh integer, _mm integer)
+ RETURNS SETOF events
+ LANGUAGE sql
+ SET search_path TO 'public'
+AS $function$
+  update events e
+     set starts_at =
+           (date_trunc('day', e.starts_at at time zone 'Asia/Dubai')
+             + make_interval(hours => _hh, mins => _mm)) at time zone 'Asia/Dubai',
+         ends_at =
+           case
+             when e.ends_at is null then null
+             else ((date_trunc('day', e.starts_at at time zone 'Asia/Dubai')
+                     + make_interval(hours => _hh, mins => _mm)) at time zone 'Asia/Dubai')
+                  + (e.ends_at - e.starts_at)
+           end
+   where e.series_id = _series
+     and e.starts_at >= _from
+  returning e.*;
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION public.set_series_time_from(uuid, timestamp with time zone, integer, integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.set_series_time_from(uuid, timestamp with time zone, integer, integer) TO anon;  -- bootstrap default; fails closed, see above
+GRANT EXECUTE ON FUNCTION public.set_series_time_from(uuid, timestamp with time zone, integer, integer) TO service_role;
