@@ -284,13 +284,15 @@ Durable. Each cost real time to find.
   over `MAX_ROWS` at any window boundary. A window cannot fix it; only pagination
   can. Everyone else — parent 1–2 squads, coach 1–3 — is comfortably under.
 - **`saveParents` is delete-then-write, not atomic.**
-- ⚠️ **AVAILABILITY / RSVP IS SWITCHED OFF BY A FLAG, AND NOTHING SAID SO.**
-  `FEATURES.availability` in `src/lib/features.js` is **false**, set 29 Jul 2026
-  because the club was not ready to rely on digital RSVP. It hides EventDetail's two
-  entry points — the summary bar and the "set availability" button — and nothing
-  else: the screen, the table, the policies, the realtime subscription and the tests
-  are all intact, and flipping it needs no other change. **Jay asked "where is the
-  availability function?" on 10 Aug**, which is what an undocumented flag costs.
+- ✅ **AVAILABILITY / RSVP IS ON — Jay, 10 Aug 2026.** `FEATURES.availability` in
+  `src/lib/features.js` is **true**. It was false from 29 Jul because the club was not
+  ready to rely on digital RSVP; that was a readiness call, and Jay withdrew it after
+  asking **"where is the availability function?" twice in one day** — which is what an
+  undocumented flag costs. The flip needed no other change, exactly as the flag's own
+  comment promised: it gates EventDetail's two entry points and nothing else, and the
+  screen, table, policies, realtime subscription and tests were live throughout.
+  ⚠️ **Nobody has used RSVP in anger.** It is switched on and unit-tested, not
+  exercised by a real parent.
 - ⚠️ **AND IT WAS HIDING A DEAD BUTTON.** `EventDetail` rendered "Set my
   availability" from Schedule AND the Dashboard, but only Schedule ever passed
   `onOpenAvailability`, and the call was `onOpenAvailability?.(event)` — so on the

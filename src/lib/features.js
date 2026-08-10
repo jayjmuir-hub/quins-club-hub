@@ -9,15 +9,27 @@
 // stay trivially mockable in tests via `vi.mock('../src/lib/features.js', ...)`.
 
 export const FEATURES = {
-  // RSVP / availability tracking (Task 16). Turned off 2026-07-29 — the
-  // club decided it isn't ready to rely on digital RSVP yet. This only
-  // hides EventDetail.jsx's two entry points: the availability summary bar
-  // and the "set availability" button. src/screens/Availability.jsx, the
-  // `availability` table, its RLS policies, and the realtime subscription
-  // are untouched and still covered by tests/availability.test.jsx.
+  // RSVP / availability tracking (Task 16).
   //
-  // claude/runbooks/e2e-roles.md's Availability/RSVP-realtime sections and part of
-  // tests/schedule.test.jsx assume this is on — both say so inline. Flip
-  // this back to true to re-enable, no other change needed.
-  availability: false,
+  // ✅ ON since 10 Aug 2026 — Jay's call, after asking "where is the
+  // availability function?" twice. It was turned off 2026-07-29 because the
+  // club was not ready to rely on digital RSVP; that reservation was about
+  // the club's readiness, not about the feature, and it was his to withdraw.
+  //
+  // ⚠️ THIS FLAG IS NARROWER THAN IT SOUNDS. It hides EventDetail.jsx's two
+  // entry points and nothing else: the availability summary bar and the
+  // "set availability" button. src/screens/Availability.jsx, the
+  // `availability` table, its RLS policies and the realtime subscription were
+  // never switched off, and stayed covered by tests/availability.test.jsx the
+  // whole time this was false.
+  //
+  // ⚠️ AVAILABILITY IS RSVP — THE INTENT. It is NOT attendance, which is the
+  // FACT: a separate table, a separate screen (src/screens/Register.jsx), and
+  // deliberately NOT behind this flag, because attendance shipped INSTEAD of
+  // RSVP and one flag would have switched both on together.
+  // `availability.status` is in/out/maybe, set BEFORE the event by the player
+  // or parent. `attendance.status` is present/absent/excused, set AFTER it by
+  // a coach. Do not compute either from the other: an "attendance %" that
+  // reads availability reports who SAID they would come as who CAME.
+  availability: true,
 }
