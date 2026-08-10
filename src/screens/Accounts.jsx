@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AccessBuilder from '../components/AccessBuilder.jsx'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
+import AdminRightsEditor from '../components/AdminRightsEditor.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
@@ -24,7 +25,7 @@ import {
 import { listPlayers } from '../data/players.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canApproveAnything, isAdmin } from '../lib/scope.js'
+import { canApproveAnything, isAdmin, isSuperAdmin } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 
@@ -421,6 +422,10 @@ function PersonDetailsForm({ group, state, onChange, onSave }) {
 
 export default function Accounts() {
   const { memberships, teams } = useMemberships()
+  // ⚠️ Drawn from the EFFECTIVE membership set, like every other gate on this
+  // screen — so "View as" does not leave a super admin holding controls the
+  // persona they are previewing would never see.
+  const viewerIsSuper = isSuperAdmin(memberships)
   const { user } = useAuth()
   const admin = isAdmin(memberships)
   // ⚠️ TWO GATES NOW, AND THEY ARE NOT THE SAME QUESTION.
@@ -1662,6 +1667,21 @@ export default function Accounts() {
                         >
                           {state.error}
                         </span>
+                      )}
+
+                      {/* ⚠️ SUPER ADMIN ONLY, AND HIDING IT IS NOT THE
+                          ENFORCEMENT. The column grant on `memberships` and
+                          the set_admin_rights RPC are what actually refuse an
+                          ordinary admin — see AdminRightsEditor's header and
+                          db/tests/rls-super-admin.sql. This gate exists so an
+                          ordinary admin is not shown a control that would only
+                          fail. */}
+                      {member.role === 'admin' && viewerIsSuper && (
+                        <AdminRightsEditor
+                          membership={member}
+                          label={rowLabel}
+                          onChanged={() => setReloadToken((token) => token + 1)}
+                        />
                       )}
                     </div>
                   )
