@@ -274,6 +274,14 @@ state; trust the decisions for reasoning.**
 Machine rules — clone paths, `hostname`, `NODE_ENV` — live in `CLAUDE.md`. **Only
 volatile clone STATE belongs here, and it rots on the next push. Measure it.**
 
+✅ **THE CLONE CHECK IS NOW A GATE, NOT A RULE.** `scripts/session-guard.mjs`
+runs on every session start (`.claude/settings.json`) and says so loudly when
+the clone is SHALLOW or BEHIND `origin/main`. ⚠️ **It never blocks** — a
+SessionStart hook that refuses to start is one flaky network call away from
+making the repo unusable, and the thing being guarded against is a silent wrong
+belief, not a malicious one. It exits 0 always and is silent when the clone is
+fine. Run it by hand any time: `node scripts/session-guard.mjs`.
+
 ⚠️ **cafnet has not been measured since 7 Aug** and was last seen checked out on
 `build/v1-mvp`, **a branch that no longer exists**. It needs
 `git fetch origin --prune && git checkout main` before anything else happens there.

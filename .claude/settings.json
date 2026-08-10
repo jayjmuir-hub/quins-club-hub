@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/session-guard.mjs",
+            "timeout": 20,
+            "statusMessage": "Checking this clone is current…"
+          }
+        ]
+      }
+    ]
+  }
+}
