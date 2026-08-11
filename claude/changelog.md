@@ -43,7 +43,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   arbitrary value, correctly. It is **their** brand colour on **their** document and must
   never be used as an app accent.
 
-- **Competition is a CHOICE, not a free-text box** — League or Tournament, or neither.
+- `18e4e12` — **Competition is a CHOICE, not a free-text box** — League or Tournament, or neither.
   Jay, 12 Aug 2026. League offers **Round 1-8**; Tournament offers **ADHJRT, Dubai Youth
   Festival, Al Ain Tournament, Small Blacks Tournament** and a "Something else" box.
   ⚠️ **"Neither — a friendly" is the DEFAULT and a real answer.** Nothing may read the blank
