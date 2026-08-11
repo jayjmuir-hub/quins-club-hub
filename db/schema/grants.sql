@@ -132,6 +132,7 @@
 --   memberships       authenticated    ← NO table-level UPDATE, as of 10 Aug
 --                                        2026. DELETE, INSERT, MAINTAIN,
 --                                        REFERENCES, SELECT, TRIGGER, TRUNCATE
+--   pitch_requests    anon, authenticated, postgres, service_role   ALL 8
 --   pitches           anon, authenticated, postgres, service_role   ALL 8
 --   player_contacts   anon, authenticated, postgres, service_role   ALL 8
 --   player_parents    anon, authenticated, postgres, service_role   ALL 8

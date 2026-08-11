@@ -762,3 +762,39 @@ CREATE TABLE IF NOT EXISTS public.pitches (
 );
 ALTER TABLE public.pitches ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS pitches_club_sort_idx ON public.pitches (club_id, sort_order, name);
+
+-- ---------------------------------------------------------------------
+-- public.pitch_requests — a coach asks, an admin allocates (11 Aug 2026)
+--
+-- ⚠️ ONE ROW PER EVENT, by unique constraint rather than by the app. A second
+-- request for the same fixture is not a second question — it is the same
+-- question asked twice, and two rows would mean two queue entries, two emails
+-- and a race over which one gets answered. Re-asking after a decline moves
+-- the existing row back to 'submitted'.
+--
+-- ⚠️ ALLOCATION WRITES `events.pitch` TOO, and the duplication is deliberate:
+-- `events.pitch` is what the schedule, the fixture rows, the calendar feed and
+-- the clash detector read. This table is the WORKFLOW; events.pitch is the
+-- ANSWER. A request table nobody reads would leave the allocation invisible
+-- everywhere it matters.
+--
+-- 'declined' and 'cancelled' exist because both happen and neither is a
+-- deletion — a request that vanishes leaves the coach wondering whether they
+-- ever sent it.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.pitch_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id uuid NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+  status text NOT NULL DEFAULT 'submitted'
+    CHECK (status IN ('submitted','allocated','declined','cancelled')),
+  needs_referee boolean NOT NULL DEFAULT false,
+  note text,
+  decision_note text,
+  requested_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  requested_at timestamptz NOT NULL DEFAULT now(),
+  decided_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  decided_at timestamptz,
+  UNIQUE (event_id)
+);
+ALTER TABLE public.pitch_requests ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS pitch_requests_status_idx ON public.pitch_requests (status, requested_at);

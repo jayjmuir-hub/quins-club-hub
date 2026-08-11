@@ -10,6 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **11 Aug — `pitch_requests`: a coach asks, an admin allocates. SCHEMA AND RLS ONLY —
+  no screen and no email yet.** Jay's four rulings: a request **attaches to an existing
+  fixture** (so it appears in the schedule at once carrying `Pitch TBD`, which is what
+  that placeholder already means); **Tracy allocates**; **the referee is a tickbox on
+  the same request**, because both are asked for at the moment a match is arranged;
+  and it must be **trackable from submission to assignment by the person who submitted
+  it**, in two dashboards, with email.
+  ⚠️ **CREATE is `can_edit_team`, DECIDE is `is_admin`, and that difference IS the
+  feature.** A coach may ASK for their own squad; only an admin may ANSWER. Widening
+  "decide" would let a coach allocate their own request — the exact thing a request
+  exists to prevent. **Proved live: a coach's own UPDATE is filtered to zero rows.**
+  ⚠️ **The read policy's `requested_by = auth.uid()` arm is a REQUIREMENT, not a
+  convenience.** Without it the submitter cannot see their own request and the feature
+  becomes a black hole with an email at the end. Proved live: after the admin
+  allocates, the requester reads back `allocated`.
+  ⚠️ **Withdrawing is a DELETE, not a status write** — the UPDATE policy is admin-only,
+  and widening it to the requester would also let them write `allocated`. Deleting an
+  UNDECIDED request is the narrow power that cannot be abused; once decided the policy
+  stops applying. Proved live: refused after a decision.
+  ⚠️ **One row per event, by constraint.** A second request is the same question asked
+  twice — two rows would mean two queue entries, two emails and a race.
+  ⚠️ **An early run of the harness showed the admin with NO access at all**, which
+  looked exactly like a broken policy. It was the test: a **membership** id had been
+  used as the JWT subject where a **profile** id was needed. The policy was correct
+  throughout. Recorded because the failure mode is indistinguishable from a real one.
+- `dc01d37` — **The pitch list is the club's real pitches, not the seed's.**
+
 - **11 Aug — the pitch list is the club's REAL pitches: A1-A4, B1, C1-C5, D1-D5.**
   ⚠️ **The list seeded hours earlier was a list of nothing.** It was derived from
   whatever text sat in `events.pitch`, and that text was almost entirely SEED DATA:
