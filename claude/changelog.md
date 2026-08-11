@@ -10,6 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **11 Aug — the cafnet startup note says what a plain `git pull` will not fix.**
+  That clone was last measured 7 Aug on a branch since deleted, and `.gitattributes`
+  landed 10 Aug. ⚠️ **Git applies `eol` attributes on CHECKOUT, so a pull normalises
+  only the files that pull changed** — every `.mjs` older than 10 Aug and untouched
+  since keeps its CRLF, and the suite then fails with a `SyntaxError` naming a blank
+  line in an unrelated test. **CI cannot see it**: Actions checks out LF and stays
+  green. Recommends a fresh clone, gated on checking `git status` AND `git stash list`
+  first.
+
+- `cc49604` — **Bring the docs up to date, and record `bfcb571`.**
+
 - **11 Aug — the docs caught up with the session.** `state-of-play.md` carried three
   claims the day had falsified (the pitch screens and email "NOT BUILT YET", the
   super-admin tier "NOT YET BUILT"), `RESTORE.md` had no record of the notification
