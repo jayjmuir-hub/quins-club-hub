@@ -10,7 +10,42 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **A match records which league team played it, and every fixture screen says so**
+- **The calendar feed names the league team** (task 8). `calendar_events_for_token()` gains
+  `league_team_name`, `league_division` and `round`; the edge function puts the team's NAME
+  in `SUMMARY` (in place of the squad) and the full `ADHQ2 · Div B · Round 4` first in
+  `DESCRIPTION`.
+  ⚠️ **The feed's columns come from the function's `RETURNS TABLE`, not from the edge
+  function** — which is why this needed a migration at all, and why the plan's description of
+  task 8 was wrong.
+  ⚠️ **`RETURNS TABLE` cannot be changed in place**, so the migration DROPs and re-creates —
+  **and a drop takes the grants with it.** This function is anon-executable deliberately (it
+  IS the feed; the token is the gate), so the migration re-grants from the ACL measured on
+  live immediately beforehand. Without that, every subscribed parent's calendar fails silently.
+  ⚠️ **LEFT JOIN, never inner** — an inner join would drop every non-league fixture from the
+  feed, which is most of them and all training, with a 200 and a valid `.ics` and no error
+  anywhere.
+  ⚠️ **SUMMARY carries only the team's NAME, deliberately unlike the app's chip.** A phone
+  truncates `SUMMARY` hard and "ADHQ2 · Div B · Round 4 v Dubai Exiles" loses the opponent —
+  the one thing a title exists to carry. Same facts, same order, different room.
+  ⚠️ **No vitest can execute the feed** (Deno, `Deno.serve` at module scope), so
+  `tests/calendar-league-team.test.js` is a **rot detector** over the source and the
+  migration, not a behaviour test. It fails if the app's format changes and the feed's does
+  not, which is the failure this duplication actually has.
+  ⚠️ **THE DROP RE-GRANTED THREE ROLES AND SILENTLY ADDED A FOURTH.** `create function`
+  grants EXECUTE to **PUBLIC** by default, which this function did not have; the ACL read
+  back afterwards differed from the one read before. A follow-up `revoke … from public`
+  restored it exactly. **Re-granting what you measured is not restoring what you measured** —
+  compare the whole `proacl`, not just the role you were worried about.
+  ✅ **Verified live**: the deployed feed returns **200 `text/calendar; charset=utf-8`** on
+  both the function URL and `adhquins-clubhub.com/calendar.ics` — not `text/html`, so
+  neither the SPA catch-all nor the service worker is intercepting — and the RPC returned
+  every event in the window, **so the LEFT JOIN dropped nothing**.
+  ⚠️ **BUT THE LEAGUE PATH ITSELF IS UNEXERCISED.** At verification the database held **zero**
+  league teams and zero tagged fixtures, so what was proved is that nothing BROKE, not that
+  the label works. Creating one league team on the Club tab and tagging one fixture is the
+  outstanding check, and it exercises tasks 5-8 at once.
+
+- `b48edde` — **A match records which league team played it, and every fixture screen says so**
   (tasks 6-7). `EventForm` gains a **League team** select and a **Round** box, both matches-only;
   `FixtureRow`, `EventDetail` and the allocation grid render `fixtureLabel`.
   ⚠️ **The picker offers only the chosen squad's teams**, and **changing the Age group clears
