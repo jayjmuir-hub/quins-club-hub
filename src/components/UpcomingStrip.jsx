@@ -114,7 +114,14 @@ export default function UpcomingStrip({ events = [], now = Date.now(), onSelect 
                 }
               : { 'aria-hidden': dayEvents.length === 0 ? undefined : undefined })}
             className={[
-              'w-[46px] shrink-0 rounded-[11px] border px-0 py-1.5 text-center',
+              // ⚠️ `rounded-tab` (12px), matching adhjrt.com's age-group
+              // buttons — Jay, 11 Aug 2026. This cell was ALREADY that shape
+              // in every other respect: white fill with a hairline border when
+              // idle, solid red when it is today, exactly as those buttons go
+              // white then red when selected. Only the corner disagreed (11px),
+              // and 11px is the app's SURFACE radius — the wrong token for
+              // something you press.
+              'w-[46px] shrink-0 rounded-tab border px-0 py-1.5 text-center',
               isToday
                 ? 'border-brand bg-brand text-white'
                 : 'border-line bg-surface-card text-ink',

@@ -10,7 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **The top menu now carries adhjrt.com's type, sheen and underline — measured, including
+- **The fortnight strip, the squad filters and the match pill all take the 12px corner.**
+  Jay: *"things like the next two week buttons can be like the age group buttons on the
+  tournament website, things like match pills etc can be similar too"*. Three changes, all
+  corner-only:
+  `UpcomingStrip` day cells (`rounded-[11px]`→`rounded-tab`) — ⚠️ **already adhjrt's shape
+  in every other respect**: white with a hairline idle, solid red for today, exactly as
+  those buttons go white then red when selected. Only the corner disagreed, and 11px is
+  the app's SURFACE radius, the wrong token for something you press.
+  `Roster`'s squad filters (`rounded-pill`→`rounded-tab`) — ⚠️ **the closest analogue in
+  the app** to the age-group buttons: a horizontal row of filters, white until chosen and
+  filled red when it is. It was a 100px pill.
+  `Chip` (`rounded-[20px]`→`rounded-tab`) — the match pill, and per `design-system.md`
+  §4.7 its neutral variant is also the age-group label, so this is the single largest
+  visual change in the sweep and what ties the fixture rows to the strip and the nav.
+  ⚠️ **`Chip`'s COLOURS ARE UNTOUCHED.** Every pairing in it was chosen to clear AA at
+  11.5px bold and several are deliberately not the brand tokens — the component header
+  gives the ratio for each. This was the corner and nothing else.
+  ⚠️ **The remaining `rounded-pill` uses are BADGES, not controls, and stay round on
+  purpose**: the masthead role label and account chip, the Accounts flag, Allocation's two
+  counts, PitchRequest's status and PlayerDetail's two. A pill is the right shape for a
+  thing that reports state; 12px is for a thing you press. **Do not "finish the job".**
+
+- `449641e` — **The top menu now carries adhjrt.com's type, sheen and underline — measured, including
   the hover state.** Jay: *"not all capital letters, seems like the font is smaller on the
   tournament site, tournament site tabs have nice animation and a shimmer when you scroll
   over them"*. `.hdr-nav a` there is **15px/600, `text-transform: none`, radius 8px,

@@ -505,7 +505,13 @@ export default function Roster() {
               />
               <span
                 className={[
-                  'block cursor-pointer select-none rounded-pill border-[1.5px] px-3.5 py-1.5 text-[13px] transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2',
+                  // ⚠️ `rounded-tab` (12px), was `rounded-pill` — Jay, 11 Aug
+                  // 2026. Of everything in this app this is the CLOSEST
+                  // analogue to adhjrt.com's age-group buttons: a horizontal
+                  // row of squad filters, white with a hairline until chosen
+                  // and filled red when it is. It was the one that should
+                  // obviously have been 12px, and it was a 100px pill.
+                  'block cursor-pointer select-none rounded-tab border-[1.5px] px-3.5 py-1.5 text-[13px] transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2',
                   genderFilter === option.value
                     ? 'border-brand bg-surface-mute font-bold text-brand-deep'
                     : 'border-line bg-surface-card font-semibold text-ink',
