@@ -165,19 +165,40 @@ from a stale in-context copy of a file.
 the `sb_secret_…` key or any Entra client secret.** Jay does those; Claude
 writes the exact click-by-click steps.
 
-**⚠️ BOTH PCs have `NODE_ENV=production` set machine-wide — cafnet AND
-jay-pc.** A plain `npm install` on either silently removes dev dependencies
-including vitest; use **`npm install --include=dev`** every time. Vitest
+**⚠️ Always `npm install --include=dev`, on either PC, regardless of the
+table below.** Vitest is a dev dependency and an ambient
+`NODE_ENV=production` makes a plain `npm install` remove it silently. Vitest
 itself is handled in `vite.config.js` (commit `5a39f5d`); the install side
 cannot be fixed in-repo. Without this, most of the suite fails with an error
-that points at React, not at the cause.
+that points at React, not at the cause. **The flag is unconditional so that
+it does not depend on any row below being current.**
 
-⚠️ **This said "cafnet" only, in three files, until 7 Aug 2026.** It was
-written from one machine and copied to the others without being re-checked.
-`set NODE_ENV` on jay-pc returns `production` — measured 7 Aug. Anyone
-trusting the old wording would have run a plain `npm install` on jay-pc and
-lost vitest, with a symptom (`'vite' is not recognized`) that points
-nowhere near the cause. **This paragraph is the single home for that fact**;
+**Machine facts.** ⚠️ **A value here is only worth what the machine it was
+run on is worth.** Each cell says where it came from. Re-run the command
+before trusting any row.
+
+| Fact | Command | jay-pc — ⚠️ SECOND-HAND | cafnet — measured 11 Aug 2026 |
+|---|---|---|---|
+| Clone path | — | `C:\Users\jayjm\GitHub\quins-club-hub` | `C:\Users\Jay\GitHub\quins-club-hub` |
+| `NODE_ENV` | `set NODE_ENV` | *reported* `production` (7 Aug) — **UNVERIFIED** | **not set, at any scope** |
+| npm from PowerShell | `npm --version` | *reported* blocked, run npm from `cmd` (9 Aug) — **UNVERIFIED** | works; `ExecutionPolicy` is `Bypass` |
+| `core.fileMode` | `git config --get core.fileMode` | *reported* `false` (5 Aug) — **UNVERIFIED** | `false` |
+| `gh` CLI | `gh auth status` | never checked — **UNKNOWN** | installed, authenticated as `jayjmuir-hub` (keyring) |
+
+⚠️ **THE `jay-pc` COLUMN IS NOT A MEASUREMENT AND MUST NOT BE READ AS ONE.**
+It was assembled on cafnet on 11 Aug from what other documents already
+claimed, because no command can be run on jay-pc from here. **Jay, who uses
+that machine, doubts all three.** The first session that runs on jay-pc
+should run the three commands above and replace the column outright — and if
+a value differs, that is the expected outcome, not a surprise.
+
+⚠️ **The `NODE_ENV` row is why rule 8 exists, and it has now been wrong
+twice in opposite directions.** It said "cafnet only" in three files until
+7 Aug; that was corrected to "BOTH PCs", asserted about cafnet from jay-pc
+without ever being run there. Measured on cafnet 11 Aug 2026 — empty at
+Process, User and Machine scope. **Both errors were the same error: a
+machine fact written from the other machine** — which is exactly what the
+`jay-pc` column above still is. This table is the single home for these;
 `state-of-play.md` and `claude/runbooks/session-and-push.md` point here.
 
 **Stack:** Vite + React, Tailwind, Supabase (Postgres 17, ref

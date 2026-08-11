@@ -97,6 +97,17 @@ required Supabase env var(s)" until you create it — values in
 `claude/runbooks/session-and-push.md`.
 Delete it before committing.
 
+**⚠️ `npm test` does NOT build, and some tests read the BUILT stylesheet.**
+`tests/button-sweep.test.js`, `tests/press-feedback.test.js` and `tests/pwa-build.test.js`
+all read `dist/` on purpose — those CSS rules live in `@layer components` and are only
+real if Tailwind emits them. But `dist/` is gitignored, so it survives `git reset --hard`
+and goes stale in silence. **After syncing, run `npm run build` before `npm test`** or the
+sweep tests fail as though the CSS regressed, pointing at button styling that is perfectly
+fine. ⚠️ **The file's own guard does not catch a stale bundle** — its "run `npm run build`
+first" message hangs off a `css.length > 1000` check, which any old build passes. It
+discriminates between *missing* and *present*, not between *fresh* and *stale*. Cost four
+red tests on cafnet on 11 Aug 2026, immediately after a 76-commit sync.
+
 **jsdom applies no Tailwind.** Any test asserting "this is visible" proves nothing about
 real rendering. Assert class tokens, and verify anything visual in Chromium via `harness/`.
 

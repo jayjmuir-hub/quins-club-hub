@@ -4,7 +4,35 @@
 through one of Jay's PCs, where git is already authenticated (a PAT in Windows Credential
 Manager, `credential.helper=manager`).
 
-**Never use the account-level GitHub connector.** It is read-only and 403s on writes.
+**Never use the account-level GitHub connector.** Re-tested 11 Aug 2026 and the claim
+holds: `create_pull_request` returned `Authentication Failed: Bad credentials`.
+
+## ⚠️ Pushing and opening a PR are DIFFERENT credentials — this cost a detour
+
+**`git push` working tells you nothing about whether a pull request can be opened.**
+Git-over-HTTPS and the GitHub REST API are two surfaces with two credentials, and **no
+git command opens a PR** — it does not exist in the protocol. On 11 Aug a session pushed
+a branch successfully and then found all three API routes shut:
+
+| Route | Result, measured 11 Aug 2026 on cafnet |
+|---|---|
+| `git push` via Credential Manager | ✅ works — `credential.helper=manager` |
+| Account-level GitHub connector | ❌ `Bad credentials` |
+| `gh` CLI | ✅ **now installed and authenticated** — see below |
+| `GH_TOKEN` / `GITHUB_TOKEN` env var | ❌ not set at any scope |
+
+⚠️ **Do not try to feed git's stored credential to `gh`.** Reading the token out of
+Credential Manager to pipe it elsewhere is blocked by the permission classifier, and
+rightly so — that shape is indistinguishable from exfiltrating it. **`gh auth login` is
+the supported route and Jay runs it**, as with every other credential.
+
+✅ **`gh` is installed on cafnet** (winget `GitHub.cli`, v2.97.0) **and authenticated as
+`jayjmuir-hub`**, keyring-backed, scopes `gist`, `read:org`, `repo`, `workflow` —
+measured 11 Aug 2026. That is enough to open PRs, read checks and comment.
+⚠️ **UNMEASURED on jay-pc.** `gh auth status` answers it in one command; do not assume
+parity, because the assumption that both PCs behave alike is what rule 8 exists to stop.
+⚠️ **`hosts.yml` existing does NOT mean logged in** — an interrupted login writes the
+file without completing. `gh auth status` is the check, and it exits `1` when logged out.
 
 ## The route that works
 
@@ -60,8 +88,11 @@ Drive's `create_file` has the same shape and the same risk.
 works but expires in ~60 minutes and needs a fake `.zip` extension. `0x0.st` and catbox
 proper both reject sandbox uploads. Litterbox 504s under load — retry.
 
-**`npm install` on `cafnet` needs `--include=dev`** — `NODE_ENV=production` is set
-machine-wide there and npm silently strips every dev dependency, vitest included.
+**`npm install` needs `--include=dev` on either PC** — npm can silently strip every dev
+dependency, vitest included. ⚠️ **This line claimed `NODE_ENV=production` was set
+machine-wide on cafnet; measured there on 11 Aug 2026, it is not set at any scope.**
+The measured per-machine table is in `CLAUDE.md` and is the single home for it — do not
+restate a value here.
 
 **Run `hostname` first.** The bridge has silently reconnected to the other PC mid-session,
 and the clone paths differ (`C:\Users\Jay\...` vs `C:\Users\jayjm\...`).

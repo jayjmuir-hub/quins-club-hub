@@ -690,77 +690,59 @@ making the repo unusable, and the thing being guarded against is a silent wrong
 belief, not a malicious one. It exits 0 always and is silent when the clone is
 fine. Run it by hand any time: `node scripts/session-guard.mjs`.
 
-### ⚠️ READ THIS FIRST IF YOU ARE ON cafnet — updated 11 Aug 2026
+### ✅ cafnet — SYNCED AND MEASURED 11 Aug 2026
 
-**cafnet has not been measured since 7 Aug**, was last seen on `build/v1-mvp` — **a
-branch that no longer exists** — and there have been **90 commits on `main` since**
-(measured 11 Aug on jay-pc). Per `CLAUDE.md` rule 8 everything below is a TO-DO and a
-prediction, **not a measured state**: nobody has run a command on that machine in four
-days. Measure before believing any of it.
+**Resolved. This section was a prediction until 11 Aug; it is now a measurement.**
+cafnet was found on `build/v1-mvp` — a branch deleted from origin — **76 commits
+behind `main`**, clean tree, empty stash. Synced to `main`, suite green.
 
-**The clone path is different: `C:\Users\Jay\GitHub\quins-club-hub`** — not `jayjm`.
-Run `hostname` first, every session.
+⚠️ **The prediction was RIGHT, and this is the part worth keeping: a plain pull was
+not enough.** `.gitattributes` (`77e1f9a`, 10 Aug) pins `*.mjs`, `*.sql` and `*.sh`
+to LF, but git applies `eol` on CHECKOUT, so `reset --hard` rewrites only the files
+whose blobs changed. **31 files that predated 10 Aug and had not been touched since
+kept their CRLF.** Repaired by deleting them and re-checking them out, which is what
+forces the attributes to apply — `git add --renormalize .` fixes the INDEX and leaves
+those working-tree files exactly as they were.
 
-⚠️ **THE TRAP THAT WILL COST AN HOUR IF IT IS NOT KNOWN: a plain `git pull` is very
-likely NOT ENOUGH, because of line endings.** `.gitattributes` — which pins `*.mjs`,
-`*.sql` and `*.sh` to LF — landed **10 Aug (`77e1f9a`), three days after cafnet was
-last synced.** Git applies those attributes when it checks a file OUT, so pulling
-fixes only the files that CHANGED in the pull. **Any `.mjs` that existed before 10 Aug
-and has not been touched since keeps its CRLF in cafnet's working tree.**
+⚠️ **The measurement that matters is a byte scan, not a command that ran.** Assert on
+the absence of `\r` in the files pinned to LF, and prove the scan can still find a
+CR that you plant — an "it worked" here is otherwise indistinguishable from a scan
+that silently matched nothing.
 
-That matters because esbuild (what Vitest transforms with) strips a `#!/usr/bin/env
-node` shebang up to the newline and leaves the `\r`, which is not a valid token. The
-symptom is vicious and points nowhere near the cause:
+**Why this matters beyond cafnet:** ⚠️ **CI cannot see this class of failure at all.**
+Actions runs on Linux and checks out LF, so `test` and `docs-check` stay green while
+the suite fails on the PC. **A green PR is no evidence.** The symptom is a
+`SyntaxError: Invalid or unexpected token` naming the *import line of an unrelated
+test*, on a line that is blank — because esbuild strips a `#!/usr/bin/env node`
+shebang up to the newline and leaves the `\r`.
 
-```
-SyntaxError: Invalid or unexpected token
-❯ tests/netlify-ignore.test.js:7:31
-```
+**The machine facts measured that day — `NODE_ENV`, npm from PowerShell,
+`core.fileMode` — are in `CLAUDE.md`'s table, which is their single home.** Two of
+the three had never been run on cafnet, and the third turned out to be wrong.
 
-— **the import line in the TEST, several files from the cause, on a line that is
-blank.** ⚠️ **And CI CANNOT SEE IT**: Actions runs on Linux and checks out LF, so
-`test` and `docs-check` stay green while the suite fails on the PC. A green PR is no
-evidence here.
-
-**Given all of that, on cafnet a FRESH CLONE is the better move than surgery** — it is
-90 commits behind on a deleted branch, the repo is public, and a new clone gets the
-line endings right by construction. **But check for uncommitted work first**, because
-this is exactly the situation where something valuable is sitting unpushed:
+**The sync sequence, for the next clone that falls behind:**
 
 ```bash
 hostname                       # confirm which machine
-cd C:\Users\Jay\GitHub\quins-club-hub
 git status                     # ⚠️ STOP and tell Jay if anything is uncommitted
 git stash list                 # and check here too — easy to forget
-```
-
-If it is genuinely clean, re-clone beside it and keep the old one until the suite
-passes. If it must be repaired in place instead:
-
-```bash
-git fetch origin --prune
-git checkout main              # build/v1-mvp is gone
+git fetch origin --prune       # ⚠️ a deleted branch leaves a STALE local ref
+git checkout main
 git reset --hard origin/main
-git add --renormalize .        # THIS is the step a plain pull misses
-git status                     # files listed here were CRLF; commit or reset them
-```
-
-Then, **before trusting anything**:
-
-```bash
+# then repair line endings, then:
 git rev-list --left-right --count origin/main...HEAD   # must be 0 0
-npm install --include=dev      # NODE_ENV=production is machine-wide on BOTH PCs
+npm install --include=dev      # see the CLAUDE.md machine table
+npm run build                  # ⚠️ some tests read dist/ — see RESTORE.md
 npm test                       # the real check — CI cannot catch the CRLF failure
 node scripts/session-guard.mjs
 ```
 
-⚠️ **Two jay-pc facts that are UNMEASURED on cafnet — do not assume either way.**
-PowerShell's execution policy blocks `npm.ps1` on jay-pc (run npm from `cmd` there),
-and jay-pc had `core.fileMode` drift set to `false` on 5 Aug. Neither has been checked
-on cafnet. `git config --get core.fileMode` answers the second in one command.
-
-⚠️ **`npm install` needs `--include=dev` on both PCs.** On jay-pc PowerShell's
-execution policy also blocks `npm.ps1` — run npm from `cmd`.
+⚠️ **`git fetch --prune` is load-bearing in that list, and the reason is worth
+naming.** cafnet's `rev-list` against `origin/build/v1-mvp` returned a confident
+`0 0` while it was 76 commits behind: the branch no longer existed on GitHub, so the
+comparison was against a stale local ref for a dead branch. **`0 0` against a ref
+that origin does not have is not evidence of anything.** `git ls-remote --heads
+origin` answers what actually exists, and is the check that exposed it.
 
 ⚠️ **A SHEBANG IN AN IMPORTED `.mjs` BREAKS THE SUITE ON WINDOWS ONLY.** Git checks
 out CRLF here; esbuild (what Vitest transforms with) strips `#!/usr/bin/env node`
