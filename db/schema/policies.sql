@@ -120,6 +120,7 @@ ALTER TABLE public.clubs           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invite_targets  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invites         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.league_teams    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.memberships     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pitch_requests  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pitches         ENABLE ROW LEVEL SECURITY;
@@ -402,6 +403,36 @@ CREATE POLICY "invites read own" ON public.invites
   USING ((lower(email) = lower(COALESCE((auth.jwt() ->> 'email'::text), ''::text))));
 
 CREATE POLICY "invites manage" ON public.invites
+  AS PERMISSIVE FOR ALL TO public
+  USING (private.is_admin(club_id))
+  WITH CHECK (private.is_admin(club_id));
+
+
+-- ---------------------------------------------------------------------
+-- league_teams  (2 policies — ADDED 2026-08-12)
+--
+-- ⚠️ READ IS DELIBERATELY WIDE — any signed-in member, not a membership check.
+-- A coach filling an RCM match sheet has to pick their league team, so a
+-- narrower policy would make the sheet unfillable. Nothing here is sensitive:
+-- it is the club's own team names, which the opposition already knows.
+--
+-- ⚠️ WRITE IS ADMIN-ONLY, AND THAT IS THE SECURITY BOUNDARY. `rcm_name` is the
+-- field that tells the league whose result a match sheet is. A coach able to
+-- rename a league team could file a result against another team's name, and the
+-- club would learn about it from the league table rather than from the app.
+--
+-- ⚠️ THE `youth` ADMIN RIGHT DOES NOT APPEAR HERE, ON PURPOSE. Same ruling as
+-- pitches: a right decides which dashboard somebody is SHOWN, not what they may
+-- do. It is a "not your job" message and must never be called a boundary.
+--
+-- Harness: db/tests/rls-league-teams.sql. Verified live 12 Aug 2026 — a coach's
+-- INSERT refused with 42501 specifically, an admin's allowed, anon reads zero.
+-- ---------------------------------------------------------------------
+CREATE POLICY "league team read" ON public.league_teams
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((auth.uid() IS NOT NULL));
+
+CREATE POLICY "league team manage" ON public.league_teams
   AS PERMISSIVE FOR ALL TO public
   USING (private.is_admin(club_id))
   WITH CHECK (private.is_admin(club_id));

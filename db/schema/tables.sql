@@ -541,9 +541,32 @@ CREATE TABLE public.events (
   -- does not, so the constraint lives where a feed import cannot trip on it.
   ends_at      timestamptz,
   notes        text,
+  -- Added 2026-08-12 (events_league_team). Column comments as stored:
+  --   league_team_id: "Which of the club's league teams played this fixture.
+  --   NOT NULL means this IS a league match; null means it is not one, and
+  --   division and round render as nothing. Never read null as 'assume league'."
+  --   round: "League round number. Null unless league_team_id is set - a round
+  --   number on a friendly is stale data, not a label."
+  --
+  -- ⚠️ THE NULL RULE IS THE FEATURE, not an implementation detail. A fixture IS
+  -- a league match when league_team_id is not null; null must render NOTHING.
+  -- This club has been bitten by exactly this shape once: src/lib/ageGroup.js
+  -- returned null for an unparseable squad name, allowsOwnContact read null as
+  -- "a senior side: adults", and the app offered a twelve-year-old girls' squad
+  -- the child's own email and phone fields. The lesson was the NULL DEFAULT.
+  --
+  -- ⚠️ team_id AND league_team_id ARE NOT THE SAME THING. team_id is the SQUAD
+  -- (the training group, "U14B Contact"); league_team_id is the COMPETING TEAM
+  -- ("ADHQ2"). One squad can enter three of them, one per division.
+  league_team_id uuid,
+  round          smallint,
   CONSTRAINT events_pkey          PRIMARY KEY (id),
   CONSTRAINT events_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
   CONSTRAINT events_team_id_fkey    FOREIGN KEY (team_id)    REFERENCES teams(id)    ON DELETE CASCADE,
+  -- ⚠️ ON DELETE SET NULL, NEVER CASCADE. Deleting a league team must cost the
+  -- fixture its LABEL, which is recoverable, and must never cost the club the
+  -- FIXTURE, which is not.
+  CONSTRAINT events_league_team_id_fkey FOREIGN KEY (league_team_id) REFERENCES league_teams(id) ON DELETE SET NULL,
   CONSTRAINT events_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id),
   CONSTRAINT events_type_check      CHECK ((type = ANY (ARRAY['match'::text, 'training'::text, 'social'::text]))),
   -- Added 2026-08-08 (event_end_time_and_notes). Note the `ends_at IS NULL OR`
@@ -908,3 +931,53 @@ ALTER TABLE public.pitch_requests ENABLE ROW LEVEL SECURITY;
 -- keeps the request and loses the name. Deliberate: the queue must not develop
 -- holes when somebody leaves the club.
 CREATE INDEX pitch_requests_status_idx ON public.pitch_requests USING btree (status, requested_at);
+
+-- ---------------------------------------------------------------------
+-- public.league_teams — the club's COMPETING teams (12 Aug 2026)
+--
+-- ⚠️ TWO DIFFERENT THINGS IN THIS CLUB ARE BOTH CALLED "TEAM", and confusing
+-- them is the mistake this table exists to prevent:
+--
+--   SQUAD        public.teams   "U14B Contact"   a training group. What
+--                                                players.team_id and
+--                                                events.team_id point at.
+--   LEAGUE TEAM  this table     "ADHQ2"          a competing entity in ONE
+--                                                division. What Rugby Club
+--                                                Management knows it as.
+--
+-- Jay, 11 Aug 2026: "each age group has 3 divisions in the league, a, b, and c,
+-- clubs can have multiple teams at an age group". So one squad row can own
+-- several rows here.
+--
+-- ⚠️ THE LETTER IN A SQUAD NAME IS GENDER, NOT DIVISION. "U14B Contact" is U14
+-- BOYS; "U14G QR" is Girls. private.squad_expects_gender parses exactly that
+-- suffix. Anything reading a division out of teams.name reads the gender
+-- instead — which is the whole reason `division` is a column and not a parse.
+--
+-- ⚠️ A COLUMN ON teams WAS THE FIRST DESIGN AND WAS WITHDRAWN. One rcm_name per
+-- squad cannot hold three league teams; it would have silently forced the club
+-- to pick one.
+--
+-- `is_active` retires without deleting, the same reasoning public.pitches
+-- records: deleting would leave last season's fixtures pointing at nothing.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.league_teams (
+  id          uuid        NOT NULL DEFAULT gen_random_uuid(),
+  club_id     uuid        NOT NULL,
+  team_id     uuid        NOT NULL,
+  rcm_name    text        NOT NULL,
+  division    text,
+  is_active   boolean     NOT NULL DEFAULT true,
+  sort_order  integer     NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT league_teams_pkey                 PRIMARY KEY (id),
+  CONSTRAINT league_teams_club_id_rcm_name_key UNIQUE (club_id, rcm_name),
+  CONSTRAINT league_teams_club_id_fkey         FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+  CONSTRAINT league_teams_team_id_fkey         FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+  -- ⚠️ NULLABLE ON PURPOSE. A club can enter a team that is not in a lettered
+  -- division, and forcing a letter would invent data. Display only, never a gate.
+  CONSTRAINT league_teams_division_check       CHECK ((division = ANY (ARRAY['A'::text, 'B'::text, 'C'::text])))
+);
+ALTER TABLE public.league_teams ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX league_teams_team_idx ON public.league_teams USING btree (team_id, sort_order, rcm_name);
