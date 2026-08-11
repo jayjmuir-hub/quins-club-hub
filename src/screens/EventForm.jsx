@@ -9,6 +9,39 @@ import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '
 // else…" stays distinguishable from "No pitch" — they are different answers,
 // and collapsing them would make the free-text box impossible to reach.
 const OTHER_PITCH = '__other__'
+
+// ══ COMPETITION ═══════════════════════════════════════════════════════════
+//
+// Jay, 12 Aug 2026: a match is a LEAGUE fixture or a TOURNAMENT fixture, and
+// the app should ask which rather than making somebody type it into a free-text
+// box and hope everyone spells it the same way.
+//
+// ⚠️ "NEITHER" IS A REAL ANSWER AND IS THE DEFAULT. A friendly is neither, and
+// friendlies are common. Nothing may read the blank as "assume league" — the
+// same rule `league_team_id` carries, for the same reason.
+const COMPETITION_LEAGUE = 'league'
+const COMPETITION_TOURNAMENT = 'tournament'
+
+// ⚠️ ONE TO EIGHT BECAUSE THAT IS THE SEASON, and a SELECT rather than a number
+// box because the set is small and closed. The column stays `smallint`, so a
+// ninth round is one line here and no migration.
+const LEAGUE_ROUNDS = [1, 2, 3, 4, 5, 6, 7, 8]
+
+// ⚠️ HARD-CODED, AND NOT A MANAGED TABLE — deliberately, unlike pitches. The
+// pitch list became a table the day clash detection needed to reason about
+// pitches; nothing reasons about a tournament, it is a label on a fixture. Four
+// regulars plus a free-text escape hatch is the same shape the pitch picker
+// settled on, and it costs no schema.
+// ⚠️ THE ESCAPE HATCH IS NOT A COURTESY. A one-off invitational the club has
+// never entered before must be nameable without a deploy, or somebody files it
+// under the closest wrong option.
+const TOURNAMENTS = [
+  'ADHJRT',
+  'Dubai Youth Festival',
+  'Al Ain Tournament',
+  'Small Blacks Tournament',
+]
+const OTHER_TOURNAMENT = '__other_tournament__'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import {
@@ -157,6 +190,8 @@ function initialValues(event, editableTeams, initialDate = null) {
       // nothing may guess otherwise from the type or the squad.
       leagueTeamId: '',
       round: '',
+      // '' = neither: a friendly. See the block by COMPETITION_LEAGUE.
+      competitionType: '',
       notes: '',
       resultUs: '',
       resultThem: '',
@@ -186,6 +221,15 @@ function initialValues(event, editableTeams, initialDate = null) {
     venue: event.venue ?? '',
     pitch: event.pitch ?? '',
     competition: event.competition ?? '',
+    // ⚠️ AN OLD ROW WITH A COMPETITION AND NO TYPE IS READ AS A TOURNAMENT.
+    // `competition` was free text from v1 until 12 Aug 2026, so every fixture
+    // predating the column holds a string and a null type. Reading that as a
+    // tournament name preserves what somebody typed and lets them correct it;
+    // showing "neither" would silently orphan the text on the next save.
+    // ⚠️ IT IS A READ, NOT A BACKFILL. The migration deliberately wrote nothing,
+    // so nothing in the database can be mistaken for an answer somebody gave.
+    competitionType:
+      event.competition_type ?? (event.competition ? COMPETITION_TOURNAMENT : ''),
     leagueTeamId: event.league_team_id ?? '',
     round: event.round == null ? '' : String(event.round),
     notes: event.notes ?? '',
@@ -535,7 +579,21 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
       home: isMatch ? values.home : null,
       venue: values.venue.trim() || null,
       pitch: values.pitch.trim() || null,
-      competition: isMatch ? values.competition.trim() || null : null,
+      // ⚠️ `competition` NOW MEANS "THE TOURNAMENT'S NAME", so it is null for a
+      // league fixture and for a friendly. Switching an event from Tournament
+      // to League therefore clears the name, which is intended: the two answers
+      // are exclusive and leaving the old name behind would render a league
+      // fixture as though it were still in a tournament.
+      competition:
+        isMatch && values.competitionType === COMPETITION_TOURNAMENT
+          ? values.competition.trim() || null
+          : null,
+      // ⚠️ IN `common`, UNLIKE THE LEAGUE FIELDS BELOW, AND THE DIFFERENCE IS
+      // REAL. What competition a session belongs to is a fact about the EVENT —
+      // an ADHJRT weekend fanned out across every age group is genuinely one
+      // tournament for all of them. Which of our teams played it, and in which
+      // round, are facts about the SQUAD, so those stay on the primary payload.
+      competition_type: isMatch ? values.competitionType || null : null,
       // Optional, and empty means NULL rather than '' — EventDetail and the
       // calendar feed both test it for truthiness, and an empty string would
       // render an "Additional info" heading over nothing.
@@ -574,17 +632,25 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
     // sends `common`: "apply to every later session" cannot retag a term with
     // one round number, which is right.
     //
-    // ⚠️ round IS NULL UNLESS A LEAGUE TEAM IS SET, whatever the input still
-    // holds. Same rule fixtureLabel enforces when rendering: no league team
-    // means no round, so a round left behind on a fixture later changed to a
-    // friendly must not survive in the column either.
+    // ⚠️ round IS NULL UNLESS THIS IS A LEAGUE FIXTURE, whatever the input
+    // still holds. A round left behind on a fixture later switched to a
+    // tournament or a friendly must not survive in the column.
+    // ⚠️ GATED ON THE COMPETITION TYPE, NOT ON THE LEAGUE TEAM — changed
+    // 12 Aug 2026 when the type became a field somebody answers. A round is a
+    // property of the COMPETITION ("round 4 of the league"), not of which of
+    // our sides turned up, and tying it to `league_team_id` meant a league
+    // fixture whose team had not been picked yet silently discarded the round.
+    // fixtureLabel still refuses to RENDER a round without a league team, which
+    // is a separate and still-correct rule about display.
     const leagueTeamId = isMatch && values.leagueTeamId ? values.leagueTeamId : null
+    const isLeagueFixture = isMatch && values.competitionType === COMPETITION_LEAGUE
     const roundText = String(values.round ?? '').trim()
     const leagueFields = {
       league_team_id: leagueTeamId,
-      round: leagueTeamId && roundText !== '' && Number.isFinite(Number(roundText))
-        ? Number(roundText)
-        : null,
+      round:
+        isLeagueFixture && roundText !== '' && Number.isFinite(Number(roundText))
+          ? Number(roundText)
+          : null,
     }
 
     const payload = {
@@ -1078,41 +1144,110 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
               )}
             </div>
 
-            {/* ⚠️ HIDDEN UNTIL A LEAGUE TEAM IS CHOSEN. A round number without
-                one is meaningless — fixtureLabel ignores it and the save
-                nulls it — so offering the box would invite somebody to fill in
-                a field that is then thrown away. */}
-            {values.leagueTeamId && (
+            {/* ⚠️ A CHOICE, NOT A FREE-TEXT BOX, as of 12 Aug 2026. It was an
+                open text field ("e.g. UAE Youth League"), which meant every
+                coach spelled the same competition differently and nothing could
+                group by it. Jay's ruling: ask which of the two it is. */}
+            <div className={FIELD}>
+              <label className={LABEL} htmlFor="event-competition-type">
+                Competition
+              </label>
+              <select
+                id="event-competition-type"
+                value={values.competitionType}
+                onChange={(domEvent) => {
+                  const chosen = domEvent.target.value
+                  // ⚠️ SWITCHING TYPE CLEARS THE OTHER SIDE'S ANSWER. League and
+                  // Tournament are exclusive, so a round left over from League
+                  // or a name left over from Tournament would be written against
+                  // a fixture that is no longer either. The save nulls them too;
+                  // this is so the FORM never shows a stale value it will drop.
+                  setValues((current) => ({
+                    ...current,
+                    competitionType: chosen,
+                    round: chosen === COMPETITION_LEAGUE ? current.round : '',
+                    competition: chosen === COMPETITION_TOURNAMENT ? current.competition : '',
+                  }))
+                }}
+                className={inputClasses(false)}
+              >
+                {/* ⚠️ "Neither" IS A REAL ANSWER AND THE DEFAULT — a friendly.
+                    Wording it "Select…" would read as an unfilled field. */}
+                <option value="">Neither — a friendly</option>
+                <option value={COMPETITION_LEAGUE}>League</option>
+                <option value={COMPETITION_TOURNAMENT}>Tournament</option>
+              </select>
+            </div>
+
+            {/* ⚠️ ROUND BELONGS TO THE LEAGUE, so it appears with it and only
+                with it. The set is small and closed, so a select rather than a
+                number box: it cannot be typed wrong, and "R9" is a conversation
+                to have rather than a value to accept silently. */}
+            {values.competitionType === COMPETITION_LEAGUE && (
               <div className={FIELD}>
                 <label className={LABEL} htmlFor="event-round">
                   Round
                 </label>
-                <input
+                <select
                   id="event-round"
-                  type="number"
-                  min="1"
-                  inputMode="numeric"
                   value={values.round}
                   onChange={setFromInput('round')}
-                  placeholder="e.g. 4"
                   className={inputClasses(false)}
-                />
+                >
+                  {/* Not knowing the round yet is normal and must be sayable. */}
+                  <option value="">Not set</option>
+                  {LEAGUE_ROUNDS.map((round) => (
+                    <option key={round} value={String(round)}>
+                      Round {round}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 
-            <div className={FIELD}>
-              <label className={LABEL} htmlFor="event-competition">
-                Competition
-              </label>
-              <input
-                id="event-competition"
-                type="text"
-                value={values.competition}
-                onChange={setFromInput('competition')}
-                placeholder="e.g. UAE Youth League"
-                className={inputClasses(false)}
-              />
-            </div>
+            {/* ⚠️ THE FOUR REGULARS PLUS AN ESCAPE HATCH, the shape the pitch
+                picker above settled on. A one-off invitational the club has
+                never entered must be nameable without a deploy, or somebody
+                files it under the closest wrong option. */}
+            {values.competitionType === COMPETITION_TOURNAMENT && (
+              <div className={FIELD}>
+                <label className={LABEL} htmlFor="event-tournament">
+                  Tournament
+                </label>
+                <select
+                  id="event-tournament"
+                  value={
+                    TOURNAMENTS.includes(values.competition) ? values.competition : OTHER_TOURNAMENT
+                  }
+                  onChange={(domEvent) => {
+                    const chosen = domEvent.target.value
+                    // Choosing "Something else" must not silently keep the
+                    // previous tournament — it clears the box so the person
+                    // types what they mean. Same as the pitch picker.
+                    set('competition')(chosen === OTHER_TOURNAMENT ? '' : chosen)
+                  }}
+                  className={inputClasses(false)}
+                >
+                  {TOURNAMENTS.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                  <option value={OTHER_TOURNAMENT}>Something else…</option>
+                </select>
+
+                {!TOURNAMENTS.includes(values.competition) && (
+                  <input
+                    type="text"
+                    aria-label="Tournament name"
+                    value={values.competition}
+                    onChange={setFromInput('competition')}
+                    placeholder="e.g. Sharjah Sevens"
+                    className={`${inputClasses(false)} mt-2`}
+                  />
+                )}
+              </div>
+            )}
 
             <div className={FIELD_ROW}>
               <div>
