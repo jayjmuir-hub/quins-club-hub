@@ -3,6 +3,7 @@ import Sheet from '../components/Sheet.jsx'
 import Chip from '../components/Chip.jsx'
 import Spinner from '../components/Spinner.jsx'
 import Button from '../components/Button.jsx'
+import PitchRequest from '../components/PitchRequest.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { countSeriesFrom, deleteEvent, deleteSeriesFrom } from '../data/events.js'
 import { FEATURES } from '../lib/features.js'
@@ -534,6 +535,14 @@ export default function EventDetail({
           this same component rendered a dead availability button on the
           dashboard for weeks because the optional call swallowed the tap. A
           screen that forgets to pass the handler gets no button. */}
+      {/* ⚠️ SELF-CONTAINED, and takes no handler — unlike the availability and
+          register blocks below, which each need one and each shipped a dead
+          button when a screen forgot to pass it. Nothing here can be forgotten
+          by a caller. It decides for itself whether to render: a fixture that
+          already has a real pitch has nothing to ask for, and somebody who
+          cannot edit the squad sees it only if a request already exists. */}
+      <PitchRequest event={event} canEdit={canEdit} />
+
       {canEdit && onOpenRegister && date && date.getTime() <= Date.now() && (
         <div className="mt-4">
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Register</h4>

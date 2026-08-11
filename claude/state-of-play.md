@@ -552,9 +552,17 @@ state; trust the decisions for reasoning.**
   if something is on it** — otherwise the booking would be invisible on the one screen
   meant to show it. ⚠️ **Fixtures with no pitch get their own list**, since they appear
   in no row.
-  ⚠️ **Still missing: Tracy's request QUEUE, the submitter's tracking view, and the
-  email.** `pitch_requests` has schema, RLS and a harness, but **nothing writes a row
-  yet** and no screen reads one. Allocation today means editing the fixture's pitch.
+  ✅ **THE REQUEST LOOP IS CLOSED** (11 Aug): a coach asks from the event sheet
+  (`PitchRequest`), Tracy answers from a queue on `/admin/allocation`, and the coach
+  sees the outcome in the same place they asked. Referee is a tickbox on the request.
+  ⚠️ **A DECLINE NEVER SHOWS ON THE FIXTURE** — it keeps `Pitch TBD`. The request
+  block is the ONLY place that fact exists, so it renders for decided requests too and
+  a decline REQUIRES a reason.
+  ⚠️ **Allocating writes the fixture FIRST, then closes the request** — not atomic,
+  and the order is the mitigation: a failure leaves the request open and the fixture
+  correct rather than telling a coach they have a pitch they do not have.
+  ⚠️ **STILL MISSING: THE EMAIL.** Jay asked for email to multiple people on submit
+  and on decision; none is sent. The loop works entirely in-app today.
 - Nothing in the UI distinguishes a Medic from a Coach, because there is no
   difference in access. Deliberate — the word is what distinguishes them.
 - ⚠️ **A SUPER-ADMIN TIER IS WANTED — decided 10 Aug, NOT YET BUILT.** Candice, Nick
