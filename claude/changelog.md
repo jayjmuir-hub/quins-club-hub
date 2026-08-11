@@ -10,7 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- **RCM match sheets — Project 2, shipped.** `match_sheets`, `match_sheet_slots` (22 per
+- **The AI ruling, and two plans.** ✅ **CHILDREN'S DATA MAY LEAVE THE CLUB FOR A
+  THIRD-PARTY API — Jay, 12 Aug 2026, asked directly and answered "yes it may".**
+  `state-of-play.md` recorded that EVERY AI feature was gated on this one question and
+  that nobody had asked him. Recorded in
+  `claude/decisions/2026-08-12-childrens-data-may-leave-the-club.md`.
+  ⚠️ **"May" is permission, not a design** — the implementation default is MINIMISATION,
+  with a written field list. Photos, contacts, medical notes and attendance are NOT sent
+  without a separate conversation.
+  ⚠️ **`match_sheets.medical_notes` is the trap this schema now carries**: a match-report
+  feature doing `select('*')` would send concussion notes about named children to a third
+  party. **No `select('*')` on the AI path** — deliberately the opposite of the convention
+  everywhere else in `src/data/`.
+  ⚠️ **The model is `claude-haiku-4-5`** (Jay's call) as ONE constant, and it does NOT take
+  `effort` — copying a request body from an Opus example errors.
+  ⚠️ **"Scrape the web for the best rugby training sessions" cannot be built as
+  described**, and the reason is copyright rather than capability: World Rugby, the RFU and
+  the rest own that material. The plan reaches the same outcome by linking out, using search
+  to DISCOVER rather than copy, and generating original sessions from age-grade principles
+  — which are facts, not expression. `drills` deliberately has **no full-text column**, and
+  its absence is the design.
+
+- `3c64990` — **RCM match sheets — Project 2, shipped.** `match_sheets`, `match_sheet_slots` (22 per
   sheet) and `match_sheet_cards`, the editor at `/match-sheet/:eventId`, and the Club Youth
   Manager's list at `/admin/youth` behind the `youth` right — which had existed since 10 Aug
   and granted access to nothing.
