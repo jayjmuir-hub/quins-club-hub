@@ -4,8 +4,40 @@
 -- Supabase project lusmshimxdcxpnrktlgz (quins-club-hub).
 -- First captured 2026-08-03; re-captured 2026-08-07;
 -- ⚠️ RE-CAPTURED 2026-08-09 — 29 functions (was 22).
+-- ⚠️ RE-CAPTURED 2026-08-11 — see the block below.
 --
 -- This is a CAPTURE, not a migration. Do not run this file. See README.md.
+--
+-- ── ⚠️ RE-CAPTURED 2026-08-11 AFTER THIS FILE WENT TWO DAYS BEHIND ───
+-- Three functions were live and had NO entry here at all, and a fourth was
+-- recorded with a signature the database no longer has:
+--
+--   private.is_super_admin()                    20260810183058 super_admin_and_rights
+--   public.set_admin_rights(uuid,bool,text[])   20260810183058 super_admin_and_rights
+--   private.notify_pitch_request()              20260811051334 pitch_request_notify
+--   public.register_my_player(...)              20260811085312 self_registration
+--                                               — 3-arg here, 4-arg live
+--
+-- ⚠️ THE `register_my_player` ENTRY WAS THE DANGEROUS ONE, and not because it
+-- was merely out of date. The 11 Aug migration DROPS the 3-argument signature,
+-- so this file was describing a function that does not exist while the one that
+-- does — carrying a new argument that decides whether a registrant becomes a
+-- 'player' or a 'parent' — appeared nowhere. A reader diffing live against this
+-- file would have found the whole self-registration guard missing and had no
+-- way to tell "not captured" from "reverted". That is the exact confusion this
+-- directory exists to remove.
+--
+-- ⚠️ AND THE COMMITTED MIGRATION IS NOT WHAT WAS APPLIED. The body live in the
+-- database carries a SHORTER version of the 0A000 comment than
+-- db/migrations/20260811_self_registration.sql does, and is missing that file's
+-- two `-- ⚠️ UNCHANGED …` comments entirely. Every executable statement is
+-- identical; only the prose differs. Recorded, not reconciled — but it means
+-- **re-applying that committed file would rewrite the live function body**, and
+-- the next capture would then show a diff nobody intended. The body below is
+-- what the database returns, per the README: capture live, never the migration.
+-- ⚠️ Note this is NOT the `apply_migration` comment-stripping described lower
+-- down — comments INSIDE a dollar-quoted body do survive, which is why the ones
+-- that are there are there. Something shorter was applied, then written up.
 --
 -- Source: pg_proc + pg_get_functiondef(oid) + proacl, verbatim. Bodies
 -- below are exactly what the database returns — not reformatted.
@@ -1307,17 +1339,23 @@ $function$
 
 
 -- ---------------------------------------------------------------------
--- public.register_my_player(text, uuid, text)  — PUBLIC-FACING WRITE
+-- public.register_my_player(text, uuid, text, boolean)  — PUBLIC-FACING WRITE
 -- ADDED by 20260808161245 register_my_player; the p_gender parameter and its
 -- two guards by 20260809083535 register_my_player_gender; the 22004 errcode by
--- 20260809083640 register_my_player_gender_errcode.
+-- 20260809083640 register_my_player_gender_errcode; p_self_register, the 0A000
+-- guard and the role expression by 20260811085312 self_registration.
 -- prosecdef: true    provolatile: v (VOLATILE)    proconfig: search_path=public
 -- proacl: {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,
 --          service_role=X/postgres}
 --
--- ⚠️ THE 2-ARGUMENT VERSION IS GONE. register_my_player(text, uuid) was
--- explicitly dropped by the gender migration, so there is no overload and no
--- older signature still callable. One row in pg_proc, confirmed 9 Aug 2026.
+-- ⚠️ THERE IS EXACTLY ONE SIGNATURE, AND KEEPING IT THAT WAY IS THE POINT.
+-- register_my_player(text, uuid) went with the gender migration; (text, uuid,
+-- text) went with the self-registration migration, which drops it explicitly in
+-- the same transaction as creating this one. **Postgres prefers an exact arity
+-- match over one satisfied by a default**, so leaving an older signature in
+-- place does not give you a compatible overload — it gives you a function every
+-- existing client keeps resolving to, with the new feature reaching nobody and
+-- nothing failing to say so. One row in pg_proc, confirmed live 11 Aug 2026.
 --
 -- How a stranger becomes a user: creates a player, puts their own confirmed
 -- email on it as a contact, and gives themselves a PENDING membership. Pending
@@ -1338,11 +1376,28 @@ $function$
 --     src/data/members.js maps 22023 to one generic message, and this case
 --     needs its own. Changing the errcode changes what the parent reads.
 --   * at most 5 pending registrations per profile (errcode 42901).
+--   * ⚠️ ADDED 11 Aug: p_self_register is REFUSED unless the squad's
+--     teams.self_registration_allowed is true, errcode 0A000. It is checked
+--     here and not only in AddYourPlayer.jsx because this is the one function
+--     in the schema a person with NO membership may call, so a check that
+--     lives only in the form is a check anyone hitting the REST endpoint
+--     skips. 0A000 is deliberate: src/data/members.js maps 42501 to a sentence
+--     about confirming your email address, which would be a lie here, and
+--     codes ABSENT from that map fall through with error.message intact.
 --
--- The role is `case when team.is_senior then 'player' else 'parent' end` —
--- teams.is_senior, never teams.name, the same rule as claim_roster_access.
+-- The role is
+--   `case when p_self_register or team.is_senior then 'player' else 'parent' end`
+-- — teams.is_senior and the new column, NEVER teams.name, the same rule as
+-- claim_roster_access. ⚠️ is_senior is still in that expression on purpose: if a
+-- senior squad ever returns, its players are players whether or not anyone
+-- remembers to set the new column.
+--
+-- ⚠️ The role is COSMETIC and that is why widening it was safe: no policy in
+-- policies.sql distinguishes 'parent' from 'player', private.is_own_player
+-- accepts either, and src/lib/scope.js treats them identically. If that ever
+-- stops being true, this line is the thing that was relied on.
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.register_my_player(p_full_name text, p_team_id uuid, p_gender text DEFAULT NULL::text)
+CREATE OR REPLACE FUNCTION public.register_my_player(p_full_name text, p_team_id uuid, p_gender text DEFAULT NULL::text, p_self_register boolean DEFAULT false)
  RETURNS memberships
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -1386,6 +1441,16 @@ begin
     raise exception 'That age group does not exist.' using errcode = '22023';
   end if;
 
+  -- ⚠️ ADDED 11 Aug 2026. Server-side because register_my_player is the one
+  -- function a person with NO membership can call. ERRCODE 0A000 deliberately:
+  -- src/data/members.js maps 42501 to a sentence about confirming your email,
+  -- which would be a lie here. Codes absent from that map fall through to
+  -- error.message intact.
+  if p_self_register and not coalesce(team_row.self_registration_allowed, false) then
+    raise exception 'Players in % cannot register themselves — a parent or carer has to do it.',
+      team_row.name using errcode = '0A000';
+  end if;
+
   clean_gender := nullif(btrim(lower(p_gender)), '');
   if clean_gender is not null and clean_gender not in ('male', 'female') then
     raise exception 'Gender must be male or female.' using errcode = '22023';
@@ -1413,7 +1478,10 @@ begin
 
   insert into public.memberships (profile_id, club_id, team_id, role, player_id, status)
   values (auth.uid(), team_row.club_id, team_row.id,
-          case when team_row.is_senior then 'player' else 'parent' end,
+          -- ⚠️ is_senior IS DELIBERATELY STILL HERE. If a senior squad ever
+          -- returns, its players are players whether or not anyone remembers
+          -- to set the new column.
+          case when p_self_register or team_row.is_senior then 'player' else 'parent' end,
           new_player.id, 'pending')
   returning * into new_membership;
 
@@ -1422,10 +1490,14 @@ end;
 $function$
 ;
 
-REVOKE ALL ON FUNCTION public.register_my_player(text, uuid, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.register_my_player(text, uuid, text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.register_my_player(text, uuid, text) TO anon;
-GRANT EXECUTE ON FUNCTION public.register_my_player(text, uuid, text) TO service_role;
+-- ⚠️ GRANTS ARE NOT INHERITED by a new signature, and the DROP of the 3-arg
+-- version took its ACLs with it. These four are the live proacl as found on
+-- 11 Aug 2026, and they match what the 3-arg version carried. On 8 Aug a revoke
+-- with no matching grant broke every events query in production for a minute.
+REVOKE ALL ON FUNCTION public.register_my_player(text, uuid, text, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.register_my_player(text, uuid, text, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.register_my_player(text, uuid, text, boolean) TO anon;
+GRANT EXECUTE ON FUNCTION public.register_my_player(text, uuid, text, boolean) TO service_role;
 
 
 -- ---------------------------------------------------------------------
@@ -1571,3 +1643,190 @@ $function$
 GRANT EXECUTE ON FUNCTION public.set_series_time_from(uuid, timestamp with time zone, integer, integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.set_series_time_from(uuid, timestamp with time zone, integer, integer) TO anon;  -- bootstrap default; fails closed, see above
 GRANT EXECUTE ON FUNCTION public.set_series_time_from(uuid, timestamp with time zone, integer, integer) TO service_role;
+
+
+-- ---------------------------------------------------------------------
+-- private.is_super_admin()
+-- Added 2026-08-10 by migration `super_admin_and_rights`. ⚠️ Live since then
+-- with no entry in this file until the 11 Aug re-capture.
+-- prosecdef: true    provolatile: s (STABLE)    proconfig: search_path=public
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+--
+-- ⚠️ THE TIER IS A FLAG ON memberships, NOT A ROLE VALUE, and that was the
+-- design decision rather than an implementation detail. Twelve places in this
+-- schema test `m.role = 'admin'`; a new role value would have to be added to
+-- all twelve and each is a chance to miss one, where a miss silently strips a
+-- super admin of an ordinary admin power. A boolean makes a super admin an
+-- admin, so all twelve keep working untouched.
+--
+-- ⚠️ `status = 'active'` is in here for the same reason it was added to
+-- can_edit_team on 10 Aug: a pending row must not carry authority.
+--
+-- ⚠️ NO `anon` GRANT, unlike most of public — this one was never created in
+-- `public`, so Supabase's default privileges on that schema never applied. It
+-- would fail closed anyway (null auth.uid() matches no membership row).
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_super_admin()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from memberships m
+    where m.profile_id = auth.uid()
+      and m.role = 'admin'
+      and m.status = 'active'
+      and m.is_super);
+$function$
+;
+
+-- No explicit grants beyond the two in proacl above.
+
+
+-- ---------------------------------------------------------------------
+-- public.set_admin_rights(uuid, boolean, text[])  — SECURITY-RELEVANT WRITE
+-- Added 2026-08-10 by migration `super_admin_and_rights`. ⚠️ Live since then
+-- with no entry in this file until the 11 Aug re-capture.
+-- prosecdef: true    provolatile: v (VOLATILE)    proconfig: search_path=public
+-- proacl: {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,
+--          service_role=X/postgres}
+--
+-- ⚠️ WHY THIS IS AN RPC AND NOT A COLUMN THE APP WRITES — the same trap
+-- approve_membership documents, and it very nearly ate this feature. `memb
+-- manage` on public.memberships is FOR ALL USING private.is_admin(club_id), so
+-- **any admin can already write membership rows**. A plain is_super column
+-- would therefore let any admin set it on themselves and the whole tier would
+-- be decoration. Two things stop that and BOTH are needed:
+--   1. the column GRANT in grants.sql — policies authorise the ROW, grants
+--      authorise the COLUMN, and getting only the policy right leaves it open;
+--   2. this function, whose first statement is the super-admin check.
+--
+-- ⚠️ AND A THIRD, easy to miss because it is not in this file: the RESTRICTIVE
+-- policy "memb no self promotion" in policies.sql closes the INSERT path. A
+-- column grant stops an UPDATE; it does not stop somebody inserting a brand new
+-- row that already has is_super = true.
+--
+-- `and role = 'admin'` in the WHERE is deliberate: rights are meaningless on a
+-- coach or parent row, and silently writing them there would leave a membership
+-- carrying authority no screen would ever show.
+--
+-- ⚠️ THE FIRST SUPER ADMIN WAS SET BY HAND IN SQL, as it had to be — this
+-- function requires a super admin to exist and none could.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_admin_rights(_membership_id uuid, _is_super boolean, _rights text[])
+ RETURNS memberships
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  _row memberships;
+begin
+  if not private.is_super_admin() then
+    raise exception 'Only a super admin can change admin rights'
+      using errcode = '42501';
+  end if;
+
+  update memberships
+     set is_super = coalesce(_is_super, false),
+         admin_rights = coalesce(_rights, '{}')
+   where id = _membership_id
+     and role = 'admin'
+  returning * into _row;
+
+  if _row.id is null then
+    raise exception 'No admin membership with that id'
+      using errcode = 'P0002';
+  end if;
+
+  return _row;
+end;
+$function$
+;
+
+-- ⚠️ anon and service_role again hold EXECUTE from Supabase's default
+-- privileges on `public`, not from intent. Fails closed: a null auth.uid()
+-- cannot satisfy is_super_admin() and the first raise fires. Same pattern
+-- already recorded on approve_membership, register_my_player,
+-- set_own_player_gender and set_series_time_from.
+GRANT EXECUTE ON FUNCTION public.set_admin_rights(uuid, boolean, text[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.set_admin_rights(uuid, boolean, text[]) TO anon;
+GRANT EXECUTE ON FUNCTION public.set_admin_rights(uuid, boolean, text[]) TO service_role;
+
+
+-- ---------------------------------------------------------------------
+-- private.notify_pitch_request()  — TRIGGER FUNCTION, REACHES OUTSIDE THE DB
+-- Added 2026-08-11 by migration `pitch_request_notify`. Fired by two triggers
+-- on public.pitch_requests — see triggers.sql.
+-- prosecdef: true    provolatile: v (VOLATILE)    proconfig: search_path=public
+-- proacl: {postgres=X/postgres}   ← the migration revokes from public, anon and
+--         authenticated, so unlike most of this file nothing else can call it.
+--
+-- The SECOND function in this project to make an outbound HTTP call, after
+-- private.notify_pending_membership. ⚠️ `pg_net` IS installed (0.20.4) — a
+-- claim that this database cannot reach the network was carried in
+-- claude/state-of-play.md for days after it stopped being true.
+--
+-- ⚠️ WHY THE DATABASE SENDS IT AND NOT THE APP, which is not a style choice:
+-- the submit mail goes to Pitch Managers, and **a coach cannot read admin email
+-- addresses** — `profiles` is not bulk-readable by one and `profiles.email` is
+-- column-granted, not merely policy-gated. A client-side send would need either
+-- the club's admin list in every coach's browser or a service-role key in it.
+--
+-- ⚠️ IT MUST NEVER FAIL THE WRITE, hence the catch-all `exception when others`.
+-- A coach's pitch request has to file whether or not Resend is having a good
+-- day. ⚠️ AND THE FAILURE IS THEREFORE GENUINELY QUIET — `raise warning` goes
+-- to the Postgres log, which nobody reads. That is survivable ONLY because the
+-- queue is in-app: the request sits on /admin/allocation whether or not the mail
+-- arrived. **The email is a prompt to go and look, never the record.**
+--
+-- ⚠️ REUSES `approval_notify_secret` from the vault — same caller, same trust
+-- domain, and a second secret is a second thing to rotate and forget. The URL
+-- is its own entry, `pitch_notify_url`.
+--
+-- ⚠️ THE pg_net QUEUE ROW IS WRITTEN IN THIS TRANSACTION, which is what stops
+-- the edge function reading back a pitch_requests row that has not committed
+-- yet. It is also the trick for proving the trigger fires without sending
+-- anything: insert inside a transaction and ROLL BACK — the queue count goes
+-- 0 → 1 and then vanishes with everything else.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_pitch_request()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+begin
+  select decrypted_secret into endpoint from vault.decrypted_secrets where name = 'pitch_notify_url';
+  select decrypted_secret into secret   from vault.decrypted_secrets where name = 'approval_notify_secret';
+
+  if endpoint is null or secret is null then
+    raise warning 'notify_pitch_request: vault secrets missing, no email sent for %', new.id;
+    return new;
+  end if;
+
+  perform net.http_post(
+    url     := endpoint,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-approval-secret', secret),
+    body    := jsonb_build_object('pitch_request_id', new.id)
+  );
+
+  return new;
+exception when others then
+  raise warning 'notify_pitch_request failed for %: %', new.id, sqlerrm;
+  return new;
+end;
+$function$
+;
+
+-- Function comment as stored in the database:
+--   'Posts a pitch request id to the notify-pitch-request edge function on
+--    submit and on decision. Swallows every failure: the in-app queue is the
+--    record, this is only the prompt.'
+
+REVOKE ALL ON FUNCTION private.notify_pitch_request() FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.notify_pitch_request() FROM anon;
+REVOKE ALL ON FUNCTION private.notify_pitch_request() FROM authenticated;

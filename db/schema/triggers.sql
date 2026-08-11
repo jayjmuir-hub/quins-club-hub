@@ -20,6 +20,14 @@
 -- 2026-08-09 by migration 20260809093858 (notify_pending_membership). See the
 -- end of this file.
 --
+-- ⚠️ RE-CAPTURED 2026-08-11. There are now SIX. Both new ones are on
+-- public.pitch_requests and both call private.notify_pitch_request, added by
+-- 20260811051334 (pitch_request_notify). They were live from 11 Aug with no
+-- entry in this file until this re-capture. ⚠️ **A trigger is the easiest
+-- object in this schema to leave uncaptured**, because unlike a function or a
+-- policy nothing in the app names it — the code that causes it to fire is an
+-- ordinary INSERT that looks like every other INSERT.
+--
 -- Migrations since the 7 Aug capture that touch anything in this file:
 --   20260807153404 sync_profile_name_pin_search_path  (already noted below)
 --   20260808084615 sync_profile_name_single_word      → the "KNOWN BUG" note
@@ -137,3 +145,54 @@ CREATE TRIGGER notify_pending_membership
   FOR EACH ROW
   WHEN ((new.status = 'pending'::text))
   EXECUTE FUNCTION private.notify_pending_membership();
+
+
+-- ---------------------------------------------------------------------
+-- public.pitch_requests → notify_pitch_request_asked      ADDED 2026-08-11
+--
+-- Mails the club's Pitch Managers, and every super admin, when a coach files a
+-- request. No WHEN clause: a row in this table IS a question being asked, and
+-- there is no state it can be inserted in that nobody needs telling about.
+--
+-- ⚠️ SUPER ADMINS ARE RECIPIENTS DELIBERATELY. A super holds every admin right
+-- implicitly, so a recipient query filtering on the `pitches` right alone would
+-- exclude the one person certain to be able to act. The recipient list is built
+-- in the edge function, not here — this trigger posts only the request id.
+--
+-- Body and the "why the database sends it" argument: functions.sql.
+-- ---------------------------------------------------------------------
+CREATE TRIGGER notify_pitch_request_asked
+  AFTER INSERT ON public.pitch_requests
+  FOR EACH ROW
+  EXECUTE FUNCTION private.notify_pitch_request();
+
+
+-- ---------------------------------------------------------------------
+-- public.pitch_requests → notify_pitch_request_answered   ADDED 2026-08-11
+--
+-- Mails the coach who asked, once the request is decided. Same function as
+-- above; the edge function tells the two cases apart from the row's status.
+--
+-- ⚠️ THE WHEN CLAUSE IS THE WHOLE DESIGN, and every clause in it is load-bearing:
+--   * `AFTER UPDATE OF status` alone is NOT enough — Postgres fires an
+--     `UPDATE OF col` trigger when the column is in the SET list, whether or not
+--     the value changed. `old.status IS DISTINCT FROM new.status` is what stops
+--     a decision_note correction emailing the coach the same answer twice.
+--   * `new.status = ANY (ARRAY['allocated','declined'])` keeps it to DECIDED
+--     states. 'cancelled' is excluded because nobody needs telling about a
+--     question that has stopped being asked, and 'withdrawn' is a DELETE, which
+--     cannot reach an UPDATE trigger at all.
+--
+-- ⚠️ THE ORDER OF THE TWO WRITES IN allocatePitch IS WHAT MAKES THIS EMAIL
+-- CORRECT. src/data/pitchRequests.js writes `events.pitch` FIRST and closes the
+-- request SECOND — chosen so a refused fixture write leaves the request open
+-- rather than telling a coach they have a pitch they do not have. The side
+-- effect is that by the time this trigger fires, events.pitch already holds the
+-- real pitch, which is what the mail reads back. **Reversing those two writes
+-- would email "you are on Pitch TBD".**
+-- ---------------------------------------------------------------------
+CREATE TRIGGER notify_pitch_request_answered
+  AFTER UPDATE OF status ON public.pitch_requests
+  FOR EACH ROW
+  WHEN (((old.status IS DISTINCT FROM new.status) AND (new.status = ANY (ARRAY['allocated'::text, 'declined'::text]))))
+  EXECUTE FUNCTION private.notify_pitch_request();

@@ -65,8 +65,26 @@
 -- It was NOT widened to coaches. That is deliberate and load-bearing — see
 -- the memberships section.
 --
--- Every policy is PERMISSIVE and applies to role {public} (i.e. no
--- explicit TO clause was given; scoping is done entirely inside the
+-- RE-CAPTURED 2026-08-11. ⚠️ ONE POLICY WAS LIVE FROM 10 AUG WITH NO ENTRY
+-- HERE, and it is the single most consequential kind to have missed:
+--
+--   ADDED   memberships  "memb no self promotion"  RESTRICTIVE, INSERT
+--                        (20260810183058 super_admin_and_rights)
+--
+-- ⚠️ THIS FILE ASSERTED THE OPPOSITE OF THE TRUTH ABOUT IT. The paragraph
+-- below read "Every policy is PERMISSIVE" — a sentence a reader would
+-- reasonably rely on, because a PERMISSIVE policy can only ever ADD rows and a
+-- RESTRICTIVE one is ANDed with everything else and can REMOVE them. Reasoning
+-- from "they are all permissive, so this set can only be widened by adding to
+-- it" was correct on 9 Aug and became wrong on 10 Aug.
+--
+-- ⚠️ Same shape as the "DELIBERATE ABSENCE OF A UNIQUE CONSTRAINT" note that
+-- tables.sql carried for a day after the unique index was created: not a
+-- missing line, but a **standing claim that inverted**. Those are worse than
+-- an omission, because an omission looks like an omission.
+--
+-- Every OTHER policy is PERMISSIVE, and all of them apply to role {public}
+-- (i.e. no explicit TO clause was given; scoping is done entirely inside the
 -- expressions via auth.uid() / auth.jwt()). Every helper referenced lives
 -- in the `private` schema — see functions.sql.
 --
@@ -77,17 +95,25 @@
 
 
 -- ---------------------------------------------------------------------
--- RLS enabled state — all thirteen public tables
+-- RLS enabled state — EVERY public table
 -- (relrowsecurity = true, relforcerowsecurity = false on every one)
 --
--- Re-verified 2026-08-09: still thirteen tables, still RLS-enabled on every
--- one, still no FORCE anywhere. No table was added or dropped by the 8-9 Aug
--- migrations. Policy counts per table as at 9 Aug: access_requests 3,
--- availability 4, calendar_tokens 1, clubs 1, events 2, invite_targets 2,
--- invites 2, memberships 3, player_contacts 2, player_parents 2, players 2,
--- profiles 7, teams 2.
+-- ⚠️ THE HEADING SAID "all thirteen public tables" UNTIL 11 AUG 2026 AND THE
+-- LIST BELOW HAD THIRTEEN ENTRIES, while live had sixteen: `attendance`
+-- (10 Aug), `pitches` and `pitch_requests` (11 Aug) were all missing. Every one
+-- of the three does have RLS on — verified live 11 Aug — so nothing was
+-- exposed. But this list is the one place in the repo that would show a table
+-- created WITHOUT RLS, and ⚠️ **Supabase's default privileges give `anon` full
+-- table rights on every new table in `public`**, so such a table is not merely
+-- unhardened, it is readable and writable by anyone holding the project URL.
+-- A list that silently stops at thirteen cannot report that. The count is now
+-- out of the heading deliberately; the list is the inventory.
+--
+-- Per-table policy counts previously lived here and were deleted for the same
+-- reason: they rot, and pg_policies answers the question in a second.
 -- ---------------------------------------------------------------------
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attendance      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.availability    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.calendar_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clubs           ENABLE ROW LEVEL SECURITY;
@@ -95,6 +121,8 @@ ALTER TABLE public.events          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invite_targets  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invites         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.memberships     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pitch_requests  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pitches         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.player_contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.player_parents  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.players         ENABLE ROW LEVEL SECURITY;
@@ -380,7 +408,12 @@ CREATE POLICY "invites manage" ON public.invites
 
 
 -- ---------------------------------------------------------------------
--- memberships  (3 policies — was 2 until 9 Aug 2026)
+-- memberships  (4 policies — was 2 until 9 Aug 2026, 3 until 10 Aug)
+--
+-- ⚠️ THE FOURTH IS THE ONLY RESTRICTIVE POLICY IN THIS SCHEMA. Read the
+-- "memb no self promotion" block at the end of this section before reasoning
+-- about what an admin can write to this table — everything above it describes
+-- what is PERMITTED, and that one describes what is FORBIDDEN regardless.
 --
 -- ⚠️⚠️ "memb manage" IS STILL ADMIN-ONLY AND MUST STAY THAT WAY. ⚠️⚠️
 --
@@ -443,6 +476,40 @@ CREATE POLICY "memb manage" ON public.memberships
 CREATE POLICY "memb read squad staff pending" ON public.memberships
   AS PERMISSIVE FOR SELECT TO public
   USING (((status = 'pending'::text) AND private.can_approve_team(team_id)));
+
+-- ADDED 2026-08-10 (super_admin_and_rights). ⚠️ THE ONLY RESTRICTIVE POLICY IN
+-- THIS FILE, and the only one whose effect is to REMOVE rows rather than add
+-- them. Restrictive policies are ANDed with the permissive set, so this cannot
+-- grant anything: an INSERT must satisfy "memb manage" AND this.
+--
+-- ⚠️ WHAT IT IS FOR, and why the column grant alone was not enough. The super
+-- tier is a FLAG on this table (memberships.is_super, plus the admin_rights
+-- array), and "memb manage" is FOR ALL and admin-only — so **every admin can
+-- already write rows here**. Two doors therefore had to be shut, not one:
+--
+--   UPDATE — closed by the column GRANT in grants.sql. `authenticated` simply
+--            does not hold UPDATE on is_super or admin_rights, so an admin
+--            cannot promote an existing row, their own included.
+--   INSERT — closed by THIS. A grant on a column does not stop somebody
+--            INSERTing a brand-new row that arrives already carrying
+--            is_super = true. Without this policy the tier is decoration: any
+--            admin could insert themselves a second, super membership.
+--
+-- The legitimate route is public.set_admin_rights, a SECURITY DEFINER RPC
+-- whose first statement is private.is_super_admin(). The `OR
+-- private.is_super_admin()` arm here is what lets a super admin create an
+-- already-super row directly, rather than having to insert then promote.
+--
+-- ⚠️ `COALESCE(array_length(admin_rights, 1), 0) = 0` and not
+-- `admin_rights = '{}'`: array_length of an empty array is NULL in Postgres,
+-- not 0, so the coalesce is load-bearing. Without it the expression is NULL for
+-- the ordinary case, NULL is not true, and a RESTRICTIVE policy that is not
+-- true REFUSES — which would block every ordinary membership insert in the app.
+--
+-- Harness: db/tests/rls-super-admin.sql.
+CREATE POLICY "memb no self promotion" ON public.memberships
+  AS RESTRICTIVE FOR INSERT TO public
+  WITH CHECK ((((is_super = false) AND (COALESCE(array_length(admin_rights, 1), 0) = 0)) OR private.is_super_admin()));
 
 
 -- ---------------------------------------------------------------------

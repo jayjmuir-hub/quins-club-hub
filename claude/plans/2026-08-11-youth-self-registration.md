@@ -1,7 +1,17 @@
 # Youth self-registration — a U13+ player registers themselves
 
-**STATUS: NOT SHIPPED.** Design agreed with Jay on 11 Aug 2026; implementation
-follows in the same branch. Update this line the moment it lands.
+**STATUS: SHIPPED** — 11 Aug 2026, commit `5979c21` (PR #41), live on
+https://adhquins-clubhub.com. Migration `20260811085312 self_registration`.
+
+⚠️ **This line said "NOT SHIPPED. …implementation follows in the same branch"
+until the next commit, and the implementation was in the SAME COMMIT as the
+plan — `5979c21` added this file and the migration and the screen together.** The
+instruction it carried — "update this line the moment it lands" — could not be
+obeyed, because the moment it landed was the moment the file was created.
+`npm run docs:check` enforces that a plan STATES whether it shipped; it cannot
+tell whether the statement is true. **If a plan is being committed alongside the
+code it plans, write the status as SHIPPED in that commit** — a plan whose
+status is a promise about the same commit is a promise nobody is left to keep.
 
 ## The question
 
