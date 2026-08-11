@@ -1,9 +1,20 @@
 # League Teams and Fixtures — Implementation Plan
 
-**STATUS: NOT SHIPPED.** Written 11 Aug 2026. Implements
+**STATUS: NOT SHIPPED IN FULL — tasks 1-7 have shipped, task 8 has not.**
+Written 11 Aug 2026. Implements
 `claude/plans/2026-08-11-league-teams-and-fixtures.md`.
 ⚠️ **Set this line to SHIPPED in the commit that ships it**, not as a promise
 about that commit.
+
+⚠️ **TASK 8 IS THE ONE LEFT, AND IT IS BIGGER THAN THIS PLAN SAYS.** The plan
+describes it as editing `supabase/functions/calendar/index.ts`. That file cannot
+do it alone: **the feed's columns come from `calendar_events_for_token()`'s
+`RETURNS TABLE`**, so the league team has to be added there by MIGRATION first.
+The same trap cost a day in Aug 2026 when the pitch was missing from the feed
+and no amount of editing the function fixed it — see the comment on the `Event`
+type in that file, and `db/migrations/20260805_calendar_feed_pitch.sql`. It is
+also a separate DEPLOY from the bundle, which is why it was not bundled into the
+tasks 6-7 change.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `superpowers:subagent-driven-development` (recommended) or

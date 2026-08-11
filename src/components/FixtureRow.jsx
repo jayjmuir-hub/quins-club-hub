@@ -1,4 +1,5 @@
 import Chip from './Chip.jsx'
+import { fixtureLabel } from '../lib/fixtureLabel.js'
 import {
   dateBoxParts,
   eventDate,
@@ -57,6 +58,14 @@ export function FixtureRow({ event, teamName, onSelect }) {
   const venue = (event?.venue ?? '').trim()
   const pitch = (event?.pitch ?? '').trim()
   const pitchIsKnown = isKnownPitch(pitch)
+  // ⚠️ ONE CHIP, NOT TWO, AND THE LABEL IS THE SHARED FORMATTER'S. This row is
+  // rendered by the Dashboard AND all three Schedule tabs, so putting the label
+  // here rather than in each caller is what stops the two screens drifting —
+  // the same reason the row itself was moved out of Schedule.jsx.
+  // ⚠️ NO LEAGUE TEAM MEANS THE SQUAD NAME, UNCHANGED. `event.league_team` is
+  // the embed from listEvents and is null for every fixture that is not a
+  // league match, which is most of them.
+  const squadLabel = fixtureLabel(event, event?.league_team, teamName)
 
   return (
     <button
@@ -78,7 +87,7 @@ export function FixtureRow({ event, teamName, onSelect }) {
       <span className="min-w-0 flex-1">
         <span className="mb-1 flex flex-wrap items-center gap-1.5">
           <Chip type={event.type}>{TYPE_LABELS[event.type] ?? 'Event'}</Chip>
-          {teamName && <Chip>{teamName}</Chip>}
+          {squadLabel && <Chip>{squadLabel}</Chip>}
         </span>
         {/* ⚠️ DROPPED WHEN IT ONLY ECHOES THE CHIP ABOVE IT — see
             titleRepeatsType in src/lib/eventFormat.js. A training called

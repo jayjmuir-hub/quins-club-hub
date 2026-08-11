@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
+import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
 import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '../data/events.js'
 
@@ -151,6 +152,11 @@ function initialValues(event, editableTeams, initialDate = null) {
       venue: DEFAULT_VENUE,
       pitch: '',
       competition: '',
+      // ⚠️ '' MEANS "NOT A LEAGUE MATCH", and that is the default for every new
+      // fixture. Null league_team_id is what makes a fixture not a league one;
+      // nothing may guess otherwise from the type or the squad.
+      leagueTeamId: '',
+      round: '',
       notes: '',
       resultUs: '',
       resultThem: '',
@@ -180,6 +186,8 @@ function initialValues(event, editableTeams, initialDate = null) {
     venue: event.venue ?? '',
     pitch: event.pitch ?? '',
     competition: event.competition ?? '',
+    leagueTeamId: event.league_team_id ?? '',
+    round: event.round == null ? '' : String(event.round),
     notes: event.notes ?? '',
     resultUs: event.result_us == null ? '' : String(event.result_us),
     resultThem: event.result_them == null ? '' : String(event.result_them),
@@ -305,6 +313,51 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
       mounted = false
     }
   }, [])
+
+  // ══ LEAGUE TEAM ═════════════════════════════════════════════════════════
+  //
+  // ⚠️ THE OPTIONS ARE THE CHOSEN SQUAD'S, AND ONLY THE CHOSEN SQUAD'S. That
+  // is the entire reason listLeagueTeams takes a teamId and refuses to answer
+  // without one: a club-wide list here would let a U14 fixture be filed under
+  // a U16 team, and the governing body receives that as a WRONG RESULT rather
+  // than as an obvious mistake. Retired teams are excluded (the default) —
+  // this is a picker, and the one screen that shows retired ones is the Club
+  // tab, where they can be brought back.
+  //
+  // ⚠️ A FAILED LOAD IS NOT AN ERROR STATE, same as the pitch list above: the
+  // field falls back to "Not a league match", which is the correct answer for
+  // every fixture that is not one, rather than refusing to let anyone save.
+  const [leagueTeamOptions, setLeagueTeamOptions] = useState([])
+  useEffect(() => {
+    let mounted = true
+    listLeagueTeams({ teamId: values.teamId })
+      .then((rows) => {
+        if (mounted) setLeagueTeamOptions(rows)
+      })
+      .catch(() => {
+        if (mounted) setLeagueTeamOptions([])
+      })
+    return () => {
+      mounted = false
+    }
+  }, [values.teamId])
+
+  // ⚠️ CHANGING THE SQUAD CLEARS THE LEAGUE TEAM, AND THIS IS THE BUG THE
+  // WHOLE FIELD IS MOST LIKELY TO HAVE. Pick U14B, pick ADHQ2, then realise it
+  // was the U16 fixture and change the Age group: without this the select
+  // still holds a U14 team's id while showing U16's options, and the save
+  // writes it. Done as an effect on the value rather than in the dropdown's
+  // onChange so it holds however teamId comes to change — structural, not a
+  // matter of remembering to check it at every use site.
+  //
+  // Keyed off a ref so it does NOT fire on mount: editing an existing league
+  // fixture must open with its league team intact.
+  const previousTeamId = useRef(values.teamId)
+  useEffect(() => {
+    if (previousTeamId.current === values.teamId) return
+    previousTeamId.current = values.teamId
+    setValues((current) => ({ ...current, leagueTeamId: '', round: '' }))
+  }, [values.teamId])
 
   // The generated dates, and any error from generating them. generateSeriesDates
   // throws on a range over a year rather than truncating, so the throw is
@@ -509,9 +562,35 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
       }
     }
 
+    // ══ THE LEAGUE FIELDS ARE THE PRIMARY SQUAD'S, AND ARE NOT IN `common` ══
+    //
+    // ⚠️ THIS IS THE WHOLE REASON THEY SIT HERE AND NOT WITH venue AND pitch.
+    // `common` is stamped onto EVERY row by rowFor(), so a multi-squad fan-out
+    // would give the primary squad's league team to all three squads' copies —
+    // the "U14 team on a U16 fixture" mistake, made automatically and for every
+    // squad at once. `league_team_id` is only ever the squad in the Age group
+    // dropdown, so it goes on the payload after rowFor() and nowhere else.
+    // ⚠️ It is also therefore ABSENT from the series-edit write below, which
+    // sends `common`: "apply to every later session" cannot retag a term with
+    // one round number, which is right.
+    //
+    // ⚠️ round IS NULL UNLESS A LEAGUE TEAM IS SET, whatever the input still
+    // holds. Same rule fixtureLabel enforces when rendering: no league team
+    // means no round, so a round left behind on a fixture later changed to a
+    // friendly must not survive in the column either.
+    const leagueTeamId = isMatch && values.leagueTeamId ? values.leagueTeamId : null
+    const roundText = String(values.round ?? '').trim()
+    const leagueFields = {
+      league_team_id: leagueTeamId,
+      round: leagueTeamId && roundText !== '' && Number.isFinite(Number(roundText))
+        ? Number(roundText)
+        : null,
+    }
+
     const payload = {
       ...(editing ? { id: event.id } : null),
       ...rowFor(teamId),
+      ...leagueFields,
     }
 
     inFlight.current = true
@@ -964,6 +1043,63 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
 
         {isMatch && (
           <>
+            {/* ⚠️ MATCHES ONLY, and the squad's own teams only. A training
+                session has no league team, and the options come from
+                listLeagueTeams({ teamId }) — see the block by its loader for
+                why a club-wide list here would be a wrong RESULT rather than
+                an obvious mistake. */}
+            <div className={FIELD}>
+              <label className={LABEL} htmlFor="event-league-team">
+                League team
+              </label>
+              <select
+                id="event-league-team"
+                value={values.leagueTeamId}
+                onChange={setFromInput('leagueTeamId')}
+                className={inputClasses(false)}
+              >
+                {/* ⚠️ "Not a league match" IS THE DEFAULT AND IS A REAL ANSWER,
+                    not a prompt to choose. Friendlies and festivals are
+                    matches with no league team, and they are the common case.
+                    Wording it as "Select…" would read as an unfilled field. */}
+                <option value="">Not a league match</option>
+                {leagueTeamOptions.map((leagueTeam) => (
+                  <option key={leagueTeam.id} value={leagueTeam.id}>
+                    {leagueTeam.division
+                      ? `${leagueTeam.rcm_name} — Div ${leagueTeam.division}`
+                      : leagueTeam.rcm_name}
+                  </option>
+                ))}
+              </select>
+              {leagueTeamOptions.length === 0 && (
+                <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+                  This squad has no league teams yet. An admin can add them on the Club tab.
+                </p>
+              )}
+            </div>
+
+            {/* ⚠️ HIDDEN UNTIL A LEAGUE TEAM IS CHOSEN. A round number without
+                one is meaningless — fixtureLabel ignores it and the save
+                nulls it — so offering the box would invite somebody to fill in
+                a field that is then thrown away. */}
+            {values.leagueTeamId && (
+              <div className={FIELD}>
+                <label className={LABEL} htmlFor="event-round">
+                  Round
+                </label>
+                <input
+                  id="event-round"
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  value={values.round}
+                  onChange={setFromInput('round')}
+                  placeholder="e.g. 4"
+                  className={inputClasses(false)}
+                />
+              </div>
+            )}
+
             <div className={FIELD}>
               <label className={LABEL} htmlFor="event-competition">
                 Competition

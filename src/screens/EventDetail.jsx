@@ -6,6 +6,7 @@ import Button from '../components/Button.jsx'
 import PitchRequest from '../components/PitchRequest.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { countSeriesFrom, deleteEvent, deleteSeriesFrom } from '../data/events.js'
+import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { FEATURES } from '../lib/features.js'
 import {
   eventDate,
@@ -443,6 +444,19 @@ export default function EventDetail({
           {event.type === 'match' ? ` · ${event.home ? 'Home' : 'Away'}` : ''}
         </KeyValue>
         <KeyValue label="Age group">{team?.name ?? 'Not set'}</KeyValue>
+        {/* ⚠️ A SEPARATE ROW, NOT A REPLACEMENT FOR "Age group". The squad and
+            the league team are different facts and this is the one screen with
+            room for both: "U14B Contact" is who trains together, "ADHQ2 · Div B
+            · Round 4" is what played. Everywhere else the two are collapsed
+            into one chip because there is only room for one.
+            ⚠️ RENDERED ONLY WHEN THERE IS ONE. No league team means this is not
+            a league match, and a row reading "Not set" on every friendly would
+            be noise — the same rule the Pitch row below follows. */}
+        {event.league_team && (
+          <KeyValue label="League team">
+            {fixtureLabel(event, event.league_team, team?.name ?? '')}
+          </KeyValue>
+        )}
         <KeyValue label="Venue">{event.venue || 'To be confirmed'}</KeyValue>
         {/* Only when set. Unlike Venue, which falls back to "To be
             confirmed" because every event has one somewhere, a pitch is

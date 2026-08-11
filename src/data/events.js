@@ -30,8 +30,22 @@ export async function listEvents({ teamIds, from, to } = {}) {
   //
   // ⚠️ A FRESH BUILDER PER PAGE. A PostgREST query builder is single-use once
   // awaited; handing the same one back would re-send page one forever.
+  // ⚠️ THE LEAGUE TEAM IS EMBEDDED, NOT FETCHED PER SCREEN, and that is a
+  // deliberate choice about where the join lives. Schedule, the Dashboard, the
+  // allocation grid and EventDetail all render fixtureLabel(); giving each its
+  // own league_teams query would be four more round trips, four more loading
+  // states, and four chances for one screen to render a label while another
+  // renders a bare squad name. PostgREST resolves it through the real foreign
+  // key, so a fixture with a null league_team_id embeds null — which is
+  // exactly what fixtureLabel treats as "not a league match".
+  //
+  // ⚠️ NOT `select('*')` ANY MORE, so nothing may assume the row shape is only
+  // columns. Every write path builds its payload from named fields (see
+  // EventForm's `common`), so no writer round-trips this object back.
   const buildQuery = () => {
-    let query = supabase.from('events').select('*')
+    let query = supabase
+      .from('events')
+      .select('*, league_team:league_teams(id, rcm_name, division)')
     if (Array.isArray(teamIds) && teamIds.length > 0) {
       query = query.in('team_id', teamIds)
     }
