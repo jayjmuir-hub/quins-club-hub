@@ -59,7 +59,20 @@ export function Chip({ type, children, className = '' }) {
   const classes = [
     'inline-flex',
     'items-center',
-    'rounded-[20px]',
+    // ⚠️ `rounded-tab` (12px), was `rounded-[20px]` — Jay, 11 Aug 2026:
+    // "things like match pills etc can be similar too", meaning adhjrt.com's
+    // age-group buttons. This is the match pill: it marks match/training/
+    // social and win/loss/draw, and per design-system.md §4.7 the neutral
+    // variant is also the age-group label, so it appears on nearly every
+    // screen. Squaring it off is the single largest visual change in the
+    // sweep, and it is what ties the fixture rows to the fortnight strip and
+    // the nav.
+    //
+    // ⚠️ COLOURS ARE UNTOUCHED AND MUST STAY THAT WAY. Every pairing in
+    // VARIANTS below was chosen to clear AA at 11.5px bold and several are
+    // deliberately NOT the brand tokens — the header explains each one. This
+    // change is the corner and nothing else.
+    'rounded-tab',
     'px-[9px]',
     'py-[3px]',
     'text-[11.5px]',
