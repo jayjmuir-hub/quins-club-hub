@@ -80,15 +80,17 @@ does. **Run `hostname` first** — the bridge flaps and has silently reconnected
 `CLAUDE.md`, which is the single home for them — this line is a reminder, not a copy.**
 Which clone is currently behind is in `claude/state-of-play.md`.
 
-⚠️ **`npm install` needs `--include=dev` on BOTH PCs** — both have
-`NODE_ENV=production` set machine-wide, so a plain `npm install` silently drops vitest.
-**The full explanation is in `CLAUDE.md`.** It is repeated here only as far as the
-command, because getting it wrong costs a confusing hour and this is the file you are
-reading when you install.
+⚠️ **`npm install --include=dev` on BOTH PCs, always** — vitest is a dev dependency and
+a plain `npm install` can drop it silently. **The explanation, and the measured
+per-machine table, are in `CLAUDE.md`, which is their single home.** The command is
+repeated here and nothing else is, because getting it wrong costs a confusing hour and
+this is the file you are reading when you install.
 
-⚠️ **This section said "cafnet" until 7 Aug 2026, in three files at once, because the
-fact was copied rather than measured.** `set NODE_ENV` on jay-pc returns `production`.
-See `CLAUDE.md` rule 8.
+⚠️ **Do not restate the `NODE_ENV` value here.** This section said "cafnet only" until
+7 Aug 2026, in three files at once; it was then corrected to "both PCs", and on 11 Aug
+that was measured on cafnet and found false too. **Both times the fact was copied
+rather than run.** The flag above is unconditional precisely so this file never needs
+to know. See `CLAUDE.md` rule 8.
 
 The second half of the same trap is already handled in-repo: `vite.config.js` forces
 `NODE_ENV=test` when `VITEST` is set, so `npm test` no longer resolves React's

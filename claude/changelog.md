@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **11 Aug — the cafnet startup note says what a plain `git pull` will not fix.**
+- **11 Aug — the machine facts were measured on the machine, and two were wrong.**
+  cafnet was synced from `build/v1-mvp` — a branch deleted from origin, 76 commits
+  behind — and the claims about it checked by running the commands there. ⚠️ **`NODE_ENV`
+  is not set on cafnet at any scope**, contradicting the "BOTH PCs" wording that had
+  replaced an earlier "cafnet only" — wrong in both directions, and copied rather than
+  run both times. npm is not blocked from PowerShell there; `core.fileMode` is `false`.
+  `CLAUDE.md` now carries a per-machine table as the single home and the three files
+  that restated a value point at it. ⚠️ **The `jay-pc` column is SECOND-HAND and says
+  so** — the first draft asserted "measured ON THAT MACHINE" over a column assembled on
+  cafnet from what other documents claimed, reproducing inside the fix the exact failure
+  it was fixing.
+  Also records three traps: the stale-`dist` one (`npm test` does not build, and three
+  test files read `dist/`), the `0 0`-against-a-dead-ref one, and that **pushing and
+  opening a PR are different credentials** — no git command opens a pull request, the
+  account-level connector still returns `Bad credentials`, and feeding git's stored
+  token to `gh` is blocked by the permission classifier and should be. `gh` is now
+  installed and authenticated on cafnet. ⚠️ **`hosts.yml` existing is not proof of
+  login.**
+
+- `2008269` — **Tell the next cafnet session what a plain `git pull` will not fix.**
   That clone was last measured 7 Aug on a branch since deleted, and `.gitattributes`
   landed 10 Aug. ⚠️ **Git applies `eol` attributes on CHECKOUT, so a pull normalises
   only the files that pull changed** — every `.mjs` older than 10 Aug and untouched
