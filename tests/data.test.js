@@ -150,7 +150,17 @@ describe('listEvents', () => {
     const result = await listEvents()
 
     expect(supabase.from).toHaveBeenCalledWith('events')
-    expect(builder.select).toHaveBeenCalledWith('*')
+    // ⚠️ EVERY COLUMN, PLUS THE LEAGUE TEAM EMBEDDED (11 Aug 2026). It was a
+    // bare '*' until then. The embed is what lets Schedule, the Dashboard, the
+    // allocation grid and EventDetail all render fixtureLabel() off the row they
+    // already have, instead of each issuing its own league_teams query and one
+    // of them getting it wrong. PostgREST resolves it through the real foreign
+    // key, so a fixture with a null league_team_id embeds null — which is
+    // exactly what fixtureLabel treats as "not a league match".
+    // ⚠️ The `*` must stay: dropping it would silently shorten every event row.
+    expect(builder.select).toHaveBeenCalledWith(
+      '*, league_team:league_teams(id, rcm_name, division)',
+    )
     expect(calls.in).toEqual([])
     expect(calls.gte).toEqual([])
     expect(calls.lte).toEqual([])

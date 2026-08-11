@@ -8,6 +8,7 @@ import { listPitchRequests, allocatePitch, declinePitch } from '../data/pitchReq
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
 import { clubToday, eventDate, eventEndDate, eventTitle, formatTime } from '../lib/eventFormat.js'
+import { fixtureLabel } from '../lib/fixtureLabel.js'
 
 // The allocation grid — pitches down the side, the day across the top.
 //
@@ -323,7 +324,16 @@ export default function Allocation() {
                               clash ? 'bg-warn-bg text-warn-ink' : 'bg-danger-bg text-brand-deep',
                             ].join(' ')}
                           >
-                            {teamsById.get(event.team_id)?.name ?? eventTitle(event)}
+                            {/* ⚠️ LABELLED BY LEAGUE TEAM WHERE THERE IS ONE,
+                                and this is the point of the change for Tracy:
+                                a Saturday of A and B fixtures used to read as
+                                the same squad name twice in two rows, with
+                                nothing to say which booking was which. */}
+                            {fixtureLabel(
+                              event,
+                              event.league_team,
+                              teamsById.get(event.team_id)?.name ?? eventTitle(event),
+                            )}
                             <span className="block text-[11px] font-semibold opacity-90">
                               {formatTime(eventDate(event))}
                               {clash ? ' · clash' : ''}
@@ -481,7 +491,9 @@ export default function Allocation() {
           <ul className="flex flex-col gap-1.5">
             {unallocated.map((event) => (
               <li key={event.id} data-testid="unallocated" className="text-sm text-ink">
-                <span className="font-bold">{teamsById.get(event.team_id)?.name ?? 'Squad'}</span>
+                <span className="font-bold">
+                  {fixtureLabel(event, event.league_team, teamsById.get(event.team_id)?.name ?? 'Squad')}
+                </span>
                 <span className="text-ink-muted">
                   {' · '}
                   {formatTime(eventDate(event))} · {eventTitle(event)}

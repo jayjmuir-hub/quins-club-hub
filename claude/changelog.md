@@ -10,7 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- `f16c025` — **The Club tab manages the club's league teams** (task 5). Each age group in the Age
+- **A match records which league team played it, and every fixture screen says so**
+  (tasks 6-7). `EventForm` gains a **League team** select and a **Round** box, both matches-only;
+  `FixtureRow`, `EventDetail` and the allocation grid render `fixtureLabel`.
+  ⚠️ **The picker offers only the chosen squad's teams**, and **changing the Age group clears
+  the league team** — pick U14B, pick ADHQ2, then realise it was the U16 fixture, and without
+  the clear the save writes a U14 team onto a U16 fixture.
+  ⚠️ **The league fields are deliberately NOT in `common`** — `common` is stamped on every row
+  by the multi-squad fan-out, so a league team there would be given to all three squads'
+  copies at once. They ride on the primary squad's payload only, which also keeps them out of
+  the series-edit write.
+  ⚠️ **`round` is written NULL unless a league team is set**, whatever the input still holds —
+  the same rule `fixtureLabel` enforces when rendering.
+  ⚠️ **`listEvents` now EMBEDS the league team** (`*, league_team:league_teams(...)`) instead
+  of each screen querying it. Four screens rendering the label off the row they already have
+  is what stops one of them drifting. **`tests/data.test.js` pinned `select('*')` and caught
+  the change**, which is the check working.
+  ⚠️ **`EventDetail` keeps Age group AND adds League team** — different facts, and it is the
+  one screen with room for both. Elsewhere they collapse into one chip.
+  ⚠️ **Task 8, the calendar feed, is NOT in this change**: the feed's columns come from
+  `calendar_events_for_token()`'s `RETURNS TABLE`, so it needs a migration plus a separate
+  edge-function deploy. Editing `supabase/functions/calendar/index.ts` alone would change
+  nothing — that exact trap cost a day in Aug 2026.
+
+- `ee85430` — **The Club tab manages the club's league teams** (task 5). Each age group in the Age
   groups list now carries its own league teams as chips, plus a "+" to enter another.
   ⚠️ **A league team is entered against the squad whose "+" was tapped** — the panel
   carries that squad's `team_id` and `club_id`, because a U14 team filed under U16 reaches
@@ -28,8 +51,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   would strip the league identity off every fixture the team ever played, leaving them
   indistinguishable from friendlies.
 
-⚠️ **AND `f16c025` ABOVE WILL DIE THE SAME WAY THE MOMENT PR #52 MERGES — THIS IS A
-TREADMILL, NOT A ONE-OFF.** `docs:check` requires every commit to be cited by SHA, and
+⚠️ **AND `f16c025` DID DIE THE MOMENT PR #52 MERGED — REPOINTED TO `ee85430` ABOVE. THIS
+IS A TREADMILL, NOT A ONE-OFF, AND IT HAS NOW RUN TWICE IN TWO PRs.**
+
+⚠️ **`npm run docs:check` CANNOT CATCH THE DEAD SHA ON THE MACHINE THAT WROTE IT, AND THAT
+IS THE TRAP THAT BIT ON PR #53.** A squashed-away commit is still a loose object in the
+clone that authored it, so `git cat-file` finds it and the check goes green locally while
+CI — a fresh clone with only `main`'s history — fails on the same file. **A green local
+`docs:check` is not evidence for a changelog SHA.** Verify with
+`git cat-file -e <sha> 2>/dev/null` inside a clone that never had the branch, or simply
+trust CI over the laptop. Same shape as the CRLF trap in `state-of-play.md`, in reverse:
+there CI is blind and the PC sees it; here the PC is blind and CI sees it.
+
+`docs:check` requires every commit to be cited by SHA, and
 `main`'s only merge method is squash, so **every** branch SHA a changelog entry cites stops
 existing at merge and `main` goes red until the next PR repoints it. That is the mechanism
 that broke below, and it will repeat after this PR, and after the one after that.
