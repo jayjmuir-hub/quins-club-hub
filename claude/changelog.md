@@ -10,7 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **11 Aug — a U13+ player can register themselves.** "Add your player" asks *is this
+- **`db/schema/` had drifted for two days, and the re-capture found three claims that
+  had INVERTED rather than merely gone stale.** Seven objects were live with no entry
+  in the directory: `private.is_super_admin`, `public.set_admin_rights`, the
+  `memb no self promotion` policy, `memberships.is_super` / `.admin_rights`,
+  `private.notify_pitch_request`, its two triggers, and
+  `teams.self_registration_allowed`. ⚠️ **`policies.sql` said "Every policy is
+  PERMISSIVE"** — `memb no self promotion` is RESTRICTIVE, the only one in the schema,
+  and it is what stops an admin INSERTing themselves an already-super membership row
+  (the column grant only closes UPDATE). ⚠️ **Its RLS-enabled list named thirteen
+  tables against sixteen live**; all sixteen do have RLS on, but that list is the only
+  thing in the repo that would show a table created without it, and Supabase's
+  defaults hand `anon` full rights on any new `public` table. ⚠️ **`functions.sql`
+  described a `register_my_player` signature the 11 Aug migration DROPS**, so the live
+  4-arg version and its self-registration guard appeared nowhere. ⚠️ **And the
+  `pitches` / `pitch_requests` blocks were the migrations' DDL pasted in, not a
+  capture** — inline unnamed constraints, so `pitches_club_id_name_key` and
+  `pitch_requests_status_check` existed nowhere in the repo as strings and a rename
+  would have diffed to nothing. Also recorded, not reconciled: the live
+  `register_my_player` body carries SHORTER comments than the committed migration, so
+  re-applying that file would rewrite the live function. Detail in
+  `db/schema/README.md`.
+
+- `5979c21` — **A U13+ player can register themselves.** "Add your player" asks *is this
   you, or your child?* for squads that permit it, and the membership role becomes
   `player` rather than `parent`. ⚠️ **The permission is a new `teams` column, never the
   squad name** — `20260806_claim_roster_access.sql` ruled that a rename must not hand an

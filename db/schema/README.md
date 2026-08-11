@@ -158,12 +158,86 @@ and before that
 > being off — which `claude/decisions/2026-08-06-roster-auto-onboarding.md`
 > already settled as a paid-plan feature on a free org.
 
+> ## ⚠️ Re-captured 2026-08-11 — and the 10 Aug "ZERO DRIFT" entry above went
+> ## out of date the SAME DAY it was written
+>
+> The reconciliation above was run on 10 Aug and was correct when run. Migration
+> `20260810183058 super_admin_and_rights` was applied **later that day**, and
+> three more followed on 11 Aug. `claude/state-of-play.md` went on quoting
+> "reconciled against live — zero drift" for two days, which is how a
+> reconciliation entry becomes a liability rather than a record: **it is a
+> measurement, and it rots like every other one.** The date is the important
+> half of it, not the verdict.
+>
+> Found live with no entry in this directory at all:
+>
+> | Object | Live since | File |
+> |---|---|---|
+> | `private.is_super_admin()` | 10 Aug | `functions.sql` |
+> | `public.set_admin_rights(uuid,bool,text[])` | 10 Aug | `functions.sql` |
+> | `"memb no self promotion"` policy | 10 Aug | `policies.sql` |
+> | `memberships.is_super`, `memberships.admin_rights` | 10 Aug | `tables.sql` |
+> | `private.notify_pitch_request()` | 11 Aug | `functions.sql` |
+> | `notify_pitch_request_asked` / `_answered` triggers | 11 Aug | `triggers.sql` |
+> | `teams.self_registration_allowed` | 11 Aug | `tables.sql` |
+>
+> And three things that were worse than absent, because each was a **standing
+> claim that had inverted**:
+>
+> - **`policies.sql` said "Every policy is PERMISSIVE".** `"memb no self
+>   promotion"` is RESTRICTIVE — the only one in the schema. A permissive set
+>   can only ever be widened by adding to it; a restrictive policy is ANDed with
+>   everything and takes rows away. Anyone reasoning from that sentence about
+>   what an admin may write to `memberships` would have reached the wrong answer.
+> - **`policies.sql` listed thirteen tables as RLS-enabled; live has sixteen.**
+>   `attendance`, `pitches` and `pitch_requests` were absent from the list. All
+>   three do have RLS on — but this list is the only place in the repo that
+>   would show a table created *without* it, and Supabase's default privileges
+>   hand `anon` full rights on any new `public` table, so that is not a cosmetic
+>   gap.
+> - **`functions.sql` described `register_my_player(text, uuid, text)`**, a
+>   signature the 11 Aug migration DROPS. The live 4-argument version — carrying
+>   the argument that decides whether a registrant becomes a `player` or a
+>   `parent` — appeared nowhere, so a diff would have shown the self-registration
+>   guard missing with no way to tell "never captured" from "reverted".
+>
+> ⚠️ **And `pitches` / `pitch_requests` in `tables.sql` were not a capture at
+> all — they were the migrations' own DDL pasted in.** `CREATE TABLE IF NOT
+> EXISTS`, inline unnamed `UNIQUE` and `CHECK`. Live names both
+> (`pitches_club_id_name_key`, `pitch_requests_status_check`) and neither string
+> existed in this directory, so dropping or renaming either would have diffed to
+> nothing. **Pasting the migration produces a file that looks complete.** The
+> "keep the output faithful, do not tidy the SQL" line in *How to regenerate*
+> below is about precisely this.
+>
+> ⚠️ **One live/repo difference is recorded rather than reconciled.** The body of
+> `public.register_my_player` in the database carries a *shorter* version of its
+> 0A000 comment than `db/migrations/20260811_self_registration.sql` does, and
+> lacks two of that file's comments entirely. Every executable statement is
+> identical. This is **not** the `apply_migration` comment-stripping described
+> further down — comments inside a dollar-quoted body do survive. Something
+> shorter was applied and a fuller file was then committed. The consequence
+> worth knowing: **re-applying that committed file would rewrite the live body**,
+> and the next capture would show a diff nobody intended.
+>
+> **How the gaps were found, because the method is reusable and cheap:** dump the
+> live inventory (`pg_proc`, `pg_policies`, `pg_constraint`, `pg_indexes`,
+> `information_schema.columns`) and check every name appears somewhere in the
+> corresponding file. It is a name-level check, not a body-level one, so it
+> catches *missing* and *extra* objects and will not catch a changed expression
+> — but every gap listed above was a missing object, and none of them needed a
+> body diff to find. ⚠️ **Include a control name that must NOT be found**: the
+> first run of this check reported `register_my_player` absent from a file
+> containing twenty occurrences of it, because PowerShell's formatter silently
+> drops objects after the first shape in a mixed pipeline. An empty result and a
+> suppressed one look identical.
+
 | File | Contents |
 |---|---|
 | `tables.sql` | Every `public` table: columns, types, nullability, defaults, PKs, FKs, CHECKs, indexes, and RLS-enabled state. Includes explicit notes where an expected unique constraint is **absent**. |
 | `policies.sql` | Every RLS policy on every `public` table, **plus the two on `storage.objects` for the `player-photos` bucket**, with command and USING / WITH CHECK expressions. |
 | `functions.sql` | Full `pg_get_functiondef()` output for every function in `public` and `private`, plus their EXECUTE grants from `proacl`. ⚠️ This row said "all 22 functions" until 9 Aug, when the count went to 29. **A count in a table of contents is a thing that rots** — the file itself is the inventory. |
-| `triggers.sql` | Every trigger: two on `auth.users`, `profiles_sync_name` on `public.profiles` (6 Aug 2026), and `notify_pending_membership` on `public.memberships` (9 Aug 2026 — the first trigger in this project that reaches OUTSIDE the database). ⚠️ This row said "there are none on any `public` table" until 7 Aug and "the three triggers" until 9 Aug. |
+| `triggers.sql` | Every trigger: two on `auth.users`, `profiles_sync_name` on `public.profiles` (6 Aug 2026), `notify_pending_membership` on `public.memberships` (9 Aug 2026 — the first trigger in this project that reaches OUTSIDE the database), and `notify_pitch_request_asked` / `notify_pitch_request_answered` on `public.pitch_requests` (11 Aug 2026 — the second and third that do). ⚠️ This row said "there are none on any `public` table" until 7 Aug, "the three triggers" until 9 Aug, and named four until 11 Aug. **A trigger is the easiest object here to leave uncaptured: nothing in the app names it, and the code that fires it is an ordinary INSERT.** |
 
 ## Why this directory exists
 

@@ -74,6 +74,30 @@
 -- 7 Aug capture. All thirteen have RLS ENABLED (relrowsecurity = true) and
 -- none have FORCE ROW LEVEL SECURITY (relforcerowsecurity = false, i.e. the
 -- table owner still bypasses RLS). Policies live in policies.sql.
+--
+-- ⚠️ RE-CAPTURED 2026-08-11, after this file went two days and three
+-- table-touching migrations behind live. Deltas applied here:
+--
+--   20260810183058 super_admin_and_rights  → memberships.is_super,
+--                                            memberships.admin_rights
+--   20260811085312 self_registration       → teams.self_registration_allowed
+--
+-- ⚠️ AND THE `pitches` / `pitch_requests` BLOCKS AT THE FOOT OF THIS FILE WERE
+-- NOT A CAPTURE. They were pasted from db/migrations/20260811_pitches.sql and
+-- 20260811_pitch_requests.sql — `CREATE TABLE IF NOT EXISTS`, inline `UNIQUE
+-- (club_id, name)`, an unnamed inline CHECK — none of which is what the live
+-- catalogue holds. Every other table in this file names its constraints, so a
+-- future diff would have shown two tables whose constraints simply do not
+-- appear: `pitches_club_id_name_key` and `pitch_requests_status_check` were
+-- both live and both unnamed here. They are now written as found.
+-- **Pasting the migration is not capturing the database**, and it produces a
+-- file that looks complete — the README's "keep the output faithful" line is
+-- about exactly this.
+--
+-- ⚠️ The count sentence above is scoped to the 9 Aug capture and is left as
+-- written. Live is SIXTEEN tables as of 11 Aug — attendance, pitches and
+-- pitch_requests joined the thirteen. The authoritative RLS-on list is in
+-- policies.sql, which had the same three missing.
 -- =====================================================================
 
 
@@ -120,6 +144,28 @@ CREATE TABLE public.teams (
   -- 'player' or a 'parent'. Renaming a squad must not be able to hand an adult
   -- a parent role.
   is_senior   boolean NOT NULL DEFAULT false,
+  -- Added 2026-08-11 (self_registration). Column comment as stored:
+  -- "Whether a player in this squad may register THEMSELVES rather than being
+  -- registered by a parent. Jay's ruling 11 Aug 2026: U13 and above. Set
+  -- deliberately per squad — NEVER derived from teams.name, so that renaming a
+  -- squad cannot change who may hold their own account."
+  --
+  -- ⚠️ THE SECOND COLUMN ON THIS TABLE THAT EXISTS PURELY SO THAT A SQUAD
+  -- RENAME CANNOT CHANGE ACCESS, and the pair should be read together.
+  -- is_senior does it for claim_roster_access; this does it for
+  -- register_my_player, whose 0A000 guard reads this column and never the name.
+  --
+  -- ⚠️ private.squad_expects_gender DOES parse teams.name, and that is not a
+  -- counter-example: it validates the data being entered, it does not decide
+  -- who gets an account. That distinction is the whole reason this is a column
+  -- and not a `name like 'U1%'`.
+  --
+  -- NOT NULL DEFAULT false, so a squad added later is closed until somebody
+  -- opens it deliberately — the safe direction. Which squads currently carry
+  -- true is DATA and is deliberately not written down here; the migration's own
+  -- guard asserts the count at apply time and `select name,
+  -- self_registration_allowed from teams` answers it now.
+  self_registration_allowed boolean NOT NULL DEFAULT false,
   CONSTRAINT teams_pkey    PRIMARY KEY (id),
   CONSTRAINT teams_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
 );
@@ -377,6 +423,40 @@ CREATE TABLE public.memberships (
   -- claude/decisions/2026-08-08-parent-self-registration.md. Do not
   -- "simplify" this by granting access at registration.
   status      text        NOT NULL DEFAULT 'active'::text,
+  -- Both added 2026-08-10 (super_admin_and_rights). No column comment stored.
+  --
+  -- ⚠️ THESE TWO COLUMNS ARE NOT PROTECTED BY ANY POLICY ON THIS TABLE, AND
+  -- THAT IS THE ONE THING TO UNDERSTAND ABOUT THEM. "memb manage" is FOR ALL
+  -- and admin-only, so every admin can already write rows here — which means a
+  -- plain flag would let any admin make themselves a super admin and the tier
+  -- would be decoration. Three things stop that, and all three are needed:
+  --   * UPDATE  — a column GRANT (db/schema/grants.sql). `authenticated` does
+  --               not hold UPDATE on either column, full stop.
+  --   * INSERT  — the RESTRICTIVE policy "memb no self promotion"
+  --               (db/schema/policies.sql). A column grant does not stop a NEW
+  --               row arriving with is_super already true.
+  --   * the way in — public.set_admin_rights, a SECURITY DEFINER RPC gated on
+  --               private.is_super_admin().
+  -- ⚠️ **Policies authorise the ROW; grants authorise the COLUMN.** Reading
+  -- policies.sql alone will tell you an admin may write this table and will not
+  -- tell you these two columns are carved out of that. Same shape as
+  -- profiles.email.
+  --
+  -- ⚠️ A FLAG AND NOT A ROLE VALUE, deliberately: twelve places in this schema
+  -- test `role = 'admin'`, and a new role value would have to be added to all
+  -- twelve, each one a chance to silently strip a super admin of an ordinary
+  -- power. A boolean makes a super admin an admin, so all twelve keep working.
+  --
+  -- ⚠️ admin_rights is NOT a security boundary and must never be described as
+  -- one. It decides which dashboard somebody is SHOWN ('youth', 'media',
+  -- 'pitches' — ADMIN_RIGHTS in src/lib/scope.js); the RLS behind those screens
+  -- is plain private.is_admin. It is a "not your job" message.
+  -- ⚠️ AND A SUPER ADMIN HOLDS EVERY RIGHT IMPLICITLY without it being listed
+  -- here, so an empty array on a super row means "all", not "none". Every
+  -- consumer must honour that — including the pitch email's recipient query,
+  -- where forgetting it excludes the one person certain to be able to act.
+  is_super      boolean NOT NULL DEFAULT false,
+  admin_rights  text[]  NOT NULL DEFAULT '{}'::text[],
   CONSTRAINT memberships_pkey            PRIMARY KEY (id),
   CONSTRAINT memberships_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT memberships_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
@@ -751,17 +831,30 @@ CREATE INDEX attendance_player_id_idx ON public.attendance (player_id);
 -- season's events naming a pitch nobody can look up, and because the column is
 -- text nothing would even complain.
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.pitches (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  club_id uuid NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  sort_order integer NOT NULL DEFAULT 0,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (club_id, name)
+-- ⚠️ REWRITTEN 11 Aug 2026 FROM THE LIVE CATALOGUE. This block and the one
+-- below were previously the migration's own DDL pasted in — `CREATE TABLE IF
+-- NOT EXISTS`, an inline unnamed `UNIQUE (club_id, name)`. Neither constraint
+-- name appeared anywhere in this file, so a rename or a drop of either would
+-- have diffed to nothing. Captured as found, per README.md.
+CREATE TABLE public.pitches (
+  id          uuid        NOT NULL DEFAULT gen_random_uuid(),
+  club_id     uuid        NOT NULL,
+  name        text        NOT NULL,
+  sort_order  integer     NOT NULL DEFAULT 0,
+  is_active   boolean     NOT NULL DEFAULT true,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT pitches_pkey             PRIMARY KEY (id),
+  CONSTRAINT pitches_club_id_name_key UNIQUE (club_id, name),
+  CONSTRAINT pitches_club_id_fkey     FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
 );
 ALTER TABLE public.pitches ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS pitches_club_sort_idx ON public.pitches (club_id, sort_order, name);
+
+-- ⚠️ The UNIQUE is on (club_id, name), so `is_active` is NOT part of it: a
+-- retired pitch still holds its name and bringing it back is an UPDATE, not an
+-- INSERT. Trying to re-add a retired pitch by name collides — which is correct,
+-- and is why the setup screen offers "bring back" rather than "add" for one it
+-- already has.
+CREATE INDEX pitches_club_sort_idx ON public.pitches USING btree (club_id, sort_order, name);
 
 -- ---------------------------------------------------------------------
 -- public.pitch_requests — a coach asks, an admin allocates (11 Aug 2026)
@@ -782,19 +875,36 @@ CREATE INDEX IF NOT EXISTS pitches_club_sort_idx ON public.pitches (club_id, sor
 -- deletion — a request that vanishes leaves the coach wondering whether they
 -- ever sent it.
 -- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.pitch_requests (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_id uuid NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
-  status text NOT NULL DEFAULT 'submitted'
-    CHECK (status IN ('submitted','allocated','declined','cancelled')),
-  needs_referee boolean NOT NULL DEFAULT false,
-  note text,
-  decision_note text,
-  requested_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
-  requested_at timestamptz NOT NULL DEFAULT now(),
-  decided_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
-  decided_at timestamptz,
-  UNIQUE (event_id)
+-- ⚠️ REWRITTEN 11 Aug 2026 FROM THE LIVE CATALOGUE — see the note on `pitches`
+-- above. The status CHECK was inline and unnamed here; live it is
+-- `pitch_requests_status_check`, and it is the constraint that decides which
+-- states the answered-email trigger can ever see.
+CREATE TABLE public.pitch_requests (
+  id             uuid        NOT NULL DEFAULT gen_random_uuid(),
+  event_id       uuid        NOT NULL,
+  status         text        NOT NULL DEFAULT 'submitted'::text,
+  needs_referee  boolean     NOT NULL DEFAULT false,
+  note           text,
+  decision_note  text,
+  requested_by   uuid,
+  requested_at   timestamptz NOT NULL DEFAULT now(),
+  decided_by     uuid,
+  decided_at     timestamptz,
+  CONSTRAINT pitch_requests_pkey             PRIMARY KEY (id),
+  CONSTRAINT pitch_requests_event_id_key     UNIQUE (event_id),
+  CONSTRAINT pitch_requests_status_check     CHECK ((status = ANY (ARRAY['submitted'::text, 'allocated'::text, 'declined'::text, 'cancelled'::text]))),
+  CONSTRAINT pitch_requests_event_id_fkey     FOREIGN KEY (event_id)     REFERENCES events(id)   ON DELETE CASCADE,
+  CONSTRAINT pitch_requests_requested_by_fkey FOREIGN KEY (requested_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT pitch_requests_decided_by_fkey   FOREIGN KEY (decided_by)   REFERENCES profiles(id) ON DELETE SET NULL
 );
 ALTER TABLE public.pitch_requests ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS pitch_requests_status_idx ON public.pitch_requests (status, requested_at);
+
+-- ⚠️ TWO TRIGGERS SIT ON THIS TABLE AND BOTH SEND EMAIL — see triggers.sql.
+-- The answered one fires only on a status transition INTO 'allocated' or
+-- 'declined', so widening the CHECK above without revisiting that WHEN clause
+-- adds a state nobody is told about.
+--
+-- ⚠️ requested_by / decided_by are ON DELETE SET NULL, so deleting a profile
+-- keeps the request and loses the name. Deliberate: the queue must not develop
+-- holes when somebody leaves the club.
+CREATE INDEX pitch_requests_status_idx ON public.pitch_requests USING btree (status, requested_at);

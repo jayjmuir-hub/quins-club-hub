@@ -55,6 +55,10 @@ infrastructure.
   function security settings, triggers, constraints, indexes, RLS state and the
   bucket settings all matched. `public.accept_invite` still carries its
   incomplete-invite guard.
+  ❌ **AND IT STOPPED BEING TRUE LATER THE SAME DAY — see 11 Aug below.**
+  `super_admin_and_rights` was applied after this reconciliation ran. **This line
+  is left standing as a dated measurement, which is all it ever was**; it was
+  quoted as current state for two days, and that is the failure, not the line.
 - **The masthead stopped truncating** (it rendered "ABU…" at the `desktop`
   breakpoint on every screen) and the **dashboard hero stopped repeating itself**.
   ⚠️ Structural, not a width: every other item in that row is `shrink-0`, so the
@@ -87,6 +91,40 @@ half-built** — where something is missing it says so.
 `docs-check` allows the changelog to be exactly one commit behind, because a commit
 cannot cite its own SHA. **The NEXT PR must add it.** This is not a nicety: the check
 went red on PR #37 for exactly this reason, having been skipped once already on #36.
+✅ **Done in `cc49604`.** The same rule now applies to `5979c21`.
+
+- ✅ **A U13+ PLAYER CAN REGISTER THEMSELVES** (`5979c21`). "Add your player" asks
+  *is this you, or your child?* for squads that permit it, and the membership role
+  becomes `player` instead of `parent`. ⚠️ **The permission is a COLUMN
+  (`teams.self_registration_allowed`), never the squad's name** — the same rule
+  `is_senior` exists for, so that renaming a squad cannot hand an account a role it
+  should not have. ⚠️ **The database refuses it, not just the form**: errcode
+  `0A000`, deliberately absent from the map in `src/data/members.js` so the sentence
+  naming the squad reaches the person. ⚠️ **The 3-arg `register_my_player` is
+  DROPPED** — Postgres prefers an exact arity match, so leaving it would have left
+  every client resolving to a function with no self-registration support and nothing
+  failing to say so. ⚠️ **The role is cosmetic** — no policy distinguishes `parent`
+  from `player` — which is what made this safe; if that changes, this is the line
+  that was relied on.
+- ⚠️ **`db/schema/` HAD DRIFTED FOR TWO DAYS AND IS NOW RE-CAPTURED.** Seven objects
+  were live with no entry in the directory at all: `private.is_super_admin`,
+  `public.set_admin_rights`, the `memb no self promotion` policy,
+  `memberships.is_super` / `.admin_rights`, `private.notify_pitch_request`, its two
+  triggers, and `teams.self_registration_allowed`. Detail and the reasoning are in
+  `db/schema/README.md`; three items are worth carrying here because they change how
+  you READ that directory:
+  ⚠️ **`policies.sql` said "Every policy is PERMISSIVE" and that had inverted** —
+  `memb no self promotion` is RESTRICTIVE, the only one in the schema, and a
+  restrictive policy takes rows away rather than adding them.
+  ⚠️ **Its RLS-enabled list stopped at thirteen tables while live had sixteen.** All
+  sixteen do have RLS on. But that list is the only thing in the repo that would show
+  a table created WITHOUT it, and Supabase's defaults hand `anon` full rights on any
+  new `public` table.
+  ⚠️ **The `pitches` and `pitch_requests` blocks were the migrations' DDL pasted in,
+  not a capture** — inline unnamed constraints, so neither `pitches_club_id_name_key`
+  nor `pitch_requests_status_check` existed as a string in the repo and a drop or
+  rename would have diffed to nothing. **Pasting the migration produces a file that
+  looks complete.**
 
 ### ⚠️ Test data currently in the live database
 

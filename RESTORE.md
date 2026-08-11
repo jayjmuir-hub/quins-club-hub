@@ -425,10 +425,11 @@ how an older migration named `accept_invite_multi_target` got re-applied on 2026
 silently reverted the incomplete-invite guard inside `public.accept_invite` — repeatedly,
 undetected, because there was no file in the repo to compare the live function against.
 
-`db/schema/` fixes that. It holds a **capture of the live database** — four SQL files
-(`tables.sql`, `policies.sql`, `functions.sql`, `triggers.sql`) generated from read-only
-catalogue queries (`information_schema.columns`, `pg_constraint`, `pg_policies`,
-`pg_proc` + `pg_get_functiondef` + `proacl`, `pg_trigger`, `pg_class.relrowsecurity`).
+`db/schema/` fixes that. It holds a **capture of the live database** — five SQL files
+(`tables.sql`, `policies.sql`, `functions.sql`, `triggers.sql`, `grants.sql`) generated
+from read-only catalogue queries (`information_schema.columns`, `pg_constraint`,
+`pg_policies`, `pg_proc` + `pg_get_functiondef` + `proacl`, `pg_trigger`,
+`pg_class.relrowsecurity`).
 
 Read `db/schema/README.md` first. The essentials:
 
@@ -437,6 +438,50 @@ Read `db/schema/README.md` first. The essentials:
 - The workflow after any schema change is: apply the migration → re-capture into
   `db/schema/` → commit both together. If the re-capture shows changes you did not intend,
   something drifted or was reverted. That is the whole point.
+- ⚠️ **PASTING THE MIGRATION'S DDL IS NOT CAPTURING THE DATABASE, and it produces a file
+  that looks complete.** `pitches` and `pitch_requests` were written into `tables.sql`
+  this way on 11 Aug: `CREATE TABLE IF NOT EXISTS`, inline unnamed `UNIQUE` and `CHECK`.
+  Live names those constraints — `pitches_club_id_name_key`, `pitch_requests_status_check`
+  — and neither string existed anywhere in the repo, so dropping or renaming either would
+  have diffed to **nothing**. Capture from the catalogue, always, even when you wrote the
+  migration ten minutes ago.
+- ⚠️ **A "reconciled — zero drift" note is a MEASUREMENT and rots like every other one.**
+  The 10 Aug reconciliation was correct when run and was falsified the same day by a
+  migration applied hours later, while `claude/state-of-play.md` quoted it as current
+  state for two days. **The date on such a note is the load-bearing half, not the verdict.**
+- ⚠️ **The cheap way to check the whole directory, which is a name-level check and finds
+  every gap of the commonest kind:** dump the live inventory (`pg_proc`, `pg_policies`,
+  `pg_constraint`, `pg_indexes`, `information_schema.columns`) and assert every name
+  appears somewhere in the corresponding file. It will not catch a changed *expression* —
+  for that you still diff bodies — but every one of the seven objects missing on 11 Aug
+  was a missing object, not a changed one. **Always include a control name that must NOT
+  be found**; see the PowerShell trap below for why an empty result cannot be trusted on
+  its own.
+- ⚠️ **Watch for a claim in these files that has INVERTED, not merely gone stale.** Three
+  had by 11 Aug: `policies.sql` said "Every policy is PERMISSIVE" after a RESTRICTIVE one
+  was added, and listed thirteen RLS-enabled tables against sixteen live; `functions.sql`
+  described a `register_my_player` signature the database no longer has. **An inverted
+  claim is worse than an omission, because an omission looks like an omission.** Same
+  shape as the "DELIBERATE ABSENCE OF A UNIQUE CONSTRAINT" note that survived a day past
+  the unique index being created.
+
+**⚠️ A POWERSHELL PIPELINE CAN SILENTLY SWALLOW OUTPUT, AND IT LOOKS EXACTLY LIKE AN
+EMPTY RESULT.** Chaining commands that emit **differently shaped objects** into one
+statement — `Get-ChildItem | Select-Object Name` followed by
+`Select-String | Select-Object Filename, LineNumber` — makes the formatter render only
+the first shape and **drop the rest with no error and no warning**. On 11 Aug this
+reported `register_my_player` as absent from a file containing twenty occurrences of it.
+Two consequences:
+
+- Emit one shape per statement, or force it with `Format-Table` / `Out-String` per command.
+- ⚠️ **`(Get-Content f | Measure-Object -Line).Lines` DOES NOT COUNT BLANK LINES.** It
+  reported 1,428 for a 1,573-line file, which reads as a plausible answer rather than a
+  wrong one. Use `(Get-Content f).Count`.
+
+This is `CLAUDE.md` rule 6's "confirm the search can find something you know is there" in
+a new costume — and the reason that rule is written as a *procedure* rather than a
+caution. **Put a control in the input: a name that must be reported missing.** If the
+control does not come back, the check is not running, whatever it printed.
 - The files carry the notes that matter alongside the SQL: the deliberately-absent unique
   constraints on `memberships` and `invite_targets`, and a prominent header on
   `public.accept_invite` listing its five guards (signed in / token exists with
