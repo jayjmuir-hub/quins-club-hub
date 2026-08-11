@@ -88,6 +88,23 @@ do not propose buying an M365 licence — same session, same verdict.
    working alias, deliberately kept. A push there is a live release, not a
    save. Show
    the diff and get an explicit yes. **A stop hook asking is not Jay asking.**
+   ⚠️ **A DEPLOY COSTS 15 NETLIFY CREDITS — Jay, 11 Aug 2026, and his words were
+   "it's not really expensive".** The number is here because `rules.md` says to
+   look it up in this file and until now it was not written down anywhere, so
+   every session had to describe deploys as vaguely expensive and could not say
+   what a build was actually worth. **The reason to skip a pointless deploy is
+   tidiness, not thrift** — do not refuse work, stall a merge, or spend a second
+   build avoiding a first one over 15 credits. ⚠️ **What still needs an explicit
+   yes is that `main` is LIVE**, and that is unchanged by the price.
+   ⚠️ **`scripts/netlify-ignore.mjs` IS NARROWER THAN "cannot reach `dist/`" ON
+   PURPOSE, and the surprise is a dotfile.** Its root-markdown pattern is
+   `/^[^/]+\.md$/`, so `.gitignore`, `.gitattributes` and `netlify.toml` all
+   BUILD. That is correct for `netlify.toml` — its redirects and headers only
+   take effect by deploying — and merely conservative for the other two. **Run
+   the gate before promising it will skip:**
+   `CACHED_COMMIT_REF=<sha> COMMIT_REF=<sha> node scripts/netlify-ignore.mjs`,
+   exit 0 means skip. Predicted wrongly on PR #43, which claimed a skip in its
+   own description while the deploy preview was building.
    ⚠️ **NEVER `[skip ci]`.** This rule asked for it on docs-only commits until
    10 Aug 2026, and it stopped being safe the moment `main` was protected:
    GitHub Actions honours that string too — on `push` AND `pull_request`,

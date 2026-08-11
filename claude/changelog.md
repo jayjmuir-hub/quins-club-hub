@@ -10,8 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **`db/schema/` had drifted for two days, and the re-capture found three claims that
-  had INVERTED rather than merely gone stale.** Seven objects were live with no entry
+- **A deploy costs 15 Netlify credits, and that is now written down.** `rules.md` tells
+  every session to look the figure up in `CLAUDE.md`; it had never been recorded, so
+  deploys were described as vaguely expensive and no session could say what a build was
+  worth. Jay's framing — *"it's not really expensive"* — is recorded with it, because
+  the number without it invites the opposite error. ⚠️ **Skipping a pointless deploy is
+  tidiness, not thrift**; what still needs an explicit yes is that `main` is LIVE.
+  ⚠️ Recorded alongside it: **`scripts/netlify-ignore.mjs` treats a DOTFILE as
+  deploy-relevant** — its root pattern is `/^[^/]+\.md$/`, so `.gitignore`,
+  `.gitattributes` and `netlify.toml` all build. Correct for `netlify.toml`, whose
+  redirects and headers only take effect by deploying. **Run the gate before promising
+  a skip** — PR #43 claimed one in its own description while the preview was building.
+
+- **Claude Code's auto-scaffolded `.claude/launch.json` is gitignored.** The app wrote
+  it mid-session; it is a per-machine dev-server config and has no business travelling
+  between the two PCs. ⚠️ **`.claude/settings.json` STAYS TRACKED** — it wires
+  `scripts/session-guard.mjs`, so an ignore rule wide enough to catch it would silently
+  untrack the clone-staleness guard and nothing would say so until a session ran on a
+  stale clone. The rule names the one file, and the check that matters is the negative
+  one: `git check-ignore .claude/settings.json` must stay empty.
+  ⚠️ **`settings.local.json` was already covered by the GLOBAL gitignore**
+  (`~/.config/git/ignore`), not by this file — asserted here as un-ignored first, and
+  `git status` had already been showing otherwise. **`git check-ignore -v` names the
+  file AND the rule; `git status` only tells you what it decided.**
+
+- `0c27689` — **`db/schema/` had drifted for two days, and the re-capture found three
+  claims that had INVERTED rather than merely gone stale.** Seven objects were live with no entry
   in the directory: `private.is_super_admin`, `public.set_admin_rights`, the
   `memb no self promotion` policy, `memberships.is_super` / `.admin_rights`,
   `private.notify_pitch_request`, its two triggers, and

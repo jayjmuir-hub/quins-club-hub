@@ -15,3 +15,8 @@ _to_delete/
 # Never commit these - this repo is PUBLIC.
 _transfer.b64
 *.b64
+
+# Claude Code's own dev-server config, auto-scaffolded per machine.
+# .claude/settings.json IS tracked and must stay so - it wires the session
+# guard. settings.local.json is covered by the global gitignore, not here.
+.claude/launch.json
