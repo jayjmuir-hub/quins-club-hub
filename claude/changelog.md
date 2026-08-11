@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **Two specs for Candice's match sheets, and the brainstorm found a modelling gap that
+- **An implementation plan for Project 1**, `claude/plans/2026-08-11-league-teams-implementation.md`
+  — eight TDD tasks. ⚠️ **Task 4 is written null-case-first on purpose** and step 5 proves
+  that test discriminates by injecting a default into the null branch. ⚠️ **One shared
+  label formatter rather than four call sites**, because the calendar feed
+  deploys separately from the bundle, so drift there stays invisible until a parent's
+  subscribed calendar disagrees with the app. ⚠️ Task 1 writes the RLS harness BEFORE the
+  migration and runs it expecting failure, so it is proved against the absence of the
+  thing it tests — and asserts `insufficient_privilege` specifically, because a negative
+  check that passes on a mistyped table name proves nothing.
+  ⚠️ **`docs-check` only validates `claude/`, `src/` and `db/` paths**, so the plan's
+  `supabase/functions/calendar/index.ts` reference was verified by hand — a green
+  `docs-check` would not have covered it.
+
+- `45d50d4` — **Two specs for Candice's match sheets, and the brainstorm found a modelling gap that
   would have wasted the build.** `claude/plans/2026-08-11-league-teams-and-fixtures.md`
   and `claude/plans/2026-08-11-match-sheets.md`, split because the work spans EventForm,
   Schedule, the calendar feed and the allocation grid before a sheet is even rendered.
