@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **A deploy costs 15 Netlify credits, and that is now written down.** `rules.md` tells
+  every session to look the figure up in `CLAUDE.md`; it had never been recorded, so
+  deploys were described as vaguely expensive and no session could say what a build was
+  worth. Jay's framing — *"it's not really expensive"* — is recorded with it, because
+  the number without it invites the opposite error. ⚠️ **Skipping a pointless deploy is
+  tidiness, not thrift**; what still needs an explicit yes is that `main` is LIVE.
+  ⚠️ Recorded alongside it: **`scripts/netlify-ignore.mjs` treats a DOTFILE as
+  deploy-relevant** — its root pattern is `/^[^/]+\.md$/`, so `.gitignore`,
+  `.gitattributes` and `netlify.toml` all build. Correct for `netlify.toml`, whose
+  redirects and headers only take effect by deploying. **Run the gate before promising
+  a skip** — PR #43 claimed one in its own description while the preview was building.
+
 - **Claude Code's auto-scaffolded `.claude/launch.json` is gitignored.** The app wrote
   it mid-session; it is a per-machine dev-server config and has no business travelling
   between the two PCs. ⚠️ **`.claude/settings.json` STAYS TRACKED** — it wires
