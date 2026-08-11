@@ -10,8 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **`db/schema/` had drifted for two days, and the re-capture found three claims that
-  had INVERTED rather than merely gone stale.** Seven objects were live with no entry
+- **Claude Code's auto-scaffolded `.claude/launch.json` is gitignored.** The app wrote
+  it mid-session; it is a per-machine dev-server config and has no business travelling
+  between the two PCs. ⚠️ **`.claude/settings.json` STAYS TRACKED** — it wires
+  `scripts/session-guard.mjs`, so an ignore rule wide enough to catch it would silently
+  untrack the clone-staleness guard and nothing would say so until a session ran on a
+  stale clone. The rule names the one file, and the check that matters is the negative
+  one: `git check-ignore .claude/settings.json` must stay empty.
+  ⚠️ **`settings.local.json` was already covered by the GLOBAL gitignore**
+  (`~/.config/git/ignore`), not by this file — asserted here as un-ignored first, and
+  `git status` had already been showing otherwise. **`git check-ignore -v` names the
+  file AND the rule; `git status` only tells you what it decided.**
+
+- `0c27689` — **`db/schema/` had drifted for two days, and the re-capture found three
+  claims that had INVERTED rather than merely gone stale.** Seven objects were live with no entry
   in the directory: `private.is_super_admin`, `public.set_admin_rights`, the
   `memb no self promotion` policy, `memberships.is_super` / `.admin_rights`,
   `private.notify_pitch_request`, its two triggers, and
