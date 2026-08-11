@@ -401,6 +401,7 @@ export default function EventDetail({
   onDeleted,
   onOpenAvailability,
   onOpenRegister,
+  onOpenMatchSheet,
 }) {
   const date = eventDate(event)
   // Null for every event created before 8 Aug 2026, and formatTimeRange
@@ -577,6 +578,33 @@ export default function EventDetail({
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Register</h4>
           <Button variant="secondary" full onClick={() => onOpenRegister(event)}>
             Take the register
+          </Button>
+        </div>
+      )}
+
+      {/* ⚠️ MATCHES ONLY, and only for someone who may edit the squad. The RCM
+          sheet is a per-match governing-body form — a training session has no
+          sheet, and a parent has no business opening one.
+          ⚠️ ALWAYS AVAILABLE, NOT GATED ON THE MATCH HAVING STARTED, unlike the
+          register above. U18's sheet is due an HOUR BEFORE kick-off (see
+          src/lib/matchSheetDeadline.js), so a "not until it has finished" gate
+          would lock out the one age group whose deadline falls first.
+          ⚠️ A HANDLER PROP, NOT A <Link>, and this is not a style preference.
+          This component renders inside a Sheet from Schedule and the Dashboard;
+          a router-aware element here couples a presentational sheet to route
+          context and broke eighteen existing tests that render it bare. The
+          file already had the answer in onOpenRegister.
+          ⚠️ RENDERED ONLY WHEN A HANDLER EXISTS, so a forgetful caller gets NO
+          button rather than a lying one — the exact defect the availability
+          button shipped with, where `onOpenAvailability?.()` drew a button on
+          the Dashboard that silently swallowed every tap. */}
+      {canEdit && event.type === 'match' && onOpenMatchSheet && (
+        <div className="mt-4">
+          <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
+            Match sheet
+          </h4>
+          <Button variant="secondary" full onClick={() => onOpenMatchSheet(event)}>
+            Open the RCM match sheet
           </Button>
         </div>
       )}

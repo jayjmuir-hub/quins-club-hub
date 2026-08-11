@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Greeting from '../components/Greeting.jsx'
@@ -331,6 +331,8 @@ function QuickActions({ canEdit, readOnlyRole }) {
 }
 
 export default function Dashboard() {
+  // Routing out to the full-page match sheet. See onOpenMatchSheet below.
+  const navigate = useNavigate()
   const { memberships, teams } = useMemberships()
 
   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
@@ -727,6 +729,7 @@ export default function Dashboard() {
           canEdit={canEditTeam(memberships, selectedEvent.team_id)}
           onEdit={(event) => setFormState({ event })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
+          onOpenMatchSheet={(fixture) => navigate(`/match-sheet/${fixture.id}`)}
           onOpenRegister={() => setRegisterOpen(true)}
           onDeleted={() => {
             closeEvent()

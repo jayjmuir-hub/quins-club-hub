@@ -224,6 +224,36 @@ export async function listEvents({ teamIds } = {}) {
   return EVENTS
 }
 
+/**
+ * One event by id, for the match sheet screen.
+ *
+ * ⚠️ MIRRORS THE REAL EMBED — `team` and `league_team` are nested objects, not
+ * flat columns. The sheet reads `event.team.name` for the deadline rule and
+ * `event.league_team.rcm_name` for the TEAM: line, so a stub returning the bare
+ * row would render a sheet with no squad and no league team and the harness
+ * would call it fine.
+ */
+// The squads the memberships stub uses, named the way the real club names
+// them. ⚠️ "U14B Contact" and not "U14 Boys": src/lib/ageGroup.js parses the
+// band off the FRONT of the name, and the match sheet's deadline rule reads
+// that band — a stub name that failed to parse would render no deadline and
+// the harness would show a screen the real app never produces.
+const HARNESS_TEAMS = [
+  { id: 't1', name: 'U12B Contact' },
+  { id: 't2', name: 'U14B Contact' },
+  { id: 't3', name: 'U18B Contact' },
+]
+
+export async function getEvent(id) {
+  const event = EVENTS.find((row) => row.id === id)
+  if (!event) return null
+  return {
+    ...event,
+    team: HARNESS_TEAMS.find((team) => team.id === event.team_id) ?? null,
+    league_team: event.league_team ?? { id: 'lt-1', rcm_name: 'ADHQ2', division: 'B' },
+  }
+}
+
 export function subscribeEvents() {
   return () => {}
 }

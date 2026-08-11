@@ -84,16 +84,24 @@ const BASE_TABS = [
 ]
 
 function tabsFor(memberships) {
+  const tabs = [...BASE_TABS]
+
   // ⚠️ ALLOCATION COMES FIRST, and Pitches (setup) after it. Allocating is the
   // weekly job; setting the list up is done twice a season. Tab order is the
   // cheapest way to say which one somebody came for.
-  return hasAdminRight(memberships, 'pitches')
-    ? [
-        ...BASE_TABS,
-        { to: '/admin/allocation', label: 'Allocation' },
-        { to: '/admin/pitches', label: 'Pitches' },
-      ]
-    : BASE_TABS
+  if (hasAdminRight(memberships, 'pitches')) {
+    tabs.push({ to: '/admin/allocation', label: 'Allocation' })
+    tabs.push({ to: '/admin/pitches', label: 'Pitches' })
+  }
+
+  // The Club Youth Manager's match sheets. ⚠️ The `youth` right has existed in
+  // ADMIN_RIGHTS since 10 Aug 2026 and granted access to NOTHING until now —
+  // the same state `pitches` was in before the pitch stack.
+  if (hasAdminRight(memberships, 'youth')) {
+    tabs.push({ to: '/admin/youth', label: 'Match sheets' })
+  }
+
+  return tabs
 }
 
 // ⚠️ MODELLED ON adhjrt.com's AGE-GROUP TABS — Jay, 11 Aug 2026, who asked for

@@ -125,6 +125,17 @@ export default {
         danger: { DEFAULT: '#c2352c', bg: '#fdeceb' },
         warn: { DEFAULT: '#c98a12', ink: '#8a5a12', bg: '#fdf3e0' },
         info: { DEFAULT: '#2f5fa8', bg: '#e9f1fb' },
+
+        // ⚠️ NOT PART OF THIS APP'S PALETTE, AND MUST NOT BE USED AS ONE.
+        // Rugby Club Management prints its Official Match Result Sheet with red
+        // headings, and src/screens/MatchSheet.jsx reproduces that form as a
+        // facsimile which gets photographed and sent to RCM. This is THEIR
+        // brand colour on THEIR document, named here only because
+        // tests/theme.test.js rightly refuses a raw hex in an arbitrary value.
+        // ⚠️ Its contrast is not this design system's business and has not been
+        // measured against our surfaces — it is only ever black-on-white
+        // facsimile chrome. Do not reach for it for an app-side accent.
+        rcm: '#c00000',
       },
 
       // ONE FAMILY NOW. The club redesign uses Inter throughout, and as of
