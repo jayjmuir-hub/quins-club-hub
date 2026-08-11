@@ -10,6 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **11 Aug — the ALLOCATION GRID (option C).** `/admin/allocation`: pitches down the
+  side, the day across the top, clashes in amber. The screen the pitch work existed
+  for — a Saturday morning fits on one view and a double booking reads without reading
+  a word. Tab order puts Allocation before Pitches, because allocating is weekly and
+  setting the list up is twice a season.
+  ⚠️ **It opens on TODAY — Jay's call, asked directly.** Today is often a quiet
+  Tuesday, so an empty day says **"Nothing on today. Use Next to look ahead."** rather
+  than drawing fifteen empty rows, which reads as the app failing to load.
+  ⚠️ **THE HOUR COLUMNS ARE DERIVED FROM THE DAY'S FIXTURES, NOT FIXED.** A fixed
+  08:00–20:00 grid would silently drop a 07:00 kick-off — the fixture would exist, be
+  allocated, and simply not appear.
+  ⚠️ **A RETIRED OR UNLISTED PITCH GETS A ROW IF SOMETHING IS ON IT.** Showing only
+  active pitches would make that booking vanish from the one screen whose job is to
+  show what is booked — it would still exist and still clash, invisibly. Not
+  hypothetical: `events.pitch` is free text and 16 seeded fixtures name pitches outside
+  the list. Both cases are labelled on the row ("retired" / "not listed").
+  ⚠️ **FIXTURES WITH NO PITCH GET THEIR OWN LIST**, because they appear in no row —
+  without it, the emptier the grid looked the more work there actually was.
+  ⚠️ Clashes reuse `findPitchClashes`, so the exemptions hold: a multi-squad fan-out
+  is not a clash, touching is not overlapping, `Pitch TBD` never clashes. Counted once
+  per pair rather than once per fixture.
+  ⚠️ Both invisible-fixture guards proved by injected fault; removing the retired-row
+  logic took four tests down.
+  ⚠️ **AND THE TEST FILE PASSED HERE WHILE FAILING IN CI** — five screen tests green
+  on Windows, all five red on Linux. The cause was the test, not the screen: it mocked
+  `pitches.js` with `vi.doMock` AFTER importing the module, then re-imported. That
+  happened to re-evaluate locally and did not in CI, so the real `listPitches` ran and
+  reached for Supabase. Fixed by hoisting to `vi.mock` with `importActual` (keeping
+  the real clash detector), plus an explicit assertion that the mock is in use —
+  otherwise the failure arrives as five "unable to find an element" errors that name
+  nothing. **The usual version of this trap is CI-green/local-red; this was the mirror
+  image, and local green proved nothing.**
+- `6421579` — **The pitch setup screen — blocks as columns.**
+
 - **11 Aug — the pitch setup screen: blocks as columns.** `/admin/pitches`, picked by
   Jay from **six** options laid out at browser width. Four block cards, all fifteen
   pitches visible at once on a desktop, stacking on a phone; tap a chip to rename or
