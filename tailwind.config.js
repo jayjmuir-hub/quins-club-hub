@@ -185,6 +185,17 @@ export default {
         // The website's radii: pills at 100px, buttons ~11px, cards 16px.
         pill: '100px',
         btn: '8px', // Touchline, 10 Aug 2026. Was 11px. See src/components/Button.jsx.
+        // Tab groups. Jay, 11 Aug 2026: "like the tabs on the adhjrt.com
+        // website". MEASURED off the live age-group tabs there rather than
+        // guessed — border-radius 12px, 0.8px border, white fill when inactive
+        // and the club red when active.
+        //
+        // ⚠️ 12px IS DELIBERATELY NOT `btn` (8px) OR `card` (16px). A tab is
+        // neither: it is softer than a control you press and tighter than the
+        // surface it sits on, which is exactly how adhjrt.com draws it. Reusing
+        // `btn` here would make the tab row read as a row of buttons, which is
+        // the thing that prompted the change.
+        tab: '12px',
         card: '16px',
       },
 
