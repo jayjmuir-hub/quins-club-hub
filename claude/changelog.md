@@ -36,7 +36,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **`EventDetail` had to change or every league match would show no competition at all** —
   the row tested `event.competition`, which is now null for exactly those.
 
-- **A league team's name is unique per SQUAD, not per club** — and the save now says which
+- `102fa48` — **A league team's name is unique per SQUAD, not per club** — and the save now says which
   of the two things went wrong. ⚠️ **Both defects were found by Jay using the app within
   hours of the feature shipping, and no test could have caught either.**
   ⚠️ **`unique (club_id, rcm_name)` was wrong.** Every age group has its own ADHQ1/ADHQ2/
