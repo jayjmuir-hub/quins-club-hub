@@ -477,6 +477,12 @@ Two consequences:
 - ⚠️ **`(Get-Content f | Measure-Object -Line).Lines` DOES NOT COUNT BLANK LINES.** It
   reported 1,428 for a 1,573-line file, which reads as a plausible answer rather than a
   wrong one. Use `(Get-Content f).Count`.
+- ⚠️ **`Select-String -SimpleMatch` WITH A REGEX-ESCAPED PATTERN FINDS NOTHING, SILENTLY.**
+  `-SimpleMatch` takes the pattern literally, backslashes included, so
+  `-Pattern "rgb\(200 16 46\)" -SimpleMatch` hunts for a string containing actual
+  backslash characters and returns zero. It looks exactly like the content being absent —
+  and on 11 Aug it was briefly read as a failed `git checkout --` restore. **Escape, or
+  use `-SimpleMatch`. Never both.**
 
 This is `CLAUDE.md` rule 6's "confirm the search can find something you know is there" in
 a new costume — and the reason that rule is written as a *procedure* rather than a

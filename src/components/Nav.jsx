@@ -79,27 +79,46 @@ function linkClassName({ isActive }) {
     // instead of a darker patch. No opacity tricks, no width-dependent
     // measurements.
     //
-    // ⚠️ `rounded-tab` (12px), NOT `rounded-pill` (100px) — Jay, 11 Aug 2026:
-    // "i don't like the rounded off buttons at the top", and then "like the
-    // tabs on the adhjrt.com website". The 12px token was measured off that
-    // site's live age-group tabs; see tailwind.config.js.
+    // ⚠️ EVERY DESKTOP VALUE BELOW WAS MEASURED OFF adhjrt.com's `.hdr-nav a`
+    // on 11 Aug 2026 — Jay: "not all capital letters, seems like the font is
+    // smaller on the tournament site, tournament site tabs have nice
+    // animation and a shimmer when you scroll over them". Read with
+    // getComputedStyle, and the hover state read by actually hovering the
+    // element, because three of its :hover rules were unreadable from the
+    // stylesheet.
     //
-    // ⚠️ ONLY THE CORNER IS COPIED FROM adhjrt.com, and that is deliberate.
-    // Its idle tab is black-on-white, which works because it sits on a white
-    // page. This row sits on the near-black masthead, so a white fill would
-    // put four bright boxes in the chrome — a far bigger change than the one
-    // that was asked for, and it would break the "identity lives on the
-    // chrome so the data surfaces can stay calm" idea the palette is built
-    // on. Idle stays transparent, active stays the brand red.
+    //   15px / 600 / normal-case / letter-spacing normal / padding 7px 11px 9px
+    //   radius 8px   ← NOT 12px
+    //   hover: white text, bg rgba(255,255,255,.07), translateY(-1px)
+    //
+    // ⚠️ 8px, AND THIS CORRECTS THE COMMIT BEFORE IT. That commit put 12px
+    // here on the strength of adhjrt.com's AGE-GROUP tabs. Its header nav is
+    // a different control and is 8px — which happens to be `rounded-btn`, the
+    // app's own button radius, so the top menu now agrees with the site-wide
+    // rule Jay invoked in the first place.
+    //
+    // ⚠️ THE SHEEN AND THE UNDERLINE ARE IN src/index.css, not here: they are
+    // `::before`/`::after` with a gradient, a blend mode and a keyframe, none
+    // of which a utility class expresses. `.nav-tab` is the hook, and that CSS
+    // is inside its own `@media (min-width: 820px)` — the class is on the
+    // element at every width, so the media query is the ONLY thing keeping a
+    // hover sheen off the phone tab bar.
+    //
+    // ⚠️ SMALLER TYPE HERE BUYS MASTHEAD WIDTH. 16px→15px and px-4→px-[11px]
+    // across five items gives the row back roughly 50px, and the wordmark is
+    // the only thing in it that can take the space (everything else is
+    // shrink-0). That is a side effect, not the fix, and the `sr-only` cutoff
+    // at `wide` is unchanged.
     //
     // ⚠️ The active pair measures 5.88:1 (white on brand #c8102e), MEASURED
     // live on 11 Aug 2026. This comment claimed 4.79:1 until then — that is
     // the ratio for #e11b22, the OTHER red, which is what adhjrt.com uses and
     // what this app's brand colour is not. Wrong figure, right conclusion.
-    'desktop:flex-row desktop:gap-0 desktop:rounded-tab desktop:px-4 desktop:py-2 desktop:text-[16px] desktop:tracking-[0.06em]',
+    'nav-tab desktop:flex-row desktop:gap-0 desktop:rounded-btn desktop:px-[11px] desktop:pb-[9px] desktop:pt-[7px] desktop:text-[15px] desktop:font-semibold desktop:normal-case desktop:tracking-normal',
+    'desktop:hover:-translate-y-px',
     isActive
       ? 'desktop:bg-brand desktop:text-white'
-      : 'desktop:text-white/80 desktop:hover:bg-white/10 desktop:hover:text-white',
+      : 'desktop:text-white/80 desktop:hover:bg-white/[0.07] desktop:hover:text-white',
   ].join(' ')
 }
 
@@ -121,7 +140,10 @@ export default function Nav({ canManageClub = false }) {
     // happened to be underneath it.
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 bg-chrome pb-[env(safe-area-inset-bottom)] shadow-tabbar desktop:static desktop:z-auto desktop:flex desktop:w-auto desktop:grid-cols-none desktop:gap-1 desktop:bg-transparent desktop:p-0 desktop:shadow-none"
+      /* `desktop:gap-[2px]` matches adhjrt.com's `.hdr-nav { gap: 2px }`. The
+         items now carry their own hover fill, so a wider gap would read as
+         five separate buttons rather than one row of tabs. */
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 bg-chrome pb-[env(safe-area-inset-bottom)] shadow-tabbar desktop:static desktop:z-auto desktop:flex desktop:w-auto desktop:grid-cols-none desktop:gap-[2px] desktop:bg-transparent desktop:p-0 desktop:shadow-none"
     >
       <div className="brand-rule absolute inset-x-0 top-0 desktop:hidden" />
       {NAV_ITEMS.map(({ to, label, end, icon: Icon }) => (
