@@ -546,10 +546,15 @@ state; trust the decisions for reasoning.**
   the `pitches` admin right (which gates the screen, not the data). Rename, retire,
   bring back, add. ⚠️ **The block is derived from the name, not stored**; `Other` is a
   real bucket and always sorts last.
-  ⚠️ **Still missing: the ALLOCATION grid (option C — pitches down the side, the day
-  across the top), Tracy's request queue, the submitter's tracking view, and the
-  email.** Jay chose C for allocation on 11 Aug; nothing of it is built, and nothing
-  writes a `pitch_requests` row yet.
+  ✅ **The ALLOCATION GRID is live** — `/admin/allocation` (option C). Pitches down the
+  side, the day across the top, clashes amber, **opens on today** (Jay's call), hour
+  columns derived from the day's fixtures. ⚠️ **A retired or unlisted pitch gets a row
+  if something is on it** — otherwise the booking would be invisible on the one screen
+  meant to show it. ⚠️ **Fixtures with no pitch get their own list**, since they appear
+  in no row.
+  ⚠️ **Still missing: Tracy's request QUEUE, the submitter's tracking view, and the
+  email.** `pitch_requests` has schema, RLS and a harness, but **nothing writes a row
+  yet** and no screen reads one. Allocation today means editing the fixture's pitch.
 - Nothing in the UI distinguishes a Medic from a Coach, because there is no
   difference in access. Deliberate — the word is what distinguishes them.
 - ⚠️ **A SUPER-ADMIN TIER IS WANTED — decided 10 Aug, NOT YET BUILT.** Candice, Nick

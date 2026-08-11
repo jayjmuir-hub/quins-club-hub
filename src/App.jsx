@@ -10,6 +10,7 @@ import AdminDashboard from './screens/AdminDashboard.jsx'
 import AdminClub from './screens/AdminClub.jsx'
 import Accounts from './screens/Accounts.jsx'
 import Pitches from './screens/Pitches.jsx'
+import Allocation from './screens/Allocation.jsx'
 import AcceptInvite from './screens/AcceptInvite.jsx'
 import Privacy from './screens/Privacy.jsx'
 import DeleteAccount from './screens/DeleteAccount.jsx'
@@ -123,6 +124,9 @@ export default function App() {
                 security — every admin can already write `pitches` — it is a
                 "you were not given this job" message. */}
             <Route path="pitches" element={<Pitches />} />
+            {/* The allocation grid — the WEEKLY job, so it sits ahead of the
+                setup screen in the tab order. Same `pitches` right. */}
+            <Route path="allocation" element={<Allocation />} />
           </Route>
 
           {/* THE COACH / TEAM MANAGER APPROVALS ROUTE (Jay, 9 Aug 2026).

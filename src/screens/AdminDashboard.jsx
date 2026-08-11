@@ -84,8 +84,15 @@ const BASE_TABS = [
 ]
 
 function tabsFor(memberships) {
+  // ⚠️ ALLOCATION COMES FIRST, and Pitches (setup) after it. Allocating is the
+  // weekly job; setting the list up is done twice a season. Tab order is the
+  // cheapest way to say which one somebody came for.
   return hasAdminRight(memberships, 'pitches')
-    ? [...BASE_TABS, { to: '/admin/pitches', label: 'Pitches' }]
+    ? [
+        ...BASE_TABS,
+        { to: '/admin/allocation', label: 'Allocation' },
+        { to: '/admin/pitches', label: 'Pitches' },
+      ]
     : BASE_TABS
 }
 
