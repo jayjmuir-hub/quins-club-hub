@@ -10,7 +10,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **The fortnight strip, the squad filters and the match pill all take the 12px corner.**
+- `d6a1f1b` — **The fortnight strip, the gender filter and the match pill all take the
+  12px corner.**
   Jay: *"things like the next two week buttons can be like the age group buttons on the
   tournament website, things like match pills etc can be similar too"*. Three changes, all
   corner-only:
@@ -18,9 +19,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   in every other respect**: white with a hairline idle, solid red for today, exactly as
   those buttons go white then red when selected. Only the corner disagreed, and 11px is
   the app's SURFACE radius, the wrong token for something you press.
-  `Roster`'s squad filters (`rounded-pill`→`rounded-tab`) — ⚠️ **the closest analogue in
-  the app** to the age-group buttons: a horizontal row of filters, white until chosen and
-  filled red when it is. It was a 100px pill.
+  `Roster`'s **gender** filter (`rounded-pill`→`rounded-tab`) — a horizontal row of
+  filters, white until chosen and filled red when it is. It was a 100px pill.
+  ❌ **`d6a1f1b` and PR #47 both call this "the squad filters" and "the closest analogue
+  to adhjrt.com's age-group buttons". It is neither.** The three controls are
+  All / Male / Female; AGE GROUP on that screen is a `<select>`, so no age-group control
+  was touched at all. Caught by verifying live after the deploy rather than by review —
+  the selector written to confirm it found zero elements, and chasing that down is what
+  exposed the mislabelling. Neither the commit message nor the PR body can be edited.
   `Chip` (`rounded-[20px]`→`rounded-tab`) — the match pill, and per `design-system.md`
   §4.7 its neutral variant is also the age-group label, so this is the single largest
   visual change in the sweep and what ties the fixture rows to the strip and the nav.
