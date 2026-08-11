@@ -109,6 +109,52 @@ describe('upsertLeagueTeam', () => {
     expect(updating.eq).toHaveBeenCalledWith('id', 'x')
   })
 
+  // ⚠️ THESE THREE EXIST BECAUSE ONE HEDGED MESSAGE COST A BUG REPORT.
+  // The file shipped saying "you may not have permission, or the name may
+  // already be in use" for every failure. Jay hit the unique constraint on
+  // 12 Aug 2026, read that, and reported a permission problem. It was not one.
+  it('⚠️ names the DUPLICATE as a duplicate, and says the rule is per SQUAD', async () => {
+    // "That name is taken" would be true and useless: the obvious next thought
+    // is "taken by whom?", and the answer is surprising — always a team in this
+    // same age group, never another one.
+    supabase.from.mockReturnValue(
+      queryStub({ data: null, error: { code: '23505', message: 'duplicate key value' } }),
+    )
+
+    await expect(
+      upsertLeagueTeam({ club_id: 'c1', team_id: 't-u14b', rcm_name: 'ADHQ1' }),
+    ).rejects.toThrow(/already has a league team called ADHQ1/i)
+
+    supabase.from.mockReturnValue(
+      queryStub({ data: null, error: { code: '23505', message: 'duplicate key value' } }),
+    )
+    await expect(
+      upsertLeagueTeam({ club_id: 'c1', team_id: 't-u14b', rcm_name: 'ADHQ1' }),
+    ).rejects.toThrow(/another age group can still use it/i)
+  })
+
+  it('⚠️ does NOT mention permission when the cause is a duplicate', async () => {
+    // The whole defect: a message that lists both causes tells the reader
+    // nothing, and sends them looking in the wrong place.
+    supabase.from.mockReturnValue(
+      queryStub({ data: null, error: { code: '23505', message: 'duplicate key value' } }),
+    )
+    await expect(
+      upsertLeagueTeam({ club_id: 'c1', team_id: 't1', rcm_name: 'ADHQ1' }),
+    ).rejects.not.toThrow(/permission/i)
+  })
+
+  it('surfaces the database\'s own message for a failure it does not recognise', async () => {
+    // Rather than a third guess. An unrecognised failure that repeats what the
+    // database said is debuggable; "something went wrong" is not.
+    supabase.from.mockReturnValue(
+      queryStub({ data: null, error: { code: '22001', message: 'value too long for type character varying(8)' } }),
+    )
+    await expect(upsertLeagueTeam({ rcm_name: 'X'.repeat(50) })).rejects.toThrow(
+      /value too long/i,
+    )
+  })
+
   it('⚠️ throws when RLS filters the write to zero rows and reports NO error', async () => {
     // This is the failure that looks like success. A non-admin's update is
     // refused by RLS as "matched no rows" — `error` is null and `data` is null.

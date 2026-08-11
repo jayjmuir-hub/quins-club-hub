@@ -144,7 +144,8 @@ export default function AdminClub() {
         // that asks for them: it is the only screen from which one can be
         // brought back. Hiding a retired team here would make it look deleted,
         // and it would then be re-added under a name that collides with
-        // league_teams_club_id_rcm_name_key.
+        // league_teams_team_id_rcm_name_key — which is scoped to the SQUAD, so
+        // the collision is always with a team in this same age group.
         return Promise.all([
           listContactsForPlayers(playerRows.map((player) => player.id)),
           listAllLeagueTeams({ includeRetired: true }),

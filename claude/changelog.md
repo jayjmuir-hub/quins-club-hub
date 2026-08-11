@@ -8,9 +8,33 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 12 Aug 2026
+
+- **A league team's name is unique per SQUAD, not per club** — and the save now says which
+  of the two things went wrong. ⚠️ **Both defects were found by Jay using the app within
+  hours of the feature shipping, and no test could have caught either.**
+  ⚠️ **`unique (club_id, rcm_name)` was wrong.** Every age group has its own ADHQ1/ADHQ2/
+  ADHQ3, one per division, so the name only identifies a team WITHIN an age group. The
+  original constraint let the club hold exactly one ADHQ1 anywhere, and blocked the second
+  age group outright. Now `unique (team_id, rcm_name)`.
+  ⚠️ **The design note that got this wrong reasoned carefully about the thing it checked.**
+  It proved a column on `teams` could not hold three league teams — true, and why this is a
+  table — then assumed without asking that names were club-unique. Jay's sentence was
+  "multiple teams at an age group"; nothing in it said the names do not repeat BETWEEN age
+  groups.
+  ⚠️ **One message naming two causes is not a message.** `upsertLeagueTeam` threw *"you may
+  not have permission, or the name may already be in use"* for every failure, so the person
+  hitting the constraint was told it might be either and reported it as a permission problem.
+  Now `23505` names the duplicate and the squad, `42501` names permission, and anything else
+  surfaces the database's own message. **The repo's rule is to read the RESPONSE rather than
+  the coloured box; a hedged message denies the user the same thing.**
+  ⚠️ **`db/tests/league-team-name-scope.sql` asserts BOTH directions** — a test that only
+  proved the second squad is now allowed would pass equally against a table with no unique
+  constraint at all.
+
 ## 11 Aug 2026
 
-- **The calendar feed names the league team** (task 8). `calendar_events_for_token()` gains
+- `8be9668` — **The calendar feed names the league team** (task 8). `calendar_events_for_token()` gains
   `league_team_name`, `league_division` and `round`; the edge function puts the team's NAME
   in `SUMMARY` (in place of the squad) and the full `ADHQ2 · Div B · Round 4` first in
   `DESCRIPTION`.
