@@ -515,6 +515,13 @@ CREATE TABLE public.events (
   opponent     text,
   home         boolean              DEFAULT true,
   venue        text,
+  -- ⚠️ MEANS "THE TOURNAMENT'S NAME" SINCE 12 Aug 2026, not "any competition".
+  -- Free text on purpose so a one-off invitational needs no migration — the app
+  -- offers four regulars and a "Something else" box, the shape the pitch picker
+  -- settled on. NULL for a league fixture and for a friendly.
+  -- ⚠️ Rows predating competition_type hold arbitrary strings with a NULL type;
+  -- the form READS those as a tournament name so nothing typed is orphaned, and
+  -- deliberately does not write the guess back.
   competition  text,
   starts_at    timestamptz NOT NULL,
   result_us    integer,
@@ -560,6 +567,21 @@ CREATE TABLE public.events (
   -- ("ADHQ2"). One squad can enter three of them, one per division.
   league_team_id uuid,
   round          smallint,
+  -- Added 2026-08-12 (competition_type). Column comment as stored:
+  --   "league | tournament. NULL means neither - a friendly - and is a real
+  --   answer, never 'assume league'. round belongs to league; competition holds
+  --   the tournament name. Deliberately NOT derived from round: a league
+  --   fixture whose round is not yet known would otherwise read as a friendly."
+  --
+  -- ⚠️ `round` NOW HANGS OFF THIS, NOT OFF league_team_id — the comment stored
+  -- against `round` above still says "null unless league_team_id is set" and is
+  -- STALE as of 12 Aug 2026. A round is a property of the COMPETITION ("round 4
+  -- of the league"), not of which of our sides turned up, and the old coupling
+  -- discarded the round on a league fixture whose team was not picked yet.
+  -- ⚠️ apply_migration strips `--` comments, and a COMMENT ON is the only way to
+  -- change a stored one — so that stale sentence is still in the database. Left
+  -- rather than silently corrected, because this file must say what is there.
+  competition_type text,
   CONSTRAINT events_pkey          PRIMARY KEY (id),
   CONSTRAINT events_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
   CONSTRAINT events_team_id_fkey    FOREIGN KEY (team_id)    REFERENCES teams(id)    ON DELETE CASCADE,
@@ -569,6 +591,11 @@ CREATE TABLE public.events (
   CONSTRAINT events_league_team_id_fkey FOREIGN KEY (league_team_id) REFERENCES league_teams(id) ON DELETE SET NULL,
   CONSTRAINT events_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id),
   CONSTRAINT events_type_check      CHECK ((type = ANY (ARRAY['match'::text, 'training'::text, 'social'::text]))),
+  -- ⚠️ NO 'friendly' VALUE, DELIBERATELY. A friendly is the ABSENCE of a
+  -- competition, so it is NULL — adding a third value would make "not answered"
+  -- and "answered: friendly" indistinguishable, which is the confusion the
+  -- league_team_id null rule exists to avoid.
+  CONSTRAINT events_competition_type_check CHECK ((competition_type = ANY (ARRAY['league'::text, 'tournament'::text]))),
   -- Added 2026-08-08 (event_end_time_and_notes). Note the `ends_at IS NULL OR`
   -- arm: a NULL end time stays legal, so the CHECK only ever fires on an end
   -- time that is actually before or equal to the start.

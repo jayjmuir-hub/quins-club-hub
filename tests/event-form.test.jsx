@@ -511,7 +511,12 @@ describe('EventForm — saving', () => {
     expect(screen.getByLabelText('Date')).toHaveValue('2026-07-30')
     expect(screen.getByLabelText('Time')).toHaveValue('20:00')
     expect(screen.getByLabelText('Opponent')).toHaveValue('Dubai Exiles')
-    expect(screen.getByLabelText('Competition')).toHaveValue('UAE Youth League')
+    // ⚠️ Competition became a SELECT on 12 Aug 2026. This fixture predates
+    // `competition_type`, so it holds free text and a null type — which the
+    // form reads as a tournament whose name is that text, keeping what somebody
+    // typed rather than orphaning it on the next save.
+    expect(screen.getByLabelText('Competition')).toHaveValue('tournament')
+    expect(screen.getByLabelText(/tournament name/i)).toHaveValue('UAE Youth League')
     expect(screen.getByRole('radio', { name: 'Home' })).toBeChecked()
 
     await user.type(screen.getByLabelText('Quins score'), '31')
@@ -610,11 +615,17 @@ describe('EventForm — saving', () => {
     await user.type(screen.getByLabelText('Opponent'), 'Jebel Ali Dragons')
     await user.clear(screen.getByLabelText('Venue'))
     await user.type(screen.getByLabelText('Venue'), 'The Sevens, Dubai')
-    await user.type(screen.getByLabelText('Competition'), 'West Asia Premiership')
+    // ⚠️ Competition is a SELECT since 12 Aug 2026, so the free-text box this
+    // test was watching for keystroke loss is now the TOURNAMENT NAME box
+    // behind it — which is the one that still takes typing, and therefore still
+    // the one that can lose it.
+    await user.selectOptions(screen.getByLabelText('Competition'), 'tournament')
+    await user.selectOptions(screen.getByLabelText(/^tournament$/i), '__other_tournament__')
+    await user.type(screen.getByLabelText(/tournament name/i), 'West Asia Premiership')
 
     expect(screen.getByLabelText('Opponent')).toHaveValue('Jebel Ali Dragons')
     expect(screen.getByLabelText('Venue')).toHaveValue('The Sevens, Dubai')
-    expect(screen.getByLabelText('Competition')).toHaveValue('West Asia Premiership')
+    expect(screen.getByLabelText(/tournament name/i)).toHaveValue('West Asia Premiership')
   })
 })
 

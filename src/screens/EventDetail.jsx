@@ -464,8 +464,23 @@ export default function EventDetail({
             before this column existed has none either. A row reading
             "Pitch — " on all of them would be noise. */}
         {event.pitch && <KeyValue label="Pitch">{event.pitch}</KeyValue>}
-        {event.type === 'match' && event.competition && (
-          <KeyValue label="Competition">{event.competition}</KeyValue>
+        {/* ⚠️ `competition` ALONE IS NO LONGER ENOUGH TO RENDER THIS ROW.
+            Since 12 Aug 2026 it holds the TOURNAMENT'S NAME and is null for a
+            league fixture, so testing it the old way made every league match
+            show no competition at all. The type is the thing to test.
+            ⚠️ THE ROUND IS REPEATED HERE ON PURPOSE. It also appears in the
+            League team row above, via fixtureLabel — but only when there IS a
+            league team, and a league fixture whose team nobody has picked yet
+            is a real state. Without this the round would be invisible in
+            exactly that case.
+            ⚠️ A row is still rendered for an OLD fixture carrying free text and
+            no type, so nothing anybody typed before today disappears. */}
+        {event.type === 'match' && (event.competition_type || event.competition) && (
+          <KeyValue label="Competition">
+            {event.competition_type === 'league'
+              ? `League${event.round != null ? ` · Round ${event.round}` : ''}`
+              : event.competition || 'Tournament'}
+          </KeyValue>
         )}
       </div>
 

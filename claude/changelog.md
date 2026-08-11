@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
+- **Competition is a CHOICE, not a free-text box** — League or Tournament, or neither.
+  Jay, 12 Aug 2026. League offers **Round 1-8**; Tournament offers **ADHJRT, Dubai Youth
+  Festival, Al Ain Tournament, Small Blacks Tournament** and a "Something else" box.
+  ⚠️ **"Neither — a friendly" is the DEFAULT and a real answer.** Nothing may read the blank
+  as "assume league" — the same rule `league_team_id` carries.
+  ⚠️ **`competition_type` is a COLUMN, not derived from `round`.** Deriving it needed no
+  migration and was wrong: a league fixture whose round nobody has entered yet would read as
+  a friendly. The type is a fact somebody states; the round is a detail they may not know.
+  ⚠️ **`round` now hangs off the COMPETITION, not off the league team.** A round is a
+  property of the competition, and the old coupling silently discarded it on a league fixture
+  whose team had not been picked. `fixtureLabel` still refuses to RENDER a round without a
+  league team — a display rule, deliberately not the same rule as what gets stored.
+  ⚠️ **`competition` now means "the tournament's name"** and is NULL for a league fixture.
+  Switching type clears the other side's answer, in the form and in the save.
+  ⚠️ **An old row with free text and no type is READ as a tournament**, keeping what somebody
+  typed. **A read, not a backfill** — the migration wrote nothing, so nothing in the database
+  can be mistaken for an answer somebody gave.
+  ⚠️ **`competition_type` rides in `common`, unlike the league fields** — an ADHJRT weekend
+  fanned out across every age group is genuinely one tournament for all of them, whereas
+  which of our teams played it is a fact about the squad.
+  ⚠️ **The tournament list is hard-coded, unlike pitches, deliberately**: the pitch list
+  became a table the day clash detection had to reason about pitches; nothing reasons about a
+  tournament, it is a label. Four regulars plus an escape hatch costs no schema.
+  ⚠️ **`EventDetail` had to change or every league match would show no competition at all** —
+  the row tested `event.competition`, which is now null for exactly those.
+
 - **A league team's name is unique per SQUAD, not per club** — and the save now says which
   of the two things went wrong. ⚠️ **Both defects were found by Jay using the app within
   hours of the feature shipping, and no test could have caught either.**

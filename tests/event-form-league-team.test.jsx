@@ -122,16 +122,22 @@ describe('EventForm — the league team field', () => {
     expect(within(select).getByText('Not a league match')).toBeInTheDocument()
   })
 
-  it('⚠️ hides Round until a league team is chosen', async () => {
-    // A round without a league team is meaningless — fixtureLabel ignores it
-    // and the save nulls it — so offering the box would invite somebody to
-    // fill in a field that is then thrown away.
+  it('⚠️ ROUND BELONGS TO THE COMPETITION, NOT TO THE LEAGUE TEAM', async () => {
+    // Changed 12 Aug 2026. Round used to appear as soon as a league team was
+    // picked. It is a property of the COMPETITION ("round 4 of the league"),
+    // not of which of our sides turned up — and the old coupling meant a league
+    // fixture whose team had not been chosen yet silently discarded the round.
     const { user } = renderForm()
 
     await screen.findByLabelText(/league team/i)
     expect(screen.queryByLabelText(/^round$/i)).not.toBeInTheDocument()
 
+    // A league TEAM alone is not enough any more.
     await user.selectOptions(screen.getByLabelText(/league team/i), 'lt-2')
+    expect(screen.queryByLabelText(/^round$/i)).not.toBeInTheDocument()
+
+    // The competition is what brings it out.
+    await user.selectOptions(screen.getByLabelText(/^competition$/i), 'league')
     expect(screen.getByLabelText(/^round$/i)).toBeInTheDocument()
   })
 
@@ -141,7 +147,8 @@ describe('EventForm — the league team field', () => {
     await screen.findByLabelText(/league team/i)
     await fillMatch(user)
     await user.selectOptions(screen.getByLabelText(/league team/i), 'lt-2')
-    await user.type(screen.getByLabelText(/^round$/i), '4')
+    await user.selectOptions(screen.getByLabelText(/^competition$/i), 'league')
+    await user.selectOptions(screen.getByLabelText(/^round$/i), '4')
     await submit(user)
 
     await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
@@ -184,21 +191,43 @@ describe('EventForm — the league team field', () => {
     expect(screen.queryByLabelText(/^round$/i)).not.toBeInTheDocument()
   })
 
-  it('⚠️ a round left behind is NOT written once the league team is cleared', async () => {
-    // The same rule fixtureLabel enforces when rendering, applied to the
-    // column: no league team means no round, whatever the input still holds.
+  it('⚠️ clearing the league team clears league_team_id but LEAVES the round', async () => {
+    // Since 12 Aug 2026 these are separate answers: the round belongs to the
+    // competition, so a fixture can be "league, round 4" while nobody has yet
+    // said which of our teams played it. ⚠️ fixtureLabel still refuses to
+    // RENDER a round without a league team — that is a display rule, and it is
+    // deliberately not the same rule as what gets stored.
     const { user } = renderForm()
 
     await screen.findByLabelText(/league team/i)
     await fillMatch(user)
+    await user.selectOptions(screen.getByLabelText(/^competition$/i), 'league')
+    await user.selectOptions(screen.getByLabelText(/^round$/i), '4')
     await user.selectOptions(screen.getByLabelText(/league team/i), 'lt-2')
-    await user.type(screen.getByLabelText(/^round$/i), '4')
     await user.selectOptions(screen.getByLabelText(/league team/i), '')
     await submit(user)
 
     await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
     expect(upsertEventMock.mock.calls[0][0]).toMatchObject({
       league_team_id: null,
+      round: 4,
+    })
+  })
+
+  it('⚠️ but a round IS dropped once the fixture stops being a league match', async () => {
+    // The rule that survived the change, moved to the field it now hangs off.
+    const { user } = renderForm()
+
+    await screen.findByLabelText(/league team/i)
+    await fillMatch(user)
+    await user.selectOptions(screen.getByLabelText(/^competition$/i), 'league')
+    await user.selectOptions(screen.getByLabelText(/^round$/i), '4')
+    await user.selectOptions(screen.getByLabelText(/^competition$/i), '')
+    await submit(user)
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
+    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({
+      competition_type: null,
       round: null,
     })
   })
@@ -226,6 +255,7 @@ describe('EventForm — the league team field', () => {
         starts_at: '2026-09-12T05:00:00.000Z',
         ends_at: '2026-09-12T06:30:00.000Z',
         league_team_id: 'lt-2',
+        competition_type: 'league',
         round: 4,
         result_us: null,
         result_them: null,
@@ -235,7 +265,7 @@ describe('EventForm — the league team field', () => {
     // ⚠️ Must NOT be cleared on mount — the squad-change effect is keyed off a
     // ref for exactly this case.
     await waitFor(() => expect(screen.getByLabelText(/league team/i)).toHaveValue('lt-2'))
-    expect(screen.getByLabelText(/^round$/i)).toHaveValue(4)
+    expect(screen.getByLabelText(/^round$/i)).toHaveValue('4')
   })
 
   it('says so when the squad has no league teams yet', async () => {
