@@ -477,6 +477,16 @@ Two consequences:
 - ⚠️ **`(Get-Content f | Measure-Object -Line).Lines` DOES NOT COUNT BLANK LINES.** It
   reported 1,428 for a 1,573-line file, which reads as a plausible answer rather than a
   wrong one. Use `(Get-Content f).Count`.
+⚠️ **`npm run docs:check` PASSING LOCALLY BEFORE YOU COMMIT DOES NOT PREDICT CI.** Its
+coverage check runs `git log <baseline>..HEAD~1` — the `~1` is the deliberate allowance
+that a commit cannot cite its own SHA. So running it in a dirty tree tests whether the
+PREVIOUS commit is recorded, not the one you are about to write. The moment you commit,
+your work becomes `HEAD~1` and CI demands its predecessor be cited. **Run it again after
+committing, or expect a red `docs-check` on a PR that was green on your machine.**
+⚠️ And the SHA only counts **at the start of a bullet** — the pattern is
+`/^-\s+\`([0-9a-f]{7,40})\`/`. Naming a SHA mid-paragraph, however prominently, is
+invisible to the check.
+
 - ⚠️ **`Select-String -SimpleMatch` WITH A REGEX-ESCAPED PATTERN FINDS NOTHING, SILENTLY.**
   `-SimpleMatch` takes the pattern literally, backslashes included, so
   `-Pattern "rgb\(200 16 46\)" -SimpleMatch` hunts for a string containing actual
