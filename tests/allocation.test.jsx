@@ -30,6 +30,19 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 // `importActual` keeps findPitchClashes and PITCH_TBD real, which matters: the
 // clash exemptions are the part worth testing, and a stubbed clash detector
 // would only be testing the stub.
+// ⚠️ MOCKED BECAUSE AN UNMOCKED DATA MODULE MAKES A REAL NETWORK CALL, and
+// that is environment-dependent in a way that is invisible here. CI sets
+// PLACEHOLDER Supabase env vars, so the client constructs happily and then
+// tries to reach placeholder.supabase.co: locally DNS fails instantly and the
+// `.catch` runs, in CI it does not resolve fast enough and Promise.all never
+// settles — so the screen sits in `loading` and every query fails with
+// "unable to find an element". Green here, red on Linux, twice.
+vi.mock('../src/data/pitchRequests.js', () => ({
+  listPitchRequests: () => Promise.resolve([]),
+  allocatePitch: () => Promise.resolve({}),
+  declinePitch: () => Promise.resolve({}),
+}))
+
 vi.mock('../src/data/pitches.js', async () => {
   const actual = await vi.importActual('../src/data/pitches.js')
   return { ...actual, listPitches: (...a) => listPitchesMock(...a) }

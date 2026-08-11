@@ -4,6 +4,7 @@ import Button from '../components/Button.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listEvents } from '../data/events.js'
 import { listPitches, findPitchClashes, PITCH_TBD } from '../data/pitches.js'
+import { listPitchRequests, allocatePitch, declinePitch } from '../data/pitchRequests.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
 import { clubToday, eventDate, eventEndDate, eventTitle, formatTime } from '../lib/eventFormat.js'
@@ -117,11 +118,18 @@ export function rowsFor(pitches, events) {
 
 export default function Allocation() {
   const { memberships, teams } = useMemberships()
+  const [requests, setRequests] = useState([])
+  const [deciding, setDeciding] = useState(null)
+  const [chosenPitch, setChosenPitch] = useState('')
+  const [reason, setReason] = useState('')
+  const [decideBusy, setDecideBusy] = useState(false)
+  const [decideError, setDecideError] = useState(null)
   const [day, setDay] = useState(() => clubToday())
   const [events, setEvents] = useState([])
   const [pitches, setPitches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   const teamIds = useMemo(() => visibleTeams(memberships, teams).map((team) => team.id), [memberships, teams])
   const teamsById = useMemo(() => new Map((teams ?? []).map((team) => [team.id, team])), [teams])
@@ -134,11 +142,17 @@ export default function Allocation() {
     Promise.all([
       listEvents({ teamIds, from: window.from, to: window.to }),
       listPitches({ includeRetired: true }),
+      // ⚠️ THE QUEUE IS NOT FILTERED BY THE DAY ON SCREEN. A request is a job
+      // waiting to be done, not a thing that happens on a date — filtering it
+      // to the visible day would hide next Saturday's requests every weekday
+      // and the queue would look empty precisely when there is work.
+      listPitchRequests({ status: 'submitted' }).catch(() => []),
     ])
-      .then(([eventRows, pitchRows]) => {
+      .then(([eventRows, pitchRows, requestRows]) => {
         if (!mounted) return
         setEvents(eventRows)
         setPitches(pitchRows)
+        setRequests(requestRows)
       })
       .catch((failure) => {
         if (!mounted) return
@@ -151,7 +165,7 @@ export default function Allocation() {
     return () => {
       mounted = false
     }
-  }, [teamIds, window.from, window.to])
+  }, [teamIds, window.from, window.to, reloadToken])
 
   const hours = useMemo(() => hourRange(events), [events])
   const rows = useMemo(() => rowsFor(pitches, events), [pitches, events])
@@ -172,6 +186,21 @@ export default function Allocation() {
     () => events.filter((event) => !(event.pitch ?? '').trim() || event.pitch === PITCH_TBD),
     [events],
   )
+
+  async function decide(work) {
+    setDecideBusy(true)
+    setDecideError(null)
+    try {
+      await work()
+      setDeciding(null)
+      // Refetch both: allocating writes the FIXTURE, so the grid is stale too.
+      setReloadToken((token) => token + 1)
+    } catch (failure) {
+      setDecideError(failure)
+    } finally {
+      setDecideBusy(false)
+    }
+  }
 
   if (!hasAdminRight(memberships, 'pitches')) {
     return (
@@ -308,6 +337,135 @@ export default function Allocation() {
               ]
             })}
           </div>
+        </Card>
+      )}
+
+      {/* ── Tracy's queue ────────────────────────────────────────────────
+          ⚠️ NOT FILTERED BY THE DAY ON SCREEN — see the fetch. A request is a
+          job waiting, not an event on a date. */}
+      {requests.length > 0 && (
+        <Card className="mt-3.5 p-3.5">
+          <h3 className="mb-2.5 text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+            Requests waiting ({requests.length})
+          </h3>
+
+          <ul className="flex flex-col gap-2.5">
+            {requests.map((request) => {
+              const fixture = request.events
+              const start = fixture ? eventDate(fixture) : null
+              const open = deciding === request.id
+              return (
+                <li key={request.id} data-testid="pitch-request" className="rounded-[11px] border border-line p-2.5">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <span className="text-sm font-bold text-ink">
+                      {teamsById.get(fixture?.team_id)?.name ?? 'Squad'}
+                    </span>
+                    <span className="text-[12.5px] text-ink-muted">
+                      {start
+                        ? `${start.toLocaleDateString(undefined, { timeZone: 'Asia/Dubai', weekday: 'short', day: 'numeric', month: 'short' })} · ${formatTime(start)}`
+                        : 'Date unknown'}
+                    </span>
+                    {request.needs_referee && (
+                      <span className="rounded-pill bg-surface-mute px-2.5 py-0.5 text-[11.5px] font-bold text-ink-muted">
+                        Referee
+                      </span>
+                    )}
+                    <span className="flex-1" />
+                    {!open && (
+                      <Button size="sm" onClick={() => {
+                        setDeciding(request.id)
+                        setChosenPitch('')
+                        setReason('')
+                        setDecideError(null)
+                      }}>
+                        Answer
+                      </Button>
+                    )}
+                  </div>
+
+                  {request.note && (
+                    <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">{request.note}</p>
+                  )}
+
+                  {open && (
+                    <div className="mt-2.5 flex flex-wrap items-end gap-2">
+                      <label className="min-w-0">
+                        <span className="mb-1 block text-[11.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+                          Give them
+                        </span>
+                        <select
+                          aria-label={`Pitch for ${teamsById.get(fixture?.team_id)?.name ?? 'this request'}`}
+                          value={chosenPitch}
+                          disabled={decideBusy}
+                          onChange={(domEvent) => setChosenPitch(domEvent.target.value)}
+                          className="rounded-[8px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-sm text-ink outline-none transition focus:border-brand"
+                        >
+                          <option value="">Choose a pitch</option>
+                          {pitches.filter((pitch) => pitch.is_active).map((pitch) => (
+                            <option key={pitch.id} value={pitch.name}>{pitch.name}</option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <Button
+                        size="sm"
+                        disabled={decideBusy || !chosenPitch}
+                        onClick={() => decide(() =>
+                          allocatePitch({
+                            requestId: request.id,
+                            eventId: request.event_id,
+                            pitch: chosenPitch,
+                          }),
+                        )}
+                      >
+                        {decideBusy ? 'Saving…' : 'Allocate'}
+                      </Button>
+
+                      <label className="min-w-0 flex-1">
+                        <span className="mb-1 block text-[11.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+                          Or say why not
+                        </span>
+                        <input
+                          type="text"
+                          aria-label="Reason for declining"
+                          value={reason}
+                          disabled={decideBusy}
+                          onChange={(domEvent) => setReason(domEvent.target.value)}
+                          placeholder="All pitches taken that morning"
+                          className="w-full rounded-[8px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-[16px] text-ink outline-none transition focus:border-brand"
+                        />
+                      </label>
+
+                      {/* ⚠️ A REASON IS REQUIRED TO DECLINE. "No pitch
+                          available" with nothing after it leaves a coach with
+                          nothing to act on — and because a decline never shows
+                          on the fixture, this note is the only thing they get. */}
+                      <Button
+                        variant="dangerQuiet"
+                        size="sm"
+                        disabled={decideBusy || !reason.trim()}
+                        onClick={() => decide(() =>
+                          declinePitch({ requestId: request.id, reason }),
+                        )}
+                      >
+                        Decline
+                      </Button>
+
+                      <Button variant="ghost" size="sm" disabled={decideBusy} onClick={() => setDeciding(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+
+                  {open && decideError && (
+                    <p role="alert" className="mt-2 text-[12.5px] font-semibold text-brand-deep">
+                      {decideError.message || "That didn't save. Try again."}
+                    </p>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         </Card>
       )}
 

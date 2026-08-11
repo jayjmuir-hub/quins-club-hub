@@ -35,3 +35,28 @@ beforeEach(() => {
     // Some environments refuse storage access entirely. Nothing to clear.
   }
 })
+
+// ⚠️ UNIT TESTS MUST MOCK EVERY DATA MODULE THEIR COMPONENT IMPORTS.
+//
+// This is a working rule rather than an enforced one, and it has cost two
+// rounds of CI failures. A screen test that renders a component whose data
+// module is NOT mocked makes a genuine request. CI sets PLACEHOLDER Supabase
+// env vars (see .github/workflows/test.yml), so the client constructs happily
+// and then reaches for placeholder.supabase.co — and the environments differ:
+// locally it fails fast and the component's `.catch` runs, in CI it does not,
+// `Promise.all` never settles, and the screen sits in `loading`.
+//
+// The symptom is several copies of "unable to find an element", naming
+// nothing, on a suite that is green on the machine that wrote it. Local green
+// is not evidence, and the error points at the assertion rather than the cause.
+//
+// ⚠️ A GLOBAL `fetch` GUARD WAS TRIED HERE ON 11 Aug 2026 AND REMOVED AGAIN.
+// It did make local behaviour match CI, but it did NOT surface the explanatory
+// message it existed to give — the throw is swallowed by the component's own
+// `.catch`, and the mechanism could not be pinned down. A guard whose comment
+// promises a clear failure and delivers a silent one is worse than none, so it
+// was taken out rather than shipped on a claim that could not be
+// substantiated. Doing it properly is a real piece of work: it needs to
+// intercept the client's transport, not the global.
+//
+// `tests/allocation.test.jsx` carries the worked example of the rule.

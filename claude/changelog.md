@@ -10,6 +10,51 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **11 Aug — the pitch request LOOP closes: a coach asks, Tracy answers, the coach
+  sees the outcome.** `PitchRequest` on the event sheet, and a queue on the allocation
+  screen. `pitch_requests` finally has something writing to it.
+  ⚠️ **`events.pitch` REMAINS THE ONLY SOURCE OF TRUTH for which pitch** — Jay's
+  ruling. The request table records the CONVERSATION and has no pitch column; a second
+  copy would disagree with the fixture the moment anyone edited the fixture directly.
+  The accepted cost: you cannot ask "what did Tracy allocate, and has it changed
+  since?", only "was this answered?".
+  ⚠️ **A DECLINE IS INVISIBLE ON THE FIXTURE — also Jay's ruling.** It keeps
+  `Pitch TBD`, which still reads "not allocated yet". So the request block is the ONLY
+  route to that fact, which is why it renders for a DECIDED request too and why the
+  decline reason is required rather than optional: "declined" with no reason leaves a
+  coach nothing to act on.
+  ⚠️ **ALLOCATING WRITES THE FIXTURE FIRST, THEN CLOSES THE REQUEST.** Closing first
+  and then failing would tell the coach they have a pitch while the schedule still
+  said `Pitch TBD`. This way a failure leaves the request OPEN and the fixture
+  correct — a job still to do rather than a lie. **Not atomic** (no transaction over
+  PostgREST); the order is the mitigation, not a fix. Proved by swapping it: three
+  tests fail.
+  ⚠️ **THE QUEUE IS NOT FILTERED BY THE DAY ON SCREEN.** A request is a job waiting,
+  not an event on a date — filtering to the visible day would hide next Saturday's
+  requests every weekday, so the queue would look empty exactly when there is work.
+  ⚠️ **The request block takes NO handler**, unlike the availability and register
+  blocks beside it — each of which shipped a dead button when a screen forgot to pass
+  one. Nothing here can be wired up wrongly by the next caller.
+  ⚠️ **AND CI CAUGHT THE SAME CLASS OF FAILURE A SECOND TIME.** Five allocation screen
+  tests: green here, red on Linux, twice in one evening. The cause both times was an
+  **unmocked data module** — the component reached for `placeholder.supabase.co` (CI
+  sets placeholder env vars, so the client constructs happily), which fails fast
+  locally and does not in CI, leaving `Promise.all` unsettled and the screen in
+  `loading`. The symptom is several "unable to find an element" errors naming nothing.
+  ⚠️ **A global `fetch` guard was written to catch this class permanently, and then
+  REMOVED.** It did make local match CI, but it did not produce the explanatory
+  message it existed to give — the throw is swallowed by the component's own `.catch`
+  — and the mechanism could not be pinned down. **A guard whose comment promises a
+  clear failure and delivers a silent one is worse than no guard**, so it was taken
+  out rather than shipped on a claim that could not be substantiated. The rule is
+  written into `src/test/setup.js` instead, with the worked example in the test.
+  ⚠️ **The identity comes from the client library at write time, not a prop or a React
+  context.** RLS checks `auth.uid()` against the token the request is sent with, so
+  that is the only id that can be right — and requiring a context broke six unrelated
+  event-sheet tests the moment the component was added, because those screens render
+  without an AuthProvider.
+- `9fa06c0` — **The allocation grid — pitches down the side, the day across the top.**
+
 - **11 Aug — the ALLOCATION GRID (option C).** `/admin/allocation`: pitches down the
   side, the day across the top, clashes in amber. The screen the pitch work existed
   for — a Saturday morning fits on one view and a double booking reads without reading
