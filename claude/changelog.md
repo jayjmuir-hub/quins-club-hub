@@ -10,6 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **Two specs for Candice's match sheets, and the brainstorm found a modelling gap that
+  would have wasted the build.** `claude/plans/2026-08-11-league-teams-and-fixtures.md`
+  and `claude/plans/2026-08-11-match-sheets.md`, split because the work spans EventForm,
+  Schedule, the calendar feed and the allocation grid before a sheet is even rendered.
+  ⚠️ **"MATCH SHEET" IS NOT A CLUB REPORT — it is the RCM Official Match Result Sheet**,
+  a governing-body form returned per team per game, submitted to a WhatsApp group as a
+  file or photo. Jay supplied a filled example, which settled the format outright.
+  ⚠️ **THE SAME FORM HAS TWO DEADLINES ON OPPOSITE SIDES OF THE MATCH**: U11–U16 within
+  24 hours AFTER, U18 one hour BEFORE kick-off. Jay described it as an after-the-match
+  report, which is true of the age groups he had in mind and not of U18.
+  ⚠️ **THE GAP THAT MATTERED: two different things here are both called "team".** A
+  SQUAD (`U14B Contact`) is a training group and is all the app models; a LEAGUE TEAM
+  (`ADHQ2`) is a competing entity in one division, and each age group can field three.
+  A first design storing one RCM name per squad was agreed and then withdrawn when Jay
+  said so — one column cannot hold three teams. ⚠️ **And the letter in a squad name is
+  GENDER, not division**: `U14B` is Boys. Anything parsing a division out of `teams.name`
+  reads the gender instead.
+  ⚠️ **Measured while designing, and it shapes the build: 7 players in the whole
+  database, 0 with a position, 0 captains, and `attendance` still empty.** A 22-man sheet
+  cannot be built from a 7-player roster and there is deliberately no import — so names
+  are stored as TEXT alongside the optional `player_id`, which is the load-bearing
+  decision in the project. Auto-filling from the register is deferred for the same
+  reason the attendance flags are.
+
+- `0ef43d4` — **Corrected what the Roster pill change actually was** — the gender filter,
+  not the squad or age-group one.
+
 - `d6a1f1b` — **The fortnight strip, the gender filter and the match pill all take the
   12px corner.**
   Jay: *"things like the next two week buttons can be like the age group buttons on the
