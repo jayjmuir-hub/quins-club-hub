@@ -60,6 +60,34 @@ infrastructure.
   ⚠️ Structural, not a width: every other item in that row is `shrink-0`, so the
   wordmark absorbs all overflow. The name is painted only at `wide`.
 
+### As of 11 Aug 2026
+
+A single long session, all of it shipped to `main` and live. **Nothing below is
+half-built** — where something is missing it says so.
+
+- **The whole pitch stack landed**: `public.pitches` (the club's real fifteen), clash
+  detection, the setup screen, the allocation grid, the request loop, and the email.
+  Detail is in §Rulings under the pitch entry — it is long because Jay ruled on most
+  of it.
+- **The super-admin tier and per-admin rights are live**, with Jay's two accounts as
+  the only supers.
+- **`private.can_edit_team` now checks membership STATUS.** It did not, so a PENDING
+  staff member could edit their squad's events. Harness:
+  `db/tests/rls-can-edit-team-status.sql`.
+- **A series can be edited, not only cancelled**, via `set_series_time_from` — the one
+  `SECURITY INVOKER` function in the schema, deliberately.
+- **Admin event reads are paged** (`fetchAllPages`, `MAX_TOTAL_ROWS = 5000`) and the
+  schedule uses a rolling window (`src/lib/eventWindow.js`, 12 months back, 6
+  forward). PostgREST's `db-max-rows` is 1000, so an unbounded read was silently
+  truncating rather than failing.
+- **Buttons all route through `<Button>`**, and phone overflow was fixed for real —
+  `harness/check-overflow.mjs` is the gate.
+
+⚠️ **`bfcb571` is not yet in `claude/changelog.md`, and that is correct.**
+`docs-check` allows the changelog to be exactly one commit behind, because a commit
+cannot cite its own SHA. **The NEXT PR must add it.** This is not a nicety: the check
+went red on PR #37 for exactly this reason, having been skipped once already on #36.
+
 ### ⚠️ Test data currently in the live database
 
 Two sets, both to be removed before a pilot:
@@ -470,6 +498,13 @@ union all select 'memberships', count(*) from memberships;
 
 -- what is actually applied
 select version, name from supabase_migrations.schema_migrations order by version desc limit 20;
+
+-- WHO IS ACTUALLY EMAILED when a coach asks for a pitch. Do not assume Tracy is
+-- on this list — as of 11 Aug she holds no right and it returns Jay twice.
+select p.full_name, m.is_super, m.admin_rights
+from memberships m join profiles p on p.id = m.profile_id
+where m.role = 'admin' and m.status = 'active'
+  and (m.is_super or m.admin_rights @> array['pitches']::text[]);
 ```
 
 For the test suite, run `npm test`. ⚠️ **No count belongs in this file**: previous
@@ -540,8 +575,8 @@ state; trust the decisions for reasoning.**
   (`can_edit_team`), an admin answers (`is_admin`), and the requester can track it to
   the outcome. Referee is a tickbox on the same request. Harness:
   `db/tests/rls-pitch-requests.sql`.
-  ⚠️ **NO SCREEN AND NO EMAIL YET.** Jay asked for two dashboards and email to
-  multiple people; neither is built. Nothing writes a `pitch_requests` row today.
+  ~~⚠️ **NO SCREEN AND NO EMAIL YET.**~~ ✅ **All three shipped 11 Aug** — setup
+  screen, allocation grid, request loop, and the email. See below.
   ✅ **The pitch SETUP screen is live** — `/admin/pitches`, blocks as columns, behind
   the `pitches` admin right (which gates the screen, not the data). Rename, retire,
   bring back, add. ⚠️ **The block is derived from the name, not stored**; `Other` is a
@@ -561,23 +596,59 @@ state; trust the decisions for reasoning.**
   ⚠️ **Allocating writes the fixture FIRST, then closes the request** — not atomic,
   and the order is the mitigation: a failure leaves the request open and the fixture
   correct rather than telling a coach they have a pitch they do not have.
-  ⚠️ **STILL MISSING: THE EMAIL.** Jay asked for email to multiple people on submit
-  and on decision; none is sent. The loop works entirely in-app today.
+  ✅ **AND THE EMAIL IS LIVE** (11 Aug, `bfcb571`): Pitch Managers **and super
+  admins** are mailed when a request is asked, the requesting coach when it is
+  answered. Trigger `private.notify_pitch_request` → edge function
+  `notify-pitch-request`.
+  ⚠️ **IT HAS TO BE SERVER-SIDE, and that is not a style choice.** The submit mail
+  goes to admins, and **a coach cannot read admin email addresses** — `profiles` is
+  not bulk-readable by one and `profiles.email` is COLUMN-granted, not merely
+  policy-gated. Sending from the app would need either the club's admin list in every
+  coach's browser or a service-role key in it.
+  ⚠️ **Super admins are recipients deliberately** — a super holds every right
+  implicitly, so filtering on the `pitches` right alone would exclude the one person
+  certain to be able to act.
+  ⚠️ **RIGHT NOW THAT IS THE ONLY REASON ANYONE IS MAILED: Tracy has NOT been granted
+  the Pitch Manager right**, so both current recipients are Jay's own two accounts.
+  Grant it on the Accounts screen and she joins automatically. **Measure this, do not
+  trust it** — the query is in §Numbers.
+  ⚠️ **THE FAILURE IS QUIET, and an earlier claim in this session that it would be
+  "visible" was wrong.** Both triggers swallow everything into a `raise warning`
+  nobody reads. That is survivable ONLY because **the queue is in-app**: the request
+  is on the allocation screen whether or not the mail arrives. **The email is a prompt
+  to go and look, never the record.**
+  ⚠️ **No vitest coverage exists or can** — a Postgres trigger and a Deno function are
+  not modules the suite can import. It was verified live instead, all three branches.
 - Nothing in the UI distinguishes a Medic from a Coach, because there is no
   difference in access. Deliberate — the word is what distinguishes them.
-- ⚠️ **A SUPER-ADMIN TIER IS WANTED — decided 10 Aug, NOT YET BUILT.** Candice, Nick
-  and Tracy are ordinary admins and keep full sight of children's data ("trusted
-  volunteers"), but **granting access, and some functions yet to be specified, become
+- ✅ **THE SUPER-ADMIN TIER IS BUILT** (11 Aug), decided 10 Aug. Candice, Nick and
+  Tracy are ordinary admins and keep full sight of children's data ("trusted
+  volunteers"), but **granting access, and the per-admin rights below, are
   super-admin-only**. The tier restricts AUTHORITY, not SIGHT.
-  ⚠️ **It must be a FLAG, not a role value.** Twelve places in the schema test
+  ⚠️ **It is a FLAG (`memberships.is_super`), not a role value** — and that was the
+  design decision, not an implementation detail. Twelve places in the schema test
   `m.role = 'admin'`; a new role value would have to be added to all twelve, and each
-  is a chance to miss one — where a miss silently strips a super admin of an ordinary
+  is a chance to miss one, where a miss silently strips a super admin of an ordinary
   power. A boolean makes a super admin an admin, so all twelve keep working.
-  ⚠️ **THE TRAP: `memb manage` is FOR ALL and admin-only, so any admin can already
-  write membership rows** — a naive column lets any admin set it on themselves and
-  the tier is decoration. Needs a COLUMN grant plus a `SECURITY DEFINER` RPC, the
-  same shape as `profiles.email` and `approve_membership`. ⚠️ **The first super admin
-  must be set by hand in SQL**; none can exist to grant it.
+  ⚠️ **THE TRAP IT HAD TO BEAT: `memb manage` is FOR ALL and admin-only, so any admin
+  can already write membership rows** — a naive column would let any admin set it on
+  themselves and the tier would be decoration. Solved the same way as `profiles.email`
+  and `approve_membership`: a **COLUMN grant** plus the `SECURITY DEFINER` RPC
+  `public.set_admin_rights`. ⚠️ **Policies authorise the ROW; grants authorise the
+  COLUMN.** Getting only the policy right leaves the hole wide open.
+  ⚠️ **The first super admin was set by hand in SQL**, as it had to be — none can
+  exist to grant it. Harness: `db/tests/rls-super-admin.sql`.
+  ✅ **Per-admin RIGHTS ride on it** — `youth`, `media`, `pitches`
+  (`ADMIN_RIGHTS` in `src/lib/scope.js`), granted by a super admin on the Accounts
+  screen. ⚠️ **A SUPER ADMIN HOLDS EVERY RIGHT IMPLICITLY** — `hasAdminRight` returns
+  true for a super without the right being listed, or Jay would have to grant himself
+  each new right as he invents it. **Every consumer must honour that**, including the
+  pitch email's recipient query; forgetting it excludes the one person certain to be
+  able to act.
+  ⚠️ **THE RIGHTS GATE SCREENS, NOT DATA — deliberately.** The RLS policy behind
+  `pitches` is plain `is_admin`. A right decides which dashboard somebody is SHOWN;
+  it is a "not your job" message, **not a security boundary**, and must never be
+  described as one.
   ⚠️ **Still true and chosen knowingly: each of the three holds every child's name,
   photo and parent contact details, club-wide, with the power to edit or delete.**
   Reasoning: `claude/decisions/2026-08-10-role-dashboards.md`.
@@ -588,7 +659,21 @@ state; trust the decisions for reasoning.**
   schedule restructure that was designed, agreed and dropped once real data showed it
   was unnecessary. Take some registers first.
 - **Nobody is emailed when an access REQUEST arrives.** ⚠️ Not to be confused with
-  the approval emails, which fire for a pending REGISTRATION.
+  the approval emails, which fire for a pending REGISTRATION. ⚠️ **As of 11 Aug this
+  is cheap** — `notify-pitch-request` is the second instance of the trigger → edge
+  function → Resend pattern, so a third is a copy with a different recipient query.
+  It reuses `approval_notify_secret`; a new one only needs its own `*_notify_url`
+  vault entry, and that should be DERIVED from `approval_notify_url` in SQL so the
+  host cannot drift and so nobody handles a value by hand.
+- **Deferred by Jay, still deferred:** test data cleanup, and the `group_id`
+  multi-squad edit/cancel. **Never started, in priority order Jay gave them:**
+  Candice's youth dashboard (match sheets → WhatsApp), Nick's social-media dashboard,
+  training plans for the head of rugby performance.
+  ⚠️ **The AI features Jay brainstormed (Smart Comms, NL queries, match reports, auto
+  lineup) ALL need one ruling first: whether children's data may leave the club for a
+  third-party API.** Nobody has asked him. **Do not start any of them until he has
+  answered** — the attendance-flag item below is the only one that dodges it, by being
+  plain SQL.
 - A parent has never signed out in a real browser. The RLS-refusal path is still
   mock-only for both events features.
 
