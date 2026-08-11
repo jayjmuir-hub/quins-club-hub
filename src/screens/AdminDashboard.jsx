@@ -96,13 +96,32 @@ function tabsFor(memberships) {
     : BASE_TABS
 }
 
+// ⚠️ MODELLED ON adhjrt.com's AGE-GROUP TABS — Jay, 11 Aug 2026, who asked for
+// "the tabs on the adhjrt.com website". The spec was MEASURED off the live site
+// with getComputedStyle rather than eyeballed from a screenshot:
+//
+//   border-radius  12px            (not the 100px pill this used to be)
+//   border         0.8px solid     stone when inactive, the red when active
+//   inactive       white fill, BLACK text
+//   active         red fill
+//
+// ⚠️ ONE THING IS DELIBERATELY NOT COPIED: adhjrt.com puts BLACK text on the
+// red active tab. Measured there it is 4.38:1, which already fails WCAG AA for
+// 13px bold (the 4.5:1 threshold — bold only counts as "large text" at 18.66px
+// and up). Against THIS app's darker red (`brand` #c8102e) the same choice
+// would be 3.57:1, materially worse. White on #c8102e is 5.88:1 and is what
+// ships here. The look is copied; the contrast bug is not.
+//
+// The inactive label is `text-ink` rather than the old `text-brand`: on
+// adhjrt.com an unselected tab is black-on-white (18.85:1 here), and red text
+// on every tab was part of what made this row read as buttons.
 function tabClassName({ isActive }) {
   return [
-    'rounded-pill px-4 py-2 text-sm font-bold transition',
+    'rounded-tab px-4 py-2 text-sm font-bold transition',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
     isActive
       ? 'bg-brand text-white'
-      : 'bg-surface-card text-brand shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT)] hover:bg-surface-mute',
+      : 'bg-surface-card text-ink shadow-[inset_0_0_0_1px_theme(colors.line.DEFAULT)] hover:bg-surface-mute',
   ].join(' ')
 }
 

@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **The `/admin` tabs are modelled on adhjrt.com's, and the spec was MEASURED rather
+  than eyeballed.** Jay: *"i want them like the tabs on the adhjrt.com website"*, after
+  noticing the pills disagreed with the site-wide 8px button rule. `getComputedStyle` on
+  the live age-group tabs there gives **12px radius, 0.8px border, white fill idle, red
+  fill active** — so a new `rounded-tab` token (12px), ⚠️ **deliberately neither `btn`
+  (8px) nor `card` (16px)**: a tab is softer than a control you press and tighter than
+  the surface it sits on, and reusing `btn` would keep the row reading as buttons, which
+  is what prompted the change.
+  ⚠️ **ONE THING WAS DELIBERATELY NOT COPIED: adhjrt.com puts BLACK text on the red
+  active tab.** Measured there it is **4.38:1** — already failing WCAG AA, since 13px
+  bold does not qualify as large text (that needs 18.66px+). Against this app's darker
+  red (`brand` #c8102e) the same choice measures **3.57:1**. White on #c8102e is
+  **5.88:1** and is what ships. **The look is copied; the contrast bug is not.**
+  ⚠️ Also worth knowing: the tab row was NOT covered by the 10 Aug button sweep, which
+  excluded tabs and pills on purpose — but that decision's own closing section said
+  nobody had audited whether each raw control was still right, and called it a design
+  question. This is that question being answered, not a ruling being overturned.
+  ⚠️ **A TAILWIND CONFIG CHANGE NEEDS THE DEV SERVER RESTARTED; a class change does
+  not.** The first render came back `borderRadius: 0px`, which looks exactly like a
+  typo. Every pre-existing token applied correctly and only the NEW one was missing —
+  that asymmetry is the tell. Verified in the built CSS too, with a fabricated token as
+  the control emitting zero rules.
+
+- `c06e51a` — **Claude Code's auto-scaffolded `.claude/launch.json` is gitignored**, and
+  the deploy cost recorded. See the two entries below, which this commit shipped.
+
 - **A deploy costs 15 Netlify credits, and that is now written down.** `rules.md` tells
   every session to look the figure up in `CLAUDE.md`; it had never been recorded, so
   deploys were described as vaguely expensive and no session could say what a build was
