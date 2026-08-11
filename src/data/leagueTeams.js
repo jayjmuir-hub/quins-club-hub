@@ -11,8 +11,31 @@ import { supabase } from '../lib/supabase'
 // ⚠️ THE LETTER IN A SQUAD NAME IS GENDER, NOT DIVISION. "U14B Contact" is U14
 // BOYS. Never derive a division from a squad name; read `division` here.
 
-const REFUSED =
-  "We couldn't save that league team. You may not have permission, or the name may already be in use."
+// ⚠️ ONE MESSAGE NAMING TWO CAUSES IS NOT A MESSAGE, AND THIS FILE SHIPPED
+// WITH ONE. It read "you may not have permission, or the name may already be
+// in use" — so when Jay hit the unique constraint on 12 Aug 2026 the app told
+// him it might be either, and he could not tell which. He reported it as a
+// permission problem. It was not. The repo's own rule is to read the RESPONSE
+// rather than the coloured box; a hedged message denies the person using the
+// app the same thing.
+//
+// So the codes are distinguished. `error.code` is PostgREST's passthrough of
+// the SQLSTATE.
+const DUPLICATE_NAME = '23505' // unique_violation
+const NOT_PERMITTED = '42501' // insufficient_privilege
+
+const REFUSED_PERMISSION =
+  "We couldn't save that league team — you may not have permission to change this club's teams."
+
+/**
+ * ⚠️ SAYS WHICH SQUAD, AND SAYS THE SCOPE OF THE RULE. "That name is taken" is
+ * true and useless here, because the obvious next thought — "taken by whom?" —
+ * has a surprising answer: names only have to differ WITHIN a squad, so the
+ * clash is always with a team in this same age group and never with another.
+ */
+function duplicateNameMessage(name) {
+  return `This squad already has a league team called ${name}. Names only need to be different within one squad, so another age group can still use it.`
+}
 
 /**
  * Every league team for one squad, in display order.
@@ -81,11 +104,22 @@ export async function upsertLeagueTeam(leagueTeam) {
     : supabase.from('league_teams').insert(fields).select().maybeSingle()
 
   const { data, error } = await query
-  if (error) throw new Error(REFUSED)
+  if (error) {
+    if (error.code === DUPLICATE_NAME) throw new Error(duplicateNameMessage(fields.rcm_name))
+    if (error.code === NOT_PERMITTED) throw new Error(REFUSED_PERMISSION)
+    // ⚠️ THE REAL MESSAGE FOR ANYTHING ELSE, rather than a third guess. The
+    // Pitches screen already renders `saveError.message` verbatim for the same
+    // reason: an unrecognised failure that says what the database said is
+    // debuggable, and one that says "something went wrong" is not.
+    throw new Error(error.message || REFUSED_PERMISSION)
+  }
   // ⚠️ RLS FILTERS AN UPDATE TO ZERO ROWS RATHER THAN RAISING, so a refusal
   // arrives here as `data === null` with no error at all. Without this branch a
   // non-admin's rename would report success and change nothing.
-  if (!data) throw new Error(REFUSED)
+  // ⚠️ THIS BRANCH IS GENUINELY ONLY EVER PERMISSION. A unique violation raises
+  // (23505) and is caught above, so unlike the old shared message this one is
+  // not hedging — there is exactly one way to arrive here.
+  if (!data) throw new Error(REFUSED_PERMISSION)
   return data
 }
 
@@ -102,5 +136,7 @@ export async function setLeagueTeamActive(id, isActive) {
     .update({ is_active: isActive })
     .eq('id', id)
 
-  if (error) throw new Error(REFUSED)
+  // No name is being written, so a duplicate cannot arise here — permission is
+  // the only thing this can be.
+  if (error) throw new Error(REFUSED_PERMISSION)
 }

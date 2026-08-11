@@ -971,7 +971,17 @@ CREATE TABLE public.league_teams (
   sort_order  integer     NOT NULL DEFAULT 0,
   created_at  timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT league_teams_pkey                 PRIMARY KEY (id),
-  CONSTRAINT league_teams_club_id_rcm_name_key UNIQUE (club_id, rcm_name),
+  -- ⚠️ PER SQUAD, NOT PER CLUB, and it was per club for one day (12 Aug 2026,
+  -- migration league_team_name_unique_per_squad). EVERY AGE GROUP HAS ITS OWN
+  -- ADHQ1, ADHQ2, ADHQ3 — one per division — so the name only identifies a
+  -- team WITHIN an age group. The original `(club_id, rcm_name)` meant the club
+  -- could have exactly one ADHQ1 anywhere, which blocked the second age group
+  -- Jay tried to set up. `team_id` already implies the club (teams.club_id is
+  -- NOT NULL), so club_id is not repeated here.
+  -- ⚠️ Still refuses the same name twice in ONE squad: two ADHQ1s under U14B
+  -- are indistinguishable in the event form's picker, and picking the wrong one
+  -- files a fixture under the wrong team.
+  CONSTRAINT league_teams_team_id_rcm_name_key UNIQUE (team_id, rcm_name),
   CONSTRAINT league_teams_club_id_fkey         FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
   CONSTRAINT league_teams_team_id_fkey         FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
   -- ⚠️ NULLABLE ON PURPOSE. A club can enter a team that is not in a lettered
