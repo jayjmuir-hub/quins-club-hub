@@ -42,6 +42,14 @@ const FIELD =
   'w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
 const LABEL = 'mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-faint'
 
+// ⚠️ "My child" FIRST, and it is the default. Registering a child is the
+// overwhelmingly common case, and a default of "I'm the player" would have a
+// distracted parent register themselves as a twelve-year-old.
+const WHO_OPTIONS = [
+  { value: 'child', label: 'My child' },
+  { value: 'self', label: "I'm the player" },
+]
+
 // Mirrors the two client-side-checkable guards inside register_my_player
 // (blank name, over 80 characters). The database is what actually enforces
 // them — these exist so the common typo does not cost a round trip and come
@@ -73,6 +81,9 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
   // null, not '' — matches players.gender, which is nullable and has a CHECK
   // that refuses the empty string. Most squads never ask for it.
   const [gender, setGender] = useState(null)
+  // "Am I the player?" — false is the historic behaviour and stays the default,
+  // so someone who never sees the question registers exactly as before.
+  const [selfRegister, setSelfRegister] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -89,6 +100,13 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
   // moment they pick U16G Contact rather than after a rejected submit.
   const selectedTeam = sortedTeams.find((team) => team.id === teamId)
   const genderRequired = squadRequiresGender(selectedTeam?.name)
+
+  // ⚠️ THE SQUAD DECIDES, AND IT COMES FROM A COLUMN — teams.self_registration_allowed,
+  // never the squad's name. 20260806_claim_roster_access.sql ruled that a
+  // rename must not be able to hand an account a role it shouldn't have, and
+  // parsing "U13" out of the text here would do exactly that. The database
+  // refuses it independently; this only decides whether to ASK.
+  const canSelfRegister = selectedTeam?.self_registration_allowed === true
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -123,7 +141,11 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
     setError(null)
     setSubmitting(true)
     try {
-      await registerMyPlayer(name, teamId, gender)
+      // ⚠️ `canSelfRegister &&` is not belt-and-braces, it is the guard. The
+      // reset in the select's onChange covers changing squad; this covers the
+      // case where `teams` reloads underneath the form and the squad's
+      // permission changes while the answer is still held in state.
+      await registerMyPlayer(name, teamId, gender, canSelfRegister && selfRegister)
       // No success state on purpose: reloading the provider gives this person
       // a membership, so AppShell stops rendering this component entirely and
       // shows them the app with the waiting-to-be-approved banner. A
@@ -187,7 +209,10 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
         )}
 
         <label htmlFor="register-player-name" className={LABEL}>
-          Player&apos;s full name
+          {/* Follows the answer above: a 16-year-old filling in "Player's full
+              name" about themselves reads as a form written for somebody
+              else. */}
+          {selfRegister ? 'Your full name' : "Player's full name"}
         </label>
         <input
           id="register-player-name"
@@ -209,7 +234,17 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
           name="teamId"
           value={teamId}
           disabled={submitting}
-          onChange={(event) => setTeamId(event.target.value)}
+          onChange={(event) => {
+            const nextId = event.target.value
+            setTeamId(nextId)
+            // ⚠️ CLEAR THE ANSWER WHEN THE QUESTION DISAPPEARS. Tick "this is
+            // me" on U18B, then change your mind to U10 Mixed, and without this
+            // the flag survives on a squad that never showed the control. The
+            // database would refuse it, but the person would be reading an
+            // error about a question they can no longer see.
+            const next = sortedTeams.find((team) => team.id === nextId)
+            if (next?.self_registration_allowed !== true) setSelfRegister(false)
+          }}
           className={FIELD}
         >
           {/* An empty first option, not a pre-selected squad: a default that
@@ -222,6 +257,23 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
             </option>
           ))}
         </select>
+
+        {/* ⚠️ CONDITIONAL on the SQUAD's column, and it appears ABOVE the
+            gender field on purpose: "who is this?" changes the meaning of every
+            question under it, so being asked it after naming the player reads
+            as an afterthought. Squads below U13 never see it and register
+            exactly as they did before. */}
+        {canSelfRegister && (
+          <Segmented
+            legend="Who are you registering?"
+            name="register-who"
+            options={WHO_OPTIONS}
+            value={selfRegister ? 'self' : 'child'}
+            onChange={(next) => setSelfRegister(next === 'self')}
+            disabled={submitting}
+            className="mt-4"
+          />
+        )}
 
         {/* ⚠️ CONDITIONAL, not always-on. Asking every parent in the club for
             their child's gender when only seven of the eighteen squads need it

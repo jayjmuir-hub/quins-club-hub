@@ -109,9 +109,21 @@ const TEAM_U16 = { id: 't-u16', club_id: CLUB_ID, name: 'U16', sort_order: 6 }
 // A single-gender squad, named exactly as the club names them. Gender is
 // REQUIRED on this one and on nothing else here (Jay, 9 Aug 2026).
 const TEAM_U16G = { id: 't-u16g', club_id: CLUB_ID, name: 'U16G Contact', sort_order: 7 }
+// ⚠️ THE ONLY SQUAD HERE THAT PERMITS SELF-REGISTRATION (11 Aug 2026), and it
+// is deliberately MIXED so these tests never have to answer the gender
+// question to reach the thing they are testing. The permission is the COLUMN —
+// the other fixtures leave it undefined, which is what a squad below U13 looks
+// like, and is why every older assertion in this file expects `false`.
+const TEAM_SELF = {
+  id: 't-u18',
+  club_id: CLUB_ID,
+  name: 'U18 Mixed',
+  sort_order: 8,
+  self_registration_allowed: true,
+}
 // Deliberately out of order: the form sorts by sort_order, like every other
 // age-group list in the app.
-const TEAMS = [TEAM_U16G, TEAM_U16, TEAM_U13]
+const TEAMS = [TEAM_U16G, TEAM_U16, TEAM_U13, TEAM_SELF]
 
 function shellState(overrides = {}) {
   return {
@@ -182,8 +194,13 @@ describe('Add your player — a signed-in account with no access', () => {
     // The third argument is gender, added 9 Aug 2026. NULL here on purpose:
     // "U13" is a mixed squad, the form never asked, and it must not invent an
     // answer. The single-gender squad has its own tests further down.
+    //
+    // The fourth is self-registration, added 11 Aug 2026. ⚠️ FALSE because this
+    // fixture squad has no self_registration_allowed, so the question is never
+    // shown — which is also the assertion that squads below U13 are untouched
+    // by that feature.
     await waitFor(() =>
-      expect(registerMyPlayerMock).toHaveBeenCalledWith('Chidi Okafor', TEAM_U13.id, null),
+      expect(registerMyPlayerMock).toHaveBeenCalledWith('Chidi Okafor', TEAM_U13.id, null, false),
     )
     expect(registerMyPlayerMock).toHaveBeenCalledTimes(1)
 
@@ -204,6 +221,11 @@ describe('Add your player — a signed-in account with no access', () => {
       'U13',
       'U16',
       'U16G Contact',
+      // ⚠️ sort_order 8, and it is LAST for that reason alone. A squad that
+      // permits self-registration is not promoted, demoted or marked in this
+      // list — the question appears after the squad is chosen, so the list
+      // stays the plain age-group list every other screen shows.
+      'U18 Mixed',
     ])
   })
 
@@ -260,7 +282,7 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
       await waitFor(() =>
-        expect(registerMyPlayerMock).toHaveBeenCalledWith('Amara Bello', TEAM_U16G.id, 'female'),
+        expect(registerMyPlayerMock).toHaveBeenCalledWith('Amara Bello', TEAM_U16G.id, 'female', false),
       )
     })
 
@@ -279,7 +301,80 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
       await waitFor(() =>
-        expect(registerMyPlayerMock).toHaveBeenCalledWith('Sam Reid', TEAM_U16G.id, 'male'),
+        expect(registerMyPlayerMock).toHaveBeenCalledWith('Sam Reid', TEAM_U16G.id, 'male', false),
+      )
+    })
+  })
+
+  // --- a U13+ player registering THEMSELVES (11 Aug 2026) ----------------
+  //
+  // ⚠️ THE PERMISSION IS teams.self_registration_allowed, NEVER THE NAME.
+  // 20260806_claim_roster_access.sql ruled that a squad rename must not hand an
+  // account a role it should not have, so these tests drive the COLUMN. A test
+  // that selected on "U18" appearing in the name would pass while the feature
+  // was wired to something a rename could break.
+  describe('a player at U13 or above registering themselves', () => {
+    it('does not ask the question at all for a squad that does not allow it', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+
+      expect(screen.queryByRole('radio', { name: /i'm the player/i })).not.toBeInTheDocument()
+      // ⚠️ The negative above is only worth something if the control can be
+      // found when it IS there. Same run, same query, the allowed squad.
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
+      expect(screen.getByRole('radio', { name: /i'm the player/i })).toBeInTheDocument()
+    })
+
+    it('defaults to "my child", so a distracted parent cannot register themselves by accident', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
+
+      expect(screen.getByRole('radio', { name: /my child/i })).toBeChecked()
+      expect(screen.getByRole('radio', { name: /i'm the player/i })).not.toBeChecked()
+    })
+
+    it('sends the flag, and renames the field to match who is answering', async () => {
+      const user = userEvent.setup()
+      registerMyPlayerMock.mockResolvedValue({ id: 'mm-9', status: 'pending' })
+      renderShell()
+
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
+      await user.click(screen.getByRole('radio', { name: /i'm the player/i }))
+
+      // The label follows the answer — "Player's full name" is a form written
+      // about somebody else.
+      const nameField = screen.getByLabelText(/your full name/i)
+      await user.type(nameField, 'Tobi Adeyemi')
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      await waitFor(() =>
+        expect(registerMyPlayerMock).toHaveBeenCalledWith('Tobi Adeyemi', TEAM_SELF.id, null, true),
+      )
+    })
+
+    // ⚠️ THE BUG THIS EXISTS TO CATCH. Answer "I'm the player" on the squad
+    // that allows it, then change your mind to one that does not. Without the
+    // reset in the select's onChange the flag survives in state, the control
+    // that set it is gone, and the person gets a refusal from the database
+    // about a question they can no longer see.
+    it('forgets the answer when the squad changes to one that cannot self-register', async () => {
+      const user = userEvent.setup()
+      registerMyPlayerMock.mockResolvedValue({ id: 'mm-10', status: 'pending' })
+      renderShell()
+
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
+      await user.click(screen.getByRole('radio', { name: /i'm the player/i }))
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+
+      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      await waitFor(() =>
+        expect(registerMyPlayerMock).toHaveBeenCalledWith('Chidi Okafor', TEAM_U13.id, null, false),
       )
     })
   })

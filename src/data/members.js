@@ -473,7 +473,7 @@ const REGISTER_FALLBACK = "We couldn't add that player. Try again in a moment."
  * error so a caller that wants to branch on the reason still can without
  * going anywhere near the wording.
  */
-export async function registerMyPlayer(fullName, teamId, gender = null) {
+export async function registerMyPlayer(fullName, teamId, gender = null, selfRegister = false) {
   const { data, error } = await supabase.rpc('register_my_player', {
     p_full_name: fullName,
     p_team_id: teamId,
@@ -482,6 +482,12 @@ export async function registerMyPlayer(fullName, teamId, gender = null) {
     // this parameter is simply passed through. Defaults to null so a caller
     // registering into a mixed squad reads the same as it always did.
     p_gender: gender ?? null,
+    // ⚠️ "This player IS me" — U13 and above only, and the SQUAD decides, not
+    // this flag. The function refuses it for a squad whose
+    // self_registration_allowed is false, so passing true from a hand-rolled
+    // REST call gains nothing. Defaults to false, which is the behaviour every
+    // existing caller already had.
+    p_self_register: selfRegister === true,
   })
 
   if (error) {
