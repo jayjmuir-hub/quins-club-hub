@@ -11,6 +11,8 @@ import AdminClub from './screens/AdminClub.jsx'
 import Accounts from './screens/Accounts.jsx'
 import Pitches from './screens/Pitches.jsx'
 import Allocation from './screens/Allocation.jsx'
+import YouthDashboard from './screens/YouthDashboard.jsx'
+import MatchSheet from './screens/MatchSheet.jsx'
 import AcceptInvite from './screens/AcceptInvite.jsx'
 import Privacy from './screens/Privacy.jsx'
 import DeleteAccount from './screens/DeleteAccount.jsx'
@@ -127,7 +129,26 @@ export default function App() {
             {/* The allocation grid — the WEEKLY job, so it sits ahead of the
                 setup screen in the tab order. Same `pitches` right. */}
             <Route path="allocation" element={<Allocation />} />
+            {/* The Club Youth Manager's list of matches and their RCM sheets.
+                Same `youth` admin right, same "not your job" wording — the
+                right decides which dashboard somebody is SHOWN, never what
+                the database will let them do. */}
+            <Route path="youth" element={<YouthDashboard />} />
           </Route>
+
+          {/* ⚠️ THE MATCH SHEET EDITOR IS DELIBERATELY OUTSIDE /admin, and the
+              reason is the same one that put /approvals outside it: the people
+              who fill these in are COACHES AND TEAM MANAGERS, and
+              AdminDashboard gates on isAdmin() before rendering its <Outlet/>.
+              Nesting this under /admin would show every coach "not authorised"
+              on the one screen written for them.
+              The screen re-checks canEditTeam itself, because a route is
+              linkable and somebody will paste the URL — and RLS on
+              match_sheets is what actually decides. */}
+          <Route
+            path="/match-sheet/:eventId"
+            element={<AppShell><MatchSheet /></AppShell>}
+          />
 
           {/* THE COACH / TEAM MANAGER APPROVALS ROUTE (Jay, 9 Aug 2026).
               Deliberately OUTSIDE /admin, and that is not a stylistic choice:

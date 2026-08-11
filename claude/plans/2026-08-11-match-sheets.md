@@ -1,11 +1,100 @@
 # RCM match result sheets — Project 2 of 2
 
-**STATUS: NOT SHIPPED.** Design agreed with Jay on 11 Aug 2026. **Depends on
-`2026-08-11-league-teams-and-fixtures.md`** — the form's `TEAM:` field reads a
-league team, which does not exist until Project 1 ships.
+**STATUS: SHIPPED**, 12 Aug 2026. Designed 11 Aug, revised by Jay on 12 Aug —
+**see §Decisions of 12 Aug, which OVERTURN three things this file says further
+down.** The Project 1 dependency was cleared the same day.
 
-⚠️ **Write the status as SHIPPED in the same commit that ships it**, not as a
-promise about that commit.
+⚠️ **THE BLOCKER BELOW IS RESOLVED: Jay supplied the real form mid-build**, and
+the facsimile is built from the document rather than from the field table. Three
+things the field table could not have told us, and which an earlier version got
+wrong:
+
+1. **The 22 run in TWO COLUMNS** — 1-12 left, 13-22 right, each with its own FR
+   column. Not one list of 22.
+2. **FINAL SCORE / TRIES are HOME and AWAY, not us and them.** They are
+   positional, so a fixture we played away puts our score in the RIGHT pair
+   while the database still stores it as `score_us`. The mapping lives in
+   `MatchSheet.jsx` and nowhere else.
+3. **CLUB is the club; HOME TEAM is the LEAGUE TEAM.** The filled example reads
+   `CLUB: AD Harlequins` and `HOME TEAM: ADHQ2`. A guess had the club name in
+   both — the league team is what identifies the side.
+
+⚠️ **AND INSTRUCTION 5 IS A FINDING, NOT BOILERPLATE:** *"WAP, DIV1, DIV2 Games
+are completed on sportslive app."* Those senior competitions do not use this
+sheet at all, which is independent support for `matchSheetDeadline()` returning
+**null** for a non-youth squad rather than guessing a rule for it.
+
+⚠️ **STILL UNEXERCISED BY A REAL COACH.** Everything below is tested and live;
+nobody has filled one in during an actual match and sent it to RCM.
+
+## ⚠️ Decisions of 12 Aug 2026 — read these BEFORE the rest of the file
+
+Four answers from Jay, and **three of them contradict text still standing
+below.** The text below is left as written rather than silently edited, because
+it records the reasoning that was argued at the time; where they disagree, this
+section wins.
+
+| Question | Jay's answer |
+|---|---|
+| The RCM form itself | **He is sending it.** Not in the repo — see the blocker below |
+| U18's opposite deadline | **One mode for everyone. U18 uses the result sheet too** |
+| Who uses it day one | Coach/manager fills → **Submit** → dashboard → **share via WhatsApp**. Candice has no account; the screen is titled **"Club Youth Manager"**, not a person |
+| Tournaments | **League only**, as originally deferred |
+| WhatsApp share | **Generate a real image/PDF in the browser** — the ~200KB dependency is accepted |
+
+### ⚠️ The three reversals, stated plainly
+
+1. **"No new dependency" is REVERSED.** §Screens below says a canvas-to-PNG
+   library "was considered and rejected at ~200KB". Jay has accepted it, because
+   the alternative does not do what he asked for: **WhatsApp cannot be handed a
+   file by a link.** `wa.me/?text=` carries text only, and RCM's own instructions
+   demand a "saved file or screen shot/picture of form". A one-click share needs
+   the Web Share API with `files`, which needs the app to *produce* a file.
+   ⚠️ **Desktop browsers largely cannot file-share**, so the print view stays as
+   the desktop path — it is a fallback now, not the only route.
+2. **The U18 deadline split is NOT being built.** §The deadline rule below
+   describes U18 → 1 hour **before** kick-off. One result-style sheet now serves
+   every age group. ⚠️ **I flagged that this is the wrong deadline for U18B and
+   U18G, which both exist; Jay ruled anyway and that is his call.**
+   ⚠️ **The app must still SHOW the true RCM deadline per age band** — deriving
+   it honestly and not offering a pre-match mode is very different from telling
+   a U18 coach the deadline is 24 hours after. Do not "simplify" the deadline
+   rule to one number to match the one editor mode.
+3. **The empty database is NOT a design input.** Jay, 12 Aug: *"build the system
+   for the end result not what data is already loaded — players, teams,
+   schedules, managers, coaches, everything will be loaded in eventually."*
+   ⚠️ **§Deliberately deferred and the `full_name` note below both lean on
+   current row counts, and that reasoning is retired.** A low count is grounds
+   for calling a feature UNEXERCISED — a verification caveat — never grounds for
+   shaping a schema or dropping a path. Concretely:
+   - **The 22 slots get a real roster picker** (typeahead over the squad's
+     players), with free text as the FALLBACK rather than the primary path.
+   - **Register auto-fill stays designed-for.** Deferring the shipping is fine;
+     building something it cannot slot into later is not. `player_id` alongside
+     `full_name` must stay.
+   - ⚠️ **`full_name` AS STORED TEXT SURVIVES — BUT ONE OF ITS THREE REASONS
+     DOES NOT.** Reason 2 below ("the club has 7 players") is void. Reasons 1
+     (the form demands the name *as per registration*, and a rendered join is
+     not a record of what was filed) and 3 (a filed sheet is history and must
+     survive a player being renamed or removed) still stand, and 3 is the
+     strongest. **Check each justification separately rather than re-affirming
+     the conclusion.**
+
+### ⚠️ BLOCKED ON ONE THING: the form
+
+**The RCM Official Match Result Sheet is not in this repo** — only the field
+table below describes it. A facsimile cannot be built from a description of its
+fields: box positions, column order, the FR column and the discipline rows are
+the whole point of the word "facsimile". Jay is sending it.
+**Everything else — schema, RLS, the editor, the dashboard, submit — is
+unblocked and does not wait on it.**
+
+### Measured 12 Aug 2026, as caveats and NOT as design inputs
+
+15 squads, **including `U18B Contact` and `U18G Contact`**; 7 players; **0
+attendance rows**; 6 match events; 1 league team. Active admins are Jacques
+Reyneke and Jay's two accounts — ⚠️ **Candice, Nick and Tracy have NO accounts,
+which `state-of-play.md` gets wrong** where it calls them ordinary admins.
 
 ## What this is
 

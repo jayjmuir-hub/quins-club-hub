@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import Button from '../components/Button.jsx'
 import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
@@ -399,6 +400,8 @@ function DaySheet({ day, events, teamsById, canManage, onClose, onSelectEvent, o
 }
 
 export default function Schedule() {
+  // Routing out to the full-page match sheet. See onOpenMatchSheet below.
+  const navigate = useNavigate()
   const { memberships, teams } = useMemberships()
 
   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
@@ -765,6 +768,7 @@ export default function Schedule() {
           canEdit={canEditSelected}
           onEdit={(event) => setFormState({ event })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
+          onOpenMatchSheet={(fixture) => navigate(`/match-sheet/${fixture.id}`)}
           onOpenRegister={() => setRegisterOpen(true)}
           onDeleted={() => {
             setSelectedEventId(null)

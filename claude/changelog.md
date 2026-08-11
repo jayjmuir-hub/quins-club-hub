@@ -10,7 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- **Competition is a CHOICE, not a free-text box** — League or Tournament, or neither.
+- **RCM match sheets — Project 2, shipped.** `match_sheets`, `match_sheet_slots` (22 per
+  sheet) and `match_sheet_cards`, the editor at `/match-sheet/:eventId`, and the Club Youth
+  Manager's list at `/admin/youth` behind the `youth` right — which had existed since 10 Aug
+  and granted access to nothing.
+  ⚠️ **The layout is a FACSIMILE of the real form**, which Jay supplied mid-build. Three
+  things came from the document and not from the field list: the 22 run in **two columns**
+  (1-12 left, 13-22 right, each with its own FR); **FINAL SCORE/TRIES are HOME and AWAY, not
+  us and them**, so an away fixture puts our score on the right; and **CLUB is the club while
+  HOME TEAM is the LEAGUE TEAM** — an earlier guess had the club name in both.
+  ⚠️ **Instruction 5 on the form — "WAP, DIV1, DIV2 Games are completed on sportslive app" —
+  is independent support for the null deadline.** Those senior competitions do not use this
+  sheet at all.
+  ⚠️ **One editor for every age group** (Jay's ruling), but `matchSheetDeadline` still reports
+  U18's real deadline of **one hour BEFORE kick-off**. Not offering a pre-match flow is a
+  different thing from telling a coach something untrue, and the module says so.
+  ⚠️ **`full_name` is stored as text even when a player is linked** — the form demands the
+  name "as per registration", and a filed sheet must survive a player being renamed or
+  removed. A third justification ("the club only has 7 players") was **retired**: Jay's ruling
+  is to build for the loaded club, so the roster picker is first-class and free text is the
+  fallback.
+  ⚠️ **`complete` means READY TO SEND, never SENT.** Nothing in the app can know whether RCM
+  received anything; submission is a human dropping a file into a WhatsApp group.
+  ⚠️ **Share generates a real PNG** via a lazily-imported html2canvas (measured 198,689
+  bytes), because **WhatsApp cannot be handed a file by a link** — `wa.me/?text=` is text
+  only. This overturns the plan's "no new dependency"; Jay accepted the cost.
+  ⚠️ **`EventDetail` gets a handler prop, not a `<Link>`** — a router-aware element in a
+  component rendered inside a Sheet broke eighteen tests, and the file already had the
+  pattern in `onOpenRegister`. It renders **only when a handler exists**, the lesson from the
+  dead availability button.
+  ⚠️ **RCM's red is a named token (`rcm`), not a raw hex** — `tests/theme.test.js` refused the
+  arbitrary value, correctly. It is **their** brand colour on **their** document and must
+  never be used as an app accent.
+
+- `18e4e12` — **Competition is a CHOICE, not a free-text box** — League or Tournament, or neither.
   Jay, 12 Aug 2026. League offers **Round 1-8**; Tournament offers **ADHJRT, Dubai Youth
   Festival, Al Ain Tournament, Small Blacks Tournament** and a "Something else" box.
   ⚠️ **"Neither — a friendly" is the DEFAULT and a real answer.** Nothing may read the blank

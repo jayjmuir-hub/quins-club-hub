@@ -113,6 +113,9 @@
 -- reason: they rot, and pg_policies answers the question in a second.
 -- ---------------------------------------------------------------------
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.match_sheets      ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
+ALTER TABLE public.match_sheet_slots ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
+ALTER TABLE public.match_sheet_cards ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
 ALTER TABLE public.attendance      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.availability    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.calendar_tokens ENABLE ROW LEVEL SECURITY;
@@ -914,3 +917,24 @@ CREATE POLICY "pitch request decide" ON public.pitch_requests
   WITH CHECK (private.is_admin((SELECT e.club_id FROM events e WHERE e.id = event_id)));
 CREATE POLICY "pitch request withdraw" ON public.pitch_requests
   FOR DELETE USING (requested_by = auth.uid() AND status = 'submitted');
+
+-- ---------------------------------------------------------------------
+-- match_sheets / match_sheet_slots / match_sheet_cards (12 Aug 2026)
+--
+-- ONE CONDITION FOR READ AND WRITE, AND NO SEPARATE is_admin ARM.
+-- private.can_edit_team ALREADY contains an admin arm, so a club admin reaches
+-- every squad's sheet through it. The plan proposed `can_edit_team OR is_admin`
+-- for reads; that arm would be redundant EXCEPT that private.is_admin does not
+-- check membership STATUS - so adding it would let a PENDING admin read every
+-- sheet in the club. can_edit_team was deliberately made status-aware on
+-- 10 Aug 2026. Do not "restore" the is_admin arm to match the house style.
+-- ---------------------------------------------------------------------
+CREATE POLICY "match sheet manage" ON public.match_sheets
+  FOR ALL USING (EXISTS (SELECT 1 FROM events e WHERE e.id = event_id AND private.can_edit_team(e.team_id)))
+  WITH CHECK (EXISTS (SELECT 1 FROM events e WHERE e.id = event_id AND private.can_edit_team(e.team_id)));
+CREATE POLICY "match sheet slot manage" ON public.match_sheet_slots
+  FOR ALL USING (private.can_edit_match_sheet(match_sheet_id))
+  WITH CHECK (private.can_edit_match_sheet(match_sheet_id));
+CREATE POLICY "match sheet card manage" ON public.match_sheet_cards
+  FOR ALL USING (private.can_edit_match_sheet(match_sheet_id))
+  WITH CHECK (private.can_edit_match_sheet(match_sheet_id));

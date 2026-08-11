@@ -1849,3 +1849,27 @@ $function$
 REVOKE ALL ON FUNCTION private.notify_pitch_request() FROM PUBLIC;
 REVOKE ALL ON FUNCTION private.notify_pitch_request() FROM anon;
 REVOKE ALL ON FUNCTION private.notify_pitch_request() FROM authenticated;
+
+-- ---------------------------------------------------------------------
+-- private.can_edit_match_sheet(uuid)   -- added 2026-08-12
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- A HELPER FOR THE CHILD TABLES, not an inlined three-hop EXISTS. Reaching
+-- slot -> sheet -> event -> squad inside a policy would make every row read
+-- re-plan that join, and - the reason that actually matters - would put the
+-- rule in three places, one of which will eventually be edited alone.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_edit_match_sheet(_sheet uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1
+    from public.match_sheets ms
+    join public.events e on e.id = ms.event_id
+    where ms.id = _sheet and private.can_edit_team(e.team_id)
+  );
+$function$
+;
+GRANT EXECUTE ON FUNCTION private.can_edit_match_sheet(uuid) TO authenticated;

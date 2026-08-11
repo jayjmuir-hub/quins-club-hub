@@ -71,6 +71,33 @@ export async function listEvents({ teamIds, from, to } = {}) {
   )
 }
 
+/**
+ * One event by id, with its squad and league team embedded.
+ *
+ * ⚠️ THE SAME EMBED AS listEvents, DELIBERATELY. The match sheet renders
+ * fixtureLabel() off this row exactly as Schedule does off a listed one, and
+ * two different shapes for "an event" is how one screen ends up rendering a
+ * league identity that another cannot. `teams` is embedded too because the
+ * sheet needs the squad NAME for the deadline rule, and a second query for one
+ * string is a second thing that can fail.
+ *
+ * Returns null for a missing or unreadable event rather than throwing — RLS
+ * hides another club's fixture as "not found", which is the correct answer to
+ * show and not an error state.
+ */
+export async function getEvent(id) {
+  if (!id) return null
+
+  const { data, error } = await supabase
+    .from('events')
+    .select('*, league_team:league_teams(id, rcm_name, division), team:teams(id, name, sort_order)')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) throw error
+  return data ?? null
+}
+
 // Suffixed so concurrent subscriptions (e.g. dashboard + schedule screens
 // both mounted) get distinct realtime channel topics rather than colliding.
 let channelSeq = 0

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 
 // Unit tests for src/screens/Schedule.jsx + src/screens/EventDetail.jsx
 // (Task 11). useMemberships and both data modules are mocked, so this
@@ -194,8 +195,22 @@ beforeEach(() => {
 
 function setup() {
   const user = userEvent.setup()
-  const utils = render(<Schedule />)
+  const utils = render(withRouter(<Schedule />))
   return { user, ...utils }
+}
+
+// ⚠️ Schedule and the Dashboard became ROUTER-AWARE on 12 Aug 2026: the match
+// sheet is a full-page form, so EventDetail's entry point navigates rather
+// than opening a sheet. Rendering them bare now throws "useNavigate() may be
+// used only in the context of a <Router>". Wrapping here is the honest fix —
+// the real app never renders these outside a Router, and a test that did was
+// exercising a shape production does not have.
+function withRouter(ui) {
+  return (
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {ui}
+    </MemoryRouter>
+  )
 }
 
 describe('Schedule — loading, empty and error states', () => {
@@ -356,7 +371,7 @@ describe('Schedule — team filter', () => {
 
     useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', team_id: 'team-1xv' }]))
     listEventsMock.mockResolvedValue([UPCOMING_TRAINING])
-    rerender(<Schedule />)
+    rerender(withRouter(<Schedule />))
 
     expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
     expect(screen.queryByText(/no upcoming fixtures/i)).not.toBeInTheDocument()

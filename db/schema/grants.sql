@@ -140,6 +140,15 @@
 --                     auth.uid(), verified live by db/tests/rls-league-teams.sql
 --                     (anon reads zero rows). This is the same shape the note
 --                     at the top of this file describes for every new table.
+--   match_sheets      anon, authenticated, postgres, service_role   ALL 8
+--   match_sheet_slots anon, authenticated, postgres, service_role   ALL 8
+--   match_sheet_cards anon, authenticated, postgres, service_role   ALL 8
+--                     ⚠️ ADDED 12 Aug 2026. As with league_teams, the `anon`
+--                     row is Supabase's DEFAULT PRIVILEGES and not intent —
+--                     the migration grants nothing on these tables. RLS is
+--                     what keeps anon out: all three policies resolve through
+--                     private.can_edit_team, which tests auth.uid() against
+--                     memberships and cannot match a null uid.
 --   pitch_requests    anon, authenticated, postgres, service_role   ALL 8
 --   pitches           anon, authenticated, postgres, service_role   ALL 8
 --   player_contacts   anon, authenticated, postgres, service_role   ALL 8

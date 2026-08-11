@@ -24,6 +24,7 @@ vi.mock('../src/data/events.js', () => ({
 }))
 
 import Schedule from '../src/screens/Schedule.jsx'
+import { MemoryRouter } from 'react-router-dom'
 
 const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
 const TEAM_U12 = { id: 'team-u12', name: 'U12', sort_order: 6 }
@@ -73,16 +74,30 @@ beforeEach(() => {
 
 const fixtures = () => screen.getAllByTestId('schedule-fixture').map((n) => n.textContent)
 
+// ⚠️ Schedule and the Dashboard became ROUTER-AWARE on 12 Aug 2026: the match
+// sheet is a full-page form, so EventDetail's entry point navigates rather
+// than opening a sheet. Rendering them bare now throws "useNavigate() may be
+// used only in the context of a <Router>". Wrapping here is the honest fix —
+// the real app never renders these outside a Router, and a test that did was
+// exercising a shape production does not have.
+function withRouter(ui) {
+  return (
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {ui}
+    </MemoryRouter>
+  )
+}
+
 describe('ScheduleTable — the wide boundary', () => {
   it('renders the table at wide', async () => {
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     expect(await screen.findByTestId('schedule-table')).toBeInTheDocument()
     expect(screen.queryByTestId('fixture-row')).not.toBeInTheDocument()
   })
 
   it('keeps the stacked list below 1280px, where seven columns would be cramped', async () => {
     setWidth({ wide: false })
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByText(/Dubai Exiles/)
     expect(screen.queryByTestId('schedule-table')).not.toBeInTheDocument()
   })
@@ -90,7 +105,7 @@ describe('ScheduleTable — the wide boundary', () => {
 
 describe('ScheduleTable — content', () => {
   it('shows upcoming fixtures across every age group, not one team', async () => {
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
     expect(screen.getAllByTestId('schedule-table-row')).toHaveLength(2)
     // Scoped to the table: the team filter pills render the same age-group
@@ -101,28 +116,28 @@ describe('ScheduleTable — content', () => {
   })
 
   it('orders upcoming fixtures by date ascending', async () => {
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
     // 10 March training precedes 14 March match.
     expect(fixtures()[0]).toMatch(/Skills session/)
   })
 
   it('marks a home match H and an away match A', async () => {
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
     expect(screen.getByText('H')).toBeInTheDocument()
   })
 
   it('does not label a training session home or away — it has no opponent', async () => {
     listEventsMock.mockResolvedValue([FUTURE_TRAINING])
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
     expect(screen.queryByText('H')).not.toBeInTheDocument()
     expect(screen.queryByText('A')).not.toBeInTheDocument()
   })
 
   it('formats the kick-off in club time, not the browser zone', async () => {
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     const table = await screen.findByTestId('schedule-table')
     // 11:00Z on 14 March is 15:00 in Asia/Dubai (UTC+4). formatTime uses the
     // RUNTIME locale (toLocaleTimeString(undefined, …)) with hour:'numeric',
@@ -135,7 +150,7 @@ describe('ScheduleTable — content', () => {
   })
 
   it('shows the competition under the fixture when there is one', async () => {
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
     expect(screen.getByText('West Asia Cup')).toBeInTheDocument()
   })
@@ -144,7 +159,7 @@ describe('ScheduleTable — content', () => {
 describe('ScheduleTable — results', () => {
   it('shows played fixtures with their score on the Results tab', async () => {
     const user = userEvent.setup()
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
     await user.click(screen.getByRole('button', { name: 'Results' }))
 
@@ -159,7 +174,7 @@ describe('ScheduleTable — results', () => {
   })
 
   it('shows an em dash rather than an empty cell for an unplayed fixture', async () => {
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
     expect(screen.getAllByText('—').length).toBeGreaterThan(0)
   })
@@ -168,7 +183,7 @@ describe('ScheduleTable — results', () => {
 describe('ScheduleTable — sorting', () => {
   it('sorts by age group when that header is clicked', async () => {
     const user = userEvent.setup()
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
     await user.click(screen.getByRole('button', { name: /^Age group/ }))
 
@@ -178,7 +193,7 @@ describe('ScheduleTable — sorting', () => {
 
   it('reverses on a second click of the same header', async () => {
     const user = userEvent.setup()
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
     const header = screen.getByRole('button', { name: /^Date/ })
     await user.click(header)
@@ -186,7 +201,7 @@ describe('ScheduleTable — sorting', () => {
   })
 
   it('exposes sort direction through aria-sort', async () => {
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
     expect(screen.getByRole('columnheader', { name: /Date/ })).toHaveAttribute('aria-sort', 'ascending')
   })
@@ -195,7 +210,7 @@ describe('ScheduleTable — sorting', () => {
 describe('ScheduleTable — empty', () => {
   it('says nothing is scheduled rather than rendering an empty table', async () => {
     listEventsMock.mockResolvedValue([])
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     expect(await screen.findByText('No upcoming fixtures yet.')).toBeInTheDocument()
     expect(screen.queryByTestId('schedule-table')).not.toBeInTheDocument()
   })
@@ -203,7 +218,7 @@ describe('ScheduleTable — empty', () => {
 
 describe('ScheduleTable — the date cell', () => {
   it('leads with the day of the week', async () => {
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
 
     // 2030-03-10T15:30:00Z is 7:30 PM in Abu Dhabi on Sunday 10 March.
@@ -225,7 +240,7 @@ describe('ScheduleTable — the date cell', () => {
     listEventsMock.mockResolvedValue([
       { ...FUTURE_TRAINING, id: 'e-late', starts_at: '2030-03-10T20:30:00Z' },
     ])
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
 
     // 20:30 UTC on Sunday = 00:30 MONDAY in Abu Dhabi.
@@ -236,7 +251,7 @@ describe('ScheduleTable — the date cell', () => {
 describe('ScheduleTable — opening a row', () => {
   it('opens the event when the row itself is clicked, not only the Open button', async () => {
     const user = userEvent.setup()
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
 
     await user.click(screen.getAllByTestId('schedule-table-row')[0])
@@ -245,7 +260,7 @@ describe('ScheduleTable — opening a row', () => {
 
   it('still opens from the Open button, and only once', async () => {
     const user = userEvent.setup()
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
 
     // ⚠️ The button is inside the clickable row, so without stopPropagation
@@ -259,7 +274,7 @@ describe('ScheduleTable — opening a row', () => {
   // a <tr> is not focusable and giving it role="button" would strip the row
   // semantics that make the cells mean anything to a screen reader.
   it('keeps a real focusable control in the row', async () => {
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByTestId('schedule-table')
 
     const row = screen.getAllByTestId('schedule-table-row')[0]

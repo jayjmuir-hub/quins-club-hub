@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 
 // Unit tests for src/screens/EventForm.jsx (Task 14) plus the wiring that
 // opens it — Schedule's "Add" button and EventDetail's Edit/Delete footer.
@@ -111,6 +112,20 @@ beforeEach(() => {
 // Guard the guard: if Node ever stopped honouring a runtime TZ change, the
 // timezone assertions below would pass vacuously against the exact bug they
 // exist to catch.
+// ⚠️ Schedule and the Dashboard became ROUTER-AWARE on 12 Aug 2026: the match
+// sheet is a full-page form, so EventDetail's entry point navigates rather
+// than opening a sheet. Rendering them bare now throws "useNavigate() may be
+// used only in the context of a <Router>". Wrapping here is the honest fix —
+// the real app never renders these outside a Router, and a test that did was
+// exercising a shape production does not have.
+function withRouter(ui) {
+  return (
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {ui}
+    </MemoryRouter>
+  )
+}
+
 describe('the test process zone really is hostile', () => {
   it('is not UTC', () => {
     expect(new Date('2026-07-30T16:00:00Z').getHours()).toBe(12)
@@ -634,13 +649,13 @@ describe('EventForm — saving', () => {
 describe('Schedule wiring', () => {
   it('offers an Add event button to a coach', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     expect(await screen.findByRole('button', { name: /add event/i })).toBeInTheDocument()
   })
 
   it('does not offer it to a parent', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await screen.findByText(/no upcoming fixtures/i)
     expect(screen.queryByRole('button', { name: /add event/i })).not.toBeInTheDocument()
   })
@@ -648,7 +663,7 @@ describe('Schedule wiring', () => {
   it('opens the empty form from the Add button', async () => {
     const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
 
     await user.click(await screen.findByRole('button', { name: /add event/i }))
 
@@ -659,7 +674,7 @@ describe('Schedule wiring', () => {
   it('reloads the schedule after a save', async () => {
     const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
 
     await user.click(await screen.findByRole('button', { name: /add event/i }))
     const callsBefore = listEventsMock.mock.calls.length
@@ -685,7 +700,7 @@ describe('EventDetail wiring', () => {
   async function openDetail(memberships) {
     const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(membershipValue(memberships))
-    render(<Schedule />)
+    render(withRouter(<Schedule />))
     await user.click(await screen.findByRole('button', { name: /Dubai Exiles/i }))
     await screen.findByRole('dialog')
     return user

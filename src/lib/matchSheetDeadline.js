@@ -1,0 +1,91 @@
+import { ageBandFromTeamName } from './ageGroup.js'
+
+// When an RCM match sheet is due, derived from the squad's age band.
+//
+// The form's own instructions carry TWO deadlines on opposite sides of the
+// match:
+//
+//   "U11 to u16 Games … within 24hours of completion of game."
+//   "U18 Boys & Girls, WXV, W7s … 1hour in advance of Kick Off."
+//
+// ⚠️ THE APP BUILDS ONE EDITOR, AND STILL TELLS THE TRUTH ABOUT BOTH.
+// Jay ruled on 12 Aug 2026 that every age group uses the same result-style
+// sheet, rather than building a separate pre-match team-sheet mode for U18. He
+// was told that is the wrong deadline for U18B and U18G, which both exist, and
+// ruled anyway — his call.
+//
+// ⚠️ THAT RULING IS ABOUT THE EDITOR, NOT ABOUT THIS MODULE. Not offering a
+// pre-match flow is a very different thing from telling a U18 coach their sheet
+// is due 24 hours after the final whistle. This returns what RCM actually
+// requires; the screens present it. Do NOT "simplify" it to one number to match
+// the single editor mode — that would make the app say something untrue.
+//
+// Pure, no imports beyond ageGroup: same rule as scope.js and playerFormat.js.
+
+/** U11-U16: due AFTER the game. */
+export const HOURS_AFTER = 24
+/** U18 and above: due BEFORE kick-off. */
+export const HOURS_BEFORE = 1
+/** The band at which the deadline flips to the other side of the match. */
+export const PRE_MATCH_FROM_AGE = 18
+
+/**
+ * The deadline for a fixture's sheet, or null when there is no rule for it.
+ *
+ * @param {string} teamName squad name, e.g. "U14B Contact"
+ * @param {Date|string|number} kickOff the fixture's start
+ * @returns {{ at: Date, side: 'before'|'after', band: number }|null}
+ *
+ * ⚠️ NULL MEANS "SHOW NO DEADLINE", AND IT MUST NEVER FALL THROUGH TO EITHER
+ * RULE. ageBandFromTeamName returns null for a senior side AND for anything it
+ * cannot parse, and this module cannot tell those apart. That module's null has
+ * already caused one real incident here: allowsOwnContact read it as "a senior
+ * side: adults" and offered a twelve-year-old girls' squad the child's own email
+ * and phone fields. **The lesson was the null default, not the regex.**
+ *
+ * Inventing a deadline is the same shape of mistake in a quieter register: a
+ * coach shown a confident wrong time files late and believes they were early.
+ */
+export function matchSheetDeadline(teamName, kickOff) {
+  const band = ageBandFromTeamName(teamName)
+  if (band === null) return null
+
+  const start = kickOff instanceof Date ? kickOff : new Date(kickOff)
+  if (Number.isNaN(start.getTime())) return null
+
+  const before = band >= PRE_MATCH_FROM_AGE
+  const shift = (before ? -HOURS_BEFORE : HOURS_AFTER) * 60 * 60 * 1000
+
+  return {
+    at: new Date(start.getTime() + shift),
+    side: before ? 'before' : 'after',
+    band,
+  }
+}
+
+/**
+ * How the deadline reads on screen. Null in, empty string out — a caller that
+ * renders this unconditionally shows nothing rather than "null".
+ */
+export function deadlineLabel(deadline) {
+  if (!deadline) return ''
+  return deadline.side === 'before'
+    ? `Due ${HOURS_BEFORE} hour before kick-off`
+    : `Due within ${HOURS_AFTER} hours of the final whistle`
+}
+
+/**
+ * Whether the deadline has passed, given "now".
+ *
+ * ⚠️ TAKES `now` RATHER THAN READING THE CLOCK, so a test can pin it and so
+ * this stays pure. The same reason clubToday() exists rather than new Date().
+ * ⚠️ NO DEADLINE IS NOT OVERDUE. A squad with no rule must never be flagged
+ * late — that is the null default again, in the place somebody is most likely
+ * to write `deadline.at < now` without checking.
+ */
+export function isOverdue(deadline, now) {
+  if (!deadline) return false
+  const at = now instanceof Date ? now : new Date(now)
+  if (Number.isNaN(at.getTime())) return false
+  return deadline.at.getTime() < at.getTime()
+}

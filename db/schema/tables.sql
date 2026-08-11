@@ -1018,3 +1018,85 @@ CREATE TABLE public.league_teams (
 ALTER TABLE public.league_teams ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX league_teams_team_idx ON public.league_teams USING btree (team_id, sort_order, rcm_name);
+
+-- ---------------------------------------------------------------------
+-- public.match_sheets / match_sheet_slots / match_sheet_cards
+-- Added 2026-08-12 (migration `match_sheets`). The RCM Official Match
+-- Result Sheet - a GOVERNING-BODY form, one per team per game.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.match_sheets (
+  id             uuid        NOT NULL DEFAULT gen_random_uuid(),
+  -- UNIQUE: a second sheet for one fixture is not a second document, it is
+  -- the same one filed twice - and two would mean two submissions to RCM.
+  event_id       uuid        NOT NULL,
+  -- ON DELETE SET NULL, never cascade: deleting a league team must cost the
+  -- sheet its TEAM: line, never the sheet.
+  league_team_id uuid,
+  captain_name   text,
+  manager_name   text,
+  score_us       smallint,
+  tries_us       smallint,
+  score_them     smallint,
+  tries_them     smallint,
+  medical_notes  text,
+  -- Column comment as stored: "complete" means the coach pressed Submit and
+  -- the sheet is ready to send to RCM. It does NOT mean RCM received it.
+  status         text        NOT NULL DEFAULT 'draft',
+  submitted_at   timestamptz,
+  created_by     uuid,
+  updated_by     uuid,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT match_sheets_pkey         PRIMARY KEY (id),
+  CONSTRAINT match_sheets_event_id_key UNIQUE (event_id),
+  CONSTRAINT match_sheets_event_id_fkey FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  CONSTRAINT match_sheets_league_team_id_fkey FOREIGN KEY (league_team_id) REFERENCES league_teams(id) ON DELETE SET NULL,
+  CONSTRAINT match_sheets_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT match_sheets_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT match_sheets_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'complete'::text])))
+);
+ALTER TABLE public.match_sheets ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE public.match_sheet_slots (
+  id             uuid     NOT NULL DEFAULT gen_random_uuid(),
+  match_sheet_id uuid     NOT NULL,
+  -- THE POSITION, NOT A SHIRT NUMBER. 1 is loosehead; 16-22 are the
+  -- replacements whose front-row cover the FR column identifies - a SAFETY
+  -- rule on the form. This club deliberately holds no squad numbers.
+  slot           smallint NOT NULL,
+  -- ON DELETE SET NULL so a filed sheet survives a player leaving the club.
+  player_id      uuid,
+  -- TEXT EVEN WHEN player_id IS SET. The form demands the name "as per
+  -- registration", and a filed sheet must still say what was filed after a
+  -- player is renamed, moved or removed.
+  full_name      text     NOT NULL,
+  front_row      boolean  NOT NULL DEFAULT false,
+  CONSTRAINT match_sheet_slots_pkey PRIMARY KEY (id),
+  CONSTRAINT match_sheet_slots_sheet_slot_key UNIQUE (match_sheet_id, slot),
+  CONSTRAINT match_sheet_slots_match_sheet_id_fkey FOREIGN KEY (match_sheet_id) REFERENCES match_sheets(id) ON DELETE CASCADE,
+  CONSTRAINT match_sheet_slots_player_id_fkey FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE SET NULL,
+  CONSTRAINT match_sheet_slots_slot_check CHECK (((slot >= 1) AND (slot <= 22)))
+);
+ALTER TABLE public.match_sheet_slots ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE public.match_sheet_cards (
+  id             uuid        NOT NULL DEFAULT gen_random_uuid(),
+  match_sheet_id uuid        NOT NULL,
+  half           smallint,
+  minute         smallint,
+  colour         text,
+  slot           smallint,
+  full_name      text,
+  reason         text,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT match_sheet_cards_pkey PRIMARY KEY (id),
+  CONSTRAINT match_sheet_cards_match_sheet_id_fkey FOREIGN KEY (match_sheet_id) REFERENCES match_sheets(id) ON DELETE CASCADE,
+  CONSTRAINT match_sheet_cards_colour_check CHECK ((colour = ANY (ARRAY['yellow'::text, 'red'::text]))),
+  CONSTRAINT match_sheet_cards_half_check CHECK (((half IS NULL) OR (half = ANY (ARRAY[1, 2])))),
+  CONSTRAINT match_sheet_cards_slot_check CHECK (((slot IS NULL) OR ((slot >= 1) AND (slot <= 22))))
+);
+ALTER TABLE public.match_sheet_cards ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX match_sheet_slots_sheet_idx ON public.match_sheet_slots USING btree (match_sheet_id, slot);
+CREATE INDEX match_sheet_cards_sheet_idx ON public.match_sheet_cards USING btree (match_sheet_id);
+CREATE INDEX match_sheets_status_idx     ON public.match_sheets      USING btree (status, event_id);
