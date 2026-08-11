@@ -70,15 +70,33 @@ function linkClassName({ isActive }) {
     'flex flex-col items-center justify-center gap-1 rounded-lg py-2 font-condensed text-[11px] font-bold uppercase tracking-[0.06em] outline-none transition',
     'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
     isActive ? 'text-white' : 'text-chrome-muted hover:text-white',
-    // Desktop (in-header top nav): text pill on the flat near-black masthead.
+    // Desktop (in-header top nav): a tab on the flat near-black masthead.
     // The old code needed two different black overlays here, one for active
     // and one for idle, because the underlying gradient's colour varied with
     // viewport width and idle text at 82% opacity fell under 4.5:1 without
     // help. The masthead is flat #0c0c0e now, so idle text can simply be
-    // full-strength white at 19.54:1 and the active state can be a solid red
-    // pill (4.79:1 white-on-red) instead of a darker patch. No opacity
-    // tricks, no width-dependent measurements.
-    'desktop:flex-row desktop:gap-0 desktop:rounded-pill desktop:px-4 desktop:py-2 desktop:text-[16px] desktop:tracking-[0.06em]',
+    // full-strength white and the active state can be a solid red fill
+    // instead of a darker patch. No opacity tricks, no width-dependent
+    // measurements.
+    //
+    // ⚠️ `rounded-tab` (12px), NOT `rounded-pill` (100px) — Jay, 11 Aug 2026:
+    // "i don't like the rounded off buttons at the top", and then "like the
+    // tabs on the adhjrt.com website". The 12px token was measured off that
+    // site's live age-group tabs; see tailwind.config.js.
+    //
+    // ⚠️ ONLY THE CORNER IS COPIED FROM adhjrt.com, and that is deliberate.
+    // Its idle tab is black-on-white, which works because it sits on a white
+    // page. This row sits on the near-black masthead, so a white fill would
+    // put four bright boxes in the chrome — a far bigger change than the one
+    // that was asked for, and it would break the "identity lives on the
+    // chrome so the data surfaces can stay calm" idea the palette is built
+    // on. Idle stays transparent, active stays the brand red.
+    //
+    // ⚠️ The active pair measures 5.88:1 (white on brand #c8102e), MEASURED
+    // live on 11 Aug 2026. This comment claimed 4.79:1 until then — that is
+    // the ratio for #e11b22, the OTHER red, which is what adhjrt.com uses and
+    // what this app's brand colour is not. Wrong figure, right conclusion.
+    'desktop:flex-row desktop:gap-0 desktop:rounded-tab desktop:px-4 desktop:py-2 desktop:text-[16px] desktop:tracking-[0.06em]',
     isActive
       ? 'desktop:bg-brand desktop:text-white'
       : 'desktop:text-white/80 desktop:hover:bg-white/10 desktop:hover:text-white',

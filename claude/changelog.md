@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **The `/admin` tabs are modelled on adhjrt.com's, and the spec was MEASURED rather
+- **The TOP MENU is now 12px too — and this is the control Jay actually meant.**
+  `src/components/Nav.jsx` carried `desktop:rounded-pill` (100px); it is now
+  `desktop:rounded-tab`. ⚠️ **The previous entry fixed the wrong row.** "The rounded off
+  buttons at the top" was read as the `/admin` dashboard tabs, and the ambiguity had
+  already been spotted and put to Jay — *"just those four tabs, or every `rounded-pill`
+  in the app?"* — then resolved by guessing rather than by waiting for the answer. It
+  cost a deploy. **An ambiguity you have already noticed is not one to resolve on the
+  balance of probability.**
+  ⚠️ **ONLY THE CORNER IS COPIED FROM adhjrt.com, deliberately.** Its idle tab is
+  black-on-white, which works on a white page. This row sits on the near-black masthead,
+  so a white fill would put four bright boxes into the chrome — far more than was asked
+  for, and against the palette's "identity lives on the chrome so the data surfaces stay
+  calm" idea. Idle stays transparent, active stays brand red.
+  ⚠️ **A stale contrast figure was corrected in passing.** `Nav.jsx` documented the
+  active item as **4.79:1** white-on-red. Measured live it is **5.88:1** — 4.79 is the
+  ratio for `#e11b22`, which is *adhjrt.com's* red, not this app's `#c8102e`. Wrong
+  number, right conclusion, sitting in the file as fact.
+  The `/admin` tabs from the previous entry stay at 12px — Jay's call, and they now
+  agree with the top menu.
+
+- `5d88d03` — **The `/admin` tabs are modelled on adhjrt.com's, and the spec was MEASURED rather
   than eyeballed.** Jay: *"i want them like the tabs on the adhjrt.com website"*, after
   noticing the pills disagreed with the site-wide 8px button rule. `getComputedStyle` on
   the live age-group tabs there gives **12px radius, 0.8px border, white fill idle, red
