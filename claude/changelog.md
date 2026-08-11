@@ -33,7 +33,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   edge-function deploy. Editing `supabase/functions/calendar/index.ts` alone would change
   nothing — that exact trap cost a day in Aug 2026.
 
-- `f16c025` — **The Club tab manages the club's league teams** (task 5). Each age group in the Age
+- `ee85430` — **The Club tab manages the club's league teams** (task 5). Each age group in the Age
   groups list now carries its own league teams as chips, plus a "+" to enter another.
   ⚠️ **A league team is entered against the squad whose "+" was tapped** — the panel
   carries that squad's `team_id` and `club_id`, because a U14 team filed under U16 reaches
@@ -53,6 +53,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ⚠️ **AND `f16c025` DID DIE THE MOMENT PR #52 MERGED — REPOINTED TO `ee85430` ABOVE. THIS
 IS A TREADMILL, NOT A ONE-OFF, AND IT HAS NOW RUN TWICE IN TWO PRs.**
+
+⚠️ **`npm run docs:check` CANNOT CATCH THE DEAD SHA ON THE MACHINE THAT WROTE IT, AND THAT
+IS THE TRAP THAT BIT ON PR #53.** A squashed-away commit is still a loose object in the
+clone that authored it, so `git cat-file` finds it and the check goes green locally while
+CI — a fresh clone with only `main`'s history — fails on the same file. **A green local
+`docs:check` is not evidence for a changelog SHA.** Verify with
+`git cat-file -e <sha> 2>/dev/null` inside a clone that never had the branch, or simply
+trust CI over the laptop. Same shape as the CRLF trap in `state-of-play.md`, in reverse:
+there CI is blind and the PC sees it; here the PC is blind and CI sees it.
+
 `docs:check` requires every commit to be cited by SHA, and
 `main`'s only merge method is squash, so **every** branch SHA a changelog entry cites stops
 existing at merge and `main` goes red until the next PR repoints it. That is the mechanism
