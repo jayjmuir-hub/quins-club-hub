@@ -10,6 +10,51 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **11 Aug — a pitch request now EMAILS: the Pitch Managers when it is asked, the
+  coach when it is answered.** Trigger `notify_pitch_request` on `pitch_requests` plus
+  the `notify-pitch-request` edge function. Closes Jay's "email multiple people,
+  appear in two dashboards, trackable from submission to assignment".
+  ⚠️ **THE DATABASE SENDS IT, NOT THE APP — and not for tidiness.** The submit mail
+  goes to admins, and **the coach who triggers it cannot read admin email addresses**:
+  `profiles` is not bulk-readable by a coach and `profiles.email` is column-granted,
+  not merely policy-gated. A client-side send would need either the club's admin list
+  in every coach's browser or a service-role key in it. The recipient list HAS to be
+  built server-side.
+  ⚠️ **SUPER ADMINS ARE RECIPIENTS TOO, deliberately.** A super holds every right
+  implicitly, so filtering on the `pitches` right alone would exclude the one person
+  certain to be able to act — and on a club where nobody has been given the job yet,
+  that is EVERY recipient. Today that is not hypothetical: Tracy has not been granted
+  the right, so both current recipients are Jay's own accounts.
+  ⚠️ **THE FAILURE IS GENUINELY QUIET, and an earlier claim that it was "visible"
+  was wrong.** Both triggers swallow everything into a `raise warning` nobody reads,
+  so a dead endpoint costs an email silently. That is only acceptable because **the
+  queue is in-app**: the request sits on the allocation screen whether or not the mail
+  arrives. The email is a prompt to go and look, never the record.
+  ⚠️ **`allocatePitch`'s write ORDER is what makes the allocated mail correct.** It
+  writes `events.pitch` first and closes the request second — chosen so a refused
+  fixture write leaves a job to do rather than a lie, but it also means the fixture
+  already holds the real pitch when the trigger fires. Reversing those two writes
+  would email "you are on Pitch TBD".
+  ⚠️ **Verified live because nothing else could verify it** — a Postgres trigger and
+  a Deno function are not modules vitest can import, so this ships with NO unit tests.
+  All three branches exercised on production: `submitted` → 2, `declined` → 1,
+  `allocated` → 1, test row deleted, `events` never written. Two checks that would
+  otherwise have passed while lying: the 401 was confirmed by its **body**, since the
+  gateway also returns 401 for a missing JWT and the status code alone cannot prove
+  `verify_jwt: false` took effect; and the trigger was proved to fire by inserting
+  inside a transaction and forcing a ROLLBACK — the pg_net queue row lives in that
+  transaction too, so it went 0 → 1 and vanished with everything else, proving the
+  wiring without sending anything.
+  ⚠️ **The copy no longer names `Pitch TBD`.** It said the fixture was "showing Pitch
+  TBD", but that string is an option a coach PICKS in the event form — `requestPitch`
+  never writes to `events`, so a fixture awaiting a pitch just as often has an empty
+  one. The claim was false about half the time.
+  Reuses `approval_notify_secret` rather than minting a second secret to rotate and
+  forget; new vault entry `pitch_notify_url` is DERIVED from `approval_notify_url` so
+  the host cannot drift between the two.
+
+- `852dbf2` — **The pitch request loop closes — ask, answer, and see the outcome.**
+
 - **11 Aug — the pitch request LOOP closes: a coach asks, Tracy answers, the coach
   sees the outcome.** `PitchRequest` on the event sheet, and a queue on the allocation
   screen. `pitch_requests` finally has something writing to it.
