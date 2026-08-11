@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **The Club tab manages the club's league teams** (task 5). Each age group in the Age
+- `f16c025` — **The Club tab manages the club's league teams** (task 5). Each age group in the Age
   groups list now carries its own league teams as chips, plus a "+" to enter another.
   ⚠️ **A league team is entered against the squad whose "+" was tapped** — the panel
   carries that squad's `team_id` and `club_id`, because a U14 team filed under U16 reaches
@@ -27,6 +27,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `team_id` itself. ⚠️ **The screen offers no Delete, deliberately**: `ON DELETE SET NULL`
   would strip the league identity off every fixture the team ever played, leaving them
   indistinguishable from friendlies.
+
+⚠️ **AND `f16c025` ABOVE WILL DIE THE SAME WAY THE MOMENT PR #52 MERGES — THIS IS A
+TREADMILL, NOT A ONE-OFF.** `docs:check` requires every commit to be cited by SHA, and
+`main`'s only merge method is squash, so **every** branch SHA a changelog entry cites stops
+existing at merge and `main` goes red until the next PR repoints it. That is the mechanism
+that broke below, and it will repeat after this PR, and after the one after that.
+**Decide the rule rather than paying it each time** — the options are citing the PR number
+instead of the SHA, teaching `scripts/docs-check.mjs` to accept an unreachable SHA that a
+squash subject matches, or writing the changelog entry only in a follow-up. Not fixed here
+because it changes a check, and that is Jay's call.
 
 ⚠️ **`b640b4a` and `8cd5ff0` USED TO HEAD THE NEXT TWO ENTRIES AND ARE NOT COMMITS.** They
 were branch commits, and `main`'s only merge method is SQUASH — so the moment PR #51
