@@ -265,6 +265,14 @@ by whoever remembered:
    request cite the squash SHA, which is the only one that will exist. That is
    what the one-behind rule is for, and doing it any other way costs a red
    `main` after every single merge.
+   ⚠️ **CONSEQUENCE, AND IT LOOKS LIKE A BUG UNTIL YOU KNOW IT: ON A BRANCH
+   WITH TWO OR MORE COMMITS THIS CHECK FAILS LOCALLY AND PASSES IN CI.** Both
+   are correct. Actions checks out a synthetic MERGE commit for a
+   `pull_request` run, so `HEAD` is that merge and the one-behind allowance
+   falls on your last real commit; locally `HEAD` IS your last real commit and
+   the allowance falls on the one before it. **Trust CI here. Do not "fix" the
+   local failure by citing a branch SHA** — that is precisely the thing that
+   turns `main` red a minute after the merge.
 3. **No test counts** in `CLAUDE.md`, `RESTORE.md`, `state-of-play.md`,
    `schema-history.md`, the runbooks or the specs. Every count ever written
    into these rotted within days. Mark a line `<!-- count-ok -->` to exempt.
