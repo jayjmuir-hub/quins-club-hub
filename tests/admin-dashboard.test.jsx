@@ -22,6 +22,7 @@ const listPlayersMock = vi.fn()
 const listContactsForPlayersMock = vi.fn()
 const listClubMembersMock = vi.fn()
 const createInviteMock = vi.fn()
+const listAllLeagueTeamsMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -44,6 +45,15 @@ vi.mock('../src/data/players.js', () => ({
 vi.mock('../src/data/members.js', () => ({
   listClubMembers: (...args) => listClubMembersMock(...args),
   createInvite: (...args) => createInviteMock(...args),
+}))
+
+// AdminClub reads the club's league teams into the Age groups list. Their own
+// behaviour is covered by tests/admin-club-league-teams.test.jsx; mocked here
+// so this file stays unable to reach the network.
+vi.mock('../src/data/leagueTeams.js', () => ({
+  listAllLeagueTeams: (...args) => listAllLeagueTeamsMock(...args),
+  upsertLeagueTeam: vi.fn(),
+  setLeagueTeamActive: vi.fn(),
 }))
 
 // Import after vi.mock so these bind to the mocked modules.
@@ -101,6 +111,7 @@ beforeEach(() => {
   listPlayersMock.mockResolvedValue(ALL_PLAYERS)
   listContactsForPlayersMock.mockResolvedValue(CONTACTS)
   listClubMembersMock.mockResolvedValue([])
+  listAllLeagueTeamsMock.mockResolvedValue([])
 })
 
 describe('AdminDashboard — authorisation gate', () => {

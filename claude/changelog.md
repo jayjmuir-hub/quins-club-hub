@@ -10,7 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- `b640b4a` — **The league-team data layer and one shared fixture label** (tasks 3-4).
+- **The Club tab manages the club's league teams** (task 5). Each age group in the Age
+  groups list now carries its own league teams as chips, plus a "+" to enter another.
+  ⚠️ **A league team is entered against the squad whose "+" was tapped** — the panel
+  carries that squad's `team_id` and `club_id`, because a U14 team filed under U16 reaches
+  the governing body as a wrong result rather than an obvious slip.
+  ⚠️ **`division` is sent as NULL, never `''`** — the column carries a check constraint of
+  `('A','B','C')`, so an empty string is a violation rather than "no division", and the
+  save would fail on a field somebody deliberately left blank.
+  ⚠️ **Retired teams are shown, greyed, and ANNOUNCED as retired** — this is the only
+  screen that can bring one back, and hiding it would make it look deleted and get it
+  re-added under a name that collides with `league_teams_club_id_rcm_name_key`.
+  ⚠️ **A new `listAllLeagueTeams` reads club-wide, and is NOT a picker source** — the
+  squad-scoped `listLeagueTeams` still exists for exactly that reason; this one saves
+  fifteen round trips on a screen that lists every squad, and the screen groups by
+  `team_id` itself. ⚠️ **The screen offers no Delete, deliberately**: `ON DELETE SET NULL`
+  would strip the league identity off every fixture the team ever played, leaving them
+  indistinguishable from friendlies.
+
+⚠️ **`b640b4a` and `8cd5ff0` USED TO HEAD THE NEXT TWO ENTRIES AND ARE NOT COMMITS.** They
+were branch commits, and `main`'s only merge method is SQUASH — so the moment PR #51
+merged they ceased to exist and `docs:check` went red on `main` itself, not merely on a
+branch. **Cite the SHA the squash produced, which nobody can know until after the merge:**
+that is exactly the "changelog is allowed to be one commit behind" rule, and the reason it
+must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than deleted —
+`CLAUDE.md` rule 7, an anchor that has rotted gets repointed, never removed.
+
+- `725d0e6` — **`league_teams`, the data layer, and one shared fixture label** (tasks 1-4,
+  PR #51). Squashed from the two entries that follow, which are kept for their detail.
+
+- (in `725d0e6`) — **The league-team data layer and one shared fixture label** (tasks 3-4).
   `listLeagueTeams` / `upsertLeagueTeam` / `setLeagueTeamActive`, plus the formatter every
   screen will render. ⚠️ **The null case is tested FIRST** — no league team means no
   division and no round, and a stale round left on a fixture later changed to a friendly
@@ -22,7 +51,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   filed under a U16 team, which the league receives as a wrong result rather than an
   obvious mistake. Nothing user-visible yet; the display work is tasks 5-7.
 
-- `8cd5ff0` — **`league_teams`: the club's COMPETING teams, distinct from its SQUADS**
+- (in `725d0e6`) — **`league_teams`: the club's COMPETING teams, distinct from its SQUADS**
   (tasks 1-2). `ADHQ2` is a league team; `U14B Contact` is a training squad; one squad can
   enter three. Plus `events.league_team_id` and `events.round`.
   ⚠️ **The RLS harness was run BEFORE the migration existed**, where it could not run at
