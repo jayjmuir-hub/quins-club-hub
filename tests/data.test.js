@@ -2076,7 +2076,7 @@ describe('createInvite (multi-target)', () => {
 // query.
 
 describe('registerMyPlayer', () => {
-  it('calls the RPC with exactly the three parameters it takes, and returns the pending row', async () => {
+  it('calls the RPC with exactly the four parameters it takes, and returns the pending row', async () => {
     const membership = {
       id: 'mm-1',
       profile_id: 'user-1',
@@ -2088,7 +2088,7 @@ describe('registerMyPlayer', () => {
 
     const result = await registerMyPlayer('Sam Muir', 't-u13')
 
-    // ⚠️ THREE ARGUMENTS, AND THE ABSENT ONES ARE STILL THE POINT. There is
+    // ⚠️ FOUR ARGUMENTS, AND THE ABSENT ONES ARE STILL THE POINT. There is
     // no club id (it is derived from the team server-side, so a caller cannot
     // point the membership at a different club from the player) and no email
     // (it is read from auth.users, so a typed address is never evidence).
@@ -2099,10 +2099,17 @@ describe('registerMyPlayer', () => {
     // passed none, and the function requires one only when the SQUAD is
     // single-gender. Sending undefined instead would drop the key and change
     // which Postgres overload PostgREST resolves.
+    //
+    // p_self_register arrived 11 Aug 2026 and is FALSE here for the same
+    // reason: the caller passed none, and false is what every pre-existing
+    // caller meant. ⚠️ It must be sent as a real boolean rather than omitted —
+    // the squad, not this flag, decides whether it is permitted, and the
+    // function refuses a true it is not entitled to.
     expect(supabase.rpc).toHaveBeenCalledWith('register_my_player', {
       p_full_name: 'Sam Muir',
       p_team_id: 't-u13',
       p_gender: null,
+      p_self_register: false,
     })
     expect(supabase.rpc).toHaveBeenCalledTimes(1)
     expect(result).toEqual(membership)
@@ -2176,7 +2183,47 @@ describe('registerMyPlayer', () => {
       p_full_name: 'Amara Bello',
       p_team_id: 't-u16g',
       p_gender: 'female',
+      p_self_register: false,
     })
+  })
+
+  // ⚠️ THE FLAG IS COERCED, NOT FORWARDED. PostgREST resolves the overload from
+  // the JSON types it is sent, so a truthy string like 'yes' arriving here from
+  // a careless caller must still leave as a boolean. `selfRegister === true` in
+  // members.js is what does it, and this is the test that would notice if
+  // somebody simplified it to a bare pass-through.
+  it.each([
+    ['a real true', true, true],
+    ['a truthy string', 'yes', false],
+    ['undefined', undefined, false],
+  ])('sends p_self_register as a boolean for %s', async (_why, given, expected) => {
+    supabase.rpc.mockResolvedValue({ data: { id: 'mm-1', status: 'pending' }, error: null })
+
+    await registerMyPlayer('Sam Reid', 't-u18b', 'male', given)
+
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'register_my_player',
+      expect.objectContaining({ p_self_register: expected }),
+    )
+  })
+
+  // ⚠️ 0A000 IS DELIBERATELY ABSENT FROM REGISTER_MESSAGES, exactly like 22004.
+  // The function's own sentence names the squad ("Players in U10 Mixed Contact
+  // cannot register themselves…"), and it only reaches the person because no
+  // entry here replaces it. If someone adds a 0A000 entry to the map, this
+  // fails — which is the point.
+  it('passes the self-registration refusal through verbatim, naming the squad', async () => {
+    supabase.rpc.mockResolvedValue({
+      data: null,
+      error: {
+        code: '0A000',
+        message: 'Players in U10 Mixed Contact cannot register themselves — a parent or carer has to do it.',
+      },
+    })
+
+    await expect(registerMyPlayer('Kid Name', 't-u10', null, true)).rejects.toThrow(
+      /U10 Mixed Contact cannot register themselves/,
+    )
   })
 })
 

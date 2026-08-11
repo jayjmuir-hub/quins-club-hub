@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **11 Aug — the machine facts were measured on the machine, and two were wrong.**
+- **11 Aug — a U13+ player can register themselves.** "Add your player" asks *is this
+  you, or your child?* for squads that permit it, and the membership role becomes
+  `player` rather than `parent`. ⚠️ **The permission is a new `teams` column, never the
+  squad name** — `20260806_claim_roster_access.sql` ruled that a rename must not hand an
+  account a role it should not have. The database refuses a self-registration for a
+  squad that disallows it (`0A000`, deliberately unmapped so the sentence naming the
+  squad reaches the person). ⚠️ **The 3-arg `register_my_player` is dropped**, because
+  Postgres prefers an exact arity match and every existing client would otherwise keep
+  resolving to it. Design and the rejected alternatives:
+  `claude/plans/2026-08-11-youth-self-registration.md`.
+
+- `0e62899` — **The machine facts were measured on the machine, and two were wrong.**
   cafnet was synced from `build/v1-mvp` — a branch deleted from origin, 76 commits
   behind — and the claims about it checked by running the commands there. ⚠️ **`NODE_ENV`
   is not set on cafnet at any scope**, contradicting the "BOTH PCs" wording that had
