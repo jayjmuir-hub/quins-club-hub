@@ -252,6 +252,19 @@ by whoever remembered:
 2. **Every changelog SHA is a real commit, and no commit is missing.**
    ⚠️ **The changelog may be exactly one commit behind** — a commit cannot
    cite its own SHA — so the next commit must catch it up.
+   ⚠️ **RUN IT AFTER THE COMMIT, NOT ONLY AFTER `git add` — the line below
+   saying "after `git add`" is necessary and NOT sufficient.** The one-behind
+   allowance is measured against `HEAD`, so a SHA that is HEAD when you stage
+   is legal, and becomes illegal the moment you commit on top of it. This went
+   green locally and red in CI on PR #55 for exactly that reason.
+   ⚠️ **AND A GREEN LOCAL RUN IS NOT EVIDENCE FOR A CHANGELOG SHA AT ALL.**
+   `main` squash-merges, so a branch SHA stops existing at merge — but it
+   survives as a loose object in the clone that authored it, where
+   `git cat-file` still finds it. CI is a fresh clone and cannot. **Never cite
+   your own branch's SHA**; leave the entry unSHA'd and let the NEXT pull
+   request cite the squash SHA, which is the only one that will exist. That is
+   what the one-behind rule is for, and doing it any other way costs a red
+   `main` after every single merge.
 3. **No test counts** in `CLAUDE.md`, `RESTORE.md`, `state-of-play.md`,
    `schema-history.md`, the runbooks or the specs. Every count ever written
    into these rotted within days. Mark a line `<!-- count-ok -->` to exempt.

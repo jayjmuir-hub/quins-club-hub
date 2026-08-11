@@ -34,7 +34,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **The calendar feed names the league team** (task 8). `calendar_events_for_token()` gains
+- `8be9668` — **The calendar feed names the league team** (task 8). `calendar_events_for_token()` gains
   `league_team_name`, `league_division` and `round`; the edge function puts the team's NAME
   in `SUMMARY` (in place of the squad) and the full `ADHQ2 · Div B · Round 4` first in
   `DESCRIPTION`.
