@@ -10,6 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **11 Aug — the docs caught up with the session.** `state-of-play.md` carried three
+  claims the day had falsified (the pitch screens and email "NOT BUILT YET", the
+  super-admin tier "NOT YET BUILT"), `RESTORE.md` had no record of the notification
+  plumbing, and the session had no handoff. ⚠️ **All three stale claims were the same
+  kind: a status line that was true when written and was carried past the change that
+  falsified it** — the precise failure `state-of-play.md` exists to catch, and the
+  third instance in a week.
+
+- `bfcb571` — **Email Pitch Managers on a pitch request, and the coach on the answer.**
+
 - **11 Aug — a pitch request now EMAILS: the Pitch Managers when it is asked, the
   coach when it is answered.** Trigger `notify_pitch_request` on `pitch_requests` plus
   the `notify-pitch-request` edge function. Closes Jay's "email multiple people,

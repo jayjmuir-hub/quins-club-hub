@@ -467,6 +467,33 @@ untracks the whole ledger. Do not fight it — stage the workspace with
 - **Supabase:** project `quins-club-hub`, ref `lusmshimxdcxpnrktlgz`, region
   `ap-northeast-1`, Postgres 17, status `ACTIVE_HEALTHY`. A second project `adhjrt-app`
   (`nnlfjbnoiyqcvxwbwsjf`) exists and is **not** used by this app.
+- **Outbound mail is sent BY THE DATABASE, through two edge functions.** A trigger
+  calls `net.http_post` (pg_net), the function reads its recipients back with the
+  service role and sends one Resend call with everyone in `bcc`:
+  `notify-approval` (`private.notify_pending_membership`, pending registrations) and
+  `notify-pitch-request` (`private.notify_pitch_request`, pitch asked and answered).
+  ⚠️ **BOTH MUST BE DEPLOYED WITH `verify_jwt: false`** — Postgres calls them with no
+  user JWT, and with verification on the gateway rejects every call **before the
+  function runs, silently**, because pg_net never reads the response. This repo has no
+  Supabase CLI config file, so the flag **cannot be encoded in the repo at all**: the
+  copies under `supabase/functions/` are documentation, and **the flag lives only at
+  deploy time.** Redeploying without it silently kills every email.
+  ⚠️ **Testing it needs the response BODY, not the status** — the gateway also
+  returns 401 for a missing JWT, so a 401 alone proves nothing. The functions answer
+  `unauthorised` in plain text; if you see JSON, verification is wrongly on.
+  ⚠️ **They share ONE secret, `approval_notify_secret`**, on purpose — a second is a
+  second thing to rotate and forget. Each has its own `*_notify_url` vault entry, and
+  `pitch_notify_url` was DERIVED from `approval_notify_url` in SQL precisely so the
+  host cannot drift and so no human handles the value.
+  ⚠️ **Neither can fail its write, and neither reports failure anywhere a user
+  sees.** Both swallow into `raise warning`. **The in-app queue or list is the record;
+  the email is only a prompt to go and look.** Never describe these as reliable
+  delivery.
+  ⚠️ **Neither has, or can have, vitest coverage** — a Postgres trigger and a Deno
+  function are not modules the suite imports. Live verification is the only check.
+  **A safe way to prove a trigger fires without sending anything: insert inside a
+  transaction and force a ROLLBACK** — the pg_net queue row is written in the same
+  transaction, so the queue count goes up and then vanishes with everything else.
 - **This repo is public.** No secret VALUE is committed and `.env` is ignored. Security
   rests on Supabase RLS, not on the code being hidden. Keep it that way.
   ⚠️ **This used to claim "no `sb_secret_` or `service_role` string appears in any tracked
