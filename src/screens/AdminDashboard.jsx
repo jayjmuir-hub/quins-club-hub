@@ -2,7 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import { ViewAsSwitcher } from '../components/ViewAsSwitcher.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin } from '../lib/scope.js'
+import { hasAdminRight, isAdmin } from '../lib/scope.js'
 
 // The back-end dashboard (admin-dashboard plan, 2026-08-05): one /admin
 // route with two tabs, absorbing what used to be /accounts and the admin
@@ -71,10 +71,23 @@ function PreviewingNotice() {
   )
 }
 
-const TABS = [
+// ⚠️ THE PITCHES TAB IS GATED ON AN ADMIN RIGHT, NOT ON `isAdmin`. Every
+// admin can already write the pitch table — the RLS policy is `is_admin`
+// deliberately, because these rights decide which specialist dashboard
+// somebody is SHOWN rather than what they may do
+// (claude/decisions/2026-08-10-role-dashboards.md). So hiding the tab is a
+// "this is not your job" signal, not a permission, and the screen repeats the
+// check because a route is linkable and somebody will paste the URL.
+const BASE_TABS = [
   { to: '/admin/accounts', label: 'Accounts' },
   { to: '/admin/club', label: 'Club' },
 ]
+
+function tabsFor(memberships) {
+  return hasAdminRight(memberships, 'pitches')
+    ? [...BASE_TABS, { to: '/admin/pitches', label: 'Pitches' }]
+    : BASE_TABS
+}
 
 function tabClassName({ isActive }) {
   return [
@@ -143,7 +156,7 @@ export default function AdminDashboard() {
         </div>
 
         <nav aria-label="Admin sections" className="mb-4 flex gap-2">
-          {TABS.map((tab) => (
+          {tabsFor(memberships).map((tab) => (
             <NavLink key={tab.to} to={tab.to} className={tabClassName}>
               {tab.label}
             </NavLink>

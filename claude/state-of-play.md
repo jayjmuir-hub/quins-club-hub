@@ -542,8 +542,14 @@ state; trust the decisions for reasoning.**
   `db/tests/rls-pitch-requests.sql`.
   ⚠️ **NO SCREEN AND NO EMAIL YET.** Jay asked for two dashboards and email to
   multiple people; neither is built. Nothing writes a `pitch_requests` row today.
-  ⚠️ **Still missing: the pitch management screen** (add/rename/retire), Tracy's
-  queue, the submitter's view, and the email.
+  ✅ **The pitch SETUP screen is live** — `/admin/pitches`, blocks as columns, behind
+  the `pitches` admin right (which gates the screen, not the data). Rename, retire,
+  bring back, add. ⚠️ **The block is derived from the name, not stored**; `Other` is a
+  real bucket and always sorts last.
+  ⚠️ **Still missing: the ALLOCATION grid (option C — pitches down the side, the day
+  across the top), Tracy's request queue, the submitter's tracking view, and the
+  email.** Jay chose C for allocation on 11 Aug; nothing of it is built, and nothing
+  writes a `pitch_requests` row yet.
 - Nothing in the UI distinguishes a Medic from a Coach, because there is no
   difference in access. Deliberate — the word is what distinguishes them.
 - ⚠️ **A SUPER-ADMIN TIER IS WANTED — decided 10 Aug, NOT YET BUILT.** Candice, Nick
