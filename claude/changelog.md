@@ -10,7 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **An implementation plan for Project 1**, `claude/plans/2026-08-11-league-teams-implementation.md`
+- `b640b4a` — **The league-team data layer and one shared fixture label** (tasks 3-4).
+  `listLeagueTeams` / `upsertLeagueTeam` / `setLeagueTeamActive`, plus the formatter every
+  screen will render. ⚠️ **The null case is tested FIRST** — no league team means no
+  division and no round, and a stale round left on a fixture later changed to a friendly
+  must not leak out. ⚠️ **`upsertLeagueTeam` throws when RLS filters a write to zero
+  rows**: that refusal arrives as `data === null` with `error === null`, so without the
+  explicit check a non-admin's rename reports back as saved while nothing changed.
+  ⚠️ **`listLeagueTeams` is always scoped to ONE squad** and returns `[]` rather than
+  querying without one — a club-wide list on the event form would let a U14 fixture be
+  filed under a U16 team, which the league receives as a wrong result rather than an
+  obvious mistake. Nothing user-visible yet; the display work is tasks 5-7.
+
+- `8cd5ff0` — **`league_teams`: the club's COMPETING teams, distinct from its SQUADS**
+  (tasks 1-2). `ADHQ2` is a league team; `U14B Contact` is a training squad; one squad can
+  enter three. Plus `events.league_team_id` and `events.round`.
+  ⚠️ **The RLS harness was run BEFORE the migration existed**, where it could not run at
+  all — that is the fault injection — and again after. All five steps pass, including a
+  coach's INSERT refused with **42501 specifically**, because a refusal caused by a
+  mistyped table name would otherwise read as "RLS works".
+  ⚠️ **The harness's first run died with "permission denied for table `_r`"**, which looks
+  exactly like an RLS failure on `league_teams` and was nothing of the kind: its temp
+  results table was granted to `authenticated` but not `anon`. **A harness that cannot
+  record its own result reports a bug that does not exist.**
+  ⚠️ **`events.league_team_id` is ON DELETE SET NULL, never cascade** — deleting a league
+  team must cost a fixture its LABEL, which is recoverable, and never the FIXTURE.
+
+- `4b5a152` — **An implementation plan for Project 1**, `claude/plans/2026-08-11-league-teams-implementation.md`
   — eight TDD tasks. ⚠️ **Task 4 is written null-case-first on purpose** and step 5 proves
   that test discriminates by injecting a default into the null branch. ⚠️ **One shared
   label formatter rather than four call sites**, because the calendar feed
