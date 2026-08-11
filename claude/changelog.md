@@ -10,6 +10,35 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
+- **11 Aug — the pitch setup screen: blocks as columns.** `/admin/pitches`, picked by
+  Jay from **six** options laid out at browser width. Four block cards, all fifteen
+  pitches visible at once on a desktop, stacking on a phone; tap a chip to rename or
+  retire, `+` to add one to that block.
+  ⚠️ **The `pitches` admin right gates the TAB and the SCREEN, and neither is
+  security.** Every admin can already write the table — the RLS policy is `is_admin`
+  deliberately, because these rights decide which specialist dashboard somebody is
+  SHOWN. So the screen says "you haven't been given the Pitch Manager job", not "you
+  are not allowed". The screen repeats the tab's check because a route is linkable and
+  somebody will paste the URL. A **super admin** gets in without the right being
+  listed, since a super admin holds all of them implicitly.
+  ⚠️ **THE BLOCK IS DERIVED FROM THE NAME, not stored.** The club already puts it in
+  the name (A1, C5), and a `block` column would be a second place for it to be wrong.
+  The cost is that a name like "Clubhouse lawn" has no block, so `Other` exists as a
+  real bucket — and it always sorts LAST, because a stray bucket in the middle of
+  A/B/C/D reads as a block the club does not have.
+  ⚠️ **THE RENAME WARNING IS PART OF THE FEATURE.** `events.pitch` is TEXT with no
+  foreign key, so renaming a pitch does NOT touch the fixtures already naming it —
+  they keep the old string and silently stop matching for clash detection. The screen
+  says so, every time, and points at retiring instead. Proved by deleting the warning:
+  the test fails.
+  ⚠️ **A retired pitch is ANNOUNCED as retired**, not just drawn with a dashed
+  outline — the outline is invisible to a screen reader, and "what is out of action"
+  is the main question this screen answers. Also proved by injected fault.
+  ⚠️ **This is NOT the allocation screen.** Allocating is weekly and gets its own grid
+  (option C, not built). They are separate so a rare destructive action does not live
+  on the screen used every week.
+- `0ae522b` — **`pitch_requests`: a coach asks, an admin allocates.**
+
 - **11 Aug — `pitch_requests`: a coach asks, an admin allocates. SCHEMA AND RLS ONLY —
   no screen and no email yet.** Jay's four rulings: a request **attaches to an existing
   fixture** (so it appears in the schedule at once carrying `Pitch TBD`, which is what

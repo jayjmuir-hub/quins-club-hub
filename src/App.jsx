@@ -9,6 +9,7 @@ import More from './screens/More.jsx'
 import AdminDashboard from './screens/AdminDashboard.jsx'
 import AdminClub from './screens/AdminClub.jsx'
 import Accounts from './screens/Accounts.jsx'
+import Pitches from './screens/Pitches.jsx'
 import AcceptInvite from './screens/AcceptInvite.jsx'
 import Privacy from './screens/Privacy.jsx'
 import DeleteAccount from './screens/DeleteAccount.jsx'
@@ -116,6 +117,12 @@ export default function App() {
             <Route index element={<Navigate to="/admin/accounts" replace />} />
             <Route path="accounts" element={<Accounts />} />
             <Route path="club" element={<AdminClub />} />
+            {/* Pitch setup. The `pitches` admin right decides whether the TAB
+                is shown; the screen itself repeats the check, because a route
+                is linkable and somebody will paste the URL. Neither is
+                security — every admin can already write `pitches` — it is a
+                "you were not given this job" message. */}
+            <Route path="pitches" element={<Pitches />} />
           </Route>
 
           {/* THE COACH / TEAM MANAGER APPROVALS ROUTE (Jay, 9 Aug 2026).
