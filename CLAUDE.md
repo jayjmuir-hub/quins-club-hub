@@ -194,29 +194,46 @@ it does not depend on any row below being current.**
 run on is worth.** Each cell says where it came from. Re-run the command
 before trusting any row.
 
-| Fact | Command | jay-pc — ⚠️ SECOND-HAND | cafnet — measured 11 Aug 2026 |
+| Fact | Command | jay-pc — measured 11 Aug 2026 | cafnet — measured 11 Aug 2026 |
 |---|---|---|---|
-| Clone path | — | `C:\Users\jayjm\GitHub\quins-club-hub` | `C:\Users\Jay\GitHub\quins-club-hub` |
-| `NODE_ENV` | `set NODE_ENV` | *reported* `production` (7 Aug) — **UNVERIFIED** | **not set, at any scope** |
-| npm from PowerShell | `npm --version` | *reported* blocked, run npm from `cmd` (9 Aug) — **UNVERIFIED** | works; `ExecutionPolicy` is `Bypass` |
-| `core.fileMode` | `git config --get core.fileMode` | *reported* `false` (5 Aug) — **UNVERIFIED** | `false` |
-| `gh` CLI | `gh auth status` | never checked — **UNKNOWN** | installed, authenticated as `jayjmuir-hub` (keyring) |
+| Clone path | — | ⚠️ **TWO** — see below | `C:\Users\Jay\GitHub\quins-club-hub` |
+| `NODE_ENV` | `set NODE_ENV` | **not set, at any scope** | **not set, at any scope** |
+| npm from PowerShell | `npm --version` | works (11.16.0); `ExecutionPolicy` is `Bypass` | works; `ExecutionPolicy` is `Bypass` |
+| `core.fileMode` | `git config --get core.fileMode` | `false` | `false` |
+| `gh` CLI | `gh auth status` | installed, authenticated as `jayjmuir-hub` (keyring) | installed, authenticated as `jayjmuir-hub` (keyring) |
 
-⚠️ **THE `jay-pc` COLUMN IS NOT A MEASUREMENT AND MUST NOT BE READ AS ONE.**
-It was assembled on cafnet on 11 Aug from what other documents already
-claimed, because no command can be run on jay-pc from here. **Jay, who uses
-that machine, doubts all three.** The first session that runs on jay-pc
-should run the three commands above and replace the column outright — and if
-a value differs, that is the expected outcome, not a surprise.
+✅ **THE `jay-pc` COLUMN IS NOW A MEASUREMENT.** It was assembled on cafnet on
+11 Aug from what other documents already claimed, and every value carried a
+**UNVERIFIED** marker. Measured on jay-pc later the same day: **two of the four
+were wrong**, exactly as this file predicted and as Jay expected.
 
-⚠️ **The `NODE_ENV` row is why rule 8 exists, and it has now been wrong
-twice in opposite directions.** It said "cafnet only" in three files until
-7 Aug; that was corrected to "BOTH PCs", asserted about cafnet from jay-pc
-without ever being run there. Measured on cafnet 11 Aug 2026 — empty at
-Process, User and Machine scope. **Both errors were the same error: a
-machine fact written from the other machine** — which is exactly what the
-`jay-pc` column above still is. This table is the single home for these;
-`state-of-play.md` and `claude/runbooks/session-and-push.md` point here.
+- ❌ `NODE_ENV` was *reported* `production`. It is **not set at Process, User or
+  Machine scope.** ⚠️ **`npm install --include=dev` stays unconditional anyway**
+  — the flag is deliberately not contingent on this row being current.
+- ❌ npm from PowerShell was *reported* blocked, "run npm from `cmd`". It
+  **works**, and `ExecutionPolicy` is `Bypass`.
+- ✅ `core.fileMode` was *reported* `false`. It **is** `false`.
+- `gh` was never checked and is installed and authenticated.
+
+⚠️ **THERE ARE TWO CLONES ON jay-pc, AND ONLY ONE WAS EVER WRITTEN DOWN.**
+Both were on `main` and clean on 11 Aug 2026.
+
+| Clone | Note |
+|---|---|
+| `C:\Users\jayjm\Quins Club Hub` | ⚠️ **The one Claude Code opens**, and it was undocumented until 11 Aug. **Ships with NO `.env`** — a block of test files then fails to COLLECT with a Supabase env-var error while the great majority of tests still pass, which reads as a broken suite and is not one. Copy `.env` from the other clone; it holds only `VITE_SUPABASE_URL` and the publishable key, both public by design. |
+| `C:\Users\jayjm\GitHub\quins-club-hub` | The one this table used to name as the only clone. Has `.env`. |
+
+⚠️ **Two clones on one machine is a second way to be stale**, and reading-order
+step 2 must be run in **whichever one you are actually in** — `hostname` no
+longer identifies the working tree on this PC.
+
+⚠️ **The `NODE_ENV` row is why rule 8 exists, and it was wrong twice in
+opposite directions before it was ever run.** It said "cafnet only" in three
+files until 7 Aug; that was corrected to "BOTH PCs", asserted about cafnet from
+jay-pc without ever being run there; and the jay-pc value was then asserted from
+cafnet. **All three errors were the same error: a machine fact written from the
+other machine.** It is now measured on both. This table is the single home for
+these; `state-of-play.md` and `claude/runbooks/session-and-push.md` point here.
 
 **Stack:** Vite + React, Tailwind, Supabase (Postgres 17, ref
 `lusmshimxdcxpnrktlgz`), Netlify (project `quins-club-hub`). `npm test` is

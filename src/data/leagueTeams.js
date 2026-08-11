@@ -40,6 +40,31 @@ export async function listLeagueTeams({ teamId, includeRetired = false } = {}) {
 }
 
 /**
+ * Every league team in the club, for the ONE screen that manages them.
+ *
+ * ⚠️ THIS IS NOT A PICKER SOURCE, AND THAT IS THE WHOLE REASON THE OTHER
+ * FUNCTION EXISTS. `listLeagueTeams` is scoped to one squad so an event form
+ * cannot offer a U16 team for a U14 fixture; if that guard is ever wanted here
+ * too, the answer is to keep using it, not to widen it. The management screen
+ * is safe because it never files a fixture — it groups by `team_id` and shows
+ * each squad only its own.
+ *
+ * Club-wide because the alternative is one round trip per squad on a screen
+ * that lists all fifteen. `listPitches` has the same shape for the same reason.
+ */
+export async function listAllLeagueTeams({ includeRetired = false } = {}) {
+  let query = supabase.from('league_teams').select('*')
+  if (!includeRetired) query = query.eq('is_active', true)
+
+  const { data, error } = await query
+    .order('sort_order', { ascending: true })
+    .order('rcm_name', { ascending: true })
+
+  if (error) throw error
+  return data ?? []
+}
+
+/**
  * Creates or renames a league team.
  *
  * ⚠️ RENAMING IS SAFE HERE, UNLIKE A PITCH. `events.league_team_id` is a real

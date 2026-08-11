@@ -3,9 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('../src/lib/supabase', () => ({ supabase: { from: vi.fn() } }))
 
 const { supabase } = await import('../src/lib/supabase')
-const { listLeagueTeams, upsertLeagueTeam, setLeagueTeamActive } = await import(
-  '../src/data/leagueTeams.js'
-)
+const { listAllLeagueTeams, listLeagueTeams, upsertLeagueTeam, setLeagueTeamActive } =
+  await import('../src/data/leagueTeams.js')
 
 /** A chainable query stub whose terminal `.order()` resolves. */
 function queryStub(result = { data: [], error: null }) {
@@ -64,6 +63,32 @@ describe('listLeagueTeams', () => {
     const result = await listLeagueTeams({})
     expect(result).toEqual([])
     expect(supabase.from).not.toHaveBeenCalled()
+  })
+})
+
+describe('listAllLeagueTeams', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('⚠️ reads the club, and filters by no squad at all', async () => {
+    // The deliberate opposite of listLeagueTeams. It exists for the management
+    // screen, which groups by team_id itself; a `team_id` filter here would
+    // just be the other function.
+    const chain = queryStub()
+    supabase.from.mockReturnValue(chain)
+
+    await listAllLeagueTeams({ includeRetired: true })
+
+    expect(supabase.from).toHaveBeenCalledWith('league_teams')
+    expect(chain.eq).not.toHaveBeenCalled()
+  })
+
+  it('hides retired teams by default, like its squad-scoped sibling', async () => {
+    const chain = queryStub()
+    supabase.from.mockReturnValue(chain)
+
+    await listAllLeagueTeams()
+
+    expect(chain.eq).toHaveBeenCalledWith('is_active', true)
   })
 })
 
