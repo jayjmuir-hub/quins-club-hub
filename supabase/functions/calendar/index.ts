@@ -89,11 +89,53 @@ type Event = {
   ends_at?: string | null
   notes?: string | null
   team_name: string | null
+  // Added 12 Aug 2026 (db/migrations/20260812_calendar_feed_league_team.sql).
+  //
+  // ⚠️ OPTIONAL FOR THE SAME REASON ends_at AND notes ARE, and the reason is
+  // directly above: calendar_events_for_token()'s RETURNS TABLE decides what
+  // actually leaves the database, not this file. Until that migration is
+  // applied these arrive `undefined`, and everything below must fall back
+  // rather than emit "undefined" into somebody's subscribed calendar.
+  league_team_name?: string | null
+  league_division?: string | null
+  round?: number | null
+}
+
+/**
+ * The fixture's league identity, or '' when it has none.
+ *
+ * ⚠️ DUPLICATES fixtureLabel() in src/lib/fixtureLabel.js, deliberately and
+ * unavoidably — the same standing arrangement locationFor() has with
+ * venueLine(). That module is browser JavaScript bundled by Vite; this is a
+ * standalone Deno function deployed separately, and there is no shared build.
+ * ⚠️ AND THIS ONE MATTERS MORE THAN THE VENUE COPY, because the feed is what a
+ * parent sees when they are NOT looking at the app: a fixture labelled ADHQ2
+ * on screen and ADHQ1 in their calendar is a family at the wrong pitch.
+ * tests/fixture-label.test.js pins the app side.
+ *
+ * ⚠️ NO LEAGUE TEAM MEANS NO LEAGUE DECORATION, and `round` is ignored
+ * entirely without one — a round number left on a fixture later changed to a
+ * friendly is stale data, not a label.
+ */
+function leagueLabel(event: Event): string {
+  if (!event.league_team_name) return ''
+  const parts = [event.league_team_name]
+  if (event.league_division) parts.push(`Div ${event.league_division}`)
+  if (event.round !== null && event.round !== undefined) parts.push(`Round ${event.round}`)
+  return parts.join(' · ')
 }
 
 /** Matches the app's own wording (src/lib/eventFormat.js). */
 function summaryFor(event: Event): string {
-  const squad = event.team_name ?? 'Quins'
+  // ⚠️ THE LEAGUE TEAM STANDS IN FOR THE SQUAD, AND ONLY ITS NAME. "ADHQ2 v
+  // Dubai Exiles" is the title; the division and round go in DESCRIPTION.
+  // A phone truncates SUMMARY hard, and "ADHQ2 · Div B · Round 4 v Dubai
+  // Exiles" loses the opponent — the one thing the title exists to carry.
+  // ⚠️ THIS IS A DELIBERATE DEPARTURE FROM THE APP'S CHIP, which shows the
+  // whole label because it has a chip to itself and no competing text. Same
+  // facts, same order, different amount of room. It is NOT a drift: both come
+  // from the same three columns and neither invents anything.
+  const squad = event.league_team_name ?? event.team_name ?? 'Quins'
   if (event.type === 'match') {
     const opponent = event.opponent ?? 'TBC'
     return event.home ? `${squad} v ${opponent}` : `${opponent} v ${squad}`
@@ -161,6 +203,16 @@ function toVEvent(event: Event, stamp: string): string[] {
   const end = endFor(event, start)
 
   const description: string[] = []
+  // ⚠️ FIRST, AHEAD OF THE COMPETITION. DESCRIPTION is the line a phone
+  // truncates from the right, and "which of our teams, in which division, in
+  // which round" is the fact a parent cannot recover from anywhere else in the
+  // entry — the SUMMARY carries only the team's name. The competition ("UAE
+  // Youth League") is the more guessable of the two.
+  // ⚠️ EMPTY STRING WHEN THE FIXTURE IS NOT A LEAGUE MATCH, so nothing is
+  // pushed and the description is byte-identical to what it was before this
+  // change for every friendly, training and social.
+  const league = leagueLabel(event)
+  if (league) description.push(league)
   if (event.competition) description.push(event.competition)
   if (event.type === 'match' && event.opponent) {
     description.push(event.home ? 'Home' : 'Away')

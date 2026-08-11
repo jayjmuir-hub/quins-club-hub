@@ -1,20 +1,33 @@
 # League Teams and Fixtures — Implementation Plan
 
-**STATUS: NOT SHIPPED IN FULL — tasks 1-7 have shipped, task 8 has not.**
-Written 11 Aug 2026. Implements
-`claude/plans/2026-08-11-league-teams-and-fixtures.md`.
-⚠️ **Set this line to SHIPPED in the commit that ships it**, not as a promise
-about that commit.
+**STATUS: SHIPPED.** All eight tasks. Written 11 Aug 2026, finished 12 Aug 2026.
+Implements `claude/plans/2026-08-11-league-teams-and-fixtures.md`.
 
-⚠️ **TASK 8 IS THE ONE LEFT, AND IT IS BIGGER THAN THIS PLAN SAYS.** The plan
-describes it as editing `supabase/functions/calendar/index.ts`. That file cannot
-do it alone: **the feed's columns come from `calendar_events_for_token()`'s
-`RETURNS TABLE`**, so the league team has to be added there by MIGRATION first.
-The same trap cost a day in Aug 2026 when the pitch was missing from the feed
-and no amount of editing the function fixed it — see the comment on the `Event`
-type in that file, and `db/migrations/20260805_calendar_feed_pitch.sql`. It is
-also a separate DEPLOY from the bundle, which is why it was not bundled into the
-tasks 6-7 change.
+⚠️ **SHIPPED IS NOT THE SAME AS EXERCISED, AND THIS ONE IS NOT EXERCISED.** At
+the moment task 8 was verified the database held **zero** league teams and zero
+tagged fixtures, so every league path — the chip, the `EventDetail` row, the
+allocation label, the `SUMMARY`, the `DESCRIPTION` line — has run only against
+tests and never against real data. The non-league path IS verified live: the
+feed returned every event in the window and nothing was dropped. **Creating one
+real league team on the Club tab and tagging one fixture is the outstanding
+end-to-end check**, and it exercises tasks 5, 6, 7 and 8 at once.
+
+⚠️ **TASK 8 WAS BIGGER THAN THIS PLAN SAID, and the correction is worth keeping
+for the next feed change.** The plan described it as editing
+`supabase/functions/calendar/index.ts`. That file cannot do it alone: **the
+feed's columns come from `calendar_events_for_token()`'s `RETURNS TABLE`**, so
+the league team had to be added there by MIGRATION first. The same trap cost a
+day in Aug 2026 when the pitch was missing from the feed and no amount of
+editing the function fixed it — see the comment on the `Event` type in that
+file, and `db/migrations/20260805_calendar_feed_pitch.sql`.
+
+⚠️ **AND THE MIGRATION HAD A SECOND TRAP THE PLAN DID NOT ANTICIPATE.**
+`RETURNS TABLE` cannot be changed in place, so the function must be DROPPED —
+and a drop takes its grants with it. This is the schema's one anon-executable
+endpoint. Re-granting the three roles measured beforehand was still not enough:
+`create function` grants EXECUTE to PUBLIC by default, which the old function
+did not have. **Compare the whole `proacl` before and after, not just the role
+you were worried about.**
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `superpowers:subagent-driven-development` (recommended) or

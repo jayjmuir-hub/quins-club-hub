@@ -5,6 +5,10 @@
 -- First captured 2026-08-03; re-captured 2026-08-07;
 -- ⚠️ RE-CAPTURED 2026-08-09 — 29 functions (was 22).
 -- ⚠️ RE-CAPTURED 2026-08-11 — see the block below.
+-- ⚠️ RE-CAPTURED 2026-08-12 — public.calendar_events_for_token only
+--   (20260812 calendar_feed_league_team). Three columns added to its
+--   RETURNS TABLE and a LEFT JOIN to league_teams. See the block at its
+--   definition for what the DROP did to its grants.
 --
 -- This is a CAPTURE, not a migration. Do not run this file. See README.md.
 --
@@ -250,15 +254,17 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 -- function did NOT. See the note on can_see_team below.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.calendar_events_for_token(_token uuid)
- RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, ends_at timestamp with time zone, notes text, team_name text)
+ RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, ends_at timestamp with time zone, notes text, team_name text, league_team_name text, league_division text, round smallint)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
   select e.id, e.type, e.title, e.opponent, e.home, e.venue, e.pitch, e.competition,
-         e.starts_at, e.ends_at, e.notes, t.name as team_name
+         e.starts_at, e.ends_at, e.notes, t.name as team_name,
+         lt.rcm_name as league_team_name, lt.division as league_division, e.round
   from public.events e
   join public.teams t on t.id = e.team_id
+  left join public.league_teams lt on lt.id = e.league_team_id
   where exists (
     select 1
     from public.calendar_tokens ct
@@ -274,6 +280,19 @@ AS $function$
 $function$
 ;
 
+-- ⚠️ THESE THREE GRANTS WERE DESTROYED AND REBUILT ON 12 Aug 2026, and the
+-- rebuild was NOT automatically identical. RETURNS TABLE cannot be changed in
+-- place, so the migration had to DROP the function — and a drop takes the ACL
+-- with it. Re-granting anon/authenticated/service_role restored those three,
+-- but `create function` ALSO grants EXECUTE to PUBLIC by default, which this
+-- function did not have before. The ACL read back after the migration was:
+--     {=X/postgres, postgres=X/postgres, anon=..., authenticated=..., ...}
+--      ^^^^^^^^^^^ PUBLIC, new
+-- A follow-up `revoke ... from public` restored the original string exactly.
+-- ⚠️ THE LESSON, since this is the one anonymous endpoint in the schema:
+-- re-granting what you measured is not the same as restoring what you
+-- measured. Compare the WHOLE proacl before and after, not just the one role
+-- you were worried about. See db/migrations/20260812_calendar_feed_league_team.sql.
 GRANT EXECUTE ON FUNCTION public.calendar_events_for_token(uuid) TO anon;
 GRANT EXECUTE ON FUNCTION public.calendar_events_for_token(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.calendar_events_for_token(uuid) TO service_role;
