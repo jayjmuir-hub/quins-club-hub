@@ -536,9 +536,14 @@ state; trust the decisions for reasoning.**
   data.**
   ⚠️ **16 events still name a pitch outside the list; all 16 are from the seeded
   September** and go when it does. No real fixture is orphaned.
-  ⚠️ **Still missing: the pitch management screen (add/rename/retire) and the pitch +
-  referee request workflow.** The data layer for both exists; the screens do not, and
-  the request flow needs a ruling on who requests, who approves and who is notified.
+  ✅ **`pitch_requests` EXISTS — schema and RLS, 11 Aug.** A coach asks
+  (`can_edit_team`), an admin answers (`is_admin`), and the requester can track it to
+  the outcome. Referee is a tickbox on the same request. Harness:
+  `db/tests/rls-pitch-requests.sql`.
+  ⚠️ **NO SCREEN AND NO EMAIL YET.** Jay asked for two dashboards and email to
+  multiple people; neither is built. Nothing writes a `pitch_requests` row today.
+  ⚠️ **Still missing: the pitch management screen** (add/rename/retire), Tracy's
+  queue, the submitter's view, and the email.
 - Nothing in the UI distinguishes a Medic from a Coach, because there is no
   difference in access. Deliberate — the word is what distinguishes them.
 - ⚠️ **A SUPER-ADMIN TIER IS WANTED — decided 10 Aug, NOT YET BUILT.** Candice, Nick

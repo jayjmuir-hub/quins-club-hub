@@ -779,3 +779,40 @@ CREATE POLICY "pitch read" ON public.pitches
   FOR SELECT USING (auth.uid() IS NOT NULL);
 CREATE POLICY "pitch manage" ON public.pitches
   FOR ALL USING (private.is_admin(club_id)) WITH CHECK (private.is_admin(club_id));
+
+-- ---------------------------------------------------------------------
+-- pitch_requests  (4 policies — 11 Aug 2026)
+--
+-- ⚠️ CREATE IS `can_edit_team`, DECIDE IS `is_admin`, AND THE DIFFERENCE IS
+-- THE WHOLE FEATURE. A coach may ASK for a pitch for their own squad; only an
+-- admin may ANSWER. Widening "decide" to can_edit_team would let a coach
+-- allocate their own request, which is the thing a request exists to prevent.
+--
+-- ⚠️ READ INCLUDES `requested_by = auth.uid()` AS A REQUIREMENT, not a
+-- convenience: Jay asked (11 Aug) for a request to be trackable from
+-- submission to assignment BY THE PERSON WHO SUBMITTED IT. An admin-only read
+-- would make the submitter's dashboard impossible.
+--
+-- ⚠️ WITHDRAWING IS A DELETE, NOT A STATUS WRITE, and deliberately so: the
+-- UPDATE policy is admin-only, and widening it to the requester would also let
+-- them write status='allocated'. Deleting their own UNDECIDED request is the
+-- narrow power that cannot be abused — once decided, status <> 'submitted' and
+-- the policy stops applying.
+--
+-- Harness: db/tests/rls-pitch-requests.sql.
+-- ---------------------------------------------------------------------
+CREATE POLICY "pitch request read" ON public.pitch_requests
+  FOR SELECT USING (
+    requested_by = auth.uid()
+    OR private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = event_id))
+  );
+CREATE POLICY "pitch request create" ON public.pitch_requests
+  FOR INSERT WITH CHECK (
+    requested_by = auth.uid()
+    AND private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = event_id))
+  );
+CREATE POLICY "pitch request decide" ON public.pitch_requests
+  FOR UPDATE USING (private.is_admin((SELECT e.club_id FROM events e WHERE e.id = event_id)))
+  WITH CHECK (private.is_admin((SELECT e.club_id FROM events e WHERE e.id = event_id)));
+CREATE POLICY "pitch request withdraw" ON public.pitch_requests
+  FOR DELETE USING (requested_by = auth.uid() AND status = 'submitted');
