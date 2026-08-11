@@ -10,7 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 11 Aug 2026
 
-- **The TOP MENU is now 12px too — and this is the control Jay actually meant.**
+- **The top menu now carries adhjrt.com's type, sheen and underline — measured, including
+  the hover state.** Jay: *"not all capital letters, seems like the font is smaller on the
+  tournament site, tournament site tabs have nice animation and a shimmer when you scroll
+  over them"*. `.hdr-nav a` there is **15px/600, `text-transform: none`, radius 8px,
+  padding 7px 11px 9px**; on hover it lifts 1px, washes to `rgba(255,255,255,.07)`, runs a
+  115° sheen across a `::before` at `mix-blend-mode: screen`, and wipes in a gradient
+  underline from the left. ⚠️ **Three of its `:hover` rules could not be read from the
+  stylesheet, so the hover state was captured by HOVERING THE REAL ELEMENT** and reading
+  the computed styles back — the sheen's `opacity: .85` and `holoSweep` timing exist
+  nowhere else.
+  ⚠️ **8px, WHICH CORRECTS THE COMMIT BEFORE IT.** `005dbc0` put 12px on the top menu from
+  adhjrt.com's AGE-GROUP tabs; its header nav is a different control at 8px — which is
+  `rounded-btn`, the app's own button radius, so the top menu now agrees with the
+  site-wide rule that started this.
+  ⚠️ **Two things deliberately not copied, both Jay's calls:** the sheen is red→white, not
+  red→white→**green**, because green means SUCCESS in this app and the chrome should not
+  spend it; and the current page keeps its **solid red fill** rather than adhjrt's
+  colour-only marker, because this is an app people navigate constantly and colour alone
+  is the weakest signal of state. The underline may be red→green — it reuses `brand-rule`,
+  the club's existing decorative hairline — and is suppressed on the active item, where a
+  red-to-green rule inside a red box reads as a rendering fault.
+  ⚠️ **Smaller type gives the masthead back ~50px.** 16px→15px and `px-4`→`px-[11px]`
+  across five items frees width in a row where the wordmark is the only non-`shrink-0`
+  item. **A side effect, not the fix** — the `sr-only` cutoff at `wide` is unchanged and
+  the truncation Jay reported is still unexplained.
+  Harness: `tests/nav-sheen.test.js`, asserting the BUILT stylesheet.
+
+- `005dbc0` — **The TOP MENU is now 12px too — and this is the control Jay actually meant.**
   `src/components/Nav.jsx` carried `desktop:rounded-pill` (100px); it is now
   `desktop:rounded-tab`. ⚠️ **The previous entry fixed the wrong row.** "The rounded off
   buttons at the top" was read as the `/admin` dashboard tabs, and the ambiguity had

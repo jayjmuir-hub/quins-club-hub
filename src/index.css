@@ -247,6 +247,117 @@
          forms when changing a colour. */
       linear-gradient(45deg, transparent 49%, rgba(42, 157, 85, 0.26) 50%);
   }
+
+  /* ---------------------------------------------------------------------
+     THE DESKTOP TOP-NAV ITEM. Modelled on adhjrt.com's `.hdr-nav a`, whose
+     rules and hover state were MEASURED live on 11 Aug 2026 — including
+     hovering the real element and reading the computed styles back, because
+     three of its :hover rules could not be read from the stylesheet.
+
+     What was copied: the 115deg sheen sweeping across a `::before` at
+     `mix-blend-mode: screen`, the gradient underline wiping in from the left
+     on a `::after`, the 1px lift, and the faint white hover wash.
+
+     ⚠️ TWO THINGS ARE DELIBERATELY NOT COPIED.
+     1. The sheen there runs red -> white -> GREEN. Here it is red -> white
+        only (Jay's call): in this app green means SUCCESS, and putting it in
+        the chrome would spend a colour that is carrying a meaning elsewhere.
+     2. adhjrt.com marks the current page with colour alone and no fill. This
+        app keeps its solid red fill (Jay's call) — it is an app people
+        navigate constantly, not a marketing site, and colour alone is the
+        weakest way to signal state.
+
+     ⚠️ DESKTOP ONLY, VIA A REAL MEDIA QUERY. These are plain CSS classes, so
+     a `desktop:` variant cannot gate them — the query has to be here. 820px
+     is `screens.desktop` in tailwind.config.js; if that moves, this moves.
+     Below it the same element is a bottom-tab-bar cell, where a sheen on a
+     touch target would be both wrong and invisible (no hover on a phone).
+     --------------------------------------------------------------------- */
+  @media (min-width: 820px) {
+    .nav-tab {
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* The sheen. `mix-blend-mode: screen` is what makes one gradient work
+       over both the transparent idle item and the red active one — it
+       lightens whatever is beneath rather than painting over it. */
+    .nav-tab::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+          115deg,
+          transparent 25%,
+          rgb(200 16 46 / 0.4) 38%,
+          rgb(255 255 255 / 0.55) 48%,
+          rgb(200 16 46 / 0.3) 62%,
+          transparent 78%
+        )
+        0% 0% / 250% 250%;
+      mix-blend-mode: screen;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+
+    /* The underline. ⚠️ Reuses `brand-rule` — the club's existing red-to-green
+       hairline, already on the masthead and above the stat band — rather than
+       inventing a second gradient. adhjrt.com's underline is the same two
+       colours, so matching it and matching ourselves are the same move here.
+       The green is fine on this one because it is DECORATIVE: nothing sits on
+       it and it carries no state, which is the same reasoning `brand-rule`
+       already carries. */
+    .nav-tab::after {
+      @apply bg-brand-rule;
+      content: '';
+      position: absolute;
+      left: 11px;
+      right: 11px;
+      bottom: 4px;
+      height: 2px;
+      border-radius: 2px;
+      transform: scaleX(0);
+      transform-origin: left center;
+      transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .nav-tab:hover::before {
+      opacity: 0.85;
+      animation: nav-sheen 0.9s ease-out forwards;
+    }
+
+    .nav-tab:hover::after {
+      transform: scaleX(1);
+    }
+
+    /* ⚠️ THE CURRENT PAGE GETS NO UNDERLINE. It already carries the solid red
+       fill, and a red-to-green rule sitting inside a red box reads as a
+       rendering fault rather than an accent. The sheen still runs, so the
+       item does not feel dead on hover. */
+    .nav-tab[aria-current='page']::after {
+      display: none;
+    }
+
+    /* Same reasoning as `.btn-sweep` above: the global reduced-motion block
+       drives durations to ~0, which for an ANIMATED sheen means it snaps to
+       its end state and sits there lit. A duration override cannot fix that;
+       only removing the element can. */
+    @media (prefers-reduced-motion: reduce) {
+      .nav-tab::before {
+        display: none;
+      }
+    }
+  }
+}
+
+@keyframes nav-sheen {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 140% 140%;
+  }
 }
 
 /* Global prefers-reduced-motion handling (design-system.md accessibility
