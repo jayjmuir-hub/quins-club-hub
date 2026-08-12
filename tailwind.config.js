@@ -109,6 +109,21 @@ export default {
           mid: '#1f9d4d', // icons, borders, medium-weight marks (3.51:1)
           ink: '#157f3c', //  5.08:1 on card — green AS TEXT.
           bg: '#e6f7ec', // success surface
+          // ⚠️ THERE IS DELIBERATELY NO accent.onDark, AND THE ATTEMPT TO ADD
+          // ONE IS WORTH RECORDING. On 12 Aug 2026 the club website's own "App"
+          // link was sampled to make one — #3bd070, a lovely 9.84:1 on the
+          // chrome — and tests/press-feedback.test.js failed the build. That
+          // hex is the RETIRED green: the site those values came from still
+          // runs the pre-6-Aug palette, so sampling it re-imported a colour
+          // this repo had already replaced, and the guard exists precisely
+          // because a retired brand colour looks correct to everyone who did
+          // not do the re-point.
+          //
+          // The masthead's App link uses accent.DEFAULT instead — 5.71:1 on
+          // flat chrome, a comfortable AA pass as text. If a lighter green is
+          // ever genuinely wanted there, it must come from the CURRENT site's
+          // dark mode the way brand.onDark did, not from the old one and not
+          // invented here.
         },
 
         // --- dark chrome: masthead + bottom tab bar ---------------------------

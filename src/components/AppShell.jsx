@@ -14,6 +14,7 @@ import { ViewAsBanner } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 import Button from './Button.jsx'
 import InstallPrompt from './InstallPrompt.jsx'
+import AppButton from './AppButton.jsx'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
 // role label, nav) plus the membership-loading gate that decides whether the
@@ -391,6 +392,15 @@ export default function AppShell({ children }) {
                 The initial, not a photo: `players.photo_path` holds head shots
                 of PLAYERS, and the signed-in person is usually a parent or a
                 coach who has no photo anywhere in the system. */}
+            {/* ⚠️ BEFORE THE ACCOUNT LINK, AND IT RENDERS NOTHING ONCE THE APP
+                IS INSTALLED — which is what keeps it out of the masthead
+                width budget for everyone who has already acted on it. The row
+                has a documented history of over-filling between 820 and
+                1280px (see the wordmark note above), so this was MEASURED in
+                Chromium rather than reasoned about; the numbers are in the
+                commit. */}
+            <AppButton />
+
             <Link
               to="/more"
               data-testid="account-button"
@@ -413,6 +423,24 @@ export default function AppShell({ children }) {
                   Barlow Condensed it replaced. There was no slack left to
                   spend. The initial alone is still a 28px tap target, so
                   below 1280px this loses only the name. */}
+              {/* ⚠️ THIS NAME WAS BRIEFLY DELETED ON 12 Aug 2026 TO MAKE ROOM
+                  FOR THE App BUTTON, AND PUTTING IT BACK IS THE CORRECTION.
+                  The measurement behind the deletion was wrong, and the way it
+                  was wrong is worth keeping: "headroom" was computed as the
+                  h1's own width minus its natural text width, which is ALWAYS
+                  ~0 — the h1 is content-sized, so that subtraction can only
+                  ever return zero and says nothing about the row.
+
+                  The row's real buffer is the `flex-1` spacer two elements up,
+                  which absorbs every squeeze before the wordmark gives an inch.
+                  Measured properly at 1280px by growing a probe until the
+                  wordmark actually truncated: IT BREAKS AT +190px. The App
+                  button is 49 and this name is ~75, so both fit with ~66px to
+                  spare.
+
+                  ⚠️ THE LESSON, NOT THE NUMBER: a "0" that a calculation can
+                  only ever produce is not a measurement. The probe that grows
+                  until something visibly breaks is, and it disagreed. */}
               {firstName && (
                 <span className="hidden max-w-[9ch] truncate font-condensed text-[13px] font-bold uppercase tracking-[0.08em] wide:inline">
                   {firstName}

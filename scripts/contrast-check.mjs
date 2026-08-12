@@ -93,6 +93,10 @@ const PAIRS = [
   [T.chromeMuted, T.chrome, 'idle bottom-tab labels', 4.5],
   [T.brandOnDark, T.rolePill, 'role pill text on its composited fill', 4.5],
   [T.brandOnDark, T.chrome, 'red text on flat chrome', 4.5],
+  // The App link in the masthead (12 Aug 2026). accent.DEFAULT on the flat
+  // chrome — see the note in tailwind.config.js about why this is NOT the
+  // brighter green the club site shows.
+  [T.accent, T.chrome, 'green App link on flat chrome', 4.5],
   [T.line, T.surfaceCard, 'hairline vs card (non-text)', 1.2],
 ]
 

@@ -151,6 +151,10 @@ const SCENARIOS = [
   // Sheet, so — unlike the three entries above that carry the sheet caveat —
   // this one is measured for real.
   'match-sheet',
+  // The pitch calendar, 12 Aug 2026. Routed screen, not a Sheet, so this one
+  // is genuinely measured. ?view= is not swept here - the gate loads the
+  // default (Day); the month grid was measured by hand at every width.
+  'allocation',
 ]
 
 // A pixel of slack. Sub-pixel layout rounding can put scrollWidth one above

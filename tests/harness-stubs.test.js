@@ -50,6 +50,9 @@ const ALIASES = [
   // and this list was not, and the suite went red on 11 vs 10 before anybody
   // had to notice. That is the third time this guard has earned its keep.
   ['harness/stubs/matchSheets.js', 'src/data/matchSheets.js'],
+  // The pitch allocation screen, 12 Aug 2026.
+  ['harness/stubs/pitches.js', 'src/data/pitches.js'],
+  ['harness/stubs/pitchRequests.js', 'src/data/pitchRequests.js'],
 ]
 
 function read(relative) {
