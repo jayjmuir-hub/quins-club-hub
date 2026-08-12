@@ -16,6 +16,14 @@ export function Card({ as: Tag = 'div', className = '', children, ...rest }) {
     'border-line',
     'bg-surface-card',
     'shadow-card',
+    // ⚠️ SO A SHADOW CHANGE ANIMATES RATHER THAN SNAPPING. Cards that are
+    // themselves links (the portal chooser) lift on hover; without this the
+    // elevation would jump between two states in one frame, which reads as a
+    // flicker rather than as a lift. Costs nothing on a card that never
+    // changes — `transition-shadow` animates one property and only when it
+    // actually differs.
+    'transition-shadow',
+    'duration-200',
     className,
   ]
     .filter(Boolean)

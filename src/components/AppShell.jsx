@@ -241,7 +241,7 @@ export default function AppShell({ children }) {
             shapes bleeding off the right edge. */}
         <header className="bg-chrome-grad text-white shadow-masthead">
           <div className="brand-rule" />
-          <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3">
+          <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3 wide:max-w-[1360px]">
             {/* crest.png is 370x400 (portrait) — object-contain keeps its native
                 aspect ratio inside the 46x46 badge box (matching the
                 prototype's background:contain treatment) instead of the
@@ -487,7 +487,7 @@ export default function AppShell({ children }) {
       <main
         id="main-content"
         tabIndex={-1}
-        className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16 focus:outline-none"
+        className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16 wide:max-w-[1360px] focus:outline-none"
       >
         {/* ⚠️ ABOVE THE loading/error/ready SPLIT, DELIBERATELY. Installing is
             not gated on having a membership: a parent who has just signed up

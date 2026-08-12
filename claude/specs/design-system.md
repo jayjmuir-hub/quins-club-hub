@@ -134,6 +134,17 @@ All colours are declared as CSS custom properties on `:root`. Quote:
 | `--warn` | `#c9861a` | Draw is NOT warn (draw uses its own grey, see below) — warn is used for the captain badge, parent scope-note accent, "maybe" avail colour |
 | `--warn-bg` | `#fbf1dd` | Social event chip bg, captain badge bg, parent scope-note bg |
 | `--shadow` | `0 6px 24px rgba(20,20,20,.10)` | Card, hero, `.btn` container elevation |
+
+⚠️ **THE APP HAS DELIBERATELY DIVERGED FROM `--shadow` SINCE 12 Aug 2026, and this
+table is the record of the PROTOTYPE, not a contract.** `shadow-card` in
+`tailwind.config.js` is now a PAIR — a 1px contact shadow at 6% plus a wide
+ambient one at 10% — because one wide soft shadow leaves nothing holding a card
+to the page: the edge floats and the surface reads muddy. Same colour, same
+total weight, placed where it does work. There is also `shadow-card-hover` and
+`shadow-card-ring` for cards that are themselves links.
+⚠️ **The prototype's single value is kept above on purpose.** It is what the
+design came from, and a spec rewritten every time the app improves on it stops
+being able to answer "what did we start from".
 | `--shadow-sm` | `0 2px 8px rgba(20,20,20,.08)` | Smaller elevation: button, search bar, viewas bar |
 | `--radius` | `16px` | Large radius — cards, hero, sheet top corners (desktop sheet uses `20px` explicitly) |
 | `--radius-sm` | `11px` | Small radius — buttons, inputs, date-box, avatar squares |

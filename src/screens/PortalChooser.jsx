@@ -47,7 +47,7 @@ export default function PortalChooser() {
               as={Link}
               to={portalHome(portal)}
               data-testid="portal-card-open"
-              className="block p-5 transition hover:border-brand hover:shadow-[0_0_0_1px_theme(colors.brand.DEFAULT)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              className="block p-5 transition duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-card-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               <h3 className="text-[17px] font-extrabold tracking-[-0.2px] text-ink">{label}</h3>
               <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">{portal.blurb}</p>

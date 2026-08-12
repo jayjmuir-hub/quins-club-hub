@@ -25,17 +25,19 @@ import {
 // it is the screen the pitch work exists for: a Saturday morning fits on one
 // view and a double booking reads as two amber cells without reading a word.
 //
-// ⚠️ IT OPENS ON TODAY, IN DAY VIEW — Jay, 11 Aug 2026, asked directly. Today
-// is often empty midweek, which is why the empty state says what is happening
-// rather than rendering a blank grid that reads as broken.
+// ⚠️ IT OPENS ON THE MONTH, ANCHORED ON TODAY — Jay, 12 Aug 2026, asked
+// directly when offered the choice.
 //
-// ⚠️ THAT RULING SURVIVED THE CALENDAR AND WAS NOT QUIETLY OVERTURNED.
-// Jay, 12 Aug 2026: "i still don't see a full calendar view in the pitch
-// management dashboard". Week and Month were ADDED beside the day grid rather
-// than replacing it as the landing view, because "opens on today" was an
-// explicit instruction and this request did not withdraw it. If the month
-// should be what opens, that is one line — and it is his call, not a guess
-// dressed up as a default.
+// ⚠️ THIS REPLACES THE 11 AUG "OPENS ON TODAY, IN DAY VIEW" RULING, AND THE WAY
+// IT WAS REPLACED IS THE POINT. That instruction was explicit, so the calendar
+// shipped with Day still the landing view and the question was put to Jay
+// rather than answered by whoever was typing. He changed it. A default nobody
+// asked about is a guess; this one is a decision, and the old ruling is
+// superseded rather than forgotten.
+//
+// ⚠️ "ANCHORED ON TODAY" IS STILL TRUE AND STILL MATTERS. `day` is initialised
+// to clubToday(), so the month that opens is THIS month with today circled —
+// not January, and not the month of some remembered selection.
 //
 // ⚠️ THE THREE VIEWS ANSWER DIFFERENT QUESTIONS, which is why all three exist:
 //   DAY    pitches × hours — "what is on this pitch at this hour", the grid you
@@ -147,7 +149,10 @@ export default function Allocation() {
   const [decideBusy, setDecideBusy] = useState(false)
   const [decideError, setDecideError] = useState(null)
   const [day, setDay] = useState(() => clubToday())
-  const [view, setView] = useState('day')
+  // Jay's call, 12 Aug 2026. See the header — this supersedes the 11 Aug
+  // "opens on today, in Day view" instruction, and it was asked rather than
+  // assumed.
+  const [view, setView] = useState('month')
   const [events, setEvents] = useState([])
   const [pitches, setPitches] = useState([])
   const [loading, setLoading] = useState(true)

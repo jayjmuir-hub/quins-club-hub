@@ -192,7 +192,7 @@ export function ViewAsBanner() {
       // would fail tests/theme.test.js's no-literals rule.
       className="bg-brand-deep text-white"
     >
-      <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2">
+      <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2 wide:max-w-[1360px]">
         <p className="text-[13px] font-semibold leading-snug">
           {`Preview — viewing as ${role}, ${team}. Data shown is filtered in your browser only.`}
         </p>

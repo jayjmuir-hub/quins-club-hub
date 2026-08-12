@@ -196,7 +196,42 @@ export default {
       },
 
       boxShadow: {
-        card: '0 6px 24px rgba(16,17,22,.10)',
+        // ⚠️ TWO SHADOWS, NOT ONE, AND THAT IS THE WHOLE CHANGE (12 Aug 2026).
+        // This was `0 6px 24px rgba(16,17,22,.10)` — the prototype's single
+        // `--shadow`, faithfully ported. One wide soft shadow is what makes a
+        // card look like a rectangle with a grey blur under it: there is
+        // nothing holding the card to the page, so the edge floats and the
+        // whole surface reads slightly muddy.
+        //
+        // The pair is how real elevation works. A tight, nearly-opaque CONTACT
+        // shadow (1px, 6%) grounds the bottom edge and keeps it crisp; a wide,
+        // offset AMBIENT one (20px, blurred up and away with a negative spread)
+        // does the depth. Same colour, same total weight — this is not "more
+        // shadow", it is the same amount of ink placed where it does work.
+        //
+        // ⚠️ THE SPEC RECORDS THE PROTOTYPE'S VALUE AND IS NOW DELIBERATELY
+        // DIVERGED FROM. claude/specs/design-system.md §3 says so; it is a
+        // record of what the prototype did, not a contract this app cannot
+        // improve on.
+        card: '0 1px 2px rgba(16,17,22,.06), 0 6px 20px -4px rgba(16,17,22,.10)',
+        // The lifted state for a card you can actually click. Deliberately a
+        // LIFT — the offset and blur both grow — rather than just a darker
+        // shadow, because a card that only darkens reads as pressed, which is
+        // the opposite of what a hover should say.
+        //
+        // ⚠️ HOVER IS A DESKTOP-ONLY AFFORDANCE and this app is used pitch-side
+        // on a phone, where it will never fire. That is fine here and would not
+        // be if it were the only signal: every clickable card in this app is
+        // also a real <button> or <a> with a focus ring.
+        'card-hover': '0 2px 4px rgba(16,17,22,.07), 0 14px 30px -8px rgba(16,17,22,.16)',
+        // The same lift PLUS the brand hairline, for a card that is itself a
+        // link. Replaces the portal chooser's old
+        // `hover:shadow-[0_0_0_1px_…brand]`, which set the ONLY shadow and so
+        // FLATTENED the card on hover — losing every bit of elevation at the
+        // exact moment the card is meant to look reachable, which reads as
+        // pressed rather than inviting.
+        'card-ring':
+          '0 0 0 1px rgba(200,16,46,1), 0 2px 4px rgba(16,17,22,.07), 0 14px 30px -8px rgba(16,17,22,.16)',
         // NB: named `masthead`, not `chrome`. `chrome` is also a colour key
         // above, and Tailwind resolves `shadow-chrome` against BOTH the
         // boxShadow scale and the shadow-colour scale — the colour wins, and
