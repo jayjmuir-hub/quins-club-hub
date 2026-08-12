@@ -231,6 +231,16 @@ will propose building.**
 Two sets, both to be removed before a pilot:
 
 - **Six `Test Player` rows** — a fixture for the pending-state RLS work.
+⚠️ **"SEEDED" DOES NOT MEAN "SAFE TO MODIFY", AND A SESSION LEARNED THAT BY
+DESTROYING A RESULT ON 12 Aug 2026.** The completed U16B match sheet is attached
+to a fixture **inside** the seeded September group, so the seeded block is no
+longer purely synthetic — a human has used one of its rows. A migration test
+selected a "seeded" event by `group_id`, wrote components to it, and then nulled
+`result_us` / `result_them` on the way out, wiping a real 22-12 that the same
+session had measured minutes earlier. **Select a test row by its id, after
+looking at it — never by the group.** Jay ruled the loss acceptable ("just test
+data"); the trap is not.
+
 - **A seeded September**, all carrying one `group_id`:
   `delete from events where group_id = '5eed0000-0000-4000-8000-000000000001';`
   Inserts only; nothing existing was modified. ⚠️ **Worth keeping until the design

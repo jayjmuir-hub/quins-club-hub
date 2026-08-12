@@ -1946,3 +1946,100 @@ begin
 end;
 $function$
 ;
+
+-- ── private.scoring_kinds_for_team, 12 Aug 2026 ─────────────────────────────
+--
+-- ⚠️ THIS IS A FOURTH COPY OF A MODEL ALREADY CARRIED THREE TIMES, AND IT IS
+-- HERE ON PURPOSE. adhjrt holds it twice (server + browser); src/lib/scoring.js
+-- is the third. The alternative was worse: if the trigger summed every component
+-- while scoring.js ignores the kinds a squad may not score, the FORM would show
+-- one total and the DATABASE would store another -- exactly the failure adhjrt's
+-- own test file exists to catch, arriving silently.
+--
+-- ⚠️ WHAT IS COPIED IS THREE THRESHOLDS, NOT FIFTEEN ROWS. The upstream table
+-- collapses onto the band number with no exceptions.
+--
+-- ⚠️ AN UNKNOWN BAND GETS THE FULL SET -- deliberately the OPPOSITE of
+-- allowsOwnContact, which fails closed. The harm is asymmetric in opposite
+-- directions: there a twelve-year-old's phone number, here a coach who cannot
+-- record a drop goal that was genuinely kicked.
+--
+-- ⚠️ THE TRAILING LETTER IS GENDER. U14B is U14 Boys. The regex mirrors
+-- src/lib/ageGroup.js's YOUTH_NAME, including refusing to read U123 as U12.
+create or replace function private.scoring_kinds_for_team(p_team_id uuid)
+returns text[]
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_name text;
+  v_override text[];
+  v_band int;
+begin
+  select name, scoring_kinds into v_name, v_override
+  from public.teams where id = p_team_id;
+
+  if v_override is not null and array_length(v_override, 1) > 0 then
+    return v_override;
+  end if;
+
+  v_band := nullif(substring(v_name from '^[Uu]([0-9]{1,2})(?![0-9])'), '')::int;
+
+  if v_band is null then
+    return array['tries','conversions','penalties','drops'];
+  elsif v_band <= 11 then
+    return array['tries'];
+  elsif v_band <= 13 then
+    return array['tries','conversions'];
+  else
+    return array['tries','conversions','penalties','drops'];
+  end if;
+end;
+$$;
+
+-- ── private.events_result_from_components, 12 Aug 2026 ──────────────────────
+--
+-- ⚠️ THE TOTAL IS COMPUTED FROM THE COMPONENTS, NEVER TAKEN FROM THE CLIENT.
+-- adhjrt states the reason and it holds here: it stops a typo -- or a tampered
+-- request -- producing a score that does not match the tries and kicks recorded
+-- beside it. Enforced in the database because RLS is already the boundary and
+-- the app is not the only possible writer.
+--
+-- ⚠️ AND THE GUARD IS PER SIDE. A fixture where our components are recorded and
+-- the opposition's are not is the normal case at half-time.
+create or replace function private.events_result_from_components()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_kinds text[];
+  v_us int;
+  v_them int;
+begin
+  v_kinds := private.scoring_kinds_for_team(new.team_id);
+
+  if new.tries_us is not null or new.conversions_us is not null
+     or new.penalties_us is not null or new.drops_us is not null then
+    v_us := 0;
+    if 'tries'       = any(v_kinds) then v_us := v_us + coalesce(new.tries_us, 0) * 5; end if;
+    if 'conversions' = any(v_kinds) then v_us := v_us + coalesce(new.conversions_us, 0) * 2; end if;
+    if 'penalties'   = any(v_kinds) then v_us := v_us + coalesce(new.penalties_us, 0) * 3; end if;
+    if 'drops'       = any(v_kinds) then v_us := v_us + coalesce(new.drops_us, 0) * 3; end if;
+    new.result_us := v_us;
+  end if;
+
+  if new.tries_them is not null or new.conversions_them is not null
+     or new.penalties_them is not null or new.drops_them is not null then
+    v_them := 0;
+    if 'tries'       = any(v_kinds) then v_them := v_them + coalesce(new.tries_them, 0) * 5; end if;
+    if 'conversions' = any(v_kinds) then v_them := v_them + coalesce(new.conversions_them, 0) * 2; end if;
+    if 'penalties'   = any(v_kinds) then v_them := v_them + coalesce(new.penalties_them, 0) * 3; end if;
+    if 'drops'       = any(v_kinds) then v_them := v_them + coalesce(new.drops_them, 0) * 3; end if;
+    new.result_them := v_them;
+  end if;
+
+  return new;
+end;
+$$;
