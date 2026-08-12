@@ -11,13 +11,14 @@ import {
 
 // The scoring model. claude/plans/2026-08-12-scoring-model.md
 //
-// ⚠️ THIS FILE IS THE PIN ON A COPY. The model lives upstream in adhjrt and is
-// reproduced here because the two apps cannot share code. These tests are what
-// makes a casual edit to the table fail loudly rather than quietly changing
-// what a coach is allowed to record.
+// ⚠️ THIS FILE PINS THE CLUB'S OWN SCORING RULES. They are age-grade rugby's,
+// not another system's, and this app answers to nothing outside it. These tests
+// are what makes a casual edit to the table fail loudly rather than quietly
+// changing what a coach is allowed to record.
 
 describe('the points table', () => {
-  // ⚠️ MEASURED off adhjrt/netlify/functions/_scoring.js on 12 Aug 2026.
+  // ⚠️ RUGBY UNION'S VALUES. Confirm against the UAERF age-grade laws before a
+  // season; they are the authority, not this file.
   it('⚠️ matches the upstream values exactly', () => {
     expect(SCORE_POINTS).toEqual({ tries: 5, conversions: 2, penalties: 3, drops: 3 })
   })
@@ -33,11 +34,11 @@ describe('the points table', () => {
   })
 })
 
-describe('scoringForBand — reproducing adhjrt row by row', () => {
-  // ⚠️ EVERY ROW OF THE UPSTREAM TABLE, not a sample. Three rules replace
-  // fifteen entries only if all fifteen actually agree, and this is the check
-  // that says so. The ids carry adhjrt's gender letters; the band is the digits.
-  const UPSTREAM = [
+describe('scoringForBand — every band the club fields', () => {
+  // ⚠️ EVERY SQUAD THE CLUB FIELDS, not a sample. Three thresholds can stand in
+  // for fifteen squads only if all fifteen actually agree, and this is the check
+  // that says so. The trailing letter is GENDER; the band is the digits.
+  const SQUADS = [
     ['u6', 6, ['tries']],
     ['u7', 7, ['tries']],
     ['u8', 8, ['tries']],
@@ -55,7 +56,7 @@ describe('scoringForBand — reproducing adhjrt row by row', () => {
     ['u18g', 18, ['tries', 'conversions', 'penalties', 'drops']],
   ]
 
-  for (const [id, band, expected] of UPSTREAM) {
+  for (const [id, band, expected] of SQUADS) {
     it(`${id} scores ${expected.join(', ')}`, () => {
       expect(scoringForBand(band)).toEqual(expected)
     })
@@ -140,8 +141,8 @@ describe('scoringForTeam — the club override', () => {
 })
 
 describe('totalFor', () => {
-  // adhjrt's own worked example: 4 tries + 2 conversions at U16B = 24.
-  it('⚠️ totals adhjrt’s worked example identically — 4 tries + 2 conv = 24', () => {
+  // Four tries and two conversions at U16B: 4*5 + 2*2 = 24.
+  it('totals 4 tries + 2 conversions at U16B as 24', () => {
     const u16b = { name: 'U16B Contact' }
     expect(totalFor(u16b, { tries: 4, conversions: 2, penalties: 0, drops: 0 })).toBe(24)
   })

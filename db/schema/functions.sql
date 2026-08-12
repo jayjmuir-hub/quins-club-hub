@@ -1949,15 +1949,14 @@ $function$
 
 -- ── private.scoring_kinds_for_team, 12 Aug 2026 ─────────────────────────────
 --
--- ⚠️ THIS IS A FOURTH COPY OF A MODEL ALREADY CARRIED THREE TIMES, AND IT IS
--- HERE ON PURPOSE. adhjrt holds it twice (server + browser); src/lib/scoring.js
--- is the third. The alternative was worse: if the trigger summed every component
--- while scoring.js ignores the kinds a squad may not score, the FORM would show
--- one total and the DATABASE would store another -- exactly the failure adhjrt's
--- own test file exists to catch, arriving silently.
+-- ⚠️ THIS IS THE SECOND COPY OF THESE THRESHOLDS INSIDE THIS APP, AND IT IS
+-- HERE ON PURPOSE. src/lib/scoring.js carries the same three. The alternative
+-- was worse: if the trigger summed every component while scoring.js ignores the
+-- kinds a squad may not score, the FORM would show one total and the DATABASE
+-- would store another, and both numbers would look plausible.
 --
--- ⚠️ WHAT IS COPIED IS THREE THRESHOLDS, NOT FIFTEEN ROWS. The upstream table
--- collapses onto the band number with no exceptions.
+-- ⚠️ WHAT IS DUPLICATED IS THREE THRESHOLDS, NOT FIFTEEN ROWS. Every squad the
+-- club fields collapses onto the band number with no exceptions.
 --
 -- ⚠️ AN UNKNOWN BAND GETS THE FULL SET -- deliberately the OPPOSITE of
 -- allowsOwnContact, which fails closed. The harm is asymmetric in opposite
@@ -2002,10 +2001,9 @@ $$;
 -- ── private.events_result_from_components, 12 Aug 2026 ──────────────────────
 --
 -- ⚠️ THE TOTAL IS COMPUTED FROM THE COMPONENTS, NEVER TAKEN FROM THE CLIENT.
--- adhjrt states the reason and it holds here: it stops a typo -- or a tampered
--- request -- producing a score that does not match the tries and kicks recorded
--- beside it. Enforced in the database because RLS is already the boundary and
--- the app is not the only possible writer.
+-- It stops a typo -- or a tampered request -- producing a score that does not
+-- match the tries and kicks recorded beside it. Enforced in the database because
+-- RLS is already the boundary and the app is not the only possible writer.
 --
 -- ⚠️ AND THE GUARD IS PER SIDE. A fixture where our components are recorded and
 -- the opposition's are not is the normal case at half-time.

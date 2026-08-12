@@ -10,7 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **Scoring components on a fixture, and the club's
+- *(SHA follows in the next PR)* — **The scoring rules are the CLUB'S, not another
+  project's — a provenance correction, no behaviour change.**
+  Jay: *"this app and project should have absolutely nothing to do with adhjrt, that is a
+  completely different project, i only told you to use the same type of scoring setup"*.
+  ❌ **The first pass read that as a dependency.** It documented another club system as an
+  upstream source of truth, called this app's table "the third copy", and warned it could go
+  **"silently wrong"** if an organiser over there changed something. **All of that was a
+  misreading of the brief, and none of it was true.** A try is five points because that is
+  rugby.
+  ⚠️ **Corrected rather than softened, across the module header, both database functions, the
+  migration, the tests and the plan** — a wrong "why" sends the next reader into another
+  codebase to understand this one, and the note it leaves behind outlives whoever wrote it.
+  ⚠️ **The ONE duplication that is real survives, because it always was real: the three
+  thresholds exist in `src/lib/scoring.js` AND in `private.scoring_kinds_for_team`.** That is
+  deliberate — without it the form would show one total and the database would store another,
+  and both would look plausible.
+  ⚠️ **No values changed. No behaviour changed.** The suite is the proof.
+  ⚠️ **Genuine adhjrt references elsewhere are untouched and correct** — the nav and tab
+  styling measured off `adhjrt.com`, `ADHJRT` as a tournament NAME in the competition
+  picker, and the retired `app.adhjrt.com` alias. **The project is a real thing this club
+  plays in; it is simply not this app's authority for scoring.**
+
+- `390a6e5` — **Scoring components on a fixture, and the club's
   per-squad scoring set.** Step 2 of the scoring plan, applied live as
   `scoring_components`.
   Eight component columns on `events`, `teams.scoring_kinds`, and a trigger deriving
@@ -40,9 +62,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **The fifteen upstream rows collapse onto three band rules, and the test asserts EVERY
   row rather than a sample** — three rules may replace fifteen entries only if all fifteen
   agree, and nothing else would say so.
-  ⚠️ **Keyed on the band NUMBER, never the id's letter.** adhjrt's `u16b` encodes GENDER,
-  and `src/lib/ageGroup.js` already carries a note about `U12G` failing to parse for exactly
-  that reason.
+  ⚠️ **Keyed on the band NUMBER, never the squad name's letter.** In `U14B` the trailing
+  letter is GENDER, and `src/lib/ageGroup.js` already carries a note about `U12G` failing to
+  parse for exactly that reason.
   ⚠️ **The unknown band fails OPEN, deliberately opposite to `allowsOwnContact`, which fails
   CLOSED.** The harm is asymmetric in opposite directions — a twelve-year-old's phone number
   versus a coach unable to record a drop goal that was kicked. Both the module and the test
@@ -69,10 +91,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   header, where it read as four separate bugs because the bottom nav is `fixed`.
   **Lengthening a label into an unwrapped row is exactly how that returns.**
   Also adds `claude/plans/2026-08-12-scoring-model.md` (**NOT SHIPPED**), which measured the
-  real model off adhjrt rather than inventing one. ⚠️ **Its headline finding: adhjrt already
-  carries that model TWICE and has a test because the copies drifted — so a copy here is a
-  THIRD, and adhjrt lets an organiser override any age group WITHOUT A DEPLOY**, which no
-  test in either repo could ever compare.
+  scoring rules the club actually needs. ⚠️ **Its provenance framing was WRONG on the first
+  pass and is corrected later the same day** — see the entry above.
 
 - `4e8f646` — **The RCM match sheet stopped printing the club's own
   squad name in the governing body's TEAM box.**
