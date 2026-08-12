@@ -121,10 +121,20 @@ export function isAdmin(memberships) {
 // there is. An unrecognised right matches no dashboard and is inert.
 export const ADMIN_RIGHTS = ['youth', 'media', 'pitches']
 
+// ⚠️ JAY'S EXACT WORDING, 12 Aug 2026, AND TWO OF THE THREE ARE NOT JOB TITLES.
+// "we aren't going to use human names anymore, only Club Youth Manager, Pitch
+// Management, Social Media Management from now on". These were Youth Manager /
+// Social Media Manager / Pitch Manager — titles a person holds — and the
+// mismatch was put to Jay before the change; he chose this wording anyway, so
+// the PROSE around them moved instead. That is why the not-authorised screens
+// say "hasn't been added to your account" rather than "you haven't been given
+// the X job", and why the pitch emails say "you look after X for the club".
+// Reverting these to "Manager" would silently un-fix three sentences.
+// claude/decisions/2026-08-12-jobs-not-people.md
 const ADMIN_RIGHT_LABELS = {
-  youth: 'Youth Manager',
-  media: 'Social Media Manager',
-  pitches: 'Pitch Manager',
+  youth: 'Club Youth Manager',
+  media: 'Social Media Management',
+  pitches: 'Pitch Management',
 }
 
 /** The human label for a right, or the raw value if it is one we do not know. */

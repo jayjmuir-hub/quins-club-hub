@@ -1,9 +1,18 @@
 # Admin portals — the plan
 
-**STATUS: NOT SHIPPED.** Written 12 Aug 2026, for Jay to review.
+**STATUS: SHIPPED 12 Aug 2026.**
 
-⚠️ **Set this line to SHIPPED in the commit that ships it**, not as a promise
-about that commit.
+⚠️ **Two things in this plan are not what shipped.**
+
+1. **The chooser is its own screen, `src/screens/PortalChooser.jsx`, mounted as
+   the index child route** — not markup inside `AdminDashboard`. It needs the
+   membership set and nothing else, and keeping it out of the dashboard left
+   that file's gate, previewing branch and desktop-only wrapper untouched.
+2. **The View-as switcher renders on the chooser ONLY**, not on every admin
+   screen as before. That is what makes the chooser worth a click for an admin
+   holding a single portal: it is where the control lives. Repeating it inside
+   every portal would put an occasionally-used tool at the top of the weekly
+   allocation screen.
 
 The ruling is in `claude/decisions/2026-08-12-admin-portals.md`. This file is
 the work.

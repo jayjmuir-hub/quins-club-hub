@@ -208,8 +208,8 @@ export default function Allocation() {
       <Card role="alert" className="p-6 text-center">
         <h3 className="text-base font-extrabold text-ink">Allocation</h3>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          You haven&apos;t been given the Pitch Manager job. A super admin can add it on
-          the Accounts screen.
+          Pitch Management hasn&apos;t been added to your account. A super admin can add
+          it on the Accounts screen.
         </p>
       </Card>
     )
@@ -325,7 +325,8 @@ export default function Allocation() {
                             ].join(' ')}
                           >
                             {/* ⚠️ LABELLED BY LEAGUE TEAM WHERE THERE IS ONE,
-                                and this is the point of the change for Tracy:
+                                and this is the point of the change for
+                                Pitch Management:
                                 a Saturday of A and B fixtures used to read as
                                 the same squad name twice in two rows, with
                                 nothing to say which booking was which. */}
@@ -350,7 +351,7 @@ export default function Allocation() {
         </Card>
       )}
 
-      {/* ── Tracy's queue ────────────────────────────────────────────────
+      {/* ── The Pitch Management queue ───────────────────────────────────
           ⚠️ NOT FILTERED BY THE DAY ON SCREEN — see the fetch. A request is a
           job waiting, not an event on a date. */}
       {requests.length > 0 && (

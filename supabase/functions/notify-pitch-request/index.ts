@@ -1,5 +1,5 @@
 // Pitch requests, both directions:
-//   SUBMITTED -> tell the people who can answer it (Pitch Managers + supers)
+//   SUBMITTED -> tell the people who can answer it (Pitch Management + supers)
 //   ANSWERED  -> tell the coach who asked
 //
 // Jay, 11 Aug 2026: email "multiple people", appear in two dashboards, and be
@@ -23,11 +23,12 @@
 // !! IT MUST NEVER BE ABLE TO FAIL THE REQUEST. pg_net queues and returns
 // immediately; it cannot raise into the caller's transaction. A dead endpoint
 // or an expired Resend key costs an email and nothing else - the request is
-// still filed and still sits in Tracy's queue on screen.
+// still filed and still sits in the Pitch Management queue on screen.
 //
 // !! AND THAT IS THE HONEST LIMIT OF "the failure is visible". It is visible
 // in THIS function's logs and nowhere else: the app is not told, and neither
-// is Tracy. The mitigation is not the email, it is that the QUEUE IS IN-APP -
+// is the person holding it. The mitigation is not the email, it is that the
+// QUEUE IS IN-APP -
 // the request is on screen whether or not the mail arrives. The email is a
 // prompt to go and look, never the record.
 //
@@ -97,8 +98,8 @@ async function sendMail(bcc: string[], subject: string, html: string, text: stri
     from: MAIL_FROM,
     // Both parts, always: HTML-only mail scores worse with filters.
     text,
-    // `to` is the club, recipients in bcc - addressing it to one Pitch Manager
-    // would single them out as the person being asked.
+    // `to` is the club, recipients in bcc - addressing it to one person who
+    // holds Pitch Management would single them out as the one being asked.
     to: [MAIL_FROM],
     bcc,
     subject,
@@ -210,7 +211,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
       )]
 
       if (recipients.length === 0) {
-        // Not an error: a club with no Pitch Manager and no super admin is a
+        // Not an error: a club with nobody holding Pitch Management and no super admin is a
         // configuration problem. Logged because it means a request will sit
         // unseen until somebody opens the queue.
         console.error(`no pitch managers for request ${requestId} - nobody will be told`)
@@ -233,7 +234,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
             quiet('Nothing is booked until somebody allocates it. The fixture is already in the schedule, without a pitch.'),
           '/admin/allocation',
           'Open the allocation grid',
-          "You're getting this because you're a Pitch Manager for the club.",
+          "You're getting this because you look after Pitch Management for the club.",
         ),
         [
           'ABU DHABI HARLEQUINS',
@@ -249,7 +250,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
           'Open the allocation grid:',
           `${APP_URL}/admin/allocation`,
           '',
-          "You're getting this because you're a Pitch Manager for the club.",
+          "You're getting this because you look after Pitch Management for the club.",
         ].filter(Boolean).join('\n'),
       )
 

@@ -227,14 +227,20 @@ describe('App', () => {
 // tests/admin-dashboard.test.jsx stubs the Accounts tab, so this is where
 // the real Accounts.jsx is proved reachable.
 describe('App — /admin', () => {
-  it('redirects bare /admin to the Accounts tab', () => {
+  // ⚠️ THIS USED TO ASSERT A REDIRECT TO /admin/accounts, and it is rewritten
+  // rather than deleted (12 Aug 2026). It is the only thing standing between a
+  // future refactor and a bare /admin that renders nothing at all.
+  it('renders the portal chooser at bare /admin, and does NOT redirect', () => {
     window.history.pushState({}, '', '/admin')
     useAuthMock.mockReturnValue(signedIn)
 
     render(<App />)
 
-    expect(window.location.pathname).toBe('/admin/accounts')
-    expect(screen.getByRole('link', { name: 'Club' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/admin')
+    expect(screen.getByTestId('portal-chooser')).toBeInTheDocument()
+    // Club Admin is open to every admin, and entering a portal lands on its
+    // FIRST tab.
+    expect(screen.getByRole('link', { name: /Club Admin/ })).toHaveAttribute('href', '/admin/accounts')
   })
 
   it('mounts the real Accounts screen on the Accounts tab', () => {

@@ -48,8 +48,8 @@ export default function AdminRightsEditor({ membership, label, onChanged }) {
       onChanged?.(saved)
     } catch (failure) {
       // ⚠️ PUT IT BACK. Leaving the tick where the user clicked it after a
-      // refusal is the lying-UI failure: they would walk away believing Nick
-      // is a Pitch Manager when the database says otherwise.
+      // refusal is the lying-UI failure: they would walk away believing
+      // somebody holds Pitch Management when the database says otherwise.
       setIsSuper(previousSuper)
       setRights(previousRights)
       setError(failure)

@@ -194,7 +194,7 @@ describe('the screen', () => {
       teams: [],
     })
     render(<Pitches />)
-    expect(await screen.findByText(/haven't been given the Pitch Manager job/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Pitch Management hasn't been added to your account/i)).toBeInTheDocument()
     expect(screen.queryAllByTestId('pitch-chip')).toHaveLength(0)
   })
 

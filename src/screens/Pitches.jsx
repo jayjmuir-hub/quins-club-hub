@@ -160,8 +160,8 @@ export default function Pitches() {
       <Card role="alert" className="p-6 text-center">
         <h3 className="text-base font-extrabold text-ink">Pitches</h3>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          You haven&apos;t been given the Pitch Manager job. A super admin can add it on
-          the Accounts screen.
+          Pitch Management hasn&apos;t been added to your account. A super admin can add
+          it on the Accounts screen.
         </p>
       </Card>
     )

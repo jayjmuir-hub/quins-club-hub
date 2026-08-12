@@ -199,7 +199,13 @@ describe('AdminDashboard — tabs', () => {
     expect(await screen.findByText('U10')).toBeInTheDocument()
     expect(screen.queryByText('Accounts tab marker')).not.toBeInTheDocument()
     // Still inside the dashboard shell, not a fresh page.
-    expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument()
+    // ⚠️ THE HEADING IS THE PORTAL, NOT "Admin", since 12 Aug 2026 — Accounts
+    // and Club are both inside the Club Admin portal, and "Admin" now names
+    // the chooser at bare /admin. The claim being made here is unchanged: the
+    // shell survived a client-side tab switch.
+    // claude/decisions/2026-08-12-admin-portals.md
+    expect(screen.getByRole('heading', { name: 'Club Admin' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Admin/ })).toHaveAttribute('href', '/admin')
   })
 
   // Desktop-only, the way /accounts and /overview always were. jsdom applies

@@ -560,8 +560,8 @@ union all select 'memberships', count(*) from memberships;
 -- what is actually applied
 select version, name from supabase_migrations.schema_migrations order by version desc limit 20;
 
--- WHO IS ACTUALLY EMAILED when a coach asks for a pitch. Do not assume Tracy is
--- on this list — as of 11 Aug she holds no right and it returns Jay twice.
+-- WHO IS ACTUALLY EMAILED when a coach asks for a pitch. Do not assume anybody
+-- holds Pitch Management — as of 11 Aug nobody did and it returns Jay twice.
 select p.full_name, m.is_super, m.admin_rights
 from memberships m join profiles p on p.id = m.profile_id
 where m.role = 'admin' and m.status = 'active'
@@ -649,7 +649,7 @@ state; trust the decisions for reasoning.**
   meant to show it. ⚠️ **Fixtures with no pitch get their own list**, since they appear
   in no row.
   ✅ **THE REQUEST LOOP IS CLOSED** (11 Aug): a coach asks from the event sheet
-  (`PitchRequest`), Tracy answers from a queue on `/admin/allocation`, and the coach
+  (`PitchRequest`), Pitch Management answers from a queue on `/admin/allocation`, and the coach
   sees the outcome in the same place they asked. Referee is a tickbox on the request.
   ⚠️ **A DECLINE NEVER SHOWS ON THE FIXTURE** — it keeps `Pitch TBD`. The request
   block is the ONLY place that fact exists, so it renders for decided requests too and
@@ -669,8 +669,8 @@ state; trust the decisions for reasoning.**
   ⚠️ **Super admins are recipients deliberately** — a super holds every right
   implicitly, so filtering on the `pitches` right alone would exclude the one person
   certain to be able to act.
-  ⚠️ **RIGHT NOW THAT IS THE ONLY REASON ANYONE IS MAILED: Tracy has NOT been granted
-  the Pitch Manager right**, so both current recipients are Jay's own two accounts.
+  ⚠️ **RIGHT NOW THAT IS THE ONLY REASON ANYONE IS MAILED: nobody has been granted
+  Pitch Management**, so both current recipients are Jay's own two accounts.
   Grant it on the Accounts screen and she joins automatically. **Measure this, do not
   trust it** — the query is in §Numbers.
   ⚠️ **THE FAILURE IS QUIET, and an earlier claim in this session that it would be
@@ -682,8 +682,9 @@ state; trust the decisions for reasoning.**
   not modules the suite can import. It was verified live instead, all three branches.
 - Nothing in the UI distinguishes a Medic from a Coach, because there is no
   difference in access. Deliberate — the word is what distinguishes them.
-- ✅ **THE SUPER-ADMIN TIER IS BUILT** (11 Aug), decided 10 Aug. Candice, Nick and
-  Tracy are ordinary admins and keep full sight of children's data ("trusted
+- ✅ **THE SUPER-ADMIN TIER IS BUILT** (11 Aug), decided 10 Aug. Club Youth Manager,
+  Pitch Management and Social Media Management are ordinary admins and keep full
+  sight of children's data ("trusted
   volunteers"), but **granting access, and the per-admin rights below, are
   super-admin-only**. The tier restricts AUTHORITY, not SIGHT.
   ⚠️ **It is a FLAG (`memberships.is_super`), not a role value** — and that was the
@@ -728,8 +729,8 @@ state; trust the decisions for reasoning.**
   host cannot drift and so nobody handles a value by hand.
 - **Deferred by Jay, still deferred:** test data cleanup, and the `group_id`
   multi-squad edit/cancel. **Never started, in priority order Jay gave them:**
-  Candice's youth dashboard (match sheets → WhatsApp), Nick's social-media dashboard,
-  training plans for the head of rugby performance.
+  the Club Youth Manager dashboard (match sheets → WhatsApp), the Social Media
+  Management dashboard, training plans for the head of rugby performance.
   ⚠️ **The AI features Jay brainstormed (Smart Comms, NL queries, match reports, auto
   lineup) ALL need one ruling first: whether children's data may leave the club for a
   third-party API.** Nobody has asked him. **Do not start any of them until he has

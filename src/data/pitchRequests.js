@@ -9,8 +9,8 @@ import { supabase } from '../lib/supabase'
 // moment anybody edited the fixture directly, silently, and the fixture is
 // what the schedule, the calendar feed and the clash detector all read.
 //
-// The cost, accepted knowingly: you cannot ask "what did Tracy allocate, and
-// has it been changed since?" — only "was this answered?".
+// The cost, accepted knowingly: you cannot ask "what did Pitch Management
+// allocate, and has it been changed since?" — only "was this answered?".
 //
 // ⚠️ A DECLINE IS INVISIBLE ON THE FIXTURE — also Jay's ruling. A declined
 // request leaves `events.pitch` on `Pitch TBD`, which still reads as "not
@@ -172,7 +172,7 @@ export async function declinePitch({ requestId, reason }) {
  * ⚠️ A DELETE, NOT A STATUS WRITE, because the UPDATE policy is admin-only —
  * widening it to the requester would also let them write 'allocated'. The
  * DELETE policy carries `status = 'submitted'`, so this silently affects zero
- * rows once Tracy has answered, which is why the zero-row check below treats
+ * rows once it has been answered, which is why the zero-row check below treats
  * that as a refusal rather than success.
  */
 export async function withdrawRequest(requestId) {

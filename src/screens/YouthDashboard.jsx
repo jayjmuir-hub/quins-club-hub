@@ -18,9 +18,10 @@ import { deadlineLabel, isOverdue, matchSheetDeadline } from '../lib/matchSheetD
 // ADMIN_RIGHTS and until now granted access to nothing (exactly where `pitches`
 // was before the pitch stack).
 //
-// ⚠️ TITLED BY THE JOB, NOT BY A PERSON — Jay, 12 Aug 2026. Candice has no
-// account yet, and a screen named after somebody who cannot sign in is a screen
-// that reads as broken.
+// ⚠️ TITLED BY THE JOB, NOT BY A PERSON — Jay, 12 Aug 2026. Nobody holds this
+// job in the app yet, and a screen named after somebody who cannot sign in is a
+// screen that reads as broken. The club's jobs are named and the volunteers
+// holding them are not: claude/decisions/2026-08-12-jobs-not-people.md.
 //
 // ⚠️ THE RIGHT GATES THE SCREEN, NOT THE DATA. RLS on match_sheets is
 // can_edit_team, which already contains an admin arm — so this is a "not your
@@ -133,8 +134,8 @@ export default function YouthDashboard() {
       <Card role="alert" className="p-6 text-center">
         <h3 className="text-base font-extrabold text-ink">Club Youth Manager</h3>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          You haven&apos;t been given the Youth Manager job. A super admin can add it on the
-          Accounts screen.
+          Club Youth Manager hasn&apos;t been added to your account. A super admin can add
+          it on the Accounts screen.
         </p>
       </Card>
     )

@@ -1787,7 +1787,7 @@ GRANT EXECUTE ON FUNCTION public.set_admin_rights(uuid, boolean, text[]) TO serv
 -- claude/state-of-play.md for days after it stopped being true.
 --
 -- ⚠️ WHY THE DATABASE SENDS IT AND NOT THE APP, which is not a style choice:
--- the submit mail goes to Pitch Managers, and **a coach cannot read admin email
+-- the submit mail goes to whoever holds Pitch Management, and **a coach cannot read admin email
 -- addresses** — `profiles` is not bulk-readable by one and `profiles.email` is
 -- column-granted, not merely policy-gated. A client-side send would need either
 -- the club's admin list in every coach's browser or a service-role key in it.

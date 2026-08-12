@@ -273,11 +273,15 @@ describe('YouthDashboard — the Club Youth Manager list', () => {
   const asYouth = { memberships: ADMIN_YOUTH, path: '/admin/youth' }
 
   it('⚠️ is titled by the JOB, not by a person', async () => {
-    // Candice has no account; a screen named after somebody who cannot sign in
-    // reads as broken.
+    // Nobody holds this job in the app yet; a screen named after somebody who
+    // cannot sign in reads as broken.
     mount(<YouthDashboard />, { memberships: [{ role: 'admin', status: 'active', admin_rights: [] }], path: '/admin/youth' })
-    expect(await screen.findByText(/Club Youth Manager/i)).toBeInTheDocument()
-    expect(screen.getByText(/haven't been given the Youth Manager job/i)).toBeInTheDocument()
+    // ⚠️ BY ROLE, not by text. Since 12 Aug the label appears TWICE on this
+    // card — as the heading and inside the sentence below it — so a bare
+    // findByText matches both and throws. Asserting the heading is also the
+    // stronger claim: it is the title being tested, not the prose.
+    expect(await screen.findByRole('heading', { name: /Club Youth Manager/i })).toBeInTheDocument()
+    expect(screen.getByText(/Club Youth Manager hasn't been added to your account/i)).toBeInTheDocument()
   })
 
   it('lists matches with their sheet status', async () => {

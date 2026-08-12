@@ -10,7 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR — a commit cannot cite its own)* — **`app.adhjrt.com` is retired.**
+- *(SHA follows in the next PR)* — **`/admin` is a chooser, and each job is its own portal.**
+  Jay: *"i'd like more of a split off for the dashboards"*. The tab row that grew with every
+  right somebody held is replaced by four cards — Club Admin, Pitch Management, Club Youth
+  Manager, Social Media Management — each entering a space with its own tabs.
+  ⚠️ **Every card renders for every admin**; not holding the job, or the job having no screen,
+  greys it. ⚠️ **A grey card is not a link IN THE MARKUP** — this repo has already shipped a
+  control that drew itself and swallowed the tap.
+  ⚠️ **"No screen yet" and "this job hasn't been added to your account" stay DIFFERENT
+  messages** — a super admin fixes one, only building fixes the other.
+  ⚠️ **Navigation only. It narrows nothing** — a portal holder is still a full admin.
+  ⚠️ **Only bare `/admin` changes**; every URL under it is untouched, so nothing bookmarked
+  breaks. `src/lib/portals.js` is the single list both the chooser and the tab row read.
+  `claude/decisions/2026-08-12-admin-portals.md`
+
+- *(SHA follows in the next PR)* — **Jobs, not people: the three club jobs are named and the
+  volunteers are not.** `Youth Manager` → **Club Youth Manager**, `Social Media Manager` →
+  **Social Media Management**, `Pitch Manager` → **Pitch Management**.
+  ⚠️ **Two of the three stop being job titles, so five sentences moved rather than the words**
+  — three not-authorised screens and both pitch emails, because "you're a Pitch Management"
+  is not English. The mismatch was put to Jay before the change and he chose this wording.
+  ⚠️ **The emails are a Supabase edge function and deploy separately from the app.**
+  ~60 human names replaced with the job name across `src/`, `tests/`, `db/schema/` and the
+  instructional docs; ⚠️ **`claude/handoffs/`, `claude/plans/` and `db/migrations/` keep
+  theirs**, being dated records of a moment. Enforced by `RETIRED_NAMES` in
+  `scripts/docs-check.mjs` — ⚠️ **regexes with word boundaries, or `Nick` would fail every <!-- stale-ok -->
+  line containing "nickname"** — scanned in code as well as docs, because every occurrence
+  outside the docs was a code comment.
+  `claude/decisions/2026-08-12-jobs-not-people.md`
+
+- `b8fd9a0` — **`app.adhjrt.com` is retired.**
   The app's original address, kept as a working alias since the 5 Aug domain move, no longer
   resolves. Removed in three places: the Supabase redirect allow-list, the Netlify domain alias,
   and the DNS record — ⚠️ **which went automatically, because `adhjrt.com` is on Netlify DNS and
@@ -353,7 +382,7 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
   `supabase/functions/calendar/index.ts` reference was verified by hand — a green
   `docs-check` would not have covered it.
 
-- `45d50d4` — **Two specs for Candice's match sheets, and the brainstorm found a modelling gap that
+- `45d50d4` — **Two specs for the Club Youth Manager's match sheets, and the brainstorm found a modelling gap that
   would have wasted the build.** `claude/plans/2026-08-11-league-teams-and-fixtures.md`
   and `claude/plans/2026-08-11-match-sheets.md`, split because the work spans EventForm,
   Schedule, the calendar feed and the allocation grid before a sheet is even rendered.
@@ -591,8 +620,8 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
   ⚠️ **SUPER ADMINS ARE RECIPIENTS TOO, deliberately.** A super holds every right
   implicitly, so filtering on the `pitches` right alone would exclude the one person
   certain to be able to act — and on a club where nobody has been given the job yet,
-  that is EVERY recipient. Today that is not hypothetical: Tracy has not been granted
-  the right, so both current recipients are Jay's own accounts.
+  that is EVERY recipient. Today that is not hypothetical: nobody has been granted
+  Pitch Management, so both current recipients are Jay's own accounts.
   ⚠️ **THE FAILURE IS GENUINELY QUIET, and an earlier claim that it was "visible"
   was wrong.** Both triggers swallow everything into a `raise warning` nobody reads,
   so a dead endpoint costs an email silently. That is only acceptable because **the
@@ -623,13 +652,13 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
 
 - `852dbf2` — **The pitch request loop closes — ask, answer, and see the outcome.**
 
-- **11 Aug — the pitch request LOOP closes: a coach asks, Tracy answers, the coach
+- **11 Aug — the pitch request LOOP closes: a coach asks, Pitch Management answers, the coach
   sees the outcome.** `PitchRequest` on the event sheet, and a queue on the allocation
   screen. `pitch_requests` finally has something writing to it.
   ⚠️ **`events.pitch` REMAINS THE ONLY SOURCE OF TRUTH for which pitch** — Jay's
   ruling. The request table records the CONVERSATION and has no pitch column; a second
   copy would disagree with the fixture the moment anyone edited the fixture directly.
-  The accepted cost: you cannot ask "what did Tracy allocate, and has it changed
+  The accepted cost: you cannot ask "what did Pitch Management allocate, and has it changed
   since?", only "was this answered?".
   ⚠️ **A DECLINE IS INVISIBLE ON THE FIXTURE — also Jay's ruling.** It keeps
   `Pitch TBD`, which still reads "not allocated yet". So the request block is the ONLY
@@ -734,7 +763,7 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
 - **11 Aug — `pitch_requests`: a coach asks, an admin allocates. SCHEMA AND RLS ONLY —
   no screen and no email yet.** Jay's four rulings: a request **attaches to an existing
   fixture** (so it appears in the schedule at once carrying `Pitch TBD`, which is what
-  that placeholder already means); **Tracy allocates**; **the referee is a tickbox on
+  that placeholder already means); **Pitch Management allocates**; **the referee is a tickbox on
   the same request**, because both are asked for at the moment a match is arranged;
   and it must be **trackable from submission to assignment by the person who submitted
   it**, in two dashboards, with email.
@@ -785,8 +814,8 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
 - **11 Aug — a managed pitch list, and the clash detection it unblocks.**
   `db/migrations/20260811_pitches.sql`. ⚠️ **This OVERTURNS the 5 Aug decision**,
   which chose "free text beside Venue. No pitches table, no clash detection." That
-  was the right scope call for one person entering fixtures; Tracy's job IS pitch
-  allocation, and the free text had already drifted — measured 11 Aug: **"Pitch 2"
+  was the right scope call for one person entering fixtures; Pitch Management IS a
+  job now, and the free text had already drifted — measured 11 Aug: **"Pitch 2"
   AND "Pitch D2"** both in use, plus "Clubhouse lawn". No clash detector can group
   by a string somebody retyped.
   ⚠️ **`events.pitch` STAYS TEXT WITH NO FOREIGN KEY**, and this is the part most
@@ -825,7 +854,7 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
   screen that hides a row is not security. The gate exists so an ordinary admin is
   not offered a control that could only fail.
   ⚠️ **A REFUSED SAVE PUTS THE TICK BACK.** The write is optimistic, so without the
-  revert somebody walks away certain that Nick is a Pitch Manager while the database
+  revert somebody walks away certain that an account holds Pitch Management while the database
   disagrees — the lying-UI failure. Proved by deleting the revert: the test fails.
   ⚠️ **A super admin's boxes show ticked AND disabled**, because a super admin holds
   every right implicitly and empty boxes would read as "no rights", the opposite of
