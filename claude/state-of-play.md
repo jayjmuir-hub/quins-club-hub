@@ -232,6 +232,14 @@ will propose building.**
   **Save draft and Submit failed on the live match sheet** while the pull
   request waited. Undone by re-adding them (they were all NULL, so it cost
   nothing) and re-applied once the new bundle was serving.
+  ✅ **RESOLVED. The drop is back on, live, and the repo agrees with it.**
+  Verified the way this file keeps saying to: **the SERVED BUNDLE first** —
+  fetch `/index.html`, read the `/assets/index-*.js` name out of it, fetch that
+  and search it — which found all three new strings AND the absence of the old
+  `Away final score` box, a control on both sides. Then the columns: all four
+  answer `400 / 42703` through PostgREST while `manager_phone` and `id` answer
+  200, and the whole new write path (`events`' eight components,
+  `teams.scoring_kinds`) resolves against live.
   ⚠️ **THE RULE: A DESTRUCTIVE SCHEMA CHANGE AGAINST A LIVE SPA IS DEPLOY-FIRST,
   DROP-SECOND.** An ADDITIVE one is safe in either order — an old bundle never
   mentions a new column — which is why `manager_phone` going in early was fine

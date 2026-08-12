@@ -1046,13 +1046,15 @@ CREATE TABLE public.match_sheets (
   -- result_them from them. All four were null on the only sheet that existed,
   -- measured the same day.
   --
-  -- ⚠️ THE DROP IS SEQUENCED AGAINST THE DEPLOY, NOT AGAINST THE MERGE, and
-  -- this capture describes the state AFTER it. Applied early on 12 Aug it broke
-  -- saving on the live site (the deployed bundle still sent all four; PostgREST
-  -- answers a write naming a missing column with 400 / PGRST204), so it was
-  -- undone and re-applied once the new bundle was serving. **If these four are
-  -- present in live, the drop has not been re-applied yet** - read the migration's
-  -- header before doing anything about it.
+  -- ⚠️ THE DROP IS SEQUENCED AGAINST THE DEPLOY, NOT AGAINST THE MERGE. Applied
+  -- early on 12 Aug it broke saving on the live site - the deployed bundle still
+  -- sent all four, and PostgREST answers a write naming a missing column with
+  -- 400 / PGRST204. It was undone, and re-applied once the new bundle was
+  -- actually serving.
+  -- ✅ RE-APPLIED AND VERIFIED 12 Aug 2026 (`drop_match_sheet_scores_after_deploy`).
+  -- All four now answer 400 / 42703 through PostgREST while `manager_phone` and
+  -- `id` answer 200 - a control on both sides, so the check distinguishes absent
+  -- from merely broken. This capture and live agree.
   medical_notes  text,
   -- Column comment as stored: "complete" means the coach pressed Submit and
   -- the sheet is ready to send to RCM. It does NOT mean RCM received it.

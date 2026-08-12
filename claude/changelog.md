@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **The match sheet had no real-browser scenario at
+- *(SHA follows in the next PR)* — **The drop is back on, in the right order this
+  time, and the docs stop describing a state that did not exist.**
+  `drop_match_sheet_scores_after_deploy`, applied only once the new bundle was actually
+  serving.
+  ⚠️ **Verified the SERVED BUNDLE first**, the way `state-of-play.md` keeps insisting —
+  fetch `/index.html`, read the `/assets/index-*.js` name out of it, fetch that and
+  search it. **All three new strings present AND the old `Away final score` box absent**:
+  a control on both sides, so it distinguishes "new build" from "any build".
+  ⚠️ **Then the columns, also with controls.** All four answer `400 / 42703` through
+  PostgREST while `manager_phone` and `id` answer 200 — otherwise a broken request looks
+  exactly like a dropped column. The whole new write path (`events`' eight components,
+  `teams.scoring_kinds`) resolves against live.
+  ⚠️ **`db/schema/tables.sql` and `state-of-play.md` said DROPPED for the window in which
+  it was not.** Both now agree with live. The temporary note was written down at the time
+  rather than left to be discovered, which is the only reason this was a footnote instead
+  of the next session's mystery.
+
+- `c8a05c7` — **The match sheet had no real-browser scenario at
   all, and it is the widest screen in the app.** `harness/main.jsx` gains `match-sheet`,
   `harness/stubs/matchSheets.js` is its stub, and the overflow gate's `SCENARIOS` list
   gains the entry.
@@ -26,7 +43,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   is exactly what the same injection FAILED to do inside a `Sheet` on 12 Aug. The other
   28 scenarios were not re-run; nothing in the commit touches them.
 
-- *(SHA follows in the next PR)* — **The sheet stops holding a score.** Applied live as
+- `c8a05c7` — **The sheet stops holding a score.** Applied live as
   `drop_match_sheet_scores`. Step 4 of the scoring plan, run LAST and only once nothing
   read the columns.
   ⚠️ **`tries_us` / `tries_them` went too, and the plan did not say so** — it named only
@@ -48,7 +65,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   safe in either order, which is why `manager_phone` going in early was fine and this was
   not. **"Nothing reads it" has to mean nothing anyone is RUNNING.**
 
-- *(SHA follows in the next PR)* — **The score is ENTERED AS COMPONENTS, and the form's
+- `c8a05c7` — **The score is ENTERED AS COMPONENTS, and the form's
   total can no longer disagree with its own tries.** Steps 3 and 5 of the scoring plan,
   plus the picker the step-2 migration added a column for and nothing could set.
   Migration `match_sheet_manager_phone`, applied live.
