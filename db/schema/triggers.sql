@@ -222,3 +222,28 @@ drop trigger if exists events_result_from_components on public.events;
 create trigger events_result_from_components
   before insert or update on public.events
   for each row execute function private.events_result_from_components();
+
+-- ── notify_access_request_asked, 12 Aug 2026 ────────────────────────────────
+--
+-- AFTER INSERT on public.access_requests. Tells every active admin that
+-- somebody has asked to be let in.
+--
+-- ⚠️ THE `when` CLAUSE IS NOT BELT-AND-BRACES, AND REMOVING IT SENDS A WRONG
+-- EMAIL. dismissAccessRequest (src/data/accessRequests.js) UPSERTS, and an
+-- upsert that finds no existing row is an INSERT — of a row that is already
+-- `dismissed`. Without the guard, dismissing a stranger who never asked would
+-- email every admin "somebody is asking to join" about the person the admin had
+-- just turned away.
+-- ⚠️ Proved by removing it inside a transaction on 12 Aug 2026: the queue delta
+-- for that insert went 0 → 1. The guard is what makes it 0.
+--
+-- ⚠️ INSERT ONLY. The other two writes to this table are an UPDATE to
+-- 'dismissed' (an admin telling themselves something they just did) and a
+-- DELETE (restoreAccessRequest — there is no row left to describe). Both
+-- measured at a queue delta of 0.
+drop trigger if exists notify_access_request_asked on public.access_requests;
+create trigger notify_access_request_asked
+after insert on public.access_requests
+for each row
+when (new.status = 'pending')
+execute function private.notify_access_request();

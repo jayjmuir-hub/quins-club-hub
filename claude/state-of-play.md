@@ -895,13 +895,42 @@ state; trust the decisions for reasoning.**
   no data to stand on and no way to have its thresholds judged.** Same trap as the
   schedule restructure that was designed, agreed and dropped once real data showed it
   was unnecessary. Take some registers first.
-- **Nobody is emailed when an access REQUEST arrives.** ⚠️ Not to be confused with
-  the approval emails, which fire for a pending REGISTRATION. ⚠️ **As of 11 Aug this
-  is cheap** — `notify-pitch-request` is the second instance of the trigger → edge
-  function → Resend pattern, so a third is a copy with a different recipient query.
-  It reuses `approval_notify_secret`; a new one only needs its own `*_notify_url`
-  vault entry, and that should be DERIVED from `approval_notify_url` in SQL so the
-  host cannot drift and so nobody handles a value by hand.
+- ✅ **ADMINS ARE NOW EMAILED WHEN AN ACCESS REQUEST ARRIVES** (12 Aug 2026,
+  migration `access_request_notify`, edge function `notify-access-request` v2).
+  This entry read "Nobody is emailed…" until then. ⚠️ **Not to be confused with the
+  approval emails, which fire for a pending MEMBERSHIP** — somebody already attached
+  to a squad. This fires for somebody with NO membership at all, asking to be let in.
+  Two queues, two sections of the Accounts screen, and conflating them sends an admin
+  to the wrong list.
+  ⚠️ **The 11 Aug estimate was right: "a third is a copy with a different recipient
+  query."** It is a near-copy of `notify-pitch-request`, reusing
+  `approval_notify_secret`, with its own `access_request_notify_url` **derived from
+  `approval_notify_url` in SQL** — so the host cannot drift and nobody ever reads,
+  pastes or types the value.
+  ⚠️ **RECIPIENTS ARE EVERY ACTIVE ADMIN, AND THAT IS MEASURED, NOT COPIED.** There
+  is no `accounts` right — `ADMIN_RIGHTS` is youth/media/pitches and those gate
+  PORTALS. Acting on a request means reading the waiting list (`access request
+  admin` = `is_admin_anywhere()`) and granting a membership (`memb manage` =
+  `is_admin(club_id)`), and **both are plain admin**. Copying the pitch function's
+  `is_super or right` clause would have silently excluded the ordinary admins who
+  can in fact do the job.
+  ⚠️ **THE `when (new.status = 'pending')` GUARD IS LOAD-BEARING.**
+  `dismissAccessRequest` UPSERTS, and an upsert that finds no row is an INSERT of a
+  row already `dismissed` — so without it, turning away a stranger who never asked
+  would email every admin "somebody is asking to join" about the person just turned
+  away. Proved by removing it in a transaction: that insert's queue delta went 0 → 1.
+  ⚠️ **A BARE `profiles(...)` EMBED DOES NOT WORK ON THIS TABLE, and the first
+  deployed version got it wrong.** `access_requests` has TWO foreign keys to
+  `profiles` (`profile_id` and `decided_by`), so PostgREST refuses the query as
+  ambiguous. **The only symptom was a 500 and no email** — exactly the quiet failure
+  this design accepts. Fixed with the explicit constraint name, which is why
+  `notify-pitch-request` carries one too. Same probe before and after: 500 → 404.
+  ⚠️ **THE RESEND CALL ITSELF IS THE ONE BRANCH NOT EXERCISED LIVE.** Everything
+  else was — the auth gate (its own `unauthorised` body, which is what proves the
+  request reached the function rather than a JWT gate), the vault derivation, the
+  trigger guard on all four write paths, and the database read. Sending for real
+  would put a test email in a third volunteer's inbox, so it was not done. The
+  `sendMail` body is byte-identical to two functions already proven in production.
 - **Deferred by Jay, still deferred:** test data cleanup, and the `group_id`
   multi-squad edit/cancel.
   ❌ **THIS ENTRY SAID "NEVER STARTED" ABOUT TWO THINGS THAT HAD ALREADY SHIPPED, and
