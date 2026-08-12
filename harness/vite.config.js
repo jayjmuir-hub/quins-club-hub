@@ -80,6 +80,14 @@ export default defineConfig({
         find: /^\.\.\/data\/matchSheets\.js$/,
         replacement: path.resolve(__dirname, 'stubs/matchSheets.js'),
       },
+      // The pitch allocation screen (12 Aug 2026). Allocation.jsx is in
+      // src/screens/, one level below src/, so the specifier text matches the
+      // same rule shape as every alias above.
+      { find: /^\.\.\/data\/pitches\.js$/, replacement: path.resolve(__dirname, 'stubs/pitches.js') },
+      {
+        find: /^\.\.\/data\/pitchRequests\.js$/,
+        replacement: path.resolve(__dirname, 'stubs/pitchRequests.js'),
+      },
     ],
   },
   server: {

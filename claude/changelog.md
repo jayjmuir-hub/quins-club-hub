@@ -10,7 +10,38 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **The URL breaks before the row cap does, and the
+- *(SHA follows in the next PR)* — **A full calendar for Pitch Management, an App button
+  in the top bar, and a desktop pass.** Three things Jay asked for on 12 Aug.
+  ⚠️ **Day | Week | Month on `/admin/allocation`, and it OPENS ON MONTH** — Jay's call
+  when offered the choice, superseding the 11 Aug "opens on today, in Day view". The
+  calendar first shipped with Day still the landing view and the question was PUT TO HIM
+  rather than answered by whoever was typing.
+  ⚠️ **The week starts MONDAY** because the UAE weekend is Sat–Sun and rugby is played on
+  it; a Sunday-start week splits the two days Pitch Management cares about across two
+  screens. ⚠️ **Clash and waiting-for-a-pitch are marked by SHAPE as well as colour** and
+  spelled out in the aria-label.
+  ⚠️ **`src/lib/calendarGrid.js` is tested in a NON-UTC zone**, because every bug it can
+  have is a time-zone bug and under a UTC runner they all pass. Month paging **clamps
+  rather than rolls over** (31 Jan +1 is 28 Feb, not 3 March), and events file by the
+  CLUB'S calendar day (a 01:00 Abu Dhabi kick-off is 21:00 UTC the day before).
+  ❌ **THE App BUTTON'S GREEN WAS SAMPLED OFF adhjrt.com AND FAILED THE BUILD.** `#3bd070`
+  is the **RETIRED** brand green — that site still runs the pre-6-Aug palette — and
+  `tests/press-feedback.test.js` exists to stop exactly that. It uses `accent` instead.
+  ❌ **AND A MASTHEAD MEASUREMENT WAS WRONG IN A WAY WORTH KEEPING.** "Headroom" was
+  computed as the wordmark's own width minus its natural text width — **a number that
+  calculation can only ever return as ~0** — and the account first name was deleted on
+  the strength of it. A probe that GREW until the wordmark visibly truncated disagreed:
+  the real buffer is a `flex-1` spacer and it breaks at +190px. The name is restored.
+  ⚠️ **Desktop: the content well goes 1120 → 1360px at `wide`**, so a 1440px monitor
+  stops leaving 320px empty; the roster table gains 240px of real column width.
+  ⚠️ **`shadow-card` is now a PAIR** — 1px contact + wide ambient — rather than one wide
+  soft blur. `claude/specs/design-system.md` records the divergence from the prototype's
+  single `--shadow` rather than being rewritten over it.
+  ⚠️ **The portal cards LIFT on hover instead of flattening.** They carried
+  `hover:shadow-[0_0_0_1px_…]`, which set the ONLY shadow and so removed every bit of
+  elevation at the moment the card is meant to look reachable.
+
+- `275bba8` — **The URL breaks before the row cap does, and the
   club lands on it.** `listPlayers` pages instead of capping, and four `.in()` readers
   are chunked.
   ⚠️ **THE LIMIT NOBODY HAD MEASURED.** PostgREST takes `.in()` as a query **STRING**,

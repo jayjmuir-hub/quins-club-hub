@@ -14,6 +14,7 @@ import { ViewAsBanner } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 import Button from './Button.jsx'
 import InstallPrompt from './InstallPrompt.jsx'
+import AppButton from './AppButton.jsx'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
 // role label, nav) plus the membership-loading gate that decides whether the
@@ -240,7 +241,7 @@ export default function AppShell({ children }) {
             shapes bleeding off the right edge. */}
         <header className="bg-chrome-grad text-white shadow-masthead">
           <div className="brand-rule" />
-          <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3">
+          <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3 wide:max-w-[1360px]">
             {/* crest.png is 370x400 (portrait) — object-contain keeps its native
                 aspect ratio inside the 46x46 badge box (matching the
                 prototype's background:contain treatment) instead of the
@@ -391,6 +392,15 @@ export default function AppShell({ children }) {
                 The initial, not a photo: `players.photo_path` holds head shots
                 of PLAYERS, and the signed-in person is usually a parent or a
                 coach who has no photo anywhere in the system. */}
+            {/* ⚠️ BEFORE THE ACCOUNT LINK, AND IT RENDERS NOTHING ONCE THE APP
+                IS INSTALLED — which is what keeps it out of the masthead
+                width budget for everyone who has already acted on it. The row
+                has a documented history of over-filling between 820 and
+                1280px (see the wordmark note above), so this was MEASURED in
+                Chromium rather than reasoned about; the numbers are in the
+                commit. */}
+            <AppButton />
+
             <Link
               to="/more"
               data-testid="account-button"
@@ -413,6 +423,24 @@ export default function AppShell({ children }) {
                   Barlow Condensed it replaced. There was no slack left to
                   spend. The initial alone is still a 28px tap target, so
                   below 1280px this loses only the name. */}
+              {/* ⚠️ THIS NAME WAS BRIEFLY DELETED ON 12 Aug 2026 TO MAKE ROOM
+                  FOR THE App BUTTON, AND PUTTING IT BACK IS THE CORRECTION.
+                  The measurement behind the deletion was wrong, and the way it
+                  was wrong is worth keeping: "headroom" was computed as the
+                  h1's own width minus its natural text width, which is ALWAYS
+                  ~0 — the h1 is content-sized, so that subtraction can only
+                  ever return zero and says nothing about the row.
+
+                  The row's real buffer is the `flex-1` spacer two elements up,
+                  which absorbs every squeeze before the wordmark gives an inch.
+                  Measured properly at 1280px by growing a probe until the
+                  wordmark actually truncated: IT BREAKS AT +190px. The App
+                  button is 49 and this name is ~75, so both fit with ~66px to
+                  spare.
+
+                  ⚠️ THE LESSON, NOT THE NUMBER: a "0" that a calculation can
+                  only ever produce is not a measurement. The probe that grows
+                  until something visibly breaks is, and it disagreed. */}
               {firstName && (
                 <span className="hidden max-w-[9ch] truncate font-condensed text-[13px] font-bold uppercase tracking-[0.08em] wide:inline">
                   {firstName}
@@ -459,7 +487,7 @@ export default function AppShell({ children }) {
       <main
         id="main-content"
         tabIndex={-1}
-        className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16 focus:outline-none"
+        className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16 wide:max-w-[1360px] focus:outline-none"
       >
         {/* ⚠️ ABOVE THE loading/error/ready SPLIT, DELIBERATELY. Installing is
             not gated on having a membership: a parent who has just signed up

@@ -9,6 +9,15 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
 import { clubToday, eventDate, eventEndDate, eventTitle, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
+import { PitchMonth, PitchWeek } from '../components/PitchCalendar.jsx'
+import {
+  monthGrid,
+  sameDay,
+  shiftMonth,
+  weekDays,
+  windowFor,
+  shiftDay as shiftDayParts,
+} from '../lib/calendarGrid.js'
 
 // The allocation grid — pitches down the side, the day across the top.
 //
@@ -16,30 +25,44 @@ import { fixtureLabel } from '../lib/fixtureLabel.js'
 // it is the screen the pitch work exists for: a Saturday morning fits on one
 // view and a double booking reads as two amber cells without reading a word.
 //
-// ⚠️ IT OPENS ON TODAY — Jay, 11 Aug 2026, asked directly. Today is often
-// empty midweek, which is why the empty state says what is happening rather
-// than rendering a blank grid that reads as broken.
+// ⚠️ IT OPENS ON THE MONTH, ANCHORED ON TODAY — Jay, 12 Aug 2026, asked
+// directly when offered the choice.
+//
+// ⚠️ THIS REPLACES THE 11 AUG "OPENS ON TODAY, IN DAY VIEW" RULING, AND THE WAY
+// IT WAS REPLACED IS THE POINT. That instruction was explicit, so the calendar
+// shipped with Day still the landing view and the question was put to Jay
+// rather than answered by whoever was typing. He changed it. A default nobody
+// asked about is a guess; this one is a decision, and the old ruling is
+// superseded rather than forgotten.
+//
+// ⚠️ "ANCHORED ON TODAY" IS STILL TRUE AND STILL MATTERS. `day` is initialised
+// to clubToday(), so the month that opens is THIS month with today circled —
+// not January, and not the month of some remembered selection.
+//
+// ⚠️ THE THREE VIEWS ANSWER DIFFERENT QUESTIONS, which is why all three exist:
+//   DAY    pitches × hours — "what is on this pitch at this hour", the grid you
+//          allocate from. The only view that can show a double booking as two
+//          cells side by side.
+//   WEEK   seven columns — "what is coming this weekend", the planning horizon.
+//   MONTH  the full calendar — "which days need me at all".
 //
 // ⚠️ THIS IS THE WEEKLY JOB. Setting the pitch list up is the rare one and
 // lives on its own screen, so a destructive action (retire) is not sitting on
 // the screen somebody uses every Saturday.
 
-const MS_DAY = 24 * 60 * 60 * 1000
+/** The three views, in the order they widen. */
+const VIEWS = [
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' },
+]
 
-/** Club-time midnight-to-midnight for a { year, month, day }. */
-function dayWindow({ year, month, day }) {
-  // ⚠️ Built from UTC parts against the CLUB's date, not the reader's. The
-  // whole app treats Abu Dhabi as the calendar (CLUB_TIME_ZONE), and a window
-  // derived from the browser's midnight would put a 6pm training on the wrong
-  // day for anyone outside the UAE.
-  const start = new Date(Date.UTC(year, month, day, 0, 0, 0) - 4 * 60 * 60 * 1000)
-  return { from: start.toISOString(), to: new Date(start.getTime() + MS_DAY - 1).toISOString() }
-}
-
-function shiftDay({ year, month, day }, delta) {
-  const moved = new Date(Date.UTC(year, month, day + delta))
-  return { year: moved.getUTCFullYear(), month: moved.getUTCMonth(), day: moved.getUTCDate() }
-}
+// ⚠️ dayWindow AND shiftDay USED TO LIVE HERE AND ARE NOW IN
+// src/lib/calendarGrid.js, which the week and month views also need. They were
+// byte-for-byte the same arithmetic — `windowFor([day])` and `dayWindow(day)`
+// produced the identical pair of ISO strings — and two copies of a time-zone
+// calculation is two places to get Abu Dhabi's +04:00 wrong in different ways.
+// The offset reasoning now lives in one file, with its own tests.
 
 /**
  * The hour columns the grid needs.
@@ -126,6 +149,10 @@ export default function Allocation() {
   const [decideBusy, setDecideBusy] = useState(false)
   const [decideError, setDecideError] = useState(null)
   const [day, setDay] = useState(() => clubToday())
+  // Jay's call, 12 Aug 2026. See the header — this supersedes the 11 Aug
+  // "opens on today, in Day view" instruction, and it was asked rather than
+  // assumed.
+  const [view, setView] = useState('month')
   const [events, setEvents] = useState([])
   const [pitches, setPitches] = useState([])
   const [loading, setLoading] = useState(true)
@@ -134,7 +161,15 @@ export default function Allocation() {
 
   const teamIds = useMemo(() => visibleTeams(memberships, teams).map((team) => team.id), [memberships, teams])
   const teamsById = useMemo(() => new Map((teams ?? []).map((team) => [team.id, team])), [teams])
-  const window = useMemo(() => dayWindow(day), [day])
+  // ⚠️ THE FETCH FOLLOWS THE VIEW, AND THAT IS THE WHOLE COST OF THE CALENDAR.
+  // A month of fifteen squads is the read that made listEvents page in the
+  // first place (~1,690 rows over 18 months, so a month is ~90) — well inside
+  // fetchAllPages, but it is the reason the window is derived from the visible
+  // days rather than left at one day and filtered.
+  const window = useMemo(() => {
+    if (view === 'day') return windowFor([day])
+    return windowFor(view === 'week' ? weekDays(day) : monthGrid(day))
+  }, [view, day])
 
   useEffect(() => {
     let mounted = true
@@ -215,17 +250,55 @@ export default function Allocation() {
     )
   }
 
-  const heading = new Date(Date.UTC(day.year, day.month, day.day)).toLocaleDateString(undefined, {
-    timeZone: 'UTC',
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
+  // ⚠️ BUILT FROM UTC PARTS WITH timeZone: 'UTC', which looks wrong and is not.
+  // `day` is already the CLUB's calendar date, so the Date below is a carrier
+  // for those parts rather than an instant — formatting it in any other zone
+  // would shift the label off the date it is labelling.
+  const asDate = new Date(Date.UTC(day.year, day.month, day.day))
+  const heading =
+    view === 'month'
+      ? asDate.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long', year: 'numeric' })
+      : view === 'week'
+        ? (() => {
+            const days = weekDays(day)
+            // ⚠️ BOTH ENDS CARRY THE MONTH, EVEN WITHIN ONE MONTH. Omitting it
+            // from the first date produced "10 – August 16" in a
+            // month-before-day locale — measured in Chromium, not imagined —
+            // which reads as a range between a number and a date. Formatting
+            // both ends the same way is unambiguous in EVERY locale, which is
+            // the point: the locale is the reader's and this code does not get
+            // to assume its order.
+            const format = (parts) =>
+              new Date(Date.UTC(parts.year, parts.month, parts.day)).toLocaleDateString(undefined, {
+                timeZone: 'UTC',
+                day: 'numeric',
+                month: 'short',
+              })
+            return `${format(days[0])} – ${format(days[6])}`
+          })()
+        : asDate.toLocaleDateString(undefined, {
+            timeZone: 'UTC',
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+          })
 
-  const isToday = (() => {
-    const t = clubToday()
-    return t.year === day.year && t.month === day.month && t.day === day.day
-  })()
+  const today = clubToday()
+  // "Today" means the visible RANGE contains today, not that the anchor is
+  // today — otherwise the button would offer to move a week view that is
+  // already showing this week.
+  const isToday =
+    view === 'day'
+      ? sameDay(today, day)
+      : view === 'week'
+        ? weekDays(day).some((d) => sameDay(d, today))
+        : day.year === today.year && day.month === today.month
+
+  /** Paging moves by whatever the view is showing. */
+  const step = (delta) =>
+    setDay((current) =>
+      view === 'month' ? shiftMonth(current, delta) : shiftDayParts(current, view === 'week' ? 7 * delta : delta),
+    )
 
   return (
     <section>
@@ -239,7 +312,7 @@ export default function Allocation() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setDay((d) => shiftDay(d, -1))}>
+          <Button variant="secondary" size="sm" onClick={() => step(-1)} aria-label="Previous">
             Previous
           </Button>
           {!isToday && (
@@ -247,10 +320,43 @@ export default function Allocation() {
               Today
             </Button>
           )}
-          <Button variant="secondary" size="sm" onClick={() => setDay((d) => shiftDay(d, 1))}>
+          <Button variant="secondary" size="sm" onClick={() => step(1)} aria-label="Next">
             Next
           </Button>
         </div>
+      </div>
+
+      {/* ⚠️ A ROW OF TABS, NOT the shared <Segmented>. Segmented is a
+          fieldset/legend RADIO GROUP built for a form question ("what gender is
+          this player") — it renders a visible legend and takes a full-width
+          row. This is a VIEW SWITCH sitting in a page header, where a legend
+          would be a label for something that is not a question. Same reason
+          Schedule's own filter pills are not Segmented either. */}
+      <div
+        role="tablist"
+        aria-label="Calendar view"
+        data-testid="allocation-views"
+        className="mb-3.5 inline-flex rounded-[11px] border-[1.5px] border-line p-0.5"
+      >
+        {VIEWS.map((option) => {
+          const on = view === option.value
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => setView(option.value)}
+              className={[
+                'rounded-[8px] px-3.5 py-1.5 text-[13px] font-bold transition',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1',
+                on ? 'bg-brand text-ink-invert' : 'text-ink-muted hover:text-ink',
+              ].join(' ')}
+            >
+              {option.label}
+            </button>
+          )
+        })}
       </div>
 
       {loading && events.length === 0 ? (
@@ -264,6 +370,34 @@ export default function Allocation() {
             {error.message || 'Something went wrong. Try again.'}
           </p>
         </Card>
+      ) : view === 'month' ? (
+        /* ⚠️ THE MONTH GRID RENDERS EVEN WHEN THE MONTH IS EMPTY, unlike the
+           day view below. An empty month is a legible answer — thirty quiet
+           squares that say "nothing booked" — whereas fifteen empty PITCH rows
+           say nothing and read as a failed load. The empty states differ
+           because the grids differ, not by oversight. */
+        <PitchMonth
+          anchor={day}
+          today={today}
+          events={events}
+          clashing={clashing}
+          onPickDay={(picked) => {
+            setDay({ year: picked.year, month: picked.month, day: picked.day })
+            setView('day')
+          }}
+        />
+      ) : view === 'week' ? (
+        <PitchWeek
+          anchor={day}
+          today={today}
+          events={events}
+          clashing={clashing}
+          teamsById={teamsById}
+          onPickDay={(picked) => {
+            setDay({ year: picked.year, month: picked.month, day: picked.day })
+            setView('day')
+          }}
+        />
       ) : events.length === 0 ? (
         /* ⚠️ A SENTENCE, NOT AN EMPTY GRID. The screen opens on today (Jay's
            call) and today is often a quiet Tuesday — fifteen empty rows would

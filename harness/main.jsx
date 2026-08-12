@@ -25,6 +25,7 @@ import Admin from '../src/screens/AdminClub.jsx'
 import Accounts from '../src/screens/Accounts.jsx'
 import AcceptInvite from '../src/screens/AcceptInvite.jsx'
 import MatchSheet from '../src/screens/MatchSheet.jsx'
+import Allocation from '../src/screens/Allocation.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
@@ -734,6 +735,48 @@ const scenarios = {
       <Routes>
         <Route path="/match-sheet/:eventId" element={<MatchSheet />} />
       </Routes>
+    </Shell>
+  ),
+
+  // ⚠️ THE PITCH CALENDAR — Day, Week and Month (12 Aug 2026). The month grid
+  // is the widest NON-SHEET thing in the app after the match sheet, and it is
+  // seven columns at 320px, so it is exactly the shape the overflow gate can
+  // measure for real.
+  //
+  // ⚠️ ADMIN WITH THE `pitches` RIGHT, because Allocation returns a refusal
+  // card without it — a scenario without the right would render the "Pitch
+  // Management hasn't been added to your account" message and pass every check
+  // while showing none of the screen.
+  //
+  // ?view=week|month picks the view; the screen itself opens on Day.
+  'allocation': () => (
+    <Shell
+      route="/admin/allocation"
+      authValue={{ ...baseAuth(JAY_EMAIL), user: { id: 'pr-jay', email: JAY_EMAIL } }}
+      membershipValue={{
+        memberships: [
+          // ⚠️ `status: 'active'` IS MANDATORY AND IS EASY TO MISS.
+          // adminRights() skips any membership that is not active, so without
+          // it this scenario renders the "Pitch Management hasn't been added to
+          // your account" refusal card and passes every check while showing
+          // none of the screen. It did exactly that first time.
+          {
+            id: 'm0',
+            role: 'admin',
+            status: 'active',
+            team_id: null,
+            player_id: null,
+            club_id: CLUB_ID,
+            admin_rights: ['pitches'],
+          },
+        ],
+        teams: TEAMS,
+        loading: false,
+        error: null,
+        reload: noop,
+      }}
+    >
+      <Allocation />
     </Shell>
   ),
 

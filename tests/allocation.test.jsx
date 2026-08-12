@@ -140,8 +140,48 @@ describe('the screen', () => {
     return userEvent.setup()
   }
 
-  it('⚠️ asks for ONE DAY, not everything', async () => {
+  // ⚠️ THE SCREEN OPENS ON MONTH SINCE 12 Aug 2026 (Jay's call, replacing the
+  // 11 Aug "opens on today, in Day view"). Every test below that exercises the
+  // pitches x hours GRID has to get there first — they are not testing the
+  // default, they are testing the grid, and conflating the two is how a
+  // default change turns into five confusing failures.
+  async function openDay(user) {
+    await user.click(await screen.findByRole('tab', { name: 'Day' }))
+  }
+
+  it('⚠️ opens on the MONTH, anchored on today', async () => {
+    // Jay asked for this directly when offered the choice. It supersedes the
+    // 11 Aug ruling; see the header of src/screens/Allocation.jsx.
     await setup()
+    expect(await screen.findByTestId('pitch-month')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Month' })).toHaveAttribute('aria-selected', 'true')
+    // Anchored on TODAY: the heading is this month, not January.
+    const now = new Date()
+    const month = now.toLocaleDateString(undefined, { month: 'long' })
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(month)
+  })
+
+  it('⚠️ a month view asks for the WHOLE month, not one day', async () => {
+    // The fetch window follows the view. If it did not, the month grid would
+    // render six empty weeks around a single populated day and look broken.
+    await setup()
+    await waitFor(() => expect(listEventsMock).toHaveBeenCalled())
+    const args = listEventsMock.mock.calls[0][0]
+    const span = Date.parse(args.to) - Date.parse(args.from)
+    expect(span).toBeGreaterThan(27 * 24 * 60 * 60 * 1000)
+  })
+
+  it('clicking a day in the month opens that day in the grid', async () => {
+    const user = await setup()
+    await screen.findByTestId('pitch-month')
+    const cells = screen.getAllByTestId('month-cell')
+    await user.click(cells[10])
+    expect(await screen.findByRole('tab', { name: 'Day' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('⚠️ asks for ONE DAY, not everything', async () => {
+    const user = await setup()
+    await openDay(user)
     await waitFor(() => expect(listEventsMock).toHaveBeenCalled())
     // ⚠️ Explicit, because the alternative failure is silent: if the pitches
     // mock ever stops applying, the real module reaches for Supabase and every
@@ -149,7 +189,9 @@ describe('the screen', () => {
     // confusing failures instead of one that names the cause. That is exactly
     // how this file failed in CI while passing here.
     expect(listPitchesMock, 'the pitches module is not mocked').toHaveBeenCalled()
-    const args = listEventsMock.mock.calls[0][0]
+    // ⚠️ THE LAST call, not the first: the screen opens on Month and refetches
+    // when the view changes, so calls[0] is the month's window.
+    const args = listEventsMock.mock.calls.at(-1)[0]
     expect(args.from).toBeTruthy()
     expect(args.to).toBeTruthy()
     // A day, not a season.
@@ -160,13 +202,15 @@ describe('the screen', () => {
     // It opens on TODAY (Jay's call) and today is often a quiet Tuesday.
     // Fifteen empty rows read as the app failing to load.
     listEventsMock.mockResolvedValue([])
-    await setup()
+    const user = await setup()
+    await openDay(user)
     expect(await screen.findByText(/nothing on today/i)).toBeInTheDocument()
     expect(screen.queryByTestId('allocation-grid')).not.toBeInTheDocument()
   })
 
   it('draws a booking on its pitch', async () => {
-    await setup()
+    const user = await setup()
+    await openDay(user)
     expect(await screen.findByTestId('allocation-grid')).toBeInTheDocument()
     expect(await screen.findByTestId('booking')).toHaveTextContent('U16B Contact')
   })
@@ -176,7 +220,8 @@ describe('the screen', () => {
       ev({ id: 'a', starts_at: '2026-09-05T05:00:00Z', ends_at: '2026-09-05T07:00:00Z' }),
       ev({ id: 'b', team_id: 't2', starts_at: '2026-09-05T06:00:00Z', ends_at: '2026-09-05T08:00:00Z' }),
     ])
-    await setup()
+    const user = await setup()
+    await openDay(user)
     expect(await screen.findAllByTestId('booking-clash')).toHaveLength(2)
     expect(screen.getByText(/1 clash/)).toBeInTheDocument()
   })
@@ -185,7 +230,8 @@ describe('the screen', () => {
     // The whole reason the grid exists. Without this list the emptier the grid
     // looks, the more work there actually is.
     listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD' }), ev()])
-    await setup()
+    const user = await setup()
+    await openDay(user)
     const waiting = await screen.findAllByTestId('unallocated')
     expect(waiting).toHaveLength(1)
     expect(screen.getByText(/1 without a pitch/)).toBeInTheDocument()
@@ -193,6 +239,7 @@ describe('the screen', () => {
 
   it('moves a day at a time and can come back to today', async () => {
     const user = await setup()
+    await openDay(user)
     await screen.findByTestId('allocation-grid')
     const before = listEventsMock.mock.calls.length
 
