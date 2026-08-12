@@ -4,6 +4,7 @@ import Button from '../components/Button.jsx'
 import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
 import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '../data/events.js'
+import { SCORE_KINDS, hasNoComponents } from '../lib/scoring.js'
 
 // The pitch picker's escape hatch. A sentinel rather than '' so "Something
 // else…" stays distinguishable from "No pitch" — they are different answers,
@@ -282,6 +283,13 @@ function parseScore(us, them) {
   return { result_us: nus, result_them: nthem }
 }
 
+/** One side's scoring components off a fixture row, keyed as scoring.js wants. */
+function componentsOf(event, side) {
+  const parts = {}
+  for (const kind of SCORE_KINDS) parts[kind] = event?.[`${kind}_${side}`] ?? null
+  return parts
+}
+
 export default function EventForm({
   event = null,
   // ⚠️ DUPLICATE IS A CREATE THAT STARTS FROM AN EXISTING ROW — a flag beside
@@ -370,6 +378,25 @@ export default function EventForm({
   // the submit label — so turning it off here is the whole feature, rather
   // than six separate places each remembering to ask about `duplicate`.
   const editing = Boolean(event?.id) && !duplicate
+
+  // ⚠️ A SCORE WITH COMPONENTS BEHIND IT CANNOT BE TYPED HERE, AND SAYING SO IS
+  // THE WHOLE POINT OF THIS FLAG. Since 12 Aug 2026 result_us / result_them are
+  // DERIVED by a database trigger from the tries, conversions, penalties and
+  // drop goals recorded on the fixture. An UPDATE from this form does not send
+  // those components, so the trigger recomputes from the ones already stored and
+  // overwrites whatever was typed — correctly, and completely silently. Left as
+  // plain inputs, a coach would type 30-0, press Save, and watch it come back
+  // 22-12 with nothing anywhere explaining why.
+  //
+  // ⚠️ NOT ON A DUPLICATE. Duplicating a played match clears the score (see
+  // initialValues), and the new fixture has no components of its own — so the
+  // boxes must be typeable, which is the ordinary case for a friendly whose
+  // score somebody just wants to record.
+  const derivedScore =
+    editing &&
+    !(
+      hasNoComponents(componentsOf(event, 'us')) && hasNoComponents(componentsOf(event, 'them'))
+    )
 
   // ⚠️ THE TITLE IS THE ONLY THING TELLING SOMEBODY THIS IS A NEW EVENT.
   // A duplicate opens on a form that is full of an existing fixture's details —
@@ -1332,8 +1359,9 @@ export default function EventForm({
                   min="0"
                   value={values.resultUs}
                   onChange={setFromInput('resultUs')}
+                  readOnly={derivedScore}
                   aria-describedby="event-score-note"
-                  className={inputClasses(false)}
+                  className={`${inputClasses(false)}${derivedScore ? ' bg-surface-mute text-ink-muted' : ''}`}
                 />
               </div>
               <div>
@@ -1347,15 +1375,21 @@ export default function EventForm({
                   min="0"
                   value={values.resultThem}
                   onChange={setFromInput('resultThem')}
+                  readOnly={derivedScore}
                   aria-describedby="event-score-note"
-                  className={inputClasses(false)}
+                  className={`${inputClasses(false)}${derivedScore ? ' bg-surface-mute text-ink-muted' : ''}`}
                 />
               </div>
             </div>
-            {/* A fixture becomes a result when it has a score, not when its
-                date passes — so leaving these blank is the normal case. */}
+            {/* ⚠️ TWO DIFFERENT SENTENCES, AND THE SECOND ONE IS LOAD-BEARING.
+                A fixture becomes a result when it has a score, not when its date
+                passes — so blank is the normal case. But once tries and kicks
+                are recorded the score is computed from them, and a form that
+                still invited typing would be lying about what Save does. */}
             <p id="event-score-note" className="-mt-2 mb-3.5 text-[12.5px] text-ink-muted">
-              Leave the scores blank until the match has been played.
+              {derivedScore
+                ? 'This score is worked out from the tries and kicks recorded on the match sheet. Change it there.'
+                : 'Leave the scores blank until the match has been played.'}
             </p>
           </>
         )}

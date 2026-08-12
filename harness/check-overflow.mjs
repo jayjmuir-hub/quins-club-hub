@@ -145,6 +145,12 @@ const SCENARIOS = [
   'view-as',
   'accounts-pending',
   'name-prompt',
+  // ⚠️ THE ONE WIDE SCREEN THAT WAS NEVER LISTED. The RCM facsimile is an
+  // eight-column table of a paper form, and since 12 Aug 2026 it carries a
+  // three-column score grid above it. It is a routed screen and NOT inside a
+  // Sheet, so — unlike the three entries above that carry the sheet caveat —
+  // this one is measured for real.
+  'match-sheet',
 ]
 
 // A pixel of slack. Sub-pixel layout rounding can put scrollWidth one above

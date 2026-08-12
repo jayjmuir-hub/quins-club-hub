@@ -43,6 +43,13 @@ const ALIASES = [
   ['harness/stubs/parents.js', 'src/data/parents.js'],
   ['harness/stubs/photos.js', 'src/data/photos.js'],
   ['harness/stubs/accessRequests.js', 'src/data/accessRequests.js'],
+  // The RCM match sheet's `match-sheet` scenario, 12 Aug 2026.
+  //
+  // ⚠️ THE COUNT ASSERTION ABOVE IS WHAT CAUGHT THIS, exactly as its own
+  // comment promised it would: the alias was added to harness/vite.config.js
+  // and this list was not, and the suite went red on 11 vs 10 before anybody
+  // had to notice. That is the third time this guard has earned its keep.
+  ['harness/stubs/matchSheets.js', 'src/data/matchSheets.js'],
 ]
 
 function read(relative) {

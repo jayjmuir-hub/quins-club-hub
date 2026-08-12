@@ -24,6 +24,7 @@ import EventDetail from '../src/screens/EventDetail.jsx'
 import Admin from '../src/screens/AdminClub.jsx'
 import Accounts from '../src/screens/Accounts.jsx'
 import AcceptInvite from '../src/screens/AcceptInvite.jsx'
+import MatchSheet from '../src/screens/MatchSheet.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
@@ -697,6 +698,43 @@ const scenarios = {
         reload: noop,
       }}
     />
+  ),
+
+  // ⚠️ THE MATCH SHEET HAD NO REAL-BROWSER SCENARIO AT ALL until 12 Aug 2026,
+  // and it is the widest thing in the app: an eight-column facsimile of a
+  // governing body's paper form, plus a three-column score grid, on a phone at
+  // the side of a pitch. Every other wide screen in this file is here because
+  // something on it overflowed; this one is here before it does.
+  //
+  // ⚠️ NOT INSIDE A SHEET, so unlike `availability`, `playerform` and
+  // `event-detail`, the overflow gate genuinely measures this one. MatchSheet
+  // is a routed screen and its contents are in the document's scrollWidth.
+  //
+  // ⚠️ ROUTES, NOT JUST A ROUTE STRING. MatchSheet reads useParams(), and
+  // outside a matched <Route> that returns {} — the screen then renders "That
+  // fixture could not be found" and the scenario measures an error card while
+  // reporting the match sheet clean.
+  //
+  // e2 is deliberate on both counts: it is on t2 ("U14 Boys"), the band that
+  // scores all FOUR kinds and therefore draws the tallest, widest score grid;
+  // and it is `home: false`, so the positional HOME/AWAY mapping is exercised
+  // rather than assumed.
+  'match-sheet': () => (
+    <Shell
+      route="/match-sheet/e2"
+      authValue={{ ...baseAuth(COACH_EMAIL), user: { id: 'pr-jay', email: COACH_EMAIL } }}
+      membershipValue={{
+        memberships: COACH_MEMBERSHIPS,
+        teams: TEAMS,
+        loading: false,
+        error: null,
+        reload: noop,
+      }}
+    >
+      <Routes>
+        <Route path="/match-sheet/:eventId" element={<MatchSheet />} />
+      </Routes>
+    </Shell>
   ),
 
   'shell-loading': () => (

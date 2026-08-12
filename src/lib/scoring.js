@@ -54,6 +54,26 @@ export const SCORE_POINTS = Object.freeze({
  */
 export const SCORE_KINDS = Object.freeze(['tries', 'conversions', 'penalties', 'drops'])
 
+/**
+ * How each scoring act is named to a person.
+ *
+ * ⚠️ "DROP GOALS", NOT "DROPS". The column is `drops` because `drop` is a
+ * Postgres keyword and the plural reads badly in SQL; on a pitch the thing is a
+ * drop goal, and a box labelled "Drops" beside "Penalties" invites somebody to
+ * count dropped balls.
+ *
+ * ⚠️ HERE RATHER THAN IN EACH SCREEN, and that is not tidiness. The match sheet
+ * offers these boxes and the Club tab decides which ones a squad gets — two
+ * screens describing the same four things. A label that drifted between them
+ * would let an admin switch on "Drop goals" and a coach look for something else.
+ */
+export const SCORE_LABELS = Object.freeze({
+  tries: 'Tries',
+  conversions: 'Conversions',
+  penalties: 'Penalties',
+  drops: 'Drop goals',
+})
+
 const TRIES_ONLY = Object.freeze(['tries'])
 const TRIES_CONV = Object.freeze(['tries', 'conversions'])
 const FULL = Object.freeze(['tries', 'conversions', 'penalties', 'drops'])

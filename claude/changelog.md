@@ -10,7 +10,78 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **The scoring rules are the CLUB'S, not another
+- *(SHA follows in the next PR)* — **The match sheet had no real-browser scenario at
+  all, and it is the widest screen in the app.** `harness/main.jsx` gains `match-sheet`,
+  `harness/stubs/matchSheets.js` is its stub, and the overflow gate's `SCENARIOS` list
+  gains the entry.
+  ⚠️ **Unlike `availability`, `playerform` and `event-detail`, THIS ONE IS ACTUALLY
+  MEASURED** — MatchSheet is a routed screen rather than a `Sheet`, so its contents are
+  in the document's `scrollWidth`.
+  ⚠️ **Verified in Chromium, NOT through `npm run check:overflow`.** Playwright is still
+  deliberately not a dependency and is not installed on this PC. Measured by driving the
+  harness in a real browser at 320 / 360 / 375 / 390 / 414: **zero overflow at every
+  width.**
+  ⚠️ **And the measurement was proved RED before the clean result was believed** — a
+  900px `shrink-0` probe in the Score card produced **611px of overflow at 320px**, which
+  is exactly what the same injection FAILED to do inside a `Sheet` on 12 Aug. The other
+  28 scenarios were not re-run; nothing in the commit touches them.
+
+- *(SHA follows in the next PR)* — **The sheet stops holding a score.** Applied live as
+  `drop_match_sheet_scores`. Step 4 of the scoring plan, run LAST and only once nothing
+  read the columns.
+  ⚠️ **`tries_us` / `tries_them` went too, and the plan did not say so** — it named only
+  `score_us` / `score_them`, because when it was written `events` had no home for a try
+  at all. Step 2 gave them one, which turned these into exactly the duplicate the other
+  two were.
+  ⚠️ **Re-measured immediately before applying, not assumed from the plan**: one sheet
+  exists and all four columns were NULL on it. **The plan said to re-measure for exactly
+  this reason** — a human filed that sheet between the plan being written and this
+  running.
+  ❌ **AND IT WAS APPLIED TOO EARLY AND BROKE THE LIVE SITE FOR ABOUT TEN MINUTES.**
+  "Run last" was read as *last in the branch*; `main` was still deployed and its bundle
+  still sent all four columns on every save, so PostgREST answered **400 / PGRST204** and
+  **Save draft and Submit failed on the live match sheet** while the PR waited to merge.
+  Undone by re-adding them — all NULL, so it cost nothing — and re-applied once the new
+  bundle was serving.
+  ⚠️ **THE RULE, now in the migration header and in `state-of-play.md`: a DESTRUCTIVE
+  schema change against a live SPA is DEPLOY-FIRST, DROP-SECOND.** An additive one is
+  safe in either order, which is why `manager_phone` going in early was fine and this was
+  not. **"Nothing reads it" has to mean nothing anyone is RUNNING.**
+
+- *(SHA follows in the next PR)* — **The score is ENTERED AS COMPONENTS, and the form's
+  total can no longer disagree with its own tries.** Steps 3 and 5 of the scoring plan,
+  plus the picker the step-2 migration added a column for and nothing could set.
+  Migration `match_sheet_manager_phone`, applied live.
+  ⚠️ **The facsimile's FINAL SCORE and TRIES boxes were free text and are now DERIVED.**
+  A Score card above the form offers exactly the boxes `scoringForTeam()` allows for that
+  squad; the total is computed from them by the same `totalFor()` the database trigger
+  mirrors. **A coach can no longer file a governing-body form whose total contradicts the
+  tries printed beside it.**
+  ⚠️ **The card sits OUTSIDE the facsimile deliberately.** RCM's form has two boxes per
+  side; conversion, penalty and drop-goal boxes inside it would photograph as a form the
+  governing body never issued.
+  ⚠️ **Components go to `public.events`, never to the sheet** — Jay ruled one score, on
+  the fixture. **The fixture is written FIRST and the sheet second**, so a failure leaves
+  the score right and the sheet unsaved rather than the reverse.
+  ⚠️ **`EventForm` goes READ-ONLY on a fixture that has components, and this was a real
+  silent bug.** It does not send the components, so the trigger recomputed from the
+  stored ones and overwrote whatever was typed — 30–0 in, 22–12 back, nothing anywhere
+  saying why.
+  ⚠️ **`getEvent()` now embeds `teams.scoring_kinds`.** Without it the club's override is
+  silently ignored and a coach gets the age-band default instead — the standing cost of
+  that embed being a column list rather than `*`.
+  ⚠️ **`db/tests/scoring.sql` now exists — the step-2 migration already CLAIMED it did.**
+  Run against production: all fifteen squads agree with `src/lib/scoring.js`, and all six
+  trigger cases pass. **Fault injection confirmed red** — an unconditional recompute
+  turns the hand-typed 22–12 into 0–0.
+  ⚠️ **Four more injections, four reds, on the JS side**: a recorded 0 read as "not
+  recorded", an unconditional recompute on screen, a one-sided component check in
+  `EventForm`, and the squad picker storing tick order instead of `SCORE_KINDS` order.
+  ⚠️ **Manager name and phone are a DEFAULT, NOT A LOCK** — they fill a blank box and
+  never touch one that already holds something, because a manager fills the form and a
+  coach signs it.
+
+- `669cc6c` — **The scoring rules are the CLUB'S, not another
   project's — a provenance correction, no behaviour change.**
   Jay: *"this app and project should have absolutely nothing to do with adhjrt, that is a
   completely different project, i only told you to use the same type of scoring setup"*.

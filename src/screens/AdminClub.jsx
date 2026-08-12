@@ -10,7 +10,10 @@ import {
   upsertLeagueTeam,
 } from '../data/leagueTeams.js'
 import { listContactsForPlayers, listPlayers } from '../data/players.js'
+import { setTeamScoringKinds } from '../data/teams.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import { SCORE_KINDS, SCORE_LABELS, scoringForBand, scoringForTeam } from '../lib/scoring.js'
+import { ageBandFromTeamName } from '../lib/ageGroup.js'
 import InviteForm from './InviteForm.jsx'
 
 // The Club tab of /admin (admin-dashboard plan, 2026-08-05). Assembled from
@@ -102,8 +105,66 @@ function LeagueTeamChip({ leagueTeam, onSelect, busy }) {
   )
 }
 
+// ══ SCORING ═══════════════════════════════════════════════════════════════
+//
+// Jay, 12 Aug 2026: scoring should be "a selectable option for scoring
+// methods", set "in the area where teams are created". This is that area.
+//
+// ⚠️ THE OVERRIDE IS teams.scoring_kinds, A COLUMN — never the squad's name.
+// Same rule as teams.is_senior and teams.self_registration_allowed: renaming a
+// squad must not silently change what may be recorded against it. NULL means
+// "use the age-band default", and every squad is null until somebody uses this
+// panel.
+//
+// ⚠️ THIS DOES NOT EDIT THE POINTS. A try is five because that is rugby; what
+// varies by age is which acts are AVAILABLE. See src/lib/scoring.js.
+
+/** "Tries · Conversions" — the chip's short form. */
+function kindsChipLabel(kinds) {
+  return kinds.map((kind) => SCORE_LABELS[kind]).join(' · ')
+}
+
+function ScoringChip({ team, onSelect, busy }) {
+  const kinds = scoringForTeam(team)
+  const overridden = Array.isArray(team.scoring_kinds)
+  const band = ageBandFromTeamName(team.name)
+
+  return (
+    <button
+      type="button"
+      data-testid={`scoring-chip-${team.id}`}
+      disabled={busy}
+      onClick={() => onSelect(team)}
+      // ⚠️ SAID OUT LOUD. "Set for this squad" versus "the U12 default" is the
+      // whole distinction this chip carries, and a dotted border says it to
+      // nobody using a screen reader.
+      aria-label={`Scoring for ${team.name}: ${kindsChipLabel(kinds)}${
+        overridden ? ', set for this squad' : `, the default for ${band ? `U${band}` : 'its age group'}`
+      }`}
+      className={[
+        CHIP,
+        'inline-flex items-center gap-1.5',
+        overridden
+          ? 'border-brand text-brand hover:border-brand-deep'
+          : 'border-dashed border-line text-ink-faint hover:border-brand hover:text-brand',
+        busy ? 'opacity-60' : '',
+      ].join(' ')}
+    >
+      <span aria-hidden="true" className="text-[11px] font-extrabold uppercase tracking-[.4px]">
+        Scoring
+      </span>
+      <span aria-hidden="true">{kindsChipLabel(kinds)}</span>
+    </button>
+  )
+}
+
 export default function AdminClub() {
-  const { teams } = useMemberships()
+  // ⚠️ `reload` IS LOAD-BEARING HERE, not defensive. `teams` is loaded once per
+  // session by the memberships context, so a scoring change saved on this
+  // screen would sit in the database and not on screen — and the chip would
+  // keep showing the old set — until a full page reload. Nothing else on this
+  // screen writes to `teams`, which is why no other panel needs it.
+  const { teams, reload: reloadTeams } = useMemberships()
 
   const [players, setPlayers] = useState([])
   const [contacts, setContacts] = useState([])
@@ -126,6 +187,12 @@ export default function AdminClub() {
   const [draftDivision, setDraftDivision] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
+
+  // The squad whose scoring is being edited, and the ticked kinds. A separate
+  // panel from the league-team one above: they answer different questions about
+  // the same row, and one panel doing both would have to explain which.
+  const [scoringTeam, setScoringTeam] = useState(null)
+  const [draftKinds, setDraftKinds] = useState([])
 
   useEffect(() => {
     let mounted = true
@@ -219,11 +286,24 @@ export default function AdminClub() {
     setSaveError(null)
   }
 
+  function openScoring(team) {
+    setScoringTeam(team)
+    setEditing(null)
+    setAdding(null)
+    // ⚠️ SEEDED FROM scoringForTeam, NOT FROM THE RAW COLUMN. The column is null
+    // on a squad that has never been touched, and seeding [] would present every
+    // untouched squad as "scores nothing" — then saving would write that.
+    setDraftKinds(scoringForTeam(team))
+    setSaveError(null)
+  }
+
   function closePanel() {
     setEditing(null)
     setAdding(null)
+    setScoringTeam(null)
     setDraftName('')
     setDraftDivision('')
+    setDraftKinds([])
     setSaveError(null)
   }
 
@@ -260,6 +340,34 @@ export default function AdminClub() {
             rcm_name,
             division,
           }),
+    )
+  }
+
+  /**
+   * Saves the squad's scoring set, or clears it back to the age-band default.
+   *
+   * ⚠️ `reloadTeams()` IS INSIDE THE WORK, NOT AFTER IT. `run` only reaches
+   * closePanel on success, so a refused write leaves the panel open with the
+   * ticks intact — and refreshing the context on a write that never landed
+   * would redraw the chip as though nothing had been attempted.
+   */
+  function saveScoring(kinds) {
+    const team = scoringTeam
+    return run(async () => {
+      await setTeamScoringKinds(team.id, kinds)
+      await reloadTeams()
+    })
+  }
+
+  function toggleKind(kind) {
+    setDraftKinds((current) =>
+      current.includes(kind)
+        ? current.filter((existing) => existing !== kind)
+        : // ⚠️ REBUILT IN SCORE_KINDS ORDER, never appended. The order these are
+          // stored in is the order the match sheet renders its boxes, and a row
+          // that reorders itself between two squads is how a coach types a
+          // conversion into the penalties box.
+          SCORE_KINDS.filter((candidate) => current.includes(candidate) || candidate === kind),
     )
   }
 
@@ -351,6 +459,11 @@ export default function AdminClub() {
                   >
                     +
                   </button>
+                  {/* ⚠️ IN THE SAME ROW AS THE LEAGUE TEAMS, for the reason the
+                      league-team chips are here at all: both are facts about
+                      THIS squad, and a section of their own would have to
+                      repeat the squad list. */}
+                  <ScoringChip team={team} onSelect={openScoring} busy={saving} />
                 </div>
               </div>
             )
@@ -437,6 +550,88 @@ export default function AdminClub() {
               <strong className="font-bold text-ink">{editing.rcm_name}</strong>.
             </p>
           )}
+
+          {saveError && (
+            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-brand-deep">
+              {saveError.message || "That didn't save. Try again."}
+            </p>
+          )}
+        </Card>
+      )}
+
+      {scoringTeam && (
+        <Card className="mt-3.5 p-3.5" data-testid="scoring-panel">
+          <h3 className="mb-2.5 text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+            Scoring for {scoringTeam.name}
+          </h3>
+
+          <p className="mb-2.5 text-[12.5px] leading-relaxed text-ink-muted">
+            What a coach can record against this squad&rsquo;s fixtures. The points are the laws of
+            the game and are not editable — what changes by age is which of them apply.
+          </p>
+
+          <div className="flex flex-wrap gap-[6px]">
+            {SCORE_KINDS.map((kind) => {
+              const on = draftKinds.includes(kind)
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  disabled={saving}
+                  onClick={() => toggleKind(kind)}
+                  className={[
+                    CHIP,
+                    on
+                      ? 'border-brand bg-brand text-white'
+                      : 'border-line text-ink hover:border-brand hover:text-brand',
+                    saving ? 'opacity-60' : '',
+                  ].join(' ')}
+                >
+                  {SCORE_LABELS[kind]}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2.5">
+            {/* ⚠️ REFUSED WHEN NOTHING IS TICKED, rather than silently saved as
+                "tries only". cleanScoringKinds falls back to tries on an empty
+                array so that a half-finished edit can never make a score
+                impossible to enter — but that fallback is a SAFETY NET for data
+                already in the database, not a way to interpret a button press.
+                Saving nothing and getting tries is the app deciding what
+                somebody meant. */}
+            <Button disabled={saving || draftKinds.length === 0} onClick={() => saveScoring(draftKinds)}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+
+            {/* ⚠️ NULL, NOT THE BAND'S LIST. Writing the default's values would
+                freeze this squad at today's rules — the point of null is that a
+                squad following the age-grade laws keeps following them when the
+                laws, or this app's reading of them, are corrected. */}
+            {Array.isArray(scoringTeam.scoring_kinds) && (
+              <Button variant="secondary" disabled={saving} onClick={() => saveScoring(null)}>
+                Use the age-group default
+              </Button>
+            )}
+
+            <Button variant="ghost" disabled={saving} onClick={closePanel}>
+              Cancel
+            </Button>
+          </div>
+
+          <p className="mt-2.5 text-[12.5px] leading-relaxed text-ink-muted">
+            {Array.isArray(scoringTeam.scoring_kinds)
+              ? 'This squad has its own scoring set.'
+              : `Following the ${
+                  ageBandFromTeamName(scoringTeam.name)
+                    ? `U${ageBandFromTeamName(scoringTeam.name)}`
+                    : 'age-group'
+                } default: ${kindsChipLabel(scoringForBand(ageBandFromTeamName(scoringTeam.name)))}.`}{' '}
+            Changing it does not touch scores already recorded.
+          </p>
 
           {saveError && (
             <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-brand-deep">

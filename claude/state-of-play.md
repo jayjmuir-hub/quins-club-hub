@@ -159,8 +159,13 @@ will propose building.**
   three things could only have come from the document: the 22 run in **two columns**
   each with its own FR; **FINAL SCORE / TRIES are POSITIONAL — HOME then AWAY, not us
   and them**, so an away fixture puts our score in the right-hand pair while the
-  database still stores `score_us`; and **CLUB is the club, HOME TEAM is the LEAGUE
+  database stores us/them; and **CLUB is the club, HOME TEAM is the LEAGUE
   TEAM**.
+  ⚠️ **THE COLUMN THAT LINE ONCE NAMED IS GONE.** It said "the database still stores
+  `score_us`", meaning `match_sheets.score_us` — dropped 12 Aug with `score_them`,
+  `tries_us` and `tries_them`. **The positional rule is unchanged and is still the
+  point**; only the table holding the numbers moved, to `public.events`. See the
+  scoring entry below.
   ⚠️ **`complete` MEANS READY TO SEND, NEVER SENT.** Nothing in this app can know
   whether RCM received anything — submission is a human dropping a file into a WhatsApp
   group.
@@ -214,6 +219,68 @@ will propose building.**
   the only gate. A real gate would be a second reviewer or a consent register, and
   neither exists. Reasoning:
   `claude/decisions/2026-08-12-social-media-management.md`.
+- ✅ **THE SCORING MODEL IS LIVE, ALL FIVE STEPS.** Plan:
+  `claude/plans/2026-08-12-scoring-model.md`, now marked SHIPPED. Tries,
+  conversions, penalties and drop goals are recorded per side **on the FIXTURE**
+  — Jay ruled one score, and `match_sheets.score_us` / `score_them` /
+  `tries_us` / `tries_them` are **DROPPED**.
+  ⚠️ **AND THE DROP BROKE THE LIVE SITE FOR ABOUT TEN MINUTES, WHICH IS THE
+  MOST TRANSFERABLE THING IN THIS ENTRY.** It was applied the moment nothing in
+  the BRANCH read those columns — which felt like the plan's "run last" — while
+  `main` was still deployed and its bundle still sent all four on every save.
+  PostgREST answers a write naming a missing column with **400 / PGRST204**, so
+  **Save draft and Submit failed on the live match sheet** while the pull
+  request waited. Undone by re-adding them (they were all NULL, so it cost
+  nothing) and re-applied once the new bundle was serving.
+  ⚠️ **THE RULE: A DESTRUCTIVE SCHEMA CHANGE AGAINST A LIVE SPA IS DEPLOY-FIRST,
+  DROP-SECOND.** An ADDITIVE one is safe in either order — an old bundle never
+  mentions a new column — which is why `manager_phone` going in early was fine
+  and this was not. **"Nothing reads it" has to mean nothing anyone is RUNNING,
+  not nothing in the repo.**
+  ⚠️ **`result_us` / `result_them` ARE DERIVED, BY A TRIGGER, AND THE GUARD IS
+  PER SIDE.** A side with no components keeps whatever result it already had.
+  That is not defensiveness: fixtures exist whose result was typed by hand before
+  components existed, and an unconditional recompute turns a real 22–12 into 0–0
+  with no error anywhere. Proved by injecting exactly that fault —
+  `db/tests/scoring.sql` carries the injection and it goes red.
+  ⚠️ **THE RULES ARE WRITTEN TWICE, ON PURPOSE, AND BOTH COPIES ARE INSIDE THIS
+  APP.** `src/lib/scoring.js` and `private.scoring_kinds_for_team` hold the same
+  three thresholds (≤11 / 12–13 / ≥14). The alternative was worse: a trigger
+  summing every component while the JS ignores the kinds a squad may not score
+  means **the form shows one total and the database stores another, and both look
+  plausible.** What is copied is three thresholds, not fifteen rows.
+  ⚠️ **AN UNKNOWN BAND FAILS OPEN — DELIBERATELY THE OPPOSITE OF
+  `allowsOwnContact`, WHICH FAILS CLOSED.** Do not unify them. The harm is
+  asymmetric in opposite directions: there it is a twelve-year-old's own phone
+  number, here it is a coach who cannot record a drop goal that was kicked.
+  ⚠️ **THE CLUB CAN OVERRIDE ANY SQUAD WITHOUT A DEPLOY** — `teams.scoring_kinds`,
+  set from the Club tab, **a COLUMN and never the squad's name** (the same rule
+  `is_senior` and `self_registration_allowed` carry). NULL means "use the band",
+  never "scores nothing", and clearing writes NULL rather than freezing today's
+  list in place.
+  ⚠️ **THE ENTRY BOXES SIT OUTSIDE THE RCM FACSIMILE, AND THAT IS A RULING, NOT A
+  LAYOUT PREFERENCE.** The real form has two boxes per side; drawing four inside
+  it would photograph as a form the governing body never issued, and the
+  photograph is the whole artefact. The form's FINAL SCORE and TRIES are now
+  derived text.
+  ⚠️ **`EventForm`'S SCORE BOXES GO READ-ONLY ON A FIXTURE WITH COMPONENTS**, and
+  this was a genuine silent bug rather than a nicety: that form does not send the
+  components, so the trigger recomputed from the stored ones and overwrote what
+  was typed — 30–0 in, 22–12 back, nothing saying why.
+  ⚠️ **`getEvent()` EMBEDS `teams.scoring_kinds`, AND THE EMBED IS A COLUMN LIST.**
+  Drop that name and nothing breaks — the club's override is silently ignored and
+  the coach gets the band default.
+  ⚠️ **NO COACH HAS ENTERED A REAL SCORE THIS WAY.** Verified in a real browser
+  against stub data and against production SQL; unexercised by a real match.
+- ✅ **THE MATCH SHEET FINALLY HAS A REAL-BROWSER SCENARIO** (`match-sheet` in
+  `harness/main.jsx`), and it is the widest screen in the app. ⚠️ **Unlike the
+  three sheet scenarios, this one is genuinely MEASURED** — MatchSheet is routed,
+  not a `Sheet`, so it is in the document's `scrollWidth`. Zero overflow at
+  320/360/375/390/414, and **the measurement was proved red first** with a 900px
+  probe (611px of overflow at 320) — the same injection that stayed green inside
+  a `Sheet`. ⚠️ **`npm run check:overflow` was NOT run**: Playwright is still not
+  a dependency and is not installed on jay-pc, so this was driven in Chromium by
+  hand.
 - ✅ **`notify-pitch-request` WAS REDEPLOYED** (version 3) so the pitch emails match
   the new wording. ⚠️ **An edge function is NOT part of the Netlify build** — merging
   the app changes nothing about the mail. Verified live: the endpoint returns its own

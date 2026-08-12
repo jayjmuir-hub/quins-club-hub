@@ -73,6 +73,13 @@ export default defineConfig({
       },
       // Admin (Task 17) reaches Supabase through this one.
       { find: /^\.\.\/data\/members\.js$/, replacement: path.resolve(__dirname, 'stubs/members.js') },
+      // The RCM match sheet (12 Aug 2026). MatchSheet.jsx lives in src/screens/,
+      // one level below src/, so the specifier text matches the rule shape used
+      // by every alias above.
+      {
+        find: /^\.\.\/data\/matchSheets\.js$/,
+        replacement: path.resolve(__dirname, 'stubs/matchSheets.js'),
+      },
     ],
   },
   server: {

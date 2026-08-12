@@ -1,9 +1,25 @@
 # Scoring — tries, conversions and the rest, per age group
 
-**STATUS: NOT SHIPPED.** Written 12 Aug 2026.
+**STATUS: SHIPPED, 12 Aug 2026.** Written the same day. All five steps are
+live.
 
-⚠️ **Set this line to SHIPPED in the commit that ships it**, not as a promise
-about that commit.
+⚠️ **THE PLAN IS NOW HISTORY AND THE CODE IS THE AUTHORITY.** `src/lib/scoring.js`,
+`private.scoring_kinds_for_team` and `db/tests/scoring.sql` are what the rules
+actually are; this file records why they are that.
+
+⚠️ **ONE THING SHIPPED WIDER THAN THIS PLAN ASKED, AND IT IS RECORDED RATHER
+THAN QUIETLY DONE.** Step 4 says to drop `match_sheets.score_us` / `score_them`.
+`tries_us` / `tries_them` went with them, because the plan's own §Where the
+numbers live says `events` had no home for a try *at the time of writing* —
+step 2 gave it one, and that turned those two columns into exactly the duplicate
+the other two were. Leaving them would have kept half the disagreement the
+ruling existed to remove.
+
+⚠️ **AND ONE THING THE PLAN DID NOT MENTION AT ALL: `EventForm`.** It writes
+`result_us` / `result_them` directly and does NOT send the components, so on a
+fixture that has them the trigger recomputed from the stored ones and silently
+overwrote whatever was typed. The boxes are now read-only there. **Nothing in
+this plan predicted it** — it fell out of building step 3.
 
 **Jay, 12 Aug 2026:** *"coaches and managers need a way to add scoring like
 tries, conversions, etc - this should mirror the adhjrt scoring attributes per
@@ -181,17 +197,38 @@ one**, because the phone is copied onto the sheet, not added to the profile.
 
 ## Order to build
 
-1. `src/lib/scoring.js` + its pinning test. Pure, no schema. **Prove the band
+1. ✅ `src/lib/scoring.js` + its pinning test. Pure, no schema. **Prove the band
    mapping against every band the club fields.**
-2. The migration: eight component columns, the guarded trigger, grants,
+2. ✅ The migration: eight component columns, the guarded trigger, grants,
    `db/schema/` re-capture. ⚠️ **Grants are not optional** — `docs:check` fails
    a build if a migration grants on a table the capture does not name.
-3. Score entry on the match sheet, built FROM `scoringFor(band)` so the form and
+3. ✅ Score entry on the match sheet, built FROM `scoringFor(band)` so the form and
    the total can never disagree.
-4. Drop `match_sheets.score_us` / `score_them` **last**, once nothing reads
+   ⚠️ **IT SITS OUTSIDE THE FACSIMILE, AND THAT WAS THE ONE DESIGN CALL THIS
+   PLAN LEFT OPEN.** RCM's form has exactly two boxes per side — FINAL SCORE and
+   TRIES. Conversion, penalty and drop-goal boxes drawn INSIDE it would
+   photograph as a form the governing body never issued, and the photograph is
+   the entire artefact. So the components are entered in a card above the form,
+   and the form's four boxes became derived text.
+4. ✅ Drop `match_sheets.score_us` / `score_them` **last**, once nothing reads
    them. ⚠️ Both are null on the only sheet that exists — measured 12 Aug — so
-   nothing is lost, but re-measure before dropping.
-5. Manager name and phone.
+   nothing is lost, but re-measure before dropping. **Re-measured, and it still
+   held: one sheet, all four columns null.** `tries_us` / `tries_them` went too
+   — see the note at the top of this file.
+5. ✅ Manager name and phone.
+
+**Shipped alongside, not in this list:**
+
+- ✅ **`teams.scoring_kinds` is settable**, on the Club tab, in the same row as
+  the league teams. Step 2 added the column; nothing could write to it, which
+  made the override a thing only SQL could reach. Clearing writes NULL rather
+  than the band's list, so a squad following the age-grade progression keeps
+  following it when the progression is corrected.
+- ✅ **`db/tests/scoring.sql`**, which step 2's migration already claimed
+  existed. Run against production: all fifteen squads agree with the JS, all six
+  trigger cases pass, and the fault injection goes red.
+- ✅ **A `match-sheet` harness scenario.** The widest screen in the app had no
+  real-browser coverage at all.
 
 ## What this plan deliberately does NOT do
 

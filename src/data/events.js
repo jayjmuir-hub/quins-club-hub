@@ -90,7 +90,15 @@ export async function getEvent(id) {
 
   const { data, error } = await supabase
     .from('events')
-    .select('*, league_team:league_teams(id, rcm_name, division), team:teams(id, name, sort_order)')
+    // ⚠️ `scoring_kinds` IS LOAD-BEARING AND EASY TO LOSE. scoringForTeam() reads
+    // the squad's override off this embed and falls back to the age band when it
+    // is absent — so dropping the column from this select does not break, it
+    // silently ignores the club's own scoring choice and offers a coach the wrong
+    // set of boxes. The embed is a column list rather than `*` on purpose (see
+    // above); that is precisely the shape that loses a column by omission.
+    .select(
+      '*, league_team:league_teams(id, rcm_name, division), team:teams(id, name, sort_order, scoring_kinds)',
+    )
     .eq('id', id)
     .maybeSingle()
 
