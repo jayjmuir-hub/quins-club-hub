@@ -156,6 +156,63 @@ export async function fetchAllPages(buildQuery, order, what, hint, { page = MAX_
   }
 }
 
+/**
+ * The most ids to put in one `.in(...)` list.
+ *
+ * ⚠️ THIS IS A URL-LENGTH LIMIT, NOT A ROW LIMIT, AND IT BITES FIRST. PostgREST
+ * takes `.in()` as a query STRING, so a uuid list costs ~37 bytes each and a
+ * club-wide read builds a URL that the gateway refuses before Postgres ever
+ * sees it. `MAX_ROWS` (900) does nothing about this: the request never gets far
+ * enough to return a row.
+ *
+ * ✅ MEASURED against this project 12 Aug 2026, with real uuids:
+ *
+ *     300 ids -> 11,196-byte URL -> 200 OK
+ *     400 ids -> 14,896-byte URL -> the fetch THREW
+ *     900 ids -> 33,396-byte URL -> 400 Bad Request
+ *
+ * ⚠️ AND THE 400-ID FAILURE IS THE DANGEROUS ONE. It is not a clean HTTP
+ * status — the connection fails, so a caller sees a network error and has every
+ * reason to read it as a bad connection rather than as a request it built
+ * wrong. Only the far end of the range answers honestly.
+ *
+ * ⚠️ THE CLUB LANDS ON THIS CLIFF, WHICH IS WHY IT IS FIXED NOW AND NOT LATER.
+ * Fifteen squads at ~25 players each is ~375 — between the last size that works
+ * and the first that does not. 200 leaves the URL at ~7.5KB, comfortably under
+ * the last measured pass, and makes a full club two requests rather than one.
+ */
+export const MAX_IN_LIST = 200
+
+/**
+ * Runs a query over a list of ids in chunks, concatenating the rows.
+ *
+ * ⚠️ THE GUARANTEE IS THE SAME AS fetchAllPages': everything, or a throw. Never
+ * some of it. `run` is expected to throw on error, exactly as every module in
+ * src/data/ already does.
+ *
+ * ⚠️ DEDUPED, because a caller that passes the same id twice would otherwise
+ * get its row back twice — and the callers here build their lists from other
+ * queries' results, which is where duplicates come from.
+ *
+ * ⚠️ NO ORDER IS PROMISED. These are presence/lookup reads whose callers index
+ * the result into a Map or a Set; chunking cannot preserve a global sort and
+ * pretending otherwise would be the kind of quiet wrongness this file exists to
+ * stop. A caller that needs an order must sort what it gets back.
+ *
+ * @param {string[]} ids
+ * @param {(chunk: string[]) => Promise<Array>} run  issues ONE query per chunk
+ */
+export async function fetchByIds(ids, run, { chunk = MAX_IN_LIST } = {}) {
+  const list = [...new Set((ids ?? []).filter(Boolean))]
+  if (list.length === 0) return []
+
+  const rows = []
+  for (let i = 0; i < list.length; i += chunk) {
+    rows.push(...((await run(list.slice(i, i + chunk))) ?? []))
+  }
+  return rows
+}
+
 export function unwrapCapped(rows, what, hint, limit = MAX_ROWS) {
   const list = rows ?? []
   if (list.length <= limit) return list

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { fetchByIds } from './limits.js'
 
 // Data access for the availability table. RLS already restricts rows to
 // what the calling user's memberships allow. There is no "no response"
@@ -34,14 +35,20 @@ export async function listAvailability(eventId) {
  * must never be read as "no filter, return everything".
  */
 export async function listAvailabilityForEvents(eventIds) {
-  if (!Array.isArray(eventIds) || eventIds.length === 0) return []
-
-  const { data, error } = await supabase
-    .from('availability')
-    .select('*')
-    .in('event_id', eventIds)
-  if (error) throw error
-  return data ?? []
+  // ⚠️ CHUNKED SINCE 12 Aug 2026. This is fed the id of every fixture on
+  // screen, and PostgREST takes `.in()` as a query STRING — ~37 bytes of URL
+  // per uuid. Measured: 300 ids works, 400 makes the fetch THROW with a
+  // connection failure rather than a status. The Dashboard's rolling window is
+  // 12 months back and 6 forward, so an admin across fifteen squads is well
+  // past that. See MAX_IN_LIST in ./limits.js.
+  return fetchByIds(eventIds, async (chunk) => {
+    const { data, error } = await supabase
+      .from('availability')
+      .select('*')
+      .in('event_id', chunk)
+    if (error) throw error
+    return data ?? []
+  })
 }
 
 // Suffixed so concurrent subscriptions to the same event (e.g. a list view

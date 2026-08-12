@@ -613,13 +613,41 @@ describe('listPlayers', () => {
   // could pass there while these two functions still returned a silently
   // truncated list — which is the only failure that would matter.
   describe('the row cap', () => {
-    it('asks the server for one row more than the cap', async () => {
+    // ⚠️ PLAYERS NO LONGER CAPS - IT PAGES. Changed 12 Aug 2026, exactly as
+    // listEvents did on 10 Aug and for the same reason. This test used to
+    // assert `.limit(MAX_ROWS + 1)`. The flat cap was right in principle - a
+    // short list that looks complete is worse than an error - and wrong in
+    // practice: Accounts, AdminClub and InviteForm all call listPlayers() with
+    // NO teamIds on purpose, so they ask for every player in the club, and
+    // "too many players" is not something a person can act on.
+    // The guarantee is unchanged: everything, or a throw, never some of it.
+    it('pages players rather than capping them', async () => {
       const { builder, calls } = createQueryBuilder({ data: [] })
       supabase.from.mockReturnValue(builder)
 
       await listPlayers()
 
-      expect(calls.limit).toEqual([[MAX_ROWS + 1]])
+      expect(calls.limit).toEqual([])
+      expect(calls.range).toEqual([[0, MAX_ROWS - 1]])
+    })
+
+    // ⚠️ `id` IS THE TIEBREAK AND IT IS LOAD-BEARING, NOT TIDINESS. `.range()`
+    // is OFFSET/LIMIT and `full_name` is NOT unique - two players called Sam
+    // Ahmed is ordinary, and this club deliberately holds no squad numbers to
+    // tell them apart. Under-specify the sort and Postgres may order those rows
+    // differently between two pages: one player returned twice, another dropped,
+    // no error anywhere. The same trap listEvents documents for two fixtures
+    // sharing a kick-off time.
+    it('⚠️ pages by a sort that ENDS IN A UNIQUE COLUMN', async () => {
+      const { builder, calls } = createQueryBuilder({ data: [] })
+      supabase.from.mockReturnValue(builder)
+
+      await listPlayers()
+
+      expect(calls.order).toEqual([
+        ['full_name', { ascending: true }],
+        ['id', { ascending: true }],
+      ])
     })
 
     it('FAULT: throws rather than handing back a truncated roster', async () => {
@@ -633,12 +661,18 @@ describe('listPlayers', () => {
       await expect(listPlayers()).rejects.toThrow(/too many players/i)
     })
 
-    it('does not throw at exactly the cap', async () => {
-      const exact = Array.from({ length: MAX_ROWS }, (_, i) => ({ id: `p${i}` }))
-      const { builder } = createQueryBuilder({ data: exact })
+    // ⚠️ AN EXACTLY-FULL PAGE IS AMBIGUOUS AND COSTS ONE MORE REQUEST. This
+    // stub returns a full page EVERY time, which is what an endless list looks
+    // like from inside fetchAllPages - so what is really being pinned here is
+    // that the backstop exists and the loop terminates. It used to assert the
+    // opposite (that exactly MAX_ROWS resolved), which was correct for a cap
+    // and is meaningless for a pager.
+    it('⚠️ does not loop forever on a page that is always full', async () => {
+      const fullPage = Array.from({ length: MAX_ROWS }, (_, i) => ({ id: `p${i}` }))
+      const { builder } = createQueryBuilder({ data: fullPage })
       supabase.from.mockReturnValue(builder)
 
-      await expect(listPlayers()).resolves.toHaveLength(MAX_ROWS)
+      await expect(listPlayers()).rejects.toThrow(/too many players/i)
     })
 
     // ⚠️ EVENTS NO LONGER CAPS — IT PAGES. Changed 10 Aug 2026. This test used

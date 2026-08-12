@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import { withCap, unwrapCapped } from './limits.js'
+import { fetchAllPages, fetchByIds } from './limits.js'
 
 // Data access for the players and player_contacts tables. RLS already
 // restricts rows to what the calling user's memberships allow. player_contacts
@@ -20,20 +20,37 @@ import { withCap, unwrapCapped } from './limits.js'
 export async function listPlayers({ teamIds } = {}) {
   if (Array.isArray(teamIds) && teamIds.length === 0) return []
 
-  let query = supabase.from('players').select('*')
-  if (Array.isArray(teamIds) && teamIds.length > 0) {
-    query = query.in('team_id', teamIds)
+  // ⚠️ PAGED, NOT CAPPED, SINCE 12 Aug 2026 — the same move listEvents made on
+  // 10 Aug, and for the same reason. The flat cap was right in principle (a
+  // short list that looks complete is worse than an error) but it turns into a
+  // broken screen rather than a fixed one: `Accounts.jsx`, `AdminClub.jsx` and
+  // `InviteForm.jsx` call this with NO teamIds on purpose, so they ask for
+  // every player in the club, and there is no action a person can take on
+  // "too many players" short of not using the screen.
+  //
+  // ⚠️ A FRESH BUILDER PER PAGE. A PostgREST query builder is single-use once
+  // awaited; handing the same one back would re-send page one forever.
+  const buildQuery = () => {
+    let query = supabase.from('players').select('*')
+    if (Array.isArray(teamIds) && teamIds.length > 0) {
+      query = query.in('team_id', teamIds)
+    }
+    return query
   }
-  query = query.order('full_name', { ascending: true })
 
-  const { data, error } = await withCap(query)
-  if (error) throw error
-  // ⚠️ THE CLUB-WIDE CALLERS ARE THE ONES THIS IS FOR. Roster and the dashboard
-  // pass `teamIds` and stay small; `Accounts.jsx`, `AdminClub.jsx` and
-  // `InviteForm.jsx` call listPlayers() with NO teamIds on purpose, so they ask
-  // for every player in the club — which is the query that grows to 700.
-  return unwrapCapped(
-    data,
+  // ⚠️ `id` IS THE TIEBREAK AND IT IS LOAD-BEARING, NOT TIDINESS. `.range()` is
+  // OFFSET/LIMIT, and `full_name` is NOT unique — a club with two Sam Ahmeds is
+  // ordinary, and this app deliberately holds no squad numbers to tell them
+  // apart. With `full_name` alone the sort is under-specified, so Postgres may
+  // order those rows differently between two requests: one player returned
+  // twice and another dropped, with no error anywhere. Exactly the trap
+  // listEvents documents for two fixtures sharing a kick-off.
+  return fetchAllPages(
+    buildQuery,
+    [
+      ['full_name', { ascending: true }],
+      ['id', { ascending: true }],
+    ],
     'players',
     'Scope the query to a squad by passing `teamIds`.',
   )
@@ -67,14 +84,21 @@ export async function getPlayerContact(playerId) {
  * convention as listPlayers({teamIds})/listEvents({teamIds}).
  */
 export async function listContactsForPlayers(playerIds) {
-  if (!Array.isArray(playerIds) || playerIds.length === 0) return []
-
-  const { data, error } = await supabase
-    .from('player_contacts')
-    .select('player_id, phone, email')
-    .in('player_id', playerIds)
-  if (error) throw error
-  return data ?? []
+  // ⚠️ CHUNKED SINCE 12 Aug 2026, AND THIS BREAKS BEFORE listPlayers DOES.
+  // PostgREST takes `.in()` as a query STRING, so every uuid costs ~37 bytes of
+  // URL. Measured against this project: 300 ids is an 11KB URL and works, 400
+  // is 15KB and the fetch THROWS — not a clean status, a connection failure
+  // that reads as a bad network rather than a request built wrong. A full club
+  // (fifteen squads, ~25 players each) is ~375, which lands on that cliff.
+  // See MAX_IN_LIST in ./limits.js for the measurements.
+  return fetchByIds(playerIds, async (chunk) => {
+    const { data, error } = await supabase
+      .from('player_contacts')
+      .select('player_id, phone, email')
+      .in('player_id', chunk)
+    if (error) throw error
+    return data ?? []
+  })
 }
 
 // A write the database refused is not an error as far as PostgREST is
