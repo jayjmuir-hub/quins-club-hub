@@ -10,7 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- **Duplicate an event, and three type marks that mean something.** Two
+- **"Add Quins to your home screen" — the app was always installable and nothing said so.**
+  Jay asked *"do we have a PWA for this?"* on 12 Aug 2026, which is the entire justification:
+  if the person who commissioned it does not know it installs, no parent will work it out.
+  ⚠️ **Measured live before writing a line of it** — `manifest.webmanifest` serves with
+  `display:standalone`, all four icons (192/512 and both maskable) return 200 `image/png`,
+  and `sw.js` is served and registered. Every installability criterion has been met since
+  the PWA plugin landed.
+  ⚠️ **ONE BANNER, TWO PLATFORMS, AND THEY ARE GENUINELY DIFFERENT.** Android/Chrome fires
+  `beforeinstallprompt`, which is captured and replayed against a real Install button. **iOS
+  NEVER fires it** — Apple has no programmatic install — so iOS gets the Share → Add to Home
+  Screen steps and **deliberately no button**, because a button there could not work. That is
+  the dead-affordance defect `EventDetail` already shipped once.
+  ⚠️ **It must be SAFARI, not merely iOS.** Add to Home Screen is absent from Chrome and
+  Firefox share sheets on iPhone, so those render nothing rather than instructions that send
+  someone hunting for a menu item that is not there.
+  ⚠️ **iPadOS 13+ reports itself as a Mac** (`platform === 'MacIntel'`); the touch-point count
+  is the only thing separating an iPad from a desktop Mac.
+  ⚠️ **The event is captured at MODULE LOAD, not in a `useEffect`** — `beforeinstallprompt`
+  fires once and early, often before React mounts, and is never re-fired. A listener in an
+  effect misses it on exactly the load where it mattered.
+  ⚠️ **`navigator.standalone` is checked as well as `display-mode: standalone`** — iOS never
+  implemented the standard one for this, so checking only it shows the banner to every iPhone
+  user who has already installed.
+  Renders above the loading/error/ready split in `AppShell`, so a parent still waiting for
+  approval sees it. Dismissal persists, and blocked `localStorage` cannot take the shell down.
+
+- `ea0b8ac` — **Duplicate an event, and three type marks that mean something.** Two
   requests from Jay, shipped together only because they touch the same two files.
   **Duplicate:** `EventDetail`'s footer becomes Edit | Duplicate | Delete, and Duplicate
   opens the CREATE form prefilled from the fixture. Jay: *"the details take the effort,

@@ -13,6 +13,7 @@ import RequestAccess from './RequestAccess.jsx'
 import { ViewAsBanner } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 import Button from './Button.jsx'
+import InstallPrompt from './InstallPrompt.jsx'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
 // role label, nav) plus the membership-loading gate that decides whether the
@@ -460,6 +461,13 @@ export default function AppShell({ children }) {
         tabIndex={-1}
         className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16 focus:outline-none"
       >
+        {/* ⚠️ ABOVE THE loading/error/ready SPLIT, DELIBERATELY. Installing is
+            not gated on having a membership: a parent who has just signed up
+            and is waiting a day or two for a coach to approve them is exactly
+            the person who should put this on their home screen, and inside the
+            `ready` branch they would never see it. It renders nothing at all
+            unless there is an install route to offer — see InstallPrompt. */}
+        <InstallPrompt />
         {loading && <LoadingState />}
         {!loading && error && (
           <ErrorState error={error} reload={reload}>
