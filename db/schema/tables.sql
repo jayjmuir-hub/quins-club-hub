@@ -1143,3 +1143,31 @@ CREATE INDEX social_ideas_status_idx ON public.social_ideas USING btree (club_id
 CREATE INDEX social_ideas_event_idx ON public.social_ideas USING btree (event_id);
 
 ALTER TABLE public.social_ideas ENABLE ROW LEVEL SECURITY;
+
+-- ── scoring components, 12 Aug 2026 (20260812_scoring_components.sql) ────────
+--
+-- ⚠️ NULL MEANS "NOT RECORDED", NEVER ZERO, and there is deliberately NO
+-- DEFAULT. A side that scored no penalties and a side whose penalties nobody
+-- wrote down are different facts; a default 0 would make every pre-existing
+-- fixture claim it scored nothing, retroactively.
+--
+-- result_us / result_them are DERIVED from these by the
+-- events_result_from_components trigger -- but only for a side that has at
+-- least one component recorded. See triggers.sql.
+alter table public.events
+  add column tries_us smallint,
+  add column conversions_us smallint,
+  add column penalties_us smallint,
+  add column drops_us smallint,
+  add column tries_them smallint,
+  add column conversions_them smallint,
+  add column penalties_them smallint,
+  add column drops_them smallint;
+
+-- The club's per-squad scoring set. NULL means "use the age-band default".
+--
+-- ⚠️ A COLUMN, NEVER THE SQUAD'S NAME -- the same rule teams.is_senior and
+-- teams.self_registration_allowed carry: renaming a squad must not silently
+-- change what may be recorded against it.
+alter table public.teams
+  add column scoring_kinds text[];

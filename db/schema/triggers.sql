@@ -211,3 +211,14 @@ CREATE TRIGGER notify_pitch_request_answered
 CREATE TRIGGER social_ideas_provenance
   BEFORE INSERT ON public.social_ideas
   FOR EACH ROW EXECUTE FUNCTION private.set_social_idea_provenance();
+
+-- ── events_result_from_components, 12 Aug 2026 ──────────────────────────────
+--
+-- ⚠️ BEFORE INSERT OR UPDATE, AND GUARDED PER SIDE. A side with no components
+-- recorded keeps whatever result it already had. That guard is not tidiness:
+-- fixtures exist whose result was typed by hand before components existed, and
+-- an unconditional recompute turns a real 22-12 into 0-0 with no error anywhere.
+drop trigger if exists events_result_from_components on public.events;
+create trigger events_result_from_components
+  before insert or update on public.events
+  for each row execute function private.events_result_from_components();

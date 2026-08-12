@@ -10,7 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **The age-band scoring model, as a pure module.**
+- *(SHA follows in the next PR)* — **Scoring components on a fixture, and the club's
+  per-squad scoring set.** Step 2 of the scoring plan, applied live as
+  `scoring_components`.
+  Eight component columns on `events`, `teams.scoring_kinds`, and a trigger deriving
+  `result_us` / `result_them` from them.
+  ⚠️ **The trigger is GUARDED PER SIDE and that is the whole point of it.** A side with no
+  components keeps whatever result it already had — fixtures exist whose result was typed by
+  hand before components existed, and an unconditional recompute turns a real 22–12 into
+  0–0 with no error anywhere. **Verified against exactly that row before anything else.**
+  ⚠️ **The band rules are replicated in SQL — a FOURTH copy, deliberately.** The alternative
+  was worse: a trigger summing every component while `scoring.js` ignores the kinds a squad
+  may not score would make the FORM show one total and the DATABASE store another. What is
+  copied is three thresholds, not fifteen rows.
+  ⚠️ **No grants.** `authenticated` already holds table-level UPDATE on `events` and `teams`
+  — **measured, not assumed** — and a table-level privilege covers columns added later.
+  Verified live: all fifteen squads resolve correctly **including `U12G QR`**, the name that
+  once broke the JS regex; and restricting U16B to tries-only recomputed 27 → 20, ignoring a
+  conversion and a penalty, matching `totalFor` exactly.
+  ⚠️ **One test proved nothing and was nearly reported as passing** — a U10 write matched
+  zero rows because no seeded U10 fixture exists. An empty result is not a pass.
+  ⚠️ **And a real result was destroyed proving this.** See `state-of-play.md`: the completed
+  U16B sheet hangs off a fixture INSIDE the seeded September group, so selecting a test row
+  by `group_id` is not safe. Jay ruled the loss acceptable; the trap is recorded.
+
+- `cf88ce6` — **The age-band scoring model, as a pure module.**
   Step 1 of `claude/plans/2026-08-12-scoring-model.md` — the table and the arithmetic only,
   no schema and no UI, so the rest can be built against something already pinned.
   ⚠️ **The fifteen upstream rows collapse onto three band rules, and the test asserts EVERY
