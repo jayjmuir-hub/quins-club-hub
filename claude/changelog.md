@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **A full calendar for Pitch Management, an App button
+- `7df6ea3` — **A full calendar for Pitch Management, an App button
   in the top bar, and a desktop pass.** Three things Jay asked for on 12 Aug.
   ⚠️ **Day | Week | Month on `/admin/allocation`, and it OPENS ON MONTH** — Jay's call
   when offered the choice, superseding the 11 Aug "opens on today, in Day view". The

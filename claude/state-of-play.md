@@ -219,6 +219,41 @@ will propose building.**
   the only gate. A real gate would be a second reviewer or a consent register, and
   neither exists. Reasoning:
   `claude/decisions/2026-08-12-social-media-management.md`.
+- ✅ **PITCH MANAGEMENT HAS A FULL CALENDAR — Day, Week and Month** (12 Aug 2026,
+  `/admin/allocation`). ⚠️ **IT OPENS ON MONTH, AND THAT SUPERSEDES THE 11 AUG
+  "OPENS ON TODAY, IN DAY VIEW" RULING.** The calendar first shipped with Day
+  still the landing view and the question was PUT TO JAY rather than answered by
+  whoever was typing; he changed it. Still anchored on today — it opens on THIS
+  month with today circled.
+  ⚠️ **The week starts MONDAY**, because the UAE weekend is Sat–Sun and rugby is
+  played on it: a Sunday-start week splits the two days Pitch Management cares
+  about across two screens.
+  ⚠️ **The month grid pads with REAL neighbouring days, never blanks** — a fixture
+  on 1 March in February's last row must still be visible.
+  ⚠️ **Clash and waiting-for-a-pitch are marked by SHAPE as well as colour** (filled
+  dot vs hollow ring) and spelled out in the aria-label.
+  ⚠️ **`src/lib/calendarGrid.js` is tested in a NON-UTC zone** — every bug it can
+  have is a time-zone bug, and under a UTC runner they all pass.
+- ✅ **AN "App" BUTTON IS IN THE MASTHEAD**, and it means GET the app, not GO to it:
+  the Club Hub IS the app, so it opens the install route. ⚠️ **That route was
+  previously reachable ONLY from a banner that sets a localStorage flag and never
+  renders again** — anyone who tapped "Not now" once had no way back.
+  ❌ **ITS GREEN WAS SAMPLED OFF adhjrt.com AND FAILED THE BUILD.** `#3bd070` is the
+  **RETIRED** brand green — that site still runs the pre-6-Aug palette — and
+  `tests/press-feedback.test.js` exists to catch exactly that. **Do not sample
+  colours from adhjrt.com; it is not the source the palette was re-pointed at.**
+- ✅ **DESKTOP: THE CONTENT WELL IS 1360px AT `wide`**, up from 1120. A 1440px
+  monitor was leaving 320px empty. The masthead and view-as bar move with it or
+  they stop lining up with the content beneath.
+  ⚠️ **`shadow-card` IS NOW A PAIR** — a 1px contact shadow plus a wide ambient one
+  — rather than the prototype's single wide blur. `claude/specs/design-system.md`
+  records the divergence rather than being rewritten over it.
+  ⚠️ **THE MASTHEAD ROW'S REAL BUFFER IS THE `flex-1` SPACER, AND IT BREAKS AT
+  +190px.** Measured 12 Aug by growing a probe until the wordmark truncated. An
+  earlier attempt computed "headroom" as the h1's own width minus its natural text
+  width — **a number that calculation can only ever return as ~0** — and the account
+  first name was deleted on the strength of it before the probe disagreed.
+
 - ✅ **THE SCORING MODEL IS LIVE, ALL FIVE STEPS.** Plan:
   `claude/plans/2026-08-12-scoring-model.md`, now marked SHIPPED. Tries,
   conversions, penalties and drop goals are recorded per side **on the FIXTURE**
