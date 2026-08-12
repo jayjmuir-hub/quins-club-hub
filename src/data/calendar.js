@@ -29,10 +29,18 @@ export async function resetMyCalendarToken() {
  * Whatever hostname someone subscribes to is welded into their Google or Apple
  * account permanently — a subscribed calendar URL cannot be changed remotely.
  * Deriving it from the current origin would mint permanent links pointing at
- * `app.adhjrt.com` for anyone who happened to arrive on the old alias, which
- * is a domain we may delete, and at a deploy-preview URL from a preview build.
- * A link that outlives its hostname is the whole failure this constant exists
- * to prevent, so it names the canonical domain and nothing else.
+ * `app.adhjrt.com` for anyone who happened to arrive on the old alias, and at a
+ * deploy-preview URL from a preview build. A link that outlives its hostname is
+ * the whole failure this constant exists to prevent, so it names the canonical
+ * domain and nothing else.
+ *
+ * ⚠️ THIS STOPPED BEING HYPOTHETICAL ON 12 AUG 2026. The line above used to
+ * call `app.adhjrt.com` "a domain we may delete"; it was retired that day and
+ * now returns NXDOMAIN. Every calendar link ever minted survived it, because
+ * this constant never pointed there. Had the origin been derived, every parent
+ * who happened to arrive on the alias would hold a permanently broken
+ * subscription that cannot be fixed remotely.
+ * See `claude/decisions/2026-08-12-retire-app-alias.md`.
  *
  * ⚠️ If the app's domain ever changes, changing this does NOT migrate anyone
  * already subscribed. It only fixes links minted afterwards. Keep the old

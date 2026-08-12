@@ -2,9 +2,12 @@
 
 ⚠️ **STATUS: THIS DEPLOY HAS HAPPENED.** The app is live at
 **`https://adhquins-clubhub.com`** on Netlify (project `quins-club-hub`, branch
-`main`, auto-deploy on push — `build/v1-mvp` until 8 Aug 2026). `app.adhjrt.com` is a working alias, deliberately
-kept. **Read this as the record of how it was set up and what each setting means — not
-as a checklist to run.** Current deploy state is in `claude/state-of-play.md`.
+`main`, auto-deploy on push — `build/v1-mvp` until 8 Aug 2026). ⚠️ **`app.adhjrt.com`
+was a working alias until 12 Aug 2026 and is now RETIRED — it no longer resolves.**
+Anything below describing it as live is a record of a moment; see
+`claude/decisions/2026-08-12-retire-app-alias.md`. **Read this as the record of how it
+was set up and what each setting means — not as a checklist to run.** Current deploy
+state is in `claude/state-of-play.md`.
 
 ⚠️ **The `abudhabiquins.com` end-state below was superseded.** The club's own site moved
 on, and the integration target is now the club's new AWS site — see

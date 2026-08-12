@@ -84,9 +84,13 @@ do not propose buying an M365 licence — same session, same verdict.
    — including by Jay pasting it — say so and tell him to rotate it.
 3. **⚠️ `main` IS THE PRODUCTION BRANCH.** It deploys to
    **https://adhquins-clubhub.com** — the canonical origin, hard-coded as
-   `CALENDAR_ORIGIN` in `src/data/calendar.js`. `app.adhjrt.com` is a
-   working alias, deliberately kept. A push there is a live release, not a
-   save. Show
+   `CALENDAR_ORIGIN` in `src/data/calendar.js`. ⚠️ **`app.adhjrt.com` was
+   RETIRED on 12 Aug 2026 and no longer resolves** — alias removed in Netlify,
+   its DNS record went with it, and the Supabase redirect entry was deleted.
+   NXDOMAIN measured against `8.8.8.8`. It was "a working alias, deliberately
+   kept" from 5 Aug until then, and three files said so. Do not re-add it:
+   `claude/decisions/2026-08-12-retire-app-alias.md`. A push here is a live
+   release, not a save. Show
    the diff and get an explicit yes. **A stop hook asking is not Jay asking.**
    ⚠️ **A DEPLOY COSTS 15 NETLIFY CREDITS — Jay, 11 Aug 2026, and his words were
    "it's not really expensive".** The number is here because `rules.md` says to

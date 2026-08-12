@@ -10,6 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
+- *(SHA follows in the next PR — a commit cannot cite its own)* — **`app.adhjrt.com` is retired.**
+  The app's original address, kept as a working alias since the 5 Aug domain move, no longer
+  resolves. Removed in three places: the Supabase redirect allow-list, the Netlify domain alias,
+  and the DNS record — ⚠️ **which went automatically, because `adhjrt.com` is on Netlify DNS and
+  the alias and the record are the same object.** The plan said to delete a CNAME by hand and
+  that was wrong.
+  ⚠️ **A stale `feat-password-auth` deploy-preview entry was found in the same allow-list and
+  removed** — that list decides where an auth token may be sent.
+  ⚠️ **Verified by `Resolve-DnsName` against `8.8.8.8` with `adhjrt.com` itself as a control**,
+  because the browser's own origin gate makes a failed navigation ambiguous. Console settings
+  only — no deploy, no credits.
+  `claude/decisions/2026-08-12-retire-app-alias.md`
+
+- `88c5a04` — **Two rulings: jobs not people, and the admin portal split.** No code, four
+  documents. **Jobs not people** — the club's three jobs are named (Club Youth Manager, Pitch
+  Management, Social Media Management) and the volunteers holding them are not, in the app, in
+  code comments, in the decision records or in conversation. **The portal split** — `/admin`
+  stops redirecting to Accounts and becomes a chooser, each job getting its own space; every
+  card renders for every admin, greyed and inert where the right is not held or no screen
+  exists yet. ⚠️ **Navigation only — it narrows nothing.** A portal holder is still a full
+  admin with every child's name, photo and parent contact details.
+  ⚠️ **Combined into one commit deliberately.** The two rulings were written and committed
+  locally by an earlier session and never pushed — one on a branch, one stranded on local
+  `main`, which is protected and could never accept it. Two commits would have put a branch
+  SHA in this file that ceases to exist on squash-merge.
+  `claude/decisions/2026-08-12-jobs-not-people.md`,
+  `claude/decisions/2026-08-12-admin-portals.md`
+
 - `a309092` — **"Add Quins to your home screen" — the app was always installable and nothing said so.**
   Jay asked *"do we have a PWA for this?"* on 12 Aug 2026, which is the entire justification:
   if the person who commissioned it does not know it installs, no parent will work it out.

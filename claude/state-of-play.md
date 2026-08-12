@@ -27,9 +27,19 @@ rulings in full, `claude/schema-history.md` the reasoning behind each migration.
 ## Where things stand
 
 **v1 MVP live at `https://adhquins-clubhub.com`** (Let's Encrypt, expires 3 Nov
-2026). `app.adhjrt.com` is a working alias, deliberately kept. ⚠️ **The canonical
-origin is hard-coded** as `CALENDAR_ORIGIN` in `src/data/calendar.js`, and a
-subscribed calendar URL cannot be changed remotely once a parent holds one.
+2026). ⚠️ **The canonical origin is hard-coded** as `CALENDAR_ORIGIN` in
+`src/data/calendar.js`, and a subscribed calendar URL cannot be changed remotely
+once a parent holds one.
+
+✅ **`app.adhjrt.com` IS RETIRED — 12 Aug 2026, and it no longer resolves.**
+It was the app's original address, kept as a working alias from 5 Aug so that
+Jay's PWA install and anything already shared kept working. Retired because
+nobody but Jay uses the app, so the blast radius was one home-screen icon and
+would only ever grow. Removed in three places — the Supabase redirect
+allow-list, the Netlify domain alias, and the DNS record that went with it —
+and verified NXDOMAIN against `8.8.8.8` with the `adhjrt.com` zone itself as a
+live control. Reasoning:
+`claude/decisions/2026-08-12-retire-app-alias.md`.
 
 **Only Jay uses the app.** No parent or coach has been onboarded. That makes almost
 any change cheap right now, and it will not stay that way.
