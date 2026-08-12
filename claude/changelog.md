@@ -10,7 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **Admins are told when somebody asks for access.**
+- *(SHA follows in the next PR)* — **The URL breaks before the row cap does, and the
+  club lands on it.** `listPlayers` pages instead of capping, and four `.in()` readers
+  are chunked.
+  ⚠️ **THE LIMIT NOBODY HAD MEASURED.** PostgREST takes `.in()` as a query **STRING**,
+  so a uuid costs ~37 bytes of URL. Measured with real uuids: **300 ids → 11,196-byte
+  URL → 200; 400 → 14,896 → the fetch THREW; 900 → 33,396 → 400.** `MAX_ROWS` does
+  nothing about it — the request never gets far enough to return a row.
+  ⚠️ **The 400-id failure is a CONNECTION failure, not a status**, so it reads as a bad
+  network rather than as a request built wrong.
+  ⚠️ **Fifteen squads at ~25 players is ~375** — between the last size measured working
+  and the first measured failing. Chunked at 200 (~7.5KB) via `fetchByIds`:
+  `listContactsForPlayers`, `listParentsForPlayers`, `listAvailabilityForEvents`,
+  `listMatchSheetsFor`.
+  ⚠️ **`listPlayers` pages by `full_name, id`** — the tiebreak is load-bearing, because
+  `full_name` is not unique and this club holds no squad numbers.
+  ⚠️ **Two tests were REWRITTEN, not deleted**: they pinned the cap, they now pin paging
+  and the tiebreak. Same precedent as the `listEvents` rewrite on 10 Aug.
+  ❌ **AND TWO PROCESS TRAPS WERE WALKED INTO AND ARE RECORDED IN `state-of-play.md`:**
+  an injection that silently matched nothing because the working tree is CRLF and the
+  script searched for `
+` — **a green run that was evidence about the script, not the
+  code** — and `git checkout --` eating uncommitted work **twice**, exactly as
+  `CLAUDE.md` rule 6 warns.
+
+- `c910842` — **Admins are told when somebody asks for access.**
   Migration `access_request_notify`; edge function `notify-access-request` (v2,
   `verify_jwt: false`). `state-of-play.md` said "Nobody is emailed when an access
   REQUEST arrives" and predicted the cost exactly: *"a third is a copy with a

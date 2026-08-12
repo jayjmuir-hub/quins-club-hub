@@ -503,6 +503,24 @@ Durable. Each cost real time to find.
   classes for consistency and does not overflow without them.
   Guarded two ways — `tests/page-header-wrap.test.js` (source, in CI, pins the class)
   and `harness/check-overflow.mjs` (real Chromium, by hand, measures the thing).
+- ⚠️ **A FAULT INJECTION THAT DOES NOT APPLY LOOKS EXACTLY LIKE A PASSING TEST, AND
+  ON WINDOWS THE COMMONEST CAUSE IS LINE ENDINGS.** 12 Aug 2026: an injection meant to
+  remove the unique tiebreak from `listPlayers`' page sort came back GREEN. The edit
+  had silently matched nothing — the script searched for `
+` and the working tree is
+  **CRLF** (`.gitattributes` pins only `*.mjs`, `*.sql` and `*.sh` to LF, not `*.js`).
+  **The green run was evidence about the SCRIPT, not about the code.** Re-done with a
+  whitespace-tolerant pattern that PRINTS how many bytes it removed, it went red
+  immediately. **Make an injection prove it landed before you believe its result** —
+  the same corollary as the entry below, arriving by a different route.
+- ⚠️ **`git checkout -- <file>` REVERTS TO THE LAST COMMIT, AND IT COST UNCOMMITTED
+  WORK TWICE IN ONE SESSION ON 12 Aug 2026** — `src/data/players.js` and then
+  `src/data/limits.js`, both while cleaning up after a fault injection. `CLAUDE.md`
+  rule 6 already says **commit before injecting a fault**; it was not followed, and
+  the only reason nothing was lost is that a copy had been taken first by luck rather
+  than by process. ⚠️ **The second loss was the more instructive one: the symptom was
+  `fetchByIds is not a function` in a test file that had not been touched**, which
+  reads as a bad import rather than as a reverted module.
 - ⚠️ **NEVER TRUST A FAULT INJECTION THAT REVERTS PART OF A FIX.** Proving the
   overflow gate, the first attempt reverted `flex-wrap` but left `min-w-0`, came back
   green, and was reported to Jay as evidence the fix was unnecessary. **It was
@@ -571,9 +589,25 @@ Durable. Each cost real time to find.
   age-group matches all at 09:00 is normal), and an under-specified sort lets Postgres
   order tied rows differently between pages — returning one twice and dropping another
   with no error anywhere.
-  ⚠️ **`listPlayers` still uses the old flat cap.** Fine at 6 players and fine at 700,
-  since both are under 900; it will need the same treatment before the club passes
-  that, and `fetchAllPages` is written to be reused.
+  ✅ **`listPlayers` NOW PAGES TOO** (12 Aug 2026), by `full_name, id` — and the
+  unique tiebreak is load-bearing for the same reason `events` pages by
+  `starts_at, id`: `full_name` is NOT unique, two players called Sam Ahmed is
+  ordinary, and this club deliberately holds no squad numbers to tell them apart.
+  ⚠️ **AND A SECOND LIMIT WAS FOUND THAT NOBODY HAD MEASURED, WHICH BITES BEFORE
+  `MAX_ROWS` DOES.** PostgREST takes `.in()` as a query **STRING**, so a uuid costs
+  ~37 bytes of URL. Measured against this project with real uuids:
+  **300 ids → 11,196-byte URL → 200; 400 ids → 14,896 bytes → the fetch THREW;
+  900 ids → 33,396 bytes → 400.** `MAX_ROWS` does nothing about it — the request
+  never gets far enough to return a row.
+  ⚠️ **THE 400-ID FAILURE IS THE DANGEROUS ONE: it is not a status, it is a
+  connection failure**, so it reads as a bad network rather than as a request built
+  wrong. Only the far end of the range answers honestly.
+  ⚠️ **THE CLUB LANDS ON THAT CLIFF** — fifteen squads at ~25 players is ~375,
+  between the last size measured working and the first measured failing. Four
+  readers were exposed and are now chunked at 200 via `fetchByIds`:
+  `listContactsForPlayers`, `listParentsForPlayers`, `listAvailabilityForEvents`
+  and `listMatchSheetsFor`. ⚠️ **`listEvents` and `listPlayers` are NOT affected** —
+  their `.in()` is on `team_id`, at most fifteen values.
 - **`saveParents` is delete-then-write, not atomic.**
 - ✅ **AVAILABILITY / RSVP IS ON — Jay, 10 Aug 2026.** `FEATURES.availability` in
   `src/lib/features.js` is **true**. It was false from 29 Jul because the club was not
