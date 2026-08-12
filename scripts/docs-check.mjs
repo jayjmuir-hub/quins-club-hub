@@ -236,6 +236,13 @@ function checkPlanStatus() {
 const STALE_TERMS = [
   ['Wild Apricot', 'the club site is not on Wild Apricot and there is no Wild Apricot import'],
   ['app.adhjrt.com is production', 'production is adhquins-clubhub.com'],
+  // ⚠️ Matched WITHOUT the hostname on purpose. Every doc writes it as
+  // `app.adhjrt.com` in backticks, so a term containing both the hostname and
+  // the verb can never match a real line - the backticks sit between them.
+  // Three files said "is a working alias, deliberately kept" until 12 Aug 2026
+  // and the phrase is what has to stop coming back, not the hostname, which is
+  // still legitimately named by every tombstone pointing at its retirement.
+  ['is a working alias', 'app.adhjrt.com was retired on 12 Aug 2026 and returns NXDOMAIN - nothing is a working alias now. See claude/decisions/2026-08-12-retire-app-alias.md'],
 ]
 
 function checkStaleTerms(files) {

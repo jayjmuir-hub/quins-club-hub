@@ -38,6 +38,15 @@ Jay's existing PWA install still points at it, and so may anything else that has
 been shared. It costs nothing to keep. **Whether it becomes permanent or gets
 retired is still undecided** — see `state-of-play.md`.
 
+> 🪦 **ANSWERED 12 AUG 2026: RETIRED.** The question this section left open was
+> closed a week later — the alias is removed and the hostname no longer
+> resolves. The reasoning above was right for its moment and is why the alias
+> existed at all; what changed is that the club still had exactly one install,
+> so the cost of retiring was still one home-screen icon and was only ever
+> going to rise. Full reasoning, and the evidence:
+> `claude/decisions/2026-08-12-retire-app-alias.md`. **The rest of this document
+> describes 5 August and is left as written.**
+
 ## Traps found during the migration — read before touching DNS again
 
 **1. Netlify DNS record names are not what you would guess.**
