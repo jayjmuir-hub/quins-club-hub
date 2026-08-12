@@ -1,4 +1,12 @@
-# Decision: Candice, Nick and Tracy are admins with different dashboards
+# Decision: the three club jobs are admins with different dashboards
+
+> ⚠️ **NAMES RETIRED 12 Aug 2026.** This document named the three volunteers
+> throughout, because on 10 Aug the jobs did not exist yet and the people were
+> the only way to describe them. The jobs now exist as rights in the schema, so
+> the names have been replaced by **Club Youth Manager**, **Pitch Management**
+> and **Social Media Management**. Nothing Jay said has been edited — the
+> verbatim quote below never contained a name.
+> See `claude/decisions/2026-08-12-jobs-not-people.md`.
 
 *10 Aug 2026. Reasoning, not current state — `RESTORE.md` and the code win on
 what is true today.*
@@ -7,21 +15,22 @@ what is true today.*
 
 Jay wanted a dashboard each for three people taking on club jobs:
 
-- **Candice** — Youth Rugby Manager: match sheets after league matches,
-  packaged for WhatsApp, generated for coaches and team managers.
-- **Nick** — social media manager.
-- **Tracy** — pitch allocation: assigning pitches, a pitch request form for
-  matches including referee requests.
+- **Club Youth Manager** — match sheets after league matches, packaged for
+  WhatsApp, generated for coaches and team managers.
+- **Social Media Management** — the club's social media.
+- **Pitch Management** — pitch allocation: assigning pitches, a pitch request
+  form for matches including referee requests.
 
 and, on the follow-up: *"specific admins, then I would be a super admin i
 guess"*.
 
 ## ⚠️ The answer changed within the hour. Both halves are recorded.
 
-**First answer.** Asked whether Nick and Tracy should see children's names,
-photos and parent contact details, Jay said **yes — trusted volunteers**; asked
-what Candice needs, **full admin, like you**. That made all three ordinary
-admins: no new role, no migration, no RLS change.
+**First answer.** Asked whether the people holding Social Media Management and
+Pitch Management should see children's names, photos and parent contact
+details, Jay said **yes — trusted volunteers**; asked what the Club Youth
+Manager needs, **full admin, like you**. That made all three ordinary admins:
+no new role, no migration, no RLS change.
 
 **Second answer, minutes later, and the one that stands:**
 
@@ -49,8 +58,9 @@ applies in full. What becomes super-admin-only is:
 
 ## ⚠️ The consequence, still true, recorded because it was chosen knowingly
 
-**Nick, Tracy and Candice each hold every child's name, photo and gender, and
-every parent's email and phone, club-wide, with the power to edit or delete.**
+**Whoever holds Club Youth Manager, Pitch Management or Social Media Management
+holds every child's name, photo and gender, and every parent's email and phone,
+club-wide, with the power to edit or delete.**
 
 The super-admin tier does not change this. It restricts AUTHORITY, not SIGHT.
 No new access is created by any of it — that is already what `admin` means —
@@ -122,11 +132,12 @@ redo it. The natural split, from the three jobs:
 
 | | Club-wide events | Children's data |
 |---|---|---|
-| Tracy — pitches, refs | yes | no |
-| Nick — social media | read only | no |
-| Candice — match sheets | yes | yes |
+| Pitch Management — pitches, refs | yes | no |
+| Social Media Management | read only | no |
+| Club Youth Manager — match sheets | yes | yes |
 
-Tracy and Nick share a permission set and differ only in the word — which is
+Pitch Management and Social Media Management share a permission set and differ
+only in the word — which is
 exactly the `coach`/`manager`/`medic` pattern and therefore cheap. The
 expensive part is the set itself: a new helper alongside `can_edit_team`, and
 a decision at each of the **thirteen** policies that currently hang off it

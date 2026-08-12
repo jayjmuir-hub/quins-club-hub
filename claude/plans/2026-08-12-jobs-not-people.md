@@ -1,9 +1,14 @@
 # Jobs, not people — the plan
 
-**STATUS: NOT SHIPPED.** Written 12 Aug 2026, for Jay to review.
+**STATUS: SHIPPED 12 Aug 2026.**
 
-⚠️ **Set this line to SHIPPED in the commit that ships it**, not as a promise
-about that commit.
+⚠️ **One thing in this plan turned out to be wrong and the code does it
+differently.** §4 proposed teaching `STALE_TERMS` to carry a `RegExp`. What
+shipped is a **separate `RETIRED_NAMES` list** of regexes, left alongside the
+string list rather than merged into it — because the two are scanned over
+different file sets. The string terms are markdown-only; the names are scanned
+in `src/`, `tests/`, `db/schema/` and `supabase/` as well. One list could not
+have expressed that.
 
 The ruling and its reasoning are in
 `claude/decisions/2026-08-12-jobs-not-people.md`. This file is only the work.

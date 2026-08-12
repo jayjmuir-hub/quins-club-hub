@@ -150,7 +150,7 @@ CREATE TRIGGER notify_pending_membership
 -- ---------------------------------------------------------------------
 -- public.pitch_requests → notify_pitch_request_asked      ADDED 2026-08-11
 --
--- Mails the club's Pitch Managers, and every super admin, when a coach files a
+-- Mails whoever holds Pitch Management, and every super admin, when a coach files a
 -- request. No WHEN clause: a row in this table IS a question being asked, and
 -- there is no state it can be inserted in that nobody needs telling about.
 --

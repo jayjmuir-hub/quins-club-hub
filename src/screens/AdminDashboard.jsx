@@ -94,7 +94,7 @@ function tabsFor(memberships) {
     tabs.push({ to: '/admin/pitches', label: 'Pitches' })
   }
 
-  // The Club Youth Manager's match sheets. ⚠️ The `youth` right has existed in
+  // Club Youth Manager's match sheets. ⚠️ The `youth` right has existed in
   // ADMIN_RIGHTS since 10 Aug 2026 and granted access to NOTHING until now —
   // the same state `pitches` was in before the pitch stack.
   if (hasAdminRight(memberships, 'youth')) {

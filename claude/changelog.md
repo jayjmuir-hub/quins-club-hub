@@ -353,7 +353,7 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
   `supabase/functions/calendar/index.ts` reference was verified by hand — a green
   `docs-check` would not have covered it.
 
-- `45d50d4` — **Two specs for Candice's match sheets, and the brainstorm found a modelling gap that
+- `45d50d4` — **Two specs for the Club Youth Manager's match sheets, and the brainstorm found a modelling gap that
   would have wasted the build.** `claude/plans/2026-08-11-league-teams-and-fixtures.md`
   and `claude/plans/2026-08-11-match-sheets.md`, split because the work spans EventForm,
   Schedule, the calendar feed and the allocation grid before a sheet is even rendered.
@@ -591,8 +591,8 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
   ⚠️ **SUPER ADMINS ARE RECIPIENTS TOO, deliberately.** A super holds every right
   implicitly, so filtering on the `pitches` right alone would exclude the one person
   certain to be able to act — and on a club where nobody has been given the job yet,
-  that is EVERY recipient. Today that is not hypothetical: Tracy has not been granted
-  the right, so both current recipients are Jay's own accounts.
+  that is EVERY recipient. Today that is not hypothetical: nobody has been granted
+  Pitch Management, so both current recipients are Jay's own accounts.
   ⚠️ **THE FAILURE IS GENUINELY QUIET, and an earlier claim that it was "visible"
   was wrong.** Both triggers swallow everything into a `raise warning` nobody reads,
   so a dead endpoint costs an email silently. That is only acceptable because **the
@@ -623,13 +623,13 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
 
 - `852dbf2` — **The pitch request loop closes — ask, answer, and see the outcome.**
 
-- **11 Aug — the pitch request LOOP closes: a coach asks, Tracy answers, the coach
+- **11 Aug — the pitch request LOOP closes: a coach asks, Pitch Management answers, the coach
   sees the outcome.** `PitchRequest` on the event sheet, and a queue on the allocation
   screen. `pitch_requests` finally has something writing to it.
   ⚠️ **`events.pitch` REMAINS THE ONLY SOURCE OF TRUTH for which pitch** — Jay's
   ruling. The request table records the CONVERSATION and has no pitch column; a second
   copy would disagree with the fixture the moment anyone edited the fixture directly.
-  The accepted cost: you cannot ask "what did Tracy allocate, and has it changed
+  The accepted cost: you cannot ask "what did Pitch Management allocate, and has it changed
   since?", only "was this answered?".
   ⚠️ **A DECLINE IS INVISIBLE ON THE FIXTURE — also Jay's ruling.** It keeps
   `Pitch TBD`, which still reads "not allocated yet". So the request block is the ONLY
@@ -734,7 +734,7 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
 - **11 Aug — `pitch_requests`: a coach asks, an admin allocates. SCHEMA AND RLS ONLY —
   no screen and no email yet.** Jay's four rulings: a request **attaches to an existing
   fixture** (so it appears in the schedule at once carrying `Pitch TBD`, which is what
-  that placeholder already means); **Tracy allocates**; **the referee is a tickbox on
+  that placeholder already means); **Pitch Management allocates**; **the referee is a tickbox on
   the same request**, because both are asked for at the moment a match is arranged;
   and it must be **trackable from submission to assignment by the person who submitted
   it**, in two dashboards, with email.
@@ -785,8 +785,8 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
 - **11 Aug — a managed pitch list, and the clash detection it unblocks.**
   `db/migrations/20260811_pitches.sql`. ⚠️ **This OVERTURNS the 5 Aug decision**,
   which chose "free text beside Venue. No pitches table, no clash detection." That
-  was the right scope call for one person entering fixtures; Tracy's job IS pitch
-  allocation, and the free text had already drifted — measured 11 Aug: **"Pitch 2"
+  was the right scope call for one person entering fixtures; Pitch Management IS a
+  job now, and the free text had already drifted — measured 11 Aug: **"Pitch 2"
   AND "Pitch D2"** both in use, plus "Clubhouse lawn". No clash detector can group
   by a string somebody retyped.
   ⚠️ **`events.pitch` STAYS TEXT WITH NO FOREIGN KEY**, and this is the part most
@@ -825,7 +825,7 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
   screen that hides a row is not security. The gate exists so an ordinary admin is
   not offered a control that could only fail.
   ⚠️ **A REFUSED SAVE PUTS THE TICK BACK.** The write is optimistic, so without the
-  revert somebody walks away certain that Nick is a Pitch Manager while the database
+  revert somebody walks away certain that an account holds Pitch Management while the database
   disagrees — the lying-UI failure. Proved by deleting the revert: the test fails.
   ⚠️ **A super admin's boxes show ticked AND disabled**, because a super admin holds
   every right implicitly and empty boxes would read as "no rights", the opposite of

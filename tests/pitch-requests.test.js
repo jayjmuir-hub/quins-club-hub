@@ -128,7 +128,7 @@ describe('declinePitch', () => {
 
 describe('withdrawRequest', () => {
   it('⚠️ treats zero rows as "already answered", not as success', async () => {
-    // The DELETE policy carries status = 'submitted', so once Tracy has
+    // The DELETE policy carries status = 'submitted', so once it has been
     // answered this silently affects nothing — which without the check would
     // look exactly like a successful withdrawal.
     calls.results['pitch_requests.delete'] = { data: [], error: null }

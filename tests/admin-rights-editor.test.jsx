@@ -11,8 +11,8 @@ import userEvent from '@testing-library/user-event'
 // the half that harness cannot see: that the screen tells the truth.
 //
 // The failure worth guarding is a lying UI — a tick that stays put after the
-// write was refused, leaving somebody certain that Nick is a Pitch Manager
-// when the database disagrees.
+// write was refused, leaving somebody certain that an account holds Pitch
+// Management when the database disagrees.
 
 const setAdminRightsMock = vi.fn()
 
@@ -33,7 +33,7 @@ const membership = (extra = {}) => ({
 
 function setup(props = {}) {
   const onChanged = vi.fn()
-  render(<AdminRightsEditor membership={membership()} label="Nick" onChanged={onChanged} {...props} />)
+  render(<AdminRightsEditor membership={membership()} label="Test Admin" onChanged={onChanged} {...props} />)
   return { onChanged, user: userEvent.setup() }
 }
 
@@ -47,14 +47,14 @@ beforeEach(() => {
 describe('assigning admin rights', () => {
   it('shows every right, none ticked for a plain admin', async () => {
     setup()
-    for (const label of ['Youth Manager', 'Social Media Manager', 'Pitch Manager']) {
+    for (const label of ['Club Youth Manager', 'Social Media Management', 'Pitch Management']) {
       expect(screen.getByRole('checkbox', { name: label })).not.toBeChecked()
     }
   })
 
   it('saves the right that was ticked, and only that one', async () => {
     const { user } = setup()
-    await user.click(screen.getByRole('checkbox', { name: 'Pitch Manager' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Pitch Management' }))
 
     await waitFor(() => expect(setAdminRightsMock).toHaveBeenCalled())
     expect(setAdminRightsMock).toHaveBeenCalledWith('memb-1', false, ['pitches'])
@@ -62,7 +62,7 @@ describe('assigning admin rights', () => {
 
   it('unticking removes just that right', async () => {
     const { user } = setup({ membership: membership({ admin_rights: ['youth', 'media'] }) })
-    await user.click(screen.getByRole('checkbox', { name: 'Youth Manager' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Club Youth Manager' }))
 
     await waitFor(() => expect(setAdminRightsMock).toHaveBeenCalled())
     expect(setAdminRightsMock).toHaveBeenCalledWith('memb-1', false, ['media'])
@@ -72,7 +72,7 @@ describe('assigning admin rights', () => {
     // A super admin holds all rights implicitly. Empty boxes would read as
     // "this person has no rights", which is the opposite of the truth.
     setup({ membership: membership({ is_super: true }) })
-    for (const label of ['Youth Manager', 'Social Media Manager', 'Pitch Manager']) {
+    for (const label of ['Club Youth Manager', 'Social Media Management', 'Pitch Management']) {
       const box = screen.getByRole('checkbox', { name: label })
       expect(box).toBeChecked()
       expect(box).toBeDisabled()
@@ -81,11 +81,11 @@ describe('assigning admin rights', () => {
 
   it('⚠️ PUTS THE TICK BACK when the write is refused', async () => {
     // The lying-UI failure. Without the revert somebody walks away certain
-    // that Nick is a Pitch Manager while the database says otherwise.
+    // that an account holds Pitch Management while the database says otherwise.
     setAdminRightsMock.mockRejectedValue(new Error('Only a super admin can change admin rights'))
     const { user } = setup()
 
-    const box = screen.getByRole('checkbox', { name: 'Pitch Manager' })
+    const box = screen.getByRole('checkbox', { name: 'Pitch Management' })
     await user.click(box)
 
     expect(await screen.findByText(/only a super admin/i)).toBeInTheDocument()
@@ -97,7 +97,7 @@ describe('assigning admin rights', () => {
     // otherwise paper over the failure.
     setAdminRightsMock.mockRejectedValue(new Error('nope'))
     const { onChanged, user } = setup()
-    await user.click(screen.getByRole('checkbox', { name: 'Youth Manager' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Club Youth Manager' }))
 
     await screen.findByRole('alert')
     expect(onChanged).not.toHaveBeenCalled()

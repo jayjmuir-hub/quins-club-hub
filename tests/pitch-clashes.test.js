@@ -83,7 +83,7 @@ describe('findPitchClashes', () => {
 
   it('still reports a real clash against a fan-out from a DIFFERENT group', () => {
     // The other half of the rule: same group is fine, different groups on the
-    // same pitch at the same time is exactly what Tracy needs to see.
+    // same pitch at the same time is exactly what Pitch Management needs to see.
     const clashes = findPitchClashes([
       at('2026-09-05T09:00:00Z', { id: 'u10', ends_at: '2026-09-05T11:00:00Z', group_id: 'g1' }),
       at('2026-09-05T09:30:00Z', { id: 'seniors', ends_at: '2026-09-05T11:00:00Z', group_id: 'g2' }),

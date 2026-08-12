@@ -865,8 +865,8 @@ CREATE INDEX attendance_player_id_idx ON public.attendance (player_id);
 -- public.pitches — the managed pitch list (11 Aug 2026)
 --
 -- ⚠️ OVERTURNS the 5 Aug decision "free text beside Venue, no pitches table,
--- no clash detection". That was the right scope call for the MVP; Tracy's job
--- IS pitch allocation, and the free text had already drifted — measured
+-- no clash detection". That was the right scope call for the MVP; Pitch
+-- Management IS a job now, and the free text had already drifted — measured
 -- 11 Aug, "Pitch 2" and "Pitch D2" both in use, plus "Clubhouse lawn".
 --
 -- ⚠️ `events.pitch` REMAINS TEXT WITH NO FOREIGN KEY, and this is the part

@@ -245,10 +245,45 @@ const STALE_TERMS = [
   ['is a working alias', 'app.adhjrt.com was retired on 12 Aug 2026 and returns NXDOMAIN - nothing is a working alias now. See claude/decisions/2026-08-12-retire-app-alias.md'],
 ]
 
+// ⚠️ THE NAMES OF THE THREE VOLUNTEERS, RETIRED 12 Aug 2026 (Jay: "we aren't
+// going to use human names anymore, only Club Youth Manager, Pitch Management,
+// Social Media Management from now on").
+//
+// ⚠️ REGEXES, NOT STRINGS, AND THE WORD BOUNDARIES ARE LOAD-BEARING. The plain
+// substring matcher above would fail every line containing "nickname" the
+// moment `Nick` were added as a string. `\b` is what makes the term usable at
+// all - proved by planting "nickname" and confirming it stays green.
+//
+// ⚠️ SCANNED IN CODE AS WELL AS DOCS - Jay's call, 12 Aug. Every occurrence of
+// a name in this repo outside the docs was a CODE COMMENT, so a
+// markdown-only gate would have policed the one place the rule was not broken.
+// claude/decisions/2026-08-12-jobs-not-people.md
+const RETIRED_NAMES = [
+  [/\bCandice\b/i, 'the job is Club Youth Manager - name the job, not the person'],
+  [/\bTracy\b/i, 'the job is Pitch Management - name the job, not the person'],
+  [/\bNick\b/i, 'the job is Social Media Management - name the job, not the person'],
+]
+
+/**
+ * Tracked source files the name rule applies to.
+ *
+ * ⚠️ `db/migrations/` IS DELIBERATELY ABSENT, for the same reason
+ * `claude/handoffs/` and `claude/plans/` are: a migration is a dated record of
+ * what ran, and `apply_migration` strips `--` comments before executing, so the
+ * database never held those words in the first place. `db/schema/` IS included
+ * - it is a living capture, read as current truth.
+ */
+function trackedCode() {
+  return execSync('git ls-files "src/*" "tests/*" "db/schema/*" "supabase/*"', { encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean)
+}
+
 function checkStaleTerms(files) {
   const historical = (f) =>
     f.startsWith('claude/handoffs/') || f.startsWith('claude/plans/') ||
     f.startsWith('claude/archive/') || f.startsWith('.superpowers/')
+
   for (const f of files) {
     if (historical(f)) continue
     const text = readFileSync(join(ROOT, f), 'utf8')
@@ -259,7 +294,27 @@ function checkStaleTerms(files) {
           fail(f, n, `stale reference "${term}" - ${why}. Fix it, or mark the line <!-- stale-ok --> if it is deliberately retiring the term`)
         }
       }
+      for (const [re, why] of RETIRED_NAMES) {
+        if (re.test(line)) {
+          fail(f, n, `retired name ${re.source} - ${why}. Fix it, or mark the line stale-ok if it is deliberately retiring the term`)
+        }
+      }
     }
+  }
+
+  // ⚠️ EVERY line of a source file, not proseLines(). That helper strips
+  // markdown fences; in a .js file the "fence" would be whatever ``` happened
+  // to appear in a comment, which would silently blind the scan.
+  for (const f of trackedCode()) {
+    const text = readFileSync(join(ROOT, f), 'utf8')
+    text.split('\n').forEach((line, i) => {
+      if (line.includes('stale-ok')) return
+      for (const [re, why] of RETIRED_NAMES) {
+        if (re.test(line)) {
+          fail(f, i + 1, `retired name ${re.source} - ${why}. Fix it, or mark the line stale-ok if it is deliberately retiring the term`)
+        }
+      }
+    })
   }
 }
 

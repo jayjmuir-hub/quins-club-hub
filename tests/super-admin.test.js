@@ -131,9 +131,9 @@ describe('the rights vocabulary', () => {
   it('is the three Jay named', () => {
     expect(ADMIN_RIGHTS).toEqual(['youth', 'media', 'pitches'])
     expect(ADMIN_RIGHTS.map(adminRightLabel)).toEqual([
-      'Youth Manager',
-      'Social Media Manager',
-      'Pitch Manager',
+      'Club Youth Manager',
+      'Social Media Management',
+      'Pitch Management',
     ])
   })
 })
