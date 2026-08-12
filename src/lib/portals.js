@@ -34,7 +34,14 @@ export const PORTALS = [
     blurb: 'Accounts, access and the club’s squads.',
     tabs: [
       { to: '/admin/accounts', label: 'Accounts' },
-      { to: '/admin/club', label: 'Club' },
+      // ⚠️ "Club" UNTIL 12 Aug 2026, AND IT HID THE THING PEOPLE COME HERE FOR.
+      // This tab is where a club's LEAGUE TEAM NAMES are created — the ADHQ1 /
+      // ADHQ2 identities that RCM knows a side by, and that the match sheet's
+      // TEAM box is stamped from. "Club" named the container rather than the
+      // job, so the one screen that fixes an empty TEAM box was the one screen
+      // nobody could find. Jay went looking for it and could not tell from the
+      // word which tab it was under.
+      { to: '/admin/club', label: 'Squads & league teams' },
     ],
   },
   {

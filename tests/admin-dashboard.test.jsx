@@ -121,7 +121,7 @@ describe('AdminDashboard — authorisation gate', () => {
     // Both tabs plus the routed tab content — NOT the heading, which
     // NotAuthorised also renders (sr-only), so it cannot tell the two apart.
     expect(screen.getByRole('link', { name: 'Accounts' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Club' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Squads & league teams' })).toBeInTheDocument()
     expect(screen.getByText('Accounts tab marker')).toBeInTheDocument()
     expect(screen.queryByText(/not authorised/i)).not.toBeInTheDocument()
   })
@@ -174,13 +174,13 @@ describe('AdminDashboard — authorisation gate', () => {
 })
 
 describe('AdminDashboard — tabs', () => {
-  it('renders exactly two tabs, Accounts and Club, as real links', () => {
+  it('renders exactly two tabs, Accounts and Squads & league teams, as real links', () => {
     renderAdmin()
 
     const tabs = screen.getByRole('navigation', { name: /admin sections/i })
     expect(tabs.querySelectorAll('a')).toHaveLength(2)
     expect(screen.getByRole('link', { name: 'Accounts' })).toHaveAttribute('href', '/admin/accounts')
-    expect(screen.getByRole('link', { name: 'Club' })).toHaveAttribute('href', '/admin/club')
+    expect(screen.getByRole('link', { name: 'Squads & league teams' })).toHaveAttribute('href', '/admin/club')
   })
 
   it('renders the Accounts tab at /admin/accounts and marks it current', () => {
@@ -188,13 +188,13 @@ describe('AdminDashboard — tabs', () => {
 
     expect(screen.getByText('Accounts tab marker')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Accounts' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Club' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: 'Squads & league teams' })).not.toHaveAttribute('aria-current')
   })
 
   it('switches tab client-side, without leaving the dashboard', async () => {
     const { user } = renderAdmin('/admin/accounts')
 
-    await user.click(screen.getByRole('link', { name: 'Club' }))
+    await user.click(screen.getByRole('link', { name: 'Squads & league teams' }))
 
     expect(await screen.findByText('U10')).toBeInTheDocument()
     expect(screen.queryByText('Accounts tab marker')).not.toBeInTheDocument()
