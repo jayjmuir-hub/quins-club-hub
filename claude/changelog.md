@@ -37,6 +37,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   exists and all four columns were NULL on it. **The plan said to re-measure for exactly
   this reason** — a human filed that sheet between the plan being written and this
   running.
+  ❌ **AND IT WAS APPLIED TOO EARLY AND BROKE THE LIVE SITE FOR ABOUT TEN MINUTES.**
+  "Run last" was read as *last in the branch*; `main` was still deployed and its bundle
+  still sent all four columns on every save, so PostgREST answered **400 / PGRST204** and
+  **Save draft and Submit failed on the live match sheet** while the PR waited to merge.
+  Undone by re-adding them — all NULL, so it cost nothing — and re-applied once the new
+  bundle was serving.
+  ⚠️ **THE RULE, now in the migration header and in `state-of-play.md`: a DESTRUCTIVE
+  schema change against a live SPA is DEPLOY-FIRST, DROP-SECOND.** An additive one is
+  safe in either order, which is why `manager_phone` going in early was fine and this was
+  not. **"Nothing reads it" has to mean nothing anyone is RUNNING.**
 
 - *(SHA follows in the next PR)* — **The score is ENTERED AS COMPONENTS, and the form's
   total can no longer disagree with its own tries.** Steps 3 and 5 of the scoring plan,

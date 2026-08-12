@@ -224,6 +224,19 @@ will propose building.**
   conversions, penalties and drop goals are recorded per side **on the FIXTURE**
   — Jay ruled one score, and `match_sheets.score_us` / `score_them` /
   `tries_us` / `tries_them` are **DROPPED**.
+  ⚠️ **AND THE DROP BROKE THE LIVE SITE FOR ABOUT TEN MINUTES, WHICH IS THE
+  MOST TRANSFERABLE THING IN THIS ENTRY.** It was applied the moment nothing in
+  the BRANCH read those columns — which felt like the plan's "run last" — while
+  `main` was still deployed and its bundle still sent all four on every save.
+  PostgREST answers a write naming a missing column with **400 / PGRST204**, so
+  **Save draft and Submit failed on the live match sheet** while the pull
+  request waited. Undone by re-adding them (they were all NULL, so it cost
+  nothing) and re-applied once the new bundle was serving.
+  ⚠️ **THE RULE: A DESTRUCTIVE SCHEMA CHANGE AGAINST A LIVE SPA IS DEPLOY-FIRST,
+  DROP-SECOND.** An ADDITIVE one is safe in either order — an old bundle never
+  mentions a new column — which is why `manager_phone` going in early was fine
+  and this was not. **"Nothing reads it" has to mean nothing anyone is RUNNING,
+  not nothing in the repo.**
   ⚠️ **`result_us` / `result_them` ARE DERIVED, BY A TRIGGER, AND THE GUARD IS
   PER SIDE.** A side with no components keeps whatever result it already had.
   That is not defensiveness: fixtures exist whose result was typed by hand before

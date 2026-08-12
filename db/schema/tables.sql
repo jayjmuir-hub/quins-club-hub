@@ -1040,11 +1040,19 @@ CREATE TABLE public.match_sheets (
   -- fills the form and a coach signs it. Added 2026-08-12
   -- (20260812_match_sheet_manager_phone.sql).
   manager_phone  text,
-  -- ⚠️ score_us / tries_us / score_them / tries_them WERE HERE AND ARE GONE -
-  -- dropped 2026-08-12 (20260812_drop_match_sheet_scores.sql). The fixture is
-  -- the single source of the score; public.events carries the components and
-  -- derives result_us / result_them from them. All four were null on the only
-  -- sheet that existed, measured the same day.
+  -- ⚠️ score_us / tries_us / score_them / tries_them WERE HERE AND GO -
+  -- 20260812_drop_match_sheet_scores.sql. The fixture is the single source of
+  -- the score; public.events carries the components and derives result_us /
+  -- result_them from them. All four were null on the only sheet that existed,
+  -- measured the same day.
+  --
+  -- ⚠️ THE DROP IS SEQUENCED AGAINST THE DEPLOY, NOT AGAINST THE MERGE, and
+  -- this capture describes the state AFTER it. Applied early on 12 Aug it broke
+  -- saving on the live site (the deployed bundle still sent all four; PostgREST
+  -- answers a write naming a missing column with 400 / PGRST204), so it was
+  -- undone and re-applied once the new bundle was serving. **If these four are
+  -- present in live, the drop has not been re-applied yet** - read the migration's
+  -- header before doing anything about it.
   medical_notes  text,
   -- Column comment as stored: "complete" means the coach pressed Submit and
   -- the sheet is ready to send to RCM. It does NOT mean RCM received it.

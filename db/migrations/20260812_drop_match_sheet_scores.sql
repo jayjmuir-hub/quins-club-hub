@@ -18,11 +18,32 @@
 -- duplicate the other two were. Leaving them would keep half the disagreement
 -- the ruling existed to remove.
 --
--- ⚠️ RUN LAST, AFTER THE APP STOPPED READING THEM. src/screens/MatchSheet.jsx
--- and src/data/matchSheets.js were changed in the same branch; getMatchSheet
--- still does `select('*')`, so a drop that landed FIRST would simply stop
--- returning columns the screen was still putting into its form state — no
--- error, just score boxes that silently emptied.
+-- ⚠️⚠️ RUN THIS **AFTER THE DEPLOY**, NOT AFTER THE BRANCH IS WRITTEN. THIS IS
+-- NOT THE SAME THING, AND GETTING IT WRONG BROKE THE LIVE SITE FOR ABOUT TEN
+-- MINUTES ON 12 Aug 2026.
+--
+-- It was applied as soon as nothing in the BRANCH read these columns, which
+-- felt like "last". But `main` was still deployed, and the deployed bundle's
+-- saveMatchSheet still sent `score_us`, `score_them`, `tries_us` and
+-- `tries_them` on every save. PostgREST answers a write naming a column that
+-- does not exist with 400 / PGRST204 — so **Save draft and Submit failed on
+-- the live match sheet** while the pull request sat waiting to be merged.
+--
+-- Undone immediately by re-adding all four (`restore_match_sheet_scores_until_deploy`),
+-- which cost nothing because every one of them was NULL, and re-applied once
+-- the new bundle was actually serving.
+--
+-- **THE RULE: a DESTRUCTIVE schema change against a live single-page app is
+-- deploy-first, drop-second.** An ADDITIVE one (see
+-- 20260812_match_sheet_manager_phone.sql) is safe in either order, because an
+-- old bundle simply never mentions the new column. A DROP is not, because the
+-- old bundle is still naming the old one. "Nothing reads it" has to mean
+-- nothing anyone is RUNNING, not nothing in the repo.
+--
+-- ⚠️ AND THE SAME ORDERING PROTECTS THE READ PATH. getMatchSheet does
+-- `select('*')`, so a drop that landed first would also stop returning columns
+-- the old screen was still putting into its form state — no error there, just
+-- score boxes that silently emptied.
 --
 -- ⚠️ MEASURED IMMEDIATELY BEFORE APPLYING, not assumed from the plan: one match
 -- sheet exists and all four columns are NULL on it. Nothing is lost. The plan
