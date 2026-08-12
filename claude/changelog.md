@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
+- *(SHA follows in the next PR)* — **Social Media Management is live: what's on, and an idea inbox.**
+  The last grey card on the chooser opens. Two screens behind the `media` right — **What's on**
+  (every event past and upcoming, split into *Coming up* and *Recently*, because a fixture that
+  has happened wants a report and one that hasn't wants a preview) and **Ideas**, an inbox any
+  member submits into from More.
+  ⚠️ **It does NOT touch `player-photos`.** The obvious build — offer the roster photos every
+  admin can already see — was ruled out by Jay before it was proposed: seeing a child's photo on
+  the roster and putting it on Instagram are different acts needing different consent. Everything
+  here is submitter-chosen, in a **second private bucket**.
+  ⚠️ **`from_staff` is stamped by a BEFORE INSERT trigger, never sent by the client** — a
+  browser-supplied "I am staff" would be a self-awarded triage priority.
+  ⚠️ **Column grants on UPDATE**: an admin marking an idea can write `status`, `decision_note`,
+  `decided_by`, `decided_at` **and nothing else**. Verified after applying — table-level UPDATE
+  to `authenticated` is none. Policies authorise the row; grants authorise the column.
+  ⚠️ **Removing an idea deletes the OBJECT first and the row second.** Storage cannot be cleared
+  by SQL (`42501`), so a row-first failure would orphan the exact image being removed.
+  ⚠️ **First nested tabs in the app**, which needed `end` on the tab `NavLink` — without it
+  "What's on" stays marked current while you stand on "Ideas".
+  `claude/decisions/2026-08-12-social-media-management.md`
+
+- `2290bf7` — **League teams shipped days ago; the status line said otherwise.**
+  ⚠️ **`docs-check` asserts a plan HAS a `**STATUS:` line, never that the line is TRUE**, so a
+  stale one is invisible to it and reads as authoritative. It rotted because the work was split
+  into a design file and an implementation file and only the second was marked. **A plan split in
+  two has two status lines, and the one nobody is looking at is the one that rots.**
+
 - `f4e1ce6` — **Recorded what shipped, and the cache trap that made a green deploy look failed.**
   ⚠️ **After Netlify said `main@78649aa` Published, the live site still served the OLD app** —
   the admin route still redirected to Accounts and still drew the old tab row. That is

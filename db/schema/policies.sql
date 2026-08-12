@@ -938,3 +938,66 @@ CREATE POLICY "match sheet slot manage" ON public.match_sheet_slots
 CREATE POLICY "match sheet card manage" ON public.match_sheet_cards
   FOR ALL USING (private.can_edit_match_sheet(match_sheet_id))
   WITH CHECK (private.can_edit_match_sheet(match_sheet_id));
+
+
+-- ---------------------------------------------------------------------
+-- public.social_ideas  (4 policies, captured 12 Aug 2026)
+--
+-- ⚠️ ROLE IS `public`, like every other policy on a `public` table here — the
+-- two storage.objects blocks are the only ones TO authenticated. Captured, not
+-- assumed.
+--
+-- ⚠️ READING IS `is_admin`, NOT the `media` right. Rights gate SCREENS, not
+-- data (claude/decisions/2026-08-10-role-dashboards.md).
+--
+-- ⚠️ private.is_admin() tests role only, NOT status — unlike can_edit_team,
+-- which was made status-aware on 10 Aug. Every admin-gated table already
+-- relies on that; recorded here so it is a known property rather than a
+-- surprise.
+-- ---------------------------------------------------------------------
+CREATE POLICY "social idea read" ON public.social_ideas
+  FOR SELECT
+  USING (((submitted_by = auth.uid()) OR private.is_admin(club_id)));
+
+CREATE POLICY "social idea create" ON public.social_ideas
+  FOR INSERT
+  WITH CHECK (((submitted_by = auth.uid()) AND (EXISTS ( SELECT 1
+     FROM memberships m
+    WHERE ((m.profile_id = auth.uid()) AND (m.club_id = social_ideas.club_id) AND (m.status = 'active'::text))))));
+
+CREATE POLICY "social idea decide" ON public.social_ideas
+  FOR UPDATE
+  USING (private.is_admin(club_id))
+  WITH CHECK (private.is_admin(club_id));
+
+-- ⚠️ TWO DELETERS: the submitter while still `new` (withdrawing), and an admin
+-- always (Jay, 12 Aug: "give the manager the ability to mark things and remove
+-- them"). The admin arm is the only real control over an inappropriate photo.
+CREATE POLICY "social idea remove" ON public.social_ideas
+  FOR DELETE
+  USING (((((submitted_by = auth.uid()) AND (status = 'new'::text))) OR private.is_admin(club_id)));
+
+
+-- ---------------------------------------------------------------------
+-- storage.objects — bucket `social-ideas`  (3 policies, captured 12 Aug 2026)
+--
+-- ⚠️ A SECOND BUCKET, NOT `player-photos`. Mixing submitted images into the
+-- roster bucket would put publication-bound photos behind policies written for
+-- recognising a child on a pitch.
+--
+-- ⚠️ CLUB-BLIND, via private.is_admin_anywhere(), because an object key
+-- carries no club. Same documented single-club assumption as
+-- can_admin_see_pending and is_admin_anywhere itself; all three are revisited
+-- together if a second club ever appears.
+-- ---------------------------------------------------------------------
+CREATE POLICY "social idea image read" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (((bucket_id = 'social-ideas'::text) AND ((private.social_idea_owner(name) = auth.uid()) OR private.is_admin_anywhere())));
+
+CREATE POLICY "social idea image write" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (((bucket_id = 'social-ideas'::text) AND (private.social_idea_owner(name) = auth.uid())));
+
+CREATE POLICY "social idea image remove" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (((bucket_id = 'social-ideas'::text) AND ((private.social_idea_owner(name) = auth.uid()) OR private.is_admin_anywhere())));

@@ -196,3 +196,18 @@ CREATE TRIGGER notify_pitch_request_answered
   FOR EACH ROW
   WHEN (((old.status IS DISTINCT FROM new.status) AND (new.status = ANY (ARRAY['allocated'::text, 'declined'::text]))))
   EXECUTE FUNCTION private.notify_pitch_request();
+
+
+-- ---------------------------------------------------------------------
+-- social_ideas_provenance  (captured 12 Aug 2026)
+--
+-- BEFORE INSERT on public.social_ideas. Stamps submitted_by, club_id and
+-- from_staff from the submitter's own membership, and forces status to 'new'.
+--
+-- ⚠️ THIS IS THE ONLY THING STOPPING A CLIENT CLAIMING STAFF STATUS. A policy
+-- authorises a ROW; it does not stop a caller putting `from_staff: true` in
+-- the payload. Same class of hole as memberships.is_super.
+-- ---------------------------------------------------------------------
+CREATE TRIGGER social_ideas_provenance
+  BEFORE INSERT ON public.social_ideas
+  FOR EACH ROW EXECUTE FUNCTION private.set_social_idea_provenance();

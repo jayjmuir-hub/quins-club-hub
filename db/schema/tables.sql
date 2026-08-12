@@ -1100,3 +1100,46 @@ ALTER TABLE public.match_sheet_cards ENABLE ROW LEVEL SECURITY;
 CREATE INDEX match_sheet_slots_sheet_idx ON public.match_sheet_slots USING btree (match_sheet_id, slot);
 CREATE INDEX match_sheet_cards_sheet_idx ON public.match_sheet_cards USING btree (match_sheet_id);
 CREATE INDEX match_sheets_status_idx     ON public.match_sheets      USING btree (status, event_id);
+
+
+-- ---------------------------------------------------------------------
+-- public.social_ideas  (captured 12 Aug 2026)
+--
+-- Post ideas submitted by any member; the Social Media Management screens mark
+-- and remove them. Migration: db/migrations/20260812_social_ideas.sql.
+-- Ruling: claude/decisions/2026-08-12-social-media-management.md.
+--
+-- ⚠️ NOT a photo library. It never touches `player-photos`; images here were
+-- chosen and uploaded by a member for publication. See the ruling.
+--
+-- ⚠️ NO UNIQUE CONSTRAINT, unlike pitch_requests. Five people sending photos
+-- of the same match is the feature working, not a duplicate.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.social_ideas (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  club_id uuid NOT NULL,
+  event_id uuid,
+  submitted_by uuid NOT NULL,
+  body text NOT NULL,
+  photo_path text,
+  from_staff boolean NOT NULL DEFAULT false,
+  status text NOT NULL DEFAULT 'new'::text,
+  decision_note text,
+  decided_by uuid,
+  decided_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Constraints, as captured — all NAMED, so a drop or rename diffs to something.
+ALTER TABLE public.social_ideas ADD CONSTRAINT social_ideas_pkey PRIMARY KEY (id);
+ALTER TABLE public.social_ideas ADD CONSTRAINT social_ideas_body_check CHECK ((length(btrim(body)) > 0));
+ALTER TABLE public.social_ideas ADD CONSTRAINT social_ideas_status_check CHECK ((status = ANY (ARRAY['new'::text, 'used'::text, 'dismissed'::text])));
+ALTER TABLE public.social_ideas ADD CONSTRAINT social_ideas_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE;
+ALTER TABLE public.social_ideas ADD CONSTRAINT social_ideas_event_id_fkey FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL;
+ALTER TABLE public.social_ideas ADD CONSTRAINT social_ideas_submitted_by_fkey FOREIGN KEY (submitted_by) REFERENCES profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.social_ideas ADD CONSTRAINT social_ideas_decided_by_fkey FOREIGN KEY (decided_by) REFERENCES profiles(id) ON DELETE SET NULL;
+
+CREATE INDEX social_ideas_status_idx ON public.social_ideas USING btree (club_id, status, created_at DESC);
+CREATE INDEX social_ideas_event_idx ON public.social_ideas USING btree (event_id);
+
+ALTER TABLE public.social_ideas ENABLE ROW LEVEL SECURITY;

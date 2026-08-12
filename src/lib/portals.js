@@ -59,12 +59,16 @@ export const PORTALS = [
   {
     key: 'media',
     right: 'media',
-    blurb: 'Nothing here yet.',
-    // ⚠️ EMPTY ON PURPOSE, AND THIS IS WHAT KEEPS THE CARD HONEST. No
-    // social-media screen exists. A portal with no tabs is greyed regardless of
-    // the right (see isPortalOpen), so the day a screen is added to this array
-    // the card opens by itself — no second edit, nothing to forget.
-    tabs: [],
+    blurb: 'What’s on, and post ideas sent in by members.',
+    // ⚠️ THIS ARRAY WAS EMPTY FROM 12 Aug UNTIL LATER THE SAME DAY, and adding
+    // these two entries is the ONLY change the chooser needed to open the card
+    // — no edit to PortalChooser, no second list. That was the point of
+    // isPortalOpen treating "no tabs" as closed rather than special-casing
+    // this portal by name.
+    tabs: [
+      { to: '/admin/social', label: 'What’s on' },
+      { to: '/admin/social/ideas', label: 'Ideas' },
+    ],
   },
 ]
 
