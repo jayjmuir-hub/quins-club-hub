@@ -10,6 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
+- `f4e1ce6` — **Recorded what shipped, and the cache trap that made a green deploy look failed.**
+  ⚠️ **After Netlify said `main@78649aa` Published, the live site still served the OLD app** —
+  the admin route still redirected to Accounts and still drew the old tab row. That is
+  indistinguishable from a release that did not take. It was the **service worker** serving a
+  cached shell. ⚠️ **Neither the browser nor the Netlify UI can settle this** — both report what
+  some cache decided. What does: fetch `/index.html`, read the `/assets/index-*.js` name out of
+  it, fetch that bundle, and search it for a string only the new build contains.
+  Also records that `notify-pitch-request` was redeployed to version 3, and that ⚠️ **an edge
+  function is not part of the Netlify build.**
+
 - `78649aa` — **`/admin` is a chooser, and each job is its own portal.**
   Jay: *"i'd like more of a split off for the dashboards"*. The tab row that grew with every
   right somebody held is replaced by four cards — Club Admin, Pitch Management, Club Youth

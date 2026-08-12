@@ -1,7 +1,18 @@
 # League teams and fixtures — Project 1 of 2
 
-**STATUS: NOT SHIPPED.** Design agreed with Jay on 11 Aug 2026. Project 2
-(`2026-08-11-match-sheets.md`) depends on this one and must not start first.
+**STATUS: SHIPPED 11–12 Aug 2026.** Design agreed with Jay on 11 Aug 2026.
+Delivered across PRs #51–#56; `src/data/leagueTeams.js` and
+`src/lib/fixtureLabel.js` are the code. Project 2
+(`2026-08-11-match-sheets.md`) depended on this one, was not allowed to start
+first, and shipped after it in #57.
+
+⚠️ **THIS LINE SAID "NOT SHIPPED" UNTIL 12 Aug 2026, DAYS AFTER IT SHIPPED, AND
+`npm run docs:check` COULD NOT SEE IT.** The plan-status check asserts that a
+STATUS line EXISTS, never that it is TRUE — so a stale one is invisible to it
+and reads as authoritative. It went stale because the work was split into a
+design file (this one) and `2026-08-11-league-teams-implementation.md`, and only
+the implementation file was marked when the code landed. **A plan split in two
+has two status lines, and the one nobody is looking at is the one that rots.**
 
 ⚠️ **Write the status as SHIPPED in the same commit that ships it.** The
 self-registration plan said "implementation follows in the same branch" while
