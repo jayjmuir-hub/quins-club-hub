@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Chip from '../components/Chip.jsx'
+import EventTypeIcon from '../components/EventTypeIcon.jsx'
 import Spinner from '../components/Spinner.jsx'
 import Button from '../components/Button.jsx'
 import PitchRequest from '../components/PitchRequest.jsx'
@@ -35,38 +36,6 @@ import {
 // (the same split EventDetail and PlayerDetail both use).
 
 const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
-
-// design-system.md §5.5: whistle = match, shirt = training, trophy = social.
-function WhistleIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="9" cy="14" r="5" />
-      <path d="M14 12h7l-2-4h-9l1 2" />
-      <path d="M9 9V6" />
-    </svg>
-  )
-}
-
-function ShirtIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M9 3 5 5 3 9l3 1.5V21h12V10.5L21 9l-2-4-4-2" />
-      <path d="M9 3a3 3 0 0 0 6 0" />
-    </svg>
-  )
-}
-
-function TrophyIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M8 4h8v5a4 4 0 0 1-8 0V4Z" />
-      <path d="M8 5H5v2a3 3 0 0 0 3 3M16 5h3v2a3 3 0 0 1-3 3" />
-      <path d="M12 13v4M9 21h6l-1-4h-4l-1 4Z" />
-    </svg>
-  )
-}
-
-const TYPE_ICONS = { match: WhistleIcon, training: ShirtIcon, social: TrophyIcon }
 
 function KeyValue({ label, children }) {
   return (
@@ -204,7 +173,7 @@ function seriesLaterLabel(later) {
   return later === 1 ? 'This and 1 later session' : `This and ${later} later sessions`
 }
 
-function FooterActions({ event, canEdit, onEdit, onDeleted }) {
+function FooterActions({ event, canEdit, onEdit, onDuplicate, onDeleted }) {
   const [confirming, setConfirming] = useState(false)
   // null when idle, otherwise which delete is in flight — the two buttons
   // must be able to say "Deleting…" independently.
@@ -375,10 +344,52 @@ function FooterActions({ event, canEdit, onEdit, onDeleted }) {
           </div>
         </div>
       ) : (
-        <div className="flex gap-2.5">
+        // ⚠️ `flex-wrap` IS INSURANCE HERE, NOT A FIX, and the difference was
+        // MEASURED rather than assumed — an earlier version of this comment
+        // claimed it was load-bearing and that was wrong twice over.
+        //
+        // What was actually measured, in real Chromium at 320px (the narrowest
+        // width the overflow harness runs): the row is 284px and the three
+        // buttons come to 83 + 97 + 85 with 10px gaps. THEY FIT ON ONE LINE,
+        // nothing is clipped, and removing `flex-wrap` changes nothing at any
+        // harness width. The claim that they needed ~330px was arithmetic done
+        // from guessed button widths.
+        //
+        // ⚠️ AND THE SECOND HALF OF THE CLAIM WAS ALSO WRONG: this row cannot
+        // widen the document whatever it does. Sheet renders `position:fixed`
+        // and sets `document.body.style.overflow = 'hidden'` while open, so
+        // its contents are outside the document's scrollWidth entirely. The
+        // Schedule-header failure that comment invoked was an IN-FLOW row on a
+        // scrolling page — a different situation, cited as if it applied.
+        //
+        // It stays because it is free, it matches the delete-confirm row
+        // directly above which already wraps, and it is what keeps a longer
+        // label (or a larger accessibility text size) from squeezing three
+        // buttons below their min-content width. It must NOT be described as
+        // the thing preventing an overflow.
+        <div className="flex flex-wrap gap-2.5">
           <Button onClick={() => onEdit?.(event)} className={FOOTER_BUTTON}>
             Edit
           </Button>
+          {/* ⚠️ RENDERED ONLY WHEN A HANDLER EXISTS, and this is not defensive
+              styling — it is the fix for a defect this exact component has
+              already shipped. "Set my availability" rendered unconditionally
+              and called `onOpenAvailability?.(event)`; Schedule passed the
+              handler and THE DASHBOARD DID NOT, so on the home screen the
+              button drew itself, invited a tap and the optional-call swallowed
+              it, silently, for weeks. Requiring the prop makes a dead button
+              impossible to render: a screen that forgets it shows no button
+              rather than a lying one. Both Schedule and Dashboard pass this
+              one, and tests/duplicate-event.test.jsx fails if either stops. */}
+          {onDuplicate && (
+            <Button
+              variant="secondary"
+              onClick={() => onDuplicate(event)}
+              className={FOOTER_BUTTON}
+            >
+              Duplicate
+            </Button>
+          )}
           <Button
             variant="dangerQuiet"
             onClick={() => setConfirming(true)}
@@ -398,6 +409,7 @@ export default function EventDetail({
   onClose,
   canEdit = false,
   onEdit,
+  onDuplicate,
   onDeleted,
   onOpenAvailability,
   onOpenRegister,
@@ -408,7 +420,6 @@ export default function EventDetail({
   // renders the start alone for those — see its comment. Nothing here
   // substitutes the calendar feed's per-type duration guess.
   const endDate = eventEndDate(event)
-  const Icon = TYPE_ICONS[event.type] ?? WhistleIcon
   const typeLabel = TYPE_LABELS[event.type] ?? 'Event'
   const played = hasResult(event)
 
@@ -417,8 +428,13 @@ export default function EventDetail({
       {/* Negative margins bleed the hero to the sheet's edges, matching the
           prototype's .detail-hero (design-system.md §4.21). */}
       <div className="-mx-[18px] -mt-4 mb-4 bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] px-[18px] py-[22px] text-white">
+        {/* ⚠️ THE BOX IS RENDERED EVEN WHEN THE TYPE HAS NO MARK. An
+            unrecognised type gets no icon (see EventTypeIcon) — and the hero's
+            proportions are built around a 56px square, so dropping the square
+            too would leave the title jumping up by 68px on a row nothing
+            recognised. An empty tinted square is the quieter wrong answer. */}
         <div className="mb-3 grid h-14 w-14 place-items-center rounded-[14px] bg-white/20">
-          <Icon className="h-7 w-7" aria-hidden="true" />
+          <EventTypeIcon type={event.type} className="h-7 w-7" />
         </div>
         <h3 className="text-[22px] font-bold leading-tight">{eventTitle(event)}</h3>
         {/* Every time in the app is Abu Dhabi time (see CLUB_TIME_ZONE), and
@@ -609,7 +625,13 @@ export default function EventDetail({
         </div>
       )}
 
-      <FooterActions event={event} canEdit={canEdit} onEdit={onEdit} onDeleted={onDeleted} />
+      <FooterActions
+        event={event}
+        canEdit={canEdit}
+        onEdit={onEdit}
+        onDuplicate={onDuplicate}
+        onDeleted={onDeleted}
+      />
     </Sheet>
   )
 }

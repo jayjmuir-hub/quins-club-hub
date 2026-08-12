@@ -767,6 +767,14 @@ export default function Schedule() {
           onClose={() => setSelectedEventId(null)}
           canEdit={canEditSelected}
           onEdit={(event) => setFormState({ event })}
+          // ⚠️ THE DASHBOARD PASSES THIS TOO, and it must. EventDetail renders
+          // the Duplicate button only when a handler exists, precisely because
+          // this component once shipped a dead availability button on the
+          // Dashboard for weeks — Schedule passed the handler, the Dashboard
+          // did not, and `onOpenAvailability?.()` swallowed every tap in
+          // silence. tests/duplicate-event.test.jsx fails if either screen
+          // stops passing it.
+          onDuplicate={(event) => setFormState({ event, duplicate: true })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
           onOpenMatchSheet={(fixture) => navigate(`/match-sheet/${fixture.id}`)}
           onOpenRegister={() => setRegisterOpen(true)}
@@ -784,6 +792,7 @@ export default function Schedule() {
       {formState && (
         <EventForm
           event={formState.event}
+          duplicate={formState.duplicate ?? false}
           initialDate={formState.date ?? null}
           onClose={() => {
             setFormState(null)

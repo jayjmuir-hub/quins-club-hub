@@ -728,6 +728,14 @@ export default function Dashboard() {
           onClose={closeEvent}
           canEdit={canEditTeam(memberships, selectedEvent.team_id)}
           onEdit={(event) => setFormState({ event })}
+          // ⚠️ NOT OPTIONAL, AND THIS SCREEN IS THE REASON THE RULE EXISTS.
+          // The Dashboard is the screen that forgot onOpenAvailability and
+          // shipped a button that silently swallowed every tap for weeks.
+          // EventDetail now refuses to draw Duplicate without a handler, so
+          // forgetting this gives no button rather than a lying one — but the
+          // point is to pass it, and tests/duplicate-event.test.jsx enforces
+          // that from this screen as well as from Schedule.
+          onDuplicate={(event) => setFormState({ event, duplicate: true })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
           onOpenMatchSheet={(fixture) => navigate(`/match-sheet/${fixture.id}`)}
           onOpenRegister={() => setRegisterOpen(true)}
@@ -761,6 +769,7 @@ export default function Dashboard() {
       {formState && (
         <EventForm
           event={formState.event}
+          duplicate={formState.duplicate ?? false}
           onClose={() => {
             setFormState(null)
             closeEvent()

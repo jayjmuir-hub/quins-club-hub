@@ -444,6 +444,19 @@ Durable. Each cost real time to find.
   authenticated screens unverifiable before.
   ⚠️ **It is not in CI**: Playwright is deliberately not a dependency (~300MB), so
   this is a gate somebody RUNS before a release, not one that runs itself.
+  ⚠️ **AND IT IS BLIND TO ANYTHING INSIDE A SHEET — measured 12 Aug 2026.**
+  `src/components/Sheet.jsx` renders `position:fixed inset-0` and sets
+  `document.body.style.overflow = 'hidden'` while open, so a sheet's contents are
+  not in the document's `scrollWidth` and **cannot fail a document-width check
+  whatever they do.** Proved by injecting a 900px `shrink-0` button into an open
+  event sheet: **the gate stayed green.** This applies to the `availability`,
+  `playerform` and `event-detail` scenarios — they verify the sheet BOOTS and
+  that the page behind it is clean, and **a clean run has never said anything
+  about a sheet's own layout.** Do not quote one as if it had; measure the row in
+  Chromium instead. ⚠️ **The way this was caught is the transferable part: the
+  first injection came back green and a CONTROL was injected rather than the
+  result being accepted. An injection that fails to go red is data about the
+  CHECK, not a clean bill of health for the code.**
   ⚠️ **It is layout-only.** It proves nothing about whether the buttons LOOK right —
   the taller tap target and the 8px corner on Dashboard, Schedule, Roster, Accounts
   and every sheet are still unlooked-at by a human.
