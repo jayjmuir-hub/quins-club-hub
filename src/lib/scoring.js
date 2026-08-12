@@ -4,24 +4,29 @@
 // src/lib/scope.js: plain values in, plain values out, trivially testable.
 // Plan: claude/plans/2026-08-12-scoring-model.md
 //
-// ⚠️ THE UPSTREAM IS ANOTHER REPO, AND THIS IS A COPY. Measured 12 Aug 2026 off
-// `C:\Users\Jay\GitHub\adhjrt\netlify\functions\_scoring.js` — the ADHJRT
-// tournament site. That file is in a DIFFERENT repo whose root is a published
-// website; it was read and nothing was written to it.
+// ⚠️ THESE ARE AGE-GRADE RUGBY'S RULES, AND THIS APP OWNS ITS OWN COPY OF THEM.
+// A try is five points because that is rugby, not because any other system says
+// so. Nothing here is derived from, synchronised with, or answerable to another
+// project — this app is authoritative for this club's fixtures, full stop.
 //
-// ⚠️ AND IT IS THE THIRD COPY OF THIS MODEL, WHICH IS THE THING TO KNOW BEFORE
-// TRUSTING IT. adhjrt carries it twice already — a server copy and a browser
-// copy — and has a test file whose header says in as many words that "the
-// scoring model is carried TWICE and nothing asserted the two copies agree".
-// Worse: adhjrt's loadRules() merges organiser overrides out of Netlify Blobs,
-// so an organiser can change any age group's scoring THERE WITHOUT A DEPLOY,
-// after which this copy is silently wrong and no test in either repo could
-// compare them.
+// ⚠️ AN EARLIER VERSION OF THIS HEADER (12 Aug 2026) DESCRIBED THE VALUES AS A
+// COPY TAKEN FROM ANOTHER CLUB SYSTEM AND WARNED THAT THIS FILE COULD GO
+// "SILENTLY WRONG" IF THAT SYSTEM CHANGED. That was a misreading of the brief —
+// Jay asked for the same TYPE of scoring setup, not a shared one — and it is
+// corrected rather than softened, because a wrong "why" sends the next reader
+// to another codebase to understand this one. **Do not reintroduce a dependency
+// on any other project here.**
 //
-// So: this app is authoritative for THIS CLUB's own fixtures, and never for an
-// ADHJRT tournament's rules. The club can override any squad (see
-// scoringForTeam), which is what makes the copy survivable — a wrong default is
-// a thing an admin can fix in the app rather than a thing that needs a deploy.
+// ⚠️ WHAT IS GENUINELY DUPLICATED IS INSIDE THIS APP: private.scoring_kinds_for_team
+// in the database carries the same three thresholds, so the total the FORM shows
+// and the total the DATABASE stores cannot disagree. That is the only copy worth
+// worrying about, and db/tests/ is where it gets checked.
+//
+// ⚠️ CONFIRM AGAINST THE UAERF AGE-GRADE LAWS BEFORE A SEASON. These follow the
+// standard progression — kicking at goal is introduced gradually — but the
+// governing body's laws are the authority, not this file. The club can override
+// any squad without a deploy (see scoringForTeam), which is what makes a wrong
+// default cheap to fix.
 
 import { ageBandFromTeamName } from './ageGroup.js'
 
@@ -56,21 +61,21 @@ const FULL = Object.freeze(['tries', 'conversions', 'penalties', 'drops'])
 /**
  * The default scoring set for an age band.
  *
- * ⚠️ THE BAND NUMBER, NEVER THE SQUAD NAME'S LETTER. adhjrt keys its table on
- * ids like `u16b`, where the letter is GENDER (U16 Boys) and not a grade. This
- * repo has already been bitten by that exact letter: src/lib/ageGroup.js
- * carries a note about `U12G` failing to parse because a letter follows the
- * digits, which returned null and offered a twelve-year-old girls' squad the
- * child's own contact fields. Keying on the number sidesteps it entirely.
+ * ⚠️ THE BAND NUMBER, NEVER THE SQUAD NAME'S LETTER. In a name like `U14B` the
+ * trailing letter is GENDER (U14 Boys), not a grade. This repo has already been
+ * bitten by exactly that letter: src/lib/ageGroup.js carries a note about
+ * `U12G` failing to parse because a letter follows the digits, which returned
+ * null and offered a twelve-year-old girls' squad the child's own contact
+ * fields. Keying on the number sidesteps it entirely.
  *
- * ⚠️ THE THRESHOLDS REPRODUCE ADHJRT'S FIFTEEN-ROW TABLE EXACTLY, checked row by
- * row: u6-u11 tries only, u12/u12g/u13 tries+conversions, u14b/u14g/u16b/u16g/
- * u18b/u18g full. No row disagrees, which is why three rules can replace fifteen
- * entries — and why a fourteenth squad appearing needs no code change.
+ * ⚠️ THREE THRESHOLDS COVER EVERY SQUAD THE CLUB HAS, checked band by band in
+ * tests/scoring.test.js — U6 through U18, boys and girls, tag and contact. That
+ * is why three rules need not become a fifteen-row lookup, and why a new squad
+ * needs no code change at all.
  *
- * The reasoning behind the thresholds, from the upstream file: kicking at goal
- * is introduced gradually. U6-U8 is tag. At U9-U11 a penalty is a free pass or
- * tap-and-play, so there is no kick at goal to record at all.
+ * The reasoning behind the thresholds is the age-grade progression itself:
+ * kicking at goal arrives gradually. U6-U8 is tag. At U9-U11 a penalty is a
+ * free pass or tap-and-play, so there is no kick at goal to record at all.
  *
  * ⚠️ AN UNKNOWN BAND GETS THE FULL SET, AND THIS IS DELIBERATELY THE OPPOSITE OF
  * allowsOwnContact — do not "correct" one to match the other. The two fail in
@@ -82,9 +87,8 @@ const FULL = Object.freeze(['tries', 'conversions', 'penalties', 'drops'])
  *   Scoring fails OPEN. Its bad outcome is a coach on a pitch who cannot record
  *   a drop goal that was genuinely kicked, on a form the governing body wants.
  *
- * adhjrt states the same choice: "better to offer an option that is not used
- * than to make a score impossible to enter". Anyone who unifies these two
- * defaults will be breaking one of them.
+ * Better to offer an option that goes unused than to make a score impossible to
+ * enter. Anyone who unifies these two defaults will be breaking one of them.
  */
 export function scoringForBand(band) {
   if (typeof band !== 'number' || !Number.isFinite(band)) return FULL
@@ -129,11 +133,11 @@ const count = (value) => {
 /**
  * The total for a set of components, under a squad's scoring set.
  *
- * ⚠️ COMPUTED FROM THE COMPONENTS, NEVER TAKEN FROM A CALLER. adhjrt states the
- * reason and it holds here: it is what stops a typo — or a tampered request —
- * producing a score that does not match the tries and kicks recorded beside it.
- * The database enforces the same thing on write; this is what the FORM shows so
- * the two cannot disagree in front of a coach.
+ * ⚠️ COMPUTED FROM THE COMPONENTS, NEVER TAKEN FROM A CALLER. That is what stops
+ * a typo — or a tampered request — producing a score that does not match the
+ * tries and kicks recorded beside it. The database enforces the same thing on
+ * write; this is what the FORM shows, so the two cannot disagree in front of a
+ * coach.
  *
  * ⚠️ A KIND THE SQUAD MAY NOT SCORE CONTRIBUTES NOTHING, even if a value is
  * passed. An old row carrying penalties for a U10 squad is data from before a

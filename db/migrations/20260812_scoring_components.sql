@@ -41,12 +41,12 @@ alter table public.teams
 
 -- ── 3. The scoring set, in SQL ──────────────────────────────────────────────
 --
--- ⚠️ THIS IS A FOURTH COPY OF A MODEL THAT IS ALREADY CARRIED THREE TIMES, AND
--- IT IS HERE ON PURPOSE. adhjrt holds it twice; src/lib/scoring.js is the third.
+-- ⚠️ THIS IS THE SECOND COPY OF THESE THRESHOLDS INSIDE THIS APP, AND
+-- IT IS HERE ON PURPOSE. src/lib/scoring.js carries the same three thresholds.
 -- The alternative was worse: if the trigger summed every component while
 -- scoring.js ignores the ones a squad may not score, the FORM would show one
--- total and the DATABASE would store another. That is precisely the failure
--- adhjrt's own test file exists to catch, and it would arrive silently.
+-- total and the DATABASE would store another, and both numbers would look
+-- plausible.
 --
 -- ⚠️ WHAT IS COPIED IS THREE THRESHOLDS, NOT FIFTEEN ROWS. The upstream table
 -- collapses onto the band number with no exceptions (checked row by row in
@@ -97,9 +97,9 @@ $$;
 
 -- ── 4. The total is DERIVED, and must not eat what is already there ─────────
 --
--- adhjrt: "Totals are always computed from the components, never taken from the
+-- The total is always computed from the components, never taken from the
 -- client. That is what stops a typo - or a tampered request - producing a score
--- that does not match the tries and kicks recorded beside it." Enforced here
+-- that does not match the tries and kicks recorded beside it. Enforced here
 -- rather than in the app, because RLS is already the boundary and the app is
 -- not the only possible writer.
 --

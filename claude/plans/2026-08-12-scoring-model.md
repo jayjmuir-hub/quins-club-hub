@@ -11,25 +11,37 @@ age group, also a selectable option for scoring methods, like the tournamen, the
 match sheets should also auto populate the details of the person filling it out,
 coach or manager, full name, and phone number"*.
 
-## The upstream model — MEASURED, not remembered
+## The rules — the club's own, from age-grade rugby
 
-Read off `C:\Users\Jay\GitHub\adhjrt\netlify\functions\_scoring.js` on
-12 Aug 2026. ⚠️ **That file is in a DIFFERENT REPO whose root is a published
-website. It was read and nothing was written to it** — see `CLAUDE.md`.
+⚠️ **THIS APP OWNS THESE RULES. THEY ARE NOT SHARED WITH, DERIVED FROM, OR
+ANSWERABLE TO ANY OTHER PROJECT.** Jay, 12 Aug 2026, correcting an earlier draft
+of this plan: *"this app and project should have absolutely nothing to do with
+adhjrt, that is a completely different project, i only told you to use the same
+type of scoring setup"*. A try is five points because that is rugby.
+
+⚠️ **THE EARLIER DRAFT TREATED ANOTHER CLUB SYSTEM AS AN UPSTREAM SOURCE OF
+TRUTH** and warned this app could go "silently wrong" if that system changed.
+That was a misreading of the brief and is corrected rather than softened,
+because a wrong "why" sends the next reader into another codebase to understand
+this one. **Do not reintroduce a dependency on any other project here.**
 
 ```
 POINTS = { tries: 5, conversions: 2, penalties: 3, drops: 3 }
 
-u6-u8    tag rugby   tries only
-u9-u11   contact     tries only  (penalties are a free pass at U9 and
+U6-U8    tag rugby   tries only
+U9-U11   contact     tries only  (a penalty is a free pass at U9 and
                                   tap-and-play at U10/U11, so there is no
                                   kick at goal to record)
-u12-u13  contact     tries + conversions
-u14+     full laws   tries + conversions + penalties + drops
+U12-U13  contact     tries + conversions
+U14+     full laws   tries + conversions + penalties + drops
 ```
 
-⚠️ **THE FIFTEEN-ROW TABLE COLLAPSES ONTO THE BAND NUMBER WITH NO EXCEPTIONS**,
-which matters because it lets this app avoid adhjrt's age-group *ids* entirely:
+⚠️ **CONFIRM AGAINST THE UAERF AGE-GRADE LAWS BEFORE A SEASON.** The progression
+above is standard, but the governing body's laws are the authority, not this
+file — which is exactly why the club can override any squad without a deploy.
+
+⚠️ **EVERY SQUAD THE CLUB FIELDS COLLAPSES ONTO THE BAND NUMBER WITH NO
+EXCEPTIONS**, which is what lets three thresholds replace a fifteen-row lookup:
 
 | Band | Scoreable |
 |---|---|
@@ -37,51 +49,34 @@ which matters because it lets this app avoid adhjrt's age-group *ids* entirely:
 | 12-13 | `tries`, `conversions` |
 | ≥ 14 | `tries`, `conversions`, `penalties`, `drops` |
 
-Checked against every row: `u6 u7 u8 u9 u10 u11` → tries; `u12 u12g u13` →
-tries+conv; `u14b u14g u16b u16g u18b u18g` → full. **No row disagrees.**
+Checked band by band in `tests/scoring.test.js`, U6 through U18, boys and girls,
+tag and contact. **A new squad needs no code change at all.**
 
-⚠️ **KEY OFF `ageBandFromTeamName`, NEVER OFF THE SQUAD NAME'S LETTER.**
-adhjrt's ids encode gender (`u16b` = U16 **Boys**), and this repo has already
-been bitten by exactly that: `src/lib/ageGroup.js` carries a note about `U12G`
-failing to parse because a letter follows the digits. The band number is the
-only thing needed here, and it sidesteps the trap completely.
+⚠️ **KEY OFF `ageBandFromTeamName`, NEVER OFF THE SQUAD NAME'S LETTER.** In
+`U14B` the trailing letter is **gender**, not a grade, and this repo has already
+been bitten by it: `src/lib/ageGroup.js` carries a note about `U12G` failing to
+parse because a letter follows the digits.
 
-## ⚠️ THE FINDING THAT CHANGES THE DESIGN — a copy here would be the THIRD
+## ⚠️ The one duplication that is real, and it is INSIDE this app
 
-adhjrt's own test file says it out loud:
+The three thresholds exist twice here: `src/lib/scoring.js` and
+`private.scoring_kinds_for_team` in the database.
 
-> *"The scoring model is carried TWICE and nothing asserted the two copies
-> agree"* — `netlify/functions/_scoring.js` (server) and `scores-data.js`
-> (browser). `tests/test-scoring-model.js` exists because a drift there means
-> the form shows one total and the server stores another.
+**That is deliberate, and the alternative was worse.** If the trigger summed
+every component while `scoring.js` ignores the kinds a squad may not score, the
+**form would show one total and the database would store another** — and both
+numbers would look plausible, which is the worst kind of disagreement.
 
-**Copying the table into this repo makes a third copy, in a third deploy, that
-no test in either repo can compare.** And it is worse than an ordinary
-duplicate:
+What is duplicated is **three thresholds, not fifteen rows**, and
+`tests/scoring.test.js` pins the JS side while `db/tests/` is where the SQL side
+gets checked against it.
 
-⚠️ **adhjrt LETS AN ORGANISER CHANGE ANY AGE GROUP'S SCORING WITHOUT A DEPLOY.**
-`loadRules()` merges overrides out of Netlify Blobs over the defaults. So the
-moment an organiser edits the tournament's rules, adhjrt is right and this app's
-copy is silently wrong — **and nothing anywhere would report it.** This is the
-same shape as every "two copies of a fact" failure already recorded here.
 
-**What to do about it, and it is not "import it":** the two apps cannot share
-code — different repos, different hosts, different runtimes.
-
-1. **The defaults live in ONE module here**, `src/lib/scoring.js`, with the
-   adhjrt file named in its header as the upstream.
-2. **The values are pinned by a test** that fails if anyone edits them casually,
-   the way `tests/theme.test.js` pins tokens.
-3. ⚠️ **The screen says where the rule came from** when a scoring method other
-   than the club default is in play. A coach entering a tournament score needs
-   to know whose rules the total was computed under.
-4. **This app never claims to be authoritative for an adhjrt tournament.**
-   The tournament's own site is.
 
 ## ⚠️ The unknown-band default is PERMISSIVE, and that is deliberate
 
-adhjrt: *"Unknown age groups get the full set rather than the narrowest — better
-to offer an option that is not used than to make a score impossible to enter."*
+**Better to offer an option that goes unused than to make a score impossible to
+enter.**
 
 **Copy that, and do not "correct" it to match `allowsOwnContact`.** The two look
 contradictory and are not:
@@ -121,12 +116,12 @@ becomes a lie.
 
 ### The total is DERIVED, and the trigger must not eat existing results
 
-adhjrt: *"Totals are always computed from the components, never taken from the
-client. That is what stops a typo — or a tampered request — producing a score
-that does not match the tries and kicks recorded beside it."*
+**The total is always computed from the components, never taken from the
+client.** That is what stops a typo — or a tampered request — producing a score
+that does not match the tries and kicks recorded beside it.
 
-**Do it in the database here**, which is stronger than adhjrt's server-side
-computation because RLS is already the boundary.
+**Do it in the database**, which is where it belongs: RLS is already the
+boundary, and the app is not the only possible writer.
 
 ⚠️ **AND THE TRIGGER MUST FIRE ONLY WHEN COMPONENTS ARE PRESENT.** There is
 live data that would be destroyed otherwise: the U16B fixture holds
@@ -152,9 +147,9 @@ where it would bite. **Read the rows back.**
 **Reuse it. Do not add a second axis that can disagree with it.**
 
 The scoring method is then: **band default**, or **the tournament's rules**.
-⚠️ **A tournament's rules are adhjrt's to change**, per the finding above, so
-picking that option must say which rules were applied and when — not silently
-recompute months later.
+⚠️ **A tournament may run its own scoring**, so picking that option must say
+which rules were applied and when — not silently recompute months later. That is
+what `teams.scoring_kinds` is for.
 
 ⚠️ **`competition_type = 'tournament'` WITH A LEAGUE-SOUNDING NAME IS ALREADY IN
 THE DATA.** The U16B fixture is `competition_type = 'tournament'` and
@@ -187,7 +182,7 @@ one**, because the phone is copied onto the sheet, not added to the profile.
 ## Order to build
 
 1. `src/lib/scoring.js` + its pinning test. Pure, no schema. **Prove the band
-   mapping against every adhjrt row.**
+   mapping against every band the club fields.**
 2. The migration: eight component columns, the guarded trigger, grants,
    `db/schema/` re-capture. ⚠️ **Grants are not optional** — `docs:check` fails
    a build if a migration grants on a table the capture does not name.
@@ -200,7 +195,7 @@ one**, because the phone is copied onto the sheet, not added to the profile.
 
 ## What this plan deliberately does NOT do
 
-- **No standings or league table.** adhjrt owns that.
+- **No standings or league table.** Out of scope for this app.
 - **No per-player attribution of tries.** Jay asked for team scoring; who scored
   is a bigger feature and a separate conversation.
 - **No editing of the points VALUES from the app.** They are World Rugby's, not
