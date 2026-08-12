@@ -42,7 +42,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   rather than a JWT gate), the vault derivation, the trigger on all four write paths,
   and the database read.
 
-- *(SHA follows in the next PR)* — **The drop is back on, in the right order this
+- `97bf93d` — **The drop is back on, in the right order this
   time, and the docs stop describing a state that did not exist.**
   `drop_match_sheet_scores_after_deploy`, applied only once the new bundle was actually
   serving.
