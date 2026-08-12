@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { getEvent } from '../data/events.js'
+import { getEvent, upsertEvent } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
 import {
   SLOT_COUNT,
@@ -14,10 +14,19 @@ import {
   setMatchSheetStatus,
 } from '../data/matchSheets.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import useMyProfile from '../lib/useMyProfile.js'
 import { canEditTeam } from '../lib/scope.js'
 import { eventDate, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { deadlineLabel, isOverdue, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
+import {
+  SCORE_KINDS,
+  SCORE_LABELS,
+  SCORE_POINTS,
+  hasNoComponents,
+  scoringForTeam,
+  totalFor,
+} from '../lib/scoring.js'
 
 // The RCM Official Match Result Sheet — Project 2.
 //
@@ -55,6 +64,58 @@ const LEFT_COLUMN = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 /** The five blank discipline rows the paper form provides. */
 const CARD_ROWS = 5
+
+/** The two sides, in the order the columns are laid out. */
+const SIDES = ['us', 'them']
+
+function emptyScore() {
+  const blank = {}
+  for (const side of SIDES) for (const kind of SCORE_KINDS) blank[`${kind}_${side}`] = ''
+  return blank
+}
+
+/** Seeds the entry boxes from the fixture. Null stays BLANK, never 0. */
+function scoreFrom(row) {
+  const next = emptyScore()
+  for (const side of SIDES) {
+    for (const kind of SCORE_KINDS) {
+      const value = row?.[`${kind}_${side}`]
+      // ⚠️ `value == null ? '' : String(value)` — NOT `value ?? ''` followed by
+      // a truthiness test. A recorded ZERO is a real answer ("they scored no
+      // penalties") and must render as 0, while "not recorded" must render as a
+      // blank box. Collapsing the two is the exact distinction the components
+      // exist to keep, and it would collapse silently.
+      next[`${kind}_${side}`] = value == null ? '' : String(value)
+    }
+  }
+  return next
+}
+
+/**
+ * One side's components as numbers, with blank meaning null.
+ *
+ * ⚠️ NULL, NOT 0, FOR A BLANK BOX — this is what hasNoComponents() reads to
+ * decide whether a side has a recorded score at all, and it is the same
+ * predicate the database trigger applies before it recomputes a result. Return
+ * 0 here and a fixture whose score was typed by hand months ago gets recomputed
+ * to nothing the first time somebody opens its match sheet.
+ */
+function partsFor(score, side) {
+  const parts = {}
+  for (const kind of SCORE_KINDS) {
+    const text = String(score[`${kind}_${side}`] ?? '').trim()
+    const parsed = Number(text)
+    parts[kind] = text === '' || !Number.isFinite(parsed) ? null : Math.max(0, Math.floor(parsed))
+  }
+  return parts
+}
+
+/** "tries, conversions and drop goals" — for the sentence naming the rules. */
+function kindSentence(kinds) {
+  const words = kinds.map((kind) => SCORE_LABELS[kind].toLowerCase())
+  if (words.length <= 1) return words.join('')
+  return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`
+}
 
 /**
  * An input that reads as a filled-in box rather than a form control.
@@ -143,6 +204,7 @@ export default function MatchSheet() {
   const { eventId } = useParams()
   const navigate = useNavigate()
   const { memberships } = useMemberships()
+  const { profile } = useMyProfile()
 
   const [event, setEvent] = useState(null)
   const [squad, setSquad] = useState([])
@@ -152,12 +214,16 @@ export default function MatchSheet() {
   const [fields, setFields] = useState({
     captain_name: '',
     manager_name: '',
-    score_us: '',
-    tries_us: '',
-    score_them: '',
-    tries_them: '',
+    manager_phone: '',
     medical_notes: '',
   })
+
+  // ⚠️ THE SCORE IS THE FIXTURE'S, NOT THE SHEET'S — Jay ruled one score, on the
+  // fixture, 12 Aug 2026. These eight boxes are `public.events` columns and are
+  // saved with the event, not with the sheet; match_sheets carried its own
+  // score_us/score_them/tries_us/tries_them until the same day and they are
+  // gone, because two places to hold a score is two places to disagree.
+  const [score, setScore] = useState(emptyScore)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -180,6 +246,7 @@ export default function MatchSheet() {
           return
         }
         setEvent(row)
+        setScore(scoreFrom(row))
 
         // ⚠️ SCOPED TO THE FIXTURE'S SQUAD. A club-wide roster on this form
         // would let a coach file a player from another age group, which the
@@ -211,10 +278,7 @@ export default function MatchSheet() {
           setFields({
             captain_name: existing.captain_name ?? '',
             manager_name: existing.manager_name ?? '',
-            score_us: existing.score_us ?? '',
-            tries_us: existing.tries_us ?? '',
-            score_them: existing.score_them ?? '',
-            tries_them: existing.tries_them ?? '',
+            manager_phone: existing.manager_phone ?? '',
             medical_notes: existing.medical_notes ?? '',
           })
         }
@@ -230,6 +294,35 @@ export default function MatchSheet() {
       mounted = false
     }
   }, [eventId])
+
+  // ── The person filling it in, defaulted from their own profile ─────────────
+  //
+  // Jay, 12 Aug 2026: the sheet should "auto populate the details of the person
+  // filling it out, coach or manager, full name, and phone number". The form's
+  // footer asks for exactly that and it was being retyped by hand — the one
+  // sheet that exists was filed with a NULL manager_name.
+  //
+  // ⚠️ DEFAULT, NOT LOCK, and the `||` is what makes it a default. It fills a
+  // BLANK box and never touches one that already has something in it, so a
+  // filed sheet naming the manager is not quietly re-signed by the next coach
+  // who opens it. The person filling the form in is not always the person whose
+  // details RCM wants.
+  //
+  // ⚠️ ONCE PER MOUNT, guarded by a ref rather than by a dependency list. The
+  // profile arrives from a cached promise (useMyProfile) whose timing relative
+  // to the sheet's own load is not fixed, so this effect can fire either side
+  // of it; without the ref, a later re-render would refill a box the coach had
+  // deliberately cleared.
+  const prefilled = useRef(false)
+  useEffect(() => {
+    if (prefilled.current || loading || !profile) return
+    prefilled.current = true
+    setFields((current) => ({
+      ...current,
+      manager_name: current.manager_name || profile.full_name || '',
+      manager_phone: current.manager_phone || profile.phone || '',
+    }))
+  }, [profile, loading])
 
   const squadName = event?.team?.name ?? ''
   const kickOff = event ? eventDate(event) : null
@@ -265,22 +358,48 @@ export default function MatchSheet() {
     setCardRows((current) => current.map((row, i) => (i === index ? { ...row, [key]: value } : row)))
   }
 
+  // ── The score, derived from the components ────────────────────────────────
+  //
+  // ⚠️ WHAT A SQUAD MAY SCORE COMES FROM scoringForTeam, NOT FROM THE SQUAD'S
+  // NAME. It reads the club's `teams.scoring_kinds` override and falls back to
+  // the age band — and the band is the DIGITS, never the trailing letter, which
+  // is gender. src/lib/scoring.js carries the full reasoning.
+  //
+  // ⚠️ THE SAME THREE THRESHOLDS LIVE IN private.scoring_kinds_for_team, and
+  // that duplication is deliberate: the trigger that stores the total and this
+  // form that shows it must agree, or a coach sees one number and the database
+  // keeps another, both plausible.
+  const kinds = scoringForTeam(event?.team)
+  const overridden = Array.isArray(event?.team?.scoring_kinds)
+
+  const ourParts = partsFor(score, 'us')
+  const theirParts = partsFor(score, 'them')
+
+  // ⚠️ FALLS BACK TO THE FIXTURE'S STORED RESULT WHEN NOTHING IS RECORDED, and
+  // that fallback is not tidiness. A result typed by hand before components
+  // existed is a real score with no components behind it; showing a blank — or
+  // worse, a derived 0 — would present a played match as unplayed. It mirrors
+  // the database trigger exactly: no components on a side, leave that side's
+  // result alone.
+  const ourTotal = hasNoComponents(ourParts) ? event?.result_us ?? null : totalFor(event?.team, ourParts)
+  const theirTotal = hasNoComponents(theirParts)
+    ? event?.result_them ?? null
+    : totalFor(event?.team, theirParts)
+
   // ⚠️ HOME AND AWAY, NOT US AND THEM. The form has two score pairs and they
   // are positional: playing away puts our score in the RIGHT-hand pair. The
-  // columns stay `score_us` / `score_them` because that is what the rest of the
-  // app means by a result (see hasResult and resultScore in eventFormat), so
-  // the mapping happens here and nowhere else.
+  // columns stay `_us` / `_them` because that is what the rest of the app means
+  // by a result (see hasResult and resultScore in eventFormat), so the mapping
+  // happens here and nowhere else.
   const weAreHome = event?.home !== false
-  const homeScore = weAreHome ? fields.score_us : fields.score_them
-  const homeTries = weAreHome ? fields.tries_us : fields.tries_them
-  const awayScore = weAreHome ? fields.score_them : fields.score_us
-  const awayTries = weAreHome ? fields.tries_them : fields.tries_us
+  const homeScore = weAreHome ? ourTotal : theirTotal
+  const homeTries = weAreHome ? ourParts.tries : theirParts.tries
+  const awayScore = weAreHome ? theirTotal : ourTotal
+  const awayTries = weAreHome ? theirParts.tries : ourParts.tries
 
-  const setScore = (side, what) => (domEvent) => {
-    const ours = (side === 'home') === weAreHome
-    const key = `${what}_${ours ? 'us' : 'them'}`
+  const setComponent = (kind, side) => (domEvent) => {
     setSaved(false)
-    setFields((current) => ({ ...current, [key]: domEvent.target.value }))
+    setScore((current) => ({ ...current, [`${kind}_${side}`]: domEvent.target.value }))
   }
 
   // ⚠️ THE SAVED SHEET WINS OVER THE LIVE FIXTURE, and only falls back to it for
@@ -331,6 +450,37 @@ export default function MatchSheet() {
       setSaving(true)
       setSaveError(null)
       try {
+        // ⚠️ THE FIXTURE IS WRITTEN FIRST, AND THE ORDER IS THE MITIGATION.
+        // This is two writes and not a transaction — the same shape as the
+        // pitch allocation, which writes the fixture before it closes the
+        // request. A failure after this line leaves the SCORE correct and the
+        // sheet unsaved, with the coach still looking at the form and able to
+        // press Save again; the other order would leave a filed sheet claiming
+        // a result the fixture does not have.
+        //
+        // ⚠️ ALL EIGHT COLUMNS ARE SENT EVERY TIME, INCLUDING NULLS. Clearing
+        // every box on a side is how a coach says "I should not have recorded
+        // that", and the trigger's guard then leaves that side's result exactly
+        // as it was — it does not zero it. See the migration.
+        const componentPatch = { id: eventId }
+        for (const side of SIDES) {
+          const parts = partsFor(score, side)
+          for (const kind of SCORE_KINDS) componentPatch[`${kind}_${side}`] = parts[kind]
+        }
+
+        // ⚠️ MERGED INTO THE CURRENT EVENT, NEVER ASSIGNED OVER IT. upsertEvent
+        // returns a plain row with no embeds, so `setEvent(saved)` would drop
+        // `team` and `league_team` — and `team` is what scoringForTeam reads, so
+        // the boxes on screen would silently change to the age-band default the
+        // instant somebody pressed Save. Spreading keeps the embeds, because the
+        // returned row has no key for them to overwrite.
+        //
+        // The result_us / result_them coming back are the TRIGGER's, computed
+        // server-side from the components just written — which is what makes
+        // this the moment the form's total and the stored total are proved equal.
+        const savedEvent = await upsertEvent(componentPatch)
+        setEvent((current) => ({ ...current, ...savedEvent }))
+
         const row = await saveMatchSheet({
           ...(sheet?.id ? { id: sheet.id } : { event_id: eventId }),
           // ⚠️ STAMPED FROM THE FIXTURE, NOT TYPED. The TEAM: line must be the
@@ -339,10 +489,7 @@ export default function MatchSheet() {
           league_team_id: event?.league_team_id ?? null,
           captain_name: fields.captain_name.trim() || null,
           manager_name: fields.manager_name.trim() || null,
-          score_us: numeric(fields.score_us),
-          tries_us: numeric(fields.tries_us),
-          score_them: numeric(fields.score_them),
-          tries_them: numeric(fields.tries_them),
+          manager_phone: fields.manager_phone.trim() || null,
           medical_notes: fields.medical_notes.trim() || null,
         })
 
@@ -368,7 +515,7 @@ export default function MatchSheet() {
         setSaving(false)
       }
     },
-    [sheet, eventId, event, fields, slots, cardRows],
+    [sheet, eventId, event, fields, score, slots, cardRows],
   )
 
   /**
@@ -524,6 +671,119 @@ export default function MatchSheet() {
             {saveError.message || "That didn't save. Try again."}
           </p>
         )}
+
+        {/* ── SCORE ─────────────────────────────────────────────────────────
+            ⚠️ OUTSIDE THE FACSIMILE, DELIBERATELY. RCM's form has exactly two
+            boxes per side — FINAL SCORE and TRIES — and putting conversion,
+            penalty and drop-goal boxes into the facsimile would photograph as
+            a form the governing body did not issue. The components are how the
+            score is ENTERED; the form is what gets sent. This block is inside
+            the `print:hidden` controls and is never in the image.
+
+            ⚠️ AND IT IS THE ONLY PLACE THE SCORE CAN BE TYPED. The form's two
+            boxes below are now derived text, so the total on the sheet cannot
+            disagree with the tries and kicks behind it — which was the point
+            of the whole exercise. ── */}
+        <Card className="mt-3.5 p-3.5" data-testid="match-sheet-score">
+          <h3 className="text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+            Score
+          </h3>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
+            {squadName || 'This squad'} records {kindSentence(kinds)}.{' '}
+            {overridden ? (
+              <>Set for this squad on the Club tab.</>
+            ) : (
+              <>The default for its age group — a club admin can change it on the Club tab.</>
+            )}
+          </p>
+
+          {/* ⚠️ A TOURNAMENT MAY RUN ITS OWN SCORING, so the sheet SAYS which
+              rules it applied rather than leaving a coach to assume. There is
+              deliberately no second per-fixture setting: `competition_type`
+              already answers league/tournament/neither, and a second axis is a
+              second thing that can disagree with it. */}
+          {event.competition_type === 'tournament' && (
+            <p className="mt-2 rounded-[11px] bg-surface-mute px-3 py-2 text-[12.5px] font-semibold text-ink-muted">
+              This is a tournament fixture. If it ran its own scoring, change the squad&rsquo;s
+              scoring on the Club tab before entering the score — these boxes are the squad&rsquo;s
+              rules, not the tournament&rsquo;s.
+            </p>
+          )}
+
+          {/* ⚠️ SURFACED, NOT GUESSED. A fixture marked as a tournament while
+              its name says "League" is a contradiction that has already been in
+              this data, and it is what left a fixture with no league team and a
+              wrong TEAM box. Only the coach knows which one they meant. */}
+          {event.competition_type === 'tournament' && /league/i.test(event.competition || '') && (
+            <p
+              role="alert"
+              data-testid="match-sheet-competition-clash"
+              className="mt-2 rounded-[11px] bg-warn-bg px-3 py-2 text-[12.5px] font-semibold text-warn-ink"
+            >
+              This fixture is recorded as a <strong>tournament</strong> but is named &ldquo;
+              {event.competition}&rdquo;. Check the fixture — one of the two is wrong, and only you
+              know which.
+            </p>
+          )}
+
+          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_58px_58px] items-center gap-x-2 gap-y-2">
+            <span aria-hidden="true" />
+            {/* Named columns, not "us" and "them": the coach is looking at a
+                fixture, and a header reading "Them" beside an opponent's name
+                is one more thing to translate on a touchline. */}
+            <span className="min-w-0 truncate text-center text-[11.5px] font-extrabold uppercase tracking-[.4px] text-ink-muted">
+              {ourName || 'Us'}
+            </span>
+            <span className="min-w-0 truncate text-center text-[11.5px] font-extrabold uppercase tracking-[.4px] text-ink-muted">
+              {event.opponent || 'Them'}
+            </span>
+
+            {kinds.map((kind) => (
+              <Fragment key={kind}>
+                <span className="text-[13px] font-bold text-ink">
+                  {SCORE_LABELS[kind]}{' '}
+                  <span className="font-semibold text-ink-faint">×{SCORE_POINTS[kind]}</span>
+                </span>
+                {SIDES.map((side) => (
+                  <input
+                    key={side}
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    aria-label={`${SCORE_LABELS[kind]}, ${side === 'us' ? ourName || 'us' : event.opponent || 'them'}`}
+                    value={score[`${kind}_${side}`]}
+                    onChange={setComponent(kind, side)}
+                    className="w-full rounded-[8px] border-[1.5px] border-line bg-surface-card px-1.5 py-2 text-center text-[16px] text-ink outline-none transition focus:border-brand"
+                  />
+                ))}
+              </Fragment>
+            ))}
+
+            <span className="text-[13px] font-extrabold text-ink">Final score</span>
+            {/* ⚠️ NOT AN INPUT. The total is computed from the components here
+                and computed again by the database on write, from the same three
+                thresholds. Letting it be typed is exactly how the two would
+                come to disagree. */}
+            <output className="rounded-[8px] bg-surface-mute py-2 text-center text-[16px] font-extrabold text-ink">
+              {ourTotal ?? '—'}
+            </output>
+            <output className="rounded-[8px] bg-surface-mute py-2 text-center text-[16px] font-extrabold text-ink">
+              {theirTotal ?? '—'}
+            </output>
+          </div>
+
+          {/* ⚠️ A SCORE WITH NO COMPONENTS IS NOT A BUG, and saying so stops the
+              next person "fixing" it. Results typed on the fixture before
+              components existed still show, and clearing every box leaves them
+              alone rather than zeroing them. */}
+          {(hasNoComponents(ourParts) || hasNoComponents(theirParts)) &&
+            (event.result_us != null || event.result_them != null) && (
+              <p className="mt-2.5 text-[12.5px] leading-relaxed text-ink-muted">
+                Part of this score was entered on the fixture itself, without the tries and kicks
+                behind it. Filling the boxes above replaces it; leaving them blank keeps it.
+              </p>
+            )}
+        </Card>
       </div>
 
       {/* ── The facsimile. This block is what html2canvas photographs, so
@@ -570,23 +830,25 @@ export default function MatchSheet() {
               <th className={`${CELL} text-left`}>AWAY TEAM</th>
               <td className={CELL} colSpan={2}>{awayName}</td>
             </tr>
+            {/* ⚠️ DERIVED, NOT TYPED — since 12 Aug 2026. These four boxes were
+                free text and are now read out of the fixture's components, via
+                the same totalFor() the database mirrors. The entry boxes are in
+                the Score card above, which is never photographed. A coach who
+                could type here could file a sheet whose FINAL SCORE did not
+                match its own TRIES, and nothing would have said so.
+
+                ⚠️ THE PAIRS ARE POSITIONAL — HOME then AWAY, never us and them.
+                An away fixture puts our score in the right-hand pair. */}
             <tr>
               <th className={`${CELL} text-left`}>FINAL SCORE</th>
-              <td className={CELL}>
-                <Cell aria-label="Home final score" value={homeScore} onChange={setScore('home', 'score')} />
-              </td>
+              <td className={CELL} data-testid="sheet-home-score">{homeScore ?? ''}</td>
               <th className={`${CELL} text-left`}>TRIES</th>
-              <td className={CELL}>
-                <Cell aria-label="Home tries" value={homeTries} onChange={setScore('home', 'tries')} />
-              </td>
+              <td className={CELL} data-testid="sheet-home-tries">{homeTries ?? ''}</td>
               <td className={CELL} />
               <th className={`${CELL} text-left`}>FINAL SCORE</th>
-              <td className={CELL}>
-                <Cell aria-label="Away final score" value={awayScore} onChange={setScore('away', 'score')} />
-              </td>
+              <td className={CELL} data-testid="sheet-away-score">{awayScore ?? ''}</td>
               <th className={`${CELL} text-left`}>
-                TRIES{' '}
-                <Cell aria-label="Away tries" value={awayTries} onChange={setScore('away', 'tries')} />
+                TRIES <span data-testid="sheet-away-tries">{awayTries ?? ''}</span>
               </th>
             </tr>
             <tr>
@@ -744,6 +1006,23 @@ export default function MatchSheet() {
                   aria-label="Team manager"
                   value={fields.manager_name}
                   onChange={setField('manager_name')}
+                />
+              </td>
+            </tr>
+            {/* ⚠️ PHONE IS NOT ON RCM'S PAPER FORM — it is an addition Jay asked
+                for on 12 Aug 2026, so that whoever receives the sheet can reach
+                the person who filed it. Kept in the same footer block and in the
+                same hand as NAME, because it is part of the same answer to
+                "who filled this in", and a stray field elsewhere on a governing
+                body's form reads as a mistake. */}
+            <tr>
+              <td className={CELL}>
+                <span className="font-bold">PHONE:</span>{' '}
+                <Cell
+                  aria-label="Team manager phone"
+                  type="tel"
+                  value={fields.manager_phone}
+                  onChange={setField('manager_phone')}
                 />
               </td>
             </tr>

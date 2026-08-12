@@ -16,6 +16,8 @@ afterAll(() => {
 })
 
 const useMembershipsMock = vi.fn()
+const useMyProfileMock = vi.fn()
+const upsertEventMock = vi.fn()
 const getEventMock = vi.fn()
 const listEventsMock = vi.fn()
 const listPlayersMock = vi.fn()
@@ -29,11 +31,18 @@ const setStatusMock = vi.fn()
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
+// ⚠️ MOCKED FOR THE PROVIDER, NOT FOR THE VALUE. useMyProfile calls useAuth,
+// which throws outside an AuthProvider — so the sheet cannot render at all
+// without this, and every unrelated test in this file would fail with an error
+// naming auth rather than the manager prefill that pulled it in.
+vi.mock('../src/lib/useMyProfile.js', () => ({
+  default: () => useMyProfileMock(),
+}))
 vi.mock('../src/data/events.js', () => ({
   getEvent: (...a) => getEventMock(...a),
   listEvents: (...a) => listEventsMock(...a),
   subscribeEvents: () => () => {},
-  upsertEvent: async () => ({}),
+  upsertEvent: (...a) => upsertEventMock(...a),
   insertEvents: async () => [],
   deleteEvent: async () => {},
   countSeriesFrom: async () => 0,
@@ -107,6 +116,10 @@ function mount(ui, { memberships = COACH, teams = [U14B, U18B], path = '/match-s
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // No profile by default: the prefill is a feature and must be asked for
+  // explicitly, so the tests that are not about it see empty boxes.
+  useMyProfileMock.mockReturnValue({ profile: null, firstName: '' })
+  upsertEventMock.mockImplementation(async (patch) => ({ ...patch }))
   getEventMock.mockResolvedValue(MATCH)
   listPlayersMock.mockResolvedValue([
     { id: 'p1', team_id: 't-u14b', full_name: 'Zara Ali' },
@@ -140,25 +153,222 @@ describe('MatchSheet — the form', () => {
     expect(screen.getAllByText(/AD Harlequins/)).toHaveLength(1)
     // TEAM: is the LEAGUE team, which is the whole reason Project 1 blocked this.
     // It appears twice: the TEAM: line and the HOME TEAM cell.
-    expect(screen.getAllByText('ADHQ2')).toHaveLength(2)
-    expect(screen.getByText('Dubai Exiles')).toBeInTheDocument()
-    expect(screen.getByText('Zayed Sports City, Abu Dhabi')).toBeInTheDocument()
+    //
+    // ⚠️ SCOPED TO THE FACSIMILE SINCE 12 Aug 2026, and the scoping is the
+    // assertion now. The Score card above the form also names the league team,
+    // as a column header — so an unscoped count of 2 would have started failing
+    // for a reason that has nothing to do with what RCM receives. What this
+    // test is about is the PHOTOGRAPHED form, which is exactly what the testid
+    // marks out.
+    const form = within(screen.getByTestId('match-sheet-facsimile'))
+    expect(form.getAllByText('ADHQ2')).toHaveLength(2)
+    expect(form.getByText('Dubai Exiles')).toBeInTheDocument()
+    expect(form.getByText('Zayed Sports City, Abu Dhabi')).toBeInTheDocument()
   })
 
   it('⚠️ puts OUR score on the right when we played AWAY', async () => {
     // The form's two score pairs are POSITIONAL — home on the left, away on the
     // right — while the database stores us/them. An away fixture is where the
     // two disagree, and it is the case a naive mapping gets wrong.
+    //
+    // ⚠️ REWRITTEN 12 Aug 2026 AND IT IS STILL THE SAME ASSERTION. The boxes
+    // used to be typed into directly; the score is now DERIVED from the
+    // components, so the test enters tries and reads the derived cell. What is
+    // being pinned — that OUR number lands in the AWAY pair — has not changed,
+    // and it would still be wrong in exactly the same way.
     getEventMock.mockResolvedValue({ ...MATCH, home: false })
     const { user } = mount(<MatchSheet />)
     await screen.findByRole('heading', { name: /official match result sheet/i })
 
-    await user.type(screen.getByLabelText('Away final score'), '31')
+    // U14B: tries, conversions, penalties and drop goals. 5 tries + 3
+    // conversions = 31, which is the number the old version of this test typed.
+    await user.type(screen.getByLabelText('Tries, ADHQ2'), '5')
+    await user.type(screen.getByLabelText('Conversions, ADHQ2'), '3')
+
+    // We were away, so the AWAY pair is ours and the HOME pair is theirs.
+    expect(screen.getByTestId('sheet-away-score')).toHaveTextContent('31')
+    expect(screen.getByTestId('sheet-away-tries')).toHaveTextContent('5')
+    expect(screen.getByTestId('sheet-home-score')).toBeEmptyDOMElement()
+
     await user.click(screen.getByRole('button', { name: /save draft/i }))
 
-    await waitFor(() => expect(saveMatchSheetMock).toHaveBeenCalled())
-    // We were away, so the AWAY box is ours.
-    expect(saveMatchSheetMock.mock.calls[0][0]).toMatchObject({ score_us: 31 })
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
+    // ⚠️ ON THE FIXTURE, NOT ON THE SHEET. Jay ruled one score, on the fixture.
+    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({
+      id: 'e-1',
+      tries_us: 5,
+      conversions_us: 3,
+      penalties_us: null,
+      drops_us: null,
+      tries_them: null,
+    })
+    expect(saveMatchSheetMock.mock.calls[0][0]).not.toHaveProperty('score_us')
+  })
+
+  describe('the score, from the components', () => {
+    it('⚠️ offers only what the age band may score — U12 gets no penalties', async () => {
+      const U12 = { id: 't-u12', club_id: CLUB, name: 'U12 Mixed Contact', sort_order: 7 }
+      getEventMock.mockResolvedValue({ ...MATCH, team_id: 't-u12', team: U12 })
+      mount(<MatchSheet />, { memberships: [{ ...COACH[0], team_id: 't-u12' }], teams: [U12] })
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      expect(screen.getByLabelText('Tries, ADHQ2')).toBeInTheDocument()
+      expect(screen.getByLabelText('Conversions, ADHQ2')).toBeInTheDocument()
+      // A penalty at U12 is a tap-and-play, so there is no kick at goal to record.
+      expect(screen.queryByLabelText('Penalties, ADHQ2')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Drop goals, ADHQ2')).not.toBeInTheDocument()
+    })
+
+    it("⚠️ honours the CLUB'S override, not the squad's name", async () => {
+      // The whole reason teams.scoring_kinds is a column: a U10 side entered in
+      // a competition that allows conversions gets them, without a deploy and
+      // without renaming the squad.
+      const U10 = {
+        id: 't-u10',
+        club_id: CLUB,
+        name: 'U10 Mixed Contact',
+        scoring_kinds: ['tries', 'conversions'],
+      }
+      getEventMock.mockResolvedValue({ ...MATCH, team_id: 't-u10', team: U10 })
+      mount(<MatchSheet />, { memberships: [{ ...COACH[0], team_id: 't-u10' }], teams: [U10] })
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      expect(screen.getByLabelText('Conversions, ADHQ2')).toBeInTheDocument()
+      expect(screen.getByText(/set for this squad on the club tab/i)).toBeInTheDocument()
+    })
+
+    it('⚠️ the FINAL SCORE box cannot be typed into', async () => {
+      // The point of the whole exercise: the total on a governing body's form
+      // cannot disagree with the tries and kicks printed beside it.
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      expect(screen.queryByLabelText('Home final score')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Away final score')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Home tries')).not.toBeInTheDocument()
+    })
+
+    it('⚠️ a hand-typed result with NO components is shown, not blanked', async () => {
+      // The trap the database trigger exists to avoid, on the screen side: a
+      // fixture whose 22-12 was typed before components existed must not read
+      // as unplayed, and must not read as 0-0.
+      getEventMock.mockResolvedValue({ ...MATCH, result_us: 22, result_them: 12 })
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      expect(screen.getByTestId('sheet-home-score')).toHaveTextContent('22')
+      expect(screen.getByTestId('sheet-away-score')).toHaveTextContent('12')
+      expect(screen.getByTestId('sheet-home-tries')).toBeEmptyDOMElement()
+      expect(screen.getByText(/entered on the fixture itself/i)).toBeInTheDocument()
+    })
+
+    it('⚠️ a recorded ZERO is not the same as not recorded', async () => {
+      // 0 tries is an answer; a blank box is the absence of one. Rendering the
+      // first as blank would erase a fact a coach deliberately recorded.
+      getEventMock.mockResolvedValue({ ...MATCH, tries_us: 0, result_us: 0 })
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      expect(screen.getByLabelText('Tries, ADHQ2')).toHaveValue(0)
+      expect(screen.getByTestId('sheet-home-score')).toHaveTextContent('0')
+      // The opposition's side has nothing recorded, so its boxes stay empty.
+      expect(screen.getByLabelText('Tries, Dubai Exiles')).toHaveValue(null)
+    })
+
+    it('⚠️ says which rules it applied on a tournament fixture', async () => {
+      getEventMock.mockResolvedValue({ ...MATCH, competition_type: 'tournament', competition: 'Dubai 7s' })
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+      expect(screen.getByText(/if it ran its own scoring/i)).toBeInTheDocument()
+      expect(screen.queryByTestId('match-sheet-competition-clash')).not.toBeInTheDocument()
+    })
+
+    it('⚠️ surfaces a tournament with a league-sounding name, and does not guess', async () => {
+      // Already in this data once: competition_type 'tournament' with
+      // competition 'UAE Youth League'. It left the fixture with no league team
+      // and a wrong TEAM box, and only the coach knows which half is wrong.
+      getEventMock.mockResolvedValue({
+        ...MATCH,
+        competition_type: 'tournament',
+        competition: 'UAE Youth League',
+      })
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+      expect(screen.getByTestId('match-sheet-competition-clash')).toBeInTheDocument()
+    })
+
+    it('⚠️ writes the FIXTURE before the sheet, so a failure leaves the score right', async () => {
+      saveMatchSheetMock.mockRejectedValueOnce(new Error('nope'))
+      const { user } = mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      await user.type(screen.getByLabelText('Tries, ADHQ2'), '2')
+      await user.click(screen.getByRole('button', { name: /save draft/i }))
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('nope'))
+      expect(upsertEventMock).toHaveBeenCalled()
+    })
+
+    it('⚠️ clearing every box sends nulls, so the trigger leaves the result alone', async () => {
+      getEventMock.mockResolvedValue({ ...MATCH, tries_us: 3, result_us: 15 })
+      const { user } = mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      await user.clear(screen.getByLabelText('Tries, ADHQ2'))
+      await user.click(screen.getByRole('button', { name: /save draft/i }))
+
+      await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
+      expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ tries_us: null })
+    })
+  })
+
+  describe('the person filling it in', () => {
+    it('defaults the name and phone from the signed-in profile', async () => {
+      useMyProfileMock.mockReturnValue({
+        profile: { full_name: 'Sam Okafor', phone: '+971 50 123 4567' },
+        firstName: 'Sam',
+      })
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      expect(screen.getByLabelText('Team manager')).toHaveValue('Sam Okafor')
+      expect(screen.getByLabelText('Team manager phone')).toHaveValue('+971 50 123 4567')
+    })
+
+    it('⚠️ DEFAULT, NOT LOCK — a filed sheet keeps the name it was filed with', async () => {
+      // A manager fills the form and a coach signs it. Re-signing a sheet
+      // because somebody else opened it is the failure this guards.
+      getMatchSheetMock.mockResolvedValue({
+        id: 'ms-1',
+        event_id: 'e-1',
+        status: 'draft',
+        manager_name: 'Priya Nair',
+        manager_phone: '+971 55 000 0000',
+        league_team: MATCH.league_team,
+        slots: [],
+        cards: [],
+      })
+      useMyProfileMock.mockReturnValue({
+        profile: { full_name: 'Sam Okafor', phone: '+971 50 123 4567' },
+        firstName: 'Sam',
+      })
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      expect(screen.getByLabelText('Team manager')).toHaveValue('Priya Nair')
+      expect(screen.getByLabelText('Team manager phone')).toHaveValue('+971 55 000 0000')
+    })
+
+    it('saves the phone onto the sheet', async () => {
+      const { user } = mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      await user.type(screen.getByLabelText('Team manager phone'), '0501112222')
+      await user.click(screen.getByRole('button', { name: /save draft/i }))
+
+      await waitFor(() => expect(saveMatchSheetMock).toHaveBeenCalled())
+      expect(saveMatchSheetMock.mock.calls[0][0]).toMatchObject({ manager_phone: '0501112222' })
+    })
   })
 
   it('reproduces the discipline grid the form actually has', async () => {

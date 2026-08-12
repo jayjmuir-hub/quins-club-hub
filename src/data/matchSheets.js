@@ -6,6 +6,13 @@ import { supabase } from '../lib/supabase'
 // stored as text, even where a player is linked, because the form demands "full
 // name as per registration" and because a submitted sheet must still say what
 // was submitted after a player is renamed, moved or removed. See the migration.
+//
+// ⚠️ A SHEET DOES NOT HOLD THE SCORE — Jay ruled ONE score, on the FIXTURE,
+// 12 Aug 2026. `public.events` carries the eight components and derives
+// result_us / result_them from them in a trigger; match_sheets.score_us,
+// score_them, tries_us and tries_them are DROPPED. Do not re-add them: the
+// score would then exist in two places, and the day they disagreed both numbers
+// would look plausible. See claude/plans/2026-08-12-scoring-model.md.
 
 /** The 22 positions on the form. Not shirt numbers — the club holds none. */
 export const SLOT_COUNT = 22

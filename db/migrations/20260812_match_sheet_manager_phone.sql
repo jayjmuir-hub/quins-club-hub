@@ -1,0 +1,35 @@
+-- The phone number on the RCM sheet's "Team Manager/Coach details" footer.
+-- Plan: claude/plans/2026-08-12-scoring-model.md, step 5.
+--
+-- ⚠️ apply_migration STRIPS `--` COMMENTS BEFORE EXECUTING, so this reasoning
+-- lives here and never in the database.
+--
+-- Jay, 12 Aug 2026: the sheet should "auto populate the details of the person
+-- filling it out, coach or manager, full name, and phone number".
+--
+-- ⚠️ STORED AS TEXT ON THE SHEET, NOT JOINED TO public.profiles. Exactly the
+-- rule match_sheet_slots.full_name already carries beside a live player_id: a
+-- filed sheet is a record of what was SENT, and it must still say what was sent
+-- after somebody changes their phone number six months later. A join would
+-- silently rewrite a document RCM already holds.
+--
+-- ⚠️ AND IT IS A DEFAULT, NOT A LOCK. The person filling the form in is not
+-- always the person whose details RCM wants — a manager fills it, a coach signs
+-- it — so the app prefills from the signed-in profile and lets it be typed
+-- over. That is a screen decision; this column only has to be able to hold
+-- something other than the profile's value, which is the whole reason it is not
+-- a join.
+--
+-- ⚠️ NOTHING IS ADDED TO public.profiles, deliberately. profiles.phone already
+-- exists and is one of only five columns `authenticated` may UPDATE (see
+-- db/schema/grants.sql §4) — the phone is COPIED onto the sheet here, never
+-- added to the profile, so no grant changes.
+alter table public.match_sheets
+  add column if not exists manager_phone text;
+
+-- ⚠️ NO NEW GRANTS. `authenticated` already holds table-level UPDATE and
+-- INSERT on public.match_sheets, and a table-level privilege in Postgres covers
+-- columns added later. Only public.profiles carries column-level grants in this
+-- schema. Adding a redundant grant here would also trip scripts/docs-check.mjs,
+-- which fails a build when a migration grants on a table the capture does not
+-- name.
