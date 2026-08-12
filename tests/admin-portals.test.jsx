@@ -38,8 +38,21 @@ function admin(rights = [], extra = {}) {
   return [{ id: 'm1', role: 'admin', status: 'active', team_id: null, admin_rights: rights, ...extra }]
 }
 
+// ⚠️ `realMemberships` IS LOAD-BEARING HERE, NOT PADDING. ViewAsSwitcher gates
+// on it and returns null without it — so a switcher assertion made against a
+// fixture lacking it would pass for both branches and prove nothing. A test
+// that cannot fail is worse than no test.
 function memberships(rows) {
-  return { memberships: rows, teams: TEAMS, loading: false, error: null, reload: vi.fn() }
+  return {
+    memberships: rows,
+    realMemberships: rows,
+    teams: TEAMS,
+    viewAs: null,
+    setViewAs: vi.fn(),
+    loading: false,
+    error: null,
+    reload: vi.fn(),
+  }
 }
 
 function renderAt(path) {
@@ -158,6 +171,21 @@ describe('PortalChooser', () => {
       .find((el) => el.textContent.includes('Pitch Management'))
     expect(pitchCard).toHaveAttribute('data-reason', 'no-right')
     expect(pitchCard).toHaveTextContent(/super admin can add it on the Accounts screen/i)
+  })
+
+  // ⚠️ THIS IS WHAT MAKES THE CHOOSER WORTH A CLICK for an admin holding a
+  // single portal — the switcher lives there. If it is ever moved back into
+  // every portal, the extra click buys nothing and the chooser becomes a
+  // speed bump.
+  it('carries the View-as switcher, which portals do not', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin(['pitches'])))
+    const { unmount } = renderAt('/admin')
+    expect(screen.getByRole('button', { name: 'View as' })).toBeInTheDocument()
+    unmount()
+
+    useMembershipsMock.mockReturnValue(memberships(admin(['pitches'])))
+    renderAt('/admin/allocation')
+    expect(screen.queryByRole('button', { name: 'View as' })).not.toBeInTheDocument()
   })
 
   it('shows no tab row on the chooser itself', () => {

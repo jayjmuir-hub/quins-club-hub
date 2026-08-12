@@ -132,6 +132,14 @@ const SCENARIOS = [
   'event-detail',
   'admin',
   'admin-nav',
+  // ⚠️ LISTED, BUT IT PROVES ALMOST NOTHING AND THAT IS WORTH KNOWING. The
+  // whole /admin tree is inside `hidden desktop:block`, so at every width
+  // below it renders the "Needs a bigger screen" card and the chooser's card
+  // grid is display:none. This entry catches the scenario failing to BOOT and
+  // nothing else. The chooser's own layout has to be looked at in a real
+  // browser at desktop width. Same class of blind spot as the sheet scenarios
+  // above.
+  'portal-chooser',
   'full-app',
   'accounts-admin',
   'view-as',

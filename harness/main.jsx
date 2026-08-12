@@ -15,6 +15,7 @@ import Dashboard from '../src/screens/Dashboard.jsx'
 // because nothing in `npm test` or `npm run build` loads harness/main.jsx.
 // Found while trying to measure the masthead for Jay's truncation report.
 import AdminDashboard from '../src/screens/AdminDashboard.jsx'
+import PortalChooser from '../src/screens/PortalChooser.jsx'
 import PlayerForm from '../src/screens/PlayerForm.jsx'
 import Availability from '../src/screens/Availability.jsx'
 import EventDetail from '../src/screens/EventDetail.jsx'
@@ -446,6 +447,47 @@ const scenarios = {
           </MembershipProvider>
         </AuthProvider>
       </BrowserRouter>
+    )
+  },
+
+  // The /admin portal chooser (12 Aug 2026,
+  // claude/decisions/2026-08-12-admin-portals.md). Reproduces App.jsx's real
+  // nesting — AdminDashboard as the parent with PortalChooser as its index
+  // child — because the chooser reaches the screen through <Outlet/> and
+  // mounting it alone would not prove that wiring.
+  //
+  // The membership holds `pitches` ONLY, deliberately, so all three card
+  // states are on screen at once: two open (Club Admin, Pitch Management), one
+  // grey for want of the job (Club Youth Manager) and one grey for want of a
+  // screen (Social Media Management).
+  //
+  // ⚠️ THE OVERFLOW GATE CANNOT SEE THIS SCREEN, AND LISTING IT HERE MUST NOT
+  // BE READ AS COVERAGE. The whole /admin tree lives inside
+  // `hidden desktop:block`, so at the gate's 320-414px widths what renders is
+  // the "Needs a bigger screen" card and nothing else. The scenario is listed
+  // because a scenario that fails to RENDER is still caught, and because this
+  // is the only way to open the chooser in a real browser at desktop width —
+  // which is the check that actually matters and which no script performs.
+  'portal-chooser': () => {
+    const PITCH_ADMIN = [
+      { id: 'm0', role: 'admin', status: 'active', team_id: null, player_id: null, admin_rights: ['pitches'] },
+    ]
+    return (
+      <MemoryRouter initialEntries={['/admin']}>
+        <AuthProvider value={baseAuth(JAY_EMAIL)}>
+          <MembershipProvider
+            value={{ memberships: PITCH_ADMIN, teams: TEAMS_15, loading: false, error: null, reload: noop }}
+          >
+            <AppShell>
+              <Routes>
+                <Route path="/admin" element={<AdminDashboard />}>
+                  <Route index element={<PortalChooser />} />
+                </Route>
+              </Routes>
+            </AppShell>
+          </MembershipProvider>
+        </AuthProvider>
+      </MemoryRouter>
     )
   },
 
