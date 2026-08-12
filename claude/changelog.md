@@ -10,7 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **The league-team tab is named after the job, the tab
+- *(SHA follows in the next PR)* — **The age-band scoring model, as a pure module.**
+  Step 1 of `claude/plans/2026-08-12-scoring-model.md` — the table and the arithmetic only,
+  no schema and no UI, so the rest can be built against something already pinned.
+  ⚠️ **The fifteen upstream rows collapse onto three band rules, and the test asserts EVERY
+  row rather than a sample** — three rules may replace fifteen entries only if all fifteen
+  agree, and nothing else would say so.
+  ⚠️ **Keyed on the band NUMBER, never the id's letter.** adhjrt's `u16b` encodes GENDER,
+  and `src/lib/ageGroup.js` already carries a note about `U12G` failing to parse for exactly
+  that reason.
+  ⚠️ **The unknown band fails OPEN, deliberately opposite to `allowsOwnContact`, which fails
+  CLOSED.** The harm is asymmetric in opposite directions — a twelve-year-old's phone number
+  versus a coach unable to record a drop goal that was kicked. Both the module and the test
+  say so, because somebody will try to unify them.
+  ⚠️ **`teams.scoring_kinds` is the club override — Jay, 12 Aug: scoring should be selectable
+  "in the area where teams are created".** A COLUMN, never the squad's name, the same rule
+  `is_senior` and `self_registration_allowed` already carry.
+  ⚠️ **`hasNoComponents` exists to protect live data**: the U16B fixture holds 22–12 with
+  every component null, and an unconditional recompute would make it 0–0 silently.
+  Proved against an injected fault: shifting the 11→12 threshold and flipping the unknown
+  default reddened 7 tests and no others.
+
+- `3bad675` — **The league-team tab is named after the job, the tab
   row can wrap, and the scoring model is specced.**
   Jay: *"need a better identifier for the section that allows admins to create league team
   names, right now it just says Club"*. **"Club" named the container rather than the job** —
