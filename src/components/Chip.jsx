@@ -1,3 +1,5 @@
+import EventTypeIcon, { EVENT_TYPE_ICONS } from './EventTypeIcon.jsx'
+
 // Event-type category chip (design-system.md §4.7): a pill-shaped inline
 // label used on fixture/event rows to mark whether an event is a match,
 // training, or social. Colours are ported verbatim from the prototype's
@@ -53,12 +55,33 @@ const VARIANTS = {
 
 const NEUTRAL_VARIANT = 'bg-surface-mute text-ink-muted'
 
+// ⚠️ THE ICON IS DECIDED HERE, NOT BY THE CALLER — 12 Aug 2026. Three separate
+// components draw a type chip (FixtureRow, for the Dashboard and all three
+// Schedule tabs; ScheduleTable, for the desktop grid; and EventDetail's result
+// chip), and asking each to pass an icon is three chances for one to be
+// forgotten and for two screens to disagree about what a training session looks
+// like. It is the same reasoning FixtureRow's own header gives for holding the
+// fixture label rather than letting each screen build one.
+//
+// ⚠️ ONLY THE THREE EVENT TYPES GET ONE. EVENT_TYPE_ICONS is keyed by
+// match/training/social and returns nothing for anything else, so the win/loss/
+// draw result chips and the neutral squad-name pill are untouched — they are
+// not event types, and a row where every pill carries a picture stops being
+// scannable, which is the whole point of the icon.
+//
+// ⚠️ `gap-1` ONLY WHEN THERE IS AN ICON. An unconditional gap on a text-only
+// chip is dead space inside a pill that is deliberately tight.
 export function Chip({ type, children, className = '' }) {
   const variantClasses = VARIANTS[type] ?? NEUTRAL_VARIANT
+  // ⚠️ ASKED OF THE MAP, NOT OF THE RENDERED ELEMENT. `<EventTypeIcon />` is a
+  // truthy React element even when the component returns null, so testing the
+  // element would put `gap-1` on every text-only chip in the app.
+  const hasIcon = Boolean(EVENT_TYPE_ICONS[type])
 
   const classes = [
     'inline-flex',
     'items-center',
+    hasIcon ? 'gap-1' : '',
     // ⚠️ `rounded-tab` (12px), was `rounded-[20px]` — Jay, 11 Aug 2026:
     // "things like match pills etc can be similar too", meaning adhjrt.com's
     // age-group buttons. This is the match pill: it marks match/training/
@@ -83,7 +106,12 @@ export function Chip({ type, children, className = '' }) {
     .filter(Boolean)
     .join(' ')
 
-  return <span className={classes}>{children}</span>
+  return (
+    <span className={classes}>
+      <EventTypeIcon type={type} className="h-3 w-3 shrink-0" />
+      {children}
+    </span>
+  )
 }
 
 export default Chip

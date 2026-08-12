@@ -166,7 +166,7 @@ function Segmented({ legend, name, options, value, onChange }) {
 // the calendar grid is built from numbers: a Date would re-read the browser's
 // zone and could land the event on the wrong day for a reader outside Abu
 // Dhabi. See CLUB_TIME_ZONE in src/lib/eventFormat.js.
-function initialValues(event, editableTeams, initialDate = null) {
+function initialValues(event, editableTeams, initialDate = null, duplicating = false) {
   const teamIds = editableTeams.map((team) => team.id)
   const fallbackTeamId = teamIds[0] ?? ''
 
@@ -213,7 +213,23 @@ function initialValues(event, editableTeams, initialDate = null) {
     type: event.type ?? 'match',
     title: event.title ?? '',
     opponent: event.opponent ?? '',
-    date,
+    // ══ DUPLICATING ═══════════════════════════════════════════════════════
+    //
+    // Jay, 12 Aug 2026: "the details are the work, the date is trivial." So a
+    // duplicate carries everything that took effort — times, venue, pitch,
+    // notes, squad, competition, league team — and clears the three things
+    // that belong to the ORIGINAL OCCURRENCE and to nothing else.
+    //
+    // ⚠️ THE DATE IS BLANK, AND JAY CHOSE THAT OVER THREE SMARTER DEFAULTS
+    // (next week, same date, today). The reasoning is the one already written
+    // above about the TIME field: a prefilled value that is a guess quietly
+    // becomes wrong, and here being wrong means a real session appearing in
+    // fifteen parents' subscribed calendars on a day nobody chose. Blank
+    // cannot be wrong; it can only be unfinished, and handleSubmit's existing
+    // `date: !values.date` check already refuses to save it. NO NEW GUARD WAS
+    // NEEDED FOR THIS — that is why blank is the cheap answer as well as the
+    // safe one.
+    date: duplicating ? '' : date,
     time,
     endTime,
     teamId: teamIds.includes(event.team_id) ? event.team_id : fallbackTeamId,
@@ -230,11 +246,25 @@ function initialValues(event, editableTeams, initialDate = null) {
     // so nothing in the database can be mistaken for an answer somebody gave.
     competitionType:
       event.competition_type ?? (event.competition ? COMPETITION_TOURNAMENT : ''),
+    // ⚠️ CARRIED ON A DUPLICATE, unlike the round below. A league team belongs
+    // to the SQUAD, and the squad carries over — so ADHQ2's next fixture is
+    // still ADHQ2's. Clearing it would make the commonest duplicate (same
+    // side, another week) worse than typing it fresh.
     leagueTeamId: event.league_team_id ?? '',
-    round: event.round == null ? '' : String(event.round),
+    // ⚠️ CLEARED ON A DUPLICATE. A round belongs to one fixture in a season's
+    // sequence; "Round 4" twice is not an obvious typo, it is a WRONG RESULT
+    // filed with the governing body — the same class of harm the league-team
+    // picker's squad scoping exists to prevent (see listLeagueTeams).
+    round: duplicating || event.round == null ? '' : String(event.round),
     notes: event.notes ?? '',
-    resultUs: event.result_us == null ? '' : String(event.result_us),
-    resultThem: event.result_them == null ? '' : String(event.result_them),
+    // ⚠️ CLEARED ON A DUPLICATE, and this is the one that would be found last.
+    // Duplicating a PLAYED match is the normal way to set up the return
+    // fixture; carrying the score would create a brand-new fixture that is
+    // already a result — it would leave Upcoming immediately (hasResult), land
+    // in the Results tab, and feed the "played with no score" dashboard tile
+    // with a lie. Nothing on screen would say where the numbers came from.
+    resultUs: duplicating || event.result_us == null ? '' : String(event.result_us),
+    resultThem: duplicating || event.result_them == null ? '' : String(event.result_them),
   }
 }
 
@@ -252,7 +282,32 @@ function parseScore(us, them) {
   return { result_us: nus, result_them: nthem }
 }
 
-export default function EventForm({ event = null, initialDate = null, onClose, onSaved }) {
+export default function EventForm({
+  event = null,
+  // ⚠️ DUPLICATE IS A CREATE THAT STARTS FROM AN EXISTING ROW — a flag beside
+  // `event`, not a third mode with its own code path. Everything below already
+  // branches on `editing`, and `editing` is what this flag turns off: the id
+  // never reaches the payload, so upsertEvent INSERTS; the series checkbox is
+  // gated on `editing` so it cannot appear; and Repeats and "Also add for"
+  // (both `!editing`) become available, which is a bonus rather than an
+  // accident — "run last term's Tuesday session again all next term" is
+  // duplicate + tick Tuesday + set an end date, and that is the one thing
+  // Repeats genuinely cannot do on its own, being create-time only.
+  //
+  // ⚠️ series_id AND group_id CANNOT LEAK INTO A DUPLICATE, and it is worth
+  // saying WHY rather than trusting it: neither is in `initialValues` at all.
+  // The payload is assembled from `common` + rowFor() + leagueFields, and the
+  // only writers of those two columns are the `repeating` and `multiSquad`
+  // branches further down, which read fresh crypto.randomUUID()s. So the
+  // protection is structural, not a filter somebody has to remember. It
+  // matters: a duplicate that inherited series_id would be swept up by "delete
+  // this and every later session" from an occurrence it has nothing to do
+  // with, on a date nobody would think to check.
+  duplicate = false,
+  initialDate = null,
+  onClose,
+  onSaved,
+}) {
   const { memberships, teams } = useMemberships()
 
   // Teams this user may actually write to. For an admin that is every team;
@@ -265,7 +320,9 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
     [memberships, teams],
   )
 
-  const [values, setValues] = useState(() => initialValues(event, editableTeams, initialDate))
+  const [values, setValues] = useState(() =>
+    initialValues(event, editableTeams, initialDate, duplicate),
+  )
   const [invalid, setInvalid] = useState({})
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -307,7 +364,21 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
   const setFromInput = (key) => (domEvent) => set(key)(domEvent.target.value)
 
   const isMatch = values.type === 'match'
-  const editing = Boolean(event?.id)
+  // ⚠️ A DUPLICATE IS NOT EDITING, and this single line is what makes that
+  // true everywhere. `editing` gates the id on the payload, the series
+  // checkbox, the Repeats panel, the extra-squads picker, the sheet title and
+  // the submit label — so turning it off here is the whole feature, rather
+  // than six separate places each remembering to ask about `duplicate`.
+  const editing = Boolean(event?.id) && !duplicate
+
+  // ⚠️ THE TITLE IS THE ONLY THING TELLING SOMEBODY THIS IS A NEW EVENT.
+  // A duplicate opens on a form that is full of an existing fixture's details —
+  // the same venue, pitch, squad and times they were just looking at — so
+  // "Add event" would read as though the sheet had failed to load the one they
+  // tapped, and "Edit event" would be a lie that costs an accidental overwrite.
+  // It is derived from `duplicate` rather than from `editing`, because
+  // `editing` is false for BOTH a duplicate and a plain add.
+  const sheetTitle = duplicate ? 'Duplicate event' : editing ? 'Edit event' : 'Add event'
 
   // Repeating is a CREATE-time feature. Editing an existing event never
   // shows the section, and this flag makes that structural rather than a
@@ -477,7 +548,7 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
   // apologises.
   if (editableTeams.length === 0) {
     return (
-      <Sheet open onClose={onClose} title={editing ? 'Edit event' : 'Add event'}>
+      <Sheet open onClose={onClose} title={sheetTitle}>
         <p role="alert" className="rounded-[11px] bg-warn-bg px-4 py-3 text-sm text-ink">
           You don&apos;t have a squad you can add or change fixtures for. Ask a club admin if that
           looks wrong.
@@ -756,7 +827,7 @@ export default function EventForm({ event = null, initialDate = null, onClose, o
   }
 
   return (
-    <Sheet open onClose={onClose} title={editing ? 'Edit event' : 'Add event'}>
+    <Sheet open onClose={onClose} title={sheetTitle}>
       {/* noValidate: this form does its own validation and reports it in a
           role="alert" region, which a screen reader announces — the native
           bubble is neither announced reliably nor visible to the browser

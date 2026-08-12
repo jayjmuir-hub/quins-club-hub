@@ -321,6 +321,35 @@ Base container: white bg, `var(--radius)` (16px), `var(--shadow)`, `1px solid va
 ### 4.7 Chip / badge (`.chip`)
 Pill-shaped inline label, `padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700`. Variants (all just background/colour swaps): `.match` (maroon/white), `.training` (green-bg/sky-deep), `.social` (warn-bg/warn), `.home` (good-bg/good), `.away` (`#efeaf4`/`#7a5aa0`), `.win` (good-bg/good), `.loss` (bad-bg/bad), `.draw` (`#eef0f2`/`#5a6470`). Default (no variant class) = neutral `#f0ecf2`/muted, used for age-group labels like "Senior Men 1st XV".
 
+### 4.7a Event-type marks (`src/components/EventTypeIcon.jsx`)
+
+**match = solid rugby ball · training = cone (rounded tip) · social = two
+people.** Rendered by `Chip` at `h-3 w-3` and by the §5.5 detail hero at
+`h-7 w-7`. ⚠️ **Replaced whistle/shirt/trophy on 12 Aug 2026** — a whistle
+starts training as often as a match, a shirt says "kit" not "session", and a
+trophy means WINNING while sitting on the end-of-term BBQ. Jay's rulings against
+drawn alternatives; do not reinstate them.
+`claude/plans/2026-08-12-duplicate-event-and-type-icons.md` holds the full
+tombstone and the options rejected.
+
+⚠️ **`Chip` decides the mark, not the caller.** Three components draw a type
+chip (`FixtureRow`, `ScheduleTable`, and the hero); passing an icon from each
+would be three chances to forget one and for two screens to disagree.
+
+⚠️ **Only the three event types get one.** Win/loss/draw and the neutral
+age-group chip never do — they are not event types, and a row where every pill
+carries a picture stops being scannable. An unrecognised type gets NO mark, and
+never a fallback one.
+
+⚠️ **The ball is solid where the other two are outlines, deliberately.** `.match`
+is the only variant with a dark fill; a 2px hairline that reads on `#e6f7ec`
+dies on solid red at 11.5px. Its seam is a **mask**, not stroked lines — the
+chip's opaque red and the hero's translucent box share no colour to stroke in —
+and the mask id must come from `useId`, since two match chips in one list would
+otherwise collide on it.
+
+Marks are decorative (`aria-hidden`): the word they mark is always beside them.
+
 ### 4.8 Pill / filter tab (`.pill`)
 ```html
 <button class="pill active" data-tab="upcoming">Upcoming</button>
@@ -547,7 +576,25 @@ Order, top to bottom:
 4. "About this prototype" static info card — demo-only content, drop in the real build.
 
 ### 5.5 Event Detail (sheet)
-`detail-hero` (icon by type: whistle=match, shirt=training, trophy=social; title; formatted date+time) → `.kv` rows: Type (+ Home/Away for matches), Age group, Venue, Competition (matches only, if set) → Result row (past events) OR Availability bar+legend (upcoming events, §4.23) → footer actions: **Edit + Delete** buttons (admin/coach) *or* a read-only `.scope-note.parent` lock message (parents).
+`detail-hero` (icon by type — see §4.7a; title; formatted date+time) → `.kv` rows: Type (+ Home/Away for matches), Age group, Venue, Competition (matches only, if set) → Result row (past events) OR Availability bar+legend (upcoming events, §4.23) → footer actions: **Edit + Duplicate + Delete** buttons (admin/coach) *or* a read-only `.scope-note.parent` lock message (parents).
+
+The footer row carries `flex-wrap`, matching the delete-confirm row above it.
+⚠️ **It is insurance, not a fix, and must not be described as one.** Measured in
+Chromium 12 Aug 2026: at 320px the row is 284px and the three buttons are
+83 + 97 + 85 with 10px gaps — one line, nothing clipped, and removing the class
+changes nothing at any harness width. What it guards is a longer label or a
+larger text size pushing the buttons below min-content. ⚠️ **Nothing in a Sheet
+can widen the DOCUMENT in any case** — `Sheet` is `position:fixed` and sets
+`body{overflow:hidden}` while open, which also means `harness/check-overflow.mjs`
+is blind to sheet contents.
+
+⚠️ **Every footer/section button here renders ONLY when its handler prop is
+passed.** Duplicate, the register, the match sheet and "Set my availability" all
+follow this rule, and it is not defensive styling: "Set my availability" once
+rendered unconditionally behind `onOpenAvailability?.()`, and because the
+Dashboard never passed the handler it drew a button that swallowed every tap in
+silence for weeks. A screen that forgets a handler must get NO button rather
+than a lying one.
 
 ### 5.6 Event Add/Edit form (sheet)
 Segmented Type control (Match/Training/Social) → conditionally-shown Opponent field (match only) or Title field (training/social only) → Date+Time field-row → Age group/Squad select (options = editable teams for this persona) → conditionally-shown Home/Away segmented control (match only) → Venue text field (pre-filled "Zayed Sports City, Abu Dhabi") → conditionally-shown Competition field (match only) → full-width Save button. Field visibility toggles live via the type-radio `onchange` handler (not CSS-only, since 4 different fields' visibility depend on it).

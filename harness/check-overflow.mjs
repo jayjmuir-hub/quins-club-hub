@@ -110,6 +110,26 @@ const SCENARIOS = [
   'overview-coach',
   'playerform',
   'availability',
+  // ⚠️ LISTED, BUT READ THE LIMIT BEFORE COUNTING IT AS COVERAGE — and the
+  // limit applies to `availability` and `playerform` above it too, which is
+  // why it is written here rather than only against this line.
+  //
+  // ⚠️ THIS GATE IS BLIND TO ANYTHING INSIDE A SHEET. Measured 12 Aug 2026:
+  // src/components/Sheet.jsx renders `position:fixed inset-0` and sets
+  // `document.body.style.overflow = 'hidden'` while open, so a sheet's
+  // contents are not in the document's scrollWidth at all. Proved by
+  // injecting a 900px `shrink-0` button into this scene's footer — THE GATE
+  // STAYED GREEN. Every sheet scenario here therefore verifies that the sheet
+  // RENDERS and that the page behind it is clean; it cannot verify the sheet's
+  // own layout, and a clean run must never be quoted as if it did.
+  //
+  // It stays listed anyway: a sheet scenario that fails to boot is still
+  // caught (a scenario that does not render fails this file), and the day
+  // Sheet stops being `fixed` this line starts measuring something real.
+  // The three-button footer it was added for (Edit | Duplicate | Delete,
+  // 12 Aug 2026) was verified by MEASURING the row in Chromium instead —
+  // 284px wide, buttons 83 + 97 + 85 at 320px, one line, nothing clipped.
+  'event-detail',
   'admin',
   'admin-nav',
   'full-app',

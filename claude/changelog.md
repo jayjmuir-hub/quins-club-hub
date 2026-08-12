@@ -10,7 +10,45 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- **The AI ruling, and two plans.** ✅ **CHILDREN'S DATA MAY LEAVE THE CLUB FOR A
+- **Duplicate an event, and three type marks that mean something.** Two
+  requests from Jay, shipped together only because they touch the same two files.
+  **Duplicate:** `EventDetail`'s footer becomes Edit | Duplicate | Delete, and Duplicate
+  opens the CREATE form prefilled from the fixture. Jay: *"the details take the effort,
+  not the date."*
+  ⚠️ **The date opens BLANK, Jay's choice over three smarter defaults** — a prefilled
+  guess quietly becomes wrong, and here wrong means a session in fifteen parents'
+  subscribed calendars on a day nobody chose. It needed **no new guard**: the form
+  already refuses to save without a date.
+  ⚠️ **Score, round and id are cleared; times, venue, pitch, notes, squad, competition
+  and league team carry.** The round goes because "Round 4" twice is a wrong result filed
+  with the governing body; the league TEAM stays because it belongs to the squad, which
+  carries.
+  ⚠️ **`series_id` cannot leak in, STRUCTURALLY** — neither it nor `group_id` is in
+  `initialValues`, and the only writers are the repeating/multiSquad branches. A duplicate
+  that inherited one would be swept up by "delete this and every later session" from an
+  occurrence it has nothing to do with.
+  ⚠️ **The whole implementation is `editing = Boolean(event?.id) && !duplicate`** — that
+  one flag already gated the id, the series checkbox, Repeats, the extra-squads picker,
+  the title and the submit label. **Repeats coming back is a bonus, not an accident:**
+  duplicate + repeat is the only way to extend a finished series.
+  **The marks:** whistle/shirt/trophy out, solid rugby ball / rounded-tip cone / two
+  people in, moved OUT of `EventDetail.jsx` into `src/components/EventTypeIcon.jsx` with
+  **`Chip` deciding the icon rather than each caller**. A whistle starts training as often
+  as a match; a shirt says "kit"; a trophy means WINNING and was sitting on the BBQ.
+  ⚠️ **Only the three event types get one** — win/loss/draw and the neutral squad pill
+  never do. The ball is solid where the others are outlines because its chip is the only
+  dark fill, and its seam is a **mask** with a `useId` id, since two match chips in one
+  list would collide on a literal one.
+  ❌ **A claim was written, tested and WITHDRAWN mid-build, and it is the most useful part:**
+  "`flex-wrap` on the three-button footer stops the document overflowing" was wrong twice
+  over. Measured — the buttons fit one line at 320px — and, more importantly,
+  ⚠️ **`harness/check-overflow.mjs` IS BLIND TO ANYTHING INSIDE A SHEET**, because `Sheet`
+  is `position:fixed` and sets `body{overflow:hidden}`. A 900px `shrink-0` button injected
+  into an open sheet left the gate GREEN. That applies to the `availability` and
+  `playerform` scenarios too. Caught only because a control fault was injected after the
+  first injection came back clean. Recorded in `state-of-play.md`.
+
+- `d551caf` — **The AI ruling, and two plans.** ✅ **CHILDREN'S DATA MAY LEAVE THE CLUB FOR A
   THIRD-PARTY API — Jay, 12 Aug 2026, asked directly and answered "yes it may".**
   `state-of-play.md` recorded that EVERY AI feature was gated on this one question and
   that nobody had asked him. Recorded in

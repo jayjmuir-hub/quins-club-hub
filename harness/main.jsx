@@ -17,6 +17,7 @@ import Dashboard from '../src/screens/Dashboard.jsx'
 import AdminDashboard from '../src/screens/AdminDashboard.jsx'
 import PlayerForm from '../src/screens/PlayerForm.jsx'
 import Availability from '../src/screens/Availability.jsx'
+import EventDetail from '../src/screens/EventDetail.jsx'
 // ⚠️ Same rot as the line above: src/screens/Admin.jsx became AdminClub.jsx.
 // Aliased back to `Admin` so the scenario bodies below don't need touching.
 import Admin from '../src/screens/AdminClub.jsx'
@@ -331,6 +332,64 @@ const scenarios = {
       </Shell>
     )
   },
+
+  // ⚠️ ADDED 12 Aug 2026 WITH THE DUPLICATE BUTTON. EventDetail's footer went
+  // from two buttons to three — Edit | Duplicate | Delete — and no other
+  // scenario opens this sheet (`schedule` and `dashboard` render the LIST), so
+  // there was nowhere to look at the new row.
+  //
+  // ⚠️ IT IS FOR LOOKING AT AND MEASURING, NOT FOR THE OVERFLOW GATE, and that
+  // is a correction to what this comment said when it was written. The gate
+  // cannot see inside a sheet: Sheet is `position:fixed` and sets body
+  // overflow hidden, so its contents are outside the document's scrollWidth.
+  // Injecting a 900px `shrink-0` button here left the gate green. The row was
+  // verified by measuring it in Chromium instead — 284px wide at 320px, the
+  // three buttons 83 + 97 + 85 with 10px gaps, one line, nothing clipped.
+  //
+  // Mounted directly for the same reason `playerform` and `availability` above
+  // are: so the gated branch is reachable without Schedule's own state
+  // deciding first.
+  //
+  // ⚠️ THE LONGEST PLAUSIBLE LABELS ON PURPOSE — a venue and pitch a coach
+  // would really type, and every optional block switched on — because a
+  // cramped row is only cramped at its widest.
+  'event-detail': () => (
+    <Shell
+      route="/schedule"
+      authValue={baseAuth(COACH_EMAIL)}
+      membershipValue={{
+        memberships: COACH_MEMBERSHIPS,
+        teams: TEAMS,
+        loading: false,
+        error: null,
+        reload: noop,
+      }}
+    >
+      <EventDetail
+        event={{
+          id: 'e6',
+          team_id: 't1',
+          type: 'training',
+          title: 'U12 Contact & Conditioning',
+          opponent: null,
+          venue: 'Zayed Sports City, Abu Dhabi',
+          pitch: 'Pitch TBD',
+          notes: 'Meet at the gate 30 minutes before. Bring both kits.',
+          starts_at: '2026-07-28T15:30:00Z',
+          ends_at: '2026-07-28T17:00:00Z',
+          series_id: null,
+          result_us: null,
+          result_them: null,
+        }}
+        team={TEAMS.find((t) => t.id === 't1')}
+        canEdit
+        onClose={noop}
+        onEdit={noop}
+        onDuplicate={noop}
+        onDeleted={noop}
+      />
+    </Shell>
+  ),
 
   // Independent Task 17 verification: mount Admin DIRECTLY (same reasoning
   // as the `playerform`/`availability` scenarios above) so its own isAdmin()
