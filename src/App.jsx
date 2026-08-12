@@ -7,6 +7,7 @@ import Schedule from './screens/Schedule.jsx'
 import Roster from './screens/Roster.jsx'
 import More from './screens/More.jsx'
 import AdminDashboard from './screens/AdminDashboard.jsx'
+import PortalChooser from './screens/PortalChooser.jsx'
 import AdminClub from './screens/AdminClub.jsx'
 import Accounts from './screens/Accounts.jsx'
 import Pitches from './screens/Pitches.jsx'
@@ -117,7 +118,11 @@ export default function App() {
               /admin/accounts as a coach gets the same "not authorised"
               card as /admin itself. */}
           <Route path="/admin" element={<AppShell><AdminDashboard /></AppShell>}>
-            <Route index element={<Navigate to="/admin/accounts" replace />} />
+            {/* ⚠️ /admin IS THE CHOOSER, and until 12 Aug 2026 it redirected
+                straight to Accounts. Every URL below is unchanged — only bare
+                /admin behaves differently, so nothing bookmarked breaks.
+                claude/decisions/2026-08-12-admin-portals.md */}
+            <Route index element={<PortalChooser />} />
             <Route path="accounts" element={<Accounts />} />
             <Route path="club" element={<AdminClub />} />
             {/* Pitch setup. The `pitches` admin right decides whether the TAB

@@ -10,6 +10,35 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
+- *(SHA follows in the next PR)* — **`/admin` is a chooser, and each job is its own portal.**
+  Jay: *"i'd like more of a split off for the dashboards"*. The tab row that grew with every
+  right somebody held is replaced by four cards — Club Admin, Pitch Management, Club Youth
+  Manager, Social Media Management — each entering a space with its own tabs.
+  ⚠️ **Every card renders for every admin**; not holding the job, or the job having no screen,
+  greys it. ⚠️ **A grey card is not a link IN THE MARKUP** — this repo has already shipped a
+  control that drew itself and swallowed the tap.
+  ⚠️ **"No screen yet" and "this job hasn't been added to your account" stay DIFFERENT
+  messages** — a super admin fixes one, only building fixes the other.
+  ⚠️ **Navigation only. It narrows nothing** — a portal holder is still a full admin.
+  ⚠️ **Only bare `/admin` changes**; every URL under it is untouched, so nothing bookmarked
+  breaks. `src/lib/portals.js` is the single list both the chooser and the tab row read.
+  `claude/decisions/2026-08-12-admin-portals.md`
+
+- *(SHA follows in the next PR)* — **Jobs, not people: the three club jobs are named and the
+  volunteers are not.** `Youth Manager` → **Club Youth Manager**, `Social Media Manager` →
+  **Social Media Management**, `Pitch Manager` → **Pitch Management**.
+  ⚠️ **Two of the three stop being job titles, so five sentences moved rather than the words**
+  — three not-authorised screens and both pitch emails, because "you're a Pitch Management"
+  is not English. The mismatch was put to Jay before the change and he chose this wording.
+  ⚠️ **The emails are a Supabase edge function and deploy separately from the app.**
+  ~60 human names replaced with the job name across `src/`, `tests/`, `db/schema/` and the
+  instructional docs; ⚠️ **`claude/handoffs/`, `claude/plans/` and `db/migrations/` keep
+  theirs**, being dated records of a moment. Enforced by `RETIRED_NAMES` in
+  `scripts/docs-check.mjs` — ⚠️ **regexes with word boundaries, or `Nick` would fail every <!-- stale-ok -->
+  line containing "nickname"** — scanned in code as well as docs, because every occurrence
+  outside the docs was a code comment.
+  `claude/decisions/2026-08-12-jobs-not-people.md`
+
 - *(SHA follows in the next PR — a commit cannot cite its own)* — **`app.adhjrt.com` is retired.**
   The app's original address, kept as a working alias since the 5 Aug domain move, no longer
   resolves. Removed in three places: the Supabase redirect allow-list, the Netlify domain alias,

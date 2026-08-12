@@ -1,8 +1,9 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import { ViewAsSwitcher } from '../components/ViewAsSwitcher.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
-import { hasAdminRight, isAdmin } from '../lib/scope.js'
+import { isAdmin } from '../lib/scope.js'
+import { portalForPath, portalLabel } from '../lib/portals.js'
 
 // The back-end dashboard (admin-dashboard plan, 2026-08-05): one /admin
 // route with two tabs, absorbing what used to be /accounts and the admin
@@ -71,38 +72,19 @@ function PreviewingNotice() {
   )
 }
 
-// ⚠️ THE PITCHES TAB IS GATED ON AN ADMIN RIGHT, NOT ON `isAdmin`. Every
-// admin can already write the pitch table — the RLS policy is `is_admin`
-// deliberately, because these rights decide which specialist dashboard
-// somebody is SHOWN rather than what they may do
-// (claude/decisions/2026-08-10-role-dashboards.md). So hiding the tab is a
-// "this is not your job" signal, not a permission, and the screen repeats the
-// check because a route is linkable and somebody will paste the URL.
-const BASE_TABS = [
-  { to: '/admin/accounts', label: 'Accounts' },
-  { to: '/admin/club', label: 'Club' },
-]
-
-function tabsFor(memberships) {
-  const tabs = [...BASE_TABS]
-
-  // ⚠️ ALLOCATION COMES FIRST, and Pitches (setup) after it. Allocating is the
-  // weekly job; setting the list up is done twice a season. Tab order is the
-  // cheapest way to say which one somebody came for.
-  if (hasAdminRight(memberships, 'pitches')) {
-    tabs.push({ to: '/admin/allocation', label: 'Allocation' })
-    tabs.push({ to: '/admin/pitches', label: 'Pitches' })
-  }
-
-  // Club Youth Manager's match sheets. ⚠️ The `youth` right has existed in
-  // ADMIN_RIGHTS since 10 Aug 2026 and granted access to NOTHING until now —
-  // the same state `pitches` was in before the pitch stack.
-  if (hasAdminRight(memberships, 'youth')) {
-    tabs.push({ to: '/admin/youth', label: 'Match sheets' })
-  }
-
-  return tabs
-}
+// ⚠️ THE TAB ROW IS NOW PORTAL-SCOPED, and this replaced a single row that grew
+// with every right somebody held (12 Aug 2026,
+// claude/decisions/2026-08-12-admin-portals.md). /admin is a chooser; standing
+// inside a portal shows THAT portal's tabs and no others.
+//
+// ⚠️ THE PORTALS AND THEIR TABS LIVE IN src/lib/portals.js, not here. The
+// chooser reads the same list, so a portal cannot be enterable from one place
+// and invisible in the other.
+//
+// ⚠️ Gating remains a UI decision only, exactly as it was: RLS decides which
+// rows any query returns, and the rights gate SCREENS rather than data
+// (claude/decisions/2026-08-10-role-dashboards.md). Each screen still repeats
+// its own check, because a route is linkable and somebody will paste the URL.
 
 // ⚠️ MODELLED ON adhjrt.com's AGE-GROUP TABS — Jay, 11 Aug 2026, who asked for
 // "the tabs on the adhjrt.com website". The spec was MEASURED off the live site
@@ -135,6 +117,10 @@ function tabClassName({ isActive }) {
 
 export default function AdminDashboard() {
   const { memberships, realMemberships, viewAs } = useMemberships()
+  const { pathname } = useLocation()
+
+  // null at /admin itself, which is the chooser. Everything below keys off it.
+  const portal = portalForPath(pathname)
 
   if (!isAdmin(memberships)) {
     // Order matters: the previewing case is a strict subset of "not an admin
@@ -184,18 +170,40 @@ export default function AdminDashboard() {
             is the whole point of the preview, and it is not a trap: the
             ViewAsBanner AppShell still renders at every width carries the
             Exit button, so the way back never depended on this screen. */}
+        {/* ⚠️ THE SWITCHER RENDERS ON THE CHOOSER ONLY, and that is what makes
+            the chooser worth a click for an admin holding a single portal —
+            it is where the control lives. Repeating it inside every portal
+            would put an occasionally-used admin tool at the top of the weekly
+            allocation screen. */}
         <div className="mb-3.5 mt-1 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Admin</h2>
-          <ViewAsSwitcher />
+          <div className="min-w-0">
+            {portal && (
+              <Link
+                to="/admin"
+                className="text-[13px] font-bold text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              >
+                ← Admin
+              </Link>
+            )}
+            <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">
+              {portal ? portalLabel(portal) : 'Admin'}
+            </h2>
+          </div>
+          {!portal && <ViewAsSwitcher />}
         </div>
 
-        <nav aria-label="Admin sections" className="mb-4 flex gap-2">
-          {tabsFor(memberships).map((tab) => (
-            <NavLink key={tab.to} to={tab.to} className={tabClassName}>
-              {tab.label}
-            </NavLink>
-          ))}
-        </nav>
+        {/* ⚠️ NO TAB ROW FOR A ONE-TAB PORTAL. A row of a single tab is chrome
+            that says nothing the heading has not already said. Match sheets is
+            the current case; Social Media Management will be the next one. */}
+        {portal && portal.tabs.length > 1 && (
+          <nav aria-label="Admin sections" className="mb-4 flex gap-2">
+            {portal.tabs.map((tab) => (
+              <NavLink key={tab.to} to={tab.to} className={tabClassName}>
+                {tab.label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
 
         <Outlet />
       </div>
