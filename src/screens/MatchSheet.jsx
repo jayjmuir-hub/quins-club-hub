@@ -283,7 +283,21 @@ export default function MatchSheet() {
     setFields((current) => ({ ...current, [key]: domEvent.target.value }))
   }
 
-  const ourName = event?.league_team?.rcm_name ?? squadName
+  // ⚠️ THE SAVED SHEET WINS OVER THE LIVE FIXTURE, and only falls back to it for
+  // a draft nobody has saved yet. A filed sheet is a record of what was SENT;
+  // if somebody corrects the fixture's league team in March, the sheet RCM
+  // already holds must not quietly change to agree with them.
+  //
+  // ⚠️ AND THERE IS NO SQUAD-NAME FALLBACK. Until 12 Aug 2026 this line ended
+  // `?? squadName`, so a fixture with no league team printed "U16B Contact" —
+  // the club's internal squad name — into a governing body's TEAM field, on a
+  // form that was then photographed and sent. A BLANK box is an obviously
+  // unfinished form; a confidently wrong one is not, and nothing warned anybody.
+  // This is the same trap `src/lib/ageGroup.js` already carries a note about:
+  // the absent value fell through to the LEAST SAFE answer.
+  const ourLeagueTeam = sheet ? sheet.league_team : event?.league_team
+  const ourName = ourLeagueTeam?.rcm_name ?? ''
+  const missingLeagueTeam = !ourName
   const homeName = weAreHome ? ourName : event?.opponent ?? ''
   const awayName = weAreHome ? event?.opponent ?? '' : ourName
 
@@ -455,8 +469,13 @@ export default function MatchSheet() {
             <Button variant="secondary" disabled={saving} onClick={() => persist(null).catch(() => {})}>
               {saving ? 'Saving…' : 'Save draft'}
             </Button>
+            {/* ⚠️ THE BLOCK IS ONE-WAY: it stops a sheet REACHING complete, and
+                never stops one being reopened. A sheet marked ready before this
+                gate existed must still be fixable, and refusing to reopen it
+                would be the app defending its own rule against the person
+                trying to obey it. */}
             <Button
-              disabled={saving}
+              disabled={saving || (missingLeagueTeam && !complete)}
               onClick={() => persist(complete ? 'draft' : 'complete').catch(() => {})}
             >
               {complete ? 'Reopen' : 'Submit'}
@@ -479,6 +498,22 @@ export default function MatchSheet() {
         {overdue && !complete && (
           <p className="mt-2.5 rounded-[11px] bg-warn-bg px-3 py-2 text-[12.5px] font-semibold text-warn-ink">
             Past the RCM deadline for this age group.
+          </p>
+        )}
+        {/* ⚠️ THIS SAYS WHAT TO DO, NOT JUST WHAT IS WRONG. The fix is on the
+            FIXTURE, not on this form — the TEAM line is stamped from the event
+            and cannot be typed here, deliberately, so a coach told only "no
+            league team" would hunt for a field that does not exist. */}
+        {missingLeagueTeam && (
+          <p
+            role="alert"
+            data-testid="match-sheet-no-league-team"
+            className="mt-2.5 rounded-[11px] bg-warn-bg px-3 py-2 text-[12.5px] font-semibold text-warn-ink"
+          >
+            This fixture has no league team, so RCM&rsquo;s <strong>TEAM</strong> box is empty and
+            this sheet cannot be marked ready to send. Edit the fixture and pick the side that
+            played — {squadName || 'the squad'} is our own name for the squad, not the name RCM
+            knows them by.
           </p>
         )}
         {saved && !saveError && (

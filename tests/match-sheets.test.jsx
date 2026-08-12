@@ -114,7 +114,15 @@ beforeEach(() => {
   ])
   getMatchSheetMock.mockResolvedValue(null)
   listMatchSheetsForMock.mockResolvedValue(new Map())
-  saveMatchSheetMock.mockResolvedValue({ id: 'ms-1', status: 'draft' })
+  // ⚠️ THE EMBED IS PART OF THE RETURN because saveMatchSheet asks for it. A
+  // mock that omits it would blank the TEAM line on save and no test would say
+  // why — which is the exact failure the embed was added to prevent.
+  saveMatchSheetMock.mockResolvedValue({
+    id: 'ms-1',
+    status: 'draft',
+    league_team_id: 'lt-2',
+    league_team: { id: 'lt-2', rcm_name: 'ADHQ2', division: 'B' },
+  })
   saveSlotsMock.mockResolvedValue([])
   saveCardsMock.mockResolvedValue([])
   setStatusMock.mockResolvedValue({ id: 'ms-1', status: 'complete' })
@@ -235,13 +243,96 @@ describe('MatchSheet — the form', () => {
   })
 
   it('⚠️ says READY TO SEND, never "sent" — the app cannot know RCM received it', async () => {
+    // ⚠️ THE LEAGUE TEAM IS PART OF THE FIXTURE BECAUSE A COMPLETE SHEET CANNOT
+    // EXIST WITHOUT ONE as of 12 Aug 2026. Without it this mock exercises the
+    // missing-league-team path instead of the one it is named for.
     getMatchSheetMock.mockResolvedValue({
       id: 'ms-1', event_id: 'e-1', status: 'complete', slots: [], cards: [],
+      league_team_id: 'lt-2', league_team: { id: 'lt-2', rcm_name: 'ADHQ2', division: 'B' },
     })
     mount(<MatchSheet />)
     expect(await screen.findByText(/ready to send/i)).toBeInTheDocument()
     expect(screen.getByText(/the app cannot send it for you/i)).toBeInTheDocument()
     expect(screen.queryByText(/\bsent to RCM\b/i)).not.toBeInTheDocument()
+  })
+
+  // ── The TEAM line. Jay filed a U16B sheet on 12 Aug 2026 whose TEAM box read
+  //    "U16B Contact" — the club's internal squad name — because the fixture had
+  //    no league team and the code ended `?? squadName`. A blank box is an
+  //    obviously unfinished form; a confidently wrong one is not.
+  describe('the TEAM line', () => {
+    const NO_LEAGUE_TEAM = { ...MATCH, league_team_id: null, league_team: null }
+
+    it('⚠️ NEVER prints the squad name in RCM\'s TEAM box', async () => {
+      getEventMock.mockResolvedValue(NO_LEAGUE_TEAM)
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      const facsimile = screen.getByTestId('match-sheet-facsimile')
+      expect(facsimile).not.toHaveTextContent(/U14B Contact/)
+      // The label survives; only the value is empty.
+      expect(facsimile).toHaveTextContent(/TEAM:/)
+    })
+
+    it('⚠️ refuses to mark a sheet ready when there is no league team', async () => {
+      getEventMock.mockResolvedValue(NO_LEAGUE_TEAM)
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      expect(screen.getByRole('button', { name: /^submit$/i })).toBeDisabled()
+      expect(screen.getByTestId('match-sheet-no-league-team')).toBeInTheDocument()
+    })
+
+    it('⚠️ names the squad as OUR name for it, and sends the coach to the fixture', async () => {
+      // The TEAM box is stamped from the event and cannot be typed here, so a
+      // warning that only said "no league team" would send a coach hunting for
+      // a field this form does not have.
+      getEventMock.mockResolvedValue(NO_LEAGUE_TEAM)
+      mount(<MatchSheet />)
+      const warning = await screen.findByTestId('match-sheet-no-league-team')
+      expect(warning).toHaveTextContent(/edit the fixture/i)
+      expect(warning).toHaveTextContent(/U14B Contact/)
+    })
+
+    it('lets a normal fixture through, and prints the league team', async () => {
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      expect(screen.getByTestId('match-sheet-facsimile')).toHaveTextContent(/ADHQ2/)
+      expect(screen.getByRole('button', { name: /^submit$/i })).not.toBeDisabled()
+      expect(screen.queryByTestId('match-sheet-no-league-team')).not.toBeInTheDocument()
+    })
+
+    it('⚠️ a FILED sheet keeps the team it was filed with, not the fixture\'s new one', async () => {
+      // A sheet is a record of what was SENT. Correcting the fixture in March
+      // must not rewrite the TEAM line on a form RCM already holds.
+      getMatchSheetMock.mockResolvedValue({
+        id: 'ms-1', event_id: 'e-1', status: 'complete', slots: [], cards: [],
+        league_team_id: 'lt-9',
+        league_team: { id: 'lt-9', rcm_name: 'ADHQ1', division: 'A' },
+      })
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      const facsimile = screen.getByTestId('match-sheet-facsimile')
+      expect(facsimile).toHaveTextContent(/ADHQ1/)
+      expect(facsimile).not.toHaveTextContent(/ADHQ2/)
+    })
+
+    it('⚠️ still lets a wrongly-completed sheet be REOPENED', async () => {
+      // The gate is one-way. A sheet marked ready before the gate existed must
+      // still be fixable, or the app defends its rule against the person trying
+      // to obey it.
+      getEventMock.mockResolvedValue(NO_LEAGUE_TEAM)
+      getMatchSheetMock.mockResolvedValue({
+        id: 'ms-1', event_id: 'e-1', status: 'complete', slots: [], cards: [],
+        league_team_id: null, league_team: null,
+      })
+      mount(<MatchSheet />)
+      await screen.findByRole('heading', { name: /official match result sheet/i })
+
+      expect(screen.getByRole('button', { name: /^reopen$/i })).not.toBeDisabled()
+    })
   })
 
   it('⚠️ shows the TRUE deadline for U18 — an hour BEFORE kick-off', async () => {

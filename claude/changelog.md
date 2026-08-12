@@ -10,7 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **`state-of-play.md` was missing four shipped features
+- *(SHA follows in the next PR)* — **The RCM match sheet stopped printing the club's own
+  squad name in the governing body's TEAM box.**
+  Jay filed a U16B sheet whose TEAM box read **"U16B Contact"**. Measured on the live row,
+  not read off the screenshot: `league_team_id` was NULL, and `ourName` ended `?? squadName`.
+  ⚠️ **The FALLBACK was the bug, not the missing data.** A blank box is an obviously
+  unfinished form; a confidently wrong one is not, and it was photographed and sent. **Same
+  shape as the incident already recorded against `src/lib/ageGroup.js`** — the absent value
+  fell through to the least safe answer. The lesson was the null default, not the regex, and
+  it had not been learned.
+  ⚠️ **The screen also ignored `match_sheets.league_team_id`**, the column stamped at save
+  precisely so a filed record is FROZEN — so correcting a fixture in March would have
+  silently rewritten a form RCM already holds. The saved sheet now wins.
+  ⚠️ **The complete-gate is ONE-WAY**: it stops a sheet reaching ready-to-send and never
+  stops one being reopened, or the app defends its own rule against the person obeying it.
+  ⚠️ **The score half is deliberately NOT in this change.** `events.result_us/result_them`
+  and `match_sheets.score_us` are two stores of one fact; Jay ruled the fixture wins, but
+  **tries have no home on `events` at all** and the scoring model decides where they go.
+  ⚠️ Proved against **two** injected faults, because the first left two assertions unproven:
+  restoring `?? squadName` turned 4 of 6 red, and making the gate two-way turned exactly the
+  reopen test red. **An injection that fails to go red is data about the CHECK.**
+
+- `41adbbf` — **`state-of-play.md` was missing four shipped features
   and calling one of them "never started".**
   League teams, the RCM match sheet, the Club Youth Manager portal, event duplication and
   the PWA install prompt had all shipped across PRs #51-#60, and **none of them appeared
