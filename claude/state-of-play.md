@@ -138,6 +138,46 @@ went red on PR #37 for exactly this reason, having been skipped once already on 
 
 ### As of 12 Aug 2026
 
+⚠️ **BACKFILL, 12 Aug: the four entries immediately below were MISSING FROM THIS FILE
+ENTIRELY** while §Open said one of them had never been started. They shipped on 11-12
+Aug across PRs #51-#60 and only `claude/changelog.md` recorded them. **This file is
+step 3 of the reading order — a feature absent from it is a feature the next session
+will propose building.**
+
+- ✅ **LEAGUE TEAMS AND FIXTURES ARE LIVE** (`725d0e6`, `ee85430`, `102fa48`,
+  `18e4e12` — PRs #51-#56). A squad fields more than one side in a competition, so a
+  league team is its own object with an `rcm_name` and a division, managed from the
+  Club tab. ⚠️ **The name is unique per SQUAD, not per club** (`102fa48`) — two age
+  groups may both run an "ADHQ2". ⚠️ **Competition is a CHOICE — League or Tournament —
+  not free text** (`18e4e12`). Plan:
+  `claude/plans/2026-08-11-league-teams-and-fixtures.md` and its implementation half.
+- ✅ **THE RCM OFFICIAL MATCH RESULT SHEET IS LIVE, AND SO IS THE CLUB YOUTH MANAGER
+  PORTAL** (`3c64990`, PR #57). Three tables, the editor at `/match-sheet/:eventId`,
+  and the manager's list at `/admin/youth` behind the `youth` right — which had existed
+  in `ADMIN_RIGHTS` since 10 Aug and granted access to nothing.
+  ⚠️ **THE LAYOUT IS A FACSIMILE OF THE REAL FORM**, which Jay supplied mid-build, and
+  three things could only have come from the document: the 22 run in **two columns**
+  each with its own FR; **FINAL SCORE / TRIES are POSITIONAL — HOME then AWAY, not us
+  and them**, so an away fixture puts our score in the right-hand pair while the
+  database still stores `score_us`; and **CLUB is the club, HOME TEAM is the LEAGUE
+  TEAM**.
+  ⚠️ **`complete` MEANS READY TO SEND, NEVER SENT.** Nothing in this app can know
+  whether RCM received anything — submission is a human dropping a file into a WhatsApp
+  group.
+  ⚠️ **`full_name` is stored as TEXT even when `player_id` is set** — the form demands
+  the name "as per registration", and a submitted sheet is history that must survive a
+  player being renamed or removed. ⚠️ **The old third reason, "the club only has 7
+  players", is RETIRED** — Jay ruled on 12 Aug to build for the loaded club. The
+  conclusion stands; that justification must not be cited again.
+  ⚠️ **Share generates a real PNG** (`html2canvas`, imported lazily) because
+  `wa.me/?text=` carries text only. That overturned the plan's "no new dependency"
+  line, knowingly.
+  ⚠️ **SHIPPED IS NOT EXERCISED: no coach has filled one in during a real match.**
+- ✅ **AN EVENT CAN BE DUPLICATED, AND THREE TYPE MARKS MEAN SOMETHING** (`ea0b8ac`,
+  PR #59).
+- ✅ **THE APP TELLS PEOPLE IT INSTALLS** (`a309092`, PR #60) — a real button on
+  Android, instructions elsewhere.
+
 - ✅ **THE THREE CLUB JOBS ARE NAMED AND THE VOLUNTEERS ARE NOT** (`78649aa`).
   **Club Youth Manager**, **Pitch Management**, **Social Media Management** — in the
   app, in code comments, in the decision records and in conversation.
@@ -778,14 +818,49 @@ state; trust the decisions for reasoning.**
   vault entry, and that should be DERIVED from `approval_notify_url` in SQL so the
   host cannot drift and so nobody handles a value by hand.
 - **Deferred by Jay, still deferred:** test data cleanup, and the `group_id`
-  multi-squad edit/cancel. **Never started, in priority order Jay gave them:**
-  the Club Youth Manager dashboard (match sheets → WhatsApp), the Social Media
-  Management dashboard, training plans for the head of rugby performance.
-  ⚠️ **The AI features Jay brainstormed (Smart Comms, NL queries, match reports, auto
-  lineup) ALL need one ruling first: whether children's data may leave the club for a
-  third-party API.** Nobody has asked him. **Do not start any of them until he has
-  answered** — the attendance-flag item below is the only one that dodges it, by being
-  plain SQL.
+  multi-squad edit/cancel.
+  ❌ **THIS ENTRY SAID "NEVER STARTED" ABOUT TWO THINGS THAT HAD ALREADY SHIPPED, and
+  it said it for a day and a half.** The list was *the Club Youth Manager dashboard
+  (match sheets → WhatsApp), the Social Media Management dashboard, training plans for
+  the head of rugby performance*. **The first shipped on 11 Aug (`3c64990`), the second
+  on 12 Aug (`ea3d500`)**, and the line was left standing through both. Corrected
+  12 Aug. ⚠️ **The same failure as the league-teams status line two commits earlier**
+  (`2290bf7`) — a claim about what does NOT exist is the one kind nothing can check,
+  because there is no file to fail against. `docs:check` cannot catch it and neither
+  can a test.
+  **What is genuinely never started, of that list: training session plans.** A plan
+  exists — `claude/plans/2026-08-12-training-session-plans.md` — and its headline
+  finding is that ⚠️ **"scrape the web for the best sessions" cannot be built as asked,
+  on copyright rather than capability.**
+  ⛔ **TABLED BY JAY, 12 Aug 2026**, in the same breath as the AI plan: *"table 1 and 2
+  for now until i bring them back up again"*. **Do not start it, do not offer to, do
+  not ask again — he reopens it or it stays closed.**
+- ✅ **THE AI RULING IS MADE — Jay, 12 Aug 2026: "yes it may."** Children's data may
+  leave the club for a third-party API.
+  ❌ **This file said "Nobody has asked him. Do not start any of them until he has
+  answered" until 12 Aug, after he had answered** — and the answer was recorded the
+  same day in `claude/decisions/2026-08-12-childrens-data-may-leave-the-club.md`, which
+  is the governing document. Smart Comms, NL queries, match reports and auto lineup are
+  **unblocked**.
+  ⚠️ **"May" is permission, not a design.** The ruling sets **minimisation** as the
+  standing default and names the field list: player names, squad, fixture facts and
+  league team go; **photos, contact details, medical notes and attendance history do
+  not**, and widening that is a conversation with Jay, not a judgement call.
+  ⚠️ **`match_sheets.medical_notes` is the trap this schema now contains** — a match
+  report feature that selects `*` sends concussion notes about named children to a
+  third party.
+  ⛔ **THE BUILD IS TABLED — Jay, 12 Aug 2026: *"table 1 and 2 for now until i bring
+  them back up again"*.** `claude/plans/2026-08-12-ai-integration.md` is written and
+  **NOT SHIPPED**. **Do not start it, do not offer to, do not ask again.**
+  ⚠️ **HE TABLED THE BUILD, NOT THE RULING.** The permission above stands and governs
+  anything that ever sends club data to a third party, from this plan or otherwise.
+  Collapsing the two would either re-ask a settled question or leave a future feature
+  with no field list to answer to.
+  ⚠️ **Nothing exists to undo: no Anthropic key, no vault entry, no `ai-assist`
+  function, no spend limit.** If it is reopened, the plan's two preconditions are still
+  the first two steps — **Jay creates the key himself, and a SPEND LIMIT is set before
+  the first call.** An unbounded loop against a paid API is the one failure in this app
+  that costs money per second. Model is `claude-haiku-4-5` (Jay's call).
 - A parent has never signed out in a real browser. The RLS-refusal path is still
   mock-only for both events features.
 
