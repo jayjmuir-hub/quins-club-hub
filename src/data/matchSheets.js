@@ -24,9 +24,18 @@ const REFUSED =
 export async function getMatchSheet(eventId) {
   if (!eventId) return null
 
+  // ⚠️ THE SHEET'S OWN LEAGUE TEAM IS EMBEDDED, NOT THE FIXTURE'S, and that is
+  // the whole point of the column. `league_team_id` is stamped onto the sheet at
+  // save time so a filed record is FROZEN — the same reasoning that stores
+  // `full_name` as text beside a live `player_id`. Until 12 Aug 2026 the screen
+  // rendered `event.league_team` instead and this column was decorative, which
+  // meant correcting a fixture's league team next month would silently rewrite
+  // the TEAM line on a sheet already sent to RCM.
   const { data, error } = await supabase
     .from('match_sheets')
-    .select('*, slots:match_sheet_slots(*), cards:match_sheet_cards(*)')
+    .select(
+      '*, league_team:league_teams(id, rcm_name, division), slots:match_sheet_slots(*), cards:match_sheet_cards(*)',
+    )
     .eq('event_id', eventId)
     .maybeSingle()
 
@@ -75,9 +84,14 @@ export async function listMatchSheetsFor(eventIds) {
 export async function saveMatchSheet(sheet) {
   const { id, slots, cards, ...fields } = sheet ?? {}
 
+  // ⚠️ THE EMBED IS ON THE WRITE'S `select()` TOO, not only on getMatchSheet.
+  // The screen renders the TEAM line from the SHEET's league team; a saved row
+  // returned without the embed reads as "this sheet has no league team", so
+  // hitting Save draft would blank a box that was correct a second earlier.
+  const embed = '*, league_team:league_teams(id, rcm_name, division)'
   const query = id
-    ? supabase.from('match_sheets').update(fields).eq('id', id).select().maybeSingle()
-    : supabase.from('match_sheets').insert(fields).select().maybeSingle()
+    ? supabase.from('match_sheets').update(fields).eq('id', id).select(embed).maybeSingle()
+    : supabase.from('match_sheets').insert(fields).select(embed).maybeSingle()
 
   const { data, error } = await query
   if (error) throw new Error(error.message || REFUSED)
