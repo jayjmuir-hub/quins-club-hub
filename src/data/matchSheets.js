@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { fetchByIds } from './limits.js'
 
 // RCM match sheets — read and write. claude/plans/2026-08-11-match-sheets.md.
 //
@@ -68,16 +69,24 @@ export async function getMatchSheet(eventId) {
  * fetch would be hundreds of round trips. Returns a Map keyed by event_id.
  */
 export async function listMatchSheetsFor(eventIds) {
-  const ids = (eventIds ?? []).filter(Boolean)
-  if (ids.length === 0) return new Map()
+  // ⚠️ CHUNKED SINCE 12 Aug 2026, AND THE COMMENT ABOVE IS WHY IT HAD TO BE.
+  // "one query for the whole list" was the right instinct and it had a ceiling
+  // nobody had measured: PostgREST takes `.in()` as a query STRING, ~37 bytes
+  // per uuid, and a full season across fifteen squads is well past the point
+  // where the URL stops working. Measured on this project — 300 ids is fine,
+  // 400 makes the fetch THROW a connection error rather than return a status.
+  // Still one query per 200 fixtures, not one per fixture. See MAX_IN_LIST in
+  // ./limits.js.
+  const rows = await fetchByIds(eventIds, async (chunk) => {
+    const { data, error } = await supabase
+      .from('match_sheets')
+      .select('id, event_id, status, submitted_at, manager_name')
+      .in('event_id', chunk)
+    if (error) throw error
+    return data ?? []
+  })
 
-  const { data, error } = await supabase
-    .from('match_sheets')
-    .select('id, event_id, status, submitted_at, manager_name')
-    .in('event_id', ids)
-
-  if (error) throw error
-  return new Map((data ?? []).map((row) => [row.event_id, row]))
+  return new Map(rows.map((row) => [row.event_id, row]))
 }
 
 /**

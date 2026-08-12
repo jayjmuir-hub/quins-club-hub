@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { fetchByIds } from './limits.js'
 
 // Data access for public.player_parents — the parent/carer rows behind a
 // player. Same conventions as src/data/players.js: throws an Error rather
@@ -45,15 +46,20 @@ export async function listParents(playerId) {
  * radius than the feature requires.
  */
 export async function listParentsForPlayers(playerIds) {
-  if (!Array.isArray(playerIds) || playerIds.length === 0) return []
-
-  const { data, error } = await supabase
-    .from('player_parents')
-    .select('id, player_id, full_name, relationship, is_primary')
-    .in('player_id', playerIds)
-
-  if (error) throw error
-  return data ?? []
+  // ⚠️ CHUNKED SINCE 12 Aug 2026. PostgREST takes `.in()` as a query STRING —
+  // ~37 bytes of URL per uuid — and this is fed a whole roster. Measured on
+  // this project: 300 ids works, 400 makes the fetch THROW a connection error
+  // rather than return a status, which reads as a bad network rather than a
+  // request built wrong. A full club is ~375 players. See MAX_IN_LIST in
+  // ./limits.js.
+  return fetchByIds(playerIds, async (chunk) => {
+    const { data, error } = await supabase
+      .from('player_parents')
+      .select('id, player_id, full_name, relationship, is_primary')
+      .in('player_id', chunk)
+    if (error) throw error
+    return data ?? []
+  })
 }
 
 const REFUSED_PARENT =

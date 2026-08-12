@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
-import { MAX_ROWS, withCap, unwrapCapped, fetchAllPages } from '../src/data/limits.js'
+import {
+  MAX_ROWS,
+  MAX_IN_LIST,
+  withCap,
+  unwrapCapped,
+  fetchAllPages,
+  fetchByIds,
+} from '../src/data/limits.js'
 
 // Tests for the row caps on the unbounded list reads.
 //
@@ -213,5 +220,72 @@ describe('fetchAllPages', () => {
     await expect(
       fetchAllPages(build, [['id', { ascending: true }]], 'events', 'hint'),
     ).rejects.toThrow('permission denied')
+  })
+})
+
+describe('fetchByIds — the URL-length limit, which bites before the row limit', () => {
+  // ⚠️ THIS IS NOT A ROW LIMIT. PostgREST takes `.in()` as a query STRING, so a
+  // uuid costs ~37 bytes of URL and a club-wide read builds a request the
+  // gateway refuses before Postgres ever sees it. MAX_ROWS does nothing about
+  // it: the request never gets far enough to return a row.
+  //
+  // ✅ MEASURED against the live project 12 Aug 2026, with real uuids:
+  //   300 ids -> 11,196-byte URL -> 200 OK
+  //   400 ids -> 14,896-byte URL -> the fetch THREW
+  //   900 ids -> 33,396-byte URL -> 400 Bad Request
+  //
+  // ⚠️ AND THE 400-ID FAILURE IS THE DANGEROUS ONE — a connection failure, not
+  // a status, so it reads as a bad network rather than a request built wrong.
+
+  it('stays well under the smallest measured failure', () => {
+    // The club lands ON this cliff: fifteen squads at ~25 players is ~375,
+    // between the last size measured working and the first measured failing.
+    expect(MAX_IN_LIST).toBeLessThanOrEqual(300)
+    expect(MAX_IN_LIST).toBeGreaterThan(0)
+  })
+
+  it('issues ONE query per chunk and concatenates every row', async () => {
+    const ids = Array.from({ length: MAX_IN_LIST * 2 + 5 }, (unused, i) => `id-${i}`)
+    const seen = []
+    const rows = await fetchByIds(ids, async (chunk) => {
+      seen.push(chunk.length)
+      return chunk.map((id) => ({ id }))
+    })
+
+    expect(seen).toEqual([MAX_IN_LIST, MAX_IN_LIST, 5])
+    expect(rows).toHaveLength(ids.length)
+  })
+
+  it('does not query at all for an empty list', async () => {
+    // Matching the teamIds convention everywhere else in src/data: an empty
+    // input means "nothing to ask about", and must NEVER be read as "no
+    // filter, return everything".
+    const run = vi.fn()
+    await expect(fetchByIds([], run)).resolves.toEqual([])
+    await expect(fetchByIds(undefined, run)).resolves.toEqual([])
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('⚠️ dedupes, because the callers build their lists from other queries', async () => {
+    const run = vi.fn(async (chunk) => chunk.map((id) => ({ id })))
+    const rows = await fetchByIds(['a', 'b', 'a', null, 'b', undefined], run)
+
+    expect(run).toHaveBeenCalledWith(['a', 'b'])
+    expect(rows).toEqual([{ id: 'a' }, { id: 'b' }])
+  })
+
+  it('⚠️ THROWS rather than returning some of it, exactly like fetchAllPages', async () => {
+    // The guarantee that matters. A partial contact list would make players
+    // look like they have no parent on file, which is a safeguarding-adjacent
+    // number somebody would act on.
+    const ids = Array.from({ length: MAX_IN_LIST + 1 }, (unused, i) => `id-${i}`)
+    let call = 0
+    await expect(
+      fetchByIds(ids, async (chunk) => {
+        call += 1
+        if (call === 2) throw new Error('second chunk failed')
+        return chunk.map((id) => ({ id }))
+      }),
+    ).rejects.toThrow(/second chunk failed/)
   })
 })
