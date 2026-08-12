@@ -39,7 +39,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   outside the docs was a code comment.
   `claude/decisions/2026-08-12-jobs-not-people.md`
 
-- *(SHA follows in the next PR — a commit cannot cite its own)* — **`app.adhjrt.com` is retired.**
+- `b8fd9a0` — **`app.adhjrt.com` is retired.**
   The app's original address, kept as a working alias since the 5 Aug domain move, no longer
   resolves. Removed in three places: the Supabase redirect allow-list, the Netlify domain alias,
   and the DNS record — ⚠️ **which went automatically, because `adhjrt.com` is on Netlify DNS and
