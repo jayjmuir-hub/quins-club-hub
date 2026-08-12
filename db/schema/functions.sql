@@ -2041,3 +2041,75 @@ begin
   return new;
 end;
 $$;
+
+-- ---------------------------------------------------------------------
+-- private.notify_access_request()  — TRIGGER FUNCTION, REACHES OUTSIDE THE DB
+-- Added 2026-08-12 by migration `access_request_notify`. Fired by one trigger
+-- on public.access_requests — see triggers.sql.
+-- prosecdef: true    provolatile: v (VOLATILE)    proconfig: search_path=public
+-- proacl: {postgres=X/postgres}   ← the migration revokes from public, anon and
+--         authenticated, so nothing else can call it.
+--
+-- The THIRD function in this project to make an outbound HTTP call, after
+-- private.notify_pending_membership and private.notify_pitch_request.
+--
+-- ⚠️ NOT THE SAME THING AS notify_pending_membership. That fires for a pending
+-- MEMBERSHIP — somebody already attached to a squad, waiting to be approved
+-- into it. This fires for an ACCESS REQUEST — somebody with NO membership at
+-- all, asking to be let in. Two queues, two sections of the Accounts screen.
+--
+-- ⚠️ WHY THE DATABASE SENDS IT AND NOT THE APP: the person triggering it has no
+-- membership, so they read zero rows from every table. They cannot read the
+-- admin list and cannot read profiles.email (column-granted, not merely
+-- policy-gated), and giving them either would hand an unapproved stranger the
+-- club's admin roster.
+--
+-- ⚠️ IT MUST NEVER FAIL THE WRITE, hence the catch-all. ⚠️ AND THE FAILURE IS
+-- THEREFORE QUIET — `raise warning` goes to a log nobody reads. Survivable ONLY
+-- because the queue is in-app: the request sits in "Waiting for access" whether
+-- or not the mail arrived. The email is a prompt to go and look, never the record.
+--
+-- ⚠️ REUSES `approval_notify_secret`. The URL is its own entry,
+-- `access_request_notify_url`, DERIVED from approval_notify_url in SQL so that
+-- the host cannot drift and so nobody ever reads, pastes or types the value.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_access_request()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+begin
+  select decrypted_secret into endpoint from vault.decrypted_secrets where name = 'access_request_notify_url';
+  select decrypted_secret into secret   from vault.decrypted_secrets where name = 'approval_notify_secret';
+
+  if endpoint is null or secret is null then
+    raise warning 'notify_access_request: vault secrets missing, no email sent for %', new.id;
+    return new;
+  end if;
+
+  perform net.http_post(
+    url     := endpoint,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-approval-secret', secret),
+    body    := jsonb_build_object('access_request_id', new.id)
+  );
+
+  return new;
+exception when others then
+  raise warning 'notify_access_request failed for %: %', new.id, sqlerrm;
+  return new;
+end;
+$function$
+;
+
+-- Function comment as stored in the database:
+--   'Posts an access request id to the notify-access-request edge function when
+--    somebody asks for access. Swallows every failure: the in-app waiting list
+--    is the record, this is only the prompt.'
+
+REVOKE ALL ON FUNCTION private.notify_access_request() FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.notify_access_request() FROM anon;
+REVOKE ALL ON FUNCTION private.notify_access_request() FROM authenticated;

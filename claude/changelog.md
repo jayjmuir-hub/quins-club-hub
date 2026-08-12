@@ -10,7 +10,39 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **The drop is back on, in the right order this
+- *(SHA follows in the next PR)* — **Admins are told when somebody asks for access.**
+  Migration `access_request_notify`; edge function `notify-access-request` (v2,
+  `verify_jwt: false`). `state-of-play.md` said "Nobody is emailed when an access
+  REQUEST arrives" and predicted the cost exactly: *"a third is a copy with a
+  different recipient query."*
+  ⚠️ **NOT the approval email.** That fires for a pending MEMBERSHIP — somebody already
+  attached to a squad. This fires for somebody with NO membership at all. Two queues,
+  two sections of the Accounts screen.
+  ⚠️ **Recipients are EVERY ACTIVE ADMIN, measured rather than copied.** There is no
+  `accounts` right; acting on a request needs `is_admin_anywhere()` to read the list
+  and `is_admin(club_id)` to grant, and both are plain admin. Copying the pitch
+  function's `is_super or right` clause would have silently excluded the ordinary
+  admins who can actually do the job.
+  ⚠️ **The endpoint is DERIVED from `approval_notify_url` in SQL** — anchored on the
+  final path segment — so the host cannot drift and **nobody ever reads, pastes or
+  types the value.** This repo is public.
+  ⚠️ **The `when (new.status = 'pending')` guard is load-bearing.**
+  `dismissAccessRequest` UPSERTS, and an upsert with no existing row INSERTS a row
+  that is already `dismissed` — so without it, turning away a stranger who never
+  asked would email every admin about the person just turned away. **Injection
+  confirmed red:** removing the guard took that insert's queue delta 0 → 1.
+  ❌ **THE FIRST DEPLOYED VERSION WAS BROKEN AND ONLY A LIVE PROBE FOUND IT.**
+  `access_requests` has TWO foreign keys to `profiles`, so a bare `profiles(...)`
+  embed is ambiguous and PostgREST refuses the whole query. **The only symptom was a
+  500 and no email** — precisely the quiet failure this design knowingly accepts.
+  Fixed with the explicit constraint name; same probe before and after, **500 → 404**.
+  ⚠️ **The Resend call is the one branch NOT exercised live** — a real send would put
+  a test email in a third volunteer's inbox. Everything else was: the auth gate (its
+  own `unauthorised` body, which is what proves the request reached the function
+  rather than a JWT gate), the vault derivation, the trigger on all four write paths,
+  and the database read.
+
+- `97bf93d` — **The drop is back on, in the right order this
   time, and the docs stop describing a state that did not exist.**
   `drop_match_sheet_scores_after_deploy`, applied only once the new bundle was actually
   serving.
