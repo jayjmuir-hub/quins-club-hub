@@ -1873,3 +1873,76 @@ AS $function$
 $function$
 ;
 GRANT EXECUTE ON FUNCTION private.can_edit_match_sheet(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.social_idea_owner(text)   (captured 12 Aug 2026)
+--
+-- The submitter of an image, parsed from its object key. Keys are
+-- `<profile_id>/<timestamp>.<ext>`, so the first segment IS the owner — a
+-- storage policy sees nothing but the filename. Mirrors photo_player/photo_team.
+--
+-- ⚠️ NO PINNED search_path, and that is RECORDED RATHER THAN FIXED — the same
+-- position as private.squad_expects_gender: it is SECURITY INVOKER, IMMUTABLE,
+-- and touches no table, so there is nothing for a search_path to redirect.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.social_idea_owner(_name text)
+ RETURNS uuid
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$
+  select nullif(split_part(_name, '/', 1), '')::uuid
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.social_idea_owner(text) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.set_social_idea_provenance()   (captured 12 Aug 2026)
+--
+-- BEFORE INSERT trigger function on public.social_ideas.
+--
+-- ⚠️ SECURITY DEFINER because it classifies the submitter from `memberships`.
+-- A member can read their own row, so INVOKER would mostly work — and "mostly"
+-- is the wrong guarantee for the value that decides how the manager triages.
+--
+-- ⚠️ IT OVERWRITES RATHER THAN DEFAULTS. Assigning only when null would leave
+-- a caller able to supply their own from_staff, which is the entire hole this
+-- closes.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.set_social_idea_provenance()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  _club uuid;
+  _staff boolean;
+begin
+  select m.club_id,
+         bool_or(m.role in ('admin', 'coach', 'manager', 'medic'))
+    into _club, _staff
+    from memberships m
+   where m.profile_id = auth.uid()
+     and m.status = 'active'
+   group by m.club_id
+   limit 1;
+
+  if _club is null then
+    raise exception 'no active membership' using errcode = '42501';
+  end if;
+
+  new.submitted_by := auth.uid();
+  new.club_id      := _club;
+  new.from_staff   := coalesce(_staff, false);
+  new.status       := 'new';
+  new.decided_by   := null;
+  new.decided_at   := null;
+  new.decision_note := null;
+
+  return new;
+end;
+$function$
+;

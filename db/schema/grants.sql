@@ -287,3 +287,20 @@
 -- What would catch it: `db/tests/grants.sql` fails immediately (`authenticated`
 -- can UPDATE profiles.email), and a re-capture would diff section 2 back to a
 -- uniform thirteen. ⚠️ **Both are manual.** Nothing automatic can see a dashboard.
+
+
+-- ---------------------------------------------------------------------
+-- public.social_ideas — COLUMN grants  (captured 12 Aug 2026)
+--
+-- ⚠️ POLICIES AUTHORISE THE ROW; GRANTS AUTHORISE THE COLUMN. "social idea
+-- decide" is FOR UPDATE over the whole row, so without this an admin marking
+-- an idea used is also authorised to rewrite the submitter's words and swap
+-- their photo. Same protection as profiles.email, and §4 above records how
+-- readily the Supabase dashboard offers to undo exactly this.
+--
+-- Verified after applying: table-level UPDATE to `authenticated` is NONE, and
+-- the column list is exactly these four.
+-- ---------------------------------------------------------------------
+REVOKE UPDATE ON public.social_ideas FROM authenticated;
+GRANT UPDATE (status, decision_note, decided_by, decided_at)
+  ON public.social_ideas TO authenticated;

@@ -197,8 +197,15 @@ export default function AdminDashboard() {
             the current case; Social Media Management will be the next one. */}
         {portal && portal.tabs.length > 1 && (
           <nav aria-label="Admin sections" className="mb-4 flex gap-2">
+            {/* ⚠️ `end` IS LOAD-BEARING AND WAS NOT NEEDED UNTIL 12 Aug 2026.
+                Every tab used to be a leaf, so a prefix match was harmless.
+                Social Media Management introduced the first NESTED pair —
+                /admin/social and /admin/social/ideas — and without `end` a
+                NavLink is active for its own path AND every path beneath it,
+                so "What's on" would light up while you are standing on
+                "Ideas". Two tabs marked current is worse than none. */}
             {portal.tabs.map((tab) => (
-              <NavLink key={tab.to} to={tab.to} className={tabClassName}>
+              <NavLink key={tab.to} to={tab.to} end className={tabClassName}>
                 {tab.label}
               </NavLink>
             ))}

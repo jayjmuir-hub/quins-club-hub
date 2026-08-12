@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
+import IdeaForm from '../components/IdeaForm.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
 import YourPlayers from '../components/YourPlayers.jsx'
 import { updateMyProfile } from '../data/members.js'
@@ -307,6 +308,25 @@ function YouCard({ profile, email, role, squads }) {
   )
 }
 
+// The member-facing door into Social Media Management. A card rather than a
+// bare button so it can carry the one sentence that explains why anyone would
+// tap it — "send us a photo" means nothing without "we might post it".
+function SendAnIdea() {
+  const [open, setOpen] = useState(false)
+  return (
+    <Card className="p-4">
+      <p className="text-sm leading-relaxed text-ink">
+        Seen something worth posting? Send the club a photo or an idea and the social
+        media manager will take a look.
+      </p>
+      <Button className="mt-3" onClick={() => setOpen(true)} data-testid="send-idea">
+        Send a post idea
+      </Button>
+      <IdeaForm open={open} onClose={() => setOpen(false)} />
+    </Card>
+  )
+}
+
 export default function More() {
   const { memberships, teams } = useMemberships()
   const { user } = useAuth()
@@ -339,6 +359,15 @@ export default function More() {
       {/* Renders nothing at all for a coach or admin with no child at the
           club — an empty "Your players" card would imply something missing. */}
       <YourPlayers memberships={memberships} teams={teams} />
+
+      {/* ⚠️ EVERY MEMBER SEES THIS, and that is the ruling rather than an
+          oversight (Jay, 12 Aug 2026): a parent with a good photo of Saturday's
+          match is exactly who the social media manager needs to hear from. It
+          lives on More because More is the one screen every role reaches on a
+          phone — the same reason the approvals entry below is here.
+          claude/decisions/2026-08-12-social-media-management.md */}
+      <SectionTitle>Social media</SectionTitle>
+      <SendAnIdea />
 
       {/* ⚠️ THE COACH'S AND TEAM MANAGER'S ONLY WAY IN (Jay, 9 Aug 2026).
           The Admin pill in the tab bar is admin-only AND desktop-only, so

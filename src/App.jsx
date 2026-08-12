@@ -8,6 +8,8 @@ import Roster from './screens/Roster.jsx'
 import More from './screens/More.jsx'
 import AdminDashboard from './screens/AdminDashboard.jsx'
 import PortalChooser from './screens/PortalChooser.jsx'
+import SocialWhatsOn from './screens/SocialWhatsOn.jsx'
+import SocialIdeas from './screens/SocialIdeas.jsx'
 import AdminClub from './screens/AdminClub.jsx'
 import Accounts from './screens/Accounts.jsx'
 import Pitches from './screens/Pitches.jsx'
@@ -139,6 +141,12 @@ export default function App() {
                 right decides which dashboard somebody is SHOWN, never what
                 the database will let them do. */}
             <Route path="youth" element={<YouthDashboard />} />
+            {/* Social Media Management. ⚠️ NESTED, unlike every other admin
+                tab — /admin/social/ideas sits under /admin/social. That is
+                why the tab row now passes `end` to NavLink; without it the
+                parent tab reads as current on the child route. */}
+            <Route path="social" element={<SocialWhatsOn />} />
+            <Route path="social/ideas" element={<SocialIdeas />} />
           </Route>
 
           {/* ⚠️ THE MATCH SHEET EDITOR IS DELIBERATELY OUTSIDE /admin, and the

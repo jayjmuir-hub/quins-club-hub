@@ -1,6 +1,13 @@
 # Social Media Management — the plan
 
-**STATUS: NOT SHIPPED.** Written 12 Aug 2026.
+**STATUS: SHIPPED 12 Aug 2026.**
+
+⚠️ **One thing this plan did not predict, and it is the sort of defect that
+reaches production.** `/admin/social/ideas` is the app's **first nested tab
+pair** — every admin tab before it was a leaf. `NavLink` is active for its own
+path *and everything beneath it* unless given `end`, so "What's on" lit up
+while standing on "Ideas". Fixed at the source in `AdminDashboard`, and pinned
+by a test that fails when `end` is removed.
 
 ⚠️ **Set this line to SHIPPED in the commit that ships it**, not as a promise
 about that commit. ⚠️ **And if this plan is ever split in two, both halves get a

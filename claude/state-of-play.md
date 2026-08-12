@@ -153,9 +153,27 @@ went red on PR #37 for exactly this reason, having been skipped once already on 
   not a link in the markup.** ⚠️ **Navigation only — nothing was narrowed.** A portal
   holder is still a full admin. ⚠️ **Only bare `/admin` changed**; every URL under it
   is untouched.
-  ⚠️ **`Social Media Management` is a grey card saying "No screen yet"** — the right
-  is grantable and unlocks nothing. Adding a tab to `PORTALS` in `src/lib/portals.js`
-  is the only change needed to open it.
+  ~~⚠️ **`Social Media Management` is a grey card saying "No screen yet"**~~
+  ✅ **OPENED THE SAME DAY.** Adding its two tabs to `PORTALS` was the only change the
+  chooser needed — no edit to `PortalChooser`, which is what that empty `tabs` array
+  was for. **Every portal now has at least one screen**, so a test asserts the
+  no-tabs rule against a synthetic portal rather than a real one; the rule outlived
+  its last real example.
+- ✅ **SOCIAL MEDIA MANAGEMENT IS LIVE** — `/admin/social` (what's on) and
+  `/admin/social/ideas` (the inbox), plus "Send a post idea" on More for every member.
+  ⚠️ **It does NOT touch `player-photos`, and that is a RULING, not an omission.**
+  Submitted images live in a second private bucket, `social-ideas`, and were chosen by
+  a member for publication. A "pick a squad photo" button is a new conversation.
+  ⚠️ **`from_staff` is stamped by a trigger, never sent by the client.**
+  ⚠️ **UPDATE is column-granted** to `status`, `decision_note`, `decided_by`,
+  `decided_at` — so marking an idea cannot rewrite the submitter's words.
+  ⚠️ **Deleting removes the storage object FIRST, the row second.** Storage cannot be
+  cleared by SQL (`42501`); row-first orphans the exact image being removed.
+  ⚠️ **The consent line on the form is a PROMPT, NOT A CONTROL.** Any member can put an
+  image into club storage, it may contain other people's children, and the manager is
+  the only gate. A real gate would be a second reviewer or a consent register, and
+  neither exists. Reasoning:
+  `claude/decisions/2026-08-12-social-media-management.md`.
 - ✅ **`notify-pitch-request` WAS REDEPLOYED** (version 3) so the pitch emails match
   the new wording. ⚠️ **An edge function is NOT part of the Netlify build** — merging
   the app changes nothing about the mail. Verified live: the endpoint returns its own

@@ -66,6 +66,8 @@ function renderAt(path) {
           <Route path="allocation" element={<div>Allocation marker</div>} />
           <Route path="pitches" element={<div>Pitches marker</div>} />
           <Route path="youth" element={<div>Match sheets marker</div>} />
+          <Route path="social" element={<div>What&apos;s on marker</div>} />
+          <Route path="social/ideas" element={<div>Ideas marker</div>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -102,11 +104,25 @@ describe('portals.js', () => {
     expect(portalForPath('/admin/youth').key).toBe('youth')
   })
 
+  // ⚠️ TESTED AGAINST A SYNTHETIC PORTAL, NOT A REAL ONE, AND ON PURPOSE.
+  // Until Social Media Management shipped its screens later on 12 Aug 2026,
+  // `media` was the live example of a screenless portal and this asserted
+  // against it. Every real portal now has tabs — so pointing this at PORTALS
+  // would leave the rule untested the moment it had nothing to bite on.
+  // The rule is what matters: no tabs means closed, whatever the right says.
+  // (Rot rule: repoint an anchor, never delete it.)
   it('⚠️ closes a portal with no screens even for somebody holding the right', () => {
-    const media = PORTALS.find((p) => p.key === 'media')
-    expect(closedReason(media, admin(['media']))).toBe('no-screen')
+    const screenless = { key: 'ghost', right: 'media', blurb: '', tabs: [] }
+    expect(closedReason(screenless, admin(['media']))).toBe('no-screen')
     // And a super admin, who holds every right implicitly.
-    expect(closedReason(media, admin([], { is_super: true }))).toBe('no-screen')
+    expect(closedReason(screenless, admin([], { is_super: true }))).toBe('no-screen')
+    expect(portalHome(screenless)).toBeNull()
+  })
+
+  it('every real portal now has at least one screen', () => {
+    for (const portal of PORTALS) {
+      expect(portal.tabs.length).toBeGreaterThan(0)
+    }
   })
 
   it('distinguishes "no right" from "no screen" — different problems, different fixes', () => {
@@ -148,18 +164,19 @@ describe('PortalChooser', () => {
     expect(open.map((el) => el.getAttribute('href'))).toEqual(['/admin/accounts', '/admin/allocation'])
   })
 
-  it('⚠️ leaves Social Media Management grey for a SUPER admin, and says why', () => {
+  // ⚠️ THIS TEST USED TO ASSERT THE OPPOSITE. Until Social Media Management
+  // shipped its two screens later on 12 Aug 2026, a super admin saw three open
+  // cards and one grey. It is rewritten rather than deleted because the claim
+  // it makes is the durable one: a super admin holds every right implicitly,
+  // so nothing is closed to them for want of a right.
+  it('⚠️ opens every portal for a SUPER admin, who holds every right implicitly', () => {
     useMembershipsMock.mockReturnValue(memberships(admin([], { is_super: true })))
     renderAt('/admin')
 
-    // A super holds every right, so three portals open and only the screenless
-    // one stays shut.
-    expect(screen.getAllByTestId('portal-card-open')).toHaveLength(3)
-    const closed = screen.getAllByTestId('portal-card-closed')
-    expect(closed).toHaveLength(1)
-    expect(closed[0]).toHaveAttribute('data-reason', 'no-screen')
-    expect(closed[0]).toHaveTextContent('Social Media Management')
-    expect(closed[0]).toHaveTextContent(/no screen yet/i)
+    expect(screen.getAllByTestId('portal-card-open')).toHaveLength(4)
+    expect(screen.queryAllByTestId('portal-card-closed')).toHaveLength(0)
+    expect(screen.getByRole('link', { name: /Social Media Management/ }))
+      .toHaveAttribute('href', '/admin/social')
   })
 
   it('tells somebody without the job how to get it, which is a different message', () => {
@@ -217,6 +234,33 @@ describe('AdminDashboard — inside a portal', () => {
 
     expect(screen.getByRole('heading', { name: 'Pitch Management' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Admin/ })).toHaveAttribute('href', '/admin')
+  })
+
+  // ⚠️ THE NESTED-TAB TRAP, AND THE ONLY PLACE IN THE APP THAT HAS IT.
+  // /admin/social/ideas starts with /admin/social, so a NavLink without `end`
+  // is active for its own path AND everything beneath it — "What's on" would
+  // light up while you are standing on "Ideas". Two tabs marked current is
+  // worse than none. Every other admin tab is a leaf, so nothing caught this
+  // before Social Media Management shipped.
+  it('⚠️ marks only the tab you are ON, not its parent, on a nested route', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin(['media'])))
+    renderAt('/admin/social/ideas')
+
+    const tabs = screen.getByRole('navigation', { name: /admin sections/i })
+    const whatsOn = within(tabs).getByRole('link', { name: /What’s on/ })
+    const ideas = within(tabs).getByRole('link', { name: 'Ideas' })
+
+    expect(ideas).toHaveAttribute('aria-current', 'page')
+    expect(whatsOn).not.toHaveAttribute('aria-current')
+  })
+
+  it('marks the parent tab when you are actually on it', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin(['media'])))
+    renderAt('/admin/social')
+
+    const tabs = screen.getByRole('navigation', { name: /admin sections/i })
+    expect(within(tabs).getByRole('link', { name: /What’s on/ })).toHaveAttribute('aria-current', 'page')
+    expect(within(tabs).getByRole('link', { name: 'Ideas' })).not.toHaveAttribute('aria-current')
   })
 
   it('⚠️ draws NO tab row for a one-tab portal', () => {
