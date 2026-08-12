@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- **"Add Quins to your home screen" — the app was always installable and nothing said so.**
+- `a309092` — **"Add Quins to your home screen" — the app was always installable and nothing said so.**
   Jay asked *"do we have a PWA for this?"* on 12 Aug 2026, which is the entire justification:
   if the person who commissioned it does not know it installs, no parent will work it out.
   ⚠️ **Measured live before writing a line of it** — `manifest.webmanifest` serves with
