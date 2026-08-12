@@ -331,7 +331,15 @@ describe('MatchSheet — the form', () => {
       mount(<MatchSheet />)
       await screen.findByRole('heading', { name: /official match result sheet/i })
 
-      expect(screen.getByLabelText('Team manager')).toHaveValue('Sam Okafor')
+      // ⚠️ waitFor, NOT A SYNCHRONOUS ASSERTION — and this went green locally
+      // and RED IN CI before it was fixed, on 12 Aug 2026. The prefill is an
+      // effect that fires after the sheet's own load commits, so the value
+      // lands on a SECOND render. findByRole only waits for the heading, which
+      // is painted by the first; on a fast enough runner the assertion beat the
+      // prefill by one commit. The test was racy, not the screen.
+      await waitFor(() =>
+        expect(screen.getByLabelText('Team manager')).toHaveValue('Sam Okafor'),
+      )
       expect(screen.getByLabelText('Team manager phone')).toHaveValue('+971 50 123 4567')
     })
 
