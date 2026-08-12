@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **`/admin` is a chooser, and each job is its own portal.**
+- `78649aa` — **`/admin` is a chooser, and each job is its own portal.**
   Jay: *"i'd like more of a split off for the dashboards"*. The tab row that grew with every
   right somebody held is replaced by four cards — Club Admin, Pitch Management, Club Youth
   Manager, Social Media Management — each entering a space with its own tabs.
@@ -24,8 +24,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   breaks. `src/lib/portals.js` is the single list both the chooser and the tab row read.
   `claude/decisions/2026-08-12-admin-portals.md`
 
-- *(SHA follows in the next PR)* — **Jobs, not people: the three club jobs are named and the
-  volunteers are not.** `Youth Manager` → **Club Youth Manager**, `Social Media Manager` →
+- `78649aa` — **Jobs, not people: the three club jobs are named and the
+  volunteers are not.** *(Same squash commit as the portal split — the two shipped together.)* `Youth Manager` → **Club Youth Manager**, `Social Media Manager` →
   **Social Media Management**, `Pitch Manager` → **Pitch Management**.
   ⚠️ **Two of the three stop being job titles, so five sentences moved rather than the words**
   — three not-authorised screens and both pitch emails, because "you're a Pitch Management"
