@@ -136,6 +136,38 @@ went red on PR #37 for exactly this reason, having been skipped once already on 
   rename would have diffed to nothing. **Pasting the migration produces a file that
   looks complete.**
 
+### As of 12 Aug 2026
+
+- ✅ **THE THREE CLUB JOBS ARE NAMED AND THE VOLUNTEERS ARE NOT** (`78649aa`).
+  **Club Youth Manager**, **Pitch Management**, **Social Media Management** — in the
+  app, in code comments, in the decision records and in conversation.
+  ⚠️ **Two of the three are not job titles, and that is deliberate**, so five
+  sentences were reworded rather than the words changed back. Reverting a label to
+  "…Manager" silently un-fixes three screens and both pitch emails.
+  ⚠️ **The names survive in `claude/handoffs/`, `claude/plans/` and `db/migrations/`**
+  — dated records of a moment. `scripts/docs-check.mjs` exempts exactly those and
+  fails a build on a name anywhere else, in code as well as docs.
+- ✅ **`/admin` IS A CHOOSER; EACH JOB IS ITS OWN PORTAL** (`78649aa`). Four cards,
+  each entering a space with its own tabs. ⚠️ **Every card renders for every admin**;
+  not holding the job, or the job having no screen, greys it, and **a grey card is
+  not a link in the markup.** ⚠️ **Navigation only — nothing was narrowed.** A portal
+  holder is still a full admin. ⚠️ **Only bare `/admin` changed**; every URL under it
+  is untouched.
+  ⚠️ **`Social Media Management` is a grey card saying "No screen yet"** — the right
+  is grantable and unlocks nothing. Adding a tab to `PORTALS` in `src/lib/portals.js`
+  is the only change needed to open it.
+- ✅ **`notify-pitch-request` WAS REDEPLOYED** (version 3) so the pitch emails match
+  the new wording. ⚠️ **An edge function is NOT part of the Netlify build** — merging
+  the app changes nothing about the mail. Verified live: the endpoint returns its own
+  `unauthorised` body to a wrong secret, which is what proves the request reached the
+  function rather than being bounced by a JWT gate.
+- ⚠️ **THE SERVICE WORKER SERVED THE OLD APP FOR MINUTES AFTER A GREEN DEPLOY, and it
+  looked exactly like a failed release.** `/admin` still redirected to Accounts and
+  still drew the old tab row while Netlify said `main@78649aa` Published. **Check the
+  SERVED BUNDLE, not the browser**: fetch `/index.html`, read the `/assets/index-*.js`
+  name out of it, fetch that and search it for a string only the new build has. That
+  is independent of every cache and it is the check that settled it.
+
 ### ⚠️ Test data currently in the live database
 
 Two sets, both to be removed before a pilot:
