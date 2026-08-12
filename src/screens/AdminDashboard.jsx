@@ -196,7 +196,17 @@ export default function AdminDashboard() {
             that says nothing the heading has not already said. Match sheets is
             the current case; Social Media Management will be the next one. */}
         {portal && portal.tabs.length > 1 && (
-          <nav aria-label="Admin sections" className="mb-4 flex gap-2">
+          <nav aria-label="Admin sections" className="mb-4 flex flex-wrap gap-2">
+            {/* ⚠️ `flex-wrap` ON THIS NAV IS LOAD-BEARING, NOT TIDINESS — added
+                12 Aug 2026 with the "Squads & league teams" rename. The row was
+                a bare `flex`, and a row that overruns does not clip: the
+                DOCUMENT gets wider than the viewport, and after that every
+                element sized to the viewport renders short or clipped, on
+                screens three away from this one. That exact failure is already
+                recorded against Schedule's header, where one bug read as four
+                because the bottom nav is `fixed` and looked perfect throughout.
+                Two tabs fit at 360px today; the wrap is what stops the NEXT
+                label being a five-screen bug. */}
             {/* ⚠️ `end` IS LOAD-BEARING AND WAS NOT NEEDED UNTIL 12 Aug 2026.
                 Every tab used to be a leaf, so a prefix match was harmless.
                 Social Media Management introduced the first NESTED pair —

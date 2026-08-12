@@ -228,6 +228,33 @@ describe('AdminDashboard — inside a portal', () => {
     expect(within(tabs).queryByText('Match sheets')).not.toBeInTheDocument()
   })
 
+  // ⚠️ Jay went looking for where league team names are created on 12 Aug 2026
+  //    and could not tell from the word "Club" which tab held them. That screen
+  //    is what fixes an empty TEAM box on an RCM match sheet, so being unable to
+  //    find it has a consequence beyond annoyance.
+  it('⚠️ names the league-team tab after the JOB, not after the container', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin([])))
+    renderAt('/admin/accounts')
+
+    const tabs = screen.getByRole('navigation', { name: /admin sections/i })
+    expect(within(tabs).getAllByRole('link').map((el) => el.textContent)).toEqual([
+      'Accounts',
+      'Squads & league teams',
+    ])
+    expect(within(tabs).queryByText(/^Club$/)).not.toBeInTheDocument()
+  })
+
+  // ⚠️ NOT TIDINESS. A bare `flex` row does not clip when it overruns — the
+  //    DOCUMENT gets wider than the viewport, and every element sized to the
+  //    viewport then renders short or clipped on screens three away. That is
+  //    already recorded against Schedule's header, where one bug read as four.
+  it('⚠️ lets the tab row WRAP, so a long label cannot widen the document', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin([])))
+    renderAt('/admin/accounts')
+
+    expect(screen.getByRole('navigation', { name: /admin sections/i })).toHaveClass('flex-wrap')
+  })
+
   it('titles the screen with the portal and offers a way back', () => {
     useMembershipsMock.mockReturnValue(memberships(admin(['pitches'])))
     renderAt('/admin/allocation')

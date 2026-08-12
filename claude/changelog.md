@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **The RCM match sheet stopped printing the club's own
+- *(SHA follows in the next PR)* — **The league-team tab is named after the job, the tab
+  row can wrap, and the scoring model is specced.**
+  Jay: *"need a better identifier for the section that allows admins to create league team
+  names, right now it just says Club"*. **"Club" named the container rather than the job** —
+  and that tab is where ADHQ1 / ADHQ2 are created, which is what the match sheet's TEAM box
+  is stamped from. So the one screen that fixes an empty TEAM box was the one screen nobody
+  could find: the other half of the U16B defect, arriving from the opposite direction.
+  ⚠️ **The rename came with a hazard that had to be fixed in the same commit.** The tab row
+  was a bare `flex` with no `flex-wrap`. A flex row that overruns does not clip — **the
+  DOCUMENT gets wider than the viewport**, and every element sized to the viewport then
+  renders short or clipped on screens three away. Already recorded against Schedule's
+  header, where it read as four separate bugs because the bottom nav is `fixed`.
+  **Lengthening a label into an unwrapped row is exactly how that returns.**
+  Also adds `claude/plans/2026-08-12-scoring-model.md` (**NOT SHIPPED**), which measured the
+  real model off adhjrt rather than inventing one. ⚠️ **Its headline finding: adhjrt already
+  carries that model TWICE and has a test because the copies drifted — so a copy here is a
+  THIRD, and adhjrt lets an organiser override any age group WITHOUT A DEPLOY**, which no
+  test in either repo could ever compare.
+
+- `4e8f646` — **The RCM match sheet stopped printing the club's own
   squad name in the governing body's TEAM box.**
   Jay filed a U16B sheet whose TEAM box read **"U16B Contact"**. Measured on the live row,
   not read off the screenshot: `league_team_id` was NULL, and `ourName` ended `?? squadName`.
