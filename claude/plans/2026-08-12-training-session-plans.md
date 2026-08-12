@@ -1,6 +1,20 @@
 # Training session plans — the plan
 
-**STATUS: NOT SHIPPED.** Written 12 Aug 2026, for Jay to review.
+**STATUS: NOT SHIPPED — TABLED BY JAY, 12 Aug 2026.** Written 12 Aug 2026.
+His words: *"table 1 and 2 for now until i bring them back up again"*.
+
+⚠️ **TABLED IS NOT REJECTED, AND IT IS NOT A QUEUE EITHER.** Do not start this,
+do not propose starting it, and do not ask again — **Jay reopens it or it stays
+closed.** A plan sitting at plain "NOT SHIPPED" reads as work waiting to be
+picked up, which is how this repo has already spent a session offering to build
+something that was live. The nearest prior instance is the roster import
+(`claude/decisions/2026-08-10-no-roster-import.md`): settled, and re-asking a
+settled question is its own kind of rot.
+
+⚠️ **What survives the tabling is the copyright finding below.** It is a legal
+constraint, not a design preference, so it will still be true whenever this is
+reopened — and it is the reason the feature cannot be built the way it was
+first described.
 
 ⚠️ **Set this line to SHIPPED in the commit that ships it**, not as a promise
 about that commit.

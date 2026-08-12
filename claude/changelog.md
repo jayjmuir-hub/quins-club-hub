@@ -10,7 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
-- *(SHA follows in the next PR)* — **Social Media Management is live: what's on, and an idea inbox.**
+- *(SHA follows in the next PR)* — **`state-of-play.md` was missing four shipped features
+  and calling one of them "never started".**
+  League teams, the RCM match sheet, the Club Youth Manager portal, event duplication and
+  the PWA install prompt had all shipped across PRs #51-#60, and **none of them appeared
+  in the file every session reads as step 3 of the reading order.** §Open meanwhile listed
+  *the Club Youth Manager dashboard* and *the Social Media Management dashboard* under
+  **"Never started"** — one had been live since 11 Aug, the other since earlier the same
+  day.
+  ⚠️ **A claim about what does NOT exist is the one kind nothing can check.** `docs:check`
+  verifies that referenced paths resolve and that plans carry a STATUS line; there is no
+  file for "we never built X" to fail against, and no test either. This is the third
+  instance in three days — `2290bf7` was the same failure about league teams, and the
+  plan-status rot it named was the same shape.
+  Also records the AI ruling of 12 Aug (*"yes it may"*) against the line that still said
+  nobody had asked him.
+  ⛔ **And both 12 Aug plans are marked TABLED — Jay, same day**: *"table 1 and 2 for now
+  until i bring them back up again"*. `claude/plans/2026-08-12-ai-integration.md` and
+  `claude/plans/2026-08-12-training-session-plans.md`. ⚠️ **A plan left at plain "NOT
+  SHIPPED" reads as work waiting to be picked up** — which is the same failure as the
+  "never started" line this commit removes, pointed the other way.
+  ⚠️ **He tabled the BUILD, not the RULING.** The children's-data permission stands and
+  still governs anything that sends club data to a third party.
+
+- `ea3d500` — **Social Media Management is live: what's on, and an idea inbox.**
   The last grey card on the chooser opens. Two screens behind the `media` right — **What's on**
   (every event past and upcoming, split into *Coming up* and *Recently*, because a fixture that
   has happened wants a report and one that hasn't wants a preview) and **Ideas**, an inbox any
