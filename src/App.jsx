@@ -12,6 +12,7 @@ import PortalChooser from './screens/PortalChooser.jsx'
 import SocialWhatsOn from './screens/SocialWhatsOn.jsx'
 import SocialIdeas from './screens/SocialIdeas.jsx'
 import AdminClub from './screens/AdminClub.jsx'
+import AdminStaff from './screens/AdminStaff.jsx'
 import Accounts from './screens/Accounts.jsx'
 import Pitches from './screens/Pitches.jsx'
 import Allocation from './screens/Allocation.jsx'
@@ -150,6 +151,13 @@ export default function App() {
             <Route index element={<PortalChooser />} />
             <Route path="accounts" element={<Accounts />} />
             <Route path="club" element={<AdminClub />} />
+            {/* Every squad and who looks after it. ⚠️ NO ADMIN RIGHT — it sits
+                in the Club Admin portal, which every admin holds. It reads
+                profiles the Accounts screen has always read
+                (`profile read club admin`), so it needed no policy change and
+                grants nobody anything new. A MEMBER-facing version does need
+                one: claude/plans/2026-08-13-squad-staff-on-home.md. */}
+            <Route path="staff" element={<AdminStaff />} />
             {/* Pitch setup. The `pitches` admin right decides whether the TAB
                 is shown; the screen itself repeats the check, because a route
                 is linkable and somebody will paste the URL. Neither is

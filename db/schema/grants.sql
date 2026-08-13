@@ -185,8 +185,13 @@
 
 -- ── 3. COLUMN-LEVEL GRANTS ─────────────────────────────────────────────────
 --
--- The only column-level grants in the entire `public` schema. Five columns of
--- one table, and they exist because table-level UPDATE was taken away above.
+-- The only column-level grants in the entire `public` schema. They exist
+-- because table-level UPDATE was taken away above.
+--
+-- ⚠️ THE SENTENCE ABOVE SAID "Five columns of one table" UNTIL 13 Aug 2026, by
+-- which point it named neither the right number nor the right number of tables
+-- — `memberships` joined on 10 Aug. A count in a heading is a thing that rots;
+-- the list below is the inventory.
 --
 --   profiles.first_name         authenticated   UPDATE
 --   profiles.full_name          authenticated   UPDATE
@@ -200,6 +205,16 @@
 --   memberships.player_id       authenticated   UPDATE
 --   memberships.role            authenticated   UPDATE
 --   memberships.status          authenticated   UPDATE
+--   memberships.title           authenticated   UPDATE   ← 13 Aug 2026
+--
+-- ⚠️ `memberships.title` IS WHY THIS SECTION IS NOT BOOKKEEPING. It is the first
+-- column added to `memberships` since the table-level UPDATE was revoked, and
+-- without its own grant (20260813_membership_title.sql) the save fails with
+-- something that reads exactly like an RLS refusal on a policy that is working
+-- correctly. **The fix for that failure is a COLUMN grant. Never
+-- `grant update on public.memberships to authenticated`** — that would restore
+-- write access to `is_super` and make the super-admin tier theatre again, with
+-- no test failing and nothing visible in the app.
 --
 -- ⚠️ `memberships` JOINED THIS LIST ON 10 Aug 2026, and for exactly the reason
 -- `profiles.email` is on it. `is_super` and `admin_rights` are NOT granted.

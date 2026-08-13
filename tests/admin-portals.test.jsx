@@ -237,9 +237,14 @@ describe('AdminDashboard — inside a portal', () => {
     renderAt('/admin/accounts')
 
     const tabs = screen.getByRole('navigation', { name: /admin sections/i })
+    // ⚠️ ORDER IS ASSERTED, NOT JUST MEMBERSHIP. Entering a portal lands on
+    // tabs[0], so a reordering that put Staff (added 13 Aug 2026) first would
+    // silently change where every admin arrives — the same trap the Allocation
+    // note in src/lib/portals.js records from the other direction.
     expect(within(tabs).getAllByRole('link').map((el) => el.textContent)).toEqual([
       'Accounts',
       'Squads & league teams',
+      'Staff',
     ])
     expect(within(tabs).queryByText(/^Club$/)).not.toBeInTheDocument()
   })

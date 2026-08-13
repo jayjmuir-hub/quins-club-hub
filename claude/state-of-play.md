@@ -435,12 +435,98 @@ will propose building.**
   `social-ideas` storage write policy is fixed**: that policy has no membership
   check, so today any account with a login can upload unboundedly, and 100 GB of
   headroom turns that from "breaks player photos" into "runs up a bill".
+- ✅ **REALTIME IS ON, APPLIED AND OBSERVED WORKING — 13 Aug 2026.**
+  `db/migrations/20260813_realtime_publication_events.sql` applied via the
+  Supabase SQL Editor; `pg_publication_tables` now returns `public` / `events`
+  where it returned nothing at all before. Captured in `db/schema/tables.sql`,
+  in a publications section that did not previously exist.
+  ⚠️ **IT HAD NEVER WORKED, AND THREE DOCUMENTS ASSERTED THE OPPOSITE.**
+  `src/data/events.js` has subscribed since the app was built and had never
+  received a message. `RESTORE.md` said "realtime triggers a full refetch on
+  any change in scope"; the readiness audit repeated it as a PERFORMANCE worry
+  about a mechanism that was inert. **The code was read; the configuration
+  feeding it was not.**
+  ✅ **DELIVERY IS PROVEN END-TO-END, TWICE.** Two browser tabs on Schedule; a
+  fixture edited in one changed in the other with no refresh, and again in
+  reverse when the edit was undone.
+  ⚠️ **THE OBVIOUS CONFOUND WAS RULED OUT AND IT MATTERED**: looking at the
+  second tab focuses it, so a focus-triggered refetch would have faked the
+  result. There is no `visibilitychange`, no focus listener and no
+  `refetchOnWindowFocus` anywhere in `src/` — **and that negative was checked
+  against a control search that found real matches**, per rule 6.
+  ✅ **THE RLS POLICY DISCRIMINATES — proved separately, at the policy layer.**
+  As a genuine non-admin attached to two squads and not a third, with a probe
+  fixture inserted into one of each inside a rolled-back transaction: the
+  member's own squad came back, the other did not. **The visible row is the
+  control** — without it, "cannot see the other" is indistinguishable from a
+  broken query.
+  ❌ **WHAT IS STILL NOT OBSERVED, AND IT IS THE SAFETY HALF.** Both test tabs
+  were the same admin, so nobody has watched a non-admin *fail* to receive a
+  change for a squad they are not in. Supabase documents that read policies
+  apply to `postgres_changes`, and the policy underneath is now verified — so
+  this is well-evidenced, not unknown. **It is not measured.** The outstanding
+  test is one observation: a non-admin on Schedule while a squad they are NOT
+  in has a fixture EDITED.
+  ⚠️ **THAT TEST MUST BE AN EDIT, NEVER A DELETE, AND THE PLAN AS FIRST WRITTEN
+  WOULD HAVE FAILED ITSELF.** Supabase's own docs: *"RLS policies are not
+  applied to `DELETE` statements, because there is no way for Postgres to verify
+  that a user has access to a delete"*. So a deleted fixture reaches EVERY
+  subscriber regardless of squad, and under a rule that says "if her screen
+  reacts, revert" that is a false alarm which would revert a working migration.
+  **No data leaks** — `events` is replica identity DEFAULT, the payload is a
+  bare id, and `subscribeEvents` discards it and re-reads under RLS.
+  ⚠️ **AND THE THUNDERING-HERD CONCERN IS NOW REAL FOR THE FIRST TIME.** Every
+  warning about "realtime triggers a full refetch for every subscriber in scope"
+  was previously describing something that never fired. From today it fires.
+  At the club's current size this is nothing; **at the 1500 members Jay expects
+  it is the least-tested thing in the app**, and it cannot be measured in SQL.
+
 - ⚠️ **A PRODUCTION READINESS AUDIT WAS RUN ON 13 Aug 2026** and its findings are
   NOT all recorded here — the report is a session artefact, not a repo document.
-  The ones that became work are in §Open. **Its two most load-bearing measurements,
-  both live:** `events` has no index on `team_id` or `starts_at`, and the live
-  performance advisor returns 18 `auth_rls_initplan` plus 100
-  `multiple_permissive_policies` warnings.
+  The ones that became work are in §Open.
+  ❌ **ITS HEADLINE MEASUREMENT — "`events` has no index on `team_id` or
+  `starts_at`" — WAS FIXED THE SAME DAY AND THIS LINE WENT ON ASSERTING IT.**
+  `db/migrations/20260813_events_indexes_and_social_upload_gate.sql` added
+  `events_team_starts_idx`, `events_club_starts_idx` and
+  `events_league_team_id_idx`; all three are live and captured in
+  `db/schema/tables.sql`. **A later session read this file, believed it, and set
+  out to re-do work that had already shipped.** That is the specific cost of a
+  stale measurement sitting in a line labelled load-bearing.
+  ⚠️ **THE ADVISOR HALF OF THE ORIGINAL CLAIM STILL STANDS** — `auth_rls_initplan`
+  and `multiple_permissive_policies` were re-measured live on 13 Aug and were
+  unchanged. **Do not cite the counts from here; run `get_advisors`.** No index
+  addresses either: both are per-row policy costs.
+
+- ⚠️ **`events_club_starts_idx` DOES NOT SERVE THE PATH IT WAS ADDED FOR, AND
+  ONLY A PLAN READ SHOWS IT.** Measured 13 Aug 2026 against ~4,000 seeded events
+  in a rolled-back transaction, as a real signed-in member with RLS live.
+  **The club-wide read still comes back `Seq Scan`.** `listEvents` with no team
+  filter sends no `club_id` predicate, and the `event read` policy filters on
+  `team_id` (`is_attached_to_team` / `can_edit_team`), never on `club_id` — so
+  the index's leading column is unconstrained and Postgres cannot use it.
+  ⚠️ **THE MIGRATION STATES THAT EXACT RULE AS ITS REASON FOR ADDING A SECOND
+  INDEX, AND THEN ADDS ONE WITH THE SAME FLAW.** A correct comment on an index
+  that does not do what it says is harder to catch than no comment at all.
+  ✅ **`(starts_at, id)` FIXES IT, AND IS NOW APPLIED AND CAPTURED** —
+  `db/migrations/20260813_events_starts_index.sql`. The plan becomes an Index
+  Scan and the Sort node disappears entirely, because the index supplies the
+  order. Applied to production 13 Aug and re-captured into
+  `db/schema/tables.sql` in the same commit.
+  ⚠️ **THE TEAM-SCOPED PATH WAS ALREADY CORRECT** — `events_team_starts_idx` is
+  used, with both the `team_id` filter and the `starts_at` range in the index
+  condition. Whatever is done about the club-wide path, do not touch that one.
+  ⚠️ **AND THE URGENCY IN THAT MIGRATION'S HEADER IS OVERSTATED.** It warns the
+  far end is "a hard 8-second FAILURE on the Schedule screen". At ~4,000 events
+  the worst plan measured is two orders of magnitude short of that, on wall times
+  this schema inflates ~4x. The index is worth having; the deadline is not real.
+  ⚠️ **DEEP PAGING BARELY IMPROVES, WHICH IS NOT WHAT WAS EXPECTED.** `.range()`
+  is OFFSET/LIMIT and OFFSET walks every skipped row whatever the index does, so
+  the win is concentrated on the first page. **Do not justify this index by page
+  depth.**
+  ⚠️ **SCOPE: `events` ONLY, AND SINGLE-QUERY COST ONLY.** Roster, availability
+  and attendance were not measured, and nothing here says anything about 1500
+  people querying at once — the realtime full-refetch-on-any-change behaviour is
+  the untested risk and SQL cannot measure it.
   ⚠️ **AND ONE ABOUT THE SUITE, WHICH IS THE ONE NOTHING ELSE WOULD HAVE CAUGHT:
   `npm test` IS NOT DETERMINISTIC.** Two full runs, same tree, same command,
   minutes apart: **4 failed** in `tests/admin-dashboard.test.jsx`, then **1904
@@ -556,9 +642,29 @@ Durable. Each cost real time to find.
   Recorded, not questioned: Jay has not been asked to confirm the third, and a
   legitimate second person holding it is exactly what the "one lost password"
   reasoning above argues for.
-- **`reynekeett@gmail.com` is a THIRD, LEGITIMATE admin — confirmed by Jay 10 Aug**
-  after it was flagged as unrecognised. Ordinary admin, not super. Recorded so the
-  next session does not raise it again as a stray.
+- ❌ **"A THIRD, LEGITIMATE ADMIN — ORDINARY ADMIN, NOT SUPER" IS STALE.** That
+  line named an account confirmed by Jay on 10 Aug and asserted it was an
+  ordinary admin. **Measured 13 Aug 2026: there is no active non-super admin
+  membership at all.** Jay, same day: *"only 3 current admin and they are all
+  super admin"*.
+  ⚠️ **THE EMAIL ADDRESS IS DELIBERATELY NOT REPEATED HERE.** This repo is
+  PUBLIC, and a volunteer's personal email in it is a disclosure — the same
+  reasoning `docs:check` already enforces for their names. Identify an account
+  from the database, not from this file.
+  ⚠️ **CONSEQUENCE, AND IT IS THE REASON THIS CORRECTION IS WORTH THE LINES:
+  EVERY ADMIN IS NOW A SUPER ADMIN, so the tier currently distinguishes
+  nobody.** Super admin is the tier that can grant super admin. The
+  "one lost password" argument for having more than one still holds; "all of
+  them" is a different thing and nobody has ruled on it.
+  ✅ **The protection itself is intact and was PROVEN, not assumed, on 13 Aug.**
+  An ordinary admin attempting `is_super = true` on themselves is refused
+  `42501 permission denied`, while the same account in the same transaction
+  writes an allowed column successfully — so the refusal is the column grant and
+  not something earlier. Detail in `db/schema/grants.sql`.
+  ⚠️ **AND POSTGRES'S OWN ERROR HINT RECOMMENDS THE HOLE**: *"Grant the required
+  privileges to the current role with: GRANT UPDATE ON public.memberships TO
+  authenticated"*. Following that hint hands every admin self-promotion. It is
+  the most authoritative-looking wrong answer in this schema.
 - **No rate limit on account creation** — only on what an account can do, which
   without a membership is nothing.
 

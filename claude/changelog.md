@@ -10,6 +10,73 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
+- ✅ **EVERY SQUAD AND WHO LOOKS AFTER IT — `/admin/staff` is live**, plus
+  `memberships.title` so a coach can be a Head Coach.
+  ⚠️ **BUILT IN THE OPPOSITE ORDER TO THE REQUEST, ON A MEASUREMENT.** Jay asked
+  for age groups to see their coaches on the HOME screen. Measured first: twelve
+  of fifteen squads had no coach, manager or medic attached at all — so the
+  member-facing card would have shipped empty to 80% of the club with no way to
+  see why. The admin directory needs no migration for its reads, no RLS change
+  and no photos, and it is the only view that surfaces the missing data the rest
+  of the feature depends on. The Home card is still phase 3.
+  ⚠️ **THE COLUMN NEEDED ITS OWN GRANT, AND THE OBVIOUS FIX IS A SECURITY HOLE.**
+  `authenticated` has no table-level UPDATE on `memberships` — it holds
+  column-level UPDATE on six columns, with `is_super` and `admin_rights`
+  deliberately excluded. `title` is the first column added since that became
+  true, so it was unwritable until granted explicitly, and the failure reads
+  exactly like an RLS refusal. **`grant update on memberships to authenticated`
+  would fix the symptom and hand every admin the ability to self-promote to
+  super admin.**
+  ⚠️ **NO CHECK CONSTRAINT ON THE TITLE**, the same ruling `admin_rights`
+  carries: a constraint means a migration per job title, for a value that labels
+  a person and grants nothing. ⚠️ **And a title is NEVER permission** —
+  `can_edit_team` keys off `role`.
+  ⚠️ **TWO QUERIES AND A CLIENT-SIDE JOIN, NOT ONE EMBEDDED READ** — a
+  deliberate retreat. The tidy version depends on PostgREST keeping a parent row
+  when an embedded filter matches nothing; if that assumption were wrong the
+  twelve empty squads would vanish, which is the one thing the screen exists to
+  show, and it would read as "no gaps" rather than as a bug.
+  ⚠️ **NOBODY IS ATTACHED TO A SQUAD FROM THIS SCREEN**, deliberately — the
+  grant flow lives in the 1,612-line `Accounts.jsx` that the accounts redesign
+  also wants to change, and pulling it in would collide with that work.
+  ✅ **Three faults injected and all three caught by the test written for them**,
+  with the other 21 still passing: the blank-name fallback losing whitespace, a
+  failed load rendering as "0 squads have nobody", and a refused title save
+  leaving the typed value on screen.
+
+- **Realtime APPLIED and observed working; a third events index; and the schema
+  capture gains a category it never had.** Two migrations applied to production
+  and captured in the same commit:
+  `db/migrations/20260813_realtime_publication_events.sql` and
+  `db/migrations/20260813_events_starts_index.sql`.
+  ✅ **Realtime delivery proved end-to-end, twice** — a fixture edited in one
+  browser tab changed in another with no refresh, and again in reverse on the
+  undo. ⚠️ **The confound was ruled out rather than assumed**: looking at the
+  second tab focuses it, so a focus-refetch would have faked it. There is no
+  `visibilitychange`, focus listener or `refetchOnWindowFocus` in `src/` — and
+  that negative was checked against a control search that found real matches.
+  ✅ **The RLS policy proved to discriminate**, separately: a genuine non-admin
+  sees a probe fixture in their own squad and not one in a squad they are not
+  in, inside a rolled-back transaction. **The visible row is the control.**
+  ❌ **NOT observed: a non-admin failing to receive someone else's change.**
+  Both tabs were the same admin. Well-evidenced, not measured.
+  ⚠️ **That outstanding test must be an EDIT, never a DELETE.** Supabase does
+  not apply RLS to deletes, so a deleted fixture reaches every subscriber — a
+  false alarm that would revert a working migration under the test's own rule.
+  ⚠️ **`events_club_starts_idx` DOES NOT SERVE THE PATH IT WAS ADDED FOR.** Its
+  own comment states the rule that condemns it: `listEvents` sends no `club_id`
+  predicate, so the club-wide read was still a `Seq Scan`. `(starts_at, id)`
+  turns it into an Index Scan with the Sort node gone — measured against ~4,000
+  seeded events in a rolled-back transaction on production, read by plan shape
+  rather than wall time. ⚠️ **Deep paging barely improves**; OFFSET walks the
+  skipped rows regardless, so do not justify the index that way.
+  ⚠️ **`db/schema/` NEVER CAPTURED PUBLICATIONS**, which is how a feature that
+  had never once worked stayed invisible to every audit. Now captured, with the
+  queries added to `db/schema/README.md`.
+  ⚠️ **Corrected in `state-of-play.md`: the audit's "no index on `team_id` or
+  `starts_at`" was fixed the same day it was written** and the file went on
+  asserting it in a line labelled load-bearing.
+
 - `3d9b61f` — **The club went live, and three findings stopped being
   theoretical.** `state-of-play.md` said *"Only Jay uses the app. No parent or
   coach has been onboarded."* Measured the same afternoon: 16 auth users, 12
@@ -21,8 +88,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **Also corrected the audit's realtime finding, which was wrong**, and caught
   a volunteer's real name being committed to a PUBLIC repo — `docs:check`
   stopped it, and the line names the job instead.
-- **Realtime is turned ON — it had never worked, and the fix is the opposite of
-  the obvious one.** Migration written, **NOT YET APPLIED**:
+- `4306689` — **Realtime is turned ON — it had never worked, and the fix is the
+  opposite of the obvious one.** ✅ **THE MIGRATION IS NOW APPLIED AND VERIFIED
+  LIVE** — see the entry above this one for the proof;
   `db/migrations/20260813_realtime_publication_events.sql`.
   ⚠️ **`src/data/events.js` has subscribed to `postgres_changes` since the app was
   built and never received a single message**, because `public.events` was not in

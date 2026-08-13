@@ -42,6 +42,10 @@ export const PORTALS = [
       // nobody could find. Jay went looking for it and could not tell from the
       // word which tab it was under.
       { to: '/admin/club', label: 'Squads & league teams' },
+      // ⚠️ ADDED LAST ON PURPOSE. Entering a portal lands on tabs[0], so putting
+      // Staff anywhere earlier would silently change where every admin arrives.
+      // Same trap the Allocation note below records, from the other direction.
+      { to: '/admin/staff', label: 'Staff' },
     ],
   },
   {

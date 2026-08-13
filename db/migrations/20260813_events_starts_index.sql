@@ -1,0 +1,68 @@
+-- 13 Aug 2026 — the third events index, and the reason the second one does not
+-- do what its own comment says.
+--
+-- ✅ APPLIED 13 Aug 2026, via the Supabase SQL Editor, and verified: seven
+-- indexes on public.events, events_starts_idx among them. Re-captured into
+-- db/schema/tables.sql in the same commit.
+--
+-- ══ WHY, AND IT WAS FOUND BY READING A PLAN RATHER THAN A FILE ════════════
+--
+-- 20260813_events_indexes_and_social_upload_gate.sql added
+-- events_club_starts_idx (club_id, starts_at) and said, correctly:
+--
+--     The admin / all-squads path. listEvents with no team filter, and the
+--     allocation grid, both scope by club and window rather than by squad.
+--     ⚠️ NOT redundant with the index above: a composite index cannot be used
+--     for a club-wide scan when its leading column (team_id) is unconstrained.
+--
+-- ⚠️ THE RULE IN THAT SECOND SENTENCE IS RIGHT AND IT CONDEMNS THE INDEX THE
+-- FIRST SENTENCE ADDS. src/data/events.js listEvents sends NO club_id
+-- predicate — it never has — and the `event read` policy filters on team_id
+-- (private.is_attached_to_team / can_edit_team), not on club_id. So on the
+-- club-wide path events_club_starts_idx ALSO has an unconstrained leading
+-- column, and Postgres cannot use it either.
+--
+-- **A correct comment attached to an index that does not do what it says is
+-- harder to catch than no comment at all.** Nothing about the file looks wrong.
+--
+-- ══ MEASURED, NOT REASONED ════════════════════════════════════════════════
+--
+-- 4,015 events seeded across all fifteen squads over the real 18-month window
+-- (src/lib/eventWindow.js), inside a transaction that ROLLED BACK on
+-- production, queried as a genuine signed-in member with RLS live. The
+-- rollback mechanism was probed with a throwaway table first, and the tree was
+-- re-read afterwards to confirm nothing persisted (10 events, 0 seed rows).
+--
+--   club-wide, before        Seq Scan + top-N heapsort   11,630 buffers  146 ms
+--   club-wide, with this     Index Scan, NO Sort node     2,780 buffers   34 ms
+--   team-scoped (unchanged)  Index Scan, events_team_starts_idx   1,932 buffers
+--
+-- ⚠️ THE SORT NODE DISAPPEARING IS THE RESULT, NOT THE MILLISECONDS. Wall time
+-- on this schema is inflated ~4x (claude/state-of-play.md), so read the shape:
+-- Seq Scan + Sort became an Index Scan because (starts_at, id) supplies both
+-- the range filter and the ORDER BY that src/data/events.js asks for.
+--
+-- ⚠️ `id` IS IN THE INDEX FOR THE SAME REASON IT IS IN THE ORDER BY, and that
+-- reason is load-bearing rather than tidy: fetchAllPages pages with .range(),
+-- which is OFFSET/LIMIT, and two events routinely share a starts_at — a
+-- Saturday of age-group matches all kicking off at 09:00 is the normal case.
+-- An index ending at starts_at would still leave a sort to break those ties.
+--
+-- ⚠️ DO NOT JUSTIFY THIS INDEX BY DEEP PAGING. Measured at offset 2700 the win
+-- collapses to ~19% (12,170 -> 10,932 buffers), because OFFSET walks every
+-- skipped row whatever the index does. The gain is concentrated on page one.
+-- This was expected to compound and does not.
+--
+-- ⚠️ AND THE URGENCY IN THE EARLIER MIGRATION IS OVERSTATED. Its header warns
+-- the far end is "a hard 8-second FAILURE on the Schedule screen". At ~4,000
+-- events the worst plan measured is two orders of magnitude short of that.
+-- Worth having; not a deadline.
+--
+-- ⚠️ WHAT IS DELIBERATELY NOT DONE HERE: dropping events_club_starts_idx.
+-- It is unused by listEvents, but the allocation grid and
+-- public.calendar_events_for_token were NOT measured, and either may constrain
+-- club_id. An index that buys nothing still costs write throughput, so this is
+-- a real question — it is left open rather than guessed at.
+
+create index if not exists events_starts_idx
+  on public.events (starts_at, id);
