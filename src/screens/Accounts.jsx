@@ -246,7 +246,20 @@ function PendingApprovals({ members, teamsById, rowState, onApprove }) {
       <div className="mt-2.5 flex flex-col gap-3">
         {members.map((member) => {
           const state = rowState[member.id] ?? {}
-          const personName = member.profiles?.full_name?.trim() || 'No name yet'
+          // ⚠️ THE EMAIL IS THE FALLBACK, NOT A PLACEHOLDER — 13 Aug 2026.
+          // This read `full_name?.trim() || 'No name yet'` and then printed the
+          // address as a SEPARATE segment, so a nameless row rendered
+          // "Added by No name yet · deniro@example.com": a placeholder standing
+          // in front of the very fact that identifies the person. Now the
+          // address is promoted into the name slot and not repeated.
+          //
+          // A row can legitimately be nameless for a few minutes — NamePrompt
+          // cannot run until the person HAS a membership, and the membership is
+          // what puts them in this queue, so the row always exists before the
+          // name does. See claude/plans/2026-08-13-registrant-name.md.
+          const personEmail = member.profiles?.email?.trim() || null
+          const realName = member.profiles?.full_name?.trim() || null
+          const personName = realName || personEmail || 'someone who has not given their name'
           const playerName = member.players?.full_name ?? 'Unnamed player'
           const teamName = member.team_id
             ? teamsById.get(member.team_id)?.name ?? member.teams?.name ?? null
@@ -283,7 +296,9 @@ function PendingApprovals({ members, teamsById, rowState, onApprove }) {
                 </span>
                 <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
                   Added by {personName}
-                  {member.profiles?.email ? ` \u00b7 ${member.profiles.email}` : ''}
+                  {/* Only when the name slot is holding an actual name \u2014
+                      otherwise this prints the address twice in one line. */}
+                  {realName && personEmail ? ` \u00b7 ${personEmail}` : ''}
                   {registered ? ` \u00b7 ${registered}` : ''}
                 </span>
               </div>

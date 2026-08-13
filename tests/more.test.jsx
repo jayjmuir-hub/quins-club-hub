@@ -21,6 +21,7 @@ const listPlayersMock = vi.fn()
 const listContactsForPlayersMock = vi.fn()
 const listParentsForPlayersMock = vi.fn()
 const registerMyPlayerMock = vi.fn()
+const updateProfileNamesMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -46,6 +47,9 @@ vi.mock('../src/data/members.js', () => ({
   // only explodes when a test actually submits the form. That is the exact trap
   // the note above the players mock describes, one module over.
   registerMyPlayer: (...a) => registerMyPlayerMock(...a),
+  // Same trap as registerMyPlayer above — the add-a-player form writes the
+  // registrant's own name before it writes any child (13 Aug 2026).
+  updateProfileNames: (...a) => updateProfileNamesMock(...a),
 }))
 
 // ⚠️ THESE MODULES NOW HAVE A SECOND CONSUMER. Since 9 Aug the "view or
@@ -135,6 +139,18 @@ beforeEach(() => {
     last_name: 'Muir',
     email: 'jay@example.com',
     phone: null,
+    // ⚠️ ADDED 13 Aug 2026 AND IT IS NOT DECORATION. The add-a-player form asks
+    // for the registrant's OWN name whenever `name_confirmed_at` is null, so a
+    // fixture without it is a person the form must interrogate before it will
+    // save anything. Somebody on /more with a membership has almost always
+    // answered already — the unconfirmed case has its own test below.
+    name_confirmed_at: '2026-08-01T00:00:00Z',
+  })
+  updateProfileNamesMock.mockResolvedValue({
+    id: 'user-1',
+    first_name: 'Jay',
+    last_name: 'Muir',
+    name_confirmed_at: '2026-08-13T00:00:00Z',
   })
   updateMyProfileMock.mockImplementation(async (fields) => ({
     id: 'user-1',
@@ -960,5 +976,141 @@ describe('More — adding another child', () => {
     // The negative is the half that matters: a chip on every card would say
     // nothing at all.
     expect(within(tom).queryByTestId('player-pending')).not.toBeInTheDocument()
+  })
+})
+
+// ── The registrant's own name (13 Aug 2026) ───────────────────────────────
+//
+// ⚠️ THE RACE THIS CLOSES WAS MEASURED ON THE LIVE DATABASE, not reasoned
+// about. A real registration on 13 Aug: membership created 08:35:50, name
+// confirmed 08:38:33 — 2m 43s during which an admin's approval queue showed a
+// row it could not name. The cause is an ordering nobody chose: `NamePrompt`
+// only mounts inside AppShell's `ready` branch (`memberships.length > 0`), and
+// the membership is ALSO what creates the queue row, so the row could not help
+// but exist first. And NamePrompt is skippable, so the gap does not always
+// close on its own.
+describe('More — the registrant’s own name', () => {
+  const PARENT_OF_ONE = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
+
+  it('does not ask again when the name is already confirmed', async () => {
+    const u = userEvent.setup()
+    useMembershipsMock.mockReturnValue(memberships(PARENT_OF_ONE))
+    listPlayersMock.mockResolvedValue([
+      { id: 'p1', full_name: 'Tom Muir', team_id: 'team-u10', position: null, photo_path: null },
+    ])
+
+    renderMore()
+    await u.click(await screen.findByTestId('add-another-player'))
+
+    // A form that interrogates somebody about a fact it already holds.
+    expect(screen.queryByLabelText(/your first name/i)).not.toBeInTheDocument()
+  })
+
+  it('asks, and writes the name BEFORE the child, when it has never been given', async () => {
+    const u = userEvent.setup()
+    getMyProfileMock.mockResolvedValue({
+      id: 'user-1',
+      first_name: null,
+      last_name: null,
+      email: 'jay@example.com',
+      phone: null,
+      name_confirmed_at: null,
+    })
+    useMembershipsMock.mockReturnValue(memberships(PARENT_OF_ONE))
+    listPlayersMock.mockResolvedValue([
+      { id: 'p1', full_name: 'Tom Muir', team_id: 'team-u10', position: null, photo_path: null },
+    ])
+
+    const order = []
+    updateProfileNamesMock.mockImplementation(async () => {
+      order.push('name')
+      return { id: 'user-1', first_name: 'Jay', name_confirmed_at: '2026-08-13T00:00:00Z' }
+    })
+    registerMyPlayerMock.mockImplementation(async () => {
+      order.push('child')
+      return { id: 'mm-new', status: 'pending' }
+    })
+
+    renderMore()
+    await u.click(await screen.findByTestId('add-another-player'))
+
+    await u.type(await screen.findByLabelText(/your first name/i), 'Jay')
+    await u.type(screen.getByLabelText(/your family name/i), 'Muir')
+    await u.type(screen.getByLabelText(/player's full name/i), 'Rory Muir')
+    await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
+    await u.click(screen.getByRole('button', { name: /add this player/i }))
+
+    await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalled())
+    expect(updateProfileNamesMock).toHaveBeenCalledWith({
+      profileId: 'user-1',
+      firstName: 'Jay',
+      lastName: 'Muir',
+    })
+    // ⚠️ THE ORDER IS THE WHOLE FIX. Writing the name after the child would
+    // leave the race exactly where it was — the membership, and so the queue
+    // row, would still land before the profile had a name.
+    expect(order).toEqual(['name', 'child'])
+  })
+
+  it('will not create a child at all when the name is blank', async () => {
+    const u = userEvent.setup()
+    getMyProfileMock.mockResolvedValue({
+      id: 'user-1',
+      first_name: null,
+      last_name: null,
+      email: 'jay@example.com',
+      phone: null,
+      name_confirmed_at: null,
+    })
+    useMembershipsMock.mockReturnValue(memberships(PARENT_OF_ONE))
+    listPlayersMock.mockResolvedValue([
+      { id: 'p1', full_name: 'Tom Muir', team_id: 'team-u10', position: null, photo_path: null },
+    ])
+
+    renderMore()
+    await u.click(await screen.findByTestId('add-another-player'))
+
+    await u.type(await screen.findByLabelText(/player's full name/i), 'Rory Muir')
+    await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
+    await u.click(screen.getByRole('button', { name: /add this player/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/your own first name/i)
+    // ⚠️ NOTHING was created. A form that saved the child and then complained
+    // about the name would have produced the exact nameless queue row this
+    // field exists to prevent.
+    expect(registerMyPlayerMock).not.toHaveBeenCalled()
+    expect(updateProfileNamesMock).not.toHaveBeenCalled()
+  })
+
+  // ⚠️ A REFUSED NAME MUST STOP EVERYTHING. updateProfileNames reads the row
+  // back and throws rather than reporting a silent zero-row success, so a
+  // refusal here is real — and carrying on past it would create the nameless
+  // row anyway.
+  it('creates no child when the name write is refused', async () => {
+    const u = userEvent.setup()
+    getMyProfileMock.mockResolvedValue({
+      id: 'user-1',
+      first_name: null,
+      last_name: null,
+      email: 'jay@example.com',
+      phone: null,
+      name_confirmed_at: null,
+    })
+    useMembershipsMock.mockReturnValue(memberships(PARENT_OF_ONE))
+    listPlayersMock.mockResolvedValue([
+      { id: 'p1', full_name: 'Tom Muir', team_id: 'team-u10', position: null, photo_path: null },
+    ])
+    updateProfileNamesMock.mockRejectedValue(new Error("We couldn't save that name."))
+
+    renderMore()
+    await u.click(await screen.findByTestId('add-another-player'))
+
+    await u.type(await screen.findByLabelText(/your first name/i), 'Jay')
+    await u.type(screen.getByLabelText(/player's full name/i), 'Rory Muir')
+    await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
+    await u.click(screen.getByRole('button', { name: /add this player/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't save that name/i)
+    expect(registerMyPlayerMock).not.toHaveBeenCalled()
   })
 })

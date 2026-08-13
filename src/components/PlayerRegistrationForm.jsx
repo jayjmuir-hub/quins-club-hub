@@ -2,7 +2,8 @@ import { useState } from 'react'
 import Button from './Button.jsx'
 import Segmented from './Segmented.jsx'
 import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
-import { registerMyPlayer } from '../data/members.js'
+import { registerMyPlayer, updateProfileNames } from '../data/members.js'
+import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
 
 // A parent registers ONE OR MORE children in one go.
 //
@@ -36,6 +37,29 @@ import { registerMyPlayer } from '../data/members.js'
 // is not on the table without a delete path that does not exist. What this does
 // instead is name the ones that landed, leave the failure and anything untried
 // on screen, and let the parent fix just that row.
+//
+// ⚠️ IT ALSO ASKS FOR THE REGISTRANT'S OWN NAME, AND THAT IS A FIX FOR A RACE
+// RATHER THAN AN EXTRA FIELD FOR ITS OWN SAKE — 13 Aug 2026, reported by Jay
+// watching a real registration land in the approval queue with no name on it.
+//
+// `NamePrompt` is the only thing that captures a person's own name, and
+// AppShell mounts it inside the `ready` branch, which requires
+// `memberships.length > 0`. The membership is ALSO what puts the person into an
+// admin's approval queue. So the order was forced and backwards: the queue row
+// existed before the name did, every single time. Measured on the live database
+// for one real registration — membership at 08:35:50, name at 08:38:33, a gap
+// of 2m 43s during which an admin was being asked to approve somebody the
+// screen could not name.
+//
+// ⚠️ AND THE GAP DOES NOT ALWAYS CLOSE. NamePrompt is skippable, so a person
+// who taps past it stays nameless indefinitely.
+//
+// Asking here removes the race at its source: the name is written BEFORE the
+// first `register_my_player` call, so by the time a membership exists the
+// profile already carries a name. ⚠️ **Asked only when we do not already have
+// one** (`name_confirmed_at` is null) — a parent adding a second child from
+// /more has long since answered, and asking again would be a form interrogating
+// somebody about a fact it is already holding.
 
 const FIELD =
   'w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
@@ -265,6 +289,14 @@ export default function PlayerRegistrationForm({
   const [rows, setRows] = useState(() => [blankRow()])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  // The registrant's own name — see the header note. `profile` resolves
+  // asynchronously, so `needsName` is false on the first render and becomes
+  // true when the row arrives; that is the right way round, because a field
+  // that appears is better than one that vanishes under a thumb mid-typing.
+  const { profile } = useMyProfile()
+  const needsName = Boolean(profile?.id) && !profile.name_confirmed_at
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   // The children that were saved before something went wrong, by name. Held
   // separately from `error` because it is good news and is worded as such —
   // and because a parent who then fixes the failing row must not see the first
@@ -299,6 +331,13 @@ export default function PlayerRegistrationForm({
    * costs nothing.
    */
   function firstProblem() {
+    // ⚠️ CHECKED FIRST, because it is written first. A list that saved two
+    // children and then refused on a blank "your name" would have created the
+    // exact nameless queue rows this field exists to prevent.
+    if (needsName && !firstName.trim()) {
+      return 'Enter your own first name, so the club knows who is registering.'
+    }
+
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index]
       const name = row.fullName.trim()
@@ -341,6 +380,34 @@ export default function PlayerRegistrationForm({
     setError(null)
     setSaved([])
     setSubmitting(true)
+
+    // ⚠️ THE NAME GOES FIRST, AND THE ORDER IS THE ENTIRE FIX. Writing it after
+    // the children would leave the same race in place — the membership, and so
+    // the admin's queue row, would exist before the profile had a name.
+    //
+    // A failure here stops everything: it is one round trip, nothing has been
+    // created yet, and carrying on would produce precisely the nameless row
+    // this is here to avoid. updateProfileNames reads the row back and throws
+    // on a refusal rather than reporting a silent zero-row success.
+    if (needsName) {
+      try {
+        const updated = await updateProfileNames({
+          profileId: profile.id,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+        })
+        // The masthead initial and the dashboard greeting read this cache and
+        // it is never invalidated by itself — priming it is the documented
+        // escape hatch (see useMyProfile's header). Without this the person
+        // has just told us their name and the app keeps showing "?" until a
+        // reload.
+        primeMyProfileCache(profile.id, updated)
+      } catch (err) {
+        setError(err?.message || "We couldn't save your name. Try again in a moment.")
+        setSubmitting(false)
+        return
+      }
+    }
 
     // Saved in order, stopping at the first refusal. See the header note: one
     // player per call is the RPC's shape, and sequential is what makes a
@@ -411,6 +478,55 @@ export default function PlayerRegistrationForm({
         >
           {error}
         </p>
+      )}
+
+      {/* ⚠️ ABOVE THE CHILDREN, and that is deliberate. "Who are you?" before
+          "who are you registering?" is the order a person expects, and it is
+          also the order the submit runs in. A field asked after the thing it
+          precedes reads as an afterthought and gets skipped.
+
+          Absent entirely once we hold a confirmed name, so a parent adding a
+          second child from /more never sees it. */}
+      {needsName && (
+        <fieldset className="mb-5 rounded-[11px] bg-surface px-3 py-3">
+          <legend className="px-1 text-xs font-bold uppercase tracking-wide text-ink-faint">
+            About you
+          </legend>
+          <p className="text-[12.5px] leading-relaxed text-ink-muted">
+            The coach approving this needs to know who asked. This is your name, not
+            your child&apos;s.
+          </p>
+
+          <label htmlFor="register-your-first-name" className={`${LABEL} mt-3`}>
+            Your first name
+          </label>
+          <input
+            id="register-your-first-name"
+            name="yourFirstName"
+            type="text"
+            autoComplete="given-name"
+            value={firstName}
+            disabled={submitting}
+            onChange={(event) => setFirstName(event.target.value)}
+            className={FIELD}
+          />
+
+          {/* Optional, and said so. Plenty of people have one name, and the
+              same wording NamePrompt and the You card already use. */}
+          <label htmlFor="register-your-last-name" className={`${LABEL} mt-3`}>
+            Your family name <span className="font-semibold normal-case">(optional)</span>
+          </label>
+          <input
+            id="register-your-last-name"
+            name="yourLastName"
+            type="text"
+            autoComplete="family-name"
+            value={lastName}
+            disabled={submitting}
+            onChange={(event) => setLastName(event.target.value)}
+            className={FIELD}
+          />
+        </fieldset>
       )}
 
       <ul>
