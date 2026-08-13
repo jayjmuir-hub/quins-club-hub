@@ -717,6 +717,15 @@ will propose building.**
   `main` that deploys live, so this cuts both ways — a red run that is fine trains
   people to re-run, and a green run proves less than it appears to. **Do not
   dismiss a single red CI run on this repo as "the flaky one" until this is fixed.**
+  ⚠️ **REPRODUCED 13 Aug 2026 IN A DIFFERENT PAIR OF FILES, AND THAT NARROWS THE
+  DIAGNOSIS.** Two consecutive full runs, same tree, same command, minutes
+  apart: first **2 failed** — one in `tests/accounts.test.jsx`, one in
+  `tests/player-form.test.jsx` — then **2126 passed**. Both files pass 124/124
+  run on their own, and neither imports the module the session was changing.
+  **So this is NOT "the admin-dashboard file is flaky": at least three test
+  files have now produced a phantom failure, which points at cross-file state or
+  scheduling rather than at anything inside one file.** Whatever gets chased
+  first, it is not `tests/admin-dashboard.test.jsx`.
 
 ### ⚠️ Test data currently in the live database
 
