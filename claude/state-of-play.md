@@ -493,13 +493,61 @@ will propose building.**
   had nobody attached, so the member-facing card would have shipped empty to most
   of the club with no way to see why. **The admin directory is the only view that
   surfaces the missing data the rest of the feature depends on.**
-  ⚠️ **The Home card is PHASE 3 and is NOT built** —
-  `claude/plans/2026-08-13-squad-staff-on-home.md`, whose header also corrects its
-  own gap 2: the mechanism is a `SECURITY DEFINER` function returning
-  `(full_name, title, role)`, **never an RLS policy on `profiles`**, because a
-  `profiles` row carries `email` and `phone` and RLS authorises rows, not columns.
+  ~~⚠️ **The Home card is PHASE 3 and is NOT built**~~
+  ✅ **SHIPPED THE SAME DAY — "Squad contacts" IS ON HOME.** The mechanism is the
+  one that header predicted: a `SECURITY DEFINER` function,
+  `public.my_squad_staff()`, **never an RLS policy on `profiles`**, because a
+  `profiles` row carries `email` and `phone` and RLS authorises rows, not
+  columns — and a column grant cannot fix it either, since grants apply to the
+  whole `authenticated` role including the admins who need those columns on
+  Accounts. **The boundary is the function's fixed seven-column result**, so
+  `is_super` and `admin_rights` are unreachable rather than merely undrawn.
   ⚠️ **A TITLE IS NEVER PERMISSION** — `can_edit_team` keys off `role`, and it
   must stay that way.
+  ⚠️ **CONTACT DETAILS ARE ON THE CARD, AND THE PLAN'S RECOMMENDATION WAS
+  OVERRULED.** The plan recommended an opt-in toggle defaulting OFF. Jay,
+  13 Aug 2026: *"stop worrying about the opt in, the staff automatically opts in
+  when accepting the position"*. **Do not narrow it back to name-and-title on
+  the strength of the plan document.**
+  ⚠️ **THE GATE IS `can_see_team`, NOT `is_attached_to_team`,** and the one
+  difference is `status = 'active'`. `event read` uses the status-blind one
+  deliberately ("fixtures are not sensitive"); a volunteer's mobile is not a
+  fixture, so **a PENDING member sees an empty card, not a refusal.**
+  ⚠️ **THE BLOCK IS BUILT FROM THE PERSON'S OWN MEMBERSHIP ROWS, NOT FROM
+  `visibleTeams()`** — which hands an admin all fifteen squads, and
+  `can_see_team` is true for an admin on every one of them, so the RPC really
+  does return the whole club to Jay. Filtering client-side is what keeps Home to
+  "your squads" and is what makes **view-as** narrow correctly. It is cosmetic,
+  never a boundary.
+  ⚠️ **STILL SHOWING ITS EMPTY STATE TO MOST OF THE CLUB, BY DESIGN.**
+  Re-measured live the same evening: **12 of 15 squads still have nobody
+  attached, and 0 of 8 staff have a title set.** The card says the staff are not
+  *listed* rather than that the squad has none — every one of those squads has
+  real adults running it and what is missing is the data. **The prerequisite is
+  an admin data task on `/admin/staff`, not code.**
+  ⚠️ **PHASE 4 (photos) IS NOT BUILT** — `profiles` has no photo column and
+  there is no staff bucket. `players.photo_path` is head shots of CHILDREN and
+  must not be reached for.
+
+- ⚠️ **`revoke execute … from public` DOES NOT KEEP `anon` OUT, AND NINE
+  MIGRATIONS ARE WRITTEN AS THOUGH IT DOES.** Measured live 13 Aug 2026:
+  `approve_membership`, `register_my_player`, `reset_my_calendar_token`,
+  `set_admin_rights`, `set_own_player_photo` and `set_series_time_from` are all
+  **executable by `anon`**. Only `delete_my_account` and the new
+  `my_squad_staff` are not.
+  ⚠️ **THE CAUSE:** Supabase ships `alter default privileges in schema public
+  grant all on functions to anon, authenticated, service_role` — a grant to
+  `anon` **by name**, which revoking the `PUBLIC` pseudo-role never touches.
+  ⚠️ **EACH IS SAFE TODAY ONLY BY ITS BODY, NOT BY ITS GRANT** — they all derive
+  everything from `auth.uid()`, which is null for `anon`. Two of them
+  (`register_my_player`, `approve_membership`) grant `anon` **deliberately**, so
+  this is not a blanket revoke.
+  ⚠️ **AND THE FACT WAS ALREADY WRITTEN DOWN.** `db/schema/functions.sql` states
+  it exactly, in the `photo_backup_list_objects` entry, and calls the revoke
+  "the load-bearing half". **Nobody applied it to the other RPCs** — the same
+  shape as the branching failure two entries up, where "the migration table is
+  polluted" and "branching replays migrations" were both recorded and never put
+  together.
 
 - ✅ **THE PLAYER PHOTOGRAPHS ARE BACKED UP — LIVE AND RUNNING NIGHTLY, 13 Aug
   2026.** The entry below said "written and protects nothing yet" for about an
@@ -669,6 +717,15 @@ will propose building.**
   `main` that deploys live, so this cuts both ways — a red run that is fine trains
   people to re-run, and a green run proves less than it appears to. **Do not
   dismiss a single red CI run on this repo as "the flaky one" until this is fixed.**
+  ⚠️ **REPRODUCED 13 Aug 2026 IN A DIFFERENT PAIR OF FILES, AND THAT NARROWS THE
+  DIAGNOSIS.** Two consecutive full runs, same tree, same command, minutes
+  apart: first **2 failed** — one in `tests/accounts.test.jsx`, one in
+  `tests/player-form.test.jsx` — then **2126 passed**. Both files pass 124/124
+  run on their own, and neither imports the module the session was changing.
+  **So this is NOT "the admin-dashboard file is flaky": at least three test
+  files have now produced a phantom failure, which points at cross-file state or
+  scheduling rather than at anything inside one file.** Whatever gets chased
+  first, it is not `tests/admin-dashboard.test.jsx`.
 
 ### ⚠️ Test data currently in the live database
 

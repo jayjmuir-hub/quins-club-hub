@@ -10,7 +10,39 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **New app icon — the crest's bat on a harlequin field — and the maskable icons
+- ✅ **AN AGE GROUP CAN SEE WHO LOOKS AFTER IT — "Squad contacts" is on Home.**
+  Phase 3 of `claude/plans/2026-08-13-squad-staff-on-home.md`, completing Jay's
+  13 Aug ask. One card per squad the person is attached to: name, title or role,
+  and **tappable `tel:` / `mailto:` links**.
+  ⚠️ **CONTACT DETAILS ARE IN ON A RULING THAT OVERTURNED THE PLAN.** The plan
+  recommended a per-person opt-in toggle defaulting OFF; Jay: *"the staff
+  automatically opts in when accepting the position"*. Do not narrow it back.
+  ⚠️ **A `SECURITY DEFINER` FUNCTION, NEVER A POLICY ON `profiles`** —
+  `public.my_squad_staff()`, `db/migrations/20260813_my_squad_staff.sql`. **RLS
+  authorises ROWS, not COLUMNS**, so a policy wide enough to show a coach's name
+  hands over their whole row; a column grant cannot fix it either, because
+  grants apply to the whole `authenticated` role including the admins who need
+  `email`/`phone` on Accounts. The boundary is the fixed seven-column result,
+  which is why `is_super` and `admin_rights` are unreachable rather than undrawn.
+  ⚠️ **GATED ON `can_see_team`, NOT `is_attached_to_team`** — the difference is
+  `status = 'active'`. A pending member sees an empty card; fixtures are not
+  sensitive and a phone number is.
+  ⚠️ **THE BLOCK IS BUILT FROM THE PERSON'S OWN MEMBERSHIPS, NOT `visibleTeams()`**,
+  which would give an admin fifteen cards — and that filter is what makes
+  view-as narrow correctly.
+  ✅ **PROVED AGAINST AN INJECTED FAULT ON LIVE, IN A ROLLED-BACK TRANSACTION.**
+  `db/tests/rls-squad-staff-visibility.sql`: the other squad's coach is invisible,
+  **and becomes visible the moment the same person joins that squad** — without
+  which every zero is equally explained by "the function returns nothing to
+  anyone". A control asserts the member still cannot read `profiles` directly.
+  ⚠️ **STILL EMPTY FOR MOST OF THE CLUB, BY DESIGN** — re-measured the same
+  evening, 12 of 15 squads have nobody attached and 0 of 8 staff have a title.
+  The wording says the staff are not *listed*, never that the squad has none.
+  ⚠️ **AND `revoke … from public` DOES NOT KEEP `anon` OUT.** Supabase's default
+  privileges grant to `anon` by name. Six other public RPCs are anon-executable;
+  this one carries an explicit `from anon` revoke and the harness asserts it.
+
+- `ffdcddf` — **New app icon — the crest's bat on a harlequin field — and the maskable icons
   are mask-safe for the first time.** The bat is traced from `src/assets/crest.png`
   as Bézier curves rather than redrawn. ⚠️ **The old maskable files were not
   maskable:** 9.6% of the crest sat outside the 80% safe circle, so Android's mask

@@ -53,6 +53,15 @@ const ALIASES = [
   // The pitch allocation screen, 12 Aug 2026.
   ['harness/stubs/pitches.js', 'src/data/pitches.js'],
   ['harness/stubs/pitchRequests.js', 'src/data/pitchRequests.js'],
+  // The Squad contacts block on Home, 13 Aug 2026.
+  //
+  // ⚠️ AND THE COUNT ASSERTION CAUGHT IT AGAIN — 14 vs 13, on the fourth
+  // occasion this guard has earned its keep. Worth recording because the
+  // failure mode it prevents got WORSE with this alias: src/data/staff.js is
+  // imported by Dashboard, which AppShell reaches, so a missing stub does not
+  // blank one scenario — it stops the harness booting at all, with a module-
+  // scope throw from src/lib/supabase.js rather than an unresolved import.
+  ['harness/stubs/staff.js', 'src/data/staff.js'],
 ]
 
 function read(relative) {

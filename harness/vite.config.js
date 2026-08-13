@@ -88,6 +88,12 @@ export default defineConfig({
         find: /^\.\.\/data\/pitchRequests\.js$/,
         replacement: path.resolve(__dirname, 'stubs/pitchRequests.js'),
       },
+      // The Squad contacts block on Home (13 Aug 2026). Dashboard.jsx is in
+      // src/screens/ and AdminStaff.jsx alongside it, so one rule covers both.
+      // ⚠️ Without this the harness does not boot AT ALL — Dashboard is reached
+      // by AppShell, and src/data/staff.js imports src/lib/supabase.js at module
+      // scope, which throws on import rather than on call.
+      { find: /^\.\.\/data\/staff\.js$/, replacement: path.resolve(__dirname, 'stubs/staff.js') },
     ],
   },
   server: {
