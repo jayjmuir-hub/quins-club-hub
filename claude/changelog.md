@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **A parent can register more than one child — the FORM was the limit, never the
+- `231b660` — **A parent can register more than one child — the FORM was the limit, never the
   database.** Plan: `claude/plans/2026-08-13-multi-child-registration.md`. Jay: *"we
   need the ability for parents to add multiple children, up to 5, i thought we built
   that in"* — we had not. ⚠️ **The "5" that made it look built is the anti-abuse
