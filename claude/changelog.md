@@ -10,7 +10,46 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- ✅ **AN AGE GROUP CAN SEE WHO LOOKS AFTER IT — "Squad contacts" is on Home.**
+- ❌ **NINE OF THE FIFTEEN DATABASE HARNESSES COULD NOT FAIL, AND `db:check`
+  ITSELF WAS THE REASON.** Found hours after that runner shipped. It threw on a
+  SQL *error* and discarded every result set — so a harness asserting via SELECT
+  (`select count(*) as leaked_expect_0`) reported `ok` whatever came back. The
+  verdict was computed, printed and compared to nothing, in nine files, every one
+  guarding an RLS boundary. **The same bug one layer up: the runner removed the
+  friction that stopped anyone RUNNING the checks and left most of them unable to
+  report a wrong answer.**
+  ✅ **The runner now refuses a harness with no `raise exception`** — the same
+  shape as its begin/rollback gate — **and prints every result row.** All fifteen
+  carry assertions, and every one was proved to fire against an injected fault.
+  ❌ **`rls-can-edit-team-status.sql` was broken THREE ways**, none ever hit:
+  it inserted `profiles.club_id` (no such column — instant 42703), never granted
+  its temp table to `authenticated` (42501, which reads exactly like the RLS
+  refusal it tests), and chose its subject squad by `order by sort_order limit 1`
+  — **today that is U6 Tag, with zero players and zero events**, so every
+  "expect 0" was trivially true and the injection could never flip. It now picks
+  the squad with the most data and **raises if no squad has both**.
+  ⚠️ **The rule: a harness must pick its subject by the property it needs, never
+  by an ordering that happens to have it today.**
+
+- ✅ **`anon` COULD EXECUTE TEN OF THE FOURTEEN `public` FUNCTIONS. NOW TWO,
+  BOTH DELIBERATE.** `db/migrations/20260813_revoke_anon_execute.sql`.
+  ⚠️ **The house pattern does not do what it reads as**: Supabase ships
+  `alter default privileges … grant all on functions to anon, …`, a grant BY
+  NAME that `revoke … from public` never touches. Nine migrations are written as
+  though it does.
+  ⚠️ **BOTH REVOKES ARE NEEDED — the first attempt fixed five of eight and
+  looked done.** A function can hold a named `anon` grant and a `PUBLIC` grant
+  independently, and `anon` inherits through PUBLIC. **Only
+  `has_function_privilege` answers this**, never the migration text.
+  ⛔ **`calendar_events_for_token` and `register_my_player` keep `anon`.** The
+  first is the calendar feed; a subscribed URL cannot be changed remotely, so
+  revoking it would break every feed in the club unrepairably.
+  `db/tests/grants.sql` §3b now fails in **both** directions, and its self-test
+  proves each arm catches.
+  ✅ **Smoke-tested live afterwards: 200, `text/calendar; charset=utf-8`, valid
+  VCALENDAR.**
+
+- `4f2df85` — ✅ **AN AGE GROUP CAN SEE WHO LOOKS AFTER IT — "Squad contacts" is on Home.**
   Phase 3 of `claude/plans/2026-08-13-squad-staff-on-home.md`, completing Jay's
   13 Aug ask. One card per squad the person is attached to: name, title or role,
   and **tappable `tel:` / `mailto:` links**.

@@ -68,13 +68,71 @@ function connectionString() {
 // prove its own assertions are not vacuous. Committing that would hand every
 // club admin the ability to rewrite any member's login email, on production,
 // with nothing failing and nothing in the app looking different.
+// ── ⚠️ THE SECOND GATE: A HARNESS MUST BE ABLE TO FAIL ─────────────────────
+//
+// Found 13 Aug 2026, hours after this runner was written to fix "a check nobody
+// RUNS is not a check". **NINE of the fifteen harnesses could not FAIL.**
+//
+// `client.query(sql)` below throws on a SQL ERROR and returns result sets for
+// everything else — and the result sets were discarded. So a harness whose
+// assertions are SELECTs, e.g.
+//
+//     select count(*) as other_squads_coach_leaked_expect_0 from ...;
+//
+// reported `ok` whichever number came back. The zero was never compared to
+// anything; nobody ever saw it. Nine files, every one of them guarding an RLS
+// boundary, and the list included the one written the same afternoon.
+//
+// ⚠️ THAT IS THE SAME BUG ONE LAYER UP, and it is worth stating plainly: this
+// runner removed the friction that stopped people RUNNING the checks, and left
+// most of them unable to report a wrong answer. **A check that runs and cannot
+// fail is not a check either.**
+//
+// So a harness must now contain at least one `raise exception` — a statement of
+// what it expects, in a form the database can act on. `raise notice` does not
+// count: a notice is printed and execution continues, which is exactly the
+// silence this gate exists to end. The rows are printed as well (see below), so
+// a human still sees everything; the exception is what makes it enforceable.
 function inspect(sql) {
   const withoutComments = sql.replace(/^\s*--.*$/gm, '')
   return {
     opens: /^\s*begin\s*;/im.test(withoutComments),
     rollsBack: /^\s*rollback\s*;/im.test(withoutComments),
     commits: /^\s*commit\s*;/im.test(withoutComments),
+    canFail: /raise\s+exception/i.test(withoutComments),
   }
+}
+
+// ── Reading what a harness actually measured ───────────────────────────────
+
+/**
+ * Every row from every statement in the file, flattened.
+ *
+ * node-postgres returns an ARRAY of result objects when the query text holds
+ * more than one statement, and a single object when it holds one. Harnesses in
+ * this directory are always multi-statement, but a one-statement file must not
+ * silently print nothing.
+ */
+function collectRows(out) {
+  const sets = Array.isArray(out) ? out : [out]
+  const rows = []
+  for (const set of sets) {
+    if (!set || !Array.isArray(set.rows)) continue
+    for (const row of set.rows) rows.push(row)
+  }
+  return rows
+}
+
+/** One `key=value` line per row, truncated so a wide row cannot flood a log. */
+function formatRows(rows) {
+  return rows.map((row) =>
+    Object.entries(row)
+      .map(([k, v]) => {
+        const text = v === null ? 'null' : String(v)
+        return `${k}=${text.length > 80 ? `${text.slice(0, 77)}...` : text}`
+      })
+      .join('  '),
+  )
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────
@@ -93,16 +151,27 @@ if (files.length === 0) {
 // Gate every file BEFORE connecting, so an unsafe one cannot be reached by a
 // run that has already started and is part way down the list.
 const unsafe = []
+const silent = []
 for (const name of files) {
-  const { opens, rollsBack, commits } = inspect(readFileSync(join(ROOT, DIR, name), 'utf8'))
+  const { opens, rollsBack, commits, canFail } = inspect(readFileSync(join(ROOT, DIR, name), 'utf8'))
   if (commits) unsafe.push(`${name}: contains COMMIT — a harness must never commit against production`)
   else if (!opens || !rollsBack) unsafe.push(`${name}: must open with BEGIN and end with ROLLBACK`)
+  if (!canFail) silent.push(name)
 }
 if (unsafe.length) {
   console.error('db-check: REFUSING TO RUN. These harnesses are not safe to run unattended:\n')
   for (const line of unsafe) console.error(`  ${line}`)
   console.error('\nSeveral harnesses inject a real fault to prove they are not vacuous.')
   console.error('Without a guaranteed rollback, that fault stays on production.\n')
+  process.exit(1)
+}
+if (silent.length) {
+  console.error('db-check: REFUSING TO RUN. These harnesses cannot FAIL:\n')
+  for (const name of silent) console.error(`  ${name}: no "raise exception" anywhere`)
+  console.error('\nA harness whose assertions are SELECTs reports `ok` whatever number comes')
+  console.error('back — this runner throws on a SQL error and on nothing else. Wrap each')
+  console.error('expectation in a `do $$ ... raise exception ... end $$;` block so a wrong')
+  console.error('answer stops the run. `raise notice` is not enough: it prints and carries on.\n')
   process.exit(1)
 }
 
@@ -146,10 +215,16 @@ for (const name of files) {
   const notices = []
   client.on('notice', (n) => notices.push(n.message))
 
+  let rows = []
   try {
     await client.connect()
-    await client.query(sql)
-    results.push({ name, ok: true, notices })
+    // ⚠️ THE RETURN VALUE WAS DISCARDED UNTIL 13 Aug 2026, and that is how nine
+    // harnesses came to be unable to report a wrong answer. node-postgres hands
+    // back an ARRAY of results for a multi-statement string and a single object
+    // for one statement, so both shapes are handled.
+    const out = await client.query(sql)
+    rows = collectRows(out)
+    results.push({ name, ok: true, notices, rows })
     console.log(`  ok    ${name}`)
   } catch (error) {
     results.push({ name, ok: false, notices, error: error.message })
@@ -157,6 +232,13 @@ for (const name of files) {
   } finally {
     await client.end().catch(() => {})
   }
+
+  // ⚠️ PRINTED EVEN ON A PASS. The `raise exception` gate above is what makes a
+  // wrong answer STOP the run; this is what lets a human read the numbers and
+  // notice one that is technically within its assertion and still wrong. The
+  // two are complementary — the gate catches what somebody thought to assert,
+  // the print is how the next surprise gets spotted at all.
+  for (const line of formatRows(rows)) console.log(`          ${line}`)
 
   // ⚠️ NOTICES ARE THE OUTPUT, NOT DECORATION. These harnesses report a pass
   // with `raise notice` — "SELF-TEST PASSED — the check caught it: ..." is how

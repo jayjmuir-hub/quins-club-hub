@@ -350,6 +350,8 @@ end;
 $function$
 ;
 
+REVOKE EXECUTE ON FUNCTION public.my_calendar_token() FROM PUBLIC;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
+REVOKE EXECUTE ON FUNCTION public.my_calendar_token() FROM anon;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
 GRANT EXECUTE ON FUNCTION public.my_calendar_token() TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.reset_my_calendar_token()
@@ -373,6 +375,8 @@ end;
 $function$
 ;
 
+REVOKE EXECUTE ON FUNCTION public.reset_my_calendar_token() FROM PUBLIC;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
+REVOKE EXECUTE ON FUNCTION public.reset_my_calendar_token() FROM anon;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
 GRANT EXECUTE ON FUNCTION public.reset_my_calendar_token() TO authenticated;
 
 
@@ -434,6 +438,8 @@ end;
 $function$
 ;
 
+REVOKE EXECUTE ON FUNCTION public.set_own_player_photo(uuid, text) FROM PUBLIC;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
+REVOKE EXECUTE ON FUNCTION public.set_own_player_photo(uuid, text) FROM anon;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
 GRANT EXECUTE ON FUNCTION public.set_own_player_photo(uuid, text) TO authenticated;
 
 
@@ -820,6 +826,32 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO anon;  -- inert: an
 -- function: the two calendar functions are SECURITY INVOKER (the grant buys
 -- an anon caller nothing), and set_own_player_photo fails closed inside
 -- private.is_own_player(). Recorded as found, per the README. Not fixed here.
+--
+-- ✅ **FIXED 13 Aug 2026 — `db/migrations/20260813_revoke_anon_execute.sql`.**
+-- All three now answer false to has_function_privilege('anon', ..., 'execute'),
+-- along with five more the note above never reached: approve_membership,
+-- set_admin_rights, set_series_time_from, claim_roster_access and
+-- set_own_player_gender. **Ten of the fourteen functions in `public` were
+-- anon-executable; two now are, both deliberately.**
+--
+-- ⚠️ THE JUDGEMENT ABOVE WAS SOUND AND THE CONCLUSION WAS STILL WRONG, WHICH
+-- IS THE PART WORTH KEEPING. "Nil-to-small, argued at each function" is exactly
+-- right — and it means each of those functions was safe **by its body rather
+-- than by its grant**. That is a separate thing that has to stay true, in eight
+-- places, forever, and it is re-argued from scratch every time somebody edits
+-- one. A grant stays true on its own.
+--
+-- ⚠️ AND THE MECHANISM WAS ALREADY DOCUMENTED IN THIS VERY FILE, in the
+-- photo_backup_list_objects entry, which calls the revoke "the load-bearing
+-- half". Two correct observations in one file, never joined up.
+--
+-- ⚠️ WHAT THIS NOTE GOT RIGHT AND MUST NOT BE LOST: both `=X` (PUBLIC) and a
+-- named `anon` grant can be present INDEPENDENTLY, and revoking one leaves the
+-- other. Three of these carried PUBLIC and needed both revokes. The only
+-- reliable check is has_function_privilege — never a reading of the SQL.
+-- Guarded now by db/tests/grants.sql §3b, in BOTH directions: it also fails if
+-- calendar_events_for_token ever LOSES anon, which would take the calendar feed
+-- off every subscriber's phone with no way to repair it.
 -- =====================================================================
 
 
@@ -996,7 +1028,7 @@ end;
 $function$
 ;
 
-GRANT EXECUTE ON FUNCTION public.claim_roster_access() TO anon;
+REVOKE EXECUTE ON FUNCTION public.claim_roster_access() FROM anon;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
 GRANT EXECUTE ON FUNCTION public.claim_roster_access() TO authenticated;
 
 
@@ -1094,7 +1126,7 @@ end;
 $function$
 ;
 
-GRANT EXECUTE ON FUNCTION public.set_own_player_gender(uuid, text) TO anon;
+REVOKE EXECUTE ON FUNCTION public.set_own_player_gender(uuid, text) FROM anon;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
 GRANT EXECUTE ON FUNCTION public.set_own_player_gender(uuid, text) TO authenticated;
 
 
@@ -1655,7 +1687,7 @@ GRANT EXECUTE ON FUNCTION public.approve_membership(uuid) TO authenticated;
 -- likely source, and the same pattern is visible on register_my_player and
 -- set_own_player_gender. It fails closed: an anon caller has a null auth.uid()
 -- and hits the first raise. Recorded as found, per the README.
-GRANT EXECUTE ON FUNCTION public.approve_membership(uuid) TO anon;
+REVOKE EXECUTE ON FUNCTION public.approve_membership(uuid) FROM anon;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
 GRANT EXECUTE ON FUNCTION public.approve_membership(uuid) TO service_role;
 
 
@@ -1716,7 +1748,7 @@ $function$
 ;
 
 GRANT EXECUTE ON FUNCTION public.set_series_time_from(uuid, timestamp with time zone, integer, integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.set_series_time_from(uuid, timestamp with time zone, integer, integer) TO anon;  -- bootstrap default; fails closed, see above
+REVOKE EXECUTE ON FUNCTION public.set_series_time_from(uuid, timestamp with time zone, integer, integer) FROM anon;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
 GRANT EXECUTE ON FUNCTION public.set_series_time_from(uuid, timestamp with time zone, integer, integer) TO service_role;
 
 
@@ -1825,7 +1857,7 @@ $function$
 -- already recorded on approve_membership, register_my_player,
 -- set_own_player_gender and set_series_time_from.
 GRANT EXECUTE ON FUNCTION public.set_admin_rights(uuid, boolean, text[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.set_admin_rights(uuid, boolean, text[]) TO anon;
+REVOKE EXECUTE ON FUNCTION public.set_admin_rights(uuid, boolean, text[]) FROM anon;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
 GRANT EXECUTE ON FUNCTION public.set_admin_rights(uuid, boolean, text[]) TO service_role;
 
 

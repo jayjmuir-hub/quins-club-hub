@@ -134,6 +134,52 @@ end $$;
 reset role;
 select * from probe;
 
+-- ══════════════════════════════════════════════════════════════════════════
+--  ⚠️ THE ASSERTION. `select * from probe` was the whole verdict, and
+--  `npm run db:check` discards result sets — so this file reported `ok` with
+--  "<<< WRONG" sitting in the output. Added 13 Aug 2026; nine harnesses were
+--  in that state. See scripts/db-check.mjs.
+--
+--  ⚠️ THE `<<< WRONG` MARKER IS BIDIRECTIONAL, which is what makes the first
+--  check sufficient on its own: a case that should be refused writes
+--  "ALLOWED  <<< WRONG" and a case that should be allowed writes
+--  "REFUSED <<< WRONG". So a build that refused EVERYTHING fails just as
+--  loudly as one that allowed everything — the non-vacuity arm is already
+--  built into the fixture.
+-- ══════════════════════════════════════════════════════════════════════════
+do $$
+declare
+  _bad text;
+  _n int;
+begin
+  select count(*) into _n from probe;
+  if _n = 0 then
+    raise exception 'FAIL: the probe is empty — nothing this harness claims to test was exercised.';
+  end if;
+
+  select string_agg(case_name || ' (expected ' || expected || ') -> ' || result, ' | ') into _bad
+    from probe where result like '%<<< WRONG%';
+  if _bad is not null then
+    raise exception 'FAIL: %', _bad;
+  end if;
+
+  -- ⚠️ THE SQLSTATE IS ASSERTED, NOT JUST THE REFUSAL, AND THIS FILE'S FOOTER
+  -- SAYS WHY: "22004 vs 22023 is not cosmetic. src/data/members.js maps 22023
+  -- to one generic sentence covering three other guards; 22004 has NO entry, so
+  -- its server message — which names the squad — reaches the parent intact."
+  -- A refusal with the wrong code is still a refusal, and the parent silently
+  -- starts seeing the wrong sentence. Nothing else in the repo would catch it.
+  select string_agg(case_name || ' -> ' || result, ' | ') into _bad
+    from probe
+   where (case_name = 'single-gender squad, blank gender' and result not like 'refused (22004)%')
+      or (case_name = 'unrecognised gender value'         and result not like 'refused (22023)%');
+  if _bad is not null then
+    raise exception 'FAIL: refused with the wrong SQLSTATE, so the parent will see the wrong message: %', _bad;
+  end if;
+
+  raise notice 'SELF-TEST PASSED — % cases, none marked WRONG, both SQLSTATEs correct.', _n;
+end $$;
+
 rollback;
 
 -- ══════════════════════════════════════════════════════════════════════════

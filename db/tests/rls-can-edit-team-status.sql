@@ -32,15 +32,71 @@ values ('cee00000-0000-4000-8000-00000000c0ac', '00000000-0000-0000-0000-0000000
         'authenticated', 'authenticated', 'pending.coach@example.invalid', now(),
         '{}'::jsonb, now(), now());
 
-insert into profiles (id, club_id, full_name, email)
-values ('cee00000-0000-4000-8000-00000000c0ac',
-        '00000000-0000-0000-0000-0000000000ad', 'Pending Coach',
+-- ⚠️ `profiles` HAS NO `club_id` COLUMN, AND THIS LINE NAMED ONE UNTIL 13 Aug
+-- 2026. The harness aborted at this INSERT with
+--
+--     42703: column "club_id" of relation "profiles" does not exist
+--
+-- so every assertion below it — the whole point of the file — had never run
+-- since the column was dropped. Measured live 13 Aug: profiles is
+-- (id, full_name, created_at, email, first_name, last_name, name_confirmed_at,
+-- phone). A membership carries the club, which is where it belongs: one person
+-- can hold rows in more than one club, so a club on the profile was always the
+-- wrong shape.
+--
+-- ⚠️ `npm run db:check` WOULD HAVE CAUGHT THIS THE FIRST TIME IT RAN — the
+-- runner throws on a SQL error. It had never been run against this file.
+insert into profiles (id, full_name, email)
+values ('cee00000-0000-4000-8000-00000000c0ac', 'Pending Coach',
         'pending.coach@example.invalid')
 on conflict (id) do nothing;
 
 -- The squad this person is PENDING staff on.
+--
+-- ⚠️ CHOSEN BY WHICH SQUAD HAS DATA, NOT BY `sort_order` — AND THAT WAS THE
+-- THIRD THING BROKEN IN THIS FILE (13 Aug 2026). It used to read
+-- `order by sort_order limit 1`, which today picks **U6 Tag**: zero players,
+-- zero events. So `players_visible_expect_0` and `contacts_visible_expect_0`
+-- came back 0 for a reason that has nothing to do with RLS — they are 0 for
+-- ANYBODY, including a full admin, because the squad is empty. The harness was
+-- passing its own assertions while measuring nothing, and its fault-injection
+-- arm (`players_now_visible_expect_gt_0`) could never flip.
+--
+-- ⚠️ IT WAS NOT ALWAYS VACUOUS, WHICH IS THE POINT. The footer records `events
+-- 34` on 10 Aug 2026, so the first squad by sort_order had data then. The
+-- fixture moved out from under a hard-coded choice — the seeded September and
+-- the three senior squads both went — and nothing said so, because nobody ran
+-- it. **A harness must pick its subject by the property it needs, never by an
+-- ordering that happens to have it today.**
 create temporary table _t on commit drop as
-select id as team_id, club_id from teams order by sort_order limit 1;
+select t.id as team_id, t.club_id
+from teams t
+order by (select count(*) from players p where p.team_id = t.id) desc,
+         (select count(*) from events e where e.team_id = t.id) desc,
+         t.sort_order
+limit 1;
+
+-- ⚠️ THE GRANT IS NOT OPTIONAL, AND ITS ABSENCE WAS THE SECOND THING BROKEN IN
+-- THIS FILE (found 13 Aug 2026, with the `profiles.club_id` fix above). A temp
+-- table is owned by `postgres`; every SELECT below runs after
+-- `set local role authenticated`, so without this the harness dies with
+--
+--     42501: permission denied for table _t
+--
+-- which reads exactly like the RLS refusal this file exists to test, and is
+-- nothing of the sort. Two independent breakages in one harness, neither ever
+-- hit, is what "a check nobody RUNS is not a check" costs in practice.
+grant select on _t to authenticated;
+
+-- What the chosen squad ACTUALLY holds, counted as the owner before any role
+-- switch. The vacuity guard at the foot of this file compares against these:
+-- "the pending coach sees 0 players" only means something if the squad has
+-- players to withhold.
+create temporary table _fixture on commit drop as
+select (select name from teams where id = (select team_id from _t)) as squad,
+       (select count(*) from players where team_id = (select team_id from _t)) as players,
+       (select count(*) from events  where team_id = (select team_id from _t)) as events;
+grant select on _fixture to authenticated;
 
 insert into memberships (profile_id, club_id, team_id, role, status)
 select 'cee00000-0000-4000-8000-00000000c0ac', club_id, team_id, 'coach', 'pending'
@@ -114,6 +170,59 @@ set local request.jwt.claims = '{"sub":"cee00000-0000-4000-8000-00000000c0ac","r
 select
   private.can_edit_team((select team_id from _t)) as can_edit_should_now_be_TRUE,
   (select count(*) from players where team_id = (select team_id from _t)) as players_now_visible_expect_gt_0;
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  ⚠️ THE ASSERTIONS. Everything above prints; this is what FAILS.
+--
+--  Added 13 Aug 2026 along with two other repairs to this file — it had been
+--  aborting on `profiles.club_id` (a column that no longer exists), dying on a
+--  missing temp-table grant, and choosing an EMPTY squad as its subject. Three
+--  independent breakages, none ever hit, because `npm run db:check` had never
+--  been pointed at it and pasting it by hand had stopped happening.
+-- ══════════════════════════════════════════════════════════════════════════
+do $$
+declare
+  _team uuid;
+  _squad text;
+  _fixture_players int;
+  _fixture_events int;
+  _players_now int;
+begin
+  select team_id into _team from _t;
+  -- ⚠️ READ FROM `_fixture`, NOT FROM `teams`/`players` DIRECTLY. This block
+  -- runs as `authenticated`, so a direct count here would be filtered by the
+  -- very policies under test and the guard would compare a number against
+  -- itself. `_fixture` was captured as the owner before the role switch.
+  select squad, players, events into _squad, _fixture_players, _fixture_events
+    from _fixture;
+
+  -- ⚠️ THE VACUITY GUARD, AND IT IS THE MOST IMPORTANT LINE IN THIS FILE.
+  -- Every "expect 0" above is satisfied by an EMPTY SQUAD for reasons that have
+  -- nothing to do with row-level security. If the club has no squad carrying
+  -- both players and fixtures, this harness cannot distinguish a working policy
+  -- from a broken one and must say so rather than pass.
+  if _fixture_players = 0 or _fixture_events = 0 then
+    raise exception 'FAIL (VACUOUS): the chosen squad "%" has % players and % events. Every "expect 0" in this harness is then trivially true and proves nothing about RLS. Seed a squad with both before trusting this file.',
+      _squad, _fixture_players, _fixture_events;
+  end if;
+
+  -- ⚠️ THE FAULT INJECTION MUST HAVE TAKEN. can_edit_team was false while
+  -- pending; it must be true now. If it is not, `set local role authenticated`
+  -- never took and everything above ran as the owner with RLS bypassed — the
+  -- easiest false green available here.
+  if not private.can_edit_team(_team) then
+    raise exception 'FAIL: after flipping the membership to active, can_edit_team is still false. The injection did not take, so every assertion above is meaningless.';
+  end if;
+
+  select count(*) into _players_now from players where team_id = _team;
+  if _players_now = 0 then
+    raise exception 'FAIL: an ACTIVE coach sees 0 players on squad "%", which holds %. The role switch or the policy is broken.',
+      _squad, _fixture_players;
+  end if;
+
+  raise notice 'SELF-TEST PASSED — subject squad "%" (% players, % events); pending saw none, active sees %.',
+    _squad, _fixture_players, _fixture_events, _players_now;
+end $$;
 
 rollback;
 
