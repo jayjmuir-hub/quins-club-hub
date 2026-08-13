@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **THE BACKUP RESTORE IS DRILLED AND IT WORKS** — 12 Aug 18:05 backup restored
+- **The `search_path` rule is a THREE-WAY TEST, not "everything is pinned except
+  one"** — plus a migration pinning
+  `private.events_result_from_components` (**written, NOT yet applied**,
+  `db/migrations/20260813_pin_scoring_trigger_search_path.sql`).
+  ⚠️ **The same advisor warning got three different CORRECT answers in one day**,
+  which is why the exemption note was rewritten as a test rather than left as a
+  rule that read as general: DEFINER → always pin; INVOKER but decides access or
+  runs in a policy or trigger → pin anyway; INVOKER touching and calling nothing →
+  recording it is enough. `squad_expects_gender` is the only function reaching the
+  third branch, and its exemption is unchanged and still correct.
+  ⚠️ **PIN IT TO THE RIGHT VALUE — `'public, pg_temp'` here, NOT the `''` used on
+  `social_idea_owner` hours earlier.** This one reads `public.events` and calls
+  into `private`; an empty path breaks it at the first trigger fire. Matched to its
+  own sibling `scoring_kinds_for_team`, not to the most recent nearby fix.
+  ⚠️ **A CHANGED ADVISOR LIST IS NOT EVIDENCE THE DATABASE CHANGED.** The warning
+  appeared hours after a run that omitted it, which read as an unannounced
+  production change. It was not: the function has been unpinned since 12 Aug
+  (`390a6e5`, `c8a05c7`) and repo and live match exactly. **Checked before acting;
+  the alarming reading was false.**
+- `c181233` — **THE BACKUP RESTORE IS DRILLED AND IT WORKS** — 12 Aug 18:05 backup restored
   into a throwaway project, checked, deleted within the hour. £0.
   ⚠️ **The discriminating check, because "there were rows" proves nothing: SIX
   `Test Player` rows in the restore against ZERO live.** They were deleted on

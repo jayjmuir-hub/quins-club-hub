@@ -1,0 +1,48 @@
+-- 13 Aug 2026 — pin the search_path on the scoring trigger function.
+--
+-- ⚠️ NOT YET APPLIED WHEN THIS FILE WAS WRITTEN. Apply it, then re-capture
+-- db/schema/functions.sql in the same commit. Capture from the catalogue
+-- (`pg_get_functiondef`), never by pasting this file — see db/schema/README.md.
+--
+-- ── HOW THIS WAS FOUND, BECAUSE THE ROUTE MATTERS ────────────────────────
+-- Supabase's security advisor flagged it on 13 Aug. It had NOT flagged it in a
+-- run a few hours earlier the same day, which read as "something changed in
+-- production behind our backs" — the alarming reading, and the wrong one.
+--
+-- ⚠️ CHECKED BEFORE ACTING, AND THE ALARMING READING WAS FALSE. The function
+-- entered the repo on 12 Aug (`390a6e5`, PR #71; amended by `c8a05c7`, PR #73)
+-- and was created UNPINNED from the start. `db/schema/functions.sql` and
+-- db/migrations/20260812_scoring_components.sql both match live exactly. There
+-- is NO DRIFT. The advisor simply runs on its own schedule and the earlier
+-- result was a stale snapshot.
+-- **Record that: an advisor list that changes is not evidence the database
+-- changed.** Diff the repo against live before believing it.
+--
+-- ── WHY PIN IT, GIVEN squad_expects_gender IS EXEMPT ─────────────────────
+-- Because the exemption was never a blanket rule about unpinned search_paths,
+-- and reading it as one is how you end up either pinning everything or
+-- exempting everything. The three-way test is written up in the inventory
+-- header of db/schema/functions.sql. In short, for THIS function:
+--
+--   * It is SECURITY INVOKER, so it runs as the caller — genuinely weaker than
+--     a DEFINER function, and this is NOT a privilege-escalation fix.
+--   * But it is VOLATILE, it is a TRIGGER on public.events, and it CALLS
+--     another function (private.scoring_kinds_for_team). squad_expects_gender
+--     is IMMUTABLE, touches no table and calls nothing — that is what its
+--     exemption rests on, and none of it is true here.
+--   * And what it computes is a SAFEGUARD: the migration that created it says
+--     the total is derived in the database so that "a typo -- or a tampered
+--     request -- " cannot produce a score contradicting the components beside
+--     it. A function whose job is to be untamperable gets its lookup path
+--     nailed down.
+--
+-- ⚠️ `public, pg_temp`, NOT the empty string — AND THIS IS THE EASY MISTAKE.
+-- private.social_idea_owner was pinned to '' earlier the same day and that was
+-- right for it: it does nothing but split a string. This one reads
+-- public.events via NEW and calls into private, so an empty search_path would
+-- break it at the first trigger fire. **Matched to its own sibling,
+-- private.scoring_kinds_for_team, which already carries exactly this setting —
+-- not copied from the last fix that happened to be nearby.**
+
+alter function private.events_result_from_components()
+  set search_path = 'public, pg_temp';

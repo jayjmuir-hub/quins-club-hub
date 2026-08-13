@@ -878,7 +878,19 @@ to notice.
   at all, deliberately** — it is the calendar feed, anon is the point, and the token
   is the gate. **Do not "fix" it to match the others.**
 - **`private.squad_expects_gender` has no pinned `search_path`.** Recorded, not
-  fixed: it is `SECURITY INVOKER`, `IMMUTABLE`, and touches no table.
+  fixed: it is `SECURITY INVOKER`, `IMMUTABLE`, touches no table and **calls
+  nothing** — there is genuinely nothing for a search_path to redirect.
+  ⚠️ **THIS IS NOT A PRECEDENT, AND READING IT AS ONE COST TIME TWICE ON 13 Aug.**
+  Two other functions carried a note that read word for word like this one, every
+  fact in both was true, and both conclusions were wrong —
+  `private.social_idea_owner` (called from three storage policies, so it decides
+  who may write) and `private.events_result_from_components` (a trigger whose job
+  is that a tampered request cannot fake a score). Both are now pinned.
+  **The rule is a three-way test, written up in the header of
+  `db/schema/functions.sql`: DEFINER → always pin; INVOKER but decides access or
+  runs in a policy or trigger → pin anyway; INVOKER touching and calling nothing
+  → recording it is enough.** `squad_expects_gender` is the only function in the
+  schema that reaches the third branch.
 - ❌ **"LEAKED-PASSWORD PROTECTION IS OFF BECAUSE IT IS A PAID-PLAN FEATURE AND
   THE ORG IS ON FREE. SETTLED 6 AUG." — THAT IS NO LONGER WHY, AND IT NO LONGER
   BELONGS IN THIS SECTION.** The org is on **Pro** (measured 13 Aug 2026,
