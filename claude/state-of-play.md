@@ -336,6 +336,45 @@ will propose building.**
   name out of it, fetch that and search it for a string only the new build has. That
   is independent of every cache and it is the check that settled it.
 
+### As of 13 Aug 2026
+
+- ✅ **SUPABASE IS ON PRO AND RESEND IS ON PRO — Jay bought both, 13 Aug 2026.**
+  Measured, not reported: `get_organization` returns `plan: "pro"` for
+  `vfjhsondxhnkijckovzt`. **What that changed by itself, with no action from
+  anyone:** daily backups with 7-day retention now exist; the project no longer
+  **pauses after 7 days idle**; storage went 1 GB → 100 GB; Supabase log retention
+  went 1 day → 7 days.
+  ⚠️ **PRO GAVE A BACKUP MECHANISM AND NOT A RESTORE. Nobody has restored one, so
+  nothing is yet known to be recoverable** — the same distinction this file draws
+  everywhere else between a thing existing and a thing being measured. The drill is
+  `claude/runbooks/backup-restore-drill.md` and it is **NOT DONE**.
+  ⚠️ **PITR IS A FURTHER PAID ADD-ON AND WAS DELIBERATELY NOT BOUGHT.** At 14 MB
+  the worst case daily backups lose is one day of availability edits. Do not
+  propose it again without a new reason.
+  ⚠️ **BRANCHING IS NOW AVAILABLE AND UNUSED** — `list_branches` returned zero on
+  13 Aug. It is the fix for "every migration is a live experiment". **Branches bill
+  by the hour: create, use, delete.** An idle branch is a standing charge nobody
+  is watching.
+  ⚠️ **THE SPEND CAP IS THE ONE THAT CAN BITE, AND IT INTERACTS WITH A KNOWN HOLE.**
+  With the cap ON, exceeding quota RESTRICTS the project rather than billing — an
+  outage. With it OFF, overage is billed. **Do not turn it off before the
+  `social-ideas` storage write policy is fixed**: that policy has no membership
+  check, so today any account with a login can upload unboundedly, and 100 GB of
+  headroom turns that from "breaks player photos" into "runs up a bill".
+- ⚠️ **A PRODUCTION READINESS AUDIT WAS RUN ON 13 Aug 2026** and its findings are
+  NOT all recorded here — the report is a session artefact, not a repo document.
+  The ones that became work are in §Open. **Its two most load-bearing measurements,
+  both live:** `events` has no index on `team_id` or `starts_at`, and the live
+  performance advisor returns 18 `auth_rls_initplan` plus 100
+  `multiple_permissive_policies` warnings.
+  ⚠️ **AND ONE ABOUT THE SUITE, WHICH IS THE ONE NOTHING ELSE WOULD HAVE CAUGHT:
+  `npm test` IS NOT DETERMINISTIC.** Two full runs, same tree, same command,
+  minutes apart: **4 failed** in `tests/admin-dashboard.test.jsx`, then **1904
+  passed**. That file alone passes 17/17. `test` is a REQUIRED check on a protected
+  `main` that deploys live, so this cuts both ways — a red run that is fine trains
+  people to re-run, and a green run proves less than it appears to. **Do not
+  dismiss a single red CI run on this repo as "the flaky one" until this is fixed.**
+
 ### ⚠️ Test data currently in the live database
 
 Two sets, both to be removed before a pilot:
@@ -409,8 +448,20 @@ Durable. Each cost real time to find.
   refusal, so a rejected grant never leaves an orphan child on the roster.
   ⚠️ **Found by Jay using the app on 10 Aug**, not by any test — the whole onboarding
   path is still unexercised by a real second person.
-- Removing the Resend cap is **pay-as-you-go, ~$0.90 per 1,000**. A purchase, so
-  **Jay does it, not the assistant.**
+- ✅ **THE RESEND CAP IS GONE — Jay bought Resend Pro, 13 Aug 2026.** This line
+  used to read *"Removing the Resend cap is pay-as-you-go, ~$0.90 per 1,000. A
+  purchase, so Jay does it, not the assistant."* He did it.
+  ⚠️ **THE 100/DAY CEILING NO LONGER EXISTS, AND THAT REMOVES A BRAKE NOBODY
+  DESIGNED.** The cap used to stop a runaway sender at 100. There are now FIVE
+  things drawing on one Resend key — auth mail via `send-email`, plus
+  `notify-approval`, `notify-pitch-request` and `notify-access-request` — and a
+  loop on any of them now sends thousands of REAL emails to REAL volunteers
+  instead of stopping. **The throttle that was wanted for "you will run out" is
+  still wanted, for "Resend can suspend `send.adhquins-clubhub.com` over spam
+  complaints".** Same fix, different reason; do not read the upgrade as closing it.
+  ⚠️ **Measure the monthly allowance on the Resend dashboard rather than citing a
+  number here** — and remember the shadow-DOM trap two bullets up: read that page
+  from a screenshot.
 - **`jayjmuir@yahoo.com` is Jay's deliberate backup — and as of 10 Aug 2026 a backup
   SUPER admin.** Any "a coach cannot see X" test using it is invalid. Use a
   purpose-made account. ⚠️ **Both of Jay's accounts are super**, on purpose: the flag
@@ -785,10 +836,21 @@ to notice.
   is the gate. **Do not "fix" it to match the others.**
 - **`private.squad_expects_gender` has no pinned `search_path`.** Recorded, not
   fixed: it is `SECURITY INVOKER`, `IMMUTABLE`, and touches no table.
-- **Leaked-password protection is off** because it is a paid-plan feature and the
-  org is on Free. Settled 6 Aug.
-- **The unindexed foreign keys.** An index on an empty table is pointless.
-  ⚠️ Re-measure before citing this once real data lands.
+- ❌ **"LEAKED-PASSWORD PROTECTION IS OFF BECAUSE IT IS A PAID-PLAN FEATURE AND
+  THE ORG IS ON FREE. SETTLED 6 AUG." — THAT IS NO LONGER WHY, AND IT NO LONGER
+  BELONGS IN THIS SECTION.** The org is on **Pro** (measured 13 Aug 2026,
+  `get_organization` → `plan: "pro"`). The plan stopped being the blocker; the
+  toggle is simply still off, measured the same day. **This is a to-do, not a
+  ruling** — moved to §Open below. Left here as a struck-through line rather than
+  deleted, because "settled" is exactly the word that stops the next session
+  looking.
+- ⚠️ **The unindexed foreign keys — THIS RULING IS NOW PARTLY WRONG, AND ITS OWN
+  LAST LINE IS WHAT CAUGHT IT.** *"An index on an empty table is pointless.
+  ⚠️ Re-measure before citing this once real data lands."* The re-measurement was
+  done on 13 Aug and the ruling holds for foreign keys and **not** for
+  `events.starts_at`, which is not a foreign key, is the column every schedule
+  read SORTS on, and appears in no index at all. Measured live: `events` carries
+  exactly `events_pkey`, `events_series_id_idx`, `events_group_id_idx`. See §Open.
 
 ## Numbers — do not cite, measure
 
@@ -839,6 +901,58 @@ decision record is a record of a moment. **Trust this file and the code for curr
 state; trust the decisions for reasoning.**
 
 ## Open, not blocking
+
+### ⚠️ Opened by the 13 Aug 2026 audit — none of these is started
+
+Ordered by what they cost to fix, not by how alarming they sound.
+
+- ⛔ **THE RESTORE HAS NEVER BEEN DONE.** Backups exist as of 13 Aug; recovery is
+  unproven. `claude/runbooks/backup-restore-drill.md`. **This is the only item
+  here whose failure is unrecoverable**, and it is 30 minutes of clicking.
+- **Leaked-password protection is still OFF**, measured 13 Aug, and the plan is no
+  longer the reason. Supabase → Authentication → Policies. Two minutes.
+- **`events` has no index on `team_id` or `starts_at`.** Every schedule, dashboard,
+  calendar-feed and allocation read filters and sorts on exactly those, then runs
+  `private.is_attached_to_team` per surviving row, under an 8s `statement_timeout`.
+  ⚠️ **Invisible at 9 events and unavoidable at the ~1,690 this app already sizes
+  itself against** (`src/data/limits.js`). ⚠️ **Do not size the fix from
+  `EXPLAIN ANALYZE` wall time on this schema — inflated ~4x. Read the plan SHAPE.**
+- ⚠️ **THE `social-ideas` STORAGE WRITE POLICY HAS NO MEMBERSHIP CHECK.** Verified
+  against live 13 Aug: the WITH CHECK is `bucket_id = 'social-ideas' AND
+  social_idea_owner(name) = auth.uid()` and nothing else. **The ROW insert
+  (`social idea create`) requires an active membership; the IMAGE upload does
+  not.** So any account with a login — including one with zero memberships — can
+  upload 5 MB objects into club storage without limit. ⚠️ **`player-photos` is NOT
+  affected** — its write policy goes through `can_edit_team`/`is_own_player`, both
+  of which require a membership. This gap is specific to the newest bucket.
+  ⚠️ **And the client uploads the image BEFORE inserting the row**
+  (`src/data/socialIdeas.js`), so a failed insert orphans an object that appears in
+  no screen and nothing sweeps.
+- **18 RLS policies call `auth.uid()` bare**, so Postgres re-evaluates it per row
+  instead of once per query. The fix is `(select auth.uid())` and changes no
+  meaning. ⚠️ **One migration touching all 18, not eighteen migrations** — and
+  prove it against an injected fault afterwards, or all you have shown is that the
+  migration applied.
+- **There is no React error boundary anywhere** (`grep ErrorBoundary src/` → 0).
+  React 18 unmounts the whole tree on an uncaught render error, and ⚠️ **the
+  service worker then serves the same broken bundle on reload, so "refresh the
+  page" does not fix it** — which no parent will get past.
+- **There is no monitoring, no alerting and no error tracking.** Detection today is
+  somebody telling Jay. ⚠️ **Pro's 7-day logs help you INVESTIGATE and tell you
+  nothing** — Log Drains are a Team-plan feature.
+- **There is no audit log.** Nothing records who deleted a player, revoked a
+  membership, edited a child's contact details or granted super-admin.
+  `events.created_by`, `availability.updated_by` and `attendance.recorded_by` are
+  single overwritten columns, not history.
+- **The realtime `events` subscription has no filter** (`src/data/events.js`), so
+  every connected client refetches its whole schedule on any event change anywhere
+  in the club. ⚠️ `src/data/availability.js` already scopes its channel per event —
+  copy that shape.
+- **`saveParents` is delete-then-write**, so a failure between the two loses a
+  child's parent records. ⚠️ **This is NOT the same as the deliberate two-call
+  split for player contacts** recorded in `RESTORE.md` — there the reasoning is
+  that a partial failure surfaces distinctly. Here the first call is a DELETE, and
+  a partial failure surfaces as missing data.
 
 - ~~**The dashboard stat band** — the loudest element on the screen carrying the
   weakest data. **The fortnight strip** renders empty cells above the fold when

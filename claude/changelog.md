@@ -8,6 +8,46 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 13 Aug 2026
+
+- **Supabase Pro and Resend Pro, and the fifteen lines that stopped being true.**
+  ⚠️ **No SHA yet, deliberately** — `main` squash-merges, so a branch SHA stops
+  existing at merge and CI (a fresh clone) cannot find it. The NEXT pull request
+  cites the squash SHA. This is what the one-commit-behind allowance is for.
+  Jay bought both plans on 13 Aug. **Measured, not reported:**
+  `get_organization` → `plan: "pro"`.
+  ⚠️ **THE UPGRADE FIXED A MECHANISM AND NOT A SINGLE LINE OF CODE.** Daily
+  backups now exist, the project no longer pauses after 7 days idle, storage went
+  1 GB → 100 GB, and Resend's 100/day cap is gone. **Nothing else on the 13 Aug
+  audit list moved.**
+  ⚠️ **AND A BACKUP NOBODY HAS RESTORED IS A BELIEF** —
+  `claude/runbooks/backup-restore-drill.md` is new, and **NOT DONE**. It is the
+  only open item whose failure is unrecoverable.
+  ⚠️ **LOSING THE 100/DAY CAP REMOVED A BRAKE NOBODY DESIGNED.** Five senders
+  share one Resend key and one sending domain; a runaway used to stop at 100 and
+  now does not. The wanted throttle is unchanged and its REASON changed — from
+  "we run out" to "Resend suspends `send.adhquins-clubhub.com`", which takes
+  sign-in with it because auth mail rides the same domain.
+  Corrected in `CLAUDE.md`, `claude/state-of-play.md`,
+  `claude/runbooks/email-and-domain.md`, `db/schema/README.md`, four edge
+  functions and two screens. ⚠️ **`claude/decisions/` was left alone on purpose**
+  — a decision record is a record of a moment.
+- **Two live-measured holes written up as a migration, NOT YET APPLIED**
+  (`db/migrations/20260813_events_indexes_and_social_upload_gate.sql`).
+  ⚠️ **`public.events` HAS NO INDEX ON `team_id` OR `starts_at`** — measured
+  live, it carries exactly `events_pkey`, `events_series_id_idx`,
+  `events_group_id_idx`. Every schedule, dashboard, calendar-feed and allocation
+  read filters and sorts on those two. This partly overturns the "unindexed
+  foreign keys are fine on an empty table" ruling, **and that ruling's own last
+  line — "re-measure before citing this once real data lands" — is what asked
+  for it.**
+  ⚠️ **THE `social-ideas` STORAGE WRITE POLICY HAS NO MEMBERSHIP CHECK** while
+  the row policy for the same feature does. Verified against live. A signed-in
+  account with zero memberships can upload 5 MB objects without limit, and an
+  orphaned object appears on no screen. ⚠️ **`player-photos` is unaffected and
+  must not be "fixed" to match.** Harness: `db/tests/rls-social-upload.sql`,
+  which injects the old policy to prove it can go red.
+
 ## 12 Aug 2026
 
 - `7df6ea3` — **A full calendar for Pitch Management, an App button

@@ -243,6 +243,31 @@ these; `state-of-play.md` and `claude/runbooks/session-and-push.md` point here.
 `lusmshimxdcxpnrktlgz`), Netlify (project `quins-club-hub`). `npm test` is
 vitest; `npm run build` is the production build.
 
+**⚠️ SUPABASE IS ON PRO AND RESEND IS ON PRO — bought by Jay 13 Aug 2026, and
+this line is here for the same reason the Netlify credit cost is: `rules.md`
+says to look the money up in this file, and until now it was written down
+nowhere.** Measured, not reported — `get_organization` on org
+`vfjhsondxhnkijckovzt` returns `plan: "pro"`. Four consequences a session must
+know before reasoning about anything:
+
+1. **Daily backups with 7-day retention EXIST.** ⚠️ **No restore has ever been
+   run**, so nothing is yet known to be recoverable —
+   `claude/runbooks/backup-restore-drill.md`. Treat "we have backups" as an
+   untested claim until that file says otherwise.
+2. **The project no longer pauses after 7 days idle.**
+3. **Database branching is available.** Use one for any migration you are not
+   certain of. ⚠️ **Branches bill BY THE HOUR — create, use, delete.** An idle
+   branch is a standing charge with no owner.
+4. **Resend's 100/day cap is gone**, and with it a brake nobody designed. ⚠️ **Do
+   not write an allowance number into any file** — read it off the dashboard.
+   Every number this repo has recorded has rotted.
+
+⚠️ **PITR was deliberately NOT bought** (a further add-on, ~$100/month, against a
+14 MB database). Do not propose it again without a new reason.
+⚠️ **Files across `claude/`, `supabase/functions/` and `src/` described the FREE
+tiers until 13 Aug 2026.** They are corrected. `claude/decisions/` was left
+alone on purpose — a decision record is a record of a moment.
+
 ## ⚠️ `npm run docs:check` — the rules that can fail a build
 
 **Run it before committing anything under `claude/`, and after editing this

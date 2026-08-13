@@ -39,22 +39,36 @@
 // a shared secret.
 //
 // == THE VOLUME PROBLEM, STATED RATHER THAN DISCOVERED LATER ==
-// Resend's free tier is 100 emails/day, 3,000/month.
+//
+// !! CORRECTED 13 Aug 2026: THE ACCOUNT IS ON RESEND PRO. This block used to
+// open "Resend's free tier is 100 emails/day, 3,000/month" and closed with "SO
+// A BIG ONBOARDING DAY CAN STILL HIT IT ... move Resend to a paid tier first."
+// Jay moved it. The daily cap is gone. Do not cite 100/day from anywhere.
+//
+// !! THE BCC DESIGN BELOW IS UNCHANGED AND STILL RIGHT. It was justified by the
+// cap, but it does not DEPEND on the cap, and removing it would be the wrong
+// lesson to draw from the upgrade:
 //
 // ONE Resend call per registration, with every recipient in `bcc`. Not one per
 // recipient: with two admins and two coaches on a squad that would be four
-// emails per registration, and a 100-player onboarding weekend would be 400 -
-// four times the daily cap, and the failures would land on whoever registered
-// last. Bcc'd, the same weekend costs 100 sends, which is exactly the cap.
+// emails per registration, and a 100-player onboarding weekend would be 400
+// sends instead of 100. Bcc also means recipients cannot see each other's
+// addresses, which is the right default for a mail to a mixed group of
+// volunteers - and that reason never had anything to do with pricing.
 //
-// !! SO A BIG ONBOARDING DAY CAN STILL HIT IT. A 429 from Resend is logged and
-// swallowed; the registration is unaffected and the queue on the Accounts
-// screen is unaffected. If the club onboards in one weekend, either stagger it
-// or move Resend to a paid tier first. This is a known ceiling, not a bug to
-// be discovered at email 101.
+// !! WHAT REPLACED THE CAP AS THE THING TO WORRY ABOUT. The cap was an
+// accidental brake: a runaway sender stopped at 100. Nothing stops one now.
+// FIVE things share one Resend key and one sending domain - send-email (all
+// auth mail), notify-approval, notify-pitch-request and notify-access-request.
+// A loop on any of them sends thousands of REAL emails to REAL volunteers, and
+// the consequence is no longer "we run out" but "Resend suspends
+// send.adhquins-clubhub.com over complaints" - which takes SIGN-IN with it,
+// because auth mail rides the same domain. A per-user throttle is still wanted;
+// only its justification changed.
 //
-// bcc also means recipients cannot see each other's addresses, which is the
-// right default for a mail to a mixed group of volunteers.
+// A 429 is still logged and swallowed, and the registration is still
+// unaffected: the queue on the Accounts screen is the record, the email is a
+// prompt to go and look at it.
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const MAIL_FROM = Deno.env.get('MAIL_FROM') ?? ''
@@ -137,8 +151,9 @@ async function sendMail(bcc: string[], subject: string, html: string, text: stri
     //   401 -> wrong or revoked RESEND_API_KEY
     //   403 -> MAIL_FROM's domain is not verified. It must be on
     //          send.adhquins-clubhub.com, NOT the root domain.
-    //   429 -> free-tier limit: 100/day, 3,000/month. See the volume note at
-    //          the top of this file - this is a known ceiling.
+    //   429 -> rate or allowance limit. !! NOT the old 100/day free cap - the
+    //          account is on Resend Pro since 13 Aug 2026. See the volume note
+    //          at the top of this file.
     throw new Error(`Resend failed (${response.status}): ${await response.text()}`)
   }
 }

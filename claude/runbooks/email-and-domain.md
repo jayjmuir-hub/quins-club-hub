@@ -50,10 +50,24 @@ HTTPS with an API key. No tenant, no OAuth dance, no client secret with a 24-mon
 **Use your own personal email, not a Microsoft/work account** — this has nothing to do
 with the M365 tenant and shouldn't get tangled with it.
 
-Go to resend.com → sign up. Free tier: 3,000 emails/month, **100/day**, 1 verified
-domain, 30-day log retention. That ceiling is fine for a club of 300 doing sign-ins and
-occasional announcements; if it ever binds, the fallback noted in the decision doc is
-Amazon SES.
+Go to resend.com → sign up.
+
+⚠️ **THIS STEP DESCRIBED THE FREE TIER UNTIL 13 Aug 2026, AND THE ACCOUNT IS NOW ON
+RESEND PRO.** The old text read: *"Free tier: 3,000 emails/month, **100/day**, 1
+verified domain, 30-day log retention. That ceiling is fine for a club of 300 doing
+sign-ins and occasional announcements; if it ever binds, the fallback noted in the
+decision doc is Amazon SES."* Recorded rather than deleted because this is a
+**setup runbook** — anyone following it from scratch starts on the free tier and
+meets that ceiling first.
+
+**On Pro the 100/day cap does not exist.** ⚠️ **Do not write the monthly allowance
+into this file** — every number this repo has written down has rotted. Read it off
+the Resend dashboard, and note the trap recorded in `claude/state-of-play.md`: the
+usage figures render in a `number-flow-react` web component whose shadow DOM holds
+every digit 0-9 per column, so text extraction and `aria-label` both return
+nonsense. **Read that page from a screenshot, or expand the row.**
+
+The Amazon SES fallback is still the fallback and has never been needed.
 
 ## 2. YOU — add the sending domain
 
@@ -147,7 +161,11 @@ function **refuses everything** if the secret is unset, rather than sending unve
 - Confirm the app still loads, signs in and shows the roster on the new origin.
 - Reinstall the PWA from the new domain and delete the old install.
 - Send more than two emails within an hour. That is the old Supabase ceiling; it should
-  no longer exist. Stay well under the Resend 100/day ceiling while testing.
+  no longer exist. ⚠️ **The "stay well under the Resend 100/day ceiling while testing"
+  line that used to sit here is obsolete — the account is on Resend Pro since
+  13 Aug 2026 and there is no daily cap.** Test freely; the thing to watch now is
+  not the quota but the sending REPUTATION of `send.adhquins-clubhub.com`, which a
+  burst of bounces to fake addresses damages and a quota never did.
 
 ---
 
@@ -169,6 +187,6 @@ function **refuses everything** if the secret is unset, rather than sending unve
 | Every send 401s (from Supabase, at the hook) | `SEND_EMAIL_HOOK_SECRET` doesn't match the one in the Hooks screen |
 | Resend call itself 401s | `RESEND_API_KEY` wrong or revoked |
 | Resend call 403s | `MAIL_FROM`'s domain isn't verified yet in Resend — recheck step 3 |
-| Resend call 429s | the 100/day free-tier cap was hit |
+| Resend call 429s | ⚠️ **No longer the 100/day free cap — the account is on Pro since 13 Aug 2026.** A 429 now means the per-second rate limit or the monthly allowance. Check the Resend dashboard (from a screenshot — see step 1) |
 | Mail sends but lands in spam | DKIM/SPF records from step 2 not fully propagated or not verified — recheck in Resend's dashboard |
 | Nothing arrives and nothing logs | The hook isn't enabled — Supabase is still sending its own |

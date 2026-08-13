@@ -47,10 +47,21 @@
 // would be an open relay wearing a shared secret.
 //
 // == VOLUME ==
-// Resend free is 100/day, 3,000/month. ONE Resend call per event with the
-// recipients in bcc, for the same reason notify-approval does it: per-recipient
-// sends would multiply a busy fixture-setting evening by the number of Pitch
-// Managers. Bcc also keeps volunteers' addresses off each other's screens.
+// !! CORRECTED 13 Aug 2026. This line said "Resend free is 100/day,
+// 3,000/month". The account is on Resend Pro and there is no daily cap.
+//
+// ONE Resend call per event with the recipients in bcc, for the same reason
+// notify-approval does it: per-recipient sends would multiply a busy
+// fixture-setting evening by the number of Pitch Managers. Bcc also keeps
+// volunteers' addresses off each other's screens - a reason that never had
+// anything to do with the price, so the design is unchanged.
+//
+// !! THIS FUNCTION IS THE MOST EXPOSED OF THE FOUR SENDERS, and losing the cap
+// is what made that worth writing down. A coach can submit pitch requests as
+// fast as they can click, each one fires this trigger, and nothing throttles
+// it. Under the old free tier that stopped at 100. Now it does not stop, and
+// the damage is to the sending reputation of send.adhquins-clubhub.com - which
+// carries SIGN-IN mail too. See the note at the top of notify-approval.
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const MAIL_FROM = Deno.env.get('MAIL_FROM') ?? ''
@@ -116,7 +127,8 @@ async function sendMail(bcc: string[], subject: string, html: string, text: stri
   if (!response.ok) {
     //   401 -> wrong or revoked RESEND_API_KEY
     //   403 -> MAIL_FROM domain not verified (send.adhquins-clubhub.com)
-    //   429 -> free-tier limit. A known ceiling, not a bug to discover at 101.
+    //   429 -> rate or allowance limit. !! NOT the old 100/day free cap - the
+    //          account is on Resend Pro since 13 Aug 2026.
     throw new Error(`Resend failed (${response.status}): ${await response.text()}`)
   }
 }
