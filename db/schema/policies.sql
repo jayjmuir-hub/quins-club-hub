@@ -994,9 +994,38 @@ CREATE POLICY "social idea image read" ON storage.objects
   FOR SELECT TO authenticated
   USING (((bucket_id = 'social-ideas'::text) AND ((private.social_idea_owner(name) = auth.uid()) OR private.is_admin_anywhere())));
 
+-- ⚠️ RE-CAPTURED 13 Aug 2026 — THE MEMBERSHIP ARM IS NEW, AND ITS ABSENCE WAS
+-- A REAL HOLE THAT WAS OPEN FROM 12 TO 13 Aug.
+--
+-- The old WITH CHECK was `bucket_id = 'social-ideas' AND
+-- social_idea_owner(name) = auth.uid()` and nothing else. That proves only
+-- that you are writing under a folder named after your own uid. **It never
+-- asked whether you were in the club.**
+--
+-- ⚠️ THE SHAPE OF THE MISTAKE, WHICH IS THE TRANSFERABLE PART: the ROW policy
+-- and the IMAGE policy are two halves of ONE feature, written in ONE
+-- migration, and only one half was gated. "social idea create" above requires
+-- an ACTIVE membership; this did not. So a signed-in stranger could not submit
+-- an IDEA and could upload IMAGES — the half that consumes storage and holds
+-- the content, and the half whose orphans appear on NO screen, including the
+-- inbox that exists to review exactly this.
+--
+-- ⚠️ PROVED BY EXECUTION, NOT BY READING. On 13 Aug, inside a transaction on
+-- production that rolled back: with the OLD policy an account with ZERO
+-- memberships was ALLOWED to upload; with this one it is REFUSED, an active
+-- member is still ALLOWED under their own prefix, and still REFUSED under
+-- somebody else's. Re-run after the change against the live policy, all three
+-- as intended. Harness: db/tests/rls-social-upload.sql.
+--
+-- ⚠️ STILL CLUB-BLIND, DELIBERATELY. An object key carries no club id, so this
+-- asks "actively a member of SOMETHING" rather than "of THIS club" — the same
+-- documented single-club assumption as private.is_admin_anywhere(). Revisited
+-- with the others if a second club appears.
 CREATE POLICY "social idea image write" ON storage.objects
   FOR INSERT TO authenticated
-  WITH CHECK (((bucket_id = 'social-ideas'::text) AND (private.social_idea_owner(name) = auth.uid())));
+  WITH CHECK (((bucket_id = 'social-ideas'::text) AND (private.social_idea_owner(name) = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM memberships m
+  WHERE ((m.profile_id = auth.uid()) AND (m.status = 'active'::text))))));
 
 CREATE POLICY "social idea image remove" ON storage.objects
   FOR DELETE TO authenticated
