@@ -94,7 +94,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `Added by No name yet · hannah@example.com`. ⚠️ **NOT verified live by Claude** — needs
   a parent sign-in.
 
-- **A count on the approvals entry point — DESIGNED, NOT SHIPPED.**
+- `1d87af7` — **A count on the approvals entry point — DESIGNED, NOT SHIPPED.**
   ⚠️ **NO SHA, DELIBERATELY.** This entry cited `6c4325f` — the BRANCH commit —
   and CI went red with *"changelog cites a SHA that is not a commit"*. The branch
   was rebased, so that SHA no longer exists; it survived only as a loose object in
