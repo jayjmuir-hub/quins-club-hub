@@ -31,8 +31,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   amount of trusting Supabase would have surfaced.
   `claude/runbooks/backup-restore-drill.md` carries the numbers and the three
   things the runbook itself got wrong.
-- **The 13 Aug migration is APPLIED, and `db/schema/` re-captured in the same
-  breath** — `events_team_starts_idx`, `events_club_starts_idx`,
+- `672c3e4` — **The 13 Aug migration is APPLIED, and `db/schema/` re-captured in
+  the same breath** — `events_team_starts_idx`, `events_club_starts_idx`,
   `events_league_team_id_idx`, the membership arm on `social idea image write`, and
   a pinned `search_path` on `private.social_idea_owner`.
   ⚠️ **Captured from the catalogue, not pasted from the migration** — `pg_indexes`
