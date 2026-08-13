@@ -30,10 +30,32 @@ pending logic at all. The card reads identically whether five are waiting or
 none — so it is on screen permanently, which trains people to skip it, and a
 coach who misses the email has no way to know without tapping in to look.
 
-⚠️ **And nobody has ever received one of these emails in anger.** No coach or
-parent has been onboarded; the whole registration-to-approval path is
-unexercised by a real second person. This plan makes the in-app half work so
-the email is not the only route.
+❌ **THIS PLAN SAID "NOBODY HAS EVER RECEIVED ONE OF THESE EMAILS IN ANGER. NO
+COACH OR PARENT HAS BEEN ONBOARDED" AND IT WAS FALSE WITHIN HOURS OF BEING
+WRITTEN.** Corrected 13 Aug 2026 the same afternoon.
+
+⚠️ **THE CLUB IS LIVE.** Measured, not reported: **16 auth users, 12 people
+holding memberships across 3 squads** (U13 Mixed Contact, U16B Contact, U18B
+Contact), **9 players, 5 player photographs in storage, 3 calendar links
+issued, 3 super admins.** Coaches, team managers, a medic, parents and players
+— real families.
+
+⚠️ **AND THE EMAIL DEMONSTRABLY WORKS**, which this plan had no right to
+assume either way: `dd80f48` records Jay and the U18 team manager both
+receiving one.
+
+**Two consequences for this plan, and they pull in opposite directions:**
+
+1. The email is doing MORE work than assumed, so the badge is less urgent than
+   "nothing tells anybody" implied.
+2. There are now **real coaches** who will meet the permanently-stuck-badge bug
+   described below if it is built wrong. It stopped being a thought experiment.
+
+⚠️ **Re-verified against `main` at `dd80f48`, after four onboarding PRs
+(`231b660`, `d7643b8`, `02e9a05`, `280f37b`, `dd80f48`) landed while this was
+being written:** the approvals card is still `More.jsx:389`, still
+`!admin && canApproveAnything(memberships)`, and there is still no badge or
+count anywhere in `Nav.jsx` or `More.jsx`. **Everything else below holds.**
 
 ---
 
