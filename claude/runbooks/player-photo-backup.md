@@ -1,9 +1,24 @@
 # Runbook — backing up, and restoring, the player photographs
 
-**Written 13 Aug 2026, alongside the code. ⚠️ NOTHING IN §1 HAS BEEN RUN YET,
-and §3 — the restore — has NOT been drilled.** Every line below is a procedure,
-not a record. Strike a step through with the evidence when it is done, the way
-`claude/state-of-play.md` does; do not delete it.
+**Written 13 Aug 2026 alongside the code. ✅ §1 IS DONE — THE BACKUP IS LIVE AND
+RUNNING NIGHTLY. ⚠️ §3, the restore, has still NOT been drilled.**
+
+✅ **Stood up 13 Aug 2026**, all of §1: R2 subscription, bucket
+`quins-player-photos` (APAC, private, `retain-one-year` lock), an Account-scoped
+Object Read & Write token limited to that bucket, four Supabase secrets, the
+migrations applied, the function deployed with `verify_jwt: false`, and a
+`pg_cron` job at 22:17 UTC. First run copied **6 of 6, zero failed**;
+`etag_mismatches: 0`.
+
+⚠️ **THE ONE THING NOBODY HAS DONE IS GET A PHOTOGRAPH BACK.** Copying is not
+restoring. §4's drill is not complete and this feature should not be described as
+proven until it is.
+
+⚠️ **Two traps hit while standing this up, both now guarded against below:**
+`R2_ACCOUNT_ID` was first set to the whole endpoint URL rather than the account
+id (§1.2), and Supabase's secrets form shows a **confirmation dialog** when
+replacing an existing secret — miss it and the value silently does not save,
+which looks exactly like the fix not working.
 
 **Why this exists, in one line: the photographs of children are the only
 unrecoverable thing in the club.** `claude/runbooks/backup-restore-drill.md`
@@ -60,15 +75,27 @@ pasted somewhere it should not be — including into a chat — say so and roll 
    Access Key**, and the **account ID** in the endpoint
    `https://<account-id>.r2.cloudflarestorage.com`. The secret is shown once.
 
-⚠️ **THE TOKEN CAN DELETE, AND NOTHING ABOVE PREVENTS IT.** Cloudflare's presets
-are Object Read only or Object Read **& Write**, and write includes
-`DeleteObject`; there is no read-plus-create option. **So "append only" is a
-property of the code, not of the credential** — `plan.ts` cannot express a
-deletion, and anyone holding this token can still empty the bucket by hand.
-**The real fix, not done:** turn on **bucket versioning** and an **Object Lock**
-retention rule in R2, which makes deletion impossible rather than merely
-un-programmed. Worth doing before this is treated as safe; recorded here so the
-gap is not discovered during a recovery.
+⚠️ **THE TOKEN CAN DELETE, AND THE PERMISSION MODEL CANNOT PREVENT IT.**
+Cloudflare's presets are Object Read only or Object Read **& Write**, and write
+includes `DeleteObject`; there is no read-plus-create option.
+
+✅ **SO THE GUARANTEE COMES FROM THE BUCKET INSTEAD, AND IT IS STRONGER THAN A
+PERMISSION WOULD HAVE BEEN.** Bucket lock rule **`retain-one-year`**, no prefix,
+**365 days**, applied 13 Aug 2026 while the bucket was still empty — so it binds
+every object ever written. R2 itself refuses to overwrite or delete inside that
+window: not this token, not a compromised Supabase project, not Jay, not a
+scripted mistake. **`plan.ts` not being able to express a deletion is now the
+second line of defence rather than the only one.**
+
+⚠️ **AND IT CUTS BOTH WAYS — THIS IS THE COST, STATED PLAINLY.** A deletion
+request ("please remove my child's photograph") **cannot be fully honoured in the
+backup for up to a year.** Jay chose one year over ninety days knowing that. If a
+parent asks, tell them the truth: the live copy goes immediately, the backup copy
+expires on its own.
+
+⚠️ **Set a lock BEFORE the first object lands.** A rule added later binds only
+what is written after it, so the oldest and most irreplaceable photographs would
+be the ones left unprotected.
 
 ### 1.2 Supabase function secrets — **Jay**
 
@@ -76,10 +103,24 @@ Supabase dashboard → **Project Settings → Edge Functions → Secrets**. Add 
 
 | Name | Value |
 |---|---|
-| `R2_ACCOUNT_ID` | the account id from §1.1 step 4 |
+| `R2_ACCOUNT_ID` | ⚠️ **the account id ALONE** — the `something` out of `https://something.r2.cloudflarestorage.com`, with no `https://` and no `.r2.cloudflarestorage.com`. **This was set to the whole URL on 13 Aug and the function built a hostname out of a hostname**, failing with a DNS error. The only reason it took seconds to diagnose is that the function logs the URL it tried. |
 | `R2_ACCESS_KEY_ID` | the access key id |
 | `R2_SECRET_ACCESS_KEY` | the secret access key |
 | `R2_BUCKET` | `quins-player-photos` |
+
+⚠️ **REPLACING AN EXISTING SECRET SHOWS A CONFIRMATION DIALOG, AND MISSING IT
+LOOKS EXACTLY LIKE THE FIX NOT WORKING.** Supabase asks "Confirm replacing
+existing secret" and does nothing until you press **Replace secret**. On 13 Aug a
+corrected value sat unsaved behind that dialog and the next run failed with the
+identical error, which reads as "my change had no effect" rather than "my change
+was never applied."
+
+✅ **VERIFY A SECRET WITHOUT REVEALING IT.** The dashboard shows a SHA-256 digest
+per secret. Hash the value you meant to store and compare:
+`printf '%s' '<value>' | sha256sum`. A match proves both the content **and** the
+absence of a trailing space — which is worth checking, because a key with a
+stray space fails as `SignatureDoesNotMatch`, an error that reads like a wrong
+credential rather than a formatting problem.
 
 `APPROVAL_NOTIFY_SECRET`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are
 already there and are reused. ⚠️ **The shared secret is deliberate** — same trust

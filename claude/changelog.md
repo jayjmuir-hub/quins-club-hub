@@ -10,6 +10,39 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
+- ✅ **THE PLAYER PHOTOGRAPHS ARE BACKED UP — live, nightly, and verified.** The
+  only unrecoverable thing in the club now has a copy. Cloudflare R2 bucket
+  `quins-player-photos` (APAC, private), edge function deployed with
+  `verify_jwt: false`, `pg_cron` at 22:17 UTC.
+  **6 of 6 copied, zero failed, five seconds**; the second run copied nothing.
+  ⚠️ **`pg_cron` INSTALLED** — previously recorded as absent, and as the reason a
+  scheduled edge function was impossible on this project.
+  ✅ **THE SCHEDULE WAS PROVED TO FIRE.** A temporary probe job at `* * * * *`
+  reached `succeeded` in `cron.job_run_details` with its summary in
+  `net._http_response`, then was unscheduled. **A schedule that has never fired
+  is not a schedule.**
+  ✅ **BYTE-IDENTITY BY MD5, NOT BY MATCHING SIZE** — `etag_mismatches: 0` on all
+  six, comparing ETags from both sides. ⚠️ **The zero is not vacuous**: every
+  source row carries an ETag and both sides deliver it QUOTED, so the
+  quote-stripping bug a unit test caught pre-deploy would have shown six
+  mismatches, not zero. That bug was real — quotes were stripped before trimming.
+  ✅ **APPEND-ONLY IS NOW ENFORCED BY R2, NOT ONLY BY THE CODE** — bucket lock
+  `retain-one-year`, 365 days, applied while the bucket was empty so it binds
+  every object ever written. **This closes the gap the plan called unfixable in
+  the credential**: R2 tokens are Object Read only or Object Read AND Write, and
+  write includes delete. ⚠️ **The cost, chosen knowingly: a deletion request
+  cannot be fully honoured in the backup for up to a year.**
+  ❌ **NOBODY HAS GOT A PHOTOGRAPH BACK YET. Copying is not restoring**, and the
+  drill's fourth requirement is outstanding.
+  ⚠️ **Two traps recorded in the runbook**: `R2_ACCOUNT_ID` set to the whole
+  endpoint URL rather than the account id, and Supabase's confirmation dialog on
+  replacing a secret — miss it and the value silently does not save, which looks
+  exactly like the fix not working.
+  ⚠️ **No credential was ever handled by the assistant.** The function is invoked
+  the way cron invokes it — Postgres reads the shared secret from the vault — and
+  the R2 values were verified by comparing SHA-256 digests rather than by reading
+  them.
+
 - **`npm run db:check` — the SQL harnesses finally have a way to be run.**
   `scripts/db-check.mjs`, runbook `claude/runbooks/db-harnesses.md`, nightly job
   `.github/workflows/db-check.yml`.
@@ -39,7 +72,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   app. `psql` is not on jay-pc, and a runner Jay cannot run does not fix the
   friction that caused this.
 
-- **The player photographs get a backup — WRITTEN, NOT RUNNING.** An append-only
+- `3a3b05d` — **The player photographs get a backup — written, and at the time of that PR NOT RUNNING.** ✅ **It is running now** — see the entry at the top of today. An append-only
   mirror of `player-photos` into a private Cloudflare R2 bucket:
   `supabase/functions/backup-player-photos/index.ts`,
   `db/migrations/20260813_photo_backup.sql`, and the deploy/restore/drill

@@ -29,7 +29,13 @@
 // thing everyone predicted would fail restored cleanly, and reasoning is not
 // evidence.
 
-import { isPlayerPhotoKey, objectsToCopy, parseListObjectsV2 } from './plan.ts'
+import {
+  isPlayerPhotoKey,
+  mismatchedEtags,
+  normaliseEtag,
+  objectsToCopy,
+  parseListObjectsV2,
+} from './plan.ts'
 import { encodeKeyPath, rfc3986, sha256Hex, signRequest } from './sigv4.ts'
 
 // !! REUSES THE APPROVAL SECRET DELIBERATELY, exactly as notify-access-request
@@ -103,9 +109,10 @@ async function r2Fetch(request: R2Request): Promise<Response> {
   })
 }
 
-/** Every key R2 already holds, following continuation tokens to the end. */
-async function listBackupKeys(): Promise<string[]> {
+/** Every key R2 already holds, with its ETag, following continuation tokens. */
+async function listBackupKeys(): Promise<{ keys: string[]; etags: Record<string, string> }> {
   const keys: string[] = []
+  const etags: Record<string, string> = {}
   let token: string | null = null
   // 100 pages × 1000 keys. A ceiling far above the club's plausible size, so it
   // is a runaway guard and not a limit — and it THROWS rather than returning a
@@ -124,8 +131,9 @@ async function listBackupKeys(): Promise<string[]> {
 
     const listing = parseListObjectsV2(text)
     keys.push(...listing.keys)
+    Object.assign(etags, listing.etags)
 
-    if (!listing.truncated) return keys
+    if (!listing.truncated) return { keys, etags }
     if (!listing.nextToken) {
       // !! A listing that says there is more and cannot say where is a listing
       // whose remainder is UNKNOWN. Reporting the run clean here would state
@@ -152,18 +160,25 @@ async function supabaseJson(path: string, init: RequestInit = {}): Promise<any> 
   return text ? JSON.parse(text) : null
 }
 
-/** Every key in the source bucket, keyset-paginated through the SQL helper. */
-async function listSourceKeys(): Promise<string[]> {
+/** Every key in the source bucket, with its ETag, keyset-paginated via the SQL helper. */
+async function listSourceKeys(): Promise<{ keys: string[]; etags: Record<string, string> }> {
   const keys: string[] = []
+  const etags: Record<string, string> = {}
   const pageSize = 1000
   let after = ''
   for (let page = 0; page < 100; page += 1) {
-    const rows: Array<{ name: string }> = await supabaseJson('rpc/photo_backup_list_objects', {
-      method: 'POST',
-      body: JSON.stringify({ _bucket: SOURCE_BUCKET, _after: after, _limit: pageSize }),
-    })
-    for (const row of rows) keys.push(row.name)
-    if (rows.length < pageSize) return keys
+    const rows: Array<{ name: string; etag: string | null }> = await supabaseJson(
+      'rpc/photo_backup_list_objects',
+      {
+        method: 'POST',
+        body: JSON.stringify({ _bucket: SOURCE_BUCKET, _after: after, _limit: pageSize }),
+      },
+    )
+    for (const row of rows) {
+      keys.push(row.name)
+      etags[row.name] = normaliseEtag(row.etag)
+    }
+    if (rows.length < pageSize) return { keys, etags }
     after = rows[rows.length - 1].name
   }
   throw new Error('source listing did not terminate within 100 pages')
@@ -242,8 +257,15 @@ Deno.serve(async (request: Request): Promise<Response> => {
       runId = row?.id ?? null
     }
 
-    const [sourceKeys, backupKeys] = await Promise.all([listSourceKeys(), listBackupKeys()])
+    const [source, backup] = await Promise.all([listSourceKeys(), listBackupKeys()])
+    const sourceKeys = source.keys
+    const backupKeys = backup.keys
     const missing = objectsToCopy(sourceKeys, backupKeys)
+
+    // !! MEASURED BEFORE THIS RUN COPIES ANYTHING, so the number describes what
+    // was already sitting in the backup rather than what we just put there. A
+    // verification that only ever inspects its own fresh writes is not one.
+    const mismatches = mismatchedEtags(source.etags, backup.etags)
 
     const summary = {
       dry_run: dryRun,
@@ -260,6 +282,14 @@ Deno.serve(async (request: Request): Promise<Response> => {
       // mirror quietly syncing deletions could never produce. Zero is expected
       // until the first head shot is replaced; it is not a failure.
       only_in_backup: objectsToCopy(backupKeys, sourceKeys).length,
+      // !! MUST BE ZERO, and unlike only_in_backup a non-zero here is a FAULT.
+      // It means a photograph in the backup is not the photograph in the source
+      // - a truncated transfer, a re-encode, or the wrong object under the right
+      // key - and it counts "could not check" as a mismatch too.
+      etag_mismatches: mismatches.length,
+    }
+    if (mismatches.length) {
+      console.error('ETAG MISMATCH - backup copy differs from source:', mismatches.join(', '))
     }
 
     if (!dryRun) {
@@ -292,6 +322,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
             failed: summary.failed,
             unrecognised: summary.unrecognised,
             more_to_do: summary.more_to_do,
+            etag_mismatches: summary.etag_mismatches,
           }),
         })
       }

@@ -77,8 +77,58 @@ export function decodeXmlEntities(text: string): string {
 
 export interface Listing {
   keys: string[]
+  /** key -> ETag, quotes stripped. See compareEtags. */
+  etags: Record<string, string>
   truncated: boolean
   nextToken: string | null
+}
+
+/**
+ * Keys whose backup copy is NOT byte-identical to the source.
+ *
+ * !! WHY AN ETag COMPARISON IS PROOF AND A SIZE COMPARISON IS NOT. Both R2 and
+ * Supabase Storage report an ETag that, for a single-part upload, IS the MD5 of
+ * the object body. Two files of identical length are routinely different files;
+ * two files with the same MD5 are not, for any cause this backup can plausibly
+ * suffer - a truncated transfer, a re-encode, the wrong object copied under the
+ * right key.
+ *
+ * !! A MISSING ETag ON EITHER SIDE IS REPORTED AS A MISMATCH, NOT SKIPPED. "We
+ * could not check" and "we checked and it matched" must never collapse into the
+ * same green number - that is the whole failure mode this feature exists to
+ * avoid, one level up.
+ *
+ * !! MULTIPART UPLOADS BREAK THIS AND THAT IS ACCEPTED. An object assembled from
+ * parts gets an ETag of the form `<hash>-<partcount>`, which is not the MD5 of
+ * the body. Player photographs are resized to tens of kilobytes before upload
+ * (src/lib/imageResize.js), so nothing here is remotely near a multipart
+ * threshold. If that ever changes, this reports a mismatch rather than a false
+ * pass, which is the correct direction to fail in.
+ */
+export function mismatchedEtags(
+  sourceEtags: Record<string, string>,
+  backupEtags: Record<string, string>,
+): string[] {
+  const bad: string[] = []
+  for (const key of Object.keys(sourceEtags).sort()) {
+    const source = normaliseEtag(sourceEtags[key])
+    const backup = normaliseEtag(backupEtags[key])
+    // Not in the backup yet is not a mismatch - it is work still to do, and
+    // objectsToCopy already reports it.
+    if (backup === '') continue
+    if (source === '' || source !== backup) bad.push(key)
+  }
+  return bad
+}
+
+/** Strip the quotes S3 wraps an ETag in, and lower-case the hex. */
+export function normaliseEtag(value: string | undefined | null): string {
+  if (!value) return ''
+  // !! TRIM FIRST, THEN STRIP QUOTES. The other order leaves the quotes in place
+  // whenever there is surrounding whitespace, because they are no longer at the
+  // string boundary - and a quoted hash never equals an unquoted one, so EVERY
+  // object would report as corrupted. Caught by a test before this ever ran.
+  return value.trim().replace(/^"+|"+$/g, '').trim().toLowerCase()
 }
 
 /**
@@ -99,8 +149,21 @@ export interface Listing {
  */
 export function parseListObjectsV2(xml: string): Listing {
   const keys: string[] = []
-  for (const m of xml.matchAll(/<Key>([\s\S]*?)<\/Key>/g)) {
-    keys.push(decodeXmlEntities(m[1]))
+  const etags: Record<string, string> = {}
+
+  // !! PER <Contents> BLOCK, NOT TWO INDEPENDENT SWEEPS. Scanning all the <Key>
+  // elements and all the <ETag> elements separately and zipping them by index
+  // would pair them correctly right up until one entry lacks an ETag, at which
+  // point every subsequent photograph is checked against the WRONG object's
+  // hash - and the mismatches would look like real corruption.
+  for (const block of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+    const key = /<Key>([\s\S]*?)<\/Key>/.exec(block[1])
+    if (!key) continue
+    const name = decodeXmlEntities(key[1])
+    keys.push(name)
+
+    const etag = /<ETag>([\s\S]*?)<\/ETag>/.exec(block[1])
+    if (etag) etags[name] = normaliseEtag(decodeXmlEntities(etag[1]))
   }
 
   const truncated = /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(xml)
@@ -108,6 +171,7 @@ export function parseListObjectsV2(xml: string): Listing {
 
   return {
     keys,
+    etags,
     truncated,
     nextToken: token ? decodeXmlEntities(token[1]) : null,
   }

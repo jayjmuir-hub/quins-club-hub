@@ -1,25 +1,39 @@
 # Plan — backing up the player photographs
 
-**STATUS: BUILT, NOT LIVE, NOT DRILLED — 13 Aug 2026.** Written 13 Aug 2026.
-Jay chose Cloudflare R2 on a recommendation the same day; everything below the
-vendor choice is design, not a ruling.
+**STATUS: SHIPPED AND RUNNING — 13 Aug 2026.** Written, built and stood up the
+same day. Jay chose Cloudflare R2 on a recommendation that morning.
 
-⚠️ **"BUILT" IS THREE STEPS SHORT OF "THE PHOTOGRAPHS ARE SAFE", AND THIS LINE
-EXISTS SO NOBODY READS IT AS DONE.** The code and the SQL are written and the
-suite covers the append-only rule and the request signing —
-`supabase/functions/backup-player-photos/index.ts`,
-`db/migrations/20260813_photo_backup.sql`,
-`claude/runbooks/player-photo-backup.md`. **Nothing has run.** There is no
-Cloudflare account, the migration is not applied, the function is not deployed,
-`pg_cron` is not installed, and **no photograph has ever been copied or got
-back.** Until §What "done" means below is satisfied in full, this feature
-protects nothing.
+✅ **THE PHOTOGRAPHS ARE BACKED UP.** Bucket `quins-player-photos` (APAC,
+private), function deployed with `verify_jwt: false`, nightly `pg_cron` job at
+22:17 UTC. First real run copied **6 of 6, zero failed, in five seconds**, and a
+second run copied nothing — the mirror is idempotent.
 
-⚠️ **THE VENDOR CHOICE PICKED UP A LIMIT NOBODY EXPECTED, and it is in the
-runbook rather than here because it is operational: R2's API tokens are Object
-Read only or Object Read AND WRITE, and write includes delete.** So append-only
-is a property of the code, not of the credential. Bucket versioning plus Object
-Lock is the real answer and is not done.
+⚠️ **WHAT IS PROVEN, AND BY WHAT.** Each of these was measured, not reasoned:
+- **The schedule fires** — a temporary probe job was observed `succeeded` in
+  `cron.job_run_details`, with its summary in `net._http_response`, then removed.
+  **A schedule that has never fired is not a schedule.**
+- **Byte-identity** — `etag_mismatches: 0` across all six, comparing MD5s from
+  both sides. ⚠️ **And that zero is not vacuous**: the source rows all carry an
+  ETag, and both sides deliver it *quoted*, so a quote-stripping bug would have
+  produced six mismatches rather than zero. That bug was real and a unit test
+  caught it before deployment.
+- **Append-only** — enforced by `plan.ts` having no way to express a deletion,
+  **and now by R2 itself**: a `retain-one-year` bucket lock means no token, no
+  mistake and no compromise can delete or overwrite a photograph for 365 days.
+  ⚠️ **That closes the gap this plan originally recorded as unfixable in the
+  credential** — R2's token presets are Object Read only or Object Read AND
+  Write, with no create-without-delete option.
+
+❌ **WHAT IS STILL NOT PROVEN, AND IT IS THE HALF THAT MATTERS MOST: NOBODY HAS
+EVER GOT A PHOTOGRAPH BACK.** §What "done" means below asks for four things and
+the fourth — somebody who did not build this following the restore procedure —
+has not happened. Copying is not restoring, and this repo's own precedent is the
+database drill, where the thing everyone predicted would fail restored cleanly
+and the useful outcome came from doing it rather than reasoning about it.
+
+⚠️ **Retention remains open and is Jay's**, not a technical question: append-only
+means R2 accumulates photographs of children who have left the club, and the
+one-year lock means a deletion request cannot be fully honoured inside that year.
 
 ⚠️ **`npm run docs:check` does NOT validate the paths in this file** —
 `scripts/docs-check.mjs` excludes `claude/plans/`. Every path below was read
