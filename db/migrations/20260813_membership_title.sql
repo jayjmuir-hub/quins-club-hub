@@ -1,0 +1,68 @@
+-- 13 Aug 2026 — a job title on a membership ("Head Coach", "Assistant Coach").
+--
+-- ⚠️ NOT YET APPLIED WHEN THIS FILE WAS WRITTEN. Apply it, then re-capture
+-- db/schema/tables.sql AND db/schema/grants.sql in the same commit — the grant
+-- below is half the migration and `scripts/docs-check.mjs` fails the build if a
+-- migration grants on a table that grants.sql does not name.
+--
+-- ══ WHY A FREE-TEXT COLUMN WITH NO CHECK CONSTRAINT ═══════════════════════
+--
+-- The exact precedent is memberships.admin_rights, and src/lib/scope.js records
+-- the reasoning: a constraint "would mean a migration per job title, for a value
+-- that gates a screen and cannot do harm". A title is the same kind of value —
+-- it labels a person, it grants nothing, and an unrecognised one is inert.
+--
+-- The vocabulary (Head Coach, Assistant Coach, …) lives in src/lib/scope.js as
+-- SUGGESTIONS. It is not a whitelist and the database does not know about it.
+--
+-- ⚠️ THE TITLE MUST NEVER BE READ AS PERMISSION. private.can_edit_team keys off
+-- `role` and must stay that way. A "Head Coach" title grants precisely what
+-- `coach` grants and not a thing more. This is the same rule
+-- 20260806_claim_roster_access.sql set when it ruled that renaming a squad must
+-- not hand anyone a role: authority comes from a column the database checks,
+-- never from a label a human typed.
+--
+-- ══ ⚠️ THE GRANT IS NOT OPTIONAL, AND THE OBVIOUS FIX FOR ITS ABSENCE IS A
+-- ══ SECURITY HOLE ═════════════════════════════════════════════════════════
+--
+-- `authenticated` has NO table-level UPDATE on public.memberships. Since
+-- 10 Aug 2026 it holds column-level UPDATE on exactly six columns:
+--
+--     profile_id, club_id, team_id, player_id, role, status
+--
+-- `is_super` and `admin_rights` are DELIBERATELY excluded — that column grant is
+-- the thing standing between an ordinary admin and promoting themselves to super
+-- admin. See db/schema/grants.sql §4.
+--
+-- So a new column is NOT writable by default, and the failure is the nastiest
+-- kind: PostgREST reports it as a permission error that looks exactly like an
+-- RLS refusal, on a policy that is in fact working correctly.
+--
+-- ⚠️ IF A FUTURE SESSION HITS THAT ERROR, THE FIX IS THE COLUMN GRANT BELOW —
+-- **NEVER** `grant update on public.memberships to authenticated`. That would
+-- restore table-level UPDATE and hand every admin the ability to write
+-- is_super. It would make the save work. It would also silently undo the
+-- protection the 10 Aug migration exists to provide, with no test failing and
+-- nothing visible in the app.
+--
+-- The same trap is recorded for profiles in claude/state-of-play.md: "Adding a
+-- column to `profiles` is therefore a decision: ungranted, a save fails with
+-- something that looks exactly like an RLS refusal." memberships now behaves the
+-- same way and this is the first column added since it started to.
+
+alter table public.memberships
+  add column if not exists title text;
+
+grant update (title) on public.memberships to authenticated;
+
+-- ══ WHAT IS NOT DONE HERE ═════════════════════════════════════════════════
+--
+-- ⚠️ NO CHANGE TO ANY POLICY. Writing a title is already governed by
+-- "memb manage" (admin-only, FOR ALL) — the same policy that governs role and
+-- team_id. An admin who may move somebody between squads may certainly label
+-- them, and widening anything here would be granting access nobody asked for.
+--
+-- ⚠️ NO INDEX. Titles are read as part of a squad's staff list — fifteen rows —
+-- and are never filtered or sorted on in the database. An index would cost
+-- write throughput to buy nothing, which is the ruling already recorded for the
+-- ~24 unindexed audit columns.

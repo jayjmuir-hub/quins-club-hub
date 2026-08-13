@@ -121,6 +121,24 @@ export function isAdmin(memberships) {
 // there is. An unrecognised right matches no dashboard and is inert.
 export const ADMIN_RIGHTS = ['youth', 'media', 'pitches']
 
+// Job titles for squad staff — what `memberships.title` is usually set to.
+//
+// ⚠️ SUGGESTIONS, NOT A WHITELIST, AND THE DIFFERENCE IS THE WHOLE DESIGN.
+// `memberships.title` is free text with NO check constraint, for the same
+// reason ADMIN_RIGHTS has none: a constraint would mean a migration per job
+// title, for a value that labels a person and grants nothing. This list only
+// decides what the picker offers. A club that wants "Forwards Coach" types it,
+// and nothing breaks.
+//
+// ⚠️ A TITLE IS NEVER PERMISSION. private.can_edit_team keys off `role`, so
+// "Head Coach" grants exactly what `coach` grants. If anything ever branches on
+// a title, that is the bug — the same rule that stops a squad RENAME handing
+// somebody a role (20260806_claim_roster_access.sql).
+//
+// ⚠️ MEDIC HAS NO TITLE OF ITS OWN HERE on purpose: "Medic" is already the role
+// label, so a title would be repeating it. A club with a physio types one.
+export const STAFF_TITLES = ['Head Coach', 'Assistant Coach', 'Team Manager', 'Physio']
+
 // ⚠️ JAY'S EXACT WORDING, 12 Aug 2026, AND TWO OF THE THREE ARE NOT JOB TITLES.
 // "we aren't going to use human names anymore, only Club Youth Manager, Pitch
 // Management, Social Media Management from now on". These were Youth Manager /
@@ -275,6 +293,23 @@ export function roleLabel(memberships) {
   const rolesHeld = new Set(memberships.map((m) => m.role))
   const highest = ROLE_PRECEDENCE.find((role) => rolesHeld.has(role))
   return highest ? ROLE_LABELS[highest] : 'No access yet'
+}
+
+/**
+ * The label for ONE role, rather than for the highest of a set.
+ *
+ * ⚠️ THIS EXISTS SO ROLE_LABELS KEEPS ONE HOME. `roleLabel` above answers
+ * "what is this person?", which is the wrong question on a screen that lists a
+ * squad's staff — there, each membership row is shown in its own right and a
+ * coach who is also a parent is being shown AS the coach. The alternative was a
+ * second copy of the four words in a screen file, and two copies of a fact are
+ * two copies that drift.
+ *
+ * An unrecognised role returns null rather than a guess, so a role added to the
+ * database and not to this file renders as nothing instead of as a wrong label.
+ */
+export function labelForRole(role) {
+  return ROLE_LABELS[role] ?? null
 }
 
 /**
