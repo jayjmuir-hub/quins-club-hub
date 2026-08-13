@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:integration": "VITEST_MODE=integration vitest run --passWithNoTests",
     "docs:check": "node scripts/docs-check.mjs",
+    "db:check": "node scripts/db-check.mjs",
     "check:overflow": "node harness/check-overflow.mjs",
     "harness": "vite --config harness/vite.config.js"
   },
@@ -30,6 +31,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
     "jsdom": "^25.0.0",
+    "pg": "^8.23.0",
     "postcss": "^8.4.45",
     "tailwindcss": "^3.4.10",
     "vite": "^5.4.2",

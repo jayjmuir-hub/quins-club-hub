@@ -10,6 +10,35 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
+- **`npm run db:check` — the SQL harnesses finally have a way to be run.**
+  `scripts/db-check.mjs`, runbook `claude/runbooks/db-harnesses.md`, nightly job
+  `.github/workflows/db-check.yml`.
+  ⚠️ **THE FIX WAS FRICTION, NOT DISCIPLINE.** `db/tests/grants.sql` had been red
+  against live for three days because running the harnesses meant pasting
+  fourteen files into the Supabase SQL editor by hand, so it happened roughly
+  never. A prose warning in the file's own header did not help — it said "parts 1
+  and 2 were run against live and passed", which was true on the day and is
+  exactly what stopped anyone looking again.
+  ⚠️ **THE RUNNER ENFORCES THE ROLLBACK RATHER THAN TRUSTING IT.** It refuses any
+  harness containing `commit;`, or lacking `begin;`/`rollback;`, **before it
+  connects** — because several harnesses inject a real fault on production to
+  prove they are not vacuous, and one of them is "any club admin may rewrite any
+  member's login email". **Both refusals proved by planting a bad file.**
+  ⚠️ **THE NIGHTLY JOB IS INERT UNTIL THE SECRET EXISTS**, rather than failing
+  every night with a credential error everyone learns to ignore. **No
+  `pull_request` trigger, and that is a security decision** — this repo is
+  public, and `schedule`/`workflow_dispatch` are the only triggers a fork cannot
+  fire.
+  ⚠️ **NOT A REQUIRED CHECK AND MUST NOT BECOME ONE.** These assert against LIVE:
+  a red run means production drifted, not that the branch is bad.
+  ✅ **`db/tests/photo-backup.sql` closes a gap opened the same day** — those
+  grants had been verified as ad-hoc SQL in a chat session, which is once, by one
+  person, somewhere nobody can re-run. Verified against live including its
+  self-test, and the injected grant confirmed gone after the rollback.
+  ⚠️ **`pg` added as a devDependency** — the first for tooling rather than the
+  app. `psql` is not on jay-pc, and a runner Jay cannot run does not fix the
+  friction that caused this.
+
 - **The player photographs get a backup — WRITTEN, NOT RUNNING.** An append-only
   mirror of `player-photos` into a private Cloudflare R2 bucket:
   `supabase/functions/backup-player-photos/index.ts`,

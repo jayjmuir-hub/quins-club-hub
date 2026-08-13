@@ -554,6 +554,34 @@ will propose building.**
   distinguishes granted from not. Injecting the real fault would have meant
   granting self-promotion on production, which the harness's own header warns
   against doing through the MCP.
+  ✅ **AND THE UNDERLYING CAUSE IS NOW FIXED, NOT JUST THE CHECK: `npm run
+  db:check` RUNS THEM ALL.** `scripts/db-check.mjs`, runbook
+  `claude/runbooks/db-harnesses.md`. The reason nobody ran them was that running
+  them meant pasting fourteen files into the SQL editor by hand — **the fix was
+  friction, not discipline.** A nightly GitHub Actions job
+  (`.github/workflows/db-check.yml`) runs them too, and is **inert until Jay
+  adds the `SUPABASE_DB_URL` secret** rather than failing every night with a
+  credential error everyone learns to ignore.
+  ⚠️ **THE RUNNER ENFORCES THE ROLLBACK RATHER THAN TRUSTING IT.** It refuses to
+  run any harness containing `commit;`, or lacking `begin;`/`rollback;`, and
+  refuses **before it connects**. That matters because several harnesses inject a
+  REAL fault on production to prove they are not vacuous, and one of those faults
+  is "any club admin may rewrite any member's login email". **Both refusals were
+  proved by planting a bad file and watching the runner stop.**
+  ⚠️ **IT MUST NEVER BECOME A REQUIRED CHECK, AND THE WORKFLOW MUST NEVER GAIN A
+  `pull_request` TRIGGER.** These assert against LIVE, so a red run means
+  production drifted rather than that a branch is bad — as a gate it would block
+  every unrelated merge. And this repo is PUBLIC: `schedule` and
+  `workflow_dispatch` cannot be fired from a fork, which is the only thing making
+  a database credential safe in Actions at all.
+  ⚠️ **`pg` IS NOW A devDependency**, the first one added for tooling rather than
+  the app. `psql` is not installed on jay-pc, and a runner Jay cannot run does
+  not fix the friction that caused this.
+  ✅ **`db/tests/photo-backup.sql` NOW EXISTS**, closing a gap in the same
+  session that opened it: the photo-backup grants were verified when the
+  migration was applied — as ad-hoc SQL in a chat, which is once, by one person,
+  where nobody can re-run it. **Verified against live including its self-test,
+  and the injected grant confirmed gone after the rollback.**
 
 - ⚠️ **A PRODUCTION READINESS AUDIT WAS RUN ON 13 Aug 2026** and its findings are
   NOT all recorded here — the report is a session artefact, not a repo document.
