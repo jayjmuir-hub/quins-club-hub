@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **A crashed screen no longer blanks the whole app.** There was no error
+- `d10602d` — **A crashed screen no longer blanks the whole app.** There was no error
   boundary anywhere in `src/`; React 18 unmounts the entire tree on an uncaught
   render error, so one null where a component expected a string gave a parent a
   white page with no text and no way back.
