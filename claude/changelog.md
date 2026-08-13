@@ -10,6 +10,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
+- `3d3e5bc` — **Session handoff for the day**, `claude/handoffs/2026-08-13-session.md`.
+  Seven PRs, and the half worth reading is the five things the session got wrong.
+
 - `328fba4` — **The error-boundary fallback is verified in a real browser.**
   Chromium at 360px, a realistic crash injected into the PUBLIC `/privacy` route
   so no login is needed and the OUTER boundary is the one exercised.
