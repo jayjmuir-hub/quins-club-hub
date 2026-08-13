@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -20,6 +20,7 @@ const updateMyProfileMock = vi.fn()
 const listPlayersMock = vi.fn()
 const listContactsForPlayersMock = vi.fn()
 const listParentsForPlayersMock = vi.fn()
+const registerMyPlayerMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -39,6 +40,12 @@ vi.mock('../src/data/members.js', () => ({
   // The You card's writer (8 Aug 2026). Mocked, like every other data
   // function in this file — nothing here reaches a Supabase client.
   updateMyProfile: (...a) => updateMyProfileMock(...a),
+  // ⚠️ ADDED 13 Aug 2026, AND ITS ABSENCE WOULD NOT HAVE FAILED LOUDLY. The
+  // add-a-player sheet on this screen calls it, and a vi.mock factory replaces
+  // the WHOLE module — so an omitted export is `undefined` at import time and
+  // only explodes when a test actually submits the form. That is the exact trap
+  // the note above the players mock describes, one module over.
+  registerMyPlayer: (...a) => registerMyPlayerMock(...a),
 }))
 
 // ⚠️ THESE MODULES NOW HAVE A SECOND CONSUMER. Since 9 Aug the "view or
@@ -135,6 +142,7 @@ beforeEach(() => {
     last_name: fields.lastName,
     phone: fields.phone,
   }))
+  registerMyPlayerMock.mockResolvedValue({ id: 'mm-new', status: 'pending' })
 })
 
 // Added 6 Aug 2026 (Jay): "they should be able to see their info and any
@@ -837,5 +845,120 @@ describe('More — whose players are "Your players"', () => {
     renderMore()
 
     expect(await screen.findByTestId('your-player')).toBeInTheDocument()
+  })
+})
+
+// ── Adding a second child (13 Aug 2026) ──────────────────────────────────
+//
+// ⚠️ THE GAP THIS CLOSES WAS INVISIBLE FROM THE DATABASE SIDE, which is why it
+// survived from 8 to 13 Aug. `register_my_player` has always allowed an
+// approved parent to register another child — its rate limit counts PENDING
+// rows precisely so that "an approved parent adding a second child later is
+// normal and must not be blocked by their own history". The FORM was the
+// restriction: AppShell renders AddYourPlayer only while
+// `memberships.length === 0`, so it vanished the moment the first child landed
+// and the only remaining route was an admin on the desktop Accounts screen.
+//
+// These tests drive the parent-facing route. The multi-row form itself is
+// covered in tests/parent-self-registration.test.jsx, where the sign-up screen
+// lives; what is asserted here is that this screen offers it, to the right
+// people, and feeds the result back into the provider.
+describe('More — adding another child', () => {
+  const PLAYER = {
+    id: 'p1',
+    full_name: 'Tom Muir',
+    team_id: 'team-u10',
+    position: 'Flanker',
+    photo_path: null,
+  }
+  const PARENT_OF_ONE = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
+
+  it('offers a parent the route to add another child', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT_OF_ONE))
+    listPlayersMock.mockResolvedValue([PLAYER])
+
+    renderMore()
+
+    expect(await screen.findByTestId('add-another-player')).toHaveTextContent(/add another player/i)
+  })
+
+  // ⚠️ THE REPORTED BUG, AND THE REASON THE GATE IS THE ROLE RATHER THAN THE
+  // LIST. More.jsx already records it: "a membership granted by hand by an
+  // admin has player_id = null, so YourPlayers renders nothing for that person
+  // and there was no editable field anywhere in the app for them". Put the add
+  // button inside the list and it stays hidden from exactly that parent.
+  it('offers it to a parent whose membership carries no linked player at all', async () => {
+    useMembershipsMock.mockReturnValue(
+      memberships([{ id: 'm9', role: 'parent', team_id: 'team-u10', player_id: null }]),
+    )
+    listPlayersMock.mockResolvedValue([])
+
+    renderMore()
+
+    expect(await screen.findByTestId('add-another-player')).toBeInTheDocument()
+    // And it words itself for somebody with nobody yet, rather than saying
+    // "another" to a person who has none.
+    expect(screen.getByTestId('add-another-player')).toHaveTextContent(/add your player/i)
+  })
+
+  it('does not offer it to a coach with no child at the club', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+
+    expect(screen.queryByTestId('add-another-player')).not.toBeInTheDocument()
+  })
+
+  it('registers the child and reloads the provider so the new row arrives', async () => {
+    const u = userEvent.setup()
+    const reload = vi.fn()
+    useMembershipsMock.mockReturnValue({ ...memberships(PARENT_OF_ONE), reload })
+    listPlayersMock.mockResolvedValue([PLAYER])
+
+    renderMore()
+    await u.click(await screen.findByTestId('add-another-player'))
+
+    await u.type(await screen.findByLabelText(/player's full name/i), 'Rory Muir')
+    await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
+    await u.click(screen.getByRole('button', { name: /add this player/i }))
+
+    await waitFor(() =>
+      expect(registerMyPlayerMock).toHaveBeenCalledWith('Rory Muir', 'team-u10', null, false),
+    )
+    // ⚠️ THE HALF THAT IS INVISIBLE WHEN IT BREAKS, exactly as at sign-up. The
+    // membership exists server-side either way; without the reload the parent
+    // closes the sheet onto a list that still shows one child, which reads as
+    // "it didn't work" — and the obvious response is to add them again.
+    await waitFor(() => expect(reload).toHaveBeenCalled())
+  })
+
+  // ⚠️ PER CHILD, NOT PER ACCOUNT — and the big banner cannot do this job.
+  // AppShell's is driven by isPendingOnly, which is `every`, so a parent with
+  // one approved child and one waiting gets no banner at all (see the test in
+  // tests/parent-self-registration.test.jsx that pins that deliberately). This
+  // chip is the only thing that answers "did my second child go through?".
+  it('marks the child who is still waiting, and only that child', async () => {
+    useMembershipsMock.mockReturnValue(
+      memberships([
+        { id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1', status: 'active' },
+        { id: 'm4', role: 'parent', team_id: 'team-u10', player_id: 'p2', status: 'pending' },
+      ]),
+    )
+    listPlayersMock.mockResolvedValue([
+      PLAYER,
+      { id: 'p2', full_name: 'Rory Muir', team_id: 'team-u10', position: null, photo_path: null },
+    ])
+
+    renderMore()
+
+    const cards = await screen.findAllByTestId('your-player')
+    const tom = cards.find((c) => within(c).queryByText('Tom Muir'))
+    const rory = cards.find((c) => within(c).queryByText('Rory Muir'))
+
+    expect(within(rory).getByTestId('player-pending')).toHaveTextContent(/waiting for approval/i)
+    // The negative is the half that matters: a chip on every card would say
+    // nothing at all.
+    expect(within(tom).queryByTestId('player-pending')).not.toBeInTheDocument()
   })
 })

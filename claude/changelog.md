@@ -10,6 +10,47 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
+- **A parent can register more than one child — the FORM was the limit, never the
+  database.** Plan: `claude/plans/2026-08-13-multi-child-registration.md`. Jay: *"we
+  need the ability for parents to add multiple children, up to 5, i thought we built
+  that in"* — we had not. ⚠️ **The "5" that made it look built is the anti-abuse
+  brake**, and `claude/decisions/2026-08-08-parent-self-registration.md` says so in as
+  many words: *"refuse beyond a small number of pending rows per profile"*. It counts
+  PENDING rows precisely so an approved parent may add another child later, which
+  `db/migrations/20260808_register_my_player.sql` also states outright. Meanwhile
+  `AddYourPlayer` took one name and `AppShell` mounts it only while
+  `memberships.length === 0`, so it vanished after the first child and the only
+  remaining route was an admin on a desktop-only screen. **No migration** — new
+  `src/components/PlayerRegistrationForm.jsx` (up to five rows, saved SEQUENTIALLY so a
+  partial failure can name which child is missing, the same reasoning
+  `src/screens/Register.jsx` already recorded), rendered by both `AddYourPlayer` and a
+  new card in `src/components/YourPlayers.jsx`. ⚠️ **That card's gate is the ROLE, not
+  the player list** — it used to return `null` on an empty list, which hid it from a
+  parent whose hand-granted membership carries `player_id = null`, the exact bug
+  `src/screens/More.jsx` already had written down. Plus a per-child "waiting for
+  approval" chip, because `isPendingOnly` is `every` and a parent with one approved and
+  one pending child correctly gets no banner. ⚠️ **Fault-injected five ways, each
+  reverted after, and FOUR of the five reproduced:** leaving saved rows in the list →
+  the retry test finds 2 rows where it expects 1; reversing the save loop → the ordering
+  assertion gets Ada where Chidi belongs; restoring the old `players.length === 0` gate
+  → the null-`player_id` test cannot find the button; changing the chip to an
+  account-wide `every(status === 'pending')` → the chip vanishes from the mixed account.
+  ⚠️ **THE FIFTH DID NOT REPRODUCE, AND THE CODE COMMENT WAS THE THING THAT WAS WRONG.**
+  Switching the row key to the array index was predicted to leave one row's typed name
+  in another's box; the removal test stayed GREEN, because every field is CONTROLLED
+  from state, so React re-renders the reused node with the right value. The classic
+  index-key bug needs an uncontrolled field and there is none here. The stable key is
+  kept — the field `id`s are derived from it — but `blankRow`'s comment now says plainly
+  that **no test discriminates on it**, instead of describing a bug that cannot happen.
+  ⚠️ **NOT verified live by Claude** — the real flow needs a parent sign-in, which Claude
+  does not do.
+
+- `747eb7f` — **The 13 Aug audit backlog was missing four of its own findings.**
+  `claude/state-of-play.md` gains the calendar-token, dependency-scanning, CSP and
+  repo-hygiene items, plus the measured bundle numbers. ⚠️ **That section IS the
+  audit** — the report was never committed — so a line deleted from it is a finding
+  that ceases to exist. (SHA added here by the next commit, per the one-behind rule.)
+
 - `3d3e5bc` — **Session handoff for the day**, `claude/handoffs/2026-08-13-session.md`.
   Seven PRs, and the half worth reading is the five things the session got wrong.
 
