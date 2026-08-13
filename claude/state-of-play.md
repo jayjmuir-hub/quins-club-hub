@@ -1055,10 +1055,21 @@ Ordered by what they cost to fix, not by how alarming they sound.
   wiring file red while the component file stays GREEN** — which is exactly the
   state `src/` was in before today. Removing only the `key`, and removing the
   outer boundary, each go red on their own assertion.
-  ⚠️ **NOT LOOKED AT IN A REAL BROWSER.** jsdom applies no Tailwind, and
-  `harness/check-overflow.mjs` has no crashing scenario, so **nothing has
-  verified the fallback LOOKS right** — only that it renders and says the right
-  words. Same standing limitation as everything else visual here.
+  ✅ **AND IT HAS NOW BEEN LOOKED AT IN A REAL BROWSER**, which this entry said
+  it had not for about twenty minutes. Chromium, real Tailwind, dev server, a
+  `throw` injected into `src/screens/Privacy.jsx` — **a PUBLIC route, so no
+  login is needed to reach it, and it exercises the OUTER boundary**, the one
+  `harness/` could never reach.
+  ⚠️ **Measured at 360px, not just eyeballed:** `documentElement.scrollWidth`
+  360 against a 360 viewport, so no overflow — the width this repo insists on
+  because a check that straddles it agrees with you. The heading, both buttons
+  side by side, and the revealed technical detail all fit and wrap.
+  ⚠️ **The injected error was a REALISTIC one** — `Cannot read properties of
+  null (reading 'full_name')` — not `throw new Error('test')`. A null player
+  name is the exact shape of failure this catches.
+  ⚠️ **`harness/check-overflow.mjs` STILL has no crashing scenario**, so this
+  was a by-hand check and is not repeatable by a gate. If the fallback's markup
+  changes, look again.
 - **There is no monitoring, no alerting and no error tracking.** Detection today is
   somebody telling Jay. ⚠️ **Pro's 7-day logs help you INVESTIGATE and tell you
   nothing** — Log Drains are a Team-plan feature.

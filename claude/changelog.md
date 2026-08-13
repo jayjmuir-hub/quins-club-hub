@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **A crashed screen no longer blanks the whole app.** There was no error
+- `d10602d` — **A crashed screen no longer blanks the whole app.** There was no error
   boundary anywhere in `src/`; React 18 unmounts the entire tree on an uncaught
   render error, so one null where a component expected a string gave a parent a
   white page with no text and no way back.
@@ -31,8 +31,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   right** — `button-sweep` rejected two hand-rolled buttons, `theme` rejected a
   raw hex. Fixed by routing through `<Button>` and `text-ink-muted`, not by
   exempting either.
-  ⚠️ **NOT looked at in a real browser** — nothing verifies the fallback LOOKS
-  right, only that it renders and says the right words.
+  ✅ **VERIFIED IN CHROMIUM AT 360px**, by injecting a realistic crash
+  (`Cannot read properties of null (reading 'full_name')`) into the PUBLIC
+  `/privacy` route — no login needed, and it exercises the OUTER boundary that
+  `harness/` cannot reach. `scrollWidth` 360 against a 360 viewport: no
+  overflow. ⚠️ **A by-hand check, not a gate** — `harness/check-overflow.mjs`
+  still has no crashing scenario, so look again if the fallback's markup
+  changes.
 - `74862ce` — **The `search_path` rule is a THREE-WAY TEST, not "everything is pinned except
   one"** — plus a migration pinning
   `private.events_result_from_components` (**written, NOT yet applied**,
