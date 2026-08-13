@@ -105,6 +105,66 @@ export function toStaffMember(row) {
   }
 }
 
+/**
+ * The staff of the squads the SIGNED-IN PERSON is attached to, for the Home
+ * card. Phase 3 of claude/plans/2026-08-13-squad-staff-on-home.md.
+ *
+ * ⚠️ AN RPC, NOT A TABLE READ, AND THAT IS THE SECURITY DESIGN RATHER THAN A
+ * STYLE CHOICE. A parent cannot read another member's `profiles` row at all —
+ * the four SELECT policies on that table are own / club-admin / two pending
+ * cases, and none of them covers "a coach on my child's squad". The obvious fix
+ * is a fifth policy, and it is WRONG: **RLS authorises ROWS, not COLUMNS**, so a
+ * policy wide enough to show a coach's name is wide enough to hand over their
+ * `email` and `phone` too, whatever this screen chooses to draw.
+ *
+ * `public.my_squad_staff()` is a SECURITY DEFINER function with a fixed seven-
+ * column result, so `is_super`, `admin_rights` and everything else on those two
+ * tables are structurally unreachable. See
+ * db/migrations/20260813_my_squad_staff.sql.
+ *
+ * ⚠️ CONTACT DETAILS ARE DELIBERATE. Jay, 13 Aug 2026: "the staff automatically
+ * opts in when accepting the position". Do not narrow this to name-and-title on
+ * the strength of the plan document — the plan recommended an opt-in toggle and
+ * was overruled.
+ *
+ * ⚠️ NO `team_id` ARGUMENT, AND DO NOT ADD ONE. The function decides scope from
+ * `auth.uid()` via `private.can_see_team`. A team id parameter would be a value
+ * the client picks, which is the shape of every "filter in the client" bug this
+ * repo has already written up — and it would buy nothing, since the result is
+ * bounded by the club's staff count, not its membership.
+ */
+export async function listMySquadStaff() {
+  const { data, error } = await supabase.rpc('my_squad_staff')
+  if (error) throw error
+
+  const byTeam = new Map()
+  for (const row of data ?? []) {
+    const list = byTeam.get(row.team_id) ?? []
+    // ⚠️ SHAPED BY THE SAME `toStaffMember` THE ADMIN DIRECTORY USES, so the
+    // blank-name rule ("" is not a name) holds on both screens from one place.
+    // The RPC returns flat columns where PostgREST returns a nested `profiles`
+    // object, so the row is re-nested rather than the helper being duplicated.
+    list.push(
+      toStaffMember({
+        id: row.membership_id,
+        role: row.role,
+        title: row.title,
+        profiles: { full_name: row.full_name, email: row.email, phone: row.phone },
+      }),
+    )
+    byTeam.set(row.team_id, list)
+  }
+
+  for (const list of byTeam.values()) {
+    // Same rule as the admin directory: by NAME, never by role. Role order
+    // would print every coach above every manager, which reads as a hierarchy
+    // the club has not agreed to.
+    list.sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  return byTeam
+}
+
 const REFUSED_TITLE =
   "We couldn't save that title — you may not have permission to change this squad's staff."
 

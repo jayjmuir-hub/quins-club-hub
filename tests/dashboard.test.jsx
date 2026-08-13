@@ -23,6 +23,7 @@ const subscribeEventsMock = vi.fn()
 const upsertEventMock = vi.fn()
 const deleteEventMock = vi.fn()
 const listPlayersMock = vi.fn()
+const listMySquadStaffMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -56,6 +57,15 @@ vi.mock('../src/data/events.js', () => ({
 
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
+}))
+
+// The Squad contacts block (13 Aug 2026). Mocked here so this file stays
+// network-free; the block's own behaviour is covered by
+// tests/squad-staff-home.test.jsx. Defaults to an empty Map — every existing
+// test in this file predates the block and must keep passing without knowing
+// about it.
+vi.mock('../src/data/staff.js', () => ({
+  listMySquadStaff: (...args) => listMySquadStaffMock(...args),
 }))
 
 // Only reached when a fixture row opens EventDetail; mocked so this file
@@ -209,11 +219,13 @@ beforeEach(() => {
   listEventsMock.mockReset()
   subscribeEventsMock.mockReset()
   listPlayersMock.mockReset()
+  listMySquadStaffMock.mockReset()
 
   useMembershipsMock.mockReturnValue(membershipValue(COACH))
   listEventsMock.mockResolvedValue(EVENTS)
   listPlayersMock.mockResolvedValue(PLAYERS)
   subscribeEventsMock.mockReturnValue(() => {})
+  listMySquadStaffMock.mockResolvedValue(new Map())
 })
 
 afterEach(() => {

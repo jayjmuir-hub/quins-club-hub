@@ -2243,3 +2243,78 @@ REVOKE ALL ON FUNCTION public.photo_backup_list_objects(text, text, integer) FRO
 REVOKE ALL ON FUNCTION public.photo_backup_list_objects(text, text, integer) FROM anon;
 REVOKE ALL ON FUNCTION public.photo_backup_list_objects(text, text, integer) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.photo_backup_list_objects(text, text, integer) TO service_role;
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  public.my_squad_staff  (13 Aug 2026, 20260813_my_squad_staff.sql)
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- Who coaches, manages and doctors the squads the CALLER is attached to. Feeds
+-- the Squad contacts block on Home (src/components/SquadStaffCard.jsx).
+--
+-- ⚠️ SECURITY DEFINER BECAUSE THE ALTERNATIVE IS A POLICY ON `profiles`, AND
+-- THAT IS THE WRONG MECHANISM. A parent cannot read another member's profile
+-- row: the four SELECT policies are own / club-admin / two pending cases. The
+-- obvious fix is a fifth policy — and **RLS authorises ROWS, not COLUMNS**, so
+-- any policy wide enough to show a coach's NAME also hands over `email` and
+-- `phone` regardless of what the screen draws. A column grant cannot rescue it
+-- either: grants apply to the whole `authenticated` role, including the admins
+-- who legitimately need those columns on Accounts.
+--
+-- So the boundary is this function's FIXED SEVEN-COLUMN RESULT. `is_super` and
+-- `admin_rights` live on `memberships`, which this function reads, and they are
+-- unreachable purely because they are not named below. **Adding a column to the
+-- RETURNS TABLE is the review.**
+--
+-- ⚠️ THE GATE IS can_see_team, NOT is_attached_to_team, AND THE DIFFERENCE IS
+-- `status = 'active'`. `event read` deliberately uses the status-blind one
+-- because "fixtures are not sensitive, and a pending parent needs them to be
+-- worth signing in at all" (20260808_membership_pending_status.sql). A
+-- volunteer's personal mobile is not a fixture, so a PENDING member gets an
+-- empty card until somebody approves them.
+--
+-- ⚠️ `m.status = 'active'` APPEARS TWICE OVER AND IS NOT REDUNDANT: once inside
+-- can_see_team (about the CALLER) and once in the body (about the PERSON BEING
+-- LISTED). A pending coach has been approved by nobody.
+--
+-- ⚠️ CONTACT DETAILS ARE RETURNED ON A RULING, NOT BY OVERSIGHT. Jay, 13 Aug
+-- 2026: "the staff automatically opts in when accepting the position". The plan
+-- (claude/plans/2026-08-13-squad-staff-on-home.md) recommended a per-person
+-- opt-in toggle and was overruled. Do not narrow this to name-and-title to
+-- match the plan document.
+--
+-- ⚠️ THE `FROM anon` REVOKE IS LOAD-BEARING AND THE HOUSE PATTERN OMITS IT.
+-- Nine migrations write `revoke execute … from public; grant … to
+-- authenticated;` and that does NOT keep anon out — Supabase's default
+-- privileges grant to `anon` BY NAME, exactly as the photo_backup entry above
+-- records. Measured 13 Aug 2026: six other public RPCs are anon-executable and
+-- are safe only by their bodies. Harness:
+-- db/tests/rls-squad-staff-visibility.sql asserts this one is false.
+CREATE OR REPLACE FUNCTION public.my_squad_staff()
+ RETURNS TABLE(team_id uuid, membership_id uuid, full_name text, title text, role text, email text, phone text)
+ LANGUAGE sql
+ STABLE
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select
+    m.team_id,
+    m.id,
+    p.full_name,
+    m.title,
+    m.role,
+    p.email,
+    p.phone
+  from memberships m
+  join profiles p on p.id = m.profile_id
+  where m.role in ('coach', 'manager', 'medic')
+    and m.status = 'active'
+    and m.team_id is not null
+    and private.can_see_team(m.team_id);
+$function$
+;
+
+-- proacl as captured: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+REVOKE ALL ON FUNCTION public.my_squad_staff() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.my_squad_staff() FROM anon;
+GRANT EXECUTE ON FUNCTION public.my_squad_staff() TO authenticated;

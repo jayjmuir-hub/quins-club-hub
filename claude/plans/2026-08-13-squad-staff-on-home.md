@@ -1,8 +1,28 @@
 # Plan — an age group sees its coaches, managers and medics
 
-**Status: PHASE 1 SHIPPED 13 Aug 2026 — `/admin/staff`. Phases 2–4 NOT
+**Status: PHASES 1, 2 AND 3 SHIPPED 13 Aug 2026. PHASE 4 (photos) NOT
 SHIPPED.** Written 13 Aug 2026 at Jay's request as a write-up only, while
-another session held the repo; phase 1 was built the same day.
+another session held the repo; phases 1 and 2 were built the same day and
+phase 3 that evening.
+
+⚠️ **THE PRIVACY RECOMMENDATION IN THIS PLAN WAS OVERRULED, AND THE CARD SHIPS
+WITH CONTACT DETAILS.** §"The decision Jay has to make" below lists four
+options and recommends the second (a per-person opt-in toggle defaulting OFF).
+Jay, 13 Aug 2026: *"stop worrying about the opt in, the staff automatically
+opts in when accepting the position"* — i.e. option 4, on a consent-at-
+acceptance argument: taking a coaching, manager or medic role on a children's
+squad carries an expectation that the families of that squad can reach you.
+**Phone and email are on the card, and `public.my_squad_staff()` returns them.**
+Do not narrow it back on the strength of the recommendation below; that
+section is preserved as the reasoning that was considered and set aside.
+
+⚠️ **AND GAP 3b'S BUILD ORDER WAS RIGHT, WHICH IS WORTH RECORDING BECAUSE IT
+INVERTED THE REQUEST.** Jay asked for the Home card; the admin directory was
+built first because twelve of fifteen squads had nobody attached. **That is
+still true on the day phase 3 shipped** — re-measured live, 12 of 15 squads
+have no coach, manager or medic and 0 of 8 staff have a title set. So the card
+ships showing its empty state to most of the club **by design**, with wording
+that says the staff are not *listed* rather than that the squad has none.
 
 ⚠️ **PHASE 2 WAS PULLED FORWARD INTO PHASE 1 AND THIS PLAN NO LONGER DESCRIBES
 WHAT WAS BUILT.** `memberships.title` shipped with the directory rather than

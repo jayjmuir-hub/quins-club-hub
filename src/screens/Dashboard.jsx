@@ -11,8 +11,10 @@ import Availability from './Availability.jsx'
 import Register from './Register.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
+import SquadStaffCard from '../components/SquadStaffCard.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
+import { listMySquadStaff } from '../data/staff.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
@@ -339,6 +341,26 @@ export default function Dashboard() {
   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
   const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
 
+  // ⚠️ THE SQUADS THIS PERSON IS *ATTACHED TO*, WHICH IS NOT `scopedTeams`.
+  // visibleTeams() hands an ADMIN every squad in the club, so building the staff
+  // block from it would put fifteen contact cards on an admin's home screen —
+  // /admin/staff is where that view belongs, and this one is "your squads".
+  //
+  // ⚠️ AND IT READS THE *EFFECTIVE* MEMBERSHIPS, SO "VIEW AS" NARROWS IT. The
+  // RPC underneath runs against the admin's REAL auth.uid() and will return
+  // every squad regardless — exactly as memberships.jsx documents for every
+  // other screen ("RLS still returns club-wide rows; the app simply declines to
+  // display them"). Filtering here is what makes the preview behave, and it is
+  // cosmetic, never a boundary.
+  const myTeams = useMemo(() => {
+    const attached = new Set(
+      (memberships ?? []).map((m) => m.team_id).filter((id) => id != null),
+    )
+    // scopedTeams is already sorted by sort_order, so the cards come out in the
+    // club's own squad order rather than in membership-row order.
+    return scopedTeams.filter((team) => attached.has(team.id))
+  }, [memberships, scopedTeams])
+
   const [events, setEvents] = useState([])
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -364,6 +386,11 @@ export default function Dashboard() {
   // Same shape as Schedule's: this screen owns the open/closed state and renders
   // the sheet, rather than EventDetail opening a second one itself.
   const [availabilityOpen, setAvailabilityOpen] = useState(false)
+  // Squad staff for the block at the bottom. A Map keyed by team id; null until
+  // the read settles, so the block can stay absent rather than flashing twelve
+  // "nobody listed yet" cards on every load and then filling them in.
+  const [staffByTeam, setStaffByTeam] = useState(null)
+  const [staffError, setStaffError] = useState(null)
   // The register (attendance): the fact rather than the intent, coach-only,
   // and not behind FEATURES.availability. Same parent-holds-the-state wiring.
   const [registerOpen, setRegisterOpen] = useState(false)
@@ -430,6 +457,32 @@ export default function Dashboard() {
       mounted = false
     }
   }, [teamIds, reloadToken])
+
+  // ⚠️ A SEPARATE READ FROM THE TWO ABOVE, AND DELIBERATELY NOT IN THEIR
+  // Promise.all. Those two are joined because the stat tiles mix counts from
+  // both, so settling them apart would draw a half-filled grid. This one feeds
+  // its own block at the bottom of the screen and shares no number with
+  // anything — putting it in the same all() would mean a failed staff read
+  // takes down the fixture list, which is the screen's whole reason to exist.
+  //
+  // ⚠️ NOT KEYED ON `reloadToken`. It is a realtime event on `events` that
+  // bumps that token, and no change to a fixture can change who coaches a
+  // squad. Refetching here would issue an extra round trip every time anyone in
+  // the club touched a fixture, for a result that cannot have moved.
+  useEffect(() => {
+    let mounted = true
+    setStaffError(null)
+    listMySquadStaff()
+      .then((byTeam) => {
+        if (mounted) setStaffByTeam(byTeam)
+      })
+      .catch((err) => {
+        if (mounted) setStaffError(err)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [memberships])
 
   // Realtime: bump the token and let the effect above refetch. The callback
   // closes over nothing but setReloadToken (a stable state setter), so this
@@ -713,6 +766,50 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
+
+      {/* ⚠️ WHO LOOKS AFTER THE SQUAD — Jay's ask, 13 Aug 2026: "i want age
+          groups to see their coaches, managers, and medics on their home
+          screen". Phase 3 of claude/plans/2026-08-13-squad-staff-on-home.md.
+
+          Shown to EVERY role, not gated like the stat band. A coach seeing the
+          other people on their own squad is useful rather than noise, and the
+          data is the same data — the gate that matters is in the database
+          (public.my_squad_staff), not here.
+
+          ⚠️ LAST ON THE SCREEN, AND THAT IS ON PURPOSE. "What is on, and when"
+          is why a parent opens this app; who to ring is what they come back for
+          occasionally. Putting it above the fixtures would push the thing
+          everyone wants below the fold to serve the thing they want sometimes.
+
+          The block disappears entirely for somebody attached to no squad — an
+          admin whose only membership has a null team_id, which is Jay's own
+          second account. */}
+      {myTeams.length > 0 && (staffByTeam || staffError) && (
+        <div data-testid="squad-staff-block">
+          <BlockTitle>Squad contacts</BlockTitle>
+          {staffError ? (
+            // ⚠️ SAID OUT LOUD RATHER THAN RENDERED AS "nobody yet". A failed
+            // read and an unstaffed squad look identical from here, and the
+            // difference matters enormously: one is a bug and the other is the
+            // normal state of twelve of the club's fifteen squads. Silently
+            // showing the empty state on an error would teach a parent that
+            // their child's squad has no coach.
+            <Card className="px-4 py-3">
+              <p role="alert" className="text-[13px] text-ink-muted">
+                We couldn&apos;t load your squad contacts just now.
+              </p>
+            </Card>
+          ) : (
+            myTeams.map((team) => (
+              <SquadStaffCard
+                key={team.id}
+                squadName={team.name}
+                staff={staffByTeam.get(team.id) ?? []}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       {/* The dashboard's fixture rows open the same detail sheet the
           schedule does, so they get the same Edit/Delete footer and the same
