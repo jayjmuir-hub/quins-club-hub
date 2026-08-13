@@ -29,7 +29,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   production change. It was not: the function has been unpinned since 12 Aug
   (`390a6e5`, `c8a05c7`) and repo and live match exactly. **Checked before acting;
   the alarming reading was false.**
-- **THE BACKUP RESTORE IS DRILLED AND IT WORKS** — 12 Aug 18:05 backup restored
+- `c181233` — **THE BACKUP RESTORE IS DRILLED AND IT WORKS** — 12 Aug 18:05 backup restored
   into a throwaway project, checked, deleted within the hour. £0.
   ⚠️ **The discriminating check, because "there were rows" proves nothing: SIX
   `Test Player` rows in the restore against ZERO live.** They were deleted on
