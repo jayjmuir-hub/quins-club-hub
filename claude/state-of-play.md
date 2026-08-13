@@ -481,6 +481,80 @@ will propose building.**
   At the club's current size this is nothing; **at the 1500 members Jay expects
   it is the least-tested thing in the app**, and it cannot be measured in SQL.
 
+- ✅ **EVERY SQUAD, AND WHO LOOKS AFTER IT — `/admin/staff` IS LIVE** (`22739ad`),
+  with `memberships.title` so a coach can be a Head Coach.
+  ⚠️ **THIS ENTRY WAS MISSING FROM THIS FILE FOR A DAY WHILE THE FEATURE WAS LIVE**,
+  and only `claude/changelog.md` recorded it. This file is step 3 of the reading
+  order: **a feature absent from it is a feature the next session proposes
+  building.** The same failure is written up two sections above about league teams
+  and match sheets; it happened again in the very next commit.
+  ⚠️ **BUILT IN THE OPPOSITE ORDER TO THE REQUEST, ON A MEASUREMENT.** Jay asked
+  for age groups to see their coaches on the HOME screen. Twelve of fifteen squads
+  had nobody attached, so the member-facing card would have shipped empty to most
+  of the club with no way to see why. **The admin directory is the only view that
+  surfaces the missing data the rest of the feature depends on.**
+  ⚠️ **The Home card is PHASE 3 and is NOT built** —
+  `claude/plans/2026-08-13-squad-staff-on-home.md`, whose header also corrects its
+  own gap 2: the mechanism is a `SECURITY DEFINER` function returning
+  `(full_name, title, role)`, **never an RLS policy on `profiles`**, because a
+  `profiles` row carries `email` and `phone` and RLS authorises rows, not columns.
+  ⚠️ **A TITLE IS NEVER PERMISSION** — `can_edit_team` keys off `role`, and it
+  must stay that way.
+
+- ⚠️ **THE PLAYER-PHOTO BACKUP IS WRITTEN AND PROTECTS NOTHING YET — 13 Aug 2026.**
+  Plan `claude/plans/2026-08-13-player-photo-backup.md`, runbook
+  `claude/runbooks/player-photo-backup.md`, function
+  `supabase/functions/backup-player-photos/index.ts`, migration
+  `db/migrations/20260813_photo_backup.sql`.
+  ⛔ **NOTHING HAS RUN. There is no Cloudflare account, the migration is not
+  applied, the function is not deployed, `pg_cron` is not installed, and no
+  photograph has ever been copied or got back.** Do not read the code landing as
+  the gap closing — the ⛔ item in §Open is unchanged until the drill passes.
+  ⚠️ **`pg_cron` IS NOT INSTALLED — measured 13 Aug, `installed_version` null.**
+  `pg_net` and `supabase_vault` are. So "a scheduled edge function" is not
+  something this project can currently do, and the migration deliberately does not
+  install an extension on the production database.
+  ✅ **IT IS THE FIRST EDGE-FUNCTION LOGIC IN THIS REPO WITH ANY VITEST COVERAGE**,
+  and the split is the point: `plan.ts` and `sigv4.ts` import nothing, so both Deno
+  and vitest load them. RESTORE.md's "a Deno function is not a module the suite
+  imports" still holds for the four deployed functions — it was a statement about
+  how they are written, not a law.
+  ⚠️ **APPEND-ONLY IS ENFORCED BY THE MODULE HAVING NO WAY TO SAY "DELETE"**, and
+  a test asserts that no export ever matches `/delete|prune|remove|sync/`. Proved
+  by adding an `objectsToDelete` and watching it go red.
+  ⚠️ **AND THE CREDENTIAL DOES NOT ENFORCE IT.** R2's token presets are Object Read
+  only or Object Read **and Write**, and write includes `DeleteObject`. The real
+  control is bucket versioning plus Object Lock, which is **not done**.
+  ⚠️ **THE DISCRIMINATING CHECK IS `only_in_backup`** — objects R2 holds that
+  `player-photos` no longer does. A mirror quietly syncing deletions cannot produce
+  that number. **It is zero until the first head shot is replaced, and zero is "not
+  yet demonstrated", not a pass.**
+
+- ❌ **`db/tests/grants.sql` HAD BEEN FAILING AGAINST LIVE SINCE 10 Aug AND
+  NOBODY SAW IT, BECAUSE NOBODY RAN IT.** Found 13 Aug while verifying an
+  unrelated migration. Its check 1c said *"these five are the only column-level
+  grants in the schema"* — false within hours of being written, when
+  `super_admin_and_rights` added six on `memberships` the SAME DAY, then
+  `social_ideas` added four on 12 Aug and `memberships.title` a seventh on 13 Aug.
+  ⚠️ **THE DATABASE WAS RIGHT AND THE CHECK WAS WRONG.** All sixteen column
+  grants live are deliberate and recorded in `db/schema/grants.sql`. Nothing was
+  exposed; a guard was simply not guarding.
+  ⚠️ **THE LESSON IS THE SIBLING OF RULE 6, AND THIS REPO DID NOT HAVE IT WRITTEN
+  DOWN: a check nobody RUNS is not a check, in exactly the way a check that has
+  never FAILED is not a check.** Its own header said "parts 1 and 2 were run
+  against live and passed", which was true on the day and is precisely what stopped
+  anyone looking again. ⚠️ **Neither `npm test` nor CI can catch this** — the repo
+  is public, so CI has no credentials, and these harnesses only ever run when a
+  human pastes them.
+  ✅ **Fixed and re-run green**, and two assertions ADDED that nothing had:
+  `memberships.title` must still BE granted (losing it reads exactly like an RLS
+  refusal), and `is_super` / `admin_rights` must NOT be. **Non-vacuity proved
+  read-only rather than by injecting a grant** — `role` and `title` come back
+  true from the same probe that returns false for `is_super`, so the probe
+  distinguishes granted from not. Injecting the real fault would have meant
+  granting self-promotion on production, which the harness's own header warns
+  against doing through the MCP.
+
 - ⚠️ **A PRODUCTION READINESS AUDIT WAS RUN ON 13 Aug 2026** and its findings are
   NOT all recorded here — the report is a session artefact, not a repo document.
   The ones that became work are in §Open.
@@ -1163,6 +1237,15 @@ below is **not started** unless it says otherwise.
   bucket to somewhere Jay owns; there is no in-app mechanism and
   `delete from storage.objects` raises `42501`, so it cannot be scripted in SQL
   either.
+  ⚠️ **A FIX IS NOW WRITTEN AND THIS ITEM IS STILL ⛔ — "no fix exists and none is
+  scheduled" became "a fix exists on disk and has never run", which is a smaller
+  change than it looks.** An append-only mirror into Cloudflare R2:
+  `claude/plans/2026-08-13-player-photo-backup.md` and
+  `claude/runbooks/player-photo-backup.md`. **Nothing has run — no account, no
+  deploy, no applied migration, no copied photograph.** Tick this off on the
+  runbook's §4 drill and on nothing else: this repo's own precedent is the database
+  drill, where the failure the audit AND the runbook both predicted did not happen,
+  and the useful outcome came from doing it rather than reasoning about it.
 - **A recovery is not just a restore, and the extra steps are undocumented
   anywhere else**: redeploy all five edge functions ⚠️ **with `verify_jwt: false`,
   which cannot be encoded in this repo**, rebuild the auth settings, and repoint

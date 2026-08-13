@@ -1,8 +1,25 @@
 # Plan — backing up the player photographs
 
-**Status: NOT SHIPPED. Nothing built.** Written 13 Aug 2026. Jay chose
-Cloudflare R2 on a recommendation the same day; everything below the vendor
-choice is design, not a ruling.
+**STATUS: BUILT, NOT LIVE, NOT DRILLED — 13 Aug 2026.** Written 13 Aug 2026.
+Jay chose Cloudflare R2 on a recommendation the same day; everything below the
+vendor choice is design, not a ruling.
+
+⚠️ **"BUILT" IS THREE STEPS SHORT OF "THE PHOTOGRAPHS ARE SAFE", AND THIS LINE
+EXISTS SO NOBODY READS IT AS DONE.** The code and the SQL are written and the
+suite covers the append-only rule and the request signing —
+`supabase/functions/backup-player-photos/index.ts`,
+`db/migrations/20260813_photo_backup.sql`,
+`claude/runbooks/player-photo-backup.md`. **Nothing has run.** There is no
+Cloudflare account, the migration is not applied, the function is not deployed,
+`pg_cron` is not installed, and **no photograph has ever been copied or got
+back.** Until §What "done" means below is satisfied in full, this feature
+protects nothing.
+
+⚠️ **THE VENDOR CHOICE PICKED UP A LIMIT NOBODY EXPECTED, and it is in the
+runbook rather than here because it is operational: R2's API tokens are Object
+Read only or Object Read AND WRITE, and write includes delete.** So append-only
+is a property of the code, not of the credential. Bucket versioning plus Object
+Lock is the real answer and is not done.
 
 ⚠️ **`npm run docs:check` does NOT validate the paths in this file** —
 `scripts/docs-check.mjs` excludes `claude/plans/`. Every path below was read

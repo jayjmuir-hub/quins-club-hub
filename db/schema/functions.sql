@@ -2183,3 +2183,62 @@ $function$
 REVOKE ALL ON FUNCTION private.notify_access_request() FROM PUBLIC;
 REVOKE ALL ON FUNCTION private.notify_access_request() FROM anon;
 REVOKE ALL ON FUNCTION private.notify_access_request() FROM authenticated;
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  public.photo_backup_list_objects  (13 Aug 2026, 20260813_photo_backup.sql)
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- Object keys in a storage bucket, for the backup-player-photos edge function.
+--
+-- ⚠️ SECURITY DEFINER BECAUSE storage.objects IS UNREACHABLE OTHERWISE. It is
+-- not readable by any app role and `storage` is not an exposed PostgREST schema,
+-- so there is no route to this list from outside the database without a definer
+-- function. search_path is pinned per the three-way rule at the top of this
+-- file: DEFINER always pins.
+--
+-- ⚠️ THE REVOKE IS THE LOAD-BEARING HALF, AND SECTION 1 OF grants.sql IS WHY.
+-- Supabase's default privileges grant EXECUTE on every new function in `public`
+-- to `anon` and `authenticated`. Without the revoke, any signed-in account --
+-- and any stranger holding the project URL -- could enumerate every object key
+-- in every bucket, and a key is the one thing needed to ask for a signed URL to
+-- a child's photograph. This function has no auth.uid() guard of its own,
+-- deliberately: the grant is the gate, and it is checked here rather than
+-- duplicated in a body that would then have two answers to the same question.
+--
+-- ⚠️ KEYSET PAGINATION, NOT OFFSET. `name > _after` rides the existing unique
+-- index on (bucket_id, name). OFFSET walks every skipped row whatever the index
+-- does -- the finding already recorded against .range() in state-of-play.
+--
+-- ⚠️ THE BUCKET IS A PARAMETER AND THAT IS NOT AN INVITATION. service_role can
+-- already read every bucket, so this grants nothing new. It is a parameter so
+-- that mirroring `social-ideas` one day is a configuration change rather than a
+-- migration -- but WHETHER to mirror it is an open question in the plan, not a
+-- flag to flip.
+CREATE OR REPLACE FUNCTION public.photo_backup_list_objects(_bucket text, _after text DEFAULT ''::text, _limit integer DEFAULT 1000)
+ RETURNS TABLE(name text, size bigint, updated_at timestamp with time zone)
+ LANGUAGE sql
+ STABLE
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select o.name,
+         (o.metadata->>'size')::bigint,
+         o.updated_at
+  from storage.objects o
+  where o.bucket_id = _bucket
+    and o.name > _after
+  order by o.name
+  limit least(greatest(_limit, 1), 1000)
+$function$
+;
+
+-- Function comment as stored in the database:
+--   'Object keys in a storage bucket, keyset-paginated. service_role only; used
+--    by the backup-player-photos edge function.'
+
+-- proacl as captured: {postgres=X/postgres,service_role=X/postgres}
+REVOKE ALL ON FUNCTION public.photo_backup_list_objects(text, text, integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.photo_backup_list_objects(text, text, integer) FROM anon;
+REVOKE ALL ON FUNCTION public.photo_backup_list_objects(text, text, integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.photo_backup_list_objects(text, text, integer) TO service_role;

@@ -111,6 +111,18 @@
 --
 -- Per-table policy counts previously lived here and were deleted for the same
 -- reason: they rot, and pg_policies answers the question in a second.
+--
+-- ⚠️ AND IT DRIFTED AGAIN — FOUND 13 AUG 2026. `social_ideas` has had RLS on
+-- since 12 Aug and was never added to this list, so the list was short by one
+-- for a day, in exactly the way the paragraph above says it must not be. It has
+-- RLS on; nothing was exposed. **The warning did not prevent the thing it warns
+-- about, because a prose warning cannot.** Re-measured against pg_class the same
+-- day and the list below now matches live table for table.
+--
+--   select c.relname, c.relrowsecurity, c.relforcerowsecurity
+--   from pg_class c
+--   where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+--   order by c.relname;
 -- ---------------------------------------------------------------------
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.match_sheets      ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
@@ -125,6 +137,8 @@ ALTER TABLE public.invite_targets  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invites         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.league_teams    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.memberships     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.photo_backup_runs ENABLE ROW LEVEL SECURITY;  -- added 13 Aug 2026
+ALTER TABLE public.social_ideas      ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026, captured 13 Aug
 ALTER TABLE public.pitch_requests  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pitches         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.player_contacts ENABLE ROW LEVEL SECURITY;
@@ -1030,3 +1044,27 @@ CREATE POLICY "social idea image write" ON storage.objects
 CREATE POLICY "social idea image remove" ON storage.objects
   FOR DELETE TO authenticated
   USING (((bucket_id = 'social-ideas'::text) AND ((private.social_idea_owner(name) = auth.uid()) OR private.is_admin_anywhere())));
+
+
+-- ---------------------------------------------------------------------
+-- public.photo_backup_runs — ONE policy, and it is read-only on purpose
+-- (13 Aug 2026, 20260813_photo_backup.sql)
+--
+-- ⚠️ THERE IS NO INSERT, UPDATE OR DELETE POLICY AND THERE MUST NEVER BE ONE.
+-- The backup-player-photos edge function writes these rows with the service
+-- role, which bypasses RLS entirely, so the app needs no write path at all. A
+-- run log an admin can edit is not a log — if this table can be rewritten from
+-- the app it stops being evidence, and evidence is the only reason it exists.
+--
+-- ⚠️ CLUB-BLIND, via private.is_admin_anywhere(). A run is a fact about a
+-- storage bucket, and a bucket carries no club — the same documented
+-- single-club assumption as the three storage policies above.
+--
+-- ⚠️ AND service_role CAN STILL DELETE A ROW. Supabase default privileges gave
+-- it all eight table privileges before the migration ran, and a GRANT cannot
+-- take one away. See db/schema/grants.sql: this is a record for a human to
+-- read, not a tamper-proof one.
+-- ---------------------------------------------------------------------
+CREATE POLICY "photo backup run read admin" ON public.photo_backup_runs
+  FOR SELECT TO authenticated
+  USING (private.is_admin_anywhere());

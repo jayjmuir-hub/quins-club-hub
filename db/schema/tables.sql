@@ -1266,6 +1266,60 @@ alter table public.teams
   add column scoring_kinds text[];
 
 
+-- ---------------------------------------------------------------------
+-- public.photo_backup_runs  (13 Aug 2026, 20260813_photo_backup.sql)
+--
+-- One row per run of the backup-player-photos edge function, which mirrors the
+-- `player-photos` bucket into Cloudflare R2. See
+-- claude/runbooks/player-photo-backup.md.
+--
+-- ⚠️ THIS TABLE IS THE ONLY EVIDENCE THE BACKUP IS RUNNING, and that is not
+-- belt-and-braces. pg_cron calls the function through pg_net, and pg_net never
+-- reads the response -- the same property RESTORE.md records for the two mail
+-- functions, where it is survivable because the in-app queue is the real record.
+-- A backup has no second record. Without a row here, a mirror that has been
+-- failing for six weeks and a mirror that is working look identical from every
+-- screen in the app.
+--
+-- ⚠️ THE ROW IS OPENED BEFORE THE WORK AND CLOSED AFTER IT, so a null
+-- finished_at on an old row means the run started and vanished -- a timeout, a
+-- deploy mid-run, or R2 hanging. That state is unreachable if the row is only
+-- written at the end, which is why it is not.
+--
+-- ⚠️ `more_to_do` EXISTS BECAUSE OF THE "NO SILENT CAPS" RULE. The function
+-- stops at 250 objects or 100 seconds, whichever comes first; a run that copied
+-- its maximum and stopped must not read as a run that finished the job.
+--
+-- ⚠️ `unrecognised` COUNTS KEYS OUTSIDE THE <player_id>/<timestamp>.<ext> shape.
+-- They are still copied -- a backup that quietly declines to copy what it does
+-- not recognise has a hole in it shaped exactly like the thing nobody predicted.
+-- The count is so an unexpected shape is visible instead of silent.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.photo_backup_runs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  bucket text NOT NULL,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  finished_at timestamptz,
+  source_objects integer,
+  backup_objects integer,
+  copied integer NOT NULL DEFAULT 0,
+  failed integer NOT NULL DEFAULT 0,
+  unrecognised integer NOT NULL DEFAULT 0,
+  more_to_do boolean NOT NULL DEFAULT false,
+  error text
+);
+
+ALTER TABLE public.photo_backup_runs ADD CONSTRAINT photo_backup_runs_pkey PRIMARY KEY (id);
+
+CREATE INDEX photo_backup_runs_started_idx ON public.photo_backup_runs USING btree (started_at DESC);
+
+ALTER TABLE public.photo_backup_runs ENABLE ROW LEVEL SECURITY;
+
+-- ⚠️ NO FOREIGN KEY ANYWHERE ON THIS TABLE, deliberately. It records what a
+-- machine did, not what a member did; there is nobody to point at. It also means
+-- a run row survives every cascade in the schema, which is the point of a log.
+
+
 -- =====================================================================
 -- LOGICAL REPLICATION PUBLICATIONS  (new capture category, 13 Aug 2026)
 -- =====================================================================
