@@ -10,6 +10,42 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
+- `3d9b61f` — **The club went live, and three findings stopped being
+  theoretical.** `state-of-play.md` said *"Only Jay uses the app. No parent or
+  coach has been onboarded."* Measured the same afternoon: 16 auth users, 12
+  people across 3 squads, 9 players, **5 child photographs**, 3 calendar links,
+  3 super admins.
+  ⚠️ **The photos have no backup, the calendar links cannot be revoked, and the
+  flaky suite now guards a site real families use.** All three were written as
+  future problems that morning.
+  ⚠️ **Also corrected the audit's realtime finding, which was wrong**, and caught
+  a volunteer's real name being committed to a PUBLIC repo — `docs:check`
+  stopped it, and the line names the job instead.
+- **Realtime is turned ON — it had never worked, and the fix is the opposite of
+  the obvious one.** Migration written, **NOT YET APPLIED**:
+  `db/migrations/20260813_realtime_publication_events.sql`.
+  ⚠️ **`src/data/events.js` has subscribed to `postgres_changes` since the app was
+  built and never received a single message**, because `public.events` was not in
+  the `supabase_realtime` publication — measured, that publication held ZERO
+  tables. Two features silently did not work: Schedule/Dashboard auto-refresh and
+  the live availability list.
+  ⚠️ **NO CLIENT-SIDE FILTER, WHICH REVERSES THE ORIGINAL INSTRUCTION.** A
+  `team_id` filter reads as an optimisation and is a bug: `events` is replica
+  identity DEFAULT, so a DELETE carries the primary key only, the filter matches
+  nothing, and **a cancelled fixture stops disappearing from other people's
+  screens**. RLS already scopes delivery. ⚠️ **And do NOT raise replica identity to
+  FULL to make filters work** — Supabase does not apply RLS to deletes, so FULL
+  would broadcast opponent, venue and notes to every subscriber.
+  ⚠️ **A test now asserts the config carries no `filter` key**, and it was proved
+  by injecting the filter and watching it go red — along with removing the
+  debounce, and forgetting to cancel the pending fire on unsubscribe. Three
+  faults, three reds, one control.
+  400ms debounce added, because the callback is a full schedule refetch.
+  ⚠️ **SCOPE: `events` only.** `availability` is excluded deliberately — its
+  subscription ALREADY filters on `event_id` and it is also replica identity
+  DEFAULT, so switching it on would immediately have the same delete bug. **That
+  needs its own ruling rather than being buried in a fix.**
+
 - `dd80f48` — **⚠️ THE APP HAD BEEN TELLING WAITING PARENTS SOMETHING FALSE FOR FOUR DAYS.**
   `PendingApprovalBanner` in `src/components/AppShell.jsx` said *"Nobody is emailed
   automatically, so if nothing has changed in a few days, mention it to your coach or
