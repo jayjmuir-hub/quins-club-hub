@@ -104,9 +104,27 @@ begin
 
   -- ── 1c. No column grants anywhere else in `public` ───────────────────────
   --
-  -- These five are the only column-level grants in the schema. A new one is
-  -- not necessarily wrong, but it is invisible in every other file in
-  -- db/schema/ and must be recorded in grants.sql deliberately.
+  -- A new column grant is not necessarily wrong, but it is invisible in every
+  -- other file in db/schema/ and must be recorded in grants.sql deliberately.
+  --
+  -- ⚠️ THIS CHECK READ "these five are the only column-level grants in the
+  -- schema" AND WAS FALSE WITHIN HOURS OF BEING WRITTEN. `super_admin_and_rights`
+  -- added six on `memberships` on 10 Aug — the SAME DAY — then `social_ideas`
+  -- added four on 12 Aug and `memberships.title` a seventh on 13 Aug.
+  --
+  -- ⚠️ SO THIS HARNESS FAILED AGAINST LIVE FROM 10 TO 13 AUG 2026 AND NOBODY
+  -- SAW IT, because nobody ran it. Its header says "Parts 1 and 2 were run
+  -- against live and passed", which was true when written and is the whole
+  -- problem: **a check nobody runs is not a check, in exactly the way a check
+  -- that has never failed is not a check.** Found on 13 Aug by running it while
+  -- verifying an unrelated migration.
+  --
+  -- ⚠️ THE FAILURE WAS THE HARNESS BEING WRONG, NOT THE DATABASE. Every one of
+  -- the sixteen grants below is deliberate and recorded in db/schema/grants.sql.
+  -- Widening the expectation is therefore the correct fix — but note that it
+  -- makes THIS list the thing that now has to be kept current, and it will rot
+  -- the same way if a migration adds a column grant without touching it. That is
+  -- the intended cost: the check fails loudly rather than drifting quietly.
   select c.relname || '.' || att.attname
     into stray
   from pg_class c
@@ -115,14 +133,49 @@ begin
                        and att.attnum > 0 and not att.attisdropped
   where n.nspname = 'public'
     and att.attacl is not null
-    and not (c.relname = 'profiles'
-             and att.attname = any(expected))
+    and (c.relname || '.' || att.attname) <> all (array[
+      -- profiles — the login-identity ceiling. See section 3 of grants.sql.
+      'profiles.first_name', 'profiles.full_name', 'profiles.last_name',
+      'profiles.name_confirmed_at', 'profiles.phone',
+      -- memberships — the super-admin ceiling. `is_super` and `admin_rights`
+      -- are DELIBERATELY ABSENT: that absence is what stops an ordinary admin
+      -- promoting themselves. 20260810_super_admin_and_rights.sql.
+      'memberships.profile_id', 'memberships.club_id', 'memberships.team_id',
+      'memberships.player_id', 'memberships.role', 'memberships.status',
+      'memberships.title',
+      -- social_ideas — marking an idea must not rewrite the submitter's words.
+      'social_ideas.status', 'social_ideas.decision_note',
+      'social_ideas.decided_by', 'social_ideas.decided_at'
+    ])
   limit 1;
 
   if stray is not null then
     raise exception
       'GRANTS: column-level grant on %, which db/schema/grants.sql does not '
       'record. Re-capture it, or drop it.', stray;
+  end if;
+
+  -- ⚠️ AND THE OTHER DIRECTION, WHICH THE ORIGINAL DID NOT CHECK AT ALL. A
+  -- column grant DISAPPEARING is the failure that looks like an RLS bug and gets
+  -- debugged in policies.sql for an hour — 1b does this for `profiles` and
+  -- nothing did it for the other two.
+  if not has_column_privilege('authenticated', 'public.memberships', 'title', 'UPDATE') then
+    raise exception
+      'GRANTS: `authenticated` has LOST UPDATE on memberships.title. Saving a '
+      'job title will fail with something that looks exactly like an RLS '
+      'refusal. ⚠️ The fix is the COLUMN grant — never `grant update on '
+      'public.memberships to authenticated`, which hands every admin is_super.';
+  end if;
+  if has_column_privilege('authenticated', 'public.memberships', 'is_super', 'UPDATE') then
+    raise exception
+      'GRANTS: `authenticated` can UPDATE memberships.is_super. `memb manage` is '
+      'FOR ALL and admin-only, so this makes the super-admin tier decoration: '
+      'any admin can promote themselves. See db/schema/grants.sql section 4.';
+  end if;
+  if has_column_privilege('authenticated', 'public.memberships', 'admin_rights', 'UPDATE') then
+    raise exception
+      'GRANTS: `authenticated` can UPDATE memberships.admin_rights, bypassing '
+      'the set_admin_rights RPC.';
   end if;
 
   -- ── 1d. Every table in `public` must have RLS enabled ────────────────────

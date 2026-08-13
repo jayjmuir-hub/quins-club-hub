@@ -10,7 +10,82 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- ✅ **EVERY SQUAD AND WHO LOOKS AFTER IT — `/admin/staff` is live**, plus
+- **`npm run db:check` — the SQL harnesses finally have a way to be run.**
+  `scripts/db-check.mjs`, runbook `claude/runbooks/db-harnesses.md`, nightly job
+  `.github/workflows/db-check.yml`.
+  ⚠️ **THE FIX WAS FRICTION, NOT DISCIPLINE.** `db/tests/grants.sql` had been red
+  against live for three days because running the harnesses meant pasting
+  fourteen files into the Supabase SQL editor by hand, so it happened roughly
+  never. A prose warning in the file's own header did not help — it said "parts 1
+  and 2 were run against live and passed", which was true on the day and is
+  exactly what stopped anyone looking again.
+  ⚠️ **THE RUNNER ENFORCES THE ROLLBACK RATHER THAN TRUSTING IT.** It refuses any
+  harness containing `commit;`, or lacking `begin;`/`rollback;`, **before it
+  connects** — because several harnesses inject a real fault on production to
+  prove they are not vacuous, and one of them is "any club admin may rewrite any
+  member's login email". **Both refusals proved by planting a bad file.**
+  ⚠️ **THE NIGHTLY JOB IS INERT UNTIL THE SECRET EXISTS**, rather than failing
+  every night with a credential error everyone learns to ignore. **No
+  `pull_request` trigger, and that is a security decision** — this repo is
+  public, and `schedule`/`workflow_dispatch` are the only triggers a fork cannot
+  fire.
+  ⚠️ **NOT A REQUIRED CHECK AND MUST NOT BECOME ONE.** These assert against LIVE:
+  a red run means production drifted, not that the branch is bad.
+  ✅ **`db/tests/photo-backup.sql` closes a gap opened the same day** — those
+  grants had been verified as ad-hoc SQL in a chat session, which is once, by one
+  person, somewhere nobody can re-run. Verified against live including its
+  self-test, and the injected grant confirmed gone after the rollback.
+  ⚠️ **`pg` added as a devDependency** — the first for tooling rather than the
+  app. `psql` is not on jay-pc, and a runner Jay cannot run does not fix the
+  friction that caused this.
+
+- **The player photographs get a backup — WRITTEN, NOT RUNNING.** An append-only
+  mirror of `player-photos` into a private Cloudflare R2 bucket:
+  `supabase/functions/backup-player-photos/index.ts`,
+  `db/migrations/20260813_photo_backup.sql`, and the deploy/restore/drill
+  procedure in `claude/runbooks/player-photo-backup.md`.
+  ⛔ **NOTHING HAS RUN AND THE GAP IS NOT CLOSED.** No Cloudflare account, no
+  applied migration, no deployed function, no installed `pg_cron`, and **no
+  photograph has ever been copied or got back.** The ⛔ item in
+  `claude/state-of-play.md` stays open until the runbook's drill passes.
+  ⚠️ **APPEND-ONLY IS ENFORCED BY THE CODE HAVING NO WAY TO SAY "DELETE"**, not by
+  a flag — a mirror that faithfully replicates a deletion is no protection against
+  the most likely thing that will go wrong, which is a deletion. In this app a head
+  shot is destroyed by REPLACEMENT: a new timestamped key is written and the old
+  object removed, so the old key stays in R2 forever. **A test asserts no export
+  ever matches `/delete|prune|remove|sync/`**, proved by adding an
+  `objectsToDelete` and watching it go red.
+  ✅ **THE FIRST EDGE-FUNCTION LOGIC IN THIS REPO WITH ANY VITEST COVERAGE.**
+  `plan.ts` and `sigv4.ts` import nothing, so Deno and vitest both load them.
+  Signing is asserted against the SHA-256 of the empty string and RFC 4231's first
+  HMAC case — ⚠️ **fixed facts of the algorithms rather than a published signature
+  constant, which would only have been worth the accuracy of the number recalled.**
+  ⚠️ **`pg_cron` IS NOT INSTALLED on this project** (`installed_version` null,
+  measured), so the migration installs no extension and the schedule is a step in
+  the runbook.
+  ⚠️ **R2's TOKEN CAN DELETE.** Its presets are Object Read only or Object Read and
+  Write; there is no create-without-delete. Bucket versioning plus Object Lock is
+  the real control and is **not done**.
+  ✅ **The migration IS applied** — rehearsed first in a rolled-back transaction on
+  production, where the listing function returned the live object count and both
+  new objects were confirmed gone after the rollback. Captured into
+  `db/schema/tables.sql`, `functions.sql`, `policies.sql` and `grants.sql` in the
+  same commit.
+  ⚠️ **`photo_backup_runs` IS THE FIRST TABLE IN THIS SCHEMA WHERE `anon` HOLDS NO
+  PRIVILEGE AT ALL.** Every other table leans on RLS alone against Supabase's
+  default grant; here the default was revoked too.
+  ❌ **AND RUNNING THE VERIFICATION FOUND SOMETHING OLDER: `db/tests/grants.sql`
+  had been failing against live since 10 Aug and nobody had seen it, because
+  nobody had run it.** Its "these five are the only column-level grants" became
+  false the same day it was written. The database was right and the check was
+  wrong. Fixed, re-run green, and two assertions added that nothing had —
+  `memberships.title` must still be granted, `is_super` and `admin_rights` must
+  not be. ⚠️ **A check nobody runs is not a check, in the same way a check that
+  has never failed is not a check.**
+  ⚠️ **`db/schema/policies.sql`'s RLS list had also drifted** — `social_ideas` was
+  missing since 12 Aug. Re-measured against `pg_class`; nothing was exposed.
+
+- `22739ad` — ✅ **EVERY SQUAD AND WHO LOOKS AFTER IT — `/admin/staff` is live**, plus
   `memberships.title` so a coach can be a Head Coach.
   ⚠️ **BUILT IN THE OPPOSITE ORDER TO THE REQUEST, ON A MEASUREMENT.** Jay asked
   for age groups to see their coaches on the HOME screen. Measured first: twelve

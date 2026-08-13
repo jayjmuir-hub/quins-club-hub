@@ -110,10 +110,15 @@
 
 -- ── 2. TABLE-LEVEL GRANTS ──────────────────────────────────────────────────
 --
--- Fourteen tables in `public`. Every one of them grants all eight privileges
--- to all four of `anon`, `authenticated`, `postgres` and `service_role` —
--- which is exactly what the default privileges above produce — with ONE
--- exception, and the exception is the whole point of the file.
+-- Almost every table in `public` grants all eight privileges to all four of
+-- `anon`, `authenticated`, `postgres` and `service_role` — which is exactly what
+-- the default privileges above produce — with the exceptions listed below, and
+-- the exceptions are the whole point of the file.
+--
+-- ⚠️ THE COUNT THAT USED TO OPEN THIS PARAGRAPH SAID "FOURTEEN" AND WAS WRONG BY
+-- 12 Aug 2026, when league_teams and the three match-sheet tables landed. Removed
+-- rather than corrected: it is a number in a capture, and this repo has watched
+-- every one of those rot. The list below is the record; count it if you need one.
 --
 -- ⚠️ `attendance` (10 Aug) IS SECTION 1 PROVING ITSELF. Its migration writes no
 -- GRANT at all, and it arrived with all eight privileges for `anon` anyway. The
@@ -149,6 +154,24 @@
 --                     what keeps anon out: all three policies resolve through
 --                     private.can_edit_team, which tests auth.uid() against
 --                     memberships and cannot match a null uid.
+--   photo_backup_runs postgres, service_role                        ALL 8
+--   photo_backup_runs authenticated    ← SELECT ONLY
+--   photo_backup_runs anon             ← NOTHING AT ALL
+--                     ⚠️ ADDED 13 Aug 2026, and it is THE FIRST TABLE IN THIS
+--                     SCHEMA WHERE `anon` HOLDS NO PRIVILEGE. Every note above
+--                     says the `anon` row is Supabase's default rather than
+--                     intent, and leans on RLS to keep anon out. Here the
+--                     default was revoked as well, so RLS is not standing alone.
+--                     ⚠️ IF A RE-CAPTURE EVER SHOWS anon BACK ON THIS TABLE,
+--                     that is drift, not a version difference — the revoke is in
+--                     db/migrations/20260813_photo_backup.sql.
+--                     ⚠️ AND service_role STILL HAS ALL 8 INCLUDING DELETE. The
+--                     migration asks for SELECT, INSERT, UPDATE and comments
+--                     "no DELETE: a run row is a record of what happened" —
+--                     ⚠️ THAT COMMENT DESCRIBES THE GRANT, NOT THE OUTCOME.
+--                     Supabase's default privileges had already given
+--                     service_role everything, and a GRANT cannot take a
+--                     privilege away. Measured after applying, not assumed.
 --   pitch_requests    anon, authenticated, postgres, service_role   ALL 8
 --   pitches           anon, authenticated, postgres, service_role   ALL 8
 --   player_contacts   anon, authenticated, postgres, service_role   ALL 8

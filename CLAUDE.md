@@ -61,7 +61,8 @@ line elsewhere, it is stale — fix it, don't obey it.
 | `claude/specs/design-system.md`, `claude/specs/accessibility.md` | The visual and a11y contracts |
 | `claude/schema-history.md` | **The reasoning behind each migration**, which the SQL does not carry. Read the relevant section before changing a policy. Reference — do not trust its status lines |
 | `claude/runbooks/session-and-push.md` | How to start a session, and the summary push procedure. Read before you push |
-| `claude/runbooks/deploy.md`, `email-and-domain.md`, `first-admin.md`, `e2e-roles.md`, `scope-mail-send.md` | Operational procedures |
+| `claude/runbooks/db-harnesses.md` | **How to RUN `db/tests/`, and why it is safe against production.** `npm run db:check`. Read it before writing a harness or before believing one is green |
+| `claude/runbooks/deploy.md`, `email-and-domain.md`, `first-admin.md`, `e2e-roles.md`, `scope-mail-send.md`, `player-photo-backup.md`, `backup-restore-drill.md` | Operational procedures |
 | `claude/writing-to-github-from-claude.md` | The exact push route, and the ways it has failed |
 | `claude/archive/quins-v1-mvp.md` | The original implementation plan. History |
 | `claude/changelog.md` | What changed, when |

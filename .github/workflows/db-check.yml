@@ -1,0 +1,65 @@
+name: DB harnesses
+
+# The SQL harnesses in db/tests/, run against the live database on a schedule.
+#
+# ⚠️ WHY THIS EXISTS. On 13 Aug 2026 `db/tests/grants.sql` was found to have
+# been FAILING against live since 10 Aug — three days — because nobody had run
+# it. Running the harnesses meant opening the Supabase SQL editor and pasting
+# thirteen files by hand, so it happened roughly never. `claude/state-of-play.md`
+# records the lesson: a check nobody RUNS is not a check, in exactly the way a
+# check that has never FAILED is not a check.
+#
+# ⚠️ NOT A PULL-REQUEST GATE, AND THAT IS DELIBERATE. These assert against LIVE.
+# A red run means production drifted — not that the branch is bad — so as a
+# required check it would block every unrelated merge until somebody fixed the
+# database. It reports; it does not gate. `test` and `docs-check` are the gates.
+#
+# ⚠️ NO `pull_request` TRIGGER, AND THAT IS A SECURITY DECISION, NOT A
+# PREFERENCE. This repo is PUBLIC. `schedule` and `workflow_dispatch` can only
+# be fired from the repo itself, so a stranger's fork cannot reach the secret
+# below. Adding `pull_request` here would run this workflow — and expose the
+# database credential — on code somebody else wrote.
+
+on:
+  schedule:
+    # 03:20 UTC, a little after 07:00 in the UAE: after the nightly photo backup
+    # and before anyone is using the app. The minute is odd on purpose, so a
+    # coincidence in the logs is not one.
+    - cron: '20 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  db-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # ⚠️ --include=dev. `pg` is a devDependency, and an npm that believes
+      # NODE_ENV is production omits those silently.
+      - run: npm ci --include=dev
+
+      # ⚠️ INERT UNTIL THE SECRET EXISTS, ON PURPOSE. Without SUPABASE_DB_URL
+      # this workflow reports "not configured" and passes, rather than failing
+      # every night with a credential error that everybody learns to ignore. A
+      # red badge nobody believes is worse than no badge.
+      #
+      # Jay adds it: Settings -> Secrets and variables -> Actions -> New
+      # repository secret, named SUPABASE_DB_URL, value from Supabase ->
+      # Project Settings -> Database -> Connection string (URI).
+      # ⚠️ Claude never handles it. It is a credential and this repo is public.
+      - name: Run the harnesses
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::notice::SUPABASE_DB_URL is not set - the db harnesses did not run."
+            echo "Add the secret to turn this on. See claude/runbooks/db-harnesses.md"
+            exit 0
+          fi
+          npm run db:check
