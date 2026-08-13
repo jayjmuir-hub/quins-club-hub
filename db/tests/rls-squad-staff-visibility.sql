@@ -134,6 +134,63 @@ insert into _res select 8, 'anon can execute? (expect false)',
 
 select seq, stage, detail from _res order by seq;
 
+-- ══════════════════════════════════════════════════════════════════════════
+--  ⚠️ THE ASSERTIONS. The SELECT above is for a human; THIS is what fails.
+--
+--  `npm run db:check` throws on a SQL error and on nothing else, so until
+--  13 Aug 2026 a harness of this shape reported `ok` whatever the numbers
+--  were — nine files were in that state, this one included, hours after the
+--  runner was written. Every expectation below is now something the database
+--  acts on rather than something a reader is trusted to notice.
+-- ══════════════════════════════════════════════════════════════════════════
+do $$
+declare
+  _d text;
+begin
+  select detail into _d from _res where seq = 1;
+  if _d <> '0' then
+    raise exception 'FAIL: a PENDING member saw % staff rows, expected 0. can_see_team has probably been swapped for is_attached_to_team, which is status-blind.', _d;
+  end if;
+
+  select detail into _d from _res where seq = 2;
+  if _d not like '%Coach Ay%' or _d not like '%Head Coach%' or _d not like '%+971500000001%' then
+    raise exception 'FAIL: own-squad staff came back as "%" — expected the coach, their title and their phone. If the name is there and the phone is not, the RETURNS TABLE has been narrowed and the 13 Aug contact-details ruling has been undone.', _d;
+  end if;
+
+  select detail into _d from _res where seq = 3;
+  if _d <> '0' then
+    raise exception 'FAIL: LEAK — a member saw % staff row(s) for a squad they are not in.', _d;
+  end if;
+
+  select detail into _d from _res where seq = 4;
+  if _d <> '0' then
+    raise exception 'FAIL: a PENDING coach was listed (% rows). An unapproved volunteer''s phone number reached the squad.', _d;
+  end if;
+
+  select detail into _d from _res where seq = 5;
+  if _d <> '0' then
+    raise exception 'FAIL: the member could read a staff profiles row DIRECTLY (% rows). A policy on public.profiles has been widened and this function is no longer the boundary.', _d;
+  end if;
+
+  -- ⚠️ THE ONE THAT MAKES ALL THE ZEROES ABOVE MEAN SOMETHING.
+  select detail into _d from _res where seq = 6;
+  if _d <> '1' then
+    raise exception 'FAIL: the injected fault did not take — after joining squad B the member still saw % of that squad''s coaches, expected 1. Every zero above is now equally explained by "the function returns nothing to anybody", which is what a forgotten `set local role authenticated` produces. STOP: this run proved nothing.', _d;
+  end if;
+
+  select detail into _d from _res where seq = 7;
+  if _d <> 'team_id,membership_id,full_name,title,role,email,phone' then
+    raise exception 'FAIL: the function returns "%" — the column list is the security boundary. is_super and admin_rights are unreachable only because they are not named.', _d;
+  end if;
+
+  select detail into _d from _res where seq = 8;
+  if _d <> 'false' then
+    raise exception 'FAIL: anon can execute my_squad_staff(). `revoke ... from public` does not remove Supabase''s default-privileges grant to anon BY NAME — an explicit `revoke ... from anon` is required.';
+  end if;
+
+  raise notice 'SELF-TEST PASSED — all eight assertions held, including the injected fault at seq 6.';
+end $$;
+
 rollback;
 
 -- ══════════════════════════════════════════════════════════════════════════

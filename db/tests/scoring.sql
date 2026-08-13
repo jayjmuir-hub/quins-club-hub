@@ -39,6 +39,12 @@ begin;
 -- Reads public.teams rather than a literal list, so a squad renamed or added in
 -- the database shows up here rather than being quietly missed. `expected` is
 -- transcribed from src/lib/scoring.js — three thresholds, ≤11 / 12-13 / ≥14.
+-- ⚠️ MATERIALISED INTO A TEMP TABLE (13 Aug 2026) SO IT CAN BE ASSERTED. This
+-- was a bare SELECT whose `pass` column nobody ever read: `npm run db:check`
+-- discards result sets, so a `false` here reported `ok`. See the assertion
+-- block at the foot of this file, and scripts/db-check.mjs for the nine
+-- harnesses that were in this state.
+create temp table band on commit drop as
 select t.name,
        t.scoring_kinds as override,
        private.scoring_kinds_for_team(t.id) as actual,
@@ -85,6 +91,8 @@ select t.name,
        end as pass
 from public.teams t
 order by t.sort_order;
+
+select * from band;
 
 -- ── Part 2: the override, and the unknown band ─────────────────────────────
 create temp table probe (case_name text, expected text, result text);
@@ -202,6 +210,83 @@ begin
 end $$;
 
 select * from trig;
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  ⚠️ THE ASSERTIONS. All three parts printed their verdict and nothing read
+--  it — `npm run db:check` discards result sets, so this file reported `ok`
+--  with `pass = false` on screen. Added 13 Aug 2026; nine harnesses were in
+--  that state. See scripts/db-check.mjs.
+--
+--  ⚠️ THE VALUES BELOW ARE THIS FILE'S OWN EXPECTED FOOTER, encoded. Where the
+--  `expected` column holds prose ("29 / still 12") the assertion uses the value
+--  that prose describes ("29 / 12"), because `expected` was written to be read
+--  by a person and `result` is machine output — comparing the two columns
+--  directly would fail on wording, not on behaviour.
+-- ══════════════════════════════════════════════════════════════════════════
+do $$
+declare
+  _bad text;
+  _n int;
+begin
+  -- ── Part 1: SQL and src/lib/scoring.js must agree ───────────────────────
+  -- ⚠️ NULL IS NOT A FAILURE: it means "a squad this file has never heard of",
+  -- or one carrying an override that Part 2 covers. Only an outright false is
+  -- drift, and drift here means the form shows one total and the database
+  -- stores another — both plausible, neither flagged.
+  select string_agg(name || ' actual=' || coalesce(actual::text, 'null'), ' | ') into _bad
+    from band where pass is false;
+  if _bad is not null then
+    raise exception 'FAIL: private.scoring_kinds_for_team has drifted from src/lib/scoring.js for: %', _bad;
+  end if;
+
+  select count(*) into _n from band;
+  if _n = 0 then
+    raise exception 'FAIL: Part 1 examined no squads at all.';
+  end if;
+
+  -- ── Part 2: the override, and the unknown band ──────────────────────────
+  select string_agg(case_name || ' -> ' || result, ' | ') into _bad from probe
+   where (case_name = 'U10 with an override'            and result <> '{tries,conversions}')
+      or (case_name = 'U10 with an EMPTY override'      and result <> '{tries}')
+      or (case_name = 'a squad with no age in its name' and result <> '{tries,conversions,penalties,drops}')
+      or (case_name = 'U123 (three digits)'             and result <> '{tries,conversions,penalties,drops}');
+  if _bad is not null then
+    raise exception 'FAIL: the override / unknown-band rules are wrong: %', _bad;
+  end if;
+
+  -- ⚠️ AN EMPTY OVERRIDE MUST MEAN "use the band", NEVER "scores nothing", and
+  -- an unknown band FAILS OPEN — deliberately the opposite of allowsOwnContact.
+  -- The harm is asymmetric in opposite directions: there it is a twelve-year-
+  -- old's phone number, here it is a coach who cannot record a drop goal that
+  -- was kicked.
+
+  -- ── Part 3: the trigger, and the live-data guard ────────────────────────
+  select string_agg(case_name || ' -> ' || result, ' | ') into _bad from trig
+   where (case_name = 'hand-typed result, no components' and result <> '22 / 12')
+      or (case_name = 'unrelated edit to that fixture'   and result <> '22 / 12')
+      or (case_name = 'our components only (4t 3c 1p)'   and result <> '29 / 12')
+      or (case_name = 'same components, tries-only squad' and result <> '20')
+      or (case_name = 'components cleared'               and result <> '20')
+      or (case_name = 'opposition tries = 0'             and result <> '0');
+  if _bad is not null then
+    raise exception 'FAIL: the result trigger is wrong: %', _bad;
+  end if;
+
+  -- ⚠️ "unrelated edit to that fixture" IS THE ONE THAT DESTROYS LIVE DATA if
+  -- it regresses: an ordinary edit to a fixture with a hand-typed score and no
+  -- components must not recompute it to 0 / 0. A session did exactly that to a
+  -- real 22-12 on 12 Aug 2026.
+
+  -- ── Non-vacuity ─────────────────────────────────────────────────────────
+  -- ⚠️ WITHOUT THIS, A HARNESS THAT RECORDED NOTHING PASSES EVERY CHECK ABOVE,
+  -- because `string_agg` over zero rows is null and null is the pass signal.
+  if (select count(*) from probe) <> 4 or (select count(*) from trig) <> 6 then
+    raise exception 'FAIL: expected 4 probe rows and 6 trig rows, got % and %. The harness did not run everything it claims to.',
+      (select count(*) from probe), (select count(*) from trig);
+  end if;
+
+  raise notice 'SELF-TEST PASSED — % squads checked, 4 override cases, 6 trigger cases.', _n;
+end $$;
 
 rollback;
 

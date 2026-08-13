@@ -100,6 +100,75 @@ select state, players, contacts, events, avail,
        end as pass
 from results;
 
+-- ══════════════════════════════════════════════════════════════════════════
+--  ⚠️ THE ASSERTION. The SELECT above computes a `pass` column and NOTHING
+--  EVER READ IT.
+--
+--  Added 13 Aug 2026. `npm run db:check` throws on a SQL ERROR and on nothing
+--  else, and discarded every result set — so this file reported `ok` with
+--  `pass` sitting at false. The verdict was computed, printed, and compared to
+--  nothing. Nine of the fifteen harnesses were in that state.
+--
+--  ⚠️ THE ASSERTED CONDITIONS ARE NOT THE ONES IN THE `pass` COLUMN ABOVE, AND
+--  THE DIFFERENCE IS DELIBERATE — this file's own footer says why:
+--
+--    `events = 26` IS NOT ASSERTED. The footer: "events is 26 because that is
+--    the fixture at the time of writing. It is a COUNT and counts rot — every
+--    count in this project's history has." Pinning it would turn the nightly
+--    job red the next time anybody adds a fixture, which is the fastest way to
+--    teach everyone to ignore a red run. What matters is that a PENDING parent
+--    sees SOME events (fixtures are deliberately not sensitive) and exactly one
+--    PLAYER (their own child).
+--
+--    `players = 6` BECOMES `players > 1` for the same reason. Six is today's
+--    squad size. The invariant is that approving the membership makes the rest
+--    of the squad appear — i.e. more than the single own-child row visible
+--    while pending. That is what the test is about, and it survives a new
+--    player joining.
+--
+--  ⚠️ `players = 1` WHILE PENDING IS THE ONE THAT MUST STAY EXACT. It is the
+--  security claim: a pending parent sees their own child and no other child.
+-- ══════════════════════════════════════════════════════════════════════════
+do $$
+declare
+  _pending_players int;
+  _pending_events int;
+  _avail int;
+  _active_players int;
+begin
+  select players, events into _pending_players, _pending_events
+    from results where state = 'PENDING';
+  select avail into _avail
+    from results where state = 'PENDING + saved availability';
+  select players into _active_players
+    from results where state = 'ACTIVE';
+
+  if _pending_players is null or _active_players is null then
+    raise exception 'FAIL: the harness did not record all three states — nothing it claims to test was exercised.';
+  end if;
+
+  if _pending_players <> 1 then
+    raise exception 'FAIL: a PENDING parent saw % players, expected exactly 1 (their own child). Anything higher means every child on the squad is visible to somebody nobody has approved.', _pending_players;
+  end if;
+
+  if _pending_events = 0 then
+    raise exception 'FAIL: a PENDING parent saw 0 events. Fixtures are deliberately visible while pending — 20260808_membership_pending_status.sql: "a pending parent needs them to be worth signing in at all". Zero means `event read` has been narrowed to can_see_team.';
+  end if;
+
+  if _avail is distinct from 1 then
+    raise exception 'FAIL: the availability a PENDING parent saved read back as %, expected 1.', _avail;
+  end if;
+
+  -- ⚠️ THE NON-VACUITY ARM. If approving the membership changed nothing, every
+  -- assertion above is equally explained by "this person can see nothing at
+  -- all", which is what a lost `set local role authenticated` produces.
+  if _active_players <= 1 then
+    raise exception 'FAIL: after approval the parent saw % players, expected more than the 1 visible while pending. The pending assertions above are therefore meaningless — most likely the run is executing as postgres with RLS bypassed, or the status update did not take.', _active_players;
+  end if;
+
+  raise notice 'SELF-TEST PASSED — pending sees 1 player and % events; active sees % players.', _pending_events, _active_players;
+end $$;
+
 rollback;
 
 -- ══════════════════════════════════════════════════════════════════════════

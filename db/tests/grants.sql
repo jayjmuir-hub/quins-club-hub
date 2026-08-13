@@ -237,6 +237,96 @@ end
 $$;
 
 
+-- ── 3b. ⚠️ WHICH FUNCTIONS `anon` MAY EXECUTE ──────────────────────────────
+--
+-- Added 13 Aug 2026, after finding that TEN of the fourteen functions in
+-- `public` were executable by `anon` — including approve_membership and
+-- set_admin_rights, whose migrations grant only `authenticated`.
+--
+-- ⚠️ TWO INDEPENDENT GRANTS HAVE TO BE GONE, AND CHECKING EITHER ONE ALONE IS
+-- HOW THIS STAYED OPEN IN TWO DIFFERENT WAYS AT ONCE:
+--
+--   * Supabase ships `alter default privileges in schema public grant all on
+--     functions to anon, authenticated, service_role` — a grant to `anon` BY
+--     NAME, which `revoke ... from public` does not touch. That is the bug in
+--     the house pattern used by nine migrations.
+--   * Some functions ALSO carry a `PUBLIC` grant (`=X/postgres` in proacl), and
+--     `anon` inherits through it — so `revoke ... from anon` alone leaves them
+--     open too.
+--
+-- ⚠️ SO THIS ASSERTS `has_function_privilege`, THE EFFECTIVE ANSWER, and never
+-- the presence of a revoke in the migration text. Reading the SQL is precisely
+-- what produced the wrong belief for a fortnight.
+--
+-- ⛔ THE TWO ALLOWED ENTRIES ARE DELIBERATE AND MUST NOT BE "TIDIED":
+--
+--   calendar_events_for_token — the calendar feed. supabase/functions/calendar
+--     calls it with the publishable key on behalf of Google/Apple, which carry
+--     no session. ⚠️ netlify.toml records that a subscribed URL cannot be
+--     changed remotely, so revoking this breaks every subscribed feed in the
+--     club with no way to warn anyone and no way to repair it.
+--   register_my_player — granted `to authenticated, anon` explicitly by
+--     20260809_register_my_player_gender.sql and 20260811_self_registration.sql.
+create or replace function pg_temp.check_anon_execute() returns void language plpgsql as $$
+declare
+  _unexpected text;
+  _missing text;
+begin
+  select string_agg(p.proname, ', ' order by p.proname) into _unexpected
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prokind = 'f'
+     and has_function_privilege('anon', p.oid, 'execute')
+     and p.proname not in ('calendar_events_for_token', 'register_my_player');
+  if _unexpected is not null then
+    raise exception 'anon can EXECUTE functions it should not: %. A `revoke ... from public` in the migration does NOT remove Supabase''s named grant to anon, and a `revoke ... from anon` does not remove a PUBLIC grant. Both are required.', _unexpected;
+  end if;
+
+  -- ⚠️ THE OTHER DIRECTION, AND IT IS NOT DECORATION. A future session
+  -- "hardening" this by revoking the two allowed entries would take the
+  -- calendar feed off every parent's phone, permanently. This arm turns that
+  -- into a red harness instead of a silent outage nobody can undo.
+  select string_agg(name, ', ') into _missing from (
+    select 'calendar_events_for_token' as name
+     where not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                        where n.nspname='public' and p.proname='calendar_events_for_token'
+                          and has_function_privilege('anon', p.oid, 'execute'))
+    union all
+    select 'register_my_player'
+     where not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                        where n.nspname='public' and p.proname='register_my_player'
+                          and has_function_privilege('anon', p.oid, 'execute'))
+  ) t;
+  if _missing is not null then
+    raise exception 'anon has LOST execute on a function that needs it: %. calendar_events_for_token is the calendar feed and a subscribed URL cannot be repaired remotely.', _missing;
+  end if;
+end
+$$;
+
+select pg_temp.check_anon_execute();
+
+-- ⚠️ AND ITS OWN SELF-TEST, because a check that has never failed is not a
+-- check. Granting anon EXECUTE on one function must make the check above go
+-- red. GRANT is transactional, so this is undone by the rollback at the foot
+-- of this file — the same arrangement part 3 uses for UPDATE(email).
+grant execute on function public.my_squad_staff() to anon;
+
+do $$
+begin
+  begin
+    perform pg_temp.check_anon_execute();
+    raise exception 'SELF-TEST FAILED: check_anon_execute() passed while anon held EXECUTE on my_squad_staff. The assertion is vacuous.';
+  exception when others then
+    if sqlerrm like 'SELF-TEST FAILED%' then
+      raise;
+    end if;
+    raise notice 'SELF-TEST PASSED — the anon check caught it: %', sqlerrm;
+  end;
+end
+$$;
+
+revoke execute on function public.my_squad_staff() from anon;
+
+
 -- ── 4. Undo everything ─────────────────────────────────────────────────────
 -- ⚠️ NOT OPTIONAL. Part 3 really did grant UPDATE(email) on production. GRANT
 -- is transactional in Postgres, so this removes it — but only if it runs.

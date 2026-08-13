@@ -529,6 +529,29 @@ will propose building.**
   there is no staff bucket. `players.photo_path` is head shots of CHILDREN and
   must not be reached for.
 
+- ✅ **FIXED THE SAME DAY — ONLY TWO FUNCTIONS ARE ANON-EXECUTABLE NOW, BOTH
+  DELIBERATELY.** `db/migrations/20260813_revoke_anon_execute.sql`. **Ten of the
+  fourteen functions in `public` were reachable by `anon`; two are.**
+  ⚠️ **BOTH REVOKES ARE NEEDED AND NEITHER ALONE IS ENOUGH — the first attempt
+  fixed five of eight and it looked done.** A function can carry a named `anon`
+  grant (Supabase's default privileges) AND a `PUBLIC` grant (`=X/postgres`),
+  independently; `anon` inherits through PUBLIC. So `revoke … from public` alone
+  leaves the named grant, and `revoke … from anon` alone leaves PUBLIC. **The
+  only honest check is `has_function_privilege('anon', oid, 'execute')`** —
+  never a reading of the migration text, which is what produced the wrong belief
+  for a fortnight.
+  ⛔ **`calendar_events_for_token` AND `register_my_player` KEEP `anon` AND MUST
+  NOT BE "TIDIED".** The first is the calendar feed, called by Google/Apple with
+  no session; `netlify.toml` records that a subscribed URL cannot be changed
+  remotely, so revoking it breaks every subscribed feed in the club with no way
+  to warn anyone and no way to repair it. **`db/tests/grants.sql` §3b now fails
+  in BOTH directions** — if anything gains anon, and if either of those two
+  loses it.
+  ✅ **The calendar feed was smoke-tested live after the change: 200,
+  `content-type: text/calendar; charset=utf-8`, valid VCALENDAR.** The
+  content-type is the assertion that matters; the SPA catch-all answers any
+  unknown path with `index.html`, so a bare 200 proves nothing.
+
 - ⚠️ **`revoke execute … from public` DOES NOT KEEP `anon` OUT, AND NINE
   MIGRATIONS ARE WRITTEN AS THOUGH IT DOES.** Measured live 13 Aug 2026:
   `approve_membership`, `register_my_player`, `reset_my_calendar_token`,
@@ -635,6 +658,35 @@ will propose building.**
   distinguishes granted from not. Injecting the real fault would have meant
   granting self-promotion on production, which the harness's own header warns
   against doing through the MCP.
+  ❌ **AND `db:check` DID NOT FINISH THE JOB — NINE OF THE FIFTEEN HARNESSES
+  COULD NOT FAIL. Found 13 Aug 2026, hours after it was written.** The runner
+  threw on a SQL *error* and discarded every result set, so a harness whose
+  assertions are SELECTs (`select count(*) as leaked_expect_0`) reported `ok`
+  whatever number came back. The verdict was computed, printed, and compared to
+  nothing — in nine files, every one guarding an RLS boundary.
+  ⚠️ **THAT IS THE SAME BUG ONE LAYER UP.** The runner removed the friction that
+  stopped anyone RUNNING the checks and left most of them unable to report a
+  wrong answer. **A check that runs and cannot fail is not a check either.**
+  ✅ **FIXED: the runner now REFUSES a harness with no `raise exception`** (the
+  same shape as the existing begin/rollback gate, and proved by planting a file
+  and watching it stop), **and it prints every result row** so a number that is
+  technically within its assertion can still be spotted. All fifteen now carry
+  assertions, each proved to fire against an injected fault.
+  ❌ **AND `rls-can-edit-team-status.sql` WAS BROKEN THREE SEPARATE WAYS**, none
+  ever hit because nothing had run it: it inserted `profiles.club_id` (a column
+  that does not exist — instant 42703), it never granted its temp table to
+  `authenticated` (42501, which reads exactly like the RLS refusal it tests),
+  and it picked its subject squad with `order by sort_order limit 1` — **today
+  that is U6 Tag, zero players, zero events**, so every "expect 0" was trivially
+  true and its fault-injection arm could never flip. It now selects the squad
+  with the most data and **raises if no squad has both players and fixtures**,
+  rather than passing vacuously.
+  ⚠️ **THE TRANSFERABLE RULE: a harness must pick its subject by the property it
+  needs, never by an ordering that happens to have it today.** That file was not
+  always vacuous — its footer records `events 34` on 10 Aug. The seeded September
+  and the senior squads went, and the fixture moved out from under a hard-coded
+  choice with nothing to say so.
+
   ✅ **AND THE UNDERLYING CAUSE IS NOW FIXED, NOT JUST THE CHECK: `npm run
   db:check` RUNS THEM ALL.** `scripts/db-check.mjs`, runbook
   `claude/runbooks/db-harnesses.md`. The reason nobody ran them was that running

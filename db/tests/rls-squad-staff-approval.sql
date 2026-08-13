@@ -177,6 +177,74 @@ insert into probe select 'U16 coach','pending rows visible after approving',
 reset role;
 
 select * from probe;
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  ⚠️ THE ASSERTION. `select * from probe` was the whole verdict, and
+--  `npm run db:check` discards result sets — so this file reported `ok` no
+--  matter what the probe said. Added 13 Aug 2026; nine harnesses were in that
+--  state. See scripts/db-check.mjs.
+--
+--  ⚠️ MATCHED ON PATTERNS, NOT ON THE EXACT REFUSAL WORDING. The message is
+--  "You can only approve…", which is user-facing copy and may legitimately be
+--  reworded; asserting it verbatim would make a copy edit look like a security
+--  regression. What must not change is WHICH SIDE of the line each person
+--  falls on.
+-- ══════════════════════════════════════════════════════════════════════════
+do $$
+declare
+  _n int;
+  _bad text;
+begin
+  select count(*) into _n from probe;
+  if _n = 0 then
+    raise exception 'FAIL: the probe is empty — nothing this harness claims to test was exercised.';
+  end if;
+
+  -- 1. EVERYONE WHO MUST BE REFUSED. A coach of the wrong squad, a medic, and
+  --    a plain parent approving anybody — including themselves.
+  select string_agg(who || ' / ' || check_name || ' -> ' || result, ' | ') into _bad
+    from probe
+   where check_name like '%approve%'
+     and who in ('U18 coach', 'U16 medic', 'plain parent')
+     and result not like 'refused%';
+  if _bad is not null then
+    raise exception 'FAIL: somebody who must not approve was NOT refused: %', _bad;
+  end if;
+
+  -- 2. THE TABLE PATH MUST BE SHUT. This is the reason approve_membership is
+  --    an RPC at all: a coach writing `memberships` directly must affect zero
+  --    rows, or a squad coach can promote a member to admin.
+  select string_agg(who || ' -> ' || result, ' | ') into _bad
+    from probe
+   where check_name like '%promote a member%'
+     and result <> 'rows written: 0';
+  if _bad is not null then
+    raise exception 'FAIL: the direct-table promotion path is OPEN: %', _bad;
+  end if;
+
+  -- 3. NO PENDING ROW MAY REMAIN VISIBLE once approving is done.
+  select string_agg(who || ' -> ' || result, ' | ') into _bad
+    from probe
+   where check_name like '%pending%visible%'
+     and result <> '0';
+  if _bad is not null then
+    raise exception 'FAIL: pending membership rows still visible: %', _bad;
+  end if;
+
+  -- 4. ⚠️ THE NON-VACUITY ARM, AND WITHOUT IT EVERY CHECK ABOVE IS FREE.
+  --    A build that refused ABSOLUTELY EVERYONE would satisfy 1, 2 and 3. The
+  --    squad's own coach and manager MUST be able to approve their own squad.
+  select count(*) into _n
+    from probe
+   where check_name like '%approve own squad%'
+     and result like 'allowed%';
+  if _n < 2 then
+    raise exception 'FAIL: only % of the entitled approvals succeeded, expected the U16 coach AND the U16 manager. Every refusal asserted above is therefore equally explained by "nobody can approve anything", which is not the feature.', _n;
+  end if;
+
+  raise notice 'SELF-TEST PASSED — % probe rows; refusals held and % entitled approval(s) succeeded.', (select count(*) from probe), _n;
+end $$;
+
 rollback;
 
 -- ══════════════════════════════════════════════════════════════════════════

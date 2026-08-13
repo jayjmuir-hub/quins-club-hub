@@ -128,6 +128,40 @@ end $$;
 reset role;
 select * from _r order by step;
 
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  ⚠️ THE ASSERTION. The SELECT above is for a human to read; THIS is the
+--  thing that fails.
+--
+--  Added 13 Aug 2026. `npm run db:check` throws on a SQL ERROR and on nothing
+--  else, and it discarded every result set — so this harness reported `ok`
+--  whatever the PASS/FAIL column said. The verdict was computed, written down,
+--  and never compared to anything. NINE of the fifteen harnesses were in that
+--  state, hours after the runner was written to fix "a check nobody RUNS is not
+--  a check". A check that runs and cannot fail is not a check either.
+--
+--  The empty-table arm matters as much as the FAIL arm: a harness that recorded
+--  no steps at all has proved nothing, and would otherwise pass silently.
+-- ══════════════════════════════════════════════════════════════════════════
+do $$
+declare
+  _bad text;
+  _n int;
+begin
+  select count(*) into _n from _r;
+  if _n = 0 then
+    raise exception 'FAIL: this harness recorded NO steps — nothing it claims to test was actually exercised.';
+  end if;
+
+  select string_agg(step || ' -> ' || outcome, ' | ') into _bad
+    from _r where outcome like '%FAIL%';
+  if _bad is not null then
+    raise exception 'FAIL: %', _bad;
+  end if;
+
+  raise notice 'SELF-TEST PASSED — % step(s), none reported FAIL.', _n;
+end $$;
+
 rollback;
 
 -- ══════════════════════════════════════════════════════════════════════════
