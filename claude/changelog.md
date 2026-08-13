@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- ✅ **THE PLAYER PHOTOGRAPHS ARE BACKED UP — live, nightly, and verified.** The
+- **New app icon — the crest's bat on a harlequin field — and the maskable icons
+  are mask-safe for the first time.** The bat is traced from `src/assets/crest.png`
+  as Bézier curves rather than redrawn. ⚠️ **The old maskable files were not
+  maskable:** 9.6% of the crest sat outside the 80% safe circle, so Android's mask
+  clipped the shield shoulders and the top of the wordmark. Measured 0% outside
+  now. `src/assets/logo-mark.svg` is the same mark for the masthead; the five
+  screens that render `crest.png` are deliberately untouched, so only the installed
+  icon and the favicon change.
+
+- `c536656` — ✅ **THE PLAYER PHOTOGRAPHS ARE BACKED UP — live, nightly, and verified.** The
   only unrecoverable thing in the club now has a copy. Cloudflare R2 bucket
   `quins-player-photos` (APAC, private), edge function deployed with
   `verify_jwt: false`, `pg_cron` at 22:17 UTC.
