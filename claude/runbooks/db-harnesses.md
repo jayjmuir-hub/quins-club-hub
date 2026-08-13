@@ -73,7 +73,7 @@ The lines worth reading are the self-tests:
           SELF-TEST PASSED — the check caught it: GRANTS: `authenticated` can UPDATE …
 ```
 
-⚠️ **`SELF-TEST PASSED` is the important line, not `all checks passed`.** Every
+⚠️ **`SELF-TEST PASSED` is the important line, not `all checks passed`.** <!-- count-ok: a literal string the harnesses print, not a count; docs-check matches `tests? passed` --> Every
 assertion in these files is of the form "this privilege is absent", and a typo'd
 role or table name makes all of them vacuously true. The self-test injects the
 real fault and confirms the check catches it. **A file that prints only "all
