@@ -41,10 +41,41 @@ and verified NXDOMAIN against `8.8.8.8` with the `adhjrt.com` zone itself as a
 live control. Reasoning:
 `claude/decisions/2026-08-12-retire-app-alias.md`.
 
-**Only Jay uses the app.** No parent or coach has been onboarded. That makes almost
-any change cheap right now, and it will not stay that way.
+❌ **"ONLY JAY USES THE APP. NO PARENT OR COACH HAS BEEN ONBOARDED. THAT MAKES
+ALMOST ANY CHANGE CHEAP RIGHT NOW, AND IT WILL NOT STAY THAT WAY."**
+**IT DID NOT STAY THAT WAY. THE CLUB WENT LIVE ON 13 Aug 2026.**
 
-Current phase is post-v1 refinement driven by Jay using the app — not new
+⚠️ **REAL FAMILIES ARE IN THE APP.** Measured live that afternoon — do not cite
+these, re-run the queries in §Numbers:
+
+| | |
+|---|---|
+| Auth users | 16 |
+| People holding a membership | 12, across **3 squads** (U13 Mixed Contact, U16B Contact, U18B Contact) |
+| Players | 9 |
+| **Player photographs in storage** | **5** |
+| Calendar links issued | 3 |
+| Super admins | **3** |
+
+Coaches, team managers, a medic, parents and players — and `dd80f48` records
+Jay and the U18 team manager **both receiving an approval email**, so the
+registration → email → approval path has now run for real.
+
+⚠️ **THE SENTENCE THIS REPLACES WAS LOAD-BEARING FOR HOW CAUTIOUS EVERY SESSION
+WAS**, and it went stale in an afternoon while five onboarding PRs
+(`231b660`, `d7643b8`, `02e9a05`, `280f37b`, `dd80f48`) were merged by a
+parallel session. **A change is no longer cheap. Assume a real parent is
+looking at whatever you touch.**
+
+⚠️ **WHAT THIS CHANGES ABOUT THE 13 Aug AUDIT BACKLOG BELOW — three items
+stopped being theoretical the same afternoon:**
+
+- **The photos have no backup** and there are now **five real children's
+  photographs**. This is the one unrecoverable thing in the club.
+- **The calendar token cannot be revoked** and **three links are out**.
+- **The flaky test suite** now guards a site real families use.
+
+Current phase is onboarding and the fixes it is throwing up — not new
 infrastructure.
 
 ### As of 10 Aug 2026
@@ -509,8 +540,22 @@ Durable. Each cost real time to find.
   SUPER admin.** Any "a coach cannot see X" test using it is invalid. Use a
   purpose-made account. ⚠️ **Both of Jay's accounts are super**, on purpose: the flag
   can only be granted by an existing super admin, so a single super account is one
-  lost password away from needing SQL to recover. ⚠️ **It also means two accounts can
-  hand out club-wide authority**, so the backup is no longer merely a way back in.
+  lost password away from needing SQL to recover.
+  ❌ **"IT ALSO MEANS TWO ACCOUNTS CAN HAND OUT CLUB-WIDE AUTHORITY" — IT IS NO
+  LONGER TWO.** Measured 13 Aug 2026: there is a **third super admin, held by
+  somebody who is not Jay** — the volunteer who does **Social Media Management**.
+  ⚠️ **Super admin is the tier that can grant super admin**, so this is the count
+  a stale sentence understates most dangerously. **Do not write the number here —
+  the query is in §Numbers.**
+  ⚠️ **NAMED BY THE JOB, NOT THE PERSON, AND `docs:check` IS WHAT ENFORCED IT.**
+  The first draft of this line wrote the volunteer's name and the build went red
+  (`retired name … name the job, not the person`). The rule exists for the
+  jobs-not-people ruling of 12 Aug — but the stronger reason is that **this repo
+  is PUBLIC**, and a real volunteer's name in it is a disclosure the ruling
+  happens to prevent as a side effect. Keep it that way.
+  Recorded, not questioned: Jay has not been asked to confirm the third, and a
+  legitimate second person holding it is exactly what the "one lost password"
+  reasoning above argues for.
 - **`reynekeett@gmail.com` is a THIRD, LEGITIMATE admin — confirmed by Jay 10 Aug**
   after it was flagged as unrecognised. Ordinary admin, not super. Recorded so the
   next session does not raise it again as a stray.
@@ -918,6 +963,25 @@ union all select 'teams', count(*) from teams
 union all select 'events', count(*) from events
 union all select 'memberships', count(*) from memberships;
 
+-- ⚠️ HOW BUSY IS THE CLUB, AND HOW MUCH IS AT STAKE. Added 13 Aug 2026, the day
+-- the club went live and every "only Jay uses this" sentence in this file went
+-- stale at once. Run this before assuming a change is cheap.
+select 'auth users' k, count(*)::text v from auth.users
+union all select 'people with a membership', count(distinct profile_id)::text from memberships
+union all select 'squads with members', count(distinct team_id)::text from memberships where team_id is not null
+union all select 'pending, waiting on somebody', count(*)::text from memberships where status = 'pending'
+union all select 'SUPER ADMINS', count(*)::text from memberships where is_super
+-- ⛔ The unrecoverable one. Nothing backs this bucket up.
+union all select 'CHILD PHOTOGRAPHS (no backup)', count(*)::text from storage.objects where bucket_id = 'player-photos'
+-- Each of these is a permanent, unrevocable feed URL somebody holds.
+union all select 'calendar links issued', count(*)::text from calendar_tokens;
+
+-- ⚠️ IS REALTIME ACTUALLY CONNECTED? It was NOT, from some point before 13 Aug
+-- 2026: the publication existed and held zero tables, so `postgres_changes`
+-- delivered nothing and two features silently did not work. An empty result here
+-- means the app's live-update subscriptions are decorative.
+select tablename from pg_publication_tables where pubname = 'supabase_realtime';
+
 -- what is actually applied
 select version, name from supabase_migrations.schema_migrations order by version desc limit 20;
 
@@ -983,7 +1047,13 @@ below is **not started** unless it says otherwise.
   Storage is outside the backup entirely. ⚠️ **This is the one thing in the club
   that cannot be re-created** — a fixture can be re-entered and a child's
   photograph cannot be re-taken retrospectively. **No fix exists and none is
-  scheduled.** The cheap version is a periodic download of the `player-photos`
+  scheduled.**
+  ⛔ **AND IT STOPPED BEING HYPOTHETICAL ON 13 Aug: THERE ARE REAL CHILDREN'S
+  PHOTOGRAPHS IN THAT BUCKET NOW.** When this item was written the same morning
+  the bucket held one object and the club had one user, so "unrecoverable" was a
+  statement about a future. It is a statement about today. **Re-run the count
+  before quoting one — the query is in §Numbers — and treat this as the highest
+  item on the list regardless of what it returns.** The cheap version is a periodic download of the `player-photos`
   bucket to somewhere Jay owns; there is no in-app mechanism and
   `delete from storage.objects` raises `42501`, so it cannot be scripted in SQL
   either.
@@ -1115,10 +1185,43 @@ below is **not started** unless it says otherwise.
   membership, edited a child's contact details or granted super-admin.
   `events.created_by`, `availability.updated_by` and `attendance.recorded_by` are
   single overwritten columns, not history.
-- **The realtime `events` subscription has no filter** (`src/data/events.js`), so
+- ❌ **THE REALTIME FINDING WAS WRONG, AND THE TRUTH IS WORSE: REALTIME DELIVERS
+  NOTHING AT ALL.** This entry said the `events` subscription *"has no filter, so
   every connected client refetches its whole schedule on any event change anywhere
-  in the club. ⚠️ `src/data/availability.js` already scopes its channel per event —
-  copy that shape.
+  in the club"*, and recommended copying `availability.js`'s per-event channel.
+  ⚠️ **Measured 13 Aug 2026: the `supabase_realtime` publication contains ZERO
+  tables.** The only tables in any publication are Realtime's own internal
+  `messages_*` partitions, in a different one. Control: 21 tables in `public`, so
+  the query works and the database is not empty.
+  ⚠️ **Supabase's `postgres_changes` is fed by that publication. Neither `events`
+  nor `availability` is in it, so no change is ever emitted.** The clients
+  subscribe, the socket opens, and nothing arrives.
+  **So two features silently do not work**: Schedule and Dashboard do not
+  auto-refresh when a fixture changes, and the availability list does not update
+  while you watch it. ⚠️ **Nobody noticed because until 13 Aug there was one user
+  and never a second person changing anything.**
+  ⚠️ **`RESTORE.md`'s "realtime triggers a full refetch on any change in scope" is
+  false too**, and predates the audit.
+  ⚠️ **AND FILTERING IT WOULD HAVE BEEN THEATRE** — the fix everyone reaches for
+  first, applied to a subscription that receives nothing. **The lesson is the one
+  this repo keeps relearning: the code was read and the configuration feeding it
+  was not.**
+  ⚠️ **DO NOT ADD A CLIENT-SIDE `team_id` FILTER WHEN TURNING IT ON.** `event read`
+  is `is_attached_to_team(team_id)`, so **RLS is already the filter** and scopes
+  delivery per subscriber. A channel filter would add nothing and would BREAK
+  DELETES: `events` has `replica_identity = DEFAULT` (measured), so a delete
+  payload carries the primary key only, a `team_id` filter matches nothing, and a
+  cancelled fixture would stop disappearing from everyone else's screen.
+  ⚠️ **AND DO NOT RAISE REPLICA IDENTITY TO FULL to "fix" that.** Supabase does not
+  apply RLS to delete events, so a FULL identity would broadcast the whole row —
+  another squad's opponent, venue and notes — to every subscriber. DEFAULT keeps a
+  delete down to an id, which is all the callback needs: it ignores the payload
+  entirely and just re-reads.
+  **The fix is: add the tables to the publication, no client filter, and debounce
+  the refetch.** ⚠️ **Verify with TWO accounts in two browsers** — the
+  discriminating test is a change in a squad the second person is NOT in, which
+  must NOT reach them. If it does, RLS is not being applied to realtime and that
+  is a disclosure bug, not a missing feature.
 - **`saveParents` is delete-then-write**, so a failure between the two loses a
   child's parent records. ⚠️ **This is NOT the same as the deliberate two-call
   split for player contacts** recorded in `RESTORE.md` — there the reasoning is
