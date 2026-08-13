@@ -3,6 +3,8 @@ import { describe, it, expect } from 'vitest'
 import {
   decodeXmlEntities,
   isPlayerPhotoKey,
+  mismatchedEtags,
+  normaliseEtag,
   objectsToCopy,
   parseListObjectsV2,
 } from '../supabase/functions/backup-player-photos/plan.ts'
@@ -139,6 +141,86 @@ describe('parseListObjectsV2', () => {
   it('decodes an escaped key rather than corrupting it', () => {
     const result = parseListObjectsV2(listing('<Contents><Key>odd &amp; name/1.jpg</Key></Contents>'))
     expect(result.keys).toEqual(['odd & name/1.jpg'])
+  })
+})
+
+describe('mismatchedEtags — byte-identity, not a matching size', () => {
+  const A = `${ALEX}/1.jpg`
+  const B = `${SAM}/2.png`
+
+  it('says nothing when every backed-up copy has the source hash', () => {
+    expect(mismatchedEtags({ [A]: 'abc', [B]: 'def' }, { [A]: 'abc', [B]: 'def' })).toEqual([])
+  })
+
+  // ⚠️ THE POINT OF THE WHOLE FUNCTION. Two files of the same length are
+  // routinely different files — a truncated transfer, a re-encode, or the wrong
+  // object stored under the right key all preserve plausibility and change the
+  // hash. Sizes matching is what we could already see; this is what proves it.
+  it('flags a copy whose hash differs', () => {
+    expect(mismatchedEtags({ [A]: 'abc' }, { [A]: 'WRONG' })).toEqual([A])
+  })
+
+  it('ignores a key not backed up yet — that is work to do, not corruption', () => {
+    expect(mismatchedEtags({ [A]: 'abc', [B]: 'def' }, { [A]: 'abc' })).toEqual([])
+  })
+
+  // ⚠️ "COULD NOT CHECK" MUST NOT LOOK LIKE "CHECKED AND FINE". This is the same
+  // failure this whole feature exists to prevent, one level up: a green number
+  // that was never actually measured.
+  it('treats a MISSING source hash as a mismatch rather than a pass', () => {
+    expect(mismatchedEtags({ [A]: '' }, { [A]: 'abc' })).toEqual([A])
+  })
+
+  it('is deterministic in its ordering', () => {
+    expect(mismatchedEtags({ [B]: 'x', [A]: 'x' }, { [B]: 'no', [A]: 'no' })).toEqual([A, B].sort())
+  })
+})
+
+describe('normaliseEtag', () => {
+  // S3 wraps ETags in literal quotes; Supabase stores them quoted too. Comparing
+  // a quoted hash against an unquoted one fails for every single object, which
+  // would read as total corruption rather than as a formatting difference.
+  it('strips the quotes S3 wraps them in', () => {
+    expect(normaliseEtag('"c4d690e0b6df6539e5ce1c3947ba579d"')).toBe('c4d690e0b6df6539e5ce1c3947ba579d')
+  })
+
+  it('lower-cases and trims, so case alone is never a mismatch', () => {
+    expect(normaliseEtag('  "ABCDEF"  ')).toBe('abcdef')
+  })
+
+  it('maps absent values to the empty string', () => {
+    expect(normaliseEtag(null)).toBe('')
+    expect(normaliseEtag(undefined)).toBe('')
+  })
+})
+
+describe('parseListObjectsV2 — ETags are paired within their own Contents block', () => {
+  const listing = (inner) => `<ListBucketResult>${inner}</ListBucketResult>`
+
+  it('reads each key with its own ETag', () => {
+    const result = parseListObjectsV2(
+      listing(
+        '<Contents><Key>a/1.jpg</Key><ETag>&quot;aaa&quot;</ETag></Contents>' +
+          '<Contents><Key>b/2.jpg</Key><ETag>&quot;bbb&quot;</ETag></Contents>',
+      ),
+    )
+    expect(result.keys).toEqual(['a/1.jpg', 'b/2.jpg'])
+    expect(result.etags).toEqual({ 'a/1.jpg': 'aaa', 'b/2.jpg': 'bbb' })
+  })
+
+  // ⚠️ THE BUG THIS SHAPE EXISTS TO PREVENT. Sweeping all <Key> elements and all
+  // <ETag> elements separately and zipping by index pairs correctly until one
+  // entry lacks an ETag — after which every later photograph is checked against
+  // the WRONG object's hash, and the mismatches look like real corruption.
+  it('does not shift the pairing when an entry has no ETag', () => {
+    const result = parseListObjectsV2(
+      listing(
+        '<Contents><Key>a/1.jpg</Key></Contents>' +
+          '<Contents><Key>b/2.jpg</Key><ETag>&quot;bbb&quot;</ETag></Contents>',
+      ),
+    )
+    expect(result.etags['b/2.jpg']).toBe('bbb')
+    expect(result.etags['a/1.jpg']).toBeUndefined()
   })
 })
 

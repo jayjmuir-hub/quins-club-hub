@@ -1306,7 +1306,14 @@ CREATE TABLE public.photo_backup_runs (
   failed integer NOT NULL DEFAULT 0,
   unrecognised integer NOT NULL DEFAULT 0,
   more_to_do boolean NOT NULL DEFAULT false,
-  error text
+  error text,
+  -- ⚠️ THE ONLY COLUMN HERE WHOSE NON-ZERO VALUE IS A FAULT. `unrecognised` and
+  -- `more_to_do` are informational and `only_in_backup` is the feature working.
+  -- A mismatch means the R2 copy is NOT the Supabase object -- compared by MD5,
+  -- which both sides report as their ETag. The function counts "could not check"
+  -- as a mismatch, so "we did not verify" cannot read as "we verified and it was
+  -- fine". NULL means the run predates the column, not that it passed.
+  etag_mismatches integer
 );
 
 ALTER TABLE public.photo_backup_runs ADD CONSTRAINT photo_backup_runs_pkey PRIMARY KEY (id);

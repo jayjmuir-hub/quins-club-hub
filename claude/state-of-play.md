@@ -501,7 +501,40 @@ will propose building.**
   ⚠️ **A TITLE IS NEVER PERMISSION** — `can_edit_team` keys off `role`, and it
   must stay that way.
 
-- ⚠️ **THE PLAYER-PHOTO BACKUP IS WRITTEN AND PROTECTS NOTHING YET — 13 Aug 2026.**
+- ✅ **THE PLAYER PHOTOGRAPHS ARE BACKED UP — LIVE AND RUNNING NIGHTLY, 13 Aug
+  2026.** The entry below said "written and protects nothing yet" for about an
+  hour. Bucket `quins-player-photos` on Cloudflare R2 (APAC, private), function
+  deployed `verify_jwt: false`, `pg_cron` job at 22:17 UTC. **6 of 6 copied, zero
+  failed, five seconds**; a second run copied nothing.
+  ⚠️ **`pg_cron` IS NOW INSTALLED**, which this file previously recorded as absent
+  and as the reason a scheduled edge function was impossible here. That sentence
+  is retired.
+  ✅ **THE SCHEDULE WAS PROVED TO FIRE, NOT ASSUMED** — a temporary probe job at
+  `* * * * *` was watched reaching `succeeded` in `cron.job_run_details` with its
+  summary in `net._http_response`, then unscheduled. **A schedule that has never
+  fired is not a schedule**, the same rule this file states for uptime monitors.
+  ✅ **BYTE-IDENTITY IS PROVEN BY MD5, NOT INFERRED FROM SIZE** —
+  `etag_mismatches: 0` across all six. ⚠️ **And the zero is not vacuous**: all six
+  source rows carry an ETag and both sides deliver it QUOTED, so the
+  quote-stripping bug that a unit test caught pre-deploy would have produced six
+  mismatches rather than zero.
+  ✅ **APPEND-ONLY IS NOW ENFORCED BY R2 ITSELF** — bucket lock `retain-one-year`,
+  365 days, set while the bucket was empty so it binds every object. **This closes
+  the gap the plan recorded as unfixable in the credential**: R2 tokens are Object
+  Read only or Object Read AND Write, and write includes delete.
+  ⚠️ **THE COST IS REAL AND JAY CHOSE IT: a deletion request cannot be fully
+  honoured in the backup for up to a year.**
+  ❌ **NOBODY HAS EVER GOT A PHOTOGRAPH BACK. Copying is not restoring**, and the
+  drill's fourth requirement — somebody who did not build it following the restore
+  procedure — is outstanding. Precedent: the database drill, where the failure
+  everyone predicted did not happen.
+  ⚠️ **Two traps, both now in the runbook**: `R2_ACCOUNT_ID` set to the whole
+  endpoint URL rather than the account id (the function built a hostname out of a
+  hostname), and Supabase's **confirmation dialog** when replacing an existing
+  secret — miss it and the value silently does not save, which looks exactly like
+  the fix not working.
+
+- ~~⚠️ **THE PLAYER-PHOTO BACKUP IS WRITTEN AND PROTECTS NOTHING YET — 13 Aug 2026.**~~
   Plan `claude/plans/2026-08-13-player-photo-backup.md`, runbook
   `claude/runbooks/player-photo-backup.md`, function
   `supabase/functions/backup-player-photos/index.ts`, migration
@@ -1265,15 +1298,17 @@ below is **not started** unless it says otherwise.
   bucket to somewhere Jay owns; there is no in-app mechanism and
   `delete from storage.objects` raises `42501`, so it cannot be scripted in SQL
   either.
-  ⚠️ **A FIX IS NOW WRITTEN AND THIS ITEM IS STILL ⛔ — "no fix exists and none is
-  scheduled" became "a fix exists on disk and has never run", which is a smaller
-  change than it looks.** An append-only mirror into Cloudflare R2:
-  `claude/plans/2026-08-13-player-photo-backup.md` and
-  `claude/runbooks/player-photo-backup.md`. **Nothing has run — no account, no
-  deploy, no applied migration, no copied photograph.** Tick this off on the
-  runbook's §4 drill and on nothing else: this repo's own precedent is the database
-  drill, where the failure the audit AND the runbook both predicted did not happen,
-  and the useful outcome came from doing it rather than reasoning about it.
+  ✅ **AND AS OF 13 Aug 2026 THIS IS LARGELY CLOSED — the photographs ARE backed
+  up.** An append-only mirror into Cloudflare R2, running nightly, with a
+  one-year bucket lock that makes deletion impossible rather than merely
+  un-programmed. 6 of 6 copied, byte-identity proven by MD5.
+  `claude/runbooks/player-photo-backup.md`.
+  ❌ **IT IS NOT ⛔-CLOSED, AND THE REMAINING GAP IS THE IMPORTANT HALF: NOBODY
+  HAS EVER GOT A PHOTOGRAPH BACK.** Copying is not restoring. Tick this item off
+  on the runbook's §4 drill and on nothing else — the precedent is the database
+  drill, where the failure the audit AND the runbook both predicted did not
+  happen, and the useful outcome came from doing it rather than reasoning about
+  it.
 - **A recovery is not just a restore, and the extra steps are undocumented
   anywhere else**: redeploy all five edge functions ⚠️ **with `verify_jwt: false`,
   which cannot be encoded in this repo**, rebuild the auth settings, and repoint

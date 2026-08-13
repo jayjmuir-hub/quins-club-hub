@@ -2216,7 +2216,7 @@ REVOKE ALL ON FUNCTION private.notify_access_request() FROM authenticated;
 -- migration -- but WHETHER to mirror it is an open question in the plan, not a
 -- flag to flip.
 CREATE OR REPLACE FUNCTION public.photo_backup_list_objects(_bucket text, _after text DEFAULT ''::text, _limit integer DEFAULT 1000)
- RETURNS TABLE(name text, size bigint, updated_at timestamp with time zone)
+ RETURNS TABLE(name text, size bigint, updated_at timestamp with time zone, etag text)
  LANGUAGE sql
  STABLE
  SECURITY DEFINER
@@ -2224,7 +2224,8 @@ CREATE OR REPLACE FUNCTION public.photo_backup_list_objects(_bucket text, _after
 AS $function$
   select o.name,
          (o.metadata->>'size')::bigint,
-         o.updated_at
+         o.updated_at,
+         o.metadata->>'eTag'
   from storage.objects o
   where o.bucket_id = _bucket
     and o.name > _after
