@@ -213,6 +213,25 @@ CREATE TABLE public.profiles (
   -- `email` so that a column added later is not writable by default.
   -- Grants are not captured in this directory at all — if you audit this
   -- table, check pg_attribute ACLs, not just the policies.
+  --
+  -- Added 2026-08-13 (staff_photos). The object key of this person's own head
+  -- shot inside the PRIVATE `staff-photos` bucket, shape
+  -- `<profile_id>/<timestamp>.<ext>`. Feeds the Squad contacts card on Home.
+  --
+  -- ⚠️ DELIBERATELY **NOT** COLUMN-GRANTED, which is the opposite of the phone
+  -- above and the opposite of memberships.title. The allow-list described in
+  -- the paragraph above is exactly why: adding `photo_path` to it would make it
+  -- writable on any row the `profile update own` policy exposes, and this is a
+  -- column somebody writes about THEMSELVES rather than one an admin maintains.
+  -- The write goes through the SECURITY DEFINER RPC `public.set_my_photo()`,
+  -- which has a hard-coded SET list and refuses a key that does not live under
+  -- the caller's own id (42501).
+  --
+  -- ⚠️ SO A DIRECT `update profiles set photo_path = …` FAILS, and it fails
+  -- looking exactly like an RLS refusal. That is the trap this table's own
+  -- comment warns about two paragraphs up; it is now deliberate rather than
+  -- accidental.
+  photo_path        text,
   phone             text,
   CONSTRAINT profiles_pkey   PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE

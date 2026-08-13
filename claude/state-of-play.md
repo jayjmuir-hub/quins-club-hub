@@ -525,9 +525,37 @@ will propose building.**
   *listed* rather than that the squad has none — every one of those squads has
   real adults running it and what is missing is the data. **The prerequisite is
   an admin data task on `/admin/staff`, not code.**
-  ⚠️ **PHASE 4 (photos) IS NOT BUILT** — `profiles` has no photo column and
-  there is no staff bucket. `players.photo_path` is head shots of CHILDREN and
-  must not be reached for.
+  ✅ **PHASE 4 IS BUILT TOO — STAFF PHOTOS ARE LIVE.** `profiles.photo_path`, a
+  private `staff-photos` bucket, two storage policies, `public.set_my_photo()`,
+  and a "Your photo" card on `/more`. All four phases of that plan shipped in
+  one day.
+  ⚠️ **A SEPARATE BUCKET FROM `player-photos`, AND THAT IS A RULING.** That one
+  holds photographs of CHILDREN behind policies written around squad
+  membership. Nothing written for staff can widen it.
+  ⚠️ **THE WRITE RULE IS NARROWER THAN THE PLAYER ONE, DELIBERATELY: OWN PREFIX
+  ONLY.** A player photo may be uploaded by that child's coach, because a
+  nine-year-old cannot. A coach is an adult with their own login, so nobody else
+  picks the picture of your face that thirty families see.
+  ⚠️ **`FOR ALL` WITH BOTH `using` AND `with check` — the trap the plan named.**
+  An INSERT consults `with check` ALONE, so `using` on its own would let any
+  signed-in account create an object under somebody else's prefix.
+  ⚠️ **`private.can_see_staff_photo` MIRRORS `my_squad_staff()` AND MUST KEEP
+  MIRRORING IT.** The card draws the NAME from the function and the FACE from
+  the policy; if they drift a parent sees a photograph of somebody the app will
+  not name. Harness: `db/tests/rls-staff-photos.sql`, proved against an injected
+  fault and with a separate arm for the `status` rule.
+  ⚠️ **`profiles.photo_path` IS DELIBERATELY NOT COLUMN-GRANTED** — the opposite
+  of `memberships.title`. A column grant applies to the whole `authenticated`
+  role; this is written by the person themselves, through the SECURITY DEFINER
+  RPC, which also refuses a key that does not live under the caller's own id.
+  ⚠️ **`getMyProfile` IS A COLUMN LIST AND NEEDED `photo_path` ADDING.** Leave
+  it off and nothing breaks: `/more` renders the monogram forever and an upload
+  appears to succeed and then vanish on reload. Silent, and it looks like a
+  storage fault.
+  ❌ **NOBODY HAS UPLOADED ONE IN THE REAL APP.** The upload path is covered by
+  unit tests and the policies are proved live in SQL, but there is no `/more`
+  scenario in `harness/` and no photograph has gone through the real control in
+  a browser. **The first real upload is the test.**
 
 - ✅ **FIXED THE SAME DAY — ONLY TWO FUNCTIONS ARE ANON-EXECUTABLE NOW, BOTH
   DELIBERATELY.** `db/migrations/20260813_revoke_anon_execute.sql`. **Ten of the

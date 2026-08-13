@@ -794,6 +794,44 @@ CREATE POLICY "player photo write" ON storage.objects
 
 
 -- ---------------------------------------------------------------------
+-- storage.objects — bucket `staff-photos`  (2 policies, added 2026-08-13)
+--
+-- Head shots of the ADULTS who staff a squad. ⚠️ A SEPARATE BUCKET FROM
+-- `player-photos` ON PURPOSE: that one holds photographs of CHILDREN behind
+-- policies written around squad membership, and nothing written for staff
+-- should be able to widen it.
+--
+-- ⚠️ THE WRITE RULE IS NARROWER THAN THE PLAYER ONE, DELIBERATELY. A player
+-- photo may be uploaded by that child's COACH (`can_edit_team`), because a
+-- nine-year-old cannot do it. A coach is an adult with their own login, so
+-- here it is OWN PREFIX ONLY — nobody else picks the picture of your face
+-- that thirty families see.
+--
+-- ⚠️ `FOR ALL` WITH **BOTH** `USING` AND `WITH CHECK`, and the pair is the
+-- point. `USING` is tested against the row as it EXISTS and governs
+-- UPDATE/DELETE; `WITH CHECK` is tested against the row being WRITTEN and is
+-- the only one an INSERT consults. With `USING` alone, any signed-in account
+-- could create an object under somebody else's prefix — and that person's
+-- own photo would then be one a stranger put there. This is the trap
+-- 20260804_self_service_profile.sql records for the player bucket.
+--
+-- The READ rule mirrors public.my_squad_staff() and must keep mirroring it:
+-- the card draws a name from that function and a face from this policy, so if
+-- the two drift a parent sees a photograph of somebody the app will not name.
+-- Proved live against an injected fault: a member of another squad is refused,
+-- and the SAME query returns the photo once they join the squad.
+-- ---------------------------------------------------------------------
+CREATE POLICY "staff photo read" ON storage.objects
+  AS PERMISSIVE FOR SELECT TO authenticated
+  USING (((bucket_id = 'staff-photos'::text) AND private.can_see_staff_photo(private.staff_photo_owner(name))));
+
+CREATE POLICY "staff photo write" ON storage.objects
+  AS PERMISSIVE FOR ALL TO authenticated
+  USING (((bucket_id = 'staff-photos'::text) AND (private.staff_photo_owner(name) = auth.uid())))
+  WITH CHECK (((bucket_id = 'staff-photos'::text) AND (private.staff_photo_owner(name) = auth.uid())));
+
+
+-- ---------------------------------------------------------------------
 -- Consequence worth keeping in view — CORRECTED 2026-08-09.
 --
 -- THIS PARAGRAPH USED TO SAY: "every SELECT policy above bottoms out in a

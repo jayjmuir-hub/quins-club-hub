@@ -38,8 +38,31 @@ export async function listMySquadStaff() {
           role: 'coach',
           title: 'Head Coach',
           name: 'Rosa Ferreira',
-          email: 'rosa.ferreira.headcoach@adhquins-clubhub.com',
+          // ⚠️ LENGTHENED 13 Aug 2026, AND THE REASON IS A MEASUREMENT THAT
+          // WENT THE WRONG WAY. This was
+          // `rosa.ferreira.headcoach@adhquins-clubhub.com` (44 chars), chosen
+          // because an email has no spaces and is the only unbreakable word on
+          // this card. Before the avatar landed, removing `break-all` with that
+          // address pushed the document to 322px against a 320 viewport — so
+          // the fixture proved the guard.
+          //
+          // The 40px avatar plus its gap then took 52px out of the row, and
+          // the SAME address stopped overflowing at all with or without
+          // `break-all`: the fixture had quietly become vacuous, and the
+          // overflow check would have passed on a card with no guard at all.
+          // At 85 chars, removing `break-all` gives **521px against a 320
+          // viewport** — 201px of overflow. Measured, both ways.
+          email: 'rosa.ferreira.assistant.head.coach.and.welfare.officer.u13mixed@adhquins-clubhub.com',
           phone: '+971 50 123 4567',
+          photoPath: 'stub/rosa.jpg',
+          // ⚠️ A REAL RENDERABLE IMAGE, as a data URI. The harness never talks
+          // to Supabase, so a signed URL cannot be produced — and a bogus URL
+          // would 404, trip the component's onError and fall back to initials,
+          // which is exactly the state this entry exists to NOT be in. A 1x1
+          // PNG scaled by object-cover proves the <img> branch renders and is
+          // laid out, which is the only thing the harness can check here.
+          photoUrl:
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
         },
         {
           membershipId: 'stub-ms-2',
@@ -48,6 +71,10 @@ export async function listMySquadStaff() {
           name: 'Sam Okonkwo',
           email: null,
           phone: null,
+          // No photo — the monogram branch, which is every member of the club
+          // on the day this shipped.
+          photoPath: null,
+          photoUrl: null,
         },
       ],
     ],

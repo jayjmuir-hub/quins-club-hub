@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 // The member-facing Squad contacts block — phase 3 of
@@ -70,6 +70,8 @@ const COACH_ROSA = {
   name: 'Rosa Ferreira',
   email: 'rosa@example.com',
   phone: '+971500000001',
+  photoPath: 'p1/1.jpg',
+  photoUrl: 'https://example.invalid/signed/rosa.jpg',
 }
 const MEDIC_SAM = {
   membershipId: 'ms-2',
@@ -78,6 +80,8 @@ const MEDIC_SAM = {
   name: 'Sam Okonkwo',
   email: null,
   phone: null,
+  photoPath: null,
+  photoUrl: null,
 }
 
 function membershipValue(memberships, teams = TEAMS) {
@@ -158,6 +162,45 @@ describe('SquadStaffCard', () => {
     // number. An empty `tel:` link is a tappable control that does nothing.
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
     expect(screen.getByText('Sam Okonkwo')).toBeInTheDocument()
+  })
+
+  it('draws the face when there is one, with an empty alt', () => {
+    const { container } = render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA]} />,
+    )
+
+    const img = container.querySelector('img')
+    expect(img).toHaveAttribute('src', 'https://example.invalid/signed/rosa.jpg')
+    // ⚠️ EMPTY alt ON PURPOSE. The name is rendered immediately beside it, so
+    // "Photo of Rosa Ferreira" would make a screen reader say the name twice.
+    expect(img).toHaveAttribute('alt', '')
+  })
+
+  it('falls back to initials when there is no photo, and says nothing about it', () => {
+    const { container } = render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={[MEDIC_SAM]} />,
+    )
+
+    // ⚠️ THE NORMAL CASE, NOT AN ERROR STATE — nobody in the club had a photo
+    // on the day this shipped. "No photo", "could not sign" and "the image
+    // 404s" must render identically and none may announce itself.
+    expect(container.querySelector('img')).toBeNull()
+    expect(screen.getByText('SO')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('falls back to initials when a signed URL 404s mid-view', async () => {
+    const { container } = render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA]} />,
+    )
+
+    const img = container.querySelector('img')
+    // A signed URL expires. Firing the image's own error must not leave a
+    // broken-image frame where a volunteer's face should be.
+    fireEvent.error(img)
+
+    expect(container.querySelector('img')).toBeNull()
+    expect(screen.getByText('RF')).toBeInTheDocument()
   })
 
   it('says the staff are not LISTED, never that the squad has none', () => {

@@ -2322,8 +2322,14 @@ GRANT EXECUTE ON FUNCTION public.photo_backup_list_objects(text, text, integer) 
 -- records. Measured 13 Aug 2026: six other public RPCs are anon-executable and
 -- are safe only by their bodies. Harness:
 -- db/tests/rls-squad-staff-visibility.sql asserts this one is false.
+-- ⚠️ `photo_path` ADDED 13 Aug 2026 (20260813_staff_photos.sql), and adding it
+-- required a DROP: `create or replace` cannot change a RETURNS TABLE and fails
+-- with 42P13. **A dropped function loses every grant and comes back
+-- anon-executable** through Supabase's default privileges — see the anon note
+-- further up this file. The revokes below are restated for that reason, not out
+-- of tidiness.
 CREATE OR REPLACE FUNCTION public.my_squad_staff()
- RETURNS TABLE(team_id uuid, membership_id uuid, full_name text, title text, role text, email text, phone text)
+ RETURNS TABLE(team_id uuid, membership_id uuid, full_name text, title text, role text, email text, phone text, photo_path text)
  LANGUAGE sql
  STABLE
  SECURITY DEFINER
@@ -2336,7 +2342,8 @@ AS $function$
     m.title,
     m.role,
     p.email,
-    p.phone
+    p.phone,
+    p.photo_path
   from memberships m
   join profiles p on p.id = m.profile_id
   where m.role in ('coach', 'manager', 'medic')
@@ -2350,3 +2357,142 @@ $function$
 REVOKE ALL ON FUNCTION public.my_squad_staff() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.my_squad_staff() FROM anon;
 GRANT EXECUTE ON FUNCTION public.my_squad_staff() TO authenticated;
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  private.staff_photo_owner  (13 Aug 2026, 20260813_staff_photos.sql)
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- The profile id out of a `staff-photos` object key. The key shape
+-- `<profile_id>/<timestamp>.<ext>` IS the security boundary — a storage policy
+-- sees only a filename, so the first path segment is the identity.
+--
+-- ⚠️ NULL RATHER THAN AN ERROR ON A MALFORMED KEY, AND THAT IS THE FAIL-CLOSED
+-- CHOICE. A policy comparing NULL to auth.uid() yields NULL, which is not true,
+-- so a key in the wrong shape is refused. Raising instead would turn a bad
+-- filename into a 500.
+--
+-- ⚠️ `search_path` IS PINNED, AND THE THREE-WAY TEST ABOVE IS WHY. This is
+-- SECURITY INVOKER, IMMUTABLE and touches no table — the same shape as
+-- private.squad_expects_gender, which is deliberately NOT pinned. The
+-- difference is the one that decided private.social_idea_owner: **this is
+-- called from storage RLS policies, so it decides who may write.** A helper in
+-- that position gets pinned whatever its volatility markers say.
+CREATE OR REPLACE FUNCTION private.staff_photo_owner(_key text)
+ RETURNS uuid
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+  select nullif(split_part(_key, '/', 1), '')::uuid;
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.staff_photo_owner(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.staff_photo_owner(text) FROM anon;
+GRANT EXECUTE ON FUNCTION private.staff_photo_owner(text) TO authenticated;
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  private.can_see_staff_photo  (13 Aug 2026, 20260813_staff_photos.sql)
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- ⚠️ THIS MIRRORS public.my_squad_staff() AND MUST KEEP MIRRORING IT. The Squad
+-- contacts card draws a name and title through that function and the FACE
+-- through the `staff photo read` policy built on this. If the two rules drift, a
+-- parent sees a photograph of somebody whose name the app will not tell them,
+-- or the reverse.
+--
+-- Three arms, and each is load-bearing:
+--   * yourself — so the upload control on /more can show what you just
+--     uploaded before anybody else can see it;
+--   * an ACTIVE member of a squad that person ACTIVELY staffs — `status =
+--     'active'` on BOTH sides, the same as my_squad_staff(). A pending member
+--     has been approved by nobody; a pending coach is not yet this squad's
+--     coach;
+--   * an admin of the club — who can already read every profile row via
+--     `profile read club admin`, so this grants nothing new.
+CREATE OR REPLACE FUNCTION private.can_see_staff_photo(_profile uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select
+    _profile = auth.uid()
+    or private.shares_admin_club(_profile)
+    or exists (
+      select 1
+      from memberships staff
+      join memberships mine
+        on mine.team_id = staff.team_id
+       and mine.profile_id = auth.uid()
+       and mine.status = 'active'
+      where staff.profile_id = _profile
+        and staff.status = 'active'
+        and staff.role in ('coach', 'manager', 'medic')
+        and staff.team_id is not null
+    );
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.can_see_staff_photo(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.can_see_staff_photo(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION private.can_see_staff_photo(uuid) TO authenticated;
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  public.set_my_photo  (13 Aug 2026, 20260813_staff_photos.sql)
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- Records (or clears) the signed-in person's own head-shot key.
+--
+-- ⚠️ AN RPC RATHER THAN AN UPDATE POLICY, for the reason set_own_player_photo
+-- records: **RLS grants access to ROWS, not COLUMNS.** An owner-update policy on
+-- public.profiles would let a person write `email` — the mirror of their login
+-- address, which an admin reads when approving a stranger — as well as
+-- photo_path. This has a hard-coded SET list.
+--
+-- ⚠️ AND profiles.photo_path IS NOT COLUMN-GRANTED, so a direct
+-- `update profiles set photo_path = …` fails looking exactly like an RLS
+-- refusal. Deliberate. See tables.sql.
+--
+-- ⚠️ THE KEY-OWNERSHIP GUARD IS NOT BELT-AND-BRACES. Without it a person could
+-- point their profile at somebody ELSE'S object key: the storage policy would
+-- still refuse them the write, but my_squad_staff() would hand the key out and
+-- the READER's own permission would sign it — one volunteer's face appearing
+-- under another's name, with no policy violated anywhere.
+CREATE OR REPLACE FUNCTION public.set_my_photo(_photo_path text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  _saved text;
+begin
+  if _photo_path is not null
+     and private.staff_photo_owner(_photo_path) is distinct from auth.uid() then
+    raise exception 'A photo key must live under your own id.'
+      using errcode = '42501';
+  end if;
+
+  update profiles
+     set photo_path = _photo_path
+   where id = auth.uid()
+  returning photo_path into _saved;
+
+  if not found then
+    raise exception 'No profile for the signed-in user.' using errcode = 'P0002';
+  end if;
+
+  return _saved;
+end;
+$function$
+;
+
+-- proacl as captured: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+REVOKE ALL ON FUNCTION public.set_my_photo(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.set_my_photo(text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.set_my_photo(text) TO authenticated;
