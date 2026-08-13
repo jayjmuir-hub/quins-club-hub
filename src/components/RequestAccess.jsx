@@ -154,12 +154,24 @@ export default function RequestAccess({ userId, email, children }) {
     return (
       <Shell title="Request sent">
         {/* ⚠️ This used to say "We'll email <address> once someone has
-            approved it". THE APP SENDS NO SUCH EMAIL — the only mail it ever
-            sends is the sign-in link the person requests themselves, and
-            nobody is notified on approval in either direction (see
-            claude/state-of-play.md, "Nobody is emailed when an access request
-            arrives"). Promising a notification that never arrives is worse
-            than promising nothing: it tells someone to stop checking. */}
+            approved it". THE APP STILL SENDS NO SUCH EMAIL, and the copy below
+            is unchanged — but HALF THIS COMMENT WENT STALE and is corrected
+            here (13 Aug 2026).
+
+            What is still true: NOBODY IS EMAILED ON APPROVAL. Being let in is
+            something the person discovers by signing in, which is why the
+            wording below tells them exactly that and promises nothing.
+
+            What is NO LONGER true: this cited state-of-play's "Nobody is
+            emailed when an access request ARRIVES". That gap was closed on
+            12 Aug by db/migrations/20260812_access_request_notify.sql and the
+            `notify-access-request` function, which is ACTIVE on the live
+            project. The club IS told. The person asking still is not, which is
+            the only direction this paragraph speaks to.
+
+            The rule that outlives both: promising a notification that never
+            arrives is worse than promising nothing, because it tells someone to
+            stop checking. */}
         <p className="mt-2 text-center text-sm leading-relaxed text-ink-faint">
           Your request is with the club and someone will connect{' '}
           <strong className="text-ink">{email}</strong> to the right age groups.

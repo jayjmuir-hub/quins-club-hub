@@ -843,6 +843,30 @@ describe('A member waiting to be approved', () => {
     teams: TEAM_U13,
   }
 
+  // ⚠️ ADDED 13 Aug 2026, AND ITS ABSENCE IS WHY A FALSE SENTENCE SHIPPED FOR
+  // FOUR DAYS. The banner told every waiting parent "Nobody is emailed
+  // automatically, so… mention it to your coach or team manager." That was true
+  // when written and became false on 9 Aug, when
+  // db/migrations/20260809_notify_pending_membership.sql started emailing every
+  // coach, team manager and admin for the squad the moment a registration
+  // lands. The full suite stayed green throughout, because nothing asserted the
+  // wording — so the app spent four days sending parents to chase a club that
+  // had already been told.
+  //
+  // This is the anchor. It pins the CLAIM, not the prose: the banner must not
+  // tell somebody nobody was notified.
+  it('does not tell a waiting parent that nobody was emailed', async () => {
+    useMembershipsMock.mockReturnValue(shellState({ memberships: [PENDING_MEMBERSHIP] }))
+
+    renderShell()
+
+    const banner = await screen.findByTestId('pending-approval')
+    expect(banner).not.toHaveTextContent(/nobody is emailed/i)
+    expect(banner).not.toHaveTextContent(/no.{0,3}one is emailed/i)
+    // And says the opposite, which is what is actually true.
+    expect(banner).toHaveTextContent(/emailed when you registered/i)
+  })
+
   it('sees the waiting banner ABOVE the app, not instead of it', async () => {
     useMembershipsMock.mockReturnValue(shellState({ memberships: [PENDING_MEMBERSHIP] }))
 

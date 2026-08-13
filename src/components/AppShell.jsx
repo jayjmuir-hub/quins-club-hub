@@ -113,11 +113,25 @@ function ErrorState({ error, reload, children }) {
 // which is precisely what the design exists to avoid. See
 // db/migrations/20260808_membership_pending_status.sql.
 //
-// The last sentence is load-bearing and unglamorous: NOBODY IS EMAILED when
-// someone is waiting. That gap already existed for access requests and is
-// worse here, because with no seeded roster every parent queues. Telling
-// someone to sit tight when no notification will ever arrive is how a person
-// waits a fortnight for a screen nobody is looking at.
+// ⚠️ THIS COMMENT AND THE BANNER BELOW BOTH SAID "NOBODY IS EMAILED" UNTIL
+// 13 Aug 2026, AND IT HAD BEEN FALSE SINCE 9 AUG. That was true when written,
+// and `db/migrations/20260809_notify_pending_membership.sql` made it untrue
+// four days later: a trigger on the membership row emails every coach, team
+// manager and admin for that squad the moment a registration lands, via the
+// `notify-approval` edge function. Confirmed ACTIVE on the live project, and
+// confirmed by Jay receiving one — along with the U18 team manager — on 13 Aug.
+//
+// ⚠️ THE USER-FACING HALF WAS THE ACTUAL BUG. The banner told a waiting parent
+// that nobody had been notified and that they should go and chase a coach. The
+// coach had already been emailed. Sending people to chase a club that has
+// already been told is worse than saying nothing.
+//
+// ⚠️ IT STILL FAILS CLOSED AND SILENTLY. The trigger needs two Vault secrets
+// and a matching Edge Function secret; without them the function answers 503
+// and no mail is sent, deliberately, so that a misconfiguration can never fail
+// a registration. So the wording below stops short of promising delivery — the
+// SCREEN is the source of truth and the email is a prompt to go and look at it,
+// which is the migration's own phrasing.
 function PendingApprovalBanner() {
   return (
     <div
@@ -128,9 +142,10 @@ function PendingApprovalBanner() {
       <p className="text-[15px] font-extrabold text-ink">Waiting to be approved</p>
       <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">
         Your player is with the club. You can see their fixtures and set their
-        availability now — the rest of the squad appears once a club admin has
-        approved you. Nobody is emailed automatically, so if nothing has changed in
-        a few days, mention it to your coach or team manager.
+        availability now — the rest of the squad appears once a coach or admin has
+        approved you. Your squad&apos;s coaches and the club admins were emailed when
+        you registered, so somebody knows you&apos;re here. If nothing has changed
+        after a few days, it&apos;s worth a nudge.
       </p>
     </div>
   )

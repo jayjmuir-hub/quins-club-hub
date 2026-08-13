@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **The registration form requires a FAMILY name too, and deliberately breaks with the
+- **⚠️ THE APP HAD BEEN TELLING WAITING PARENTS SOMETHING FALSE FOR FOUR DAYS.**
+  `PendingApprovalBanner` in `src/components/AppShell.jsx` said *"Nobody is emailed
+  automatically, so if nothing has changed in a few days, mention it to your coach or
+  team manager."* That was **true when written and false from 9 Aug**, when
+  `db/migrations/20260809_notify_pending_membership.sql` put a trigger on the membership
+  row that emails every coach, team manager and admin for the squad via the
+  `notify-approval` function — **confirmed ACTIVE on the live project, and confirmed by
+  Jay and the U18 team manager both receiving one.** So the app was sending parents to
+  chase a club that had already been told. ⚠️ **Claude repeated the false claim back to
+  Jay as a "still open" gap, twice, having read it from the comment rather than measured
+  it** — the correction came from Jay: *"i do get the emails."* ⚠️ **NO TEST ASSERTED
+  THE SENTENCE**, which is exactly why a green suite carried it for four days; there is
+  now an anchor pinning the CLAIM rather than the prose, and **it was fault-injected by
+  restoring the old sentence and watching it fail.** `src/components/RequestAccess.jsx`'s
+  comment was half-stale in the same way and is corrected: the club IS now told when an
+  access request arrives (`20260812_access_request_notify.sql`), while **nobody is
+  emailed on APPROVAL** — still true, and the only direction that paragraph speaks to.
+  ⚠️ **The notification still fails CLOSED and silently** if its Vault secrets are
+  missing, so the new wording stops short of promising delivery.
+
+- `280f37b` — **The registration form requires a FAMILY name too, and deliberately breaks with the
   rest of the app to do it.** Jay: *"why would we only have them enter their first
   name?"* — a fair challenge, and the honest answer was that the field had been copied
   from an existing convention rather than thought about. ⚠️ **`NamePrompt`,
