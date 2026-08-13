@@ -344,10 +344,31 @@ will propose building.**
   anyone:** daily backups with 7-day retention now exist; the project no longer
   **pauses after 7 days idle**; storage went 1 GB → 100 GB; Supabase log retention
   went 1 day → 7 days.
-  ⚠️ **PRO GAVE A BACKUP MECHANISM AND NOT A RESTORE. Nobody has restored one, so
-  nothing is yet known to be recoverable** — the same distinction this file draws
-  everywhere else between a thing existing and a thing being measured. The drill is
-  `claude/runbooks/backup-restore-drill.md` and it is **NOT DONE**.
+  ✅ **AND THE RESTORE IS PROVEN — DRILLED 13 Aug 2026, SAME DAY.** This entry said
+  *"Pro gave a backup mechanism and not a restore… nothing is yet known to be
+  recoverable"*, which was true for about four hours. Restored the 12 Aug 18:05
+  backup into a throwaway project, checked it, deleted it within the hour.
+  ⚠️ **THE DISCRIMINATING CHECK, because "there were rows" proves nothing: the
+  restore contained SIX `Test Player` rows and live contains ZERO** — they were
+  deleted on 13 Aug, after the backup. That number cannot be produced by an empty
+  restore, a partial one, or by accidentally querying production.
+  `auth.users` 8 (live 9, one signup after the backup); policies/functions/RLS
+  tables 53/39/21, identical to live; `accept_invite`'s fifth guard intact; all
+  four vault secrets **decrypt**. Full numbers:
+  `claude/runbooks/backup-restore-drill.md`.
+  ❌ **THE PREDICTION WAS WRONG AND THAT IS THE POINT.** The audit and the runbook
+  both named `auth.users` as the thing most likely to fail. It restored cleanly.
+  **Sound reasoning, wrong answer — which is the entire argument for drilling
+  rather than reasoning.**
+  ⚠️ **"THE RESTORE WORKS" IS NARROWER THAN IT SOUNDS. NO PLAYER PHOTOGRAPH IS
+  RECOVERABLE** — storage objects are not in the backup at all, only the database's
+  metadata about them, so a restore yields every player record pointing at an image
+  that does not exist. **Neither are the five edge functions**, so a recovered club
+  has no calendar feed and no email until they are redeployed with
+  `verify_jwt: false`. See the runbook's §What does NOT come back.
+  ⚠️ **A BACKUP IS AS SENSITIVE AS THE LIVE DATABASE.** The vault secrets came back
+  DECRYPTABLE in a brand-new project, so anywhere a backup is stored or downloaded
+  holds the club's notification secret in readable form.
   ⚠️ **PITR IS A FURTHER PAID ADD-ON AND WAS DELIBERATELY NOT BOUGHT.** At 14 MB
   the worst case daily backups lose is one day of availability edits. Do not
   propose it again without a new reason.
@@ -928,9 +949,21 @@ state; trust the decisions for reasoning.**
 
 Ordered by what they cost to fix, not by how alarming they sound.
 
-- ⛔ **THE RESTORE HAS NEVER BEEN DONE.** Backups exist as of 13 Aug; recovery is
-  unproven. `claude/runbooks/backup-restore-drill.md`. **This is the only item
-  here whose failure is unrecoverable**, and it is 30 minutes of clicking.
+- ✅ **DONE — THE RESTORE IS DRILLED AND WORKS** (13 Aug, see above). This read
+  *"⛔ THE RESTORE HAS NEVER BEEN DONE… the only item here whose failure is
+  unrecoverable"* for four hours.
+- ⛔ **BUT THE PHOTOS ARE NOW THE UNRECOVERABLE ITEM, AND NOTHING COVERS THEM.**
+  Storage is outside the backup entirely. ⚠️ **This is the one thing in the club
+  that cannot be re-created** — a fixture can be re-entered and a child's
+  photograph cannot be re-taken retrospectively. **No fix exists and none is
+  scheduled.** The cheap version is a periodic download of the `player-photos`
+  bucket to somewhere Jay owns; there is no in-app mechanism and
+  `delete from storage.objects` raises `42501`, so it cannot be scripted in SQL
+  either.
+- **A recovery is not just a restore, and the extra steps are undocumented
+  anywhere else**: redeploy all five edge functions ⚠️ **with `verify_jwt: false`,
+  which cannot be encoded in this repo**, rebuild the auth settings, and repoint
+  `.env` and Netlify at the new project ref. Written up in the runbook.
 - **Leaked-password protection is still OFF**, measured 13 Aug, and the plan is no
   longer the reason. Supabase → Authentication → Policies. Two minutes.
 - ✅ **DONE 13 Aug — `events` NOW HAS `(team_id, starts_at)`, `(club_id, starts_at)`
