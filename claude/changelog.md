@@ -10,7 +10,42 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **A parent can register more than one child — the FORM was the limit, never the
+- **The approval queue can name the person it is asking about.** Plan:
+  `claude/plans/2026-08-13-registrant-name.md`. Reported by Jay watching a real
+  registration land with no name on it, and asking whether it was waiting on email
+  confirmation. ⚠️ **It was not, and the database rules that out outright** —
+  `register_my_player` refuses to run unless `email_confirmed_at` is set, so a queue row
+  cannot predate confirmation. **Measured on the live database instead:** profile
+  created 08:34:27, email confirmed 08:34:46, membership created 08:35:50, name
+  confirmed 08:38:33 — **a 2m 43s window in which an admin was asked to approve somebody
+  the screen could not name.** ⚠️ **THE ORDER WAS FORCED AND BACKWARDS.** `NamePrompt` is
+  the only thing that captures a person's own name and `src/components/AppShell.jsx`
+  mounts it inside the `ready` branch (`memberships.length > 0`) — and the membership is
+  ALSO what creates the queue row, so the row could not help but exist first. ⚠️ **And
+  NamePrompt is skippable, so the gap does not always close.** Fix: the registration form
+  now asks for the registrant's own name when `name_confirmed_at` is null, and writes it
+  **before** the first `register_my_player` call — the ORDER is the fix, and the tests
+  assert on call order rather than on the calls merely happening. Plus a fallback in
+  `src/screens/Accounts.jsx`, which rendered `Added by No name yet · deniro@example.com`
+  — a placeholder standing in front of the one fact identifying the person; the address
+  is now promoted into the name slot and not repeated. ⚠️ **NOT caused by the multi-child
+  change** — that commit touched neither `AppShell.jsx`, `NamePrompt` nor the queue.
+  ⚠️ **Fault-injected three ways, each reverted, all three reproduced:** skipping the name
+  write entirely → both "written BEFORE any child" tests fail on the missing call;
+  **relocating the name write to AFTER the children loop → both order assertions fail
+  while every other test stays green**, which is the one that matters, because that is
+  precisely the regression that would silently restore the race; and restoring the old
+  placeholder → the queue test fails printing the original string back verbatim,
+  `Added by No name yet · hannah@example.com`. ⚠️ **NOT verified live by Claude** — needs
+  a parent sign-in.
+
+- `6c4325f` — **A count on the approvals entry point — DESIGNED, NOT SHIPPED.**
+  `claude/plans/2026-08-13-approval-badge.md`, plus the SHA catch-up for `231b660`.
+  ⚠️ **`docs:check` does NOT validate paths inside `claude/plans/`** (`scripts/docs-check.mjs`
+  excludes it, because a plan may name files that do not exist yet), so that plan's paths
+  were checked by hand. (SHA added here by the next commit, per the one-behind rule.)
+
+- `231b660` — **A parent can register more than one child — the FORM was the limit, never the
   database.** Plan: `claude/plans/2026-08-13-multi-child-registration.md`. Jay: *"we
   need the ability for parents to add multiple children, up to 5, i thought we built
   that in"* — we had not. ⚠️ **The "5" that made it look built is the anti-abuse

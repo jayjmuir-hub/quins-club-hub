@@ -603,6 +603,106 @@ describe('Add your player — a signed-in account with no access', () => {
     })
   })
 
+  // ── The registrant's own name, at sign-up (13 Aug 2026) ────────────────
+  //
+  // ⚠️ THIS IS WHERE IT MATTERS MOST, because at sign-up the person has NO
+  // membership — and `NamePrompt`, the only other thing that captures a name,
+  // is mounted inside AppShell's `ready` branch, which requires
+  // `memberships.length > 0`. So before this field existed the order was forced
+  // and backwards: registering a child created the membership, the membership
+  // put the person in an admin's approval queue, and only THEN could the app
+  // ask their name. Measured live on 13 Aug: a 2m 43s window in which the queue
+  // showed a row it could not name — and NamePrompt is skippable, so the window
+  // does not always close.
+  describe('the registrant’s own name', () => {
+    function unnamed() {
+      getMyProfileMock.mockResolvedValue({
+        id: 'user-1',
+        full_name: null,
+        first_name: null,
+        last_name: null,
+        name_confirmed_at: null,
+        email: 'hannah@example.com',
+      })
+    }
+
+    it('is not asked for when the person has already given it', async () => {
+      renderShell()
+      // The default fixture carries name_confirmed_at.
+      expect(await screen.findByLabelText(/player's full name/i)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/your first name/i)).not.toBeInTheDocument()
+    })
+
+    it('is written BEFORE any child, so the queue row can never be nameless', async () => {
+      const user = userEvent.setup()
+      unnamed()
+
+      const order = []
+      updateProfileNamesMock.mockImplementation(async () => {
+        order.push('name')
+        return { id: 'user-1', first_name: 'Hannah', name_confirmed_at: '2026-08-13T00:00:00Z' }
+      })
+      registerMyPlayerMock.mockImplementation(async () => {
+        order.push('child')
+        return { id: 'mm-new', status: 'pending' }
+      })
+
+      renderShell()
+
+      await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
+      await user.type(screen.getByLabelText(/your family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalled())
+      expect(updateProfileNamesMock).toHaveBeenCalledWith({
+        profileId: 'user-1',
+        firstName: 'Hannah',
+        lastName: 'Okafor',
+      })
+      // ⚠️ THE ASSERTION THAT IS THE FIX. Reverse these two and the race is
+      // back exactly as it was.
+      expect(order).toEqual(['name', 'child'])
+    })
+
+    it('refuses to register anything while it is blank', async () => {
+      const user = userEvent.setup()
+      unnamed()
+      renderShell()
+
+      await user.type(await screen.findByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/your own first name/i)
+      expect(registerMyPlayerMock).not.toHaveBeenCalled()
+      expect(updateProfileNamesMock).not.toHaveBeenCalled()
+    })
+
+    // A family name is genuinely optional — plenty of people have one name,
+    // and the same rule already applies in NamePrompt and the You card.
+    it('accepts a first name alone', async () => {
+      const user = userEvent.setup()
+      unnamed()
+      renderShell()
+
+      await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
+      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      await waitFor(() =>
+        expect(updateProfileNamesMock).toHaveBeenCalledWith({
+          profileId: 'user-1',
+          firstName: 'Hannah',
+          lastName: '',
+        }),
+      )
+      await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalled())
+    })
+  })
+
   it('will not submit a blank name, and does not spend a round trip finding out', async () => {
     const user = userEvent.setup()
     renderShell()
@@ -897,6 +997,40 @@ describe('Accounts — the approval queue', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/your own age groups/i)
     expect(screen.getByTestId('pending-membership')).toBeInTheDocument()
+  })
+
+  // ⚠️ THE ROW CAN STILL ARRIVE NAMELESS, and the queue must stay usable when
+  // it does. The registration form now asks (see above), but somebody who
+  // signed up BEFORE 13 Aug 2026, or who reaches a membership by some other
+  // route, can still have a profile with no name. This used to render
+  // "Added by No name yet · deniro@example.com" — a placeholder standing in
+  // front of the one fact that identifies the person.
+  it('falls back to the email address when the registrant has no name yet', async () => {
+    listClubMembersMock.mockResolvedValue([
+      JAY_ADMIN,
+      { ...HANNAH_PENDING, profiles: { full_name: null, email: 'hannah@example.com' } },
+    ])
+    renderAccounts()
+
+    const card = within(await screen.findByTestId('pending-approvals')).getByTestId(
+      'pending-membership',
+    )
+    expect(card).toHaveTextContent(/added by hannah@example\.com/i)
+    expect(card).not.toHaveTextContent(/no name yet/i)
+    // ⚠️ ONCE, not twice. The address used to be printed again as its own
+    // segment, so promoting it into the name slot without this check would
+    // read "Added by hannah@example.com · hannah@example.com".
+    expect(card.textContent.match(/hannah@example\.com/g)).toHaveLength(1)
+  })
+
+  it('still prints the name AND the address when both are known', async () => {
+    renderAccounts()
+
+    const card = within(await screen.findByTestId('pending-approvals')).getByTestId(
+      'pending-membership',
+    )
+    expect(card).toHaveTextContent(/added by hannah okafor/i)
+    expect(card).toHaveTextContent(/hannah@example\.com/)
   })
 
   it('shows no queue at all when nobody is waiting', async () => {
