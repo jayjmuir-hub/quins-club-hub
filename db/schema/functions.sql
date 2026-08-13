@@ -824,9 +824,65 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO anon;  -- inert: an
 
 
 -- =====================================================================
+-- ⚠️ THE search_path RULE IS A THREE-WAY TEST, NOT "EVERY FUNCTION IS
+-- ⚠️ PINNED EXCEPT ONE". Written 13 Aug 2026 after the same advisor warning
+-- ⚠️ got three DIFFERENT correct answers in one day.
+--
+-- The line below used to read "Every one is `SET search_path` pinned EXCEPT
+-- private.squad_expects_gender", and a reader naturally took the exemption as
+-- a general precedent about harmless-looking helpers. It is not one. Applied
+-- as a blanket rule in either direction it is wrong both ways: pin everything
+-- and you break functions that legitimately need `public` on the path; exempt
+-- everything and you leave an access-control helper resolving names it should
+-- not.
+--
+-- ASK THREE QUESTIONS, IN THIS ORDER:
+--
+--   1. Is it SECURITY DEFINER?  → PIN IT. Not negotiable. A DEFINER function
+--      runs with the owner's rights, so name resolution is a privilege
+--      boundary. Every DEFINER function in both schemas is pinned.
+--
+--   2. Is it INVOKER, but does it DECIDE ACCESS or get called from an RLS
+--      POLICY or a TRIGGER?  → PIN IT ANYWAY. Volatility markers do not
+--      matter here; position does. Two examples, both from 13 Aug:
+--        · private.social_idea_owner — IMMUTABLE, touches no table, and its
+--          exemption note read WORD FOR WORD like squad_expects_gender's.
+--          Every fact in it was true and the conclusion was wrong, because it
+--          is called from three storage.objects policies and therefore decides
+--          who may write into a bucket.
+--        · private.events_result_from_components — a TRIGGER on public.events
+--          whose whole job is that a tampered request cannot produce a score
+--          contradicting its components.
+--
+--   3. Is it INVOKER, touches no table, calls nothing, and decides nothing?
+--      → RECORDING IT IS ENOUGH. private.squad_expects_gender is the only
+--      function here that reaches this branch: it takes a string, calls
+--      lower()/btrim() and the `~` operator, all pg_catalog, and returns a
+--      word. There is nothing for a search_path to redirect.
+--
+-- ⚠️ AND PIN IT TO THE RIGHT VALUE, WHICH IS THE STEP THAT BITES. `''` is
+-- correct only for a function that resolves nothing outside pg_catalog
+-- (social_idea_owner). Anything reading `public` tables or calling into
+-- `private` needs `'public, pg_temp'`. **Match the function's own siblings,
+-- not whichever fix happened to be made last** — copying an empty path onto a
+-- trigger that reads public.events breaks it at the first fire.
+--
+-- ⚠️ A CHANGED ADVISOR LIST IS NOT EVIDENCE THE DATABASE CHANGED. On 13 Aug
+-- events_result_from_components appeared in a security-advisor run hours after
+-- an earlier run that omitted it, which read as an unannounced production
+-- change. It was not: the function had been unpinned since 12 Aug and repo and
+-- live matched exactly. The advisor runs on its own schedule. **Diff the repo
+-- against live before believing a new warning means new drift.**
+-- =====================================================================
+--
 -- Complete inventory as captured on 2026-08-09 — 29 functions.
 --
--- Every one is `SET search_path` pinned EXCEPT private.squad_expects_gender.
+-- ⚠️ THIS LINE IS A 9 AUG MEASUREMENT AND HAS ROTTED TWICE SINCE.
+-- It read "Every one is `SET search_path` pinned EXCEPT
+-- private.squad_expects_gender". Two functions added later were also unpinned
+-- — private.social_idea_owner (12 Aug) and
+-- private.events_result_from_components (12 Aug) — and both were pinned on
+-- 13 Aug. Count nothing from this list; run the query in README.md.
 --
 -- The 18 present since the 2026-08-03 capture:
 --   public.accept_invite(uuid)                  SECURITY DEFINER, VOLATILE
