@@ -957,9 +957,24 @@ state; trust the decisions for reasoning.**
 
 ## Open, not blocking
 
-### ⚠️ Opened by the 13 Aug 2026 audit — none of these is started
+### ⚠️ Opened by the 13 Aug 2026 audit
 
-Ordered by what they cost to fix, not by how alarming they sound.
+**THIS LIST IS THE AUDIT.** The report itself was a session artefact and was
+deliberately never committed — it is a dated verdict and would rot like every
+other one here. ⚠️ **So this section is the ONLY surviving record of what the
+audit found, and an item deleted from here is a finding that ceases to exist.**
+Tick things off by striking them through with the evidence, never by removing
+the line.
+
+⚠️ **FOUR ITEMS WERE MISSING FROM THIS LIST UNTIL LATE ON 13 Aug**, because the
+first transplant from the report was done from memory rather than by walking
+the report end to end: the calendar-token item, dependency scanning, CSP and
+the repo-hygiene one. They were found by grepping this file for each finding in
+turn and counting the hits — four came back **zero**. **Do the same before
+claiming this list is complete.**
+
+Ordered by what they cost to fix, not by how alarming they sound. Everything
+below is **not started** unless it says otherwise.
 
 - ✅ **DONE — THE RESTORE IS DRILLED AND WORKS** (13 Aug, see above). This read
   *"⛔ THE RESTORE HAS NEVER BEEN DONE… the only item here whose failure is
@@ -1073,6 +1088,29 @@ Ordered by what they cost to fix, not by how alarming they sound.
 - **There is no monitoring, no alerting and no error tracking.** Detection today is
   somebody telling Jay. ⚠️ **Pro's 7-day logs help you INVESTIGATE and tell you
   nothing** — Log Drains are a Team-plan feature.
+  **Two concrete first steps, both free and both needing Jay** (they are account
+  creations, which Claude does not do): an uptime monitor on `/` **and** on
+  `/calendar.ics`, and Sentry's free tier wired into `ErrorBoundary`'s
+  `componentDidCatch`, which is the one place already built for it.
+  ⚠️ **THE `/calendar.ics` CHECK MUST ASSERT `content-type: text/calendar`, NOT
+  A 200.** The SPA catch-all answers any unknown path with `index.html`, so a
+  200 there is worth nothing — the same trap `RESTORE.md` records for the feed.
+  ⚠️ **And an uptime monitor that has never fired is not a monitor.** Pause the
+  Netlify site deliberately once and confirm the email arrives.
+- **The whole app is one JavaScript chunk, and every parent downloads all of
+  it.** Measured 13 Aug on a production build: **835 KB JS (228 KB gzipped),
+  464 KB CSS (95 KB gzipped), `dist/` 5.7 MB total**, with exactly ONE dynamic
+  import in the codebase (`html2canvas` in `MatchSheet.jsx`, correctly lazy).
+  ⚠️ **Do not re-cite those numbers — re-measure.** They are a dated
+  measurement and this file's own rule applies.
+  **Two fixes, biggest first:** (1) `flag-icons` is imported whole for a phone
+  country picker and is most of the 464 KB CSS plus ~3 MB of SVGs — import only
+  the countries `PhoneInput` offers, or drop to two-letter codes. (2) route-level
+  `React.lazy` on `AdminDashboard`, `MatchSheet`, `PlayerImport` and `Allocation`
+  — the admin half is used by three people and shipped to everyone.
+  ⚠️ **`tests/pwa-build.test.js` and `tests/button-sweep.test.js` READ `dist/`**,
+  so splitting the bundle changes the filenames they glob for. Run
+  `npm run build && npm test`, never `npm test` alone, when touching this.
 - **There is no audit log.** Nothing records who deleted a player, revoked a
   membership, edited a child's contact details or granted super-admin.
   `events.created_by`, `availability.updated_by` and `attendance.recorded_by` are
@@ -1086,6 +1124,43 @@ Ordered by what they cost to fix, not by how alarming they sound.
   split for player contacts** recorded in `RESTORE.md` — there the reasoning is
   that a partial failure surfaces distinctly. Here the first call is a DELETE, and
   a partial failure surfaces as missing data.
+
+- ⚠️ **THE CALENDAR TOKEN IS AN UNREVOCABLE, NON-EXPIRING CREDENTIAL IN A URL,
+  AND NOBODY CAN SEE IF ONE HAS LEAKED.** `reset_my_calendar_token()` is the only
+  revocation, it is self-service only, and it silently breaks the legitimate
+  subscription at the same time. There is no `last_used_at`, no hit count, and no
+  admin-side reset. ⚠️ **`netlify.toml` already records that a subscribed URL
+  cannot be changed remotely** — once it is in someone's Google account it is
+  there for good.
+  ⚠️ **The realistic leak is a parent pasting "here's the calendar link" into a
+  squad WhatsApp group**, which the app's own wording invites. Anyone in that
+  group then holds a permanent feed of where a named group of children will be,
+  and when. Low data sensitivity — fixtures are not secret — but it is the
+  safeguarding shape that makes it worth naming.
+  ⚠️ **DO NOT ADD AN EXPIRY.** A feed that dies on a timer produces a club-wide
+  "my calendar stopped working" with no way to warn anyone, which is the exact
+  failure `netlify.toml` was written to prevent. The cheap fix is
+  **visibility**: record `last_used_at` on `calendar_tokens`, show it on the
+  subscribe screen, add an admin-side reset, and say plainly that the link works
+  without a password.
+- **Nothing scans the dependencies.** No Dependabot config, no `npm audit` step
+  in either workflow. ⚠️ **Measured 13 Aug: `react-router-dom` carries two
+  moderate advisories** — an open redirect via backslash, and constructor
+  injection in SSR hydration. **Neither is exploitable here**: `safeNext()` in
+  `AuthConfirm.jsx` independently blocks `//host` and `/\host`, and this app is
+  not server-rendered. Recorded so the next session does not re-panic at the
+  same `npm audit` output. Fix is 15 minutes: `dependabot.yml` plus
+  `npm audit --audit-level=high` in `test.yml`.
+- **CSP is `frame-ancestors 'none'` and nothing else.** No `connect-src`, no
+  `script-src`, no `style-src`. ⚠️ **`netlify.toml` already explains why, and the
+  reasoning is right** — a wrong `connect-src` breaks the app SILENTLY for anyone
+  whose service worker has cached a page. It stays on this list because it is the
+  **only thing that would contain a compromised npm dependency**, and this app
+  has no dependency scanning either (above). Do `connect-src` first, and test it
+  against a browser that already has a service worker registered.
+- **No `LICENSE` and no `SECURITY.md`** on a public repo that runs children's-data
+  infrastructure. Fifteen minutes, and the absence of a security contact is an
+  odd signal on a repo anyone can read.
 
 - ~~**The dashboard stat band** — the loudest element on the screen carrying the
   weakest data. **The fortnight strip** renders empty cells above the fold when
