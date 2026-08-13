@@ -10,6 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
+- ✅ **EVERY SQUAD AND WHO LOOKS AFTER IT — `/admin/staff` is live**, plus
+  `memberships.title` so a coach can be a Head Coach.
+  ⚠️ **BUILT IN THE OPPOSITE ORDER TO THE REQUEST, ON A MEASUREMENT.** Jay asked
+  for age groups to see their coaches on the HOME screen. Measured first: twelve
+  of fifteen squads had no coach, manager or medic attached at all — so the
+  member-facing card would have shipped empty to 80% of the club with no way to
+  see why. The admin directory needs no migration for its reads, no RLS change
+  and no photos, and it is the only view that surfaces the missing data the rest
+  of the feature depends on. The Home card is still phase 3.
+  ⚠️ **THE COLUMN NEEDED ITS OWN GRANT, AND THE OBVIOUS FIX IS A SECURITY HOLE.**
+  `authenticated` has no table-level UPDATE on `memberships` — it holds
+  column-level UPDATE on six columns, with `is_super` and `admin_rights`
+  deliberately excluded. `title` is the first column added since that became
+  true, so it was unwritable until granted explicitly, and the failure reads
+  exactly like an RLS refusal. **`grant update on memberships to authenticated`
+  would fix the symptom and hand every admin the ability to self-promote to
+  super admin.**
+  ⚠️ **NO CHECK CONSTRAINT ON THE TITLE**, the same ruling `admin_rights`
+  carries: a constraint means a migration per job title, for a value that labels
+  a person and grants nothing. ⚠️ **And a title is NEVER permission** —
+  `can_edit_team` keys off `role`.
+  ⚠️ **TWO QUERIES AND A CLIENT-SIDE JOIN, NOT ONE EMBEDDED READ** — a
+  deliberate retreat. The tidy version depends on PostgREST keeping a parent row
+  when an embedded filter matches nothing; if that assumption were wrong the
+  twelve empty squads would vanish, which is the one thing the screen exists to
+  show, and it would read as "no gaps" rather than as a bug.
+  ⚠️ **NOBODY IS ATTACHED TO A SQUAD FROM THIS SCREEN**, deliberately — the
+  grant flow lives in the 1,612-line `Accounts.jsx` that the accounts redesign
+  also wants to change, and pulling it in would collide with that work.
+  ✅ **Three faults injected and all three caught by the test written for them**,
+  with the other 21 still passing: the blank-name fallback losing whitespace, a
+  failed load rendering as "0 squads have nobody", and a refused title save
+  leaving the typed value on screen.
+
 - **Realtime APPLIED and observed working; a third events index; and the schema
   capture gains a category it never had.** Two migrations applied to production
   and captured in the same commit:

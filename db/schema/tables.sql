@@ -457,6 +457,26 @@ CREATE TABLE public.memberships (
   -- where forgetting it excludes the one person certain to be able to act.
   is_super      boolean NOT NULL DEFAULT false,
   admin_rights  text[]  NOT NULL DEFAULT '{}'::text[],
+  -- ── Added 2026-08-13, migration membership_title ──
+  --
+  -- The job title shown on /admin/staff — "Head Coach", "Assistant Coach".
+  --
+  -- ⚠️ NO CHECK CONSTRAINT, DELIBERATELY, and the same reasoning as
+  -- admin_rights above: a constraint would mean a migration per job title, for
+  -- a value that labels a person and grants nothing. STAFF_TITLES in
+  -- src/lib/scope.js is a picker's suggestions, not a whitelist, and the
+  -- database does not know about it.
+  --
+  -- ⚠️ A TITLE IS NEVER PERMISSION. private.can_edit_team keys off `role`, so
+  -- "Head Coach" grants precisely what `coach` grants. Anything that ever
+  -- branches on this column is a bug.
+  --
+  -- ⚠️ IT NEEDED ITS OWN COLUMN GRANT AND IS THE FIRST COLUMN ADDED SINCE THAT
+  -- BECAME TRUE. `authenticated` has no table-level UPDATE on memberships, so a
+  -- new column is unwritable by default and fails looking exactly like an RLS
+  -- refusal. See grants.sql — and do NOT fix such a failure with a table-level
+  -- grant, which would hand every admin write access to is_super.
+  title         text,
   CONSTRAINT memberships_pkey            PRIMARY KEY (id),
   CONSTRAINT memberships_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT memberships_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,

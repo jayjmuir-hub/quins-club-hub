@@ -1,7 +1,29 @@
 # Plan — an age group sees its coaches, managers and medics
 
-**Status: NOT SHIPPED. Nothing built, nothing committed.** Written 13 Aug 2026
-at Jay's request as a write-up only, while another session held the repo.
+**Status: PHASE 1 SHIPPED 13 Aug 2026 — `/admin/staff`. Phases 2–4 NOT
+SHIPPED.** Written 13 Aug 2026 at Jay's request as a write-up only, while
+another session held the repo; phase 1 was built the same day.
+
+⚠️ **PHASE 2 WAS PULLED FORWARD INTO PHASE 1 AND THIS PLAN NO LONGER DESCRIBES
+WHAT WAS BUILT.** `memberships.title` shipped with the directory rather than
+after it, on Jay's ruling: whoever staffs the twelve empty squads is touching
+every squad once, and that is the only moment titles can be set without a second
+pass through all fifteen. What remains unbuilt is the member-facing card
+(phase 3) and photos (phase 4).
+
+⚠️ **AND GAP 2 BELOW PROPOSES THE WRONG MECHANISM — corrected 13 Aug.** It asks
+for an RLS policy letting a member read staff `profiles` rows. **RLS authorises
+ROWS, not columns**, and a `profiles` row carries `email` and `phone` — so that
+policy would expose a coach's mobile to every parent in the squad even if the
+card only draws a name. This repo's own rule: *a screen that hides a row is not
+security.* A column grant cannot fix it either, because grants apply to the
+whole `authenticated` role including admins, who legitimately need those
+columns on Accounts.
+**The answer is a `SECURITY DEFINER` function returning only
+`(full_name, title, role)` for staff on squads the caller is attached to** — no
+policy change on `profiles` at all, and the contact details are structurally
+unreachable rather than merely unrendered. It is also less work than what gap 2
+describes.
 
 ⚠️ **`npm run docs:check` does NOT validate the paths in this file** —
 `scripts/docs-check.mjs` excludes `claude/plans/`. Every path below was read

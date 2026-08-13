@@ -174,13 +174,17 @@ describe('AdminDashboard — authorisation gate', () => {
 })
 
 describe('AdminDashboard — tabs', () => {
-  it('renders exactly two tabs, Accounts and Squads & league teams, as real links', () => {
+  // ⚠️ THREE SINCE 13 Aug 2026 — Staff joined the Club Admin portal. The count
+  // is asserted rather than dropped: it is what would catch a tab silently
+  // disappearing, and "at least two" would pass against exactly that bug.
+  it('renders exactly three tabs, Accounts, Squads & league teams and Staff, as real links', () => {
     renderAdmin()
 
     const tabs = screen.getByRole('navigation', { name: /admin sections/i })
-    expect(tabs.querySelectorAll('a')).toHaveLength(2)
+    expect(tabs.querySelectorAll('a')).toHaveLength(3)
     expect(screen.getByRole('link', { name: 'Accounts' })).toHaveAttribute('href', '/admin/accounts')
     expect(screen.getByRole('link', { name: 'Squads & league teams' })).toHaveAttribute('href', '/admin/club')
+    expect(screen.getByRole('link', { name: 'Staff' })).toHaveAttribute('href', '/admin/staff')
   })
 
   it('renders the Accounts tab at /admin/accounts and marks it current', () => {
