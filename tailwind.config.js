@@ -310,11 +310,50 @@ export default {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+
+        // ── Redesign, 13 Aug 2026 ──────────────────────────────────────────
+        // ⚠️ TRANSFORM AND OPACITY ONLY, EVERY ONE OF THEM. Those two are the
+        // properties a browser can hand to the compositor; animating width,
+        // top or box-shadow forces layout or paint on every frame, and this
+        // app is used on a mid-range Android at the side of a pitch.
+
+        // Rows arriving. A list that fades up in sequence reads as FILLING;
+        // the same list appearing at once reads as a flash, and on a slow
+        // connection as a glitch.
+        riseIn: {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        // The skeleton sweep. A spinner says "wait"; a skeleton in the shape
+        // of what is coming says "nearly there", and it stops the page height
+        // collapsing and rebounding when the data lands.
+        shimmer: {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(100%)' },
+        },
+        // The live dot on the next fixture. Deliberately slow — 2.2s — because
+        // a fast pulse next to text is an accessibility problem, not a flourish.
+        livePulse: {
+          '0%, 100%': { opacity: '1', transform: 'scale(1)' },
+          '50%': { opacity: '.45', transform: 'scale(.82)' },
+        },
       },
       animation: {
         'sheet-slide-up': 'sheetSlideUp .28s cubic-bezier(.32,.72,0,1)',
         'sheet-scale-in': 'sheetScaleIn .2s ease-out',
         'scrim-fade-in': 'scrimFadeIn .2s ease',
+        // ⚠️ `both` MATTERS ON THE STAGGERED ONE. Rows carry a delay, and
+        // without `backwards` they paint at full opacity for that delay and
+        // THEN jump to opacity 0 to start — a visible flicker that gets worse
+        // the further down the list you look.
+        'rise-in': 'riseIn .4s cubic-bezier(.22,.61,.36,1) both',
+        shimmer: 'shimmer 1.4s ease-in-out infinite',
+        'live-pulse': 'livePulse 2.2s cubic-bezier(.22,.61,.36,1) infinite',
+      },
+      transitionTimingFunction: {
+        // The house curve: decelerating, so things arrive softly and leave
+        // quickly. Used for every lift, slide and reveal in the redesign.
+        club: 'cubic-bezier(.22,.61,.36,1)',
       },
     },
   },

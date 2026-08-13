@@ -51,6 +51,35 @@ function isKnownPitch(value) {
   return !/\b(tbd|tba|tbc)\b/.test(pitch)
 }
 
+/**
+ * The 3px edge down the left of a row, and what it means.
+ *
+ * Redesign, 13 Aug 2026. Every row in every list looked identical, so scanning
+ * a month meant reading. An edge is the cheapest possible encoding: it costs
+ * three pixels, it is visible in peripheral vision, and it needs no legend
+ * because each state also carries its words elsewhere in the row.
+ *
+ * ⚠️ IT IS NEVER THE ONLY SIGNAL. The chip says the type, the score says the
+ * result, "no pitch yet" says the pitch is missing. This repeats what is
+ * already written, which is exactly what makes it safe for anyone who cannot
+ * separate the colours — roughly one man in twelve, and this club's volunteers
+ * are mostly men.
+ *
+ * ⚠️ ORDER MATTERS. A played match is a result first and a match second; a
+ * match with no pitch needs attention more than it needs to look like a match.
+ */
+function edgeTone(event, played) {
+  if (played) return 'bg-line-strong'
+  if (event?.type === 'match') {
+    const pitch = String(event?.pitch ?? '').trim()
+    const missing = !pitch || /(tbd|tba|tbc)/i.test(pitch)
+    if (missing) return 'bg-warn'
+    return 'bg-brand'
+  }
+  if (event?.type === 'training') return 'bg-accent'
+  return 'bg-line-strong'
+}
+
 export function FixtureRow({ event, teamName, onSelect }) {
   const date = eventDate(event)
   const { month, day, weekday } = dateBoxParts(date)
@@ -76,8 +105,14 @@ export function FixtureRow({ event, teamName, onSelect }) {
       // Chromium's UA stylesheet centres a <button>'s content inside its box,
       // which would shove this row's contents around once it is taller than
       // its text. Setting the layout explicitly overrides that.
-      className="flex w-full items-center gap-[13px] border-b border-line p-[14px] text-left transition last:border-b-0 hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+      className="relative flex w-full items-center gap-[13px] border-b border-line p-[14px] pl-[17px] text-left transition-colors duration-150 last:border-b-0 hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
     >
+      {/* The state edge. Inset by 1px at top and bottom so it never overlaps
+          the row divider below it, which would read as a broken line. */}
+      <span
+        aria-hidden="true"
+        className={`absolute inset-y-px left-0 w-[3px] rounded-r-[3px] ${edgeTone(event, played)}`}
+      />
       <span className="w-[52px] shrink-0 rounded-[11px] bg-surface-mute px-1 py-2 text-center">
         <span className="block text-[10.5px] font-extrabold uppercase tracking-[.5px] text-brand">{month}</span>
         <span className="block text-[21px] font-extrabold leading-none text-ink">{day}</span>

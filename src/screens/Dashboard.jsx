@@ -6,7 +6,7 @@ import Greeting from '../components/Greeting.jsx'
 import UpcomingStrip from '../components/UpcomingStrip.jsx'
 import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
-import Spinner from '../components/Spinner.jsx'
+import { DashboardSkeleton } from '../components/Skeleton.jsx'
 import Availability from './Availability.jsx'
 import Register from './Register.jsx'
 import EventDetail from './EventDetail.jsx'
@@ -228,14 +228,49 @@ function NextFixtureHero({ event, teamName }) {
   return (
     <div
       data-testid="next-fixture"
-      className="harlequin relative mb-4 overflow-hidden rounded-card bg-hero-grad p-[18px] text-white shadow-card"
+      className="harlequin group relative mb-4 overflow-hidden rounded-card bg-hero-grad p-[18px] pb-[21px] text-white shadow-card"
     >
+      {/* ── Redesign, 13 Aug 2026 ──────────────────────────────────────────
+          ⚠️ TWO DECORATIVE LAYERS, BOTH BEHIND THE CONTENT (`z-10` on every
+          text block above already), both pointer-events-none so neither can
+          swallow a tap.
+
+          The hero was a FLAT maroon gradient — the strongest surface on the
+          screen with no depth in it at all. A single soft radial, warm and
+          low-opacity, reads as light falling across the card rather than as a
+          second colour. It uses white at 12%, NOT a new brand hue: the palette
+          is a hard constraint and this must not become a fourth red. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.12),transparent_68%)]"
+      />
+      {/* ⚠️ THE CLUB'S OWN RED→GREEN HAIRLINE, AT THE BASE. It already exists
+          as `brand-rule` in tailwind.config.js and appeared in exactly one
+          place in the whole app — under the masthead. Repeating it here ties
+          the page's loudest card back to the chrome above it, and it is the one
+          mark in this design system nobody else has. Decorative only: no text
+          sits on it, so the full-saturation green is safe. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-brand-rule"
+      />
       {/* ⚠️ Reflects the event's TYPE. This was hardcoded "Next fixture",
           which made a training session announce itself as a fixture whenever
           no match was coming — and the fallback to any event type is
           deliberate, so that is the normal out-of-season state, not a rare
           one. See nextEventLabel in src/lib/eventFormat.js. */}
-      <div className="relative z-10 font-condensed text-[14px] font-bold uppercase tracking-[0.18em] opacity-95">
+      <div className="relative z-10 flex items-center gap-2 font-condensed text-[14px] font-bold uppercase tracking-[0.18em] opacity-95">
+        {/* ⚠️ THE DOT IS NOT THE MESSAGE — the eyebrow beside it already says
+            what this card is. It is an ambient sign that the screen is showing
+            live data rather than something cached from yesterday, which is the
+            "alive" the brief asked for. `aria-hidden` because a screen reader
+            gaining "bullet, bullet, bullet" tells it nothing. 2.2s deliberately:
+            anything faster next to text is a distraction, and for some people a
+            genuine barrier. */}
+        <span
+          aria-hidden="true"
+          className="h-[7px] w-[7px] shrink-0 animate-live-pulse rounded-full bg-white/90"
+        />
         {eyebrow}
       </div>
 
@@ -550,11 +585,20 @@ export default function Dashboard() {
 
   if (isFirstLoad) {
     return (
-      <section>
+      // ⚠️ A SKELETON, NOT A SPINNER — redesign, 13 Aug 2026. The spinner was
+      // not merely plainer; it gave the page NO HEIGHT. The masthead sat on the
+      // tab bar, then the data landed and the document grew by six hundred
+      // pixels in a single frame. On a phone that reads as the app lurching,
+      // and it throws away the scroll position of anyone who had started to
+      // move. The skeleton holds the real shape, so nothing jumps.
+      //
+      // ⚠️ role="status" AND THE VISUALLY-HIDDEN SENTENCE STAY. The blocks are
+      // aria-hidden, so without this line a screen reader would be told
+      // nothing at all was happening — a silent screen is worse than a spinner.
+      <section role="status" aria-live="polite">
         <h2 className="sr-only">Dashboard</h2>
-        <Card className="flex justify-center py-10">
-          <Spinner label="Loading your dashboard…" />
-        </Card>
+        <span className="sr-only">Loading your dashboard…</span>
+        <DashboardSkeleton />
       </section>
     )
   }
@@ -674,13 +718,35 @@ export default function Dashboard() {
             </Card>
           ) : (
             <Card data-testid="upcoming-list" className="overflow-hidden">
-              {upcoming.map((event) => (
-                <FixtureRow
+              {upcoming.map((event, index) => (
+                // ⚠️ THE STAGGER IS CAPPED AT SIX, AND THE CAP IS THE POINT.
+                // 40ms each is lively over four rows and a queue over twenty —
+                // the last row of a full month would wait most of a second
+                // before appearing, which stops reading as motion and starts
+                // reading as a slow page. Everything past the sixth arrives
+                // with the sixth.
+                //
+                // ⚠️ AN INLINE STYLE, NOT A CLASS. The delay is per-index, so
+                // as a class it would be an arbitrary value Tailwind has to
+                // generate a rule for per row — and Tailwind cannot see a class
+                // name built at runtime anyway, so they would all silently
+                // resolve to nothing.
+                //
+                // ⚠️ THE KEY IS event.id AND MUST STAY THAT WAY. Keyed by index
+                // the animation would replay on every realtime refresh, so a
+                // fixture somebody else edited would make the whole list
+                // flicker for everyone looking at it.
+                <div
                   key={event.id}
-                  event={event}
-                  teamName={teamsById.get(event.team_id)?.name}
-                  onSelect={openEvent}
-                />
+                  className="animate-rise-in"
+                  style={{ animationDelay: `${Math.min(index, 6) * 40}ms` }}
+                >
+                  <FixtureRow
+                    event={event}
+                    teamName={teamsById.get(event.team_id)?.name}
+                    onSelect={openEvent}
+                  />
+                </div>
               ))}
             </Card>
           )}
