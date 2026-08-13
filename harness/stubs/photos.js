@@ -38,6 +38,33 @@ export function clearPhotoUrlCache() {}
 
 export const PHOTO_BUCKET = 'player-photos'
 
+// Staff head shots (13 Aug 2026). ⚠️ tests/harness-stubs.test.js caught the
+// absence of these the moment they were added to the real module — which is
+// what that guard is for: harness/main.jsx imports every screen into ONE
+// bundle, so a named import that does not resolve blanks every scenario at
+// once, not just the one under test.
+export const STAFF_PHOTO_BUCKET = 'staff-photos'
+
+export async function uploadStaffPhoto() {
+  return 'stub/staff.jpg'
+}
+
+export async function setMyPhoto(photoPath) {
+  return photoPath ?? null
+}
+
+export async function signStaffPhotoUrl() {
+  return null
+}
+
+export async function signStaffPhotoUrls() {
+  return {}
+}
+
+export async function deleteStaffPhoto() {
+  return true
+}
+
 export async function setOwnPlayerPhoto(playerId, photoPath) {
   return { id: playerId, photo_path: photoPath }
 }

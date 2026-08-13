@@ -4,6 +4,7 @@ import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
 import IdeaForm from '../components/IdeaForm.jsx'
+import MyPhotoField from '../components/MyPhotoField.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
 import YourPlayers from '../components/YourPlayers.jsx'
 import { updateMyProfile } from '../data/members.js'
@@ -360,6 +361,18 @@ export default function More() {
         role={roleLabel(memberships)}
         squads={squads}
       />
+
+      {/* ⚠️ ITS OWN CARD, NOT A FIELD INSIDE YouCard, AND THAT IS DELIBERATE.
+          YouCard is read-only until "Edit" is pressed (Jay, 9 Aug 2026) because
+          /more is mostly opened for other reasons — folding a photo control
+          into it would mean either putting the photo behind that Edit gate,
+          where nobody would find it, or breaking the gate. A photo is also not
+          a text field: it saves on choose rather than on submit, so it has a
+          different lifecycle from every other row in that card.
+          Phase 4 of claude/plans/2026-08-13-squad-staff-on-home.md. */}
+      <div className="mt-3">
+        <MyPhotoField profile={profile} userId={user?.id} />
+      </div>
 
       {/* Renders nothing at all for a coach or admin with no child at the
           club — an empty "Your players" card would imply something missing.

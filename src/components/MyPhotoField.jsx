@@ -1,0 +1,197 @@
+import { useEffect, useRef, useState } from 'react'
+import Button from './Button.jsx'
+import Card from './Card.jsx'
+import { initials } from '../lib/playerFormat.js'
+import {
+  deleteStaffPhoto,
+  setMyPhoto,
+  signStaffPhotoUrl,
+  uploadStaffPhoto,
+} from '../data/photos.js'
+
+// "Your photo" on /more — the upload half of phase 4 of
+// claude/plans/2026-08-13-squad-staff-on-home.md.
+//
+// ⚠️ EVERY MEMBER GETS THIS CARD, NOT ONLY STAFF, and that is deliberate. The
+// alternative is deciding who is "staff" in the UI, which means a second copy
+// of a rule the database already owns — and it would take the card away from
+// somebody the moment an admin changed their role, losing a photo they had
+// already uploaded. What the ROLE decides is who can SEE it
+// (`private.can_see_staff_photo`), which is the database's job. A parent who
+// uploads one has simply put a face next to their own name for nobody.
+//
+// ⚠️ IT IS NOT A SECOND PLACE TO EDIT YOUR NAME. YouCard above is deliberately
+// read-only until "Edit" is pressed (Jay, 9 Aug 2026) because /more is mostly
+// opened for other reasons. This card follows the same instinct: no live text
+// input, and the only controls are two buttons.
+
+/**
+ * ⚠️ UPLOADS IMMEDIATELY, UNLIKE `PhotoField`, AND THE DIFFERENCE IS THAT THERE
+ * IS NO FORM HERE.
+ *
+ * PhotoField defers the upload until the surrounding PlayerForm is saved, so
+ * that abandoning the form leaves no orphaned photograph of a child in the
+ * bucket. This card has no save button to defer to, so the upload IS the
+ * action — which means an orphan is possible in a different way: the object
+ * lands and then `set_my_photo` fails, leaving a file nothing points at.
+ *
+ * So the order is: upload, record, and **delete the just-uploaded object if
+ * recording fails**. That is the opposite order to a replacement, where the OLD
+ * object is deleted only after the NEW key is safely recorded — in both cases
+ * the rule is that a failure never leaves the profile pointing at nothing.
+ */
+export default function MyPhotoField({ profile, userId }) {
+  const inputRef = useRef(null)
+  const [photoPath, setPhotoPath] = useState(profile?.photo_path ?? null)
+  const [url, setUrl] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  const profileId = profile?.id ?? userId ?? null
+  const ready = Boolean(profileId)
+
+  // ⚠️ SEEDED WHEN THE PROFILE ARRIVES, THEN OWNED LOCALLY. useMyProfile
+  // resolves asynchronously and is cached at module level with no reload, so
+  // re-seeding on every profile object would undo an upload the moment
+  // anything else re-rendered this screen.
+  const seededFor = useRef(null)
+  useEffect(() => {
+    if (!profile?.id || seededFor.current === profile.id) return
+    seededFor.current = profile.id
+    setPhotoPath(profile.photo_path ?? null)
+  }, [profile])
+
+  useEffect(() => {
+    let mounted = true
+    if (!photoPath) {
+      setUrl(null)
+      return undefined
+    }
+    signStaffPhotoUrl(photoPath).then((value) => {
+      if (mounted) setUrl(value)
+    })
+    return () => {
+      mounted = false
+    }
+  }, [photoPath])
+
+  async function choose(event) {
+    const file = event.target.files?.[0]
+    // Cleared immediately so that picking the SAME file again still fires a
+    // change event — otherwise a failed upload cannot be retried with the same
+    // photo, which is exactly the photo somebody would retry with.
+    event.target.value = ''
+    if (!file || !profileId) return
+
+    setBusy(true)
+    setError(null)
+    const previous = photoPath
+    let uploaded = null
+    try {
+      uploaded = await uploadStaffPhoto(profileId, file)
+      await setMyPhoto(uploaded)
+      setPhotoPath(uploaded)
+      // Only now is the old object unreferenced. Best-effort: an orphan in a
+      // private bucket is untidy, and failing here must not turn a successful
+      // save into a visible error.
+      if (previous) await deleteStaffPhoto(previous)
+    } catch (err) {
+      // ⚠️ THE OBJECT LANDED AND THE ROW DID NOT. Tidy it up, or the bucket
+      // accumulates a file per failed save that nothing will ever point at.
+      if (uploaded) await deleteStaffPhoto(uploaded)
+      setError(err.message || 'That photo could not be saved.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove() {
+    if (!photoPath) return
+    setBusy(true)
+    setError(null)
+    const previous = photoPath
+    try {
+      // ⚠️ THE ROW FIRST, THE OBJECT SECOND — the opposite order to the social
+      // ideas delete, and for the opposite reason. There, deleting the row
+      // first would orphan an image nobody can reach. Here the row is the only
+      // thing anyone reads, so clearing it is what makes the photo gone; a
+      // failure to delete the object then leaves an unreferenced file rather
+      // than a profile pointing at a missing one.
+      await setMyPhoto(null)
+      setPhotoPath(null)
+      setUrl(null)
+      await deleteStaffPhoto(previous)
+    } catch (err) {
+      setError(err.message || 'That photo could not be removed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card className="p-[14px]" data-testid="my-photo">
+      <div className="flex items-center gap-3.5">
+        {url ? (
+          <img
+            src={url}
+            alt=""
+            className="h-16 w-16 shrink-0 overflow-hidden rounded-[16px] bg-brand/10 object-cover"
+          />
+        ) : (
+          <div
+            className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-[16px] bg-brand/10 text-[20px] font-extrabold tracking-[.5px] text-brand-deep"
+            aria-hidden="true"
+          >
+            {initials(profile?.full_name)}
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] leading-relaxed text-ink-muted">
+            {/* ⚠️ SAYS WHO CAN SEE IT, AND THAT IS THE POINT OF THE SENTENCE.
+                A photo upload with no audience stated is a photo somebody
+                uploads without knowing where it appears. The rule stated here
+                is exactly what private.can_see_staff_photo enforces. */}
+            If you coach, manage or look after a squad, this appears next to your
+            name for the families of that squad.
+          </p>
+
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy || !ready}
+              onClick={() => inputRef.current?.click()}
+            >
+              {photoPath ? 'Change photo' : 'Add a photo'}
+            </Button>
+            {photoPath && (
+              <Button type="button" variant="secondary" disabled={busy} onClick={remove}>
+                Remove
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Visually hidden but a real, focusable input — the same arrangement
+          PhotoField uses, and for the same reason: a bare <input type="file">
+          is an unstyleable native control reading "No file chosen". */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        aria-label="Choose a photo of yourself"
+        onChange={choose}
+      />
+
+      {busy && <p className="mt-2 text-[12.5px] text-ink-faint">Saving…</p>}
+      {error && (
+        <p role="alert" className="mt-2 text-[12.5px] font-bold text-brand">
+          {error}
+        </p>
+      )}
+    </Card>
+  )
+}

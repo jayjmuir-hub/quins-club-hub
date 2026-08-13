@@ -10,7 +10,41 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- ❌ **NINE OF THE FIFTEEN DATABASE HARNESSES COULD NOT FAIL, AND `db:check`
+- ✅ **STAFF PHOTOS — THE SQUAD CONTACTS CARD HAS FACES, AND THE PLAN IS DONE.**
+  Phase 4, the last of `claude/plans/2026-08-13-squad-staff-on-home.md`. All
+  four phases shipped in one day. `profiles.photo_path`, a private
+  `staff-photos` bucket, two storage policies, `public.set_my_photo()`, and a
+  "Your photo" card on `/more`.
+  ⚠️ **A SEPARATE BUCKET FROM `player-photos` — a ruling, not tidiness.** That
+  one holds photographs of CHILDREN behind policies written around squad
+  membership; nothing written for staff can widen it.
+  ⚠️ **OWN PREFIX ONLY, narrower than the player rule.** A player photo may be
+  uploaded by that child's coach because a nine-year-old cannot. A coach is an
+  adult with their own login.
+  ⚠️ **`FOR ALL` with BOTH `using` AND `with check`** — an INSERT consults
+  `with check` alone, so `using` by itself would let anybody signed in write
+  under somebody else's prefix. Proved by executing it, both ways.
+  ⚠️ **`private.can_see_staff_photo` mirrors `my_squad_staff()`**; the card
+  takes the name from one and the face from the other, so drift means a
+  photograph of somebody the app will not name. Harness
+  `db/tests/rls-staff-photos.sql` — 8 steps, an injected fault that flips the
+  read, and a separate arm proving a PENDING coach's photo stays hidden.
+  ⚠️ **`profiles.photo_path` is NOT column-granted**, unlike `memberships.title`
+  — a column grant covers the whole `authenticated` role, and this is written by
+  the person themselves through the RPC, which refuses a key under anyone
+  else's id.
+  ⚠️ **`getMyProfile` is a column list and needed the name adding.** Omit it and
+  `/more` shows the monogram forever while an upload appears to save and then
+  vanishes — silent, and it looks like storage.
+  ⚠️ **The harness email fixture was LENGTHENED because it had gone vacuous.**
+  The 40px avatar took 52px out of the row, and the old 44-character address
+  stopped overflowing with or without `break-all` — so the overflow check would
+  have passed on a card with no guard. At 84 chars, removing `break-all` gives
+  **521px against a 320 viewport**. Measured both ways.
+  ❌ **Nobody has uploaded one in the real app** — no `/more` scenario exists in
+  `harness/`, so the control itself is unit-tested and unexercised.
+
+- `4ba07e7` — ❌ **NINE OF THE FIFTEEN DATABASE HARNESSES COULD NOT FAIL, AND `db:check`
   ITSELF WAS THE REASON.** Found hours after that runner shipped. It threw on a
   SQL *error* and discarded every result set — so a harness asserting via SELECT
   (`select count(*) as leaked_expect_0`) reported `ok` whatever came back. The
@@ -31,7 +65,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **The rule: a harness must pick its subject by the property it needs, never
   by an ordering that happens to have it today.**
 
-- ✅ **`anon` COULD EXECUTE TEN OF THE FOURTEEN `public` FUNCTIONS. NOW TWO,
+- `4ba07e7` — ✅ **`anon` COULD EXECUTE TEN OF THE FOURTEEN `public` FUNCTIONS. NOW TWO,
   BOTH DELIBERATE.** `db/migrations/20260813_revoke_anon_execute.sql`.
   ⚠️ **The house pattern does not do what it reads as**: Supabase ships
   `alter default privileges … grant all on functions to anon, …`, a grant BY

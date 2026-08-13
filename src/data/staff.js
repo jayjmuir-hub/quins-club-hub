@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 import { SQUAD_STAFF_ROLES } from '../lib/scope.js'
 import { unwrapCapped, withCap } from './limits.js'
+import { signStaffPhotoUrls } from './photos.js'
 
 // Squad staff — who coaches, manages and doctors each age group.
 //
@@ -102,6 +103,11 @@ export function toStaffMember(row) {
     name: name || email || 'No name yet',
     email: email || null,
     phone: String(row.profiles?.phone ?? '').trim() || null,
+    // The storage KEY, never a URL — a private bucket has no durable URL, and
+    // a stored one is a stored thing that stops working. The Home card carries
+    // a signed `photoUrl` alongside this; the admin directory does not select
+    // the column at all and gets null, which renders as initials.
+    photoPath: row.profiles?.photo_path ?? null,
   }
 }
 
@@ -137,21 +143,47 @@ export async function listMySquadStaff() {
   const { data, error } = await supabase.rpc('my_squad_staff')
   if (error) throw error
 
+  const rows = data ?? []
+
+  // ⚠️ SIGNED ONCE, IN A BATCH, BEFORE ANYTHING RENDERS. `staff-photos` is a
+  // PRIVATE bucket, so there is no durable URL — `photo_path` is an object key
+  // and a viewable URL has to be signed and expires. Signing per card would be
+  // one sequential round trip per person before the first face appeared; a
+  // parent in two squads with three staff each would wait for six.
+  //
+  // ⚠️ A FAILURE HERE IS NOT AN ERROR. Keys that will not sign are simply
+  // absent from the result, so `photoUrl` comes out undefined and the card
+  // falls back to initials — which is what somebody with no photo already
+  // looks like, and today that is everybody. An error box where a face should
+  // be is worse than a monogram in every one of those cases.
+  let urls = {}
+  try {
+    urls = await signStaffPhotoUrls(rows.map((row) => row.photo_path))
+  } catch {
+    urls = {}
+  }
+
   const byTeam = new Map()
-  for (const row of data ?? []) {
+  for (const row of rows) {
     const list = byTeam.get(row.team_id) ?? []
     // ⚠️ SHAPED BY THE SAME `toStaffMember` THE ADMIN DIRECTORY USES, so the
     // blank-name rule ("" is not a name) holds on both screens from one place.
     // The RPC returns flat columns where PostgREST returns a nested `profiles`
     // object, so the row is re-nested rather than the helper being duplicated.
-    list.push(
-      toStaffMember({
+    list.push({
+      ...toStaffMember({
         id: row.membership_id,
         role: row.role,
         title: row.title,
-        profiles: { full_name: row.full_name, email: row.email, phone: row.phone },
+        profiles: {
+          full_name: row.full_name,
+          email: row.email,
+          phone: row.phone,
+          photo_path: row.photo_path,
+        },
       }),
-    )
+      photoUrl: urls[row.photo_path] ?? null,
+    })
     byTeam.set(row.team_id, list)
   }
 

@@ -1,0 +1,193 @@
+-- ══════════════════════════════════════════════════════════════════════════
+--  HARNESS — staff head shots: who may upload one, and who may look at one.
+--  Run via `npm run db:check`. SAFE ON PRODUCTION: one transaction, rolled
+--  back. Re-runnable.
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- WHAT IT GUARDS. Two independent boundaries that have to agree:
+--
+--   WRITE — `staff photo write` is own-prefix-only, narrower than the player
+--     equivalent (where a coach may upload for a child). ⚠️ It is FOR ALL with
+--     BOTH `using` and `with check`, and the `with check` is the half that
+--     matters: `using` governs UPDATE/DELETE against the row as it EXISTS,
+--     while an INSERT consults `with check` ALONE. With `using` only, anybody
+--     signed in could create an object under somebody else's prefix.
+--
+--   READ — `staff photo read` mirrors public.my_squad_staff(). The card draws
+--     the NAME from that function and the FACE from this policy, so if they
+--     drift a parent sees a photograph of somebody the app will not name.
+--
+-- ⚠️ THE `status = 'active'` ON BOTH SIDES IS THE SUBTLE PART. It is about two
+-- DIFFERENT people: the caller, and the person being looked at. A pending
+-- member has been approved by nobody; a pending coach is not yet this squad's
+-- coach.
+--
+-- ⚠️ AS `postgres` RLS IS BYPASSED ENTIRELY and every refusal below becomes a
+-- success. The injection at the bottom is what makes the refusals mean
+-- something.
+
+begin;
+
+create temporary table _t on commit drop as
+select id as team_id, club_id, row_number() over (order by sort_order) as n
+from teams order by sort_order limit 2;
+create temporary table _r (seq int, stage text, detail text) on commit drop;
+grant select, insert on _t, _r to authenticated;
+
+insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at,
+                        raw_user_meta_data, created_at, updated_at)
+values ('dee00000-0000-4000-8000-0000000000c1','00000000-0000-0000-0000-000000000000','authenticated','authenticated','h.coach@example.invalid',now(),'{}'::jsonb,now(),now()),
+       ('dee00000-0000-4000-8000-0000000000f1','00000000-0000-0000-0000-000000000000','authenticated','authenticated','h.parent@example.invalid',now(),'{}'::jsonb,now(),now());
+
+insert into profiles (id, full_name, email) values
+ ('dee00000-0000-4000-8000-0000000000c1','H Coach','h.coach@example.invalid'),
+ ('dee00000-0000-4000-8000-0000000000f1','H Parent','h.parent@example.invalid')
+on conflict (id) do nothing;
+
+-- A coach on squad A. The parent starts on squad B — NOT the coach's.
+insert into memberships (profile_id, club_id, team_id, role, status)
+select 'dee00000-0000-4000-8000-0000000000c1', club_id, team_id, 'coach', 'active' from _t where n = 1;
+insert into memberships (profile_id, club_id, team_id, role, status)
+select 'dee00000-0000-4000-8000-0000000000f1', club_id, team_id, 'parent', 'active' from _t where n = 2;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"dee00000-0000-4000-8000-0000000000f1","role":"authenticated"}';
+
+insert into _r select 1, 'READ: not in the coach''s squad (expect false)',
+  private.can_see_staff_photo('dee00000-0000-4000-8000-0000000000c1')::text;
+
+-- ⚠️ THE CONTROL. Without it, "cannot see the coach" is equally explained by
+-- "this function returns false to everybody", which a lost `set local role`
+-- produces.
+insert into _r select 2, 'READ: own photo (expect true)',
+  private.can_see_staff_photo('dee00000-0000-4000-8000-0000000000f1')::text;
+
+do $$ begin
+  perform public.set_my_photo('dee00000-0000-4000-8000-0000000000c1/1.jpg');
+  insert into _r values (3, 'RPC: key under ANOTHER person''s id', 'ALLOWED <<< WRONG');
+exception when others then
+  insert into _r values (3, 'RPC: key under ANOTHER person''s id', 'refused ('||sqlstate||')');
+end $$;
+
+do $$ begin
+  perform public.set_my_photo('dee00000-0000-4000-8000-0000000000f1/1.jpg');
+  insert into _r values (4, 'RPC: key under OWN id', 'allowed');
+exception when others then
+  insert into _r values (4, 'RPC: key under OWN id', 'REFUSED <<< WRONG: '||sqlerrm);
+end $$;
+
+-- ⚠️ THE `with check` TEST. An INSERT consults it alone.
+do $$ begin
+  insert into storage.objects (bucket_id, name, owner)
+  values ('staff-photos','dee00000-0000-4000-8000-0000000000c1/x.jpg', auth.uid());
+  insert into _r values (5, 'STORAGE: upload under ANOTHER person''s prefix', 'ALLOWED <<< WRONG');
+exception when others then
+  insert into _r values (5, 'STORAGE: upload under ANOTHER person''s prefix', 'refused ('||sqlstate||')');
+end $$;
+
+do $$ begin
+  insert into storage.objects (bucket_id, name, owner)
+  values ('staff-photos','dee00000-0000-4000-8000-0000000000f1/x.jpg', auth.uid());
+  insert into _r values (6, 'STORAGE: upload under OWN prefix', 'allowed');
+exception when others then
+  insert into _r values (6, 'STORAGE: upload under OWN prefix', 'REFUSED <<< WRONG ('||sqlstate||')');
+end $$;
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  ⚠️ THE FAULT INJECTION. Put the SAME parent into the coach's squad and the
+--  SAME read must flip. Without this every refusal above is equally explained
+--  by "nobody can see anything".
+-- ══════════════════════════════════════════════════════════════════════════
+reset role;
+insert into memberships (profile_id, club_id, team_id, role, status)
+select 'dee00000-0000-4000-8000-0000000000f1', club_id, team_id, 'parent', 'active' from _t where n = 1;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"dee00000-0000-4000-8000-0000000000f1","role":"authenticated"}';
+
+insert into _r select 7, 'INJECTED: now in the coach''s squad (expect true)',
+  private.can_see_staff_photo('dee00000-0000-4000-8000-0000000000c1')::text;
+
+-- ⚠️ AND THE STATUS ARM, which the injection above does not reach. Demote the
+-- COACH to pending: the parent is still in that squad, so only `status` can
+-- change the answer.
+reset role;
+update memberships set status = 'pending'
+ where profile_id = 'dee00000-0000-4000-8000-0000000000c1';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"dee00000-0000-4000-8000-0000000000f1","role":"authenticated"}';
+
+insert into _r select 8, 'a PENDING coach''s photo (expect false)',
+  private.can_see_staff_photo('dee00000-0000-4000-8000-0000000000c1')::text;
+
+reset role;
+select seq, stage, detail from _r order by seq;
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  THE ASSERTIONS. The SELECT above is for a human; this is what fails.
+--  `npm run db:check` throws on a SQL error and on nothing else — see
+--  scripts/db-check.mjs for the nine harnesses that could not report a wrong
+--  answer until 13 Aug 2026.
+-- ══════════════════════════════════════════════════════════════════════════
+do $$
+declare
+  _d text;
+  _bad text;
+begin
+  if (select count(*) from _r) <> 8 then
+    raise exception 'FAIL: expected 8 recorded steps, got %. The harness did not run everything it claims to.',
+      (select count(*) from _r);
+  end if;
+
+  select string_agg(seq || ': ' || stage || ' -> ' || detail, ' | ') into _bad
+    from _r where detail like '%<<< WRONG%';
+  if _bad is not null then
+    raise exception 'FAIL: %', _bad;
+  end if;
+
+  select detail into _d from _r where seq = 1;
+  if _d <> 'false' then
+    raise exception 'FAIL: a member of another squad can see this coach''s photo (%).', _d;
+  end if;
+
+  select detail into _d from _r where seq = 2;
+  if _d <> 'true' then
+    raise exception 'FAIL: a person cannot see their OWN photo (%) — the upload control on /more would show a blank after a successful save.', _d;
+  end if;
+
+  select detail into _d from _r where seq = 3;
+  if _d not like 'refused (42501)%' then
+    raise exception 'FAIL: set_my_photo accepted a key under another person''s id (%). my_squad_staff would hand that key out and the reader''s own permission would sign it — one volunteer''s face under another''s name.', _d;
+  end if;
+
+  select detail into _d from _r where seq = 5;
+  if _d not like 'refused%' then
+    raise exception 'FAIL: an upload under another person''s prefix was allowed (%). The `with check` half of "staff photo write" is missing — `using` alone does not constrain an INSERT.', _d;
+  end if;
+
+  -- ⚠️ THE TWO THAT MAKE THE REFUSALS ABOVE MEAN ANYTHING.
+  select detail into _d from _r where seq = 7;
+  if _d <> 'true' then
+    raise exception 'FAIL: the injected fault did not take — after joining the squad the member STILL cannot see the coach''s photo (%). Every refusal above is therefore equally explained by "nobody can see anything", which is what a forgotten `set local role authenticated` produces. STOP: this run proved nothing.', _d;
+  end if;
+
+  select detail into _d from _r where seq = 8;
+  if _d <> 'false' then
+    raise exception 'FAIL: a PENDING coach''s photo is visible to the squad (%). can_see_staff_photo has stopped checking status on the person being looked at, and my_squad_staff has drifted from it.', _d;
+  end if;
+
+  raise notice 'SELF-TEST PASSED — 8 steps: read scoped, writes own-prefix-only, injection flipped, status arm held.';
+end $$;
+
+rollback;
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  EXPECTED — measured live 13 Aug 2026
+--    1  READ: not in the coach's squad                false
+--    2  READ: own photo                               true
+--    3  RPC: key under ANOTHER person's id            refused (42501)
+--    4  RPC: key under OWN id                         allowed
+--    5  STORAGE: upload under ANOTHER prefix          refused (42501)
+--    6  STORAGE: upload under OWN prefix              allowed
+--    7  INJECTED: now in the coach's squad            true   <-- MUST be true
+--    8  a PENDING coach's photo                       false
+-- ══════════════════════════════════════════════════════════════════════════

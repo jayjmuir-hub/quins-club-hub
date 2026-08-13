@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import Card from './Card.jsx'
 import { labelForRole } from '../lib/scope.js'
+import { initials } from '../lib/playerFormat.js'
 
 // "Who looks after this squad" — the member-facing half of the staff feature.
 // Phase 3 of claude/plans/2026-08-13-squad-staff-on-home.md; the admin half is
@@ -28,12 +30,58 @@ import { labelForRole } from '../lib/scope.js'
  * ⚠️ A TITLE IS NEVER PERMISSION. It is a label typed by an admin;
  * `private.can_edit_team` keys off `role` and must stay that way.
  */
+/**
+ * The face, or the monogram.
+ *
+ * ⚠️ NOT `PlayerAvatar`, AND THE DIFFERENCE IS THE BUCKET. That component signs
+ * against `player-photos`, which holds photographs of children behind policies
+ * written around squad membership. These come from `staff-photos` and are
+ * signed in one batch by `listMySquadStaff` before anything renders — so this
+ * takes a URL and never signs, which is also why there is no effect here.
+ *
+ * ⚠️ THE FALLBACK IS THE NORMAL CASE, NOT AN ERROR STATE. On the day this
+ * shipped nobody in the club had a photo, so "no photo", "could not sign" and
+ * "the image 404s" must all render identically and none of them may announce
+ * itself. The same ruling PlayerAvatar carries.
+ */
+function StaffAvatar({ name, url }) {
+  const [failed, setFailed] = useState(false)
+
+  const shared = 'h-10 w-10 shrink-0 overflow-hidden rounded-[12px] text-[14px]'
+
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        // The name is rendered immediately beside this, so an alt of "Photo of
+        // Rosa Ferreira" would only repeat it. Empty alt marks it decorative
+        // and stops a screen reader saying the name twice.
+        alt=""
+        className={`${shared} bg-brand/10 object-cover`}
+        onError={() => setFailed(true)}
+      />
+    )
+  }
+
+  return (
+    <div
+      className={`${shared} grid place-items-center bg-brand/10 font-extrabold tracking-[.5px] text-brand-deep`}
+      aria-hidden="true"
+    >
+      {initials(name)}
+    </div>
+  )
+}
+
 function StaffPerson({ member }) {
   const role = labelForRole(member.role)
   const line = member.title ?? role
 
   return (
     <li className="border-t border-line px-4 py-3 first:border-t-0" data-testid="squad-staff-person">
+      <div className="flex items-start gap-3">
+        <StaffAvatar name={member.name} url={member.photoUrl} />
+        <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
         <span className="text-[15px] font-bold text-ink">{member.name}</span>
         {line && <span className="text-[13px] font-semibold text-ink-muted">{line}</span>}
@@ -77,6 +125,8 @@ function StaffPerson({ member }) {
           )}
         </div>
       )}
+        </div>
+      </div>
     </li>
   )
 }

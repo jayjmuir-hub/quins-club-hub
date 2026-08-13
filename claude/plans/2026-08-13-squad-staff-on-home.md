@@ -1,9 +1,17 @@
 # Plan — an age group sees its coaches, managers and medics
 
-**Status: PHASES 1, 2 AND 3 SHIPPED 13 Aug 2026. PHASE 4 (photos) NOT
-SHIPPED.** Written 13 Aug 2026 at Jay's request as a write-up only, while
-another session held the repo; phases 1 and 2 were built the same day and
-phase 3 that evening.
+**Status: SHIPPED — ALL FOUR PHASES, 13 Aug 2026.** Written the same day at
+Jay's request as a write-up only, while another session held the repo; phases 1
+and 2 were built that afternoon, phases 3 and 4 that evening.
+
+⚠️ **PHASE 4 COST LESS THAN THIS PLAN PREDICTED, AND THE PREDICTION IS WORTH
+KEEPING.** §3 calls photos "roughly half the work of the whole feature and the
+least of the four things by value". The second half of that is still true. The
+first was wrong, and the reason is that phases 1–3 had already built the
+things it assumed would be missing: the `my_squad_staff()` boundary to hang a
+column on, the card to draw a face in, and — the big one —
+`src/data/photos.js`, which needed only a bucket parameter rather than a second
+copy of the signed-URL machinery.
 
 ⚠️ **THE PRIVACY RECOMMENDATION IN THIS PLAN WAS OVERRULED, AND THE CARD SHIPS
 WITH CONTACT DETAILS.** §"The decision Jay has to make" below lists four

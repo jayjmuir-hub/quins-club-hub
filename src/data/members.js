@@ -190,7 +190,15 @@ export async function getMyProfile(userId) {
     // Selected HERE rather than by a second query because useMyProfile already
     // caches this row per user id — /more reads the phone straight out of that
     // cache, at the cost of one more column on a row it was fetching anyway.
-    .select('id, full_name, first_name, last_name, name_confirmed_at, email, phone, created_at')
+    // ⚠️ `photo_path` ADDED 13 Aug 2026, AND THIS SELECT IS A COLUMN LIST —
+    // the exact trap already recorded for getEvent's embed. Leave the name off
+    // and nothing breaks: /more simply renders the initials monogram forever,
+    // the "Change photo" button says "Add a photo" for somebody who already
+    // has one, and the upload appears to succeed and then vanish on reload.
+    // Silent, and it looks like a storage problem rather than a missing word.
+    .select(
+      'id, full_name, first_name, last_name, name_confirmed_at, email, phone, photo_path, created_at',
+    )
     .eq('id', userId)
     .maybeSingle()
 
