@@ -351,10 +351,32 @@ will propose building.**
   ⚠️ **PITR IS A FURTHER PAID ADD-ON AND WAS DELIBERATELY NOT BOUGHT.** At 14 MB
   the worst case daily backups lose is one day of availability edits. Do not
   propose it again without a new reason.
-  ⚠️ **BRANCHING IS NOW AVAILABLE AND UNUSED** — `list_branches` returned zero on
-  13 Aug. It is the fix for "every migration is a live experiment". **Branches bill
-  by the hour: create, use, delete.** An idle branch is a standing charge nobody
-  is watching.
+  ❌ **BRANCHING IS AVAILABLE AND DOES NOT WORK ON THIS PROJECT. TRIED 13 Aug 2026,
+  STATUS `MIGRATIONS_FAILED`, ZERO TABLES IN `public`.** This was written as "now
+  available and unused — the fix for every-migration-is-a-live-experiment" and that
+  lasted about ten minutes.
+  ⚠️ **WHY, AND IT IS A CONSEQUENCE THIS REPO ALREADY PREDICTED IN ANOTHER
+  CONTEXT.** A branch replays the parent's migration HISTORY into a fresh database.
+  Measured the same day: `supabase_migrations.schema_migrations` holds **89 rows, 12
+  of them named `accept_invite_multi_target`** — the stale rows `RESTORE.md` records
+  as *"all stale and each one reverts the function if re-run"*. The history is not
+  replayable, so the feature that depends on replaying it cannot work.
+  ⚠️ **THE TWO FACTS WERE BOTH ALREADY WRITTEN DOWN AND NOBODY HAD PUT THEM
+  TOGETHER**: "the migration table is polluted" and "branching replays migrations".
+  The cost of the gap was one failed branch and about a tenth of a cent.
+  ⚠️ **SO M10 — "no staging" — IS NOT FIXED BY PRO, AND IS WORSE THAN THE AUDIT
+  SAID.** Cleaning `schema_migrations` is now a prerequisite for having a staging
+  environment at all, not merely tidiness. Do not propose "just use a branch"
+  again until it is done and a branch has been observed reaching
+  `MIGRATIONS_PASSED`.
+  ✅ **WHAT TO USE INSTEAD, AND IT IS BETTER THAN THE BRANCH WOULD HAVE BEEN:
+  a transaction on production that ROLLS BACK.** Verified 13 Aug that the Supabase
+  MCP honours `begin; … rollback;` — probed with a throwaway table before anything
+  was relied on. It runs against the REAL schema and the REAL data, where a branch
+  carries `with_data: false` and would have needed the fixtures seeding by hand.
+  The pattern is already the house style for `db/tests/*.sql`.
+  ⚠️ **Branches bill by the hour ($0.01344, measured) — if one is ever created
+  again, create, use, delete.**
   ⚠️ **THE SPEND CAP IS THE ONE THAT CAN BITE, AND IT INTERACTS WITH A KNOWN HOLE.**
   With the cap ON, exceeding quota RESTRICTS the project rather than billing — an
   outage. With it OFF, overage is billed. **Do not turn it off before the

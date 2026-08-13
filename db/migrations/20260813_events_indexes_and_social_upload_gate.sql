@@ -2,11 +2,31 @@
 -- MEASURING LIVE rather than by reading the repo, and neither is visible at the
 -- club's current size.
 --
--- ⚠️ NOT YET APPLIED WHEN THIS FILE WAS WRITTEN. Run it on a Supabase BRANCH
--- first (Pro, since 13 Aug), run db/tests/ against the branch, then apply to
--- production and re-capture db/schema/ in the same commit. See
--- db/schema/README.md — pasting this file into tables.sql is NOT capturing the
--- database, and produces a file that looks complete.
+-- ⚠️ NOT YET APPLIED WHEN THIS FILE WAS WRITTEN. Apply it, then re-capture
+-- db/schema/ in the same commit. See db/schema/README.md — pasting this file
+-- into tables.sql is NOT capturing the database, and produces a file that looks
+-- complete.
+--
+-- ❌ **THIS HEADER SAID "RUN IT ON A SUPABASE BRANCH FIRST" AND THAT ADVICE IS
+-- DEAD.** Tried 13 Aug 2026: the branch came back `MIGRATIONS_FAILED` with zero
+-- tables, because a branch replays the parent's migration HISTORY and this
+-- project's history is polluted — 89 rows, 12 of them the stale
+-- `accept_invite_multi_target` that reverts a security guard on re-run. See
+-- claude/state-of-play.md, 13 Aug.
+--
+-- ✅ **WHAT WAS DONE INSTEAD, AND IT IS STRONGER EVIDENCE THAN THE BRANCH WOULD
+-- HAVE BEEN.** Section 2 below was proved on PRODUCTION inside a transaction that
+-- rolled back — against the real schema and the real data, where a branch carries
+-- `with_data: false`. The rollback mechanism itself was probed with a throwaway
+-- table BEFORE anything was relied on it, and the live policy and row counts were
+-- re-read afterwards to confirm nothing persisted.
+--
+-- ⚠️ **THE RUN INJECTED THE FAULT FIRST, WHICH IS THE HALF THAT MATTERS.** Against
+-- the live policy as it stands, a signed-in account with ZERO memberships was
+-- ALLOWED to upload — the bug demonstrated by EXECUTING it, not by reading the
+-- policy text. Then, with the new policy in the same transaction: stranger
+-- REFUSED, active member under their own prefix ALLOWED, active member under
+-- somebody else's prefix REFUSED. All four as intended.
 --
 -- =====================================================================
 -- 1. events — the two indexes every read path needs and none of which exist
