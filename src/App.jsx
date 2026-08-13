@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import { MembershipProvider } from './lib/memberships.jsx'
 import AppShell from './components/AppShell.jsx'
@@ -77,9 +78,31 @@ function Authed() {
   )
 }
 
+// ⚠️ THE OUTERMOST BOUNDARY, AND IT IS NOT THE SAME ONE AppShell HAS.
+//
+// AppShell's boundary wraps the routed SCREEN, so the nav survives a screen
+// crash. This one wraps everything, because the things AppShell's cannot see
+// are exactly the things whose failure is total: AppShell itself, RequireAuth,
+// MembershipProvider, and the four PUBLIC routes below — /privacy,
+// /delete-account, /reset-password and /auth/confirm — none of which render
+// inside an AppShell at all.
+//
+// ⚠️ TWO OF THOSE PUBLIC ROUTES ARE LINKED FROM THE PLAY STORE LISTING and are
+// opened cold by a reviewer. A white page there is a rejected app, not an
+// inconvenience.
+//
+// ⚠️ IT IS INSIDE BrowserRouter, DELIBERATELY. Outside it, the fallback could
+// not offer anything router-aware later, and a crash in BrowserRouter's own
+// setup is not a thing this can catch anyway.
+//
+// ⚠️ NOT keyed on pathname here, unlike AppShell's. If the shell or a provider
+// has thrown, navigating is not a recovery — the fallback's own "Try again"
+// and "Clear saved data" are, and remounting on every route change would hide
+// a persistent failure behind a flicker.
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <ErrorBoundary>
       <Routes>
         {/* PUBLIC — no session required, and no MembershipProvider either.
             Both of these are linked from the Play Store listing and must
@@ -187,6 +210,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }

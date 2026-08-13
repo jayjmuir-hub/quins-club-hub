@@ -15,6 +15,7 @@ import crest from '../assets/crest.png'
 import Button from './Button.jsx'
 import InstallPrompt from './InstallPrompt.jsx'
 import AppButton from './AppButton.jsx'
+import ErrorBoundary from './ErrorBoundary.jsx'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
 // role label, nav) plus the membership-loading gate that decides whether the
@@ -556,7 +557,24 @@ export default function AppShell({ children }) {
                 z-50, so it also sits above the sticky view-as banner/masthead
                 wrapper (z-40) rather than fighting it. */}
             <NamePrompt />
-            {children}
+            {/* ⚠️ THE BOUNDARY GOES HERE, AROUND THE ROUTED SCREEN ONLY, AND
+                THE PLACEMENT IS THE WHOLE POINT. Everything above it — the
+                masthead, the nav, the sign-out control — stays rendered when a
+                screen throws, so a parent whose Roster crashes can still reach
+                Schedule. Wrapping the whole shell instead would take the
+                navigation down with the screen and leave them stranded.
+
+                ⚠️ KEYED ON pathname, AND WITHOUT THIS THE FIX IS HALF A BUG.
+                A boundary holds its error state until something clears it, so
+                a crashed Roster would STAY on the fallback while the person
+                taps Schedule — nav working, content permanently broken, which
+                is worse than the blank page because it looks deliberate.
+                Changing the key remounts the boundary on every navigation.
+
+                ⚠️ There is a SECOND boundary in src/App.jsx, outside all of
+                this. It is not redundant: AppShell itself, MembershipProvider
+                and RequireAuth can throw, and none of that is inside this one. */}
+            <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>
             {isMoreRoute && (
               <div className="mt-6 border-t border-line pt-6">
                 <SignOutControl signOut={signOut} />
