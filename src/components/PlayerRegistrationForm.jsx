@@ -337,6 +337,29 @@ export default function PlayerRegistrationForm({
     if (needsName && !firstName.trim()) {
       return 'Enter your own first name, so the club knows who is registering.'
     }
+    // ⚠️ BOTH NAMES ARE REQUIRED HERE, AND THAT DEPARTS FROM THE REST OF THE
+    // APP ON PURPOSE — Jay, 13 Aug 2026.
+    //
+    // NamePrompt, RequestAccess and the You card all make the family name
+    // optional, and NamePrompt states the reason: "plenty of people have one
+    // name, and a gate nobody can pass is worse than a sortable list." That
+    // principle is sound for those fields, which exist so the app has A name
+    // for somebody — a greeting, an initial, a sortable list.
+    //
+    // This field exists for one purpose only: so a coach can identify a
+    // STRANGER asking to join a children's squad. "Sarah" does not do that, and
+    // the club has enough families that it will not do it more than once.
+    //
+    // Measured before changing it, rather than argued: of 13 adults with a
+    // confirmed name, ZERO have no family name, and zero of 9 players have a
+    // single-word name. The exemption was protecting nobody here. Jay's call
+    // was to require it outright and skip the "I have only one name" escape
+    // that was offered — so a genuine mononym would have to put something in
+    // the box. ⚠️ If that person ever turns up, THIS is the line to revisit,
+    // and the escape hatch is the fix, not deleting the requirement.
+    if (needsName && !lastName.trim()) {
+      return 'Enter your family name too — a first name alone is not enough for a coach to know who you are.'
+    }
 
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index]
@@ -511,10 +534,11 @@ export default function PlayerRegistrationForm({
             className={FIELD}
           />
 
-          {/* Optional, and said so. Plenty of people have one name, and the
-              same wording NamePrompt and the You card already use. */}
+          {/* ⚠️ NOT marked optional, unlike every other family-name field in
+              the app. See the guard in firstProblem() for why this one is
+              different and what to revisit if a mononym ever registers. */}
           <label htmlFor="register-your-last-name" className={`${LABEL} mt-3`}>
-            Your family name <span className="font-semibold normal-case">(optional)</span>
+            Your family name
           </label>
           <input
             id="register-your-last-name"

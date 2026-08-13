@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **The SAME nameless-row fix, at the two sites the first pass missed.** ⚠️ **The
+- **The registration form requires a FAMILY name too, and deliberately breaks with the
+  rest of the app to do it.** Jay: *"why would we only have them enter their first
+  name?"* — a fair challenge, and the honest answer was that the field had been copied
+  from an existing convention rather than thought about. ⚠️ **`NamePrompt`,
+  `RequestAccess` and the You card all mark the family name OPTIONAL**, and
+  `src/components/NamePrompt.jsx` states why: *"plenty of people have one name, and a
+  gate nobody can pass is worse than a sortable list."* That holds for those fields,
+  which exist so the app has A name for somebody. It does not hold for this one, which
+  exists **only** so a coach can identify a stranger asking to join a children's squad —
+  and "Sarah" does not do that in a club with hundreds of families. ⚠️ **Measured before
+  changing it, not argued:** of 13 adults with a confirmed name, **ZERO** have no family
+  name, and **zero of 9** players have a single-word name — the exemption was protecting
+  nobody here. Jay declined the offered "I have only one name" escape hatch, so this is a
+  hard requirement; ⚠️ **if a genuine mononym ever registers, the guard in
+  `firstProblem()` is the line to revisit and the escape hatch is the fix — not deleting
+  the requirement.** ⚠️ **Fault-injected:** disabling the guard makes the "refuses a
+  first name alone" test fail. The old assertion was INVERTED rather than deleted, and a
+  positive twin was added — the same journey must still succeed once the family name is
+  filled in, so the negative is not passing for the wrong reason.
+
+- `02e9a05` — **The SAME nameless-row fix, at the two sites the first pass missed.** ⚠️ **The
   previous commit fixed `PendingApprovals` and left `'No name yet'` in the "Waiting for
   access" list and the dismissed list — and those are the more visible of the three**,
   because a person who signs up and completes NEITHER onboarding form still lands there
