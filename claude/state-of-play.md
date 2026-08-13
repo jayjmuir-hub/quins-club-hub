@@ -642,9 +642,29 @@ Durable. Each cost real time to find.
   Recorded, not questioned: Jay has not been asked to confirm the third, and a
   legitimate second person holding it is exactly what the "one lost password"
   reasoning above argues for.
-- **`reynekeett@gmail.com` is a THIRD, LEGITIMATE admin — confirmed by Jay 10 Aug**
-  after it was flagged as unrecognised. Ordinary admin, not super. Recorded so the
-  next session does not raise it again as a stray.
+- ❌ **"A THIRD, LEGITIMATE ADMIN — ORDINARY ADMIN, NOT SUPER" IS STALE.** That
+  line named an account confirmed by Jay on 10 Aug and asserted it was an
+  ordinary admin. **Measured 13 Aug 2026: there is no active non-super admin
+  membership at all.** Jay, same day: *"only 3 current admin and they are all
+  super admin"*.
+  ⚠️ **THE EMAIL ADDRESS IS DELIBERATELY NOT REPEATED HERE.** This repo is
+  PUBLIC, and a volunteer's personal email in it is a disclosure — the same
+  reasoning `docs:check` already enforces for their names. Identify an account
+  from the database, not from this file.
+  ⚠️ **CONSEQUENCE, AND IT IS THE REASON THIS CORRECTION IS WORTH THE LINES:
+  EVERY ADMIN IS NOW A SUPER ADMIN, so the tier currently distinguishes
+  nobody.** Super admin is the tier that can grant super admin. The
+  "one lost password" argument for having more than one still holds; "all of
+  them" is a different thing and nobody has ruled on it.
+  ✅ **The protection itself is intact and was PROVEN, not assumed, on 13 Aug.**
+  An ordinary admin attempting `is_super = true` on themselves is refused
+  `42501 permission denied`, while the same account in the same transaction
+  writes an allowed column successfully — so the refusal is the column grant and
+  not something earlier. Detail in `db/schema/grants.sql`.
+  ⚠️ **AND POSTGRES'S OWN ERROR HINT RECOMMENDS THE HOLE**: *"Grant the required
+  privileges to the current role with: GRANT UPDATE ON public.memberships TO
+  authenticated"*. Following that hint hands every admin self-promotion. It is
+  the most authoritative-looking wrong answer in this schema.
 - **No rate limit on account creation** — only on what an account can do, which
   without a membership is nothing.
 
