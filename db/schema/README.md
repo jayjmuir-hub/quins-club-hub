@@ -157,6 +157,12 @@ and before that
 > too, with the fails-closed reasoning for each), and leaked-password protection
 > being off — which `claude/decisions/2026-08-06-roster-auto-onboarding.md`
 > already settled as a paid-plan feature on a free org.
+>
+> ⚠️ **THAT LAST ONE STOPPED BEING SETTLED ON 13 Aug 2026.** The org is on
+> **Pro** (measured: `get_organization` → `plan: "pro"`), so the plan is no
+> longer the reason and the WARN is no longer explained by anything. It is
+> simply a toggle nobody has turned on — Supabase → Authentication → Policies.
+> **A "recorded, not a finding" note survives only as long as its reason does.**
 
 > ## ⚠️ Re-captured 2026-08-11 — and the 10 Aug "ZERO DRIFT" entry above went
 > ## out of date the SAME DAY it was written

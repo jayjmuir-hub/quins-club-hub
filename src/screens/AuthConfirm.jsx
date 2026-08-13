@@ -26,10 +26,21 @@ import crest from '../assets/crest.png'
 //
 // ⚠️ THE PAID ALTERNATIVE WAS REJECTED ON COST, not on merit. Supabase's
 // custom-domain add-on would give auth.adhquins-clubhub.com and needs no code
-// at all — but it requires a PAID plan, and this org is on Free. Pro plus the
-// add-on is roughly $35/month to change a hostname in an email. If the project
-// ever moves to Pro for other reasons, that route becomes worth reconsidering;
-// this screen would keep working either way.
+// at all. This comment used to add "but it requires a PAID plan, and this org
+// is on Free. Pro plus the add-on is roughly $35/month ... If the project ever
+// moves to Pro for other reasons, that route becomes worth reconsidering."
+//
+// ⚠️ THE PROJECT MOVED TO PRO ON 13 Aug 2026, so the condition this comment set
+// has been met and the sum has changed: Pro is being paid for anyway, so the
+// add-on alone is the marginal cost.
+//
+// ⚠️ IT IS STILL NOT RECOMMENDED, and this is a note rather than a plan. This
+// screen already achieves the same outcome — every link in every auth email
+// reads as the club's own domain — and it is deployed, tested and working. The
+// add-on would buy a tidier hostname in a place no parent looks, for a
+// recurring fee. It is Jay's call, not a judgement to be made in a refactor.
+// Whichever way it goes, THIS SCREEN KEEPS WORKING and must not be deleted:
+// the emailed links point here, and they are already in people's inboxes.
 //
 // ══ ⚠️ THE OPEN REDIRECT THIS SCREEN COULD HAVE BEEN ════════════════════
 // `next` arrives in the query string, from an email, and this screen redirects

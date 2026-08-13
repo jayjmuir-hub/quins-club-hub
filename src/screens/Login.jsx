@@ -60,13 +60,22 @@ const RATE_LIMITED = /rate limit|too many requests|429/i
 const RATE_LIMIT_MESSAGE =
   'Lots of people are signing in right now. Wait a couple of minutes and try again.'
 
-// Resend's free tier sends 100 emails per DAY. When it trips, Resend returns
-// 429 daily_quota_exceeded, the Send Email Auth Hook returns 500, and GoTrue
-// hands the browser "Unexpected status code returned from hook: 500" — which
-// contains no "rate limit", no "429", and nothing else RATE_LIMITED matches.
-// Untranslated, a parent reads that and concludes the app is broken.
+// When Resend refuses a send for ANY reason, it returns a 429, the Send Email
+// Auth Hook returns 500, and GoTrue hands the browser "Unexpected status code
+// returned from hook: 500" — which contains no "rate limit", no "429", and
+// nothing else RATE_LIMITED matches. Untranslated, a parent reads that and
+// concludes the app is broken.
 //
 // NOT hypothetical: it happened on 6 Aug 2026 at 04:44 and is in the auth logs.
+//
+// ⚠️ THE CAUSE CHANGED ON 13 Aug 2026 AND THE HANDLING MUST NOT. This said
+// "Resend's free tier sends 100 emails per DAY", which was the trigger in
+// August; the account is on Resend Pro now and that daily cap is gone. The
+// 429 → 500 → unreadable-message CHAIN is unchanged, and it is still reachable
+// via the per-second rate limit, the monthly allowance, a revoked key or a
+// suspended sending domain. **Do not delete the second pattern below because
+// the original cause was fixed** — it is the only thing standing between a
+// failed sign-in and a parent being told the app is broken.
 //
 // Deliberately vaguer than the rate-limit copy above. This same error covers
 // every way the mail hook can fail, and promising "wait a couple of minutes"

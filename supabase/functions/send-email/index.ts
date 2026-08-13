@@ -174,7 +174,13 @@ async function sendMail(to: string, subject: string, html: string, text: string)
     //   403 -> MAIL_FROM's domain isn't verified in Resend. Check it is on
     //          send.adhquins-clubhub.com and NOT the root domain.
     //   422 -> malformed request (bad address, missing field)
-    //   429 -> free-tier limit: 100/day, 3,000/month
+    //   429 -> rate or allowance limit. !! NOT the old 100/day free cap - the
+    //          account is on Resend Pro since 13 Aug 2026. A 429 HERE is the
+    //          worst of the four, because this function carries sign-in and
+    //          password-reset mail: the hook returns 500, GoTrue returns
+    //          500 unexpected_failure, and nobody can get in. friendlyAuthError
+    //          in src/screens/Login.jsx has a second pattern for exactly this,
+    //          because none of those words say "rate limit".
     throw new Error(`Resend sendMail failed (${response.status}): ${await response.text()}`)
   }
 }

@@ -86,7 +86,8 @@ async function sendMail(bcc: string[], subject: string, html: string, text: stri
   if (!response.ok) {
     //   401 -> wrong or revoked RESEND_API_KEY
     //   403 -> MAIL_FROM domain not verified
-    //   429 -> free-tier limit. A known ceiling, not a bug to discover at 101.
+    //   429 -> rate or allowance limit. !! NOT the old 100/day free cap - the
+    //          account is on Resend Pro since 13 Aug 2026.
     throw new Error(`Resend failed (${response.status}): ${await response.text()}`)
   }
 }
