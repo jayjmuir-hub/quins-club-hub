@@ -10,6 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
+- **A crashed screen no longer blanks the whole app.** There was no error
+  boundary anywhere in `src/`; React 18 unmounts the entire tree on an uncaught
+  render error, so one null where a component expected a string gave a parent a
+  white page with no text and no way back.
+  ⚠️ **AND REFRESHING DID NOT FIX IT**, which is what made this worse than the
+  ordinary case — the service worker serves the same bundle, and the
+  NetworkFirst cache may return the same poisoned response. So the fallback
+  offers **Clear saved data** (purge then reload) as well as **Try again**.
+  ⚠️ **TWO BOUNDARIES, NOT REDUNDANT**: AppShell wraps the routed screen only so
+  the nav survives; App wraps everything, including the four public routes that
+  render outside any AppShell — two of which the Play Store opens cold.
+  ⚠️ **AppShell's is KEYED ON `pathname`**, or a crashed screen never clears
+  while the person taps other tabs.
+  ⚠️ **THE WIRING IS TESTED SEPARATELY FROM THE COMPONENT.** Proved by injecting
+  three faults: **removing the AppShell boundary turns the wiring file red while
+  the component file stays GREEN** — the exact state `src/` was in this morning,
+  and the reason a component test alone would have been worthless.
+  ⚠️ **Two of the repo's own guardrails caught the first draft and both were
+  right** — `button-sweep` rejected two hand-rolled buttons, `theme` rejected a
+  raw hex. Fixed by routing through `<Button>` and `text-ink-muted`, not by
+  exempting either.
+  ⚠️ **NOT looked at in a real browser** — nothing verifies the fallback LOOKS
+  right, only that it renders and says the right words.
 - **The `search_path` rule is a THREE-WAY TEST, not "everything is pinned except
   one"** — plus a migration pinning
   `private.events_result_from_components` (**written, NOT yet applied**,

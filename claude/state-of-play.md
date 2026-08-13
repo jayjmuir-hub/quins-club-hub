@@ -1025,10 +1025,40 @@ Ordered by what they cost to fix, not by how alarming they sound.
   meaning. ⚠️ **One migration touching all 18, not eighteen migrations** — and
   prove it against an injected fault afterwards, or all you have shown is that the
   migration applied.
-- **There is no React error boundary anywhere** (`grep ErrorBoundary src/` → 0).
-  React 18 unmounts the whole tree on an uncaught render error, and ⚠️ **the
-  service worker then serves the same broken bundle on reload, so "refresh the
-  page" does not fix it** — which no parent will get past.
+- ✅ **DONE 13 Aug — THERE ARE NOW TWO ERROR BOUNDARIES.** This read *"there is
+  no React error boundary anywhere (`grep ErrorBoundary src/` → 0)"*.
+  ⚠️ **TWO, AND THEY ARE NOT REDUNDANT.** `AppShell` wraps the routed **screen
+  only**, so the masthead and nav survive and a parent whose Roster crashed can
+  still reach Schedule. `App` wraps **everything**, because AppShell itself,
+  `RequireAuth` and `MembershipProvider` can throw — and because `/privacy`,
+  `/delete-account`, `/reset-password` and `/auth/confirm` render outside any
+  AppShell. **The first two are linked from the Play Store listing and opened
+  cold by a reviewer.**
+  ⚠️ **THE AppShell ONE IS KEYED ON `location.pathname`, AND WITHOUT THAT THE
+  FIX IS HALF A BUG.** A boundary holds its error state until something clears
+  it, so a crashed Roster would stay on the fallback while the person taps
+  Schedule — nav working, content permanently broken, which reads as deliberate
+  and is worse than the blank page it replaced.
+  ⚠️ **THE FALLBACK OFFERS "CLEAR SAVED DATA", NOT JUST "TRY AGAIN", AND THAT IS
+  THE SERVICE-WORKER POINT.** A reload is served the same bundle, and the
+  NetworkFirst cache over `GET /rest/v1/*` may hand back the same poisoned
+  response that caused the crash — so the one thing every non-technical person
+  tries first is the one thing that reliably fails. That button purges the cache
+  (`clearCachedApiResponses`) and then reloads.
+  ⚠️ **The raw exception is one tap away, never shown by default.** This club has
+  no error tracking at all, so the only route from a crash to a diagnosis is
+  somebody telling Jay what it said.
+  ⚠️ **THE WIRING IS TESTED SEPARATELY FROM THE COMPONENT, AND THAT SPLIT IS THE
+  POINT.** `tests/error-boundary.test.jsx` proves the component catches;
+  `tests/error-boundary-wiring.test.jsx` proves something actually renders it.
+  **Proved by injecting three faults: removing the AppShell boundary turns the
+  wiring file red while the component file stays GREEN** — which is exactly the
+  state `src/` was in before today. Removing only the `key`, and removing the
+  outer boundary, each go red on their own assertion.
+  ⚠️ **NOT LOOKED AT IN A REAL BROWSER.** jsdom applies no Tailwind, and
+  `harness/check-overflow.mjs` has no crashing scenario, so **nothing has
+  verified the fallback LOOKS right** — only that it renders and says the right
+  words. Same standing limitation as everything else visual here.
 - **There is no monitoring, no alerting and no error tracking.** Detection today is
   somebody telling Jay. ⚠️ **Pro's 7-day logs help you INVESTIGATE and tell you
   nothing** — Log Drains are a Team-plan feature.
