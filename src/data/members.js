@@ -430,9 +430,18 @@ const REGISTER_MESSAGES = {
     "We couldn't use those details. Check the player's name is filled in and no longer than " +
     '80 characters, and pick an age group from the list. If the list looks out of date, ' +
     'reload the page.',
+  // ⚠️ REWORDED 13 Aug 2026, and the old wording is worth recording because it
+  // was right when it was written and wrong the moment the feature landed. It
+  // read "please wait rather than adding more", which is a telling-off — fair
+  // when the only way to reach this code was to submit the same form five
+  // times, and unfair now that a parent of six is deliberately supported and
+  // simply hit the ceiling. The limit is on players AWAITING APPROVAL, never on
+  // how many children an account may have, so the message has to say that or
+  // the parent concludes the app cannot hold their family.
   42901:
-    "You already have players waiting to be approved, so we haven't added another. " +
-    'The club will review them — please wait rather than adding more.',
+    'You have five players waiting to be approved, which is the most we can hold at ' +
+    'once. Once a coach or admin has approved them you can add the rest — there is no ' +
+    'limit on how many children one account can have.',
   // ⚠️ NO 22004 ENTRY, AND THE ABSENCE IS THE POINT. The gender-required guard
   // raises 22004 rather than joining the three raises under 22023 precisely so
   // that its server message — which NAMES THE SQUAD ("U16G Contact is a

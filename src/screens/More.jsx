@@ -328,7 +328,12 @@ function SendAnIdea() {
 }
 
 export default function More() {
-  const { memberships, teams } = useMemberships()
+  // `reload` is passed to YourPlayers so that a child added there lands in the
+  // provider — the new membership is created server-side and nothing pushes it
+  // here. Kept as a prop rather than a second useMemberships() call inside that
+  // component, so it stays a pure props component and its tests stay free of
+  // the provider.
+  const { memberships, teams, reload } = useMemberships()
   const { user } = useAuth()
   const { profile } = useMyProfile()
   const admin = isAdmin(memberships)
@@ -357,8 +362,11 @@ export default function More() {
       />
 
       {/* Renders nothing at all for a coach or admin with no child at the
-          club — an empty "Your players" card would imply something missing. */}
-      <YourPlayers memberships={memberships} teams={teams} />
+          club — an empty "Your players" card would imply something missing.
+          ⚠️ Since 13 Aug 2026 it also holds the ONLY parent-facing route to
+          adding a second child, so "renders nothing" is now decided by ROLE
+          rather than by whether the list came back empty. */}
+      <YourPlayers memberships={memberships} teams={teams} reload={reload} />
 
       {/* ⚠️ EVERY MEMBER SEES THIS, and that is the ruling rather than an
           oversight (Jay, 12 Aug 2026): a parent with a good photo of Saturday's

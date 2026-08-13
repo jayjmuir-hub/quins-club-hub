@@ -1,8 +1,5 @@
-import { useState } from 'react'
-import { registerMyPlayer } from '../data/members.js'
-import Segmented from './Segmented.jsx'
 import Button from './Button.jsx'
-import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
+import PlayerRegistrationForm from './PlayerRegistrationForm.jsx'
 
 // What a signed-in account with NO membership sees FIRST: add your player.
 //
@@ -13,6 +10,13 @@ import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gend
 // own child. RequestAccess — "tell the club who you are and wait" — is still
 // mounted alongside this, but as the SECONDARY route, for someone who is not
 // registering a child at all: a coach, a committee member, a volunteer.
+//
+// ⚠️ THE FIELDS THEMSELVES MOVED TO PlayerRegistrationForm.jsx ON 13 AUG 2026,
+// when a parent gained the ability to register more than one child. This file
+// keeps what is specific to the zero-membership moment — the shell, the copy
+// about approval, and the way out to RequestAccess — and nothing else. The form
+// is the SAME component /more opens, so there is one implementation of the one
+// function a person with no membership may call.
 //
 // ⚠️ WHAT THIS FORM CREATES IS NOT ACCESS. register_my_player writes a
 // membership with status='pending', which attaches the person to the squad's
@@ -38,24 +42,6 @@ import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gend
 // select that cannot be submitted. RequestAccess's own header comment records
 // the same fact from the other side.
 
-const FIELD =
-  'w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
-const LABEL = 'mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-faint'
-
-// ⚠️ "My child" FIRST, and it is the default. Registering a child is the
-// overwhelmingly common case, and a default of "I'm the player" would have a
-// distracted parent register themselves as a twelve-year-old.
-const WHO_OPTIONS = [
-  { value: 'child', label: 'My child' },
-  { value: 'self', label: "I'm the player" },
-]
-
-// Mirrors the two client-side-checkable guards inside register_my_player
-// (blank name, over 80 characters). The database is what actually enforces
-// them — these exist so the common typo does not cost a round trip and come
-// back as a code this screen then has to translate.
-const NAME_MAX = 80
-
 function Shell({ title, children }) {
   return (
     <div className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-line bg-surface-card p-6 shadow-card">
@@ -76,98 +62,13 @@ function Shell({ title, children }) {
  * who cannot get in must always be able to get out.
  */
 export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess, children }) {
-  const [fullName, setFullName] = useState('')
-  const [teamId, setTeamId] = useState('')
-  // null, not '' — matches players.gender, which is nullable and has a CHECK
-  // that refuses the empty string. Most squads never ask for it.
-  const [gender, setGender] = useState(null)
-  // "Am I the player?" — false is the historic behaviour and stays the default,
-  // so someone who never sees the question registers exactly as before.
-  const [selfRegister, setSelfRegister] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState(null)
-
-  // sort_order then name, the same ordering every other age-group list in the
-  // app uses (Accounts, InviteForm, AccessBuilder). A parent scanning for
-  // "U13" should find it where they expect it, not in insertion order.
-  const sortedTeams = [...teams].sort((a, b) => {
-    const orderDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0)
-    if (orderDiff !== 0) return orderDiff
-    return a.name.localeCompare(b.name)
-  })
-
-  // Whether the CHOSEN squad makes gender mandatory, so the field appears the
-  // moment they pick U16G Contact rather than after a rejected submit.
-  const selectedTeam = sortedTeams.find((team) => team.id === teamId)
-  const genderRequired = squadRequiresGender(selectedTeam?.name)
-
-  // ⚠️ THE SQUAD DECIDES, AND IT COMES FROM A COLUMN — teams.self_registration_allowed,
-  // never the squad's name. 20260806_claim_roster_access.sql ruled that a
-  // rename must not be able to hand an account a role it shouldn't have, and
-  // parsing "U13" out of the text here would do exactly that. The database
-  // refuses it independently; this only decides whether to ASK.
-  const canSelfRegister = selectedTeam?.self_registration_allowed === true
-
-  async function handleSubmit(event) {
-    event.preventDefault()
-
-    const name = fullName.trim()
-    if (!name) {
-      setError("Enter your player's name.")
-      return
-    }
-    if (name.length > NAME_MAX) {
-      setError(`That name is too long — ${NAME_MAX} characters at most.`)
-      return
-    }
-    if (!teamId) {
-      setError("Choose your player's age group.")
-      return
-    }
-
-    // ⚠️ Gender is required only when the SQUAD is single-gender (Jay, 9 Aug
-    // 2026). Mirrors the guard inside register_my_player, which is what
-    // actually enforces it — this exists so the common case does not cost a
-    // round trip, exactly like the name checks above.
-    //
-    // Note the asymmetry with the mismatch rule: a gender that CONTRADICTS the
-    // squad is allowed through here and everywhere else. Only a blank is
-    // refused. Do not "tighten" this into a match check.
-    if (squadRequiresGender(selectedTeam?.name) && !gender) {
-      setError(genderRequiredMessage(selectedTeam.name))
-      return
-    }
-
-    setError(null)
-    setSubmitting(true)
-    try {
-      // ⚠️ `canSelfRegister &&` is not belt-and-braces, it is the guard. The
-      // reset in the select's onChange covers changing squad; this covers the
-      // case where `teams` reloads underneath the form and the squad's
-      // permission changes while the answer is still held in state.
-      await registerMyPlayer(name, teamId, gender, canSelfRegister && selfRegister)
-      // No success state on purpose: reloading the provider gives this person
-      // a membership, so AppShell stops rendering this component entirely and
-      // shows them the app with the waiting-to-be-approved banner. A
-      // "Registered!" card here would be a screen nobody ever sees, or worse,
-      // one that lingers if the reload were ever made conditional.
-      await onRegistered?.()
-    } catch (err) {
-      // registerMyPlayer has already turned the RPC's error code into a
-      // sentence (see REGISTER_MESSAGES in src/data/members.js). Anything
-      // still without a message is a network-level failure.
-      setError(err?.message || "We couldn't add that player. Try again in a moment.")
-      setSubmitting(false)
-    }
-  }
-
   const secondary = (
     <Button variant="secondary" full onClick={onAskForAccess} className="mt-4">
       I&apos;m not adding a player
     </Button>
   )
 
-  if (sortedTeams.length === 0) {
+  if (teams.length === 0) {
     return (
       <Shell title="Let&apos;s get you connected">
         <p className="mt-2 text-center text-sm leading-relaxed text-ink-faint">
@@ -189,118 +90,23 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
         straight away.
       </p>
 
-      {/* Said up front, not after they submit. Someone who registers a child
+      {/* ⚠️ SAID UP FRONT, NOT AFTER THEY SUBMIT. Someone who registers a child
           and then finds the roster empty will assume the app is broken; being
           told in advance that the squad list waits for approval turns the same
-          screen into the expected outcome. */}
+          screen into the expected outcome.
+
+          The second sentence is new with multi-child registration (13 Aug
+          2026): a parent of three arriving at a form with one name box has no
+          way of knowing the other two are catered for, and the obvious guess —
+          "I suppose I need an account each" — is the expensive one to undo. */}
       <p className="mt-3 rounded-[11px] bg-surface px-3 py-2.5 text-sm leading-relaxed text-ink-muted">
         A coach or admin checks every new player, so the rest of the squad stays
         hidden until they&apos;ve approved you. That usually takes a day or two.
+        Got more than one child at the club? Add them all here — one account covers
+        the family.
       </p>
 
-      <form className="mt-5" onSubmit={handleSubmit} noValidate>
-        {error && (
-          <p
-            role="alert"
-            className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
-          >
-            {error}
-          </p>
-        )}
-
-        <label htmlFor="register-player-name" className={LABEL}>
-          {/* Follows the answer above: a 16-year-old filling in "Player's full
-              name" about themselves reads as a form written for somebody
-              else. */}
-          {selfRegister ? 'Your full name' : "Player's full name"}
-        </label>
-        <input
-          id="register-player-name"
-          name="playerName"
-          type="text"
-          autoComplete="off"
-          maxLength={NAME_MAX}
-          value={fullName}
-          disabled={submitting}
-          onChange={(event) => setFullName(event.target.value)}
-          className={FIELD}
-        />
-
-        <label htmlFor="register-player-team" className={`${LABEL} mt-4`}>
-          Age group
-        </label>
-        <select
-          id="register-player-team"
-          name="teamId"
-          value={teamId}
-          disabled={submitting}
-          onChange={(event) => {
-            const nextId = event.target.value
-            setTeamId(nextId)
-            // ⚠️ CLEAR THE ANSWER WHEN THE QUESTION DISAPPEARS. Tick "this is
-            // me" on U18B, then change your mind to U10 Mixed, and without this
-            // the flag survives on a squad that never showed the control. The
-            // database would refuse it, but the person would be reading an
-            // error about a question they can no longer see.
-            const next = sortedTeams.find((team) => team.id === nextId)
-            if (next?.self_registration_allowed !== true) setSelfRegister(false)
-          }}
-          className={FIELD}
-        >
-          {/* An empty first option, not a pre-selected squad: a default that
-              happens to be right for one family is wrong for every other one,
-              and a wrong age group is a row an admin has to notice and fix. */}
-          <option value="">Choose an age group…</option>
-          {sortedTeams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {team.name}
-            </option>
-          ))}
-        </select>
-
-        {/* ⚠️ CONDITIONAL on the SQUAD's column, and it appears ABOVE the
-            gender field on purpose: "who is this?" changes the meaning of every
-            question under it, so being asked it after naming the player reads
-            as an afterthought. Squads below U13 never see it and register
-            exactly as they did before. */}
-        {canSelfRegister && (
-          <Segmented
-            legend="Who are you registering?"
-            name="register-who"
-            options={WHO_OPTIONS}
-            value={selfRegister ? 'self' : 'child'}
-            onChange={(next) => setSelfRegister(next === 'self')}
-            disabled={submitting}
-            className="mt-4"
-          />
-        )}
-
-        {/* ⚠️ CONDITIONAL, not always-on. Asking every parent in the club for
-            their child's gender when only seven of the eighteen squads need it
-            is a question most families should never see — and an optional
-            question on a sign-up form is one people answer wrongly to get
-            past it. It appears when the squad demands it, and says why. */}
-        {genderRequired && (
-          <>
-            <p className="mt-4 rounded-[11px] bg-surface px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-muted">
-              {selectedTeam.name} is a single-gender squad, so we need this one.
-            </p>
-            <Segmented
-              legend="Gender (required)"
-              name="register-player-gender"
-              options={GENDERS}
-              value={gender}
-              onChange={setGender}
-              disabled={submitting}
-              className="mt-2"
-            />
-          </>
-        )}
-
-        <Button type="submit" full disabled={submitting} className="mt-4">
-          {submitting ? 'Adding…' : 'Add my player'}
-        </Button>
-      </form>
+      <PlayerRegistrationForm teams={teams} onDone={onRegistered} submitLabel="Add my player" />
 
       {/* The old route, kept and kept working. Not everyone signing in is a
           parent — a coach, a team manager or a committee member has no child to

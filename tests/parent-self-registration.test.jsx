@@ -379,6 +379,230 @@ describe('Add your player — a signed-in account with no access', () => {
     })
   })
 
+  // ── More than one child, in one go (Jay, 13 Aug 2026) ──────────────────
+  //
+  // ⚠️ THE FORM WAS THE LIMIT, NOT THE DATABASE, and that is the whole reason
+  // this took five days to notice. `register_my_player` counts only PENDING
+  // rows against its cap of five, deliberately, so that "an approved parent
+  // adding a second child later is normal and must not be blocked by their own
+  // history" (db/migrations/20260808_register_my_player.sql). The form took one
+  // name and vanished after one submit.
+  //
+  // ⚠️ SEQUENTIAL, NOT CONCURRENT, and the partial-failure tests below are why.
+  // The RPC takes one player per call, so three children are three round trips
+  // whatever happens; firing them together makes "which child is missing?"
+  // unanswerable. Register.jsx's touchline sweep made the same call first.
+  describe('a parent registering more than one child', () => {
+    it('saves each child in turn, in the order they were typed', async () => {
+      const user = userEvent.setup()
+      const reload = vi.fn()
+      useMembershipsMock.mockReturnValue(shellState({ reload }))
+
+      renderShell()
+
+      await user.type(screen.getByLabelText(/player 1's full name|player's full name/i), 'Chidi Okafor')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+
+      await user.click(screen.getByRole('button', { name: /add another child/i }))
+
+      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
+
+      await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
+
+      await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalledTimes(2))
+      // Order matters: it is the order the parent typed, and it is what makes
+      // the partial-failure message below able to name the right child.
+      expect(registerMyPlayerMock.mock.calls[0]).toEqual(['Chidi Okafor', TEAM_U13.id, null, false])
+      expect(registerMyPlayerMock.mock.calls[1]).toEqual(['Ada Okafor', TEAM_U16.id, null, false])
+      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+    })
+
+    // ⚠️ PER ROW, NOT PER FORM. Two children in two different squads, one of
+    // which is single-gender: the gender question must appear against that
+    // child only. A form that asked once and applied the answer to everybody
+    // would record a gender the parent never gave for the other child.
+    it('asks for gender only on the row whose squad demands it', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      await user.click(screen.getByRole('button', { name: /add another child/i }))
+      await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16G.id)
+
+      // Exactly one gender control on the page, and the explanation names the
+      // squad that caused it.
+      expect(screen.getAllByRole('radio', { name: /^female$/i })).toHaveLength(1)
+      expect(screen.getByText(/U16G Contact is a single-gender squad/i)).toBeInTheDocument()
+    })
+
+    it('names the row that is incomplete rather than saying "your player"', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      await user.click(screen.getByRole('button', { name: /add another child/i }))
+      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      // Row 2 has no age group.
+      await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /choose an age group for ada okafor/i,
+      )
+      // Nothing was sent: a list that is refused client-side must not half-save.
+      expect(registerMyPlayerMock).not.toHaveBeenCalled()
+    })
+
+    // ⚠️ THE ONE THAT MATTERS. Each call is its own committed transaction, so
+    // child one EXISTS the moment it returns — "roll it all back" is not on the
+    // table without a delete path that does not exist. What a parent must never
+    // see is a generic apology that leaves them guessing whether any of it
+    // landed, because the obvious response is to submit the lot again and
+    // create duplicates the club then has to spot and delete.
+    it('keeps the children that saved, and names the one that did not', async () => {
+      const user = userEvent.setup()
+      const refusal = new Error('That age group does not exist.')
+      refusal.code = '22023'
+      registerMyPlayerMock
+        .mockResolvedValueOnce({ id: 'mm-1', status: 'pending' })
+        .mockRejectedValueOnce(refusal)
+
+      renderShell()
+
+      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      await user.click(screen.getByRole('button', { name: /add another child/i }))
+      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
+      await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
+
+      // The good news, said as good news.
+      expect(await screen.findByTestId('registered-so-far')).toHaveTextContent(
+        /chidi okafor is registered/i,
+      )
+      // And the bad news, naming the child and carrying the server's reason.
+      expect(screen.getByRole('alert')).toHaveTextContent(/ada okafor wasn't added/i)
+      expect(screen.getByRole('alert')).toHaveTextContent(/that age group does not exist/i)
+    })
+
+    // The child who saved must be GONE from the list, or the parent fixes the
+    // failing row, resubmits, and registers the first one a second time.
+    it('does not re-submit a child who already saved', async () => {
+      const user = userEvent.setup()
+      const refusal = new Error('That age group does not exist.')
+      refusal.code = '22023'
+      registerMyPlayerMock
+        .mockResolvedValueOnce({ id: 'mm-1', status: 'pending' })
+        .mockRejectedValueOnce(refusal)
+
+      renderShell()
+
+      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      await user.click(screen.getByRole('button', { name: /add another child/i }))
+      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
+      await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
+
+      await screen.findByTestId('registered-so-far')
+
+      // One row left, and it is Ada's.
+      expect(screen.getAllByTestId('player-row')).toHaveLength(1)
+      expect(screen.getByLabelText(/player's full name/i)).toHaveValue('Ada Okafor')
+
+      registerMyPlayerMock.mockResolvedValueOnce({ id: 'mm-2', status: 'pending' })
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalledTimes(3))
+      // Three calls total: Chidi, Ada-refused, Ada-retried. Chidi was never
+      // sent twice.
+      const names = registerMyPlayerMock.mock.calls.map((call) => call[0])
+      expect(names).toEqual(['Chidi Okafor', 'Ada Okafor', 'Ada Okafor'])
+    })
+
+    // ⚠️ A PARENT MUST NOT BE STRANDED BY A ROW THEY CANNOT FIX. Two children
+    // saved and the third refused for a reason outside their control leaves
+    // real access waiting on the other side of this form.
+    it('offers a way through once something has saved', async () => {
+      const user = userEvent.setup()
+      const reload = vi.fn()
+      useMembershipsMock.mockReturnValue(shellState({ reload }))
+      const refusal = new Error('That age group does not exist.')
+      refusal.code = '22023'
+      registerMyPlayerMock
+        .mockResolvedValueOnce({ id: 'mm-1', status: 'pending' })
+        .mockRejectedValueOnce(refusal)
+
+      renderShell()
+
+      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      await user.click(screen.getByRole('button', { name: /add another child/i }))
+      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
+      await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
+
+      await screen.findByTestId('registered-so-far')
+      await user.click(screen.getByRole('button', { name: /continue without them/i }))
+
+      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+    })
+
+    // ⚠️ THE ESCAPE HATCH MUST NOT EXIST BEFORE IT IS EARNED. Offered on a
+    // fresh form it reads as "skip this", on the one screen whose entire
+    // purpose is not to be skipped.
+    it('does not offer that way through before anything has saved', async () => {
+      renderShell()
+
+      expect(screen.queryByRole('button', { name: /continue without them/i })).not.toBeInTheDocument()
+    })
+
+    it('stops at five rows and says why', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      const addAnother = () => screen.getByRole('button', { name: /add another child/i })
+      for (let i = 0; i < 4; i += 1) {
+        // eslint-disable-next-line no-await-in-loop -- each click must land
+        // before the next row exists to click it again.
+        await user.click(addAnother())
+      }
+
+      expect(screen.getAllByTestId('player-row')).toHaveLength(5)
+      expect(addAnother()).toBeDisabled()
+      // ⚠️ Says WHY, and says the limit is on players AWAITING APPROVAL rather
+      // than on the family. A disabled button with no sentence beside it reads
+      // as the app refusing to hold their children.
+      expect(screen.getByText(/the most you can add at once/i)).toBeInTheDocument()
+    })
+
+    it('lets a row be removed again, without disturbing the others', async () => {
+      const user = userEvent.setup()
+      renderShell()
+
+      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.click(screen.getByRole('button', { name: /add another child/i }))
+      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+
+      await user.click(screen.getByRole('button', { name: /remove ada okafor/i }))
+
+      expect(screen.getAllByTestId('player-row')).toHaveLength(1)
+      // ⚠️ THE BUG A KEYED LIST EXISTS TO PREVENT. With index keys, removing a
+      // row leaves the survivor holding the removed row's input state — so this
+      // would read "Ada Okafor" while claiming to be player 1.
+      expect(screen.getByLabelText(/player's full name/i)).toHaveValue('Chidi Okafor')
+    })
+
+    // The first row can never be removed: a list you can empty is a form with
+    // no fields.
+    it('does not let the only row be removed', async () => {
+      renderShell()
+
+      expect(screen.queryByRole('button', { name: /^remove/i })).not.toBeInTheDocument()
+    })
+  })
+
   it('will not submit a blank name, and does not spend a round trip finding out', async () => {
     const user = userEvent.setup()
     renderShell()
@@ -397,7 +621,13 @@ describe('Add your player — a signed-in account with no access', () => {
     await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/choose your player's age group/i)
+    // ⚠️ THE WORDING NAMES THE CHILD SINCE 13 Aug 2026, and the change is not
+    // cosmetic. The form can now hold up to five rows, so "choose your player's
+    // age group" would leave a parent of three hunting for which box it means.
+    // With one row and a name typed it reads the same either way.
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /choose an age group for chidi okafor/i,
+    )
     expect(registerMyPlayerMock).not.toHaveBeenCalled()
   })
 
