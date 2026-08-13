@@ -33,7 +33,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   exempting either.
   ⚠️ **NOT looked at in a real browser** — nothing verifies the fallback LOOKS
   right, only that it renders and says the right words.
-- **The `search_path` rule is a THREE-WAY TEST, not "everything is pinned except
+- `74862ce` — **The `search_path` rule is a THREE-WAY TEST, not "everything is pinned except
   one"** — plus a migration pinning
   `private.events_result_from_components` (**written, NOT yet applied**,
   `db/migrations/20260813_pin_scoring_trigger_search_path.sql`).
