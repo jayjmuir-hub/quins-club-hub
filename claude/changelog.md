@@ -10,6 +10,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
+- `a39d69a` — **Docs for the calendar, the App button and the desktop pass.** Records
+  what shipped and carries the "do not sample colours from adhjrt.com" warning.
+
 - `7df6ea3` — **A full calendar for Pitch Management, an App button
   in the top bar, and a desktop pass.** Three things Jay asked for on 12 Aug.
   ⚠️ **Day | Week | Month on `/admin/allocation`, and it OPENS ON MONTH** — Jay's call
