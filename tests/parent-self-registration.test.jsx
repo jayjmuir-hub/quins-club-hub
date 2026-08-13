@@ -680,9 +680,19 @@ describe('Add your player — a signed-in account with no access', () => {
       expect(updateProfileNamesMock).not.toHaveBeenCalled()
     })
 
-    // A family name is genuinely optional — plenty of people have one name,
-    // and the same rule already applies in NamePrompt and the You card.
-    it('accepts a first name alone', async () => {
+    // ⚠️ INVERTED 13 Aug 2026 (Jay). This asserted that a first name ALONE was
+    // accepted, matching NamePrompt, RequestAccess and the You card, all of
+    // which mark the family name optional because "plenty of people have one
+    // name".
+    //
+    // That principle holds for those fields, which exist so the app has A name
+    // for somebody. It does not hold for this one, which exists so a coach can
+    // identify a STRANGER asking to join a children's squad — "Sarah" does not
+    // do that. Measured before changing it: of 13 adults with a confirmed name,
+    // ZERO have no family name; zero of 9 players have a single-word name. The
+    // exemption was protecting nobody, and Jay's call was to require it and skip
+    // the escape hatch that was offered.
+    it('refuses a first name alone, unlike every other name field in the app', async () => {
       const user = userEvent.setup()
       unnamed()
       renderShell()
@@ -692,14 +702,48 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
+      expect(await screen.findByRole('alert')).toHaveTextContent(/family name/i)
+      // Nothing written, in either direction — the name is checked before any
+      // round trip, exactly like the blank-first-name case above.
+      expect(updateProfileNamesMock).not.toHaveBeenCalled()
+      expect(registerMyPlayerMock).not.toHaveBeenCalled()
+    })
+
+    // ⚠️ The negative above is worth nothing unless the same journey SUCCEEDS
+    // once the family name is there. Same run, same fields, one box filled in.
+    it('accepts it once the family name is given', async () => {
+      const user = userEvent.setup()
+      unnamed()
+      renderShell()
+
+      await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
+      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+      await screen.findByRole('alert')
+
+      await user.type(screen.getByLabelText(/your family name/i), 'Okafor')
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
       await waitFor(() =>
         expect(updateProfileNamesMock).toHaveBeenCalledWith({
           profileId: 'user-1',
           firstName: 'Hannah',
-          lastName: '',
+          lastName: 'Okafor',
         }),
       )
       await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalled())
+    })
+
+    // ⚠️ AND THE FIELD MUST NOT SAY "optional", because it no longer is. The
+    // label is the only thing telling somebody the rules before they submit.
+    it('does not label the family name optional', async () => {
+      unnamed()
+      renderShell()
+
+      const label = await screen.findByLabelText(/your family name/i)
+      expect(label).toBeInTheDocument()
+      expect(screen.queryByLabelText(/your family name \(optional\)/i)).not.toBeInTheDocument()
     })
   })
 

@@ -1106,6 +1106,11 @@ describe('More — the registrant’s own name', () => {
     await u.click(await screen.findByTestId('add-another-player'))
 
     await u.type(await screen.findByLabelText(/your first name/i), 'Jay')
+    // ⚠️ The family name is REQUIRED here since 13 Aug 2026 (see the guard in
+    // PlayerRegistrationForm). Without it this test would never reach the
+    // refusal it exists to exercise — it would stop at client-side validation
+    // and pass for the wrong reason.
+    await u.type(screen.getByLabelText(/your family name/i), 'Muir')
     await u.type(screen.getByLabelText(/player's full name/i), 'Rory Muir')
     await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
     await u.click(screen.getByRole('button', { name: /add this player/i }))
