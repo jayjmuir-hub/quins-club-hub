@@ -242,10 +242,103 @@ describe('subscribeEvents', () => {
     expect(channel.on).toHaveBeenCalledWith(
       'postgres_changes',
       expect.objectContaining({ event: '*', schema: 'public', table: 'events' }),
-      callback,
+      // ⚠️ NOT `callback` any more. Since 13 Aug 2026 the handler is a debounce
+      // wrapper, so the raw callback is no longer what reaches Supabase. The
+      // debouncing itself is asserted below; this line only pins the shape.
+      expect.any(Function),
     )
     expect(channel.subscribe).toHaveBeenCalled()
     expect(typeof unsubscribe).toBe('function')
+  })
+
+  // ⚠️ NO `filter` KEY, AND THIS IS THE LOAD-BEARING ASSERTION OF THE THREE.
+  // Adding `filter: team_id=in.(...)` reads as an obvious optimisation and is
+  // a bug: `events` is replica identity DEFAULT, so a DELETE payload carries
+  // the primary key only, the filter matches nothing, and a cancelled fixture
+  // stops disappearing from other people's screens. RLS already scopes
+  // delivery. This test is what stops somebody "improving" it.
+  it('passes NO server-side filter — RLS scopes delivery, and a filter would drop deletes', () => {
+    const channel = createChannel()
+    supabase.channel.mockReturnValue(channel)
+
+    subscribeEvents(vi.fn())
+
+    const [, config] = channel.on.mock.calls[0]
+    expect(config).not.toHaveProperty('filter')
+  })
+
+  it('coalesces a burst of changes into ONE callback', () => {
+    vi.useFakeTimers()
+    try {
+      const channel = createChannel()
+      supabase.channel.mockReturnValue(channel)
+      const callback = vi.fn()
+
+      subscribeEvents(callback, { debounceMs: 400 })
+      const [, , onChange] = channel.on.mock.calls[0]
+
+      onChange({})
+      onChange({})
+      onChange({})
+      expect(callback).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(400)
+      // A coach saving three fixtures must cost every connected client ONE
+      // refetch, not three.
+      expect(callback).toHaveBeenCalledTimes(1)
+      // The payload is deliberately not forwarded — a coalesced burst has no
+      // single meaningful one, and callers only ever needed "go and re-read".
+      expect(callback).toHaveBeenCalledWith()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('fires again for a change arriving after the window', () => {
+    vi.useFakeTimers()
+    try {
+      const channel = createChannel()
+      supabase.channel.mockReturnValue(channel)
+      const callback = vi.fn()
+
+      subscribeEvents(callback, { debounceMs: 400 })
+      const [, , onChange] = channel.on.mock.calls[0]
+
+      onChange({})
+      vi.advanceTimersByTime(400)
+      onChange({})
+      vi.advanceTimersByTime(400)
+
+      // ⚠️ Not a formality: a debounce that latches would silently turn live
+      // updates off again after the first one, which is the bug this whole
+      // change exists to fix.
+      expect(callback).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('unsubscribing cancels a pending callback', () => {
+    vi.useFakeTimers()
+    try {
+      const channel = createChannel()
+      supabase.channel.mockReturnValue(channel)
+      const callback = vi.fn()
+
+      const unsubscribe = subscribeEvents(callback, { debounceMs: 400 })
+      const [, , onChange] = channel.on.mock.calls[0]
+
+      onChange({})
+      unsubscribe()
+      vi.advanceTimersByTime(400)
+
+      // ⚠️ The callback is a setState. Firing after unmount means an unmounted
+      // Schedule refetches and stores into a component that is gone — the kind
+      // of leak that only shows up as a console warning nobody reads.
+      expect(callback).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('the returned unsubscribe function is idempotent (safe to call twice)', () => {
