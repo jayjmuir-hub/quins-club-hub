@@ -94,7 +94,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `Added by No name yet · hannah@example.com`. ⚠️ **NOT verified live by Claude** — needs
   a parent sign-in.
 
-- `6c4325f` — **A count on the approvals entry point — DESIGNED, NOT SHIPPED.**
+- **A count on the approvals entry point — DESIGNED, NOT SHIPPED.**
+  ⚠️ **NO SHA, DELIBERATELY.** This entry cited `6c4325f` — the BRANCH commit —
+  and CI went red with *"changelog cites a SHA that is not a commit"*. The branch
+  was rebased, so that SHA no longer exists; it survived only as a loose object in
+  the clone that wrote it, which is exactly the trap `CLAUDE.md` describes for
+  squash merges. **Never cite a branch SHA.** The next pull request cites the
+  squash SHA, which is the only one that will exist.
   `claude/plans/2026-08-13-approval-badge.md`, plus the SHA catch-up for `231b660`.
   ⚠️ **`docs:check` does NOT validate paths inside `claude/plans/`** (`scripts/docs-check.mjs`
   excludes it, because a plan may name files that do not exist yet), so that plan's paths
