@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **The approval queue can name the person it is asking about.** Plan:
+- **The SAME nameless-row fix, at the two sites the first pass missed.** ⚠️ **The
+  previous commit fixed `PendingApprovals` and left `'No name yet'` in the "Waiting for
+  access" list and the dismissed list — and those are the more visible of the three**,
+  because a person who signs up and completes NEITHER onboarding form still lands there
+  carrying nothing but an address. **Found by grepping the DEPLOYED production bundle
+  for the string that was supposed to be gone and finding it still there**, not by a
+  test: the suite was green because the two remaining sites had a test asserting the
+  placeholder. Both now fall back to the email address, and the address is suppressed
+  from the line below so it is not printed twice, a line apart. The old assertion in
+  `tests/accounts.test.jsx` is rewritten rather than deleted, and now pins the count at
+  exactly one. ⚠️ **THE LESSON: a green suite proved only that the sites WITH tests were
+  fixed.** The verification that caught it was checking the shipped artefact against the
+  claim, which is why "must be GONE" belongs in a post-deploy check and not only in a
+  test.
+
+- `d7643b8` — **The approval queue can name the person it is asking about.** Plan:
   `claude/plans/2026-08-13-registrant-name.md`. Reported by Jay watching a real
   registration land with no name on it, and asking whether it was waiting on email
   confirmation. ⚠️ **It was not, and the database rules that out outright** —

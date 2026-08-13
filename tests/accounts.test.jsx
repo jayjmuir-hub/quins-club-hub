@@ -832,7 +832,19 @@ describe('Accounts — waiting for access', () => {
     expect(within(section).getByText(/see nothing at all in the app/i)).toBeInTheDocument()
     // Not "requests" — nobody asked for anything.
     expect(within(section).queryByText(/request/i)).not.toBeInTheDocument()
-    expect(within(section).getByText('No name yet')).toBeInTheDocument()
+
+    // ⚠️ CHANGED 13 Aug 2026: the fallback is the EMAIL, not "No name yet".
+    // This asserted the placeholder, which is what an admin was left holding
+    // when somebody signed up and completed neither onboarding form — a label
+    // that identifies nobody, sitting where the only identifying fact should
+    // be. JANICE_PENDING has `full_name: ''` and an address, so her card is
+    // headed by that address now.
+    expect(within(section).queryByText('No name yet')).not.toBeInTheDocument()
+    expect(within(section).getByText('janice@example.com')).toBeInTheDocument()
+    // ⚠️ ONCE, not twice — the address used to be repeated on the line below
+    // the heading, and promoting it without suppressing that would print it
+    // twice, a line apart.
+    expect(within(section).getAllByText('janice@example.com')).toHaveLength(1)
     expect(within(section).getByText(/signed up 3 Aug 2026/)).toBeInTheDocument()
   })
 

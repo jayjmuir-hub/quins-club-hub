@@ -1202,9 +1202,24 @@ export default function Accounts() {
                   const state = grantState[profile.id] ?? {}
                   const triage = triageState[profile.id] ?? {}
                   const request = requestByProfile.get(profile.id)
-                  const displayName = profile.full_name?.trim() || 'No name yet'
+                  // ⚠️ THE EMAIL IS THE FALLBACK HERE TOO — 13 Aug 2026, and
+                  // this site was MISSED by the first pass at it. The pending
+                  // queue above was fixed and this was not, which is the more
+                  // visible of the two: a person who signs up and completes
+                  // neither form still lands in this list, carrying nothing but
+                  // an address. "No name yet" as the heading, with the address
+                  // demoted to the line below, put a placeholder where the only
+                  // identifying fact should be.
+                  const realName = profile.full_name?.trim() || null
+                  const displayName = realName || profile.email || 'No name yet'
                   const label = profile.email || displayName
                   const signedUp = formatJoined(profile.created_at)
+                  // The second line: the address, unless the heading is already
+                  // showing it, plus when they signed up. Built here rather than
+                  // inline so the JSX below stays readable.
+                  const subtitle = [realName ? profile.email ?? 'No email on file' : null, signedUp ? `signed up ${signedUp}` : null]
+                    .filter(Boolean)
+                    .join(' · ')
 
                   return (
                     <Card
@@ -1231,10 +1246,11 @@ export default function Accounts() {
                             </span>
                           )}
                         </span>
-                        <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
-                          {profile.email ?? 'No email on file'}
-                          {signedUp ? ` · signed up ${signedUp}` : ''}
-                        </span>
+                        {subtitle && (
+                          <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
+                            {subtitle}
+                          </span>
+                        )}
                         {/* Their own words. This is the whole reason the
                             request row exists: "Parent of Sam Muir, U10" is
                             what makes an unknown email actionable. */}
@@ -1325,7 +1341,10 @@ export default function Accounts() {
               {dismissed.map((profile) => {
                 const triage = triageState[profile.id] ?? {}
                 const request = requestByProfile.get(profile.id)
-                const displayName = profile.full_name?.trim() || 'No name yet'
+                // Same fallback as the waiting list above — a dismissed person
+                // is the one an admin is most likely to be trying to identify.
+                const displayName =
+                  profile.full_name?.trim() || profile.email || 'No name yet'
 
                 return (
                   <Card
@@ -1335,9 +1354,12 @@ export default function Accounts() {
                   >
                     <div className="min-w-0">
                       <span className="block text-[15px] font-bold text-ink">{displayName}</span>
-                      <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
-                        {profile.email ?? 'No email on file'}
-                      </span>
+                      {/* Suppressed when the heading is already the address. */}
+                      {(profile.full_name?.trim() || !profile.email) && (
+                        <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
+                          {profile.email ?? 'No email on file'}
+                        </span>
+                      )}
                       {request?.note && (
                         <span
                           className={`mt-1 block text-[12.5px] italic leading-relaxed ${MUTED_ON_PAPER}`}
