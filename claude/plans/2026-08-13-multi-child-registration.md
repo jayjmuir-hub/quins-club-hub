@@ -134,11 +134,23 @@ cannot hold their family.
 
 ## What is NOT covered, and is worth knowing
 
-⚠️ **Nobody is emailed when a registration is waiting.** That gap pre-dates this
-work — `PendingApprovalBanner` in `src/components/AppShell.jsx` says so out loud
-— and multi-child registration makes it land harder, because one parent can now
-put up to five rows into a queue nobody is notified about. Not in scope here;
-recorded so it is not rediscovered as a bug in this feature.
+⚠️ **THIS SECTION CLAIMED "nobody is emailed when a registration is waiting" AND
+IT WAS WRONG — corrected 13 Aug 2026, same day, after Jay said he had received
+the emails and so had the U18 team manager.** The claim was copied from
+`PendingApprovalBanner`'s comment in `src/components/AppShell.jsx`, which had
+been stale since **9 Aug**: `db/migrations/20260809_notify_pending_membership.sql`
+puts a trigger on the membership row that emails every coach, team manager and
+admin for that squad via the `notify-approval` function, confirmed ACTIVE on the
+live project.
+
+**So a parent registering several children does NOT fill a queue nobody watches**
+— the club is told each time. ⚠️ **The lesson is the one this repo keeps paying
+for: a code comment is not a measurement.** The banner's own user-facing text
+was telling parents to go and chase a coach who had already been emailed; that
+is fixed.
+
+What IS still true: **nobody is emailed on APPROVAL** — being let in is
+discovered by signing in.
 
 ⚠️ **"I'm the player" is still offered per row**, so a 16-year-old could in
 theory register themselves and a sibling in one submit. The database does not
