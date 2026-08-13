@@ -10,6 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
+- `328fba4` — **The error-boundary fallback is verified in a real browser.**
+  Chromium at 360px, a realistic crash injected into the PUBLIC `/privacy` route
+  so no login is needed and the OUTER boundary is the one exercised.
+  ⚠️ **A by-hand check, not a gate** — `harness/check-overflow.mjs` still has no
+  crashing scenario. Session record: `claude/handoffs/2026-08-13-session.md`.
+
 - `d10602d` — **A crashed screen no longer blanks the whole app.** There was no error
   boundary anywhere in `src/`; React 18 unmounts the entire tree on an uncaught
   render error, so one null where a component expected a string gave a parent a
