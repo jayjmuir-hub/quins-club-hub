@@ -50,6 +50,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 12 Aug 2026
 
+- `a39d69a` — **The docs caught up with the calendar, the App button and the
+  desktop pass.** The one-commit-behind entry for `7df6ea3` below, cleared by the
+  next pull request exactly as the rule requires. ⚠️ **It was then left uncited
+  for a day**, and `npm run docs:check` is what found it — run AFTER committing,
+  which is the run that predicts CI.
 - `7df6ea3` — **A full calendar for Pitch Management, an App button
   in the top bar, and a desktop pass.** Three things Jay asked for on 12 Aug.
   ⚠️ **Day | Week | Month on `/admin/allocation`, and it OPENS ON MONTH** — Jay's call
