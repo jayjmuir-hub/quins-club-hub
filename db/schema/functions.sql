@@ -1882,14 +1882,28 @@ GRANT EXECUTE ON FUNCTION private.can_edit_match_sheet(uuid) TO authenticated;
 -- `<profile_id>/<timestamp>.<ext>`, so the first segment IS the owner — a
 -- storage policy sees nothing but the filename. Mirrors photo_player/photo_team.
 --
--- ⚠️ NO PINNED search_path, and that is RECORDED RATHER THAN FIXED — the same
--- position as private.squad_expects_gender: it is SECURITY INVOKER, IMMUTABLE,
--- and touches no table, so there is nothing for a search_path to redirect.
+-- ❌ **THIS SAID "NO PINNED search_path, RECORDED RATHER THAN FIXED" UNTIL
+-- 13 Aug 2026, AND IT IS NOW PINNED.** The old note put it "in the same
+-- position as private.squad_expects_gender: SECURITY INVOKER, IMMUTABLE, and
+-- touches no table, so there is nothing for a search_path to redirect."
+--
+-- ⚠️ EVERY ONE OF THOSE FACTS IS STILL TRUE AND THE CONCLUSION WAS STILL
+-- WRONG, WHICH IS THE PART WORTH KEEPING. squad_expects_gender maps a squad
+-- name to a gender for a form. THIS function is called from THREE
+-- storage.objects RLS POLICIES — it is one of the things deciding who may
+-- write into a bucket. A helper in that position gets pinned whatever its
+-- volatility markers say, because the cost of being wrong is not a wrong
+-- dropdown.
+--
+-- ⚠️ squad_expects_gender's own exemption is UNCHANGED and still correct. Do
+-- not read this as a precedent for pinning it too — read it as the reason the
+-- two are now decided differently.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.social_idea_owner(_name text)
  RETURNS uuid
  LANGUAGE sql
  IMMUTABLE
+ SET search_path TO ''
 AS $function$
   select nullif(split_part(_name, '/', 1), '')::uuid
 $function$

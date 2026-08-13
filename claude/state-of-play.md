@@ -933,23 +933,48 @@ Ordered by what they cost to fix, not by how alarming they sound.
   here whose failure is unrecoverable**, and it is 30 minutes of clicking.
 - **Leaked-password protection is still OFF**, measured 13 Aug, and the plan is no
   longer the reason. Supabase → Authentication → Policies. Two minutes.
-- **`events` has no index on `team_id` or `starts_at`.** Every schedule, dashboard,
-  calendar-feed and allocation read filters and sorts on exactly those, then runs
-  `private.is_attached_to_team` per surviving row, under an 8s `statement_timeout`.
-  ⚠️ **Invisible at 9 events and unavoidable at the ~1,690 this app already sizes
-  itself against** (`src/data/limits.js`). ⚠️ **Do not size the fix from
-  `EXPLAIN ANALYZE` wall time on this schema — inflated ~4x. Read the plan SHAPE.**
-- ⚠️ **THE `social-ideas` STORAGE WRITE POLICY HAS NO MEMBERSHIP CHECK.** Verified
-  against live 13 Aug: the WITH CHECK is `bucket_id = 'social-ideas' AND
-  social_idea_owner(name) = auth.uid()` and nothing else. **The ROW insert
-  (`social idea create`) requires an active membership; the IMAGE upload does
-  not.** So any account with a login — including one with zero memberships — can
-  upload 5 MB objects into club storage without limit. ⚠️ **`player-photos` is NOT
-  affected** — its write policy goes through `can_edit_team`/`is_own_player`, both
-  of which require a membership. This gap is specific to the newest bucket.
-  ⚠️ **And the client uploads the image BEFORE inserting the row**
-  (`src/data/socialIdeas.js`), so a failed insert orphans an object that appears in
-  no screen and nothing sweeps.
+- ✅ **DONE 13 Aug — `events` NOW HAS `(team_id, starts_at)`, `(club_id, starts_at)`
+  AND `(league_team_id)`.** It had none of them, and the two indexes it did have are
+  why that was easy to miss: both partial, both on columns almost nothing queries by,
+  so the file showed indexes and a skim moved on. ⚠️ **This partly overturned the
+  "an index on an empty table is pointless" ruling above** — which still stands for
+  the ~24 `*_by` audit columns and never covered `starts_at`.
+  ⚠️ **Nothing has been MEASURED to be faster and nothing was expected to be** — at
+  9 events there is nothing to speed up. This is a cliff removed, not a gain
+  banked, and the claim to make is "the plan shape changes", never "the app got
+  faster". ⚠️ **Do not size it from `EXPLAIN ANALYZE` wall time on this schema —
+  inflated ~4x.**
+- ✅ **DONE 13 Aug — THE `social-ideas` STORAGE WRITE POLICY NOW CHECKS
+  MEMBERSHIP.** It did not, from 12 to 13 Aug. The old WITH CHECK was
+  `bucket_id = 'social-ideas' AND social_idea_owner(name) = auth.uid()` and nothing
+  else, so any signed-in account — **including one with zero memberships** — could
+  upload 5 MB objects into club storage without limit.
+  ⚠️ **THE SHAPE OF THE MISTAKE IS THE PART TO CARRY: the ROW policy and the IMAGE
+  policy are two halves of ONE feature, written in ONE migration, and only one half
+  was gated.** `social idea create` required an active membership all along. So a
+  stranger could not submit an idea and could upload images — the half that consumes
+  storage, holds the content, and whose orphans appear on **no** screen.
+  ⚠️ **PROVED BY EXECUTION, TWICE.** Before: a zero-membership account was ALLOWED,
+  demonstrated by doing it rather than by reading the policy. After: REFUSED, while
+  an active member is still allowed under their own prefix and still refused under
+  somebody else's. Harness: `db/tests/rls-social-upload.sql`.
+  ⚠️ **`player-photos` WAS NEVER AFFECTED AND MUST NOT BE "FIXED" TO MATCH** — its
+  write policy goes through `can_edit_team`/`is_own_player`, both of which already
+  require a membership. The harness carries a control that goes red if a future fix
+  reaches into the wrong bucket.
+  ⚠️ **STILL OPEN, AND NOT FIXED BY THIS: the client uploads the image BEFORE
+  inserting the row** (`src/data/socialIdeas.js`), so a failed insert still orphans
+  an object that appears on no screen and nothing sweeps. Narrower now — only a
+  member can create one — but not gone.
+- ✅ **DONE 13 Aug — `private.social_idea_owner` HAS A PINNED `search_path`.**
+  ⚠️ **Its exemption note used to read exactly like `squad_expects_gender`'s, every
+  fact in it was true, and the conclusion was still wrong.** Both are
+  `SECURITY INVOKER`, `IMMUTABLE` and touch no table — but this one is called from
+  three `storage.objects` RLS policies, so it decides who may write. **A helper in
+  that position gets pinned whatever its volatility markers say.**
+  ⚠️ **`squad_expects_gender`'s exemption is UNCHANGED and still correct.** This is
+  not a precedent for pinning it; it is the reason the two are now decided
+  differently.
 - **18 RLS policies call `auth.uid()` bare**, so Postgres re-evaluates it per row
   instead of once per query. The fix is `(select auth.uid())` and changes no
   meaning. ⚠️ **One migration touching all 18, not eighteen migrations** — and

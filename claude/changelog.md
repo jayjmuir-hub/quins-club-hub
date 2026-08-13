@@ -10,10 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **Supabase Pro and Resend Pro, and the fifteen lines that stopped being true.**
-  ⚠️ **No SHA yet, deliberately** — `main` squash-merges, so a branch SHA stops
-  existing at merge and CI (a fresh clone) cannot find it. The NEXT pull request
-  cites the squash SHA. This is what the one-commit-behind allowance is for.
+- **The 13 Aug migration is APPLIED, and `db/schema/` re-captured in the same
+  breath** — `events_team_starts_idx`, `events_club_starts_idx`,
+  `events_league_team_id_idx`, the membership arm on `social idea image write`, and
+  a pinned `search_path` on `private.social_idea_owner`.
+  ⚠️ **Captured from the catalogue, not pasted from the migration** — `pg_indexes`
+  and `pg_get_functiondef`. Pasting the DDL is what left `pitches` and
+  `pitch_requests` with unnamed constraints on 11 Aug.
+  ⚠️ **VERIFIED BY EXECUTION, BEFORE AND AFTER.** With the old policy a
+  zero-membership account was ALLOWED to upload; with the new one it is REFUSED,
+  while an active member is still allowed under their own prefix and still refused
+  under somebody else's. Both runs were transactions on PRODUCTION that rolled back
+  — and ⚠️ **the rollback mechanism itself was probed with a throwaway table first**,
+  rather than trusted.
+  ⚠️ **NOTHING WAS MEASURED TO BE FASTER AND NOTHING WAS EXPECTED TO BE.** At 9
+  events there is nothing to speed up. A cliff was removed, not a gain banked.
+- `d0c531f` — **Supabase Pro and Resend Pro, and the fifteen lines that stopped
+  being true.** ⚠️ **This entry carried NO SHA when it was written, deliberately,
+  and the squash SHA is filled in here by the next pull request — which is the
+  whole one-behind mechanism working as designed rather than an oversight being
+  corrected.**
   Jay bought both plans on 13 Aug. **Measured, not reported:**
   `get_organization` → `plan: "pro"`.
   ⚠️ **THE UPGRADE FIXED A MECHANISM AND NOT A SINGLE LINE OF CODE.** Daily

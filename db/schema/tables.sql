@@ -617,6 +617,36 @@ CREATE INDEX events_series_id_idx ON public.events USING btree (series_id)
 CREATE INDEX events_group_id_idx ON public.events USING btree (group_id)
   WHERE (group_id IS NOT NULL);
 
+-- ── Added 2026-08-13, migration events_indexes_and_social_upload_gate ──
+--
+-- ⚠️ UNTIL TODAY THIS TABLE HAD NO INDEX ON `team_id` OR `starts_at` AT ALL,
+-- and the two entries above are why that was easy to miss: the file records
+-- two indexes on `events`, both partial, both on columns almost nothing
+-- queries by. A reader skimming this block saw indexes and moved on.
+--
+-- Every hot read filters on team_id and/or club_id AND ranges over starts_at,
+-- then ORDERS BY starts_at — src/data/events.js listEvents, the paged reads in
+-- src/data/limits.js, public.calendar_events_for_token, the allocation grid,
+-- the dashboard. On top of that the `event read` policy calls
+-- private.is_attached_to_team() for every row the scan produces, and
+-- `authenticated` carries statement_timeout = 8s. Unindexed, the far end of
+-- that is a hard failure on the Schedule screen, not a slow one.
+--
+-- ⚠️ THIS PARTLY OVERTURNS THE "unindexed foreign keys are fine on an empty
+-- table" RULING IN claude/state-of-play.md, and that ruling's own closing line
+-- — "re-measure before citing this once real data lands" — is what asked for
+-- it. It still stands for the ~24 *_by audit columns. It never covered
+-- starts_at, which is not a foreign key.
+--
+-- ⚠️ events_club_starts_idx IS NOT REDUNDANT with events_team_starts_idx. A
+-- composite index cannot serve a club-wide scan when its leading column
+-- (team_id) is unconstrained, which is exactly the admin / all-squads path.
+--
+-- Captured from pg_indexes, not pasted from the migration.
+CREATE INDEX events_team_starts_idx ON public.events USING btree (team_id, starts_at);
+CREATE INDEX events_club_starts_idx ON public.events USING btree (club_id, starts_at);
+CREATE INDEX events_league_team_id_idx ON public.events USING btree (league_team_id);
+
 
 -- ---------------------------------------------------------------------
 -- availability  (RSVPs)
