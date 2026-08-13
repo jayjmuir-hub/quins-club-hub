@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
-- **⚠️ THE APP HAD BEEN TELLING WAITING PARENTS SOMETHING FALSE FOR FOUR DAYS.**
+- `dd80f48` — **⚠️ THE APP HAD BEEN TELLING WAITING PARENTS SOMETHING FALSE FOR FOUR DAYS.**
   `PendingApprovalBanner` in `src/components/AppShell.jsx` said *"Nobody is emailed
   automatically, so if nothing has changed in a few days, mention it to your coach or
   team manager."* That was **true when written and false from 9 Aug**, when
