@@ -10,6 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 13 Aug 2026
 
+- **THE BACKUP RESTORE IS DRILLED AND IT WORKS** — 12 Aug 18:05 backup restored
+  into a throwaway project, checked, deleted within the hour. £0.
+  ⚠️ **The discriminating check, because "there were rows" proves nothing: SIX
+  `Test Player` rows in the restore against ZERO live.** They were deleted on
+  13 Aug, after the backup, so that number cannot be produced by an empty restore,
+  a partial one, or by querying the wrong database.
+  ❌ **THE PREDICTION WAS WRONG, WHICH IS THE POINT.** `auth.users` was named as
+  the thing most likely to fail; it restored cleanly, all 8. Sound reasoning, wrong
+  answer.
+  ⚠️ **AND THE PASS IS NARROWER THAN IT SOUNDS. NO PLAYER PHOTOGRAPH IS
+  RECOVERABLE** — storage objects are outside the backup, so a restore yields every
+  player record pointing at an image that does not exist. **The five edge functions
+  do not transfer either.** A real recovery is restore + redeploy five functions
+  with `verify_jwt: false` + rebuild auth + repoint `.env` and Netlify.
+  ⚠️ **A BACKUP IS AS SENSITIVE AS THE LIVE DATABASE** — all four vault secrets came
+  back DECRYPTABLE in a brand-new project.
+  ⚠️ **Jay initially chose to skip the drill and mark backups confirmed. He then
+  chose to run it.** The photo gap and the edge-function gap are both things no
+  amount of trusting Supabase would have surfaced.
+  `claude/runbooks/backup-restore-drill.md` carries the numbers and the three
+  things the runbook itself got wrong.
 - **The 13 Aug migration is APPLIED, and `db/schema/` re-captured in the same
   breath** — `events_team_starts_idx`, `events_club_starts_idx`,
   `events_league_team_id_idx`, the membership arm on `social idea image write`, and
