@@ -238,9 +238,49 @@ and before that
 > drops objects after the first shape in a mixed pipeline. An empty result and a
 > suppressed one look identical.
 
+> ## ⚠️ Re-captured 2026-08-13 — and this directory had a whole CATEGORY missing
+>
+> Two migrations: `20260813_realtime_publication_events` and
+> `20260813_events_starts_index`. Both applied, both captured here in the same
+> commit. But the interesting half is what neither of them changed:
+>
+> ⚠️ **PUBLICATIONS WERE NEVER CAPTURED, AND THE GAP HID A FEATURE THAT HAD
+> NEVER WORKED ONCE.** `src/data/events.js` has subscribed to `postgres_changes`
+> since the app was built. `public.events` was not in the `supabase_realtime`
+> publication — measured, that publication held **zero tables** — so Postgres
+> emitted nothing and the socket sat open receiving nothing. Schedule/Dashboard
+> auto-refresh and the live availability list were both inert, for months.
+>
+> **Every previous audit of this read the code and not the configuration.** The
+> subscription is four lines of ordinary-looking JavaScript and it is correct;
+> nothing about it is wrong. `RESTORE.md` asserted the opposite — "realtime
+> triggers a full refetch on any change in scope" — and a production readiness
+> audit repeated it as a *performance* worry about a mechanism that was doing
+> nothing at all. The publications section in `tables.sql` exists so the next
+> reader can diff the thing rather than reason about it.
+>
+> ⚠️ **The failure is silent in both directions.** Emptying that publication
+> again produces no error, in the app or the logs — just features that quietly
+> stop working. `pg_publication_tables` is now in *How to regenerate*; skipping
+> it means a table dropping out of the publication diffs to nothing.
+>
+> ⚠️ **AND A CORRECT COMMENT WAS FOUND GUARDING AN INDEX THAT DOES NOT DO WHAT
+> IT SAYS.** `events_club_starts_idx` was added the same day for "the admin /
+> all-squads path", with an accurate note that a composite index cannot serve a
+> scan whose leading column is unconstrained. That rule condemns the index
+> itself: `listEvents` sends no `club_id` predicate and the `event read` policy
+> filters on `team_id`, so the club-wide read was still a `Seq Scan`.
+> `events_starts_idx (starts_at, id)` fixes it — verified by plan shape, not by
+> wall time. **The comment reads as evidence the case was considered. It was;
+> the conclusion was still wrong.**
+>
+> ⚠️ **`events_club_starts_idx` is left in place and unresolved**, because the
+> allocation grid and `public.calendar_events_for_token` were not measured and
+> either may constrain `club_id`. Recorded as an open question, not guessed at.
+
 | File | Contents |
 |---|---|
-| `tables.sql` | Every `public` table: columns, types, nullability, defaults, PKs, FKs, CHECKs, indexes, and RLS-enabled state. Includes explicit notes where an expected unique constraint is **absent**. |
+| `tables.sql` | Every `public` table: columns, types, nullability, defaults, PKs, FKs, CHECKs, indexes, and RLS-enabled state. Includes explicit notes where an expected unique constraint is **absent**. ⚠️ **Also the logical replication PUBLICATIONS since 13 Aug 2026** — realtime membership appears nowhere else in this directory, and its absence hid a feature that had never worked. |
 | `policies.sql` | Every RLS policy on every `public` table, **plus the two on `storage.objects` for the `player-photos` bucket**, with command and USING / WITH CHECK expressions. |
 | `functions.sql` | Full `pg_get_functiondef()` output for every function in `public` and `private`, plus their EXECUTE grants from `proacl`. ⚠️ This row said "all 22 functions" until 9 Aug, when the count went to 29. **A count in a table of contents is a thing that rots** — the file itself is the inventory. |
 | `triggers.sql` | Every trigger: two on `auth.users`, `profiles_sync_name` on `public.profiles` (6 Aug 2026), `notify_pending_membership` on `public.memberships` (9 Aug 2026 — the first trigger in this project that reaches OUTSIDE the database), and `notify_pitch_request_asked` / `notify_pitch_request_answered` on `public.pitch_requests` (11 Aug 2026 — the second and third that do). ⚠️ This row said "there are none on any `public` table" until 7 Aug, "the three triggers" until 9 Aug, and named four until 11 Aug. **A trigger is the easiest object here to leave uncaptured: nothing in the app names it, and the code that fires it is an ordinary INSERT.** |
@@ -330,6 +370,15 @@ JOIN pg_class c ON c.oid = t.tgrelid
 JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE NOT t.tgisinternal AND n.nspname IN ('public', 'auth', 'private')
 ORDER BY n.nspname, c.relname, t.tgname;
+
+-- tables.sql, publications section  (added 2026-08-13)
+-- ⚠️ Realtime membership lives NOWHERE ELSE in this directory. Skip these two
+-- and a table silently dropping out of the publication diffs to nothing.
+SELECT pubname, puballtables, pubinsert, pubupdate, pubdelete, pubtruncate
+FROM pg_publication ORDER BY pubname;
+
+SELECT schemaname, tablename FROM pg_publication_tables
+WHERE pubname = 'supabase_realtime' ORDER BY schemaname, tablename;
 ```
 
 All of the above are `SELECT`s. Capturing the schema requires **no writes of any kind**.

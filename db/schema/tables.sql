@@ -647,6 +647,32 @@ CREATE INDEX events_team_starts_idx ON public.events USING btree (team_id, start
 CREATE INDEX events_club_starts_idx ON public.events USING btree (club_id, starts_at);
 CREATE INDEX events_league_team_id_idx ON public.events USING btree (league_team_id);
 
+-- ── Added 2026-08-13, migration events_starts_index ──
+--
+-- ⚠️ THE events_club_starts_idx COMMENT ABOVE IS CORRECT AND THE INDEX IT
+-- DESCRIBES DOES NOT DO THE JOB. Its own rule — a composite index cannot serve
+-- a scan whose leading column is unconstrained — applies to itself on the
+-- club-wide path: src/data/events.js listEvents sends no club_id predicate, and
+-- the `event read` policy filters on team_id, never club_id. So the admin /
+-- all-squads read was still a Seq Scan after that migration shipped.
+--
+-- Measured against ~4,000 seeded events in a rolled-back transaction on
+-- production, as a real signed-in member with RLS live: Seq Scan + top-N
+-- heapsort (11,630 buffers) became an Index Scan with NO Sort node (2,780).
+-- The disappearing Sort is the result; wall time on this schema is inflated
+-- ~4x and is not the evidence.
+--
+-- `id` is the second column for the same reason it is in listEvents' ORDER BY:
+-- fetchAllPages uses .range() (OFFSET/LIMIT) and two events routinely share a
+-- starts_at, so an index ending at starts_at would still leave a tie-break sort.
+--
+-- ⚠️ events_club_starts_idx IS LEFT IN PLACE, UNRESOLVED. The allocation grid
+-- and public.calendar_events_for_token were not measured and either may
+-- constrain club_id. Left as an open question rather than a guess.
+--
+-- Captured from pg_indexes, not pasted from the migration.
+CREATE INDEX events_starts_idx ON public.events USING btree (starts_at, id);
+
 
 -- ---------------------------------------------------------------------
 -- availability  (RSVPs)
@@ -1218,3 +1244,42 @@ alter table public.events
 -- change what may be recorded against it.
 alter table public.teams
   add column scoring_kinds text[];
+
+
+-- =====================================================================
+-- LOGICAL REPLICATION PUBLICATIONS  (new capture category, 13 Aug 2026)
+-- =====================================================================
+--
+-- ⚠️ THIS DIRECTORY DID NOT CAPTURE PUBLICATIONS AT ALL UNTIL TODAY, AND THAT
+-- BLIND SPOT HID A FEATURE THAT HAD NEVER ONCE WORKED. src/data/events.js has
+-- subscribed to postgres_changes since the app was built; public.events was not
+-- in supabase_realtime, so Postgres emitted nothing and the socket sat open
+-- receiving nothing. Two features -- Schedule/Dashboard auto-refresh and the
+-- live availability list -- were silently inert, and no file here would have
+-- shown it. The code was read many times; the configuration feeding it was not.
+--
+-- ⚠️ AND THE FAILURE MODE IS SILENT IN BOTH DIRECTIONS. If this publication is
+-- ever emptied again, every realtime feature goes quiet with no error anywhere,
+-- in the app or in the logs. A capture is the only thing that would diff it.
+--
+-- Membership is changed with ALTER PUBLICATION, not by anything in a table
+-- definition, which is why it belongs in its own section rather than beside
+-- events above.
+--
+-- Captured 13 Aug 2026 from pg_publication and pg_publication_tables, after
+-- 20260813_realtime_publication_events.sql was applied.
+--
+--   pg_publication: two rows, both puballtables = false, both publishing
+--   insert/update/delete/truncate --
+--     supabase_realtime
+--     supabase_realtime_messages_publication   (Realtime's own internal
+--                                               messages_* partitions; not ours,
+--                                               and deliberately not enumerated)
+--
+-- ⚠️ EXACTLY ONE OF OUR TABLES IS PUBLISHED. public.availability is NOT, and
+-- that is a decision rather than an omission: its subscription already carries
+-- `filter: event_id=eq.<id>` and it is replica identity DEFAULT, so publishing
+-- it would immediately have the delete gap -- a cleared availability would not
+-- disappear from another viewer's screen. See the migration.
+
+ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
