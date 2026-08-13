@@ -254,6 +254,13 @@ export async function getEvent(id) {
   }
 }
 
+// ⚠️ MIRRORS THE REAL MODULE'S EXPORT, and tests/harness-stubs.test.js is what
+// forced it — adding REALTIME_DEBOUNCE_MS to src/data/events.js without adding
+// it here turns every harness scenario dark at once, because harness/main.jsx
+// imports every screen into one bundle. The VALUE is irrelevant to the harness
+// (nothing here ever fires a change); only the export has to exist.
+export const REALTIME_DEBOUNCE_MS = 400
+
 export function subscribeEvents() {
   return () => {}
 }

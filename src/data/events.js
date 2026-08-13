@@ -111,19 +111,74 @@ export async function getEvent(id) {
 let channelSeq = 0
 
 /**
+ * How long to wait for the changes to stop arriving before re-reading.
+ *
+ * ⚠️ THE CALLBACK IS A FULL REFETCH OF THE CALLER'S WHOLE SCHEDULE, so a coach
+ * saving three fixtures in a row would otherwise cost every connected client
+ * three of them. 400ms is long enough to collapse a burst of saves and short
+ * enough that nobody perceives it as lag on a single change.
+ */
+export const REALTIME_DEBOUNCE_MS = 400
+
+/**
  * Subscribes to realtime changes on the events table. Returns an unsubscribe
  * function — call it from a useEffect cleanup. Safe to call more than once.
+ *
+ * ⚠️ THIS DID NOTHING AT ALL UNTIL 13 Aug 2026, and the code was never the
+ * reason. `public.events` was not in the `supabase_realtime` publication, so
+ * Postgres emitted no changes and this socket sat open receiving nothing. Two
+ * features silently did not work. See
+ * db/migrations/20260813_realtime_publication_events.sql — and note that if
+ * that publication is ever emptied again, everything here goes quiet with no
+ * error anywhere.
+ *
+ * ⚠️ NO `filter` IS PASSED, DELIBERATELY, AND THE OBVIOUS "FIX" IS A BUG.
+ * Adding `filter: team_id=in.(...)` looks like an optimisation and breaks
+ * deletes: `events` is replica identity DEFAULT, so a DELETE payload carries
+ * the primary key only, `team_id` is absent, the filter matches nothing, and a
+ * cancelled fixture stops disappearing from other people's screens. RLS
+ * (`event read` → `is_attached_to_team`) already scopes delivery per
+ * subscriber, so a filter would buy nothing and cost that. Contrast
+ * subscribeAvailability, which DOES filter — on `event_id`, and therefore has
+ * the same latent delete gap; see the migration.
+ *
+ * ⚠️ THE PAYLOAD IS DELIBERATELY NOT PASSED ON. Callers get "something
+ * changed, re-read" and nothing else — which is both what they already did and
+ * the only thing that stays correct once changes are coalesced, since a
+ * debounced burst has no single meaningful payload. The re-read is itself
+ * RLS-scoped, so a delete arriving as a bare id is enough.
+ *
+ * @param callback   invoked with NO arguments, at most once per debounce window
+ * @param debounceMs injectable purely so tests need not wait in real time
  */
-export function subscribeEvents(callback) {
+export function subscribeEvents(callback, { debounceMs = REALTIME_DEBOUNCE_MS } = {}) {
+  let timer = null
+
+  function onChange() {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = null
+      callback()
+    }, debounceMs)
+  }
+
   const channel = supabase
     .channel(`events-changes-${++channelSeq}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, callback)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, onChange)
     .subscribe()
 
   let unsubscribed = false
   return () => {
     if (unsubscribed) return
     unsubscribed = true
+    // ⚠️ CANCEL THE PENDING FIRE. Without this a change arriving just before a
+    // screen unmounts calls back afterwards, and the callback is a setState —
+    // so an unmounted Schedule would try to refetch and store into a component
+    // that is gone.
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
+    }
     supabase.removeChannel(channel)
   }
 }

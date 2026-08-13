@@ -1,0 +1,101 @@
+-- 13 Aug 2026 — turn realtime ON for public.events. It has never been on.
+--
+-- ⚠️ NOT YET APPLIED WHEN THIS FILE WAS WRITTEN. Apply it, then re-capture
+-- db/schema/ in the same commit, then run the two-browser test below. The
+-- test is not optional here: this migration's whole purpose is a behaviour
+-- nothing in the vitest suite can observe.
+--
+-- ══ WHAT WAS ACTUALLY WRONG ═══════════════════════════════════════════════
+--
+-- src/data/events.js has subscribed to `postgres_changes` on public.events
+-- since the app was built, and src/data/availability.js likewise. Both open a
+-- socket. Neither has ever received a single message.
+--
+-- ⚠️ MEASURED 13 Aug 2026: the `supabase_realtime` publication contains ZERO
+-- TABLES. The only tables in any publication are Realtime's own internal
+-- `messages_*` partitions, in a different publication. Control: 21 tables in
+-- `public`, so the query works and the database is not empty.
+--
+-- Supabase's postgres_changes is fed by logical replication from exactly that
+-- publication. A table not in it emits nothing. So TWO FEATURES SILENTLY DID
+-- NOT WORK — Schedule and Dashboard never auto-refreshed when a fixture
+-- changed, and the availability list never updated while you watched it.
+--
+-- ⚠️ NOBODY NOTICED BECAUSE UNTIL 13 Aug THERE WAS ONE USER, and a live-update
+-- feature is invisible without a second person changing something.
+--
+-- ⚠️ AND THE AUDIT GOT THIS WRONG IN THE COMFORTING DIRECTION. It reported the
+-- events subscription as "unfiltered, so every client refetches its whole
+-- schedule on any change" — a performance worry about a mechanism that was
+-- inert. `RESTORE.md` said "realtime triggers a full refetch on any change in
+-- scope", which is also false and predates the audit. **The code was read; the
+-- configuration feeding it was not.**
+--
+-- ══ WHY THERE IS NO FILTER, WHICH IS THE OPPOSITE OF THE OBVIOUS FIX ═══════
+--
+-- The instinct — and the original instruction — was to add
+-- `filter: team_id=in.(...)` to the client subscription. Do not.
+--
+-- 1. RLS IS ALREADY THE FILTER. `event read` is
+--    `private.is_attached_to_team(team_id)`, and Supabase applies read policies
+--    to postgres_changes, so a parent only ever receives changes for squads
+--    they are attached to. A channel filter would duplicate that in a second
+--    place, which is the drift risk this repo already carries twice.
+--
+-- 2. ⚠️ A FILTER WOULD SILENTLY DROP DELETES. Measured: public.events has
+--    `relreplident = 'd'` (DEFAULT), so a DELETE's payload carries the primary
+--    key and nothing else. `team_id` is not in it, the filter matches nothing,
+--    and A CANCELLED FIXTURE WOULD STOP DISAPPEARING from everyone else's
+--    screen. That failure is invisible in testing unless somebody thinks to
+--    delete an event while a second browser watches.
+--
+-- ⚠️ AND DO NOT "FIX" THAT BY RAISING REPLICA IDENTITY TO FULL. It would put
+-- every column in the delete payload and make filters work — but Supabase does
+-- NOT apply RLS to delete events, so a FULL identity would broadcast the whole
+-- row (opponent, venue, pitch, notes) to every subscriber regardless of squad.
+-- DEFAULT keeps a delete down to an id, which is all the callback needs: it
+-- ignores the payload entirely and just re-reads, and the re-read is itself
+-- RLS-scoped.
+--
+-- ══ SCOPE: events ONLY ════════════════════════════════════════════════════
+--
+-- ⚠️ public.availability IS DELIBERATELY NOT INCLUDED, and this is a decision
+-- rather than an oversight. Its subscription ALREADY carries
+-- `filter: event_id=eq.<id>`, and availability is also replica identity
+-- DEFAULT — so switching it on would immediately have the delete bug described
+-- above: clearing an availability would not disappear from another viewer's
+-- screen. That needs its own ruling (accept the gap, drop the filter and let
+-- RLS scope it, or something else), and shipping it silently alongside a fix
+-- would bury it.
+
+alter publication supabase_realtime add table public.events;
+
+-- ══ HOW TO VERIFY, AND WHY THE SUITE CANNOT ═══════════════════════════════
+--
+-- No vitest test can observe this. Every test mocks subscribeEvents, which is
+-- correct — they are testing screens, not Supabase's replication.
+--
+-- 1. Confirm the publication actually changed:
+--
+--      select tablename from pg_publication_tables
+--       where pubname = 'supabase_realtime';
+--
+--    ⚠️ An empty result here means the app's live updates are decorative. That
+--    was the state before this migration and it is the check worth keeping.
+--
+-- 2. ⚠️ THE TWO-BROWSER TEST, AND THE SECOND ROW IS THE ONE THAT MATTERS.
+--    Two accounts, two browsers, both on Schedule. One must be a NON-ADMIN
+--    attached to some squads and not others.
+--
+--      change a fixture in a squad they ARE in   -> their screen updates
+--      change a fixture in a squad they are NOT in -> their screen MUST NOT
+--
+--    The first row only proves messages arrive. **The second proves RLS is
+--    applied to realtime.** If a change reaches someone outside the squad,
+--    that is a DISCLOSURE BUG and this migration must be reverted:
+--
+--      alter publication supabase_realtime drop table public.events;
+--
+-- 3. Delete a fixture with the second browser open, and confirm it disappears
+--    there too. That is the case a filter would have broken, and the reason
+--    this migration adds none.
