@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- ✅ **THE DOM-FREE TEST FILES RUN IN `node`, NOT jsdom.** Every test file that
+- `acc0798` ✅ **THE DOM-FREE TEST FILES RUN IN `node`, NOT jsdom.** Every test file that
   touches no DOM now carries `// @vitest-environment node` as its first line.
   Reasoning in `vite.config.js`.
   ⚠️ **THE CHECK IS VITEST'S `environment` FIGURE, NOT "THE TESTS STILL PASS".**
