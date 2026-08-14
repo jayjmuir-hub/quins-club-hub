@@ -18,6 +18,7 @@ import useMyProfile from '../lib/useMyProfile.js'
 import { canEditTeam } from '../lib/scope.js'
 import { eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
+import { shareElementAsImage } from '../lib/shareImage.js'
 import { deadlineLabel, isOverdue, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
 import {
   SCORE_KINDS,
@@ -521,44 +522,28 @@ export default function MatchSheet() {
   /**
    * Renders the sheet to a PNG and hands it to the OS share sheet.
    *
-   * ⚠️ WHATSAPP CANNOT BE SENT A FILE BY A LINK. `wa.me/?text=` carries text
-   * only, and RCM's own instruction 2 asks for a "saved file or screen
-   * shot/picture of form" — so a one-click share has to PRODUCE a file. Jay
-   * accepted the ~194KB html2canvas dependency for exactly this, 12 Aug 2026,
-   * overturning the plan's "no new dependency" line.
+   * ⚠️ THE MECHANISM MOVED TO src/lib/shareImage.js ON 14 Aug 2026, unchanged,
+   * because the lineup screen needs the identical thing and two copies of it
+   * would drift. The reasoning that used to live here — that `wa.me/?text=`
+   * cannot carry a file, that html2canvas is imported lazily because it is a
+   * fifth of a megabyte, that a desktop download is the NORMAL route rather than
+   * an error, and that an aborted share is somebody changing their mind — is all
+   * in that file now. Read it before changing this.
    *
-   * ⚠️ IMPORTED LAZILY. It is a fifth of a megabyte used by one button on one
-   * screen; a static import would put it in the bundle every parent downloads
-   * to look at a fixture list.
-   *
-   * ⚠️ DESKTOP BROWSERS LARGELY CANNOT FILE-SHARE, so the download fallback is
-   * not an error path — it is the normal desktop route.
+   * ⚠️ RCM's own instruction 2 asks for a "saved file or screen shot/picture of
+   * form", which is why this screen shares an IMAGE at all. That part is
+   * specific to the match sheet and stays here.
    */
   async function share() {
     setSharing(true)
     setSaveError(null)
     try {
-      const { default: html2canvas } = await import('html2canvas')
-      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: '#ffffff' })
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
-      if (!blob) throw new Error('The sheet could not be turned into an image.')
-
-      const file = new File([blob], `match-sheet-${eventId}.png`, { type: 'image/png' })
-
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'RCM match sheet' })
-        return
-      }
-
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = file.name
-      link.click()
-      URL.revokeObjectURL(url)
+      await shareElementAsImage(printRef.current, {
+        filename: `match-sheet-${eventId}.png`,
+        title: 'RCM match sheet',
+      })
     } catch (failure) {
-      // ⚠️ An ABORTED share is the person changing their mind, not a failure.
-      if (failure?.name !== 'AbortError') setSaveError(failure)
+      setSaveError(failure)
     } finally {
       setSharing(false)
     }

@@ -414,6 +414,7 @@ export default function EventDetail({
   onOpenAvailability,
   onOpenRegister,
   onOpenMatchSheet,
+  onOpenLineup,
 }) {
   const date = eventDate(event)
   // Null for every event created before 8 Aug 2026, and formatTimeRange
@@ -620,6 +621,24 @@ export default function EventDetail({
           button rather than a lying one — the exact defect the availability
           button shipped with, where `onOpenAvailability?.()` drew a button on
           the Dashboard that silently swallowed every tap. */}
+      {/* ⚠️ THE TEAM SHEET IS NOT THE RCM MATCH SHEET, and the two sit apart on
+          this screen on purpose (Jay, 14 Aug 2026). Picking a team happens
+          BEFORE the match and is shared to a WhatsApp group; the RCM sheet is
+          filed AFTER it with the governing body. Putting them under one heading
+          is how a coach ends up filing a team selection.
+          ⚠️ SAME handler-required rule as every other button in this file — a
+          screen that forgets to pass it gets no button rather than a dead one. */}
+      {canEdit && event.type === 'match' && onOpenLineup && (
+        <div className="mt-4">
+          <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
+            Team sheet
+          </h4>
+          <Button variant="secondary" full onClick={() => onOpenLineup(event)}>
+            Pick the team
+          </Button>
+        </div>
+      )}
+
       {canEdit && event.type === 'match' && onOpenMatchSheet && (
         <div className="mt-4">
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">

@@ -1,0 +1,556 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import Button from '../components/Button.jsx'
+import Card from '../components/Card.jsx'
+import Spinner from '../components/Spinner.jsx'
+import crest from '../assets/crest.png'
+import { getEvent } from '../data/events.js'
+import { listPlayers } from '../data/players.js'
+import { listAvailability } from '../data/availability.js'
+import { createLineup, listLineups, saveLineupPlayers, updateLineup } from '../data/lineups.js'
+import { useMemberships } from '../lib/memberships.jsx'
+import { canEditTeam } from '../lib/scope.js'
+import {
+  eventDate,
+  eventTimeLabel,
+  eventTitle,
+  formatLongDate,
+  venueLine,
+} from '../lib/eventFormat.js'
+import { shareElementAsImage } from '../lib/shareImage.js'
+
+// Picking a team, and sharing it — phase 1 of
+// claude/plans/2026-08-14-match-lineups.md.
+//
+// ⚠️ COACH-ONLY, AND THAT IS A PRODUCT DECISION RATHER THAN A STUB (Jay, 14 Aug
+// 2026). Parents get the lineup as a WhatsApp image; the app shows it to nobody
+// else. That adds no new place where one family can read about another family's
+// child. The database agrees — the `lineup manage` policy is
+// private.can_edit_team — so this screen's own gate only decides what to OFFER.
+//
+// ⚠️ NOT DRAG AND DROP, deliberately. HTML5 drag does not work on touch at all,
+// and this is used pitch-side on a phone; a pointer-events library is ~30KB on a
+// bundle that already warns at 890KB, and an accessible keyboard path has to
+// exist anyway — at which point drag is a SECOND implementation of one piece of
+// state. Tap-to-assign is two taps and free on accessibility.
+
+const ROLE_STARTER = 'starter'
+const ROLE_REPLACEMENT = 'replacement'
+
+// ⚠️ THE ORDER IS THE POINT. A coach picks from who said yes, then works down.
+// `out` is last and collapsed, because picking somebody who said no is allowed
+// (Jay asked for it) but should never be the easy accident.
+const AVAILABILITY_GROUPS = [
+  { key: 'in', label: 'Available', tone: 'text-accent-ink' },
+  { key: 'maybe', label: 'Maybe', tone: 'text-warn-ink' },
+  { key: 'none', label: 'No response', tone: 'text-ink-muted' },
+  { key: 'out', label: 'Not available', tone: 'text-brand-deep' },
+]
+
+const STATUS_CHIP = {
+  in: null, // the expected case says nothing
+  maybe: { label: 'Maybe', className: 'bg-warn-bg text-warn-ink' },
+  none: { label: 'No response', className: 'bg-surface-mute text-ink-muted' },
+  out: { label: 'Said no', className: 'bg-danger-bg text-brand-deep' },
+}
+
+// ⚠️ A GUIDE, NOT A GATE. See the migration's comment on players_per_side: the
+// count warns when it is over, and never refuses. Coaches over-pick then cut.
+const SIDE_SIZES = [7, 9, 10, 12, 13, 15]
+
+/** availability rows -> { [playerId]: 'in'|'maybe'|'out' }. */
+function statusMap(rows) {
+  const map = new Map()
+  for (const row of rows ?? []) map.set(row.player_id, row.status)
+  return map
+}
+
+function StatusChip({ status }) {
+  const chip = STATUS_CHIP[status ?? 'none']
+  if (!chip) return null
+  return (
+    <span className={`shrink-0 rounded-tab px-[7px] py-[2px] text-[11px] font-bold ${chip.className}`}>
+      {chip.label}
+    </span>
+  )
+}
+
+function PickedRow({ player, status, onRemove, onToggleRole }) {
+  return (
+    <li className="flex items-center gap-2 border-b border-line py-2 last:border-b-0">
+      <span className="min-w-0 flex-1 truncate text-[14.5px] font-bold text-ink">
+        {player.full_name}
+      </span>
+      {/* ⚠️ THE WARNING IS ON THE PICKED ROW, NOT ONLY IN THE POOL. Once somebody
+          is in the team the pool is scrolled away, and "did I pick anyone who
+          said no?" is exactly the question a coach asks at the end. */}
+      <StatusChip status={status} />
+      <button
+        type="button"
+        onClick={onToggleRole}
+        className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-brand hover:bg-surface-mute"
+      >
+        {player.role === ROLE_STARTER ? '→ Bench' : '→ Start'}
+      </button>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${player.full_name}`}
+        className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-ink-muted hover:bg-surface-mute"
+      >
+        Remove
+      </button>
+    </li>
+  )
+}
+
+export default function Lineup() {
+  const { eventId } = useParams()
+  const navigate = useNavigate()
+  const { memberships, teams } = useMemberships()
+
+  const [event, setEvent] = useState(null)
+  const [players, setPlayers] = useState([])
+  const [statuses, setStatuses] = useState(() => new Map())
+  const [lineupId, setLineupId] = useState(null)
+  // [{ player_id, role, position, sort_order }]
+  const [picked, setPicked] = useState([])
+  const [perSide, setPerSide] = useState(null)
+  const [notes, setNotes] = useState('')
+  const [showOut, setShowOut] = useState(false)
+
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [error, setError] = useState(null)
+  const [saved, setSaved] = useState(false)
+  const shareRef = useRef(null)
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    Promise.all([getEvent(eventId), listLineups(eventId)])
+      .then(async ([eventRow, lineups]) => {
+        if (!mounted) return
+        setEvent(eventRow)
+        const [playerRows, availabilityRows] = await Promise.all([
+          listPlayers({ teamIds: eventRow?.team_id ? [eventRow.team_id] : [] }),
+          listAvailability(eventId),
+        ])
+        if (!mounted) return
+        setPlayers(playerRows)
+        setStatuses(statusMap(availabilityRows))
+
+        // ⚠️ THE FIRST lineup, not "the" lineup — event_id is deliberately not
+        // unique (see the migration). Phase 1 edits one; a tournament day with
+        // several is what that decision leaves room for.
+        const existing = lineups[0]
+        if (existing) {
+          setLineupId(existing.id)
+          setPerSide(existing.players_per_side ?? null)
+          setNotes(existing.notes ?? '')
+          setPicked(
+            [...(existing.lineup_players ?? [])]
+              .sort((a, b) => a.sort_order - b.sort_order)
+              .map((row) => ({
+                player_id: row.player_id,
+                role: row.role,
+                position: row.position,
+                sort_order: row.sort_order,
+              })),
+          )
+        }
+      })
+      .catch((failure) => {
+        if (mounted) setError(failure)
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [eventId])
+
+  const playersById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
+  const pickedIds = useMemo(() => new Set(picked.map((p) => p.player_id)), [picked])
+
+  const canEdit = canEditTeam(memberships, event?.team_id)
+  const team = teams.find((t) => t.id === event?.team_id)
+
+  const starters = picked.filter((p) => p.role === ROLE_STARTER)
+  const bench = picked.filter((p) => p.role === ROLE_REPLACEMENT)
+  const overPicked = perSide != null && starters.length > perSide
+
+  // The pool, grouped, with everyone already picked removed.
+  const pool = useMemo(() => {
+    const groups = { in: [], maybe: [], none: [], out: [] }
+    for (const player of players) {
+      if (pickedIds.has(player.id)) continue
+      const status = statuses.get(player.id)
+      groups[status === 'in' || status === 'maybe' || status === 'out' ? status : 'none'].push(player)
+    }
+    for (const key of Object.keys(groups)) {
+      groups[key].sort((a, b) => a.full_name.localeCompare(b.full_name))
+    }
+    return groups
+  }, [players, pickedIds, statuses])
+
+  function add(playerId, role) {
+    setSaved(false)
+    setPicked((current) => [
+      ...current,
+      { player_id: playerId, role, position: null, sort_order: current.length },
+    ])
+  }
+
+  function remove(playerId) {
+    setSaved(false)
+    setPicked((current) => current.filter((p) => p.player_id !== playerId))
+  }
+
+  function toggleRole(playerId) {
+    setSaved(false)
+    setPicked((current) =>
+      current.map((p) =>
+        p.player_id === playerId
+          ? { ...p, role: p.role === ROLE_STARTER ? ROLE_REPLACEMENT : ROLE_STARTER }
+          : p,
+      ),
+    )
+  }
+
+  async function save() {
+    setSaving(true)
+    setError(null)
+    setSaved(false)
+    try {
+      // ⚠️ THE ROW IS CREATED ON FIRST SAVE, NOT ON MOUNT. Creating it when the
+      // screen opens would write a lineup for every fixture a coach merely
+      // looked at, and "did anyone pick a team?" would stop being answerable.
+      let id = lineupId
+      if (!id) {
+        const created = await createLineup({
+          eventId,
+          playersPerSide: perSide,
+          notes: notes.trim() || null,
+        })
+        id = created.id
+        setLineupId(id)
+      } else {
+        await updateLineup(id, { playersPerSide: perSide, notes: notes.trim() || null })
+      }
+      await saveLineupPlayers(
+        id,
+        picked.map((p, index) => ({ ...p, sort_order: index })),
+      )
+      setSaved(true)
+    } catch (failure) {
+      setError(failure)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function share() {
+    setSharing(true)
+    setError(null)
+    try {
+      await shareElementAsImage(shareRef.current, {
+        filename: `lineup-${eventId}.png`,
+        title: 'Team sheet',
+      })
+    } catch (failure) {
+      setError(failure)
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <section>
+        <Card className="flex justify-center py-10">
+          <Spinner label="Loading the squad…" />
+        </Card>
+      </section>
+    )
+  }
+
+  // Defensive, like every other screen reachable by a pasted URL. The database
+  // is the boundary; this is a message rather than a control.
+  if (!canEdit) {
+    return (
+      <section>
+        <Card className="p-6">
+          <p role="alert" className="text-sm text-ink">
+            You can&apos;t pick the team for this fixture. Ask a club admin if that looks wrong.
+          </p>
+        </Card>
+      </section>
+    )
+  }
+
+  const date = eventDate(event)
+
+  return (
+    <section>
+      {/* ⚠️ `flex-wrap` IS REQUIRED, and tests/page-header-wrap.test.js enforces
+          it across every screen: a page header without it pushes the whole
+          document wider than the viewport rather than wrapping. It caught this
+          screen on its first run. */}
+      <div className="mb-3.5 mt-1 flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Team sheet</h2>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="text-[13px] font-bold text-brand"
+        >
+          Back
+        </button>
+      </div>
+
+      {error && (
+        <p
+          role="alert"
+          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+        >
+          {error.message || "That didn't save. Try again."}
+        </p>
+      )}
+
+      <Card className="mb-3 p-[14px]">
+        <p className="text-[15px] font-extrabold text-ink">{eventTitle(event)}</p>
+        <p className="mt-0.5 text-[12.5px] font-semibold text-ink-muted">
+          {team?.name} · {formatLongDate(date)} · {eventTimeLabel(event)}
+        </p>
+
+        <label className="mt-3 block">
+          <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+            Players per side
+          </span>
+          <select
+            value={perSide ?? ''}
+            onChange={(domEvent) => {
+              setSaved(false)
+              setPerSide(domEvent.target.value === '' ? null : Number(domEvent.target.value))
+            }}
+            className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none focus:border-brand"
+          >
+            <option value="">Not set</option>
+            {SIDE_SIZES.map((size) => (
+              <option key={size} value={String(size)}>
+                {size}-a-side
+              </option>
+            ))}
+          </select>
+        </label>
+      </Card>
+
+      <div className="mb-2 flex items-baseline justify-between">
+        <h3 className="text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+          Starting {perSide != null ? `— ${starters.length} of ${perSide}` : `— ${starters.length}`}
+        </h3>
+        {overPicked && (
+          <span className="text-[12px] font-bold text-warn-ink">
+            {starters.length - perSide} over
+          </span>
+        )}
+      </div>
+      <Card className="mb-3 px-[14px] py-1">
+        {starters.length === 0 ? (
+          <p className="py-3 text-[13px] text-ink-muted">Nobody picked yet.</p>
+        ) : (
+          <ul>
+            {starters.map((p) => (
+              <PickedRow
+                key={p.player_id}
+                player={{ ...playersById.get(p.player_id), role: p.role }}
+                status={statuses.get(p.player_id)}
+                onRemove={() => remove(p.player_id)}
+                onToggleRole={() => toggleRole(p.player_id)}
+              />
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <h3 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+        Replacements — {bench.length}
+      </h3>
+      <Card className="mb-3 px-[14px] py-1">
+        {bench.length === 0 ? (
+          <p className="py-3 text-[13px] text-ink-muted">No replacements yet.</p>
+        ) : (
+          <ul>
+            {bench.map((p) => (
+              <PickedRow
+                key={p.player_id}
+                player={{ ...playersById.get(p.player_id), role: p.role }}
+                status={statuses.get(p.player_id)}
+                onRemove={() => remove(p.player_id)}
+                onToggleRole={() => toggleRole(p.player_id)}
+              />
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <h3 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+        Squad
+      </h3>
+      <Card className="mb-3 px-[14px] py-2">
+        {AVAILABILITY_GROUPS.map((group) => {
+          const list = pool[group.key]
+          if (list.length === 0) return null
+          // ⚠️ "Not available" IS COLLAPSED, NOT ABSENT. Jay asked explicitly for
+          // the option to pick somebody who has not marked themselves available;
+          // hiding them outright would be the app overruling the coach.
+          if (group.key === 'out' && !showOut) {
+            return (
+              <button
+                key={group.key}
+                type="button"
+                onClick={() => setShowOut(true)}
+                className="my-2 text-[13px] font-bold text-brand"
+              >
+                Show {list.length} who said no
+              </button>
+            )
+          }
+          return (
+            <div key={group.key} className="py-1.5">
+              <p className={`mb-1 text-[11.5px] font-bold uppercase tracking-[.6px] ${group.tone}`}>
+                {group.label} — {list.length}
+              </p>
+              <ul>
+                {list.map((player) => (
+                  <li
+                    key={player.id}
+                    className="flex items-center gap-2 border-b border-line py-2 last:border-b-0"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-[14.5px] text-ink">
+                      {player.full_name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => add(player.id, ROLE_STARTER)}
+                      className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
+                    >
+                      Start
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => add(player.id, ROLE_REPLACEMENT)}
+                      className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
+                    >
+                      Bench
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        })}
+      </Card>
+
+      <label className="mb-3 block">
+        <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+          Note for the group
+        </span>
+        <textarea
+          rows={2}
+          value={notes}
+          onChange={(domEvent) => {
+            setSaved(false)
+            setNotes(domEvent.target.value)
+          }}
+          placeholder="Meet 8:15 at the gate. Bring both kits."
+          className="w-full resize-y rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none focus:border-brand"
+        />
+      </label>
+
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+        <Button variant="secondary" onClick={share} disabled={sharing || picked.length === 0}>
+          {sharing ? 'Preparing…' : 'Share to WhatsApp'}
+        </Button>
+        {saved && !saving && (
+          <span role="status" className="self-center text-[13px] font-semibold text-ink-muted">
+            Saved
+          </span>
+        )}
+      </div>
+
+      <p className="mt-2 text-[12.5px] leading-relaxed text-ink-muted">
+        Sharing makes a picture of the team sheet and hands it to your phone&apos;s share
+        menu — pick the WhatsApp group there. On a computer it downloads instead.
+      </p>
+
+      {/* ══ WHAT GETS PHOTOGRAPHED ══════════════════════════════════════════
+          ⚠️ THIS IS THE ACTUAL DELIVERABLE. Most parents will never open the app
+          for a lineup — they will see this PNG in a WhatsApp group, so it has to
+          stand on its own: who, against whom, when, where.
+          ⚠️ FULL NAMES, which is Jay's explicit decision (14 Aug 2026) over a
+          first-name-plus-initial option that was offered. Consistent with the
+          RCM match sheet the club already shares as an image.
+          ⚠️ RENDERED, NOT HIDDEN WITH display:none. html2canvas cannot photograph
+          a display:none element — it has zero size. It is positioned off-screen
+          instead, which is the same trick MatchSheet's facsimile relies on. */}
+      <div className="pointer-events-none fixed -left-[9999px] top-0" aria-hidden="true">
+        <div ref={shareRef} className="w-[720px] bg-white p-8 font-sans">
+          <div className="flex items-center gap-4 border-b-4 border-brand pb-4">
+            <img src={crest} alt="" className="h-[64px] w-[59px] object-contain" />
+            <div>
+              <p className="text-[13px] font-bold uppercase tracking-[2px] text-ink-muted">
+                Abu Dhabi Harlequins
+              </p>
+              <p className="text-[30px] font-extrabold leading-tight text-ink">
+                {eventTitle(event)}
+              </p>
+              <p className="text-[15px] font-semibold text-ink-muted">
+                {team?.name} · {formatLongDate(date)} · {eventTimeLabel(event)}
+                {venueLine(event) ? ` · ${venueLine(event)}` : ''}
+                {perSide != null ? ` · ${perSide}-a-side` : ''}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-8">
+            <div>
+              <p className="mb-2 text-[13px] font-extrabold uppercase tracking-[1px] text-brand">
+                Starting
+              </p>
+              <ol className="text-[16px] leading-[1.9] text-ink">
+                {starters.map((p, index) => (
+                  <li key={p.player_id}>
+                    <span className="inline-block w-6 font-bold text-ink-muted">{index + 1}</span>
+                    {playersById.get(p.player_id)?.full_name}
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div>
+              <p className="mb-2 text-[13px] font-extrabold uppercase tracking-[1px] text-brand">
+                Replacements
+              </p>
+              <ol className="text-[16px] leading-[1.9] text-ink">
+                {bench.map((p) => (
+                  <li key={p.player_id}>{playersById.get(p.player_id)?.full_name}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
+
+          {notes.trim() && (
+            <p className="mt-5 border-t border-line pt-4 text-[16px] font-semibold text-ink">
+              {notes.trim()}
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
