@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🗓️ **"WE DON'T KNOW YET", AS A THING A FIXTURE CAN SAY — plus R0 and a duration
+- 🏆 **A TOURNAMENT IS NAMED, NOT OPPOSED.** Reported by Jay from the live
+  schedule: a tournament read **"Quins vs Al Ain Tournament"**. ⚠️ **The cause was
+  the REQUIRED OPPONENT FIELD, not the title function.** A match could not be
+  saved without an opponent and a tournament has none, so the only way to enter
+  one was to type the tournament's name into the opponent box — after which
+  `Quins vs <opponent>` was doing exactly what it was told. The opponent is now
+  optional for a tournament, which is also what lets a club put a tournament on
+  the schedule months ahead and add the draw later. `eventTitle` renders the
+  tournament's own name, ⚠️ **checked AHEAD of the opponent** so the fixtures
+  already carrying the workaround read correctly with no data migration.
+  ⚠️ **The calendar feed had to learn `competition_type`** — it received the
+  tournament's NAME but never the type, so it could not tell one from a legacy
+  free-text row (`db/migrations/20260814_calendar_feed_competition_type.sql`).
+  ⚠️ **Inferring it from "`competition` is not null" was REJECTED**: that is what
+  the app does for legacy rows and is very nearly right, and "very nearly right by
+  a convention the writer happens to follow" is how the two sides drift.
+
+- `be92c0c` — 🗓️ **"WE DON'T KNOW YET", AS A THING A FIXTURE CAN SAY — plus R0 and a duration
   shortcut.** Jay's three asks on the event form. ⚠️ **The migration
   (`db/migrations/20260814_competition_tbd_and_time_tbd.sql`) MUST BE APPLIED
   BEFORE THIS DEPLOYS**, or a coach picking TBD gets a raw CHECK violation.

@@ -20,6 +20,38 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### `20260814_calendar_feed_competition_type` — the feed learns what a tournament is
+
+✅ **APPLIED 14 Aug 2026 as `calendar_feed_competition_type`.** Measured after: the
+function returns `competition_type`, still returns `time_tbd`, and its ACL is
+unchanged with **no PUBLIC**.
+
+Jay, from the live schedule: a tournament read **"Quins vs Al Ain Tournament"**. The
+app fix is in `src/lib/eventFormat.js`; this is the half that stops a parent's
+CALENDAR disagreeing with the screen.
+
+⚠️ **The feed could not see `competition_type` at all.** It received `competition` —
+the tournament's NAME — but never the type, so it had no way to tell a tournament from
+a legacy row carrying arbitrary free text. An edge function **cannot add a column to
+its own input**; that is decided by this function's `RETURNS TABLE`, which is the point
+`20260812_calendar_feed_league_team` makes at length and the reason the pitch was
+missing from the feed for a day in Aug 2026.
+
+⚠️ **REJECTED: inferring it from `competition` being non-null.** That is exactly what
+the app does for rows predating the column, and it is *very nearly* right — the app
+nulls `competition` for a league fixture and for a friendly, so a non-null value does
+imply a tournament today. Refused because "very nearly right, by a convention the
+writer happens to follow" is how the two sides drift, and this is the file whose whole
+job is stopping that. Sending the column costs one word in a select list.
+
+⚠️ **THE EDGE FUNCTION IS A SEPARATE DEPLOY AND WAS THE THING MOST NEARLY FORGOTTEN.**
+It sat on the pre-TBD version for hours after the migration landed. Deployed as
+**version 32**, `verify_jwt` still false. Smoke-tested with a non-existent token:
+200 and a valid empty `VCALENDAR`, which also proves the new RPC signature and the
+function agree — a mismatch surfaces as a 503.
+
+---
+
 ### `20260814_competition_tbd_and_time_tbd` — "we don't know yet", as a thing a fixture can say
 
 ✅ **APPLIED 14 Aug 2026 as `20260814160402 competition_tbd_and_time_tbd`**, by Claude

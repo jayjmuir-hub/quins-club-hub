@@ -447,6 +447,10 @@ export default function EventForm({
   const setFromInput = (key) => (domEvent) => set(key)(domEvent.target.value)
 
   const isMatch = values.type === 'match'
+  // Whether this fixture is a tournament entry rather than a fixture against one
+  // named side. Decides that the opponent is optional, and how the field is
+  // labelled — see the `opponent` guard in handleSubmit.
+  const isTournament = isMatch && values.competitionType === COMPETITION_TOURNAMENT
   // ⚠️ A DUPLICATE IS NOT EDITING, and this single line is what makes that
   // true everywhere. `editing` gates the id on the payload, the series
   // checkbox, the Repeats panel, the extra-squads picker, the sheet title and
@@ -764,7 +768,14 @@ export default function EventForm({
       // nullable — see the migration for why those two are not in conflict.
       endTime: timeTbd ? false : !values.endTime || !ends_at || !endsAfterStart,
       teamId: !teamId,
-      opponent: isMatch && !values.opponent.trim(),
+      // ⚠️ NOT REQUIRED FOR A TOURNAMENT (Jay, 14 Aug 2026). A club enters a
+      // tournament months ahead and finds out who it is playing days before, so
+      // demanding an opponent means the fixture cannot go on the schedule at all
+      // until the draw lands — and the workaround people actually used was to
+      // type the tournament's NAME into the box, which then rendered as
+      // "Quins vs Al Ain Tournament" everywhere. This is the bug; eventTitle's
+      // tournament branch is the cosmetic half.
+      opponent: isMatch && !isTournament && !values.opponent.trim(),
       title: !isMatch && !values.title.trim(),
     }
     setInvalid(nextInvalid)
@@ -1030,6 +1041,14 @@ export default function EventForm({
         {isMatch ? (
           <div className={FIELD}>
             <label className={LABEL} htmlFor="event-opponent">
+              {/* ⚠️ THE LABEL DOES NOT CHANGE WITH THE COMPETITION, AND THAT IS
+                  A CORRECTION. It briefly read "Opponent (optional)" for a
+                  tournament, which broke `getByLabelText('Opponent')` in three
+                  unrelated tests — and those tests were right: a field's
+                  accessible NAME is its identity, and identity should not move
+                  because a dropdown elsewhere changed. The placeholder and the
+                  note below carry the message instead, which is where the
+                  guidance belongs. */}
               Opponent
             </label>
             <input
@@ -1038,9 +1057,17 @@ export default function EventForm({
               value={values.opponent}
               onChange={setFromInput('opponent')}
               aria-invalid={invalid.opponent ? 'true' : undefined}
-              placeholder="e.g. Dubai Exiles"
+              aria-describedby={isTournament ? 'event-opponent-note' : undefined}
+              placeholder={isTournament ? 'Leave blank until the draw is out' : 'e.g. Dubai Exiles'}
               className={inputClasses(invalid.opponent)}
             />
+            {isTournament && (
+              <p id="event-opponent-note" className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+                A tournament is listed by its own name, so you don&apos;t need an
+                opponent. Put the tournament in <strong>Competition</strong> below and
+                add an opponent later only if this is one specific fixture within it.
+              </p>
+            )}
           </div>
         ) : (
           <div className={FIELD}>

@@ -190,6 +190,54 @@ describe('duration', () => {
   })
 })
 
+describe('tournaments have no opponent', () => {
+  // Jay, 14 Aug 2026, from the live schedule. The required Opponent field is
+  // what made somebody type "Al Ain Tournament" into it, which then rendered as
+  // "Quins vs Al Ain Tournament" everywhere.
+  it('saves a tournament with the opponent left blank', async () => {
+    const user = renderForm()
+    const dateInput = screen.getByLabelText('Date')
+    await user.clear(dateInput)
+    await user.type(dateInput, '2026-10-10')
+    await user.type(screen.getByLabelText('Time'), '09:00')
+    await user.type(screen.getByLabelText('End time'), '17:00')
+    await user.selectOptions(screen.getByLabelText('Competition'), 'tournament')
+    await user.selectOptions(screen.getByLabelText('Tournament'), 'Al Ain Tournament')
+    // Deliberately no opponent — the draw is not out yet.
+    await user.click(screen.getByRole('button', { name: /add event/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
+    const payload = upsertEventMock.mock.calls[0][0]
+    expect(payload.competition).toBe('Al Ain Tournament')
+    expect(payload.competition_type).toBe('tournament')
+    expect(payload.opponent).toBe('')
+  })
+
+  it('says the opponent is not needed, without renaming the field', async () => {
+    // ⚠️ THE LABEL STAYS "Opponent". It briefly became "Opponent (optional)" for
+    // a tournament and broke `getByLabelText('Opponent')` in three unrelated
+    // tests — correctly, because a field's accessible name is its identity and
+    // should not move because a dropdown elsewhere changed. The guidance lives
+    // in the placeholder and the note.
+    const user = renderForm()
+    await user.selectOptions(screen.getByLabelText('Competition'), 'tournament')
+    const opponent = screen.getByLabelText('Opponent')
+    expect(opponent).toHaveAttribute('placeholder', expect.stringMatching(/draw is out/i))
+    expect(screen.getByText(/don.t need an opponent/i)).toBeInTheDocument()
+  })
+
+  it('STILL requires an opponent for an ordinary fixture', async () => {
+    // The guard is narrowed to tournaments, not removed. A friendly with no
+    // opponent is still an unfinished fixture.
+    const user = renderForm()
+    await user.type(screen.getByLabelText('Time'), '15:00')
+    await user.type(screen.getByLabelText('End time'), '16:30')
+    await user.click(screen.getByRole('button', { name: /add event/i }))
+    expect(upsertEventMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/highlighted fields/i)
+  })
+})
+
 describe('start time TBD', () => {
   it('hides the time fields and saves midnight CLUB time with the flag', async () => {
     const user = renderForm()

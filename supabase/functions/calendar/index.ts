@@ -107,6 +107,14 @@ type Event = {
   // entry it has today. Deploying this function before the migration therefore
   // changes nothing rather than breaking the feed.
   time_tbd?: boolean | null
+  // Added 14 Aug 2026 alongside the tournament-title fix.
+  //
+  // ⚠️ OPTIONAL, LIKE EVERY FIELD ABOVE IT, AND THE FALLBACK IS DELIBERATE:
+  // until the matching migration is applied this arrives `undefined`, and
+  // summaryFor() below then falls back to the pre-existing "squad v opponent"
+  // — which is what every fixture rendered as yesterday. Deploying this
+  // function early therefore changes nothing.
+  competition_type?: string | null
 }
 
 /**
@@ -144,6 +152,20 @@ function summaryFor(event: Event): string {
   // facts, same order, different amount of room. It is NOT a drift: both come
   // from the same three columns and neither invents anything.
   const squad = event.league_team_name ?? event.team_name ?? 'Quins'
+  // ⚠️ A TOURNAMENT IS NAMED, NOT OPPOSED — "U16B Contact — Al Ain Tournament",
+  // never "U16B Contact v Al Ain Tournament". Mirrors eventTitle() in
+  // src/lib/eventFormat.js, and ⚠️ THIS MIRRORING IS THE WHOLE RISK: the app is
+  // bundled by Vite and this is a Deno function deployed separately, so a fix
+  // applied to one and not the other means a parent reads one thing on screen
+  // and another in their calendar. Same standing arrangement leagueLabel() and
+  // locationFor() already have.
+  //
+  // ⚠️ AHEAD OF THE OPPONENT LINE, because rows entered before this fix hold the
+  // tournament's name in the opponent column too — the workaround the required
+  // opponent field forced. Opponent-first would keep rendering the old string.
+  if (event.type === 'match' && event.competition_type === 'tournament' && event.competition) {
+    return `${squad} — ${event.competition}`
+  }
   if (event.type === 'match') {
     const opponent = event.opponent ?? 'TBC'
     return event.home ? `${squad} v ${opponent}` : `${opponent} v ${squad}`
@@ -282,7 +304,12 @@ function toVEvent(event: Event, stamp: string): string[] {
   if (allDay) description.push('Kick-off time to be confirmed')
   const league = leagueLabel(event)
   if (league) description.push(league)
-  if (event.competition) description.push(event.competition)
+  // ⚠️ SKIPPED WHEN THE SUMMARY ALREADY IS THE TOURNAMENT NAME, or the entry
+  // reads "U16B Contact — Al Ain Tournament" with "Al Ain Tournament" repeated
+  // directly underneath it.
+  if (event.competition && !(event.type === 'match' && event.competition_type === 'tournament')) {
+    description.push(event.competition)
+  }
   if (event.type === 'match' && event.opponent) {
     description.push(event.home ? 'Home' : 'Away')
   }
