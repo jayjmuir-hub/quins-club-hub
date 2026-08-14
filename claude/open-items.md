@@ -1,0 +1,117 @@
+# Open items
+
+**Known, not blocking, not forgotten.** Split out of `state-of-play.md` on
+14 Aug 2026 so that file could go back to being about today.
+
+⚠️ **MOST OF THIS IS THE 13 Aug 2026 PRODUCTION-READINESS AUDIT, AND THIS IS THE
+ONLY RECORD OF IT.** The report itself was a session artefact and was never
+committed, deliberately — it was a dated verdict. **An item deleted from here is
+a finding that ceases to exist.** Tick things off by striking them through with
+the evidence, never by removing the line.
+
+Everything is **not started** unless it says otherwise. Ordered by cost to fix.
+
+## Needs Jay (account creations — Claude does not do these)
+
+- **Leaked-password protection is OFF.** Supabase → Authentication → Policies.
+- **No monitoring, alerting or error tracking.** Detection today is somebody
+  telling Jay. Two free first steps: an uptime monitor on `/` **and**
+  `/calendar.ics`, and Sentry's free tier wired into `ErrorBoundary`'s
+  `componentDidCatch`, which already exists for it.
+  ⚠️ **The `/calendar.ics` check must assert `content-type: text/calendar`, not a
+  200** — the SPA catch-all answers any unknown path with `index.html`.
+  ⚠️ **A monitor that has never fired is not a monitor.** Pause the Netlify site
+  once and confirm the email arrives.
+
+## Cheap (under an hour each)
+
+- **No dependency scanning.** No Dependabot, no `npm audit` step. ⚠️ `react-router-dom`
+  carries two moderate advisories, **neither exploitable here** — `safeNext()` blocks
+  `//host` and `/\host`, and this app is not server-rendered. Recorded so nobody
+  re-panics at the same output.
+- **No `LICENSE`, no `SECURITY.md`** on a public repo running children's-data
+  infrastructure.
+- **CSP is `frame-ancestors 'none'` and nothing else.** `netlify.toml` explains why
+  and the reasoning is sound — a wrong `connect-src` breaks the app silently for
+  anyone holding a cached service worker. It stays here because it is the only thing
+  that would contain a compromised npm dependency. Do `connect-src` first, and test
+  against a browser that already has a service worker registered.
+- **CI pins Node 20.** Bumping to 22+ would retire the jsdom/`WebSocket` trap in
+  `vite.config.js` and let eight more test files run in the `node` environment.
+  Both dev PCs are already on 24.
+
+## One migration each
+
+- **`anon` holds full table privileges on every table in `public`.** Measured
+  14 Aug 2026 across seven tables, all identical. Source is Supabase's default
+  privileges. **Safe today by its POLICIES, not by its grants** — which is the thing
+  this repo's rules say not to rely on. One migration across all of `public` or it is
+  not worth doing.
+- **18 RLS policies call `auth.uid()` bare**, so Postgres re-evaluates per row. Fix is
+  `(select auth.uid())` and changes no meaning. One migration touching all 18, and
+  prove it against an injected fault afterwards.
+
+## Real gaps, no cheap fix
+
+- **No audit log.** Nothing records who deleted a player, revoked a membership, edited
+  a child's contact details or granted super-admin. `events.created_by`,
+  `availability.updated_by` and `attendance.recorded_by` are single overwritten
+  columns, not history.
+- **The whole app is one JavaScript chunk** and every parent downloads all of it.
+  ⚠️ Re-measure rather than citing an old figure. Two fixes, biggest first:
+  `flag-icons` is imported whole for a phone country picker and is most of the CSS
+  plus megabytes of SVG; and route-level `React.lazy` on `AdminDashboard`,
+  `MatchSheet`, `PlayerImport` and `Allocation` — the admin half is used by three
+  people and shipped to everyone.
+  ⚠️ `tests/pwa-build.test.js` and `tests/button-sweep.test.js` READ `dist/`, so run
+  `npm run build && npm test`, never `npm test` alone, when touching this.
+- **The calendar token is an unrevocable, non-expiring credential in a URL**, and
+  nobody can see if one has leaked. ⛔ **Do not add an expiry** — a feed that dies on
+  a timer produces a club-wide "my calendar stopped working" with no way to warn
+  anyone. The cheap fix is visibility: `last_used_at`, shown on the subscribe screen,
+  plus an admin-side reset.
+- **`saveParents` is delete-then-write**, so a failure between the two loses a child's
+  parent records. ⚠️ Not the same as the deliberate two-call split for player
+  contacts, where a partial failure surfaces distinctly; here it surfaces as missing
+  data.
+- **`social_ideas` uploads the image BEFORE inserting the row**, so a failed insert
+  orphans an object that appears on no screen and nothing sweeps.
+- **`supabase_migrations.schema_migrations` is polluted** — many stale rows, a dozen
+  of one name. ⚠️ **Supabase branching replays that history, so branching does not
+  work on this project** (tried 13 Aug, `MIGRATIONS_FAILED`, zero tables). Cleaning it
+  is a prerequisite for having any staging environment. **Use a rolled-back
+  transaction on production instead** — the house style for `db/tests/*.sql`.
+
+## Shipped but never exercised by a real person
+
+- **The match sheet** — no coach has filled one in during a real match.
+- **The scoring model** — no coach has entered a real score.
+- **Staff photos** — nobody has uploaded one in the real app.
+- **The photo backup restores** — copying is not restoring, and nobody has ever got a
+  photograph back. ⛔ **Tabled by Jay.**
+- **Realtime's safety half** — nobody has watched a non-admin *fail* to receive a
+  change for a squad they are not in. ⚠️ **That test must be an EDIT, never a DELETE**:
+  Supabase does not apply RLS to delete events, so a deleted fixture reaches every
+  subscriber regardless of squad and would read as a leak that is not one.
+  ⚠️ **The thundering herd is real now that realtime works** — every subscriber in
+  scope refetches on any change. Nothing at today's size; the least-tested thing in
+  the app at the 1500 members Jay expects, and SQL cannot measure it.
+- **`/notices` has no real-browser coverage.** `harness/` carries only the pure
+  `NoticeBoard` card, so the composer and the receipts sheet cannot be reached there.
+- **`attendance` is empty.** Anything computed from it — a percentage, consecutive
+  absences, an "at risk" flag — has no data to stand on and no way to have its
+  thresholds judged. Take some registers first.
+
+## Deferred by Jay, still deferred
+
+- **The `group_id` multi-squad edit/cancel.** A series can be edited; a group cannot.
+  Reaching across squads has a different blast radius, because there RLS makes the
+  write genuinely partial rather than all-or-nothing.
+- **Test data cleanup.**
+
+## Unexplained
+
+- **One phantom test failure in `tests/notice-board.test.jsx`** does not fit the
+  timeout mechanism fixed on 14 Aug — the file is synchronous and runs in ~160ms. It
+  was never reproduced and its message was never recorded. **If a phantom failure
+  appears again, capture the MESSAGE, not the file name.**

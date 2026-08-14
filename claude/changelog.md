@@ -10,6 +10,35 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
+- `60f7093` ✅ **`writing-to-github-from-claude.md` emptied and rebuilt** — see the
+  entry below; it keeps only the routes that work and the traps that have bitten.
+
+- `0e7cfd4` ✅ **`state-of-play.md` WAS EMPTIED TO A HEADING BY JAY AND REBUILT
+  FROM SCRATCH.** The first had
+  reached **2,151 lines**; roughly half was dated narrative, much of it about its
+  own past wrongness, because every correction was appended rather than replacing
+  anything. It had been rewritten once before, on 10 Aug, at 591 lines.
+  ⚠️ **THE TWO HALVES WERE NOT THE SAME PROBLEM.** "Where things stand" (1,106
+  lines) rots by design and is gone, correctly. The rulings and the audit backlog
+  did not rot — the file's own audit said every wrong claim in its history was a
+  rotted MEASUREMENT and never a wrong ruling.
+  ✅ **The audit backlog is rescued into `claude/open-items.md`** and compressed
+  hard. It carried the only record of the 13 Aug readiness audit, which was
+  deliberately never committed as a report.
+  ⚠️ **The rulings section was NOT rescued — Jay's call**, on the grounds that
+  most of it is also recorded in `RESTORE.md`, in migration headers and in
+  `claude/decisions/`. **Not all of it is.** It remains in git history at
+  `480b38d` and can be mined if something turns out to be missing.
+  ⚠️ **`state-of-play.md` NOW CARRIES A SIZE RULE** — nothing dated, and a note
+  that passing ~80 lines means something has crept back in.
+  ❌ **BOTH PUSHES TURNED `main` RED** (`docs-check`, commits missing from the
+  changelog). Fixed by this entry. **A direct push to `main` still runs the
+  required checks** — owner bypass lets the push through, it does not make the
+  build pass.
+
+- `480b38d` ✅ **Trailing newlines restored on eight test files**, collateral from
+  the `@vitest-environment node` work.
+
 - `acc0798` ✅ **THE DOM-FREE TEST FILES RUN IN `node`, NOT jsdom.** Every test file that
   touches no DOM now carries `// @vitest-environment node` as its first line.
   Reasoning in `vite.config.js`.

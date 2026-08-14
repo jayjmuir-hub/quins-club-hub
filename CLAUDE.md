@@ -55,6 +55,7 @@ line elsewhere, it is stale — fix it, don't obey it.
 
 | Read | For |
 |---|---|
+| `claude/open-items.md` | **Everything known-broken but not blocking, and the ONLY record of the 13 Aug 2026 readiness audit.** Split out of `state-of-play.md` on 14 Aug. An item deleted from it is a finding that ceases to exist |
 | `claude/decisions/` | **The rulings.** Why a settled question was settled. Read the relevant one BEFORE re-opening any argument — several are tombstones over ideas already examined in full and killed |
 | `claude/plans/` | Feature plans, dated. Superseded by the code once shipped |
 | `claude/handoffs/` | Session records, dated. **History, not instruction** — a handoff describes a moment and goes stale by design. Useful for the traps, not for current state |
