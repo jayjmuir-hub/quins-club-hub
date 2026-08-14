@@ -24,7 +24,26 @@ import { registerSW } from 'virtual:pwa-register'
 // Hourly. Long enough to be invisible in bandwidth terms (it is a conditional
 // request for one small script), short enough that a fix reaches the club the
 // same afternoon.
+//
+// ⚠️ THE TIMER ALONE WAS NOT ENOUGH, AND JAY REPORTED THE SYMPTOM: "changes are
+// immediately showing up on the desktop site but not the app". A browser tab
+// re-checks the worker script on every page load, so the site looks instant. An
+// INSTALLED PWA does not navigate — you switch away and back — so it waited up
+// to an hour, and the moment somebody looks at it is exactly the moment it had
+// not checked.
+//
+// Measured on production 14 Aug 2026 before changing anything, because the
+// obvious suspects were both innocent: `sw.js` is served
+// `public, must-revalidate, max-age=0` (so nothing stale is cached) and the
+// deployed worker does contain skipWaiting and clientsClaim (so once fetched it
+// takes over and reloads). The gap was only ever WHEN the check happens.
 const UPDATE_CHECK_MS = 60 * 60 * 1000
+
+// ⚠️ A FLOOR ON HOW OFTEN A CHECK CAN FIRE. Without it, switching between apps
+// on a phone — which is a visibilitychange every time — would issue a request
+// per flick. One a minute is far more responsive than the hour it replaces and
+// still costs nothing.
+const MIN_GAP_MS = 60 * 1000
 
 export const updateSW = registerSW({
   // Runs once the worker is registered. `registration` is the live
@@ -33,15 +52,34 @@ export const updateSW = registerSW({
   onRegisteredSW(swUrl, registration) {
     if (!registration) return
 
-    setInterval(() => {
-      // Don't burn a request while the tab is hidden or the device is offline;
-      // the next tick picks it up. update() rejects when the worker script is
-      // unreachable, which is routine on a flaky connection, so swallow it
-      // rather than surfacing an unhandled rejection.
+    let lastCheck = 0
+
+    // update() rejects when the worker script is unreachable, which is routine
+    // on a flaky connection, so swallow it rather than surfacing an unhandled
+    // rejection. A hidden or offline app is skipped — the next trigger picks it
+    // up, and there are now three of them.
+    const check = () => {
       if (document.visibilityState !== 'visible') return
       if (!navigator.onLine) return
+      const now = Date.now()
+      if (now - lastCheck < MIN_GAP_MS) return
+      lastCheck = now
       registration.update().catch(() => {})
-    }, UPDATE_CHECK_MS)
+    }
+
+    // ⚠️ THE ONE THAT ACTUALLY FIXES THE REPORT. Bringing the app back to the
+    // foreground is the moment a member expects to see the latest, and for an
+    // installed PWA it is the ONLY signal that resembles a page load.
+    document.addEventListener('visibilitychange', check)
+
+    // Coming back online after a spell without signal — pitch-side, in other
+    // words — is the other moment a check is both cheap and likely to find
+    // something.
+    window.addEventListener('online', check)
+
+    // Kept as the backstop for an app left open and visible for hours, which
+    // neither listener above would ever fire for.
+    setInterval(check, UPDATE_CHECK_MS)
   },
 
   onOfflineReady() {
