@@ -10,11 +10,38 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
+- ✅ **THE RECEIPTS SHEET NOW SAYS WHO HAS SEEN A NOTICE, NOT ONLY WHO HAS NOT.**
+  Found by Jay on the **first real notice ever posted** — U16B, read by one other
+  person — where the sheet said *"1 of 6 seen"* above a list of the five who had
+  not, and offered no way to learn who the one was.
+  ⚠️ **THE DATA WAS THERE THE WHOLE TIME.** `announcement_audience` returns
+  `read_at` for every member of the audience; the sheet computed the seen COUNT
+  and rendered only the unseen NAMES. Nothing in the plan or the code argued for
+  hiding it — it was simply never built.
+  ⚠️ **THE CHASE LIST STAYS, AND STAYS FIRST.** The two halves answer different
+  questions: seen is *"did it land?"*, unseen is *"who do I ring?"*. A test
+  exists specifically so "add the seen list" cannot quietly become "replace the
+  unseen list", and it was proved by making exactly that swap and watching it go
+  red.
+  ⚠️ **EACH NAME CARRIES WHEN, IN THE CLUB'S ZONE**, through the existing
+  `formatTableDate`/`formatTime`. "Did they see it before training?" is the real
+  question behind a read receipt and a bare name cannot answer it.
+  ✅ **`tests/notice-receipts.test.jsx` IS THE FIRST TEST THE RECEIPTS SHEET HAS
+  EVER HAD** — the whole component was uncovered. Six tests, written before the
+  code and red first.
+  ⚠️ **AND THE FIRST DRAFT OF THAT FILE USED REAL MEMBER NAMES**, lifted from a
+  screenshot of the live board, hours after `CLAUDE.md` rule 9 was written to
+  forbid exactly that. `docs:check` caught ONE of five, and only because it
+  collided with the retired-names list. **A checker is not the gate here;
+  inventing the data is.**
+  ❌ **STILL NO REAL-BROWSER COVERAGE FOR `/notices`** — `harness/` carries only
+  the pure `NoticeBoard` card, so the sheet cannot be reached there.
+
 - `15ef4e8` ✅ **The `state-of-play.md` rebuild itself** — 56 lines,
   `claude/open-items.md` new, `writing-to-github-from-claude.md` 55. Detail below.
 
-- ✅ **THE SCORING TRIGGER'S `search_path` IS PINNED, AND THE REPO HAD CLAIMED IT
-  ALREADY WAS.** `db/migrations/20260814_pin_scoring_trigger_search_path.sql`,
+- `6de277b` ✅ **THE SCORING TRIGGER'S `search_path` IS PINNED, AND THE REPO HAD
+  CLAIMED IT ALREADY WAS.** `db/migrations/20260814_pin_scoring_trigger_search_path.sql`,
   applied to production and verified live.
   ⚠️ **THE CLAIM WAS HALF TRUE, WHICH IS WHY IT SURVIVED.**
   `db/schema/functions.sql` said `social_idea_owner` and
@@ -47,6 +74,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 - `60f7093` ✅ **`writing-to-github-from-claude.md` emptied and rebuilt** — see the
   entry below; it keeps only the routes that work and the traps that have bitten.
+
+- `15ef4e8` ✅ **The rebuild itself** — `state-of-play.md` 56 lines,
+  `claude/open-items.md` new, `writing-to-github-from-claude.md` 55. Detail below.
+  ⚠️ **`scripts/docs-check.mjs` READS ONLY THE FIRST SHA ON A LINE**, so two
+  commits cannot share one entry. Found twice in one session.
 
 - `0e7cfd4` ✅ **`state-of-play.md` WAS EMPTIED TO A HEADING BY JAY AND REBUILT
   FROM SCRATCH.** The first had

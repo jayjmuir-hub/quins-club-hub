@@ -14,6 +14,7 @@ import {
   noticeStats,
 } from '../data/announcements.js'
 import { useAuth } from '../lib/auth.jsx'
+import { formatTableDate, formatTime } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import {
   audienceLabel,
@@ -255,6 +256,17 @@ function Receipts({ notice, onClose }) {
   }, [notice])
 
   const unread = (rows ?? []).filter((row) => !row.read_at)
+  // ⚠️ BOTH HALVES ARE DRAWN, AND FOR A WHILE ONLY ONE WAS. The sheet shipped
+  // on 14 Aug 2026 showing "1 of 6 seen" over a list of the five who had NOT —
+  // with no way to find out who the one was. `announcement_audience` had
+  // returned `read_at` for every member the whole time; the seen half was
+  // counted and never rendered. Found by Jay on the first real notice posted.
+  //
+  // ⚠️ THE CHASE LIST STAYS FIRST. It is the half a coach acts on: the seen
+  // list answers "did it land?", the unseen list answers "who do I ring?".
+  const seen = (rows ?? [])
+    .filter((row) => row.read_at)
+    .sort((a, b) => new Date(a.read_at) - new Date(b.read_at))
 
   return (
     <Sheet open={Boolean(notice)} onClose={onClose} title={notice?.title ?? 'Seen by'}>
@@ -304,6 +316,35 @@ function Receipts({ notice, onClose }) {
                 ))}
               </ul>
             </>
+          )}
+
+          <h4 className="mb-2 mt-4 text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+            Seen — {seen.length}
+          </h4>
+          {seen.length === 0 ? (
+            <p className="text-[13px] text-ink-muted">No one has seen this yet.</p>
+          ) : (
+            <ul className="rounded-[11px] border border-line">
+              {seen.map((row) => (
+                <li
+                  key={row.profile_id}
+                  data-testid="receipt-seen"
+                  className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-t border-line px-3 py-2 first:border-t-0"
+                >
+                  <span className="text-[14px] text-ink">
+                    {row.full_name?.trim() || 'Name not set'}
+                  </span>
+                  {/* ⚠️ THE TIME IS THE POINT, NOT DECORATION. "Did they see it
+                      before training?" is the actual question behind a read
+                      receipt, and a bare name cannot answer it. Rendered in the
+                      CLUB's zone like every other time in this app — a coach in
+                      Dubai reading "07:15" must not be seeing UTC. */}
+                  <span className="text-[12.5px] tabular-nums text-ink-muted">
+                    {formatTableDate(new Date(row.read_at))} · {formatTime(new Date(row.read_at))}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </>
       )}
