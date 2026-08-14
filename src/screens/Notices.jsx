@@ -1,0 +1,604 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Button from '../components/Button.jsx'
+import Card from '../components/Card.jsx'
+import { Empty } from '../components/Empty.jsx'
+import Spinner from '../components/Spinner.jsx'
+import { Sheet } from '../components/Sheet.jsx'
+import {
+  createNotice,
+  deleteNotice,
+  listMyReads,
+  listNotices,
+  markNoticesRead,
+  noticeAudience,
+  noticeStats,
+} from '../data/announcements.js'
+import { useAuth } from '../lib/auth.jsx'
+import { useMemberships } from '../lib/memberships.jsx'
+import {
+  audienceLabel,
+  authorLine,
+  canPostNotice,
+  currentNotices,
+  isExpired,
+  postableTeams,
+  seenSummary,
+} from '../lib/notices.js'
+import { visibleTeams } from '../lib/scope.js'
+
+// The noticeboard — /notices. Phase 1 of claude/plans/2026-08-14-notices.md.
+//
+// ⚠️ THIS SCREEN IS DELIBERATELY NOT UNDER /admin, and it is the same reason
+// that put /approvals and /match-sheet/:eventId outside it: AdminDashboard gates
+// on isAdmin() before rendering its <Outlet/>, and THE PEOPLE WHO POST SQUAD
+// NOTICES ARE COACHES AND TEAM MANAGERS. Nesting this under /admin would show
+// every coach "not authorised" on the one screen written for them.
+//
+// ⚠️ ONE SCREEN, NOT TWO. Reading and posting are the same list — like Accounts,
+// which self-gates rather than having a second copy of the approvals queue that
+// could drift. The composer appears for whoever may post; the receipts open on
+// a notice whose numbers the caller is allowed to see. Everything else is the
+// same board every member reads.
+//
+// ⚠️ EVERY GATE HERE IS COSMETIC. `announcement create`, `announcement edit`,
+// `announcement remove` and the two SECURITY DEFINER functions are the
+// enforcement. This file decides what to OFFER, so that nobody writes three
+// paragraphs and is then refused.
+
+const ALL = 'all'
+
+// ⚠️ RELATIVE DURATIONS, NOT A DATE PICKER, AND THAT IS A TIMEZONE DECISION.
+// RESTORE.md: every time in this app is Abu Dhabi time, and a naive
+// `new Date(\`${d}T${t}\`)` resolves in the BROWSER's zone — so a date input
+// would need Dubai-anchored interpretation, and a committee member setting
+// "expires 20 Aug" from London would get a notice that vanished at 8pm on the
+// 19th. A duration has no such ambiguity: it is measured from now, which is the
+// same instant everywhere. It is also what people actually mean — "leave this up
+// for a week", not "delete this at midnight on a specific date".
+const EXPIRY_CHOICES = [
+  { key: 'none', label: 'Until I remove it', days: null },
+  { key: 'week', label: 'A week', days: 7 },
+  { key: 'fortnight', label: 'Two weeks', days: 14 },
+  { key: 'month', label: 'A month', days: 30 },
+]
+
+const FIELD =
+  'w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none transition focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
+const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
+
+function expiryFromChoice(key) {
+  const choice = EXPIRY_CHOICES.find((c) => c.key === key)
+  if (!choice?.days) return null
+  return new Date(Date.now() + choice.days * 24 * 60 * 60 * 1000).toISOString()
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The composer
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function Composer({ open, onClose, teams, clubWide, onPosted }) {
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  // ⚠️ THE DEFAULT SCOPE IS THE NARROWEST ONE AVAILABLE. An admin who holds
+  // club-wide could have this default to "Whole club", and the cost of a
+  // mis-tap there is every family in the club. A coach's only option is their
+  // squad anyway, so defaulting to teams[0] is right for both and safe for one.
+  const [scope, setScope] = useState(() => teams[0]?.id ?? (clubWide ? '' : ''))
+  const [pinned, setPinned] = useState(false)
+  const [expiry, setExpiry] = useState('none')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  const clubWideChosen = scope === ''
+  const recipientsHint = clubWideChosen
+    ? 'Everyone in the club will see this.'
+    : 'Everyone attached to that squad will see this.'
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setSaving(true)
+    setError(null)
+    try {
+      await createNotice({
+        title,
+        body,
+        teamId: clubWideChosen ? null : scope,
+        pinned,
+        expiresAt: expiryFromChoice(expiry),
+      })
+      setTitle('')
+      setBody('')
+      setPinned(false)
+      setExpiry('none')
+      onPosted()
+      onClose()
+    } catch (err) {
+      setError(err.message || 'That notice could not be posted. Try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Post a notice">
+      <form onSubmit={handleSubmit}>
+        {error && (
+          <p
+            role="alert"
+            className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+          >
+            {error}
+          </p>
+        )}
+
+        <label className={LABEL} htmlFor="notice-scope">
+          Who sees it
+        </label>
+        <select
+          id="notice-scope"
+          className={FIELD}
+          value={scope}
+          disabled={saving}
+          onChange={(event) => setScope(event.target.value)}
+        >
+          {/* ⚠️ CLUB-WIDE IS LAST, NOT FIRST. A select opens on its current
+              value, but a person scanning the list should meet their squads
+              before the option that reaches every family in the club. */}
+          {teams.map((team) => (
+            <option key={team.id} value={team.id}>
+              {team.name}
+            </option>
+          ))}
+          {clubWide && <option value="">Whole club</option>}
+        </select>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted" data-testid="scope-hint">
+          {recipientsHint}
+        </p>
+
+        <div className="mt-3.5">
+          <label className={LABEL} htmlFor="notice-title">
+            Title
+          </label>
+          <input
+            id="notice-title"
+            type="text"
+            className={FIELD}
+            value={title}
+            disabled={saving}
+            maxLength={120}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </div>
+
+        <div className="mt-3.5">
+          <label className={LABEL} htmlFor="notice-body">
+            Notice
+          </label>
+          <textarea
+            id="notice-body"
+            rows={5}
+            className={FIELD}
+            value={body}
+            disabled={saving}
+            onChange={(event) => setBody(event.target.value)}
+          />
+        </div>
+
+        <div className="mt-3.5">
+          <label className={LABEL} htmlFor="notice-expiry">
+            Keep it up for
+          </label>
+          <select
+            id="notice-expiry"
+            className={FIELD}
+            value={expiry}
+            disabled={saving}
+            onChange={(event) => setExpiry(event.target.value)}
+          >
+            {EXPIRY_CHOICES.map((choice) => (
+              <option key={choice.key} value={choice.key}>
+                {choice.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <label className="mt-3.5 flex items-center gap-2.5 text-[14px] font-semibold text-ink">
+          <input
+            type="checkbox"
+            checked={pinned}
+            disabled={saving}
+            onChange={(event) => setPinned(event.target.checked)}
+            className="h-4 w-4 accent-brand"
+          />
+          Pin it to the home screen
+        </label>
+
+        <div className="mt-4 flex items-center gap-3">
+          <Button type="submit" disabled={saving || !title.trim() || !body.trim()}>
+            {saving ? 'Posting…' : 'Post'}
+          </Button>
+          {!saving && (
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      </form>
+    </Sheet>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Read receipts
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function Receipts({ notice, onClose }) {
+  const [rows, setRows] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let mounted = true
+    if (!notice) return undefined
+    setRows(null)
+    setError(null)
+    noticeAudience(notice.id)
+      .then((data) => {
+        if (mounted) setRows(data)
+      })
+      .catch((err) => {
+        if (mounted) setError(err.message || 'Could not load who has seen this.')
+      })
+    return () => {
+      mounted = false
+    }
+  }, [notice])
+
+  const unread = (rows ?? []).filter((row) => !row.read_at)
+
+  return (
+    <Sheet open={Boolean(notice)} onClose={onClose} title={notice?.title ?? 'Seen by'}>
+      {error && (
+        <p role="alert" className="text-[13px] font-semibold text-brand-deep">
+          {error}
+        </p>
+      )}
+
+      {!rows && !error && <Spinner />}
+
+      {rows && (
+        <>
+          <p className="text-[15px] font-bold text-ink">
+            {rows.length - unread.length} of {rows.length} seen
+          </p>
+
+          {/* ⚠️ SAID OUT LOUD, BECAUSE THE NUMBER IS WEAKER THAN IT LOOKS. A
+              read is recorded when the notice was drawn on somebody's screen,
+              which is not the same as their having read it — and a coach acting
+              on "18 of 24" deserves to know that. This sentence is the whole
+              honesty of the feature; do not delete it as clutter. */}
+          <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
+            Counted when the notice appeared on someone&apos;s screen. That isn&apos;t proof
+            they read it.
+          </p>
+
+          {unread.length === 0 ? (
+            <p className="mt-3.5 text-[13px] text-ink-muted">Everyone has seen this.</p>
+          ) : (
+            <>
+              <h4 className="mb-2 mt-4 text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+                Not seen yet — {unread.length}
+              </h4>
+              <ul className="rounded-[11px] border border-line">
+                {unread.map((row) => (
+                  <li
+                    key={row.profile_id}
+                    data-testid="receipt-unread"
+                    className="border-t border-line px-3 py-2 text-[14px] text-ink first:border-t-0"
+                  >
+                    {/* A member who has never set a name is a real state — the
+                        profiles row is created by a trigger with an empty
+                        full_name. Showing a blank row would read as a bug. */}
+                    {row.full_name?.trim() || 'Name not set'}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
+    </Sheet>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   One notice in the list
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function NoticeRow({ notice, teamsById, unread, stat, expired, onOpenReceipts, onDelete }) {
+  // ⚠️ TWO-STEP INLINE CONFIRM, NEVER A NATIVE confirm(). Established in Task
+  // 14: a native dialog blocks the event loop and hangs the browser check dead.
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const author = authorLine(notice)
+  const summary = seenSummary(stat)
+
+  return (
+    <Card className="mb-2.5" data-testid="notice-row">
+      <div className="px-4 py-3">
+        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+          {unread && !expired && (
+            <span className="h-2 w-2 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+          )}
+          <h3 className="text-[15px] font-bold text-ink">{notice.title}</h3>
+          {unread && !expired && <span className="sr-only">New</span>}
+          <span className="text-[12px] font-semibold text-ink-muted">
+            {audienceLabel(notice, teamsById)}
+          </span>
+          {expired && (
+            <span className="rounded-[6px] bg-surface-mute px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-[.4px] text-ink-muted">
+              Expired
+            </span>
+          )}
+        </div>
+
+        <p className="mt-1.5 whitespace-pre-line text-[13.5px] leading-relaxed text-ink">
+          {notice.body}
+        </p>
+
+        {author && <p className="mt-2 text-[12px] font-semibold text-ink-faint">{author}</p>}
+
+        {/* Only rendered for somebody the database will give numbers to — the
+            author, or an admin. `noticeStats` returns an empty map for everyone
+            else, so this whole row simply does not appear for a parent. */}
+        {(summary || onDelete) && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-2.5">
+            {summary && (
+              <button
+                type="button"
+                data-testid="open-receipts"
+                onClick={() => onOpenReceipts(notice)}
+                className="text-[13px] font-bold text-brand underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                {summary}
+              </button>
+            )}
+
+            {onDelete && !confirming && (
+              <button
+                type="button"
+                data-testid="delete-notice"
+                onClick={() => setConfirming(true)}
+                className="text-[13px] font-bold text-ink-muted underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                Take it down
+              </button>
+            )}
+
+            {onDelete && confirming && (
+              <span className="flex items-center gap-2.5">
+                <span className="text-[13px] text-ink-muted">Take it down?</span>
+                <Button
+                  variant="danger"
+                  disabled={busy}
+                  data-testid="confirm-delete-notice"
+                  onClick={async () => {
+                    setBusy(true)
+                    try {
+                      await onDelete(notice)
+                    } finally {
+                      setBusy(false)
+                      setConfirming(false)
+                    }
+                  }}
+                >
+                  {busy ? 'Removing…' : 'Yes'}
+                </Button>
+                {!busy && (
+                  <Button variant="ghost" onClick={() => setConfirming(false)}>
+                    Keep it
+                  </Button>
+                )}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The screen
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export default function Notices() {
+  const { memberships, teams } = useMemberships()
+  const { user } = useAuth()
+
+  const [notices, setNotices] = useState(null)
+  const [readIds, setReadIds] = useState(() => new Set())
+  const [stats, setStats] = useState(() => new Map())
+  const [error, setError] = useState(null)
+  const [composerOpen, setComposerOpen] = useState(false)
+  const [receiptsFor, setReceiptsFor] = useState(null)
+  const [filter, setFilter] = useState(ALL)
+
+  const myTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
+  const teamsById = useMemo(() => new Map((teams ?? []).map((t) => [t.id, t])), [teams])
+  const composerTeams = useMemo(
+    () => postableTeams(memberships, teams),
+    [memberships, teams],
+  )
+  const mayPost = canPostNotice(memberships)
+
+  const load = useCallback(async () => {
+    setError(null)
+    try {
+      const [rows, reads] = await Promise.all([listNotices(), listMyReads()])
+      setNotices(rows)
+      setReadIds(reads)
+
+      // ⚠️ THE STATS CALL IS ALLOWED TO FAIL WITHOUT BREAKING THE BOARD. It is
+      // the only request on this screen an ordinary member has no use for, and
+      // a noticeboard that refuses to render because a coach's counter is
+      // unavailable would be the tail wagging the dog.
+      try {
+        setStats(await noticeStats())
+      } catch {
+        setStats(new Map())
+      }
+    } catch (err) {
+      setError(err.message || 'We could not load the notices just now.')
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  // ⚠️ MARKED READ ON ARRIVAL, AND ONLY THE ONES ON SCREEN. This is what makes
+  // the count mean "it appeared in front of them" — which is the strongest claim
+  // this feature can honestly make, and the Receipts sheet says so in words.
+  //
+  // ⚠️ EXPIRED NOTICES ARE NOT MARKED. They are not rendered to a member, so
+  // recording them as seen would be a lie told to a coach's counter.
+  useEffect(() => {
+    if (!notices || !user?.id) return
+    const unseen = currentNotices(notices)
+      .filter((notice) => !readIds.has(notice.id))
+      .map((notice) => notice.id)
+    if (unseen.length === 0) return
+
+    markNoticesRead(user.id, unseen)
+    // Optimistic: the dot clears immediately rather than on the next load.
+    // markNoticesRead never throws (see its header), so there is no failure
+    // path that would leave this out of step with the database in a way the
+    // person could act on.
+    setReadIds((previous) => {
+      const next = new Set(previous)
+      for (const id of unseen) next.add(id)
+      return next
+    })
+  }, [notices, readIds, user])
+
+  const shown = useMemo(() => {
+    if (!notices) return []
+    // ⚠️ AN AUTHOR OR ADMIN SEES EXPIRED NOTICES; A MEMBER DOES NOT. The row is
+    // readable to both (the policy keeps it so deliberately), and the person who
+    // posted it needs to find it again to read its receipts. `stats` is exactly
+    // the set the database will give numbers for, so it is the right test —
+    // rather than a second client-side copy of "am I an admin".
+    const list = notices.filter((notice) => !isExpired(notice) || stats.has(notice.id))
+    if (filter === ALL) return list
+    return list.filter((notice) => notice.team_id === filter)
+  }, [notices, stats, filter])
+
+  async function handleDelete(notice) {
+    try {
+      await deleteNotice(notice.id)
+      await load()
+    } catch (err) {
+      setError(err.message || 'That notice could not be removed.')
+    }
+  }
+
+  return (
+    <section>
+      {/* ⚠️ `flex-wrap` IS LOAD-BEARING — tests/page-header-wrap.test.js. The
+          action group is shrink-0, so without it a long title plus the button
+          pushes the whole DOCUMENT wider than the phone, which shows up as a
+          clipped masthead and a cut-off sheet three screens away. */}
+      <div className="mb-3.5 mt-1 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Notices</h2>
+        {mayPost && (
+          <Button data-testid="post-notice" onClick={() => setComposerOpen(true)}>
+            Post a notice
+          </Button>
+        )}
+      </div>
+
+      {error && (
+        <Card className="mb-3 px-4 py-3">
+          <p role="alert" className="text-[13px] font-semibold text-brand-deep">
+            {error}
+          </p>
+        </Card>
+      )}
+
+      {/* ⚠️ HIDDEN BELOW TWO SQUADS, the same rule Schedule and Roster follow —
+          a single pill that cannot change anything is furniture. */}
+      {myTeams.length > 1 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setFilter(ALL)}
+            className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
+              filter === ALL
+                ? 'border-ink bg-ink text-white'
+                : 'border-line bg-surface-card text-ink-muted'
+            }`}
+          >
+            All
+          </button>
+          {myTeams.map((team) => (
+            <button
+              key={team.id}
+              type="button"
+              onClick={() => setFilter(team.id)}
+              className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
+                filter === team.id
+                  ? 'border-ink bg-ink text-white'
+                  : 'border-line bg-surface-card text-ink-muted'
+              }`}
+            >
+              {team.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!notices && !error && <Spinner />}
+
+      {notices && shown.length === 0 && (
+        <Empty
+          message={
+            mayPost
+              ? 'Nothing on the board. Post a notice and everyone in the squad will see it next time they open the app.'
+              : 'Nothing on the board. When a coach or the club posts something, it will show up here.'
+          }
+        />
+      )}
+
+      {shown.map((notice) => (
+        <NoticeRow
+          key={notice.id}
+          notice={notice}
+          teamsById={teamsById}
+          unread={!readIds.has(notice.id)}
+          expired={isExpired(notice)}
+          stat={stats.get(notice.id)}
+          onOpenReceipts={setReceiptsFor}
+          // ⚠️ OFFERED ONLY WHERE THE DATABASE WOULD ALLOW IT. `stats` holds
+          // exactly the notices the caller authored plus, for an admin, the
+          // club's — which is the same set "announcement remove" permits. A
+          // button that draws itself and is then refused is the defect this
+          // repo has already shipped once, on the availability control.
+          onDelete={stats.has(notice.id) ? handleDelete : null}
+        />
+      ))}
+
+      {mayPost && (
+        <Composer
+          open={composerOpen}
+          onClose={() => setComposerOpen(false)}
+          teams={composerTeams}
+          clubWide={(memberships ?? []).some((m) => m.role === 'admin' && m.status === 'active')}
+          onPosted={load}
+        />
+      )}
+
+      <Receipts notice={receiptsFor} onClose={() => setReceiptsFor(null)} />
+    </section>
+  )
+}

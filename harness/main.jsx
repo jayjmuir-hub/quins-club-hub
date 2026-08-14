@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { MemoryRouter, BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '../src/components/AppShell.jsx'
+import NoticeBoard from '../src/components/NoticeBoard.jsx'
 import Login from '../src/screens/Login.jsx'
 import Schedule from '../src/screens/Schedule.jsx'
 import Roster from '../src/screens/Roster.jsx'
@@ -207,6 +208,59 @@ const scenarios = {
 
   // Independent verification pass: three age groups in scope.
   'roster-three': rosterScenario(COACH_THREE_MEMBERSHIPS, TEAMS_THREE),
+
+  // The Home noticeboard card (14 Aug 2026). NoticeBoard is a PURE PROPS
+  // component, like SquadStaffCard, so this scenario needs no data stub at all
+  // — the fixtures below are the props. That is the only reason it is here:
+  // the /notices SCREEN reads three tables and is NOT represented in this file,
+  // so do not read a green harness as covering the screen.
+  //
+  // ⚠️ THE LONG-TITLE ROW IS THE MEASUREMENT, not decoration. A notice title is
+  // free text somebody typed on a phone, and this card sits at the top of the
+  // dashboard where an overflow pushes the whole page wide. Check it at 320px.
+  notices: () => (
+    <MemoryRouter>
+      <div className="mx-auto max-w-[720px] bg-surface p-3">
+        <NoticeBoard
+          teamsById={new Map([['t1', { id: 't1', name: 'U16B Contact' }]])}
+          readIds={new Set(['read-one'])}
+          notices={[
+            {
+              id: 'unread-one',
+              team_id: null,
+              title: 'Zayed Sports City closed Saturday',
+              body: 'All Saturday sessions move to Al Bateen. Kick-off times are unchanged.',
+              pinned: true,
+              expires_at: null,
+              created_at: new Date().toISOString(),
+              author: { full_name: 'Jay Muir' },
+            },
+            {
+              id: 'read-one',
+              team_id: 't1',
+              title: 'Kit for Friday’s fixture',
+              body: 'Away strip. Meet at the clubhouse 14:30, not at the pitch.\nKick-off is 16:00.',
+              pinned: true,
+              expires_at: null,
+              created_at: new Date().toISOString(),
+              author: { full_name: 'Sarah Nolan', title: 'Head Coach' },
+            },
+            {
+              id: 'long',
+              team_id: 't1',
+              title:
+                'Registration paperwork for the interclub tournament must be returned before Thursday',
+              body: 'Forms are with the team manager.',
+              pinned: true,
+              expires_at: null,
+              created_at: new Date().toISOString(),
+              author: { full_name: 'A Volunteer With A Long Name', title: 'Assistant Coach' },
+            },
+          ]}
+        />
+      </div>
+    </MemoryRouter>
+  ),
 
   dashboard: dashboardScenario(COACH_MEMBERSHIPS),
   'dashboard-admin': dashboardScenario(ADMIN_MEMBERSHIPS),

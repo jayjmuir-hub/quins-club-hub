@@ -744,6 +744,56 @@ will propose building.**
   where nobody can re-run it. **Verified against live including its self-test,
   and the injected grant confirmed gone after the rollback.**
 
+### As of 14 Aug 2026
+
+- ⏳ **THE NOTICEBOARD IS BUILT AND IS NOT LIVE.** Plan
+  `claude/plans/2026-08-14-notices.md`, migration
+  `db/migrations/20260814_announcements.sql`, harness
+  `db/tests/announcements.sql`, screen `src/screens/Notices.jsx`.
+  ⛔ **THE MIGRATION HAS NOT BEEN APPLIED.** No notice has ever been posted,
+  read or counted by a real person, and `/notices` against production today
+  would fail its read. **Do not read the code landing as the feature
+  existing** — the same trap the player-photo backup entry above carries.
+  ⛔ **AND `npm run docs:check` IS RED ON ONE CHECK UNTIL IT IS APPLIED**:
+  `db/schema/grants.sql` does not name the two new tables. That file is a
+  CAPTURE, and pasting the migration's DDL into it is exactly the anti-pattern
+  `RESTORE.md` records for `pitches` — so it stays red rather than being made
+  green by hand. Apply, re-capture, commit both.
+  ⚠️ **PHASE 1 SENDS NO EMAIL AND THAT IS THE DESIGN, NOT AN OMISSION.** Resend
+  Pro removed the 100/day ceiling on 13 Aug — a brake nobody designed — so the
+  outbox, the preferences table and unsubscribe are phase 2 and must exist
+  BEFORE anything here can reach an inbox. **A notify trigger added to phase 1
+  is the runaway that cap used to catch.**
+  ⚠️ **THE READ GATE IS `can_see_team`, NOT `is_attached_to_team`**, so a
+  PENDING member sees an empty board. Deliberately unlike `event read`, and the
+  second reason is the one to carry: **the audience count is a feature and has
+  to mean something.** "18 of 24" must not count accounts nobody approved.
+  ⚠️ **AUDIENCE IS NOT READERSHIP** — an admin can read a squad notice and is
+  not counted in it.
+  ⚠️ **`team_id` IS NOT UPDATABLE**, enforced by the COLUMN GRANTS and not by
+  the policy. Restoring that grant "for consistency" silently reopens
+  re-scoping a notice after it has been read, and every existing test stays
+  green.
+  ⚠️ **THE HOME CARD SITS ABOVE THE FIXTURE HERO** — a knowing departure from
+  `claude/specs/design-system.md` §5.1, approved by Jay from a mockup, and
+  survivable only because the card returns null rather than an empty box. If it
+  ever renders a placeholder, that decision has to be re-made.
+  ✅ **THE SCHEMA WAS EXERCISED AGAINST PRODUCTION IN A ROLLED-BACK
+  TRANSACTION** — the pattern this file recommends in place of a branch. 13 of
+  14 assertions green on the first complete run.
+  ⚠️ **THE FOURTEENTH IS WORTH KNOWING AND IT WAS THE HARNESS'S BUG, NOT THE
+  SCHEMA'S**: `auth.users` carries `on_auth_user_created` → `handle_new_user()`,
+  which creates the `profiles` row with an EMPTY `full_name`, so a later
+  `insert into profiles … on conflict (id) do nothing` does nothing and every
+  fixture ends up nameless. It looked exactly like a broken `order by`.
+  ⚠️ **AND `memberships_unique_grant` IS `(profile_id, club_id, role, team_id,
+  player_id)`** — so a parent with two children in one squad really does hold
+  two active membership rows, which is why the audience count must dedupe on
+  `profile_id`. Found by the constraint refusing the fixture.
+  ❌ **THE `/notices` SCREEN HAS NO REAL-BROWSER COVERAGE.** Only the pure
+  `NoticeBoard` card is in `harness/` (scenario `notices`), measured at 320px
+  and proved non-vacuous with a 900px probe.
+
 - ⚠️ **A PRODUCTION READINESS AUDIT WAS RUN ON 13 Aug 2026** and its findings are
   NOT all recorded here — the report is a session artefact, not a repo document.
   The ones that became work are in §Open.

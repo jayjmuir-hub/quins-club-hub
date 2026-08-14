@@ -7,6 +7,7 @@ import Dashboard from './screens/Dashboard.jsx'
 import Schedule from './screens/Schedule.jsx'
 import Roster from './screens/Roster.jsx'
 import More from './screens/More.jsx'
+import Notices from './screens/Notices.jsx'
 import AdminDashboard from './screens/AdminDashboard.jsx'
 import PortalChooser from './screens/PortalChooser.jsx'
 import SocialWhatsOn from './screens/SocialWhatsOn.jsx'
@@ -137,6 +138,20 @@ export default function App() {
           <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
           <Route path="/roster" element={<AppShell><Roster /></AppShell>} />
           <Route path="/more" element={<AppShell><More /></AppShell>} />
+
+          {/* THE NOTICEBOARD (Jay, 14 Aug 2026).
+              ⚠️ DELIBERATELY NOT UNDER /admin, and it is the same reason that
+              put /approvals and /match-sheet/:eventId outside it: the people
+              who post SQUAD notices are coaches and team managers, and
+              AdminDashboard gates on isAdmin() before rendering its <Outlet/>.
+              Nesting this there would show every coach "not authorised" on the
+              one screen written for them.
+              ⚠️ NOT desktop-only either. Telling a squad where to meet on
+              Friday is a thing done from a phone, at the pitch.
+              The screen self-gates on who may POST; who may READ is decided by
+              RLS, and the composer is offered only where the database would
+              accept it. */}
+          <Route path="/notices" element={<AppShell><Notices /></AppShell>} />
 
           {/* Admin-only, desktop-only. AdminDashboard gates on isAdmin()
               against the EFFECTIVE membership set and renders <Outlet/>,

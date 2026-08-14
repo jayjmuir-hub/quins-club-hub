@@ -8,6 +8,35 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 14 Aug 2026
+
+- ⏳ **NOTICES — THE CLUB NOTICEBOARD, PHASE 1. BUILT, NOT APPLIED, NOT LIVE.**
+  Plan `claude/plans/2026-08-14-notices.md`. `public.announcements` (scoped by
+  `team_id`, null meaning the whole club), `public.announcement_reads`, two
+  `SECURITY DEFINER` functions for the receipts, `/notices`, the pinned card on
+  Home and a link on `/more`.
+  ⚠️ **NOTHING IN IT SENDS EMAIL, ON PURPOSE.** Resend Pro removed the 100/day
+  ceiling on 13 Aug — a brake nobody designed — so the outbox, preferences and
+  unsubscribe are phase 2 and the email itself is phase 3. **Do not bolt a
+  notify trigger onto phase 1.**
+  ⚠️ **THE READ GATE IS `can_see_team`, SO A PENDING MEMBER SEES AN EMPTY
+  BOARD** — deliberately unlike `event read`, because the audience count is a
+  feature and must not include accounts nobody has approved.
+  ⚠️ **`team_id` IS NOT UPDATABLE**, enforced by the column grants rather than
+  the policy: a squad notice thirty people have read must not become club-wide
+  afterwards.
+  ⚠️ **A READ MEANS "IT APPEARED ON THEIR SCREEN"**, and the receipts sheet says
+  so on the screen.
+  ✅ Exercised against production in a rolled-back transaction, 13 of 14 green
+  first time; the fourteenth was the harness's own bug (`handle_new_user` wins
+  the race, so `on conflict do nothing` left the fixtures nameless).
+  ✅ Home card measured at 320px in Chromium, proved non-vacuous with a 900px
+  probe. ❌ The `/notices` screen has no real-browser coverage.
+  ⛔ **`db/schema/grants.sql` IS NOT UPDATED AND `npm run docs:check` IS RED ON
+  EXACTLY THAT CHECK.** That file is a CAPTURE of live, and pasting the
+  migration's DDL into it is the specific anti-pattern `RESTORE.md` records. It
+  gets re-captured once the migration is applied — not before.
+
 ## 13 Aug 2026
 
 - ✅ **STAFF PHOTOS — THE SQUAD CONTACTS CARD HAS FACES, AND THE PLAN IS DONE.**
