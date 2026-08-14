@@ -20,6 +20,7 @@ import Allocation from './screens/Allocation.jsx'
 import YouthDashboard from './screens/YouthDashboard.jsx'
 import MatchSheet from './screens/MatchSheet.jsx'
 import Lineup from './screens/Lineup.jsx'
+import GameTime from './screens/GameTime.jsx'
 import AcceptInvite from './screens/AcceptInvite.jsx'
 import Privacy from './screens/Privacy.jsx'
 import DeleteAccount from './screens/DeleteAccount.jsx'
@@ -222,6 +223,13 @@ export default function App() {
               and somebody will paste the URL — and the `lineup manage` RLS policy
               is what actually decides. */}
           <Route path="/lineup/:eventId" element={<AppShell><Lineup /></AppShell>} />
+
+          {/* WHO HAS NOT HAD A CHANCE TO PLAY (Jay, 14 Aug 2026). Outside /admin
+              for the same reason /lineup and /match-sheet are: the people who
+              need it are COACHES AND TEAM MANAGERS, and AdminDashboard gates on
+              isAdmin(). Coach-only is enforced by RLS on lineup_players, not by
+              this route. */}
+          <Route path="/game-time" element={<AppShell><GameTime /></AppShell>} />
 
           {/* THE COACH / TEAM MANAGER APPROVALS ROUTE (Jay, 9 Aug 2026).
               Deliberately OUTSIDE /admin, and that is not a stylistic choice:
