@@ -121,6 +121,24 @@ export function resultScore(event) {
  * there is a last-resort fallback rather than a blank row.
  */
 export function eventTitle(event) {
+  // ⚠️ A TOURNAMENT IS NOT PLAYED AGAINST ONE SIDE, so it is named rather than
+  // opposed — "Al Ain Tournament", never "Quins vs Al Ain Tournament".
+  // Reported by Jay from the live schedule, 14 Aug 2026.
+  //
+  // ⚠️ THE BUG WAS THE REQUIRED OPPONENT FIELD, NOT THIS FUNCTION. A match
+  // could not be saved without an opponent, and a tournament has none, so the
+  // only way to enter one was to type the tournament's name into the opponent
+  // box — after which "Quins vs <opponent>" was doing exactly what it was told.
+  // EventForm no longer requires an opponent for a tournament; this branch is
+  // what makes the rows already carrying that workaround read correctly, with
+  // no data migration.
+  //
+  // ⚠️ AHEAD OF THE OPPONENT CHECK ON PURPOSE. Those existing rows hold the
+  // tournament name in BOTH columns, so an opponent-first order would keep
+  // rendering the old string for every fixture already entered.
+  if (event?.type === 'match' && event.competition_type === 'tournament' && event.competition) {
+    return event.competition
+  }
   if (event?.type === 'match' && event.opponent) return `Quins vs ${event.opponent}`
   if (event?.title) return event.title
   if (event?.type === 'match') return 'Quins match'
