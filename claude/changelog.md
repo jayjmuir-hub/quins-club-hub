@@ -10,6 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
+- 🐛 **THE VIEW-AS DROPDOWN SHIPPED CLIPPED TO A SLIVER, AND THE CHECK THAT
+  MISSED IT IS THE POINT.** Reported from a screenshot minutes after the deploy.
+  The panel was `absolute` inside the trigger's wrapper and **the masthead row
+  carries `overflow-hidden`** — deliberately, to clip the `harlequin` diagonals
+  that bleed off its right edge — so the menu was clipped with it.
+  ⚠️ **THE PRE-MERGE BROWSER MEASUREMENT COULD NOT HAVE CAUGHT IT.** It asked
+  `getBoundingClientRect()` whether the menu sat inside the viewport, and **a
+  layout box reports its full size even when an ancestor is clipping it to
+  nothing**. Proved by injecting the bug back in: the rect was **identical at
+  264×475 in both states** while `document.elementFromPoint` went from **5/5**
+  sample points hitting the menu to **0/5**. **Geometry and visibility are
+  different questions and only one is the one a person asks.**
+  ✅ Fixed by portalling the panel to `<body>` and positioning it `fixed` from
+  the trigger's rect, recomputed on resize and capture-phase scroll. Verified
+  5/5 visible at 1280px and at 320px, first menu item clickable, no document
+  overflow.
+  ⚠️ **`position: fixed` ESCAPES THE CLIP ONLY BECAUSE NO ANCESTOR SETS
+  `transform`/`filter`/`perspective`** — `Sheet.jsx` leans on the same property
+  and carries the same caveat; a page-transition wrapper would break both.
+  ⚠️ **PORTALLING CHANGED THE OUTSIDE-CLICK RULE AND GETTING IT WRONG WOULD HAVE
+  BEEN SILENT**: the handler must test the wrapper AND the panel, or every click
+  on a menu item counts as "outside" and closes the menu before the click lands
+  — picking a persona would do nothing at all.
+
 - `7228442` **The app icon is the crest again — wordless, with CLUB HUB above the bat, lightly
   3D.** Jay: *"i've changed my mind, i want to revert back to the original Quins logo
   crest"*, then *"remove all the wording"*, *"put Club Hub inside the logo white part,
@@ -120,7 +144,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   class token, the same proxy (and the same admission of being one) as
   `tests/page-header-wrap.test.js`.
 
-- ⏳ **VIEW-AS IS A DROPDOWN IN THE MASTHEAD, ON EVERY SCREEN.** Jay: *"i want
+- `2fa89fc` ✅ **VIEW-AS IS A DROPDOWN IN THE MASTHEAD, ON EVERY SCREEN.** Jay: *"i want
   to be able to select view as with a drop down from any screen, as an admin"*.
   Ruling: `claude/decisions/2026-08-14-view-as-everywhere.md`.
   ⚠️ **THIS OVERTURNS THE 7 Aug DECISION on its conclusion and NOT on its

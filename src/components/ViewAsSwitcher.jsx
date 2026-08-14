@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 
@@ -99,6 +100,9 @@ export function ViewAsSwitcher() {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
   const triggerRef = useRef(null)
+  const panelRef = useRef(null)
+  // Viewport coordinates for the portalled panel — see the note above its render.
+  const [anchor, setAnchor] = useState(null)
 
   const admin = isAdmin(realMemberships)
 
@@ -123,17 +127,66 @@ export function ViewAsSwitcher() {
       }
     }
     function onPointerDown(event) {
-      // ⚠️ `contains` ON THE WRAPPER, WHICH HOLDS BOTH THE TRIGGER AND THE
-      // PANEL. Testing the panel alone would treat a click on the trigger as
-      // "outside", closing and immediately reopening it — the classic
-      // double-toggle that makes a dropdown look broken on one click.
-      if (wrapRef.current && !wrapRef.current.contains(event.target)) setOpen(false)
+      // ⚠️ BOTH REFS, AND THAT BECAME NECESSARY THE MOMENT THE PANEL WAS
+      // PORTALLED. The wrapper holds the TRIGGER; the panel is now a child of
+      // <body> and is no longer inside it. Testing the wrapper alone would make
+      // every click on a menu item "outside" — the menu would close on
+      // pointerdown before the click landed, so choosing a persona would do
+      // nothing at all.
+      //
+      // ⚠️ And the trigger must stay in the test too: dropping it would treat a
+      // click on the trigger as outside, closing and instantly reopening — the
+      // double-toggle that makes a dropdown look like it refuses to shut.
+      if (wrapRef.current?.contains(event.target)) return
+      if (panelRef.current?.contains(event.target)) return
+      setOpen(false)
     }
     document.addEventListener('keydown', onKeyDown)
     document.addEventListener('pointerdown', onPointerDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [open])
+
+  // ══ ⚠️ THE PANEL IS PORTALLED TO <body> AND POSITIONED IN VIEWPORT COORDS ══
+  //
+  // It was `absolute` inside the trigger's wrapper until 14 Aug 2026, and it was
+  // CLIPPED TO A SLIVER on the live site. The masthead row carries
+  // `overflow-hidden` — deliberately, to clip the `harlequin` diagonals that
+  // bleed off its right edge — and an absolutely-positioned child of a clipped
+  // ancestor is clipped with it.
+  //
+  // ⚠️ THE CHECK THAT MISSED IT IS THE PART WORTH REMEMBERING. The pre-merge
+  // measurement asked `getBoundingClientRect()` whether the menu sat inside the
+  // viewport, and it does — **a layout box is reported at full size even when an
+  // ancestor is visually clipping it to nothing.** The rect said 264px wide at
+  // 40→304 while a person saw a 6px strip. Measure VISIBILITY with
+  // `document.elementFromPoint`, not geometry with a rect.
+  //
+  // ⚠️ `position: fixed` ESCAPES THE CLIP ONLY BECAUSE NO ANCESTOR SETS
+  // `transform` / `filter` / `perspective` — any of those would make that
+  // ancestor the containing block and re-clip it. `Sheet.jsx` relies on exactly
+  // the same property and states the same caveat. If a page-transition wrapper
+  // ever adds a transform, both break together.
+  useEffect(() => {
+    if (!open) return undefined
+    function place() {
+      const rect = triggerRef.current?.getBoundingClientRect()
+      if (!rect) return
+      // Right-anchored, so the panel opens inward from a trigger that sits near
+      // the right edge at every width.
+      setAnchor({ top: Math.round(rect.bottom + 8), right: Math.round(window.innerWidth - rect.right) })
+    }
+    place()
+    // `true` for capture: the masthead is sticky, so it does not move on scroll,
+    // but a scroll container between here and the trigger would — and a stale
+    // anchor leaves the menu floating away from its button.
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
     }
   }, [open])
 
@@ -183,21 +236,28 @@ export function ViewAsSwitcher() {
         )}
       </button>
 
-      {open && (
+      {open && anchor && createPortal(
         <div
+          ref={panelRef}
           data-testid="view-as-menu"
           role="menu"
           aria-label="View as"
-          // ⚠️ z-50: the sticky masthead is z-40 and the view-as banner sits in
-          // the same stacking context. Anything lower renders BEHIND the bar
-          // this control is attached to.
-          //
-          // ⚠️ `right-0` so it opens inward. The trigger is near the right edge
-          // of a 1360px-capped row on desktop and at the very edge of a 320px
-          // phone; a left-anchored panel would hang off the screen and take the
-          // document width with it, which is the failure
+          // ⚠️ POSITIONED IN JS, NOT IN TAILWIND, because it is portalled out of
+          // the masthead and has no positioned ancestor to anchor to any more.
+          // `right` rather than `left` keeps it opening inward from a trigger
+          // that sits near the right edge at every width.
+          style={{ position: 'fixed', top: anchor.top, right: anchor.right }}
+          // ⚠️ `max-w-[calc(100vw-16px)]` IS THE PHONE GUARD. A fixed 264px
+          // panel is wider than the gap between the trigger and the left edge on
+          // the narrowest phones, and a fixed element that overflows would take
+          // the document width with it — the failure
           // harness/check-overflow.mjs exists to catch.
-          className="absolute right-0 top-full z-50 mt-2 max-h-[70vh] w-[264px] overflow-y-auto rounded-[14px] border border-line bg-surface-card p-2 shadow-card"
+          //
+          // ⚠️ z-50: the sticky masthead is z-40. Portalled to <body> this is
+          // already above it in document order, but the token stays so that
+          // moving this back into the tree cannot silently put it behind the bar
+          // it hangs from.
+          className="z-50 max-h-[70vh] w-[264px] max-w-[calc(100vw-16px)] overflow-y-auto rounded-[14px] border border-line bg-surface-card p-2 shadow-card"
         >
           <p className="px-3 pb-2 pt-1 text-[12px] leading-relaxed text-ink-muted">
             Preview how the app looks for a coach or parent in one age group.
@@ -262,7 +322,8 @@ export function ViewAsSwitcher() {
               </button>
             </div>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

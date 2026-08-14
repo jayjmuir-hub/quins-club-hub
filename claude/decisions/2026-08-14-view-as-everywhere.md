@@ -81,6 +81,44 @@ replaced before any of the numbers above meant anything.
   said "change who you are previewing **below**", and "below" now points at
   nothing.
 
+## ⚠️ It shipped clipped, and the check that missed it is the lesson
+
+**14 Aug 2026, reported from a screenshot minutes after the deploy.** The panel
+was `absolute` inside the trigger's wrapper, and **the masthead row carries
+`overflow-hidden`** — deliberately, to clip the `harlequin` diagonals that bleed
+off its right edge. An absolutely-positioned child of a clipped ancestor is
+clipped with it, so the dropdown rendered as a ~6px sliver.
+
+⚠️ **THE PRE-MERGE MEASUREMENT WAS INCAPABLE OF SEEING IT.** It asked
+`getBoundingClientRect()` whether the menu sat inside the viewport, and it did —
+264px at 40→304 on a 320px screen. **A layout box reports its full size even
+when an ancestor is visually clipping it to nothing.** Measured afterwards with
+the bug injected back in:
+
+| | rect | sample points hitting the menu |
+|---|---|---|
+| Portalled (fixed) | 264 × 475 | **5/5** |
+| Back inside the clipped row | **264 × 475 — identical** | **0/5** |
+
+**Geometry and visibility are different questions, and only one of them is the
+one a person asks.** Use `document.elementFromPoint` on sampled points inside
+the element; a rect cannot answer it.
+
+**The fix:** the panel is portalled to `<body>` and positioned `fixed` from the
+trigger's rect, recomputed on resize and on capture-phase scroll.
+
+⚠️ **`position: fixed` escapes the clip only because no ancestor sets
+`transform` / `filter` / `perspective`** — any of those would become the
+containing block and re-clip it. `Sheet.jsx` depends on exactly the same
+property and states the same caveat; if a page-transition wrapper ever adds a
+transform, both break together.
+
+⚠️ **PORTALLING CHANGED THE OUTSIDE-CLICK RULE, AND GETTING IT WRONG WOULD HAVE
+BEEN SILENT.** The panel is no longer inside the trigger's wrapper, so the
+handler must test **both** refs. Wrapper-only would treat every click on a menu
+item as "outside", closing the menu on `pointerdown` before the click landed —
+choosing a persona would simply do nothing.
+
 ## What must not be undone
 
 ⚠️ **DO NOT PUT THE PERSONA TEXT BACK ON THE TRIGGER.** "Coach, Senior Men 2nd
