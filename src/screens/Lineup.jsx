@@ -396,10 +396,33 @@ export default function Lineup() {
         )}
       </Card>
 
+      {/* ⚠️ "Still to pick", NOT "Squad" — Jay, 14 Aug 2026, having picked all
+          four U16B players and asked what the empty section was for. "Squad"
+          reads as THE SQUAD (the whole roster), so an empty one looks like the
+          roster failed to load. This list is the players NOT yet picked, and the
+          heading now says so. */}
       <h3 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
-        Squad
+        Still to pick
       </h3>
       <Card className="mb-3 px-[14px] py-2">
+        {/* ⚠️ AN EXPLICIT EMPTY STATE, because a heading over an empty card reads
+            as broken — the same defect as the orphaned timezone note on the event
+            form earlier today, and jsdom cannot see either.
+            ⚠️ TWO DIFFERENT EMPTINESSES, said differently. "Everyone is picked"
+            is success; "this squad has no players" is a job for an admin, and
+            telling somebody the first when the second is true would send them
+            looking for a bug that is really a roster gap. */}
+        {players.length === 0 ? (
+          <p className="py-3 text-[13px] leading-relaxed text-ink-muted">
+            There are no players in {team?.name ?? 'this squad'} yet. An admin adds them on
+            the Roster screen.
+          </p>
+        ) : picked.length === players.length ? (
+          <p className="py-3 text-[13px] leading-relaxed text-ink-muted">
+            Everyone in this squad is in the team — all {players.length}. Remove somebody
+            above to put them back here.
+          </p>
+        ) : null}
         {AVAILABILITY_GROUPS.map((group) => {
           const list = pool[group.key]
           if (list.length === 0) return null

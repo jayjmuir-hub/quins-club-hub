@@ -243,3 +243,39 @@ describe('an existing lineup', () => {
     expect(screen.getByDisplayValue('Meet at the gate.')).toBeInTheDocument()
   })
 })
+
+describe('the "still to pick" list', () => {
+  it('says everyone is picked rather than leaving an empty card', async () => {
+    // ⚠️ REPORTED BY JAY, 14 Aug 2026, from the live app: he picked all four
+    // U16B players and asked what the empty section was. A heading over an empty
+    // card reads as broken — and the heading itself said "Squad", which sounds
+    // like the whole roster rather than "the ones you have not picked".
+    const user = renderScreen()
+    await waitFor(() => expect(screen.getByText('Rory Aldenbrook')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /Show 1 who said no/ }))
+
+    for (const name of ['Rory Aldenbrook', 'Callum Whitstead', 'Ewan Marchetti', 'Tomas Bergqvist']) {
+      await user.click(
+        within(screen.getByText(name).closest('li')).getByRole('button', { name: 'Start' }),
+      )
+    }
+
+    expect(screen.getByText(/Everyone in this squad is in the team/)).toBeInTheDocument()
+    expect(screen.getByText(/Still to pick/)).toBeInTheDocument()
+  })
+
+  it('distinguishes an EMPTY SQUAD from everyone being picked', async () => {
+    // ⚠️ TWO DIFFERENT EMPTINESSES. "Everyone is picked" is success; "no players
+    // in this squad" is a roster gap for an admin. Saying the first when the
+    // second is true sends somebody hunting a bug that is really missing data.
+    listPlayersMock.mockResolvedValue([])
+    useMembershipsMock.mockReturnValue({ memberships: COACH, teams: [TEAM], loading: false, error: null })
+    getEventMock.mockResolvedValue(EVENT)
+    listAvailabilityMock.mockResolvedValue([])
+    listLineupsMock.mockResolvedValue([])
+    render(<Lineup />)
+
+    expect(await screen.findByText(/no players in U16B Contact yet/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Everyone in this squad/)).not.toBeInTheDocument()
+  })
+})
