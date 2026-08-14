@@ -62,8 +62,15 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   lint; a string search for `auth.uid()` finds only 17. There are **19 bare calls**
   across those 18 policies, because `calendar_tokens / calendar token own` and
   `social_ideas / social idea create` carry two each. Fix is `(select auth.uid())`
-  and changes no meaning. Not started. ⚠️ **No policy currently uses the wrapped
-  form**, so there is no partial state to reconcile.
+  and changes no meaning. Not started.
+  ✅ **THE HOUSE STYLE ALREADY EXISTS — SIX POLICIES USE THE WRAPPED FORM**, all
+  on `announcements` and `announcement_reads`, shipped 14 Aug. So this is
+  following a precedent in the schema, not inventing one; copy those.
+  ⚠️ **An earlier draft of this line claimed no policy used the wrapped form.**
+  That came from a query that listed only policies with BARE calls — the wrapped
+  ones were filtered out before they could be counted, and the absence was read
+  as evidence. The same mistake as reading an empty search as proof of absence,
+  which `CLAUDE.md` rule 6 exists to stop.
 
 ## Real gaps, no cheap fix
 
