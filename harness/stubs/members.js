@@ -514,6 +514,19 @@ export async function registerMyPlayer(fullName, teamId) {
       42901:
         "You already have players waiting to be approved, so we haven't added another. " +
         'The club will review them — please wait rather than adding more.',
+      // ⚠️ THE TWO DUPLICATE GUARDS (14 Aug 2026). These messages are the
+      // SERVER's, verbatim — neither code is mapped in src/data/members.js, so
+      // what a parent reads is the sentence the database raised, and a stub
+      // that invented its own wording would be showing something no parent can
+      // ever see. See db/migrations/20260814_registration_duplicate_guards.sql.
+      42710:
+        'Someone with that name is already registered in U14B Contact. If that is your ' +
+        'player, they are already on the roster — ask the club to connect you to them ' +
+        'rather than adding them again.',
+      42809:
+        'That is your own name, but you have said you are registering a child. If you are ' +
+        'the player, choose "I am the player". If you are registering your child, use ' +
+        'their name.',
     }
     const error = new Error(messages[code] ?? 'Something went wrong.')
     error.code = code
