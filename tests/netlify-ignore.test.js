@@ -1,3 +1,6 @@
+// @vitest-environment node
+// Nothing in this file touches the DOM, and a jsdom costs ~1.3s to build. The
+// measurement and the rule are in vite.config.js.
 import { describe, it, expect, vi } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'

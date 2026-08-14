@@ -10,8 +10,42 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- ✅ **THE SUITE IS A QUARTER FASTER, AND THERE IS FINALLY A COMMAND FOR THE
-  EDIT-TEST LOOP.** `npm run test:watch` (reruns only what your save affects)
+- ✅ **THE DOM-FREE TEST FILES RUN IN `node`, NOT jsdom.** Every test file that
+  touches no DOM now carries `// @vitest-environment node` as its first line.
+  Reasoning in `vite.config.js`.
+  ⚠️ **THE CHECK IS VITEST'S `environment` FIGURE, NOT "THE TESTS STILL PASS".**
+  A docblock that is malformed or not on the first line is **silently ignored**
+  — the file keeps running in jsdom and keeps passing, so a green run proves
+  nothing. Across the qualifying files that figure went **43.91s → 10ms**, with
+  all of their tests passing either way.
+  ⚠️ **IT BARELY MOVES A 16-CORE WALL CLOCK (~40s, unchanged) AND THAT IS
+  EXPECTED** — the run is bound by the slowest FILE, not by total CPU. At four
+  workers, the shape of the CI runner, **~59s → ~50-53s**.
+  ⚠️ **The candidate list was picked conservatively** — anything mentioning a
+  DOM global, storage, `navigator`, testing-library or `render(` was left in
+  jsdom, which is why `data.test.js` and `calendar-grid.test.js` did not
+  qualify. A file that later grows a DOM assertion fails loudly with
+  `document is not defined`; the fix is to delete its docblock.
+  ⛔ **AND EIGHT OF THEM HAD TO GO BACK, BECAUSE THE FIRST ATTEMPT PASSED
+  LOCALLY AND FAILED IN CI.** `@supabase/supabase-js` needs a global
+  `WebSocket`. jsdom supplies one; **Node 20, which the workflow pins, does not**
+  — it became a global in Node 22, and both dev PCs run Node 24. The CI error is
+  `Node.js detected but native WebSocket not found`, which names nothing to do
+  with the docblock that caused it. **Any file whose closure reaches supabase-js
+  stays in jsdom.**
+  ⚠️ **THE CLOSURE, NOT THE VISIBLE IMPORTS.** Four of the eight reach it only
+  transitively, and `tests/session-guard.test.js` reaches it through a **dynamic**
+  `import(MODULE_PATH)` that no grep for `from '…'` finds — the first pass missed
+  exactly that one.
+  ✅ **PROVED LOCALLY BOTH WAYS** by deleting `globalThis.WebSocket` in the setup
+  file to turn a dev machine into Node 20: the annotated files pass without it,
+  and a supabase-touching file put back on `node` fails with the exact CI error.
+  ⚠️ **Bumping CI to Node 22+ would retire this and let the eight join the rest.
+  Not done** — changing the runtime the production build runs on is a bigger
+  decision than a test speed-up.
+
+- `b1a9826` ✅ **THE SUITE IS A QUARTER FASTER, AND THERE IS FINALLY A COMMAND
+  FOR THE EDIT-TEST LOOP.** `npm run test:watch` (reruns only what your save affects)
   and `npm run test:related -- <file>`. `CLAUDE.md` now says which to use when.
   ⚠️ **THE POINT IS THE LOOP, NOT THE TOTAL.** A full run was ~40s and was being
   used as feedback while editing. Watch mode is 1-3s per save.
@@ -40,9 +74,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `event-format`, `expected 21 to be 20` in `schedule`, both date off-by-one.
   Forks isolate by process, which is the only reason the current suite is
   correct. **Do not re-propose it without first removing the TZ mutation.**
-  ⚠️ **NOT DONE, AND STILL AVAILABLE:** 35 test files never touch the DOM and
-  still pay ~1.4s each to build a jsdom. A sample of ten measured **3.94s →
-  2.76s** under `--environment=node`.
+  ✅ **DONE the same day — see the entry above.**
 
 - `bed0619` ✅ **THE FLAKY SUITE IS FIXED, AND IT WAS ONE CONFIG LINE.**
   `vite.config.js` now sets `testTimeout: 15000`; vitest's default is 5000.

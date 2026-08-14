@@ -920,11 +920,36 @@ will propose building.**
   `event-format`, `expected 21 to be 20` in `schedule`. **Forks isolate by
   process and that is the only reason the suite is currently correct.** Do not
   re-propose threads without removing the TZ mutation first.
-  ⚠️ **STILL AVAILABLE AND NOT DONE:** roughly a third of the test files never
-  touch the DOM and still build a jsdom each (~1.4s apiece). A sample of ten
-  measured **3.94s → 2.76s** under `--environment=node`. **Count them rather
-  than citing one** — every file matching neither `render(` nor `document.`
-  qualifies, and the fix is a `@vitest-environment node` docblock per file.
+  ✅ **AND THE DOM-FREE FILES NOW RUN IN `node` — DONE 14 Aug 2026.** Every test
+  file that touches no DOM carries `// @vitest-environment node` as its first
+  line; `vite.config.js` carries the reasoning. **Count them rather than citing
+  a number here.**
+  ⚠️ **THE DISCRIMINATING CHECK IS VITEST'S OWN `environment` FIGURE, NOT
+  "THE TESTS STILL PASS".** A docblock that is malformed, or not on the first
+  line, is **silently ignored** — the file keeps running in jsdom and keeps
+  passing, so a green run says nothing at all. Across the qualifying files that
+  figure went **43.91s → 10ms**, which is the measurement to repeat.
+  ⚠️ **IT BARELY MOVES THE WALL CLOCK ON A BIG MACHINE AND THAT IS EXPECTED.**
+  On 16 cores the run is bound by the slowest FILE, so it stays ~40s. At four
+  workers — the shape of the CI runner — **~59s → ~50-53s**. The win is CPU, and
+  CPU only becomes time when the workers are the bottleneck.
+  ⛔ **A TEST FILE WHOSE CLOSURE REACHES `@supabase/supabase-js` MUST STAY IN
+  jsdom, AND GETTING THIS WRONG ONLY FAILS IN CI.** supabase-js needs a global
+  `WebSocket`: jsdom has one, **Node 20 — which `.github/workflows/test.yml`
+  pins — does not** (it became a global in Node 22), and **both dev PCs run Node
+  24**. So the first attempt was green locally and red in CI with
+  `Node.js detected but native WebSocket not found`, an error naming nothing to
+  do with the docblock that caused it. Eight files went back to jsdom.
+  ⚠️ **TRACE THE CLOSURE, NOT THE VISIBLE IMPORTS** — four of the eight reach it
+  only transitively, and `tests/session-guard.test.js` reaches it through a
+  **dynamic** `import(MODULE_PATH)`, which is exactly the one a grep for
+  `from '…'` misses.
+  ✅ **REPRODUCIBLE ON A DEV MACHINE**: `delete globalThis.WebSocket` at the top
+  of `src/test/setup.js` makes any Node 22+ machine behave like CI for this.
+  Proved both directions — annotated files pass without it, a supabase-touching
+  file put back on `node` fails with the exact CI error.
+  ⚠️ **Bumping CI to Node 22+ would retire this whole trap.** Not done; it
+  changes the runtime the production build runs on.
 
 ### As of 14 Aug 2026
 

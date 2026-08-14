@@ -153,6 +153,51 @@ export default defineConfig({
   ],
   base: '/',
   test: {
+    // jsdom is the DEFAULT, not the rule. Building one costs ~1.3s per test
+    // file, and a third of this suite never touches the DOM — so those files
+    // carry `// @vitest-environment node` as their first line and opt out.
+    //
+    // Measured 14 Aug 2026 across the 33 files that qualify: the `environment`
+    // figure in vitest's own duration breakdown went **43.91s to 10ms**, and all
+    // 622 of their tests passed either way. ⚠️ **That figure is the check worth
+    // repeating** — a docblock that is malformed, or not on the first line, is
+    // silently ignored and the file simply keeps running in jsdom and passing.
+    // "The tests still pass" proves nothing here; the environment time does.
+    //
+    // ⚠️ IT DOES NOT MAKE THE WHOLE RUN MUCH FASTER ON A BIG MACHINE, and that
+    // is not a disappointment. On 16 cores the wall clock is set by the slowest
+    // FILE, not by total CPU, so it stays ~40s. At four workers — the shape of
+    // the CI runner — it is ~59s to ~53s. The win is CPU, and CPU only shows up
+    // as time when the workers are the bottleneck.
+    //
+    // ⚠️ ADDING ONE TO A FILE THAT LATER GROWS A DOM ASSERTION FAILS LOUDLY
+    // (`document is not defined`), which is the right direction: the fix is to
+    // delete the docblock, not to reach for a shim.
+    //
+    // ⛔ **A FILE THAT REACHES `@supabase/supabase-js` MUST STAY IN jsdom, AND
+    // THIS ONE ONLY EVER FAILS IN CI.** supabase-js needs a global `WebSocket`.
+    // jsdom supplies one; **Node 20 — which `.github/workflows/test.yml` pins —
+    // does not**, and it only became a global in Node 22. Both dev PCs run Node
+    // 24, so the eight files this caught passed locally and failed in CI with
+    // `Node.js detected but native WebSocket not found`, which names nothing to
+    // do with the docblock that caused it.
+    //
+    // ⚠️ **THE CLOSURE IS WHAT MATTERS, NOT THE IMPORT LIST YOU CAN SEE.** Four
+    // of the eight reach it only transitively, and `tests/session-guard.test.js`
+    // reaches it through a DYNAMIC `import(MODULE_PATH)` that no grep for
+    // `from '...'` will find. Trace the whole graph, both kinds of import, before
+    // annotating anything.
+    //
+    // ⚠️ **REPRODUCE IT LOCALLY BEFORE BELIEVING A FIX**: `delete
+    // globalThis.WebSocket` at the top of src/test/setup.js turns any dev
+    // machine into CI's Node 20 for this purpose. Used to prove both halves —
+    // the annotated files pass without it, and a supabase-touching file put back
+    // on `node` fails with the exact CI error.
+    //
+    // ⚠️ **Bumping CI to Node 22+ would retire this whole paragraph** and let
+    // those eight join the rest. Not done here; it is a change to the runtime
+    // the production build runs on, which is a bigger decision than a test
+    // speed-up.
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.js'],
