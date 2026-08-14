@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🏟️ **NO PITCH REQUEST ON AN AWAY MATCH** (Jay). An away fixture is played on
+- 📓 **THE SECOND 14 Aug SESSION RECORD.**
+  `claude/handoffs/2026-08-14-tbd-tournaments-and-pitches.md`, covering the
+  evening's four merges and the traps behind them. ⚠️ **It corrects the earlier
+  handoff's claim that `apply_migration` and `execute_sql` are refused here** —
+  both were used to apply two migrations. What IS gated is a production `DELETE`
+  and `gh pr merge` without `--auto`. ⚠️ It also records that **the calendar edge
+  function does not deploy with Netlify** and sat on the pre-TBD version for
+  hours, which is the closest thing to a live incident today.
+
+- `5f61f92` — 🏟️ **NO PITCH REQUEST ON AN AWAY MATCH** (Jay). An away fixture is played on
   somebody else's ground, so there is no pitch of ours to ask for — and offering
   the button put a request into the allocator's queue for a match the club is not
   hosting. ⚠️ **The check is a strict `home === false`, NOT `!event.home`.**
