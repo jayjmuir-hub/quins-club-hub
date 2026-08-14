@@ -1228,10 +1228,19 @@ export default function EventForm({
 
         {/* The one place the form names the zone, mirroring the detail
             sheet (§4.21). A coach entering fixtures from the UK over the
-            summer needs to know 20:00 means 20:00 at Zayed Sports City. */}
-        <p id="event-time-note" className="-mt-2 mb-3.5 text-[12.5px] text-ink-muted">
-          Times are Abu Dhabi time.
-        </p>
+            summer needs to know 20:00 means 20:00 at Zayed Sports City.
+
+            ⚠️ GOES WITH THE TIME FIELDS, and it has to: it is their
+            `aria-describedby` target, so leaving it behind would point two
+            removed inputs at nothing — and it read as an orphan on screen,
+            "Times are Abu Dhabi time" sitting under a form with no times in it.
+            Spotted by actually ticking the box in the running app; jsdom
+            renders it either way and no test noticed. */}
+        {!values.timeTbd && (
+          <p id="event-time-note" className="-mt-2 mb-3.5 text-[12.5px] text-ink-muted">
+            Times are Abu Dhabi time.
+          </p>
+        )}
 
         {/* Repeats. Create-time only — an existing event has occurrences
             around it that editing this one must not silently rewrite, so
