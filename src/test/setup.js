@@ -1,6 +1,42 @@
 import '@testing-library/jest-dom'
 import { beforeEach } from 'vitest'
 
+// ⚠️ EVERY KEYSTROKE IN THIS SUITE USED TO WAIT A TICK, AND IT WAS THE SINGLE
+// BIGGEST THING THE TESTS SPENT THEIR TIME ON.
+//
+// user-event's default `delay` is 0, which still means an awaited macrotask
+// between every character. On a suite that types into a lot of forms that is
+// most of the wall clock. Measured 14 Aug 2026: tests/invite-form.test.jsx
+// 11.8s -> 5.0s, and the whole suite at four workers (the shape of the CI
+// runner) 78s -> 55s. All tests passed either way.
+//
+// ⚠️ IT IS SAFE HERE BECAUSE NOTHING IN THIS APP DEBOUNCES A KEYSTROKE, and
+// that was checked rather than assumed: the only debounce in `src/` is the
+// realtime subscription in src/data/events.js, which already takes an
+// injectable `debounceMs` and is nowhere near an input. **If a debounced input
+// is ever added, its test must pass its own `delay` and this comment is the
+// reason why.**
+//
+// ⚠️ PATCHED IN ONE PLACE RATHER THAN AT 283 CALL SITES, deliberately. The
+// alternative was editing every `userEvent.setup()` in 46 files, which fixes
+// today's tests and silently loses the speed the first time somebody writes a
+// new one the ordinary way. A caller who genuinely needs a delay still wins:
+// their options are spread AFTER the default.
+//
+// ⚠️ IMPORTED CONDITIONALLY, AND A STATIC IMPORT HERE BREAKS THE SUITE. This
+// setup file runs for EVERY test file including the ones that declare
+// `@vitest-environment node`, and user-event reads `window.navigator` at import
+// time to stub the clipboard. Importing it unconditionally fails those files
+// with `Cannot read properties of undefined (reading 'navigator')` — pointing
+// at a library nothing in that file uses. Caught by tests/test-timeout.test.js,
+// which is the only node-environment file here and went red the moment the
+// static import went in.
+if (typeof window !== 'undefined') {
+  const { default: userEvent } = await import('@testing-library/user-event')
+  const setupWithoutDelay = userEvent.setup.bind(userEvent)
+  userEvent.setup = (options = {}) => setupWithoutDelay({ delay: null, ...options })
+}
+
 // jsdom keeps ONE localStorage for the whole test file, so anything a screen
 // persists survives into the next test in that file. Roster's team filter is
 // the first such state (desktop-spec.md §10 decision 2 — the filter has to

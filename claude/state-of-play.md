@@ -908,6 +908,23 @@ will propose building.**
   like a broken dependency and is a wrong environment.
   ⚠️ **THIS DOES NOT MAKE A SLOW TEST CORRECT.** A test approaching 15s on an
   idle machine is doing too much, and the fix there is the test.
+  ✅ **AND THE TESTS WERE THEN MADE FASTER AT SOURCE — 14 Aug 2026.**
+  `userEvent` defaults to `delay: null` in `src/test/setup.js`, because
+  user-event awaits a macrotask between EVERY KEYSTROKE. `invite-form` **11.8s →
+  4.7s**; the suite at four workers **77.9s → ~59s**. So the heaviest test now
+  runs at well under a second and the timeout margin is ~15x rather than 2x —
+  **the ceiling and the floor were both moved, on purpose.**
+  ⚠️ **`pool: 'threads'` IS ~9% FASTER AND BREAKS THIS SUITE. MEASURED, NOT
+  FEARED.** **Eleven test files mutate `process.env.TZ`**; threads share one
+  process, so it leaks and dates go off by one — `expected 25 to be 24` in
+  `event-format`, `expected 21 to be 20` in `schedule`. **Forks isolate by
+  process and that is the only reason the suite is currently correct.** Do not
+  re-propose threads without removing the TZ mutation first.
+  ⚠️ **STILL AVAILABLE AND NOT DONE:** roughly a third of the test files never
+  touch the DOM and still build a jsdom each (~1.4s apiece). A sample of ten
+  measured **3.94s → 2.76s** under `--environment=node`. **Count them rather
+  than citing one** — every file matching neither `render(` nor `document.`
+  qualifies, and the fix is a `@vitest-environment node` docblock per file.
 
 ### As of 14 Aug 2026
 

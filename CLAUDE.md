@@ -208,6 +208,19 @@ cannot be fixed in-repo. Without this, most of the suite fails with an error
 that points at React, not at the cause. **The flag is unconditional so that
 it does not depend on any row below being current.**
 
+**⚠️ DO NOT RUN THE WHOLE SUITE WHILE YOU ARE EDITING. `npm test` IS 107 FILES
+AND ABOUT 40 SECONDS, AND IT IS THE WRONG COMMAND FOR A FEEDBACK LOOP.**
+
+| While you are… | Run | Cost |
+|---|---|---|
+| changing a screen or component | `npm run test:watch` — reruns only the files affected by the file you just saved, and keeps running | 1-3s per save |
+| checking one thing | `npm run test:related -- src/screens/Notices.jsx` | ~5s |
+| about to push | `npm test` | ~40s |
+
+⚠️ **`test:watch` STAYS RUNNING — press `q` to quit.** That is the point of it:
+it watches, and a save is the trigger. ⚠️ **It is not a substitute for the full
+run before a push** — it only knows about the files it can see are related.
+
 **Machine facts.** ⚠️ **A value here is only worth what the machine it was
 run on is worth.** Each cell says where it came from. Re-run the command
 before trusting any row.
