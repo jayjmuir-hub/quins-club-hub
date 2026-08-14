@@ -2213,7 +2213,7 @@ describe('createInvite (multi-target)', () => {
 // query.
 
 describe('registerMyPlayer', () => {
-  it('calls the RPC with exactly the four parameters it takes, and returns the pending row', async () => {
+  it('calls the RPC with exactly the six parameters it takes, and returns the pending row', async () => {
     const membership = {
       id: 'mm-1',
       profile_id: 'user-1',
@@ -2242,11 +2242,21 @@ describe('registerMyPlayer', () => {
     // caller meant. ⚠️ It must be sent as a real boolean rather than omitted —
     // the squad, not this flag, decides whether it is permitted, and the
     // function refuses a true it is not entitled to.
+    //
+    // p_confirm_duplicate / p_confirm_self_name arrived 14 Aug 2026 and are
+    // FALSE here for the same reason again: the caller passed no overrides, and
+    // false is what every pre-existing caller meant. ⚠️ THEY ARE TWO KEYS AND
+    // MUST STAY TWO. A single "confirmed" flag would mean that agreeing "this
+    // is a different child who happens to share the name" also waved through
+    // "I am registering myself as my own child" — different mistakes, different
+    // sentences, and a tick may only forgive the one it was shown.
     expect(supabase.rpc).toHaveBeenCalledWith('register_my_player', {
       p_full_name: 'Sam Muir',
       p_team_id: 't-u13',
       p_gender: null,
       p_self_register: false,
+      p_confirm_duplicate: false,
+      p_confirm_self_name: false,
     })
     expect(supabase.rpc).toHaveBeenCalledTimes(1)
     expect(result).toEqual(membership)
@@ -2290,6 +2300,25 @@ describe('registerMyPlayer', () => {
     await expect(registerMyPlayer('Sam Muir', 't-u13')).rejects.toThrow(/duplicate key/i)
   })
 
+  // ⚠️ 42710 AND 42809 ARE DELIBERATELY UNMAPPED TOO — 14 Aug 2026, the
+  // duplicate guards. Same reasoning as 22004 below: the server's sentence
+  // names the squad and tells the person what to do instead ("choose 'I am the
+  // player'"), and a generic entry in REGISTER_MESSAGES would replace exactly
+  // the part that makes the refusal actionable. The CODE still has to survive,
+  // because PlayerRegistrationForm branches on it to decide WHICH tick to
+  // offer — a duplicate and a self-name mistake get different wording.
+  it.each([
+    ['42710', 'Someone with that name is already registered in U18B Contact.'],
+    ['42809', 'That is your own name, but you have said you are registering a child.'],
+  ])('passes the %s guard message through verbatim, and keeps the code', async (code, message) => {
+    supabase.rpc.mockResolvedValue({ data: null, error: { code, message } })
+
+    await expect(registerMyPlayer('Sam Muir', 't-u13')).rejects.toMatchObject({
+      code,
+      message,
+    })
+  })
+
   // ⚠️ 22004 IS DELIBERATELY UNMAPPED, AND THIS IS THE TEST THAT SAYS SO.
   //
   // The gender-required guard raises its own code precisely so its server
@@ -2321,6 +2350,8 @@ describe('registerMyPlayer', () => {
       p_team_id: 't-u16g',
       p_gender: 'female',
       p_self_register: false,
+      p_confirm_duplicate: false,
+      p_confirm_self_name: false,
     })
   })
 

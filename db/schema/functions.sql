@@ -1446,7 +1446,20 @@ $function$
 
 
 -- ---------------------------------------------------------------------
--- public.register_my_player(text, uuid, text, boolean)  — PUBLIC-FACING WRITE
+-- public.register_my_player(text, uuid, text, boolean, boolean, boolean)
+--                                                      — PUBLIC-FACING WRITE
+--
+-- ⚠️ THE LAST TWO PARAMETERS ARRIVED 14 Aug 2026 (registration_duplicate_guards)
+-- BECAUSE OF TWO REAL ROWS ON THE LIVE ROSTER. Before them this function
+-- INSERTed a new `players` row unconditionally on every call — there was no
+-- uniqueness of any kind, at any layer, on a roster of children. U18B ended up
+-- holding one boy twice (added by his father's account and by his own, spelled
+-- differently) and U14B ended up holding a PARENT as a player.
+--
+-- ⚠️ THE CHECKS CANNOT LIVE IN THE CLIENT. A registering parent holds a PENDING
+-- membership, so `player read` returns nothing and a client-side "is this
+-- already here?" answers no every single time. This function is the only thing
+-- that can see the squad on their behalf.
 -- ADDED by 20260808161245 register_my_player; the p_gender parameter and its
 -- two guards by 20260809083535 register_my_player_gender; the 22004 errcode by
 -- 20260809083640 register_my_player_gender_errcode; p_self_register, the 0A000
@@ -1504,7 +1517,7 @@ $function$
 -- accepts either, and src/lib/scope.js treats them identically. If that ever
 -- stops being true, this line is the thing that was relied on.
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.register_my_player(p_full_name text, p_team_id uuid, p_gender text DEFAULT NULL::text, p_self_register boolean DEFAULT false)
+CREATE OR REPLACE FUNCTION public.register_my_player(p_full_name text, p_team_id uuid, p_gender text DEFAULT NULL::text, p_self_register boolean DEFAULT false, p_confirm_duplicate boolean DEFAULT false, p_confirm_self_name boolean DEFAULT false)
  RETURNS memberships
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -1517,6 +1530,8 @@ declare
   new_player    public.players;
   new_membership public.memberships;
   clean_name    text;
+  name_key      text;
+  caller_key    text;
   clean_gender  text;
   team_row      public.teams;
 begin
@@ -1566,6 +1581,56 @@ begin
   if clean_gender is null and private.squad_expects_gender(team_row.name) is not null then
     raise exception '% is a single-gender squad, so the player''s gender has to be recorded.',
       team_row.name using errcode = '22004';
+  end if;
+
+  name_key := private.name_match_key(clean_name);
+
+  -- ⚠️ GUARD 1 — ALREADY ON THIS SQUAD'S ROSTER. Scoped to the SQUAD, not the
+  -- club: brothers in different age groups share a surname, and two boys called
+  -- Tom Smith in U12 and U16 are two boys. Within one squad the same first-and-
+  -- last name is overwhelmingly the same child added twice. The message
+  -- deliberately does NOT echo the stored spelling — see the disclosure note in
+  -- the migration.
+  if name_key is not null and not p_confirm_duplicate then
+    if exists (
+      select 1 from public.players pl
+       where pl.team_id = team_row.id
+         and private.name_match_key(pl.full_name) = name_key
+    ) then
+      raise exception 'Someone with that name is already registered in %. If that is your player, they are already on the roster — ask the club to connect you to them rather than adding them again.',
+        team_row.name using errcode = '42710';
+    end if;
+  end if;
+
+  -- ⚠️ GUARD 2 — THAT IS YOUR OWN NAME. Only when they said "my child": a U13+
+  -- player registering THEMSELVES is supposed to type their own name, and
+  -- firing here would break the whole self-registration feature. The signal is
+  -- the CONTRADICTION, never the name alone.
+  --
+  -- ⚠️ THE PROFILE ALREADY HAS A NAME BY THIS POINT even on a first
+  -- registration, because PlayerRegistrationForm writes it before the first
+  -- call — the 13 Aug fix for the nameless-approval-queue race. That is what
+  -- makes this guard work on the very registration it most needs to catch.
+  if not p_self_register and not p_confirm_self_name then
+    select private.name_match_key(
+             coalesce(
+               nullif(btrim(pr.full_name), ''),
+               btrim(coalesce(pr.first_name, '') || ' ' || coalesce(pr.last_name, ''))
+             )
+           )
+      into caller_key
+      from public.profiles pr
+     where pr.id = auth.uid();
+
+    if caller_key is not null and name_key is not null and caller_key = name_key then
+      if coalesce(team_row.self_registration_allowed, false) then
+        raise exception 'That is your own name, but you have said you are registering a child. If you are the player, choose "I am the player". If you are registering your child, use their name.'
+          using errcode = '42809';
+      else
+        raise exception 'That is your own name, but you have said you are registering a child. Players in % cannot register themselves, so if this is you, ask the club to set your access up instead.',
+          team_row.name using errcode = '42809';
+      end if;
+    end if;
   end if;
 
   select count(*) into pending_count
@@ -2543,3 +2608,58 @@ GRANT EXECUTE ON FUNCTION public.set_my_photo(text) TO authenticated;
 -- 20260814_announcement_author_not_audience.sql as they now stand. They are
 -- reproduced there in full and are not duplicated here.
 -- ---------------------------------------------------------------------
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  private.name_match_key  (14 Aug 2026, 20260814_registration_duplicate_guards)
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- FIRST token + LAST token, case-folded and punctuation-blind. The whole of the
+-- duplicate rule, in one place — because two copies of a matching rule are two
+-- copies that drift, and because the CLIENT cannot hold a copy at all: a
+-- registering parent's membership is pending, so they cannot see the roster
+-- they would be comparing against.
+--
+-- What it does on the real rows that caused it:
+--   'Yassine Dhaouadi'       -> 'yassine dhaouadi'
+--   'yassine ridha dhaouadi' -> 'yassine dhaouadi'   <-- MATCH, middle ignored
+--   'GOVERT BUIJS'           -> 'govert buijs'
+--   'Juan Buijs-Bernad'      -> 'juan bernad'        <-- correctly NO match
+--
+-- ⚠️ `[^[:alnum:]]+` RATHER THAN `[^a-z0-9]+`, and this club already has the
+-- names that make the difference. The class is unicode-aware, so 'José' stays
+-- 'josé' instead of collapsing to 'jos' (which would collide with a genuinely
+-- different 'Jos'), and Arabic-script names survive intact. Measured — an
+-- earlier draft of this note claimed non-Latin names "reduce to nothing", and
+-- they do not.
+--
+-- NULL comes back only for a name with no alphanumerics at all, and a NULL key
+-- never matches anything, so that case fails OPEN. Right direction to fail: a
+-- missed duplicate is a tidy-up, a false block is a family that cannot register.
+CREATE OR REPLACE FUNCTION private.name_match_key(_name text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+  select case
+           when parts is null or cardinality(parts) = 0 then null
+           when parts[1] = '' then null
+           when cardinality(parts) = 1 then parts[1]
+           else parts[1] || ' ' || parts[cardinality(parts)]
+         end
+  from (
+    select nullif(
+             regexp_split_to_array(
+               btrim(regexp_replace(lower(coalesce(_name, '')), '[^[:alnum:]]+', ' ', 'g')),
+               ' '
+             ),
+             array[]::text[]
+           ) as parts
+  ) t;
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.name_match_key(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.name_match_key(text) FROM anon;
+GRANT EXECUTE ON FUNCTION private.name_match_key(text) TO authenticated;

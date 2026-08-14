@@ -10,7 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🐛 **THE VIEW-AS DROPDOWN SHIPPED CLIPPED TO A SLIVER, AND THE CHECK THAT
+- ⛔ **SELF-REGISTRATION WAS PUTTING THE WRONG PEOPLE ON THE ROSTER — FIXED.**
+  `db/migrations/20260814_registration_duplicate_guards.sql`. Reported by Jay
+  from the real club. `register_my_player` INSERTed a new `players` row
+  **unconditionally on every call**: no uniqueness of any kind, at any layer, on
+  a roster of children. Two different failures, both still on the live roster —
+  U18B held **one boy twice** (his father's account and his own, spelled
+  differently), and U14B held a **parent as a player** (his own name in the name
+  box while "Who are you registering?" stayed on its default).
+  ⚠️ **THE CHECK CANNOT LIVE IN THE CLIENT, AND THAT IS WHY THIS EXISTED.** A
+  registering parent holds a PENDING membership, so `player read` returns
+  nothing and a client-side "is this already here?" answers **no** every single
+  time. The rule lives in SQL and nowhere else — `private.name_match_key`, first
+  token + last token, case- and punctuation-blind.
+  ⚠️ **TWO CONFIRMATION FLAGS, NOT ONE**, with a harness assertion: one flag
+  would mean confirming *a different child with the same name* also waved
+  through *I am registering myself as my own child*.
+  ⚠️ **THE LIVE APP WAS GUARDED BEFORE THE DEPLOY** — both parameters default to
+  false and PostgREST calls by name, so the serving bundle resolved to the new
+  function immediately. Verified against live before applying.
+  ⚠️ **An enumeration oracle was accepted knowingly** and is argued in the
+  migration; the message does not echo the stored spelling.
+  ✅ **AND BOTH BAD ROWS ARE NOW CLEANED UP** (14 Aug, on Jay's instruction). The
+  duplicated U18 pair went first; the U14 parent-as-player row was removed last.
+  ⚠️ **A PLAIN DELETE WOULD HAVE DESTROYED A PARENT'S PHONE NUMBER.** That bogus
+  player row carried the family's TWO `player_parents` records — the father's and
+  the mother's — while the real child had NONE, and `player_parents` CASCADES on
+  delete. They were moved to the child first. ⚠️ **`memberships.player_id` is
+  `ON DELETE SET NULL`**, so the dangling membership was deleted explicitly rather
+  than left pointing at nothing.
+  ✅ **The confirm UI HAS now been seen in a real browser** — `signup` scenario
+  added to `harness/`, both refusals and both ticks confirmed, and editing the name
+  withdraws the tick.
+
+- `15159bf` 🐛 **THE VIEW-AS DROPDOWN SHIPPED CLIPPED TO A SLIVER, AND THE CHECK THAT
   MISSED IT IS THE POINT.** Reported from a screenshot minutes after the deploy.
   The panel was `absolute` inside the trigger's wrapper and **the masthead row
   carries `overflow-hidden`** — deliberately, to clip the `harlequin` diagonals

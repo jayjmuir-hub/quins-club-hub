@@ -119,7 +119,34 @@ function blankRow() {
     // default, so someone who never sees the question registers exactly as
     // before.
     selfRegister: false,
+    // ⚠️ WHICH REFUSAL THIS ROW IS CURRENTLY ARGUING WITH, and the tick that
+    // answers it. Added 14 Aug 2026 with the duplicate guards — see
+    // db/migrations/20260814_registration_duplicate_guards.sql.
+    //
+    // null | 'duplicate' | 'selfName'. Set from the server's errcode, never
+    // guessed here: the matching rule lives in SQL and nowhere else, because
+    // the registering parent CANNOT SEE the squad's roster (their membership is
+    // pending, so `player read` returns nothing) and any client-side attempt at
+    // "is this a duplicate?" would confidently answer no, every time.
+    needsConfirm: null,
+    confirmDuplicate: false,
+    confirmSelfName: false,
   }
+}
+
+// The sentence and the tick for each refusal. The SERVER's message is what is
+// shown above these — it names the squad and says what to do instead — so
+// these are only the label on the override.
+const CONFIRM_LABELS = {
+  duplicate: 'This is a different player who happens to have the same name.',
+  selfName: 'This really is my child, and they have the same name as me.',
+}
+
+// The two errcodes the guards raise. Kept next to the labels so adding a third
+// guard has one obvious place to land.
+const CONFIRM_FOR_CODE = {
+  42710: 'duplicate',
+  42809: 'selfName',
 }
 
 /**
@@ -189,9 +216,45 @@ function PlayerRow({ row, index, total, teams, disabled, onChange, onRemove }) {
         maxLength={NAME_MAX}
         value={row.fullName}
         disabled={disabled}
-        onChange={(event) => onChange({ fullName: event.target.value })}
+        // ⚠️ EDITING THE NAME WITHDRAWS THE CONFIRMATION, and that is not
+        // tidiness. The tick means "yes, THIS name is deliberate" — carrying it
+        // across a rewrite would let somebody confirm a warning about one name
+        // and then submit a different one with the guard already switched off.
+        onChange={(event) =>
+          onChange({
+            fullName: event.target.value,
+            needsConfirm: null,
+            confirmDuplicate: false,
+            confirmSelfName: false,
+          })
+        }
         className={FIELD}
       />
+
+      {/* Only ever rendered because the SERVER refused this row and said why.
+          The message itself is in the alert above the list — it names the
+          squad and gives the correct action — so this is just the way past it
+          for the case where the person really does know better. */}
+      {row.needsConfirm && (
+        <label className="mt-2 flex items-start gap-2 rounded-[11px] bg-danger-bg px-3 py-2.5 text-[12.5px] font-semibold leading-relaxed text-brand-deep">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+            checked={
+              row.needsConfirm === 'duplicate' ? row.confirmDuplicate : row.confirmSelfName
+            }
+            disabled={disabled}
+            onChange={(event) =>
+              onChange(
+                row.needsConfirm === 'duplicate'
+                  ? { confirmDuplicate: event.target.checked }
+                  : { confirmSelfName: event.target.checked },
+              )
+            }
+          />
+          <span>{CONFIRM_LABELS[row.needsConfirm]}</span>
+        </label>
+      )}
 
       <label htmlFor={teamId} className={`${LABEL} mt-4`}>
         {total === 1 ? 'Age group' : `Player ${index + 1}'s age group`}
@@ -448,7 +511,10 @@ export default function PlayerRegistrationForm({
         const canSelfRegister = team?.self_registration_allowed === true
         // eslint-disable-next-line no-await-in-loop -- sequential is the design;
         // see the header note on partial failure.
-        await registerMyPlayer(name, row.teamId, row.gender, canSelfRegister && row.selfRegister)
+        await registerMyPlayer(name, row.teamId, row.gender, canSelfRegister && row.selfRegister, {
+          confirmDuplicate: row.confirmDuplicate === true,
+          confirmSelfName: row.confirmSelfName === true,
+        })
         done.push(name)
       } catch (err) {
         // registerMyPlayer has already turned the RPC's error code into a
@@ -456,11 +522,26 @@ export default function PlayerRegistrationForm({
         // still without a message is a network-level failure.
         const reason = err?.message || "We couldn't add that player. Try again in a moment."
         setSaved(done)
+        // ⚠️ THE TWO GUARD CODES GET A TICK RATHER THAN A DEAD END. Both
+        // refusals describe something that is USUALLY a mistake and
+        // OCCASIONALLY correct — two boys with the same name in one squad, or a
+        // child named after their father. A hard stop would be idiot-proof and
+        // also wrong for those families, with no route left but ringing the
+        // club. The tick is offered on the failing row only, and editing the
+        // name withdraws it.
+        const confirm = CONFIRM_FOR_CODE[err?.code] ?? null
         // What is left on screen is the row that failed and anything after it.
         // The saved ones are gone from the list because they are no longer
         // something to submit — leaving them would let a parent resubmit a
         // child who is already in, creating a duplicate the club has to spot.
-        setRows(rows.slice(index))
+        const remaining = rows.slice(index)
+        setRows(
+          confirm
+            ? remaining.map((candidate, offset) =>
+                offset === 0 ? { ...candidate, needsConfirm: confirm } : candidate,
+              )
+            : remaining,
+        )
         setError(done.length > 0 ? `${rowLabel(row, index)} wasn't added — ${reason}` : reason)
         setSubmitting(false)
         return

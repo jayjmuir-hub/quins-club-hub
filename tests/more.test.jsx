@@ -940,7 +940,7 @@ describe('More — adding another child', () => {
     await u.click(screen.getByRole('button', { name: /add this player/i }))
 
     await waitFor(() =>
-      expect(registerMyPlayerMock).toHaveBeenCalledWith('Rory Muir', 'team-u10', null, false),
+      expect(registerMyPlayerMock).toHaveBeenCalledWith('Rory Muir', 'team-u10', null, false, { confirmDuplicate: false, confirmSelfName: false }),
     )
     // ⚠️ THE HALF THAT IS INVISIBLE WHEN IT BREAKS, exactly as at sign-up. The
     // membership exists server-side either way; without the reload the parent

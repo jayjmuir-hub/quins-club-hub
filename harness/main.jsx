@@ -45,10 +45,21 @@ function Home() {
 
 const noop = async () => {}
 
+// ⚠️ `id` ADDED 14 Aug 2026, AND ITS ABSENCE WAS HIDING A WHOLE BLOCK OF UI.
+// useMyProfile bails when `user.id` is missing, so `profile` stayed null in
+// every scenario, `needsName` was therefore always false, and
+// PlayerRegistrationForm's "About you" fieldset — the fix for the nameless
+// approval-queue race — COULD NOT RENDER HERE AT ALL. The `?unconfirmedName=1`
+// knob in harness/stubs/members.js was equally inert for the same reason.
+//
+// A real session always carries an id, so this makes the fixture more like
+// production rather than less. It cannot switch anything on by surprise:
+// getMyProfile still returns a CONFIRMED name by default, so every existing
+// scenario sees `needsName === false`, exactly as before.
 function baseAuth(email) {
   return {
-    session: { user: { email } },
-    user: { email },
+    session: { user: { id: 'harness-user', email } },
+    user: { id: 'harness-user', email },
     loading: false,
     signInWithEmail: noop,
     signInWithGoogle: noop,
@@ -171,6 +182,60 @@ const scenarios = {
     <Shell
       authValue={baseAuth(JAY_EMAIL)}
       membershipValue={{ memberships: [], teams: [], loading: false, error: null, reload: noop }}
+    />
+  ),
+
+  // ⚠️ SIGN-UP, WITH SQUADS. `shell-no-membership` above passes `teams: []`,
+  // which lands on AddYourPlayer's "we couldn't load the club's age groups"
+  // fallback — a branch that is now UNREACHABLE in production and was the only
+  // sign-up state this harness could render.
+  //
+  // `team read` was widened to `auth.uid() IS NOT NULL` by
+  // 20260808_teams_readable_before_registration.sql. ⚠️ THAT MIGRATION IS
+  // APPLIED — measured live 14 Aug 2026 — and the comment in
+  // src/components/AddYourPlayer.jsx saying it was "written but NOT applied" is
+  // stale. So a brand-new account DOES see every squad, and this scenario is
+  // what a real parent actually meets.
+  //
+  // ⚠️ THE SQUAD NAMES ARE THE REAL CLUB'S, and that matters more than it
+  // looks: squadRequiresGender() parses the NAME, so "U14B" asks for gender and
+  // "U13 Mixed" does not. Inventing tidy fixture names would show a form no
+  // parent ever meets. All three of these permit self-registration, exactly as
+  // production does (measured 14 Aug 2026).
+  //
+  //   U11 Mixed Contact  below U13: NEITHER extra control — name + age group
+  //   U13 Mixed Contact  self-registration only — "Who are you registering?"
+  //   U14B Contact       BOTH — self-registration AND required gender, which is
+  //                      what the real U14B parent sees
+  //
+  // ?registerThrow=42710 / 42809 drives the two duplicate guards through
+  // harness/stubs/members.js, which is the only way to see the confirm tick.
+  signup: () => (
+    <Shell
+      authValue={baseAuth(JAY_EMAIL)}
+      membershipValue={{
+        memberships: [],
+        teams: [
+          { id: 't-plain', club_id: CLUB_ID, name: 'U11 Mixed Contact', sort_order: 6 },
+          {
+            id: 't-self',
+            club_id: CLUB_ID,
+            name: 'U13 Mixed Contact',
+            sort_order: 9,
+            self_registration_allowed: true,
+          },
+          {
+            id: 't-both',
+            club_id: CLUB_ID,
+            name: 'U14B Contact',
+            sort_order: 10,
+            self_registration_allowed: true,
+          },
+        ],
+        loading: false,
+        error: null,
+        reload: noop,
+      }}
     />
   ),
 

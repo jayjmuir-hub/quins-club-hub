@@ -490,7 +490,30 @@ const REGISTER_FALLBACK = "We couldn't add that player. Try again in a moment."
  * error so a caller that wants to branch on the reason still can without
  * going anywhere near the wording.
  */
-export async function registerMyPlayer(fullName, teamId, gender = null, selfRegister = false) {
+/**
+ * ⚠️ THE TWO CONFIRM FLAGS ARE SEPARATE ON PURPOSE, AND MUST STAY SEPARATE.
+ * A single "yes, I'm sure" would mean that confirming *"a different child who
+ * happens to share the name"* also silently waved through *"I am registering
+ * myself as my own child"*. They are different mistakes and the person is shown
+ * a different sentence for each; a tick may only forgive the thing it was shown.
+ * db/migrations/20260814_registration_duplicate_guards.sql makes the same point
+ * from the other side, and proves it: confirming one still trips the other.
+ *
+ * ⚠️ NEITHER CODE IS IN REGISTER_MESSAGES, AND THE ABSENCE IS THE POINT — the
+ * same arrangement 22004 already has. The server messages NAME THE SQUAD and
+ * tell the person what to do instead ("choose 'I am the player'"), and a
+ * generic entry here would replace exactly the part that explains the refusal.
+ *
+ *   42710  someone with that name is already in this squad
+ *   42809  that is your own name, and you said it was a child's
+ */
+export async function registerMyPlayer(
+  fullName,
+  teamId,
+  gender = null,
+  selfRegister = false,
+  { confirmDuplicate = false, confirmSelfName = false } = {},
+) {
   const { data, error } = await supabase.rpc('register_my_player', {
     p_full_name: fullName,
     p_team_id: teamId,
@@ -505,6 +528,11 @@ export async function registerMyPlayer(fullName, teamId, gender = null, selfRegi
     // REST call gains nothing. Defaults to false, which is the behaviour every
     // existing caller already had.
     p_self_register: selfRegister === true,
+    // Both default to false in the function, so an older bundle sending only
+    // the four arguments above still resolves and is still guarded — verified
+    // against live before the migration was applied.
+    p_confirm_duplicate: confirmDuplicate === true,
+    p_confirm_self_name: confirmSelfName === true,
   })
 
   if (error) {
