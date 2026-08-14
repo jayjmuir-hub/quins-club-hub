@@ -125,6 +125,8 @@
 --   order by c.relname;
 -- ---------------------------------------------------------------------
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.announcements      ENABLE ROW LEVEL SECURITY;  -- added 14 Aug 2026
+ALTER TABLE public.announcement_reads ENABLE ROW LEVEL SECURITY;  -- added 14 Aug 2026
 ALTER TABLE public.match_sheets      ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
 ALTER TABLE public.match_sheet_slots ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
 ALTER TABLE public.match_sheet_cards ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
@@ -1106,3 +1108,67 @@ CREATE POLICY "social idea image remove" ON storage.objects
 CREATE POLICY "photo backup run read admin" ON public.photo_backup_runs
   FOR SELECT TO authenticated
   USING (private.is_admin_anywhere());
+
+
+-- ---------------------------------------------------------------------
+-- public.announcements / public.announcement_reads  (captured 14 Aug 2026)
+-- Migration: db/migrations/20260814_announcements.sql
+--
+-- Captured from pg_policy via pg_get_expr, not pasted from the migration.
+-- All six are PERMISSIVE.
+--
+-- !! THE READ POLICY USES can_see_team, WHICH REQUIRES status = 'active', AND
+-- THAT IS A DELIBERATE DIVERGENCE FROM `event read`. That one uses the
+-- status-blind is_attached_to_team because 20260808_membership_pending_status
+-- ruled fixtures are not sensitive and a pending parent needs them. A notice is
+-- not a fixture, and the second reason is the one specific to this feature:
+-- THE AUDIENCE COUNT IS A FEATURE AND IT HAS TO MEAN SOMETHING. "18 of 24" must
+-- not count accounts nobody has approved. public.announcement_audience is built
+-- to agree with this policy line for line. Change one, change both.
+--
+-- !! "announcement edit" HAS A WITH CHECK THAT IS NOT ITS USING, ON PURPOSE.
+-- USING decides which rows may be edited; WITH CHECK decides what they may
+-- become. Without the second arm an author could edit a row into a shape they
+-- could never have created.
+--
+-- !! RE-SCOPING IS BLOCKED BY THE COLUMN GRANT, NOT BY ANY POLICY HERE. See
+-- grants.sql: team_id is absent from the UPDATE list. Reading these policies
+-- alone would suggest an author can move a notice between squads.
+-- ---------------------------------------------------------------------
+CREATE POLICY "announcement read" ON public.announcements
+  FOR SELECT USING (
+CASE
+    WHEN (team_id IS NULL) THEN (EXISTS ( SELECT 1
+       FROM memberships m
+      WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = announcements.club_id) AND (m.status = 'active'::text))))
+    ELSE private.can_see_team(team_id)
+END);
+
+CREATE POLICY "announcement create" ON public.announcements
+  FOR INSERT WITH CHECK (((author_id = ( SELECT auth.uid() AS uid)) AND
+CASE
+    WHEN (team_id IS NULL) THEN private.is_admin(club_id)
+    ELSE private.can_edit_team(team_id)
+END));
+
+CREATE POLICY "announcement edit" ON public.announcements
+  FOR UPDATE USING (((author_id = ( SELECT auth.uid() AS uid)) OR private.is_admin(club_id)))
+  WITH CHECK (
+CASE
+    WHEN (team_id IS NULL) THEN private.is_admin(club_id)
+    ELSE private.can_edit_team(team_id)
+END);
+
+CREATE POLICY "announcement remove" ON public.announcements
+  FOR DELETE USING (((author_id = ( SELECT auth.uid() AS uid)) OR private.is_admin(club_id)));
+
+-- !! SELECT AND INSERT ONLY. There is deliberately no UPDATE or DELETE policy,
+-- so a read cannot be un-read or back-dated even by the person who owns it, and
+-- read_at therefore means FIRST read. `authenticated` does hold table-level
+-- DELETE here from Supabase's defaults (grants.sql records it) -- inert,
+-- because RLS is on and no policy grants it.
+CREATE POLICY "announcement read own reads" ON public.announcement_reads
+  FOR SELECT USING ((profile_id = ( SELECT auth.uid() AS uid)));
+
+CREATE POLICY "announcement mark read" ON public.announcement_reads
+  FOR INSERT WITH CHECK ((profile_id = ( SELECT auth.uid() AS uid)));

@@ -342,3 +342,100 @@
 REVOKE UPDATE ON public.social_ideas FROM authenticated;
 GRANT UPDATE (status, decision_note, decided_by, decided_at)
   ON public.social_ideas TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.announcements — TABLE and COLUMN grants  (captured 14 Aug 2026)
+--
+-- Captured from information_schema.column_privileges and
+-- .table_privileges after applying 20260814_announcements.sql — NOT pasted
+-- from the migration.
+--
+-- ⚠️ `team_id` IS THE ONE THAT MATTERS, AND IT IS ABSENT FROM THE UPDATE LIST
+-- ON PURPOSE. A notice's audience is fixed when it is posted. "announcement
+-- edit" is FOR UPDATE over the whole row, so without this revoke an author
+-- could re-scope a squad notice to the WHOLE CLUB after thirty families had
+-- already read it — and the read receipts would then be counted against an
+-- audience that never saw it, with nothing on the row to show it had happened.
+-- The policy does not stop this; only the missing grant does.
+--
+-- ⚠️ `author_id`, `club_id` and `created_at` are absent for the same class of
+-- reason: they are stamped by `announcements_provenance` and an admin editing a
+-- typo must not be able to reassign authorship.
+--
+-- ⚠️ `updated_at` IS ALSO ABSENT, AND IT IS NOT AN OVERSIGHT. It is written by
+-- the `announcements_touch` trigger, so an edit cannot claim not to have
+-- happened — which is the only thing that column is for.
+--
+-- VERIFIED IN THE CAPTURE: table-level UPDATE to `authenticated` is NONE, and
+-- the column-level UPDATE list for `authenticated` is exactly these four.
+-- ---------------------------------------------------------------------
+GRANT SELECT, INSERT, DELETE ON public.announcements TO authenticated;
+REVOKE UPDATE ON public.announcements FROM authenticated;
+GRANT UPDATE (title, body, pinned, expires_at)
+  ON public.announcements TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.announcement_reads — TABLE grants  (captured 14 Aug 2026)
+--
+-- ⚠️ NO UPDATE, AND NO UPDATE OR DELETE POLICY EITHER, so a read cannot be
+-- un-read or back-dated. `read_at` therefore means FIRST read, which is what
+-- the word means. The client upserts with `ignoreDuplicates`.
+--
+-- ⚠️ THE CAPTURE SHOWS `authenticated` HOLDING TABLE-LEVEL **DELETE** HERE,
+-- WHICH THIS MIGRATION NEVER GRANTED. It comes from Supabase's own
+-- `alter default privileges in schema public grant all on tables to anon,
+-- authenticated, service_role`. It is inert — RLS is enabled and there is no
+-- DELETE policy, so no row is deletable — but it is inert BY THE POLICY rather
+-- than by the grant. Recorded as found; see the note below.
+-- ---------------------------------------------------------------------
+GRANT SELECT, INSERT ON public.announcement_reads TO authenticated;
+REVOKE UPDATE ON public.announcement_reads FROM authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- ⚠️ `anon` HOLDS FULL TABLE PRIVILEGES ON EVERY TABLE IN `public`, INCLUDING
+-- THESE TWO. MEASURED 14 Aug 2026, NOT REASONED ABOUT.
+--
+--   announcements, announcement_reads, social_ideas, events, players,
+--   memberships, match_sheets
+--     -> anon: DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+--
+-- Every one of the seven probed came back identical, so this is the schema's
+-- pre-existing shape and NOT something the notices migration introduced. The
+-- source is the same Supabase default-privileges line quoted above.
+--
+-- ⚠️ IT IS THE TABLE-LEVEL SIBLING OF THE FUNCTION-LEVEL FINDING RECORDED IN
+-- `db/migrations/20260813_my_squad_staff.sql`, where six RPCs turned out to be
+-- callable by `anon` for exactly this reason. The conclusion is the same one
+-- that migration reached: these are safe today by their POLICIES, which all
+-- test `auth.uid()` (null for `anon`), rather than by their grants — and this
+-- repo's own rule says not to rely on that.
+--
+-- ⚠️ DELIBERATELY NOT FIXED HERE. Tightening only the two newest tables would
+-- leave the schema inconsistent while fixing nothing an attacker could reach;
+-- it is one migration across all of `public` or it is not worth doing. Logged
+-- in `claude/state-of-play.md` §Open.
+-- ---------------------------------------------------------------------
+
+
+-- ---------------------------------------------------------------------
+-- public.announcement_stats() / public.announcement_audience(uuid)
+--   (captured 14 Aug 2026)
+--
+-- ⚠️ THE EXPLICIT `FROM anon` IS LOAD-BEARING, not belt-and-braces — see the
+-- header of db/migrations/20260813_my_squad_staff.sql. `REVOKE … FROM PUBLIC`
+-- does NOT remove Supabase's by-name grant to `anon`.
+--
+-- Both are SECURITY DEFINER, so RLS is bypassed inside them and their own
+-- WHERE clause (`author_id = auth.uid() OR private.is_admin(club_id)`) is the
+-- only gate on the club's entire notice history.
+-- ---------------------------------------------------------------------
+REVOKE EXECUTE ON FUNCTION public.announcement_stats() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.announcement_stats() FROM anon;
+GRANT EXECUTE ON FUNCTION public.announcement_stats() TO authenticated;
+
+REVOKE EXECUTE ON FUNCTION public.announcement_audience(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.announcement_audience(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.announcement_audience(uuid) TO authenticated;

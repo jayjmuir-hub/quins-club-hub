@@ -2496,3 +2496,41 @@ $function$
 REVOKE ALL ON FUNCTION public.set_my_photo(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.set_my_photo(text) FROM anon;
 GRANT EXECUTE ON FUNCTION public.set_my_photo(text) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.set_announcement_provenance() / private.touch_announcement()
+-- public.announcement_stats() / public.announcement_audience(uuid)
+--   ADDED 14 Aug 2026 by 20260814_announcements.sql
+--
+-- Measured live after applying: anon=false, authenticated=true on BOTH public
+-- functions (has_function_privilege), so the explicit REVOKE ... FROM anon did
+-- its job. See grants.sql for why that revoke is load-bearing.
+--
+-- !! BOTH PUBLIC FUNCTIONS ARE SECURITY DEFINER, SO RLS IS BYPASSED INSIDE THEM
+-- and their own WHERE clause is the only gate on the club's entire notice
+-- history: author_id = auth.uid() OR private.is_admin(club_id). db/tests/
+-- announcements.sql step 12 is the assertion that an ordinary member gets zero
+-- rows from announcement_stats().
+--
+-- !! announcement_audience RETURNS NAME ONLY -- no email, no phone, no role,
+-- no membership id -- and adding a column to its RETURNS TABLE is the only way
+-- one could ever appear. That is deliberately NARROWER than my_squad_staff,
+-- which DOES return contact details, and the difference is consent: Jay ruled
+-- on 13 Aug that staff opt in when they accept the position. A parent opted
+-- into nothing of the kind, and "who has not read my notice" is not a reason to
+-- hand a coach thirty families' phone numbers.
+--
+-- !! count(distinct m.profile_id) IS LOAD-BEARING IN BOTH. memberships_unique_grant
+-- is (profile_id, club_id, role, team_id, player_id), so a parent with TWO
+-- children in one squad holds TWO active membership rows. count(*) reports a
+-- squad of 24 as 26. db/tests/announcements.sql injects exactly that fault.
+--
+-- !! AUDIENCE IS NOT READERSHIP. A club admin can READ a squad notice
+-- (can_see_team has an admin arm) and is NOT counted in its audience. The read
+-- policy and these functions agree on membership STATUS -- the half that must
+-- match -- and differ on the admin arm, which is the half that must not.
+--
+-- Bodies are in db/migrations/20260814_announcements.sql. They are reproduced
+-- there in full and are not duplicated here.
+-- ---------------------------------------------------------------------

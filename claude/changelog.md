@@ -32,14 +32,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the race, so `on conflict do nothing` left the fixtures nameless).
   ✅ Home card measured at 320px in Chromium, proved non-vacuous with a 900px
   probe. ❌ The `/notices` screen has no real-browser coverage.
-  ⛔ **`db/schema/grants.sql` IS NOT UPDATED AND `npm run docs:check` IS RED ON
-  EXACTLY THAT CHECK.** That file is a CAPTURE of live, and pasting the
-  migration's DDL into it is the specific anti-pattern `RESTORE.md` records. It
-  gets re-captured once the migration is applied — not before.
+  ✅ **APPLIED TO PRODUCTION 14 Aug 2026, and the harness then ran against live
+  for real: 15 of 15 green.** All five `db/schema/` files re-captured from the
+  catalogue afterwards — `pg_policy`, `pg_constraint`, `pg_indexes`,
+  `pg_get_triggerdef`, `information_schema.*_privileges` — not pasted from the
+  migration.
+  ⚠️ **THE CAPTURE FOUND SOMETHING THE MIGRATION DID NOT GRANT:** `anon` holds
+  `DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE` on both new tables.
+  **So does every other table probed** — `events`, `players`, `memberships`,
+  `match_sheets`, `social_ideas` — so it is the schema's pre-existing shape from
+  Supabase's default privileges, not something notices introduced. Deliberately
+  NOT fixed here: tightening two tables would leave the schema inconsistent
+  while fixing nothing reachable. Logged in `claude/state-of-play.md` §Open.
+  ⚠️ **Nothing is DEPLOYED.** The tables exist; no bundle serving
+  `adhquins-clubhub.com` mentions them yet.
 
 ## 13 Aug 2026
 
-- ✅ **STAFF PHOTOS — THE SQUAD CONTACTS CARD HAS FACES, AND THE PLAN IS DONE.**
+- `8213cad` ✅ **STAFF PHOTOS — THE SQUAD CONTACTS CARD HAS FACES, AND THE PLAN IS DONE.**
   Phase 4, the last of `claude/plans/2026-08-13-squad-staff-on-home.md`. All
   four phases shipped in one day. `profiles.photo_path`, a private
   `staff-photos` bucket, two storage policies, `public.set_my_photo()`, and a

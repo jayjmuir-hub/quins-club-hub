@@ -750,15 +750,14 @@ will propose building.**
   `claude/plans/2026-08-14-notices.md`, migration
   `db/migrations/20260814_announcements.sql`, harness
   `db/tests/announcements.sql`, screen `src/screens/Notices.jsx`.
-  ⛔ **THE MIGRATION HAS NOT BEEN APPLIED.** No notice has ever been posted,
-  read or counted by a real person, and `/notices` against production today
-  would fail its read. **Do not read the code landing as the feature
-  existing** — the same trap the player-photo backup entry above carries.
-  ⛔ **AND `npm run docs:check` IS RED ON ONE CHECK UNTIL IT IS APPLIED**:
-  `db/schema/grants.sql` does not name the two new tables. That file is a
-  CAPTURE, and pasting the migration's DDL into it is exactly the anti-pattern
-  `RESTORE.md` records for `pitches` — so it stays red rather than being made
-  green by hand. Apply, re-capture, commit both.
+  ✅ **THE MIGRATION IS APPLIED TO PRODUCTION — 14 Aug 2026** — and the harness
+  then ran against live for the first time: **15 of 15 green**. All five
+  `db/schema/` files re-captured from the catalogue in the same commit.
+  ⛔ **BUT NOTHING IS DEPLOYED. The tables exist and no bundle serving
+  `adhquins-clubhub.com` mentions them.** No notice has ever been posted, read
+  or counted by a real person. **Do not read the code landing, or the migration
+  landing, as the feature existing** — the same trap the player-photo backup
+  entry above carries.
   ⚠️ **PHASE 1 SENDS NO EMAIL AND THAT IS THE DESIGN, NOT AN OMISSION.** Resend
   Pro removed the 100/day ceiling on 13 Aug — a brake nobody designed — so the
   outbox, the preferences table and unsubscribe are phase 2 and must exist
@@ -1544,6 +1543,24 @@ below is **not started** unless it says otherwise.
   ⚠️ **`squad_expects_gender`'s exemption is UNCHANGED and still correct.** This is
   not a precedent for pinning it; it is the reason the two are now decided
   differently.
+- ⚠️ **`anon` HOLDS FULL TABLE PRIVILEGES ON EVERY TABLE IN `public`. MEASURED
+  14 Aug 2026, not reasoned about.** Seven tables probed — `announcements`,
+  `announcement_reads`, `social_ideas`, `events`, `players`, `memberships`,
+  `match_sheets` — and **all seven came back identical**:
+  `DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE`. Source is
+  Supabase's `alter default privileges in schema public grant all on tables to
+  anon, authenticated, service_role`.
+  ⚠️ **THIS IS THE TABLE-LEVEL SIBLING OF THE FUNCTION-LEVEL FINDING FROM
+  13 Aug**, where six RPCs turned out to be callable by `anon` for exactly the
+  same reason. The conclusion is the same: every one of these is safe today **by
+  its POLICIES**, which all test `auth.uid()` and get null for `anon` — i.e.
+  safe by the body, not by the grant, which is the thing this repo's rules say
+  not to rely on.
+  ⚠️ **NOT EXPLOITABLE TODAY as far as anything measured shows**, and it is one
+  migration across all of `public` or it is not worth doing — tightening only
+  the newest two tables leaves the schema inconsistent while fixing nothing.
+  Found while re-capturing `db/schema/grants.sql` for the noticeboard; recorded
+  there in full.
 - **18 RLS policies call `auth.uid()` bare**, so Postgres re-evaluates it per row
   instead of once per query. The fix is `(select auth.uid())` and changes no
   meaning. ⚠️ **One migration touching all 18, not eighteen migrations** — and
