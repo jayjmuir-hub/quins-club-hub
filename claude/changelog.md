@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🏉 **"WHAT IS THE SQUAD SECTION, IT IS EMPTY" — reported by Jay from the live
+- 🕐 **WHO HASN'T HAD A GAME — phase 1 of tiers and game time.** Jay: *"tracking
+  which players haven't had a chance to play in matches or tournaments"*.
+  A coach-only rollup per squad, **ordered fewest-first**, because a list sorted
+  by name answers "who is in this squad" — which the Roster already does — and
+  this screen exists only to answer "who am I overlooking".
+  ⚠️ **NO SCHEMA CHANGE.** It reads `lineup_players` joined to `events`, so the
+  team sheets coaches already fill in are the record. ⚠️ **An appearance is a
+  SELECTION, not attendance and not minutes**: `attendance` had ZERO rows in use
+  (measured), so counting from it would have reported every player in the club as
+  having played nothing — a confident, wrong answer. `role` gives starts vs bench
+  for free, so "always a replacement" is visible without recording minutes.
+  ⚠️ **COACH-ONLY BY CONSTRUCTION** — `lineup_players` RLS returns zero rows to a
+  parent, so no gate in the screen could be trusted and none is relied on.
+  ⚠️ **HISTORY STARTS WHEN TEAM SHEETS DID, and the screen says so out loud**: a
+  0 means "not picked since the club started using them", not "never played". A
+  bare zero beside a long-serving player is a lie of omission.
+  Design and the tier model: `claude/plans/2026-08-14-tiers-and-game-time.md`.
+
+- `a7d66cd` — 🏉 **"WHAT IS THE SQUAD SECTION, IT IS EMPTY" — reported by Jay from the live
   app**, having picked all four U16B players. Nothing was broken: that list is the
   players NOT yet picked, so picking everyone empties it. ⚠️ **But it had no empty
   state**, and a heading over an empty card reads as broken — the same defect as
@@ -20,7 +38,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   "Still to pick", with TWO different empty states — "everyone is picked" is
   success, "no players in this squad" is a roster gap for an admin, and saying the
   first when the second is true sends somebody hunting a bug that is missing data.
-
 - `61b657a` — 🏉 **PICKING A TEAM, AND SHARING IT — phase 1 of match lineups.** Jay's ask:
   a GUI for coaches to select a lineup from players who marked themselves
   available, *with the option to add players who did not*, plus generate-and-share
