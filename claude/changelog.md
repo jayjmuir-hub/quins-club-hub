@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🏉 **FORWARD OR BACK, BEFORE ANYBODY DECIDES WHICH FORWARD.** Jay: *"designate
+- 🔄 **AN INSTALLED APP NOW NOTICES A DEPLOY WHEN YOU LOOK AT IT.** Jay: *"changes
+  are immediately showing up on the desktop site but not the app"*.
+  ⚠️ **MEASURED BEFORE CHANGING ANYTHING, AND BOTH OBVIOUS SUSPECTS WERE
+  INNOCENT**: production serves `sw.js` as `public, must-revalidate, max-age=0`,
+  so nothing stale was cached, and the deployed worker does contain `skipWaiting`
+  and `clientsClaim`, so it takes over and reloads the moment it is fetched. The
+  gap was only ever **WHEN** the app asks. A browser tab re-checks the worker
+  script on every page load, which is why the site looks instant; **an installed
+  PWA never navigates** — you switch away and back — so it waited on an hourly
+  timer, and the moment somebody looks is exactly the moment it has not checked.
+  Now it also checks on `visibilitychange` and on `online`, floored at one check
+  a minute so switching between apps on a phone is not a request per flick. The
+  hourly timer stays as the backstop for a screen left open and untouched.
+
+- `27ca965` — 🏉 **FORWARD OR BACK, BEFORE ANYBODY DECIDES WHICH FORWARD.** Jay: *"designate
   players as forwards or back and then later on we will drill that down to
   specific positions"*. ⚠️ **The roster ALREADY grouped into Forwards and Backs —
   but it DERIVED that from `players.position`**, so the grouping only existed once
