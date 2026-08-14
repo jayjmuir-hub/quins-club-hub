@@ -49,9 +49,22 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   POLICIES, not by its grants** — which is the thing this repo's rules say not to
   rely on, and it was confirmed safe by measurement: `set local role anon` sees zero
   rows on ten tables where the same counts unprivileged return real ones.
-  🔧 **Migration and harness WRITTEN, NOT YET APPLIED** —
+  ✅ ~~**APPLIED TO PRODUCTION 14 Aug 2026**~~ —
   `db/migrations/20260814_revoke_anon_table_privileges.sql` and
-  `db/tests/anon-table-grants.sql`. ⚠️ **It is a PARTIAL fix and says so:** the
+  `db/tests/anon-table-grants.sql`. **Measured after: `anon` holds SELECT,
+  INSERT, UPDATE and DELETE on 0 of 24 tables; `authenticated` and
+  `service_role` still hold all 24.**
+  ✅ **AND THE PROTECTION DEMONSTRABLY MOVED FROM POLICY TO GRANT.** `set local
+  role anon; select … from teams` used to return zero rows silently; it now
+  raises `42501: permission denied for table teams`. ⚠️ **That distinction is
+  the whole point of the change** — and the error names the missing GRANT, so
+  it is refused by the gate this was aimed at rather than by something earlier.
+  ✅ **The calendar feed was smoke-tested after applying** — `/calendar.ics`
+  with a bogus token returned **200, `content-type: text/calendar;
+  charset=utf-8`, a real `BEGIN:VCALENDAR` body**. It is SECURITY DEFINER and
+  never depended on an anon table grant, but it is the one thing here that
+  could not be repaired if it broke.
+  ⚠️ **IT REMAINS A PARTIAL FIX:** the
   `postgres` default privilege can be closed, the `supabase_admin` one cannot, so a
   table created down that path still arrives open. The harness walks every table
   rather than trusting either default.
@@ -63,11 +76,17 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   across those 18 policies, because `calendar_tokens / calendar token own` and
   `social_ideas / social idea create` carry two each. Fix is `(select auth.uid())`
   and changes no meaning.
-  🔧 **Migration and harness WRITTEN, NOT YET APPLIED** —
+  ✅ ~~**APPLIED TO PRODUCTION 14 Aug 2026**~~ —
   `db/migrations/20260814_rls_initplan_wrap_auth_calls.sql` and
-  `db/tests/rls-initplan.sql`. Equivalence was proved by comparing the
-  expressions Postgres RE-PRINTS before and after, normalised for the wrapper:
-  60 policies in, 60 out, zero differences in meaning, bare calls 18 → 0.
+  `db/tests/rls-initplan.sql`. Equivalence was proved BEFORE applying, by
+  comparing the expressions Postgres RE-PRINTS before and after, normalised for
+  the wrapper: 60 policies in, 60 out, zero differences in meaning.
+  **Measured after applying: 60 policies still 60, bare calls 0, wrapped 24, and
+  Supabase's `auth_rls_initplan` lint went from 18 entries to none.**
+  ⚠️ **THE ADVISOR IS STILL NOISY AND THAT IS NOT A FAILURE** — 132 lints
+  remain, of which **100 are `multiple_permissive_policies`**, a separate
+  question this migration never touched. Do not read a noisy advisor as this
+  having not worked; read the lint NAME.
   ✅ **THE HOUSE STYLE ALREADY EXISTS — SIX POLICIES USE THE WRAPPED FORM**, all
   on `announcements` and `announcement_reads`, shipped 14 Aug. So this is
   following a precedent in the schema, not inventing one; copy those.

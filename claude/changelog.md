@@ -10,8 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🔧 **A MIGRATION TO STOP 18 RLS POLICIES RE-EVALUATING AN `auth.*` CALL PER
-  ROW, WRITTEN AND PROVEN BUT NOT YET APPLIED.**
+- ✅ **BOTH 14 Aug MIGRATIONS ARE NOW APPLIED TO PRODUCTION.** Run by Jay in the
+  Supabase SQL editor as one `begin; … commit;`, so they landed together or not
+  at all. Measured immediately after, not assumed:
+  - **`anon` holds SELECT, INSERT, UPDATE and DELETE on 0 of 24 tables**;
+    `authenticated` and `service_role` still hold all 24.
+  - **60 policies still 60, bare `auth.*` calls 0, wrapped 24**, and Supabase's
+    `auth_rls_initplan` lint went from **18 entries to none**.
+  ✅ **THE PROTECTION DEMONSTRABLY MOVED FROM POLICY TO GRANT.** `set local role
+  anon; select … from teams` used to return zero rows silently. It now raises
+  `42501: permission denied for table teams` — and the hint names the missing
+  GRANT, so it is refused by the gate this change was aimed at rather than by
+  something earlier. ⚠️ **A negative that fails for the right reason is the
+  whole assertion**; the old silent zero and the new hard refusal look equally
+  "safe" from the app and are not the same thing.
+  ✅ **The calendar feed was smoke-tested live afterwards** — `/calendar.ics`
+  with a bogus token: **200, `content-type: text/calendar; charset=utf-8`, a
+  real `BEGIN:VCALENDAR` body.** The content-type is the assertion, never the
+  200 — the SPA catch-all answers any unknown path with `index.html`.
+  ⚠️ **THE ADVISOR IS STILL NOISY AND THAT IS NOT A FAILURE.** 132 lints remain,
+  **100 of them `multiple_permissive_policies`** — untouched by either migration
+  and a separate question. Read the lint NAME, not the count.
+  ⚠️ **Claude could not apply these itself** — both `execute_sql` and
+  `apply_migration` were refused by the permission layer, so the SQL was handed
+  over as a single paste. Worth knowing before planning any future migration
+  session around Claude applying it.
+
+- `56f1dd7` — 🔧 **A MIGRATION TO STOP 18 RLS POLICIES RE-EVALUATING AN `auth.*`
+  CALL PER ROW, WRITTEN AND PROVEN.**
   `db/migrations/20260814_rls_initplan_wrap_auth_calls.sql` with
   `db/tests/rls-initplan.sql`. 19 bare calls across 18 policies, wrapped as
   `(select auth.uid())` so Postgres evaluates them once per query instead of
