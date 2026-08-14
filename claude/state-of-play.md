@@ -939,6 +939,42 @@ will propose building.**
   `player-form` and `admin-dashboard`, that is four unrelated files. **It is not
   "the admin-dashboard one".**
 
+- ✅ **A `parent` OR `player` MEMBERSHIP MUST NOW POINT AT A PLAYER** —
+  `memberships_family_role_needs_player`, `db/migrations/20260814_family_role_needs_player.sql`.
+  Jay's ruling, 14 Aug 2026: *"nobody outside staff should be able to create an
+  account without a player"*.
+  ⛔ **IT DOES NOT STOP ANYBODY CREATING A LOGIN, AND NOTHING CAN.** Signing up
+  is Supabase auth and the app REQUIRES it before registration — sign up,
+  confirm the email, then add your player. **An account with no membership at
+  all is a normal, temporary state**; three existed the day this shipped, all
+  people whose child had already been registered by somebody else. They are
+  listed under "waiting for access" on Accounts, and the 14 Aug duplicate guard
+  now tells them what to do. ⚠️ **Do not read this constraint as "orphan logins
+  are impossible".**
+  ⚠️ **WHAT IT DOES STOP** is an account let INTO a squad pointing at no
+  player — it can see every child in that squad and cannot touch its own,
+  because `is_own_player` needs a real id.
+  ⚠️ **THE SCREEN ALREADY REFUSED IT; THREE OTHER WAYS IN DID NOT.**
+  `AccessBuilder` says "Choose a child" and will not submit — but
+  `public.accept_invite` inserted the broken row from an invite with no player,
+  `grantMemberships` writes `player_id: playerId ?? null` straight into an
+  INSERT, and hand-written SQL answers to nothing. **The guard was in the
+  component, one layer above every other caller.**
+  ⚠️ **`accept_invite` IS FIXED IN THE SAME MIGRATION, AND ITS GUARD SITS BEFORE
+  `accepted_at` IS STAMPED** — after it, a refused invite would be BURNED and
+  the person left holding a link that reports "already used". Proved: still
+  unaccepted afterwards.
+  ⚠️ **THE CONSTRAINT NAMES THE TWO FAMILY ROLES RATHER THAN SAYING `player_id
+  is not null`.** Eleven staff memberships live with a null player — a coach is
+  not anybody's parent — so the blunt version would break every one of them.
+  **Half of `db/tests/family-role-needs-player.sql` exists to prove the rule
+  stays OFF for staff**, and it also proves an UPDATE clearing the player is
+  caught, not just an INSERT.
+  ✅ **THE ONE VIOLATING ROW WAS FIXED FIRST, ON EVIDENCE RATHER THAN A GUESS.**
+  An active parent on U18B with no player. She was linked to her son because
+  **his own `player_parents` row names her, with a matching email AND phone** —
+  not because they share a surname.
+
 ### ⚠️ Test data currently in the live database
 
 Two sets, both to be removed before a pilot:

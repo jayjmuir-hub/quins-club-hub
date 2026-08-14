@@ -1728,9 +1728,52 @@ describe('grantMembership', () => {
     const { builder, calls } = createQueryBuilder({ data: { id: 'm-new' } })
     supabase.from.mockReturnValue(builder)
 
-    await grantMembership({ profileId: 'pr-new', clubId: 'c-1', role: 'parent', teamId: 't-12' })
+    // ⚠️ `playerId` ADDED 14 Aug 2026, AND IT IS INCIDENTAL TO WHAT THIS TEST
+    // IS ABOUT. A `parent` row must now name a player — the database enforces
+    // it via memberships_family_role_needs_player — so the old call is refused
+    // before it ever reaches an insert. The assertion below is unchanged and
+    // still about the `id` column; the player is here only to make the call
+    // legal. The rule itself is tested in the grantMembership block further
+    // down and in db/tests/family-role-needs-player.sql.
+    await grantMembership({
+      profileId: 'pr-new',
+      clubId: 'c-1',
+      role: 'parent',
+      teamId: 't-12',
+      playerId: 'p-1',
+    })
 
     expect(calls.insert[0][0]).not.toHaveProperty('id')
+  })
+
+  // ⚠️ THE RULE ITSELF, AT THE DATA LAYER. Jay, 14 Aug 2026: "nobody outside
+  // staff should be able to create an account without a player". The database
+  // is what enforces it; this exists so an admin reads a sentence rather than a
+  // raw 23514 naming a constraint.
+  it.each([
+    ['parent', /child this parent is responsible for/i],
+    ['player', /player this account belongs to/i],
+  ])('refuses a %s row with no player, in words', async (role, expected) => {
+    const { builder } = createQueryBuilder({ data: { id: 'm-new' } })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(
+      grantMembership({ profileId: 'pr-new', clubId: 'c-1', role, teamId: 't-12' }),
+    ).rejects.toThrow(expected)
+    // Refused before any request goes out — a round trip to be told what we
+    // already knew is a round trip on a pitch-side connection.
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it.each(['coach', 'manager', 'medic'])('still allows a %s row with no player', async (role) => {
+    const { builder, calls } = createQueryBuilder({ data: { id: 'm-new' } })
+    supabase.from.mockReturnValue(builder)
+
+    // A coach is not anybody's parent. Naming every staff role rather than
+    // saying "not parent" is what would catch a future role being added to the
+    // wrong side of the rule.
+    await grantMembership({ profileId: 'pr-new', clubId: 'c-1', role, teamId: 't-12' })
+    expect(calls.insert[0][0].player_id).toBeNull()
   })
 
   it('passes a linked player through when one is given', async () => {

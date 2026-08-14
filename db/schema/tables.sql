@@ -506,7 +506,29 @@ CREATE TABLE public.memberships (
   CONSTRAINT memberships_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text, 'medic'::text, 'parent'::text, 'player'::text]))),
   -- Added 2026-08-08 (membership_pending_status). Two values only, as found;
   -- there is no 'rejected'/'dismissed' value on this column.
-  CONSTRAINT memberships_status_check     CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text])))
+  CONSTRAINT memberships_status_check     CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text]))),
+  -- Added 2026-08-14 (family_role_needs_player). Jay's ruling: "nobody outside
+  -- staff should be able to create an account without a player".
+  --
+  -- ⚠️ IT NAMES THE TWO FAMILY ROLES RATHER THAN SAYING `player_id IS NOT
+  -- NULL`, AND THAT IS THE WHOLE DESIGN. Eleven staff memberships live with a
+  -- null player_id — a coach is not anybody's parent — so the blunt version
+  -- would break every one of them, admins included. A staff row MAY carry a
+  -- player_id when the same person is also that child's parent (two do);
+  -- allowed, never required.
+  --
+  -- ⚠️ WHAT IT PREVENTS is an account let INTO a squad that points at no
+  -- player: it can see every child in that squad and cannot touch its own,
+  -- because private.is_own_player needs a real id. One such row existed in
+  -- production before this — an active parent on U18B — and it came from the
+  -- invite path, which is fixed in the same migration.
+  --
+  -- ⚠️ IT DOES **NOT** PREVENT AN ACCOUNT WITH NO MEMBERSHIP AT ALL, and
+  -- nothing can: signing up is Supabase auth and the app requires it BEFORE
+  -- registration. Three such logins existed the day this was written. They are
+  -- normal, temporary, and listed under "waiting for access" on Accounts.
+  CONSTRAINT memberships_family_role_needs_player
+    CHECK (((role <> ALL (ARRAY['parent'::text, 'player'::text])) OR (player_id IS NOT NULL)))
 );
 ALTER TABLE public.memberships ENABLE ROW LEVEL SECURITY;
 

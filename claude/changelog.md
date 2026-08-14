@@ -10,6 +10,42 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
+- ✅ **A `parent` OR `player` MEMBERSHIP MUST NOW POINT AT A PLAYER.**
+  `db/migrations/20260814_family_role_needs_player.sql`, constraint
+  `memberships_family_role_needs_player`. Jay: *"nobody outside staff should be
+  able to create an account without a player"*.
+  ⛔ **THIS DOES NOT STOP ANYBODY CREATING A LOGIN, AND NOTHING CAN.** Signing up
+  is Supabase auth and the app requires it BEFORE registration. An account with
+  no membership is a normal, temporary state — three existed, all people whose
+  child had already been registered by somebody else — and they are listed under
+  "waiting for access" on Accounts. **Do not read this as "orphan logins are
+  impossible".**
+  ⚠️ **WHAT IT STOPS** is an account let into a squad pointing at no player: it
+  can see every child in that squad and cannot touch its own, because
+  `is_own_player` needs a real id.
+  ⚠️ **THE SCREEN ALREADY REFUSED IT; THREE OTHER WAYS IN DID NOT** —
+  `accept_invite` (an invite with no player), `grantMemberships`
+  (`player_id ?? null` straight into an INSERT), and hand-written SQL. The guard
+  was in the component, one layer above every other caller.
+  ⚠️ **`accept_invite` FIXED IN THE SAME MIGRATION, GUARD BEFORE `accepted_at`**
+  — after it, a refused invite would be burned and the person left with a link
+  reporting "already used". Proved still unaccepted.
+  ⚠️ **THE CONSTRAINT NAMES THE TWO FAMILY ROLES**, not `player_id is not null`:
+  eleven staff rows legitimately have none. Half of
+  `db/tests/family-role-needs-player.sql` proves the rule stays OFF for staff,
+  and that an UPDATE clearing the player is caught too, not just an INSERT.
+  ✅ **The one violating row was fixed first, on evidence** — the child's own
+  `player_parents` row names that parent with a matching email AND phone, not a
+  shared surname.
+
+- ✅ **THE TWO BAD ROSTER ROWS ARE GONE** (14 Aug, on Jay's instruction).
+  ⚠️ **A PLAIN DELETE WOULD HAVE DESTROYED A PARENT'S PHONE NUMBER.** The
+  parent-as-player row carried the family's TWO `player_parents` records — the
+  father's and the mother's — while the real child had NONE, and
+  `player_parents` CASCADES. They were moved to the child first.
+  ⚠️ **`memberships.player_id` IS `ON DELETE SET NULL`**, so the dangling
+  membership was deleted explicitly rather than left pointing at nothing.
+
 - ⛔ **SELF-REGISTRATION WAS PUTTING THE WRONG PEOPLE ON THE ROSTER — FIXED.**
   `db/migrations/20260814_registration_duplicate_guards.sql`. Reported by Jay
   from the real club. `register_my_player` INSERTed a new `players` row
