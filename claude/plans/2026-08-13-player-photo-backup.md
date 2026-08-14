@@ -31,6 +31,19 @@ has not happened. Copying is not restoring, and this repo's own precedent is the
 database drill, where the thing everyone predicted would fail restored cleanly
 and the useful outcome came from doing it rather than reasoning about it.
 
+⛔ **THE RESTORE DRILL IS TABLED BY JAY, 13 Aug 2026: "table the restore drill
+until i bring it up again". Do not start it, do not offer to, do not ask again**
+— he reopens it or it stays closed. Same standing as the AI integration and
+training-session plans.
+
+⚠️ **TABLED IS NOT DONE, AND CONFLATING THE TWO IS THE FAILURE THIS REPO HAS
+ALREADY MADE ONCE.** When Jay tabled the AI build, a session had to go back and
+separate that from the AI *ruling*, which still governed everything. The same
+split applies here: he has tabled the WORK, not the FINDING. **The backup
+remains unproven for restore, and every document must keep saying so.** Anything
+that reads "backups are working" without that qualifier is wrong, whatever the
+state of this line.
+
 ⚠️ **Retention remains open and is Jay's**, not a technical question: append-only
 means R2 accumulates photographs of children who have left the club, and the
 one-year lock means a deletion request cannot be fully honoured inside that year.
