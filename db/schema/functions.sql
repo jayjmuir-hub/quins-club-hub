@@ -282,7 +282,7 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 -- function did NOT. See the note on can_see_team below.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.calendar_events_for_token(_token uuid)
- RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, ends_at timestamp with time zone, notes text, team_name text, league_team_name text, league_division text, round smallint, time_tbd boolean)
+ RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, ends_at timestamp with time zone, notes text, team_name text, league_team_name text, league_division text, round smallint, time_tbd boolean, competition_type text)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
@@ -290,7 +290,7 @@ AS $function$
   select e.id, e.type, e.title, e.opponent, e.home, e.venue, e.pitch, e.competition,
          e.starts_at, e.ends_at, e.notes, t.name as team_name,
          lt.rcm_name as league_team_name, lt.division as league_division, e.round,
-         e.time_tbd
+         e.time_tbd, e.competition_type
   from public.events e
   join public.teams t on t.id = e.team_id
   left join public.league_teams lt on lt.id = e.league_team_id
