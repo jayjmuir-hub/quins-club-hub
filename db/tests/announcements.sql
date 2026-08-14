@@ -201,6 +201,59 @@ begin
     case when _first = 'AAA Test Coach' then 'coach - pass' else coalesce(nullif(_first,''),'(blank)') || ' - FAIL' end);
 end $$;
 
+-- ── 9c-9e. THE AUTHOR IS NOT IN THEIR OWN AUDIENCE ────────────────────────
+--
+-- ⚠️ THE COACH IS THE AUTHOR HERE AND HOLDS AN ACTIVE MEMBERSHIP ON THE SQUAD,
+-- which is what made this wrong until 14 Aug 2026: they were counted in the
+-- audience they were writing to, and the client's mark-on-render recorded their
+-- own read the instant they pressed Post. The receipts read "1 of 25 seen"
+-- before anybody else had opened the app.
+--
+-- ⚠️ IT WAS INVISIBLE IN THE FIRST REAL TEST. That notice was posted by a
+-- CLUB-WIDE admin to a squad they are not attached to, so they were already
+-- outside its audience and it read a correct "1 of 8". Whether the author was
+-- counted depended on the shape of their membership — which is why this harness
+-- posts as a COACH OF THE SQUAD and not as an admin.
+--
+-- ⚠️ THE NUMERATOR NEEDS THE EXCLUSION AS WELL AS THE DENOMINATOR. The author's
+-- own read row is real and is never deleted; only the join back to the audience
+-- excludes them. Drop that half and a notice can report "1 of 0 seen".
+insert into announcement_reads (announcement_id, profile_id)
+select id, 'a0000000-0000-4000-8000-00000000000a'
+  from announcements where title = 'Kit for Friday'
+on conflict do nothing;
+
+do $$
+declare _aud int; _seen int; _rows int; _first text;
+begin
+  select audience_count, seen_count into _aud, _seen
+    from announcement_stats() s
+    join announcements a on a.id = s.announcement_id
+   where a.title = 'Kit for Friday';
+
+  -- Was 2 (coach + the two-child parent). The coach wrote it.
+  insert into _r values ('09c audience EXCLUDES the author (expect 1)',
+    case when _aud = 1 then '1 - pass' else coalesce(_aud::text,'null') || ' - FAIL' end);
+
+  -- The parent read it in step 4; the author's own read must not add to this.
+  insert into _r values ('09d seen counts the parent only (expect 1)',
+    case when _seen = 1 then '1 - pass' else coalesce(_seen::text,'null') || ' - FAIL' end);
+
+  insert into _r values ('09e seen never exceeds audience',
+    case when _seen <= _aud then 'ok - pass' else 'seen > audience - FAIL' end);
+
+  select count(*) into _rows from announcement_audience(
+    (select id from announcements where title = 'Kit for Friday'));
+  select full_name into _first from announcement_audience(
+    (select id from announcements where title = 'Kit for Friday')) limit 1;
+  -- ⚠️ THE LIST AND THE COUNT MUST AGREE. Excluding the author from one and not
+  -- the other gives a number that contradicts the names printed under it, which
+  -- is worse than the bug being fixed.
+  insert into _r values ('09f audience list agrees with the count (expect 1, the parent)',
+    case when _rows = 1 and _first = 'BBB Two Children' then 'parent - pass'
+         else _rows::text || '/' || coalesce(nullif(_first,''),'(none)') || ' - FAIL' end);
+end $$;
+
 -- ── 10-11. What an author may change ──────────────────────────────────────
 do $$
 begin
@@ -290,6 +343,12 @@ rollback;
 --    `private.is_attached_to_team(team_id)` in "announcement read", then re-run
 --    steps 4-6.
 --    EXPECTED: step 5 flips to "YES - FAIL", steps 4 and 6 stay green.
+--
+-- C2. THE AUTHOR EXCLUSION. Drop `and m.profile_id <> a.author_id` from
+--    public.announcement_stats, then re-run step 9c.
+--    EXPECTED: 09c flips to "2 - FAIL" — the coach counted in the audience they
+--    wrote to. ⚠️ Drop it from `announcement_audience` instead and 09f flips
+--    while 09c stays green, which is the split this pair exists to catch.
 --
 -- C. THE COLUMN GRANT. `grant update (team_id) on public.announcements to
 --    authenticated;` then re-run steps 10-11.

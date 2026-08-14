@@ -218,6 +218,32 @@ describe('SquadStaffCard', () => {
 })
 
 describe('Squad contacts on the Dashboard', () => {
+  // ⚠️ THE HEADING SAT FLUSH AGAINST THE CARD ABOVE IT — reported from a
+  // screenshot on 14 Aug 2026, and invisible to every test in this suite until
+  // this one, because jsdom applies no CSS and cannot see a collapsed margin.
+  //
+  // The cause is worth more than the fix: BlockTitle carries
+  // `mt-[18px] first:mt-0`, and `first:` compiles to `:first-child`, which is
+  // scoped to the element's PARENT. Wrapping a BlockTitle in a div therefore
+  // makes it that div's first child and silently zeroes its top margin. The two
+  // other wrapped BlockTitles on this screen already carry a compensating
+  // margin, which is exactly why this one looked like a one-off rather than a
+  // pattern.
+  //
+  // Pinned as a class token rather than a measurement — the same proxy, and the
+  // same honesty about being one, as tests/page-header-wrap.test.js.
+  it('keeps the block clear of the card above it', async () => {
+    useMembershipsMock.mockReturnValue(
+      membershipValue([{ id: 'm1', role: 'parent', team_id: 'team-u13', player_id: 'p1' }]),
+    )
+    listMySquadStaffMock.mockResolvedValue(new Map([['team-u13', [COACH_ROSA]]]))
+
+    renderDashboard()
+
+    const block = await screen.findByTestId('squad-staff-block')
+    expect(block.className.split(/\s+/)).toContain('mt-[18px]')
+  })
+
   it('shows one card per squad a parent is attached to, in club order', async () => {
     useMembershipsMock.mockReturnValue(
       membershipValue([

@@ -2596,8 +2596,17 @@ GRANT EXECUTE ON FUNCTION public.set_my_photo(text) TO authenticated;
 -- policy and these functions agree on membership STATUS -- the half that must
 -- match -- and differ on the admin arm, which is the half that must not.
 --
--- Bodies are in db/migrations/20260814_announcements.sql. They are reproduced
--- there in full and are not duplicated here.
+-- !! AMENDED 14 Aug 2026 by 20260814_announcement_author_not_audience.sql: both
+-- public functions now exclude the AUTHOR from the audience
+-- (`and m.profile_id <> a.author_id`), in the denominator AND in the numerator.
+-- A coach holds a membership on the squad they coach, so a coach posting to
+-- their own squad was counted in the audience they were writing to and their
+-- own mark-on-render read made it "1 of 25 seen" before anyone else opened the
+-- app. Verified live: both bodies carry the clause.
+--
+-- Bodies are in db/migrations/20260814_announcements.sql as first written and in
+-- 20260814_announcement_author_not_audience.sql as they now stand. They are
+-- reproduced there in full and are not duplicated here.
 -- ---------------------------------------------------------------------
 
 

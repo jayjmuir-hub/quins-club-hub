@@ -1,31 +1,57 @@
-import { useMemo, useState } from 'react'
-import Sheet from './Sheet.jsx'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 
 // The admin-only "view as" preview control and its banner (design spec
-// 2026-08-03 §1). Two exports, both rendered by AppShell: the trigger +
-// sheet next to the desktop role badge, and the sticky banner above the
-// masthead.
+// 2026-08-03 §1). Two exports, BOTH rendered by AppShell: a compact dropdown in
+// the masthead, and the sticky banner above it.
 //
 // THE ONE RULE THIS FILE EXISTS TO KEEP: every gate here reads
 // `realMemberships`, never the effective `memberships`. While previewing as a
-// parent, `isAdmin(memberships)` is false — gating the banner or its exit
-// button on that would hide the only way out and soft-lock the admin into a
-// preview they could only escape by clearing localStorage. `memberships` is
+// parent, `isAdmin(memberships)` is false — gating the trigger or the banner's
+// exit button on that would hide the only way out and soft-lock the admin into
+// a preview they could only escape by clearing localStorage. `memberships` is
 // deliberately not destructured anywhere below; if you find yourself reaching
 // for it here, you are about to reintroduce that bug.
 //
-// It is also worth restating what this feature is NOT: row-level security
-// still returns club-wide rows for the admin's real auth.uid(). The preview
-// only changes what the app chooses to display in this browser. Hence the
-// wording — "preview", "filtered in your browser only" — and never anything
-// like "restricted to" or "you now have coach permissions", which would
-// suggest a security boundary that does not exist here.
+// It is also worth restating what this feature is NOT: row-level security still
+// returns club-wide rows for the admin's real auth.uid(). The preview only
+// changes what the app chooses to display in this browser. Hence the wording —
+// "preview", "filtered in your browser only" — and never anything like
+// "restricted to" or "you now have coach permissions", which would suggest a
+// security boundary that does not exist here.
+//
+// ══ ⚠️ IT IS BACK IN THE MASTHEAD, AND THE 7 Aug RULING SAID IT MUST NOT BE ══
+//
+// Jay, 14 Aug 2026: *"i want to be able to select view as with a drop down from
+// any screen, as an admin"*. That overturns the 7 Aug decision to move this onto
+// /admin, and the REASON that decision existed has not gone away — so read this
+// before making the trigger any bigger:
+//
+//   The masthead row is crest | wordmark | flex-1 spacer | role pill | App
+//   button | account | THIS | nav. **Every item except the wordmark is
+//   `shrink-0`, so the wordmark absorbs every overflow** and truncates to
+//   "ABU DHABI HARLE…". On 7 Aug this control was 84px of text pill and that is
+//   exactly what happened.
+//
+//   The row's real buffer is the `flex-1` spacer, measured on 12 Aug 2026 by
+//   growing a probe until the wordmark visibly truncated: **it breaks at
+//   +190px** at 1280px. The App button (49) and the account first name (~75)
+//   have since spent ~124 of it.
+//
+// ⚠️ SO THE BUDGET IS ABOUT 66px AND THIS TRIGGER IS AN ICON, NOT A LABEL.
+// The persona is NOT written in the masthead — `ViewAsBanner` below already
+// states it in full, at every width, directly above. Putting the words in both
+// places is what cost the wordmark its 19px in the first place.
+//
+// ⚠️ DO NOT "IMPROVE" THIS BY ADDING THE PERSONA TEXT BACK TO THE TRIGGER.
+// "Coach, Senior Men 2nd XV" is 200px+. Re-measure with the probe before
+// changing this element's width at all.
 
 function personaRoleLabel(role) {
-  // roleLabel() takes a membership array; a one-element synthetic array is
-  // the cheapest way to reuse its label map rather than duplicate it.
+  // roleLabel() takes a membership array; a one-element synthetic array is the
+  // cheapest way to reuse its label map rather than duplicate it.
   return roleLabel([{ role }])
 }
 
@@ -33,146 +59,280 @@ function teamName(teams, teamId) {
   return teams.find((team) => team.id === teamId)?.name ?? 'Unknown age group'
 }
 
-function personaClasses(active) {
+// Hand-rolled rather than a dependency, like every other icon in this app.
+function EyeIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12" r="2.75" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function optionClasses(active) {
   return [
-    'flex w-full items-center justify-between gap-3 rounded-[11px] border-[1.5px] px-3 py-2.5 text-left text-sm font-bold transition',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
-    active
-      ? 'border-brand bg-danger-bg text-brand-ink'
-      : 'border-line bg-surface-card text-ink hover:border-brand',
+    'flex w-full items-center justify-between gap-3 rounded-[9px] px-3 py-2 text-left text-[13.5px] font-semibold transition',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-inset',
+    active ? 'bg-danger-bg text-brand-ink' : 'text-ink hover:bg-surface-mute',
   ].join(' ')
 }
 
 /**
- * Desktop-only trigger + sheet. Renders nothing at all for anyone who is not
- * a real admin.
+ * The masthead dropdown. Renders nothing at all for anyone who is not a real
+ * admin.
+ *
+ * ⚠️ A DROPDOWN, NOT A `Sheet` — Jay asked for one by name on 14 Aug 2026, and
+ * it is also the right shape here: this control now lives on EVERY screen, and
+ * a full-screen modal on a phone for a preview toggle is heavier than the thing
+ * it is previewing. The cost is that the three behaviours `Sheet` gave for free
+ * — Escape, outside-click and focus return — are implemented below by hand.
+ * They are not optional; the account link two elements away is a plain `<Link>`
+ * precisely because nobody wanted to write them, so do not delete them here.
  */
 export function ViewAsSwitcher() {
   const { realMemberships, teams, viewAs, setViewAs } = useMemberships()
   const [open, setOpen] = useState(false)
+  const wrapRef = useRef(null)
+  const triggerRef = useRef(null)
+  const panelRef = useRef(null)
+  // Viewport coordinates for the portalled panel — see the note above its render.
+  const [anchor, setAnchor] = useState(null)
 
   const admin = isAdmin(realMemberships)
 
-  // Built from the REAL set: while previewing, the effective set holds a
-  // single team and this list would collapse to just that one, stranding the
-  // admin on whichever age group they picked last.
+  // Built from the REAL set: while previewing, the effective set holds a single
+  // team and this list would collapse to just that one, stranding the admin on
+  // whichever age group they picked last.
   const previewTeams = useMemo(
     () => (admin ? visibleTeams(realMemberships, teams) : []),
     [admin, realMemberships, teams],
   )
+
+  // Escape closes and returns focus to the trigger. ⚠️ Keyed on `open` rather
+  // than always-listening: a document-level keydown handler that runs on every
+  // screen for every admin, to do nothing 99% of the time, is exactly the kind
+  // of thing that ends up swallowing a keystroke somewhere else.
+  useEffect(() => {
+    if (!open) return undefined
+    function onKeyDown(event) {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
+    function onPointerDown(event) {
+      // ⚠️ BOTH REFS, AND THAT BECAME NECESSARY THE MOMENT THE PANEL WAS
+      // PORTALLED. The wrapper holds the TRIGGER; the panel is now a child of
+      // <body> and is no longer inside it. Testing the wrapper alone would make
+      // every click on a menu item "outside" — the menu would close on
+      // pointerdown before the click landed, so choosing a persona would do
+      // nothing at all.
+      //
+      // ⚠️ And the trigger must stay in the test too: dropping it would treat a
+      // click on the trigger as outside, closing and instantly reopening — the
+      // double-toggle that makes a dropdown look like it refuses to shut.
+      if (wrapRef.current?.contains(event.target)) return
+      if (panelRef.current?.contains(event.target)) return
+      setOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [open])
+
+  // ══ ⚠️ THE PANEL IS PORTALLED TO <body> AND POSITIONED IN VIEWPORT COORDS ══
+  //
+  // It was `absolute` inside the trigger's wrapper until 14 Aug 2026, and it was
+  // CLIPPED TO A SLIVER on the live site. The masthead row carries
+  // `overflow-hidden` — deliberately, to clip the `harlequin` diagonals that
+  // bleed off its right edge — and an absolutely-positioned child of a clipped
+  // ancestor is clipped with it.
+  //
+  // ⚠️ THE CHECK THAT MISSED IT IS THE PART WORTH REMEMBERING. The pre-merge
+  // measurement asked `getBoundingClientRect()` whether the menu sat inside the
+  // viewport, and it does — **a layout box is reported at full size even when an
+  // ancestor is visually clipping it to nothing.** The rect said 264px wide at
+  // 40→304 while a person saw a 6px strip. Measure VISIBILITY with
+  // `document.elementFromPoint`, not geometry with a rect.
+  //
+  // ⚠️ `position: fixed` ESCAPES THE CLIP ONLY BECAUSE NO ANCESTOR SETS
+  // `transform` / `filter` / `perspective` — any of those would make that
+  // ancestor the containing block and re-clip it. `Sheet.jsx` relies on exactly
+  // the same property and states the same caveat. If a page-transition wrapper
+  // ever adds a transform, both break together.
+  useEffect(() => {
+    if (!open) return undefined
+    function place() {
+      const rect = triggerRef.current?.getBoundingClientRect()
+      if (!rect) return
+      // Right-anchored, so the panel opens inward from a trigger that sits near
+      // the right edge at every width.
+      setAnchor({ top: Math.round(rect.bottom + 8), right: Math.round(window.innerWidth - rect.right) })
+    }
+    place()
+    // `true` for capture: the masthead is sticky, so it does not move on scroll,
+    // but a scroll container between here and the trigger would — and a stale
+    // anchor leaves the menu floating away from its button.
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open])
 
   if (!admin) return null
 
   function choose(next) {
     setViewAs(next)
     setOpen(false)
+    triggerRef.current?.focus()
   }
 
-  // ⚠️ THE VISIBLE LABEL DROPS "Viewing as", THE ACCESSIBLE NAME KEEPS IT.
-  //
-  // Jay, 7 Aug 2026: the club wordmark read "ABU DHABI HARLE…" at 1442px.
-  // Measured in the harness at the masthead's 1120px cap (admin previewing as
-  // a coach, account name showing): the wordmark got 226px and needed 257.
-  // This trigger was 202px of that row, and every character of it is ALREADY
-  // on screen — ViewAsBanner sits directly above saying "Preview — viewing as
-  // Coach, U13. Data shown is filtered in your browser only." The masthead was
-  // restating the banner and charging the wordmark for it.
-  //
-  // ⚠️ A WIDER SCREEN CANNOT FIX THAT. The row is max-w-[1120px], so every
-  // viewport at or above ~1152px gives it exactly the same space.
-  //
-  // Shortening alone would not have been enough, which is why max-w/truncate
-  // is on the button below: "Coach, U13" is short, but "Coach, Senior Men 2nd
-  // XV" is LONGER than the string this replaced, so the squad name has to be
-  // bounded or the same bug returns for one squad instead of all of them.
-  const triggerLabel = viewAs
-    ? `${personaRoleLabel(viewAs.role)}, ${teamName(teams, viewAs.teamId)}`
+  // The full sentence reaches screen readers and hover, and NEVER the masthead
+  // itself — see the width note at the top of this file.
+  const triggerAria = viewAs
+    ? `Change preview — currently viewing as ${personaRoleLabel(viewAs.role)}, ${teamName(teams, viewAs.teamId)}`
     : 'View as'
 
-  // The full sentence still reaches screen readers, and a title gives sighted
-  // users the untruncated text on hover. Losing "viewing as" from the
-  // accessible name would leave a button announced as just "Coach, U13".
-  const triggerAria = viewAs ? `Change preview — currently viewing as ${triggerLabel}` : 'View as'
-
   return (
-    <>
-      {/* ⚠️ STYLED FOR A LIGHT SURFACE, NOT THE DARK CHROME. This was
-          bg-white/10 + text-white while it lived in the masthead; rendered
-          unchanged on the Admin screen (7 Aug 2026) that is white-on-near-
-          white and effectively invisible. It now matches the Admin tab pills
-          directly beneath it — surface-card fill, brand text, inset hairline.
-
-          Still `hidden desktop:block` even though its only parent is already
-          desktop-only. Belt and braces on purpose: the preview is a
-          desk-bound admin tool (spec §1), and that rule should survive this
-          component being rendered somewhere else later. */}
+    <div ref={wrapRef} className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         data-testid="view-as-trigger"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
+        onClick={() => setOpen((was) => !was)}
+        aria-haspopup="menu"
         aria-expanded={open}
         aria-label={triggerAria}
         title={triggerAria}
-        // max-w-[16ch] + truncate is kept from the masthead version. It is no
-        // longer load-bearing for the club wordmark — this control is not in
-        // that row any more — but "Coach, Senior Men 2nd XV" is a long thing
-        // to put in a pill beside a heading, and a bounded control keeps the
-        // Admin header from reflowing as the persona changes. The full text
-        // is in aria-label and title either way.
-        className="hidden max-w-[16ch] shrink-0 truncate rounded-pill bg-surface-card px-4 py-2 text-sm font-bold text-brand shadow-[inset_0_0_0_1.5px_theme(colors.line.DEFAULT)] outline-none transition hover:bg-surface-mute focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 desktop:block"
+        // ⚠️ STYLED FOR THE DARK CHROME, unlike the version that lived on the
+        // Admin screen — this sits on the near-black masthead again.
+        //
+        // ⚠️ THE ACTIVE STATE IS A RING AND A DOT, NOT COLOUR ALONE
+        // (claude/specs/accessibility.md). The dot is aria-hidden and the state
+        // is carried in the aria-label, which says "currently viewing as …".
+        className={[
+          'grid h-8 w-8 place-items-center rounded-full text-white outline-none transition',
+          'focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
+          viewAs ? 'bg-brand/30 ring-1 ring-inset ring-brand-onDark' : 'bg-white/15 hover:bg-white/25',
+        ].join(' ')}
       >
-        {triggerLabel}
+        <EyeIcon className="h-[18px] w-[18px]" />
+        {viewAs && (
+          <span
+            aria-hidden="true"
+            className="absolute right-0 top-0 h-2 w-2 rounded-full bg-brand-onDark"
+          />
+        )}
       </button>
 
-      <Sheet open={open} onClose={() => setOpen(false)} title="View as">
-        {/* Deliberately still only Coach and Parent, not one persona per
-            role. 'manager' and 'medic' grant EXACTLY what 'coach' grants
-            (SQUAD_STAFF_ROLES in src/lib/scope.js), so a "Team Manager of
-            U12" persona would render a pixel-identical preview to "Coach of
-            U12" — 30 extra buttons across 15 squads showing nothing new.
-            personaRoleLabel() goes through roleLabel(), so if a persona for
-            one of them is ever added it will already be labelled correctly. */}
-        <p className="mb-4 text-[13px] leading-relaxed text-ink-muted">
-          Preview how the app looks for a coach or parent in one age group.
-          This filters what this browser displays; your own access is
-          unchanged.
-        </p>
+      {open && anchor && createPortal(
+        <div
+          ref={panelRef}
+          data-testid="view-as-menu"
+          role="menu"
+          aria-label="View as"
+          // ⚠️ POSITIONED IN JS, NOT IN TAILWIND, because it is portalled out of
+          // the masthead and has no positioned ancestor to anchor to any more.
+          // `right` rather than `left` keeps it opening inward from a trigger
+          // that sits near the right edge at every width.
+          style={{ position: 'fixed', top: anchor.top, right: anchor.right }}
+          // ⚠️ `max-w-[calc(100vw-16px)]` IS THE PHONE GUARD. A fixed 264px
+          // panel is wider than the gap between the trigger and the left edge on
+          // the narrowest phones, and a fixed element that overflows would take
+          // the document width with it — the failure
+          // harness/check-overflow.mjs exists to catch.
+          //
+          // ⚠️ z-50: the sticky masthead is z-40. Portalled to <body> this is
+          // already above it in document order, but the token stays so that
+          // moving this back into the tree cannot silently put it behind the bar
+          // it hangs from.
+          className="z-50 max-h-[70vh] w-[264px] max-w-[calc(100vw-16px)] overflow-y-auto rounded-[14px] border border-line bg-surface-card p-2 shadow-card"
+        >
+          <p className="px-3 pb-2 pt-1 text-[12px] leading-relaxed text-ink-muted">
+            Preview how the app looks for a coach or parent in one age group.
+            This filters what this browser displays; your own access is
+            unchanged.
+          </p>
 
-        <div className="flex flex-col gap-2">
-          <button type="button" onClick={() => choose(null)} className={personaClasses(!viewAs)}>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => choose(null)}
+            className={optionClasses(!viewAs)}
+          >
             <span>All age groups (Admin)</span>
-            {!viewAs && <span className="text-[12px] font-bold uppercase tracking-[.4px]">Current</span>}
+            {!viewAs && (
+              <span className="text-[11px] font-bold uppercase tracking-[.4px]">Current</span>
+            )}
           </button>
 
+          {/* Deliberately still only Coach and Parent, not one persona per
+              role. 'manager' and 'medic' grant EXACTLY what 'coach' grants
+              (SQUAD_STAFF_ROLES in src/lib/scope.js), so a "Team Manager of
+              U12" persona would render a pixel-identical preview to "Coach of
+              U12" — 30 extra rows across 15 squads showing nothing new.
+              personaRoleLabel() goes through roleLabel(), so if a persona for
+              one of them is ever added it will already be labelled correctly. */}
+          {/* ⚠️ THE VISIBLE LABEL IS "Coach"; THE ACCESSIBLE NAME IS "Coach of
+              U12 Boys". Grouping under a squad heading is what keeps this menu
+              compact enough to be worth having on a phone — but a heading is a
+              VISUAL association only, so without the aria-label a screen reader
+              reads out fifteen buttons all called "Coach" and two called
+              "Parent" per squad, with nothing to tell them apart. The heading is
+              aria-hidden for the same reason: it would otherwise be announced as
+              a stray line of text between identical items.
+              Same split the trigger makes, and the same one
+              claude/specs/accessibility.md asks for. */}
           {previewTeams.map((team) => (
-            <div key={team.id} className="flex flex-col gap-2">
+            <div key={team.id} className="mt-1 border-t border-line pt-1">
+              <p
+                aria-hidden="true"
+                className="px-3 py-1 text-[11px] font-bold uppercase tracking-[.4px] text-ink-faint"
+              >
+                {team.name}
+              </p>
               <button
                 type="button"
+                role="menuitem"
+                aria-label={`Coach of ${team.name}`}
                 onClick={() => choose({ role: 'coach', teamId: team.id })}
-                className={personaClasses(viewAs?.role === 'coach' && viewAs?.teamId === team.id)}
+                className={optionClasses(viewAs?.role === 'coach' && viewAs?.teamId === team.id)}
               >
-                <span>Coach of {team.name}</span>
+                <span>Coach</span>
               </button>
               <button
                 type="button"
+                role="menuitem"
+                aria-label={`Parent in ${team.name}`}
                 onClick={() => choose({ role: 'parent', teamId: team.id })}
-                className={personaClasses(viewAs?.role === 'parent' && viewAs?.teamId === team.id)}
+                className={optionClasses(viewAs?.role === 'parent' && viewAs?.teamId === team.id)}
               >
-                <span>Parent in {team.name}</span>
+                <span>Parent</span>
               </button>
             </div>
           ))}
-        </div>
-      </Sheet>
-    </>
+        </div>,
+        document.body,
+      )}
+    </div>
   )
 }
 
 /**
- * The persistent preview banner. Rendered by AppShell above the masthead,
- * at every width (unlike the trigger) — it is the only way back out of a
- * preview, so it must never be CSS-hidden either.
+ * The persistent preview banner. Rendered by AppShell above the masthead, at
+ * every width (as is the trigger, since 14 Aug 2026) — it is the only thing
+ * that states the persona in words, so it must never be CSS-hidden.
  */
 export function ViewAsBanner() {
   const { realMemberships, teams, viewAs, setViewAs } = useMemberships()
@@ -188,8 +348,8 @@ export function ViewAsBanner() {
       role="status"
       // brand-deep (#b3141a) is this theme's dark club red — the token the
       // retheme mapped the old #8E1526 "plum" onto (claude/specs/design-system.md
-      // §2's mapping table). White on it measures 6.93:1. A raw hex here
-      // would fail tests/theme.test.js's no-literals rule.
+      // §2's mapping table). White on it measures 6.93:1. A raw hex here would
+      // fail tests/theme.test.js's no-literals rule.
       className="bg-brand-deep text-white"
     >
       <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2 wide:max-w-[1360px]">
