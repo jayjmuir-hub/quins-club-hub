@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
+- ✅ **NOTHING GRANTS SQUAD ACCESS WITHOUT AN ADMIN — `claim_roster_access` NOW
+  INSERTS `pending`.** `db/migrations/20260814_claim_roster_access_pending.sql`.
+  It was the one path that opened an age group with no human involved.
+  ⚠️ **OVERTURNS A DELIBERATE RULING** — `20260809_notify_pending_membership.sql`
+  says *"a roster email match IS the verification"*, which held while the club
+  expected to import a roster. Since the no-roster-import ruling every
+  `player_contacts.email` was written by whoever registered that child, so a
+  match now proves only that two accounts share an address.
+  ⚠️ **REACHABLE, NOT THEORETICAL** — children carrying their own email on their
+  contact record were handed the whole squad on sign-up. **Measured: 1 player of
+  6 visible now, where it was all 6.**
+  ⚠️ **THE MATCHING IS UNCHANGED, ONLY THE GRANTING.** Identifying which child an
+  account belongs to and granting that account access are two different jobs;
+  this function was doing both.
+  ✅ **Admins now get told** — the pending trigger fires where these inserts used
+  to slip past it silently. ⚠️ **No existing membership was downgraded.**
+
 - ✅ **A `parent` OR `player` MEMBERSHIP MUST NOW POINT AT A PLAYER.**
   `db/migrations/20260814_family_role_needs_player.sql`, constraint
   `memberships_family_role_needs_player`. Jay: *"nobody outside staff should be

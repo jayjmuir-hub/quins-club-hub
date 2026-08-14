@@ -1045,7 +1045,32 @@ begin
          p.team_id,
          case when t.is_senior then 'player' else 'parent' end,
          p.id,
-         'active'
+         -- ⚠️ 'pending' SINCE 14 Aug 2026 (claim_roster_access_pending), and it
+         -- USED TO BE 'active'. Jay's ruling: nothing gets squad access without
+         -- an admin approving it.
+         --
+         -- The old position is recorded in
+         -- 20260809_notify_pending_membership.sql — "a roster email match IS
+         -- the verification" — and it was sound while the club expected to
+         -- IMPORT a roster: an email already on a child's record had been put
+         -- there by the club. Since the no-roster-import ruling (10 Aug) every
+         -- `player_contacts.email` was put there by whoever registered that
+         -- child, so a match proves two accounts share an address and nothing
+         -- more. And it was REACHABLE: children carrying their own email on
+         -- their contact record were being handed the whole squad — every other
+         -- child's name, photo and parent contact details — unseen.
+         --
+         -- ⚠️ THE MATCHING IS UNCHANGED. Identifying which child an account
+         -- belongs to is still automatic; it simply no longer grants anything.
+         -- Two different jobs, and this function used to do both.
+         --
+         -- ⚠️ CONSEQUENCE: `notify_pending_membership` fires
+         -- `when (new.status = 'pending')`, so these inserts USED TO SLIP PAST
+         -- IT SILENTLY and now email the squad's staff like any other
+         -- registration. That trigger's own comment about not emailing
+         -- volunteers over work that does not exist is now stale for this path
+         -- — the work exists, because somebody has to approve it.
+         'pending'
   from public.player_contacts c
   join public.players p on p.id = c.player_id
   join public.teams   t on t.id = p.team_id
