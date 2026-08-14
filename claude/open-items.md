@@ -62,7 +62,12 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   lint; a string search for `auth.uid()` finds only 17. There are **19 bare calls**
   across those 18 policies, because `calendar_tokens / calendar token own` and
   `social_ideas / social idea create` carry two each. Fix is `(select auth.uid())`
-  and changes no meaning. Not started.
+  and changes no meaning.
+  🔧 **Migration and harness WRITTEN, NOT YET APPLIED** —
+  `db/migrations/20260814_rls_initplan_wrap_auth_calls.sql` and
+  `db/tests/rls-initplan.sql`. Equivalence was proved by comparing the
+  expressions Postgres RE-PRINTS before and after, normalised for the wrapper:
+  60 policies in, 60 out, zero differences in meaning, bare calls 18 → 0.
   ✅ **THE HOUSE STYLE ALREADY EXISTS — SIX POLICIES USE THE WRAPPED FORM**, all
   on `announcements` and `announcement_reads`, shipped 14 Aug. So this is
   following a precedent in the schema, not inventing one; copy those.

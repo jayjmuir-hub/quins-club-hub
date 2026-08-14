@@ -10,8 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🔧 **A MIGRATION TO TAKE TABLE PRIVILEGES OFF `anon`, WRITTEN AND PROVEN BUT
-  NOT YET APPLIED.** `db/migrations/20260814_revoke_anon_table_privileges.sql`
+- 🔧 **A MIGRATION TO STOP 18 RLS POLICIES RE-EVALUATING AN `auth.*` CALL PER
+  ROW, WRITTEN AND PROVEN BUT NOT YET APPLIED.**
+  `db/migrations/20260814_rls_initplan_wrap_auth_calls.sql` with
+  `db/tests/rls-initplan.sql`. 19 bare calls across 18 policies, wrapped as
+  `(select auth.uid())` so Postgres evaluates them once per query instead of
+  once per row.
+  ⚠️ **THE OBVIOUS SEARCH FINDS 17 OF THE 18.** `open-items.md` described this
+  as "18 policies call `auth.uid()` bare"; the 18th, `invites / invites read
+  own`, calls **`auth.jwt()`**. A migration written to that description fixes
+  17 and leaves the lint reporting one forever.
+  ✅ **SIX POLICIES ALREADY USED THE WRAPPED FORM** — all on `announcements`
+  and `announcement_reads` — so this follows a precedent rather than inventing
+  one. An earlier draft of the open item claimed the opposite; that claim came
+  from a query which filtered the wrapped policies out before counting them.
+  ✅ **`alter policy`, NOT drop-and-create.** The name, command, roles and
+  PERMISSIVE/RESTRICTIVE flag are never restated, so they cannot be got wrong —
+  which matters in a schema where `memb no self promotion` is RESTRICTIVE and
+  would open a hole if recreated permissive by omission.
+  ⚠️ **`profile update own` HAS NO WITH CHECK AND MUST NOT ACQUIRE ONE** —
+  Postgres reuses USING for the check there, so adding one is a behaviour
+  change dressed as a rewrite.
+  ✅ **EQUIVALENCE PROVED, NOT ASSERTED:** the expressions Postgres re-prints
+  from its own parse tree were captured before and after inside a rolled-back
+  transaction and compared with the wrapper normalised away — **60 policies in,
+  60 out, zero differences in meaning, bare calls 18 → 0.** ⚠️ **And the
+  comparison was proved able to fail**, by injecting one policy rewritten with
+  `and` where the original had `or`: the mismatch was reported.
+
+- `27047d1` — 🔧 **A MIGRATION TO TAKE TABLE PRIVILEGES OFF `anon`, WRITTEN AND
+  PROVEN BUT NOT YET APPLIED.** `db/migrations/20260814_revoke_anon_table_privileges.sql`
   with `db/tests/anon-table-grants.sql`. The sibling of 13 Aug's function-execute
   revoke: same Supabase default, different object type.
   ⚠️ **`anon` can SELECT, INSERT, UPDATE and DELETE on 23 of the 24 tables** —
