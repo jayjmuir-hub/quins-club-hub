@@ -324,10 +324,17 @@ by whoever remembered:
    `main` after every single merge.
    ⚠️ **CONSEQUENCE, AND IT LOOKS LIKE A BUG UNTIL YOU KNOW IT: ON A BRANCH
    WITH TWO OR MORE COMMITS THIS CHECK FAILS LOCALLY AND PASSES IN CI.** Both
-   are correct. Actions checks out a synthetic MERGE commit for a
-   `pull_request` run, so `HEAD` is that merge and the one-behind allowance
-   falls on your last real commit; locally `HEAD` IS your last real commit and
-   the allowance falls on the one before it. **Trust CI here. Do not "fix" the
+   are correct. ⚠️ **AND THE MECHANISM IS STRONGER THAN THIS LINE USED TO SAY —
+   MEASURED 14 Aug 2026.** It read "the one-behind allowance falls on your last
+   real commit", which implies a three-commit branch would still fail in CI on
+   the earlier two. It does not. The check runs `BASELINE..HEAD~1`, and for the
+   synthetic merge commit Actions builds on a `pull_request` run, **`HEAD~1` is
+   the FIRST PARENT — the base branch tip** — so the range contains only what is
+   already on `main` and **every commit on the branch is outside it, however
+   many there are.** Evidence: PR #121 carried three commits and `docs-check`
+   passed in CI; under the old account it should have failed on two of them.
+   Locally `HEAD` IS your last real commit, so the allowance falls on the one
+   before it and anything earlier is demanded. **Trust CI here. Do not "fix" the
    local failure by citing a branch SHA** — that is precisely the thing that
    turns `main` red a minute after the merge.
 3. **No test counts** in `CLAUDE.md`, `RESTORE.md`, `state-of-play.md`,

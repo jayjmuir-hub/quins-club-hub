@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- ✅ **BOTH 14 Aug MIGRATIONS ARE NOW APPLIED TO PRODUCTION.** Run by Jay in the
+- 📓 **THE 14 Aug SESSION RECORD, AND A CORRECTION TO `CLAUDE.md` ITSELF.**
+  `claude/handoffs/2026-08-14-migrations-and-merges.md`.
+  ⚠️ **`CLAUDE.md` DESCRIBED THE `docs:check` CI MECHANISM WRONGLY**, and the
+  wrong version was load-bearing — it read "the one-behind allowance falls on
+  your last real commit", which implies a three-commit branch still fails in CI
+  on the earlier two. **Measured: it does not.** The check runs
+  `BASELINE..HEAD~1`, and on a `pull_request` run `HEAD~1` is the synthetic
+  merge commit's FIRST PARENT — the base branch tip — so the range holds only
+  what is already on `main` and **every branch commit is outside it, however
+  many.** Evidence: PR #121 carried three commits and `docs-check` passed in CI.
+  ⚠️ **The handoff also records that Claude cannot apply a migration here** —
+  `execute_sql` and `apply_migration` are both refused by the permission layer —
+  and that `npm run db:check` still cannot run anywhere, because neither PC
+  holds `SUPABASE_DB_URL`. **Both new harnesses have therefore never been run by
+  the runner**, only proved via the Supabase MCP.
+
+- `7bd6299` — ✅ **BOTH 14 Aug MIGRATIONS ARE NOW APPLIED TO PRODUCTION.** Run by Jay in the
   Supabase SQL editor as one `begin; … commit;`, so they landed together or not
   at all. Measured immediately after, not assumed:
   - **`anon` holds SELECT, INSERT, UPDATE and DELETE on 0 of 24 tables**;
