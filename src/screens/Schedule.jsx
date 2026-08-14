@@ -777,6 +777,7 @@ export default function Schedule() {
           onDuplicate={(event) => setFormState({ event, duplicate: true })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
           onOpenMatchSheet={(fixture) => navigate(`/match-sheet/${fixture.id}`)}
+          onOpenLineup={(fixture) => navigate(`/lineup/${fixture.id}`)}
           onOpenRegister={() => setRegisterOpen(true)}
           onDeleted={() => {
             setSelectedEventId(null)

@@ -10,7 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 📓 **THE SECOND 14 Aug SESSION RECORD.**
+- 🏉 **PICKING A TEAM, AND SHARING IT — phase 1 of match lineups.** Jay's ask:
+  a GUI for coaches to select a lineup from players who marked themselves
+  available, *with the option to add players who did not*, plus generate-and-share
+  to a WhatsApp group, and **the coach chooses how many players per side**.
+  ⚠️ **DELIBERATELY NOT THE RCM MATCH SHEET** (Jay, in as many words) — that is a
+  document FILED after the match; this is a plan made before it. ⚠️ **And keeping
+  them apart removed the hardest constraint for free**: `match_sheets.event_id` is
+  UNIQUE, so a squad fielding two teams at a tournament could never be expressed
+  against it. `lineups.event_id` deliberately carries NO unique index, and the
+  migration's guard FAILS if one appears.
+  ⚠️ **`players_per_side` is on the LINEUP, not the squad** — a squad plays 10s
+  one weekend and 7s the next — and it is a GUIDE, NOT A GATE: the screen counts
+  "8 of 10" and warns when over, never refusing the 11th.
+  ⚠️ **Not drag-and-drop, deliberately**: HTML5 drag does not work on touch at
+  all, this is used pitch-side on a phone, and an accessible keyboard path has to
+  exist regardless — at which point drag is a second implementation of one piece
+  of state.
+  ⚠️ **The share was EXTRACTED, not rewritten.** `MatchSheet` has shared a PNG
+  this way since 12 Aug; it now lives in `src/lib/shareImage.js` and both screens
+  call it. ⚠️ **`anon` was explicitly revoked on both new tables** — Supabase's
+  DEFAULT PRIVILEGES still grant `anon` on a new table depending on which role
+  creates it, which the 14 Aug grants sweep did not change. Measured, then
+  fault-injected: `anon` is refused at the GRANT with 42501, and an authenticated
+  caller with no membership is refused by the POLICY. Full names on the shared
+  image, Jay's explicit call over first-name-plus-initial.
+- `f6ccb28` — 📓 **THE SECOND 14 Aug SESSION RECORD.**
   `claude/handoffs/2026-08-14-tbd-tournaments-and-pitches.md`, covering the
   evening's four merges and the traps behind them. ⚠️ **It corrects the earlier
   handoff's claim that `apply_migration` and `execute_sql` are refused here** —

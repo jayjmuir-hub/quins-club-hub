@@ -19,6 +19,7 @@ import Pitches from './screens/Pitches.jsx'
 import Allocation from './screens/Allocation.jsx'
 import YouthDashboard from './screens/YouthDashboard.jsx'
 import MatchSheet from './screens/MatchSheet.jsx'
+import Lineup from './screens/Lineup.jsx'
 import AcceptInvite from './screens/AcceptInvite.jsx'
 import Privacy from './screens/Privacy.jsx'
 import DeleteAccount from './screens/DeleteAccount.jsx'
@@ -208,6 +209,19 @@ export default function App() {
             path="/match-sheet/:eventId"
             element={<AppShell><MatchSheet /></AppShell>}
           />
+
+          {/* THE TEAM SHEET (Jay, 14 Aug 2026) — picking a lineup before a
+              match, and sharing it to a WhatsApp group.
+              ⚠️ OUTSIDE /admin for the same reason /match-sheet and /approvals
+              are: AdminDashboard gates on isAdmin() before rendering its
+              <Outlet/>, and the people who pick a team are COACHES AND TEAM
+              MANAGERS. Nesting it there would show every coach "not authorised"
+              on the one screen written for them.
+              ⚠️ NOT desktop-only either. A team is picked on a phone.
+              The screen re-checks canEditTeam itself because a route is linkable
+              and somebody will paste the URL — and the `lineup manage` RLS policy
+              is what actually decides. */}
+          <Route path="/lineup/:eventId" element={<AppShell><Lineup /></AppShell>} />
 
           {/* THE COACH / TEAM MANAGER APPROVALS ROUTE (Jay, 9 Aug 2026).
               Deliberately OUTSIDE /admin, and that is not a stylistic choice:
