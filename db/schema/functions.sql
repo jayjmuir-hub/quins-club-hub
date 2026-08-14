@@ -2673,11 +2673,12 @@ GRANT EXECUTE ON FUNCTION public.set_my_photo(text) TO authenticated;
 -- registering parent's membership is pending, so they cannot see the roster
 -- they would be comparing against.
 --
--- What it does on the real rows that caused it:
---   'Yassine Dhaouadi'       -> 'yassine dhaouadi'
---   'yassine ridha dhaouadi' -> 'yassine dhaouadi'   <-- MATCH, middle ignored
---   'GOVERT BUIJS'           -> 'govert buijs'
---   'Juan Buijs-Bernad'      -> 'juan bernad'        <-- correctly NO match
+-- What it does on the shape of the rows that caused it. ⚠️ **The names are
+-- INVENTED**; the spellings reproduce the real cases exactly:
+--   'Sara Ahmed'        -> 'sara ahmed'
+--   'sara noor ahmed'   -> 'sara ahmed'     <-- MATCH, middle ignored
+--   'PIETER VOS'        -> 'pieter vos'
+--   'Lars Vos-Meijer'   -> 'lars meijer'    <-- correctly NO match
 --
 -- ⚠️ `[^[:alnum:]]+` RATHER THAN `[^a-z0-9]+`, and this club already has the
 -- names that make the difference. The class is unicode-aware, so 'José' stays

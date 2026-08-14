@@ -889,14 +889,15 @@ will propose building.**
   INSERTed a new `players` row **unconditionally on every call** — there was no
   uniqueness of any kind, at any layer, on a roster of children.
   ⚠️ **TWO DIFFERENT FAILURES that look like one problem from the Accounts
-  screen**, and both are still on the live roster:
+  screen.** ⚠️ **The names below are INVENTED**; the spellings reproduce the
+  real cases exactly, which is all the example is for.
   - **One child, two roster spots, two accounts** — U18B Contact.
-    `Yassine Dhaouadi` created by his father's account and
-    `yassine ridha dhaouadi` by the boy's own. Neither account could see the
-    other's row, so neither could possibly notice.
+    `Sara Ahmed` created by a parent's account and `sara noor ahmed` by the
+    player's own. Neither account could see the other's row, so neither could
+    possibly notice.
   - **A parent on the roster as a player** — U14B Contact. The account
-    `Govert Buijs-Bernad` registered `GOVERT BUIJS` (himself) alongside
-    `Juan Buijs-Bernad` (his son). Both landed as role `parent`, so the "Who
+    `Pieter Vos-Meijer` registered `PIETER VOS` (themselves) alongside
+    `Lars Vos-Meijer` (their child). Both landed as role `parent`, so the "Who
     are you registering?" control was simply left on its default, *My child*.
   ✅ **FIXED — two server-side guards, `db/migrations/20260814_registration_duplicate_guards.sql`.**
   `42710` for a name already on that squad, `42809` for the registrant's own
@@ -908,8 +909,8 @@ will propose building.**
   the squad on their behalf. The matching rule therefore lives in SQL and
   nowhere else (`private.name_match_key`).
   ⚠️ **FIRST token + LAST token, case- and punctuation-blind**, which is what
-  makes `Yassine Dhaouadi` match `yassine ridha dhaouadi` while correctly
-  leaving `GOVERT BUIJS` and `Juan Buijs-Bernad` alone. `[^[:alnum:]]+` not
+  makes `Sara Ahmed` match `sara noor ahmed` while correctly leaving
+  `PIETER VOS` and `Lars Vos-Meijer` alone. `[^[:alnum:]]+` not
   `[^a-z0-9]+` — the club has accented and Arabic-script names and the
   unicode-aware class keeps them intact.
   ⚠️ **TWO SEPARATE CONFIRMATION FLAGS, NOT ONE**, and a harness asserts it: a
@@ -927,9 +928,17 @@ will propose building.**
   with a confirmed email, and a refusal creates no row so the pending cap does
   not limit probing. Reasoning is in the migration; the message deliberately
   does not echo the stored spelling.
-  ⛔ **THE TWO BAD ROWS ARE STILL THERE. Deleting a child's record is the club's
-  call, not a migration's** — `GOVERT BUIJS` (U14B) and the duplicate
-  `yassine ridha dhaouadi` (U18B).
+  ~~⛔ **THE TWO BAD ROWS ARE STILL THERE. Deleting a child's record is the
+  club's call, not a migration's.**~~
+  ✅ **BOTH WERE REMOVED ON 14 Aug 2026, on Jay's instruction** — the detail is
+  in `claude/changelog.md`, and it was **re-measured live: neither row exists**.
+  ⚠️ **THIS LINE WENT ON SAYING ⛔ FOR A DAY AFTER THE CLEANUP LANDED**, with
+  only the changelog recording it — the same failure this file warns about three
+  sections above, arriving inside a single day. **A ⛔ in the step-3 entry point
+  is an instruction to the next session**, and this one would have sent somebody
+  to delete two rows that are not there.
+  ⚠️ **THE PARENT'S LOGIN SURVIVED THE CLEANUP AND SHOULD HAVE** — only the
+  bogus PLAYER row went. Measured: the account is still on `profiles`.
   ❌ **AND THE FORM'S CONFIRM UI HAS NOT BEEN SEEN IN A BROWSER** — there is no
   sign-up scenario in `harness/`. Covered by five unit tests, proved
   non-vacuous by injection, and unexercised by a human.

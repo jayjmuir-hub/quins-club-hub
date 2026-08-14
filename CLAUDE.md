@@ -151,6 +151,19 @@ do not propose buying an M365 licence — same session, same verdict.
    --count` — run the command, paste the answer.** The same rule that
    applies to counts (see `state-of-play.md`) applies to machines: a fact
    worth recording is worth measuring, and one copy of it beats three.
+9. **⚠️ NEVER WRITE A REAL PERSON'S NAME INTO THIS REPO — AND A WORKED EXAMPLE
+   IS STILL WRITING IT DOWN.** This repo is PUBLIC, and its members are mostly
+   CHILDREN. **Invent the data, keep the shape**: a bug found on the live roster
+   gets documented with made-up names whose spellings reproduce the real case
+   exactly, which is all a worked example ever needed. Identify a real row from
+   the DATABASE, never from a document.
+   ⚠️ **IT APPLIES TO `db/` AS MUCH AS TO `claude/`** — a migration header, a
+   harness comment and a `db/schema/` capture are all published the moment they
+   are pushed, and "it's only a comment" is how a name gets past a review.
+   ⚠️ **`docs:check` CANNOT ENFORCE THIS AND MUST NOT BE ASKED TO.** A denylist
+   of real names would put those names into the repo, in the checker. The gate is
+   this rule, plus the same instinct that already stops a volunteer's name or
+   email going in.
 
 ## Facts worth having before you touch anything
 
