@@ -244,6 +244,36 @@ describe('ViewAsSwitcher menu', () => {
     expect(screen.getByTestId('view-as-menu')).toBeInTheDocument()
   })
 
+  // ⚠️ THE REGRESSION THIS EXISTS TO HOLD, AND IT SHIPPED TO PRODUCTION.
+  //
+  // The panel was `absolute` inside the trigger's wrapper, and the masthead row
+  // carries `overflow-hidden` — deliberately, to clip the `harlequin` diagonals
+  // that bleed off its right edge. An absolutely-positioned child of a clipped
+  // ancestor is clipped with it, so the menu rendered as a ~6px sliver.
+  //
+  // ⚠️ THE PRE-MERGE BROWSER CHECK COULD NOT HAVE CAUGHT IT, WHICH IS THE REAL
+  // LESSON. It asked `getBoundingClientRect()` whether the menu sat inside the
+  // viewport — and a layout box reports its full size even when an ancestor is
+  // visually clipping it to nothing. Measured afterwards with the bug injected
+  // back in: the rect was IDENTICAL at 264x475 in both states, while
+  // `document.elementFromPoint` went from 5/5 sample points hitting the menu to
+  // 0/5. Measure visibility, not geometry.
+  //
+  // jsdom has no layout at all, so this pins the STRUCTURAL property that makes
+  // the clip impossible: the panel is not inside the header.
+  it('portals the panel out of the masthead, which clips its overflow', async () => {
+    const user = userEvent.setup()
+    renderShell(ctx())
+
+    await user.click(screen.getByTestId('view-as-trigger'))
+
+    const menu = screen.getByTestId('view-as-menu')
+    const header = document.querySelector('header')
+    expect(header).toBeTruthy()
+    expect(header.contains(menu)).toBe(false)
+    expect(menu.parentElement).toBe(document.body)
+  })
+
   it('offers All age groups first, then a Coach and a Parent entry per team', async () => {
     const user = userEvent.setup()
     renderShell(ctx())
