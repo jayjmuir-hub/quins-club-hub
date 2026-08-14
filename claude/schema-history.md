@@ -20,6 +20,58 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### `20260814_competition_tbd_and_time_tbd` — "we don't know yet", as a thing a fixture can say
+
+⚠️ **WRITTEN 14 Aug 2026 AND NOT YET APPLIED WHEN THIS WAS COMMITTED.** Check
+`list_migrations` before believing otherwise — this file's status lines rot, which is
+what the header says.
+
+Jay asked for a TBD option on the competition dropdown, R0 on the round, and a TBD
+start time. Two of the three needed the database.
+
+**Why `'tbd'` does not reopen the `'friendly'` ruling.** `db/schema/tables.sql` carries
+a tombstone next to `events_competition_type_check` refusing a third value, because
+"a friendly is the ABSENCE of a competition, so it is NULL — adding a third value
+would make *not answered* and *answered: friendly* indistinguishable." That refusal
+stands and is untouched. It rejected a value that **already had a representation**;
+`'tbd'` had none. Before this there was no way to record "a real competitive fixture
+whose competition nobody has confirmed", and the only expressible answers were a guess
+or NULL — which the app renders as "a friendly". **NULL keeps its exact meaning; the
+state that had none now has one.** Four states, and nothing may collapse `'tbd'` into
+NULL.
+
+**Why the start time is a FLAG and not a nullable `starts_at`.** ⚠️ `starts_at` is
+`timestamptz NOT NULL` and must stay so. Every read path orders, ranges and pages on it
+— `listEvents`, the 18-month window, the fortnight strip, the dashboard hero, the feed
+function itself. A NULL there would land in the sort key of all of them, and the
+failure mode is a fixture **silently missing from a list**, not an error. So the DATE
+stays real and `time_tbd` says the clock time is a placeholder.
+
+⚠️ **The app writes midnight CLUB time as that placeholder**, so a TBD fixture sorts to
+the top of its own day. **That is a convention of the writer, not a rule the column
+enforces** — nothing may read "starts_at is midnight" as "the time is TBD", because a
+genuine 00:00 social is a legal fixture. `isTimeTbd()` in `src/lib/eventFormat.js` and
+the edge function both test the flag and only the flag.
+
+⚠️ **`events_no_end_when_time_tbd` is not tidiness.** Without it a fixture could carry a
+15:30 finish against a placeholder midnight start, which `events_ends_after_starts`
+accepts happily (00:00 < 15:30) and every calendar renders as a 15½-hour event.
+
+⚠️ **The migration recreates `calendar_events_for_token`, and that is the half most
+likely to be forgotten.** The feed's columns are decided by that function's
+`RETURNS TABLE`, never by the edge function — the point
+`db/migrations/20260812_calendar_feed_league_team.sql` makes at length, and the reason
+the pitch was missing from the feed for a day in Aug 2026 while somebody edited
+`index.ts`. Same `drop`/`create` (a return type cannot be changed in place), same
+mandatory `grant` **and** `revoke ... from public` afterwards.
+
+**R0 needed no migration.** `round` is a bare `smallint` with no CHECK. ⚠️ **0 is falsy
+in JavaScript**, so the risk was never the database — it was a renderer testing
+truthiness. `src/lib/fixtureLabel.js` and `supabase/functions/calendar/index.ts` both
+already test `round != null`; that was verified before R0 was added, not assumed.
+
+---
+
 ### The 9 Aug 2026 migrations (five)
 
 `20260809080107 age_groups_rename`, `20260809083535 register_my_player_gender`,

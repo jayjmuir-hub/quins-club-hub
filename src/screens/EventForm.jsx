@@ -22,11 +22,73 @@ const OTHER_PITCH = '__other__'
 // same rule `league_team_id` carries, for the same reason.
 const COMPETITION_LEAGUE = 'league'
 const COMPETITION_TOURNAMENT = 'tournament'
+// ⚠️ "NOT DECIDED YET" IS NOT THE SAME AS "NEITHER" (Jay, 14 Aug 2026). NULL
+// already means a friendly and is an ANSWER; before this there was no way to say
+// "a real competitive fixture, competition unknown" except by picking one at
+// random. Both states now exist and NOTHING may collapse 'tbd' into null — see
+// db/migrations/20260814_competition_tbd_and_time_tbd.sql, which also explains
+// why this does not reopen the 'friendly' ruling that was refused on 12 Aug.
+const COMPETITION_TBD = 'tbd'
 
-// ⚠️ ONE TO EIGHT BECAUSE THAT IS THE SEASON, and a SELECT rather than a number
-// box because the set is small and closed. The column stays `smallint`, so a
-// ninth round is one line here and no migration.
-const LEAGUE_ROUNDS = [1, 2, 3, 4, 5, 6, 7, 8]
+// ⚠️ ZERO TO EIGHT. R0 added 14 Aug 2026 (Jay) — a qualifying/pre-season round
+// the league numbers from nought. A SELECT rather than a number box because the
+// set is small and closed. The column is a bare `smallint` with NO check
+// constraint, so this needed no migration.
+//
+// ⚠️ 0 IS A LEGAL ROUND AND IS FALSY IN JAVASCRIPT. Every renderer must test
+// `round != null`, never `if (round)`. src/lib/fixtureLabel.js and
+// supabase/functions/calendar/index.ts both already do — verified, not assumed,
+// before this line was added. A new call site that tests truthiness will drop
+// Round 0 silently and only for that one round.
+const LEAGUE_ROUNDS = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+// ══ DURATION ══════════════════════════════════════════════════════════════
+//
+// Jay, 14 Aug 2026: "a duration option with the time and end time, so one can
+// just set 1 hour or 1.5 hours, etc and it auto calculates the end time".
+//
+// ⚠️ DERIVED FROM THE TWO TIME FIELDS, NOT HELD AS ITS OWN STATE. A third piece
+// of state would be a third thing that can disagree with the other two: type an
+// end time by hand and the stored duration is a lie; change the start and it is
+// a lie again. Computing it on every render means the select can only ever show
+// what the two times actually say, and "Custom" is what an unmatched gap looks
+// like rather than a state anyone has to maintain.
+const DURATIONS = [
+  { minutes: 30, label: '30 minutes' },
+  { minutes: 45, label: '45 minutes' },
+  { minutes: 60, label: '1 hour' },
+  { minutes: 75, label: '1 hour 15' },
+  { minutes: 90, label: '1½ hours' },
+  { minutes: 105, label: '1 hour 45' },
+  { minutes: 120, label: '2 hours' },
+  { minutes: 150, label: '2½ hours' },
+  { minutes: 180, label: '3 hours' },
+  { minutes: 240, label: '4 hours' },
+]
+const DURATION_CUSTOM = '__custom__'
+
+/** "HH:MM" -> minutes since midnight, or null if it is not a time. */
+function minutesOfDay(value) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value ?? '').trim())
+  if (!match) return null
+  const hours = Number(match[1])
+  const mins = Number(match[2])
+  if (hours > 23 || mins > 59) return null
+  return hours * 60 + mins
+}
+
+/** minutes since midnight -> "HH:MM", or null once it would pass midnight. */
+function timeOfDay(minutes) {
+  // ⚠️ NULL RATHER THAN A WRAP. An event that runs past midnight cannot be
+  // entered at all — one date field, and `events_ends_after_starts` refuses an
+  // end before its start (the limit is documented at the ends_at line in
+  // handleSubmit). Wrapping 23:00 + 2h to 01:00 would put a value in the box
+  // that looks accepted and is refused on Save; returning null lets the caller
+  // say so beside the control instead.
+  if (minutes == null || minutes < 0 || minutes > 23 * 60 + 59) return null
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`
+}
 
 // ⚠️ HARD-CODED, AND NOT A MANAGED TABLE — deliberately, unlike pitches. The
 // pitch list became a table the day clash detection needed to reason about
@@ -181,6 +243,10 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
       date: initialDate ?? `${today.year}-${pad(today.month + 1)}-${pad(today.day)}`,
       time: '',
       endTime: '',
+      // ⚠️ FALSE, NOT "unset". A new fixture is assumed to have a time somebody
+      // is about to type; TBD is a thing you say on purpose, and the required
+      // Time field is what prompts you to say it.
+      timeTbd: false,
       teamId: fallbackTeamId,
       home: true,
       venue: DEFAULT_VENUE,
@@ -231,8 +297,17 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     // NEEDED FOR THIS — that is why blank is the cheap answer as well as the
     // safe one.
     date: duplicating ? '' : date,
-    time,
-    endTime,
+    // ⚠️ A TBD FIXTURE'S STORED TIME IS A PLACEHOLDER (midnight), so it must not
+    // reach the Time box — reopening one would show "00:00" as though somebody
+    // had chosen it, and clearing the checkbox would then save that midnight as
+    // a real kick-off. Blank is the honest prefill and the required-field check
+    // makes it unmissable the moment TBD is turned off.
+    time: event.time_tbd === true ? '' : time,
+    endTime: event.time_tbd === true ? '' : endTime,
+    // ⚠️ CARRIED ON A DUPLICATE, like the times themselves. "Same fixture,
+    // another week, time still to be confirmed" is the ordinary case; clearing
+    // it would demand a kick-off nobody knows yet.
+    timeTbd: event.time_tbd === true,
     teamId: teamIds.includes(event.team_id) ? event.team_id : fallbackTeamId,
     home: event.home !== false,
     venue: event.venue ?? '',
@@ -569,6 +644,62 @@ export default function EventForm({
       current.includes(id) ? current.filter((existing) => existing !== id) : [...current, id],
     )
 
+  // ══ DURATION, DERIVED FROM THE TWO TIME FIELDS ═══════════════════════════
+  // See the DURATIONS block at the top of the file for why this is computed
+  // rather than stored. An unmatched gap — or no gap at all — reads as "Custom",
+  // which is a description of the two boxes, not a state anyone maintains.
+  const startMinutes = minutesOfDay(values.time)
+  const endMinutes = minutesOfDay(values.endTime)
+  const durationMinutes =
+    startMinutes != null && endMinutes != null && endMinutes > startMinutes
+      ? endMinutes - startMinutes
+      : null
+  const durationValue =
+    durationMinutes != null && DURATIONS.some((option) => option.minutes === durationMinutes)
+      ? String(durationMinutes)
+      : DURATION_CUSTOM
+
+  // ⚠️ THE LAST GAP THE PERSON ESTABLISHED, REMEMBERED ACROSS AN EMPTY BOX.
+  // Deriving the shift from the two CURRENT values is not enough: clearing the
+  // Time field to retype it makes the old start unreadable for one render, so
+  // by the time the new start arrives there is no gap left to preserve and a
+  // 90-minute session silently becomes whatever the stale end time implies.
+  // Caught by a test that cleared the field before typing, which is what a
+  // person actually does.
+  //
+  // Kept in step with the two boxes by the effect below rather than written at
+  // each call site, so typing an end time by hand redefines the gap exactly as
+  // choosing a duration does.
+  const durationRef = useRef(null)
+  useEffect(() => {
+    if (durationMinutes != null) durationRef.current = durationMinutes
+  }, [durationMinutes])
+
+  // Why a duration could not be applied, or null. Held as state rather than
+  // derived because it describes an ATTEMPT ("that would run past midnight"),
+  // not the current value of anything — there is nothing on screen to re-derive
+  // it from once the person changes something.
+  const [durationNote, setDurationNote] = useState(null)
+
+  // ⚠️ WRITES THE END TIME, NEVER THE START. The start is the thing the person
+  // chose; a duration is a statement about how long it lasts.
+  function applyDuration(minutes) {
+    const start = minutesOfDay(values.time)
+    if (start == null) {
+      setDurationNote('Set a start time first, then pick how long it runs.')
+      return
+    }
+    const end = timeOfDay(start + minutes)
+    if (!end) {
+      // The one-date limit, said where it happens rather than on Save. See the
+      // note at `ends_at` in handleSubmit.
+      setDurationNote('That would run past midnight, and an event has to finish on the day it starts.')
+      return
+    }
+    setDurationNote(null)
+    set('endTime')(end)
+  }
+
   // A user with nothing they can edit should not be shown a form whose Save
   // button the database is guaranteed to refuse. This is defensive — every
   // entry point already gates on the same check — so it explains rather than
@@ -588,7 +719,17 @@ export default function EventForm({
     domEvent.preventDefault()
     if (inFlight.current) return
 
-    const starts_at = clubWallTimeToUtc(values.date, values.time)
+    // ⚠️ A TBD FIXTURE STILL GETS A REAL `starts_at`, AND IT HAS TO. The column
+    // is `timestamptz NOT NULL` and every read path orders, ranges and pages on
+    // it — see the migration. Midnight club time is the placeholder, chosen so a
+    // TBD fixture sorts to the TOP of its own day rather than into an arbitrary
+    // slot in the middle of it.
+    //
+    // ⚠️ THE MIDNIGHT IS A CONVENTION OF THIS WRITER, NOT A SIGNAL. `time_tbd`
+    // is what every reader tests; nothing anywhere may infer TBD from a midnight
+    // start, because a genuine 00:00 social is a legal fixture.
+    const timeTbd = values.timeTbd === true
+    const starts_at = clubWallTimeToUtc(values.date, timeTbd ? '00:00' : values.time)
     // Both ends are built from the SAME date field and the same club-zone
     // conversion, so an event runs on one club calendar day.
     //
@@ -601,19 +742,27 @@ export default function EventForm({
     // a rare case and visible; rolling over is wrong in a common case and
     // invisible. If Jay wants after-midnight events, the honest fix is an
     // end-DATE field, not a rule that infers one.
-    const ends_at = clubWallTimeToUtc(values.date, values.endTime)
+    // ⚠️ NULL WHENEVER THE START IS TBD, and the database enforces the same rule
+    // (`events_no_end_when_time_tbd`). A real finish against a placeholder
+    // midnight passes `events_ends_after_starts` happily and renders as a
+    // fifteen-hour event in every subscribed calendar.
+    const ends_at = timeTbd ? null : clubWallTimeToUtc(values.date, values.endTime)
     // Instant comparison, not a string one. Both are UTC ISO strings today so
     // a lexicographic compare would happen to work — and would stop working
     // the day either side gained an offset or a different precision.
     const endsAfterStart =
       Boolean(starts_at && ends_at) && Date.parse(ends_at) > Date.parse(starts_at)
 
+    // ⚠️ TBD SUSPENDS THE TWO TIME CHECKS AND NOTHING ELSE. The date stays
+    // required — "we don't know when" is a fixture nobody can plan around, and
+    // the whole point of a TBD kick-off is that the DAY is known. Everything
+    // else (squad, opponent, title) is unaffected.
     const nextInvalid = {
       date: !values.date,
-      time: !values.time || !starts_at,
+      time: timeTbd ? false : !values.time || !starts_at,
       // REQUIRED (Jay's ruling, 8 Aug 2026) even though the column is
       // nullable — see the migration for why those two are not in conflict.
-      endTime: !values.endTime || !ends_at || !endsAfterStart,
+      endTime: timeTbd ? false : !values.endTime || !ends_at || !endsAfterStart,
       teamId: !teamId,
       opponent: isMatch && !values.opponent.trim(),
       title: !isMatch && !values.title.trim(),
@@ -697,6 +846,10 @@ export default function EventForm({
       // render an "Additional info" heading over nothing.
       notes: values.notes.trim() || null,
       starts_at,
+      // ⚠️ IN `common`, so a multi-squad fan-out and a whole repeating term all
+      // carry it — "the time is not settled yet" is a fact about the SESSION,
+      // true of every squad joining it and of every week of it.
+      time_tbd: timeTbd,
       // Overwritten per occurrence in the series branch below. Left here so
       // the ONE-OFF and the MULTI-SQUAD fan-out both carry it without a
       // second place to remember: rowFor() spreads `common`, so every fanned
@@ -782,7 +935,10 @@ export default function EventForm({
     const rows = repeating
       ? seriesDates.map((date) => ({
           ...payload,
-          starts_at: clubWallTimeToUtc(date, values.time),
+          // ⚠️ THE PLACEHOLDER IS RECOMPUTED PER DATE TOO. Midnight is a wall
+          // time, and a wall time is only meaningful against a date — the same
+          // trap the ends_at line below documents.
+          starts_at: clubWallTimeToUtc(date, timeTbd ? '00:00' : values.time),
           // ⚠️ RECOMPUTED PER OCCURRENCE, exactly like starts_at, and NOT
           // carried over from `payload`. The whole series is "the same wall
           // clock on each date", so the end has to be converted against ITS
@@ -792,7 +948,7 @@ export default function EventForm({
           // CHECK would reject as a raw 23514 on a batch insert, taking the
           // whole term down with it. Same trap as the offset lookup in
           // clubWallTimeToUtc: a time is only meaningful against a date.
-          ends_at: clubWallTimeToUtc(date, values.endTime),
+          ends_at: timeTbd ? null : clubWallTimeToUtc(date, values.endTime),
           series_id: seriesId,
         }))
       : multiSquad
@@ -922,41 +1078,154 @@ export default function EventForm({
             className={inputClasses(invalid.date)}
           />
         </div>
-        <div className={FIELD_ROW}>
-          <div>
-            <label className={LABEL} htmlFor="event-time">
-              Time
-            </label>
-            <input
-              id="event-time"
-              type="time"
-              value={values.time}
-              onChange={setFromInput('time')}
-              aria-invalid={invalid.time ? 'true' : undefined}
-              aria-describedby="event-time-note"
-              className={inputClasses(invalid.time)}
-            />
-          </div>
-          <div>
-            {/* REQUIRED. The column is nullable — see the migration — but
-                every event created HERE gets an end time, because the only
-                other answer available to the calendar feed is a per-type
-                guess (match 120, training 90) that has been quietly landing
-                in parents' phones since the feed shipped. */}
-            <label className={LABEL} htmlFor="event-end-time">
-              End time
-            </label>
-            <input
-              id="event-end-time"
-              type="time"
-              value={values.endTime}
-              onChange={setFromInput('endTime')}
-              aria-invalid={invalid.endTime ? 'true' : undefined}
-              aria-describedby="event-time-note"
-              className={inputClasses(invalid.endTime)}
-            />
-          </div>
-        </div>
+        {/* ⚠️ TIME TBD (Jay, 14 Aug 2026). A CHECKBOX rather than a "TBD" option
+            inside the time input, because a native <input type="time"> has no
+            way to carry one — and rather than a magic blank, because blank
+            already means "you haven't filled this in" and the form refuses it.
+            Ticking it says something; leaving a box empty says nothing. */}
+        <label className="mb-3.5 flex cursor-pointer items-start gap-2.5 rounded-[11px] border-[1.5px] border-line px-3 py-2.5">
+          <input
+            type="checkbox"
+            checked={values.timeTbd}
+            onChange={(domEvent) => {
+              const on = domEvent.target.checked
+              setDurationNote(null)
+              // ⚠️ TICKING CLEARS BOTH TIMES. They are about to become
+              // unsendable — ends_at is nulled on save and starts_at becomes a
+              // placeholder — so leaving them on screen would show two values
+              // that Save is going to throw away.
+              setValues((current) => ({
+                ...current,
+                timeTbd: on,
+                time: on ? '' : current.time,
+                endTime: on ? '' : current.endTime,
+              }))
+              // The two time errors no longer apply; clearing them stops a
+              // stale red border sitting on a field that is now disabled.
+              setInvalid((current) => ({ ...current, time: false, endTime: false }))
+            }}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+          />
+          <span className="text-[13px] leading-relaxed text-ink">
+            <span className="font-bold">Kick-off time to be confirmed</span>
+            {/* ⚠️ "day", NOT "date". This whole label is the checkbox's
+                accessible name, and the word "date" in it made
+                `getByLabelText(/date/i)` ambiguous with the Date field directly
+                above — which broke an unrelated Schedule test. The copy is no
+                worse for it, but the reason it is worded this way is not
+                obvious enough to leave unwritten. */}
+            <span className="block text-[12.5px] text-ink-muted">
+              The day is fixed but the time isn&apos;t settled. It shows as
+              &ldquo;Time TBD&rdquo; in the app, and goes into subscribed calendars as an
+              all-day entry rather than at a made-up time.
+            </span>
+          </span>
+        </label>
+
+        {!values.timeTbd && (
+          <>
+            <div className={FIELD_ROW}>
+              <div>
+                <label className={LABEL} htmlFor="event-time">
+                  Time
+                </label>
+                <input
+                  id="event-time"
+                  type="time"
+                  value={values.time}
+                  onChange={(domEvent) => {
+                    const nextTime = domEvent.target.value
+                    setDurationNote(null)
+                    // ⚠️ MOVING THE START DRAGS THE END WITH IT, keeping the gap
+                    // the person already set — the behaviour every calendar app
+                    // has, and without it changing 18:00 to 19:00 silently turns
+                    // a 90-minute session into a 30-minute one.
+                    //
+                    // ⚠️ ONLY WHEN THERE IS A REAL GAP TO PRESERVE, and the end
+                    // is left alone if the shift would cross midnight — the
+                    // ordering check then refuses it with its own message rather
+                    // than this quietly inventing a finish.
+                    const nextStart = minutesOfDay(nextTime)
+                    const keepMinutes = durationRef.current
+                    setValues((current) => {
+                      if (nextStart != null && keepMinutes != null) {
+                        const shifted = timeOfDay(nextStart + keepMinutes)
+                        return { ...current, time: nextTime, endTime: shifted ?? current.endTime }
+                      }
+                      return { ...current, time: nextTime }
+                    })
+                  }}
+                  aria-invalid={invalid.time ? 'true' : undefined}
+                  aria-describedby="event-time-note"
+                  className={inputClasses(invalid.time)}
+                />
+              </div>
+              <div>
+                {/* REQUIRED. The column is nullable — see the migration — but
+                    every event created HERE gets an end time, because the only
+                    other answer available to the calendar feed is a per-type
+                    guess (match 120, training 90) that has been quietly landing
+                    in parents' phones since the feed shipped. */}
+                <label className={LABEL} htmlFor="event-end-time">
+                  End time
+                </label>
+                <input
+                  id="event-end-time"
+                  type="time"
+                  value={values.endTime}
+                  onChange={(domEvent) => {
+                    setDurationNote(null)
+                    set('endTime')(domEvent.target.value)
+                  }}
+                  aria-invalid={invalid.endTime ? 'true' : undefined}
+                  aria-describedby="event-time-note"
+                  className={inputClasses(invalid.endTime)}
+                />
+              </div>
+            </div>
+
+            {/* ⚠️ A SHORTCUT FOR THE END TIME, NOT A THIRD SOURCE OF TRUTH.
+                Picking one fills End time in; typing an end time by hand moves
+                this to "Custom". Nothing is stored for it — see DURATIONS. */}
+            <div className={FIELD}>
+              <label className={LABEL} htmlFor="event-duration">
+                Duration
+              </label>
+              <select
+                id="event-duration"
+                value={durationValue}
+                onChange={(domEvent) => {
+                  const chosen = domEvent.target.value
+                  // "Custom" is a description of what the two boxes currently
+                  // say, so choosing it changes nothing — there is no duration
+                  // it could apply.
+                  if (chosen === DURATION_CUSTOM) return
+                  applyDuration(Number(chosen))
+                }}
+                className={inputClasses(false)}
+              >
+                {DURATIONS.map((option) => (
+                  <option key={option.minutes} value={String(option.minutes)}>
+                    {option.label}
+                  </option>
+                ))}
+                {/* Last, and it is where the select sits whenever the two times
+                    do not match a preset — including before either is filled
+                    in. */}
+                <option value={DURATION_CUSTOM}>Custom</option>
+              </select>
+              {durationNote && (
+                <p
+                  role="alert"
+                  className="mt-1.5 rounded-[9px] bg-warn-bg px-3 py-2 text-[12.5px] text-ink"
+                >
+                  {durationNote}
+                </p>
+              )}
+            </div>
+          </>
+        )}
+
         {/* The one place the form names the zone, mirroring the detail
             sheet (§4.21). A coach entering fixtures from the UK over the
             summer needs to know 20:00 means 20:00 at Zayed Sports City. */}
@@ -1274,6 +1543,12 @@ export default function EventForm({
                 <option value="">Neither — a friendly</option>
                 <option value={COMPETITION_LEAGUE}>League</option>
                 <option value={COMPETITION_TOURNAMENT}>Tournament</option>
+                {/* ⚠️ NOT THE SAME AS "Neither" ABOVE, and the two must never be
+                    merged. "Neither" is an ANSWER — this is a friendly. This is
+                    the absence of one: a real competitive fixture whose
+                    competition nobody has confirmed yet. Before it existed the
+                    only way to record that was to guess. */}
+                <option value={COMPETITION_TBD}>TBD — not decided yet</option>
               </select>
             </div>
 
@@ -1292,8 +1567,12 @@ export default function EventForm({
                   onChange={setFromInput('round')}
                   className={inputClasses(false)}
                 >
-                  {/* Not knowing the round yet is normal and must be sayable. */}
-                  <option value="">Not set</option>
+                  {/* ⚠️ THE SAME NULL IT ALWAYS WAS — only the wording changed
+                      (Jay, 14 Aug 2026), from "Not set" to "TBD", to match the
+                      competition dropdown above and the pitch picker's
+                      `Pitch TBD`. No new state and no migration: an unknown
+                      round has always been a null round. */}
+                  <option value="">TBD — not known yet</option>
                   {LEAGUE_ROUNDS.map((round) => (
                     <option key={round} value={String(round)}>
                       Round {round}

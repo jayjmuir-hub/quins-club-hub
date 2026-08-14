@@ -12,9 +12,9 @@ import { FEATURES } from '../lib/features.js'
 import {
   eventDate,
   eventEndDate,
+  eventTimeRangeLabel,
   eventTitle,
   formatLongDate,
-  formatTimeRange,
   hasResult,
   resultLabel,
   resultOutcome,
@@ -450,7 +450,7 @@ export default function EventDetail({
             --muted-on-paper rule (#5c5854, not #77726e) doesn't apply here:
             this sits on the gradient, not on paper. */}
         <p className="mt-1 text-sm font-semibold text-white/[.85]">
-          {formatLongDate(date)} · {formatTimeRange(date, endDate)}
+          {formatLongDate(date)} · {eventTimeRangeLabel(event)}
           {date && <span className="font-normal"> · Abu Dhabi time</span>}
         </p>
       </div>
@@ -494,9 +494,15 @@ export default function EventDetail({
             no type, so nothing anybody typed before today disappears. */}
         {event.type === 'match' && (event.competition_type || event.competition) && (
           <KeyValue label="Competition">
-            {event.competition_type === 'league'
-              ? `League${event.round != null ? ` · Round ${event.round}` : ''}`
-              : event.competition || 'Tournament'}
+            {/* ⚠️ 'tbd' IS ITS OWN BRANCH AND MUST NOT FALL THROUGH. Without it
+                the final arm would render `event.competition || 'Tournament'`
+                and label an undecided fixture a tournament — the exact
+                mis-filing the TBD option exists to stop. */}
+            {event.competition_type === 'tbd'
+              ? 'To be decided'
+              : event.competition_type === 'league'
+                ? `League${event.round != null ? ` · Round ${event.round}` : ''}`
+                : event.competition || 'Tournament'}
           </KeyValue>
         )}
       </div>

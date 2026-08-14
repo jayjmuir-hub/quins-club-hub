@@ -7,7 +7,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
-import { clubToday, eventDate, formatTime } from '../lib/eventFormat.js'
+import { clubToday, eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 
@@ -210,7 +210,7 @@ function EventSection({ title, events, squadsById, empty }) {
                       month: 'short',
                     })}
                     {' · '}
-                    {formatTime(eventDate(event))}
+                    {eventTimeLabel(event)}
                     {event.venue ? ` · ${event.venue}` : ''}
                   </span>
                 </div>
