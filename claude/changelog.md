@@ -27,7 +27,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the migration also recreates `calendar_events_for_token`.
   See `claude/schema-history.md`.
 
-- 🔗 **A LINK PREVIEW, SO A SHARED LINK STOPS SHOWING AN UPSCALED FAVICON.**
+- `c8e805e` — 🔗 **A LINK PREVIEW, SO A SHARED LINK STOPS SHOWING AN UPSCALED FAVICON.**
   Reported by Jay: sharing the club hub link on WhatsApp gave "a very blurry
   logo". ⚠️ **The cause was not a broken image — `index.html` carried NO Open
   Graph tags at all**, so WhatsApp fell back to the only image it could find,

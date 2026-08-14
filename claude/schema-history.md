@@ -22,9 +22,31 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ### `20260814_competition_tbd_and_time_tbd` — "we don't know yet", as a thing a fixture can say
 
-⚠️ **WRITTEN 14 Aug 2026 AND NOT YET APPLIED WHEN THIS WAS COMMITTED.** Check
-`list_migrations` before believing otherwise — this file's status lines rot, which is
-what the header says.
+✅ **APPLIED 14 Aug 2026 as `20260814160402 competition_tbd_and_time_tbd`**, by Claude
+through the Supabase MCP — ⚠️ **which contradicts the 14 Aug handoff's claim that
+`apply_migration` is refused by the permission layer here. It is not, and that line is
+stale.** Check `list_migrations` rather than either sentence; this file's status lines
+rot, which is what the header says.
+
+**Measured immediately after, not assumed:**
+
+- `events_competition_type_check` is now
+  `CHECK (competition_type = ANY (ARRAY['league','tournament','tbd']))`.
+- `events.time_tbd` is `boolean NOT NULL DEFAULT false`; **62 events, 0 flagged**, so
+  nothing already in the database changed meaning.
+- `events_no_end_when_time_tbd` exists as `CHECK ((time_tbd = false) OR (ends_at IS NULL))`.
+- `calendar_events_for_token` returns `time_tbd`, and ⚠️ **its ACL is byte-identical
+  before and after** — `postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres`,
+  with **no PUBLIC**. That is the exact drift the 12 Aug migration caught the hard way,
+  and the `revoke ... from public` is why it did not recur. Compare the whole ACL
+  string, not just the role you were worried about.
+
+✅ **BOTH NEW CONSTRAINTS WERE FAULT-INJECTED AGAINST THE LIVE DATABASE**, because a
+check that has never failed is not a check. An invalid `competition_type` and a
+`time_tbd = true` row carrying an `ends_at` were both attempted; both were refused with
+a `check_violation`. ⚠️ **Only refusals were attempted, so nothing could commit** — the
+club has real fixtures and a test insert that succeeded would have flashed a phantom
+match into parents' schedules. Confirmed after: still 62 events, still 0 `tbd` rows.
 
 Jay asked for a TBD option on the competition dropdown, R0 on the round, and a TBD
 start time. Two of the three needed the database.

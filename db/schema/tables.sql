@@ -643,6 +643,17 @@ CREATE TABLE public.events (
   -- change a stored one — so that stale sentence is still in the database. Left
   -- rather than silently corrected, because this file must say what is there.
   competition_type text,
+  -- Added 2026-08-14 (competition_tbd_and_time_tbd). Column comment as stored:
+  --   "True when the kick-off time is not yet known. starts_at still holds a
+  --   real DATE (the app writes midnight club time as the placeholder) because
+  --   starts_at is NOT NULL and every read path sorts and pages on it - do not
+  --   make it nullable to express this. Readers must render the time as "TBD"
+  --   and the calendar feed must emit an ALL-DAY entry. Nothing may infer this
+  --   flag from a midnight starts_at: the flag is the only truth."
+  --
+  -- ⚠️ NOT NULL DEFAULT false, so every fixture predating it keeps exactly the
+  -- meaning it had. Measured immediately after applying: 62 events, 0 flagged.
+  time_tbd     boolean NOT NULL DEFAULT false,
   CONSTRAINT events_pkey          PRIMARY KEY (id),
   CONSTRAINT events_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
   CONSTRAINT events_team_id_fkey    FOREIGN KEY (team_id)    REFERENCES teams(id)    ON DELETE CASCADE,
@@ -656,7 +667,21 @@ CREATE TABLE public.events (
   -- competition, so it is NULL — adding a third value would make "not answered"
   -- and "answered: friendly" indistinguishable, which is the confusion the
   -- league_team_id null rule exists to avoid.
-  CONSTRAINT events_competition_type_check CHECK ((competition_type = ANY (ARRAY['league'::text, 'tournament'::text]))),
+  --
+  -- ⚠️ 'tbd' WAS ADDED 14 Aug 2026 AND DOES NOT CONTRADICT THE PARAGRAPH ABOVE.
+  -- That refusal rejected a value which ALREADY had a representation; 'tbd' had
+  -- none — there was no way to record "a real competitive fixture whose
+  -- competition nobody has confirmed yet", and the only expressible answers were
+  -- a guess or NULL, which renders as "a friendly". NULL keeps its exact meaning.
+  -- Four states now: NULL = friendly (answered), 'tbd' = not answered, league,
+  -- tournament. NOTHING MAY COLLAPSE 'tbd' INTO NULL.
+  CONSTRAINT events_competition_type_check CHECK ((competition_type = ANY (ARRAY['league'::text, 'tournament'::text, 'tbd'::text]))),
+  -- Added 2026-08-14. ⚠️ NOT TIDINESS. Without it a fixture could carry a real
+  -- finish against the placeholder midnight a TBD start writes — which
+  -- events_ends_after_starts accepts happily (00:00 < 15:30) and every calendar
+  -- renders as a 15½-hour event. Fault-injected against the live database after
+  -- applying: the insert is refused with a check_violation.
+  CONSTRAINT events_no_end_when_time_tbd CHECK (((time_tbd = false) OR (ends_at IS NULL))),
   -- Added 2026-08-08 (event_end_time_and_notes). Note the `ends_at IS NULL OR`
   -- arm: a NULL end time stays legal, so the CHECK only ever fires on an end
   -- time that is actually before or equal to the start.
