@@ -5,19 +5,23 @@
 -- ══ ⚠️ WHAT ACTUALLY HAPPENED, MEASURED ON THE LIVE ROSTER ════════════════
 --
 -- Reported by Jay, 14 Aug 2026, from the real club. Two DIFFERENT failures that
--- look like one problem from the Accounts screen:
+-- look like one problem from the Accounts screen.
+--
+-- ⚠️ THE NAMES BELOW ARE INVENTED — this repo is public, and a worked example
+-- never needs a real one. The spellings reproduce the real cases exactly, which
+-- is the only thing the example was ever for.
 --
 --   1. ONE CHILD, TWO ROSTER SPOTS, TWO ACCOUNTS — U18B Contact.
---      `Yassine Dhaouadi`      created by his father's account (role parent)
---      `yassine ridha dhaouadi` created by the boy's own account (role player)
+--      `Sara Ahmed`      created by a parent's account (role parent)
+--      `sara noor ahmed` created by the player's own account (role player)
 --      Neither account could see the other's row, so neither had any way to
 --      know. Nothing in the app or the database looked at the name.
 --
 --   2. A PARENT ON THE ROSTER AS A PLAYER — U14B Contact.
---      Account `Govert Buijs-Bernad` registered TWO "children": `GOVERT BUIJS`
---      (himself) and `Juan Buijs-Bernad` (his son). Both landed as role
+--      Account `Pieter Vos-Meijer` registered TWO "children": `PIETER VOS`
+--      (themselves) and `Lars Vos-Meijer` (their child). Both landed as role
 --      `parent`, so the "Who are you registering?" control was left on its
---      default — "My child" — while his own name went in the name box.
+--      default — "My child" — while the adult's own name went in the name box.
 --
 -- ⚠️ `register_my_player` HAD NO IDEA EITHER HAD HAPPENED. It INSERTs a new
 -- `players` row unconditionally on every call. There was no uniqueness of any
@@ -57,15 +61,15 @@
 -- ── The matching rule ──────────────────────────────────────────────────────
 --
 -- FIRST token + LAST token, case-folded, punctuation-blind. That is what makes
--- the real U18 case match:
+-- the U18 case match:
 --
---   'Yassine Dhaouadi'       -> 'yassine dhaouadi'
---   'yassine ridha dhaouadi' -> 'yassine dhaouadi'   <-- middle name ignored
+--   'Sara Ahmed'      -> 'sara ahmed'
+--   'sara noor ahmed' -> 'sara ahmed'   <-- middle name ignored
 --
--- and what correctly leaves the real U14 pair alone:
+-- and what correctly leaves the U14 pair alone:
 --
---   'GOVERT BUIJS'      -> 'govert buijs'
---   'Juan Buijs-Bernad' -> 'juan bernad'
+--   'PIETER VOS'      -> 'pieter vos'
+--   'Lars Vos-Meijer' -> 'lars meijer'
 --
 -- ⚠️ `[^[:alnum:]]+` RATHER THAN `[^a-z0-9]+`, and the difference is not
 -- cosmetic in this club — which already has Arabic-script and accented names on
@@ -300,11 +304,12 @@ grant execute on function public.register_my_player(text, uuid, text, boolean, b
 
 -- ══ WHAT THIS DOES NOT DO ═════════════════════════════════════════════════
 --
--- ⚠️ IT DOES NOT CLEAN UP THE TWO BAD ROWS ALREADY ON THE ROSTER. `GOVERT
--- BUIJS` and the duplicate `yassine ridha dhaouadi` are real rows attached to
--- real accounts, and deleting a child's record is a decision for the club, not
--- a side effect of a migration. They are listed at the top of this file so
--- whoever does it knows exactly which two.
+-- ⚠️ IT DOES NOT CLEAN UP THE TWO BAD ROWS ALREADY ON THE ROSTER. They are real
+-- rows attached to real accounts, and deleting a child's record is a decision
+-- for the club, not a side effect of a migration.
+-- ✅ **BOTH WERE REMOVED SEPARATELY ON 14 Aug 2026, on Jay's instruction** —
+-- see `claude/changelog.md`. Identify a real row from the database, never from
+-- a document.
 --
 -- ⚠️ IT DOES NOT ADD A DATABASE CONSTRAINT. A unique index on
 -- (team_id, name_match_key(full_name)) would look stronger and would be wrong:

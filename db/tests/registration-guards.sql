@@ -5,17 +5,20 @@
 --  back. Re-runnable.
 -- ══════════════════════════════════════════════════════════════════════════
 --
--- WHAT IT GUARDS, AND BOTH CAME FROM REAL ROWS ON THE LIVE ROSTER (14 Aug 2026):
+-- WHAT IT GUARDS, AND BOTH CAME FROM REAL ROWS ON THE LIVE ROSTER (14 Aug 2026).
+-- ⚠️ THE NAMES BELOW ARE INVENTED — spellings chosen to reproduce the real
+-- cases exactly, which is all a worked example needs.
 --
---   42710 — U18B Contact held ONE child TWICE. `Yassine Dhaouadi` was created
---           by his father's account and `yassine ridha dhaouadi` by the boy's
---           own, three characters apart. Neither account could see the other's
---           row, so neither had any way to notice.
+--   42710 — U18B Contact held ONE child TWICE. `Sara Ahmed` was created by a
+--           parent's account and `sara noor ahmed` by the player's own, a
+--           middle name apart. Neither account could see the other's row, so
+--           neither had any way to notice.
 --
 --   42809 — U14B Contact held a PARENT as a player. The account
---           `Govert Buijs-Bernad` registered `GOVERT BUIJS` (himself) beside
---           `Juan Buijs-Bernad` (his son), because the name box took his name
---           while "Who are you registering?" stayed on its default, "My child".
+--           `Pieter Vos-Meijer` registered `PIETER VOS` (themselves) beside
+--           `Lars Vos-Meijer` (their child), because the name box took the
+--           adult's name while "Who are you registering?" stayed on its
+--           default, "My child".
 --
 -- ⚠️ THE CHECK CANNOT LIVE IN THE CLIENT AND THAT IS THE WHOLE REASON THIS
 -- HARNESS EXISTS. A registering parent holds a PENDING membership, so
@@ -83,9 +86,9 @@ exception when others then
   insert into _r values (2, 'the same child a second time', 'refused ('||sqlstate||')');
 end $$;
 
--- ── 3. The same child with a MIDDLE NAME — the exact real spelling variant. ─
--- 'Yassine Dhaouadi' vs 'yassine ridha dhaouadi'. First and last token match;
--- everything between is ignored, and so is case.
+-- ── 3. The same child with a MIDDLE NAME — the real spelling variant's shape. ─
+-- 'Sara Ahmed' vs 'sara noor ahmed'. First and last token match; everything
+-- between is ignored, and so is case.
 do $$ begin
   perform public.register_my_player('wilberforce quentin ttestington', (select id from _team), null, false);
   insert into _r values (3, 'same child, middle name and different case', 'ALLOWED <<< WRONG');

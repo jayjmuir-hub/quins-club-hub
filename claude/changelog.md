@@ -10,8 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- ✅ **NOTHING GRANTS SQUAD ACCESS WITHOUT AN ADMIN — `claim_roster_access` NOW
-  INSERTS `pending`.** `db/migrations/20260814_claim_roster_access_pending.sql`.
+- ✅ **WORKED EXAMPLES USE INVENTED NAMES, AND `CLAUDE.md` RULE 9 SAYS SO.**
+  The registration-guard migration, its harness, the `db/schema/functions.sql`
+  capture and `state-of-play.md` all demonstrate the first-token/last-token
+  matching rule; they now do it with made-up names whose spellings reproduce the
+  real cases exactly — `Sara Ahmed` / `sara noor ahmed` for the middle-name
+  match, `PIETER VOS` / `Lars Vos-Meijer` for the double-barrelled non-match.
+  **Nothing the documentation demonstrates is lost.**
+  ⚠️ **THIS REPO IS PUBLIC AND ITS MEMBERS ARE MOSTLY CHILDREN**, so a worked
+  example is a publication. **Invent the data, keep the shape**; identify a real
+  row from the database, never from a document.
+  ⚠️ **`docs:check` CANNOT ENFORCE IT** — a denylist of real names would put
+  those names into the repo, in the checker.
+  ✅ **The invented names were checked against live before use** — zero matches
+  in `players`, `profiles` and `player_parents`, **with a control token that
+  returned a real row**, so the zeros mean something.
+  ⚠️ **Documentation only. The migration is already applied**, and
+  `apply_migration` strips `--` comments, so the database never held either set.
+
+- ❌ **`state-of-play.md` SAID ⛔ "THE TWO BAD ROWS ARE STILL THERE" WHILE THEY
+  WERE ALREADY DELETED**, for a day, in the file that is step 3 of the reading
+  order. Only this file recorded the cleanup. Corrected, and re-measured live:
+  neither row exists, and the parent's LOGIN correctly survived. **A ⛔ in the
+  entry point is an instruction to the next session** — this one pointed at two
+  rows that are not there.
+
+- `8c7e62e` ✅ **NOTHING GRANTS SQUAD ACCESS WITHOUT AN ADMIN —
+  `claim_roster_access` NOW INSERTS `pending`.** `db/migrations/20260814_claim_roster_access_pending.sql`.
   It was the one path that opened an age group with no human involved.
   ⚠️ **OVERTURNS A DELIBERATE RULING** — `20260809_notify_pending_membership.sql`
   says *"a roster email match IS the verification"*, which held while the club
@@ -27,7 +52,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ✅ **Admins now get told** — the pending trigger fires where these inserts used
   to slip past it silently. ⚠️ **No existing membership was downgraded.**
 
-- ✅ **A `parent` OR `player` MEMBERSHIP MUST NOW POINT AT A PLAYER.**
+- `8c7e62e` ✅ **A `parent` OR `player` MEMBERSHIP MUST NOW POINT AT A PLAYER.**
   `db/migrations/20260814_family_role_needs_player.sql`, constraint
   `memberships_family_role_needs_player`. Jay: *"nobody outside staff should be
   able to create an account without a player"*.
@@ -55,7 +80,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `player_parents` row names that parent with a matching email AND phone, not a
   shared surname.
 
-- ✅ **THE TWO BAD ROSTER ROWS ARE GONE** (14 Aug, on Jay's instruction).
+- `8c7e62e` ✅ **THE TWO BAD ROSTER ROWS ARE GONE** (14 Aug, on Jay's
+  instruction).
   ⚠️ **A PLAIN DELETE WOULD HAVE DESTROYED A PARENT'S PHONE NUMBER.** The
   parent-as-player row carried the family's TWO `player_parents` records — the
   father's and the mother's — while the real child had NONE, and
