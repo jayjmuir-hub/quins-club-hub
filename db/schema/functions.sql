@@ -155,6 +155,7 @@ declare
   inv public.invites%rowtype;
   caller_email text;
   target_count int;
+  missing_player int;   -- added 2026-08-14 (family_role_needs_player)
 begin
   select email into caller_email from auth.users where id = auth.uid();
   if caller_email is null then
@@ -180,6 +181,33 @@ begin
   -- Replaces the dropped invites_team_required_unless_admin CHECK.
   if inv.role <> 'admin' and target_count = 0 and inv.team_id is null then
     raise exception 'This invite is incomplete — it has no age group. Ask an admin to send a new one.';
+  end if;
+
+  -- ⚠️ ADDED 14 Aug 2026 (family_role_needs_player), AND IT IS HERE RATHER THAN
+  -- LEFT TO THE CONSTRAINT FOR ONE REASON: without it the insert below violates
+  -- memberships_family_role_needs_player and the person accepting a perfectly
+  -- ordinary-looking invite reads a raw 23514 naming a table.
+  --
+  -- ⚠️ IT SITS BEFORE `update invites set accepted_at`, DELIBERATELY. After it,
+  -- a refused invite would be BURNED — marked used, membership refused, and the
+  -- person left holding a link that now reports "already used". Proved: the
+  -- refused invite is still unaccepted afterwards.
+  --
+  -- Both branches are checked against the player the insert would ACTUALLY use —
+  -- invite_targets.player_id when there are targets, invites.player_id when
+  -- there are not. Checking the wrong one lets the other through.
+  if inv.role in ('parent', 'player') then
+    if target_count > 0 then
+      select count(*) into missing_player
+        from public.invite_targets t
+       where t.invite_id = inv.id and t.player_id is null;
+    else
+      missing_player := case when inv.player_id is null then 1 else 0 end;
+    end if;
+
+    if missing_player > 0 then
+      raise exception 'This invite is incomplete — it does not say which player it is for. Ask an admin to send a new one.';
+    end if;
   end if;
 
   update public.invites set accepted_at = now() where id = inv.id;
@@ -1017,7 +1045,32 @@ begin
          p.team_id,
          case when t.is_senior then 'player' else 'parent' end,
          p.id,
-         'active'
+         -- ⚠️ 'pending' SINCE 14 Aug 2026 (claim_roster_access_pending), and it
+         -- USED TO BE 'active'. Jay's ruling: nothing gets squad access without
+         -- an admin approving it.
+         --
+         -- The old position is recorded in
+         -- 20260809_notify_pending_membership.sql — "a roster email match IS
+         -- the verification" — and it was sound while the club expected to
+         -- IMPORT a roster: an email already on a child's record had been put
+         -- there by the club. Since the no-roster-import ruling (10 Aug) every
+         -- `player_contacts.email` was put there by whoever registered that
+         -- child, so a match proves two accounts share an address and nothing
+         -- more. And it was REACHABLE: children carrying their own email on
+         -- their contact record were being handed the whole squad — every other
+         -- child's name, photo and parent contact details — unseen.
+         --
+         -- ⚠️ THE MATCHING IS UNCHANGED. Identifying which child an account
+         -- belongs to is still automatic; it simply no longer grants anything.
+         -- Two different jobs, and this function used to do both.
+         --
+         -- ⚠️ CONSEQUENCE: `notify_pending_membership` fires
+         -- `when (new.status = 'pending')`, so these inserts USED TO SLIP PAST
+         -- IT SILENTLY and now email the squad's staff like any other
+         -- registration. That trigger's own comment about not emailing
+         -- volunteers over work that does not exist is now stale for this path
+         -- — the work exists, because somebody has to approve it.
+         'pending'
   from public.player_contacts c
   join public.players p on p.id = c.player_id
   join public.teams   t on t.id = p.team_id

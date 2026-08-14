@@ -885,6 +885,30 @@ function toMembershipRow({ profileId, clubId, role, teamId, playerId } = {}, lab
     throw new Error('Choose an age group for this role.')
   }
 
+  // ⚠️ A `parent` OR `player` ROW MUST NAME A PLAYER — Jay's ruling, 14 Aug
+  // 2026: "nobody outside staff should be able to create an account without a
+  // player". The DATABASE is what enforces it
+  // (`memberships_family_role_needs_player`); this exists so an admin gets a
+  // sentence instead of a raw 23514 naming a constraint.
+  //
+  // ⚠️ AND IT IS *NOT* REDUNDANT WITH AccessBuilder, which already refuses to
+  // submit without a child. That guard is in the component; this one is in the
+  // function every caller goes through, and the gap between the two is exactly
+  // how one of these rows reached production — an account let into a squad,
+  // able to see every child in it and unable to touch its own, because
+  // `private.is_own_player` needs a real id.
+  //
+  // Staff roles legitimately have none: a coach is not anybody's parent. One
+  // MAY carry a player_id when the same person is also that child's parent —
+  // allowed, never required.
+  if ((role === 'parent' || role === 'player') && !playerId) {
+    throw new Error(
+      role === 'player'
+        ? 'Choose the player this account belongs to.'
+        : 'Choose the child this parent is responsible for.',
+    )
+  }
+
   return {
     profile_id: profileId,
     club_id: clubId,

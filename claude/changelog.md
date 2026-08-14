@@ -10,7 +10,60 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- ⛔ **SELF-REGISTRATION WAS PUTTING THE WRONG PEOPLE ON THE ROSTER — FIXED.**
+- ✅ **NOTHING GRANTS SQUAD ACCESS WITHOUT AN ADMIN — `claim_roster_access` NOW
+  INSERTS `pending`.** `db/migrations/20260814_claim_roster_access_pending.sql`.
+  It was the one path that opened an age group with no human involved.
+  ⚠️ **OVERTURNS A DELIBERATE RULING** — `20260809_notify_pending_membership.sql`
+  says *"a roster email match IS the verification"*, which held while the club
+  expected to import a roster. Since the no-roster-import ruling every
+  `player_contacts.email` was written by whoever registered that child, so a
+  match now proves only that two accounts share an address.
+  ⚠️ **REACHABLE, NOT THEORETICAL** — children carrying their own email on their
+  contact record were handed the whole squad on sign-up. **Measured: 1 player of
+  6 visible now, where it was all 6.**
+  ⚠️ **THE MATCHING IS UNCHANGED, ONLY THE GRANTING.** Identifying which child an
+  account belongs to and granting that account access are two different jobs;
+  this function was doing both.
+  ✅ **Admins now get told** — the pending trigger fires where these inserts used
+  to slip past it silently. ⚠️ **No existing membership was downgraded.**
+
+- ✅ **A `parent` OR `player` MEMBERSHIP MUST NOW POINT AT A PLAYER.**
+  `db/migrations/20260814_family_role_needs_player.sql`, constraint
+  `memberships_family_role_needs_player`. Jay: *"nobody outside staff should be
+  able to create an account without a player"*.
+  ⛔ **THIS DOES NOT STOP ANYBODY CREATING A LOGIN, AND NOTHING CAN.** Signing up
+  is Supabase auth and the app requires it BEFORE registration. An account with
+  no membership is a normal, temporary state — three existed, all people whose
+  child had already been registered by somebody else — and they are listed under
+  "waiting for access" on Accounts. **Do not read this as "orphan logins are
+  impossible".**
+  ⚠️ **WHAT IT STOPS** is an account let into a squad pointing at no player: it
+  can see every child in that squad and cannot touch its own, because
+  `is_own_player` needs a real id.
+  ⚠️ **THE SCREEN ALREADY REFUSED IT; THREE OTHER WAYS IN DID NOT** —
+  `accept_invite` (an invite with no player), `grantMemberships`
+  (`player_id ?? null` straight into an INSERT), and hand-written SQL. The guard
+  was in the component, one layer above every other caller.
+  ⚠️ **`accept_invite` FIXED IN THE SAME MIGRATION, GUARD BEFORE `accepted_at`**
+  — after it, a refused invite would be burned and the person left with a link
+  reporting "already used". Proved still unaccepted.
+  ⚠️ **THE CONSTRAINT NAMES THE TWO FAMILY ROLES**, not `player_id is not null`:
+  eleven staff rows legitimately have none. Half of
+  `db/tests/family-role-needs-player.sql` proves the rule stays OFF for staff,
+  and that an UPDATE clearing the player is caught too, not just an INSERT.
+  ✅ **The one violating row was fixed first, on evidence** — the child's own
+  `player_parents` row names that parent with a matching email AND phone, not a
+  shared surname.
+
+- ✅ **THE TWO BAD ROSTER ROWS ARE GONE** (14 Aug, on Jay's instruction).
+  ⚠️ **A PLAIN DELETE WOULD HAVE DESTROYED A PARENT'S PHONE NUMBER.** The
+  parent-as-player row carried the family's TWO `player_parents` records — the
+  father's and the mother's — while the real child had NONE, and
+  `player_parents` CASCADES. They were moved to the child first.
+  ⚠️ **`memberships.player_id` IS `ON DELETE SET NULL`**, so the dangling
+  membership was deleted explicitly rather than left pointing at nothing.
+
+- `5ab98c5` ⛔ **SELF-REGISTRATION WAS PUTTING THE WRONG PEOPLE ON THE ROSTER — FIXED.**
   `db/migrations/20260814_registration_duplicate_guards.sql`. Reported by Jay
   from the real club. `register_my_player` INSERTed a new `players` row
   **unconditionally on every call**: no uniqueness of any kind, at any layer, on
