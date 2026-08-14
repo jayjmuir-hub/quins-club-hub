@@ -103,7 +103,13 @@ export default defineConfig({
         // They are fetched on demand instead — a picker that needs the network
         // to draw a flag it has never shown before is an acceptable trade,
         // since the field still works and the number still saves offline.
-        globIgnores: ['**/flags/**', '**/assets/*-flag*.svg'],
+        //
+        // ⚠️ og-image.png is here for the SAME reason and it is not an
+        // oversight. It is 1200x630 and about 100KB, and NO MEMBER EVER SEES
+        // IT — the only thing that fetches it is WhatsApp's link scraper, on
+        // its own servers. Precaching it would put 100KB into every install's
+        // download for a file that renders on nobody's device.
+        globIgnores: ['**/flags/**', '**/assets/*-flag*.svg', '**/og-image.png'],
         // /calendar.ics is a Netlify proxy to the Supabase edge function, not
         // a route in this app. Workbox's navigateFallback answers ANY
         // same-origin navigation it does not recognise with index.html, so

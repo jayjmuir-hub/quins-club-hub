@@ -11,6 +11,48 @@
     <link rel="icon" type="image/png" href="/icons/favicon-32.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Abu Dhabi Harlequins</title>
+    <meta
+      name="description"
+      content="Abu Dhabi Harlequins — Quins Club Hub: fixtures, training and squad availability."
+    />
+
+    <!-- ⚠️ WHAT A LINK LOOKS LIKE WHEN SOMEBODY SHARES IT (WhatsApp, and every
+         other chat app). There were NO tags here at all until 14 Aug 2026, and
+         the failure was not that the preview was missing — it was that WhatsApp
+         found the 180x180 apple-touch-icon above, used it as the preview, and
+         scaled it up. Reported by Jay as "the logo is very blurry", which is
+         exactly what an upscaled icon looks like.
+
+         ⚠️ EVERY URL HERE MUST BE ABSOLUTE. A scraper is not a browser: it has
+         no page to resolve "/og-image.png" against, and a relative og:image is
+         silently ignored — which puts us straight back to the blurry icon with
+         nothing on screen to say why. CALENDAR_ORIGIN in src/data/calendar.js
+         is the same origin and the same reasoning; if the domain ever moves,
+         both change together.
+
+         ⚠️ 1200x630 IS NOT DECORATION. Below roughly 300px on a side, WhatsApp
+         falls back to the small square thumbnail and the large preview never
+         appears. og:image:width/height let it lay the card out before the image
+         has finished downloading.
+
+         ⚠️ THESE ARE STATIC TAGS AND MUST STAY STATIC. A scraper does not run
+         JavaScript, so anything React sets at runtime is invisible to it. This
+         file is what Netlify serves for every route (SPA fallback), so this is
+         the only place the tags can live. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Quins Club Hub" />
+    <meta property="og:title" content="Quins Club Hub" />
+    <meta
+      property="og:description"
+      content="Abu Dhabi Harlequins — fixtures, training and squad availability."
+    />
+    <meta property="og:url" content="https://adhquins-clubhub.com/" />
+    <meta property="og:image" content="https://adhquins-clubhub.com/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Abu Dhabi Harlequins crest beside the words Quins Club Hub" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>

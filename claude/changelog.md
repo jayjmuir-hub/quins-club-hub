@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 📓 **THE 14 Aug SESSION RECORD, AND A CORRECTION TO `CLAUDE.md` ITSELF.**
+- 🔗 **A LINK PREVIEW, SO A SHARED LINK STOPS SHOWING AN UPSCALED FAVICON.**
+  Reported by Jay: sharing the club hub link on WhatsApp gave "a very blurry
+  logo". ⚠️ **The cause was not a broken image — `index.html` carried NO Open
+  Graph tags at all**, so WhatsApp fell back to the only image it could find,
+  the 180×180 `apple-touch-icon`, and scaled it into a preview slot several
+  times its size. Added `public/og-image.png` (1200×630 — below roughly 300px a
+  side WhatsApp shows a small square thumbnail instead of the large card) plus
+  the `og:` and `twitter:` tags. ⚠️ **Every URL in them is ABSOLUTE**: a scraper
+  has no page to resolve a relative `og:image` against and ignores it silently,
+  which lands straight back on the blurry icon with nothing on screen to say
+  why. ⚠️ **The tags are STATIC and must stay static** — a scraper runs no
+  JavaScript, so anything React sets at runtime is invisible to it. The image is
+  in workbox `globIgnores` for the same reason the country flags are: only
+  WhatsApp's servers ever fetch it, so precaching would cost every install 100KB
+  for a file no member's device renders. Verified absent from `dist/sw.js`.
+
+- `ae9e4bc` — 📓 **THE 14 Aug SESSION RECORD, AND A CORRECTION TO `CLAUDE.md` ITSELF.**
   `claude/handoffs/2026-08-14-migrations-and-merges.md`.
   ⚠️ **`CLAUDE.md` DESCRIBED THE `docs:check` CI MECHANISM WRONGLY**, and the
   wrong version was load-bearing — it read "the one-behind allowance falls on
