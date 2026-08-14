@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🕐 **WHO HASN'T HAD A GAME — phase 1 of tiers and game time.** Jay: *"tracking
+- 🏉 **FORWARD OR BACK, BEFORE ANYBODY DECIDES WHICH FORWARD.** Jay: *"designate
+  players as forwards or back and then later on we will drill that down to
+  specific positions"*. ⚠️ **The roster ALREADY grouped into Forwards and Backs —
+  but it DERIVED that from `players.position`**, so the grouping only existed once
+  somebody had named a specific position, and a nine-year-old who is plainly a
+  forward sat in **"Other"** until prop-or-lock was decided. `players.unit` says
+  the coarse thing directly. ⚠️ **THE UNIT WINS WHERE THE TWO DISAGREE** — Jay's
+  explicit choice between two options: a `back` whose position says "Flanker" is a
+  data error for a human to fix, not something the app reconciles. Deriving unit
+  from position was rejected because it cannot express "forward, position not
+  decided", which is the entire reason the column exists. ⚠️ **Every existing row
+  is NULL, so the fallback is the whole club** until coaches fill it in, and a
+  test pins that the roster still groups exactly as it did. ⚠️ **NOT sensitive** —
+  same class as `position`, which parents already read; **the A/B/C ability tier
+  is not this and must not live on `players`** (see the plan for why RLS cannot
+  hide a column from a parent).
+
+- `1419a21` — 🕐 **WHO HASN'T HAD A GAME — phase 1 of tiers and game time.** Jay: *"tracking
   which players haven't had a chance to play in matches or tournaments"*.
   A coach-only rollup per squad, **ordered fewest-first**, because a list sorted
   by name answers "who is in this squad" — which the Roster already does — and

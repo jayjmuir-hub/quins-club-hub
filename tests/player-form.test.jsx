@@ -342,6 +342,11 @@ describe('PlayerForm — saving a new player', () => {
       // assertion worth having: it catches the field being dropped from the
       // payload AND it catching a default value being invented.
       gender: null,
+      // ⚠️ ADDED 14 Aug 2026 with players.unit, and this exact-match assertion
+      // is what caught it — which is the assertion doing its job rather than
+      // being in the way. Untouched here, so it must be an explicit null: a
+      // coach who has not decided forward-or-back has not said "forward".
+      unit: null,
     })
     // No id on an insert, and never a jersey number.
     expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('id')

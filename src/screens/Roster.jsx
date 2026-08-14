@@ -70,9 +70,25 @@ const POSITION_GROUP_ORDER = ['Forwards', 'Backs', 'Other']
 // the player row's "Flanker · U10" meta line still uses it.
 const MUTED_ON_PAPER = 'text-ink-muted'
 
-function positionGroup(position) {
-  if (FORWARDS.includes(position)) return 'Forwards'
-  if (BACKS.includes(position)) return 'Backs'
+// ⚠️ TAKES THE PLAYER, NOT THE POSITION, SINCE 14 Aug 2026, and the change is
+// the whole point of players.unit. It used to receive a position string and so
+// could only bucket a player once somebody had named a specific position —
+// which meant a nine-year-old who is plainly a forward sat in "Other" until
+// prop-or-lock was decided.
+//
+// ⚠️ `unit` WINS WHERE THE TWO DISAGREE. Jay's explicit choice between deriving
+// the unit from the position and keeping the unit authoritative: a player marked
+// `back` whose position says "Flanker" is a DATA ERROR FOR A HUMAN TO FIX, and
+// this function must not quietly paper over it by preferring the position.
+// Deriving was rejected because it cannot express "forward, position not decided",
+// which is the entire reason the column exists.
+export function positionGroup(player) {
+  if (player?.unit === 'forward') return 'Forwards'
+  if (player?.unit === 'back') return 'Backs'
+  // No unit set: fall back to the bucket the position implies, which is exactly
+  // what this did for every player before the column existed.
+  if (FORWARDS.includes(player?.position)) return 'Forwards'
+  if (BACKS.includes(player?.position)) return 'Backs'
   return 'Other'
 }
 
@@ -359,7 +375,7 @@ export default function Roster() {
   // hundred players.
   const bucket = new Map()
   visible.forEach((player) => {
-    const key = groupByPosition ? positionGroup(player.position) : player.team_id
+    const key = groupByPosition ? positionGroup(player) : player.team_id
     if (!bucket.has(key)) bucket.set(key, [])
     bucket.get(key).push(player)
   })

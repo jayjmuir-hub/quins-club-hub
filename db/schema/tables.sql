@@ -264,6 +264,16 @@ CREATE TABLE public.players (
   -- Added 2026-08-07 (player_gender). Nullable on purpose: "not recorded" is a
   -- real state and is not the same as either value.
   gender      text,
+  -- Added 2026-08-14 (players_unit). forward | back | NULL.
+  -- ⚠️ AUTHORITATIVE OVER `position` WHERE THEY DISAGREE (Jay's explicit choice).
+  -- Roster.positionGroup reads this first and falls back to the position only
+  -- when it is NULL. A `back` whose position says Flanker is a data error for a
+  -- human, not something the app reconciles. Deriving it from position was
+  -- rejected: that cannot express "forward, position not decided", which is the
+  -- whole reason the column exists.
+  -- ⚠️ NOT sensitive — same class as `position`, which parents already read.
+  -- The A/B/C ability tier is NOT this and must not live here.
+  unit        text,
   CONSTRAINT players_pkey         PRIMARY KEY (id),
   CONSTRAINT players_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
   CONSTRAINT players_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
