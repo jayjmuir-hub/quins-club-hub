@@ -881,6 +881,33 @@ will propose building.**
   files have now produced a phantom failure, which points at cross-file state or
   scheduling rather than at anything inside one file.** Whatever gets chased
   first, it is not `tests/admin-dashboard.test.jsx`.
+  ✅ **DIAGNOSED AND FIXED — 14 Aug 2026. IT WAS ONE CONFIG LINE, AND IT WAS
+  NEITHER CROSS-FILE STATE NOR ANYTHING INSIDE ANY FILE.** `vite.config.js` now
+  sets `testTimeout: 15000`; vitest's default is 5000.
+  ⚠️ **THE MECHANISM, AND IT EXPLAINS WHY CHASING FILES COULD NEVER CONVERGE.**
+  The heaviest tests here legitimately cost **1.4-2.6s** in jsdom — the worst is
+  InviteForm's five-children case, which types five search terms into a picker
+  over a 45-player roster and re-renders on every keystroke. Against a 5000ms
+  ceiling that is a margin of about **2x**. Contention slows everything
+  proportionally, so **whichever test sits nearest the ceiling tips over, and
+  which FILE that is depends on machine load rather than on the file.**
+  ✅ **REPRODUCED ON DEMAND rather than waited for** — oversubscribe the pool
+  (16 logical CPUs, 40 forks): **8 loaded runs, 8 failures, every one of them
+  "Test timed out in 5000ms"**, across `invite-form`, `event-form-competition`
+  and `repeating-events` — **three files, none of them the four originally
+  blamed.** The 2.27s test measured 5.02s under that load.
+  ✅ **AND THE FIX WAS PROVED THE WAY THIS FILE INSISTS ON: 6 loaded runs green
+  under the identical command, then the fault injected by putting 5000 back on
+  the command line — red again, same test, immediately.**
+  ⚠️ **A GUARD EXISTS BECAUSE A CONFIG LINE IS THE EASIEST THING HERE TO DELETE
+  BY ACCIDENT** — `tests/test-timeout.test.js`, asserting a FLOOR rather than a
+  value, proved against both faults (lowered, and removed entirely).
+  ⚠️ **IT RUNS IN THE `node` ENVIRONMENT, NOT THE SUITE'S jsdom**, and it has to:
+  importing `vite.config.js` pulls in esbuild, which refuses to load under jsdom
+  and fails as a COLLECTION error naming esbuild with zero tests run. That looks
+  like a broken dependency and is a wrong environment.
+  ⚠️ **THIS DOES NOT MAKE A SLOW TEST CORRECT.** A test approaching 15s on an
+  idle machine is doing too much, and the fix there is the test.
 
 ### As of 14 Aug 2026
 
@@ -947,6 +974,20 @@ will propose building.**
   which failed in a full run and passes 9/9 alone. With `accounts`,
   `player-form` and `admin-dashboard`, that is four unrelated files. **It is not
   "the admin-dashboard one".**
+  ✅ **THE FLAKE IS FIXED — see the timeout entry in the 13 Aug section above.**
+  `accounts` and `player-form` both hold tests in the 1.9-2.6s band and fit the
+  mechanism exactly.
+  ❌ **BUT `notice-board` DOES NOT FIT IT, AND THAT IS RECORDED RATHER THAN
+  TIDIED AWAY.** Every test in that file is synchronous and the whole file runs
+  in ~160ms — reaching 5000ms would need a 31x slowdown, where the worst
+  measured under deliberate oversubscription was 2.2x. **Its failure was never
+  reproduced and its message was never recorded**, so what happened there is
+  unknown. The likeliest remaining explanation is a worker dying under load, in
+  which case vitest blames whichever file it was running — which would hit a
+  fast file as readily as a slow one.
+  ⚠️ **So the timeout fix is well-evidenced for three of the four files and is
+  an ASSUMPTION for the fourth.** If a phantom failure appears again, the thing
+  to capture is **the message**, not the file name.
 
 - ✅ **NOTHING GRANTS SQUAD ACCESS WITHOUT AN ADMIN ANY MORE —
   `claim_roster_access` NOW INSERTS `pending`, NOT `active`.**

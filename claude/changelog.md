@@ -10,7 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- ✅ **WORKED EXAMPLES USE INVENTED NAMES, AND `CLAUDE.md` RULE 9 SAYS SO.**
+- ✅ **THE FLAKY SUITE IS FIXED, AND IT WAS ONE CONFIG LINE.**
+  `vite.config.js` now sets `testTimeout: 15000`; vitest's default is 5000.
+  Guard: `tests/test-timeout.test.js`.
+  ⚠️ **IT WAS NEVER CROSS-FILE STATE.** The heaviest tests here legitimately cost
+  **1.4-2.6s** in jsdom — the worst types five search terms into a picker over a
+  45-player roster, re-rendering on every keystroke — so against a 5000ms ceiling
+  they ran with a margin of about **2x**. Contention slows everything
+  proportionally, so **whichever test sits nearest the ceiling tips over, and
+  which file that is depends on machine load.** That is why four unrelated files
+  were blamed in turn and none of them was the problem.
+  ✅ **Reproduced on demand instead of waited for** — oversubscribing the pool
+  (16 logical CPUs, 40 forks) gave **8 loaded runs, 8 failures, all
+  "Test timed out in 5000ms"**, in three files none of which were the four
+  originally blamed.
+  ✅ **Proved: 6 loaded runs green under the identical command, then red again
+  the moment 5000 was put back.** The guard was proved against both faults — the
+  value lowered, and the line deleted.
+  ⚠️ **The guard runs in the `node` environment**: importing `vite.config.js`
+  pulls in esbuild, which refuses to load under jsdom and fails as a collection
+  error naming esbuild, with zero tests run.
+  ❌ **THREE OF THE FOUR BLAMED FILES FIT THE MECHANISM; `notice-board` DOES
+  NOT** — it is synchronous and runs in ~160ms. Its failure was never reproduced
+  and its message never recorded. Recorded as unexplained rather than assumed
+  closed.
+
+- `e0fcc1f` ✅ **WORKED EXAMPLES USE INVENTED NAMES, AND `CLAUDE.md` RULE 9 SAYS
+  SO.**
   The registration-guard migration, its harness, the `db/schema/functions.sql`
   capture and `state-of-play.md` all demonstrate the first-token/last-token
   matching rule; they now do it with made-up names whose spellings reproduce the
@@ -28,9 +54,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **Documentation only. The migration is already applied**, and
   `apply_migration` strips `--` comments, so the database never held either set.
 
-- ❌ **`state-of-play.md` SAID ⛔ "THE TWO BAD ROWS ARE STILL THERE" WHILE THEY
-  WERE ALREADY DELETED**, for a day, in the file that is step 3 of the reading
-  order. Only this file recorded the cleanup. Corrected, and re-measured live:
+- `e0fcc1f` ❌ **`state-of-play.md` SAID ⛔ "THE TWO BAD ROWS ARE STILL THERE"
+  WHILE THEY WERE ALREADY DELETED**, for a day, in the file that is step 3 of
+  the reading order. Only this file recorded the cleanup. Corrected, and re-measured live:
   neither row exists, and the parent's LOGIN correctly survived. **A ⛔ in the
   entry point is an instruction to the next session** — this one pointed at two
   rows that are not there.

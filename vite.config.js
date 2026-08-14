@@ -156,6 +156,33 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.js'],
+    // ⚠️ THE FLAKY SUITE WAS THIS NUMBER, AND NOTHING ELSE. Four unrelated test
+    // files (admin-dashboard, accounts, player-form, notice-board) each produced
+    // a phantom failure in a full run and passed alone, which read as cross-file
+    // state and is not.
+    //
+    // Measured 14 Aug 2026. The heaviest tests in this suite legitimately cost
+    // 1.4-2.6s in jsdom — the worst is InviteForm's five-children case, which
+    // types five search terms into a picker over a 45-player roster and
+    // re-renders the list on every keystroke. Vitest's default testTimeout is
+    // 5000ms, so those tests run with a margin of about 2x. Under CPU contention
+    // everything slows proportionally and whichever test is nearest the ceiling
+    // tips over — so the failing FILE is a function of machine load, not of the
+    // file, which is exactly why chasing individual files never converged.
+    //
+    // Reproduced on demand by oversubscribing the pool (16 logical CPUs, 40
+    // forks): 8 runs, 8 failures, all of them "Test timed out in 5000ms", across
+    // three files none of which were the four originally blamed. The 2.27s test
+    // measured 5.02s under that load — a 2.2x slowdown against a 2.2x margin.
+    //
+    // 15000ms tolerates ~6.6x. It is deliberately not "as high as possible": a
+    // genuinely hung test — see the unmocked-data-module trap in
+    // src/test/setup.js, which hangs in CI and not locally — still has to fail
+    // in a reasonable time rather than sit there.
+    //
+    // ⚠️ THIS DOES NOT MAKE A SLOW TEST CORRECT. If a test approaches this
+    // ceiling on an idle machine, it is doing too much and the fix is the test.
+    testTimeout: 15000,
     include: isIntegration
       ? ['**/*.integration.test.{js,jsx}']
       : ['**/*.test.{js,jsx}'],
