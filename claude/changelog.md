@@ -10,7 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- ⏳ **NOTICES — THE CLUB NOTICEBOARD, PHASE 1. BUILT, NOT APPLIED, NOT LIVE.**
+- **The app icon is the crest again — wordless, with CLUB HUB above the bat, lightly
+  3D.** Jay: *"i've changed my mind, i want to revert back to the original Quins logo
+  crest"*, then *"remove all the wording"*, *"put Club Hub inside the logo white part,
+  above the bat"*, *"make the logo look somewhat 3d"*, and white for the tile.
+  ⚠️ **This partly reverses `ffdcddf` (#99), which replaced the crest with a bat mark**
+  — but it KEEPS that change's real contribution: the maskable tiles measure **0%
+  outside the 80% safe circle**, and are measured on the RENDERED tile with the drop
+  shadow included, because blur and offset extend past the artwork and would otherwise
+  make "mask-safe" true of the crest and false of the icon. ⚠️ **The lettering removal
+  took three attempts and the first two failed identically:** keying on "is this pixel
+  red / is this pixel white" strips glyph CORES and leaves ANTI-ALIASED FRINGES, so the
+  wordmark stayed perfectly readable as pale pink outlines and "RUGBY CLUB" as an
+  embossed ghost. The fringes are neither red nor white, and on green they run through
+  pale greens that satisfy any is-green test. Fixed by keying on DISTANCE from the
+  sampled panel colour, bracketed per row by the panel's own extent, threshold 12 —
+  at 30 a letter-shaped residue of 7–18px per row survived on the "1970" line. Residual
+  is now **0**, and the script reports it so a future tweak cannot quietly bring a ghost
+  back. New `harness/make-icons.mjs` — ⚠️ **#99 generated its icons by hand and left no
+  script**, which is what made a one-line brief into a research task; icons are derived
+  artefacts and deriving them is now repeatable. Playwright resolved at runtime, same as
+  the shoot scripts, so it stays out of `package.json`. ⚠️ **`src/assets/logo-mark.svg`
+  is now ORPHANED** — nothing in `src/` imports it and the icons no longer derive from
+  it. Left in place deliberately rather than deleted; see the note below.
+  ⚠️ **NOT verified on a real phone** — the only true test of an icon is a home screen.
+
+- `cb0c5e0` ⏳ **NOTICES — THE CLUB NOTICEBOARD, PHASE 1. BUILT, NOT APPLIED, NOT LIVE.**
   Plan `claude/plans/2026-08-14-notices.md`. `public.announcements` (scoped by
   `team_id`, null meaning the whole club), `public.announcement_reads`, two
   `SECURITY DEFINER` functions for the receipts, `/notices`, the pinned card on
