@@ -24,7 +24,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   all — they pin the pre-existing gates too, and both new arms were verified by
   injecting `!event.home` and watching them fail.
 
-- 🏆 **A TOURNAMENT IS NAMED, NOT OPPOSED.** Reported by Jay from the live
+- `58432ba` — 🏆 **A TOURNAMENT IS NAMED, NOT OPPOSED.** Reported by Jay from the live
   schedule: a tournament read **"Quins vs Al Ain Tournament"**. ⚠️ **The cause was
   the REQUIRED OPPONENT FIELD, not the title function.** A match could not be
   saved without an opponent and a tournament has none, so the only way to enter
