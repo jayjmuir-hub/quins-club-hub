@@ -116,6 +116,7 @@ export default function Lineup() {
   // [{ player_id, role, position, sort_order }]
   const [picked, setPicked] = useState([])
   const [perSide, setPerSide] = useState(null)
+  const [squadSize, setSquadSize] = useState(null)
   const [notes, setNotes] = useState('')
   const [showOut, setShowOut] = useState(false)
 
@@ -148,6 +149,7 @@ export default function Lineup() {
         if (existing) {
           setLineupId(existing.id)
           setPerSide(existing.players_per_side ?? null)
+          setSquadSize(existing.squad_size ?? null)
           setNotes(existing.notes ?? '')
           setPicked(
             [...(existing.lineup_players ?? [])]
@@ -181,6 +183,7 @@ export default function Lineup() {
   const starters = picked.filter((p) => p.role === ROLE_STARTER)
   const bench = picked.filter((p) => p.role === ROLE_REPLACEMENT)
   const overPicked = perSide != null && starters.length > perSide
+  const overSquad = squadSize != null && picked.length > squadSize
 
   // The pool, grouped, with everyone already picked removed.
   const pool = useMemo(() => {
@@ -233,12 +236,13 @@ export default function Lineup() {
         const created = await createLineup({
           eventId,
           playersPerSide: perSide,
+          squadSize,
           notes: notes.trim() || null,
         })
         id = created.id
         setLineupId(id)
       } else {
-        await updateLineup(id, { playersPerSide: perSide, notes: notes.trim() || null })
+        await updateLineup(id, { playersPerSide: perSide, squadSize, notes: notes.trim() || null })
       }
       await saveLineupPlayers(
         id,
@@ -345,6 +349,39 @@ export default function Lineup() {
             ))}
           </select>
         </label>
+
+        {/* ⚠️ TOTAL, NOT BENCH SIZE (Jay, 14 Aug 2026). Set independently of
+            players-per-side rather than derived from it: "22 for a 15s match"
+            and "10 for a 7s tournament" are both things a coach knows and the
+            app cannot work out.
+            ⚠️ A NUMBER INPUT, NOT A SELECT, unlike players-per-side directly
+            above. That set is small and closed — the formats a club plays. A
+            matchday squad total is not: it varies by competition, by tournament
+            rules and by who is fit. A select would need a dozen options and
+            still be wrong for somebody. */}
+        <label className="mt-3 block">
+          <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+            Total in the squad
+          </span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="1"
+            max="40"
+            value={squadSize ?? ''}
+            onChange={(domEvent) => {
+              setSaved(false)
+              const raw = domEvent.target.value
+              setSquadSize(raw === '' ? null : Number(raw))
+            }}
+            placeholder="e.g. 22"
+            className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none focus:border-brand"
+          />
+          <span className="mt-1.5 block text-[12.5px] leading-relaxed text-ink-muted">
+            Starters plus replacements. Used to count against — it never stops you
+            picking somebody.
+          </span>
+        </label>
       </Card>
 
       <div className="mb-2 flex items-baseline justify-between">
@@ -375,9 +412,23 @@ export default function Lineup() {
         )}
       </Card>
 
-      <h3 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
-        Replacements — {bench.length}
-      </h3>
+      <div className="mb-2 flex items-baseline justify-between">
+        <h3 className="text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+          Replacements — {bench.length}
+        </h3>
+        {/* ⚠️ THE SQUAD TOTAL IS COUNTED HERE, against ALL picked players rather
+            than against the bench, because that is what the number means —
+            starters plus replacements. Shown beside Replacements because this is
+            where the total is finally reached. */}
+        {squadSize != null && (
+          <span
+            className={`text-[12px] font-bold ${overSquad ? 'text-warn-ink' : 'text-ink-muted'}`}
+          >
+            {picked.length} of {squadSize} in the squad
+            {overSquad ? ` — ${picked.length - squadSize} over` : ''}
+          </span>
+        )}
+      </div>
       <Card className="mb-3 px-[14px] py-1">
         {bench.length === 0 ? (
           <p className="py-3 text-[13px] text-ink-muted">No replacements yet.</p>
