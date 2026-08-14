@@ -29,8 +29,18 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   carries two moderate advisories, **neither exploitable here** — `safeNext()` blocks
   `//host` and `/\host`, and this app is not server-rendered. Recorded so nobody
   re-panics at the same output.
-- **No `LICENSE`, no `SECURITY.md`** on a public repo running children's-data
-  infrastructure.
+- ✅ ~~**No `LICENSE`, no `SECURITY.md`** on a public repo running children's-data
+  infrastructure.~~ — **both shipped 14 Aug 2026.** `LICENSE.md` is all rights
+  reserved, held by Abu Dhabi Harlequins RFC (Jay's call; there was no prior
+  ruling — every "licence" in `claude/` was an M365 seat). `SECURITY.md` sends
+  reports to `admin@adhquins-clubhub.com`, which is already the app's public
+  contact on the privacy and account-deletion screens, and rules out a GitHub
+  issue as a disclosure route.
+  ⚠️ **Named `.md` on purpose** — a bare `LICENSE` misses
+  `scripts/netlify-ignore.mjs`'s `/^[^/]+\.md$/` and would deploy.
+  ⚠️ **`package.json` still has no `license` field.** Left alone deliberately:
+  it is deploy-relevant, so a metadata string would have cost a live release.
+  Fold `"license": "UNLICENSED"` into the next PR that deploys anyway.
 - **CSP is `frame-ancestors 'none'` and nothing else.** `netlify.toml` explains why
   and the reasoning is sound — a wrong `connect-src` breaks the app silently for
   anyone holding a cached service worker. It stays here because it is the only thing

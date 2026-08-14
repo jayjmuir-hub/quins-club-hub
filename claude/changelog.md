@@ -30,6 +30,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
+- 📓 **A LICENCE AND A SECURITY POLICY, ON A PUBLIC REPO THAT HAD NEITHER.**
+  `LICENSE.md` is **all rights reserved, Abu Dhabi Harlequins RFC** — Jay's call,
+  14 Aug. The repo is public for transparency and for security review, and that
+  is now stated rather than inferred; the club's name, crest and photographs are
+  named as outside it entirely. `SECURITY.md` routes reports to
+  `admin@adhquins-clubhub.com` — already the app's public contact on the privacy
+  and account-deletion screens — and forbids a GitHub issue, which would be a
+  disclosure. ⚠️ **The testing rules are written for a live service holding
+  children's data with no staging environment**: own account only, stop at proof
+  of access, no scanning or load testing. It points at `claude/open-items.md`
+  for what is already known.
+  ⚠️ **BOTH ARE `.md` DELIBERATELY.** A bare `LICENSE` is not matched by
+  `scripts/netlify-ignore.mjs`'s root-markdown pattern `/^[^/]+\.md$/`, so it
+  would have published a live release to add a text file. GitHub recognises
+  `LICENSE.md` identically.
+
 - `cf8a221` — 👓 **THE COACH'S ROSTER SHOWS WHAT A COACH NEEDS AND DROPS WHAT REPEATS ITSELF.**
   Jay, on the U16B coach view: a tier grade and a second position had been recorded
   and neither appeared; Gender read "Male" on every row of a single-gender squad;
