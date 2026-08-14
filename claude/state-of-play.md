@@ -746,18 +746,29 @@ will propose building.**
 
 ### As of 14 Aug 2026
 
-- ⏳ **THE NOTICEBOARD IS BUILT AND IS NOT LIVE.** Plan
+- ✅ **THE NOTICEBOARD IS LIVE — 14 Aug 2026** (`cb0c5e0`, PR #105). Plan
   `claude/plans/2026-08-14-notices.md`, migration
   `db/migrations/20260814_announcements.sql`, harness
   `db/tests/announcements.sql`, screen `src/screens/Notices.jsx`.
   ✅ **THE MIGRATION IS APPLIED TO PRODUCTION — 14 Aug 2026** — and the harness
   then ran against live for the first time: **15 of 15 green**. All five
   `db/schema/` files re-captured from the catalogue in the same commit.
-  ⛔ **BUT NOTHING IS DEPLOYED. The tables exist and no bundle serving
-  `adhquins-clubhub.com` mentions them.** No notice has ever been posted, read
-  or counted by a real person. **Do not read the code landing, or the migration
-  landing, as the feature existing** — the same trap the player-photo backup
-  entry above carries.
+  ✅ **AND IT IS DEPLOYED, VERIFIED IN THE SERVED BUNDLE** rather than in a
+  browser — `/index.html` → `/assets/index-B0FJg607.js` → six strings only this
+  build has. ⚠️ **The search was proved non-vacuous in the same breath**: the
+  harness fixture names and a nonsense control all came back ABSENT from that
+  same bundle. ⚠️ **One control, `Zayed`, came back FOUND and was NOT a leak** —
+  `EventForm.jsx` has always carried `DEFAULT_VENUE = 'Zayed Sports City'`. **A
+  control has to be checked against the source before it is believed**, which is
+  the same lesson as "confirm the search can find something you know is there",
+  arriving from the opposite direction.
+  ⛔ **STILL UNEXERCISED BY A REAL PERSON. No coach has posted a notice and no
+  parent has read one**, so nothing is known about the feature beyond the
+  database refusing the right things and the bundle being served. **Do not read
+  "live" as "working"** — the same trap the match sheet and the scoring model
+  entries above both carry.
+  ⛔ **AND THE `/notices` SCREEN ITSELF HAS NEVER RENDERED AGAINST REAL DATA.**
+  Only the pure `NoticeBoard` card is in `harness/`.
   ⚠️ **PHASE 1 SENDS NO EMAIL AND THAT IS THE DESIGN, NOT AN OMISSION.** Resend
   Pro removed the 100/day ceiling on 13 Aug — a brake nobody designed — so the
   outbox, the preferences table and unsubscribe are phase 2 and must exist

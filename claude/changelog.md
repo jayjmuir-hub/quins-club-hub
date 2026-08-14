@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- ⏳ **NOTICES — THE CLUB NOTICEBOARD, PHASE 1. BUILT, NOT APPLIED, NOT LIVE.**
+- `cb0c5e0` ✅ **NOTICES — THE CLUB NOTICEBOARD, PHASE 1. LIVE.**
   Plan `claude/plans/2026-08-14-notices.md`. `public.announcements` (scoped by
   `team_id`, null meaning the whole club), `public.announcement_reads`, two
   `SECURITY DEFINER` functions for the receipts, `/notices`, the pinned card on
@@ -44,8 +44,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Supabase's default privileges, not something notices introduced. Deliberately
   NOT fixed here: tightening two tables would leave the schema inconsistent
   while fixing nothing reachable. Logged in `claude/state-of-play.md` §Open.
-  ⚠️ **Nothing is DEPLOYED.** The tables exist; no bundle serving
-  `adhquins-clubhub.com` mentions them yet.
+  ✅ **DEPLOYED AND VERIFIED IN THE SERVED BUNDLE, 14 Aug 2026** — not in a
+  browser, which the service worker has made a liar before. Fetched
+  `/index.html`, read `/assets/index-B0FJg607.js` out of it, fetched that and
+  searched it: `All notices`, `Post a notice`, `Nothing on the board`,
+  `Take it down`, `announcement_stats` and `announcement_audience` all present.
+  ⚠️ **AND THE SEARCH WAS PROVED NON-VACUOUS**, because a `.Contains` that
+  always returns true proves nothing: the harness fixture strings
+  (`ZZ Probe Squad`, `Sarah Nolan`, `A Volunteer With A Long Name`) and a
+  nonsense control all came back ABSENT from the same bundle.
+  ⚠️ **`Zayed` IS IN THE BUNDLE AND IS NOT A LEAK** — it was used as a control
+  and came back FOUND. `src/screens/EventForm.jsx` has
+  `DEFAULT_VENUE = 'Zayed Sports City, Abu Dhabi'`, so it was always there. A
+  control has to be checked against the source before it is believed.
+  ❌ **STILL UNEXERCISED: no coach has posted a notice and no parent has read
+  one.** The bundle being served is not the feature working.
 
 ## 13 Aug 2026
 
