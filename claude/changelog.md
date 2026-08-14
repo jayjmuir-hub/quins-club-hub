@@ -35,7 +35,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ❌ **The confirm UI has not been seen in a browser** — no sign-up scenario in
   `harness/`.
 
-- ⏳ **NOTICES — THE CLUB NOTICEBOARD, PHASE 1. BUILT, NOT APPLIED, NOT LIVE.**
+- `cb0c5e0` ⏳ **NOTICES — THE CLUB NOTICEBOARD, PHASE 1. BUILT, NOT APPLIED, NOT LIVE.**
+  ⚠️ **THE STATUS ON THIS LINE IS STALE AND IS CORRECTED ON ANOTHER BRANCH.**
+  `docs/notices-live` (`3a64d48`) marks it live. Only the SHA is added here, so
+  that `docs:check` passes without this branch duplicating — and then conflicting
+  with — somebody else's correction.
   Plan `claude/plans/2026-08-14-notices.md`. `public.announcements` (scoped by
   `team_id`, null meaning the whole club), `public.announcement_reads`, two
   `SECURITY DEFINER` functions for the receipts, `/notices`, the pinned card on
