@@ -100,6 +100,7 @@ function initialValues(player, editableTeams) {
   return {
     fullName: player?.full_name ?? '',
     position: player?.position ?? '',
+    unit: player?.unit ?? '',
     // An existing player's own squad wins, even if the editable list hasn't
     // loaded yet — see the reconciliation note in the component for why
     // falling through to "the first team" is not acceptable here.
@@ -362,6 +363,8 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       team_id: teamId,
       full_name: fullName,
       position: values.position || null,
+      // '' means nobody has decided, which is a real answer and stays NULL.
+      unit: values.unit || null,
       is_captain: values.isCaptain,
       // `?? null` rather than `|| null` so the value is written through
       // exactly as held. Both happen to behave the same for the two strings
@@ -534,6 +537,31 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             setPhotoRemoved(true)
           }}
         />
+
+        {/* ⚠️ ABOVE POSITION, AND THAT ORDER IS THE POINT. This is the coarse
+            answer a coach has first — a player is plainly a forward months
+            before anyone decides between prop and lock — and Position below is
+            the detail that may never be filled in. Asking for the detail first
+            is what pushed those players into "Other" on the roster.
+            ⚠️ AUTHORITATIVE OVER Position WHERE THEY DISAGREE (Jay, 14 Aug
+            2026). The form does not stop you saying "back" and "Flanker"; that
+            combination is a data error for a human to notice, not something the
+            app reconciles. */}
+        <div className={FIELD}>
+          <label className={LABEL} htmlFor="player-unit">
+            Forward or back
+          </label>
+          <select
+            id="player-unit"
+            value={values.unit}
+            onChange={setFromInput('unit')}
+            className={inputClasses(false)}
+          >
+            <option value="">Not set</option>
+            <option value="forward">Forward</option>
+            <option value="back">Back</option>
+          </select>
+        </div>
 
         <div className={FIELD}>
           <label className={LABEL} htmlFor="player-position">
