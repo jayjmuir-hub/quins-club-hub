@@ -247,3 +247,22 @@ after insert on public.access_requests
 for each row
 when (new.status = 'pending')
 execute function private.notify_access_request();
+
+
+-- ---------------------------------------------------------------------
+-- public.announcements  (captured 14 Aug 2026, pg_get_triggerdef)
+-- Migration: db/migrations/20260814_announcements.sql
+--
+-- announcements_provenance OVERWRITES rather than defaults. Assigning
+-- author_id/club_id only when null would leave a caller able to supply their
+-- own, which is the entire hole it exists to close: a policy authorises a ROW,
+-- it does not stop a client putting somebody else's uuid in the payload.
+--
+-- announcements_touch IS WHY updated_at IS NOT COLUMN-GRANTED. It is written
+-- here so that an edit cannot claim not to have happened, which is the only
+-- thing the column is for. It also pins author_id/club_id/team_id/created_at
+-- back to their OLD values -- belt to the grants' braces, so that restoring a
+-- grant by accident does not silently make authorship editable.
+-- ---------------------------------------------------------------------
+CREATE TRIGGER announcements_provenance BEFORE INSERT ON public.announcements FOR EACH ROW EXECUTE FUNCTION private.set_announcement_provenance();
+CREATE TRIGGER announcements_touch BEFORE UPDATE ON public.announcements FOR EACH ROW EXECUTE FUNCTION private.touch_announcement();

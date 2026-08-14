@@ -1383,3 +1383,60 @@ ALTER TABLE public.photo_backup_runs ENABLE ROW LEVEL SECURITY;
 -- disappear from another viewer's screen. See the migration.
 
 ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
+
+
+-- ---------------------------------------------------------------------
+-- public.announcements  (captured 14 Aug 2026)
+-- Migration: db/migrations/20260814_announcements.sql
+--
+-- Constraints and indexes captured from pg_constraint / pg_indexes, so every
+-- one is named here exactly as live names it. !! Pasting the migration's inline
+-- unnamed CHECKs is what happened to `pitches` on 11 Aug and produced a file
+-- that looked complete while a rename would have diffed to nothing.
+--
+-- !! team_id NULL MEANS THE WHOLE CLUB. A column, never the squad's name --
+-- the same rule teams.is_senior and teams.self_registration_allowed carry.
+--
+-- !! THERE IS DELIBERATELY NO (club_id, created_at) INDEX. events_club_starts_idx
+-- was added on 13 Aug for exactly this shape and does NOT serve the path it was
+-- added for: the client sends no club_id predicate (one club) and the read
+-- policy filters on team membership, so the leading column is unconstrained and
+-- Postgres cannot use it. 20260813_events_starts_index.sql is that fix, and
+-- announcements_created_idx leads on created_at for the same reason.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.announcements (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  club_id    uuid NOT NULL,
+  team_id    uuid,
+  author_id  uuid NOT NULL,
+  title      text NOT NULL,
+  body       text NOT NULL,
+  pinned     boolean NOT NULL DEFAULT false,
+  expires_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz
+);
+ALTER TABLE public.announcements ADD CONSTRAINT announcements_club_id_fkey   FOREIGN KEY (club_id)   REFERENCES clubs(id)    ON DELETE CASCADE;
+ALTER TABLE public.announcements ADD CONSTRAINT announcements_team_id_fkey   FOREIGN KEY (team_id)   REFERENCES teams(id)    ON DELETE CASCADE;
+ALTER TABLE public.announcements ADD CONSTRAINT announcements_author_id_fkey FOREIGN KEY (author_id) REFERENCES profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.announcements ADD CONSTRAINT announcements_title_check CHECK ((length(btrim(title)) > 0));
+ALTER TABLE public.announcements ADD CONSTRAINT announcements_body_check  CHECK ((length(btrim(body))  > 0));
+CREATE INDEX announcements_created_idx      ON public.announcements USING btree (created_at DESC, id);
+CREATE INDEX announcements_team_created_idx ON public.announcements USING btree (team_id, created_at DESC);
+
+-- ---------------------------------------------------------------------
+-- public.announcement_reads  (captured 14 Aug 2026)
+--
+-- !! THE PRIMARY KEY IS THE DEDUPLICATION. Marking a notice read twice is the
+-- normal case -- opening the board again does it -- so this is an upsert target
+-- rather than something the client is trusted to call once.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.announcement_reads (
+  announcement_id uuid NOT NULL,
+  profile_id      uuid NOT NULL,
+  read_at         timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.announcement_reads ADD CONSTRAINT announcement_reads_pkey PRIMARY KEY (announcement_id, profile_id);
+ALTER TABLE public.announcement_reads ADD CONSTRAINT announcement_reads_announcement_id_fkey FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE;
+ALTER TABLE public.announcement_reads ADD CONSTRAINT announcement_reads_profile_id_fkey      FOREIGN KEY (profile_id)      REFERENCES profiles(id)      ON DELETE CASCADE;
+CREATE INDEX announcement_reads_profile_idx ON public.announcement_reads USING btree (profile_id);

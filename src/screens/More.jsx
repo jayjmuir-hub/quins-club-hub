@@ -381,6 +381,25 @@ export default function More() {
           rather than by whether the list came back empty. */}
       <YourPlayers memberships={memberships} teams={teams} reload={reload} />
 
+      {/* ⚠️ EVERY MEMBER SEES THIS, for the same reason the post-idea card
+          below does: More is the one screen every role reaches on a phone. The
+          Home card shows PINNED notices only, so without this link an ordinary
+          notice is unreachable for anyone who does not happen to have one
+          pinned — and the pin is the poster's choice, not the reader's. */}
+      <SectionTitle>Notices</SectionTitle>
+      <Card className="p-[14px]">
+        <Link
+          to="/notices"
+          className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand"
+        >
+          <span>Club and squad notices</span>
+          <span aria-hidden="true">›</span>
+        </Link>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+          Everything the club and your squads have posted.
+        </p>
+      </Card>
+
       {/* ⚠️ EVERY MEMBER SEES THIS, and that is the ruling rather than an
           oversight (Jay, 12 Aug 2026): a parent with a good photo of Saturday's
           match is exactly who the social media manager needs to hear from. It

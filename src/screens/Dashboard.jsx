@@ -12,10 +12,14 @@ import Register from './Register.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import SquadStaffCard from '../components/SquadStaffCard.jsx'
+import NoticeBoard from '../components/NoticeBoard.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
 import { listMySquadStaff } from '../data/staff.js'
+import { listMyReads, listNotices, markNoticesRead } from '../data/announcements.js'
+import { pinnedNotices } from '../lib/notices.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
+import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import {
@@ -336,6 +340,9 @@ export default function Dashboard() {
   // Routing out to the full-page match sheet. See onOpenMatchSheet below.
   const navigate = useNavigate()
   const { memberships, teams } = useMemberships()
+  // Only for the notice read-receipt write, which needs the caller's own
+  // profile id. Everything else on this screen is scoped by RLS.
+  const { user } = useAuth()
 
   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
@@ -363,6 +370,10 @@ export default function Dashboard() {
 
   const [events, setEvents] = useState([])
   const [players, setPlayers] = useState([])
+  // null until the first read settles, so the board can stay absent rather than
+  // flashing an empty card under the greeting on every load.
+  const [notices, setNotices] = useState(null)
+  const [noticeReads, setNoticeReads] = useState(() => new Set())
   const [loading, setLoading] = useState(true)
   const [settled, setSettled] = useState(false)
   const [error, setError] = useState(null)
@@ -483,6 +494,52 @@ export default function Dashboard() {
       mounted = false
     }
   }, [memberships])
+
+  // ⚠️ A THIRD SEPARATE READ, for the same reason as the staff one above: the
+  // noticeboard shares no number with the stat tiles, so a failed notice read
+  // must not take the fixture list down with it. There is deliberately no error
+  // state — a board that could not load renders as no board, which is what an
+  // empty board looks like anyway. That is acceptable HERE and would not be on
+  // /notices, where the person came specifically to read them and silence would
+  // be a lie; that screen says so out loud.
+  //
+  // ⚠️ NOT KEYED ON `reloadToken`, like the staff read. That token is bumped by
+  // realtime on `events`, and no fixture change can alter a notice.
+  useEffect(() => {
+    let mounted = true
+    Promise.all([listNotices(), listMyReads()])
+      .then(([rows, reads]) => {
+        if (!mounted) return
+        setNotices(rows)
+        setNoticeReads(reads)
+      })
+      .catch(() => {
+        if (mounted) setNotices([])
+      })
+    return () => {
+      mounted = false
+    }
+  }, [memberships])
+
+  // ⚠️ MARKS READ ONLY WHAT IS ACTUALLY DRAWN — the pinned ones, and only the
+  // unexpired pinned ones, because `pinnedNotices` filters expiry. The count a
+  // coach sees means "this appeared in front of them", and the Home card renders
+  // the full body, so a pinned notice seen here genuinely was. Anything not on
+  // this screen stays unread until /notices shows it.
+  useEffect(() => {
+    if (!notices || !user?.id) return
+    const unseen = pinnedNotices(notices)
+      .filter((notice) => !noticeReads.has(notice.id))
+      .map((notice) => notice.id)
+    if (unseen.length === 0) return
+
+    markNoticesRead(user.id, unseen)
+    setNoticeReads((previous) => {
+      const next = new Set(previous)
+      for (const id of unseen) next.add(id)
+      return next
+    })
+  }, [notices, noticeReads, user])
 
   // Realtime: bump the token and let the effect above refetch. The callback
   // closes over nothing but setReloadToken (a stable state setter), so this
@@ -643,6 +700,20 @@ export default function Dashboard() {
       {/* Sits above the fixture hero so the first thing on the screen is
           addressed to the person, not to the club. */}
       <Greeting />
+
+      {/* ⚠️ ABOVE THE FIXTURE HERO, AND THAT IS A KNOWING DEPARTURE FROM
+          design-system.md §5.1, WHICH CALLS THE HERO "the page's opening
+          statement". Jay approved this placement from a mockup on 14 Aug 2026,
+          and the reason is that the alternative defeats the feature: a notice
+          below the hero and the fortnight strip is a notice nobody scrolls to,
+          which is WhatsApp with extra steps.
+          ⚠️ IT COSTS NOTHING WHEN THERE IS NOTHING PINNED. NoticeBoard returns
+          null rather than an empty card (see its header), so on the ordinary
+          week where nobody has posted, the hero is still the first thing on the
+          screen and this line has no effect at all. That property is what makes
+          the departure survivable — if it ever starts rendering a placeholder,
+          this decision has to be re-made. */}
+      <NoticeBoard notices={notices} readIds={noticeReads} teamsById={teamsById} />
 
       {nextFixture && (
         <NextFixtureHero

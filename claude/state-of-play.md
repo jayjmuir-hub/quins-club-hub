@@ -744,6 +744,55 @@ will propose building.**
   where nobody can re-run it. **Verified against live including its self-test,
   and the injected grant confirmed gone after the rollback.**
 
+### As of 14 Aug 2026
+
+- ⏳ **THE NOTICEBOARD IS BUILT AND IS NOT LIVE.** Plan
+  `claude/plans/2026-08-14-notices.md`, migration
+  `db/migrations/20260814_announcements.sql`, harness
+  `db/tests/announcements.sql`, screen `src/screens/Notices.jsx`.
+  ✅ **THE MIGRATION IS APPLIED TO PRODUCTION — 14 Aug 2026** — and the harness
+  then ran against live for the first time: **15 of 15 green**. All five
+  `db/schema/` files re-captured from the catalogue in the same commit.
+  ⛔ **BUT NOTHING IS DEPLOYED. The tables exist and no bundle serving
+  `adhquins-clubhub.com` mentions them.** No notice has ever been posted, read
+  or counted by a real person. **Do not read the code landing, or the migration
+  landing, as the feature existing** — the same trap the player-photo backup
+  entry above carries.
+  ⚠️ **PHASE 1 SENDS NO EMAIL AND THAT IS THE DESIGN, NOT AN OMISSION.** Resend
+  Pro removed the 100/day ceiling on 13 Aug — a brake nobody designed — so the
+  outbox, the preferences table and unsubscribe are phase 2 and must exist
+  BEFORE anything here can reach an inbox. **A notify trigger added to phase 1
+  is the runaway that cap used to catch.**
+  ⚠️ **THE READ GATE IS `can_see_team`, NOT `is_attached_to_team`**, so a
+  PENDING member sees an empty board. Deliberately unlike `event read`, and the
+  second reason is the one to carry: **the audience count is a feature and has
+  to mean something.** "18 of 24" must not count accounts nobody approved.
+  ⚠️ **AUDIENCE IS NOT READERSHIP** — an admin can read a squad notice and is
+  not counted in it.
+  ⚠️ **`team_id` IS NOT UPDATABLE**, enforced by the COLUMN GRANTS and not by
+  the policy. Restoring that grant "for consistency" silently reopens
+  re-scoping a notice after it has been read, and every existing test stays
+  green.
+  ⚠️ **THE HOME CARD SITS ABOVE THE FIXTURE HERO** — a knowing departure from
+  `claude/specs/design-system.md` §5.1, approved by Jay from a mockup, and
+  survivable only because the card returns null rather than an empty box. If it
+  ever renders a placeholder, that decision has to be re-made.
+  ✅ **THE SCHEMA WAS EXERCISED AGAINST PRODUCTION IN A ROLLED-BACK
+  TRANSACTION** — the pattern this file recommends in place of a branch. 13 of
+  14 assertions green on the first complete run.
+  ⚠️ **THE FOURTEENTH IS WORTH KNOWING AND IT WAS THE HARNESS'S BUG, NOT THE
+  SCHEMA'S**: `auth.users` carries `on_auth_user_created` → `handle_new_user()`,
+  which creates the `profiles` row with an EMPTY `full_name`, so a later
+  `insert into profiles … on conflict (id) do nothing` does nothing and every
+  fixture ends up nameless. It looked exactly like a broken `order by`.
+  ⚠️ **AND `memberships_unique_grant` IS `(profile_id, club_id, role, team_id,
+  player_id)`** — so a parent with two children in one squad really does hold
+  two active membership rows, which is why the audience count must dedupe on
+  `profile_id`. Found by the constraint refusing the fixture.
+  ❌ **THE `/notices` SCREEN HAS NO REAL-BROWSER COVERAGE.** Only the pure
+  `NoticeBoard` card is in `harness/` (scenario `notices`), measured at 320px
+  and proved non-vacuous with a 900px probe.
+
 - ⚠️ **A PRODUCTION READINESS AUDIT WAS RUN ON 13 Aug 2026** and its findings are
   NOT all recorded here — the report is a session artefact, not a repo document.
   The ones that became work are in §Open.
@@ -1494,6 +1543,24 @@ below is **not started** unless it says otherwise.
   ⚠️ **`squad_expects_gender`'s exemption is UNCHANGED and still correct.** This is
   not a precedent for pinning it; it is the reason the two are now decided
   differently.
+- ⚠️ **`anon` HOLDS FULL TABLE PRIVILEGES ON EVERY TABLE IN `public`. MEASURED
+  14 Aug 2026, not reasoned about.** Seven tables probed — `announcements`,
+  `announcement_reads`, `social_ideas`, `events`, `players`, `memberships`,
+  `match_sheets` — and **all seven came back identical**:
+  `DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE`. Source is
+  Supabase's `alter default privileges in schema public grant all on tables to
+  anon, authenticated, service_role`.
+  ⚠️ **THIS IS THE TABLE-LEVEL SIBLING OF THE FUNCTION-LEVEL FINDING FROM
+  13 Aug**, where six RPCs turned out to be callable by `anon` for exactly the
+  same reason. The conclusion is the same: every one of these is safe today **by
+  its POLICIES**, which all test `auth.uid()` and get null for `anon` — i.e.
+  safe by the body, not by the grant, which is the thing this repo's rules say
+  not to rely on.
+  ⚠️ **NOT EXPLOITABLE TODAY as far as anything measured shows**, and it is one
+  migration across all of `public` or it is not worth doing — tightening only
+  the newest two tables leaves the schema inconsistent while fixing nothing.
+  Found while re-capturing `db/schema/grants.sql` for the noticeboard; recorded
+  there in full.
 - **18 RLS policies call `auth.uid()` bare**, so Postgres re-evaluates it per row
   instead of once per query. The fix is `(select auth.uid())` and changes no
   meaning. ⚠️ **One migration touching all 18, not eighteen migrations** — and
