@@ -43,7 +43,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   added to `harness/`, both refusals and both ticks confirmed, and editing the name
   withdraws the tick.
 
-- 🐛 **THE VIEW-AS DROPDOWN SHIPPED CLIPPED TO A SLIVER, AND THE CHECK THAT
+- `15159bf` 🐛 **THE VIEW-AS DROPDOWN SHIPPED CLIPPED TO A SLIVER, AND THE CHECK THAT
   MISSED IT IS THE POINT.** Reported from a screenshot minutes after the deploy.
   The panel was `absolute` inside the trigger's wrapper and **the masthead row
   carries `overflow-hidden`** — deliberately, to clip the `harlequin` diagonals
