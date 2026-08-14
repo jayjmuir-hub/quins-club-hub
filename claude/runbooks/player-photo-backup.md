@@ -329,7 +329,17 @@ cache.
 
 ---
 
-## 4. The drill — and it is not done until this passes
+## 4. The drill — ⛔ TABLED, and still not done
+
+⛔ **TABLED BY JAY, 13 Aug 2026: "table the restore drill until i bring it up
+again". Do not start it, do not offer to, do not ask again.**
+
+⚠️ **THE SECTION STAYS IN FULL, AND THAT IS DELIBERATE.** Tabling the work does
+not retire the requirement — **nobody has ever got a photograph back, and until
+somebody has, this backup is an untested claim.** Deleting or softening what
+follows would turn a known gap into an invisible one, which is the exact failure
+mode the whole feature exists to guard against. When Jay reopens it, this is
+what to run.
 
 ⚠️ **A BACKUP IS AN UNTESTED CLAIM UNTIL A RESTORE HAS BEEN DRILLED.** The
 database drill on 13 Aug 2026 is the precedent, and its most useful outcome was

@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- ✅ **THE RECEIPTS SHEET NOW SAYS WHO HAS SEEN A NOTICE, NOT ONLY WHO HAS NOT.**
+- `46102ad` — ✅ **THE RECEIPTS SHEET NOW SAYS WHO HAS SEEN A NOTICE, NOT ONLY WHO HAS NOT.**
   Found by Jay on the **first real notice ever posted** — U16B, read by one other
   person — where the sheet said *"1 of 6 seen"* above a list of the five who had
   not, and offered no way to learn who the one was.
@@ -587,6 +587,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   now. `src/assets/logo-mark.svg` is the same mark for the masthead; the five
   screens that render `crest.png` are deliberately untouched, so only the installed
   icon and the favicon change.
+
+- ⛔ **THE RESTORE DRILL IS TABLED — Jay, 13 Aug 2026: "table the restore drill
+  until i bring it up again".** Do not start it, do not offer to, do not ask
+  again.
+  ⚠️ **TABLED IS NOT DONE, AND THE SECTIONS DESCRIBING IT ARE KEPT IN FULL.** He
+  tabled the WORK, not the FINDING — the same split a session had to write down
+  when he tabled the AI build but not the AI ruling. **Nobody has ever got a
+  photograph back, the backup is still an untested claim for restore, and every
+  document keeps saying so.** Softening those lines would turn a known gap into
+  an invisible one, which is the failure the whole feature exists to guard
+  against.
 
 - `c536656` — ✅ **THE PLAYER PHOTOGRAPHS ARE BACKED UP — live, nightly, and verified.** The
   only unrecoverable thing in the club now has a copy. Cloudflare R2 bucket
