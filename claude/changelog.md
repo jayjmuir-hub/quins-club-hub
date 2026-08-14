@@ -46,7 +46,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **`memberships.player_id` IS `ON DELETE SET NULL`**, so the dangling
   membership was deleted explicitly rather than left pointing at nothing.
 
-- ⛔ **SELF-REGISTRATION WAS PUTTING THE WRONG PEOPLE ON THE ROSTER — FIXED.**
+- `5ab98c5` ⛔ **SELF-REGISTRATION WAS PUTTING THE WRONG PEOPLE ON THE ROSTER — FIXED.**
   `db/migrations/20260814_registration_duplicate_guards.sql`. Reported by Jay
   from the real club. `register_my_player` INSERTed a new `players` row
   **unconditionally on every call**: no uniqueness of any kind, at any layer, on
