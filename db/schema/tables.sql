@@ -1487,3 +1487,62 @@ ALTER TABLE public.announcement_reads ADD CONSTRAINT announcement_reads_pkey PRI
 ALTER TABLE public.announcement_reads ADD CONSTRAINT announcement_reads_announcement_id_fkey FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE;
 ALTER TABLE public.announcement_reads ADD CONSTRAINT announcement_reads_profile_id_fkey      FOREIGN KEY (profile_id)      REFERENCES profiles(id)      ON DELETE CASCADE;
 CREATE INDEX announcement_reads_profile_idx ON public.announcement_reads USING btree (profile_id);
+
+
+-- ---------------------------------------------------------------------
+-- public.lineups / public.lineup_players  (captured 14 Aug 2026)
+--
+-- ⚠️ NOT THE RCM MATCH SHEET. See db/migrations/20260814_match_lineups.sql:
+-- match_sheets is a document FILED after the match; a lineup is a plan made
+-- before it. `player_id` CASCADES here and there is no full_name snapshot, both
+-- opposite to match_sheet_slots, on purpose.
+--
+-- ⚠️ THERE IS DELIBERATELY NO UNIQUE INDEX ON lineups.event_id. That is what
+-- lets a squad field two teams at a tournament, or play several games in a day.
+-- The migration's guard FAILS if one ever appears.
+--
+-- ⚠️ players_per_side AND squad_size ARE BOTH GUIDES, NOT GATES. Nothing ties
+-- either to the number of rows in lineup_players and the screen must never
+-- refuse a pick because of them.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.lineups (
+  id               uuid        NOT NULL DEFAULT gen_random_uuid(),
+  event_id         uuid        NOT NULL,
+  label            text,
+  players_per_side smallint,
+  -- Added 2026-08-14 (lineup_squad_size). Starters PLUS replacements.
+  squad_size       smallint,
+  notes            text,
+  created_by       uuid,
+  updated_by       uuid,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT lineups_pkey PRIMARY KEY (id),
+  CONSTRAINT lineups_event_id_fkey   FOREIGN KEY (event_id)   REFERENCES events(id)   ON DELETE CASCADE,
+  CONSTRAINT lineups_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT lineups_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT lineups_players_per_side_check CHECK ((players_per_side IS NULL) OR ((players_per_side >= 1) AND (players_per_side <= 30))),
+  CONSTRAINT lineups_squad_size_check       CHECK ((squad_size IS NULL) OR ((squad_size >= 1) AND (squad_size <= 40)))
+);
+ALTER TABLE public.lineups ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE public.lineup_players (
+  id         uuid     NOT NULL DEFAULT gen_random_uuid(),
+  lineup_id  uuid     NOT NULL,
+  -- ⚠️ CASCADE, not SET NULL, and no full_name beside it — see above.
+  player_id  uuid     NOT NULL,
+  role       text     NOT NULL DEFAULT 'starter',
+  -- Free text on purpose: the offerable list lives in src/lib/positions.js and
+  -- a CHECK here would be a second copy that drifts.
+  position   text,
+  sort_order smallint NOT NULL DEFAULT 0,
+  CONSTRAINT lineup_players_pkey PRIMARY KEY (id),
+  CONSTRAINT lineup_players_lineup_id_fkey FOREIGN KEY (lineup_id) REFERENCES lineups(id) ON DELETE CASCADE,
+  CONSTRAINT lineup_players_player_id_fkey FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+  CONSTRAINT lineup_players_lineup_player_key UNIQUE (lineup_id, player_id),
+  CONSTRAINT lineup_players_role_check CHECK ((role = ANY (ARRAY['starter'::text, 'replacement'::text])))
+);
+ALTER TABLE public.lineup_players ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX lineups_event_idx         ON public.lineups        USING btree (event_id);
+CREATE INDEX lineup_players_lineup_idx ON public.lineup_players USING btree (lineup_id, sort_order);

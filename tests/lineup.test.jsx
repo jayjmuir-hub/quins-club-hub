@@ -243,3 +243,81 @@ describe('an existing lineup', () => {
     expect(screen.getByDisplayValue('Meet at the gate.')).toBeInTheDocument()
   })
 })
+
+describe('the "still to pick" list', () => {
+  it('says everyone is picked rather than leaving an empty card', async () => {
+    // ⚠️ REPORTED BY JAY, 14 Aug 2026, from the live app: he picked all four
+    // U16B players and asked what the empty section was. A heading over an empty
+    // card reads as broken — and the heading itself said "Squad", which sounds
+    // like the whole roster rather than "the ones you have not picked".
+    const user = renderScreen()
+    await waitFor(() => expect(screen.getByText('Rory Aldenbrook')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /Show 1 who said no/ }))
+
+    for (const name of ['Rory Aldenbrook', 'Callum Whitstead', 'Ewan Marchetti', 'Tomas Bergqvist']) {
+      await user.click(
+        within(screen.getByText(name).closest('li')).getByRole('button', { name: 'Start' }),
+      )
+    }
+
+    expect(screen.getByText(/Everyone in this squad is in the team/)).toBeInTheDocument()
+    expect(screen.getByText(/Still to pick/)).toBeInTheDocument()
+  })
+
+  it('distinguishes an EMPTY SQUAD from everyone being picked', async () => {
+    // ⚠️ TWO DIFFERENT EMPTINESSES. "Everyone is picked" is success; "no players
+    // in this squad" is a roster gap for an admin. Saying the first when the
+    // second is true sends somebody hunting a bug that is really missing data.
+    listPlayersMock.mockResolvedValue([])
+    useMembershipsMock.mockReturnValue({ memberships: COACH, teams: [TEAM], loading: false, error: null })
+    getEventMock.mockResolvedValue(EVENT)
+    listAvailabilityMock.mockResolvedValue([])
+    listLineupsMock.mockResolvedValue([])
+    render(<Lineup />)
+
+    expect(await screen.findByText(/no players in U16B Contact yet/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Everyone in this squad/)).not.toBeInTheDocument()
+  })
+})
+
+describe('total in the squad', () => {
+  it('counts every picked player against the total, and warns when over', async () => {
+    // Jay, 14 Aug 2026: "need an option below players per side to select total
+    // number in squad".
+    // ⚠️ COUNTS ALL PICKED, NOT THE BENCH. The number means starters PLUS
+    // replacements, so counting only replacements against it would be wrong in
+    // exactly the case a coach checks it.
+    // ⚠️ AND IT NEVER BLOCKS — same guide-not-gate rule as players-per-side.
+    const user = renderScreen()
+    await waitFor(() => expect(screen.getByText('Rory Aldenbrook')).toBeInTheDocument())
+
+    await user.clear(screen.getByLabelText(/Total in the squad/i))
+    await user.type(screen.getByLabelText(/Total in the squad/i), '1')
+
+    await user.click(
+      within(screen.getByText('Rory Aldenbrook').closest('li')).getByRole('button', { name: 'Start' }),
+    )
+    expect(screen.getByText(/1 of 1 in the squad/)).toBeInTheDocument()
+
+    // The second pick is allowed, and reported as over.
+    await user.click(
+      within(screen.getByText('Callum Whitstead').closest('li')).getByRole('button', { name: 'Bench' }),
+    )
+    expect(screen.getByText(/2 of 1 in the squad — 1 over/)).toBeInTheDocument()
+    expect(screen.getByText(/Replacements — 1/)).toBeInTheDocument()
+  })
+
+  it('saves the total alongside players per side', async () => {
+    const user = renderScreen()
+    await waitFor(() => expect(screen.getByText('Rory Aldenbrook')).toBeInTheDocument())
+    await user.selectOptions(screen.getByLabelText(/Players per side/i), '15')
+    await user.clear(screen.getByLabelText(/Total in the squad/i))
+    await user.type(screen.getByLabelText(/Total in the squad/i), '22')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(createLineupMock).toHaveBeenCalled())
+    expect(createLineupMock).toHaveBeenCalledWith(
+      expect.objectContaining({ playersPerSide: 15, squadSize: 22 }),
+    )
+  })
+})

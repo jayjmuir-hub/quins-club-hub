@@ -21,7 +21,7 @@ export async function listLineups(eventId) {
   const { data, error } = await supabase
     .from('lineups')
     .select(
-      'id, event_id, label, players_per_side, notes, created_at, updated_at,' +
+      'id, event_id, label, players_per_side, squad_size, notes, created_at, updated_at,' +
         ' lineup_players(id, player_id, role, position, sort_order)',
     )
     .eq('event_id', eventId)
@@ -43,7 +43,13 @@ export async function listLineups(eventId) {
  * two teams at a tournament), so "the lineup for this event" is not a thing the
  * database can answer. The screen decides which one it is editing.
  */
-export async function createLineup({ eventId, label = null, playersPerSide = null, notes = null }) {
+export async function createLineup({
+  eventId,
+  label = null,
+  playersPerSide = null,
+  squadSize = null,
+  notes = null,
+}) {
   const { data: session } = await supabase.auth.getUser()
   const me = session?.user?.id ?? null
 
@@ -53,11 +59,12 @@ export async function createLineup({ eventId, label = null, playersPerSide = nul
       event_id: eventId,
       label,
       players_per_side: playersPerSide,
+      squad_size: squadSize,
       notes,
       created_by: me,
       updated_by: me,
     })
-    .select('id, event_id, label, players_per_side, notes')
+    .select('id, event_id, label, players_per_side, squad_size, notes')
     .single()
 
   if (error) throw error
@@ -65,7 +72,7 @@ export async function createLineup({ eventId, label = null, playersPerSide = nul
 }
 
 /** Updates the lineup's own fields (not its players). */
-export async function updateLineup(lineupId, { label, playersPerSide, notes }) {
+export async function updateLineup(lineupId, { label, playersPerSide, squadSize, notes }) {
   const { data: session } = await supabase.auth.getUser()
 
   const patch = { updated_by: session?.user?.id ?? null }
@@ -73,13 +80,14 @@ export async function updateLineup(lineupId, { label, playersPerSide, notes }) {
   // cannot blank the label it never showed.
   if (label !== undefined) patch.label = label
   if (playersPerSide !== undefined) patch.players_per_side = playersPerSide
+  if (squadSize !== undefined) patch.squad_size = squadSize
   if (notes !== undefined) patch.notes = notes
 
   const { data, error } = await supabase
     .from('lineups')
     .update(patch)
     .eq('id', lineupId)
-    .select('id, label, players_per_side, notes')
+    .select('id, label, players_per_side, squad_size, notes')
 
   if (error) throw error
   // ⚠️ THE ZERO-ROW CHECK, NOT `.single()`. `.single()` throws its own opaque

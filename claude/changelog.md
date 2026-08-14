@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🏉 **PICKING A TEAM, AND SHARING IT — phase 1 of match lineups.** Jay's ask:
+- 🏉 **"WHAT IS THE SQUAD SECTION, IT IS EMPTY" — reported by Jay from the live
+  app**, having picked all four U16B players. Nothing was broken: that list is the
+  players NOT yet picked, so picking everyone empties it. ⚠️ **But it had no empty
+  state**, and a heading over an empty card reads as broken — the same defect as
+  the orphaned timezone note on the event form earlier the same day, and jsdom
+  cannot see either. ⚠️ **The heading was also wrong**: "Squad" reads as THE squad
+  (the whole roster), so an empty one looks like the roster failed to load. Now
+  "Still to pick", with TWO different empty states — "everyone is picked" is
+  success, "no players in this squad" is a roster gap for an admin, and saying the
+  first when the second is true sends somebody hunting a bug that is missing data.
+
+- `61b657a` — 🏉 **PICKING A TEAM, AND SHARING IT — phase 1 of match lineups.** Jay's ask:
   a GUI for coaches to select a lineup from players who marked themselves
   available, *with the option to add players who did not*, plus generate-and-share
   to a WhatsApp group, and **the coach chooses how many players per side**.
