@@ -42,14 +42,28 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## One migration each
 
-- **`anon` holds full table privileges on every table in `public`.** Measured
-  14 Aug 2026 across seven tables, all identical. Source is Supabase's default
-  privileges. **Safe today by its POLICIES, not by its grants** — which is the thing
-  this repo's rules say not to rely on. One migration across all of `public` or it is
-  not worth doing.
-- **18 RLS policies call `auth.uid()` bare**, so Postgres re-evaluates per row. Fix is
-  `(select auth.uid())` and changes no meaning. One migration touching all 18, and
-  prove it against an injected fault afterwards.
+- **`anon` holds full table privileges on `public`.** ⚠️ **Re-measured 14 Aug 2026:
+  it is 23 of the 24 tables, not the "seven" this line used to claim** — seven was a
+  sample read as a total. The exception is `photo_backup_runs`, created 13 Aug with
+  an explicit revoke. Source is Supabase's default privileges. **Safe today by its
+  POLICIES, not by its grants** — which is the thing this repo's rules say not to
+  rely on, and it was confirmed safe by measurement: `set local role anon` sees zero
+  rows on ten tables where the same counts unprivileged return real ones.
+  🔧 **Migration and harness WRITTEN, NOT YET APPLIED** —
+  `db/migrations/20260814_revoke_anon_table_privileges.sql` and
+  `db/tests/anon-table-grants.sql`. ⚠️ **It is a PARTIAL fix and says so:** the
+  `postgres` default privilege can be closed, the `supabase_admin` one cannot, so a
+  table created down that path still arrives open. The harness walks every table
+  rather than trusting either default.
+- **18 RLS policies re-evaluate an `auth.*` call per row.** ⚠️ **This line said "call
+  `auth.uid()` bare" and that is wrong in a way that would make a migration miss
+  one:** 17 of the 18 call `auth.uid()`, and the 18th — `invites / invites read own`
+  — calls `auth.jwt()`. The count comes from Supabase's own `auth_rls_initplan`
+  lint; a string search for `auth.uid()` finds only 17. There are **19 bare calls**
+  across those 18 policies, because `calendar_tokens / calendar token own` and
+  `social_ideas / social idea create` carry two each. Fix is `(select auth.uid())`
+  and changes no meaning. Not started. ⚠️ **No policy currently uses the wrapped
+  form**, so there is no partial state to reconcile.
 
 ## Real gaps, no cheap fix
 

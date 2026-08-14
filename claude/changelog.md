@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
+- 🔧 **A MIGRATION TO TAKE TABLE PRIVILEGES OFF `anon`, WRITTEN AND PROVEN BUT
+  NOT YET APPLIED.** `db/migrations/20260814_revoke_anon_table_privileges.sql`
+  with `db/tests/anon-table-grants.sql`. The sibling of 13 Aug's function-execute
+  revoke: same Supabase default, different object type.
+  ⚠️ **`anon` can SELECT, INSERT, UPDATE and DELETE on 23 of the 24 tables** —
+  `photo_backup_runs` is the lone exception. `claude/open-items.md` said "seven
+  tables"; seven was a sample that had been read as a total.
+  ✅ **NOTHING IS EXPOSED TODAY, AND THAT IS MEASURED RATHER THAN ARGUED.**
+  `set local role anon` returns zero rows across ten tables where the same
+  counts, run unprivileged, return real ones — so the zero discriminates.
+  ⚠️ `announcements` reads zero on both sides and proves nothing; it is empty.
+  ⚠️ **ONE POLICY LOOKS LIKE A HOLE AND IS NOT.** `memb no self promotion` has a
+  WITH CHECK that passes for anybody, which would let `anon` insert a membership
+  — except it is **RESTRICTIVE**, not permissive. The predicate alone cannot
+  tell you which; `pg_policies.permissive` can. Do not "fix" it.
+  ⚠️ **THE FIX IS PARTIAL AND THE FILE SAYS SO.** Two default-privilege entries
+  govern new tables in `public`; the `postgres` one was closed, the
+  `supabase_admin` one **refused** — verified by reading `pg_default_acl` back
+  inside a transaction rather than by reading the error. So the harness walks
+  every table instead of trusting a default.
+  ✅ **PROVEN BEFORE BEING WRITTEN DOWN:** migration and harness were run
+  together in a rolled-back transaction — the check passed clean against the
+  migrated schema, then caught a real injected `grant select … to anon`, with
+  the grant confirmed live at the moment of the catch. Production re-measured
+  afterwards and unchanged.
+
 - `46102ad` — ✅ **THE RECEIPTS SHEET NOW SAYS WHO HAS SEEN A NOTICE, NOT ONLY WHO HAS NOT.**
   Found by Jay on the **first real notice ever posted** — U16B, read by one other
   person — where the sheet said *"1 of 6 seen"* above a list of the five who had
@@ -588,7 +614,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   screens that render `crest.png` are deliberately untouched, so only the installed
   icon and the favicon change.
 
-- ⛔ **THE RESTORE DRILL IS TABLED — Jay, 13 Aug 2026: "table the restore drill
+- `4990e1d` — ⛔ **THE RESTORE DRILL IS TABLED — Jay, 13 Aug 2026: "table the restore drill
   until i bring it up again".** Do not start it, do not offer to, do not ask
   again.
   ⚠️ **TABLED IS NOT DONE, AND THE SECTIONS DESCRIBING IT ARE KEPT IN FULL.** He

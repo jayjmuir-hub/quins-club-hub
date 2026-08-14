@@ -1,0 +1,122 @@
+-- 14 Aug 2026 — take table privileges away from `anon` across all of `public`.
+--
+-- The sibling of 20260813_revoke_anon_execute.sql, which did this for FUNCTION
+-- execute. Same cause, same argument, different object type.
+--
+-- ══ WHAT WAS MEASURED, 14 Aug 2026 ════════════════════════════════════════
+--
+-- 23 of the 24 tables in `public` answered TRUE to all four of
+-- has_table_privilege('anon', …) for SELECT, INSERT, UPDATE and DELETE.
+--
+-- The one exception is `photo_backup_runs`, created 13 Aug with an explicit
+-- revoke — the first table in this schema where the default was closed rather
+-- than left to RLS alone. db/tests/photo-backup.sql already asserts it, and
+-- this migration makes that table the rule instead of the exception.
+--
+-- Source is Supabase's own default privilege, not anything this repo wrote:
+--
+--     alter default privileges in schema public
+--       grant all on tables to anon, authenticated, service_role;
+--
+-- So every table has been anon-reachable from the instant it was created, and
+-- will be again for the next one.
+--
+-- ══ ⚠️ WHY THIS CHANGES NOTHING TODAY, AND WHY IT IS STILL WORTH DOING ═════
+--
+-- Nothing is currently exposed. Measured, not reasoned — `set local role anon`
+-- inside a rolled-back transaction, counting rows on ten tables:
+--
+--     clubs 0, teams 0, players 0, profiles 0, memberships 0, events 0,
+--     player_parents 0, player_contacts 0, calendar_tokens 0
+--
+-- ⚠️ AND THAT ZERO IS NOT VACUOUS. The identical counts run WITHOUT dropping
+-- to `anon` returned clubs 1, teams 15, players 14, profiles 20,
+-- memberships 29, events 30, player_parents 17, player_contacts 13,
+-- calendar_tokens 4. The rows are there; `anon` simply cannot see them.
+-- ⚠️ `announcements` was 0 on BOTH sides and proves nothing either way — the
+-- table is genuinely empty. It is named here so nobody later cites it as
+-- evidence.
+--
+-- Writes are shut too. Every policy in `public` is `TO PUBLIC`, so they apply
+-- to `anon` as well, and each one bottoms out in `auth.uid()` — NULL for an
+-- unauthenticated caller — or in a `private.*` helper that does.
+--
+-- ⚠️ ONE POLICY LOOKS LIKE A HOLE AND IS NOT. `memberships / memb no self
+-- promotion` has a WITH CHECK that passes for anybody:
+--
+--     ((is_super = false) AND (coalesce(array_length(admin_rights,1),0) = 0))
+--       OR private.is_super_admin()
+--
+-- If that were PERMISSIVE, `anon` could insert a membership row. It is
+-- **RESTRICTIVE** — it narrows what the permissive `memb manage` admits rather
+-- than admitting anything itself. Checked with pg_policies.permissive, because
+-- the predicate alone cannot tell you which it is. Do not "fix" it.
+--
+-- ⚠️ SO THIS IS THE SAME FINDING AS THE FUNCTION MIGRATION, VERBATIM: the
+-- schema is safe **by its policies, not by its grants.** That is 60-odd
+-- policies and a dozen helper functions, each of which has to keep being right,
+-- forever, on a database holding children's data. A revoke is one thing that
+-- stays true on its own.
+--
+-- ══ ⚠️ WHAT THIS DOES **NOT** CLOSE ═══════════════════════════════════════
+--
+-- Two default-privilege entries exist for tables in `public`, and only one of
+-- them can be altered from here:
+--
+--   set by `postgres`        -> altered below, `anon` removed          ✅
+--   set by `supabase_admin`  -> REFUSED; we are not that role          ❌
+--
+-- Measured by running the alter inside a transaction and reading pg_default_acl
+-- back, not by reading the error. The `supabase_admin` entry still reads
+-- `anon=arwdDxtm/supabase_admin`.
+--
+-- ⚠️ CONSEQUENCE: a table created by OUR migrations (which run as `postgres`)
+-- now arrives with no anon grant. A table created by Supabase's own machinery
+-- as `supabase_admin` still would. **That is why db/tests/anon-table-grants.sql
+-- asserts every table individually and does not trust the default.** A new
+-- table that arrives anon-readable turns that harness red.
+--
+-- ══ WHAT IS DELIBERATELY LEFT ALONE ═══════════════════════════════════════
+--
+-- ⛔ SEQUENCES. `anon` holds rwU on sequences in `public` by the same default.
+-- Out of scope: this migration is about reading and writing rows. Recorded so
+-- the next person knows it was seen and skipped, not missed.
+--
+-- ⛔ `calendar_events_for_token` and `register_my_player` KEEP their anon
+-- EXECUTE — see 20260813_revoke_anon_execute.sql, which explains why at length.
+-- Both are SECURITY DEFINER and run as their owner, so **neither depends on a
+-- table grant held by `anon`** and neither is affected by this file.
+-- ⚠️ The calendar feed is the one thing here that could not be repaired if it
+-- broke: a subscribed URL cannot be changed once a parent's phone holds it.
+-- Smoke-test /calendar.ics after applying.
+--
+-- ⛔ NO `revoke ... from public` STATEMENT, and its ABSENCE is deliberate.
+-- The function migration's sharpest finding was that `from anon` and
+-- `from public` are independent, and three functions survived a revoke because
+-- they carried a PUBLIC grant instead of a named one. **That does not apply
+-- here: no table in `public` carries a PUBLIC grant.** Measured — scanning
+-- every relacl for an aclitem beginning `=` returned zero rows, and no table
+-- has a null ACL. A statement is not added on the strength of a lesson from a
+-- different object type; the harness checks the OUTCOME with
+-- has_table_privilege, which catches either route.
+
+revoke all privileges on all tables in schema public from anon;
+
+-- Stop the next table arriving with the same grant, as far as we are able.
+alter default privileges for role postgres in schema public revoke all on tables from anon;
+
+-- ══ HOW TO VERIFY AFTER APPLYING ══════════════════════════════════════════
+--
+-- Expected: anon 0, authenticated 24, service_role 24.
+-- Measured in a rolled-back transaction before this file was written.
+--
+--   select count(*) filter (where has_table_privilege('anon', c.oid, 'SELECT'))          as anon,
+--          count(*) filter (where has_table_privilege('authenticated', c.oid, 'SELECT')) as authed,
+--          count(*) filter (where has_table_privilege('service_role', c.oid, 'SELECT'))  as service,
+--          count(*)                                                                     as total
+--   from pg_class c join pg_namespace n on n.oid = c.relnamespace
+--   where n.nspname = 'public' and c.relkind = 'r';
+--
+-- Then `npm run db:check -- anon-table-grants`, and smoke-test the calendar
+-- feed — asserting `content-type: text/calendar`, never a bare 200, because
+-- the SPA catch-all answers any unknown path with index.html.
