@@ -937,12 +937,24 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO anon;  -- inert: an
 --
 -- Complete inventory as captured on 2026-08-09 — 29 functions.
 --
--- ⚠️ THIS LINE IS A 9 AUG MEASUREMENT AND HAS ROTTED TWICE SINCE.
+-- ⚠️ THIS LINE IS A 9 AUG MEASUREMENT AND HAS ROTTED THREE TIMES SINCE.
 -- It read "Every one is `SET search_path` pinned EXCEPT
 -- private.squad_expects_gender". Two functions added later were also unpinned
 -- — private.social_idea_owner (12 Aug) and
--- private.events_result_from_components (12 Aug) — and both were pinned on
--- 13 Aug. Count nothing from this list; run the query in README.md.
+-- private.events_result_from_components (12 Aug).
+--
+-- ❌ **AND THE SENTENCE THAT REPLACED IT SAID "both were pinned on 13 Aug",
+-- WHICH WAS HALF TRUE FOR A DAY.** social_idea_owner was.
+-- events_result_from_components was NOT — measured live 14 Aug 2026, found by
+-- running `get_advisors` while checking something else, and pinned that day by
+-- db/migrations/20260814_pin_scoring_trigger_search_path.sql with
+-- `search_path = ''`.
+-- ⚠️ **A HALF-TRUE SENTENCE SURVIVES A READ-THROUGH IN A WAY A FALSE ONE DOES
+-- NOT**, which is why this one lasted a day inside a file whose whole job is to
+-- be the capture. **A prose claim in this file is not a measurement.**
+-- ✅ There is now a harness: `db/tests/search-path.sql` asserts every function
+-- in `private` is pinned except the NAMED exemption, and goes red if the
+-- exemption itself is ever pinned. Count nothing from this list; run that.
 --
 -- The 18 present since the 2026-08-03 capture:
 --   public.accept_invite(uuid)                  SECURITY DEFINER, VOLATILE

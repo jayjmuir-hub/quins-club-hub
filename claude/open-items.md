@@ -109,6 +109,26 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   write genuinely partial rather than all-or-nothing.
 - **Test data cleanup.**
 
+## Supabase security advisor — read through, not yet actioned
+
+Run `get_advisors` rather than trusting this list. As of 14 Aug 2026:
+
+- ✅ **Leaked-password protection no longer appears** — Jay turned it on. Recorded
+  because the evidence is the ABSENCE of a lint, which this repo has misread
+  before; confirm on the dashboard if it ever matters.
+- ✅ **`private.events_result_from_components` is pinned**
+  (`20260814_pin_scoring_trigger_search_path.sql`), and
+  `db/tests/search-path.sql` now guards the whole schema.
+- ⛔ **`private.squad_expects_gender` stays unpinned deliberately.** Do not
+  "finish the job" — the reasoning is in `db/schema/functions.sql` and the
+  harness names it as an exemption rather than counting.
+- ⚠️ **Two lint types are NEWER THAN THE 13 Aug AUDIT and have never been read
+  through**: `SECURITY DEFINER` functions executable by `anon`, and by
+  `authenticated`. Several are deliberate and documented —
+  `calendar_events_for_token` and `register_my_player` keep `anon` on purpose,
+  and `db/tests/grants.sql` §3b asserts it in BOTH directions. **The rest have
+  not been assessed.** This is a read-through, not an alarm.
+
 ## Unexplained
 
 - **One phantom test failure in `tests/notice-board.test.jsx`** does not fit the

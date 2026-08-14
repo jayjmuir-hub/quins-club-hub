@@ -1,0 +1,47 @@
+-- 14 Aug 2026 — pin private.events_result_from_components' search_path.
+--
+-- ══ ⚠️ THE REPO SAID THIS WAS ALREADY DONE, AND THE DATABASE DISAGREED ═════
+--
+-- db/schema/functions.sql states, in as many words, that this function "was
+-- unpinned since 12 Aug" and that it and private.social_idea_owner "were both
+-- pinned on 13 Aug". Measured live 14 Aug 2026: social_idea_owner IS pinned.
+-- This one was NOT. So half of that sentence was true, which is the shape that
+-- makes a claim survive a read-through.
+--
+-- ⚠️ FOUND BY RUNNING get_advisors WHILE CHECKING SOMETHING ELSE, not by
+-- reading. `db/schema/` is a capture of the catalogue and the catalogue is
+-- authoritative — but a PROSE claim inside it is neither, and this one had been
+-- wrong for a day.
+--
+-- ══ WHY THIS FUNCTION MATTERS MORE THAN THE LINT SUGGESTS ═════════════════
+--
+-- It is the trigger that recomputes a fixture's score from its components, and
+-- db/schema/functions.sql already records its purpose as: a tampered request
+-- cannot produce a score contradicting its components. A security-relevant
+-- trigger resolving unqualified names through the caller's search_path is the
+-- exact case lint 0011 exists for.
+--
+-- ══ WHY `''` AND NOT `public` ═════════════════════════════════════════════
+--
+-- The body touches no unqualified object. Its only call is
+-- private.scoring_kinds_for_team(...), already schema-qualified, and that
+-- function carries its own search_path. So the empty path is available here and
+-- is strictly stronger than the `search_path=public` most triggers in this
+-- schema carry — it resolves NOTHING implicitly. Same choice as
+-- private.name_match_key, social_idea_owner, staff_photo_owner and
+-- sync_profile_name.
+--
+-- ⚠️ EXERCISED BEFORE IT WAS APPLIED, in a rolled-back transaction on
+-- production — the pattern this repo uses in place of a Supabase branch, which
+-- does not work here. Pinned, then wrote components to a real fixture and read
+-- the result back: 4 tries returned 20, not 24, because that squad is U10 and
+-- scores TRIES ONLY. **The wrong-looking number is the proof**: a broken
+-- search_path could not have produced a band-correct answer, it would have
+-- raised.
+--
+-- ⚠️ private.squad_expects_gender REMAINS UNPINNED AND THAT IS CORRECT. Its
+-- exemption is documented and unchanged: SECURITY INVOKER, IMMUTABLE, touches
+-- no table, and is not called from any policy. Do not "finish the job" here —
+-- the two were decided differently on purpose, and db/schema/functions.sql
+-- carries the reasoning.
+alter function private.events_result_from_components() set search_path = '';
