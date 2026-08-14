@@ -856,6 +856,63 @@ will propose building.**
   scheduling rather than at anything inside one file.** Whatever gets chased
   first, it is not `tests/admin-dashboard.test.jsx`.
 
+### As of 14 Aug 2026
+
+- ⛔ **SELF-REGISTRATION WAS PUTTING THE WRONG PEOPLE ON THE ROSTER, AND HAD
+  BEEN SINCE IT SHIPPED.** Reported by Jay from the real club. `register_my_player`
+  INSERTed a new `players` row **unconditionally on every call** — there was no
+  uniqueness of any kind, at any layer, on a roster of children.
+  ⚠️ **TWO DIFFERENT FAILURES that look like one problem from the Accounts
+  screen**, and both are still on the live roster:
+  - **One child, two roster spots, two accounts** — U18B Contact.
+    `Yassine Dhaouadi` created by his father's account and
+    `yassine ridha dhaouadi` by the boy's own. Neither account could see the
+    other's row, so neither could possibly notice.
+  - **A parent on the roster as a player** — U14B Contact. The account
+    `Govert Buijs-Bernad` registered `GOVERT BUIJS` (himself) alongside
+    `Juan Buijs-Bernad` (his son). Both landed as role `parent`, so the "Who
+    are you registering?" control was simply left on its default, *My child*.
+  ✅ **FIXED — two server-side guards, `db/migrations/20260814_registration_duplicate_guards.sql`.**
+  `42710` for a name already on that squad, `42809` for the registrant's own
+  name filed as a child.
+  ⚠️ **THE CHECK CANNOT LIVE IN THE CLIENT, AND THIS IS THE REASON THE BUG
+  EXISTED.** A registering parent holds a PENDING membership, so `player read`
+  (`can_see_team`) returns nothing — a client-side "is this already here?"
+  answers **no** every single time. Only the `SECURITY DEFINER` function can see
+  the squad on their behalf. The matching rule therefore lives in SQL and
+  nowhere else (`private.name_match_key`).
+  ⚠️ **FIRST token + LAST token, case- and punctuation-blind**, which is what
+  makes `Yassine Dhaouadi` match `yassine ridha dhaouadi` while correctly
+  leaving `GOVERT BUIJS` and `Juan Buijs-Bernad` alone. `[^[:alnum:]]+` not
+  `[^a-z0-9]+` — the club has accented and Arabic-script names and the
+  unicode-aware class keeps them intact.
+  ⚠️ **TWO SEPARATE CONFIRMATION FLAGS, NOT ONE**, and a harness asserts it: a
+  single "yes I'm sure" would mean confirming *a different child with the same
+  name* also waved through *I am registering myself as my own child*. Different
+  mistakes, different sentences, and a tick may only forgive the one it was
+  shown.
+  ⚠️ **THE GUARDS PROTECTED THE LIVE APP BEFORE ANY DEPLOY.** Both new
+  parameters default to `false` and PostgREST calls by NAME, so the bundle that
+  was already serving resolved to the new function and was immediately guarded —
+  verified against live before applying. The deploy only adds the ticks that let
+  a genuine same-name case through.
+  ⚠️ **AN ENUMERATION ORACLE WAS ACCEPTED KNOWINGLY**: "someone with that name
+  is already registered in U18B" confirms a child's existence to any account
+  with a confirmed email, and a refusal creates no row so the pending cap does
+  not limit probing. Reasoning is in the migration; the message deliberately
+  does not echo the stored spelling.
+  ⛔ **THE TWO BAD ROWS ARE STILL THERE. Deleting a child's record is the club's
+  call, not a migration's** — `GOVERT BUIJS` (U14B) and the duplicate
+  `yassine ridha dhaouadi` (U18B).
+  ❌ **AND THE FORM'S CONFIRM UI HAS NOT BEEN SEEN IN A BROWSER** — there is no
+  sign-up scenario in `harness/`. Covered by five unit tests, proved
+  non-vacuous by injection, and unexercised by a human.
+
+- ⚠️ **THE FLAKY SUITE HIT A FOURTH FILE — `tests/notice-board.test.jsx`**,
+  which failed in a full run and passes 9/9 alone. With `accounts`,
+  `player-form` and `admin-dashboard`, that is four unrelated files. **It is not
+  "the admin-dashboard one".**
+
 ### ⚠️ Test data currently in the live database
 
 Two sets, both to be removed before a pilot:

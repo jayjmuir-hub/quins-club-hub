@@ -200,7 +200,7 @@ describe('Add your player — a signed-in account with no access', () => {
     // shown — which is also the assertion that squads below U13 are untouched
     // by that feature.
     await waitFor(() =>
-      expect(registerMyPlayerMock).toHaveBeenCalledWith('Chidi Okafor', TEAM_U13.id, null, false),
+      expect(registerMyPlayerMock).toHaveBeenCalledWith('Chidi Okafor', TEAM_U13.id, null, false, { confirmDuplicate: false, confirmSelfName: false }),
     )
     expect(registerMyPlayerMock).toHaveBeenCalledTimes(1)
 
@@ -282,7 +282,7 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
       await waitFor(() =>
-        expect(registerMyPlayerMock).toHaveBeenCalledWith('Amara Bello', TEAM_U16G.id, 'female', false),
+        expect(registerMyPlayerMock).toHaveBeenCalledWith('Amara Bello', TEAM_U16G.id, 'female', false, { confirmDuplicate: false, confirmSelfName: false }),
       )
     })
 
@@ -301,7 +301,7 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
       await waitFor(() =>
-        expect(registerMyPlayerMock).toHaveBeenCalledWith('Sam Reid', TEAM_U16G.id, 'male', false),
+        expect(registerMyPlayerMock).toHaveBeenCalledWith('Sam Reid', TEAM_U16G.id, 'male', false, { confirmDuplicate: false, confirmSelfName: false }),
       )
     })
   })
@@ -352,7 +352,7 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
       await waitFor(() =>
-        expect(registerMyPlayerMock).toHaveBeenCalledWith('Tobi Adeyemi', TEAM_SELF.id, null, true),
+        expect(registerMyPlayerMock).toHaveBeenCalledWith('Tobi Adeyemi', TEAM_SELF.id, null, true, { confirmDuplicate: false, confirmSelfName: false }),
       )
     })
 
@@ -374,7 +374,7 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
       await waitFor(() =>
-        expect(registerMyPlayerMock).toHaveBeenCalledWith('Chidi Okafor', TEAM_U13.id, null, false),
+        expect(registerMyPlayerMock).toHaveBeenCalledWith('Chidi Okafor', TEAM_U13.id, null, false, { confirmDuplicate: false, confirmSelfName: false }),
       )
     })
   })
@@ -413,8 +413,8 @@ describe('Add your player — a signed-in account with no access', () => {
       await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalledTimes(2))
       // Order matters: it is the order the parent typed, and it is what makes
       // the partial-failure message below able to name the right child.
-      expect(registerMyPlayerMock.mock.calls[0]).toEqual(['Chidi Okafor', TEAM_U13.id, null, false])
-      expect(registerMyPlayerMock.mock.calls[1]).toEqual(['Ada Okafor', TEAM_U16.id, null, false])
+      expect(registerMyPlayerMock.mock.calls[0]).toEqual(['Chidi Okafor', TEAM_U13.id, null, false, { confirmDuplicate: false, confirmSelfName: false }])
+      expect(registerMyPlayerMock.mock.calls[1]).toEqual(['Ada Okafor', TEAM_U16.id, null, false, { confirmDuplicate: false, confirmSelfName: false }])
       await waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
     })
 
@@ -1180,5 +1180,167 @@ describe('Accounts — the approval queue', () => {
       // here and when.
       expect(await screen.findByText(/when a parent registers a player/i)).toBeInTheDocument()
     })
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════
+//  The duplicate guards — 14 Aug 2026.
+//
+//  ⚠️ THESE ARE ABOUT THE SCREEN, NOT THE RULE. The matching itself lives in
+//  SQL and ONLY in SQL (private.name_match_key), because the registering
+//  parent cannot see the roster they are duplicating: their membership is
+//  pending, so `player read` returns nothing and any client-side "is this
+//  already here?" would answer no every single time. What is tested here is
+//  that the refusal reaches the person, that the way past it is offered on the
+//  right row, and that the two confirmations stay independent.
+//
+//  Both guards exist because of real rows on the live roster:
+//    42710 — U18B had ONE child on it twice, added by his father's account and
+//            by his own, spelled differently.
+//    42809 — U14B had a PARENT on it as a player, because the name box got his
+//            name while "Who are you registering?" stayed on "My child".
+// ══════════════════════════════════════════════════════════════════════════
+
+function refusal(code, message) {
+  const error = new Error(message)
+  error.code = code
+  return error
+}
+
+async function submitOneChild(user, name, teamId) {
+  await user.type(screen.getByLabelText(/player's full name/i), name)
+  await user.selectOptions(screen.getByLabelText(/age group/i), teamId)
+  await user.click(screen.getByRole('button', { name: /add my player/i }))
+}
+
+describe('Add your player — the duplicate guards', () => {
+  it('shows the server’s sentence when the player is already on the roster', async () => {
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue(shellState())
+    registerMyPlayerMock.mockRejectedValue(
+      refusal('42710', 'Someone with that name is already registered in U13.'),
+    )
+
+    renderShell()
+    await submitOneChild(user, 'Chidi Okafor', TEAM_U13.id)
+
+    // ⚠️ THE SERVER'S WORDING, NOT A LOCAL ONE. It names the squad and says
+    // what to do instead, which is the part a parent acts on — src/data/
+    // members.js deliberately keeps 42710 out of REGISTER_MESSAGES so it
+    // survives.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/already registered in U13/i)
+  })
+
+  it('offers a tick, and sends the confirmation only after it is ticked', async () => {
+    const user = userEvent.setup()
+    const reload = vi.fn()
+    useMembershipsMock.mockReturnValue(shellState({ reload }))
+    registerMyPlayerMock.mockRejectedValueOnce(
+      refusal('42710', 'Someone with that name is already registered in U13.'),
+    )
+
+    renderShell()
+    await submitOneChild(user, 'Chidi Okafor', TEAM_U13.id)
+    await screen.findByRole('alert')
+
+    // The first attempt asserted nothing.
+    expect(registerMyPlayerMock).toHaveBeenLastCalledWith('Chidi Okafor', TEAM_U13.id, null, false, {
+      confirmDuplicate: false,
+      confirmSelfName: false,
+    })
+
+    registerMyPlayerMock.mockResolvedValue({ id: 'm-new', status: 'pending' })
+    await user.click(screen.getByRole('checkbox', { name: /different player who happens/i }))
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    // ⚠️ ONLY the duplicate flag. A single "yes I'm sure" would have waved
+    // through the self-name guard as well, which is a different mistake.
+    await waitFor(() =>
+      expect(registerMyPlayerMock).toHaveBeenLastCalledWith('Chidi Okafor', TEAM_U13.id, null, false, {
+        confirmDuplicate: true,
+        confirmSelfName: false,
+      }),
+    )
+  })
+
+  it('offers a different tick when the name is the registrant’s own', async () => {
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue(shellState())
+    registerMyPlayerMock.mockRejectedValueOnce(
+      refusal('42809', 'That is your own name, but you have said you are registering a child.'),
+    )
+
+    renderShell()
+    await submitOneChild(user, 'Chidi Okafor', TEAM_U13.id)
+    await screen.findByRole('alert')
+
+    // ⚠️ THE OTHER TICK, worded for the other mistake. Offering the duplicate
+    // wording here would ask a parent to confirm something nobody said.
+    expect(
+      screen.getByRole('checkbox', { name: /same name as me/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('checkbox', { name: /different player who happens/i }),
+    ).not.toBeInTheDocument()
+
+    registerMyPlayerMock.mockResolvedValue({ id: 'm-new', status: 'pending' })
+    await user.click(screen.getByRole('checkbox', { name: /same name as me/i }))
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    await waitFor(() =>
+      expect(registerMyPlayerMock).toHaveBeenLastCalledWith('Chidi Okafor', TEAM_U13.id, null, false, {
+        confirmDuplicate: false,
+        confirmSelfName: true,
+      }),
+    )
+  })
+
+  it('withdraws the confirmation when the name is edited', async () => {
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue(shellState())
+    registerMyPlayerMock.mockRejectedValueOnce(
+      refusal('42710', 'Someone with that name is already registered in U13.'),
+    )
+
+    renderShell()
+    await submitOneChild(user, 'Chidi Okafor', TEAM_U13.id)
+    await screen.findByRole('alert')
+    await user.click(screen.getByRole('checkbox', { name: /different player who happens/i }))
+
+    // ⚠️ THE POINT OF THE TEST. The tick means "yes, THIS name is deliberate".
+    // Carrying it across a rewrite would let somebody confirm a warning about
+    // one name and then submit a different one with the guard already off.
+    registerMyPlayerMock.mockResolvedValue({ id: 'm-new', status: 'pending' })
+    await user.type(screen.getByLabelText(/player's full name/i), ' Jr')
+    expect(
+      screen.queryByRole('checkbox', { name: /different player who happens/i }),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+    await waitFor(() =>
+      expect(registerMyPlayerMock).toHaveBeenLastCalledWith(
+        'Chidi Okafor Jr',
+        TEAM_U13.id,
+        null,
+        false,
+        { confirmDuplicate: false, confirmSelfName: false },
+      ),
+    )
+  })
+
+  it('offers no tick for a refusal that is not one of the guards', async () => {
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue(shellState())
+    registerMyPlayerMock.mockRejectedValue(
+      refusal('42901', 'You already have 5 players waiting to be approved.'),
+    )
+
+    renderShell()
+    await submitOneChild(user, 'Chidi Okafor', TEAM_U13.id)
+    await screen.findByRole('alert')
+
+    // A pending-cap refusal is not something a tick can forgive, and offering
+    // one would imply it is.
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
 })
