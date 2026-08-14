@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🏆 **A TOURNAMENT IS NAMED, NOT OPPOSED.** Reported by Jay from the live
+- 🏟️ **NO PITCH REQUEST ON AN AWAY MATCH** (Jay). An away fixture is played on
+  somebody else's ground, so there is no pitch of ours to ask for — and offering
+  the button put a request into the allocator's queue for a match the club is not
+  hosting. ⚠️ **The check is a strict `home === false`, NOT `!event.home`.**
+  `EventForm` writes `home: null` for every training and social, so the loose
+  version would have hidden the button from the MAJORITY of the fixtures that
+  want a pitch — the club trains far more often than it plays. A null means
+  "nobody said", not "away", the same rule the dashboard hero follows.
+  ⚠️ **An EXISTING request still shows on an away fixture**, so one switched to
+  Away after the fact can still be withdrawn; what is suppressed is the OFFER,
+  never the record of one already made. First tests to render `PitchRequest` at
+  all — they pin the pre-existing gates too, and both new arms were verified by
+  injecting `!event.home` and watching them fail.
+
+- `58432ba` — 🏆 **A TOURNAMENT IS NAMED, NOT OPPOSED.** Reported by Jay from the live
   schedule: a tournament read **"Quins vs Al Ain Tournament"**. ⚠️ **The cause was
   the REQUIRED OPPONENT FIELD, not the title function.** A match could not be
   saved without an opponent and a tournament has none, so the only way to enter

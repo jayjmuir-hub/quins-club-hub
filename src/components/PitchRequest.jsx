@@ -64,8 +64,28 @@ export default function PitchRequest({ event, canEdit }) {
 
   // A fixture that already has a real pitch has nothing to ask for.
   const allocatedAlready = Boolean((event.pitch ?? '').trim()) && event.pitch !== PITCH_TBD
+
+  // ⚠️ AN AWAY MATCH IS PLAYED ON SOMEBODY ELSE'S GROUND, so there is no pitch
+  // of ours to ask for (Jay, 14 Aug 2026). Offering the button put a request
+  // into the allocator's queue for a fixture the club is not hosting.
+  //
+  // ⚠️ STRICT `=== false`, NOT `!event.home`. The column is nullable and a NULL
+  // means "nobody said", not "away" — the dashboard hero already follows this
+  // rule and renders no home/away chip for a null rather than claiming Away.
+  // `!event.home` would additionally swallow every training and social, whose
+  // `home` is written NULL by EventForm, and those DO need a pitch. Getting this
+  // wrong hides the button from the majority of the fixtures that want it.
+  const isAwayMatch = event.type === 'match' && event.home === false
+
   if (loading) return null
-  if (!request && (!canEdit || allocatedAlready)) return null
+  // ⚠️ `isAway` JOINS THE *NO REQUEST* BRANCH DELIBERATELY, rather than becoming
+  // a blanket early return. A fixture switched to Away AFTER a request was
+  // submitted must still show that request and its Withdraw button — otherwise
+  // the coach cannot take it back and the allocator is left holding a request
+  // for a match nobody is hosting, with nothing on screen pointing at it. Same
+  // reasoning as the decided-request case in this file's header: what is
+  // suppressed is the OFFER, never the record of one already made.
+  if (!request && (!canEdit || allocatedAlready || isAwayMatch)) return null
 
   async function run(work) {
     setBusy(true)
