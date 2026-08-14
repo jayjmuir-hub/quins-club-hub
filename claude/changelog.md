@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- **The app icon is the crest again — wordless, with CLUB HUB above the bat, lightly
+- `7228442` **The app icon is the crest again — wordless, with CLUB HUB above the bat, lightly
   3D.** Jay: *"i've changed my mind, i want to revert back to the original Quins logo
   crest"*, then *"remove all the wording"*, *"put Club Hub inside the logo white part,
   above the bat"*, *"make the logo look somewhat 3d"*, and white for the tile.
@@ -35,7 +35,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   it. Left in place deliberately rather than deleted; see the note below.
   ⚠️ **NOT verified on a real phone** — the only true test of an icon is a home screen.
 
-- `cb0c5e0` ⏳ **NOTICES — THE CLUB NOTICEBOARD, PHASE 1. BUILT, NOT APPLIED, NOT LIVE.**
+- `cb0c5e0` ✅ **NOTICES — THE CLUB NOTICEBOARD, PHASE 1. LIVE.**
   Plan `claude/plans/2026-08-14-notices.md`. `public.announcements` (scoped by
   `team_id`, null meaning the whole club), `public.announcement_reads`, two
   `SECURITY DEFINER` functions for the receipts, `/notices`, the pinned card on
@@ -69,8 +69,84 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Supabase's default privileges, not something notices introduced. Deliberately
   NOT fixed here: tightening two tables would leave the schema inconsistent
   while fixing nothing reachable. Logged in `claude/state-of-play.md` §Open.
-  ⚠️ **Nothing is DEPLOYED.** The tables exist; no bundle serving
-  `adhquins-clubhub.com` mentions them yet.
+  ✅ **DEPLOYED AND VERIFIED IN THE SERVED BUNDLE, 14 Aug 2026** — not in a
+  browser, which the service worker has made a liar before. Fetched
+  `/index.html`, read `/assets/index-B0FJg607.js` out of it, fetched that and
+  searched it: `All notices`, `Post a notice`, `Nothing on the board`,
+  `Take it down`, `announcement_stats` and `announcement_audience` all present.
+  ⚠️ **AND THE SEARCH WAS PROVED NON-VACUOUS**, because a `.Contains` that
+  always returns true proves nothing: the harness fixture strings
+  (`ZZ Probe Squad`, `Sarah Nolan`, `A Volunteer With A Long Name`) and a
+  nonsense control all came back ABSENT from the same bundle.
+  ⚠️ **`Zayed` IS IN THE BUNDLE AND IS NOT A LEAK** — it was used as a control
+  and came back FOUND. `src/screens/EventForm.jsx` has
+  `DEFAULT_VENUE = 'Zayed Sports City, Abu Dhabi'`, so it was always there. A
+  control has to be checked against the source before it is believed.
+  ❌ **STILL UNEXERCISED: no coach has posted a notice and no parent has read
+  one.** The bundle being served is not the feature working.
+
+- ⏳ **THE AUTHOR IS NO LONGER IN THEIR OWN NOTICE'S AUDIENCE.** Jay: *"make the
+  author change"*. `db/migrations/20260814_announcement_author_not_audience.sql`,
+  **applied to production 14 Aug 2026**.
+  ⚠️ **A COACH POSTING TO THEIR OWN SQUAD WAS COUNTED IN THE AUDIENCE THEY WERE
+  WRITING TO**, and the client marks a notice read on render — so the receipts
+  read **"1 of 25 seen"** the instant they pressed Post. The 1 was them and the
+  25 counted them.
+  ⚠️ **IT WAS INVISIBLE IN THE FIRST REAL TEST, WHICH IS THE PART TO CARRY.**
+  That notice was posted by a CLUB-WIDE admin to a squad they are not attached
+  to, so they were already outside its audience and it read a correct "1 of 8".
+  **Whether the author was counted depended on the shape of their membership** —
+  the same screen meant different things for a coach and for an admin, and
+  nothing on it said so.
+  ⚠️ **BOTH FUNCTIONS, OR THE SCREEN CONTRADICTS ITSELF.** `announcement_stats`
+  makes the number and `announcement_audience` makes the list under it; the
+  numerator needs the exclusion as well as the denominator, or a notice can
+  report "1 of 0 seen".
+  ⚠️ **Accepted consequence: a squad whose only active member is the coach now
+  has an audience of ZERO**, so the counter disappears rather than reading
+  "0 of 0" — already the documented behaviour, now reachable in one more case.
+  ✅ Proved in a rolled-back transaction first (6 of 6), applied, then verified
+  live: both functions carry the clause and `anon` is still refused execute.
+  `db/tests/announcements.sql` gains steps 09c–09f and a C2 injection.
+
+- 🐛 **SQUAD CONTACTS SAT FLUSH AGAINST THE CARD ABOVE IT** — reported from a
+  screenshot. ⚠️ **The cause is worth more than the fix: `BlockTitle` carries
+  `mt-[18px] first:mt-0`, and `first:` compiles to `:first-child`, which is
+  scoped to the element's PARENT.** Wrapping a BlockTitle in a `<div>` therefore
+  makes it that div's first child and silently zeroes its top margin. **The two
+  other wrapped BlockTitles on that screen already carry a compensating margin**,
+  which is exactly why this read as a one-off rather than as a pattern.
+  ⚠️ **No test in the suite could see it** — jsdom applies no CSS. Pinned as a
+  class token, the same proxy (and the same admission of being one) as
+  `tests/page-header-wrap.test.js`.
+
+- ⏳ **VIEW-AS IS A DROPDOWN IN THE MASTHEAD, ON EVERY SCREEN.** Jay: *"i want
+  to be able to select view as with a drop down from any screen, as an admin"*.
+  Ruling: `claude/decisions/2026-08-14-view-as-everywhere.md`.
+  ⚠️ **THIS OVERTURNS THE 7 Aug DECISION on its conclusion and NOT on its
+  reasoning.** That one moved the control out of the masthead because an **84px
+  text pill** truncated the club wordmark to "ABU DHABI HARLE…" — every item in
+  that row is `shrink-0` except the wordmark, so the wordmark eats all overflow.
+  It is now a **32px icon** and the persona is stated by `ViewAsBanner` directly
+  above instead. **Do not put the persona text back on the trigger.**
+  ✅ **MEASURED IN CHROMIUM, NOT REASONED**: trigger 32px, wordmark 257/257 not
+  truncated, **296px of slack left** — and the slack is a probe result that
+  matches the measured `flex-1` spacer exactly. Menu fits at 375px and 320px
+  with no document overflow; Escape closes and returns focus.
+  ⚠️ **THE FIRST PROBE WAS A BROKEN CHECK AND READ AS A PASS.**
+  `scrollWidth > clientWidth` never fires here — it reported "not truncated" at
+  every width down to a 142px box. The wordmark re-flows rather than overflowing
+  its own box, so the working detector compares the NATURAL TEXT WIDTH
+  (`Range.selectNodeContents`) against the box.
+  ⚠️ **Rows are labelled "Coach"/"Parent" under a squad heading, and each
+  carries an `aria-label` of "Coach of U12 Boys"** — a visual heading is a
+  visual association only, and without it a screen reader gets fifteen buttons
+  all called "Coach".
+  ⚠️ **`AdminDashboard` lost its copy** rather than keeping a second one, and
+  its "change who you are previewing **below**" copy was reworded — "below" now
+  points at nothing.
+  ⚠️ **Escape, outside-click and focus-return are hand-written now** that this
+  is not a `Sheet`. `tests/view-as.test.jsx` is what stands behind them.
 
 ## 13 Aug 2026
 

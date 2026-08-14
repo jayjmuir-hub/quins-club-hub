@@ -114,31 +114,46 @@ beforeEach(() => {
 
 describe('ViewAsSwitcher trigger', () => {
   it('renders for a real admin', () => {
-    renderAdmin(ctx())
+    renderShell(ctx())
 
-    expect(screen.getByTestId('view-as-trigger')).toHaveTextContent('View as')
+    expect(screen.getByTestId('view-as-trigger')).toBeInTheDocument()
   })
 
-  // ⚠️ THE REGRESSION THIS FILE NOW EXISTS TO HOLD (7 Aug 2026).
+  // ⚠️ THE 7 Aug ASSERTION WAS "is NOT in the masthead" AND IT IS NOW ITS
+  // OPPOSITE (Jay, 14 Aug 2026: from any screen). The reasoning behind the old
+  // one has NOT been repealed and is pinned by the two tests below instead:
   //
-  // The switcher used to sit in the masthead. An admin's masthead row —
-  // crest 46 | wordmark | role pill 75 | account 77 | View-as 84 | nav 492 —
-  // does not fit inside its max-w-[1120px] cap, and the wordmark is the only
-  // item in that row without shrink-0, so it absorbed the whole overflow and
-  // rendered "ABU DHABI HARLE…". A wider screen cannot fix that, because the
-  // row is capped.
+  //   The masthead row is crest | wordmark | spacer | role pill | App | account
+  //   | THIS | nav, and the wordmark is the only item without `shrink-0`, so it
+  //   absorbs every overflow and truncates to "ABU DHABI HARLE…". On 7 Aug this
+  //   control was an 84px TEXT PILL and that is exactly what happened.
   //
-  // Putting ANY new control back into the masthead re-breaks it. This asserts
-  // the switcher specifically is not there.
-  it('is NOT in the masthead — that is what truncated the club wordmark', () => {
+  // What changed is the control: it is a 32px icon and the persona lives in the
+  // banner. So the rule this file now holds is not "keep it out" but "keep it
+  // SMALL and keep the words out of it".
+  it('IS in the masthead, on an ordinary screen and not only on /admin', () => {
     renderShell(ctx())
 
     const masthead = document.querySelector('header')
     expect(masthead).toBeTruthy()
-    expect(masthead.querySelector('[data-testid="view-as-trigger"]')).toBeNull()
-    // ...and on a screen that is not /admin it is absent entirely, rather
-    // than merely relocated within the shell.
-    expect(screen.queryByTestId('view-as-trigger')).not.toBeInTheDocument()
+    expect(masthead.querySelector('[data-testid="view-as-trigger"]')).not.toBeNull()
+  })
+
+  // ⚠️ THE WORDMARK GUARD, AND THE REASON THE OLD RULING EXISTED. jsdom applies
+  // no CSS and cannot measure a layout overflow — that is why the 7 Aug bug
+  // reached production — so this pins the two properties that keep the control
+  // cheap instead: a FIXED small box, and no persona text inside it.
+  it('costs the masthead a fixed 32px and never grows with the persona', () => {
+    renderShell(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
+
+    const trigger = screen.getByTestId('view-as-trigger')
+    expect(hasClassToken(trigger, 'h-8')).toBe(true)
+    expect(hasClassToken(trigger, 'w-8')).toBe(true)
+    // The wrapper is what sits in the flex row, so that is what must not shrink.
+    expect(hasClassToken(trigger.parentElement, 'shrink-0')).toBe(true)
+    // ⚠️ AND THE PERSONA IS NOT WRITTEN IN IT. "Coach, Senior Men 2nd XV" is
+    // 200px+ of text; putting it back is precisely what broke the wordmark.
+    expect(trigger.textContent).not.toMatch(/coach|parent|u12|boys/i)
   })
 
   // The way OUT of a preview must not have moved with the way in. The banner
@@ -167,80 +182,81 @@ describe('ViewAsSwitcher trigger', () => {
     expect(screen.queryByTestId('view-as-trigger')).not.toBeInTheDocument()
   })
 
-  it('is desktop-only: hidden below the 820px breakpoint, shown at and above it', () => {
-    renderAdmin(ctx())
+  // ⚠️ NOT desktop-only ANY MORE, and this is the assertion that delivers
+  // "from any screen". The old control carried `hidden desktop:block`; a phone
+  // is a screen, and an admin standing on a touchline is exactly who wants to
+  // check what a parent can see.
+  it('is shown at every width, not hidden below the desktop breakpoint', () => {
+    renderShell(ctx())
 
     const trigger = screen.getByTestId('view-as-trigger')
-    expect(hasClassToken(trigger, 'hidden')).toBe(true)
-    // `desktop:block`, not `desktop:flex` — truncate needs a block box, and a
-    // flex container ignores text-overflow on its children.
-    expect(hasClassToken(trigger, 'desktop:block')).toBe(true)
+    expect(hasClassToken(trigger, 'hidden')).toBe(false)
+    expect(hasClassToken(trigger, 'desktop:block')).toBe(false)
   })
 
-  // ⚠️ It sits on a LIGHT surface now, not the dark chrome. The masthead
-  // version was bg-white/10 + text-white, which on the Admin screen is white
-  // on near-white — present in the DOM, invisible to a person. jsdom applies
-  // no CSS and cannot see that, so the token is pinned instead.
-  it('is styled for the light Admin surface, not the dark masthead', () => {
-    renderAdmin(ctx())
+  // ⚠️ IT IS BACK ON THE DARK CHROME, so it is back to white-on-translucent.
+  // The version that lived on the Admin screen was bg-surface-card + text-brand
+  // because that screen is white-on-near-white; those tokens on the near-black
+  // masthead are the same bug in reverse. jsdom applies no CSS and cannot see
+  // either, so the tokens are pinned.
+  it('is styled for the dark masthead chrome, not the light Admin surface', () => {
+    renderShell(ctx())
 
     const trigger = screen.getByTestId('view-as-trigger')
-    expect(hasClassToken(trigger, 'bg-surface-card')).toBe(true)
-    expect(hasClassToken(trigger, 'text-brand')).toBe(true)
-    expect(hasClassToken(trigger, 'text-white')).toBe(false)
-    expect(hasClassToken(trigger, 'bg-white/10')).toBe(false)
+    expect(hasClassToken(trigger, 'text-white')).toBe(true)
+    expect(hasClassToken(trigger, 'bg-surface-card')).toBe(false)
   })
 
-  it('names the current persona once a preview is active', () => {
-    renderAdmin(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
-
-    // The VISIBLE text is the persona alone; the banner above states it in
-    // full, so the button does not repeat "Viewing as".
-    expect(screen.getByTestId('view-as-trigger')).toHaveTextContent('Coach, U12 Boys')
-  })
-
-  // The injected fault for the test above: dropping the prefix from the
-  // visible label must NOT drop it from the accessible name, or the control
-  // is announced as the bare string "Coach, U12 Boys" with nothing saying it
-  // is a preview or that activating it changes one.
-  it('keeps the full sentence in the accessible name', () => {
-    renderAdmin(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
+  // ⚠️ THE STATE IS NOT CARRIED BY COLOUR ALONE (claude/specs/accessibility.md).
+  // The visible difference is a ring plus a dot; the dot is aria-hidden, so the
+  // accessible name is what has to say a preview is running.
+  it('says it is previewing in the accessible name, not only in the styling', () => {
+    renderShell(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
 
     const trigger = screen.getByTestId('view-as-trigger')
     expect(trigger).toHaveAccessibleName(/currently viewing as Coach, U12 Boys/i)
     expect(trigger).toHaveAttribute('title', expect.stringMatching(/viewing as/i))
   })
 
-  // Not load-bearing for the wordmark any more, but still worth holding: an
-  // unbounded "Coach, Senior Men 2nd XV" reflows the Admin header row every
-  // time the persona changes.
-  it('bounds its own width', () => {
-    renderAdmin(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
+  it('is announced as "View as" when no preview is running', () => {
+    renderShell(ctx())
 
-    const trigger = screen.getByTestId('view-as-trigger')
-    expect(hasClassToken(trigger, 'max-w-[16ch]')).toBe(true)
-    expect(hasClassToken(trigger, 'truncate')).toBe(true)
-    // shrink-0 as well: the cap bounds the maximum, this stops flexbox
-    // squeezing it to nothing on a narrow desktop and reflowing the row.
-    expect(hasClassToken(trigger, 'shrink-0')).toBe(true)
+    expect(screen.getByTestId('view-as-trigger')).toHaveAccessibleName('View as')
   })
 })
 
-// These drive the sheet, so they render the screen the trigger now lives on.
-// The two that start with a preview already active go through the Admin
-// screen's PREVIEWING branch — which is exactly the path that exists so an
-// admin can change persona without exiting first, and this is what holds it.
-describe('ViewAsSwitcher sheet', () => {
+// ⚠️ A DROPDOWN, NOT A `Sheet`, SINCE 14 Aug 2026 (Jay asked for one by name).
+// These render through the shell on an ORDINARY screen, because that is the
+// change: the picker is no longer reachable only from /admin.
+//
+// ⚠️ THE THREE BEHAVIOURS `Sheet` USED TO PROVIDE ARE NOW HAND-WRITTEN, so they
+// need holding here — Escape, outside-click and focus return. The account link
+// two elements along in the masthead is deliberately a plain <Link> BECAUSE
+// nobody wanted to write them; if these tests are ever deleted, that comment in
+// AppShell.jsx becomes the only thing standing behind them.
+describe('ViewAsSwitcher menu', () => {
+  it('opens from an ordinary screen, not only from /admin', async () => {
+    const user = userEvent.setup()
+    renderShell(ctx())
+
+    expect(screen.queryByTestId('view-as-menu')).not.toBeInTheDocument()
+    await user.click(screen.getByTestId('view-as-trigger'))
+    expect(screen.getByTestId('view-as-menu')).toBeInTheDocument()
+  })
+
   it('offers All age groups first, then a Coach and a Parent entry per team', async () => {
     const user = userEvent.setup()
-    renderAdmin(ctx())
+    renderShell(ctx())
 
     await user.click(screen.getByTestId('view-as-trigger'))
 
-    const dialog = screen.getByRole('dialog')
-    const options = Array.from(dialog.querySelectorAll('button'))
-      .map((button) => button.textContent.replace('Current', '').trim())
-      .filter((label) => label.length > 0)
+    const menu = screen.getByTestId('view-as-menu')
+    // ⚠️ THE ACCESSIBLE NAME, NOT THE VISIBLE TEXT. The rows read "Coach" and
+    // "Parent" under a squad heading; without the aria-label a screen reader
+    // gets fifteen buttons all called "Coach". That is what this asserts.
+    const options = Array.from(menu.querySelectorAll('button')).map(
+      (button) => button.getAttribute('aria-label') ?? button.textContent.replace('Current', '').trim(),
+    )
 
     expect(options).toEqual([
       'All age groups (Admin)',
@@ -251,48 +267,92 @@ describe('ViewAsSwitcher sheet', () => {
     ])
   })
 
-  it('picking a coach persona sets viewAs with that role and team, and closes the sheet', async () => {
+  it('picking a coach persona sets viewAs with that role and team, and closes the menu', async () => {
     const user = userEvent.setup()
-    renderAdmin(ctx())
+    renderShell(ctx())
 
     await user.click(screen.getByTestId('view-as-trigger'))
-    await user.click(screen.getByRole('button', { name: 'Coach of U14 Girls' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Coach of U14 Girls' }))
 
     expect(setViewAsMock).toHaveBeenCalledWith({ role: 'coach', teamId: 't2' })
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('view-as-menu')).not.toBeInTheDocument()
   })
 
   it('picking a parent persona sets the parent role', async () => {
     const user = userEvent.setup()
-    renderAdmin(ctx())
+    renderShell(ctx())
 
     await user.click(screen.getByTestId('view-as-trigger'))
-    await user.click(screen.getByRole('button', { name: 'Parent in U12 Boys' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Parent in U12 Boys' }))
 
     expect(setViewAsMock).toHaveBeenCalledWith({ role: 'parent', teamId: 't1' })
   })
 
   it('All age groups (Admin) exits the preview', async () => {
     const user = userEvent.setup()
-    renderAdmin(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
+    renderShell(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
 
     await user.click(screen.getByTestId('view-as-trigger'))
-    await user.click(screen.getByRole('button', { name: /All age groups \(Admin\)/ }))
+    await user.click(screen.getByRole('menuitem', { name: /All age groups \(Admin\)/ }))
 
     expect(setViewAsMock).toHaveBeenCalledWith(null)
   })
 
   it('still lists every team while previewing — the list is built from the real set', async () => {
-    // Regression guard: built from the EFFECTIVE set, this list would
-    // collapse to the single previewed team and the admin could only ever
-    // hop between coach and parent of that one age group.
+    // Regression guard: built from the EFFECTIVE set, this list would collapse
+    // to the single previewed team and the admin could only ever hop between
+    // coach and parent of that one age group.
     const user = userEvent.setup()
-    renderAdmin(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
+    renderShell(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
 
     await user.click(screen.getByTestId('view-as-trigger'))
 
-    expect(screen.getByRole('button', { name: 'Coach of U14 Girls' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Parent in U14 Girls' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Coach of U14 Girls' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Parent in U14 Girls' })).toBeInTheDocument()
+  })
+
+  it('closes on Escape and gives focus back to the trigger', async () => {
+    const user = userEvent.setup()
+    renderShell(ctx())
+
+    const trigger = screen.getByTestId('view-as-trigger')
+    await user.click(trigger)
+    expect(screen.getByTestId('view-as-menu')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByTestId('view-as-menu')).not.toBeInTheDocument()
+    // ⚠️ Without the focus return, Escape drops the caret to <body> and a
+    // keyboard user restarts from the top of the document every time they
+    // change their mind.
+    expect(trigger).toHaveFocus()
+  })
+
+  it('closes when the pointer goes down outside it', async () => {
+    const user = userEvent.setup()
+    renderShell(ctx())
+
+    await user.click(screen.getByTestId('view-as-trigger'))
+    expect(screen.getByTestId('view-as-menu')).toBeInTheDocument()
+
+    await user.click(document.body)
+
+    expect(screen.queryByTestId('view-as-menu')).not.toBeInTheDocument()
+  })
+
+  // ⚠️ THE INJECTED FAULT FOR THE TEST ABOVE. The outside-click handler tests
+  // the WRAPPER, which holds the trigger and the panel. Testing the panel alone
+  // would count a click on the trigger as "outside" — closing and instantly
+  // reopening, which reads as the menu refusing to shut.
+  it('the trigger still toggles closed rather than double-firing', async () => {
+    const user = userEvent.setup()
+    renderShell(ctx())
+
+    const trigger = screen.getByTestId('view-as-trigger')
+    await user.click(trigger)
+    await user.click(trigger)
+
+    expect(screen.queryByTestId('view-as-menu')).not.toBeInTheDocument()
   })
 })
 
@@ -428,24 +488,25 @@ describe('anti-soft-lock: previewing as a parent', () => {
     expect(setViewAsMock).toHaveBeenCalledWith(null)
   })
 
-  // ⚠️ REPOINTED, NOT RELAXED (7 Aug 2026). The trigger moved out of the
-  // masthead onto /admin, so this now renders /admin — but the requirement is
-  // unchanged and still the highest-risk one in the plan: an admin previewing
-  // as a parent is NOT an admin by the effective set, and the control that
-  // gets them back must still be reachable.
+  // ⚠️ REPOINTED TWICE, AND STRENGTHENED BOTH TIMES. On 7 Aug the trigger moved
+  // out of the masthead onto /admin, so this rendered /admin and the requirement
+  // hung entirely on AdminDashboard's PREVIEWING branch. Since 14 Aug the
+  // trigger is in the shell, so this renders an ORDINARY screen: the admin gets
+  // out from wherever they happen to be standing, not just from the one screen
+  // the preview has taken away from them.
   //
-  // Reaching it depends entirely on AdminDashboard's PREVIEWING branch. If
-  // that branch is ever removed, this goes red — which is the point. The
-  // banner's Exit is tested separately as the always-available second route,
-  // so the two are not one anchor wearing two hats.
-  it('keeps the switcher trigger on screen, with every team still selectable', async () => {
+  // The requirement is unchanged and is still the highest-risk one in the plan:
+  // while previewing as a parent, isAdmin(memberships) is FALSE, and every gate
+  // in ViewAsSwitcher reads realMemberships instead. If any of them is ever
+  // switched to the effective set, this goes red.
+  it('keeps the switcher trigger on screen on ANY screen, with every team still selectable', async () => {
     const user = userEvent.setup()
-    renderAdmin(previewingAsParent())
+    renderShell(previewingAsParent())
 
     await user.click(screen.getByTestId('view-as-trigger'))
 
-    expect(screen.getByRole('button', { name: /All age groups \(Admin\)/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Coach of U14 Girls' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /All age groups \(Admin\)/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Coach of U14 Girls' })).toBeInTheDocument()
   })
 
   it('the effective set really is the parent one — the shell shows the parent role label', () => {
@@ -456,26 +517,24 @@ describe('anti-soft-lock: previewing as a parent', () => {
 })
 
 describe('effective vs real scoping', () => {
-  // Renders BOTH children in one tree on purpose: the whole value of this
-  // test is seeing the two scopes side by side in a single render — the
-  // screen narrowed to the previewed team, the switcher still holding all of
-  // them. Splitting it into two renders would lose exactly that.
-  // (AdminDashboard is here because the switcher moved onto it, 7 Aug 2026.)
+  // The whole value of this test is seeing the two scopes side by side in a
+  // SINGLE render — the screen narrowed to the previewed team, the switcher
+  // still holding all of them. Splitting it into two renders would lose that.
+  //
+  // ⚠️ AdminDashboard USED TO BE MOUNTED HERE PURELY TO REACH THE TRIGGER
+  // (7 Aug). It is gone because the trigger is in the shell now, which makes
+  // this a cleaner test of the actual claim rather than a tour of one screen.
   it('a child screen sees only the previewed team, while the switcher still sees all', async () => {
     const user = userEvent.setup()
     renderShell(
       ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }),
-      <>
-        <ScopedChild />
-        <AdminDashboard />
-      </>,
     )
 
     expect(screen.getByTestId('scoped-teams')).toHaveTextContent('U12 Boys')
     expect(screen.getByTestId('scoped-teams')).not.toHaveTextContent('U14 Girls')
 
     await user.click(screen.getByTestId('view-as-trigger'))
-    expect(screen.getByRole('button', { name: 'Coach of U14 Girls' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Coach of U14 Girls' })).toBeInTheDocument()
   })
 
   it('with no preview, a child screen sees every team', () => {

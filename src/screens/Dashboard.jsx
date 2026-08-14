@@ -854,9 +854,23 @@ export default function Dashboard() {
 
           The block disappears entirely for somebody attached to no squad — an
           admin whose only membership has a null team_id, which is Jay's own
-          second account. */}
+          second account.
+
+          ⚠️ `mt-[18px]` ON THE WRAPPER IS LOAD-BEARING AND ITS ABSENCE IS
+          INVISIBLE IN JSDOM. BlockTitle carries `mt-[18px] first:mt-0`, and
+          `first:` compiles to `:first-child` — which is scoped to the element's
+          PARENT, not to the page. So wrapping a BlockTitle in a div makes it
+          that div's first child and silently zeroes its top margin: the heading
+          then sits flush against whatever card precedes it. Reported from a
+          screenshot on 14 Aug 2026, SQUAD CONTACTS jammed against the fixture
+          card above it.
+
+          ⚠️ THE TWO OTHER WRAPPED USES ON THIS SCREEN (the Upcoming grid and
+          the Quick actions column) ALREADY CARRY THIS MARGIN for the same
+          reason, which is why this read as a one-off rather than as a pattern.
+          If you add a third wrapper around a BlockTitle, it needs this too. */}
       {myTeams.length > 0 && (staffByTeam || staffError) && (
-        <div data-testid="squad-staff-block">
+        <div data-testid="squad-staff-block" className="mt-[18px]">
           <BlockTitle>Squad contacts</BlockTitle>
           {staffError ? (
             // ⚠️ SAID OUT LOUD RATHER THAN RENDERED AS "nobody yet". A failed
