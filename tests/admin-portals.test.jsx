@@ -190,19 +190,27 @@ describe('PortalChooser', () => {
     expect(pitchCard).toHaveTextContent(/super admin can add it on the Accounts screen/i)
   })
 
-  // ⚠️ THIS IS WHAT MAKES THE CHOOSER WORTH A CLICK for an admin holding a
-  // single portal — the switcher lives there. If it is ever moved back into
-  // every portal, the extra click buys nothing and the chooser becomes a
-  // speed bump.
-  it('carries the View-as switcher, which portals do not', () => {
+  // ⚠️ THE 12 Aug RULE WAS "the chooser carries the View-as switcher, which
+  // portals do not", AND IT IS GONE — 14 Aug 2026, Jay: from any screen. The
+  // switcher is in the masthead now, so the chooser and every portal are on
+  // equal terms and NEITHER renders one of its own.
+  //
+  // ⚠️ THE ASSERTION IS KEPT RATHER THAN DELETED, INVERTED TO PIN THE NEW RULE:
+  // no screen under /admin may grow its own copy. Two copies of one control
+  // drift, and the two would have sat six inches apart doing the same job.
+  //
+  // ⚠️ These render AdminDashboard WITHOUT AppShell, so the masthead is not in
+  // the tree at all — which is exactly what makes this a test of the SCREEN
+  // rather than of the shell. tests/view-as.test.jsx covers the masthead copy.
+  it('grows no View-as switcher of its own — nor does any portal', () => {
     useMembershipsMock.mockReturnValue(memberships(admin(['pitches'])))
     const { unmount } = renderAt('/admin')
-    expect(screen.getByRole('button', { name: 'View as' })).toBeInTheDocument()
+    expect(screen.queryByTestId('view-as-trigger')).not.toBeInTheDocument()
     unmount()
 
     useMembershipsMock.mockReturnValue(memberships(admin(['pitches'])))
     renderAt('/admin/allocation')
-    expect(screen.queryByRole('button', { name: 'View as' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('view-as-trigger')).not.toBeInTheDocument()
   })
 
   it('shows no tab row on the chooser itself', () => {

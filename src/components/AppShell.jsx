@@ -10,7 +10,7 @@ import AddYourPlayer from './AddYourPlayer.jsx'
 import RequestAccess from './RequestAccess.jsx'
 // ViewAsBanner only — the switcher itself moved to the Admin screen on
 // 7 Aug 2026. See the long note at its old call site below.
-import { ViewAsBanner } from './ViewAsSwitcher.jsx'
+import { ViewAsBanner, ViewAsSwitcher } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 import Button from './Button.jsx'
 import InstallPrompt from './InstallPrompt.jsx'
@@ -464,7 +464,27 @@ export default function AppShell({ children }) {
               )}
             </Link>
 
-            {/* ⚠️ ViewAsSwitcher USED TO BE HERE, AND MUST NOT COME BACK.
+            {/* ⚠️ ViewAsSwitcher IS BACK HERE AS OF 14 Aug 2026, AND THE NOTE
+                BELOW IS KEPT BECAUSE ITS MEASUREMENT STILL BINDS.
+                Jay: "i want to be able to select view as with a drop down from
+                any screen, as an admin" — which this row is the only place that
+                delivers, since AppShell wraps every routed screen.
+
+                ⚠️ WHAT CHANGED IS THE CONTROL, NOT THE CONSTRAINT. The 84px
+                text pill measured below is now a 32px ICON BUTTON, and the
+                persona it used to spell out is stated by ViewAsBanner directly
+                above instead — in full, at every width. The wordmark is still
+                the only item in this row without `shrink-0`, so it still
+                absorbs every overflow, and the 12 Aug probe still says the row
+                breaks at +190px with ~66px unspent.
+
+                ⚠️ SO THE OLD RULING IS OVERTURNED ON ITS CONCLUSION AND NOT ON
+                ITS REASONING. Do not put the persona text back on the trigger;
+                re-measure with the probe before changing its width at all.
+                claude/decisions/2026-08-14-view-as-everywhere.md
+
+                --- the 7 Aug note, kept verbatim ---
+                ViewAsSwitcher USED TO BE HERE, AND MUST NOT COME BACK.
                 Moved to the Admin screen on 7 Aug 2026 (Jay's call).
 
                 The masthead row cannot fit an admin's full complement at its
@@ -491,6 +511,7 @@ export default function AppShell({ children }) {
                 occasionally, that screen is already desktop-only, and
                 ViewAsBanner below still gives one-click Exit from anywhere,
                 so nobody can get stranded in a preview. */}
+            <ViewAsSwitcher />
 
             {/* Admin is admin-only, and gates on the EFFECTIVE membership
                 set (the same one AdminDashboard itself reads), so an admin

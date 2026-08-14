@@ -1,6 +1,5 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import Card from '../components/Card.jsx'
-import { ViewAsSwitcher } from '../components/ViewAsSwitcher.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin } from '../lib/scope.js'
 import { portalForPath, portalLabel } from '../lib/portals.js'
@@ -59,14 +58,19 @@ function PreviewingNotice() {
       <h2 className="sr-only">Admin</h2>
       <Card className="p-6 text-center">
         <h3 className="text-base font-extrabold text-ink">You&apos;re previewing the app</h3>
+        {/* ⚠️ THE COPY NAMES THE MASTHEAD, AND IT HAS TO. This card used to
+            render its own <ViewAsSwitcher /> and say "change who you are
+            previewing BELOW". The control moved into the masthead on 14 Aug
+            2026 and is now on every screen, so the word "below" pointed at
+            nothing — the exact shape of dead instruction this repo has shipped
+            before (the availability button that drew itself and swallowed the
+            tap). Both ways out are at the top of the screen now: the eye button
+            changes the persona, Exit preview ends it. */}
         <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-ink-muted">
           Admin tools are hidden while you preview, because you are seeing the app as
-          someone else sees it. Change who you are previewing below, or use Exit preview
-          at the top of the screen to come back.
+          someone else sees it. Use the eye button at the top of the screen to change who
+          you are previewing, or Exit preview to come back.
         </p>
-        <div className="mt-4 flex justify-center">
-          <ViewAsSwitcher />
-        </div>
       </Card>
     </section>
   )
@@ -153,28 +157,23 @@ export default function AdminDashboard() {
       </Card>
 
       <div className="hidden desktop:block">
-        {/* ViewAsSwitcher lives HERE, not in the masthead (moved 7 Aug 2026,
-            Jay's call). The masthead could not fit an admin's full row at its
-            1120px cap and was truncating the club wordmark to "ABU DHABI
-            HARLE…" — the reasoning is written out in full at its old call
-            site in AppShell.jsx.
+        {/* ⚠️ ViewAsSwitcher NO LONGER LIVES HERE — 14 Aug 2026, Jay: "i want
+            to be able to select view as with a drop down from any screen, as an
+            admin". It is in the masthead, which AppShell renders around every
+            routed screen, so this screen was the ONE place it did not need to
+            be repeated.
 
-            This screen is the right home for it regardless: the control is
-            admin-only, used occasionally rather than constantly, and this
-            screen is already gated to admins AND already desktop-only, which
-            is exactly the switcher's own audience and its own width rule.
+            ⚠️ IT WAS REMOVED RATHER THAN LEFT IN PLACE ALONGSIDE, and that is
+            the point: two copies of one control drift, and on this screen they
+            would have been six inches apart doing the same job. The same
+            reasoning src/lib/portals.js gives for one tab list read by two
+            things.
 
-            ⚠️ Starting a preview from here immediately removes this screen —
-            the /admin gate reads the EFFECTIVE membership set, so previewing
-            as a coach drops the admin's own access to it. That is correct and
-            is the whole point of the preview, and it is not a trap: the
-            ViewAsBanner AppShell still renders at every width carries the
-            Exit button, so the way back never depended on this screen. */}
-        {/* ⚠️ THE SWITCHER RENDERS ON THE CHOOSER ONLY, and that is what makes
-            the chooser worth a click for an admin holding a single portal —
-            it is where the control lives. Repeating it inside every portal
-            would put an occasionally-used admin tool at the top of the weekly
-            allocation screen. */}
+            ⚠️ Starting a preview immediately removes this screen — the /admin
+            gate reads the EFFECTIVE membership set, so previewing as a coach
+            drops the admin's own access to it. That is correct and is the whole
+            point of the preview, and it was never a trap: ViewAsBanner carries
+            Exit at every width, and now the trigger is up there too. */}
         <div className="mb-3.5 mt-1 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             {portal && (
@@ -189,7 +188,6 @@ export default function AdminDashboard() {
               {portal ? portalLabel(portal) : 'Admin'}
             </h2>
           </div>
-          {!portal && <ViewAsSwitcher />}
         </div>
 
         {/* ⚠️ NO TAB ROW FOR A ONE-TAB PORTAL. A row of a single tab is chrome
