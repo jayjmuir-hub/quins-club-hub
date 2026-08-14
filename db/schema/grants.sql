@@ -439,3 +439,38 @@ GRANT EXECUTE ON FUNCTION public.announcement_stats() TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.announcement_audience(uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.announcement_audience(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.announcement_audience(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.lineups / public.lineup_players — TABLE grants  (captured 14 Aug 2026)
+--
+-- Captured from information_schema.table_privileges after applying
+-- 20260814_match_lineups.sql — NOT pasted from the migration, which is the whole
+-- point of this file. The two disagree, and the disagreement is the useful part.
+--
+-- ⚠️ THE MIGRATION GRANTED `SELECT, INSERT, UPDATE, DELETE`. THE CAPTURE SHOWS
+-- `authenticated` ALSO HOLDING `TRUNCATE`, `REFERENCES` AND `TRIGGER`, which it
+-- never granted. Same cause as the note on `announcement_reads` above: Supabase's
+-- own `alter default privileges in schema public grant all on tables to anon,
+-- authenticated, service_role`. Recorded as FOUND.
+--
+-- ⚠️ `TRUNCATE` IS THE ONE WORTH KNOWING ABOUT, BECAUSE TRUNCATE BYPASSES RLS.
+-- It is inert through the API — PostgREST exposes SELECT/INSERT/UPDATE/DELETE and
+-- has no TRUNCATE route — so nothing a client can send reaches it. It is NOT new
+-- and NOT specific to these tables: the same default has applied to every table
+-- in `public`. Left alone deliberately rather than revoked on two tables while
+-- twenty-four others keep it, which would make the schema less consistent, not
+-- more. **If it is ever tidied, tidy it schema-wide in its own migration.**
+--
+-- ✅ `anon` DOES NOT APPEAR FOR EITHER TABLE, AND THAT IS THE LOAD-BEARING LINE.
+-- The 14 Aug grants sweep revoked anon across `public`, but it revoked EXISTING
+-- tables — it did not change the DEFAULT PRIVILEGES that decide what a NEW one
+-- gets, and `pg_default_acl` still holds a supabase_admin entry that includes
+-- anon. The migration's explicit `revoke all ... from anon` is why anon is absent
+-- here. Fault-injected against live the same day: `set local role anon; select
+-- from lineups` raises 42501 — refused by the GRANT, not merely returned empty.
+-- ---------------------------------------------------------------------
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lineups        TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lineup_players TO authenticated;
+REVOKE ALL ON public.lineups        FROM anon;
+REVOKE ALL ON public.lineup_players FROM anon;
