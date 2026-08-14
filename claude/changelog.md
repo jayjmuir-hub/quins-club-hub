@@ -10,7 +10,41 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- ✅ **THE FLAKY SUITE IS FIXED, AND IT WAS ONE CONFIG LINE.**
+- ✅ **THE SUITE IS A QUARTER FASTER, AND THERE IS FINALLY A COMMAND FOR THE
+  EDIT-TEST LOOP.** `npm run test:watch` (reruns only what your save affects)
+  and `npm run test:related -- <file>`. `CLAUDE.md` now says which to use when.
+  ⚠️ **THE POINT IS THE LOOP, NOT THE TOTAL.** A full run was ~40s and was being
+  used as feedback while editing. Watch mode is 1-3s per save.
+  ✅ **`userEvent` NOW DEFAULTS TO `delay: null`.** user-event's default is an
+  awaited macrotask between EVERY KEYSTROKE, and on a suite that types into this
+  many forms that was most of the wall clock. Measured: `invite-form` **11.8s →
+  4.7s**, and the whole suite at four workers — the shape of the CI runner —
+  **77.9s → ~59s**. All 2189 tests pass either way.
+  ⚠️ **SAFE ONLY BECAUSE NOTHING IN THIS APP DEBOUNCES A KEYSTROKE, and that was
+  checked rather than assumed** — the only debounce in `src/` is the realtime
+  subscription, which already takes an injectable `debounceMs`. A future
+  debounced input must pass its own delay.
+  ⚠️ **PATCHED IN `src/test/setup.js`, NOT AT THE 283 CALL SITES.** Editing every
+  `userEvent.setup()` in 46 files measured ~5s FASTER again (~55s), and was
+  rejected: it fixes today's tests and silently loses the speed the first time
+  somebody writes a new one the ordinary way.
+  ⚠️ **A STATIC IMPORT THERE BREAKS THE SUITE, AND THE ONE NODE-ENVIRONMENT FILE
+  CAUGHT IT.** `setup.js` runs for every test file including
+  `tests/test-timeout.test.js`, which declares `@vitest-environment node`;
+  user-event reads `window.navigator` at import time, so the failure is
+  `Cannot read properties of undefined (reading 'navigator')` in a file that
+  never mentions user-event. It is imported conditionally.
+  ⛔ **`pool: 'threads'` WAS TRIED AND MUST NOT BE ADOPTED.** ~9% faster and it
+  BREAKS: **eleven test files mutate `process.env.TZ`** and threads share one
+  process, so it leaks. Measured failures — `expected 25 to be 24` in
+  `event-format`, `expected 21 to be 20` in `schedule`, both date off-by-one.
+  Forks isolate by process, which is the only reason the current suite is
+  correct. **Do not re-propose it without first removing the TZ mutation.**
+  ⚠️ **NOT DONE, AND STILL AVAILABLE:** 35 test files never touch the DOM and
+  still pay ~1.4s each to build a jsdom. A sample of ten measured **3.94s →
+  2.76s** under `--environment=node`.
+
+- `bed0619` ✅ **THE FLAKY SUITE IS FIXED, AND IT WAS ONE CONFIG LINE.**
   `vite.config.js` now sets `testTimeout: 15000`; vitest's default is 5000.
   Guard: `tests/test-timeout.test.js`.
   ⚠️ **IT WAS NEVER CROSS-FILE STATE.** The heaviest tests here legitimately cost

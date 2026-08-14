@@ -8,6 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:watch": "vitest",
+    "test:related": "vitest related --run",
     "test:integration": "VITEST_MODE=integration vitest run --passWithNoTests",
     "docs:check": "node scripts/docs-check.mjs",
     "db:check": "node scripts/db-check.mjs",
