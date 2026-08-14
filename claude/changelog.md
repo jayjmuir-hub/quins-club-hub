@@ -10,6 +10,41 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
+- `15ef4e8` ✅ **The `state-of-play.md` rebuild itself** — 56 lines,
+  `claude/open-items.md` new, `writing-to-github-from-claude.md` 55. Detail below.
+
+- ✅ **THE SCORING TRIGGER'S `search_path` IS PINNED, AND THE REPO HAD CLAIMED IT
+  ALREADY WAS.** `db/migrations/20260814_pin_scoring_trigger_search_path.sql`,
+  applied to production and verified live.
+  ⚠️ **THE CLAIM WAS HALF TRUE, WHICH IS WHY IT SURVIVED.**
+  `db/schema/functions.sql` said `social_idea_owner` and
+  `events_result_from_components` "were both pinned on 13 Aug". The first was.
+  The second was not, for a day, inside the file whose whole job is to be the
+  capture. **A prose claim in a schema capture is not a measurement.**
+  ⚠️ **FOUND BY RUNNING `get_advisors` WHILE CHECKING SOMETHING ELSE** — Jay
+  asked whether leaked-password protection had taken. It had; this had not.
+  ⚠️ **IT MATTERS MORE THAN THE LINT SUGGESTS**: that trigger recomputes a
+  fixture's score from its components, and its stated job is that a tampered
+  request cannot produce a score contradicting them.
+  ⚠️ **`search_path = ''`, NOT `public`** — the body's only call is already
+  schema-qualified, so the empty path is available and is strictly stronger.
+  ✅ **EXERCISED BEFORE IT WAS APPLIED**, in a rolled-back transaction on
+  production. **4 tries returned 20, not the 24 predicted — and the wrong-looking
+  number is the proof**: that squad is U10 and scores TRIES ONLY, so a broken
+  search_path could not have produced a band-correct answer, it would have
+  raised.
+  ✅ **`db/tests/search-path.sql` IS NEW** — every function in `private` must be
+  pinned except a NAMED exemption, and it goes red if the exemption itself is
+  ever pinned. ⚠️ **Named, not counted**: a "at most one unpinned" rule stays
+  green while the wrong function drifts. Proved by injecting a real unpinned
+  function and watching it raise, plus a self-test arm inside the file.
+
+- ❌ **AND THE REBUILT `state-of-play.md` CARRIED A STALE FACT WITHIN THE HOUR.**
+  Its "test data in the live database" section warned about a seeded September
+  that **no longer exists — zero rows, measured the same day**. It was copied
+  from the old file without being re-run, which is exactly the failure the
+  rebuild was for. Corrected, and the correction left in place as the lesson.
+
 - `60f7093` ✅ **`writing-to-github-from-claude.md` emptied and rebuilt** — see the
   entry below; it keeps only the routes that work and the traps that have bitten.
 

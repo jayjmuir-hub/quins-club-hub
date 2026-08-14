@@ -67,8 +67,7 @@ select t.name from teams t where not exists (
 
 ## Test data still in the live database
 
-A seeded September, all carrying one `group_id`:
-`delete from events where group_id = '5eed0000-0000-4000-8000-000000000001';`
-⚠️ **"Seeded" does not mean safe to modify** — a real completed match sheet hangs
-off one of those fixtures. Select a test row by its id after looking at it, never
-by the group.
+**None known.** ⚠️ The seeded September this file warned about for a week is
+**gone — measured 14 Aug 2026, zero rows.** That warning was carried into this
+rebuilt file from the old one without being re-run, which is precisely the
+failure this file was rebuilt to stop. **Measure before you repeat.**
