@@ -6,7 +6,7 @@ import {
   eventDate,
   eventTitle,
   formatTableDate,
-  formatTime,
+  eventTimeLabel,
   hasResult,
   resultOutcome,
   resultScore,
@@ -158,7 +158,7 @@ export default function ScheduleTable({ events, teamsById, onSelect, emptyMessag
                     <span data-testid="schedule-date" className="font-bold">
                       {formatTableDate(date)}
                     </span>
-                    <span className="ml-2 text-[13px] text-ink-faint">{formatTime(date)}</span>
+                    <span className="ml-2 text-[13px] text-ink-faint">{eventTimeLabel(event)}</span>
                   </td>
 
                   <td className={CELL}>

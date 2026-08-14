@@ -7,7 +7,7 @@ import { listPitches, findPitchClashes, PITCH_TBD } from '../data/pitches.js'
 import { listPitchRequests, allocatePitch, declinePitch } from '../data/pitchRequests.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
-import { clubToday, eventDate, eventEndDate, eventTitle, formatTime } from '../lib/eventFormat.js'
+import { clubToday, eventDate, eventEndDate, eventTimeLabel, eventTitle, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PitchMonth, PitchWeek } from '../components/PitchCalendar.jsx'
 import {
@@ -470,7 +470,7 @@ export default function Allocation() {
                               teamsById.get(event.team_id)?.name ?? eventTitle(event),
                             )}
                             <span className="block text-[11px] font-semibold opacity-90">
-                              {formatTime(eventDate(event))}
+                              {eventTimeLabel(event)}
                               {clash ? ' · clash' : ''}
                             </span>
                           </span>
@@ -631,7 +631,7 @@ export default function Allocation() {
                 </span>
                 <span className="text-ink-muted">
                   {' · '}
-                  {formatTime(eventDate(event))} · {eventTitle(event)}
+                  {eventTimeLabel(event)} · {eventTitle(event)}
                 </span>
               </li>
             ))}

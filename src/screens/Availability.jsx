@@ -6,7 +6,7 @@ import { listAvailability, setAvailability, subscribeAvailability } from '../dat
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, childPlayerIds } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
-import { eventDate, eventTitle, formatLongDate, formatTime } from '../lib/eventFormat.js'
+import { eventDate, eventTimeLabel, eventTitle, formatLongDate } from '../lib/eventFormat.js'
 
 // The availability / RSVP sheet (Task 16, design-system.md §4.23's bar +
 // legend has no screen-level mockup — this is new functionality Task 16
@@ -202,7 +202,7 @@ export default function Availability({ event, team, onClose }) {
       <div className="mb-4">
         <h3 className="text-[17px] font-extrabold leading-tight text-ink">{eventTitle(event)}</h3>
         <p className="mt-1 text-[13px] font-semibold text-ink-muted">
-          {team?.name ?? 'Age group not set'} · {formatLongDate(date)} · {formatTime(date)}
+          {team?.name ?? 'Age group not set'} · {formatLongDate(date)} · {eventTimeLabel(event)}
         </p>
       </div>
 

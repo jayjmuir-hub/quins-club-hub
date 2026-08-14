@@ -6,7 +6,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listIdeas, markIdea, removeIdea, signIdeaPhoto } from '../data/socialIdeas.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
-import { eventDate, formatTime } from '../lib/eventFormat.js'
+import { eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 
 // The post-idea inbox. Any member submits; the manager marks and removes.
@@ -219,7 +219,7 @@ export default function SocialIdeas() {
                       month: 'short',
                     })}
                     {' · '}
-                    {formatTime(eventDate(idea.events))}
+                    {eventTimeLabel(idea.events)}
                   </p>
                 )}
 

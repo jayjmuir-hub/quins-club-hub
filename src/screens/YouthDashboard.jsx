@@ -8,7 +8,7 @@ import { listEvents } from '../data/events.js'
 import { listMatchSheetsFor } from '../data/matchSheets.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
-import { clubToday, eventDate, formatTime } from '../lib/eventFormat.js'
+import { clubToday, eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { deadlineLabel, isOverdue, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
@@ -221,7 +221,7 @@ export default function YouthDashboard() {
                     month: 'short',
                   })}
                   {' · '}
-                  {formatTime(eventDate(event))}
+                  {eventTimeLabel(event)}
                   {/* ⚠️ The true RCM deadline, which differs by age band even
                       though one editor serves them all. */}
                   {deadline ? ` · ${deadlineLabel(deadline)}` : ''}

@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🔗 **A LINK PREVIEW, SO A SHARED LINK STOPS SHOWING AN UPSCALED FAVICON.**
+- 🗓️ **"WE DON'T KNOW YET", AS A THING A FIXTURE CAN SAY — plus R0 and a duration
+  shortcut.** Jay's three asks on the event form. ⚠️ **The migration
+  (`db/migrations/20260814_competition_tbd_and_time_tbd.sql`) MUST BE APPLIED
+  BEFORE THIS DEPLOYS**, or a coach picking TBD gets a raw CHECK violation.
+  ⚠️ **`'tbd'` does NOT reopen the `'friendly'` ruling** refused on 12 Aug: that
+  rejected a value which already had a representation, and `'tbd'` had none —
+  NULL still means a friendly and nothing may collapse the two.
+  ⚠️ **The TBD start time is a FLAG, never a nullable `starts_at`** — that column
+  is the sort key of every read path, and a NULL there loses a fixture from a
+  list silently rather than erroring. The app writes midnight club time as the
+  placeholder, and **nothing may infer TBD from that midnight**; the flag is the
+  only truth. ⚠️ **R0 needed no migration but 0 IS FALSY** — every renderer was
+  checked for `round != null` before it was added. The calendar feed emits an
+  **all-day** entry for a TBD kick-off rather than a made-up 00:00, which is why
+  the migration also recreates `calendar_events_for_token`.
+  See `claude/schema-history.md`.
+
+- `c8e805e` — 🔗 **A LINK PREVIEW, SO A SHARED LINK STOPS SHOWING AN UPSCALED FAVICON.**
   Reported by Jay: sharing the club hub link on WhatsApp gave "a very blurry
   logo". ⚠️ **The cause was not a broken image — `index.html` carried NO Open
   Graph tags at all**, so WhatsApp fell back to the only image it could find,

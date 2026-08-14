@@ -4,7 +4,7 @@ import {
   dateBoxParts,
   eventDate,
   eventTitle,
-  formatTime,
+  eventTimeLabel,
   hasResult,
   resultLabel,
   resultOutcome,
@@ -103,7 +103,7 @@ export function FixtureRow({ event, teamName, onSelect }) {
         <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12.5px] text-ink-faint">
           <span className="flex items-center gap-1">
             <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            {formatTime(date)}
+            {eventTimeLabel(event)}
           </span>
           {/* ⚠️ VENUE AND PITCH RENDERED SEPARATELY, not through venueLine().
               A KNOWN pitch is the one thing a parent standing at a 12-pitch

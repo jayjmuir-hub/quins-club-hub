@@ -95,20 +95,25 @@ describe('Competition — league or tournament', () => {
     expect(select.tagName).toBe('SELECT')
   })
 
-  it('offers Round 1-8 for a league fixture, and nothing outside that', async () => {
+  // ⚠️ WIDENED 14 Aug 2026 (Jay): R0 was added, so this used to assert that
+  // "Round 0" was ABSENT and now asserts it is present. The 9 is unchanged and
+  // is the half of this test still doing its original job — the set is closed,
+  // and a ninth round is a conversation rather than a value to accept silently.
+  // The empty option's wording moved from "Not set" to "TBD" in the same
+  // breath, to match the competition dropdown and the pitch picker.
+  it('offers Round 0-8 for a league fixture, and nothing outside that', async () => {
     const { user } = renderForm()
     await screen.findByLabelText(/^competition$/i)
     await user.selectOptions(screen.getByLabelText(/^competition$/i), 'league')
 
     const round = screen.getByLabelText(/^round$/i)
     expect(round.tagName).toBe('SELECT')
-    for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    for (const n of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
       expect(within(round).getByText(`Round ${n}`)).toBeInTheDocument()
     }
     expect(within(round).queryByText('Round 9')).not.toBeInTheDocument()
-    expect(within(round).queryByText('Round 0')).not.toBeInTheDocument()
     // ⚠️ Not knowing the round yet is normal and must be sayable.
-    expect(within(round).getByText(/not set/i)).toBeInTheDocument()
+    expect(within(round).getByText(/TBD/i)).toBeInTheDocument()
   })
 
   it('offers the four regular tournaments plus an escape hatch', async () => {

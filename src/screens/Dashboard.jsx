@@ -25,13 +25,14 @@ import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import {
   clubToday,
   eventDate,
+  eventTimeLabel,
   eventTitle,
   formatLongDate,
   formatTime,
   hasResult,
   nextEventLabel,
-  titleRepeatsType,
   sortByStart,
+  titleRepeatsType,
   venueLine,
 } from '../lib/eventFormat.js'
 
@@ -263,7 +264,7 @@ function NextFixtureHero({ event, teamName }) {
         </span>
         <span className="flex items-center gap-1.5">
           <ClockIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-          {formatTime(date)}
+          {eventTimeLabel(event)}
         </span>
         {venueLine(event) && (
           <span className="flex items-center gap-1.5">

@@ -260,6 +260,62 @@ export function formatTimeRange(start, end) {
 }
 
 /**
+ * The label used wherever a fixture's kick-off is shown. Matches `Pitch TBD`,
+ * the wording the pitch picker already settled on.
+ */
+export const TIME_TBD = 'Time TBD'
+
+/**
+ * Whether this event's stored clock time is a placeholder rather than a
+ * kick-off (added 14 Aug 2026, Jay).
+ *
+ * ⚠️ THE FLAG IS THE ONLY TRUTH, AND THIS FUNCTION IS WHY IT IS A FUNCTION
+ * RATHER THAN A `.time_tbd` READ AT TWELVE CALL SITES. `starts_at` is
+ * `timestamptz NOT NULL` and stays that way — the schedule orders, ranges and
+ * pages on it — so a TBD fixture still holds a real instant, and the app writes
+ * midnight club time as the placeholder. NOTHING MAY INFER TBD FROM THAT
+ * MIDNIGHT: a genuine 00:00 social is a legal fixture, and reading the clock to
+ * decide would render it as "time unknown" forever. The column comment in
+ * db/migrations/20260814_competition_tbd_and_time_tbd.sql says the same from the
+ * other side.
+ *
+ * Strict `=== true` so a row that has not selected the column — an older cached
+ * read, a narrower `select` — is treated as "has a time", which is the state
+ * every fixture in the database had before the column existed.
+ */
+export function isTimeTbd(event) {
+  return event?.time_tbd === true
+}
+
+/**
+ * "7:30 PM", or "Time TBD" when the kick-off is not yet known.
+ *
+ * ⚠️ TAKES THE EVENT, NOT A DATE, and that is the whole point: `formatTime`
+ * cannot see the flag, so every call site that renders an event's time from
+ * `formatTime(eventDate(event))` would silently print the placeholder midnight.
+ * Prefer this at every event-facing call site. `formatTime` stays for the places
+ * that format an instant which is not an event's kick-off at all — a notice's
+ * read receipt, a pitch request's window.
+ */
+export function eventTimeLabel(event) {
+  if (isTimeTbd(event)) return TIME_TBD
+  return formatTime(eventDate(event))
+}
+
+/**
+ * The detail sheet's "6:00 PM – 7:30 PM", TBD-aware.
+ *
+ * ⚠️ NO RANGE IS EVER SHOWN FOR A TBD FIXTURE, and it cannot be: the database
+ * refuses an `ends_at` while `time_tbd` is true (`events_no_end_when_time_tbd`),
+ * because a real finish against a placeholder midnight would render as a
+ * fifteen-hour event in every parent's calendar.
+ */
+export function eventTimeRangeLabel(event) {
+  if (isTimeTbd(event)) return TIME_TBD
+  return formatTimeRange(eventDate(event), eventEndDate(event))
+}
+
+/**
  * "Mon 01 Sept" — the desktop schedule table's date cell.
  *
  * ⚠️ THIS EXISTS BECAUSE ScheduleTable.jsx WAS DOING IT ITSELF. It called

@@ -1,6 +1,6 @@
 import Card from './Card.jsx'
 import { dayKey, dayKeyOf, monthGrid, sameDay, weekDays } from '../lib/calendarGrid.js'
-import { eventDate, formatTime } from '../lib/eventFormat.js'
+import { eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PITCH_TBD } from '../data/pitches.js'
 
@@ -62,7 +62,7 @@ function WeekEntry({ event, clash, label }) {
     >
       <span className="block text-[12px] font-extrabold leading-tight">{label}</span>
       <span className="block text-[11.5px] font-semibold leading-tight opacity-90">
-        {formatTime(eventDate(event))}
+        {eventTimeLabel(event)}
         {/* The pitch is the point of this screen, so it is never omitted —
             "waiting for a pitch" is a state somebody has to act on, and a blank
             would read as "no pitch needed". */}

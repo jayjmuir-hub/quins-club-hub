@@ -99,6 +99,14 @@ type Event = {
   league_team_name?: string | null
   league_division?: string | null
   round?: number | null
+  // Added 14 Aug 2026 (db/migrations/20260814_competition_tbd_and_time_tbd.sql).
+  //
+  // ⚠️ OPTIONAL FOR THE SAME REASON AS EVERY FIELD ABOVE IT, and here the
+  // fallback genuinely matters: until that migration is applied this arrives
+  // `undefined`, and `undefined !== true` means every fixture keeps the timed
+  // entry it has today. Deploying this function before the migration therefore
+  // changes nothing rather than breaking the feed.
+  time_tbd?: boolean | null
 }
 
 /**
@@ -198,9 +206,64 @@ function endFor(event: Event, start: Date): Date {
   return new Date(start.getTime() + (DURATION_MINUTES[event.type] ?? 90) * 60_000)
 }
 
+// ══ ALL-DAY ENTRIES, FOR A FIXTURE WHOSE KICK-OFF IS NOT SET ═══════════════
+//
+// Jay, 14 Aug 2026. `time_tbd` says the clock time in starts_at is a
+// placeholder (the app writes midnight club time). Emitting that as a timed
+// entry would put "00:00" in every subscribed parent's calendar — the same
+// class of invented value as the per-type duration guess above, except this one
+// would be flatly wrong rather than approximate.
+//
+// ⚠️ THE ZONE IS NOT OPTIONAL HERE. `starts_at` is UTC and the club is UTC+4, so
+// the placeholder midnight is stored as 20:00 the PREVIOUS day. Formatting the
+// instant in UTC would put every TBD fixture on the wrong date — a day early,
+// silently, for every reader. Asia/Dubai is the same CLUB_TIME_ZONE the app
+// pins in src/lib/eventFormat.js and for the same reason.
+const CLUB_TIME_ZONE = 'Asia/Dubai'
+
+/** The club's calendar date for an instant, as ICS's DATE value: "20260815". */
+function icsDate(value: Date): string {
+  // en-CA renders ISO-ordered YYYY-MM-DD, which is exactly the shape wanted
+  // once the separators come out. The LOCALE is pinned here — unlike the app's
+  // display formatters, which take the reader's — because this is a wire
+  // format, not something a human reads.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: CLUB_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+    .format(value)
+    .replace(/-/g, '')
+}
+
+/**
+ * The day after an ICS DATE, because RFC 5545 §3.6.1 makes DTEND EXCLUSIVE for
+ * a DATE-valued event: a one-day entry on the 15th is DTSTART 20260815 /
+ * DTEND 20260816. Omitting DTEND, or repeating DTSTART, gives a zero-length
+ * all-day event that clients render inconsistently and some drop entirely.
+ *
+ * ⚠️ DONE IN CALENDAR ARITHMETIC, NOT BY ADDING 86,400,000ms TO THE INSTANT.
+ * The instant is 20:00 UTC on the previous day, so adding a day to it and
+ * re-formatting would work by luck; Date.UTC on the parsed parts rolls the
+ * month and the year correctly and cannot be knocked out by an offset change.
+ */
+function icsDatePlusOneDay(yyyymmdd: string): string {
+  const year = Number(yyyymmdd.slice(0, 4))
+  const month = Number(yyyymmdd.slice(4, 6))
+  const day = Number(yyyymmdd.slice(6, 8))
+  const next = new Date(Date.UTC(year, month - 1, day + 1))
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${next.getUTCFullYear()}${pad(next.getUTCMonth() + 1)}${pad(next.getUTCDate())}`
+}
+
 function toVEvent(event: Event, stamp: string): string[] {
   const start = new Date(event.starts_at)
   const end = endFor(event, start)
+  // ⚠️ STRICT === true, matching src/lib/eventFormat.js's isTimeTbd. An
+  // `undefined` from a pre-migration feed function must read as "has a time",
+  // which is what every fixture in the database was before the column existed.
+  const allDay = event.time_tbd === true
 
   const description: string[] = []
   // ⚠️ FIRST, AHEAD OF THE COMPETITION. DESCRIPTION is the line a phone
@@ -211,6 +274,12 @@ function toVEvent(event: Event, stamp: string): string[] {
   // ⚠️ EMPTY STRING WHEN THE FIXTURE IS NOT A LEAGUE MATCH, so nothing is
   // pushed and the description is byte-identical to what it was before this
   // change for every friendly, training and social.
+  // ⚠️ AHEAD OF EVERYTHING, INCLUDING THE LEAGUE LABEL. An all-day entry with
+  // no explanation reads as "this lasts all day", which is a different and
+  // wrong claim — the day is known and the kick-off is not. DESCRIPTION
+  // truncates from the right on a phone, so this has to be the first thing in
+  // it or it is the first thing lost.
+  if (allDay) description.push('Kick-off time to be confirmed')
   const league = leagueLabel(event)
   if (league) description.push(league)
   if (event.competition) description.push(event.competition)
@@ -229,8 +298,15 @@ function toVEvent(event: Event, stamp: string): string[] {
     // of creating a duplicate every time the feed is polled.
     `UID:${event.id}@quins.adhjrt.com`,
     `DTSTAMP:${stamp}`,
-    `DTSTART:${icsStamp(start)}`,
-    `DTEND:${icsStamp(end)}`,
+    // ⚠️ `;VALUE=DATE` IS WHAT MAKES IT ALL-DAY, and both properties must carry
+    // it — a DATE DTSTART with a DATE-TIME DTEND is invalid and clients disagree
+    // wildly about how to recover from it.
+    ...(allDay
+      ? [
+          `DTSTART;VALUE=DATE:${icsDate(start)}`,
+          `DTEND;VALUE=DATE:${icsDatePlusOneDay(icsDate(start))}`,
+        ]
+      : [`DTSTART:${icsStamp(start)}`, `DTEND:${icsStamp(end)}`]),
     `SUMMARY:${escapeText(summaryFor(event))}`,
   ]
   const location = locationFor(event)

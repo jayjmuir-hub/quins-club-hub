@@ -16,7 +16,7 @@ import {
 import { useMemberships } from '../lib/memberships.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import { canEditTeam } from '../lib/scope.js'
-import { eventDate, formatTime } from '../lib/eventFormat.js'
+import { eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { deadlineLabel, isOverdue, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
 import {
@@ -857,7 +857,7 @@ export default function MatchSheet() {
               <th className={`${CELL} text-left`}>VENUE</th>
               <td className={CELL} colSpan={3}>{event.venue || ''}</td>
               <th className={`${CELL} text-left`}>KICK OFF TIME</th>
-              <td className={CELL}>{formatTime(kickOff)}</td>
+              <td className={CELL}>{eventTimeLabel(event)}</td>
             </tr>
             <tr>
               <th className={`${CELL} text-left`}>COMPETITION</th>
