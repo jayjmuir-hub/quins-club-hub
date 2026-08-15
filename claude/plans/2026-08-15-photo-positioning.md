@@ -1,7 +1,7 @@
 # Photo positioning — drag and drop, and where the face is
 
-**STATUS: PHASE 1 BUILT AND MERGED. PHASES 2-5 NOT STARTED. THE MIGRATION IS
-WRITTEN AND NOT APPLIED.**
+**STATUS: PHASES 1 AND 2 SHIPPED — the picker, the columns and the write path,
+all applied to production 15 Aug 2026. PHASES 3-5 NOT STARTED.**
 
 Jay, 15 Aug 2026:
 
@@ -57,18 +57,32 @@ is the enhancement. The file input is real, focusable and carries `accept`;
 `isAcceptableImage()` exists because **drag-and-drop bypasses `accept` entirely**,
 so without it the two routes into the same field would disagree.
 
-## Phase 2 — the column and the write path (not started)
+## Phase 2 — the column and the write path ✅ applied 15 Aug 2026
 
-`db/migrations/20260815_photo_focal_point.sql` is written and **not applied** —
-applying it to production is Jay's call.
+`20260815_photo_focal_point.sql` and `20260815_photo_focus_write_path.sql`, both
+applied to production. Two smallints per table with a range CHECK, not one text
+column: the value is user-controlled and ends up in a style attribute, and two
+integers cannot carry anything else. Null means centre, so nothing changed
+visually.
 
-Two smallints per table with a range CHECK, not one text column: the value is
-user-controlled and ends up in a style attribute, and two integers cannot carry
-anything else. Null means centre, so nothing changes visually until somebody
-drags.
+⚠️ **PROVED THE CHECK BITES** rather than trusting the migration's success —
+`update … set photo_focus_x = 999` inside a transaction raised `check_violation`
+and the transaction was rolled back, so no real row moved.
 
-Then extend `set_my_photo` and `set_own_player_photo` to carry the point, keeping
-authorisation where it already is rather than adding a new write path.
+⚠️ **NEW FUNCTIONS, NOT NEW ARGUMENTS.** `set_my_photo_focus` and
+`set_own_player_photo_focus`, because defaulted parameters on the existing
+functions would create an OVERLOAD and PostgREST resolves an RPC by the JSON keys
+it is given — an existing call carrying only `_photo_path` would become
+ambiguous. It also matches what a person does: repositioning should not require
+re-uploading. Authorisation is copied from the function each sits beside, not
+generalised.
+
+⚠️ **AND `revoke … from public` DID NOT REMOVE THE `anon` GRANT.** Supabase's
+default privileges grant EXECUTE to `anon` explicitly, and revoking from the
+PUBLIC pseudo-role leaves that untouched — `proacl` still read `anon=X` after the
+usual revoke/grant pair. **This repo's own advisor walk recorded that finding
+hours earlier and it was reproduced anyway.** Fixed with an explicit
+`revoke … from anon`; both RPCs now 404 to an anon key.
 
 ## Phase 3 — wire the existing fields (not started)
 
