@@ -17,7 +17,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- ⚙️ **CI MOVES TO NODE 24, AND EIGHT TEST FILES LEAVE jsdom BEHIND THEM.** All
+- 📦 **THE FIRST DEPENDABOT BATCH — the grouped minor and patch updates.**
+  `@supabase/supabase-js` 2.45 → 2.112, `@testing-library/user-event` 14.5 → 14.6,
+  `postcss` 8.4 → 8.5.
+  ⚠️ **THE SUITE PASSING PROVES ALMOST NOTHING ABOUT THE SUPABASE JUMP**, and that
+  is worth saying out loud: every test file mocks `@supabase/supabase-js`, so 2413
+  green tests exercise the mock and not the client. Sixty-seven minor versions of
+  the app's entire data layer went unverified by the thing that looked like it
+  was verifying them. Checked separately against the LIVE API instead: the new
+  client makes a real RPC call (`calendar_events_for_token`, bogus token, 0 rows)
+  and an anon read of `teams` is still refused with `permission denied for table
+  teams` — the grant-level refusal the 14 Aug revoke introduced, intact.
+  ⚠️ **EVERY DEPENDABOT PULL REQUEST FAILS `docs-check` ON ARRIVAL, BY DESIGN AND
+  NOT BY FAULT.** The changelog's one-behind rule requires each pull request to
+  cite the previous merge's squash SHA, and Dependabot does not write changelog
+  entries. So a dependency bump needs a human commit adding its entry and the
+  citation before it can go green — which is the correct outcome rather than a
+  workaround, because these bumps DEPLOY and belong in the changelog like
+  anything else. Expect it; do not "fix" `docs-check`.
+
+- `d480aa2` — ⚙️ **CI MOVES TO NODE 24, AND EIGHT TEST FILES LEAVE jsdom BEHIND THEM.** All
   three workflows pinned Node 20; both dev PCs run 24, and that gap was not
   cosmetic — `@supabase/supabase-js` needs a global `WebSocket`, which jsdom
   supplies and Node 20 does not (it became a global in Node 22). Eight files
