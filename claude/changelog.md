@@ -10,6 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
+- `61ba5a3` — 📓 **THE REAL MERGE ROUTE, AND `docs-check` FAILING IN BOTH DIRECTIONS.**
+  ⚠️ **`gh pr merge --auto` DOES NOT WORK HERE** — auto-merge is off as a repository
+  setting, and the trap is that it APPEARS to succeed when the checks are already
+  green. `claude/runbooks/session-and-push.md` now carries wait-then-merge instead.
+  ⚠️ **AND `docs-check` FAILS THE OTHER WAY TOO, ON A ONE-COMMIT BRANCH** — measured
+  on PR #138. CI's `HEAD~1` is the base tip, so the previous PR's squash SHA is
+  inside the checked range and is demanded, while locally the one-behind allowance
+  still covers it: **green locally, red in CI**, which is the mirror image of the
+  case `CLAUDE.md` already described. Both directions are now written down.
+  `claude/open-items.md` also gains "shipped but never seen against real data" —
+  deliberately not the same claim as known-broken — and "not built, and
+  deliberately so", which records that nothing compares a player's grade against a
+  fixture's tier.
+
 - `3044872` — 🎯 **THE ROSTER LANDS ON THE TIER GROUPING, AND THE COLUMN SORT STILL WORKS.**
   Jay: *"i want it to land default on Tier, then forwards and backs view instead of
   nothing view"*. It shipped the previous day defaulting to `none` — that was
