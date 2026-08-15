@@ -40,6 +40,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   caller has a non-null uid) but one revoke away from it. Fixed with
   `coalesce(..., false)` inside the predicate rather than a guard per caller.
 
+- `95524d9` — 🧒 **PLAYER PHOTOS GET THE PICKER TOO — phase 3 finished, and the plan is now
+  complete bar one question for Jay.** Drop zone and positioner on the coach form
+  and the parent form.
+  ⚠️ **NOTHING SAVES ITSELF THERE.** `focus` is the surrounding form's state
+  exactly as `file` and `removed` already were, because the FORM decides when any
+  of it reaches the database — the property that stops an abandoned form leaving
+  an orphaned photograph of a child in the bucket.
+  ⚠️ **THE TWO FORMS SAVE IT DIFFERENTLY, MIRRORING THE PATH.** The coach form
+  carries both columns in ONE `upsertPlayer`, so no window exists where a photo
+  has a position chosen for the previous one. A parent has no such reach and goes
+  through `set_own_player_photo_focus`, scoped by `private.is_own_player`.
+  ⚠️ **AND THE "Add photo" BUTTON STAYS HERE** where the staff card lost it —
+  that card had no other control so its button and drop zone were duplicates by
+  accessible name; this one sits beside Change/Remove, whose labels differ.
+
 - `2f77eb6` — 🙂 **STAFF CAN POSITION THEIR OWN PHOTO TOO — phase 3, the staff half.** A drop
   zone and the positioner on the "Your photo" card, and the avatar honours the
   stored focal point.

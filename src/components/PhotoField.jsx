@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { signPhotoUrl } from '../data/photos.js'
 import Button from './Button.jsx'
 import { initials } from '../lib/playerFormat.js'
+import PhotoPositioner, {
+  PhotoDropZone,
+  clampFocus,
+  focusToObjectPosition,
+} from './PhotoPositioner.jsx'
 
 // The head-shot field in PlayerForm: current photo (or a monogram), a button
 // to choose a new one, and a button to remove it.
@@ -25,6 +30,12 @@ export default function PhotoField({
   removed,
   onFileChange,
   onRemove,
+  // ⚠️ FOCUS IS THE PARENT'S STATE, LIKE `file` AND `removed`. This component
+  // has never owned what it shows — the surrounding form does, because the form
+  // is what decides when any of it reaches the database. Positioning had to
+  // follow the same shape or the two would save at different moments.
+  focus = null,
+  onFocusChange = null,
   disabled = false,
 }) {
   const inputRef = useRef(null)
@@ -62,6 +73,7 @@ export default function PhotoField({
   // A newly chosen file wins over the stored one; "removed" beats both.
   const preview = localUrl ?? (removed ? null : storedUrl)
   const hasPhoto = Boolean(preview)
+  const point = clampFocus(focus)
 
   return (
     <div className="mb-4">
@@ -74,6 +86,7 @@ export default function PhotoField({
           <img
             src={preview}
             alt=""
+            style={{ objectPosition: focusToObjectPosition(point) }}
             className="h-20 w-20 shrink-0 rounded-[18px] bg-surface-mute object-cover"
           />
         ) : (
@@ -120,6 +133,38 @@ export default function PhotoField({
           )}
         </div>
       </div>
+
+      {/* ⚠️ THE DROP ZONE IS AN ADDITION, NOT A REPLACEMENT, and unlike the
+          staff card the "Add photo" button STAYS. That card had no photo and no
+          other control, so its button and its drop zone were duplicates; this
+          one sits inside a form with a Change/Remove pair whose labels differ,
+          so there is no second control with the same name. */}
+      {!hasPhoto && !disabled && (
+        <div className="mt-3">
+          <PhotoDropZone
+            onFile={(chosen) => onFileChange?.(chosen)}
+            disabled={disabled}
+            label={player?.full_name ? `Add a photo for ${player.full_name}` : 'Add a photo'}
+          />
+        </div>
+      )}
+
+      {/* ⚠️ POSITIONING IS PART OF THE FORM HERE, NOT A SEPARATE SAVE — the
+          opposite of the staff card, and deliberately. Nothing this component
+          touches reaches the database until the surrounding form is saved,
+          which is the property that stops an abandoned form leaving an orphaned
+          photograph of a child in the bucket. A focal point that saved itself
+          immediately would break that for no gain. */}
+      {hasPhoto && onFocusChange && (
+        <div className="mt-3" data-testid="player-photo-positioner">
+          <PhotoPositioner
+            url={preview}
+            focus={point}
+            onFocusChange={onFocusChange}
+            disabled={disabled}
+          />
+        </div>
+      )}
 
       <p className="mt-2 text-[12.5px] text-ink-muted">
         A head shot. It&apos;s resized on your device before uploading, so a photo straight from

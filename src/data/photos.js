@@ -405,3 +405,24 @@ export async function setMyPhotoFocus(focus) {
   if (error) throw error
   return data
 }
+
+/**
+ * Records the focal point for a player a parent owns.
+ *
+ * ⚠️ AN RPC, WHERE THE COACH-SIDE FORM USES A PLAIN UPSERT, AND THE ASYMMETRY IS
+ * THE EXISTING ONE RATHER THAN A NEW ONE. `PlayerForm` (coach, admin) writes
+ * through `upsertPlayer`, governed by the players update policy;
+ * `MyPlayerForm` (a parent) has no such reach and goes through
+ * `set_own_player_photo`, scoped by `private.is_own_player`. The focal point
+ * follows whichever path its photo already follows — inventing a third would
+ * mean a third place for the rule to be wrong.
+ */
+export async function setOwnPlayerPhotoFocus(playerId, focus) {
+  const { data, error } = await supabase.rpc('set_own_player_photo_focus', {
+    _player: playerId,
+    _focus_x: focus?.x ?? null,
+    _focus_y: focus?.y ?? null,
+  })
+  if (error) throw error
+  return data
+}

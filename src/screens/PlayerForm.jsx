@@ -198,6 +198,14 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   // child in the bucket.
   const [photoFile, setPhotoFile] = useState(null)
   const [photoRemoved, setPhotoRemoved] = useState(false)
+  // ⚠️ SEEDED FROM THE PLAYER, AND A NEW FILE RESETS IT. Keeping a point chosen
+  // for a different picture is worse than the centre, because it looks
+  // deliberate rather than unset.
+  const [photoFocus, setPhotoFocus] = useState(
+    player?.photo_focus_x == null && player?.photo_focus_y == null
+      ? null
+      : { x: player?.photo_focus_x, y: player?.photo_focus_y },
+  )
 
   // Guards against a double submit landing two inserts: `saving` state is
   // async, this is not.
@@ -461,7 +469,16 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       if (photoFile || photoRemoved) {
         try {
           const nextPath = photoFile ? await uploadPlayerPhoto(saved.id, photoFile) : null
-          saved = await upsertPlayer({ id: saved.id, photo_path: nextPath })
+          // ⚠️ THE FOCAL POINT GOES IN THE SAME WRITE AS THE PATH. Two writes
+          // would leave a window where a photo exists with a position chosen
+          // for the previous one — and this form already treats the photo as
+          // part of the save rather than as its own action.
+          saved = await upsertPlayer({
+            id: saved.id,
+            photo_path: nextPath,
+            photo_focus_x: nextPath ? (photoFocus?.x ?? null) : null,
+            photo_focus_y: nextPath ? (photoFocus?.y ?? null) : null,
+          })
           if (previousPath && previousPath !== nextPath) {
             forgetPhotoUrl(previousPath)
             // Best-effort: an orphaned file in a private bucket is untidy,
@@ -625,6 +642,8 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           player={player}
           file={photoFile}
           removed={photoRemoved}
+          focus={photoFocus}
+          onFocusChange={setPhotoFocus}
           disabled={saving}
           onFileChange={(file) => {
             setPhotoFile(file)
