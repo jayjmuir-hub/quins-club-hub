@@ -17,7 +17,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- 📷 **THE PHOTO PICKER: DRAG AND DROP, AND A FOCAL POINT YOU CAN SEE THE EFFECT
+- 🗄️ **THE FOCAL POINT REACHES THE DATABASE — PHASE 2, APPLIED TO PRODUCTION.**
+  `photo_focus_x` / `photo_focus_y` on `players` and `profiles`, plus
+  `set_my_photo_focus` and `set_own_player_photo_focus`.
+  ⚠️ **PROVED THE CHECK BITES** rather than trusting a `success: true` —
+  `photo_focus_x = 999` inside a transaction raised `check_violation`, and the
+  transaction rolled back so no real row moved.
+  ⚠️ **NEW FUNCTIONS, NOT NEW ARGUMENTS.** Defaulted parameters on the existing
+  `set_my_photo` would create an OVERLOAD, and PostgREST resolves an RPC by the
+  JSON keys it is handed — an existing call carrying only `_photo_path` would
+  have become ambiguous and started failing. Repositioning also should not
+  require re-uploading.
+  ⚠️ **AND `revoke … from public` DOES NOT REMOVE AN `anon` GRANT.** Supabase's
+  default privileges grant EXECUTE to `anon` EXPLICITLY, and revoking from the
+  PUBLIC pseudo-role leaves that alone — `proacl` still read `anon=X` after the
+  usual revoke/grant pair. **This repo's own security-advisor walk recorded that
+  exact finding hours earlier, and it was reproduced anyway by someone who had
+  just read it.** The revoke has to name `anon`. Both RPCs now return 404 to an
+  anon key.
+
+- `ebce0b1` — 📷 **THE PHOTO PICKER: DRAG AND DROP, AND A FOCAL POINT YOU CAN SEE THE EFFECT
   OF.** Phase 1 of `claude/plans/2026-08-15-photo-positioning.md`.
   ⚠️ **IT STORES A FOCAL POINT, NOT A CROP, AND THAT RULING IS THE WHOLE DESIGN.**
   The same photograph renders at three very different shapes — the lead tile at
