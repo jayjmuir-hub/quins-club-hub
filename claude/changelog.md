@@ -17,7 +17,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- 🔎 **DEPENDENCY SCANNING EXISTS NOW, AND IT GATES WHAT ACTUALLY SHIPS.**
+- ⚙️ **CI MOVES TO NODE 24, AND EIGHT TEST FILES LEAVE jsdom BEHIND THEM.** All
+  three workflows pinned Node 20; both dev PCs run 24, and that gap was not
+  cosmetic — `@supabase/supabase-js` needs a global `WebSocket`, which jsdom
+  supplies and Node 20 does not (it became a global in Node 22). Eight files
+  therefore passed locally and failed only in CI, with an error naming nothing to
+  do with the cause. They now run in `node`; `environment` across the eight went
+  to **3ms**.
+  ⚠️ **PROVED THE BUMP IS WHAT FIXED THEM** rather than trusting a green run,
+  using the technique `vite.config.js` already documented: `delete
+  globalThis.WebSocket` in `src/test/setup.js` turns a dev machine into a Node 20
+  runner, and with it those eight fail with the exact CI error.
+  ⚠️ **NETLIFY'S BUILD NODE IS A DIFFERENT SETTING AND IS STILL UNPINNED** — no
+  `.nvmrc`, no `NODE_VERSION` — so CI's build is not proving the production
+  build's runtime. Recorded, deliberately not changed.
+
+- `268f866` — 🔎 **DEPENDENCY SCANNING EXISTS NOW, AND IT GATES WHAT ACTUALLY SHIPS.**
   Dependabot watches npm weekly and the workflow actions monthly — grouped, so
   minor and patch arrive as one reviewable pull request and majors arrive alone
   — and `npm audit --omit=dev --audit-level=high` is a step of the `test` job,
