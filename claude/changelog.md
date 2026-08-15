@@ -10,6 +10,53 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
+- 🐞 **THE PHOTO POSITIONER NEVER MOVED A SINGLE PHOTO ON THE SCREENS IT WAS
+  BUILT FOR.** Jay, on the U18B head coach's tile: *"no matter how many times i
+  try to adjust this head coaches photo, it always cuts off the top of his head
+  in that double tall pill, like it isn't adjusting the photo in the pill at
+  all"*. It was not adjusting it. The focal point saved correctly, the picker's
+  preview showed it correctly, `/admin/staff` drew it correctly — and the two
+  components that render a face for everybody else, `SquadStaffCard` and
+  `PlayerAvatar`, had **no `object-position` at all**, so `object-cover` centred
+  every crop. On the lead tile, the tallest shape in the app, centring a
+  landscape photograph throws the top of it away, and a head goes with it.
+  ⚠️ **THREE LAYERS WERE MISSING, NOT ONE**, which is why it survived a feature
+  that shipped in four phases: `public.my_squad_staff()` did not RETURN the two
+  columns, `listMySquadStaff` did not MAP them, and the tiles did not APPLY
+  them. Any one of the three left alone keeps the bug intact.
+  ⚠️ **`20260815_my_squad_staff_focus.sql` APPLIED TO PRODUCTION 15 Aug 2026**,
+  by drop-and-recreate (42P13 — `create or replace` cannot change a RETURNS
+  TABLE). **Verified after applying rather than assumed**, because a dropped
+  function comes back anon-executable through Supabase's default privileges:
+  `anon` EXECUTE false, `authenticated` true, `proacl` identical to before the
+  drop. `db/schema/functions.sql` re-captured from the catalogue in the same
+  breath, and its header stopped claiming a "FIXED SEVEN-COLUMN RESULT" — the
+  list had been eight since 13 Aug, which is what a count written beside the
+  thing it counts always does.
+  ⚠️ **AND THE SAME OMISSION HIT PLAYERS**, found while fixing staff — a parent
+  has been able to position their child's head shot since the picker shipped,
+  and the roster, the dashboard and the detail hero all ignored it.
+  ⚠️ **THE FIRST VERSION OF THE REGRESSION TEST WAS VACUOUS AND WAS MEASURED TO
+  BE.** jsdom's computed `object-position` is already `50% 50%`, so
+  `toHaveStyle({objectPosition: '50% 50%'})` passes on an `<img>` carrying no
+  positioning whatsoever — the bug itself. Asserted on the inline style instead;
+  all eight new tests were then confirmed to fail against the deleted line.
+  `focusToObjectPosition` moved to `src/lib/photoFocus.js` so drawing a face
+  does not pull the picker's drag maths into Home's bundle.
+  ⚠️ **AND SEVEN ENTRIES IN THIS FILE WERE ATTRIBUTED TO THE WRONG COMMIT** —
+  the whole photo-positioning run, from *"a club admin may set a staff member's
+  photo"* down to *"an admin can actually upload a staff photo"*. Each carried
+  the SHA of the entry BELOW it. The cause is visible in the shape of it: the
+  first entry of the run was correctly left unSHA'd (a commit cannot cite
+  itself), and the next pass filled the SHAs in **by position**, so one blank
+  slot shifted every attribution after it by one. `docs:check` cannot see this —
+  it asks whether each SHA EXISTS and whether every commit appears SOMEWHERE,
+  and a uniform shift satisfies both. Repaired by matching each entry's headline
+  to the commit subject.
+  ⚠️ **A SECOND, OLDER SHIFT IS STILL THERE**, across the Dependabot block
+  (`ebce0b1` through `a24b360`), and is deliberately left alone rather than
+  guessed at in a bugfix. It is a separate piece of work.
+
 - `a9891de` — 📓 **THREE FEATURES WENT LIVE AND NOBODY HAD LOOKED AT ANY OF THEM**,
   recorded in `claude/open-items.md` as UNVERIFIED rather than working, with the
   four things a harness cannot settle — chief among them that the contact tiles
@@ -17,7 +64,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- 🔑 **A CLUB ADMIN MAY NOW SET A STAFF MEMBER'S PHOTO — REVERSING A RULING MADE
+- `361fd6f` — 🔑 **A CLUB ADMIN MAY NOW SET A STAFF MEMBER'S PHOTO — REVERSING A RULING MADE
   TWO DAYS EARLIER.** `20260813_staff_photos.sql` narrowed the write policy to
   own-photo-only and argued it well: *"A coach is an adult with their own login.
   Nobody else picks the picture of your face that thirty families see."*
@@ -40,7 +87,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   caller has a non-null uid) but one revoke away from it. Fixed with
   `coalesce(..., false)` inside the predicate rather than a guard per caller.
 
-- `b42541c` — 🐞 **"CHANGE PHOTO" DID NOTHING ONCE A PHOTO EXISTED.** Jay, minutes after the
+- `f88f07e` — 🐞 **"CHANGE PHOTO" DID NOTHING ONCE A PHOTO EXISTED.** Jay, minutes after the
   feature shipped: *"put an U18 head coach photo, saved, tried to change photo
   and nothing happens"*. With a photo stored, opening the editor ALWAYS rendered
   the positioner — the stored URL was truthy, so the drop zone was unreachable —
@@ -54,7 +101,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   catch it by restoring the single buggy expression: two fail, exactly as
   reported.
 
-- `ea3ccad` — 📐 **AN ODD LAST TILE KEEPS ITS WIDTH AND LEAVES A GAP.** Jay, on the real
+- `b42541c` — 📐 **AN ODD LAST TILE KEEPS ITS WIDTH AND LEAVES A GAP.** Jay, on the real
   six-person squad: *"i don't like the bottom one going full length"*. It was
   promoted to full width to avoid the hole, on the reasoning that a lone tile
   beside a gap looks unfinished. Seen on the real thing, a tile stretched to
@@ -67,7 +114,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   quietly deleted: it used to assert an even number of half tiles so none was
   ever alone. It now asserts that `wide` appears ONLY for a squad of one.
 
-- `a7fcb53` — 🧱 **THE LEAD TILE GOES BACK TO TWO TILES TALL, AND THE CONTACT ICONS SHRINK.**
+- `ea3ccad` — 🧱 **THE LEAD TILE GOES BACK TO TWO TILES TALL, AND THE CONTACT ICONS SHRINK.**
   Jay, having seen BOTH layouts with a real photograph in them: the lead is two
   small tiles tall and the rest flow around it — under as well as beside.
   ⚠️ **THIS REVERSES A RULE FROM EARLIER THE SAME DAY, SO DO NOT "FIX" IT BACK.**
@@ -93,7 +140,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the grants that were verified all looked fine. Test the path, not the
   destination.
 
-- `95524d9` — 🧒 **PLAYER PHOTOS GET THE PICKER TOO — phase 3 finished, and the plan is now
+- `a7fcb53` — 🧒 **PLAYER PHOTOS GET THE PICKER TOO — phase 3 finished, and the plan is now
   complete bar one question for Jay.** Drop zone and positioner on the coach form
   and the parent form.
   ⚠️ **NOTHING SAVES ITSELF THERE.** `focus` is the surrounding form's state
@@ -108,7 +155,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   that card had no other control so its button and drop zone were duplicates by
   accessible name; this one sits beside Change/Remove, whose labels differ.
 
-- `2f77eb6` — 🙂 **STAFF CAN POSITION THEIR OWN PHOTO TOO — phase 3, the staff half.** A drop
+- `95524d9` — 🙂 **STAFF CAN POSITION THEIR OWN PHOTO TOO — phase 3, the staff half.** A drop
   zone and the positioner on the "Your photo" card, and the avatar honours the
   stored focal point.
   ⚠️ **POSITIONING IS A SECOND ACTION, NOT PART OF THE UPLOAD.** The upload there
@@ -126,7 +173,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ❌ **The two PLAYER fields are still not wired** — stated in the plan rather
   than left to be discovered.
 
-- `361fd6f` — 📸 **AN ADMIN CAN NOW ACTUALLY UPLOAD A STAFF PHOTO — the screen half.** A
+- `2f77eb6` — 📸 **AN ADMIN CAN NOW ACTUALLY UPLOAD A STAFF PHOTO — the screen half.** A
   control on every `/admin/staff` row: drop zone, positioner, save. Phase 4 of
   `claude/plans/2026-08-15-photo-positioning.md`.
   ⚠️ **`uploadStaffPhoto` NEEDED NO SIBLING** — it already took a profile id and

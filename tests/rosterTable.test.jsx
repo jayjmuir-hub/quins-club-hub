@@ -394,4 +394,48 @@ describe('RosterTable — the face beside the name', () => {
     expect(tomRow.querySelector('img')).toHaveAttribute('src', 'https://signed.example/p1.jpg')
     expect(within(tomRow).queryByText('TF')).not.toBeInTheDocument()
   })
+
+  // ⚠️ THE SAME OMISSION THE SQUAD-CONTACT TILE HAD, FOUND WHILE FIXING IT.
+  // `PhotoField` has let a parent position their child's head shot since 15 Aug
+  // 2026 and PlayerAvatar drew every one of them centred, so the control did
+  // nothing anybody could see — on the roster, on the dashboard and in the `xl`
+  // detail hero alike.
+  it('crops a player photo around its focal point', async () => {
+    listPlayersMock.mockResolvedValue([
+      { ...TOM, photo_path: 'players/p1.jpg', photo_focus_x: 40, photo_focus_y: 22 },
+      AMY,
+    ])
+
+    render(<Roster />)
+    await screen.findByTestId('roster-table')
+
+    const tomImg = await waitFor(() => {
+      const row = rows().find((r) => within(r).queryByText('Tom Fletcher'))
+      const img = row.querySelector('img')
+      expect(img).not.toBeNull()
+      return img
+    })
+    expect(tomImg).toHaveStyle({ objectPosition: '40% 22%' })
+  })
+
+  // Every photo uploaded before the columns existed is in this state, and it has
+  // to render exactly as it did before the feature landed.
+  //
+  // ⚠️ ASSERTED ON THE INLINE STYLE RATHER THAN WITH `toHaveStyle`: jsdom's
+  // COMPUTED `object-position` is already `50% 50%`, so the matcher form passes
+  // on an <img> with no positioning at all — the bug itself. Measured.
+  it('centres a player photo nobody has positioned', async () => {
+    listPlayersMock.mockResolvedValue([{ ...TOM, photo_path: 'players/p1.jpg' }, AMY])
+
+    render(<Roster />)
+    await screen.findByTestId('roster-table')
+
+    const tomImg = await waitFor(() => {
+      const row = rows().find((r) => within(r).queryByText('Tom Fletcher'))
+      const img = row.querySelector('img')
+      expect(img).not.toBeNull()
+      return img
+    })
+    expect(tomImg.style.objectPosition).toBe('50% 50%')
+  })
 })

@@ -1,7 +1,16 @@
 # Photo positioning — drag and drop, and where the face is
 
-**STATUS: PHASES 1-4 SHIPPED. Only PHASE 5 — what to do about the 1:4 lead
-tile — remains, and it is Jay's call rather than a build.**
+**STATUS: PHASES 1-4 SHIPPED, PLUS PHASE 4b — WITHOUT WHICH NONE OF THE OTHER
+FOUR DID ANYTHING VISIBLE.** Only PHASE 5 — what to do about the 1:4 lead
+tile — remains, and it is Jay's call rather than a build.
+
+⚠️ **THIS PLAN HAD NO RENDER PHASE, AND THAT IS THE WHOLE STORY OF THE BUG
+BELOW.** Every phase is about CAPTURING the focal point — the picker, the
+column, the write path, the admin route — and each one shipped, was tested and
+worked. Nobody wrote down "and then the tiles draw it", because it reads as too
+obvious to be a step. It was the only step that was missing, and the feature was
+declared complete without it. **A plan whose phases all end at the database
+needs a phase that ends at the screen.**
 
 Jay, 15 Aug 2026:
 
@@ -150,6 +159,30 @@ client. Worth remembering before writing a parallel function for the next case.
 ⚠️ **THE SIGNED URL IS RE-FETCHED AFTER SAVING.** `staff-photos` is private, so
 the RPC returns only the key; reusing the local object URL would show the right
 face until the next reload and then break.
+
+## Phase 4b — the renderers actually read it ✅ shipped 15 Aug 2026
+
+The phase this plan forgot. `SquadStaffCard` (Home) and `PlayerAvatar` (roster,
+dashboard, detail hero) drew `object-cover` with no `object-position`, so every
+crop was centred whatever anybody chose. Jay found it on a real head coach:
+*"like it isn't adjusting the photo in the pill at all"*.
+
+⚠️ **THREE LAYERS, AND FIXING ANY TWO CHANGES NOTHING.** `my_squad_staff()` did
+not return the columns; `listMySquadStaff` did not map them; the tiles did not
+apply them. The RPC is the one that is not obvious: it is SECURITY DEFINER with a
+fixed column list *precisely* so a parent cannot read another member's `profiles`
+row, so there is no client-side `select` to widen — a missing column there is a
+migration (`db/migrations/20260815_my_squad_staff_focus.sql`), and adding one
+means a DROP, which loses every grant and hands `anon` EXECUTE back.
+
+⚠️ **THE ADMIN SCREEN WORKED THROUGHOUT, WHICH IS WHY THIS SURVIVED.**
+`/admin/staff` reads `profiles` directly and previewed the point correctly, so
+the natural check after saving showed the feature working. **The screen that
+proves a photo feature is the one a parent sees, not the one that saved it.**
+
+⚠️ **AND `PHOTO_SHAPES` IS NOW LOAD-BEARING RATHER THAN DECORATIVE.** The preview
+and the real tiles share one `focusToObjectPosition`, so a preview that lies can
+now only lie about the SHAPE. Re-measure it when the tile layout changes.
 
 ## Phase 5 — the tall lead tile (not started, and it is Jay's call)
 

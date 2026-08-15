@@ -63,6 +63,16 @@ export async function listMySquadStaff() {
           // laid out, which is the only thing the harness can check here.
           photoUrl:
             'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+          // ⚠️ NOT THE CENTRE, AND NOT ROUND NUMBERS. This is the only entry
+          // carrying a focal point, and it is here because the whole positioning
+          // feature was invisible on this card until 15 Aug 2026 — the value
+          // saved, the preview moved, and the tile stayed stubbornly centred. A
+          // stub of `{x: 50, y: 50}` would render identically to the bug.
+          //
+          // Head shots sit high in the frame, so `y: 28` is also the realistic
+          // case rather than an arbitrary one: it is what somebody dragging a
+          // face into view on the 1:4 lead tile actually produces.
+          focus: { x: 47, y: 28 },
         },
         {
           membershipId: 'stub-ms-2',

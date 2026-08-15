@@ -176,6 +176,63 @@ describe('SquadStaffCard', () => {
     expect(img).toHaveAttribute('alt', '')
   })
 
+  // ⚠️ THE BUG THIS BLOCK EXISTS FOR, AND IT SHIPPED LOOKING LIKE A BROKEN
+  // PICKER. Jay, 15 Aug 2026, on a real head coach's tile: "no matter how many
+  // times i try to adjust this head coaches photo, it always cuts off the top of
+  // his head in that double tall pill, like it isn't adjusting the photo in the
+  // pill at all". It was not adjusting it — the value saved, `/admin/staff`
+  // previewed it correctly, and this component had no `object-position` at all,
+  // so `object-cover` centred every crop. On the lead tile, the tallest shape in
+  // the app, centring a landscape photograph throws away the top of it.
+  it('crops around the focal point rather than the centre', () => {
+    const { container } = render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[{ ...COACH_ROSA, focus: { x: 47, y: 28 } }]}
+      />,
+    )
+
+    expect(container.querySelector('img')).toHaveStyle({ objectPosition: '47% 28%' })
+  })
+
+  // ⚠️ NULL IS THE MAJORITY CASE, NOT AN EDGE ONE: every photo uploaded before
+  // the columns existed has it, and it must render exactly as it did before the
+  // feature landed. A crash here would be inside a render.
+  //
+  // ⚠️ ASSERTED ON THE INLINE STYLE, NOT WITH `toHaveStyle`, AND THE DIFFERENCE
+  // IS WHETHER THIS TEST EXISTS AT ALL. jsdom's COMPUTED `object-position`
+  // defaults to `50% 50%`, so `toHaveStyle({objectPosition: '50% 50%'})` passes
+  // on an <img> carrying no positioning whatsoever — which is precisely the bug.
+  // Measured by deleting the style prop: the version written first stayed green.
+  it('centres a photo nobody has positioned', () => {
+    const { container } = render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={[{ ...COACH_ROSA, focus: null }]} />,
+    )
+
+    expect(container.querySelector('img').style.objectPosition).toBe('50% 50%')
+  })
+
+  // ⚠️ THE 28px HEADER FACE IS THE CROP WITH THE LEAST ROOM FOR ERROR — a face
+  // high in the frame is missing entirely at that size — and it is drawn by a
+  // SECOND call to TileBackground, which is exactly the kind of second call a
+  // fix like this gets applied to only once.
+  it('positions the face on a collapsed squad header too', () => {
+    render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[{ ...COACH_ROSA, focus: { x: 47, y: 28 } }, MEDIC_SAM]}
+        defaultOpen={false}
+      />,
+    )
+
+    // ⚠️ SCOPED TO THE TOGGLE, NOT `container.querySelector('img')`. A collapsed
+    // panel is still RENDERED — `hidden` plus a display class, so `aria-controls`
+    // always names an element that exists — so the tiles' own images are in the
+    // document too and a bare query would find one of those instead.
+    const face = screen.getByTestId('squad-staff-toggle').querySelector('img')
+    expect(face).toHaveStyle({ objectPosition: '47% 28%' })
+  })
+
   it('falls back to initials when there is no photo, and says nothing about it', () => {
     const { container } = render(
       <SquadStaffCard squadName="U13 Mixed Contact" staff={[MEDIC_SAM]} />,

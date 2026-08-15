@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { initials } from '../lib/playerFormat.js'
 import { signPhotoUrl } from '../data/photos.js'
+// ⚠️ FROM `lib/`, NOT FROM `PhotoPositioner.jsx` — this component renders on the
+// roster, the dashboard and the player hero, and the picker is a large module to
+// drag onto all three for a percentage. See src/lib/photoFocus.js.
+import { focusToObjectPosition } from '../lib/photoFocus.js'
 
 // A player's head shot, falling back to their initials.
 //
@@ -28,6 +32,15 @@ export default function PlayerAvatar({
   className = '',
 }) {
   const path = player?.photo_path ?? null
+  // ⚠️ READ OFF THE PLAYER ROW, NOT TAKEN AS A PROP, because every caller
+  // already hands over the whole row and a prop would be a second thing each of
+  // the six call sites had to remember. Null for a photo uploaded before the
+  // columns existed, which `focusToObjectPosition` renders as the centre — the
+  // behaviour every one of those photos has today.
+  const focus =
+    player?.photo_focus_x == null && player?.photo_focus_y == null
+      ? null
+      : { x: player.photo_focus_x, y: player.photo_focus_y }
   const [signedUrl, setSignedUrl] = useState(url ?? null)
   // A photo that 404s or whose signature has expired mid-view: fall back
   // rather than leaving a broken image frame on screen.
@@ -84,6 +97,14 @@ export default function PlayerAvatar({
         // marks it decorative and keeps a screen reader from saying the name
         // twice.
         alt=""
+        // ⚠️ THE SAME OMISSION THE SQUAD-CONTACT TILE HAD, AND FIXED IN THE SAME
+        // BREATH BECAUSE IT IS THE SAME BUG. `PhotoField` has let a parent
+        // position their child's head shot since 15 Aug 2026 and every screen
+        // that draws one ignored the result — `object-cover` centres the crop,
+        // so a face high in the frame is cropped off in the `xl` hero exactly as
+        // it was on the lead tile. The columns are already on the row: the
+        // roster reads `players` with `select('*')`.
+        style={{ objectPosition: focusToObjectPosition(focus) }}
         className={`${shared} bg-white/20 object-cover`}
         onError={() => setFailed(true)}
       />

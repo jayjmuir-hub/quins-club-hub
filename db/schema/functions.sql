@@ -2424,10 +2424,13 @@ GRANT EXECUTE ON FUNCTION public.photo_backup_list_objects(text, text, integer) 
 -- either: grants apply to the whole `authenticated` role, including the admins
 -- who legitimately need those columns on Accounts.
 --
--- So the boundary is this function's FIXED SEVEN-COLUMN RESULT. `is_super` and
+-- So the boundary is this function's FIXED COLUMN LIST. `is_super` and
 -- `admin_rights` live on `memberships`, which this function reads, and they are
 -- unreachable purely because they are not named below. **Adding a column to the
 -- RETURNS TABLE is the review.**
+-- ⚠️ IT READ "FIXED SEVEN-COLUMN RESULT" UNTIL 15 Aug 2026, AND THE LIST HAD
+-- BEEN EIGHT SINCE 13 Aug. A count written beside the thing it counts is a fact
+-- with two copies, and this is the copy that rotted. The rule needs no number.
 --
 -- ⚠️ THE GATE IS can_see_team, NOT is_attached_to_team, AND THE DIFFERENCE IS
 -- `status = 'active'`. `event read` deliberately uses the status-blind one
@@ -2459,11 +2462,19 @@ GRANT EXECUTE ON FUNCTION public.photo_backup_list_objects(text, text, integer) 
 -- anon-executable** through Supabase's default privileges — see the anon note
 -- further up this file. The revokes below are restated for that reason, not out
 -- of tidiness.
+-- ⚠️ `photo_focus_x` / `photo_focus_y` ADDED 15 Aug 2026
+-- (20260815_my_squad_staff_focus.sql), by the same drop-and-recreate and for the
+-- same 42P13 reason. WHY THEY HAD TO COME THROUGH HERE AT ALL: the photo
+-- positioner shipped in four phases and every one of them stopped at the
+-- database, so the Squad contacts card — the surface the whole feature exists to
+-- control — drew every face centred whatever anybody chose. There is no
+-- client-side route to those columns precisely BECAUSE of the design in the note
+-- above, so the fix was necessarily a migration. Measured after applying:
+-- `anon` EXECUTE false, `authenticated` true, proacl identical to before the drop.
 CREATE OR REPLACE FUNCTION public.my_squad_staff()
- RETURNS TABLE(team_id uuid, membership_id uuid, full_name text, title text, role text, email text, phone text, photo_path text)
+ RETURNS TABLE(team_id uuid, membership_id uuid, full_name text, title text, role text, email text, phone text, photo_path text, photo_focus_x smallint, photo_focus_y smallint)
  LANGUAGE sql
- STABLE
- SECURITY DEFINER
+ STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
   select
@@ -2474,7 +2485,9 @@ AS $function$
     m.role,
     p.email,
     p.phone,
-    p.photo_path
+    p.photo_path,
+    p.photo_focus_x,
+    p.photo_focus_y
   from memberships m
   join profiles p on p.id = m.profile_id
   where m.role in ('coach', 'manager', 'medic')
