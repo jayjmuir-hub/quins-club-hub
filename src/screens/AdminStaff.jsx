@@ -83,9 +83,17 @@ function StaffPhoto({ member, onPhoto }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [open, setOpen] = useState(false)
+  // ⚠️ "REPLACING" IS A SEPARATE STATE FROM "HAS NO PHOTO", AND LEAVING IT OUT
+  // WAS A BUG JAY HIT WITHIN MINUTES: with a photo already saved, opening the
+  // editor always showed the POSITIONER, because the stored URL was truthy —
+  // so "Change photo" opened a panel with no way to choose a file, and
+  // "Choose a different photo" cleared only the local preview and was
+  // immediately overruled by the stored one. Nothing happened, twice.
+  const [replacing, setReplacing] = useState(false)
 
   function take(chosen) {
     setError(null)
+    setReplacing(false)
     setFile(chosen)
     // ⚠️ REVOKED, not merely replaced. Choosing three photos in a row would
     // otherwise leak two object URLs for as long as the screen is open.
@@ -116,6 +124,7 @@ function StaffPhoto({ member, onPhoto }) {
 
   function close() {
     setOpen(false)
+    setReplacing(false)
     setFile(null)
     setLocalUrl((old) => {
       if (old) URL.revokeObjectURL(old)
@@ -123,7 +132,9 @@ function StaffPhoto({ member, onPhoto }) {
     })
   }
 
-  const shown = localUrl ?? member.photoUrl
+  // ⚠️ WHILE REPLACING, THE STORED PHOTO MUST NOT WIN. Falling back to it is
+  // what made "Choose a different photo" a no-op.
+  const shown = replacing ? localUrl : (localUrl ?? member.photoUrl)
 
   if (!open) {
     return (
@@ -165,7 +176,7 @@ function StaffPhoto({ member, onPhoto }) {
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button onClick={save} disabled={busy || (!file && !member.photoPath)}>
+        <Button onClick={save} disabled={busy || (!file && (replacing || !member.photoPath))}>
           {busy ? 'Saving…' : 'Save'}
         </Button>
         <Button variant="ghost" onClick={close} disabled={busy}>
@@ -174,7 +185,9 @@ function StaffPhoto({ member, onPhoto }) {
         {shown && !busy && (
           <button
             type="button"
+            data-testid="staff-photo-replace"
             onClick={() => {
+              setReplacing(true)
               setFile(null)
               setLocalUrl((old) => {
                 if (old) URL.revokeObjectURL(old)

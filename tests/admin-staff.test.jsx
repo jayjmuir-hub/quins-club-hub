@@ -314,3 +314,87 @@ describe('AdminStaff — setting a photo for somebody else', () => {
     expect(setStaffPhotoMock).not.toHaveBeenCalled()
   })
 })
+
+// ── Changing a photo that is already there (15 Aug 2026) ────────────────────
+//
+// ⚠️ THESE EXIST BECAUSE THE FIRST VERSION SHIPPED WITHOUT THEM AND JAY HIT THE
+// BUG WITHIN MINUTES: "put an U18 head coach photo, saved, tried to change
+// photo and nothing happens". With a photo already stored, opening the editor
+// always rendered the POSITIONER — the stored URL was truthy, so the drop zone
+// was unreachable — and "Choose a different photo" cleared only the LOCAL
+// preview, which the stored one immediately overruled.
+//
+// The original tests all started from a staff member with NO photo, so every
+// one of them passed. That is the shape of the gap worth remembering: the
+// happy path was covered and the second use of the same control was not.
+
+describe('AdminStaff — changing a photo that already exists', () => {
+  const WITH_PHOTO = {
+    ...COACH,
+    photoPath: 'p-coach/1.jpg',
+    photoUrl: 'https://example.invalid/stored.jpg',
+  }
+
+  beforeEach(() => {
+    uploadStaffPhotoMock.mockReset().mockResolvedValue('p-coach/999.jpg')
+    setStaffPhotoMock.mockReset().mockResolvedValue({
+      id: 'p-coach',
+      photo_path: 'p-coach/999.jpg',
+      photo_focus_x: 50,
+      photo_focus_y: 50,
+    })
+    signStaffPhotoUrlMock.mockReset().mockResolvedValue('https://example.invalid/new.jpg')
+  })
+
+  it('opens on the positioner, because repositioning is the common case', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
+
+    render(<AdminStaff />)
+    await userEvent.click(await screen.findByTestId('staff-photo-open'))
+
+    expect(screen.getByTestId('photo-stage')).toBeInTheDocument()
+  })
+
+  // ⚠️ THE BUG, EXACTLY AS REPORTED. Before the fix this button cleared the
+  // local preview and the stored photo won straight back, so the panel did not
+  // change and there was no way to reach a file picker at all.
+  it('reaches a file picker via "Choose a different photo"', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
+
+    render(<AdminStaff />)
+    await userEvent.click(await screen.findByTestId('staff-photo-open'))
+    await userEvent.click(screen.getByTestId('staff-photo-replace'))
+
+    expect(screen.getByTestId('photo-drop-zone')).toBeInTheDocument()
+    expect(screen.queryByTestId('photo-stage')).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/Add a photo for Alex Morgan/i)).toBeInTheDocument()
+  })
+
+  it('uploads the replacement and records the new key', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
+
+    render(<AdminStaff />)
+    await userEvent.click(await screen.findByTestId('staff-photo-open'))
+    await userEvent.click(screen.getByTestId('staff-photo-replace'))
+
+    const file = new File(['x'], 'new.jpg', { type: 'image/jpeg' })
+    await userEvent.upload(screen.getByLabelText(/Add a photo for Alex Morgan/i), file)
+    await userEvent.click(screen.getByRole('button', { name: /^Save$/ }))
+
+    await waitFor(() => expect(uploadStaffPhotoMock).toHaveBeenCalledWith('p-coach', file))
+    expect(setStaffPhotoMock).toHaveBeenCalledWith('p-coach', 'p-coach/999.jpg', { x: 50, y: 50 })
+  })
+
+  // ⚠️ SAVE MUST NOT SILENTLY RE-SAVE THE OLD PHOTO. Mid-replacement with no
+  // file chosen there is nothing to save, and an enabled button that quietly
+  // keeps the existing photo would look like the replacement had worked.
+  it('disables Save while replacing until a file is chosen', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
+
+    render(<AdminStaff />)
+    await userEvent.click(await screen.findByTestId('staff-photo-open'))
+    await userEvent.click(screen.getByTestId('staff-photo-replace'))
+
+    expect(screen.getByRole('button', { name: /^Save$/ })).toBeDisabled()
+  })
+})
