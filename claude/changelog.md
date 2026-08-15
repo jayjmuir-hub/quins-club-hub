@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
-- 📓 **A PLAN THAT SAID "NOT YET MERGED" FOR TWO PULL REQUESTS AFTER IT WENT
+- 📬 **THE DMARC REPORTS ARE READABLE NOW, AND THE ONE THAT WOULD MATTER SETS AN
+  EXIT CODE.** Jay asked why "Report Domain: …" mail was arriving daily; the
+  answer was our own `rua=` tag, and the attachments were gzipped XML nobody
+  could read. `scripts/dmarc-summary.mjs` (`npm run mail:dmarc`) reads the
+  `.xml.gz` Yahoo and Docomo send and the `.zip` Google sends, with no
+  dependency added for either. ⚠️ **Failing spoofs are noise and it says so; the
+  alarm is a spoof that PASSED**, which means a leaked DKIM key or an SPF record
+  authorising a stranger, and that alone exits non-zero.
+  Investigated in full: four forged messages on 13 Aug from four IPs in four
+  countries — Congo, Brazil, Israel, Uzbekistan — using invented subdomains
+  (`raker.`, `ichu.`, `visto.`) that resolve to nothing and are covered by no
+  wildcard. All quarantined, none authenticated, and a week of Google's reports
+  over the same period saw no spoofing at all. Not targeted, not a breach, and
+  the app was not involved. `claude/runbooks/dmarc-reports.md` has the standing
+  guidance and the `p=reject` change that is still to make — ⚠️ **not yet,
+  because no root-domain Microsoft 365 mail has ever appeared in a report, so
+  its alignment is untested rather than proven.**
+
+- `9721bb6` — 📓 **A PLAN THAT SAID "NOT YET MERGED" FOR TWO PULL REQUESTS AFTER IT WENT
   LIVE.** `claude/plans/2026-08-14-match-lineups.md` still carried
   **STATUS: PHASE 1 BUILT … NOT YET MERGED OR DEPLOYED** while `/lineup/:eventId`
   had been routed on `main` since `61b657a` (#130) and `a7d66cd` (#131). Three

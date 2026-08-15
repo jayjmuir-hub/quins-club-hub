@@ -13,6 +13,7 @@
     "test:integration": "VITEST_MODE=integration vitest run --passWithNoTests",
     "docs:check": "node scripts/docs-check.mjs",
     "db:check": "node scripts/db-check.mjs",
+    "mail:dmarc": "node scripts/dmarc-summary.mjs",
     "check:overflow": "node harness/check-overflow.mjs",
     "harness": "vite --config harness/vite.config.js"
   },

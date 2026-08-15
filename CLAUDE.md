@@ -63,6 +63,7 @@ line elsewhere, it is stale — fix it, don't obey it.
 | `claude/schema-history.md` | **The reasoning behind each migration**, which the SQL does not carry. Read the relevant section before changing a policy. Reference — do not trust its status lines |
 | `claude/runbooks/session-and-push.md` | How to start a session, and the summary push procedure. Read before you push |
 | `claude/runbooks/db-harnesses.md` | **How to RUN `db/tests/`, and why it is safe against production.** `npm run db:check`. Read it before writing a harness or before believing one is green |
+| `claude/runbooks/dmarc-reports.md` | **Why the daily "Report Domain: …" mail arrives, and the one line of it worth reacting to.** `npm run mail:dmarc`. Read it BEFORE treating a spoofed subdomain as an incident — the reports are the protection working, and the only serious case is a spoof that PASSED |
 | `claude/runbooks/deploy.md`, `email-and-domain.md`, `first-admin.md`, `e2e-roles.md`, `scope-mail-send.md`, `player-photo-backup.md`, `backup-restore-drill.md` | Operational procedures |
 | `claude/writing-to-github-from-claude.md` | The exact push route, and the ways it has failed |
 | `claude/archive/quins-v1-mvp.md` | The original implementation plan. History |
