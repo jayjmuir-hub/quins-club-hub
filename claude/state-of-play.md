@@ -31,7 +31,6 @@ person using them, and none of those bugs had a failing test.
 
 ## Blocked on Jay
 
-- **Leaked-password protection is OFF** — Supabase → Authentication → Policies.
 - **Most squads have nobody attached on `/admin/staff`**, so the Home "Squad
   contacts" card shows its empty state to most of the club. Data entry, not code.
   Run the query below rather than trusting this sentence.

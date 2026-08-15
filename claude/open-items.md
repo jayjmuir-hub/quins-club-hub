@@ -13,7 +13,26 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Needs Jay (account creations — Claude does not do these)
 
-- **Leaked-password protection is OFF.** Supabase → Authentication → Policies.
+- ✅ ~~**Leaked-password protection is OFF.** Supabase → Authentication → Policies.~~
+  — **IT IS ON. Read off the dashboard 15 Aug 2026**, after Jay said he thought
+  he had already done it and this file said otherwise for two days.
+  ⚠️ **AND THE POINTER WAS WRONG TOO, WHICH IS PROBABLY WHY IT LOOKED UNDONE.**
+  The setting is not under Authentication → Policies; it is
+  **Authentication → Attack Protection**, as "Prevent use of leaked passwords",
+  and it shows a green ENABLED badge rather than a toggle. Anyone following the
+  old direction landed on the RLS policies list and found nothing to switch.
+  ⚠️ **THE ADVISOR AGREES, AND ITS SILENCE IS THE EVIDENCE.** Supabase emits an
+  `auth_leaked_password_protection` lint when this is off; `get_advisors` returned
+  16 security lints and not that one. **A missing lint only counts because the
+  same call returned others** — an empty result would have proved nothing, which
+  is the trap `CLAUDE.md` rule 6 exists for.
+- **Captcha protection on the auth endpoints is OFF** — same screen, measured the
+  same day, `aria-checked="false"`. ⚠️ **RECORDED, NOT RECOMMENDED.** It is a
+  real gap and it also puts a challenge in front of every sign-up and password
+  reset for a club of a few hundred families, most of them arriving from a
+  WhatsApp link on a phone. Nobody has weighed that trade yet, and this line
+  exists so the next person knows the switch is there and untouched rather than
+  considered and rejected.
 - **No monitoring, alerting or error tracking.** Detection today is somebody
   telling Jay. Two free first steps: an uptime monitor on `/` **and**
   `/calendar.ics`, and Sentry's free tier wired into `ErrorBoundary`'s
