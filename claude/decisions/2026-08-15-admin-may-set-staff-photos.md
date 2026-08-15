@@ -28,10 +28,21 @@ chose to reverse it.
 
 ## What is preserved
 
-⚠️ **THIS IS NOT THE PLAYER-PHOTO RULE.** The 13 Aug note was arguing against
-`can_edit_team` — "anyone who can edit a squad" — and that is still refused. A
-coach cannot set another coach's photo. Only a **club admin**, and only for a
-person who is a member of a club they administer.
+⚠️ **IT NOW MATCHES THE PLAYER-PHOTO RULE, AND THAT WAS A SECOND DECISION THE
+SAME DAY.** Jay: *"just like teamsnap, sometimes photos need to be uploaded by
+staff when parents forget"* — which is already live for player photos and always
+has been: `can_edit_team(photo_team(name)) or is_own_player(photo_player(name))`.
+
+A first pass made the staff rule **club admins only**. That was a conservative
+reading of the overrule rather than anything asked for, and it left a split
+nobody would defend: **a U16 coach could upload a child's photo but not a fellow
+coach's.** Widened to `can_edit_team` the same afternoon, so the two buckets now
+say the same thing — anyone who may edit a squad may set the photo of a person
+attached to it, and anyone may set their own.
+
+So the 13 Aug argument against `can_edit_team` is now **fully** retired rather
+than half. What is still preserved is narrower and worth keeping: `set_my_photo`
+remains self-only, so no ordinary caller gains anyone else's reach.
 
 ⚠️ **`set_my_photo` STAYS SELF-ONLY.** The self-serve path is used by everybody
 and keeps the narrowest possible rule. The admin path is a separate function,

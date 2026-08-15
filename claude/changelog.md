@@ -25,9 +25,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   have a photo and most will never log in, so the principle was producing no
   faces rather than consented ones. Jay was shown the ruling and reversed it;
   `claude/decisions/2026-08-15-admin-may-set-staff-photos.md`.
-  ⚠️ **THE NARROWING IS PRESERVED WHERE IT CAN BE.** Not `can_edit_team` — a
-  coach still cannot set another coach's photo. Club admins only, and
-  `set_my_photo` stays self-only.
+  ⚠️ **AND IT MATCHES THE PLAYER-PHOTO RULE, AFTER A SECOND PASS.** Jay: *"just
+  like teamsnap, sometimes photos need to be uploaded by staff when parents
+  forget"* — already live for players, and always has been. The first pass made
+  the staff rule club-admins-only, which left a split nobody would defend: a U16
+  coach could upload a child's photo but not a fellow coach's. Widened to
+  `can_edit_team`, so both buckets now say the same thing. `set_my_photo` stays
+  self-only.
   ⚠️ **AND THREE-VALUED LOGIC NEARLY OPENED A HOLE.** The first predicate
   returned **NULL**, not false, with no signed-in user — and the two callers
   disagreed about it: a storage policy treats NULL as not-true and denies, but

@@ -10,9 +10,16 @@
 -- it, so the principle was producing no faces rather than consented ones.
 -- Reasoning: claude/decisions/2026-08-15-admin-may-set-staff-photos.md
 --
--- ⚠️ THE NARROWING IS PRESERVED WHERE IT CAN BE. NOT `can_edit_team` — the
--- player-photo precedent the 13 Aug note argued against is still refused. Club
--- admins only, and only for members of a club they administer.
+-- ⚠️ AND IT MATCHES THE PLAYER-PHOTO RULE, DELIBERATELY. Jay, the same day:
+-- "just like teamsnap, sometimes photos need to be uploaded by staff when
+-- parents forget". That is already live for player photos and always has been —
+-- `can_edit_team(photo_team(name)) or is_own_player(photo_player(name))`.
+--
+-- A first pass made this club-admins-only, which was a conservative reading of
+-- the overrule rather than something anyone asked for, and it left a split
+-- nobody would defend: a U16 coach could upload a child's photo but not a
+-- fellow coach's. So `can_edit_team` is in, and the 13 Aug argument against it
+-- is fully retired rather than half.
 
 -- ── The predicate ──────────────────────────────────────────────────────────
 --
@@ -41,8 +48,10 @@ as $function$
       or exists (
         select 1 from public.memberships m
         where m.profile_id = _profile
-          and m.club_id is not null
-          and private.is_admin(m.club_id)
+          and (
+            (m.club_id is not null and private.is_admin(m.club_id))
+            or (m.team_id is not null and private.can_edit_team(m.team_id))
+          )
       )
     ),
     false
