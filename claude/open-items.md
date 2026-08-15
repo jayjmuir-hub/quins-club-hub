@@ -92,9 +92,21 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   anyone holding a cached service worker. It stays here because it is the only thing
   that would contain a compromised npm dependency. Do `connect-src` first, and test
   against a browser that already has a service worker registered.
-- **CI pins Node 20.** Bumping to 22+ would retire the jsdom/`WebSocket` trap in
-  `vite.config.js` and let eight more test files run in the `node` environment.
-  Both dev PCs are already on 24.
+- ✅ ~~**CI pins Node 20.**~~ — **all three workflows pin Node 24 as of 15 Aug
+  2026**, matching both dev PCs, and the eight files that were stuck in jsdom
+  now run in `node`. Measured on the move: `environment` across those eight went
+  to **3ms**.
+  ⚠️ **PROVED THE BUMP IS WHAT FIXED THEM**, using the technique `vite.config.js`
+  already documented: `delete globalThis.WebSocket` in `src/test/setup.js` turns
+  a dev machine into a Node 20 runner, and with it the eight fail with the exact
+  CI error. Without it they pass. A green run alone would not have shown which
+  change was responsible.
+  ⚠️ **NETLIFY'S BUILD NODE IS A SEPARATE SETTING AND IS STILL UNPINNED** — there
+  is no `.nvmrc`, no `.node-version`, and no `NODE_VERSION` in `netlify.toml`, so
+  the production build runs on whatever Netlify defaults to and CI's `npm run
+  build` is therefore not proving Netlify's build. **Not changed here**: pinning
+  it alters the runtime a live release is built on, which is Jay's call and not a
+  side effect of a test speed-up.
 
 ## One migration each
 

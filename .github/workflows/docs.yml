@@ -38,7 +38,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       # No `npm ci` on purpose: docs-check has zero dependencies and reads only
       # the filesystem and `git`. Installing would make a docs check depend on

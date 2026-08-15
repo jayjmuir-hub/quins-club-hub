@@ -180,30 +180,34 @@ export default defineConfig({
     // (`document is not defined`), which is the right direction: the fix is to
     // delete the docblock, not to reach for a shim.
     //
-    // ⛔ **A FILE THAT REACHES `@supabase/supabase-js` MUST STAY IN jsdom, AND
-    // THIS ONE ONLY EVER FAILS IN CI.** supabase-js needs a global `WebSocket`.
-    // jsdom supplies one; **Node 20 — which `.github/workflows/test.yml` pins —
-    // does not**, and it only became a global in Node 22. Both dev PCs run Node
-    // 24, so the eight files this caught passed locally and failed in CI with
-    // `Node.js detected but native WebSocket not found`, which names nothing to
-    // do with the docblock that caused it.
+    // ✅ **THE `@supabase/supabase-js` / WebSocket TRAP IS RETIRED — 15 Aug 2026.**
+    // It used to say a file reaching supabase-js MUST stay in jsdom, because
+    // supabase-js needs a global `WebSocket`: jsdom supplies one, and **Node 20,
+    // which the workflows pinned, does not** — it became a global in Node 22. So
+    // eight files passed locally on Node 24 and failed only in CI, with
+    // `Node.js detected but native WebSocket not found`, an error naming nothing
+    // to do with the docblock that caused it.
     //
-    // ⚠️ **THE CLOSURE IS WHAT MATTERS, NOT THE IMPORT LIST YOU CAN SEE.** Four
-    // of the eight reach it only transitively, and `tests/session-guard.test.js`
+    // **The workflows now pin Node 24**, matching both dev PCs, and those eight
+    // run in `node` with the rest. Measured on the move: `environment` across the
+    // eight went to **3ms**.
+    //
+    // ⚠️ **THE CLOSURE STILL MATTERS, AND THAT PART IS NOT RETIRED.** Four of the
+    // eight reached supabase-js only transitively, and `tests/session-guard.test.js`
     // reaches it through a DYNAMIC `import(MODULE_PATH)` that no grep for
-    // `from '...'` will find. Trace the whole graph, both kinds of import, before
-    // annotating anything.
+    // `from '...'` will find. The reason to trace the whole graph before
+    // annotating has changed — it is no longer WebSocket — but a file that
+    // touches the DOM anywhere in its closure still cannot move.
     //
-    // ⚠️ **REPRODUCE IT LOCALLY BEFORE BELIEVING A FIX**: `delete
-    // globalThis.WebSocket` at the top of src/test/setup.js turns any dev
-    // machine into CI's Node 20 for this purpose. Used to prove both halves —
-    // the annotated files pass without it, and a supabase-touching file put back
-    // on `node` fails with the exact CI error.
+    // ⚠️ **AND THE REPRODUCTION TECHNIQUE IS WORTH KEEPING even though the bug is
+    // gone**: `delete globalThis.WebSocket` at the top of src/test/setup.js turns
+    // any dev machine into a Node 20 runner for this purpose. It was used again
+    // on the way out — with it, the eight fail with the exact CI error; without
+    // it they pass — which is what proves the bump is the thing that fixed them
+    // rather than something incidental.
     //
-    // ⚠️ **Bumping CI to Node 22+ would retire this whole paragraph** and let
-    // those eight join the rest. Not done here; it is a change to the runtime
-    // the production build runs on, which is a bigger decision than a test
-    // speed-up.
+    // ⚠️ **IF CI IS EVER PINNED BACK BELOW NODE 22, THOSE EIGHT BREAK** and the
+    // error will not mention Node. That is the rot this note exists to catch.
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.js'],

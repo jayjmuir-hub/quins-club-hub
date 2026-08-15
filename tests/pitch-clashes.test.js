@@ -1,3 +1,7 @@
+// @vitest-environment node
+// Reaches @supabase/supabase-js, which needs a global WebSocket. That is why
+// this file sat in jsdom until 15 Aug 2026: CI pinned Node 20, where WebSocket
+// is not a global. CI now runs Node 24, matching both dev PCs.
 import { describe, it, expect } from 'vitest'
 import { findPitchClashes, PITCH_TBD } from '../src/data/pitches.js'
 
