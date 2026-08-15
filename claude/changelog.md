@@ -17,7 +17,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- 📦 **THE FIRST DEPENDABOT BATCH — the grouped minor and patch updates.**
+- 🤖 **THE WORKFLOW ACTIONS GO 4 → 7** — `actions/checkout`, and
+  `actions/setup-node` in the pull request behind it. Three majors each, on
+  actions that run with access to this repo on every push, which is the supply
+  chain the github-actions half of `.github/dependabot.yml` exists to watch.
+  ⚠️ **THE PROOF IS THE RUN ITSELF**, which is the pleasant property of an
+  actions bump: the `test` job on that pull request checked out and set up Node
+  using the NEW versions, so a green check is not circumstantial evidence — it is
+  the thing working.
+
+- `fffb123` — 📦 **THE FIRST DEPENDABOT BATCH — the grouped minor and patch updates.**
   `@supabase/supabase-js` 2.45 → 2.112, `@testing-library/user-event` 14.5 → 14.6,
   `postcss` 8.4 → 8.5.
   ⚠️ **THE SUITE PASSING PROVES ALMOST NOTHING ABOUT THE SUPABASE JUMP**, and that
