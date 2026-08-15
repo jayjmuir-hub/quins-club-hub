@@ -17,7 +17,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- 🔐 **LEAKED-PASSWORD PROTECTION WAS ALREADY ON, AND TWO FILES SAID OTHERWISE.**
+- 🛡️ **THE SUPABASE SECURITY ADVISOR, WALKED IN FULL FOR THE FIRST TIME.**
+  Sixteen warnings that nobody had read. **Fourteen are deliberate and correctly
+  guarded; two are untidy grants worth one small migration; none is a hole.**
+  ⚠️ **THE LINT FLAGS EXPOSURE, NOT VULNERABILITY** — fifteen of the sixteen say
+  a `SECURITY DEFINER` function is callable through the API, which is true of
+  every RPC this app has. The question it cannot answer, and the walk did, is
+  whether each function guards itself. Every mutating one does, by its own code
+  rather than by its grant, and all fourteen already set `search_path`.
+  ⚠️ **FIVE PROBES RUN AGAINST PRODUCTION rather than reasoned about**, including
+  one built so it could not write even if the guard it was testing had failed —
+  it passed a team id that does not exist, so a second guard stood behind the
+  first. Zero rows created, confirmed after. `claude/open-items.md` has the table.
+
+- `d3b8b3f` — 🔐 **LEAKED-PASSWORD PROTECTION WAS ALREADY ON, AND TWO FILES SAID OTHERWISE.**
   Read off the dashboard 15 Aug 2026 after Jay said he thought he had done it.
   ⚠️ **THE POINTER WAS WRONG TOO**: both files sent people to Authentication →
   Policies; it lives under Authentication → **Attack Protection**. A wrong
