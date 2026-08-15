@@ -104,9 +104,21 @@ describe('RosterTable — rendering', () => {
 })
 
 describe('RosterTable — sorting', () => {
+  // ⚠️ THESE TWO TURN GROUPING OFF FIRST, since 15 Aug 2026. Grouping now
+  // defaults to ON for anyone who can edit (Jay's instruction), and a grouped
+  // table cannot also be sorted end-to-end — the headings would be meaningless
+  // if rows crossed them. Sorting ACROSS the whole table is precisely what the
+  // "Nothing" grouping gives, so that is what these two now ask for; the
+  // grouped case is covered by the section-sorting test below.
+  async function ungroup(user) {
+    await user.selectOptions(screen.getByLabelText('Group by'), 'none')
+  }
+
   it('sorts by name ascending by default', async () => {
+    const user = userEvent.setup()
     render(<Roster />)
     await screen.findByTestId('roster-table')
+    await ungroup(user)
     expect(names()).toEqual(['Amy Rose', 'Tom Fletcher', 'Zac Bell'])
   })
 
@@ -114,14 +126,38 @@ describe('RosterTable — sorting', () => {
     const user = userEvent.setup()
     render(<Roster />)
     await screen.findByTestId('roster-table')
+    await ungroup(user)
     await user.click(screen.getByRole('button', { name: /^Name/ }))
     expect(names()).toEqual(['Zac Bell', 'Tom Fletcher', 'Amy Rose'])
+  })
+
+  it('⚠️ still sorts WITHIN a group when the table is grouped', async () => {
+    // The regression this exists to stop: when grouping went on by default the
+    // column headers still highlighted and still flipped their arrow while
+    // changing nothing on screen. Tom and Zac are both in the U10 squad; with
+    // no grades they share the "Not graded" group, where Tom is a Flanker
+    // (Forwards) and Zac has no position (Other). Amy is U12.
+    const user = userEvent.setup()
+    listPlayersMock.mockResolvedValue([
+      TOM,
+      { ...ZAC, position: 'Lock' },
+      { id: 'p4', team_id: 'team-u10', full_name: 'Alfie Denning', position: 'Prop', is_captain: false },
+    ])
+    render(<Roster />)
+    await screen.findByTestId('roster-table')
+
+    // All three are forwards, so they sit in one section and the sort is
+    // visible end to end within it.
+    expect(names()).toEqual(['Alfie Denning', 'Tom Fletcher', 'Zac Bell'])
+    await user.click(screen.getByRole('button', { name: /^Name/ }))
+    expect(names()).toEqual(['Zac Bell', 'Tom Fletcher', 'Alfie Denning'])
   })
 
   it('sorts players with no position last, not first', async () => {
     const user = userEvent.setup()
     render(<Roster />)
     await screen.findByTestId('roster-table')
+    await ungroup(user)
     await user.click(screen.getByRole('button', { name: /^Position/ }))
     expect(names()[2]).toBe('Zac Bell')
   })

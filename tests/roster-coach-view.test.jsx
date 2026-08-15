@@ -127,7 +127,7 @@ describe('tier and the other positions become visible', () => {
   it('shows a Tier column with each graded player’s letter', async () => {
     render(<Roster />)
     await screen.findByTestId('roster-table')
-    expect(header(/tier/i)).toBeInTheDocument()
+    expect(header('Tier')).toBeInTheDocument()
 
     const row = (await screen.findByText('Tyrone Bexley')).closest('tr')
     await waitFor(() => expect(within(row).getByText('A')).toBeInTheDocument())
@@ -157,15 +157,29 @@ describe('tier and the other positions become visible', () => {
     await screen.findByTestId('roster-table')
 
     expect(listPlayerGradesMock).not.toHaveBeenCalled()
-    expect(header(/tier/i)).not.toBeInTheDocument()
+    expect(header('Tier')).not.toBeInTheDocument()
   })
 })
 
 describe('grouping by tier, then forwards and backs', () => {
-  it('is off until the coach chooses it', async () => {
-    // ⚠️ Deliberate: nobody's roster reorganises itself on the next deploy.
+  it('⚠️ IS ON BY DEFAULT for a coach — Jay, 15 Aug 2026', async () => {
+    // "i want it to land default on Tier, then forwards and backs view instead
+    // of nothing view". It shipped defaulting to 'none' and that was reversed on
+    // his instruction; this test is the thing that stops it drifting back.
     render(<Roster />)
     await screen.findByTestId('roster-table')
+    expect(screen.getByLabelText('Group by')).toHaveValue('tier')
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: /tier a/i })).toBeInTheDocument())
+  })
+
+  it('can still be turned off', async () => {
+    render(<Roster />)
+    await screen.findByTestId('roster-table')
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: /tier a/i })).toBeInTheDocument())
+
+    await userEvent.selectOptions(screen.getByLabelText('Group by'), 'none')
     expect(screen.queryByRole('columnheader', { name: /tier a/i })).not.toBeInTheDocument()
   })
 
@@ -175,7 +189,7 @@ describe('grouping by tier, then forwards and backs', () => {
 
     // ⚠️ Wait for the grades to land first: grouping by tier before they arrive
     // groups by what is known then, which is nothing.
-    await screen.findByRole('columnheader', { name: /tier/i })
+    await screen.findByRole('columnheader', { name: 'Tier' })
     await waitFor(() => expect(screen.getAllByText('A').length).toBeGreaterThan(0))
     await userEvent.selectOptions(screen.getByLabelText('Group by'), 'tier')
 
@@ -207,6 +221,21 @@ describe('grouping by tier, then forwards and backs', () => {
     render(<Roster />)
     await screen.findByTestId('roster-table')
     expect(screen.queryByLabelText('Group by')).not.toBeInTheDocument()
+  })
+
+  it('⚠️ NEVER GROUPS A PARENT’S ROSTER, however the default is set', async () => {
+    // The regression the default-on change would otherwise have caused: a parent
+    // has no grades, so grouping by tier would put ONE heading reading "Not
+    // graded" over every child on the roster — a statement about the club's
+    // record-keeping, made to the one audience who cannot act on it.
+    useMembershipsMock.mockReturnValue({ memberships: PARENT, teams: [U16B] })
+    render(<Roster />)
+    await screen.findByTestId('roster-table')
+
+    const headings = screen.getAllByRole('columnheader').map((cell) => cell.textContent)
+    expect(headings.some((text) => /Not graded|Tier [ABC]/.test(text))).toBe(false)
+    // ...and every player is still on screen.
+    expect(screen.getAllByTestId('table-player-name')).toHaveLength(4)
   })
 })
 
