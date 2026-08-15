@@ -17,7 +17,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- 🤖 **THE WORKFLOW ACTIONS GO 4 → 7** — `actions/checkout`, and
+- `a9bef62` — 🤖 **THE WORKFLOW ACTIONS GO 4 → 7** — `actions/checkout`, and
   `actions/setup-node` in the pull request behind it. Three majors each, on
   actions that run with access to this repo on every push, which is the supply
   chain the github-actions half of `.github/dependabot.yml` exists to watch.
