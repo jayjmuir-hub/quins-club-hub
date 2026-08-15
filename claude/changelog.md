@@ -40,6 +40,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   caller has a non-null uid) but one revoke away from it. Fixed with
   `coalesce(..., false)` inside the predicate rather than a guard per caller.
 
+- `361fd6f` — 📸 **AN ADMIN CAN NOW ACTUALLY UPLOAD A STAFF PHOTO — the screen half.** A
+  control on every `/admin/staff` row: drop zone, positioner, save. Phase 4 of
+  `claude/plans/2026-08-15-photo-positioning.md`.
+  ⚠️ **`uploadStaffPhoto` NEEDED NO SIBLING** — it already took a profile id and
+  built the key from it, so what had blocked an admin all along was the STORAGE
+  POLICY, not the client. The client change was one new function.
+  ⚠️ **THE SIGNED URL IS RE-FETCHED AFTER SAVING.** `staff-photos` is private, so
+  the RPC returns only the key. Reusing the local object URL would show the right
+  face until the next reload and then break.
+  ⚠️ **THE KEY IS BUILT FROM THE PROFILE ID, NOT THE MEMBERSHIP ID**, which meant
+  `toStaffMember` had to start carrying it — a shape with only the membership id
+  cannot upload. Pinned by a test, because the wrong id fails at the database
+  with a permission error rather than looking wrong on screen.
+  ⚠️ **A GREEN BUILD PROVED NOTHING HERE.** The import block for the picker
+  silently failed to land, `npm run build` passed anyway — undefined identifiers
+  are a runtime error, not a build one — and the tests caught it with
+  `ReferenceError: clampFocus is not defined`.
+
 - `0556e61` — 👀 **THE LIVE SITE WAS FINALLY LOOKED AT, AND IT IS FINE.** Eight deploys in a
   day — three UI features, a react-router major, a layout change — every one
   verified in a harness against invented data and none seen by a person. Jay

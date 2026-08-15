@@ -21,10 +21,23 @@ vi.mock('../src/data/staff.js', () => ({
   setMembershipTitle: (...args) => setMembershipTitleMock(...args),
 }))
 
+// The photo half (15 Aug 2026). Mocked so this file stays network-free; the
+// picker's own behaviour is covered by tests/photo-positioner.test.jsx.
+const uploadStaffPhotoMock = vi.fn()
+const setStaffPhotoMock = vi.fn()
+const signStaffPhotoUrlMock = vi.fn()
+
+vi.mock('../src/data/photos.js', () => ({
+  uploadStaffPhoto: (...args) => uploadStaffPhotoMock(...args),
+  setStaffPhoto: (...args) => setStaffPhotoMock(...args),
+  signStaffPhotoUrl: (...args) => signStaffPhotoUrlMock(...args),
+}))
+
 import AdminStaff from '../src/screens/AdminStaff.jsx'
 
 const COACH = {
   membershipId: 'm-coach',
+  profileId: 'p-coach',
   role: 'coach',
   title: 'Head Coach',
   name: 'Alex Morgan',
@@ -34,6 +47,7 @@ const COACH = {
 
 const MEDIC = {
   membershipId: 'm-medic',
+  profileId: 'p-medic',
   role: 'medic',
   title: null,
   name: 'Sam Patel',
@@ -181,5 +195,122 @@ describe('AdminStaff — setting a title', () => {
     const input = screen.getByLabelText('Title', { selector: '#title-m-coach' })
     expect(input.tagName).toBe('INPUT')
     expect(input).toHaveAttribute('list', 'staff-titles')
+  })
+})
+
+
+// ── The photo control (15 Aug 2026) ─────────────────────────────────────────
+//
+// ⚠️ THIS SCREEN COULD NOT DO THIS UNTIL A RULING WAS REVERSED. Staff photos
+// were own-photo-only until 15 Aug; see
+// claude/decisions/2026-08-15-admin-may-set-staff-photos.md. The tests below
+// are about the WIRING — that the upload key and the focal point reach the
+// right functions — because the permission itself lives in the database and is
+// not something this screen can get right or wrong.
+
+describe('AdminStaff — setting a photo for somebody else', () => {
+  beforeEach(() => {
+    uploadStaffPhotoMock.mockReset()
+    setStaffPhotoMock.mockReset()
+    signStaffPhotoUrlMock.mockReset()
+    uploadStaffPhotoMock.mockResolvedValue('p-coach/1234.jpg')
+    setStaffPhotoMock.mockResolvedValue({
+      id: 'p-coach',
+      photo_path: 'p-coach/1234.jpg',
+      photo_focus_x: 50,
+      photo_focus_y: 50,
+    })
+    signStaffPhotoUrlMock.mockResolvedValue('https://example.invalid/signed.jpg')
+  })
+
+  it('offers a photo control on every staff row', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [COACH, MEDIC] }])
+
+    render(<AdminStaff />)
+
+    const buttons = await screen.findAllByTestId('staff-photo-open')
+    expect(buttons).toHaveLength(2)
+    expect(buttons[0]).toHaveTextContent(/add photo/i)
+  })
+
+  it('says "Change photo" when there already is one', async () => {
+    listSquadStaffMock.mockResolvedValue([
+      {
+        id: 't1',
+        name: 'U12 Boys',
+        staff: [{ ...COACH, photoPath: 'p-coach/1.jpg', photoUrl: 'https://example.invalid/a.jpg' }],
+      },
+    ])
+
+    render(<AdminStaff />)
+    expect(await screen.findByTestId('staff-photo-open')).toHaveTextContent(/change photo/i)
+  })
+
+  it('opens a drop zone naming the person, so an admin cannot lose track of whose photo it is', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [COACH] }])
+
+    render(<AdminStaff />)
+    await userEvent.click(await screen.findByTestId('staff-photo-open'))
+
+    expect(screen.getByTestId('staff-photo-editor')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Add a photo for Alex Morgan/i)).toBeInTheDocument()
+  })
+
+  // ⚠️ THE KEY IS BUILT FROM THE PROFILE ID, NOT THE MEMBERSHIP ID. A photo key
+  // is `<profile-id>/<timestamp>` and `set_staff_photo` refuses one that is not
+  // — so passing the wrong id here produces a permission error at the database
+  // rather than a wrong-looking screen, which is exactly the sort of thing a
+  // unit test should catch first.
+  it('uploads against the profile id and records the key with the focal point', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [COACH] }])
+
+    render(<AdminStaff />)
+    await userEvent.click(await screen.findByTestId('staff-photo-open'))
+
+    const file = new File(['x'], 'face.jpg', { type: 'image/jpeg' })
+    const input = screen.getByLabelText(/Add a photo for Alex Morgan/i)
+    await userEvent.upload(input, file)
+
+    await userEvent.click(screen.getByRole('button', { name: /^Save$/ }))
+
+    await waitFor(() => expect(uploadStaffPhotoMock).toHaveBeenCalledWith('p-coach', file))
+    expect(setStaffPhotoMock).toHaveBeenCalledWith('p-coach', 'p-coach/1234.jpg', {
+      x: 50,
+      y: 50,
+    })
+  })
+
+  // ⚠️ THE URL HAS TO BE RE-SIGNED. `staff-photos` is private, so the RPC's
+  // return value carries only the KEY. Reusing the local object URL would show
+  // the right face until the next reload and then break.
+  it('re-signs the stored key rather than trusting the local preview', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [COACH] }])
+
+    render(<AdminStaff />)
+    await userEvent.click(await screen.findByTestId('staff-photo-open'))
+    await userEvent.upload(
+      screen.getByLabelText(/Add a photo for Alex Morgan/i),
+      new File(['x'], 'face.jpg', { type: 'image/jpeg' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: /^Save$/ }))
+
+    await waitFor(() => expect(signStaffPhotoUrlMock).toHaveBeenCalledWith('p-coach/1234.jpg'))
+  })
+
+  it('says so when the upload fails, and leaves the editor open', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [COACH] }])
+    uploadStaffPhotoMock.mockRejectedValue(new Error('That photo is too large. The limit is 5 MB.'))
+
+    render(<AdminStaff />)
+    await userEvent.click(await screen.findByTestId('staff-photo-open'))
+    await userEvent.upload(
+      screen.getByLabelText(/Add a photo for Alex Morgan/i),
+      new File(['x'], 'huge.jpg', { type: 'image/jpeg' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: /^Save$/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/5 MB/)
+    expect(screen.getByTestId('staff-photo-editor')).toBeInTheDocument()
+    expect(setStaffPhotoMock).not.toHaveBeenCalled()
   })
 })

@@ -357,3 +357,33 @@ export async function deletePlayerPhoto(path) {
   const { error } = await supabase.storage.from(PHOTO_BUCKET).remove([path])
   return !error
 }
+
+/**
+ * Records a photo key and focal point against SOMEBODY ELSE'S profile.
+ *
+ * ⚠️ A DIFFERENT FUNCTION FROM `setMyPhoto`, WHICH STAYS SELF-ONLY. The
+ * self-serve path is used by everybody and keeps the narrowest rule; this one
+ * carries a reach that most callers should not have. `public.set_staff_photo`
+ * enforces it — `private.may_set_staff_photo` — so this is not the boundary,
+ * it is the call.
+ *
+ * ⚠️ WHO MAY DO IT IS A RULING THAT WAS REVERSED, TWICE, ON 15 Aug 2026. The
+ * bucket was own-photo-only until Jay overruled it, and the first reversal was
+ * admin-only until he widened it to match the player-photo rule. See
+ * claude/decisions/2026-08-15-admin-may-set-staff-photos.md before narrowing
+ * anything here.
+ *
+ * `uploadStaffPhoto` needs no sibling: it already takes a profile id and builds
+ * the key from it. What blocked an admin was the STORAGE POLICY, not the client.
+ */
+export async function setStaffPhoto(profileId, photoPath, focus = null) {
+  const { data, error } = await supabase.rpc('set_staff_photo', {
+    _profile: profileId,
+    _photo_path: photoPath ?? null,
+    _focus_x: focus?.x ?? null,
+    _focus_y: focus?.y ?? null,
+  })
+  if (error) throw error
+  if (photoPath) forgetPhotoUrl(photoPath, STAFF_PHOTO_BUCKET)
+  return data
+}
