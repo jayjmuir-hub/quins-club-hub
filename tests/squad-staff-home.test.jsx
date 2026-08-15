@@ -540,6 +540,53 @@ describe('SquadStaffCard — collapsing a squad', () => {
   })
 })
 
+describe('Squad contacts on the Dashboard — which squad is open', () => {
+  // ⚠️ THE WIRING, NOT THE COMPONENT. SquadStaffCard's own collapse is covered
+  // above; what cannot be seen from inside it is WHICH card gets the open one,
+  // and that is the half worth pinning — passing `defaultOpen` to all of them,
+  // or to none, both leave a screen that looks plausible.
+  it('opens the first squad and collapses the rest', async () => {
+    useMembershipsMock.mockReturnValue(
+      membershipValue([
+        { id: 'm1', role: 'parent', team_id: 'team-u13', player_id: 'p1' },
+        { id: 'm2', role: 'parent', team_id: 'team-u16', player_id: 'p2' },
+        { id: 'm3', role: 'parent', team_id: 'team-u18', player_id: 'p3' },
+      ]),
+    )
+    listMySquadStaffMock.mockResolvedValue(
+      new Map([
+        ['team-u13', [COACH_ROSA, MEDIC_SAM]],
+        ['team-u16', [COACH_ROSA, MEDIC_SAM]],
+        ['team-u18', [COACH_ROSA, MEDIC_SAM]],
+      ]),
+    )
+
+    renderDashboard()
+
+    const toggles = await screen.findAllByTestId('squad-staff-toggle')
+    expect(toggles.map((t) => t.getAttribute('aria-expanded'))).toEqual([
+      'true',
+      'false',
+      'false',
+    ])
+  })
+
+  // ⚠️ THE COMMON CASE MUST NOT PAY FOR THE RARE ONE. Ten of the club's twelve
+  // parents are attached to exactly one squad, and for them nothing about this
+  // feature should be visible at all.
+  it('leaves a single-squad parent with an open card', async () => {
+    useMembershipsMock.mockReturnValue(
+      membershipValue([{ id: 'm1', role: 'parent', team_id: 'team-u13', player_id: 'p1' }]),
+    )
+    listMySquadStaffMock.mockResolvedValue(new Map([['team-u13', [COACH_ROSA]]]))
+
+    renderDashboard()
+
+    const toggle = await screen.findByTestId('squad-staff-toggle')
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  })
+})
+
 describe('Squad contacts on the Dashboard', () => {
   // ⚠️ THE HEADING SAT FLUSH AGAINST THE CARD ABOVE IT — reported from a
   // screenshot on 14 Aug 2026, and invisible to every test in this suite until

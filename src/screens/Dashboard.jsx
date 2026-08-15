@@ -1054,11 +1054,25 @@ export default function Dashboard() {
               </p>
             </Card>
           ) : (
-            myTeams.map((team) => (
+            // ⚠️ ONLY THE FIRST SQUAD OPENS, AND THIS ONE PROP IS THE WHOLE
+            // MECHANISM. Jay's ceiling, 15 Aug 2026: "we have parents who could
+            // have up to 5 age groups worth of players". Measured at 390×844, an
+            // open four-person squad is 488px and a collapsed one is 44px — so
+            // five squads is 2,440px of contacts hanging off the bottom of Home,
+            // or 664px this way.
+            //
+            // ⚠️ `myTeams` IS ALREADY IN CLUB ORDER (visibleTeams sorts by
+            // `sort_order`), so "the first" is the youngest squad the parent is
+            // attached to rather than whichever row the database happened to
+            // return first. That is stable between loads, which matters — a
+            // disclosure that opens a different squad each visit is worse than
+            // one that opens none.
+            myTeams.map((team, index) => (
               <SquadStaffCard
                 key={team.id}
                 squadName={team.name}
                 staff={staffByTeam.get(team.id) ?? []}
+                defaultOpen={index === 0}
               />
             ))
           )}
