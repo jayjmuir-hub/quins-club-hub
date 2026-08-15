@@ -10,6 +10,37 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
+- 📓 **A PLAN THAT SAID "NOT YET MERGED" FOR TWO PULL REQUESTS AFTER IT WENT
+  LIVE.** `claude/plans/2026-08-14-match-lineups.md` still carried
+  **STATUS: PHASE 1 BUILT … NOT YET MERGED OR DEPLOYED** while `/lineup/:eventId`
+  had been routed on `main` since `61b657a` (#130) and `a7d66cd` (#131). Three
+  more of its claims were wrong with it, and the last one is the nasty one:
+  ⚠️ **IT NAMED THE TABLE `match_lineups`, WHICH DOES NOT EXIST.** The table is
+  `lineups`. Anyone checking the feature by querying the name this file gave gets
+  `relation does not exist` — which reads as "never built" rather than as "wrong
+  name", and would have sent a session off to rebuild something that is live.
+  ⚠️ **AND "no coach has picked a team" WAS FALSE — MEASURED.** `lineups` and
+  `lineup_players` both hold real rows, so the save round trip the file said had
+  never been run against production has been run. **The genuinely unverified half
+  survives and moved to `claude/open-items.md`:** whether a lineup image has ever
+  reached a WhatsApp group. The image is the deliverable and no query can answer
+  that — it needs a human with a phone.
+  ⚠️ **THIS IS THE INVERSION `RESTORE.md` WARNS ABOUT**, in a file nobody re-reads
+  after shipping: a status line is worse than an omission, because an omission
+  looks like an omission. `docs:check` enforces that a plan STATES whether it
+  shipped; it cannot tell whether the statement is true.
+  Also recorded: the RCM match sheet, the register and the noticeboard have **no
+  rows at all**, so each has only ever been seen in its empty state on the live
+  site — correct for a club three days into onboarding, and a note rather than a
+  fault. And the roster item's proposed "tidy fix" is now half-done by a different
+  route (see below), so the complaint it records is unchanged for the squads it was
+  actually about.
+  ⚠️ **Two untracked PNGs deleted from the repo root** — `logo-glow.png` and
+  `logo-ring.png`, app-icon option boards from 14 Aug. They were drawn on the
+  wordless bat mark from #99, which `7228442` (#109) replaced with the crest two
+  hours later, so they decorate artwork that no longer exists. Never tracked, so
+  nothing was ever published.
+
 - `de82481` — 🧒 **U10 AND BELOW GET A SIMPLIFIED APP, AND A CARD EXPLAINING THEIR SEASON.**
   Four facts from the club's youth section, only the last of which this repo had
   ever recorded: **the league starts at U11**; U6-U8 play **Mighty Minis** at the
@@ -59,7 +90,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Proved both ways by injecting a fault into `isMinisBand`: forced false, 23
   tests failed; forced true, all six controls failed.
 
-- 🖼️ **SQUAD CONTACTS BECOME A TILE MOSAIC, WITH CALL, WHATSAPP AND EMAIL.**
+- `03de5ca` — 🖼️ **SQUAD CONTACTS BECOME A TILE MOSAIC, WITH CALL, WHATSAPP AND EMAIL.**
   Jay picked the bento mosaic from four previewed options: a poster tile per
   person, the lead's spanning two rows, photo filling the tile, title at the top,
   name and three contact buttons at the bottom.
