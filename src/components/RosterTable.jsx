@@ -84,6 +84,22 @@ export default function RosterTable({
   onSelect,
   onPatch,
   photoUrls,
+  // ⚠️ ALL FOUR ARE OPTIONAL, so every existing caller and test renders exactly
+  // as before. The grouped, tier-aware table is what the COACH view asks for;
+  // the plain one is still correct everywhere else.
+  //
+  // `groups` is the nested structure from src/lib/rosterGrouping.js. When it is
+  // present the table renders heading rows and IGNORES `players` for ordering —
+  // the grouping rule has already sorted within each section.
+  groups = null,
+  // Column keys to leave out — see constantColumns(). A column whose value is
+  // identical on every visible row tells the reader nothing.
+  hiddenColumns = null,
+  // player id -> 'A' | 'B' | 'C'. Only ever passed for a coach.
+  tierByPlayer = null,
+  // player id -> ['Prop', 'Hooker']. The FULL set; players.position is the
+  // primary and is what the inline editor below still writes.
+  positionsByPlayer = null,
 }) {
   const [sort, setSort] = useState({ key: 'full_name', dir: 'asc' })
   // Per-row, keyed by player id: the field currently in flight, and the last
@@ -134,6 +150,41 @@ export default function RosterTable({
     }
   }
 
+  // ⚠️ THE COLUMNS ARE DERIVED, NOT FIXED. Jay, 14 Aug 2026, on the U16B coach
+  // view: the Gender column repeated "Male" four times and the Age group column
+  // repeated "U16B Contact" four times. Both are the same fault — a column whose
+  // value never varies carries no information — so the caller passes which ones
+  // are constant rather than this file special-casing two of them by name.
+  const columns = SORTABLE.filter((column) => !hiddenColumns?.has(column.key))
+  const show = (key) => !hiddenColumns?.has(key)
+  // Every column a heading row has to stretch across: the visible ones, the
+  // optional Tier column, and the Open column.
+  const span = columns.length + (tierByPlayer ? 1 : 0) + 1
+
+  const otherPositions = (player) =>
+    (positionsByPlayer?.get(player.id) ?? []).filter((name) => name !== player.position)
+
+  // ⚠️ FLATTENED TO A SINGLE LIST OF ROWS, each either a heading or a player, so
+  // the tbody keeps ONE map instead of three nested ones. Group headings and
+  // section headings are different rows because they are different levels: Jay
+  // chose the nested shape ("option A") over a flat one with a chip.
+  const rows = []
+  if (groups) {
+    for (const group of groups) {
+      rows.push({ kind: 'group', key: `g-${group.key}`, label: group.label, count: group.count })
+      for (const section of group.sections) {
+        // A null label is a single-level grouping — see rosterGrouping.js. It
+        // renders no sub-heading rather than an empty one.
+        if (section.label) {
+          rows.push({ kind: 'section', key: `s-${group.key}-${section.key}`, label: section.label })
+        }
+        for (const player of section.players) rows.push({ kind: 'player', key: player.id, player })
+      }
+    }
+  } else {
+    for (const player of sorted) rows.push({ kind: 'player', key: player.id, player })
+  }
+
   return (
     <Card className="overflow-hidden">
       <div className="max-h-[70vh] overflow-auto">
@@ -143,7 +194,7 @@ export default function RosterTable({
           </caption>
           <thead>
             <tr>
-              {SORTABLE.map(({ key, label }) => (
+              {columns.map(({ key, label }) => (
                 <th
                   key={key}
                   scope="col"
@@ -162,6 +213,9 @@ export default function RosterTable({
                   </button>
                 </th>
               ))}
+              {tierByPlayer && (
+                <th scope="col" className={HEAD_CELL}>Tier</th>
+              )}
               <th scope="col" className={`${HEAD_CELL} w-px whitespace-nowrap`}>
                 <span className="sr-only">Open player</span>
               </th>
@@ -169,7 +223,41 @@ export default function RosterTable({
           </thead>
 
           <tbody>
-            {sorted.map((player) => {
+            {rows.map((row) => {
+              if (row.kind === 'group') {
+                return (
+                  <tr key={row.key}>
+                    {/* A heading row inside ONE table, rather than a table per
+                        group: separate tables would let the columns drift out of
+                        alignment between groups, which is the thing a table is
+                        for. */}
+                    <th
+                      colSpan={span}
+                      scope="colgroup"
+                      className="border-t border-line bg-surface-sunk px-3 py-1.5 text-left text-[12px] font-extrabold uppercase tracking-[.5px] text-ink"
+                    >
+                      {row.label}
+                      <span className="ml-2 font-bold text-ink-muted">{row.count}</span>
+                    </th>
+                  </tr>
+                )
+              }
+
+              if (row.kind === 'section') {
+                return (
+                  <tr key={row.key}>
+                    <th
+                      colSpan={span}
+                      scope="colgroup"
+                      className="border-t border-line px-3 py-1 pl-6 text-left text-[11px] font-bold uppercase tracking-[.5px] text-ink-muted"
+                    >
+                      {row.label}
+                    </th>
+                  </tr>
+                )
+              }
+
+              const player = row.player
               const editable = canEditTeam(player.team_id)
               const busy = saving[player.id]
               const error = errors[player.id]
@@ -237,8 +325,28 @@ export default function RosterTable({
                     ) : (
                       <span className="px-2 text-ink-muted">{player.position || 'Not set'}</span>
                     )}
+                    {/* ⚠️ THE OTHER positions, not all of them. The select above
+                        edits players.position — the primary — and repeating it
+                        as a chip directly beneath itself would read as a
+                        duplicate. Jay added a second position to a player and
+                        saw no sign of it here at all, which is what these are
+                        for. */}
+                    {otherPositions(player).length > 0 && (
+                      <span className="mt-0.5 flex flex-wrap gap-1 px-2">
+                        {otherPositions(player).map((name) => (
+                          <span
+                            key={name}
+                            data-testid="other-position"
+                            className="rounded-[100px] bg-surface-sunk px-1.5 py-px text-[11px] font-bold text-ink-muted"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </td>
 
+                  {show('gender') && (
                   <td className={BODY_CELL}>
                     {editable ? (
                       <select
@@ -266,7 +374,9 @@ export default function RosterTable({
                       </span>
                     )}
                   </td>
+                  )}
 
+                  {show('team') && (
                   <td className={BODY_CELL}>
                     {editable ? (
                       <select
@@ -286,6 +396,7 @@ export default function RosterTable({
                       </span>
                     )}
                   </td>
+                  )}
 
                   <td className={BODY_CELL}>
                     {editable ? (
@@ -307,6 +418,14 @@ export default function RosterTable({
                         : <span className="px-2 text-ink-faint">—</span>
                     )}
                   </td>
+
+                  {tierByPlayer && (
+                    <td className={BODY_CELL}>
+                      {tierByPlayer.get(player.id)
+                        ? <Badge tone="neutral">{tierByPlayer.get(player.id)}</Badge>
+                        : <span className="px-2 text-ink-faint">—</span>}
+                    </td>
+                  )}
 
                   <td className={`${BODY_CELL} text-right`}>
                     <Button variant="ghost" size="sm" onClick={() => onSelect(player.id)}>

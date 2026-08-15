@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { positionGroup } from '../src/screens/Roster.jsx'
+import { positionGroup } from '../src/lib/rosterUnit.js'
 
 // players.unit — "designate players as forwards or back" (Jay, 14 Aug 2026),
 // with the specific positions to follow later.

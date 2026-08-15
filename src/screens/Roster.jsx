@@ -6,6 +6,9 @@ import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import RosterTable from '../components/RosterTable.jsx'
 import TeamFilter, { ALL_TEAMS_ID } from '../components/TeamFilter.jsx'
+import { positionGroup, POSITION_GROUP_ORDER } from '../lib/rosterUnit.js'
+import { buildRosterGroups, constantColumns, GROUP_BY } from '../lib/rosterGrouping.js'
+import { listPlayerGrades, listPlayerPositions } from '../data/playerTiers.js'
 import PlayerDetail from './PlayerDetail.jsx'
 import PlayerForm from './PlayerForm.jsx'
 import MyPlayerForm from './MyPlayerForm.jsx'
@@ -53,12 +56,6 @@ function readStoredFilter() {
 // src/lib/eventFormat.js was extracted only because two screens genuinely
 // shared it.
 
-// Ported verbatim from the prototype's posGroup() (design-system.md §7), so
-// the grouped-by-position view matches the approved design exactly.
-const FORWARDS = ['Prop', 'Hooker', 'Lock', 'Flanker', 'Number 8']
-const BACKS = ['Scrum-half', 'Fly-half', 'Centre', 'Wing', 'Fullback']
-const POSITION_GROUP_ORDER = ['Forwards', 'Backs', 'Other']
-
 // design-system.md's --muted (#77726e) is specified against a card, where it
 // measures 4.755:1 on white and clears AA. The section head and the group
 // headers sit OUTSIDE any card, on --paper (#f5f4f3), where the same pair
@@ -69,28 +66,6 @@ const POSITION_GROUP_ORDER = ['Forwards', 'Backs', 'Other']
 // value), so it introduces no new colour. --muted inside a card is untouched:
 // the player row's "Flanker · U10" meta line still uses it.
 const MUTED_ON_PAPER = 'text-ink-muted'
-
-// ⚠️ TAKES THE PLAYER, NOT THE POSITION, SINCE 14 Aug 2026, and the change is
-// the whole point of players.unit. It used to receive a position string and so
-// could only bucket a player once somebody had named a specific position —
-// which meant a nine-year-old who is plainly a forward sat in "Other" until
-// prop-or-lock was decided.
-//
-// ⚠️ `unit` WINS WHERE THE TWO DISAGREE. Jay's explicit choice between deriving
-// the unit from the position and keeping the unit authoritative: a player marked
-// `back` whose position says "Flanker" is a DATA ERROR FOR A HUMAN TO FIX, and
-// this function must not quietly paper over it by preferring the position.
-// Deriving was rejected because it cannot express "forward, position not decided",
-// which is the entire reason the column exists.
-export function positionGroup(player) {
-  if (player?.unit === 'forward') return 'Forwards'
-  if (player?.unit === 'back') return 'Backs'
-  // No unit set: fall back to the bucket the position implies, which is exactly
-  // what this did for every player before the column existed.
-  if (FORWARDS.includes(player?.position)) return 'Forwards'
-  if (BACKS.includes(player?.position)) return 'Backs'
-  return 'Other'
-}
 
 // Every group is ordered by name. The prototype sorted position groups by
 // jersey number, but the club does not use numbers (see playerFormat.js), so
@@ -223,6 +198,16 @@ export default function Roster() {
   // ("who are the girls in this group") and a sticky one would leave someone
   // convinced players had gone missing on their next visit.
   const [genderFilter, setGenderFilter] = useState('all')
+  // ⚠️ 'none' BY DEFAULT, so nobody's roster reorganises itself under them on
+  // the next deploy. Jay asked to "be able to" group by tier, which is a
+  // control, not a new default — and grouping 315 players nobody has graded
+  // yet would produce one heading reading "Not graded" over the whole club.
+  const [groupBy, setGroupBy] = useState('none')
+  // Coach-only data, loaded alongside the players. Empty maps for a parent:
+  // player_grades is refused by RLS for them, so this is belt and braces over
+  // a policy that already says no.
+  const [tierByPlayer, setTierByPlayer] = useState(new Map())
+  const [positionsByPlayer, setPositionsByPlayer] = useState(new Map())
   const [selectedPlayerId, setSelectedPlayerId] = useState(null)
   // null when the add/edit sheet is closed; { player } when open (player is
   // null for "add"). An object rather than a boolean so opening the form for
@@ -297,6 +282,44 @@ export default function Roster() {
   // private.can_edit_team). Asking the helper rather than testing the string
   // is what stops the next role needing an edit here.
   const canEditAnything = admin || memberships.some((membership) => isSquadStaffRole(membership.role))
+
+  // ⚠️ COACH-ONLY, AND GATED HERE AS WELL AS BY RLS. The roster is a screen a
+  // PARENT sees; RLS refuses player_grades to them, but a refusal that arrives
+  // as an error in the console is not a design — not asking is. The same reason
+  // the Tier column is passed only when canEditAnything.
+  //
+  // Keyed on the id list rather than on `players`, which is a new array on every
+  // reload and would re-fetch grades each time the photos resolved.
+  const playerIdKey = players.map((player) => player.id).sort().join(',')
+  useEffect(() => {
+    if (!canEditAnything || playerIdKey === '') {
+      setTierByPlayer(new Map())
+      setPositionsByPlayer(new Map())
+      return undefined
+    }
+    let mounted = true
+    const ids = playerIdKey.split(',')
+    Promise.all([listPlayerGrades(ids), listPlayerPositions(ids)])
+      .then(([grades, positions]) => {
+        if (!mounted) return
+        // listPlayerGrades hands back the whole row; the table only wants the
+        // letter.
+        setTierByPlayer(new Map([...grades].map(([id, row]) => [id, row.tier])))
+        setPositionsByPlayer(positions)
+      })
+      .catch(() => {
+        // A failure here must not take the roster down with it: the names, the
+        // photos and the age groups are the screen's job, and tier is a
+        // decoration on top of them.
+        if (mounted) {
+          setTierByPlayer(new Map())
+          setPositionsByPlayer(new Map())
+        }
+      })
+    return () => {
+      mounted = false
+    }
+  }, [canEditAnything, playerIdKey])
   const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
   const normalisedQuery = query.trim().toLowerCase()
@@ -326,7 +349,12 @@ export default function Roster() {
   const matchingSearch = players.filter(
     (player) =>
       matchesQuery(player, teamsById.get(player.team_id)?.name ?? '', normalisedQuery) &&
-      (genderFilter === 'all' || player.gender === genderFilter),
+      // ⚠️ 'unrecorded' IS NOT ON THE RADIO ROW. It is reachable only by
+      // clicking the nudge below, which is the point of the nudge: a coach who
+      // is told "9 players have no gender recorded" can then see WHICH nine
+      // without hunting for them.
+      (genderFilter === 'all'
+        || (genderFilter === 'unrecorded' ? !player.gender : player.gender === genderFilter)),
   )
 
   // How many players the gender filter is currently hiding BECAUSE THEY HAVE
@@ -340,7 +368,7 @@ export default function Roster() {
   // nobody has answered for". Those are very different statements to put in
   // front of a coach picking a team.
   const hiddenUnrecorded =
-    genderFilter === 'all'
+    genderFilter === 'all' || genderFilter === 'unrecorded'
       ? 0
       : players.filter(
           (player) =>
@@ -387,6 +415,30 @@ export default function Roster() {
       label: groupByPosition ? key : (teamsById.get(key)?.name ?? 'No age group'),
       players: [...bucket.get(key)].sort(byName),
     }))
+
+  // ⚠️ THE DESKTOP TABLE'S COLUMNS AND GROUPING, which are NOT the mobile
+  // `groups` above. The mobile list has always grouped; the table has not, and
+  // Jay asked for both a tidier column set and a grouping he can choose.
+  //
+  // ⚠️ HIDING THE AGE GROUP COLUMN TAKES ITS INLINE EDITOR WITH IT. That is the
+  // real cost of this and it is accepted deliberately: when the roster is
+  // filtered to one squad the column reads "U16B Contact" on every row, and
+  // moving a player to another age group still works from the player sheet.
+  // Widen the filter and the column — and the editor — come back.
+  const hiddenColumns = constantColumns(visible, {
+    gender: (player) => player.gender ?? null,
+    team: (player) => player.team_id ?? null,
+  })
+
+  const tableGroups =
+    groupBy === 'none'
+      ? null
+      : buildRosterGroups(visible, { groupBy, tierByPlayer, teamsById })
+
+  // How many of the players on screen have no gender recorded. Distinct from
+  // hiddenUnrecorded above, which counts the ones a gender FILTER is hiding;
+  // this one is about the gap itself and shows while the filter is off.
+  const missingGender = visible.filter((player) => !player.gender).length
 
   // Derive the open player from the live list rather than storing the row
   // itself, so the sheet's contents stay in step with a reload and a removed
@@ -549,6 +601,57 @@ export default function Roster() {
         </div>
       </fieldset>
 
+      {/* ⚠️ CLICKABLE — Jay's explicit choice ("nudge should be clickable").
+          A count on its own tells a coach there is a gap and then leaves them to
+          find it by eye down a list of fifty; this jumps straight to the rows
+          that need answering. It is a button rather than a link because it
+          changes what this screen is showing, not where you are.
+
+          Only while the filter is off: with Male or Female selected the
+          hiddenUnrecorded line below is already saying the more precise thing. */}
+      {genderFilter === 'all' && missingGender > 0 && (
+        <button
+          type="button"
+          onClick={() => setGenderFilter('unrecorded')}
+          className="mb-3 block w-full rounded-[12px] border border-line bg-surface-sunk px-3 py-2 text-left text-[13px] font-semibold text-ink-muted transition hover:border-brand hover:text-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          {missingGender === 1
+            ? '1 player has no gender recorded.'
+            : `${missingGender} players have no gender recorded.`}
+          <span className="ml-1 underline underline-offset-[3px]">Show them</span>
+        </button>
+      )}
+
+      {genderFilter === 'unrecorded' && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-[12px] border border-brand bg-surface-mute px-3 py-2 text-[13px] font-semibold text-brand-deep">
+          <span>Showing players with no gender recorded.</span>
+          <Button variant="ghost" size="sm" onClick={() => setGenderFilter('all')}>
+            Show all
+          </Button>
+        </div>
+      )}
+
+      {/* Grouping is a coach's tool: it exists to answer "who are my tier B
+          forwards", which is not a question a parent asks of a roster. */}
+      {canEditAnything && isDesktop && (
+        <div className="mb-3 flex items-center gap-2">
+          <label htmlFor="roster-group-by" className="text-[13px] font-semibold text-ink-muted">
+            Group by
+          </label>
+          <select
+            id="roster-group-by"
+            value={groupBy}
+            onChange={(event) => setGroupBy(event.target.value)}
+            className="rounded-[10px] border-[1.5px] border-line bg-surface-card px-2.5 py-1.5 text-[13px] font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          >
+            <option value="none">Nothing</option>
+            <option value={GROUP_BY.TIER}>Tier, then forwards and backs</option>
+            <option value={GROUP_BY.UNIT}>Forwards and backs</option>
+            <option value={GROUP_BY.TEAM}>Age group</option>
+          </select>
+        </div>
+      )}
+
       {/* See hiddenUnrecorded above. This line is what stops a filtered count
           being read as a fact about the squad. */}
       {hiddenUnrecorded > 0 && (
@@ -604,6 +707,13 @@ export default function Roster() {
           onSelect={setSelectedPlayerId}
           onPatch={patchPlayer}
           photoUrls={photoUrls}
+          groups={tableGroups}
+          hiddenColumns={hiddenColumns}
+          // ⚠️ PASSED ONLY FOR A COACH, so the Tier column does not exist in a
+          // parent's DOM at all. RLS already refuses the underlying rows; this
+          // is the second lock, on the screen a parent actually opens.
+          tierByPlayer={canEditAnything ? tierByPlayer : null}
+          positionsByPlayer={canEditAnything ? positionsByPlayer : null}
         />
       )}
 
