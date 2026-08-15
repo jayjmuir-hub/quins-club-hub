@@ -1,4 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
+// ⚠️ IMPORTED AS WELL AS RE-EXPORTED FURTHER DOWN. A bare `export … from` does
+// NOT bring the names into this module's scope, and this file calls all three.
+import { DEFAULT_FOCUS, clampFocus, focusToObjectPosition } from '../lib/photoFocus.js'
 
 // Choosing a photo, and saying which part of it matters.
 //
@@ -38,27 +41,15 @@ export const PHOTO_SHAPES = [
   { key: 'face', label: 'Header', ratio: 1, width: 40, round: true },
 ]
 
-export const DEFAULT_FOCUS = { x: 50, y: 50 }
-
-/**
- * Clamp to the 0-100 the database stores, and round — sub-pixel focus is noise.
- *
- * ⚠️ TAKES THE WHOLE VALUE RATHER THAN DESTRUCTURING IN THE SIGNATURE, because a
- * default parameter only fires on `undefined` and the database will hand this
- * `null` for every photo uploaded before the column existed. `clampFocus(null)`
- * destructured in the signature throws, and it throws inside a render.
- */
-export function clampFocus(focus) {
-  const source = focus && typeof focus === 'object' ? focus : {}
-  const n = (v) => Math.max(0, Math.min(100, Math.round(Number.isFinite(v) ? v : 50)))
-  return { x: n(source.x), y: n(source.y) }
-}
-
-/** The CSS value. Kept here so the picker and every renderer agree on the format. */
-export function focusToObjectPosition(focus) {
-  const { x, y } = clampFocus(focus ?? DEFAULT_FOCUS)
-  return `${x}% ${y}%`
-}
+// ⚠️ MOVED TO `src/lib/photoFocus.js` ON 15 Aug 2026 AND RE-EXPORTED, NOT
+// COPIED. `SquadStaffCard` and `PlayerAvatar` need `focusToObjectPosition` to
+// draw a face, and importing it from here would pull this whole file — drop
+// zone, drag maths, preview strip — into the bundle of every screen that shows a
+// photograph. The re-export keeps the four existing import sites working and,
+// more to the point, keeps the picker's PREVIEW and the real tiles provably on
+// the same function: that is the only reason a preview can be trusted to
+// predict what the tile will do.
+export { DEFAULT_FOCUS, clampFocus, focusToObjectPosition } from '../lib/photoFocus.js'
 
 /**
  * ⚠️ IMAGE TYPES ONLY, AND CHECKED RATHER THAN TRUSTED. A drop target accepts

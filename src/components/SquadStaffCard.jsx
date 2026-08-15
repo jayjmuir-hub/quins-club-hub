@@ -3,6 +3,11 @@ import { labelForRole } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 import { whatsappUrl } from '../lib/phone.js'
 import { useMediaQuery } from '../lib/useMediaQuery.js'
+// ⚠️ FROM `lib/`, NOT FROM `PhotoPositioner.jsx`. Importing it from the picker
+// would pull the drop zone and the drag maths into Home's bundle to render a
+// percentage; the helper was moved out for exactly this. Same function either
+// way — the picker re-exports it — so the preview and this tile cannot disagree.
+import { focusToObjectPosition } from '../lib/photoFocus.js'
 
 // "Who looks after this squad" — the member-facing half of the staff feature.
 // Phase 3 of claude/plans/2026-08-13-squad-staff-on-home.md; the admin half is
@@ -235,8 +240,22 @@ function ContactButton({ href, label, tone = 'ghost', children }) {
  * club's fifteen staff have no photo, so "no photo", "could not sign" and "the
  * image 404s" must all render identically and none of them may announce itself.
  * The same ruling PlayerAvatar carries.
+ *
+ * ⚠️ `object-position` IS WHAT MAKES THE PICKER MEAN ANYTHING, AND IT WAS
+ * MISSING FROM THIS COMPONENT UNTIL 15 Aug 2026. `object-cover` alone centres
+ * the crop, so on the lead tile — the tallest shape in the app — a landscape
+ * photograph loses the top and bottom of itself whatever the person chose, and
+ * a head goes with the top. Jay reported it as the picker not working: "like it
+ * isn't adjusting the photo in the pill at all". It was not. This one style is
+ * the entire visible half of claude/plans/2026-08-15-photo-positioning.md.
+ *
+ * ⚠️ THE FORMAT COMES FROM `focusToObjectPosition`, NOT FROM A TEMPLATE STRING
+ * BUILT HERE. That helper clamps to the 0-100 the database stores and defaults a
+ * null to the centre — and it is where the picker's PREVIEW gets its value too,
+ * which is the only reason the preview can be trusted to predict this tile.
+ * Two formatters would be two chances for them to disagree.
  */
-function TileBackground({ name, role, url, compact = false }) {
+function TileBackground({ name, role, url, focus, compact = false }) {
   const [failed, setFailed] = useState(false)
 
   if (url && !failed) {
@@ -247,6 +266,7 @@ function TileBackground({ name, role, url, compact = false }) {
         // Ferreira" would only repeat it. Empty alt marks it decorative and
         // stops a screen reader saying the name twice.
         alt=""
+        style={{ objectPosition: focusToObjectPosition(focus) }}
         className="absolute inset-0 h-full w-full object-cover"
         onError={() => setFailed(true)}
       />
@@ -333,7 +353,12 @@ function StaffTile({ member, span = 'half', style }) {
       style={style}
       className={`relative overflow-hidden rounded-[14px] bg-surface-sunk ${SPAN_CLASS[span]}`}
     >
-      <TileBackground name={member.name} role={member.role} url={member.photoUrl} />
+      <TileBackground
+        name={member.name}
+        role={member.role}
+        url={member.photoUrl}
+        focus={member.focus}
+      />
 
       {/* ⚠️ THE SCRIM IS WHAT MAKES WHITE TEXT LEGAL OVER AN UNKNOWN PHOTO.
           Nobody vets these images, so the type has to survive a bright one. The
@@ -435,7 +460,16 @@ function FaceStack({ staff }) {
             index > 0 ? '-ml-2' : ''
           }`}
         >
-          <TileBackground name={member.name} role={member.role} url={member.photoUrl} compact />
+          {/* ⚠️ THE FOCAL POINT MATTERS MOST HERE, NOT LEAST. This is 28px and
+              round, so it is the crop with the least room for error — a face
+              two-thirds up a photograph is missing entirely at this size. */}
+          <TileBackground
+            name={member.name}
+            role={member.role}
+            url={member.photoUrl}
+            focus={member.focus}
+            compact
+          />
         </span>
       ))}
     </span>

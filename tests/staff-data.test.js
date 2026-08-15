@@ -69,6 +69,41 @@ describe('toStaffMember — the nameless row', () => {
   })
 })
 
+// ⚠️ THE FOCAL POINT MOVED INTO `toStaffMember` ON 15 Aug 2026, AND THE REASON
+// IS THAT ONE OF THE TWO CALLERS DID NOT MAP IT. `listSquadStaff` (the admin
+// directory) built the point itself; `listMySquadStaff` (the Home card — the
+// surface the whole positioning feature exists to control) did not, so a
+// repositioned photo moved on /admin/staff and stayed centred on Home. A shared
+// shaping function is only shared if the shaping is IN it.
+describe('toStaffMember — the focal point', () => {
+  it('carries the point through', () => {
+    const row = {
+      id: 'm1',
+      role: 'coach',
+      profiles: { full_name: 'Alex Morgan', photo_focus_x: 47, photo_focus_y: 28 },
+    }
+    expect(toStaffMember(row).focus).toEqual({ x: 47, y: 28 })
+  })
+
+  it('reports null for a photo nobody has positioned', () => {
+    const row = { id: 'm1', role: 'coach', profiles: { full_name: 'Alex Morgan' } }
+    expect(toStaffMember(row).focus).toBeNull()
+  })
+
+  // ⚠️ ZERO IS A REAL FOCAL POINT — the very top, or the far left, of a
+  // photograph — and it is exactly what a person dragging a head shot upward
+  // produces. `photo_focus_y || null` would silently throw it away and re-centre
+  // the crop, which is indistinguishable from the bug this all fixes.
+  it('keeps a zero rather than treating it as unset', () => {
+    const row = {
+      id: 'm1',
+      role: 'coach',
+      profiles: { full_name: 'Alex Morgan', photo_focus_x: 0, photo_focus_y: 0 },
+    }
+    expect(toStaffMember(row).focus).toEqual({ x: 0, y: 0 })
+  })
+})
+
 // ⚠️ TWO VALUES MEANING "no title" is how a screen ends up with an empty chip
 // nobody can clear. The write normalises to NULL, matching what the read
 // expects.

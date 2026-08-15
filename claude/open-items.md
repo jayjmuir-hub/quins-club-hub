@@ -367,6 +367,14 @@ green suite and has never been exercised by a human on the live site.
     harness stands one in with a 1×1 pink PNG stretched by `object-cover`, so
     the scrim's whole job — holding white text legible over an unknown image —
     is untested against an actual face. Two staff have photos; thirteen do not.
+    ✅ **THIS ONE PAID OUT ON 15 Aug 2026, AND IT IS THE BEST ARGUMENT IN THIS
+    FILE FOR KEEPING SUCH ITEMS.** The first real photograph put on a real tile
+    exposed a bug no harness could have: the photo positioner did not position
+    anything. `SquadStaffCard` had no `object-position`, so `object-cover`
+    centred every crop and the lead tile cut the top off a head. A 1×1 PNG has
+    no top of a head to cut off — **the fixture was incapable of failing.**
+    ⚠️ **The scrim half of this item is still unverified** and the entry stays
+    for it.
   - **Almost every squad will render an even grid, not the featured tile**,
     because the lead is chosen by title and only two people are titled "Head
     Coach". That is the design working, and it will look like the feature is

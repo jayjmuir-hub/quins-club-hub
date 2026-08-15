@@ -75,10 +75,6 @@ export async function listSquadStaff() {
     list.push({
       ...toStaffMember(row),
       photoUrl: urls[row.profiles?.photo_path] ?? null,
-      focus:
-        row.profiles?.photo_focus_x == null && row.profiles?.photo_focus_y == null
-          ? null
-          : { x: row.profiles.photo_focus_x, y: row.profiles.photo_focus_y },
     })
     byTeam.set(row.team_id, list)
   }
@@ -125,7 +121,35 @@ export function toStaffMember(row) {
     // a signed `photoUrl` alongside this; the admin directory does not select
     // the column at all and gets null, which renders as initials.
     photoPath: row.profiles?.photo_path ?? null,
+    // ⚠️ MAPPED HERE RATHER THAN AT EACH CALL SITE, AND IT USED TO BE THE OTHER
+    // WAY. `listSquadStaff` built this itself and `listMySquadStaff` — the Home
+    // card, the surface the whole positioning feature exists to control —
+    // simply did not, so a repositioned photo moved on /admin/staff and stayed
+    // stubbornly centred on Home. One mapping cannot be half-applied.
+    //
+    // ⚠️ NULL RATHER THAN `{x: 50, y: 50}` FOR "never positioned". The renderers
+    // already default a null through `focusToObjectPosition`, and a synthetic
+    // centre here would make "nobody has touched this" indistinguishable from
+    // "somebody chose the middle" for anything that later wants to tell them
+    // apart — the picker's own reset among them.
+    focus: toFocus(row.profiles),
   }
+}
+
+/**
+ * The two focal-point columns as one point, or null.
+ *
+ * ⚠️ BOTH NULL MEANS NULL, BUT ONE NULL DOES NOT. The columns are written
+ * together by every write path, so a half-set pair is not a state this app
+ * creates — but a smallint of 0 is a perfectly legitimate focal point (the very
+ * top or the far left of a photo), and `photo_focus_x || null` would throw it
+ * away. Compare against null explicitly.
+ */
+function toFocus(profile) {
+  const x = profile?.photo_focus_x
+  const y = profile?.photo_focus_y
+  if (x == null && y == null) return null
+  return { x, y }
 }
 
 /**
@@ -197,6 +221,14 @@ export async function listMySquadStaff() {
           email: row.email,
           phone: row.phone,
           photo_path: row.photo_path,
+          // ⚠️ THESE TWO REACH HERE ONLY BECAUSE `my_squad_staff()` NAMES THEM.
+          // The function is SECURITY DEFINER with a fixed column list precisely
+          // so a parent cannot read a `profiles` row, so there is no client-side
+          // route to the focal point — a missing column here is not a `select`
+          // to widen, it is a migration
+          // (db/migrations/20260815_my_squad_staff_focus.sql).
+          photo_focus_x: row.photo_focus_x,
+          photo_focus_y: row.photo_focus_y,
         },
       }),
       photoUrl: urls[row.photo_path] ?? null,
