@@ -30,6 +30,19 @@ vi.mock('../src/data/parents.js', () => ({
   saveParents: (...args) => saveParentsMock(...args),
 }))
 
+// ⚠️ ADDED 14 Aug 2026 with player_positions and player_grades. Without it the
+// form's last two writes reach the real Supabase client and throw, which is how
+// this file caught the writes being placed BEFORE the contact save — a refused
+// position write returned early and the phone number was never stored. Ten tests
+// failed; the fix was the ORDER, not the mock.
+vi.mock('../src/data/playerTiers.js', () => ({
+  TIERS: ['A', 'B', 'C'],
+  listPlayerGrades: async () => new Map(),
+  listPlayerPositions: async () => new Map(),
+  savePlayerPositions: async () => [],
+  setPlayerGrade: async () => null,
+}))
+
 // The photo bucket is private, so the form signs URLs and uploads through
 // these. Mocked wholesale: photo behaviour has its own tests, and an
 // unmocked call would put the network into a unit test.

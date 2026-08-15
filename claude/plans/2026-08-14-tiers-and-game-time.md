@@ -1,7 +1,14 @@
 # A/B/C tiers, player grading, and game time
 
-**STATUS: PHASE 1 IN PROGRESS, NOTHING APPLIED.** Design agreed with Jay
-14 Aug 2026. No migration has been run. Phases 2 and 3 are NOT started.
+**STATUS: PHASES 1 AND 2 BUILT; PHASE 2 NOT YET MERGED.** Phase 1 (game time)
+shipped as `1419a21`. Phase 2 — `events.tier`, `player_grades`, `player_positions`
+— is applied to production and on `feat/tiers-and-positions`. ⚠️ **Unexercised: no
+player has been graded and no multi-position player exists yet.** ⚠️ **The
+ELIGIBILITY WARNING in the lineup picker is NOT built** — the data now supports it
+(a fixture knows its tier, a player knows their grade) but nothing compares them.
+Phase 3 (minutes) is not started and is still waiting on Jay's answer that fair
+game time means appearances, which he has since given: **appearances**, so minutes
+may never be needed.
 
 Jay, 14 Aug 2026: *"need to be able to designate players as A, B, or C league
 players and also track matches played per player"*; then, correcting a wrong

@@ -474,3 +474,32 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.lineups        TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.lineup_players TO authenticated;
 REVOKE ALL ON public.lineups        FROM anon;
 REVOKE ALL ON public.lineup_players FROM anon;
+
+
+-- ---------------------------------------------------------------------
+-- public.player_grades / public.player_positions — TABLE grants
+-- (captured 14 Aug 2026 from information_schema.table_privileges)
+--
+-- ⚠️ TWO TABLES, DELIBERATELY DIFFERENT VISIBILITY, AND THE GRANTS LOOK
+-- IDENTICAL BECAUSE THE DIFFERENCE IS IN THE POLICIES, NOT HERE. Both give
+-- `authenticated` the four verbs; what separates them is that
+-- `player grade manage` is can_edit_team on BOTH read and write with NO wider
+-- read arm — so a PARENT CANNOT READ THEIR OWN CHILD'S GRADE — while
+-- `player position read` is deliberately squad-wide. Anyone reading only this
+-- file would conclude the two are the same; they are not.
+--
+-- ⚠️ `authenticated` ALSO HOLDS TRUNCATE / REFERENCES / TRIGGER, which neither
+-- migration granted. Supabase's own `alter default privileges ... grant all on
+-- tables` again — same note as lineups above, same conclusion: inert through
+-- PostgREST, not new, and if it is ever tidied it should be tidied schema-wide.
+--
+-- ✅ `anon` APPEARS FOR NEITHER TABLE. That is the explicit revoke in each
+-- migration, and for player_grades it is the line that matters most in this
+-- file: it holds a judgement about a child's ability. Fault-injected the same
+-- day — anon gets 42501, and an authenticated caller with no membership reads
+-- zero rows and is refused 42501 on a write.
+-- ---------------------------------------------------------------------
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.player_grades    TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.player_positions TO authenticated;
+REVOKE ALL ON public.player_grades    FROM anon;
+REVOKE ALL ON public.player_positions FROM anon;

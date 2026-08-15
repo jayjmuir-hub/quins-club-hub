@@ -257,6 +257,7 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
       // nothing may guess otherwise from the type or the squad.
       leagueTeamId: '',
       round: '',
+      tier: '',
       // '' = neither: a friendly. See the block by COMPETITION_LEAGUE.
       competitionType: '',
       notes: '',
@@ -332,6 +333,9 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     // filed with the governing body — the same class of harm the league-team
     // picker's squad scoping exists to prevent (see listLeagueTeams).
     round: duplicating || event.round == null ? '' : String(event.round),
+    // ⚠️ CARRIED ON A DUPLICATE, unlike the round. The tier belongs to the
+    // COMPETITION, and a duplicate is normally the same competition again.
+    tier: event.tier ?? '',
     notes: event.notes ?? '',
     // ⚠️ CLEARED ON A DUPLICATE, and this is the one that would be found last.
     // Duplicating a PLAYED match is the normal way to set up the return
@@ -852,6 +856,12 @@ export default function EventForm({
       // tournament for all of them. Which of our teams played it, and in which
       // round, are facts about the SQUAD, so those stay on the primary payload.
       competition_type: isMatch ? values.competitionType || null : null,
+      // ⚠️ IN `common`, so a multi-squad fan-out and a whole repeating term all
+      // carry it: what tier a fixture is played at is a fact about the FIXTURE,
+      // true of every squad joining it.
+      // ⚠️ NULL FOR A NON-MATCH and for a friendly, which has no tier. Nothing
+      // may read a missing tier as 'assume A'.
+      tier: isMatch ? values.tier || null : null,
       // Optional, and empty means NULL rather than '' — EventDetail and the
       // calendar feed both test it for truthiness, and an empty string would
       // render an "Additional info" heading over nothing.
@@ -1524,7 +1534,27 @@ export default function EventForm({
               <select
                 id="event-league-team"
                 value={values.leagueTeamId}
-                onChange={setFromInput('leagueTeamId')}
+                onChange={(domEvent) => {
+                  const chosen = domEvent.target.value
+                  // ⚠️ PREFILLS THE TIER, NEVER DERIVES IT. For a LEAGUE fixture
+                  // the tier and the chosen team's division agree, and making
+                  // somebody type it twice invites them to disagree. But the
+                  // tier stays its own editable field, because for a TOURNAMENT
+                  // they need not agree: we may send ADHQ2 (our B team) to an
+                  // A-tier tournament, and deriving would record a B appearance
+                  // for a match played at A level — backwards for the
+                  // eligibility the player grade exists to police.
+                  //
+                  // ⚠️ ONLY FILLS A BLANK. Overwriting a tier somebody has
+                  // already chosen would silently undo exactly the tournament
+                  // case this field exists for.
+                  const division = leagueTeamOptions.find((t) => t.id === chosen)?.division
+                  setValues((current) => ({
+                    ...current,
+                    leagueTeamId: chosen,
+                    tier: current.tier || (division ?? ''),
+                  }))
+                }}
                 className={inputClasses(false)}
               >
                 {/* ⚠️ "Not a league match" IS THE DEFAULT AND IS A REAL ANSWER,
@@ -1545,6 +1575,30 @@ export default function EventForm({
                   This squad has no league teams yet. An admin can add them on the Club tab.
                 </p>
               )}
+            </div>
+
+            {/* ⚠️ THE TIER OF THE COMPETITION, NOT OF OUR TEAM (Jay, 14 Aug
+                2026). Prefilled from the league team above when that is picked
+                and this is still blank — see that handler for why it prefills
+                rather than derives. It applies to TOURNAMENTS TOO: Jay's
+                "tournaments would have same tier levels as league".
+                ⚠️ "None" IS THE DEFAULT AND IS A REAL ANSWER — a friendly has no
+                tier, and nothing may read a missing tier as "assume A". */}
+            <div className={FIELD}>
+              <label className={LABEL} htmlFor="event-tier">
+                Tier
+              </label>
+              <select
+                id="event-tier"
+                value={values.tier}
+                onChange={setFromInput('tier')}
+                className={inputClasses(false)}
+              >
+                <option value="">None — a friendly or untiered</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+              </select>
             </div>
 
             {/* ⚠️ A CHOICE, NOT A FREE-TEXT BOX, as of 12 Aug 2026. It was an
