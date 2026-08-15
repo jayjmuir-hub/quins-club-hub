@@ -1,14 +1,31 @@
 # Match lineups — picking a team, and sharing it
 
-**STATUS: PHASE 1 BUILT, MIGRATION APPLIED, NOT YET MERGED OR DEPLOYED**
-(14 Aug 2026). `match_lineups` is applied to production and both RLS gates were
-fault-injected; the screen, data layer and extracted share are on
-`feat/match-lineups`. ⚠️ **Unexercised: no coach has picked a team and no lineup
-image has reached a WhatsApp group.** ⚠️ **The SAVE round trip has not been run
-against production** — the screen was driven in the browser far enough to prove
-picking, grouping and the per-side counter, but Save was deliberately not pressed
-because it would leave a lineup row this session could not delete (a production
-DELETE is refused by the permission layer). Phases 2 and 3 are NOT started.
+**STATUS: PHASE 1 SHIPPED AND LIVE.** Merged as `61b657a` (#130) and `a7d66cd`
+(#131); `/lineup/:eventId` is routed in `src/App.jsx` on `main`. **Phases 2 and 3
+are NOT started.**
+
+❌ **THIS HEADER SAID "NOT YET MERGED OR DEPLOYED" UNTIL 15 Aug 2026, WHICH WAS
+TWO PULL REQUESTS OUT OF DATE**, and it is exactly the inversion `RESTORE.md`
+warns about — a status line that is worse than an omission, because an omission
+looks like an omission. Three of its four claims were wrong:
+
+- ❌ *"NOT YET MERGED OR DEPLOYED"* — merged and live.
+- ❌ *"no coach has picked a team"* — **measured 15 Aug 2026: `lineups` and
+  `lineup_players` both hold real rows.** Somebody has picked a team.
+- ❌ *"The SAVE round trip has not been run against production"* — it has; the
+  rows above are what a save produces.
+- ❌ **The table is `lineups`, not `match_lineups`.** That name appears nowhere in
+  the database. Anyone querying the name this file gave gets
+  `relation does not exist`, which reads as "the feature was never built".
+
+⚠️ **STILL GENUINELY UNVERIFIED, and it is the half that matters most:** whether
+a lineup image has ever reached a WhatsApp group. **The image is the deliverable**
+(see below) and no row in any table can tell you whether one arrived. That is a
+question for a human with a phone, not a query.
+
+⚠️ **DO NOT WRITE A ROW COUNT INTO THIS FILE.** The counts above are stated as
+"holds real rows" on purpose — every number this repo has recorded has rotted.
+The query lives in `claude/state-of-play.md`.
 
 Jay, 14 Aug 2026: *"we need a way for coaches to select a lineup for teams in
 matches (league, tournaments, friendlies)… easy GUI type thing… from players who

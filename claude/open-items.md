@@ -195,9 +195,28 @@ green suite and has never been exercised by a human on the live site.
   has yet opened the real U16B roster and confirmed the headings, the counts, or
   that the constant-column rule hides what it should. **The club-wide view will
   show one "Not graded" heading over everything until more players are graded**;
-  that is expected, not a bug, and the tidy fix if it grates is to default to
-  tier grouping only when the roster is filtered to a single squad.
+  that is expected, not a bug.
+  ⚠️ **THE "TIDY FIX" THIS ITEM PROPOSED IS NOW HALF-DONE, BY A DIFFERENT ROUTE.**
+  It suggested defaulting to tier grouping only when the roster is filtered to a
+  single squad. What shipped on 15 Aug (`de82481`) instead drops tier and
+  forwards/backs entirely when every squad in view is **U10 or below**, because
+  those squads have no grades and no positions to group by — `src/lib/minis.js`.
+  A club-wide view, or any view containing one U11+ squad, still defaults to tier
+  and still shows the single "Not graded" heading. **So the complaint this item
+  records is unchanged for the squads it was actually about.**
 - **The all-day calendar entry has never reached a phone.**
+- **The lineup image has never been seen to reach a WhatsApp group.** Rows exist
+  in `lineups` and `lineup_players` — measured 15 Aug 2026, so a team HAS been
+  picked and saved against production — but the image is the actual deliverable
+  and no query can tell you whether one arrived. Moved here from
+  `claude/plans/2026-08-14-match-lineups.md`, whose status header had claimed the
+  whole feature was unmerged for two pull requests after it went live.
+- **The RCM match sheet, the register and the noticeboard have no rows at all.**
+  All three shipped and all three are empty, so every screen that reads them has
+  only ever been seen in its empty state on the live site. ⚠️ **Empty is the
+  CORRECT state for a club three days into onboarding — this is a note, not a
+  fault.** Run the query in `claude/state-of-play.md` rather than trusting this
+  sentence.
 - **Nothing is graded and no player has two positions** beyond what Jay entered
   by hand while testing, so neither the tier column nor the position chips have
   been seen on a realistic roster.
