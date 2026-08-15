@@ -40,6 +40,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   caller has a non-null uid) but one revoke away from it. Fixed with
   `coalesce(..., false)` inside the predicate rather than a guard per caller.
 
+- `2f77eb6` — 🙂 **STAFF CAN POSITION THEIR OWN PHOTO TOO — phase 3, the staff half.** A drop
+  zone and the positioner on the "Your photo" card, and the avatar honours the
+  stored focal point.
+  ⚠️ **POSITIONING IS A SECOND ACTION, NOT PART OF THE UPLOAD.** The upload there
+  is immediate and its ordering is argued for at the top of the file for reasons
+  unrelated to where a face is.
+  ⚠️ **AND THE RESET IS BEST-EFFORT, OUTSIDE THE ROLLBACK — AN EXISTING TEST
+  FORCED THAT.** Awaited inside the upload's `try`, a failure would land in the
+  `catch` and DELETE A PHOTO THAT HAD ALREADY SAVED, turning a cosmetic problem
+  into data loss. The test that caught it was written for a different reason
+  months of work earlier.
+  ⚠️ **THE "Add a photo" BUTTON WAS REMOVED RATHER THAN KEPT BESIDE THE DROP
+  ZONE** — two controls with the same accessible name doing the same thing is a
+  duplicate to a screen reader, and a test caught it as "Found multiple elements
+  with the role button".
+  ❌ **The two PLAYER fields are still not wired** — stated in the plan rather
+  than left to be discovered.
+
 - `361fd6f` — 📸 **AN ADMIN CAN NOW ACTUALLY UPLOAD A STAFF PHOTO — the screen half.** A
   control on every `/admin/staff` row: drop zone, positioner, save. Phase 4 of
   `claude/plans/2026-08-15-photo-positioning.md`.

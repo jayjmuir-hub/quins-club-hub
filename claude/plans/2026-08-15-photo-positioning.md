@@ -1,8 +1,8 @@
 # Photo positioning — drag and drop, and where the face is
 
-**STATUS: PHASES 1, 2 AND 4 SHIPPED — the picker, the columns, the write path,
-and the admin-for-staff upload. PHASE 3 (the four existing self-serve fields)
-and PHASE 5 (the tall lead tile) NOT STARTED.**
+**STATUS: PHASES 1, 2 AND 4 SHIPPED, PHASE 3 HALF DONE — the staff self-serve
+field has the picker; the two PLAYER fields do not yet. PHASE 5 (the tall lead
+tile) NOT STARTED.**
 
 Jay, 15 Aug 2026:
 
@@ -85,7 +85,26 @@ usual revoke/grant pair. **This repo's own advisor walk recorded that finding
 hours earlier and it was reproduced anyway.** Fixed with an explicit
 `revoke … from anon`; both RPCs now 404 to an anon key.
 
-## Phase 3 — wire the existing fields (not started)
+## Phase 3 — wire the existing fields (staff done, players not)
+
+✅ **`MyPhotoField` (More, staff self-serve)** has a drop zone and the
+positioner. ⚠️ **Positioning is a SECOND action, not part of the upload** — the
+upload here is immediate and its ordering is argued for at the top of that file
+for reasons that have nothing to do with where a face is, and `set_my_photo_focus`
+is a separate RPC for the same reason.
+
+⚠️ **THE FOCAL-POINT RESET IS BEST-EFFORT AND OUTSIDE THE ROLLBACK, AND THE
+EXISTING TEST IS WHAT FORCED IT.** Awaited inside the upload's `try`, a failure
+would land in the `catch` and DELETE A PHOTO THAT HAD ALREADY SAVED — turning a
+cosmetic problem into data loss. A stale focal point is the lesser harm by a
+wide margin.
+
+⚠️ **AND THE "Add a photo" BUTTON WAS REMOVED, NOT KEPT ALONGSIDE THE DROP
+ZONE.** Rendering both gave two controls with the SAME accessible name doing the
+same thing — a duplicate to a screen reader, and caught by a test as "Found
+multiple elements with the role button".
+
+❌ **Still to do: the two PLAYER fields.**
 
 Four call sites, and they do not behave the same today:
 

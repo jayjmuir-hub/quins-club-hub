@@ -387,3 +387,21 @@ export async function setStaffPhoto(profileId, photoPath, focus = null) {
   if (photoPath) forgetPhotoUrl(photoPath, STAFF_PHOTO_BUCKET)
   return data
 }
+
+/**
+ * Records the signed-in person's own focal point.
+ *
+ * ⚠️ SEPARATE FROM `setMyPhoto`, AND THE DATABASE MODELS IT THE SAME WAY.
+ * Repositioning a photo you already uploaded should not mean uploading it
+ * again, and the upload path here is documented as immediate-and-irreversible
+ * for reasons that have nothing to do with where a face is. Two actions, two
+ * calls.
+ */
+export async function setMyPhotoFocus(focus) {
+  const { data, error } = await supabase.rpc('set_my_photo_focus', {
+    _focus_x: focus?.x ?? null,
+    _focus_y: focus?.y ?? null,
+  })
+  if (error) throw error
+  return data
+}
