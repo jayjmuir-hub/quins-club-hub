@@ -40,6 +40,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   caller has a non-null uid) but one revoke away from it. Fixed with
   `coalesce(..., false)` inside the predicate rather than a guard per caller.
 
+- `ea3ccad` — 📐 **AN ODD LAST TILE KEEPS ITS WIDTH AND LEAVES A GAP.** Jay, on the real
+  six-person squad: *"i don't like the bottom one going full length"*. It was
+  promoted to full width to avoid the hole, on the reasoning that a lone tile
+  beside a gap looks unfinished. Seen on the real thing, a tile stretched to
+  twice its neighbours' width is the more obviously wrong of the two — it reads
+  as a different KIND of thing rather than as the last of a set.
+  ⚠️ **THE SINGLE-PERSON CASE IS STILL FULL WIDTH AND IS NOT THE SAME CASE.**
+  With one tile there is no set for it to be the odd one out of, and a
+  half-width tile alone on a row is a card that looks truncated.
+  ⚠️ **THE INVARIANT IN THE TESTS CHANGED WITH THE RULE**, rather than being
+  quietly deleted: it used to assert an even number of half tiles so none was
+  ever alone. It now asserts that `wide` appears ONLY for a squad of one.
+
 - `a7fcb53` — 🧱 **THE LEAD TILE GOES BACK TO TWO TILES TALL, AND THE CONTACT ICONS SHRINK.**
   Jay, having seen BOTH layouts with a real photograph in them: the lead is two
   small tiles tall and the rest flow around it — under as well as beside.

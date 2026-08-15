@@ -294,8 +294,19 @@ describe('tileSpans — the lead is two tiles tall and the rest flow around it',
   // made the lead a 175x712 strip and a person in it a vertical sliver. Jay
   // chose the wrapping as the lesser problem, having seen both.
   it('lets the rest flow under the lead as well as beside it', () => {
-    expect(tileSpans(4, true)).toEqual(['lead', 'half', 'half', 'wide'])
-    expect(tileSpans(6, true)).toEqual(['lead', 'half', 'half', 'half', 'half', 'wide'])
+    expect(tileSpans(4, true)).toEqual(['lead', 'half', 'half', 'half'])
+    expect(tileSpans(6, true)).toEqual(['lead', 'half', 'half', 'half', 'half', 'half'])
+  })
+
+  // ⚠️ AN ODD LAST TILE KEEPS ITS WIDTH AND LEAVES A GAP — Jay, 15 Aug 2026,
+  // on the real six-person squad: "i don't like the bottom one going full
+  // length". A tile stretched to twice its neighbours' width reads as a
+  // different KIND of thing; a gap just reads as the end of the list.
+  it('never stretches the odd last tile', () => {
+    for (const n of [3, 4, 5, 6, 7]) {
+      expect(tileSpans(n, true).slice(1)).not.toContain('wide')
+      expect(tileSpans(n, false)).not.toContain('wide')
+    }
   })
 
   it('leaves a full last row alone at five', () => {
@@ -304,16 +315,17 @@ describe('tileSpans — the lead is two tiles tall and the rest flow around it',
 
   it('pairs them off evenly when nobody leads', () => {
     expect(tileSpans(4, false)).toEqual(['half', 'half', 'half', 'half'])
-    expect(tileSpans(3, false)).toEqual(['half', 'half', 'wide'])
+    expect(tileSpans(3, false)).toEqual(['half', 'half', 'half'])
   })
 
-  // The invariant behind every case above: no tile is ever alone on a row.
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])('never strands a tile at %i', (n) => {
+  // ⚠️ THE INVARIANT CHANGED WITH THE RULE. It used to be "an even number of
+  // half tiles, so none is ever alone"; a lone tile is now allowed and simply
+  // leaves a gap. What still holds is that `wide` appears ONLY for a squad of
+  // one, where there is no set to be the odd one out of.
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])('uses wide only for a squad of one (%i)', (n) => {
     for (const hasLead of [true, false]) {
       const spans = tileSpans(n, hasLead)
-      const lead = spans.filter((x) => x === 'lead').length
-      const halves = spans.filter((x) => x === 'half').length
-      expect((lead ? halves - 2 : halves) % 2).toBe(0)
+      expect(spans.includes('wide')).toBe(n === 1)
     }
   })
 })
@@ -411,7 +423,7 @@ describe('SquadStaffCard — the mosaic on screen', () => {
       'lead',
       'half',
       'half',
-      'wide',
+      'half',
     ])
 
     rerender(
@@ -426,7 +438,7 @@ describe('SquadStaffCard — the mosaic on screen', () => {
       'half',
       'half',
       'half',
-      'wide',
+      'half',
     ])
   })
 

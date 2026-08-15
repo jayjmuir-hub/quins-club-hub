@@ -87,14 +87,20 @@ export function tileSpans(count, hasLead) {
   //
   // So: two rows, then ordinary flow. The only thing still forced is that no
   // tile sits alone on a row.
+  // ⚠️ AN ODD LAST TILE STAYS HALF WIDTH AND LEAVES A GAP — Jay, 15 Aug 2026,
+  // looking at the real six-person squad: "i don't like the bottom one going
+  // full length". It used to be promoted to full width to avoid the hole, on
+  // the reasoning that a lone tile beside a gap looks unfinished. Seen on the
+  // real thing, a tile stretched to twice its neighbours' width is the more
+  // obviously wrong of the two: it reads as a different KIND of thing rather
+  // than as the last of a set.
+  //
+  // ⚠️ THE SINGLE-PERSON CASE IS STILL FULL WIDTH, AND THAT IS NOT THE SAME
+  // CASE. With one tile there is no set for it to be the odd one out of, and a
+  // half-width tile alone on a row is a card that looks truncated.
   const lead = hasLead && count >= 3
   const spans = new Array(count).fill('half')
   if (lead) spans[0] = 'lead'
-
-  // Everything except the lead and the two tiles beside it shares rows two at a
-  // time; an odd one out goes full width rather than leaving a hole.
-  const flowing = count - (lead ? 3 : 0)
-  if (flowing > 0 && flowing % 2 === 1) spans[count - 1] = 'wide'
   return spans
 }
 
