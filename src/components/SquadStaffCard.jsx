@@ -92,10 +92,14 @@ export function tileSpans(count, hasLead) {
 // The monogram's gradient, keyed to role. The role is written in words in the
 // pill on the same tile, so the colour repeats it rather than carrying it —
 // the same rule the fixture row's state edge follows.
+// ⚠️ NAMED TOKENS, NOT `to-[#7d0a1c]` — tests/theme.test.js refuses a raw hex
+// inside a Tailwind arbitrary value, and it caught the first version of this
+// file. The gradients themselves live in tailwind.config.js under
+// `backgroundImage`, beside `hero-grad` and `stat-band`.
 const MONOGRAM_TONE = {
-  coach: 'from-brand-deep via-brand to-[#7d0a1c]',
-  manager: 'from-chrome-raised via-[#2b2b2b] to-chrome',
-  medic: 'from-accent-ink via-accent to-[#0f6b31]',
+  coach: 'bg-monogram-coach',
+  manager: 'bg-monogram-manager',
+  medic: 'bg-monogram-medic',
 }
 
 function PhoneIcon(props) {
@@ -196,7 +200,7 @@ function TileBackground({ name, role, url }) {
   return (
     <div
       aria-hidden="true"
-      className={`absolute inset-0 bg-gradient-to-br ${tone}`}
+      className={`absolute inset-0 ${tone}`}
     >
       {/* The initials as a watermark, not as a label — the name is written in
           full at the bottom of the tile, so this is texture. Bled off the top

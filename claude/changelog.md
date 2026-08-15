@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
-- 🧒 **U10 AND BELOW GET A SIMPLIFIED APP, AND A CARD EXPLAINING THEIR SEASON.**
+- `de82481` — 🧒 **U10 AND BELOW GET A SIMPLIFIED APP, AND A CARD EXPLAINING THEIR SEASON.**
   Four facts from the club's youth section, only the last of which this repo had
   ever recorded: **the league starts at U11**; U6-U8 play **Mighty Minis** at the
   cricket stadium on league match weekends; U9-U10 play **friendly festivals** of
@@ -58,6 +58,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   could introduce is *"everybody lost it"* rather than *"the minis kept it"*.
   Proved both ways by injecting a fault into `isMinisBand`: forced false, 23
   tests failed; forced true, all six controls failed.
+
+- 🖼️ **SQUAD CONTACTS BECOME A TILE MOSAIC, WITH CALL, WHATSAPP AND EMAIL.**
+  Jay picked the bento mosaic from four previewed options: a poster tile per
+  person, the lead's spanning two rows, photo filling the tile, title at the top,
+  name and three contact buttons at the bottom.
+  ⚠️ **THE LEAD IS CHOSEN BY TITLE, NEVER BY ROLE, BECAUSE A RULING ALREADY SAYS
+  SO.** `src/data/staff.js` sorts by NAME in two places and states both times that
+  role order "reads as a hierarchy the club has not agreed to" — and a featured
+  tile picked by role would restate that hierarchy at twice the size. A title is
+  a string an admin typed, so featuring it states only what the club already
+  chose to say. Visible consequence: only two people in the club are titled
+  "Head Coach", so most squads render as an even grid until titles are set.
+  ⚠️ **THE MONOGRAM IS THE ORDINARY CASE.** Measured 15 Aug 2026: **two** of the
+  club's fifteen staff have a photo, so it is designed rather than patched.
+  ⚠️ **`tileSpans()` IS A FUNCTION BECAUSE AUTO-PLACEMENT LEAVES HOLES AT THE
+  SIZES THE CLUB HAS** — 1, 1, 4 and 6. Any tile that would sit alone on a row
+  goes full width; the lead only gets the tall tile from three people up.
+  ⚠️ **A CLIPPED BUTTON THAT NO OVERFLOW CHECK COULD SEE.** At 320px three 44px
+  buttons needed 144px inside a 140px tile, and because the tile clips, the
+  document did not overflow and `harness/check-overflow.mjs` stayed green while
+  the email button was sliced in half. The grid is one column below 372px, and
+  the button gap is 4px because 6px left exactly zero slack at 375 — the iPhone
+  SE and mini.
+  ⚠️ **`bg-white/92` GENERATED NO RULE AT ALL.** Tailwind's opacity scale runs in
+  fives, so the title pill and the ghost buttons rendered fully transparent. An
+  off-scale value needs `bg-white/[.92]`.
+  ⚠️ **THE NUMBER AND ADDRESS ARE NO LONGER PRINTED**, which is what the tile
+  costs: an email address is one unbreakable word and will not fit a 168px tile.
+  A display change, not a privacy one — the 13 Aug opt-in ruling is untouched and
+  the details are one tap away.
 
 - `d5b8667` — 🎨 **THE HOME REDESIGN, REBUILT ON A DASHBOARD THAT MOVED UNDER IT.** PR #79
   previewed this on 13 Aug and was never merged; `main` moved 59 commits and

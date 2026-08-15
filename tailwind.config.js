@@ -193,6 +193,22 @@ export default {
         // Masthead + hero fills.
         'chrome-grad': 'linear-gradient(180deg,#121212,#0a0a0a)',
         'hero-grad': 'linear-gradient(135deg,#a30d25,#c8102e)',
+        // The squad-contact monogram tiles (15 Aug 2026). Two of the club's
+        // fifteen staff have a photo, so the initials tile is the ORDINARY
+        // rendering of that block and has to look designed rather than blank.
+        // One gradient per role — the role is written in words in the pill on
+        // the same tile, so the colour repeats it rather than carrying it.
+        //
+        // ⚠️ THEY LIVE HERE RATHER THAN AS `to-[#7d0a1c]` AT THE CALL SITE, AND
+        // tests/theme.test.js IS WHY — it refuses a raw hex inside a Tailwind
+        // arbitrary value, and it caught exactly that on the first version of
+        // SquadStaffCard.jsx. The rule is right: a hex in JSX is a colour no
+        // contrast sweep can find and no re-theme can follow.
+        //
+        // Decorative fills with white text over a scrim, not text colours.
+        'monogram-coach': 'linear-gradient(150deg,#a30d25,#c8102e 60%,#7d0a1c)',
+        'monogram-manager': 'linear-gradient(150deg,#2b2b2b,#121212 60%,#0a0a0a)',
+        'monogram-medic': 'linear-gradient(150deg,#157f3c,#2a9d55 60%,#0f6b31)',
       },
 
       boxShadow: {
