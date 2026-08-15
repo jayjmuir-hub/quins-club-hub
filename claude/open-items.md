@@ -127,6 +127,71 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   as evidence. The same mistake as reading an empty search as proof of absence,
   which `CLAUDE.md` rule 6 exists to stop.
 
+## ✅ The Supabase security advisor — walked in full, 15 Aug 2026
+
+**16 warnings. Fourteen are deliberate and correctly guarded; two are untidy
+grants worth one small migration. Nothing here is a hole.** This section exists
+because the list had never been read, and "16 unknown warnings" is a worse state
+than a longer list of understood ones. **Re-run `get_advisors` rather than
+trusting these counts.**
+
+⚠️ **THE ADVISOR FLAGS EXPOSURE, NOT VULNERABILITY.** Fifteen of the sixteen say
+"this `SECURITY DEFINER` function can be called through the API", which is TRUE
+of every RPC this app has — it is how the app works. The question the lint cannot
+answer, and this walk did, is whether each function guards itself.
+
+**What was checked, and what it found:**
+
+- **All fourteen `public` `SECURITY DEFINER` functions set `search_path`
+  explicitly** — twelve to `public`, and `delete_my_account` and
+  `photo_backup_list_objects` to the empty string. That is the hardening the
+  lint's dangerous cousin is about, and it was already done.
+- **Every mutating function enforces its own authorisation**, by its own code
+  and not by the grant: `set_admin_rights` requires `private.is_super_admin()`,
+  `approve_membership` requires `private.can_approve_team()`, the
+  `set_own_player_*` pair check ownership, `accept_invite` matches the invite's
+  email against the caller's, and `delete_my_account` refuses the last admin.
+- **Every reading function is scoped**: `my_squad_staff` by
+  `private.can_see_team()`, `announcement_audience` and `announcement_stats` by
+  author-or-admin, `calendar_events_for_token` by the memberships attached to
+  the token itself.
+- **`photo_backup_list_objects` is `service_role` only** and is correctly absent
+  from the advisor's list.
+
+**Measured against production, not reasoned about:**
+
+| Probe | Result |
+|---|---|
+| `private.squad_expects_gender` via REST, anon key | **404** — the `private` schema is not exposed by PostgREST |
+| `public.my_squad_staff` via REST, anon key | **401** — granted to `authenticated` only |
+| `public.register_my_player` via REST, anon key | **42501 "You must be signed in."** |
+| `public.calendar_events_for_token` via REST, anon key, bogus token | **`[]`** |
+| `select auth.uid()` under `set local role anon` | **null**, which is what makes the guard above fire |
+
+⚠️ **THE `register_my_player` PROBE WAS BUILT SO IT COULD NOT WRITE EVEN IF THE
+GUARD HAD FAILED** — it passed a team id that does not exist, so the second
+guard would have stopped it before any insert. Confirmed after the fact: zero
+rows created. **A probe against production has to be safe in the branch where it
+proves you wrong.**
+
+### The two worth a migration
+
+- **`public.register_my_player` has `anon` EXECUTE and does not need it.** No
+  hole — the body's first statement refuses a null `auth.uid()`, proven above —
+  but the grant is unnecessary, and revoking it is the same reasoning as the
+  14 Aug table-privilege revoke: protection should come from the GRANT, not only
+  from the code behind it. The app calls this as `authenticated`, so nothing
+  legitimate loses access.
+  `revoke execute on function public.register_my_player(text, uuid, text, boolean, boolean, boolean) from anon;`
+- **Ten `private.` functions carry an `anon` EXECUTE grant**, including
+  `squad_expects_gender`, which is also the one function the advisor flags for a
+  mutable `search_path`. ⚠️ **IT IS `SECURITY INVOKER`, SO THE search_path LINT
+  IS MILD** — it runs with the caller's own privileges and gains nothing from a
+  hijacked path — and the schema is unreachable through the API anyway (404
+  above). Worth setting `search_path` for hygiene, since it is called from inside
+  a `SECURITY DEFINER` function, and worth revoking grants that were never meant
+  to exist. **Low priority and honestly labelled as such.**
+
 ## Real gaps, no cheap fix
 
 - **No audit log.** Nothing records who deleted a player, revoked a membership, edited
