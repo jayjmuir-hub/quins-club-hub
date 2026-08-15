@@ -24,6 +24,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   that shipped in four phases: `public.my_squad_staff()` did not RETURN the two
   columns, `listMySquadStaff` did not MAP them, and the tiles did not APPLY
   them. Any one of the three left alone keeps the bug intact.
+  ⚠️ **`20260815_my_squad_staff_focus.sql` APPLIED TO PRODUCTION 15 Aug 2026**,
+  by drop-and-recreate (42P13 — `create or replace` cannot change a RETURNS
+  TABLE). **Verified after applying rather than assumed**, because a dropped
+  function comes back anon-executable through Supabase's default privileges:
+  `anon` EXECUTE false, `authenticated` true, `proacl` identical to before the
+  drop. `db/schema/functions.sql` re-captured from the catalogue in the same
+  breath, and its header stopped claiming a "FIXED SEVEN-COLUMN RESULT" — the
+  list had been eight since 13 Aug, which is what a count written beside the
+  thing it counts always does.
   ⚠️ **AND THE SAME OMISSION HIT PLAYERS**, found while fixing staff — a parent
   has been able to position their child's head shot since the picker shipped,
   and the roster, the dashboard and the detail hero all ignored it.
