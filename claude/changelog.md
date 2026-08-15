@@ -17,6 +17,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
+- `b3628c7` — 🏗️ **jsdom 25 → 30, AND IT COSTS TEST TIME.** Five majors of standards and
+  security fixes in the environment 123 test files render into. All 2413 tests
+  pass unchanged.
+  ⚠️ **IT ROUGHLY DOUBLES THE jsdom BUILD COST, MEASURED RATHER THAN FEARED.** On
+  a fixed five-file set, warm: `environment` 3.4s on jsdom 25 against ~6s on 30.
+  ⚠️ **THE FIRST RUN OF EACH IS USELESS FOR THIS** — the same five files measured
+  50.96s then 3.35s on identical back-to-back runs, because run one carries
+  cold-start. Compare warm runs or compare nothing.
+  ⚠️ **IT MATTERS MORE IN CI THAN ON A DEV MACHINE**, for the reason
+  `vite.config.js` already records: on many cores the wall clock is set by the
+  slowest FILE, but at the four workers a runner has, CPU is the bottleneck and
+  environment cost shows up as time. It is a devDependency either way — nothing
+  here reaches a phone.
+
 - `a24b360` — 🧪 **VITEST 2 → 4, AND THE CRITICAL ADVISORY GOES WITH IT.** `npm audit` drops
   from 10 findings to 6 — **zero critical**, where the critical was vitest itself.
   A dev dependency, so it never reached a phone; it did run on maintainers'
