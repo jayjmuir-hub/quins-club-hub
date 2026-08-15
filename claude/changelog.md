@@ -17,6 +17,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
+- 📷 **THE PHOTO PICKER: DRAG AND DROP, AND A FOCAL POINT YOU CAN SEE THE EFFECT
+  OF.** Phase 1 of `claude/plans/2026-08-15-photo-positioning.md`.
+  ⚠️ **IT STORES A FOCAL POINT, NOT A CROP, AND THAT RULING IS THE WHOLE DESIGN.**
+  The same photograph renders at three very different shapes — the lead tile at
+  ~1:4, the half tiles at ~1.9:1, and a 28px circle — so a crop that frames a
+  face in one is a sliver of forehead in another. **There is no single crop that
+  is right for all three.** One point drives `object-position` everywhere,
+  including shapes that do not exist yet.
+  ⚠️ **THE HARNESS SCENARIO IS LOAD-BEARING, NOT A CONVENIENCE.** jsdom gives
+  every element a zero-sized box, so `getBoundingClientRect()` returns zeros and
+  every pointer position collapses to the same answer — the drag maths is exactly
+  what the unit tests cannot reach. Verified in Chromium with a generated image
+  carrying a different colour in each corner: dragging to the top-left gave
+  `2% 2%` and every preview followed.
+  ⚠️ **`isAcceptableImage()` EXISTS BECAUSE DRAG-AND-DROP BYPASSES `accept`.** The
+  file input can refuse a video by attribute; a drop target is handed whatever the
+  OS gives it, so without it the two routes into one field disagree.
+  ⚠️ **THE MIGRATION IS WRITTEN AND NOT APPLIED** —
+  `db/migrations/20260815_photo_focal_point.sql`. Two smallints with a range
+  CHECK rather than one text column, because the value is user-controlled and
+  ends up in a style attribute, and two integers cannot carry anything else.
+
 - `199d4ec` — 🧱 **THE SQUAD TILES LINE UP: THE LEAD OWNS THE LEFT COLUMN, EVERYONE ELSE THE
   RIGHT.** Jay, looking at the real six-person squad: *"only head coach should be
   furthest left, then the rest should be to the right"*. The old rule gave the
