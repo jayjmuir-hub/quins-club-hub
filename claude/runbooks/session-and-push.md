@@ -69,6 +69,24 @@ git add path/to/file another/path
 git commit -m "..."
 git push origin main
 ```
+⚠️ **`gh pr merge --auto` DOES NOT WORK ON THIS REPO — measured 15 Aug 2026.**
+It fails with `GraphQL: Auto merge is not allowed for this repository
+(enablePullRequestAutoMerge)`; auto-merge is a repository setting and it is off.
+The trap is that the command **appears to succeed when the checks are already
+green** — `gh` merges immediately and prints nothing, which is what happened on
+PR #136 and read as proof that `--auto` worked. Ten minutes later the identical
+command on PR #137 errored, because `test` was still running.
+
+**So: wait for the checks, then merge plainly.**
+```bash
+gh pr view <n> --json mergeStateStatus,statusCheckRollup   --jq '{mergeStateStatus,checks:[.statusCheckRollup[]|select(.name!=null)|{name,conclusion}]}'
+# mergeStateStatus CLEAN and `test` SUCCESS, then:
+gh pr merge <n> --squash
+```
+`BLOCKED` with an empty `test` conclusion means the run is still going, not that
+something is wrong. ⚠️ **`main` is the production branch, so a merge is a live
+release** — CLAUDE.md rule 3 still applies and Jay's explicit yes comes first.
+
 **Do not rely on the Claude GitHub *connector*.** It returned `Bad credentials` across
 multiple sessions and is a different credential from the PC's git. The PC route above is
 the reliable one.

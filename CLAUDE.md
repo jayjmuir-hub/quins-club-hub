@@ -337,6 +337,14 @@ by whoever remembered:
    before it and anything earlier is demanded. **Trust CI here. Do not "fix" the
    local failure by citing a branch SHA** — that is precisely the thing that
    turns `main` red a minute after the merge.
+   ⚠️ **AND IT FAILS THE OTHER WAY TOO, ON A ONE-COMMIT BRANCH — MEASURED ON
+   PR #138, 15 Aug 2026.** Same mechanism, opposite sign: CI's `HEAD~1` is the
+   base tip, so **the previous PR's squash SHA is INSIDE the range and is
+   demanded**, while locally `HEAD~1` is the commit before it and the one-behind
+   allowance covers it. So a branch cut straight after a merge goes **green
+   locally and red in CI** until the changelog cites the SHA that merge produced.
+   **Trust CI in both directions.** The fix is never a local workaround — it is
+   the entry the previous pull request could not write for itself.
 3. **No test counts** in `CLAUDE.md`, `RESTORE.md`, `state-of-play.md`,
    `schema-history.md`, the runbooks or the specs. Every count ever written
    into these rotted within days. Mark a line `<!-- count-ok -->` to exempt.

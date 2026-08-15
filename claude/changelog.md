@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
-- 🎯 **THE ROSTER LANDS ON THE TIER GROUPING, AND THE COLUMN SORT STILL WORKS.**
+- `3044872` — 🎯 **THE ROSTER LANDS ON THE TIER GROUPING, AND THE COLUMN SORT STILL WORKS.**
   Jay: *"i want it to land default on Tier, then forwards and backs view instead of
   nothing view"*. It shipped the previous day defaulting to `none` — that was
   Claude's call, argued from the club-wide view where nobody is graded yet putting
