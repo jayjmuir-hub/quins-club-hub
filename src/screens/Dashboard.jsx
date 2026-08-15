@@ -22,6 +22,7 @@ import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { recordsScores, squadFormat } from '../lib/minis.js'
 import {
   clubToday,
   eventDate,
@@ -405,6 +406,37 @@ export default function Dashboard() {
     return scopedTeams.filter((team) => attached.has(team.id))
   }, [memberships, scopedTeams])
 
+  // The squads whose season needs explaining — U10 and below, and nothing else.
+  //
+  // ⚠️ BUILT FROM `myTeams`, NOT FROM `scopedTeams`. An admin sees every squad
+  // in the club, and a card explaining Mighty Minis to somebody with no child in
+  // them is the definition of furniture. This is the same list the Squad
+  // contacts block uses, and for the same reason: it is about YOUR squads.
+  //
+  // ⚠️ GROUPED BY FORMAT, NOT ONE CARD PER SQUAD — Jay, 15 Aug 2026: "we have
+  // some parents who could have up to 5 age groups worth of players". Per squad,
+  // a parent with children in U6, U7 and U8 would get three cards carrying the
+  // same two sentences about the cricket stadium, which is how somebody learns
+  // to scroll past a block without reading it. There are only ever two formats,
+  // so this is at most two cards however many children somebody has.
+  //
+  // ⚠️ THE SQUADS ARE STILL NAMED ON THE CARD. Collapsing to a bare "Mighty
+  // Minis" would leave a parent with a child in U8 AND one in U11 unable to tell
+  // which of them this is about — and that parent is exactly who needs to know
+  // the two are on different systems. `myTeams` is already in the club's sort
+  // order, so the names come out U6, U7, U8 rather than in membership order.
+  const formats = useMemo(() => {
+    const byFormat = new Map()
+    for (const team of myTeams) {
+      const format = squadFormat(team.name)
+      if (!format) continue
+      const existing = byFormat.get(format.key)
+      if (existing) existing.teams.push(team)
+      else byFormat.set(format.key, { format, teams: [team] })
+    }
+    return [...byFormat.values()]
+  }, [myTeams])
+
   const [events, setEvents] = useState([])
   const [players, setPlayers] = useState([])
   // null until the first read settles, so the board can stay absent rather than
@@ -665,9 +697,17 @@ export default function Dashboard() {
   // MATCHES ONLY, for the same reason `fixturesToPlay` is matches only — a
   // training cannot carry a score, so counting one here would rebuild the
   // "26 fixtures to play" bug in a new cell.
+  //
+  // ⚠️ AND NOT U6 OR U7, WHICH RECORD NO SCORE AT ALL (Jay, 15 Aug 2026). This
+  // is the same failure the Youth Manager's queue had before the minis were
+  // filtered out of it: a fixture that can never be ticked off sits in the count
+  // for ever, and a number that only goes up teaches the coach it is on to stop
+  // reading it. `recordsScores` fails open, so a squad whose row has not loaded
+  // still counts — an unresolvable squad should look like work, not vanish.
   const needsScore = events.filter((event) => {
     if (event.type !== 'match') return false
     if (hasResult(event)) return false
+    if (!recordsScores(teamsById.get(event.team_id)?.name)) return false
     const date = eventDate(event)
     return date != null && date.getTime() <= now
   })
@@ -941,6 +981,63 @@ export default function Dashboard() {
           the Quick actions column) ALREADY CARRY THIS MARGIN for the same
           reason, which is why this read as a one-off rather than as a pattern.
           If you add a third wrapper around a BlockTitle, it needs this too. */}
+      {/* ⚠️ HOW YOUR SQUAD'S SEASON WORKS — U10 and below only (15 Aug 2026).
+          "so what actually happens on a Saturday?" is the question a new minis
+          parent has, and until now the app answered it with a fixture list that
+          looks identical to a U16 league season and a Competition row reading
+          nothing. The facts came from the club's youth section: U6-U8 play
+          Mighty Minis at the cricket stadium; U9-U10 play friendly festivals
+          three or four clubs at a time, each hosting one weekend; and the league
+          does not start until U11.
+
+          ⚠️ COSTS NOTHING FOR EVERY OTHER SQUAD. squadFormat returns null from
+          U11 up, so `formats` is empty for most of the club and this block does
+          not render at all — the same property that lets NoticeBoard sit above
+          the fixture hero. If it ever starts rendering a placeholder, its
+          position on the screen has to be re-argued.
+
+          ⚠️ ABOVE SQUAD CONTACTS AND BELOW THE FIXTURES, deliberately. It is
+          reference — read once when a child joins, then never again — so it
+          belongs with the other reference block at the foot rather than above
+          "what is on, and when", which is why anybody opens this screen.
+
+          ⚠️ `mt-[18px]` ON THE WRAPPER IS LOAD-BEARING — see the Squad contacts
+          note directly below for the full reason. BlockTitle's `first:mt-0` is
+          scoped to its PARENT, so wrapping one in a div silently zeroes its top
+          margin and jams the heading against the card above. This is the third
+          wrapped BlockTitle on this screen and it needs the margin for the same
+          reason the other two do. */}
+      {formats.length > 0 && (
+        <div data-testid="squad-format-block" className="mt-[18px]">
+          <BlockTitle>How your season works</BlockTitle>
+          {formats.map(({ format, teams: formatTeams }) => (
+            <Card
+              key={format.key}
+              data-testid="squad-format-card"
+              className="mb-2.5 p-[14px] last:mb-0"
+            >
+              <h3 className="text-[15px] font-extrabold text-ink">{format.title}</h3>
+              {/* The squads this card is about. Its own line rather than part of
+                  the heading: three squad names plus a title runs to two lines
+                  on a phone and the title stops being findable. */}
+              <p className="mt-0.5 text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-faint">
+                {formatTeams.map((team) => team.name).join(' · ')}
+              </p>
+              <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-muted">
+                {format.summary}
+              </p>
+              <ul className="mt-2 space-y-1">
+                {format.points.map((point) => (
+                  <li key={point} className="text-[12.5px] leading-relaxed text-ink-muted">
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {myTeams.length > 0 && (staffByTeam || staffError) && (
         <div data-testid="squad-staff-block" className="mt-[18px]">
           <BlockTitle>Squad contacts</BlockTitle>

@@ -153,6 +153,35 @@ function dashboardScenario(memberships, teams = TEAMS) {
 
 const PARENT_MEMBERSHIPS = [{ id: 'm4', role: 'parent', team_id: 't1', player_id: 'p1' }]
 
+// ⚠️ THE MINIS — U10 and below (15 Aug 2026). ALL FIVE of the club's minis
+// squads, and the count is the point rather than thoroughness for its own sake.
+//
+// Jay, the day this shipped: "we have some parents who could have up to 5 age
+// groups worth of players". The "How your season works" block groups by FORMAT
+// rather than by squad, so five squads must render TWO cards — and the WIDEST
+// line the block can ever produce is the three squad names on the Mighty Minis
+// card. That line is what a narrow phone would clip, and jsdom cannot see a
+// clip because it computes no CSS. Three squads would have measured a case that
+// cannot happen; five measures the worst one that can.
+//
+// ⚠️ THE NAMES ARE THE CLUB'S REAL ONES, measured against the live `teams` table
+// on 15 Aug 2026. `U6 Tag` ENDS IN A "g" and `U12G QR` puts a letter straight
+// after the digits — the two suffix traps this repo has already paid for, in
+// the fixture rather than beside it (src/lib/ageGroup.js, src/lib/gender.js).
+const MINIS_TEAMS = [
+  { id: 't-u6', club_id: CLUB_ID, name: 'U6 Tag', sort_order: 1 },
+  { id: 't-u7', club_id: CLUB_ID, name: 'U7 Tag', sort_order: 2 },
+  { id: 't-u8', club_id: CLUB_ID, name: 'U8 Tag', sort_order: 3 },
+  { id: 't-u9', club_id: CLUB_ID, name: 'U9 Mixed Contact', sort_order: 4 },
+  { id: 't-u10', club_id: CLUB_ID, name: 'U10 Mixed Contact', sort_order: 5 },
+]
+const MINIS_PARENT = MINIS_TEAMS.map((team, index) => ({
+  id: `m-minis-${index}`,
+  role: 'parent',
+  team_id: team.id,
+  player_id: `p${index + 1}`,
+}))
+
 // A coach of one squad: the team filter is hidden and the list groups by
 // position. Task 12's grouping rule turns on team count, so this is the
 // scenario that renders the Forwards/Backs/Other headings.
@@ -330,6 +359,9 @@ const scenarios = {
   dashboard: dashboardScenario(COACH_MEMBERSHIPS),
   'dashboard-admin': dashboardScenario(ADMIN_MEMBERSHIPS),
   'dashboard-parent': dashboardScenario(PARENT_MEMBERSHIPS),
+  // A parent with three children in the minis. Renders "How your season works"
+  // — two cards for three squads. See MINIS_TEAMS above.
+  'dashboard-minis': dashboardScenario(MINIS_PARENT, MINIS_TEAMS),
 
   // Task 5 (Overview screen) browser verification. Same Shell/membership
   // pattern as the dashboard scenarios above; renders the real Overview
@@ -509,6 +541,59 @@ const scenarios = {
         onEdit={noop}
         onDuplicate={noop}
         onDeleted={noop}
+      />
+    </Shell>
+  ),
+
+  // ⚠️ A MINIS MATCH (15 Aug 2026). The same sheet as `event-detail` above, on a
+  // U8 squad and as a MATCH rather than a training session, which is what makes
+  // the "Mighty Minis" note render at all.
+  //
+  // Two things only a browser can settle. The note is a tinted block inside a
+  // Sheet, and Sheet is `position: fixed` with `body { overflow: hidden }` — so
+  // its contents sit outside the document's scrollWidth entirely and
+  // harness/check-overflow.mjs cannot see them (the same property EventDetail's
+  // own footer comment spells out). And `onOpenMatchSheet` IS passed here, so
+  // the absence of the RCM button is the age rule doing its job rather than a
+  // caller that forgot the handler — the exact confusion that let a dead
+  // availability button ship on the Dashboard for weeks.
+  'event-detail-minis': () => (
+    <Shell
+      route="/schedule"
+      authValue={baseAuth(COACH_EMAIL)}
+      membershipValue={{
+        memberships: [{ id: 'm-u8', role: 'coach', team_id: 't-u8', player_id: null }],
+        teams: MINIS_TEAMS,
+        loading: false,
+        error: null,
+        reload: noop,
+      }}
+    >
+      <EventDetail
+        event={{
+          id: 'e-minis',
+          team_id: 't-u8',
+          type: 'match',
+          title: null,
+          opponent: 'Dubai Exiles',
+          home: true,
+          venue: 'Abu Dhabi Cricket Stadium',
+          pitch: null,
+          notes: null,
+          starts_at: '2026-09-12T05:00:00Z',
+          ends_at: '2026-09-12T06:30:00Z',
+          series_id: null,
+          result_us: null,
+          result_them: null,
+        }}
+        team={MINIS_TEAMS.find((t) => t.id === 't-u8')}
+        canEdit
+        onClose={noop}
+        onEdit={noop}
+        onDuplicate={noop}
+        onDeleted={noop}
+        onOpenMatchSheet={noop}
+        onOpenLineup={noop}
       />
     </Shell>
   ),

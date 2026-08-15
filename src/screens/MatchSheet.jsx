@@ -20,6 +20,7 @@ import { eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { shareElementAsImage } from '../lib/shareImage.js'
 import { deadlineLabel, isOverdue, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
+import { isMinisTeam } from '../lib/minis.js'
 import {
   SCORE_KINDS,
   SCORE_LABELS,
@@ -578,6 +579,29 @@ export default function MatchSheet() {
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
           Only the coaches and team managers attached to this squad can fill in its match sheet.
         </p>
+      </Card>
+    )
+  }
+
+  // ⚠️ THE ROUTE IS LINKABLE, so the button being hidden on EventDetail is not
+  // enough — somebody will paste the URL, and an old bookmark to a U10 fixture
+  // is exactly how a coach would land here. Says WHY rather than "not
+  // authorised": they are perfectly entitled to edit this squad, there is simply
+  // no sheet to file. instruction 1 on the form is "U11 to u16 Games".
+  //
+  // ⚠️ AFTER the mayEdit gate, deliberately. Somebody with no business on this
+  // squad should be told that first — the age of the squad is not their answer.
+  if (isMinisTeam(squadName)) {
+    return (
+      <Card role="alert" data-testid="match-sheet-not-required" className="p-6 text-center">
+        <h3 className="text-base font-extrabold text-ink">No match sheet for this age group</h3>
+        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+          RCM&rsquo;s result sheet covers U11 and above. {squadName || 'This squad'} plays
+          friendlies, so there is nothing to fill in or send.
+        </p>
+        <Button onClick={() => navigate('/schedule')} className="mx-auto mt-4">
+          Back to the schedule
+        </Button>
       </Card>
     )
   }

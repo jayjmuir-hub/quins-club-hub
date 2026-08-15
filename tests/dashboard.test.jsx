@@ -934,3 +934,86 @@ describe('Dashboard — the second column needs its own gap on mobile', () => {
     expect(classes).toContain('desktop:mt-0')
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════
+// HOW YOUR SEASON WORKS — U10 and below (15 Aug 2026).
+//
+// The club's youth section confirmed that the league starts at U11; that U6-U8
+// play Mighty Minis at the cricket stadium on league match weekends; and that
+// U9-U10 play friendly festivals of three or four clubs, each hosting one
+// weekend. Until this card the app answered a new minis parent's "so what
+// happens on Saturday?" with a fixture list that looks exactly like a U16
+// league season. src/lib/minis.js.
+describe('Dashboard — how your season works', () => {
+  const U8 = { id: 'team-u8', name: 'U8 Tag', sort_order: 3 }
+  const U7 = { id: 'team-u7', name: 'U7 Tag', sort_order: 2 }
+  const U9 = { id: 'team-u9', name: 'U9 Mixed Contact', sort_order: 4 }
+
+  const parentOf = (...teams) =>
+    teams.map((team, index) => ({
+      id: `m-p${index}`,
+      role: 'parent',
+      team_id: team.id,
+      player_id: `p-${index}`,
+    }))
+
+  it('tells a U8 parent it is Mighty Minis, at the cricket stadium', async () => {
+    useMembershipsMock.mockReturnValue(membershipValue(parentOf(U8), [U8]))
+    renderDashboard()
+
+    const block = await screen.findByTestId('squad-format-block')
+    expect(block).toHaveTextContent(/mighty minis/i)
+    expect(block).toHaveTextContent(/cricket stadium/i)
+    expect(block).toHaveTextContent(/league starts at U11/i)
+  })
+
+  it('⚠️ says NOTHING to a U14 parent, or to a senior one', async () => {
+    // The property that lets this block sit on the home screen at all: it costs
+    // nothing for most of the club. If it ever starts rendering a placeholder,
+    // its position has to be re-argued.
+    //
+    // ⚠️ BOTH CONTROLS, because they reach the answer by different routes. U14
+    // parses to a band and is refused on the number; the senior side does not
+    // parse at all and is refused by the fail-open default — the same null that
+    // once had allowsOwnContact offering a twelve-year-old their own phone.
+    const U14 = { id: 'team-u14', name: 'U14B Contact', sort_order: 9 }
+    for (const team of [U14, TEAM_FIRST_XV]) {
+      useMembershipsMock.mockReturnValue(membershipValue(parentOf(team), [team]))
+      const { unmount } = renderDashboard()
+      await screen.findByTestId('upcoming-list')
+      expect(screen.queryByTestId('squad-format-block')).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('⚠️ ONE CARD PER FORMAT, NOT PER SQUAD — Jay: "up to 5 age groups"', async () => {
+    // A parent with children in U7, U8 and U9 would otherwise get three cards,
+    // two of them carrying the same two sentences about the cricket stadium.
+    // There are only ever two formats, so this is at most two cards however
+    // many children somebody has.
+    useMembershipsMock.mockReturnValue(
+      membershipValue(parentOf(U7, U8, U9), [U7, U8, U9]),
+    )
+    renderDashboard()
+
+    const block = await screen.findByTestId('squad-format-block')
+    // ⚠️ COUNTED BY CARD, NOT BY HEADING. BlockTitle is itself an h3 and sits
+    // inside this block, so a heading count is one more than the number of
+    // cards and would have made a per-squad regression look like a pass.
+    expect(within(block).getAllByTestId('squad-format-card')).toHaveLength(2)
+    // Both minis squads named on the one Mighty Minis card, in the club's sort
+    // order, so a parent can tell which children it is about.
+    expect(block).toHaveTextContent('U7 Tag · U8 Tag')
+  })
+
+  it('⚠️ an ADMIN with no children in the minis sees nothing', async () => {
+    // Built from the squads somebody is ATTACHED to, not from the ones they can
+    // see. An admin sees all fifteen, and a card explaining Mighty Minis to
+    // somebody with no child in them is the definition of furniture.
+    useMembershipsMock.mockReturnValue(membershipValue(ADMIN, [U8, TEAM_U10]))
+    renderDashboard()
+    await screen.findByTestId('upcoming-list')
+
+    expect(screen.queryByTestId('squad-format-block')).not.toBeInTheDocument()
+  })
+})

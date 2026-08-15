@@ -5,6 +5,7 @@ import { getPlayerContact, upsertContact, upsertPlayer } from '../data/players.j
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { POSITIONS } from '../lib/positions.js'
+import { isMinisTeam } from '../lib/minis.js'
 import { listPlayerGrades, listPlayerPositions, savePlayerPositions, setPlayerGrade, TIERS } from '../data/playerTiers.js'
 import { listParents, saveParents } from '../data/parents.js'
 import { deletePlayerPhoto, forgetPhotoUrl, uploadPlayerPhoto } from '../data/photos.js'
@@ -579,6 +580,25 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   // aria-required below; the actual refusal happens in handleSubmit.
   const genderRequired = squadRequiresGender(selectedTeam?.name)
 
+  // ══ U10 AND BELOW ═══════════════════════════════════════════════════════
+  //
+  // No grade, no forward-or-back, no positions. There is no league below U11,
+  // so there is no tier to grade anybody for; and at tag rugby "prop" is not a
+  // thing a six-year-old is yet. Confirmed by the club's youth section, 15 Aug
+  // 2026 — src/lib/minis.js.
+  //
+  // ⚠️ KEYED ON THE SELECTED SQUAD, exactly like the U13 contact rule six lines
+  // above and for the same reason: moving a child from U10 to U11 in this form
+  // must reveal the fields there and then, not after a save and a reopen.
+  //
+  // ⚠️ THE VALUES ARE LEFT ALONE, NOT CLEARED. `values.tier`, `values.unit` and
+  // `values.positions` still hold whatever was loaded, and the submit still
+  // writes them — so hiding the controls rewrites nothing. A U8 player who was
+  // graded before today keeps their row until somebody moves them up and clears
+  // it deliberately. Blanking on render would be a destructive write triggered
+  // by opening a form, which is the one thing a form must never do.
+  const minisPlayer = isMinisTeam(selectedTeam?.name)
+
   return (
     <Sheet open onClose={onClose} title={editing ? 'Edit player' : 'Add player'}>
       {/* noValidate: this form does its own validation and reports it in a
@@ -626,6 +646,10 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             2026). The form does not stop you saying "back" and "Flanker"; that
             combination is a data error for a human to notice, not something the
             app reconciles. */}
+        {/* ⚠️ THE THREE SELECTION FIELDS BELOW — unit, positions and tier — ARE
+            ALL OFF FOR U10 AND BELOW. See the `minisPlayer` block above for why,
+            and for why the stored values are deliberately untouched. */}
+        {!minisPlayer && (
         <div className={FIELD}>
           <label className={LABEL} htmlFor="player-unit">
             Forward or back
@@ -641,6 +665,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             <option value="back">Back</option>
           </select>
         </div>
+        )}
 
         {/* ⚠️ EVERY POSITION THIS PLAYER CAN COVER (Jay, 14 Aug 2026: "the option
             to add multiple positions in case there are players who play
@@ -651,6 +676,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             because a checkbox list has no memory of which was pressed first and
             pretending otherwise would make the primary depend on invisible
             state. */}
+        {!minisPlayer && (
         <fieldset className={FIELD}>
           <legend className={LABEL}>Positions they can play</legend>
           <div className="flex flex-wrap gap-2">
@@ -694,6 +720,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             </p>
           )}
         </fieldset>
+        )}
 
         {/* ⚠️ COACH AND MANAGER ONLY, AND THE DATABASE IS WHAT ENFORCES IT — the
             `player grade manage` policy on `player_grades` is can_edit_team on
@@ -703,6 +730,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             ⚠️ IT MUST NEVER REACH THE SHARED LINEUP IMAGE. That PNG leaves the
             app and can be forwarded on; a judgement about a child's ability must
             not travel with it. */}
+        {!minisPlayer && (
         <div className={FIELD}>
           <label className={LABEL} htmlFor="player-tier">
             Tier
@@ -725,7 +753,9 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             it is not shown to parents and never appears on a shared team sheet.
           </p>
         </div>
+        )}
 
+        {!minisPlayer && (
         <div className={FIELD}>
           <label className={LABEL} htmlFor="player-position">
             Position
@@ -747,6 +777,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             ))}
           </select>
         </div>
+        )}
 
         <div className={FIELD}>
           <label className={LABEL} htmlFor="player-team">

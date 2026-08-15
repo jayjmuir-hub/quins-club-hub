@@ -8,6 +8,7 @@ import PitchRequest from '../components/PitchRequest.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { countSeriesFrom, deleteEvent, deleteSeriesFrom } from '../data/events.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
+import { isMinisTeam, squadFormat } from '../lib/minis.js'
 import { FEATURES } from '../lib/features.js'
 import {
   eventDate,
@@ -42,6 +43,38 @@ function KeyValue({ label, children }) {
     <div className="flex items-baseline justify-between gap-4 border-b border-line py-3 last:border-b-0">
       <span className="text-[14.5px] font-semibold text-ink-faint">{label}</span>
       <span className="text-right text-[14.5px] font-bold text-ink">{children}</span>
+    </div>
+  )
+}
+
+// How a minis squad's season works, on the fixture a parent has just opened.
+//
+// ⚠️ MATCHES ONLY, AND MINIS ONLY. squadFormat returns null for U11 and above,
+// so this renders nothing at all for most of the club — the same "costs nothing
+// when there is nothing to say" property NoticeBoard has, and the reason it can
+// sit this high on the sheet without becoming furniture.
+//
+// ⚠️ IT SITS WHERE THE COMPETITION ROW WOULD BE, and that is the point rather
+// than a coincidence. An older squad's fixture answers "what is this game for?"
+// with League · Round 4. These squads have no answer to give there, and a blank
+// where the answer goes is what makes a parent ask.
+function SquadFormatNote({ format }) {
+  return (
+    <div
+      data-testid="squad-format-note"
+      className="mb-4 rounded-[11px] bg-surface-mute px-3.5 py-3"
+    >
+      <h4 className="text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
+        {format.title}
+      </h4>
+      <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink">{format.summary}</p>
+      <ul className="mt-1.5 space-y-1">
+        {format.points.map((point) => (
+          <li key={point} className="text-[12.5px] leading-relaxed text-ink-muted">
+            {point}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -423,6 +456,20 @@ export default function EventDetail({
   const endDate = eventEndDate(event)
   const typeLabel = TYPE_LABELS[event.type] ?? 'Event'
   const played = hasResult(event)
+  // ⚠️ NULL FOR EVERY SQUAD FROM U11 UP, and for a squad whose row has not
+  // loaded — squadFormat fails open the same way isMinisTeam does, so a missing
+  // `team` prop shows nothing rather than the wrong age group's format.
+  const format = event.type === 'match' ? squadFormat(team?.name) : null
+  // U10 and below are not on the RCM form at all (src/lib/minis.js). Asked as a
+  // question about the SQUAD rather than derived from matchSheetDeadline being
+  // null — that is also null for the Women's XV, which IS on the form.
+  const minis = isMinisTeam(team?.name)
+  // ⚠️ THE RESULT BLOCK NEEDS NO AGE RULE, AND ADDING ONE WOULD BE A TAUTOLOGY.
+  // It already renders on `played` — hasResult(), i.e. a score is present — so a
+  // U7 fixture with no score has never shown it, and one that somehow HAS a
+  // score should. Gating it on the band as well would read as `played && (
+  // recordsScores || played)`, which is just `played`. The rule belongs where
+  // the score is ENTERED (EventForm), not where it is displayed.
 
   return (
     <Sheet open onClose={onClose} title={typeLabel}>
@@ -507,6 +554,8 @@ export default function EventDetail({
           </KeyValue>
         )}
       </div>
+
+      {format && <SquadFormatNote format={format} />}
 
       {/* Additional info (8 Aug 2026). Only when set, for the same reason
           Pitch is: most events have none and a permanent empty heading is
@@ -639,7 +688,14 @@ export default function EventDetail({
         </div>
       )}
 
-      {canEdit && event.type === 'match' && onOpenMatchSheet && (
+      {/* ⚠️ AND NOT FOR THE MINIS (15 Aug 2026). The RCM form's own instructions
+          start at U11 — "U11 to u16 Games" — so U6-U10 have no sheet to file,
+          and offering one invites a coach to spend an evening on a form the
+          governing body will not take. matchSheetDeadline returns null for these
+          squads for the same reason, but this is asked of the SQUAD rather than
+          read off the deadline: that is also null for the Women's XV, which is
+          on the form ("WXV") and must keep its button. */}
+      {canEdit && event.type === 'match' && !minis && onOpenMatchSheet && (
         <div className="mt-4">
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
             Match sheet

@@ -220,17 +220,24 @@ describe('MatchSheet — the form', () => {
     })
 
     it("⚠️ honours the CLUB'S override, not the squad's name", async () => {
-      // The whole reason teams.scoring_kinds is a column: a U10 side entered in
-      // a competition that allows conversions gets them, without a deploy and
-      // without renaming the squad.
-      const U10 = {
-        id: 't-u10',
+      // The whole reason teams.scoring_kinds is a column: a side entered in a
+      // competition that allows conversions gets them, without a deploy and
+      // without renaming the squad. U11's default is tries only, so the
+      // conversions box appearing can only be the override.
+      //
+      // ⚠️ U11, AND IT WAS U10 UNTIL 15 Aug 2026. U10 and below have no RCM
+      // sheet at all now (src/lib/minis.js — the form starts at "U11 to u16"),
+      // so this screen answers a U10 fixture with "no match sheet for this age
+      // group" and there is no scoring row to assert on. The override rule this
+      // test is actually about is unchanged; only the squad it is asked of is.
+      const U11 = {
+        id: 't-u11',
         club_id: CLUB,
-        name: 'U10 Mixed Contact',
+        name: 'U11 Mixed Contact',
         scoring_kinds: ['tries', 'conversions'],
       }
-      getEventMock.mockResolvedValue({ ...MATCH, team_id: 't-u10', team: U10 })
-      mount(<MatchSheet />, { memberships: [{ ...COACH[0], team_id: 't-u10' }], teams: [U10] })
+      getEventMock.mockResolvedValue({ ...MATCH, team_id: 't-u11', team: U11 })
+      mount(<MatchSheet />, { memberships: [{ ...COACH[0], team_id: 't-u11' }], teams: [U11] })
       await screen.findByRole('heading', { name: /official match result sheet/i })
 
       expect(screen.getByLabelText('Conversions, ADHQ2')).toBeInTheDocument()
