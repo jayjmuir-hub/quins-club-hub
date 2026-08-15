@@ -198,11 +198,13 @@ export default function Roster() {
   // ("who are the girls in this group") and a sticky one would leave someone
   // convinced players had gone missing on their next visit.
   const [genderFilter, setGenderFilter] = useState('all')
-  // ⚠️ 'none' BY DEFAULT, so nobody's roster reorganises itself under them on
-  // the next deploy. Jay asked to "be able to" group by tier, which is a
-  // control, not a new default — and grouping 315 players nobody has graded
-  // yet would produce one heading reading "Not graded" over the whole club.
-  const [groupBy, setGroupBy] = useState('none')
+  // ⚠️ TIER BY DEFAULT — Jay, 15 Aug 2026: "i want it to land default on Tier,
+  // then forwards and backs view instead of nothing view". This overrides the
+  // original choice of 'none', which was mine and was argued from the risk that
+  // a club-wide view of players nobody has graded yet shows one heading reading
+  // "Not graded" over everything. That is still true and he has seen it stated;
+  // a coach opening their own squad is the case this screen is for.
+  const [groupBy, setGroupBy] = useState(GROUP_BY.TIER)
   // Coach-only data, loaded alongside the players. Empty maps for a parent:
   // player_grades is refused by RLS for them, so this is belt and braces over
   // a policy that already says no.
@@ -430,8 +432,14 @@ export default function Roster() {
     team: (player) => player.team_id ?? null,
   })
 
+  // ⚠️ NEVER GROUPED FOR A PARENT, and this became load-bearing the moment
+  // grouping went on by default. A parent cannot see grades — RLS refuses
+  // player_grades and the screen does not ask — so `tierByPlayer` is empty for
+  // them, and grouping by tier would put a single heading reading "Not graded"
+  // across every child on the roster. That is a statement about the club's
+  // record-keeping made to exactly the audience with no way to act on it.
   const tableGroups =
-    groupBy === 'none'
+    !canEditAnything || groupBy === 'none'
       ? null
       : buildRosterGroups(visible, { groupBy, tierByPlayer, teamsById })
 

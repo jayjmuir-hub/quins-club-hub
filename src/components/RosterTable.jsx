@@ -108,7 +108,13 @@ export default function RosterTable({
   const [saving, setSaving] = useState({})
   const [errors, setErrors] = useState({})
 
-  const sorted = [...players].sort((a, b) => {
+  // ⚠️ ALSO APPLIED WITHIN EACH GROUP, not just to the flat list. Grouping
+  // reorders the table, so without this a chosen sort silently stopped working
+  // the moment grouping went on by default — the column headers would still
+  // highlight and still flip their arrow while changing nothing on screen.
+  // Sorting now means "within the section", which is the only reading of it
+  // that can coexist with headings.
+  const bySort = (a, b) => {
     const result = compare(a, b, sort.key, teamsById)
     // Name is the tiebreaker for every other column, so equal positions or
     // equal age groups still come out in a stable, readable order.
@@ -116,7 +122,9 @@ export default function RosterTable({
       ? a.full_name.localeCompare(b.full_name)
       : 0
     return (sort.dir === 'asc' ? result : -result) || tie
-  })
+  }
+
+  const sorted = [...players].sort(bySort)
 
   function toggleSort(key) {
     setSort((prev) => (prev.key === key
@@ -178,7 +186,9 @@ export default function RosterTable({
         if (section.label) {
           rows.push({ kind: 'section', key: `s-${group.key}-${section.key}`, label: section.label })
         }
-        for (const player of section.players) rows.push({ kind: 'player', key: player.id, player })
+        for (const player of [...section.players].sort(bySort)) {
+          rows.push({ kind: 'player', key: player.id, player })
+        }
       }
     }
   } else {

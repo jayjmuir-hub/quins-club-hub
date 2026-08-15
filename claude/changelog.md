@@ -8,9 +8,29 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 15 Aug 2026
+
+- 🎯 **THE ROSTER LANDS ON THE TIER GROUPING, AND THE COLUMN SORT STILL WORKS.**
+  Jay: *"i want it to land default on Tier, then forwards and backs view instead of
+  nothing view"*. It shipped the previous day defaulting to `none` — that was
+  Claude's call, argued from the club-wide view where nobody is graded yet putting
+  one "Not graded" heading over everything. Still true, still stated, and overruled:
+  a coach opening their own squad is what this screen is for.
+  ⚠️ **A PARENT'S ROSTER IS NEVER GROUPED, and this became load-bearing the moment
+  grouping went on by default.** A parent cannot see grades, so `tierByPlayer` is
+  empty for them and grouping by tier would head every child on the roster with
+  "Not graded" — a statement about the club's record-keeping made to the one
+  audience who cannot act on it. Gated on `canEditAnything`, not left to the data.
+  ⚠️ **THE COLUMN SORT SILENTLY STOPPED WORKING AND THE SUITE CAUGHT IT.** Grouping
+  reorders the table, so the headers went on highlighting and flipping their arrow
+  while changing nothing on screen. The sort is now applied WITHIN each section —
+  the only reading that can coexist with headings, since a row crossing a heading
+  makes the heading a lie. Two existing tests asserted end-to-end ordering; they now
+  select the "Nothing" grouping first, which is exactly what it means.
+
 ## 14 Aug 2026
 
-- 👓 **THE COACH'S ROSTER SHOWS WHAT A COACH NEEDS AND DROPS WHAT REPEATS ITSELF.**
+- `cf8a221` — 👓 **THE COACH'S ROSTER SHOWS WHAT A COACH NEEDS AND DROPS WHAT REPEATS ITSELF.**
   Jay, on the U16B coach view: a tier grade and a second position had been recorded
   and neither appeared; Gender read "Male" on every row of a single-gender squad;
   Age group read "U16B Contact" on every row of a roster filtered to that squad.
