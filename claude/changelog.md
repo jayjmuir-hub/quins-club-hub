@@ -17,7 +17,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- 👀 **THE LIVE SITE WAS FINALLY LOOKED AT, AND IT IS FINE.** Eight deploys in a
+- 🔑 **A CLUB ADMIN MAY NOW SET A STAFF MEMBER'S PHOTO — REVERSING A RULING MADE
+  TWO DAYS EARLIER.** `20260813_staff_photos.sql` narrowed the write policy to
+  own-photo-only and argued it well: *"A coach is an adult with their own login.
+  Nobody else picks the picture of your face that thirty families see."*
+  ⚠️ **OVERRULED ON A FACT THE ORIGINAL DID NOT WEIGH** — two of fifteen staff
+  have a photo and most will never log in, so the principle was producing no
+  faces rather than consented ones. Jay was shown the ruling and reversed it;
+  `claude/decisions/2026-08-15-admin-may-set-staff-photos.md`.
+  ⚠️ **THE NARROWING IS PRESERVED WHERE IT CAN BE.** Not `can_edit_team` — a
+  coach still cannot set another coach's photo. Club admins only, and
+  `set_my_photo` stays self-only.
+  ⚠️ **AND THREE-VALUED LOGIC NEARLY OPENED A HOLE.** The first predicate
+  returned **NULL**, not false, with no signed-in user — and the two callers
+  disagreed about it: a storage policy treats NULL as not-true and denies, but
+  `if not <NULL> then raise` never fires, so the RPC would have fallen through
+  to its UPDATE. Not reachable (`anon` has no EXECUTE, and an authenticated
+  caller has a non-null uid) but one revoke away from it. Fixed with
+  `coalesce(..., false)` inside the predicate rather than a guard per caller.
+
+- `0556e61` — 👀 **THE LIVE SITE WAS FINALLY LOOKED AT, AND IT IS FINE.** Eight deploys in a
   day — three UI features, a react-router major, a layout change — every one
   verified in a harness against invented data and none seen by a person. Jay
   opened it on a phone at the end of the day and reported no problems.
