@@ -44,10 +44,35 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Cheap (under an hour each)
 
-- **No dependency scanning.** No Dependabot, no `npm audit` step. ⚠️ `react-router-dom`
-  carries two moderate advisories, **neither exploitable here** — `safeNext()` blocks
-  `//host` and `/\host`, and this app is not server-rendered. Recorded so nobody
-  re-panics at the same output.
+- ✅ ~~**No dependency scanning.** No Dependabot, no `npm audit` step.~~ —
+  **both shipped 15 Aug 2026.** `.github/dependabot.yml` watches npm weekly and
+  the workflow actions monthly, grouped so minor and patch arrive as one
+  reviewable pull request and majors arrive alone; `npm audit --omit=dev
+  --audit-level=high` is a step of the `test` job, which is one of the two
+  REQUIRED checks, so it gates from the moment it merged.
+  ⚠️ **`--omit=dev` IS THE DESIGN, NOT A SHORTCUT.** Measured the same day: the
+  full tree carries **10 advisories — 5 moderate, 4 high, 1 CRITICAL — and eight
+  of them, including the critical (`vitest`), are devDependencies that never
+  ship.** Gating on the full tree would let a critical in a test runner block a
+  fix to the live site.
+  ⚠️ **AND `high` RATHER THAN `moderate` BECAUSE THE TWO PRODUCTION ADVISORIES
+  HAVE NO NON-BREAKING FIX** — see the item below. Gating at `moderate` would
+  red every build from the day it merged, and a permanently red gate teaches
+  people to ignore the gate. **Drop it to `moderate` the day react-router 7
+  lands.**
+  ✅ **Proved it can fail rather than assuming**: the same command at
+  `--audit-level=moderate` exits 1 today, at `high` it exits 0.
+- **The two production advisories are `react-router`, and the ONLY fix is a
+  major version.** ⚠️ **Re-measured 15 Aug 2026 and the old note was right about
+  what ships but silent about the rest**: production is exactly 2 moderate, both
+  react-router, and **neither is exploitable here** — `safeNext()` blocks
+  `//host` and `/\host`, and the third advisory in the set is SSR hydration,
+  which this app does not do. Recorded so nobody re-panics at the same output.
+  ⚠️ **`npm audit` SAYS `fixAvailable: true` AND THAT IS MISLEADING.** The
+  advisory range is `6.0.0-alpha.0 - 7.17.0`, and the installed 6.30.4 is
+  already the newest v6 — so the "available fix" is **react-router-dom 7.18.2, a
+  major**, i.e. a migration rather than a bump. That is why Dependabot is
+  configured to bring majors as their own pull request.
 - ✅ ~~**No `LICENSE`, no `SECURITY.md`** on a public repo running children's-data
   infrastructure.~~ — **both shipped 14 Aug 2026.** `LICENSE.md` is all rights
   reserved, held by Abu Dhabi Harlequins RFC (Jay's call; there was no prior

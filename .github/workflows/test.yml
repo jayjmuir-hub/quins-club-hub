@@ -64,3 +64,42 @@ jobs:
       - run: npm run build
 
       - run: npm test
+
+      # ── Dependency advisories ────────────────────────────────────────────
+      #
+      # ⚠️ THIS IS A STEP OF THE `test` JOB ON PURPOSE, NOT ITS OWN WORKFLOW.
+      # `test` and `docs-check` are the two REQUIRED checks on this repo; a new
+      # workflow would produce a new check name that gates nothing until
+      # somebody edits branch protection, and a gate that does not gate is the
+      # "check nobody runs" this repo has been bitten by before. Living here, it
+      # blocks a merge from the moment it lands.
+      #
+      # ⚠️ LAST, so a genuine test failure is never masked by it — and because
+      # `npm audit` talks to the registry, so it is the one step here that can
+      # fail for reasons that have nothing to do with the code.
+      #
+      # ⚠️ `--omit=dev` IS THE WHOLE DESIGN, AND IT IS A JUDGEMENT WORTH STATING.
+      # Measured 15 Aug 2026: the full tree carries 10 advisories — 5 moderate,
+      # 4 high, 1 CRITICAL — and eight of them, including the critical (vitest),
+      # are devDependencies. None of those ship. `dist/` is what a parent's
+      # phone downloads, and it contains no vitest, no vite, no esbuild. Gating
+      # on the full tree would mean a critical in a test runner blocking a fix
+      # to the live site, which is the wrong way round.
+      #
+      # ⚠️ AND `--audit-level=high` RATHER THAN `moderate` BECAUSE THE TWO
+      # PRODUCTION ADVISORIES TODAY ARE MODERATE AND HAVE NO NON-BREAKING FIX.
+      # Both are react-router, and the only version without them is v7 — a
+      # major, i.e. a migration. Gating at `moderate` would red every build in
+      # this repo from the day it merged, until an unrelated framework upgrade
+      # happened. A permanently red gate teaches people to ignore the gate.
+      # The reasoning for why they are not exploitable here is in
+      # claude/open-items.md; when react-router 7 lands, drop this to moderate.
+      - name: Audit what actually ships
+        run: npm audit --omit=dev --audit-level=high
+
+      # The rest of the picture, reported and never gating. Dev advisories are
+      # worth SEEING — a compromised test runner still runs on a maintainer's
+      # laptop with their credentials — they are just not worth blocking a
+      # release for. `|| true` so this can only ever inform.
+      - name: Report every advisory, including dev (never fails)
+        run: npm audit || true

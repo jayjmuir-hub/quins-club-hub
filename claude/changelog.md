@@ -17,7 +17,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- 🛡️ **THE SUPABASE SECURITY ADVISOR, WALKED IN FULL FOR THE FIRST TIME.**
+- 🔎 **DEPENDENCY SCANNING EXISTS NOW, AND IT GATES WHAT ACTUALLY SHIPS.**
+  Dependabot watches npm weekly and the workflow actions monthly — grouped, so
+  minor and patch arrive as one reviewable pull request and majors arrive alone
+  — and `npm audit --omit=dev --audit-level=high` is a step of the `test` job,
+  which is a REQUIRED check, so it gates immediately rather than waiting on
+  somebody editing branch protection.
+  ⚠️ **`--omit=dev` IS THE DESIGN.** Measured: the full tree carries **10
+  advisories — 5 moderate, 4 high, 1 CRITICAL — and eight, including the
+  critical (`vitest`), are devDependencies that never reach a phone.** Gating on
+  the whole tree would let a critical in a test runner block a fix to the live
+  site.
+  ⚠️ **AND `high` RATHER THAN `moderate`, BECAUSE THE TWO PRODUCTION ADVISORIES
+  HAVE NO NON-BREAKING FIX.** Both are react-router; the advisory range runs to
+  7.17.0 and 6.30.4 is already the newest v6, so `npm audit`'s
+  `fixAvailable: true` means **a major**, not a bump. Gating at `moderate` would
+  red every build from day one, and a permanently red gate teaches people to
+  ignore the gate.
+  ✅ **Proved the gate can fail** — the same command at `moderate` exits 1 today
+  and at `high` exits 0.
+
+- `69dfdaa` — 🛡️ **THE SUPABASE SECURITY ADVISOR, WALKED IN FULL FOR THE FIRST TIME.**
   Sixteen warnings that nobody had read. **Fourteen are deliberate and correctly
   guarded; two are untidy grants worth one small migration; none is a hole.**
   ⚠️ **THE LINT FLAGS EXPOSURE, NOT VULNERABILITY** — fifteen of the sixteen say
