@@ -26,11 +26,13 @@ vi.mock('../src/data/staff.js', () => ({
 const uploadStaffPhotoMock = vi.fn()
 const setStaffPhotoMock = vi.fn()
 const signStaffPhotoUrlMock = vi.fn()
+const deleteStaffPhotoMock = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('../src/data/photos.js', () => ({
   uploadStaffPhoto: (...args) => uploadStaffPhotoMock(...args),
   setStaffPhoto: (...args) => setStaffPhotoMock(...args),
   signStaffPhotoUrl: (...args) => signStaffPhotoUrlMock(...args),
+  deleteStaffPhoto: (...args) => deleteStaffPhotoMock(...args),
 }))
 
 import AdminStaff from '../src/screens/AdminStaff.jsx'
@@ -396,5 +398,84 @@ describe('AdminStaff — changing a photo that already exists', () => {
     await userEvent.click(screen.getByTestId('staff-photo-replace'))
 
     expect(screen.getByRole('button', { name: /^Save$/ })).toBeDisabled()
+  })
+})
+
+
+// ── The review findings (15 Aug 2026) ───────────────────────────────────────
+//
+// ⚠️ NONE OF THESE COULD HAVE BEEN CAUGHT BY THE EARLIER TESTS, because the
+// suite mocks the data layer — an orphaned STORAGE OBJECT is invisible to it.
+// What is pinned instead is the calls and their ordering, which is the part
+// the component can get wrong.
+
+describe('AdminStaff — replacement does not strand storage objects', () => {
+  const WITH_PHOTO = {
+    ...COACH,
+    photoPath: 'p-coach/old.jpg',
+    photoUrl: 'https://example.invalid/old.jpg',
+  }
+
+  beforeEach(() => {
+    uploadStaffPhotoMock.mockReset().mockResolvedValue('p-coach/new.jpg')
+    setStaffPhotoMock.mockReset().mockResolvedValue({
+      id: 'p-coach', photo_path: 'p-coach/new.jpg', photo_focus_x: 50, photo_focus_y: 50,
+    })
+    signStaffPhotoUrlMock.mockReset().mockResolvedValue('https://example.invalid/new.jpg')
+    deleteStaffPhotoMock.mockReset().mockResolvedValue(undefined)
+  })
+
+  async function replaceWith(file) {
+    render(<AdminStaff />)
+    await userEvent.click(await screen.findByTestId('staff-photo-open'))
+    await userEvent.click(screen.getByTestId('staff-photo-replace'))
+    await userEvent.upload(screen.getByLabelText(/Add a photo for Alex Morgan/i), file)
+    await userEvent.click(screen.getByRole('button', { name: /^Save$/ }))
+  }
+
+  it('deletes the OLD object after the new key is recorded', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
+
+    await replaceWith(new File(['x'], 'new.jpg', { type: 'image/jpeg' }))
+
+    await waitFor(() => expect(deleteStaffPhotoMock).toHaveBeenCalledWith('p-coach/old.jpg'))
+    // ⚠️ AFTER the record, never before — deleting first would, on a failed
+    // record, leave the profile pointing at a file that no longer exists.
+    expect(setStaffPhotoMock.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteStaffPhotoMock.mock.invocationCallOrder[0],
+    )
+  })
+
+  it('deletes the NEW object when recording it fails, and keeps the old one', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
+    setStaffPhotoMock.mockRejectedValue(new Error('network'))
+
+    await replaceWith(new File(['x'], 'new.jpg', { type: 'image/jpeg' }))
+
+    await waitFor(() => expect(deleteStaffPhotoMock).toHaveBeenCalledWith('p-coach/new.jpg'))
+    expect(deleteStaffPhotoMock).not.toHaveBeenCalledWith('p-coach/old.jpg')
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+  })
+
+  // ⚠️ THE UX DEAD END: the RPC always allowed clearing a photo and the UI
+  // never offered it — a wrong photo on the wrong person could only be fixed by
+  // overwriting it with another photo.
+  it('offers Remove, clears the row first and the object second', async () => {
+    listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
+    setStaffPhotoMock.mockResolvedValue({
+      id: 'p-coach', photo_path: null, photo_focus_x: null, photo_focus_y: null,
+    })
+
+    render(<AdminStaff />)
+    await userEvent.click(await screen.findByTestId('staff-photo-open'))
+    await userEvent.click(screen.getByTestId('staff-photo-remove'))
+
+    await waitFor(() =>
+      expect(setStaffPhotoMock).toHaveBeenCalledWith('p-coach', null, null),
+    )
+    await waitFor(() => expect(deleteStaffPhotoMock).toHaveBeenCalledWith('p-coach/old.jpg'))
+    expect(setStaffPhotoMock.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteStaffPhotoMock.mock.invocationCallOrder[0],
+    )
   })
 })

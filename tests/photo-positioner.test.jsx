@@ -178,6 +178,20 @@ describe('isAcceptableImage', () => {
   })
 })
 
+describe('isAcceptableImage — HEIC and friends', () => {
+  // ⚠️ HEIC IS `image/*` AND MUST STILL BE REFUSED — review finding, 15 Aug
+  // 2026. Every iPhone shoots HEIC by default; browsers cannot RENDER it, so
+  // accepting it produced a blank preview and a failure at save, two steps
+  // removed from the mistake. The drop is the one moment the person is still
+  // holding the file they need to swap.
+  it('refuses HEIC even though it is an image', () => {
+    const f = (type) => new File(['x'], 'a', { type })
+    expect(isAcceptableImage(f('image/heic'))).toBe(false)
+    expect(isAcceptableImage(f('image/heif'))).toBe(false)
+    expect(isAcceptableImage(f('image/webp'))).toBe(true)
+  })
+})
+
 describe('PhotoDropZone', () => {
   it('hands a dropped image to its caller', () => {
     const onFile = vi.fn()
@@ -201,7 +215,7 @@ describe('PhotoDropZone', () => {
     })
 
     expect(onFile).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert')).toHaveTextContent(/not an image/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/JPEG, PNG or WebP/i)
   })
 
   // ⚠️ THE TAP TARGET IS THE PRIMARY ROUTE. This app is opened on a phone, and a
@@ -212,7 +226,7 @@ describe('PhotoDropZone', () => {
 
     const input = screen.getByLabelText('Add a photo')
     expect(input).toHaveAttribute('type', 'file')
-    expect(input).toHaveAttribute('accept', 'image/*')
+    expect(input).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp')
   })
 
   it('takes a chosen file from the input too', () => {

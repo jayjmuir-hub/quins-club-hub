@@ -238,9 +238,25 @@ export default defineConfig({
     // ⚠️ THIS DOES NOT MAKE A SLOW TEST CORRECT. If a test approaches this
     // ceiling on an idle machine, it is doing too much and the fix is the test.
     testTimeout: 15000,
+    // ⚠️ ANCHORED TO `tests/`, NOT `**/` — AGENT WORKTREES ARE WHY, found
+    // 15 Aug 2026. A Claude session working in a worktree gets a FULL CHECKOUT
+    // of this repo created at `.claude/worktrees/<name>/`, and a `**/` include
+    // collected every test twice: 125 files became 250 — with the dangerous
+    // half being that the duplicates ran against the WORKTREE'S OWN OLDER
+    // SOURCE, so their pass or fail said nothing about the code being edited
+    // here. Every tracked test file lives in `tests/` (measured: git ls-files
+    // counts 126 there, 0 anywhere else), so the anchor loses nothing.
+    // ⚠️ A TEST ADDED OUTSIDE `tests/` WILL SILENTLY NOT RUN until its
+    // directory is added here. That is the trade, stated.
+    //
+    // ⚠️ AND IF YOU ARE ADDING AN `include` TO THIS CONFIG: THERE WAS ALREADY
+    // ONE HERE. A second `include:` earlier in this object cost twenty minutes
+    // on 15 Aug — a duplicate key in an object literal is not an error, the
+    // LATER one silently wins, and every probe of the first says the config is
+    // being ignored.
     include: isIntegration
-      ? ['**/*.integration.test.{js,jsx}']
-      : ['**/*.test.{js,jsx}'],
+      ? ['tests/**/*.integration.test.{js,jsx}']
+      : ['tests/**/*.test.{js,jsx}'],
     exclude: isIntegration
       ? ['**/node_modules/**', '**/dist/**']
       : ['**/node_modules/**', '**/dist/**', '**/*.integration.test.{js,jsx}'],
