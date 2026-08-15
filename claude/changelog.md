@@ -10,7 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🎓 **A/B/C GRADING AND MULTIPLE POSITIONS — phase 2 of tiers and game time.**
+- 👓 **THE COACH'S ROSTER SHOWS WHAT A COACH NEEDS AND DROPS WHAT REPEATS ITSELF.**
+  Jay, on the U16B coach view: a tier grade and a second position had been recorded
+  and neither appeared; Gender read "Male" on every row of a single-gender squad;
+  Age group read "U16B Contact" on every row of a roster filtered to that squad.
+  ⚠️ **THE LAST TWO ARE ONE FAULT, AND IT IS DERIVED RATHER THAN SPECIAL-CASED.**
+  `constantColumns()` hides any column whose value is identical on every visible
+  row, so the rule also covers cases nobody has thought of and reverses itself when
+  the filter widens. A MISSING value counts as a difference — a squad with one
+  player whose gender is unset keeps the column, which is exactly the row to fix.
+  ⚠️ **GROUPING IS NESTED (tier, then forwards and backs) AND OFF BY DEFAULT.**
+  Jay chose nested over a flatter shape with a FWD/BCK chip. Off by default because
+  he asked to *be able to* group — a control, not a new default — and grouping 315
+  ungraded players would put one "Not graded" heading over the whole club. Empty
+  sub-groups never render a heading; ungraded players go last and are never dropped.
+  ⚠️ **TIER IS COACH-ONLY IN THREE PLACES**: RLS refuses `player_grades`, the screen
+  does not request them for a parent, and the column is not passed. A refused
+  request is still a request.
+  ⚠️ **HIDING THE AGE GROUP COLUMN TAKES ITS INLINE EDITOR WITH IT** — accepted
+  deliberately. The player sheet still moves a player between squads, and widening
+  the filter brings the column back.
+  ⚠️ **`positionGroup()` MOVED to `src/lib/rosterUnit.js`** from `Roster.jsx`,
+  unchanged: `src/lib/rosterGrouping.js` needs it, and a lib importing a screen runs
+  the dependency the wrong way.
+
+- `9a700a1` — 🎓 **A/B/C GRADING AND MULTIPLE POSITIONS — phase 2 of tiers and game time.**
   ⚠️ **`events.tier` IS PREFILLED FROM THE LEAGUE TEAM BUT NEVER DERIVED FROM IT.**
   For a league fixture the two agree; for a tournament they need not, because we
   may send our B team to an A-tier tournament — and deriving would record a B
