@@ -17,6 +17,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
+- `a24b360` — 🧪 **VITEST 2 → 4, AND THE CRITICAL ADVISORY GOES WITH IT.** `npm audit` drops
+  from 10 findings to 6 — **zero critical**, where the critical was vitest itself.
+  A dev dependency, so it never reached a phone; it did run on maintainers'
+  laptops.
+  ⚠️ **A MAJOR TEST-RUNNER JUMP IS EXACTLY WHERE THIS SUITE'S TUNING COULD HAVE
+  BROKEN**, so it was run rather than trusted: 123 files, 2413 tests, all passing,
+  plus `npm run build` and `vitest related --run`. The 15000ms `testTimeout` and
+  the per-file `@vitest-environment node` docblocks both survive.
+  ⚠️ **`--reporter=basic` NO LONGER EXISTS** and fails with `ERR_LOAD_URL` about a
+  custom reporter module — which reads like a project failure and is not. Nothing
+  in this repo uses it; it is written down because it is an easy flag to reach for
+  when reading CI output, and the error names nothing helpful.
+
 - `a9bef62` — 🤖 **THE WORKFLOW ACTIONS GO 4 → 7** — `actions/checkout`, and
   `actions/setup-node` in the pull request behind it. Three majors each, on
   actions that run with access to this repo on every push, which is the supply
