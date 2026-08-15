@@ -27,6 +27,10 @@ import Accounts from '../src/screens/Accounts.jsx'
 import AcceptInvite from '../src/screens/AcceptInvite.jsx'
 import MatchSheet from '../src/screens/MatchSheet.jsx'
 import Allocation from '../src/screens/Allocation.jsx'
+import PhotoPositioner, {
+  PhotoDropZone,
+  DEFAULT_FOCUS,
+} from '../src/components/PhotoPositioner.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
@@ -44,6 +48,53 @@ function Home() {
 }
 
 const noop = async () => {}
+
+/**
+ * The photo picker, standing alone. Starts on the drop zone; choosing or
+ * dropping a file moves it to the stage, exactly as the real fields will.
+ *
+ * ⚠️ THE OBJECT URL IS REVOKED WHEN THE FILE CHANGES. A harness is still code
+ * somebody reads and copies, and leaking one per selection is the habit that
+ * ends up in the real field.
+ */
+function PhotoPositionerScenario() {
+  const [url, setUrl] = React.useState(null)
+  const [focus, setFocus] = React.useState(DEFAULT_FOCUS)
+
+  const take = (file) => {
+    setUrl((old) => {
+      if (old) URL.revokeObjectURL(old)
+      return URL.createObjectURL(file)
+    })
+    setFocus(DEFAULT_FOCUS)
+  }
+
+  return (
+    <div style={{ maxWidth: 390, margin: '0 auto', padding: 16 }}>
+      <h2 className="mb-2 font-display text-[17px] uppercase text-ink">Your photo</h2>
+      {url ? (
+        <>
+          <PhotoPositioner url={url} focus={focus} onFocusChange={setFocus} />
+          <p className="mt-3 text-[12px] text-ink-faint">
+            focus = {focus.x}% {focus.y}%
+          </p>
+          <button
+            type="button"
+            className="mt-2 text-[13px] font-semibold text-brand underline"
+            onClick={() => {
+              URL.revokeObjectURL(url)
+              setUrl(null)
+            }}
+          >
+            Choose a different photo
+          </button>
+        </>
+      ) : (
+        <PhotoDropZone onFile={take} />
+      )}
+    </div>
+  )
+}
 
 // ⚠️ `id` ADDED 14 Aug 2026, AND ITS ABSENCE WAS HIDING A WHOLE BLOCK OF UI.
 // useMyProfile bails when `user.id` is missing, so `profile` stayed null in
@@ -990,6 +1041,13 @@ const scenarios = {
       membershipValue={{ memberships: [], teams: [], loading: true, error: null, reload: noop }}
     />
   ),
+
+  // The photo picker (15 Aug 2026). ⚠️ IT EXISTS BECAUSE jsdom CANNOT TEST THE
+  // FEATURE. Every element in jsdom has a zero-sized box, so
+  // `getBoundingClientRect()` returns all zeros and every pointer position
+  // collapses to the same answer — the drag maths is exactly the part the unit
+  // tests cannot reach. Drag it here instead.
+  'photo-positioner': () => <PhotoPositionerScenario />,
 }
 
 const params = new URLSearchParams(window.location.search)
