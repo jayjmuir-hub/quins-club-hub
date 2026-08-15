@@ -174,6 +174,32 @@ Run `get_advisors` rather than trusting this list. As of 14 Aug 2026:
   and `db/tests/grants.sql` §3b asserts it in BOTH directions. **The rest have
   not been assessed.** This is a read-through, not an alarm.
 
+## Shipped but never seen against real data
+
+⚠️ **These are not known-broken. They are known-UNVERIFIED**, which is a
+different claim and the one this repo has confused before. Each shipped with a
+green suite and has never been exercised by a human on the live site.
+
+- **The coach roster's nested grouping** (`cf8a221`, `3044872`) — tier, then
+  forwards and backs. Every test runs in jsdom against invented squads. Nobody
+  has yet opened the real U16B roster and confirmed the headings, the counts, or
+  that the constant-column rule hides what it should. **The club-wide view will
+  show one "Not graded" heading over everything until more players are graded**;
+  that is expected, not a bug, and the tidy fix if it grates is to default to
+  tier grouping only when the roster is filtered to a single squad.
+- **The all-day calendar entry has never reached a phone.**
+- **Nothing is graded and no player has two positions** beyond what Jay entered
+  by hand while testing, so neither the tier column nor the position chips have
+  been seen on a realistic roster.
+
+## Not built, and deliberately so
+
+- **Nothing compares a player's grade against a fixture's tier.** Both exist —
+  `player_grades.tier` and `events.tier` — and an eligibility warning in the
+  lineup picker ("graded C, this is an A-tier fixture") was offered and not
+  taken up. Recorded so the next session knows the data is already there and the
+  absence is a choice, not an oversight.
+
 ## Unexplained
 
 - **One phantom test failure in `tests/notice-board.test.jsx`** does not fit the
