@@ -40,6 +40,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   caller has a non-null uid) but one revoke away from it. Fixed with
   `coalesce(..., false)` inside the predicate rather than a guard per caller.
 
+- `a7fcb53` — 🧱 **THE LEAD TILE GOES BACK TO TWO TILES TALL, AND THE CONTACT ICONS SHRINK.**
+  Jay, having seen BOTH layouts with a real photograph in them: the lead is two
+  small tiles tall and the rest flow around it — under as well as beside.
+  ⚠️ **THIS REVERSES A RULE FROM EARLIER THE SAME DAY, SO DO NOT "FIX" IT BACK.**
+  The previous version gave the lead the whole left column, because tiles
+  wrapping back to the left margin looked like a broken grid. True — and the
+  cure was worse: at six people the lead became **175×712, a 1:4 strip**, and a
+  photograph of a person in it is a vertical sliver. Measured after: 175×280.
+  ⚠️ **THE BUTTONS ARE 36px AND THE TAP TARGET IS STILL 44px.** 44px of visible
+  red on a 175px tile was most of the row; an `after:` block extends the hit
+  area back out without drawing anything, so the floor Button.jsx argues for is
+  intact. Measured: box 36×36, hit area 44×44.
+  ⚠️ **AND 372px NOW MEANS SOMETHING ELSE.** It was derived from three 44px
+  buttons; they shrank and the threshold did NOT follow, because at 320px a
+  two-column grid puts the NAME in a ~140px box and a long one wraps to three
+  lines. The binding constraint moved from the buttons to the type.
+
+- 🐛 **AND THE ADMIN UPLOAD WAS BROKEN IN PRODUCTION FOR AN HOUR** — `permission
+  denied for function may_set_staff_photo`, reported by Jay from the live screen.
+  ⚠️ **A HELPER USED INSIDE AN RLS POLICY IS EVALUATED AS THE CALLER.** It was
+  revoked from `public` and granted to nobody, which is right for a helper only
+  called from a SECURITY DEFINER body and wrong for one a storage policy also
+  calls. **The RPC always worked** — it runs as `postgres` — which is exactly why
+  the grants that were verified all looked fine. Test the path, not the
+  destination.
+
 - `95524d9` — 🧒 **PLAYER PHOTOS GET THE PICKER TOO — phase 3 finished, and the plan is now
   complete bar one question for Jay.** Drop zone and positioner on the coach form
   and the parent form.
