@@ -83,3 +83,7 @@ export async function setStaffPhoto(profileId, photoPath, focus = null) {
 export async function setMyPhotoFocus(focus) {
   return { photo_focus_x: focus?.x ?? null, photo_focus_y: focus?.y ?? null }
 }
+
+export async function setOwnPlayerPhotoFocus(playerId, focus) {
+  return { id: playerId, photo_focus_x: focus?.x ?? null, photo_focus_y: focus?.y ?? null }
+}

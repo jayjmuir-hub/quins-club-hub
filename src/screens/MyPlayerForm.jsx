@@ -9,7 +9,13 @@ import Segmented from '../components/Segmented.jsx'
 import { getPlayerContact, setOwnPlayerGender, upsertContact } from '../data/players.js'
 import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
 import { listParents, saveParents } from '../data/parents.js'
-import { deletePlayerPhoto, forgetPhotoUrl, setOwnPlayerPhoto, uploadPlayerPhoto } from '../data/photos.js'
+import {
+  deletePlayerPhoto,
+  forgetPhotoUrl,
+  setOwnPlayerPhoto,
+  setOwnPlayerPhotoFocus,
+  uploadPlayerPhoto,
+} from '../data/photos.js'
 import { allowsOwnContact } from '../lib/ageGroup.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 import { toEditorRows, toSaveRows } from '../lib/parentRows.js'
@@ -59,6 +65,11 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
   const [error, setError] = useState(null)
 
   const [photoFile, setPhotoFile] = useState(null)
+  const [photoFocus, setPhotoFocus] = useState(
+    player?.photo_focus_x == null && player?.photo_focus_y == null
+      ? null
+      : { x: player?.photo_focus_x, y: player?.photo_focus_y },
+  )
   const [photoRemoved, setPhotoRemoved] = useState(false)
   // Phone is stored E.164 and edited as country + national digits, the same
   // split PlayerForm and the parent rows use (see src/components/PhoneInput.jsx).
@@ -126,6 +137,16 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
       if (photoFile || photoRemoved) {
         const nextPath = photoFile ? await uploadPlayerPhoto(player.id, photoFile) : null
         await setOwnPlayerPhoto(player.id, nextPath)
+        // ⚠️ A SECOND CALL, WHERE THE COACH FORM MANAGES ONE. That form writes
+        // the row directly and can carry both columns in a single upsert; a
+        // parent has no such reach and goes through `set_own_player_photo`,
+        // scoped by `private.is_own_player`. The focal point follows the same
+        // route rather than inventing a third place for the rule to live.
+        //
+        // ⚠️ AFTER the path, and awaited: if this fails the photo is still
+        // saved and the position is merely the centre, which is the same
+        // trade the staff card makes.
+        await setOwnPlayerPhotoFocus(player.id, nextPath ? photoFocus : null)
         if (previousPath && previousPath !== nextPath) {
           forgetPhotoUrl(previousPath)
           deletePlayerPhoto(previousPath)
@@ -207,6 +228,8 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
             player={player}
             file={photoFile}
             removed={photoRemoved}
+            focus={photoFocus}
+            onFocusChange={setPhotoFocus}
             onFileChange={(file) => {
               setPhotoFile(file)
               setPhotoRemoved(false)

@@ -1,8 +1,7 @@
 # Photo positioning — drag and drop, and where the face is
 
-**STATUS: PHASES 1, 2 AND 4 SHIPPED, PHASE 3 HALF DONE — the staff self-serve
-field has the picker; the two PLAYER fields do not yet. PHASE 5 (the tall lead
-tile) NOT STARTED.**
+**STATUS: PHASES 1-4 SHIPPED. Only PHASE 5 — what to do about the 1:4 lead
+tile — remains, and it is Jay's call rather than a build.**
 
 Jay, 15 Aug 2026:
 
@@ -104,7 +103,26 @@ ZONE.** Rendering both gave two controls with the SAME accessible name doing the
 same thing — a duplicate to a screen reader, and caught by a test as "Found
 multiple elements with the role button".
 
-❌ **Still to do: the two PLAYER fields.**
+✅ **`PhotoField` (PlayerForm, MyPlayerForm)** has the drop zone and the
+positioner too.
+
+⚠️ **NOTHING SAVES ITSELF THERE, AND THAT IS THE POINT.** `focus` is the
+surrounding form's state exactly as `file` and `removed` already were, because
+the FORM decides when any of it reaches the database — the property that stops
+an abandoned form leaving an orphaned photograph of a child in the bucket.
+
+⚠️ **THE TWO PARENT FORMS SAVE IT DIFFERENTLY, MIRRORING HOW THEY ALREADY SAVE
+THE PATH.** `PlayerForm` (coach, admin) carries both columns in ONE `upsertPlayer`,
+so there is no window where a photo has a position chosen for the previous one.
+`MyPlayerForm` (a parent) has no such reach and makes a second call to
+`set_own_player_photo_focus`, scoped by `private.is_own_player` — following the
+route its photo already takes rather than inventing a third place for the rule
+to live.
+
+⚠️ **AND THE "Add photo" BUTTON STAYS HERE**, unlike the staff card where it was
+removed. That card had no other control, so its button and drop zone were
+duplicates by accessible name; this one sits beside Change/Remove, whose labels
+differ.
 
 Four call sites, and they do not behave the same today:
 
