@@ -40,6 +40,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   caller has a non-null uid) but one revoke away from it. Fixed with
   `coalesce(..., false)` inside the predicate rather than a guard per caller.
 
+- `b42541c` — 🐞 **"CHANGE PHOTO" DID NOTHING ONCE A PHOTO EXISTED.** Jay, minutes after the
+  feature shipped: *"put an U18 head coach photo, saved, tried to change photo
+  and nothing happens"*. With a photo stored, opening the editor ALWAYS rendered
+  the positioner — the stored URL was truthy, so the drop zone was unreachable —
+  and "Choose a different photo" cleared only the LOCAL preview, which the
+  stored one immediately overruled. There was no route to a new file at all.
+  ⚠️ **"REPLACING" IS A SEPARATE STATE FROM "HAS NO PHOTO"**, and collapsing the
+  two is the whole bug. While replacing, the stored photo must not win.
+  ⚠️ **EVERY EXISTING TEST PASSED, AND THAT IS THE SHAPE WORTH REMEMBERING.**
+  They all started from a staff member with NO photo, so the happy path was
+  covered and the SECOND use of the same control was not. Proved the new ones
+  catch it by restoring the single buggy expression: two fail, exactly as
+  reported.
+
 - `ea3ccad` — 📐 **AN ODD LAST TILE KEEPS ITS WIDTH AND LEAVES A GAP.** Jay, on the real
   six-person squad: *"i don't like the bottom one going full length"*. It was
   promoted to full width to avoid the hole, on the reasoning that a lone tile
