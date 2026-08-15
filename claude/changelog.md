@@ -10,7 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 🔄 **AN INSTALLED APP NOW NOTICES A DEPLOY WHEN YOU LOOK AT IT.** Jay: *"changes
+- 🎓 **A/B/C GRADING AND MULTIPLE POSITIONS — phase 2 of tiers and game time.**
+  ⚠️ **`events.tier` IS PREFILLED FROM THE LEAGUE TEAM BUT NEVER DERIVED FROM IT.**
+  For a league fixture the two agree; for a tournament they need not, because we
+  may send our B team to an A-tier tournament — and deriving would record a B
+  appearance for a match played at A level, backwards for the eligibility the
+  grade exists to police. The prefill only fills a BLANK, so it cannot undo a tier
+  somebody chose.
+  ⚠️ **THE PLAYER GRADE IS ITS OWN TABLE, NOT A COLUMN ON `players`.** RLS grants
+  ROWS not COLUMNS and a parent and a coach are the same `authenticated` role, so
+  a column could not have been hidden from parents by any mechanism this schema
+  has — not a policy, not a column GRANT. `player_grades` is coach-only on BOTH
+  read and write: a parent cannot see their own child's grade, and it never
+  reaches the shared team-sheet image.
+  ⚠️ **`player_positions` IS DELIBERATELY THE OPPOSITE SHAPE** — squad-readable,
+  coach-writable, like `players.position` itself. A position is not a judgement
+  about a child. Do not tidy the two into one shape.
+  ⚠️ **`players.position` SURVIVES AS THE PRIMARY**, kept in step with the first
+  ticked position: six things read it and none were rewritten. Backfilled so the
+  new table is not empty on day one.
+  ⚠️ **THE WRITE ORDER WAS WRONG AND THE SUITE CAUGHT IT**: the two new writes sat
+  before the contact save, so a refused position write returned early and a phone
+  number was never stored. Ten tests failed. They now run last, and a test pins
+  the order.
+
+- `3688e47` — 🔄 **AN INSTALLED APP NOW NOTICES A DEPLOY WHEN YOU LOOK AT IT.** Jay: *"changes
   are immediately showing up on the desktop site but not the app"*.
   ⚠️ **MEASURED BEFORE CHANGING ANYTHING, AND BOTH OBVIOUS SUSPECTS WERE
   INNOCENT**: production serves `sw.js` as `public, must-revalidate, max-age=0`,

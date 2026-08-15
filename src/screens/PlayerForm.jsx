@@ -5,6 +5,7 @@ import { getPlayerContact, upsertContact, upsertPlayer } from '../data/players.j
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { POSITIONS } from '../lib/positions.js'
+import { listPlayerGrades, listPlayerPositions, savePlayerPositions, setPlayerGrade, TIERS } from '../data/playerTiers.js'
 import { listParents, saveParents } from '../data/parents.js'
 import { deletePlayerPhoto, forgetPhotoUrl, uploadPlayerPhoto } from '../data/photos.js'
 import { allowsOwnContact } from '../lib/ageGroup.js'
@@ -101,6 +102,11 @@ function initialValues(player, editableTeams) {
     fullName: player?.full_name ?? '',
     position: player?.position ?? '',
     unit: player?.unit ?? '',
+    // ⚠️ BOTH LOAD ASYNCHRONOUSLY and so start empty rather than from `player`.
+    // player_positions and player_grades are separate tables — the roster row
+    // this form is opened from carries neither. See the effect below.
+    positions: [],
+    tier: '',
     // An existing player's own squad wins, even if the editable list hasn't
     // loaded yet — see the reconciliation note in the component for why
     // falling through to "the first team" is not acceptable here.
@@ -199,6 +205,39 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   // The contact prefill. Runs only when editing, and only when the form is
   // not gated — a user who may not edit this squad must not cause a
   // player_contacts read at all, let alone see its result.
+  // ⚠️ POSITIONS AND GRADE LOAD SEPARATELY FROM THE PLAYER ROW, because they are
+  // separate tables and the roster row this form opens from carries neither.
+  //
+  // ⚠️ allSettled, NOT all: the GRADE read can legitimately come back empty or
+  // refused — `player_grades` is coach-only and most players are ungraded — and
+  // that must not stop somebody editing a phone number. A failure here leaves
+  // both fields at their defaults rather than taking the form down.
+  useEffect(() => {
+    if (!editing || gated) return undefined
+    let mounted = true
+
+    Promise.allSettled([listPlayerPositions([player.id]), listPlayerGrades([player.id])]).then(
+      ([positionsResult, gradesResult]) => {
+        if (!mounted) return
+        setValues((current) => ({
+          ...current,
+          positions:
+            positionsResult.status === 'fulfilled'
+              ? positionsResult.value.get(player.id) ?? []
+              : current.positions,
+          tier:
+            gradesResult.status === 'fulfilled'
+              ? gradesResult.value.get(player.id)?.tier ?? ''
+              : current.tier,
+        }))
+      },
+    )
+
+    return () => {
+      mounted = false
+    }
+  }, [editing, gated, player?.id])
+
   useEffect(() => {
     if (!editing || gated) return undefined
 
@@ -362,7 +401,16 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       ...(team?.club_id ? { club_id: team.club_id } : null),
       team_id: teamId,
       full_name: fullName,
-      position: values.position || null,
+      // ⚠️ STILL THE PRIMARY, AND KEPT IN STEP WITH THE FIRST SELECTED POSITION.
+      // Six things read players.position (the roster meta line and its inline
+      // editor, YourPlayers, PlayerDetail, the importer, the forwards/backs
+      // fallback) and none of them were rewritten — see the player_positions
+      // migration. When the coach has picked positions, the first one wins; the
+      // single-select below is kept for the players who only ever have one.
+      // Parenthesised because `??` and `||` cannot be mixed bare — and the
+      // grouping matters: a ticked position wins, otherwise the single-select
+      // falls back to null when it is ''.
+      position: values.positions[0] ?? (values.position || null),
       // '' means nobody has decided, which is a real answer and stays NULL.
       unit: values.unit || null,
       is_captain: values.isCaptain,
@@ -458,6 +506,37 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         } catch (err) {
           onSaved?.(saved)
           setErrorStage('parents')
+          setError(err)
+          return
+        }
+      }
+
+      // --- positions and grade ----------------------------------------
+      // ⚠️ LAST, AND THE ORDER IS THE WHOLE POINT. These were briefly written
+      // straight after the player row, which meant a refused position write
+      // RETURNED EARLY and the CONTACT DETAILS were never saved — a phone number
+      // lost to a secondary table. Ten tests caught it. Every write in this
+      // sequence blocks the ones after it, so the order has to run from most
+      // important to least: player, photo, contact, parents, then these.
+      //
+      // ⚠️ AFTER THE PLAYER ROW EXISTS, like the photo: both tables key on the
+      // player id, and a brand-new player has none until upsertPlayer returns.
+      //
+      // ⚠️ NEITHER FAILURE MAY LOSE THE PLAYER, so each reports its own stage.
+      if (saved?.id) {
+        try {
+          await savePlayerPositions(saved.id, values.positions)
+        } catch (err) {
+          onSaved?.(saved)
+          setErrorStage('positions')
+          setError(err)
+          return
+        }
+        try {
+          await setPlayerGrade(saved.id, values.tier || null)
+        } catch (err) {
+          onSaved?.(saved)
+          setErrorStage('grade')
           setError(err)
           return
         }
@@ -561,6 +640,90 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             <option value="forward">Forward</option>
             <option value="back">Back</option>
           </select>
+        </div>
+
+        {/* ⚠️ EVERY POSITION THIS PLAYER CAN COVER (Jay, 14 Aug 2026: "the option
+            to add multiple positions in case there are players who play
+            different positions sometimes").
+            ⚠️ THE FIRST ONE TICKED BECOMES players.position, which is still the
+            PRIMARY and is what six other screens read — see the player_positions
+            migration. Order is the order of POSITIONS, not the order of ticking,
+            because a checkbox list has no memory of which was pressed first and
+            pretending otherwise would make the primary depend on invisible
+            state. */}
+        <fieldset className={FIELD}>
+          <legend className={LABEL}>Positions they can play</legend>
+          <div className="flex flex-wrap gap-2">
+            {POSITIONS.map((position) => {
+              const on = values.positions.includes(position)
+              return (
+                <label key={position}>
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={() =>
+                      setValues((current) => ({
+                        ...current,
+                        positions: on
+                          ? current.positions.filter((p) => p !== position)
+                          : POSITIONS.filter(
+                              (p) => p === position || current.positions.includes(p),
+                            ),
+                      }))
+                    }
+                    className="peer sr-only"
+                  />
+                  <span
+                    className={[
+                      'block cursor-pointer select-none rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2',
+                      on
+                        ? 'border-brand bg-surface-mute font-bold text-brand-deep'
+                        : 'border-line font-semibold text-ink',
+                    ].join(' ')}
+                  >
+                    {position}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+          {values.positions.length > 1 && (
+            <p className="mt-2 text-[12.5px] leading-relaxed text-ink-muted">
+              {values.positions[0]} is their main position — it is the one shown on the
+              roster and in lists.
+            </p>
+          )}
+        </fieldset>
+
+        {/* ⚠️ COACH AND MANAGER ONLY, AND THE DATABASE IS WHAT ENFORCES IT — the
+            `player grade manage` policy on `player_grades` is can_edit_team on
+            BOTH read and write, with no wider read arm, so a parent cannot see
+            their own child's grade either. This form is already coach-only (see
+            the `gated` check above), so the control is simply here.
+            ⚠️ IT MUST NEVER REACH THE SHARED LINEUP IMAGE. That PNG leaves the
+            app and can be forwarded on; a judgement about a child's ability must
+            not travel with it. */}
+        <div className={FIELD}>
+          <label className={LABEL} htmlFor="player-tier">
+            Tier
+          </label>
+          <select
+            id="player-tier"
+            value={values.tier}
+            onChange={setFromInput('tier')}
+            className={inputClasses(false)}
+          >
+            <option value="">Not graded</option>
+            {TIERS.map((tier) => (
+              <option key={tier} value={tier}>
+                {tier}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+            Which league tier they play at. Only coaches and managers can see this —
+            it is not shown to parents and never appears on a shared team sheet.
+          </p>
         </div>
 
         <div className={FIELD}>
@@ -750,6 +913,19 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
               <span className="block">
                 The player was saved, but the parent details were not.
               </span>
+            )}
+            {/* ⚠️ NAMED SEPARATELY rather than folded into one "something else
+                failed" line. `savePlayerPositions` deletes before it inserts, so
+                a refusal can leave a player with NO positions — a coach needs to
+                know which of the two to check. */}
+            {errorStage === 'positions' && (
+              <span className="block">
+                The player was saved, but their positions were not — they may now have
+                none. Check them and save again.
+              </span>
+            )}
+            {errorStage === 'grade' && (
+              <span className="block">The player was saved, but their tier was not.</span>
             )}
             {error.message || "We couldn't save that. Try again."}
           </p>
