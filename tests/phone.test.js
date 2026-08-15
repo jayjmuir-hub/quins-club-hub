@@ -11,6 +11,7 @@ import {
   isValidPhone,
   joinPhone,
   splitPhone,
+  whatsappUrl,
 } from '../src/lib/phone.js'
 import { RELATIONSHIPS, isKnownRelationship } from '../src/lib/relationships.js'
 
@@ -166,5 +167,25 @@ describe('RELATIONSHIPS', () => {
   it('recognises its own values and nothing else', () => {
     expect(isKnownRelationship('Mother')).toBe(true)
     expect(isKnownRelationship('mum')).toBe(false)
+  })
+})
+
+describe('whatsappUrl', () => {
+  // ⚠️ `wa.me` TAKES BARE DIGITS. Given a `+` or a space it opens WhatsApp on
+  // an error rather than on a conversation, and it fails quietly enough to
+  // ship — nothing throws, the app looks fine, and the button just does not
+  // work. E.164 storage is what makes the strip a one-liner.
+  it('strips the plus from a stored E.164 number', () => {
+    expect(whatsappUrl('+971500000001')).toBe('https://wa.me/971500000001')
+  })
+
+  it('strips spaces and punctuation from a number typed by hand', () => {
+    expect(whatsappUrl('+971 50 (123) 4567')).toBe('https://wa.me/971501234567')
+  })
+
+  // A tappable control that opens nothing is worse than no control, so the
+  // caller needs a null it can branch on rather than a broken link.
+  it.each([null, undefined, '', '   ', 'not a number'])('returns null for %j', (value) => {
+    expect(whatsappUrl(value)).toBeNull()
   })
 })

@@ -143,6 +143,26 @@ export function formatPhone(stored) {
 }
 
 /**
+ * A `wa.me` link for a stored number, or null when there is nothing to dial.
+ *
+ * ⚠️ `wa.me` TAKES BARE DIGITS — no `+`, no spaces, no brackets. Handing it a
+ * formatted string opens WhatsApp on an error rather than on a conversation,
+ * and it fails quietly enough to ship. E.164 storage is what makes this a
+ * one-line strip; see the STORAGE FORMAT note at the top of this file.
+ *
+ * ⚠️ WHETHER THAT NUMBER IS ON WHATSAPP IS AN ASSUMPTION, AND IT IS NOT OURS
+ * TO CHECK. There is no API that answers it, so the button is offered for any
+ * number we hold and WhatsApp itself says "not on WhatsApp" when it is not.
+ * That is the honest failure — a guess made by us would be worse, because we
+ * would hide the button from people who do have it.
+ */
+export function whatsappUrl(stored) {
+  const digits = String(stored ?? '').replace(/[^\d]/g, '')
+  if (digits === '') return null
+  return `https://wa.me/${digits}`
+}
+
+/**
  * Digits grouped the way the selected country writes them, e.g.
  * ('AE', '501234567') → "050 123 4567". Returns the digits unchanged when the
  * number isn't recognised, so a part-typed or unusual number is never mangled.

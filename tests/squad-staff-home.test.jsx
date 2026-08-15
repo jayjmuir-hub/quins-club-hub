@@ -54,7 +54,7 @@ vi.mock('../src/data/staff.js', () => ({
   listMySquadStaff: (...args) => listMySquadStaffMock(...args),
 }))
 
-import SquadStaffCard from '../src/components/SquadStaffCard.jsx'
+import SquadStaffCard, { leadIndex, tileSpans } from '../src/components/SquadStaffCard.jsx'
 import Dashboard from '../src/screens/Dashboard.jsx'
 import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
@@ -214,6 +214,232 @@ describe('SquadStaffCard', () => {
     expect(screen.queryByText(/has no coach/i)).not.toBeInTheDocument()
     // The card is still drawn — the squad name must not vanish.
     expect(screen.getByText('U13 Mixed Contact')).toBeInTheDocument()
+  })
+})
+
+// ── The tile mosaic (15 Aug 2026) ───────────────────────────────────────────
+
+const MANAGER_PRIYA = {
+  membershipId: 'ms-3',
+  role: 'manager',
+  title: 'Team Manager',
+  name: 'Priyanka Ramachandran',
+  email: 'priya@example.com',
+  phone: '+971551112233',
+  photoPath: null,
+  photoUrl: null,
+}
+const COACH_DAN = {
+  membershipId: 'ms-4',
+  role: 'coach',
+  title: 'Assistant Coach',
+  name: 'Dan Whitfield',
+  email: 'dan@example.com',
+  phone: '+971509876543',
+  photoPath: null,
+  photoUrl: null,
+}
+
+function person(n) {
+  return { ...COACH_DAN, membershipId: `gen-${n}`, name: `Person ${n}`, title: 'Assistant Coach' }
+}
+
+describe('leadIndex — who gets the big tile', () => {
+  // ⚠️ THE RULE IS TITLE, NEVER ROLE, AND src/data/staff.js IS WHY. It sorts by
+  // name in two places and says both times that role order "reads as a
+  // hierarchy the club has not agreed to". Featuring by role would restate that
+  // hierarchy at twice the size, so the lead is whoever the club chose to CALL
+  // a head — a string an admin typed, not something this code inferred.
+  it('features whoever is titled a head, wherever they sit in the list', () => {
+    expect(leadIndex([MEDIC_SAM, COACH_ROSA, MANAGER_PRIYA])).toBe(1)
+  })
+
+  it('does not care about case', () => {
+    expect(leadIndex([{ ...COACH_ROSA, title: 'head coach' }])).toBe(0)
+  })
+
+  // ⚠️ WORD BOUNDARY, NOT `includes`. "Overhead", "Forehead" and — the one that
+  // matters here — a title like "Overheads and Kit" would all match a substring
+  // test and quietly promote the wrong person to the biggest tile on the screen.
+  it('does not match head inside another word', () => {
+    expect(leadIndex([{ ...COACH_ROSA, title: 'Overheads and Kit' }])).toBe(-1)
+  })
+
+  it('features nobody when no title says so, which is most squads', () => {
+    expect(leadIndex([MEDIC_SAM, MANAGER_PRIYA])).toBe(-1)
+    expect(leadIndex([{ ...COACH_ROSA, title: null }])).toBe(-1)
+    expect(leadIndex([])).toBe(-1)
+  })
+})
+
+describe('tileSpans — the mosaic never leaves a hole', () => {
+  // The sizes the club actually has, measured 15 Aug 2026: eleven squads with
+  // nobody, two with one person, one with four and one with six.
+  it('gives a lone person the full width rather than half a row', () => {
+    expect(tileSpans(1, true)).toEqual(['wide'])
+    expect(tileSpans(1, false)).toEqual(['wide'])
+  })
+
+  // ⚠️ A LEAD NEEDS THREE PEOPLE TO BE WORTH IT. With two, the tall tile has a
+  // single half-height tile beside it and the other half of that column is a
+  // hole — the "feature" is a gap.
+  it('refuses the tall tile below three people', () => {
+    expect(tileSpans(2, true)).toEqual(['half', 'half'])
+  })
+
+  it('stacks two tiles beside the lead at three', () => {
+    expect(tileSpans(3, true)).toEqual(['lead', 'half', 'half'])
+  })
+
+  // Four is the size that exposed the rule: the fourth tile would sit alone on
+  // row three with a hole beside it.
+  it('widens the odd last tile at four', () => {
+    expect(tileSpans(4, true)).toEqual(['lead', 'half', 'half', 'wide'])
+  })
+
+  it('leaves a full last row alone at five', () => {
+    expect(tileSpans(5, true)).toEqual(['lead', 'half', 'half', 'half', 'half'])
+  })
+
+  it('widens the last of six', () => {
+    expect(tileSpans(6, true)).toEqual(['lead', 'half', 'half', 'half', 'half', 'wide'])
+  })
+
+  it('pairs them off evenly when nobody leads', () => {
+    expect(tileSpans(4, false)).toEqual(['half', 'half', 'half', 'half'])
+    expect(tileSpans(3, false)).toEqual(['half', 'half', 'wide'])
+  })
+
+  // The invariant behind every case above, stated once so a new size cannot
+  // quietly break it: no tile is ever left alone on a row.
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])('never leaves a lone half tile at %i', (n) => {
+    for (const hasLead of [true, false]) {
+      const spans = tileSpans(n, hasLead)
+      const lead = spans.filter((s) => s === 'lead').length
+      // Columns consumed after the lead's own column-worth of rows.
+      const halves = spans.filter((s) => s === 'half').length
+      const flowing = lead ? halves - 2 : halves
+      expect(flowing % 2).toBe(0)
+    }
+  })
+})
+
+describe('SquadStaffCard — the contact buttons', () => {
+  it('offers call, WhatsApp and email, each with a name a screen reader can use', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA]} />)
+
+    expect(screen.getByRole('link', { name: 'Call Rosa Ferreira' })).toHaveAttribute(
+      'href',
+      'tel:+971500000001',
+    )
+    // ⚠️ BARE DIGITS. `wa.me/+971...` opens WhatsApp on an error rather than on
+    // a conversation, and it fails quietly enough to ship.
+    expect(
+      screen.getByRole('link', { name: 'Message Rosa Ferreira on WhatsApp' }),
+    ).toHaveAttribute('href', 'https://wa.me/971500000001')
+    expect(screen.getByRole('link', { name: 'Email Rosa Ferreira' })).toHaveAttribute(
+      'href',
+      'mailto:rosa@example.com',
+    )
+  })
+
+  it('drops both phone buttons together when there is no number', () => {
+    render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[{ ...COACH_ROSA, phone: null }]}
+      />,
+    )
+
+    expect(screen.queryByRole('link', { name: /Call/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /WhatsApp/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Email/ })).toBeInTheDocument()
+  })
+
+  // ⚠️ jsdom COMPUTES NO CSS, so the 44px floor cannot be measured here — the
+  // class token is the only thing this environment can hold. The width was
+  // measured in Chromium instead: at 320px the three buttons needed 144px in a
+  // 140px tile and the last one was CLIPPED rather than overflowing, because
+  // the tile clips. See the breakpoint note in SquadStaffCard.jsx.
+  it('keeps every contact button at the 44px tap-target floor', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA]} />)
+
+    for (const link of screen.getAllByRole('link')) {
+      expect(link.className).toContain('h-11')
+      expect(link.className).toContain('w-11')
+    }
+  })
+})
+
+describe('SquadStaffCard — the mosaic on screen', () => {
+  it('gives the titled head the lead tile and nobody else', () => {
+    render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[MEDIC_SAM, COACH_ROSA, MANAGER_PRIYA]}
+      />,
+    )
+
+    const tiles = screen.getAllByTestId('squad-staff-person')
+    expect(tiles.map((t) => t.dataset.span)).toEqual(['lead', 'half', 'half'])
+    // The lead is moved to the front; everyone else keeps the order the data
+    // module chose, which is by name.
+    expect(tiles[0]).toHaveTextContent('Rosa Ferreira')
+    expect(tiles.filter((t) => t.dataset.featured === 'true')).toHaveLength(1)
+  })
+
+  it('lays a squad out evenly when nobody is titled a head', () => {
+    render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={[MEDIC_SAM, MANAGER_PRIYA]} />,
+    )
+
+    const tiles = screen.getAllByTestId('squad-staff-person')
+    expect(tiles.map((t) => t.dataset.span)).toEqual(['half', 'half'])
+    expect(tiles.some((t) => t.dataset.featured === 'true')).toBe(false)
+  })
+
+  it('lays out the four- and six-person squads the club really has', () => {
+    const { rerender } = render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[COACH_ROSA, MEDIC_SAM, COACH_DAN, MANAGER_PRIYA]}
+      />,
+    )
+    expect(screen.getAllByTestId('squad-staff-person').map((t) => t.dataset.span)).toEqual([
+      'lead',
+      'half',
+      'half',
+      'wide',
+    ])
+
+    rerender(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[COACH_ROSA, MEDIC_SAM, COACH_DAN, MANAGER_PRIYA, person(5), person(6)]}
+      />,
+    )
+    expect(screen.getAllByTestId('squad-staff-person').map((t) => t.dataset.span)).toEqual([
+      'lead',
+      'half',
+      'half',
+      'half',
+      'half',
+      'wide',
+    ])
+  })
+
+  // ⚠️ THE MONOGRAM IS THE ORDINARY CASE, NOT AN ERROR STATE. Thirteen of the
+  // club's fifteen staff have no photo, so a wall of these is what this
+  // component mostly renders — and none of them may announce itself.
+  it('renders the monogram without an image and without saying so', () => {
+    const { container } = render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={[MANAGER_PRIYA]} />,
+    )
+
+    expect(container.querySelector('img')).toBeNull()
+    expect(screen.getByText('PR')).toBeInTheDocument()
+    expect(screen.queryByText(/no photo/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Priyanka Ramachandran')).toBeInTheDocument()
   })
 })
 

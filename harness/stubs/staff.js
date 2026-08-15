@@ -71,8 +71,42 @@ export async function listMySquadStaff() {
           name: 'Sam Okonkwo',
           email: null,
           phone: null,
-          // No photo — the monogram branch, which is every member of the club
-          // on the day this shipped.
+          // No photo — the monogram branch, which is thirteen of the club's
+          // fifteen staff.
+          photoPath: null,
+          photoUrl: null,
+        },
+        // ⚠️ FOUR PEOPLE, NOT TWO, SINCE THE TILE MOSAIC LANDED (15 Aug 2026).
+        // At two, `tileSpans()` never produces a lead tile at all — the layout
+        // under test simply does not appear, and the harness would show a
+        // perfectly tidy two-up grid while the mosaic went unverified. Four is
+        // the smallest size that exercises every branch at once: a lead, the
+        // two tiles that stack beside it, and the odd last tile that has to go
+        // full width rather than sit alone on its row. It is also a size the
+        // club really has — squad sizes on 15 Aug were 1, 1, 4 and 6.
+        {
+          membershipId: 'stub-ms-3',
+          role: 'coach',
+          title: 'Assistant Coach',
+          name: 'Dan Whitfield',
+          email: 'dan.whitfield@adhquins-clubhub.com',
+          // ⚠️ E.164, LIKE THE DATABASE STORES IT. `whatsappUrl()` strips
+          // everything but digits, so a stub written with spaces would pass
+          // whatever the function did to the `+`.
+          phone: '+971509876543',
+          photoPath: null,
+          photoUrl: null,
+        },
+        {
+          membershipId: 'stub-ms-4',
+          role: 'manager',
+          title: 'Team Manager',
+          // A long name, because the tile is 170px wide at 390 and the name is
+          // set in the display face. This is the string that finds out whether
+          // it wraps or overflows.
+          name: 'Priyanka Ramachandran',
+          email: 'priyanka.ramachandran@adhquins-clubhub.com',
+          phone: '+971551112233',
           photoPath: null,
           photoUrl: null,
         },
