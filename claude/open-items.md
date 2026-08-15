@@ -38,9 +38,11 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   issue as a disclosure route.
   ⚠️ **Named `.md` on purpose** — a bare `LICENSE` misses
   `scripts/netlify-ignore.mjs`'s `/^[^/]+\.md$/` and would deploy.
-  ⚠️ **`package.json` still has no `license` field.** Left alone deliberately:
-  it is deploy-relevant, so a metadata string would have cost a live release.
-  Fold `"license": "UNLICENSED"` into the next PR that deploys anyway.
+  ✅ **`package.json` now carries `"license": "UNLICENSED"`** — folded in on
+  15 Aug 2026 exactly as this line asked, alongside the DMARC chore that was
+  going to build anyway. ⚠️ **It is `UNLICENSED`, not a SPDX id, and that is
+  correct**: npm reserves that string for a package that is deliberately not
+  open source, which is what "all rights reserved" means in `LICENSE.md`.
 - **CSP is `frame-ancestors 'none'` and nothing else.** `netlify.toml` explains why
   and the reasoning is sound — a wrong `connect-src` breaks the app silently for
   anyone holding a cached service worker. It stays here because it is the only thing
@@ -205,6 +207,25 @@ green suite and has never been exercised by a human on the live site.
   and still shows the single "Not graded" heading. **So the complaint this item
   records is unchanged for the squads it was actually about.**
 - **The all-day calendar entry has never reached a phone.**
+- **THREE FEATURES SHIPPED TO PRODUCTION ON 15 Aug AND NONE HAS BEEN LOOKED AT.**
+  The Home redesign (`d5b8667`), the minis simplification (`de82481`) and the
+  squad-contact tiles (`03de5ca`). ⚠️ **Every visual claim made about them was
+  measured in the harness against INVENTED data**, which is the right tool and is
+  not the same as having seen them. The specific things a browser cannot settle:
+  - **The contact tiles have never been drawn with a real photograph.** The
+    harness stands one in with a 1×1 pink PNG stretched by `object-cover`, so
+    the scrim's whole job — holding white text legible over an unknown image —
+    is untested against an actual face. Two staff have photos; thirteen do not.
+  - **Almost every squad will render an even grid, not the featured tile**,
+    because the lead is chosen by title and only two people are titled "Head
+    Coach". That is the design working, and it will look like the feature is
+    missing. Setting titles on `/admin/staff` is the lever.
+  - **The collapse only appears for a parent attached to more than one squad**,
+    which is two of the club's twelve.
+  - **The skeleton holds the first screenful and the page still grows below it.**
+    Measured at 390×844: the loading block goes from 110px to 942px, against a
+    loaded page of about 1,800. The honest claim is "nothing above the fold
+    moves", and whether that is enough is a question only a phone can answer.
 - **The lineup image has never been seen to reach a WhatsApp group.** Rows exist
   in `lineups` and `lineup_players` — measured 15 Aug 2026, so a team HAS been
   picked and saved against production — but the image is the actual deliverable

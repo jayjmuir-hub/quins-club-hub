@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
-- 📬 **THE DMARC REPORTS ARE READABLE NOW, AND THE ONE THAT WOULD MATTER SETS AN
+- `2701039` — 📬 **THE DMARC REPORTS ARE READABLE NOW, AND THE ONE THAT WOULD MATTER SETS AN
   EXIT CODE.** Jay asked why "Report Domain: …" mail was arriving daily; the
   answer was our own `rua=` tag, and the attachments were gzipped XML nobody
   could read. `scripts/dmarc-summary.mjs` (`npm run mail:dmarc`) reads the
