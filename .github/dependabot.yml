@@ -1,0 +1,61 @@
+version: 2
+
+# Dependency updates, opened as pull requests.
+#
+# ⚠️ WHY THIS EXISTS. Nothing was watching. `claude/open-items.md` recorded "no
+# Dependabot, no `npm audit` step" as a known gap on 13 Aug 2026, and the only
+# reason anyone knew about the react-router advisories was that a human had run
+# `npm audit` by hand once. This repo is public and the app holds children's
+# data; noticing a dependency advisory should not depend on somebody
+# remembering.
+#
+# ⚠️ IT OPENS PULL REQUESTS, IT DOES NOT MERGE THEM. Every one still goes
+# through `test` and `docs-check` like any other branch, and `main` is the
+# production branch (CLAUDE.md rule 3) — a dependency bump is a live release the
+# same as a feature is.
+
+updates:
+  # ── The app ───────────────────────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      # Monday morning UAE time, so a week's advisories land before anyone is
+      # using the app rather than during a Saturday match.
+      day: monday
+      time: '04:00'
+      timezone: Asia/Dubai
+    open-pull-requests-limit: 5
+
+    # ⚠️ GROUPED, AND THE GROUPING IS THE POINT. Ungrouped, this repo would get
+    # a pull request per package per week — and a wall of individual bumps is
+    # reviewed by nobody, which is the same outcome as having no scanning. One
+    # PR for the safe range and separate ones for majors is a list a person will
+    # actually read.
+    groups:
+      # Patch and minor together: these are the ones where "all green" is a
+      # reasonable basis for merging.
+      safe-updates:
+        update-types:
+          - minor
+          - patch
+    # Majors arrive on their own, because they are migrations rather than
+    # updates. react-router 6 -> 7 is the live example: it is the ONLY fix for
+    # the two production advisories this repo carries, and it is not a bump.
+    # See claude/open-items.md.
+
+  # ── The workflows themselves ──────────────────────────────────────────────
+  # ⚠️ NOT AN AFTERTHOUGHT. `actions/checkout` and `actions/setup-node` run with
+  # access to this repo on every push; a pinned action going stale is a supply
+  # chain nobody is watching. Monthly, because they change slowly and a weekly
+  # PR for them would be noise.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        update-types:
+          - minor
+          - patch
