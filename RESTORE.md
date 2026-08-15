@@ -281,9 +281,28 @@ failed closed would silently take its match sheet away. `src/lib/scoring.js`
 already argues this exact asymmetry for its own default and is a third example,
 not a fourth opinion.
 
-⚠️ **A NUMBER NEARBY IS NOT THE SAME NUMBER.** `scoringForBand`'s tries-only band
-runs to **11 inclusive**; the match sheet and the league start **at 11**. Anyone
-who unifies them will move one.
+⚠️ **THERE ARE THREE AGE BOUNDARIES IN A ROW AND THEY FALL IN THREE DIFFERENT
+PLACES. DO NOT TIDY THEM TOGETHER.**
+
+| Rule | Bands | Constant |
+|---|---|---|
+| No score is entered at all | U6–U7 | `SCORES_FROM_AGE = 8` |
+| Mighty Minis rather than festivals | U6–U8 | `MIGHTY_MINIS_MAX_AGE = 8` |
+| No league, no RCM match sheet | U6–U10 | `MINIS_MAX_AGE = 10` |
+
+**U8 is where all three disagree**: Mighty Minis, no league, no sheet — and it
+still records a score. `tests/minis.test.js` writes them out band by band so that
+merging two requires deleting a test first.
+
+⚠️ **`recordsScores` IS NOT `scoringForTeam`.** That one answers *which kinds*
+may be scored and its thresholds are **mirrored in the database** by
+`private.scoring_kinds_for_team`, so moving it means writing a migration. This
+one answers *whether anybody enters a score*, is UI-only, and the database
+neither knows nor cares.
+
+⚠️ **AND A NUMBER NEARBY IS STILL NOT THE SAME NUMBER.** `scoringForBand`'s
+tries-only band runs to **11 inclusive**; the match sheet and the league start
+**at 11**.
 
 **The club does not use jersey numbers.** `players.jersey_num` stays in the schema (nullable,
 harmless, available if a senior side ever wants it) but nothing in the UI reads it. Roster rows

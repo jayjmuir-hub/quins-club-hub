@@ -30,11 +30,37 @@ to them"*.
 the competition tier and the round; the RCM match sheet; player grades,
 forward-or-back and positions.
 
+**Removed for U6 and U7 only:** score entry. Asked directly the same day —
+*"i would say keep scoring for U8/U9/U10"* — and the two he left out are the two
+he left out.
+
+⚠️ **THAT IS A THIRD BOUNDARY AND IT MATCHES NEITHER OF THE OTHER TWO.**
+
+| Rule | Bands | Constant |
+|---|---|---|
+| No score recorded at all | U6–U7 | `SCORES_FROM_AGE = 8` |
+| Mighty Minis, at the cricket stadium | U6–U8 | `MIGHTY_MINIS_MAX_AGE = 8` |
+| No league, no match sheet | U6–U10 | `MINIS_MAX_AGE = 10` |
+
+**U8 is the band where all three visibly disagree**: it is Mighty Minis, it has
+no league and no sheet, and it *does* record a score. It would be tidier if
+scoring stopped where the format changes — it does not, and anyone who
+"corrects" one constant to match another will either take the score off a U8
+side that uses it or hand one to a U7 side that does not. `tests/minis.test.js`
+writes the three out band by band so that tidying them requires deleting a test
+first.
+
+⚠️ **`recordsScores` IS NOT `scoringForTeam`, AND MERGING THEM MEANS A
+MIGRATION.** That one answers *which kinds* may be scored and its thresholds are
+mirrored inside the database by `private.scoring_kinds_for_team`. This one
+answers *whether anybody enters a score*, is a UI question only, and the database
+neither knows nor cares — which is why U6 can have a scoring *kind* defined and
+still record nothing.
+
 **Kept, and each was considered:**
 
-- **Scores.** Offered and refused. `scoringForBand` already gives these squads
-  tries-only, and a U9 festival result is a thing a coach may reasonably want to
-  record. Taking it away would be a second, separate argument.
+- **Scores at U8, U9 and U10.** `scoringForBand` already gives them tries-only,
+  and a festival result is a thing a coach may reasonably want to record.
 - **The team sheet.** A festival of three clubs still needs a team picked and
   sent to a WhatsApp group. Only the governing body's *result* form goes.
 - **Game time.** *Who has not had a chance to play* is arguably more important

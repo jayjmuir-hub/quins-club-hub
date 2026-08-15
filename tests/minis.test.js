@@ -5,8 +5,10 @@ import { describe, it, expect } from 'vitest'
 import {
   MINIS_MAX_AGE,
   MIGHTY_MINIS_MAX_AGE,
+  SCORES_FROM_AGE,
   isMinisBand,
   isMinisTeam,
+  recordsScores,
   squadFormat,
 } from '../src/lib/minis.js'
 import { matchSheetDeadline } from '../src/lib/matchSheetDeadline.js'
@@ -135,6 +137,51 @@ describe('matchSheetDeadline — the lower bound added 15 Aug 2026', () => {
     expect(due).not.toBeNull()
     expect(due.side).toBe('after')
     expect(due.band).toBe(11)
+  })
+})
+
+describe('recordsScores — U6 and U7 do not', () => {
+  it('⚠️ THREE BOUNDARIES IN A ROW, IN THREE DIFFERENT PLACES', () => {
+    // The whole reason each has its own named constant. Written out band by band
+    // so that anyone "tidying" two of them together has to delete this test to
+    // do it, and has to read it first.
+    //
+    //   U6-U7    no score recorded at all              SCORES_FROM_AGE = 8
+    //   U6-U8    Mighty Minis at the cricket stadium   MIGHTY_MINIS_MAX_AGE = 8
+    //   U6-U10   no league, no match sheet             MINIS_MAX_AGE = 10
+    expect(SCORES_FROM_AGE).toBe(8)
+    expect(recordsScores('U6 Tag')).toBe(false)
+    expect(recordsScores('U7 Tag')).toBe(false)
+    expect(recordsScores('U8 Tag')).toBe(true)
+
+    // U8 is the band where the three rules visibly disagree: it is Mighty Minis,
+    // it has no league and no sheet, and it DOES record a score.
+    expect(squadFormat('U8 Tag').key).toBe('mighty-minis')
+    expect(isMinisTeam('U8 Tag')).toBe(true)
+    expect(recordsScores('U8 Tag')).toBe(true)
+  })
+
+  it('U9 and U10 keep scores — Jay: "keep scoring for U8/U9/U10"', () => {
+    for (const name of ['U9 Mixed Contact', 'U10 Mixed Contact']) {
+      expect(recordsScores(name)).toBe(true)
+    }
+  })
+
+  it('⚠️ fails OPEN, like every other rule in this module', () => {
+    // An unreadable squad name records scores. The alternative is a fixture
+    // whose score cannot be entered and whose squad nobody can identify.
+    for (const name of [null, undefined, '', 'Senior Men 1st XV', "Women's XV", 'junk']) {
+      expect(recordsScores(name)).toBe(true)
+    }
+  })
+
+  it('⚠️ is NOT scoringForTeam, and the database is why', () => {
+    // scoringForBand's thresholds are mirrored by private.scoring_kinds_for_team,
+    // so moving one means writing a migration. This is a UI question the
+    // database neither knows nor cares about — which is precisely why U6 can
+    // answer "no score is entered" while still having a scoring KIND defined.
+    expect(scoringForBand(6)).toEqual(['tries'])
+    expect(recordsScores('U6 Tag')).toBe(false)
   })
 })
 

@@ -50,6 +50,27 @@ export const MINIS_MAX_AGE = 10
 export const MIGHTY_MINIS_MAX_AGE = 8
 
 /**
+ * The youngest band that records a score at all. U6 and U7 do not.
+ *
+ * Jay, 15 Aug 2026, asked directly: *"i would say keep scoring for U8/U9/U10"*.
+ * The two he left out are the two he left out.
+ *
+ * ⚠️ THIS IS A THIRD BOUNDARY AND IT DELIBERATELY DOES NOT MATCH THE OTHER TWO.
+ * The club now has three lines in a row and they fall in three different places:
+ *
+ *   U6-U7    no score recorded at all
+ *   U6-U8    Mighty Minis, at the cricket stadium   (MIGHTY_MINIS_MAX_AGE)
+ *   U6-U10   no league, no match sheet              (MINIS_MAX_AGE)
+ *
+ * It would be tidier if scoring stopped where the format changes. It does not,
+ * and a reader who "corrects" 8 to match one of the others will silently either
+ * take the score off a U8 side that uses it or hand one to a U7 side that does
+ * not. Each constant is named so that no call site has to remember which of the
+ * three it meant.
+ */
+export const SCORES_FROM_AGE = 8
+
+/**
  * Whether a band number is minis.
  *
  * ⚠️ NULL IS NOT MINIS. See the header — a band we could not read must keep the
@@ -68,6 +89,29 @@ export function isMinisBand(band) {
  */
 export function isMinisTeam(name) {
   return isMinisBand(ageBandFromTeamName(name))
+}
+
+/**
+ * Whether a score is recorded for this squad at all.
+ *
+ * ⚠️ NOT THE SAME QUESTION AS `scoringForTeam`, AND THE TWO MUST NOT BE MERGED.
+ * That one answers *which kinds* may be scored (tries only, tries plus
+ * conversions, the full set) and its thresholds are mirrored inside the database
+ * by `private.scoring_kinds_for_team` — so changing it means changing a
+ * migration too. This one answers *whether anybody enters a score*, is a UI
+ * question only, and the database neither knows nor cares.
+ *
+ * ⚠️ IT HIDES THE ENTRY, IT DOES NOT ERASE A STORED VALUE. A U7 fixture that
+ * somehow carries a score still shows it — the same rule the league fields on
+ * EventForm follow. Measured 15 Aug 2026: no U6 or U7 fixture exists at all, let
+ * alone a scored one, so this is insurance rather than a migration.
+ *
+ * Fails OPEN like everything else here: an unreadable squad name records scores.
+ */
+export function recordsScores(teamName) {
+  const band = ageBandFromTeamName(teamName)
+  if (band === null) return true
+  return band >= SCORES_FROM_AGE
 }
 
 /**

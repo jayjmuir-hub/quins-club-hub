@@ -379,6 +379,74 @@ describe('EventForm — there is no league below U11', () => {
   })
 })
 
+// ════════════════════════════════════════════════════════════════════════════
+describe('EventForm — U6 and U7 record no score', () => {
+  // Jay, 15 Aug 2026, asked directly: "i would say keep scoring for U8/U9/U10".
+  // ⚠️ THE BOUNDARY IS 8, WHICH IS NOT WHERE EITHER OTHER AGE RULE FALLS. U8 is
+  // Mighty Minis AND has no league AND no match sheet — and still scores. That
+  // is why it gets its own constant, and why the U8 case below is a control
+  // rather than a duplicate of the U14 one.
+  const U6 = { id: 't-u6', club_id: CLUB, name: 'U6 Tag', sort_order: 1 }
+  const TEAMS_WITH_U6 = [U6, U8, U10, U14B]
+
+  function open(event = null, teams = TEAMS_WITH_U6) {
+    provide(ADMIN, teams)
+    render(<EventForm event={event} onClose={vi.fn()} onSaved={vi.fn()} />)
+    return userEvent.setup()
+  }
+
+  const scoreBox = () => screen.queryByLabelText(/quins score/i)
+  const pickSquad = (user, team) =>
+    user.selectOptions(screen.getByLabelText(/age group/i), team.id)
+
+  it('⚠️ offers no score boxes on a U6 fixture', async () => {
+    const user = open()
+    await user.click(screen.getByRole('radio', { name: 'Match' }))
+    await pickSquad(user, U6)
+
+    expect(scoreBox()).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/opposition score/i)).not.toBeInTheDocument()
+  })
+
+  it('⚠️ DOES offer them at U8 — the control, and the boundary', async () => {
+    // U8 is the case that proves this is its own rule: everything ELSE about U8
+    // is simplified, and the score survives. If someone folds this threshold
+    // into MINIS_MAX_AGE or MIGHTY_MINIS_MAX_AGE, this is the test that fails.
+    const user = open()
+    await user.click(screen.getByRole('radio', { name: 'Match' }))
+    await pickSquad(user, U8)
+
+    expect(scoreBox()).toBeInTheDocument()
+    expect(screen.queryByTestId('event-form-no-league')).toBeInTheDocument()
+  })
+
+  it('U9/U10 keep their scores too', async () => {
+    const user = open()
+    await user.click(screen.getByRole('radio', { name: 'Match' }))
+    await pickSquad(user, U10)
+    expect(scoreBox()).toBeInTheDocument()
+  })
+
+  it('⚠️ moves with the age group dropdown, both ways', async () => {
+    const user = open()
+    await user.click(screen.getByRole('radio', { name: 'Match' }))
+    await pickSquad(user, U6)
+    expect(scoreBox()).not.toBeInTheDocument()
+
+    await pickSquad(user, U8)
+    expect(scoreBox()).toBeInTheDocument()
+  })
+
+  it('⚠️ a U6 fixture ALREADY holding a score keeps its boxes', async () => {
+    // Same escape hatch as the league fields: hiding a control over a stored
+    // value strands it. No such fixture exists — measured against the live
+    // database the day this shipped, U6 and U7 have no fixtures at all — so
+    // this is insurance, and it is cheap.
+    open(fixture(U6, { result_us: 15, result_them: 10 }))
+    await waitFor(() => expect(scoreBox()).toBeInTheDocument())
+  })
+})
+
 // A <select> is not a container RTL's `within` narrows usefully by role on its
 // own, so this wraps the element and queries its options. Kept local: one file
 // needs it and src/ does not.

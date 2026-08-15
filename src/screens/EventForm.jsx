@@ -5,7 +5,7 @@ import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
 import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '../data/events.js'
 import { SCORE_KINDS, hasNoComponents } from '../lib/scoring.js'
-import { isMinisTeam } from '../lib/minis.js'
+import { isMinisTeam, recordsScores } from '../lib/minis.js'
 
 // The pitch picker's escape hatch. A sentinel rather than '' so "Something
 // else…" stays distinguishable from "No pitch" — they are different answers,
@@ -665,6 +665,13 @@ export default function EventForm({
   const showLeagueTeam = leagueApplies || values.leagueTeamId !== ''
   const showTier = leagueApplies || values.tier !== ''
   const showLeagueOption = leagueApplies || values.competitionType === COMPETITION_LEAGUE
+  // U6 and U7 record no score. Same escape hatch as the three fields above: a
+  // fixture already holding one keeps its boxes rather than stranding a value
+  // nobody can see or clear.
+  const showScore =
+    recordsScores(editableTeams.find((team) => team.id === teamId)?.name) ||
+    String(values.resultUs ?? '') !== '' ||
+    String(values.resultThem ?? '') !== ''
 
   // Extras AND a repeat is refused outright (see the row-count guard in
   // handleSubmit). Naming it here so the SUBMIT BUTTON can tell the truth:
@@ -1777,6 +1784,18 @@ export default function EventForm({
               </div>
             )}
 
+            {/* ⚠️ NO SCORE AT U6 AND U7 — Jay, 15 Aug 2026: "i would say keep
+                scoring for U8/U9/U10". The two he left out are the two he left
+                out, and the boundary is its own constant in src/lib/minis.js
+                precisely because it does NOT line up with either of the other
+                two age rules.
+                ⚠️ THE ESCAPE HATCH IS THE SAME ONE THE LEAGUE FIELDS HAVE: a
+                fixture already holding a score keeps its boxes, so a value that
+                is really stored can be seen and cleared rather than being
+                stranded. No such fixture exists today — measured against the
+                live database the day this shipped — so this is insurance. */}
+            {showScore && (
+            <>
             <div className={FIELD_ROW}>
               <div>
                 <label className={LABEL} htmlFor="event-result-us">
@@ -1821,6 +1840,8 @@ export default function EventForm({
                 ? 'This score is worked out from the tries and kicks recorded on the match sheet. Change it there.'
                 : 'Leave the scores blank until the match has been played.'}
             </p>
+            </>
+            )}
           </>
         )}
 

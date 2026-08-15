@@ -464,6 +464,12 @@ export default function EventDetail({
   // question about the SQUAD rather than derived from matchSheetDeadline being
   // null — that is also null for the Women's XV, which IS on the form.
   const minis = isMinisTeam(team?.name)
+  // ⚠️ THE RESULT BLOCK NEEDS NO AGE RULE, AND ADDING ONE WOULD BE A TAUTOLOGY.
+  // It already renders on `played` — hasResult(), i.e. a score is present — so a
+  // U7 fixture with no score has never shown it, and one that somehow HAS a
+  // score should. Gating it on the band as well would read as `played && (
+  // recordsScores || played)`, which is just `played`. The rule belongs where
+  // the score is ENTERED (EventForm), not where it is displayed.
 
   return (
     <Sheet open onClose={onClose} title={typeLabel}>

@@ -37,6 +37,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **THE HOME CARD IS GROUPED BY FORMAT, NOT BY SQUAD** — Jay: *"we have some
   parents who could have up to 5 age groups worth of players"*. Two formats
   exist, so it is at most two cards however many children somebody has.
+  ⚠️ **AND U6 AND U7 RECORD NO SCORE AT ALL** — Jay, asked directly the same day:
+  *"i would say keep scoring for U8/U9/U10"*. **That is a THIRD boundary and it
+  matches neither of the other two**: scores stop at 8, the Mighty Minis format
+  ends at 8, and the league and match sheet start at 11. **U8 is where all three
+  disagree** — Mighty Minis, no league, no sheet, and it still scores. Each has
+  its own named constant and `tests/minis.test.js` writes them out band by band,
+  so tidying two together requires deleting a test first. Also excluded from the
+  Dashboard's "Needs a score" tile, which would otherwise have counted a U6
+  fixture for ever — the same un-emptiable queue the Youth Manager's list had.
+  ⚠️ **`recordsScores` IS NOT `scoringForTeam`.** That one answers WHICH KINDS may
+  be scored and its thresholds are mirrored in the database by
+  `private.scoring_kinds_for_team`, so moving it means a migration. This one
+  answers whether anybody enters a score and is UI-only.
   ⚠️ **`tests/roster.test.jsx`'s FIXTURE SQUAD WAS NAMED `U10` AND IS NOW `U12`.**
   Four grouping tests in that file had quietly become assertions about the minis
   rule. U12 is the only band that is both above the minis threshold and below the

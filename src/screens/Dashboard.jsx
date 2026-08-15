@@ -22,7 +22,7 @@ import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
-import { squadFormat } from '../lib/minis.js'
+import { recordsScores, squadFormat } from '../lib/minis.js'
 import {
   clubToday,
   eventDate,
@@ -697,9 +697,17 @@ export default function Dashboard() {
   // MATCHES ONLY, for the same reason `fixturesToPlay` is matches only — a
   // training cannot carry a score, so counting one here would rebuild the
   // "26 fixtures to play" bug in a new cell.
+  //
+  // ⚠️ AND NOT U6 OR U7, WHICH RECORD NO SCORE AT ALL (Jay, 15 Aug 2026). This
+  // is the same failure the Youth Manager's queue had before the minis were
+  // filtered out of it: a fixture that can never be ticked off sits in the count
+  // for ever, and a number that only goes up teaches the coach it is on to stop
+  // reading it. `recordsScores` fails open, so a squad whose row has not loaded
+  // still counts — an unresolvable squad should look like work, not vanish.
   const needsScore = events.filter((event) => {
     if (event.type !== 'match') return false
     if (hasResult(event)) return false
+    if (!recordsScores(teamsById.get(event.team_id)?.name)) return false
     const date = eventDate(event)
     return date != null && date.getTime() <= now
   })
