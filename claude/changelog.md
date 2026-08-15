@@ -17,7 +17,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- 👀 **THE LIVE SITE WAS FINALLY LOOKED AT, AND IT IS FINE.** Eight deploys in a
+- 🔑 **A CLUB ADMIN MAY NOW SET A STAFF MEMBER'S PHOTO — REVERSING A RULING MADE
+  TWO DAYS EARLIER.** `20260813_staff_photos.sql` narrowed the write policy to
+  own-photo-only and argued it well: *"A coach is an adult with their own login.
+  Nobody else picks the picture of your face that thirty families see."*
+  ⚠️ **OVERRULED ON A FACT THE ORIGINAL DID NOT WEIGH** — two of fifteen staff
+  have a photo and most will never log in, so the principle was producing no
+  faces rather than consented ones. Jay was shown the ruling and reversed it;
+  `claude/decisions/2026-08-15-admin-may-set-staff-photos.md`.
+  ⚠️ **AND IT MATCHES THE PLAYER-PHOTO RULE, AFTER A SECOND PASS.** Jay: *"just
+  like teamsnap, sometimes photos need to be uploaded by staff when parents
+  forget"* — already live for players, and always has been. The first pass made
+  the staff rule club-admins-only, which left a split nobody would defend: a U16
+  coach could upload a child's photo but not a fellow coach's. Widened to
+  `can_edit_team`, so both buckets now say the same thing. `set_my_photo` stays
+  self-only.
+  ⚠️ **AND THREE-VALUED LOGIC NEARLY OPENED A HOLE.** The first predicate
+  returned **NULL**, not false, with no signed-in user — and the two callers
+  disagreed about it: a storage policy treats NULL as not-true and denies, but
+  `if not <NULL> then raise` never fires, so the RPC would have fallen through
+  to its UPDATE. Not reachable (`anon` has no EXECUTE, and an authenticated
+  caller has a non-null uid) but one revoke away from it. Fixed with
+  `coalesce(..., false)` inside the predicate rather than a guard per caller.
+
+- `0556e61` — 👀 **THE LIVE SITE WAS FINALLY LOOKED AT, AND IT IS FINE.** Eight deploys in a
   day — three UI features, a react-router major, a layout change — every one
   verified in a harness against invented data and none seen by a person. Jay
   opened it on a phone at the end of the day and reported no problems.
