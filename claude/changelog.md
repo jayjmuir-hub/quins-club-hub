@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
+- `a9891de` — 📓 **THREE FEATURES WENT LIVE AND NOBODY HAD LOOKED AT ANY OF THEM**,
+  recorded in `claude/open-items.md` as UNVERIFIED rather than working, with the
+  four things a harness cannot settle — chief among them that the contact tiles
+  have never been drawn with a real photograph. `package.json` gained
+  `"license": "UNLICENSED"` in the same breath, folded into a pull request that
+  was going to deploy anyway.
+
+- 🔐 **LEAKED-PASSWORD PROTECTION WAS ALREADY ON, AND TWO FILES SAID OTHERWISE.**
+  Read off the dashboard 15 Aug 2026 after Jay said he thought he had done it.
+  ⚠️ **THE POINTER WAS WRONG TOO**: both files sent people to Authentication →
+  Policies; it lives under Authentication → **Attack Protection**. A wrong
+  pointer is worse than none — it produces a confident negative.
+  ⚠️ **The advisor agreed, and its silence counted only because it was noisy** —
+  16 security lints returned and not the leaked-password one. Captcha protection
+  is OFF on the same screen and is now recorded, deliberately without a
+  recommendation.
+
 - `2701039` — 📬 **THE DMARC REPORTS ARE READABLE NOW, AND THE ONE THAT WOULD MATTER SETS AN
   EXIT CODE.** Jay asked why "Report Domain: …" mail was arriving daily; the
   answer was our own `rua=` tag, and the attachments were gzipped XML nobody
