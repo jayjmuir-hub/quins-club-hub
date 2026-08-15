@@ -10,7 +10,43 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
-- 🎨 **THE HOME REDESIGN, REBUILT ON A DASHBOARD THAT MOVED UNDER IT.** PR #79
+- 🧒 **U10 AND BELOW GET A SIMPLIFIED APP, AND A CARD EXPLAINING THEIR SEASON.**
+  Four facts from the club's youth section, only the last of which this repo had
+  ever recorded: **the league starts at U11**; U6-U8 play **Mighty Minis** at the
+  cricket stadium on league match weekends; U9-U10 play **friendly festivals** of
+  three or four clubs, each hosting one weekend; and the RCM sheet's own
+  instructions say *"U11 to u16 Games"*. Gone below U11: the League competition
+  option, the league team, the tier, the round, the match sheet, player grades,
+  forward-or-back and positions. `src/lib/minis.js`;
+  `claude/decisions/2026-08-15-minis-simplified.md`.
+  ⚠️ **`matchSheetDeadline` HAD BEEN HANDING EVERY BAND UNDER 18 A DEADLINE, U6
+  INCLUDED** — *"Due within 24 hours of the final whistle"*, stated confidently,
+  for a governing-body form nobody has ever filed for those squads. The quote
+  that says otherwise was in `claude/plans/2026-08-11-match-sheets.md` when the
+  sheet was built; the lower bound was simply never implemented.
+  ⚠️ **IT FAILS OPEN, THE OPPOSITE OF `allowsOwnContact`, AND THE WOMEN'S XV IS
+  WHY.** `ageBandFromTeamName` answers null for a senior side and for junk alike;
+  `isMinisTeam` reads that as **not minis, keep everything**. WXV is named on the
+  RCM form and carries no age band, so a rule that failed closed would have
+  silently taken its match sheet away. Do not unify these two defaults —
+  `src/lib/scoring.js` already argues the same asymmetry for its own.
+  ⚠️ **A LEGACY VALUE KEEPS ITS CONTROL.** A U8 fixture already filed as a league
+  match still shows the League option, the league team, the tier and the round,
+  because hiding a control over a stored value makes it uneditable and invisible
+  at once. Nothing is normalised on open.
+  ⚠️ **THE HOME CARD IS GROUPED BY FORMAT, NOT BY SQUAD** — Jay: *"we have some
+  parents who could have up to 5 age groups worth of players"*. Two formats
+  exist, so it is at most two cards however many children somebody has.
+  ⚠️ **`tests/roster.test.jsx`'s FIXTURE SQUAD WAS NAMED `U10` AND IS NOW `U12`.**
+  Four grouping tests in that file had quietly become assertions about the minis
+  rule. U12 is the only band that is both above the minis threshold and below the
+  U13 own-contact one, which that file also covers.
+  ⚠️ **EVERY SCREEN TEST IS PAIRED WITH A U14 CONTROL**, because the failure this
+  could introduce is *"everybody lost it"* rather than *"the minis kept it"*.
+  Proved both ways by injecting a fault into `isMinisBand`: forced false, 23
+  tests failed; forced true, all six controls failed.
+
+- `d5b8667` — 🎨 **THE HOME REDESIGN, REBUILT ON A DASHBOARD THAT MOVED UNDER IT.** PR #79
   previewed this on 13 Aug and was never merged; `main` moved 59 commits and
   changed all three files it touched, so this is a rebuild rather than a rebase.
   Shipped: the 3px state edge on every fixture row, the skeleton replacing the

@@ -1,4 +1,5 @@
 import { ageBandFromTeamName } from './ageGroup.js'
+import { isMinisBand } from './minis.js'
 
 // When an RCM match sheet is due, derived from the squad's age band.
 //
@@ -7,6 +8,14 @@ import { ageBandFromTeamName } from './ageGroup.js'
 //
 //   "U11 to u16 Games … within 24hours of completion of game."
 //   "U18 Boys & Girls, WXV, W7s … 1hour in advance of Kick Off."
+//
+// ⚠️ AND THE LOWER BOUND IS IN THAT FIRST LINE, WHICH THIS MODULE IGNORED UNTIL
+// 15 Aug 2026. "U11 to u16" — nothing younger is on the form at all. This
+// returned `side: 'after'` for every band below 18, so a U6 Tag fixture was
+// given a confident "Due within 24 hours of the final whistle" for a sheet
+// nobody has ever filed and RCM does not want. The 12 Aug ruling that one
+// EDITOR serves every age group was never a claim that every age group files
+// one. See src/lib/minis.js.
 //
 // ⚠️ THE APP BUILDS ONE EDITOR, AND STILL TELLS THE TRUTH ABOUT BOTH.
 // Jay ruled on 12 Aug 2026 that every age group uses the same result-style
@@ -28,6 +37,8 @@ export const HOURS_AFTER = 24
 export const HOURS_BEFORE = 1
 /** The band at which the deadline flips to the other side of the match. */
 export const PRE_MATCH_FROM_AGE = 18
+/** The youngest band the form applies to at all. Below this there is no sheet. */
+export const SHEET_FROM_AGE = 11
 
 /**
  * The deadline for a fixture's sheet, or null when there is no rule for it.
@@ -45,10 +56,18 @@ export const PRE_MATCH_FROM_AGE = 18
  *
  * Inventing a deadline is the same shape of mistake in a quieter register: a
  * coach shown a confident wrong time files late and believes they were early.
+ *
+ * ⚠️ AND NULL FOR THE MINIS IS THE SAME ANSWER FOR A DIFFERENT REASON. A senior
+ * side gets null because this module does not know the rule; U6-U10 get null
+ * because there IS no rule — the form starts at U11. Both callers want the same
+ * thing (show nothing, never flag it late), which is why they share a return
+ * value rather than getting a third state nobody would handle.
  */
 export function matchSheetDeadline(teamName, kickOff) {
   const band = ageBandFromTeamName(teamName)
   if (band === null) return null
+  // U10 and below are not on the RCM form. See the header, and src/lib/minis.js.
+  if (isMinisBand(band)) return null
 
   const start = kickOff instanceof Date ? kickOff : new Date(kickOff)
   if (Number.isNaN(start.getTime())) return null

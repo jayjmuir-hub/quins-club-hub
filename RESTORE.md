@@ -265,6 +265,26 @@ consequence: a user with no squads would otherwise see the whole club.
 **A fixture is a "result" when a score is present, not when its date has passed.** The
 prototype used this rule. A match played last week with no score entered is still Upcoming.
 
+**⚠️ THE LEAGUE STARTS AT U11, AND SO DOES THE RCM MATCH SHEET.** Two separate
+facts that happen to share a number. U10 and below play friendlies only — U6-U8
+the Mighty Minis at the cricket stadium, U9-U10 mini tournaments of three or four
+clubs — and the sheet's own instructions read *"U11 to u16 Games"*. `src/lib/minis.js`
+holds the threshold and the two formats; the ruling is
+`claude/decisions/2026-08-15-minis-simplified.md`.
+
+⚠️ **IT FAILS OPEN AND `allowsOwnContact` FAILS CLOSED. DO NOT ALIGN THEM.** Both
+are handed `ageBandFromTeamName`'s null — which means "a senior side" AND "cannot
+parse this" — and they answer differently on purpose, because the harm is
+asymmetric in opposite directions. The case that settles it: **the Women's XV is
+on the RCM form ("WXV") and its name carries no age band**, so a minis rule that
+failed closed would silently take its match sheet away. `src/lib/scoring.js`
+already argues this exact asymmetry for its own default and is a third example,
+not a fourth opinion.
+
+⚠️ **A NUMBER NEARBY IS NOT THE SAME NUMBER.** `scoringForBand`'s tries-only band
+runs to **11 inclusive**; the match sheet and the league start **at 11**. Anyone
+who unifies them will move one.
+
 **The club does not use jersey numbers.** `players.jersey_num` stays in the schema (nullable,
 harmless, available if a senior side ever wants it) but nothing in the UI reads it. Roster rows
 and the PlayerDetail hero show initials instead, via `src/lib/playerFormat.js`. Never add a

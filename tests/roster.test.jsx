@@ -45,13 +45,21 @@ vi.mock('../src/data/players.js', () => ({
 // Import after vi.mock so this binds to the mocked modules.
 import Roster from '../src/screens/Roster.jsx'
 
-const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
+// ⚠️ U12, AND IT WAS U10 UNTIL 15 Aug 2026. It has to be a band that is BOTH
+// above the minis threshold and below the own-contact one: U10 and under no
+// longer group by forwards and backs at all (src/lib/minis.js — no positions in
+// tag rugby), which silently turned four grouping tests in this file into
+// assertions about the minis rule, and U13 and over would break the
+// own-contact boundary this file also covers further down. U12 is the only band
+// that satisfies both. The minis behaviour has its own file: tests/minis.test.js
+// and tests/minis-screens.test.jsx.
+const TEAM_U12 = { id: 'team-u12', name: 'U12', sort_order: 5 }
 const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
-const TEAMS = [TEAM_FIRST_XV, TEAM_U10] // deliberately unsorted; visibleTeams sorts
+const TEAMS = [TEAM_FIRST_XV, TEAM_U12] // deliberately unsorted; visibleTeams sorts
 
 const ADMIN = [{ id: 'm1', role: 'admin', team_id: null }]
-const COACH_ONE_TEAM = [{ id: 'm2', role: 'coach', team_id: 'team-u10' }]
-const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p-flanker' }]
+const COACH_ONE_TEAM = [{ id: 'm2', role: 'coach', team_id: 'team-u12' }]
+const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u12', player_id: 'p-flanker' }]
 // A membership pointing at a team that isn't in the teams list — visibleTeams
 // resolves it to zero teams. See the "no visible teams" test for why that
 // case is asserted rather than assumed away.
@@ -64,28 +72,28 @@ const UNRESOLVED_TEAM = [{ id: 'm4', role: 'parent', team_id: 'team-gone', playe
 // done by the screen rather than inherited from the fixture order.
 const FLANKER = {
   id: 'p-flanker',
-  team_id: 'team-u10',
+  team_id: 'team-u12',
   full_name: 'Tom Fletcher',
   position: 'Flanker',
   is_captain: true,
 }
 const FLY_HALF = {
   id: 'p-fly-half',
-  team_id: 'team-u10',
+  team_id: 'team-u12',
   full_name: 'Ali Hassan',
   position: 'Fly-half',
   is_captain: false,
 }
 const PROP = {
   id: 'p-prop',
-  team_id: 'team-u10',
+  team_id: 'team-u12',
   full_name: 'Ben Okafor',
   position: 'Prop',
   is_captain: false,
 }
 const UTILITY = {
   id: 'p-utility',
-  team_id: 'team-u10',
+  team_id: 'team-u12',
   full_name: 'Sami Rahman',
   position: 'Utility',
   is_captain: false,
@@ -95,14 +103,14 @@ const UTILITY = {
 // other forwards, so a group that merely kept fixture order would fail.
 const HOOKER = {
   id: 'p-hooker',
-  team_id: 'team-u10',
+  team_id: 'team-u12',
   full_name: 'Zaid Noor',
   position: 'Hooker',
   is_captain: false,
 }
 const LOCK = {
   id: 'p-lock',
-  team_id: 'team-u10',
+  team_id: 'team-u12',
   full_name: 'Adam Price',
   position: 'Lock',
   is_captain: false,
@@ -116,7 +124,7 @@ const SENIOR = {
 }
 
 const ALL_PLAYERS = [FLY_HALF, PROP, SENIOR, FLANKER, UTILITY, HOOKER, LOCK]
-const U10_PLAYERS = [FLY_HALF, PROP, FLANKER, UTILITY, HOOKER, LOCK]
+const U12_PLAYERS = [FLY_HALF, PROP, FLANKER, UTILITY, HOOKER, LOCK]
 
 // jsdom applies no CSS at all — no Tailwind, and no UA stylesheet layout
 // either — so asserting on the literal class token is the only way to make a
@@ -187,14 +195,14 @@ describe('Roster — scoping the query', () => {
     setup()
 
     await screen.findByText('Tom Fletcher')
-    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u10'] })
+    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u12'] })
   })
 
   it('passes every visible team, in display order, for an admin', async () => {
     setup()
 
     await screen.findByText('Tom Fletcher')
-    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u10', 'team-1xv'] })
+    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u12', 'team-1xv'] })
   })
 
   // The deliberate zero-teams decision: an empty teamIds array means "no
@@ -218,7 +226,7 @@ describe('Roster — grouping', () => {
     setup()
 
     await screen.findByText('Tom Fletcher')
-    expect(groupLabels()).toEqual(['U10', 'Senior Men 1st XV'])
+    expect(groupLabels()).toEqual(['U12', 'Senior Men 1st XV'])
   })
 
   it('omits an age group with no players in it', async () => {
@@ -232,7 +240,7 @@ describe('Roster — grouping', () => {
 
   it('groups by position when the user can only see one team', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
-    listPlayersMock.mockResolvedValue(U10_PLAYERS)
+    listPlayersMock.mockResolvedValue(U12_PLAYERS)
 
     setup()
 
@@ -244,9 +252,9 @@ describe('Roster — grouping', () => {
     const { user } = setup()
 
     await screen.findByText('Tom Fletcher')
-    expect(groupLabels()).toEqual(['U10', 'Senior Men 1st XV'])
+    expect(groupLabels()).toEqual(['U12', 'Senior Men 1st XV'])
 
-    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u10')
+    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u12')
 
     expect(groupLabels()).toEqual(['Forwards', 'Backs', 'Other'])
     expect(screen.queryByText('Craig Muir')).not.toBeInTheDocument()
@@ -254,7 +262,7 @@ describe('Roster — grouping', () => {
 
   it('sorts a position group by name', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
-    listPlayersMock.mockResolvedValue(U10_PLAYERS)
+    listPlayersMock.mockResolvedValue(U12_PLAYERS)
 
     setup()
 
@@ -272,7 +280,7 @@ describe('Roster — grouping', () => {
 
   it('shows each group’s player count', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
-    listPlayersMock.mockResolvedValue(U10_PLAYERS)
+    listPlayersMock.mockResolvedValue(U12_PLAYERS)
 
     setup()
 
@@ -302,12 +310,12 @@ describe('Roster — team filter pill counts', () => {
 
     await screen.findByText('Tom Fletcher')
     expect(screen.getByRole('option', { name: 'All age groups · 7' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'U10 · 6' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'U12 · 6' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
 
-    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u10')
+    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u12')
 
-    // Selecting U10 must not zero out the squads it hides, nor shrink "All"
+    // Selecting U12 must not zero out the squads it hides, nor shrink "All"
     // to the size of the current selection.
     expect(screen.getByRole('option', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'All age groups · 7' })).toBeInTheDocument()
@@ -320,7 +328,7 @@ describe('Roster — team filter pill counts', () => {
     await user.type(screen.getByRole('searchbox'), 'craig')
 
     expect(screen.getByRole('option', { name: 'All age groups · 1' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'U10 · 0' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'U12 · 0' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
   })
 })
@@ -335,7 +343,7 @@ describe('Roster — a team filter that outlives its team', () => {
     const { user, rerender } = setup()
 
     await screen.findByText('Tom Fletcher')
-    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u10')
+    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u12')
     expect(screen.queryByText('Craig Muir')).not.toBeInTheDocument()
 
     useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', team_id: 'team-1xv' }]))
@@ -402,7 +410,7 @@ describe('Roster — player rows', () => {
     await screen.findByText('Tom Fletcher')
     const row = screen.getByRole('button', { name: /Tom Fletcher/ })
     expect(within(row).getByText('TF')).toBeInTheDocument()
-    expect(within(row).getByText('Flanker · U10')).toBeInTheDocument()
+    expect(within(row).getByText('Flanker · U12')).toBeInTheDocument()
   })
 
   // The initials tile is decoration: it restates the name that is already in
@@ -503,9 +511,9 @@ describe('PlayerDetail — opening a player', () => {
 
     expect(within(dialog).getByRole('heading', { name: 'Tom Fletcher' })).toBeInTheDocument()
     expect(within(dialog).getByText('Flanker')).toBeInTheDocument()
-    expect(within(dialog).getByText('U10')).toBeInTheDocument()
+    expect(within(dialog).getByText('U12')).toBeInTheDocument()
     expect(within(dialog).getByText('Captain')).toBeInTheDocument()
-    // Tom is U10. A player's OWN contact details are a U13+ feature, so the
+    // Tom is U12. A player's OWN contact details are a U13+ feature, so the
     // block is not rendered and — the part that matters — the query is never
     // issued for an under-13 in the first place.
     expect(getPlayerContactMock).not.toHaveBeenCalled()
@@ -539,7 +547,7 @@ describe('PlayerDetail — opening a player', () => {
 })
 
 describe('PlayerDetail — contact details', () => {
-  // Craig Muir (Senior Men 1st XV), NOT Tom Fletcher (U10). A player's own
+  // Craig Muir (Senior Men 1st XV), NOT Tom Fletcher (U12). A player's own
   // phone and email are shown only from U13 up, so the whole of this suite
   // needs a player old enough to have them. The U13 boundary itself is
   // asserted in its own suite below.
@@ -742,7 +750,7 @@ describe('PlayerDetail — parents', () => {
 })
 
 describe('PlayerDetail — the U13 own-contact boundary', () => {
-  it('does not query or show a U10 player’s own contact details', async () => {
+  it('does not query or show a U12 player’s own contact details', async () => {
     getPlayerContactMock.mockResolvedValue({
       player_id: 'p-flanker',
       phone: '+971502001000',

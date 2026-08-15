@@ -8,6 +8,7 @@ import RosterTable from '../components/RosterTable.jsx'
 import TeamFilter, { ALL_TEAMS_ID } from '../components/TeamFilter.jsx'
 import { positionGroup, POSITION_GROUP_ORDER } from '../lib/rosterUnit.js'
 import { buildRosterGroups, constantColumns, GROUP_BY } from '../lib/rosterGrouping.js'
+import { isMinisTeam } from '../lib/minis.js'
 import { listPlayerGrades, listPlayerPositions } from '../data/playerTiers.js'
 import PlayerDetail from './PlayerDetail.jsx'
 import PlayerForm from './PlayerForm.jsx'
@@ -391,13 +392,46 @@ export default function Roster() {
     }
   })
 
+  // ══ U10 AND BELOW ═══════════════════════════════════════════════════════
+  //
+  // Grades and forwards/backs are the machinery of picking a competitive team,
+  // and U10 and below do not have one to pick — no league, no tiers, and tag
+  // rugby has no positions to sort anybody into. Confirmed by the club's youth
+  // section, 15 Aug 2026; the rule lives in src/lib/minis.js.
+  //
+  // ⚠️ DERIVED FROM THE SQUADS ON SCREEN, NOT FROM THE PLAYERS. A search box
+  // that happened to match only U8 children must not silently change what the
+  // roster's controls are — that is a filter, not a change of squad. Reading the
+  // pill answers "which roster am I looking at", which is the actual question.
+  //
+  // ⚠️ AND NOT FROM `scopedTeams` ALONE EITHER. A coach who runs both U8 and
+  // U14 gets the full set on "All", and gets the simplified one the moment they
+  // pick the U8 pill — which is the whole reason the pill exists.
+  //
+  // ⚠️ FAILS OPEN, like everything else keyed on a squad name: with no squads in
+  // view at all this is false and nothing is hidden. `every` on an empty array
+  // is true, which would quietly strip the roster's controls at the exact moment
+  // somebody is wondering why the list is empty.
+  const shownTeams =
+    activeFilter === ALL_TEAMS_ID
+      ? scopedTeams
+      : scopedTeams.filter((team) => team.id === activeFilter)
+  const minisOnly = shownTeams.length > 0 && shownTeams.every((team) => isMinisTeam(team.name))
+
   // The grouping rule (design-system.md §5.3): one team in view — because a
   // pill is selected, or because the user only sees one — groups by position;
   // several teams group by age group. Zero visible teams falls to the
   // age-group branch, which then produces no groups at all and renders the
   // empty state; that is the right answer, since with no squad there are no
   // positions to organise and nothing to organise them from.
-  const groupByPosition = activeFilter !== ALL_TEAMS_ID || scopedTeams.length === 1
+  //
+  // ⚠️ EXCEPT FOR THE MINIS, where the position branch produced a single
+  // heading reading "Other" over the whole squad — every child unbucketed,
+  // because nobody has told the app whether a seven-year-old is a prop. The
+  // age-group branch gives one heading carrying the squad's name instead, which
+  // says something true.
+  const groupByPosition =
+    !minisOnly && (activeFilter !== ALL_TEAMS_ID || scopedTeams.length === 1)
 
   // Not memoised: `visible` is rebuilt on every render anyway (it depends on
   // the search box), so a useMemo here would never hit its cache and would
@@ -438,10 +472,19 @@ export default function Roster() {
   // them, and grouping by tier would put a single heading reading "Not graded"
   // across every child on the roster. That is a statement about the club's
   // record-keeping made to exactly the audience with no way to act on it.
+  //
+  // ⚠️ AND NEVER GROUPED FOR A MINIS ROSTER, whatever the dropdown last held.
+  // `groupBy` defaults to TIER and is remembered across pill changes, so without
+  // this a coach who looked at U14 and then clicked U8 would get their minis
+  // squad filed under one heading reading "Not graded". The dropdown drops those
+  // two options below; this is what makes the state they may already be in
+  // harmless. Same reconciliation-against-live-scope rule the team pill itself
+  // follows — a stored choice can outlive what produced it.
+  const tableGroupBy = minisOnly && groupBy !== GROUP_BY.TEAM ? 'none' : groupBy
   const tableGroups =
-    !canEditAnything || groupBy === 'none'
+    !canEditAnything || tableGroupBy === 'none'
       ? null
-      : buildRosterGroups(visible, { groupBy, tierByPlayer, teamsById })
+      : buildRosterGroups(visible, { groupBy: tableGroupBy, tierByPlayer, teamsById })
 
   // How many of the players on screen have no gender recorded. Distinct from
   // hiddenUnrecorded above, which counts the ones a gender FILTER is hiding;
@@ -640,7 +683,14 @@ export default function Roster() {
       )}
 
       {/* Grouping is a coach's tool: it exists to answer "who are my tier B
-          forwards", which is not a question a parent asks of a roster. */}
+          forwards", which is not a question a parent asks of a roster.
+          ⚠️ NOR IS IT A QUESTION A MINIS COACH ASKS. Both tier options go for
+          U10 and below (15 Aug 2026) — there are no grades and no units down
+          there, so each would have produced a single heading over the whole
+          squad reading "Not graded" or "Other". The select is rendered with
+          `tableGroupBy` rather than `groupBy` so a remembered TIER choice shows
+          as "Nothing" here instead of as a value with no matching option, which
+          renders as a blank box. */}
       {canEditAnything && isDesktop && (
         <div className="mb-3 flex items-center gap-2">
           <label htmlFor="roster-group-by" className="text-[13px] font-semibold text-ink-muted">
@@ -648,13 +698,17 @@ export default function Roster() {
           </label>
           <select
             id="roster-group-by"
-            value={groupBy}
+            value={tableGroupBy}
             onChange={(event) => setGroupBy(event.target.value)}
             className="rounded-[10px] border-[1.5px] border-line bg-surface-card px-2.5 py-1.5 text-[13px] font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <option value="none">Nothing</option>
-            <option value={GROUP_BY.TIER}>Tier, then forwards and backs</option>
-            <option value={GROUP_BY.UNIT}>Forwards and backs</option>
+            {!minisOnly && (
+              <>
+                <option value={GROUP_BY.TIER}>Tier, then forwards and backs</option>
+                <option value={GROUP_BY.UNIT}>Forwards and backs</option>
+              </>
+            )}
             <option value={GROUP_BY.TEAM}>Age group</option>
           </select>
         </div>
@@ -720,8 +774,12 @@ export default function Roster() {
           // ⚠️ PASSED ONLY FOR A COACH, so the Tier column does not exist in a
           // parent's DOM at all. RLS already refuses the underlying rows; this
           // is the second lock, on the screen a parent actually opens.
-          tierByPlayer={canEditAnything ? tierByPlayer : null}
-          positionsByPlayer={canEditAnything ? positionsByPlayer : null}
+          // ⚠️ AND NOT FOR A MINIS ROSTER (15 Aug 2026) — two columns that would
+          // read "—" on every row. Nothing is being HIDDEN from anybody here:
+          // these squads have no grades and no positions to show, and a coach
+          // who moves a child up to U11 gets both columns back with the pill.
+          tierByPlayer={canEditAnything && !minisOnly ? tierByPlayer : null}
+          positionsByPlayer={canEditAnything && !minisOnly ? positionsByPlayer : null}
         />
       )}
 

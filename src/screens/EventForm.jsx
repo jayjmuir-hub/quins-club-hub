@@ -5,6 +5,7 @@ import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
 import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '../data/events.js'
 import { SCORE_KINDS, hasNoComponents } from '../lib/scoring.js'
+import { isMinisTeam } from '../lib/minis.js'
 
 // The pitch picker's escape hatch. A sentinel rather than '' so "Something
 // else…" stays distinguishable from "No pitch" — they are different answers,
@@ -635,6 +636,35 @@ export default function EventForm({
   // insert will use, so what the button counts is what gets written.
   const targetTeamIds = [teamId, ...otherTeams.filter((t) => extras.includes(t.id)).map((t) => t.id)]
   const multiSquad = targetTeamIds.length > 1
+
+  // ══ THE LEAGUE STARTS AT U11 ════════════════════════════════════════════
+  //
+  // Confirmed by the club's youth section, 15 Aug 2026: U10 and below play
+  // friendlies only. This form has been offering a League option, a league team
+  // and a round on a U6 fixture since the competition field shipped on 12 Aug.
+  // src/lib/minis.js holds the rule and the reasoning.
+  //
+  // ⚠️ DERIVED FROM THE CHOSEN SQUAD, NOT FROM THE EVENT, so the fields appear
+  // and disappear as somebody moves the Age group dropdown. That is the same
+  // reactive shape the league-team loader and its clearing effect already have
+  // — see them above — rather than a decision taken once when the sheet opened.
+  //
+  // ⚠️ EACH FIELD HAS ITS OWN ESCAPE HATCH, AND THAT IS THE WHOLE CARE HERE. A
+  // U8 fixture created before today can be holding a league team, a tier or
+  // `competition_type = 'league'`. Hiding a control over a value that is really
+  // stored would make it uneditable and invisible at once — the person who came
+  // to correct it would find nothing wrong. So a field that HOLDS something
+  // stays on screen for this squad even though it would not be offered fresh,
+  // and clearing it is what makes it go away.
+  //
+  // ⚠️ NOTHING IS CLEARED ON OPEN. Normalising legacy rows here would rewrite
+  // data as a side effect of somebody opening a sheet to change the kick-off
+  // time, silently, with no undo.
+  const minisSquad = isMinisTeam(editableTeams.find((team) => team.id === teamId)?.name)
+  const leagueApplies = !minisSquad
+  const showLeagueTeam = leagueApplies || values.leagueTeamId !== ''
+  const showTier = leagueApplies || values.tier !== ''
+  const showLeagueOption = leagueApplies || values.competitionType === COMPETITION_LEAGUE
 
   // Extras AND a repeat is refused outright (see the row-count guard in
   // handleSubmit). Naming it here so the SUBMIT BUTTON can tell the truth:
@@ -1526,7 +1556,12 @@ export default function EventForm({
                 session has no league team, and the options come from
                 listLeagueTeams({ teamId }) — see the block by its loader for
                 why a club-wide list here would be a wrong RESULT rather than
-                an obvious mistake. */}
+                an obvious mistake.
+                ⚠️ AND NOT FOR U10 AND BELOW (15 Aug 2026), which have no league
+                to have a team in — unless this fixture is already holding one,
+                in which case it stays visible so it can be cleared. See the
+                `minisSquad` block above. */}
+            {showLeagueTeam && (
             <div className={FIELD}>
               <label className={LABEL} htmlFor="event-league-team">
                 League team
@@ -1576,6 +1611,7 @@ export default function EventForm({
                 </p>
               )}
             </div>
+            )}
 
             {/* ⚠️ THE TIER OF THE COMPETITION, NOT OF OUR TEAM (Jay, 14 Aug
                 2026). Prefilled from the league team above when that is picked
@@ -1583,7 +1619,14 @@ export default function EventForm({
                 rather than derives. It applies to TOURNAMENTS TOO: Jay's
                 "tournaments would have same tier levels as league".
                 ⚠️ "None" IS THE DEFAULT AND IS A REAL ANSWER — a friendly has no
-                tier, and nothing may read a missing tier as "assume A". */}
+                tier, and nothing may read a missing tier as "assume A".
+                ⚠️ AND GONE FOR U10 AND BELOW (15 Aug 2026). A tier is the level a
+                COMPETITION is played at, and it exists to be checked against a
+                player's grade — neither of which these squads have. A minis
+                festival is three or four clubs turning up, not a graded entry.
+                Same escape hatch as the league team above: a fixture already
+                holding a tier keeps the control. */}
+            {showTier && (
             <div className={FIELD}>
               <label className={LABEL} htmlFor="event-tier">
                 Tier
@@ -1600,6 +1643,7 @@ export default function EventForm({
                 <option value="C">C</option>
               </select>
             </div>
+            )}
 
             {/* ⚠️ A CHOICE, NOT A FREE-TEXT BOX, as of 12 Aug 2026. It was an
                 open text field ("e.g. UAE Youth League"), which meant every
@@ -1631,7 +1675,12 @@ export default function EventForm({
                 {/* ⚠️ "Neither" IS A REAL ANSWER AND THE DEFAULT — a friendly.
                     Wording it "Select…" would read as an unfilled field. */}
                 <option value="">Neither — a friendly</option>
-                <option value={COMPETITION_LEAGUE}>League</option>
+                {/* ⚠️ NOT OFFERED BELOW U11 (15 Aug 2026) — there is no league
+                    for them to be in. The option comes back if this fixture is
+                    already filed as one, so a mistake made before today can be
+                    seen and changed rather than being locked in behind a
+                    dropdown that no longer admits it. */}
+                {showLeagueOption && <option value={COMPETITION_LEAGUE}>League</option>}
                 <option value={COMPETITION_TOURNAMENT}>Tournament</option>
                 {/* ⚠️ NOT THE SAME AS "Neither" ABOVE, and the two must never be
                     merged. "Neither" is an ANSWER — this is a friendly. This is
@@ -1640,6 +1689,18 @@ export default function EventForm({
                     only way to record that was to guess. */}
                 <option value={COMPETITION_TBD}>TBD — not decided yet</option>
               </select>
+              {/* ⚠️ SAYS WHY THE OPTION IS MISSING. A dropdown that quietly has
+                  one fewer entry than the coach remembers reads as a bug, and
+                  the answer — "the league starts at U11" — is a fact worth
+                  someone knowing rather than an apology for the control. */}
+              {minisSquad && (
+                <p
+                  data-testid="event-form-no-league"
+                  className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted"
+                >
+                  The league starts at U11. This age group plays friendlies and festivals.
+                </p>
+              )}
             </div>
 
             {/* ⚠️ ROUND BELONGS TO THE LEAGUE, so it appears with it and only

@@ -12,6 +12,7 @@ import { clubToday, eventDate, eventTimeLabel, formatTime } from '../lib/eventFo
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { deadlineLabel, isOverdue, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
+import { isMinisTeam } from '../lib/minis.js'
 
 // The Club Youth Manager's dashboard — every match, and whether its RCM sheet
 // is done. Behind the `youth` admin right, which already existed in
@@ -104,21 +105,39 @@ export default function YouthDashboard() {
 
   const decorated = useMemo(
     () =>
-      rows.map((row) => {
-        const squad = squadsById.get(row.team_id)
-        const deadline = matchSheetDeadline(squad?.name ?? '', eventDate(row))
-        const sheet = sheets.get(row.id) ?? null
-        return {
-          event: row,
-          squad,
-          sheet,
-          deadline,
-          // ⚠️ A fixture with NO deadline rule is never overdue. isOverdue
-          // already refuses, and this is the second place that would otherwise
-          // be tempted to write `deadline.at < now`.
-          overdue: sheet?.status !== 'complete' && isOverdue(deadline, now),
-        }
-      }),
+      rows
+        // ⚠️ U10 AND BELOW ARE NOT ON THE RCM FORM, so their fixtures are not
+        // this screen's work — "U11 to u16 Games" is instruction 1 on the form
+        // itself. Left in, every minis friendly sat here reading "Not started"
+        // forever and then "Overdue", which is a queue that can never be
+        // emptied and a badge that teaches the Youth Manager to ignore the
+        // real ones. See src/lib/minis.js.
+        //
+        // ⚠️ FILTERED HERE RATHER THAN IN THE QUERY, on purpose: listEvents has
+        // no notion of an age band, and teaching it one would put a UI rule
+        // into the data layer where the calendar feed and Schedule would
+        // inherit it silently.
+        //
+        // ⚠️ A FIXTURE WHOSE SQUAD DID NOT LOAD IS KEPT. isMinisTeam answers
+        // false for a blank name, so an unresolvable squad still shows up
+        // needing a sheet — the failure a Youth Manager can see and ask about,
+        // rather than a fixture that quietly vanished.
+        .filter((row) => !isMinisTeam(squadsById.get(row.team_id)?.name))
+        .map((row) => {
+          const squad = squadsById.get(row.team_id)
+          const deadline = matchSheetDeadline(squad?.name ?? '', eventDate(row))
+          const sheet = sheets.get(row.id) ?? null
+          return {
+            event: row,
+            squad,
+            sheet,
+            deadline,
+            // ⚠️ A fixture with NO deadline rule is never overdue. isOverdue
+            // already refuses, and this is the second place that would otherwise
+            // be tempted to write `deadline.at < now`.
+            overdue: sheet?.status !== 'complete' && isOverdue(deadline, now),
+          }
+        }),
     [rows, squadsById, sheets, now],
   )
 
@@ -170,8 +189,12 @@ export default function YouthDashboard() {
       <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Match sheets</h2>
+          {/* ⚠️ "U11 AND UP" IS SAID OUT LOUD rather than left to be noticed.
+              The minis' fixtures are filtered out above, so without this line
+              the Youth Manager sees a list that is missing matches they know
+              are in the schedule and has no way to tell a rule from a bug. */}
           <p className="text-[13px] font-medium text-ink-muted">
-            RCM result sheets for every match
+            RCM result sheets for every match, U11 and up
             {overdueCount > 0 ? ` · ${overdueCount} past the deadline` : ''}
           </p>
         </div>
