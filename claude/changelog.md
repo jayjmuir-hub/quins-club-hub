@@ -17,6 +17,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
+- `09fc372` — 🛣️ **REACT ROUTER 6 → 7, AND THE PRODUCTION ADVISORIES GO TO ZERO.** This is
+  the one that mattered: `npm audit --omit=dev` was 2 moderate for weeks and is
+  now **0**. The whole tree is down to 4, from 10 when scanning was switched on
+  this morning.
+  ⚠️ **A FRAMEWORK MAJOR ON A LIVE SITE, SO IT WAS EXERCISED RATHER THAN TRUSTED.**
+  The app uses only the declarative API — `BrowserRouter`, `Routes`, `Route`,
+  `Link`, `NavLink`, `Outlet`, `useNavigate`, `useLocation`, `useParams`,
+  `useSearchParams`, `Navigate` — and no data router, which is what makes v7 a
+  bump here rather than a migration. Checked: build, 2413 tests, and **real
+  navigation in Chromium** (`/` → Schedule → `/roster`, URL and content both
+  changing), because every test uses `MemoryRouter` and the app ships
+  `BrowserRouter`.
+  ⚠️ **`App.jsx` STILL PASSES `future={{ v7_startTransition, v7_relativeSplatPath }}`**
+  and v7 accepts it without complaint — those flags are the default now, so the
+  prop is inert rather than wrong. Harmless to leave, tidier to remove.
+
 - `b3628c7` — 🏗️ **jsdom 25 → 30, AND IT COSTS TEST TIME.** Five majors of standards and
   security fixes in the environment 123 test files render into. All 2413 tests
   pass unchanged.
@@ -28,8 +44,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **IT MATTERS MORE IN CI THAN ON A DEV MACHINE**, for the reason
   `vite.config.js` already records: on many cores the wall clock is set by the
   slowest FILE, but at the four workers a runner has, CPU is the bottleneck and
-  environment cost shows up as time. It is a devDependency either way — nothing
-  here reaches a phone.
+  environment cost shows up as time. **Measured on the runner: the `test` job went
+  99s on jsdom 25 to 124s on 30.** It is a devDependency either way — nothing here
+  reaches a phone.
 
 - `a24b360` — 🧪 **VITEST 2 → 4, AND THE CRITICAL ADVISORY GOES WITH IT.** `npm audit` drops
   from 10 findings to 6 — **zero critical**, where the critical was vitest itself.

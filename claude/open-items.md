@@ -62,8 +62,23 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   lands.**
   ✅ **Proved it can fail rather than assuming**: the same command at
   `--audit-level=moderate` exits 1 today, at `high` it exits 0.
-- **The two production advisories are `react-router`, and the ONLY fix is a
-  major version.** ⚠️ **Re-measured 15 Aug 2026 and the old note was right about
+- ✅ ~~**The two production advisories are `react-router`, and the ONLY fix is a
+  major version.**~~ — **taken, 15 Aug 2026. `npm audit --omit=dev` is now 0.**
+  react-router-dom 6.30.4 → 7.18.2, and the whole tree is down to 4 findings from
+  the 10 that were there when scanning was switched on the same morning.
+  ⚠️ **IT WAS A BUMP RATHER THAN A MIGRATION ONLY BECAUSE THIS APP USES NO DATA
+  ROUTER.** It uses the declarative API and nothing else, so v7's changes did not
+  reach it. An app on `createBrowserRouter` would have had a real piece of work
+  here.
+  ⚠️ **Exercised in a real browser, not only in jsdom** — every test uses
+  `MemoryRouter` and the app ships `BrowserRouter`, so navigation was driven in
+  Chromium: `/` → Schedule → `/roster`, URL and content both changing.
+  ⚠️ **`react-dom` 19 WAS OFFERED AND REFUSED** the same day (#152): Dependabot
+  bumped `react-dom` while leaving `react` at 18, and `npm ci` fails outright with
+  `Conflicting peer dependency: react@19.2.8`. **React 18 → 19 is a migration and
+  wants its own piece of work**, with both packages moved together — not a
+  dependency PR.
+- ~~**The old note, kept for its reasoning:**~~ ⚠️ **Re-measured 15 Aug 2026 and the old note was right about
   what ships but silent about the rest**: production is exactly 2 moderate, both
   react-router, and **neither is exploitable here** — `safeNext()` blocks
   `//host` and `/\host`, and the third advisory in the set is SSR hydration,
