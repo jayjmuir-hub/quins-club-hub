@@ -54,7 +54,7 @@ vi.mock('../src/data/staff.js', () => ({
   listMySquadStaff: (...args) => listMySquadStaffMock(...args),
 }))
 
-import SquadStaffCard, { leadIndex, tileSpans } from '../src/components/SquadStaffCard.jsx'
+import SquadStaffCard, { leadIndex, leadRowSpan, tileSpans } from '../src/components/SquadStaffCard.jsx'
 import Dashboard from '../src/screens/Dashboard.jsx'
 import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
@@ -272,7 +272,7 @@ describe('leadIndex — who gets the big tile', () => {
   })
 })
 
-describe('tileSpans — the mosaic never leaves a hole', () => {
+describe('tileSpans — the lead owns the left column', () => {
   // The sizes the club actually has, measured 15 Aug 2026: eleven squads with
   // nobody, two with one person, one with four and one with six.
   it('gives a lone person the full width rather than half a row', () => {
@@ -280,29 +280,15 @@ describe('tileSpans — the mosaic never leaves a hole', () => {
     expect(tileSpans(1, false)).toEqual(['wide'])
   })
 
-  // ⚠️ A LEAD NEEDS THREE PEOPLE TO BE WORTH IT. With two, the tall tile has a
-  // single half-height tile beside it and the other half of that column is a
-  // hole — the "feature" is a gap.
-  it('refuses the tall tile below three people', () => {
-    expect(tileSpans(2, true)).toEqual(['half', 'half'])
-  })
-
-  it('stacks two tiles beside the lead at three', () => {
-    expect(tileSpans(3, true)).toEqual(['lead', 'half', 'half'])
-  })
-
-  // Four is the size that exposed the rule: the fourth tile would sit alone on
-  // row three with a hole beside it.
-  it('widens the odd last tile at four', () => {
-    expect(tileSpans(4, true)).toEqual(['lead', 'half', 'half', 'wide'])
-  })
-
-  it('leaves a full last row alone at five', () => {
-    expect(tileSpans(5, true)).toEqual(['lead', 'half', 'half', 'half', 'half'])
-  })
-
-  it('widens the last of six', () => {
-    expect(tileSpans(6, true)).toEqual(['lead', 'half', 'half', 'half', 'half', 'wide'])
+  // ⚠️ JAY'S RULE, 15 Aug 2026, looking at the real six-person squad: "only head
+  // coach should be furthest left, then the rest should be to the right". The
+  // previous version let tiles wrap BELOW the lead and back to the left margin,
+  // so two tiles shared a left edge with the featured one and the column stopped
+  // meaning anything.
+  it.each([2, 3, 4, 5, 6, 9])('puts the lead first and everyone else beside it at %i', (n) => {
+    const spans = tileSpans(n, true)
+    expect(spans[0]).toBe('lead')
+    expect(spans.slice(1)).toEqual(new Array(n - 1).fill('half'))
   })
 
   it('pairs them off evenly when nobody leads', () => {
@@ -310,17 +296,30 @@ describe('tileSpans — the mosaic never leaves a hole', () => {
     expect(tileSpans(3, false)).toEqual(['half', 'half', 'wide'])
   })
 
-  // The invariant behind every case above, stated once so a new size cannot
-  // quietly break it: no tile is ever left alone on a row.
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])('never leaves a lone half tile at %i', (n) => {
-    for (const hasLead of [true, false]) {
-      const spans = tileSpans(n, hasLead)
-      const lead = spans.filter((s) => s === 'lead').length
-      // Columns consumed after the lead's own column-worth of rows.
-      const halves = spans.filter((s) => s === 'half').length
-      const flowing = lead ? halves - 2 : halves
-      expect(flowing % 2).toBe(0)
-    }
+  // The invariant, stated once so a new size cannot quietly break it: with a
+  // lead nothing wraps at all, and without one no tile is left alone on a row.
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])('never strands a tile at %i', (n) => {
+    const led = tileSpans(n, true)
+    expect(led.filter((s) => s === 'lead')).toHaveLength(n === 1 ? 0 : 1)
+
+    const even = tileSpans(n, false)
+    expect(even.filter((s) => s === 'half').length % 2).toBe(0)
+  })
+})
+
+describe('leadRowSpan — the lead is as tall as the column beside it', () => {
+  // ⚠️ COMPUTED, SO IT CANNOT BE A TAILWIND CLASS. `row-span-${n}` built at
+  // runtime resolves to nothing and the lead silently collapses to one row —
+  // the same trap the Dashboard's per-row animation delay documents.
+  it('is one row per tile beside it', () => {
+    expect(leadRowSpan(6)).toBe(5)
+    expect(leadRowSpan(3)).toBe(2)
+    expect(leadRowSpan(2)).toBe(1)
+  })
+
+  it('never drops below one, whatever it is handed', () => {
+    expect(leadRowSpan(1)).toBe(1)
+    expect(leadRowSpan(0)).toBe(1)
   })
 })
 
@@ -409,7 +408,7 @@ describe('SquadStaffCard — the mosaic on screen', () => {
       'lead',
       'half',
       'half',
-      'wide',
+      'half',
     ])
 
     rerender(
@@ -424,7 +423,7 @@ describe('SquadStaffCard — the mosaic on screen', () => {
       'half',
       'half',
       'half',
-      'wide',
+      'half',
     ])
   })
 

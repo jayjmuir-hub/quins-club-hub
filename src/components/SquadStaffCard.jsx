@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { labelForRole } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 import { whatsappUrl } from '../lib/phone.js'
+import { useMediaQuery } from '../lib/useMediaQuery.js'
 
 // "Who looks after this squad" — the member-facing half of the staff feature.
 // Phase 3 of claude/plans/2026-08-13-squad-staff-on-home.md; the admin half is
@@ -57,36 +58,56 @@ export function leadIndex(staff) {
  * How each tile spans the two-column grid — `'lead' | 'wide' | 'half'`.
  *
  * ⚠️ THIS IS A FUNCTION RATHER THAN CSS AUTO-PLACEMENT BECAUSE AUTO-PLACEMENT
- * LEAVES HOLES, AND THE HOLES LAND ON THE SQUAD SIZES THE CLUB ACTUALLY HAS.
- * Letting the grid flow freely is tidy for three people and wrong for one, two,
- * four and six: a lead spanning two rows next to a single tile leaves a
- * head-height gap in the second column, and four people leave a lone half-width
- * tile on the last row with a hole beside it. The club's real sizes today are
- * 1, 1, 4 and 6.
+ * LEAVES HOLES, AND THE HOLES LAND ON THE SQUAD SIZES THE CLUB ACTUALLY HAS —
+ * 1, 1, 4 and 6 today.
  *
  * The rules, in order:
- *   - A lead only gets the tall tile when there are THREE or more people —
- *     below that there is nothing to stack beside it, so the "feature" is just
- *     a gap.
- *   - Exactly two tiles fill the row beside the lead; everything after that
- *     wraps two per row.
- *   - Any tile that would be alone on its row goes full width instead.
+ *   - One person gets the full width. There is no column to be the left of.
+ *   - With a lead, the lead takes the WHOLE left column and everyone else
+ *     stacks on the right. See the note inside.
+ *   - With no lead, an even two-per-row grid, and a tile that would sit alone
+ *     on the last row goes full width instead.
  */
 export function tileSpans(count, hasLead) {
   if (count <= 0) return []
   if (count === 1) return ['wide']
 
-  const lead = hasLead && count >= 3
+  // ⚠️ THE LEAD OWNS THE LEFT COLUMN OUTRIGHT — Jay, 15 Aug 2026, looking at the
+  // real U16B squad: *"only head coach should be furthest left, then the rest
+  // should be to the right"*. The previous rule gave the lead two rows and then
+  // let everyone else wrap underneath it, so at six people two more tiles sat
+  // BELOW the lead and back at the left margin. Two tiles starting at the same
+  // left edge, one of them the featured one, reads as a broken grid rather than
+  // as a hierarchy — the eye cannot tell which column means anything.
+  //
+  // Now: one tall tile on the left, everything else stacked on the right, and
+  // the left edge means "this is the lead" and nothing else.
+  if (hasLead) return ['lead', ...new Array(count - 1).fill('half')]
+
+  // No lead: an even grid, and the only special case is a tile that would sit
+  // alone on the final row.
   const spans = new Array(count).fill('half')
-  if (lead) spans[0] = 'lead'
-
-  // Tiles that share the grid two-per-row: everything except the lead and the
-  // two that sit beside it.
-  const flowStart = lead ? 3 : 0
-  const flowing = count - flowStart
-  if (flowing > 0 && flowing % 2 === 1) spans[count - 1] = 'wide'
-
+  if (count % 2 === 1) spans[count - 1] = 'wide'
   return spans
+}
+
+/**
+ * How many grid rows the lead tile spans — one per tile beside it.
+ *
+ * ⚠️ IT IS AN INLINE STYLE BECAUSE IT IS COMPUTED. Tailwind cannot see a class
+ * name built at runtime, so `row-span-${n}` would silently resolve to nothing
+ * and the lead would collapse to a single row — the same trap the Dashboard's
+ * staggered animation delay documents.
+ */
+// ⚠️ THE SAME 372px THE GRID USES, AND THE NUMBER IS DERIVED, NOT CHOSEN: three
+// 44px contact buttons plus two 4px gaps plus 22px of tile inset is 162, and two
+// of those plus the 8px grid gap and 32px of page padding is 364. 372 is that
+// with a little air. It appears twice — here and as the `min-[372px]:` Tailwind
+// variant — because a media query cannot be read from a class name.
+export const TWO_COLUMN_QUERY = '(min-width: 372px)'
+
+export function leadRowSpan(count) {
+  return Math.max(1, count - 1)
 }
 
 // The monogram's gradient, keyed to role. The role is written in words in the
@@ -259,14 +280,14 @@ function TileBackground({ name, role, url, compact = false }) {
 // the floor Button.jsx already argues for, in the same words, for the same
 // wet-hands-at-the-side-of-a-pitch reason.
 const SPAN_CLASS = {
-  // Two rows down the left. 280 = two half tiles (136 each) plus the 8px gap,
-  // so the lead's bottom edge lines up with the second tile beside it.
-  lead: 'min-[372px]:row-span-2 min-h-[152px] min-[372px]:min-h-[280px]',
+  // ⚠️ NO `row-span-*` HERE — the lead's row span is computed from how many
+  // tiles sit beside it and is applied as an inline style. See leadRowSpan().
+  lead: 'min-h-[152px] min-[372px]:min-h-[280px]',
   wide: 'min-[372px]:col-span-2 min-h-[152px]',
   half: 'min-h-[152px] min-[372px]:min-h-[136px]',
 }
 
-function StaffTile({ member, span = 'half' }) {
+function StaffTile({ member, span = 'half', style }) {
   const featured = span === 'lead'
   const role = labelForRole(member.role)
   const line = member.title ?? role
@@ -277,6 +298,7 @@ function StaffTile({ member, span = 'half' }) {
       data-testid="squad-staff-person"
       data-featured={featured ? 'true' : undefined}
       data-span={span}
+      style={style}
       className={`relative overflow-hidden rounded-[14px] bg-surface-sunk ${SPAN_CLASS[span]}`}
     >
       <TileBackground name={member.name} role={member.role} url={member.photoUrl} />
@@ -420,6 +442,12 @@ export function SquadStaffCard({ squadName, staff = [], defaultOpen = true }) {
   // title.
   const ordered = lead > 0 ? [staff[lead], ...staff.filter((_, i) => i !== lead)] : staff
   const spans = tileSpans(ordered.length, lead >= 0)
+  // ⚠️ THE ROW SPAN IS A MEDIA-QUERY DECISION AND CSS CANNOT EXPRESS IT, because
+  // the value is computed per squad. `useMediaQuery` — the hook Roster.jsx and
+  // Schedule.jsx already use — keeps it in step with the SAME 372px the grid
+  // switches columns at. ⚠️ The number is written twice, here and in the
+  // Tailwind variant, and they must move together; see TWO_COLUMN_QUERY.
+  const twoColumns = useMediaQuery(TWO_COLUMN_QUERY)
 
   const collapsible = staff.length > 0
   const panelId = `squad-staff-${squadName.replace(/\W+/g, '-').toLowerCase()}`
@@ -501,7 +529,19 @@ export function SquadStaffCard({ squadName, staff = [], defaultOpen = true }) {
           } auto-rows-min grid-cols-1 gap-2 min-[372px]:grid-cols-2 desktop:max-w-[520px]`}
         >
           {ordered.map((member, index) => (
-            <StaffTile key={member.membershipId} member={member} span={spans[index]} />
+            <StaffTile
+              key={member.membershipId}
+              member={member}
+              span={spans[index]}
+              // ⚠️ ONLY the lead carries a row span, and only once the grid has
+              // two columns to span rows in. Below 372px it is a single column
+              // and a multi-row lead would leave a hole.
+              style={
+                spans[index] === 'lead' && twoColumns
+                  ? { gridRow: `span ${leadRowSpan(ordered.length)}` }
+                  : undefined
+              }
+            />
           ))}
         </ul>
       )}

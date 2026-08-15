@@ -17,6 +17,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
+- `199d4ec` — 🧱 **THE SQUAD TILES LINE UP: THE LEAD OWNS THE LEFT COLUMN, EVERYONE ELSE THE
+  RIGHT.** Jay, looking at the real six-person squad: *"only head coach should be
+  furthest left, then the rest should be to the right"*. The old rule gave the
+  lead two rows and let the remainder wrap BELOW it and back to the left margin,
+  so two ordinary tiles shared a left edge with the featured one and the column
+  stopped meaning anything. Measured after: exactly **two distinct left edges**
+  at every size.
+  ⚠️ **THE LEAD'S ROW SPAN IS COMPUTED, SO IT IS AN INLINE STYLE.** Tailwind
+  cannot see `row-span-${n}` built at runtime — it would resolve to nothing and
+  the lead would silently collapse to one row, the same trap the Dashboard's
+  per-row animation delay carries.
+  ⚠️ **AND IT ONLY APPLIES ABOVE 372px**, the width the grid gains its second
+  column at, via `useMediaQuery` — the hook Roster and Schedule already use.
+  Below that a multi-row lead in a single-column grid would leave a hole.
+  ⚠️ **THE COST, MEASURED AND NOT YET RESOLVED: at six people the lead is 712px
+  tall and 175px wide on a phone — a 1:4 strip.** Fine at three or four; extreme
+  at six. Flagged rather than quietly capped, because capping it puts tiles back
+  under the lead, which is the thing this change removed.
+
 - `09fc372` — 🛣️ **REACT ROUTER 6 → 7, AND THE PRODUCTION ADVISORIES GO TO ZERO.** This is
   the one that mattered: `npm audit --omit=dev` was 2 moderate for weeks and is
   now **0**. The whole tree is down to 4, from 10 when scanning was switched on

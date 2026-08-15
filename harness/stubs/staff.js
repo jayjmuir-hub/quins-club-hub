@@ -110,6 +110,34 @@ export async function listMySquadStaff() {
           photoPath: null,
           photoUrl: null,
         },
+        // ⚠️ SIX, BECAUSE SIX IS WHAT THE CLUB'S LARGEST SQUAD HAS and it is the
+        // size that exposed the old layout — Jay, 15 Aug 2026, looking at the
+        // real thing: tiles wrapped BELOW the lead and back to the left margin,
+        // so two of them shared a left edge with the featured one.
+        // ⚠️ INVENTED NAMES. The squad this reproduces is real and its people
+        // are real; CLAUDE.md rule 9 forbids either from appearing in this repo,
+        // and a worked example is still writing it down. The SHAPE is what is
+        // copied: six people, one titled head, a mix of who has a phone.
+        {
+          membershipId: 'stub-ms-5',
+          role: 'coach',
+          title: 'Assistant Coach',
+          name: 'Tomas Iversen',
+          email: 'tomas.iversen@adhquins-clubhub.com',
+          phone: null,
+          photoPath: null,
+          photoUrl: null,
+        },
+        {
+          membershipId: 'stub-ms-6',
+          role: 'manager',
+          title: 'Team Manager',
+          name: 'Grace Mbeki',
+          email: 'grace.mbeki@adhquins-clubhub.com',
+          phone: '+971544445555',
+          photoPath: null,
+          photoUrl: null,
+        },
       ],
     ],
   ])
