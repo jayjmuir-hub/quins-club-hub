@@ -63,8 +63,9 @@ export function leadIndex(staff) {
  *
  * The rules, in order:
  *   - One person gets the full width. There is no column to be the left of.
- *   - With a lead, the lead takes the WHOLE left column and everyone else
- *     stacks on the right. See the note inside.
+ *   - With a lead, the lead is TWO small tiles tall and everyone else flows
+ *     around it — under as well as beside. See the note inside; that rule was
+ *     reversed once and the reversal matters.
  *   - With no lead, an even two-per-row grid, and a tile that would sit alone
  *     on the last row goes full width instead.
  */
@@ -72,42 +73,56 @@ export function tileSpans(count, hasLead) {
   if (count <= 0) return []
   if (count === 1) return ['wide']
 
-  // ⚠️ THE LEAD OWNS THE LEFT COLUMN OUTRIGHT — Jay, 15 Aug 2026, looking at the
-  // real U16B squad: *"only head coach should be furthest left, then the rest
-  // should be to the right"*. The previous rule gave the lead two rows and then
-  // let everyone else wrap underneath it, so at six people two more tiles sat
-  // BELOW the lead and back at the left margin. Two tiles starting at the same
-  // left edge, one of them the featured one, reads as a broken grid rather than
-  // as a hierarchy — the eye cannot tell which column means anything.
+  // ⚠️ THE LEAD IS TWO SMALL TILES TALL, AND EVERYTHING ELSE FLOWS AROUND IT —
+  // UNDER AS WELL AS BESIDE. Jay, 15 Aug 2026, after seeing BOTH versions
+  // against the real six-person squad with a real photograph in it.
   //
-  // Now: one tall tile on the left, everything else stacked on the right, and
-  // the left edge means "this is the lead" and nothing else.
-  if (hasLead) return ['lead', ...new Array(count - 1).fill('half')]
-
-  // No lead: an even grid, and the only special case is a tile that would sit
-  // alone on the final row.
+  // ⚠️ THIS REVERSES THE RULE DIRECTLY ABOVE IT IN THE HISTORY, SO DO NOT
+  // "FIX" IT BACK. The previous version gave the lead the WHOLE left column,
+  // because tiles wrapping back to the left margin under it looked like a
+  // broken grid. That was true, and the cure was worse: at six people the lead
+  // became 175x712 — a 1:4 strip — and a photograph of a person in it is a
+  // vertical sliver. Seen with an actual squad photo, the wrapping is the
+  // lesser problem by a distance.
+  //
+  // So: two rows, then ordinary flow. The only thing still forced is that no
+  // tile sits alone on a row.
+  const lead = hasLead && count >= 3
   const spans = new Array(count).fill('half')
-  if (count % 2 === 1) spans[count - 1] = 'wide'
+  if (lead) spans[0] = 'lead'
+
+  // Everything except the lead and the two tiles beside it shares rows two at a
+  // time; an odd one out goes full width rather than leaving a hole.
+  const flowing = count - (lead ? 3 : 0)
+  if (flowing > 0 && flowing % 2 === 1) spans[count - 1] = 'wide'
   return spans
 }
 
 /**
- * How many grid rows the lead tile spans — one per tile beside it.
+ * How many grid rows the lead tile spans.
  *
  * ⚠️ IT IS AN INLINE STYLE BECAUSE IT IS COMPUTED. Tailwind cannot see a class
  * name built at runtime, so `row-span-${n}` would silently resolve to nothing
  * and the lead would collapse to a single row — the same trap the Dashboard's
  * staggered animation delay documents.
  */
-// ⚠️ THE SAME 372px THE GRID USES, AND THE NUMBER IS DERIVED, NOT CHOSEN: three
-// 44px contact buttons plus two 4px gaps plus 22px of tile inset is 162, and two
-// of those plus the 8px grid gap and 32px of page padding is 364. 372 is that
-// with a little air. It appears twice — here and as the `min-[372px]:` Tailwind
-// variant — because a media query cannot be read from a class name.
+// ⚠️ THE SAME 372px THE GRID USES, AND WHAT IT IS DERIVED FROM HAS CHANGED.
+// It was the contact buttons: three at 44px plus gaps and insets needed a 162px
+// tile, so two columns needed 364. The buttons shrank to 36px on 15 Aug and the
+// threshold did NOT follow them down — at 320px a two-column grid puts the NAME
+// in a ~140px box, and a long one wraps to three lines over the photo. The
+// binding constraint moved from the buttons to the type; the number stayed.
+//
+// It appears twice — here and as the `min-[372px]:` Tailwind variant — because
+// a media query cannot be read out of a class name. They must move together.
 export const TWO_COLUMN_QUERY = '(min-width: 372px)'
 
-export function leadRowSpan(count) {
-  return Math.max(1, count - 1)
+export function leadRowSpan() {
+  // ⚠️ ALWAYS TWO. It was `count - 1` — the lead owning the whole left column —
+  // until 15 Aug 2026, when a real photograph showed what that does at six
+  // people: a 1:4 strip. Two small tiles plus the 8px gap between them is the
+  // tallest the lead can be while still holding a face.
+  return 2
 }
 
 // The monogram's gradient, keyed to role. The role is written in words in the
@@ -180,7 +195,15 @@ function ContactButton({ href, label, tone = 'ghost', children }) {
   // like a missing class. It shipped that way into the first screenshot of this
   // component. An off-scale value needs the arbitrary form, `bg-white/[.92]`.
   const base =
-    'grid h-11 w-11 shrink-0 place-items-center rounded-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white'
+    // ⚠️ THE BUTTON IS 36px AND THE TAP TARGET IS STILL 44px, WHICH IS NOT A
+    // CONTRADICTION. Jay asked for smaller icons on the tiles (15 Aug 2026);
+    // 44px of visible red on a 175px tile was three-quarters of the row. The
+    // `after:` block extends the HIT AREA back out to 44 without drawing
+    // anything — the standard way to keep a control comfortable to hit while
+    // letting it look its size. Shrinking the box alone would have broken the
+    // floor Button.jsx argues for, one-handed and often wet at the side of a
+    // pitch.
+    "relative grid h-9 w-9 shrink-0 place-items-center rounded-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
   const tones = {
     solid: 'bg-brand text-white hover:bg-brand-deep',
     ghost: 'bg-white/90 text-brand-deep hover:bg-white',
@@ -260,10 +283,13 @@ function TileBackground({ name, role, url, compact = false }) {
  * because only the caller knows how many tiles there are.
  */
 // ⚠️ EVERY SPAN IS GATED ON `min-[372px]:`, AND 372 IS ARITHMETIC RATHER THAN
-// TASTE. Three 44px buttons plus two 4px gaps is 140px, and the tile insets add
+// TASTE. Three 36px buttons plus two 4px gaps is 116px, and the tile insets add
 // 22 — so a tile carrying the full set of contact buttons cannot be narrower
-// than 162px. Two of those plus the 8px grid gap and the screen's 32px of
-// padding is 364, and 372 is that with a little air. BELOW IT, ONE COLUMN.
+// than 138px. Two of those plus the 8px grid gap and the screen's 32px of
+// padding is 316. 372 is kept anyway: the buttons shrank on 15 Aug and the
+// threshold did NOT follow them down, because at 320px a two-column grid puts
+// the NAME in a 140px box and a long one wraps to three lines. The constraint
+// moved from the buttons to the type, and the number is now about that.
 //
 // ⚠️ THE BUTTON GAP IS 4px BECAUSE 6px LEFT EXACTLY ZERO SLACK AT 375. Measured:
 // at a 375px viewport the tile is 167.5 and the button row needed all 167.5 of
@@ -359,17 +385,17 @@ function StaffTile({ member, span = 'half', style }) {
                 label={`Call ${member.name}`}
                 tone="solid"
               >
-                <PhoneIcon className="h-[17px] w-[17px]" aria-hidden="true" />
+                <PhoneIcon className="h-[15px] w-[15px]" aria-hidden="true" />
               </ContactButton>
             )}
             {wa && (
               <ContactButton href={wa} label={`Message ${member.name} on WhatsApp`}>
-                <WhatsAppIcon className="h-[18px] w-[18px]" aria-hidden="true" />
+                <WhatsAppIcon className="h-[16px] w-[16px]" aria-hidden="true" />
               </ContactButton>
             )}
             {member.email && (
               <ContactButton href={`mailto:${member.email}`} label={`Email ${member.name}`}>
-                <MailIcon className="h-[17px] w-[17px]" aria-hidden="true" />
+                <MailIcon className="h-[15px] w-[15px]" aria-hidden="true" />
               </ContactButton>
             )}
           </div>
@@ -538,7 +564,7 @@ export function SquadStaffCard({ squadName, staff = [], defaultOpen = true }) {
               // and a multi-row lead would leave a hole.
               style={
                 spans[index] === 'lead' && twoColumns
-                  ? { gridRow: `span ${leadRowSpan(ordered.length)}` }
+                  ? { gridRow: `span ${leadRowSpan()}` }
                   : undefined
               }
             />

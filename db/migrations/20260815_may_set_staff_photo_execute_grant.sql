@@ -1,0 +1,25 @@
+-- 15 Aug 2026 — the storage policy needs EXECUTE on its own helper.
+--
+-- ⚠️ A HELPER USED INSIDE AN RLS POLICY IS EVALUATED AS THE CALLER, SO THE
+-- CALLER NEEDS EXECUTE ON IT. `20260815_admin_may_set_staff_photos.sql` did
+-- `revoke all ... from public` on `private.may_set_staff_photo` and granted it
+-- to nobody. That is correct for a helper only ever called from inside a
+-- SECURITY DEFINER body, and wrong for this one, because the "staff photo
+-- write" policy calls it too.
+--
+-- ⚠️ THE SYMPTOM WAS AT THE UPLOAD, NOT AT THE RPC, WHICH IS WHY THE CHECKS
+-- MISSED IT. `set_staff_photo` is SECURITY DEFINER and runs as `postgres`, so
+-- ITS call to the helper always worked — and every grant verified at the time
+-- was on the RPC. The storage INSERT is the step an ordinary `authenticated`
+-- role evaluates the policy for, and it failed with `permission denied for
+-- function may_set_staff_photo`, reported from the live admin screen.
+--
+-- **Test the path, not the destination.**
+--
+-- ⚠️ MATCHED TO THE SIBLINGS RATHER THAN GUESSED. In the same schema,
+-- `private.staff_photo_owner` and `private.can_see_staff_photo` — the helpers
+-- the READ policy uses — both hold `authenticated=X` and NOT `anon`. This is
+-- the same: anon has no business writing a photo, and the write policy is only
+-- ever reached by a signed-in caller.
+
+grant execute on function private.may_set_staff_photo(uuid) to authenticated;
