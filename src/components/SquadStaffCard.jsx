@@ -121,6 +121,14 @@ function WhatsAppIcon(props) {
   )
 }
 
+function ChevronIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
+
 function MailIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -178,7 +186,7 @@ function ContactButton({ href, label, tone = 'ghost', children }) {
  * image 404s" must all render identically and none of them may announce itself.
  * The same ruling PlayerAvatar carries.
  */
-function TileBackground({ name, role, url }) {
+function TileBackground({ name, role, url, compact = false }) {
   const [failed, setFailed] = useState(false)
 
   if (url && !failed) {
@@ -202,13 +210,24 @@ function TileBackground({ name, role, url }) {
       aria-hidden="true"
       className={`absolute inset-0 ${tone}`}
     >
-      {/* The initials as a watermark, not as a label — the name is written in
-          full at the bottom of the tile, so this is texture. Bled off the top
+      {/* On a tile: the initials as a watermark, not as a label — the name is
+          written in full at the bottom, so this is texture. Bled off the top
           right corner so it reads as a mark rather than as centred text that
-          failed to load an image. */}
-      <span className="absolute -top-1 right-2 font-display text-[54px] leading-none text-white/20">
-        {initials(name)}
-      </span>
+          failed to load an image.
+
+          ⚠️ IN THE 28px HEADER FACE THAT READING INVERTS. There is no name
+          beside it there, so the initials are the whole content and have to be
+          centred and legible rather than a 54px watermark bleeding out of a
+          circle — which is what the tile treatment renders at that size. */}
+      {compact ? (
+        <span className="absolute inset-0 grid place-items-center font-display text-[10px] leading-none text-white">
+          {initials(name)}
+        </span>
+      ) : (
+        <span className="absolute -top-1 right-2 font-display text-[54px] leading-none text-white/20">
+          {initials(name)}
+        </span>
+      )}
     </div>
   )
 }
@@ -345,7 +364,55 @@ function StaffTile({ member, span = 'half' }) {
  * attached to a squad should see that squad named on their home screen whether
  * or not anyone has been attached to it yet.
  */
-export function SquadStaffCard({ squadName, staff = [] }) {
+/**
+ * The faces shown on a collapsed squad's header, so the row says WHO is inside
+ * it rather than only how many. Capped at four and overlapped, which is what
+ * keeps the header one line on a phone.
+ */
+function FaceStack({ staff }) {
+  const shown = staff.slice(0, 4)
+
+  return (
+    <span aria-hidden="true" className="flex shrink-0 items-center">
+      {shown.map((member, index) => (
+        <span
+          key={member.membershipId}
+          className={`relative h-7 w-7 overflow-hidden rounded-full ring-2 ring-surface-card ${
+            index > 0 ? '-ml-2' : ''
+          }`}
+        >
+          <TileBackground name={member.name} role={member.role} url={member.photoUrl} compact />
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/**
+ * One squad's staff, or an honest empty state.
+ *
+ * ⚠️ EVERY SQUAD AFTER THE FIRST STARTS COLLAPSED, AND THAT IS JAY'S CALL ON A
+ * REAL CEILING (15 Aug 2026): "we have parents who could have up to 5 age groups
+ * worth of players". Measured at 390×844, a four-person squad's mosaic is 472px,
+ * so five of them is about 2,400px — three phone screens of contacts hanging off
+ * the bottom of Home. Collapsed, each extra squad costs one 56px row.
+ *
+ * ⚠️ THE COST IS REAL AND IS THE REASON THIS WAS A DECISION RATHER THAN A TWEAK:
+ * the contact buttons for the second child onward are now behind a tap, and
+ * contacting someone is what this block is FOR. The header carries the faces and
+ * the count so the row still says who is in there, and the first squad — the
+ * only one most parents have — is untouched.
+ *
+ * ⚠️ AN EMPTY SQUAD IS NEVER COLLAPSIBLE. There is nothing behind the tap, and a
+ * disclosure that opens onto one sentence is a control that wastes a tap to say
+ * "still nothing". It renders the sentence directly, as before.
+ *
+ * `staff` is an array — possibly empty. The block is always drawn: a parent
+ * attached to a squad should see that squad named on their home screen whether
+ * or not anyone has been attached to it yet.
+ */
+export function SquadStaffCard({ squadName, staff = [], defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen)
   const lead = leadIndex(staff)
   // The lead first, then everyone else in the order the data module chose —
   // which is by NAME. Moving one person to the front is the only reordering
@@ -354,9 +421,42 @@ export function SquadStaffCard({ squadName, staff = [] }) {
   const ordered = lead > 0 ? [staff[lead], ...staff.filter((_, i) => i !== lead)] : staff
   const spans = tileSpans(ordered.length, lead >= 0)
 
+  const collapsible = staff.length > 0
+  const panelId = `squad-staff-${squadName.replace(/\W+/g, '-').toLowerCase()}`
+
   return (
     <div className="mb-3" data-testid="squad-staff-card">
-      <h4 className="mb-2 ml-0.5 text-[15px] font-extrabold text-ink">{squadName}</h4>
+      {collapsible ? (
+        <h4>
+          <button
+            type="button"
+            data-testid="squad-staff-toggle"
+            aria-expanded={open}
+            aria-controls={panelId}
+            onClick={() => setOpen((was) => !was)}
+            // ⚠️ `min-h-[44px]` — this is the control that opens a collapsed
+            // squad, so it is subject to the same floor as every other tap
+            // target here. Measured at 36px before this line, which is under it.
+            className="mb-1 flex min-h-[44px] w-full items-center gap-2.5 rounded-[10px] px-1 text-left transition-colors hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          >
+            <span className="min-w-0 flex-1 truncate text-[15px] font-extrabold text-ink">
+              {squadName}
+            </span>
+            {/* Only when closed: an open squad shows the faces full size two
+                lines below, and repeating them in the header is noise. */}
+            {!open && <FaceStack staff={ordered} />}
+            <span className="shrink-0 text-[12px] font-semibold text-ink-faint">
+              {staff.length}
+            </span>
+            <ChevronIcon
+              className={`h-4 w-4 shrink-0 text-ink-faint transition-transform ${open ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+          </button>
+        </h4>
+      ) : (
+        <h4 className="mb-2 ml-0.5 text-[15px] font-extrabold text-ink">{squadName}</h4>
+      )}
 
       {staff.length === 0 ? (
         // ⚠️ A SENTENCE, NOT <Empty>. The same ruling the fortnight strip
@@ -382,7 +482,24 @@ export function SquadStaffCard({ squadName, staff = [] }) {
         // outcome for a phone-first block on a wide screen. More columns would
         // mean tileSpans() needing a second set of rules for a grid nobody in
         // this club is looking at — the app is opened on a phone.
-        <ul className="grid auto-rows-min grid-cols-1 gap-2 min-[372px]:grid-cols-2 desktop:max-w-[520px]">
+        // ⚠️ `hidden` RATHER THAN NOT RENDERING, so `aria-controls` always names
+        // an element that exists. A disclosure button pointing at an id that is
+        // absent while closed is the most common way this pattern is got wrong,
+        // and it is exactly when the pointer matters.
+        //
+        // ⚠️ AND THE ATTRIBUTE ALONE DOES NOTHING HERE — MEASURED, 15 Aug 2026.
+        // Preflight's `[hidden] { display: none }` and the `.grid` utility have
+        // the SAME specificity, and the utility comes later in the cascade, so
+        // `display: grid` wins and the "hidden" panel renders in full. The card
+        // measured 484px tall with `hidden` set. The display class has to be
+        // swapped as well; the attribute stays for the semantics.
+        <ul
+          id={panelId}
+          hidden={!open}
+          className={`${
+            open ? 'grid' : 'hidden'
+          } auto-rows-min grid-cols-1 gap-2 min-[372px]:grid-cols-2 desktop:max-w-[520px]`}
+        >
           {ordered.map((member, index) => (
             <StaffTile key={member.membershipId} member={member} span={spans[index]} />
           ))}

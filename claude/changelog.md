@@ -88,6 +88,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   costs: an email address is one unbreakable word and will not fit a 168px tile.
   A display change, not a privacy one — the 13 Aug opt-in ruling is untouched and
   the details are one tap away.
+  ⚠️ **EVERY SQUAD AFTER THE FIRST COLLAPSES**, on Jay's ceiling: "we have parents
+  who could have up to 5 age groups worth of players". Measured: an open
+  four-person squad is 488px and a collapsed one is 44px, so five squads goes
+  from 2,440px — three phone screens — to 664px. The cost is real and was the
+  reason it was a decision rather than a tweak: the contact buttons for the
+  second child onward are behind a tap. The header carries the faces and the
+  count so the row still says who is in there.
+  ⚠️ **THE `hidden` ATTRIBUTE ALONE DID NOTHING.** Preflight's
+  `[hidden] { display: none }` and the `.grid` utility have the same specificity
+  and the utility comes later, so a "hidden" panel measured 484px tall and fully
+  rendered. The display class is swapped as well; the attribute stays for the
+  semantics. jsdom cannot see this, so the test pins the class.
 
 - `d5b8667` — 🎨 **THE HOME REDESIGN, REBUILT ON A DASHBOARD THAT MOVED UNDER IT.** PR #79
   previewed this on 13 Aug and was never merged; `main` moved 59 commits and

@@ -443,6 +443,103 @@ describe('SquadStaffCard — the mosaic on screen', () => {
   })
 })
 
+describe('SquadStaffCard — collapsing a squad', () => {
+  // ⚠️ JAY'S CEILING, 15 Aug 2026: "we have parents who could have up to 5 age
+  // groups worth of players". Measured in Chromium: an open four-person squad
+  // is 488px and a collapsed one is 44px, so five squads goes from 2,440px —
+  // about three phone screens — to 664px.
+  const FOUR = [COACH_ROSA, MEDIC_SAM, COACH_DAN, MANAGER_PRIYA]
+
+  it('opens by default, because most parents have one squad', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} />)
+
+    expect(screen.getByTestId('squad-staff-toggle')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getAllByTestId('squad-staff-person')).toHaveLength(4)
+  })
+
+  it('starts closed when told to, and says who is inside without opening', () => {
+    render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} defaultOpen={false} />,
+    )
+
+    const toggle = screen.getByTestId('squad-staff-toggle')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    // The count is on the header, so the row still reports what it is hiding.
+    expect(toggle).toHaveTextContent('U13 Mixed Contact')
+    expect(toggle).toHaveTextContent('4')
+  })
+
+  it('opens and closes on tap', () => {
+    render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} defaultOpen={false} />,
+    )
+
+    const toggle = screen.getByTestId('squad-staff-toggle')
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  // ⚠️ THE PANEL STAYS IN THE DOM WHILE CLOSED. A disclosure whose
+  // `aria-controls` points at an id that does not exist is broken exactly when
+  // the pointer matters, which is while it is closed.
+  it('keeps aria-controls pointing at a real element while closed', () => {
+    render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} defaultOpen={false} />,
+    )
+
+    const id = screen.getByTestId('squad-staff-toggle').getAttribute('aria-controls')
+    expect(id).toBeTruthy()
+    expect(document.getElementById(id)).toBeInTheDocument()
+  })
+
+  // ⚠️ THE REGRESSION GUARD FOR A BUG jsdom CANNOT SEE. Preflight's
+  // `[hidden] { display: none }` and the `.grid` utility have the same
+  // specificity and the utility comes later, so the `hidden` ATTRIBUTE alone
+  // left the panel fully rendered — measured at 484px tall in Chromium while
+  // "hidden". The display class has to be swapped too, and that is what this
+  // pins, because a jsdom assertion on visibility would pass either way.
+  it('swaps the display class as well as setting hidden', () => {
+    render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} defaultOpen={false} />,
+    )
+
+    const toggle = screen.getByTestId('squad-staff-toggle')
+    const id = toggle.getAttribute('aria-controls')
+    const closed = document.getElementById(id)
+    expect(closed).toHaveAttribute('hidden')
+    expect(closed.className.split(/\s+/)).toContain('hidden')
+    expect(closed.className.split(/\s+/)).not.toContain('grid')
+
+    // ⚠️ TOGGLED, NOT RE-RENDERED WITH A NEW PROP. `defaultOpen` seeds
+    // useState, so changing the prop on an already-mounted card does nothing —
+    // which is correct (it is a default, not a controlled value) and is why the
+    // first version of this test failed.
+    fireEvent.click(toggle)
+    const opened = document.getElementById(id)
+    expect(opened).not.toHaveAttribute('hidden')
+    expect(opened.className.split(/\s+/)).toContain('grid')
+  })
+
+  // ⚠️ A disclosure that opens onto one sentence wastes a tap to say "still
+  // nothing", and this is the state eleven of fifteen squads are in.
+  it('gives an empty squad no toggle at all', () => {
+    render(<SquadStaffCard squadName="U16 Girls" staff={[]} defaultOpen={false} />)
+
+    expect(screen.queryByTestId('squad-staff-toggle')).not.toBeInTheDocument()
+    expect(
+      screen.getByText('No coach, team manager or medic listed for this squad yet.'),
+    ).toBeInTheDocument()
+  })
+
+  it('keeps the toggle at the 44px tap-target floor', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} />)
+
+    expect(screen.getByTestId('squad-staff-toggle').className).toContain('min-h-[44px]')
+  })
+})
+
 describe('Squad contacts on the Dashboard', () => {
   // ⚠️ THE HEADING SAT FLUSH AGAINST THE CARD ABOVE IT — reported from a
   // screenshot on 14 Aug 2026, and invisible to every test in this suite until
