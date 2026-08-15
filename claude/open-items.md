@@ -343,7 +343,22 @@ green suite and has never been exercised by a human on the live site.
   and still shows the single "Not graded" heading. **So the complaint this item
   records is unchanged for the squads it was actually about.**
 - **The all-day calendar entry has never reached a phone.**
-- **THREE FEATURES SHIPPED TO PRODUCTION ON 15 Aug AND NONE HAS BEEN LOOKED AT.**
+- ✅ ~~**THREE FEATURES SHIPPED TO PRODUCTION ON 15 Aug AND NONE HAS BEEN LOOKED
+  AT.**~~ — **Jay opened the live site on a phone at the end of that day, after
+  eight deploys, and reported no problems.** That closes the biggest unknown of
+  the day: sign-in and tab navigation work under react-router 7, which was the
+  one failure nobody could have detected from here.
+  ⚠️ **BE PRECISE ABOUT WHAT "it's fine" ESTABLISHES.** It is one person, on one
+  device, looking — not a per-item verification, and not a check against a real
+  photograph or a large squad. What it rules out is the class of failure that
+  would have been obvious: a blank screen, a broken route, a page that lurches.
+  It does not rule out a wrong colour on a state edge nobody happened to look
+  at, or a tile that only misbehaves at a size his own squads do not have.
+  ⚠️ **THE ITEMS BELOW ARE STILL UNVERIFIED IN THE NARROW SENSE THEY DESCRIBE**,
+  and are kept for that reason rather than deleted. In particular the contact
+  tiles have STILL never been drawn with a real photograph — two of fifteen
+  staff have one, and neither sits on a squad that was opened.
+  The original entry, kept because the reasoning outlives the verdict:
   The Home redesign (`d5b8667`), the minis simplification (`de82481`) and the
   squad-contact tiles (`03de5ca`). ⚠️ **Every visual claim made about them was
   measured in the harness against INVENTED data**, which is the right tool and is
