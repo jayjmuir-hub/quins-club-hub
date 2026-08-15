@@ -16,11 +16,14 @@ const setMyPhoto = vi.fn()
 const deleteStaffPhoto = vi.fn()
 const signStaffPhotoUrl = vi.fn()
 
+const setMyPhotoFocusMock = vi.fn().mockResolvedValue({})
+
 vi.mock('../src/data/photos.js', () => ({
   uploadStaffPhoto: (...a) => uploadStaffPhoto(...a),
   setMyPhoto: (...a) => setMyPhoto(...a),
   deleteStaffPhoto: (...a) => deleteStaffPhoto(...a),
   signStaffPhotoUrl: (...a) => signStaffPhotoUrl(...a),
+  setMyPhotoFocus: (...args) => setMyPhotoFocusMock(...args),
 }))
 
 import MyPhotoField from '../src/components/MyPhotoField.jsx'
@@ -141,5 +144,41 @@ describe('MyPhotoField', () => {
     // knowing where it appears. The sentence must match what
     // private.can_see_staff_photo actually enforces.
     expect(screen.getByText(/families of that squad/i)).toBeInTheDocument()
+  })
+})
+
+// ── Positioning (15 Aug 2026) ───────────────────────────────────────────────
+//
+// ⚠️ POSITIONING IS A SECOND ACTION, NOT PART OF THE UPLOAD, and these tests
+// exist mostly to keep it that way. The upload path here is immediate and its
+// ordering is argued for at the top of MyPhotoField.jsx for reasons that have
+// nothing to do with where a face is.
+
+describe('MyPhotoField — positioning', () => {
+  it('offers Position only once there is a photo', async () => {
+    const { unmount } = render(<MyPhotoField profile={PROFILE} userId="prof-1" />)
+    expect(screen.queryByRole('button', { name: /^Position$/ })).not.toBeInTheDocument()
+    unmount()
+
+    render(<MyPhotoField profile={WITH_PHOTO} userId="prof-1" />)
+    expect(await screen.findByRole('button', { name: /^Position$/ })).toBeInTheDocument()
+  })
+
+  // ⚠️ THE RESET IS BEST-EFFORT AND OUTSIDE THE ROLLBACK, and this is the test
+  // that says why. Awaited inside the upload's try block, a failure here would
+  // land in the catch and DELETE A PHOTO THAT HAD ALREADY SAVED — turning a
+  // cosmetic problem into data loss. A stale focal point is the lesser harm.
+  it('does not undo a saved upload when resetting the focal point fails', async () => {
+    setMyPhotoFocusMock.mockRejectedValueOnce(new Error('network'))
+    uploadStaffPhoto.mockResolvedValue('prof-1/222.jpg')
+    setMyPhoto.mockResolvedValue('prof-1/222.jpg')
+
+    render(<MyPhotoField profile={PROFILE} userId="prof-1" />)
+
+    await userEvent.upload(await screen.findByLabelText(/add a photo/i), file())
+
+    await waitFor(() => expect(setMyPhoto).toHaveBeenCalledWith('prof-1/222.jpg'))
+    // The uploaded object must NOT be cleaned up — the save succeeded.
+    expect(deleteStaffPhoto).not.toHaveBeenCalledWith('prof-1/222.jpg')
   })
 })

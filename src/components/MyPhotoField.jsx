@@ -5,9 +5,15 @@ import { initials } from '../lib/playerFormat.js'
 import {
   deleteStaffPhoto,
   setMyPhoto,
+  setMyPhotoFocus,
   signStaffPhotoUrl,
   uploadStaffPhoto,
 } from '../data/photos.js'
+import PhotoPositioner, {
+  PhotoDropZone,
+  clampFocus,
+  focusToObjectPosition,
+} from './PhotoPositioner.jsx'
 
 // "Your photo" on /more — the upload half of phase 4 of
 // claude/plans/2026-08-13-squad-staff-on-home.md.
@@ -46,6 +52,17 @@ export default function MyPhotoField({ profile, userId }) {
   const [url, setUrl] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  // ⚠️ POSITIONING IS A SECOND ACTION, NOT PART OF THE UPLOAD. The upload here
+  // is immediate and its ordering is argued for at the top of this file for
+  // reasons that have nothing to do with where a face is; folding the focal
+  // point into it would entangle the two. `set_my_photo_focus` is a separate
+  // RPC for the same reason.
+  const [positioning, setPositioning] = useState(false)
+  const [focus, setFocus] = useState(clampFocus(
+    profile?.photo_focus_x == null && profile?.photo_focus_y == null
+      ? null
+      : { x: profile?.photo_focus_x, y: profile?.photo_focus_y },
+  ))
 
   const profileId = profile?.id ?? userId ?? null
   const ready = Boolean(profileId)
@@ -59,6 +76,13 @@ export default function MyPhotoField({ profile, userId }) {
     if (!profile?.id || seededFor.current === profile.id) return
     seededFor.current = profile.id
     setPhotoPath(profile.photo_path ?? null)
+    setFocus(
+      clampFocus(
+        profile.photo_focus_x == null && profile.photo_focus_y == null
+          ? null
+          : { x: profile.photo_focus_x, y: profile.photo_focus_y },
+      ),
+    )
   }, [profile])
 
   useEffect(() => {
@@ -75,14 +99,8 @@ export default function MyPhotoField({ profile, userId }) {
     }
   }, [photoPath])
 
-  async function choose(event) {
-    const file = event.target.files?.[0]
-    // Cleared immediately so that picking the SAME file again still fires a
-    // change event — otherwise a failed upload cannot be retried with the same
-    // photo, which is exactly the photo somebody would retry with.
-    event.target.value = ''
+  async function upload(file) {
     if (!file || !profileId) return
-
     setBusy(true)
     setError(null)
     const previous = photoPath
@@ -91,6 +109,19 @@ export default function MyPhotoField({ profile, userId }) {
       uploaded = await uploadStaffPhoto(profileId, file)
       await setMyPhoto(uploaded)
       setPhotoPath(uploaded)
+      // ⚠️ A NEW PHOTO RESETS THE FOCAL POINT. Keeping the old one would apply
+      // a position chosen for a DIFFERENT picture, which is worse than the
+      // centre because it looks deliberate.
+      //
+      // ⚠️ BEST-EFFORT, AND OUTSIDE THE ROLLBACK, AND THE EXISTING TEST IS WHAT
+      // FORCED THAT. Awaited inside the try above, a failure here would land in
+      // the catch and DELETE A PHOTO THAT HAD ALREADY SAVED SUCCESSFULLY —
+      // turning a cosmetic problem into data loss. A stale focal point on a
+      // saved photo is the lesser harm by a wide margin, and the person can
+      // reposition it.
+      setFocus(clampFocus(null))
+      setMyPhotoFocus(null).catch(() => {})
+      setPositioning(true)
       // Only now is the old object unreferenced. Best-effort: an orphan in a
       // private bucket is untidy, and failing here must not turn a successful
       // save into a visible error.
@@ -103,6 +134,29 @@ export default function MyPhotoField({ profile, userId }) {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function savePosition() {
+    setBusy(true)
+    setError(null)
+    try {
+      await setMyPhotoFocus(focus)
+      setPositioning(false)
+    } catch (err) {
+      setError(err.message || 'That position could not be saved.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // ⚠️ THE COMMENTS THAT USED TO LIVE HERE MOVED INTO `upload()` WITH THE CODE.
+  // This is now only the input's adapter: take the file, clear the input so the
+  // SAME photo can be picked again after a failure — which is exactly the photo
+  // somebody retries with — and hand it on.
+  async function choose(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    await upload(file)
   }
 
   async function remove() {
@@ -135,6 +189,7 @@ export default function MyPhotoField({ profile, userId }) {
           <img
             src={url}
             alt=""
+            style={{ objectPosition: focusToObjectPosition(focus) }}
             className="h-16 w-16 shrink-0 overflow-hidden rounded-[16px] bg-brand/10 object-cover"
           />
         ) : (
@@ -157,14 +212,31 @@ export default function MyPhotoField({ profile, userId }) {
           </p>
 
           <div className="mt-2.5 flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy || !ready}
-              onClick={() => inputRef.current?.click()}
-            >
-              {photoPath ? 'Change photo' : 'Add a photo'}
-            </Button>
+            {/* ⚠️ ONLY WHEN THERE IS ALREADY A PHOTO. With none, the drop zone
+                below IS the control — it is tappable and says so. Rendering both
+                gave two buttons with the SAME accessible name doing the same
+                thing, which a screen reader reports as a duplicate and the test
+                caught as "Found multiple elements with the role button". */}
+            {photoPath && (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy || !ready}
+                onClick={() => inputRef.current?.click()}
+              >
+                Change photo
+              </Button>
+            )}
+            {photoPath && (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => setPositioning((was) => !was)}
+              >
+                {positioning ? 'Done' : 'Position'}
+              </Button>
+            )}
             {photoPath && (
               <Button type="button" variant="secondary" disabled={busy} onClick={remove}>
                 Remove
@@ -173,6 +245,27 @@ export default function MyPhotoField({ profile, userId }) {
           </div>
         </div>
       </div>
+
+      {/* ⚠️ THE DROP ZONE IS AN ADDITION, NOT A REPLACEMENT. The buttons above
+          stay the primary route because this app is opened on a phone, and a
+          phone has no drag. This is for the desktop admin sitting with a folder
+          of headshots. */}
+      {!photoPath && ready && (
+        <div className="mt-3">
+          <PhotoDropZone onFile={upload} disabled={busy} label="Add a photo" />
+        </div>
+      )}
+
+      {positioning && url && (
+        <div className="mt-3" data-testid="my-photo-positioner">
+          <PhotoPositioner url={url} focus={focus} onFocusChange={setFocus} disabled={busy} />
+          <div className="mt-2.5">
+            <Button type="button" disabled={busy} onClick={savePosition}>
+              {busy ? 'Saving…' : 'Save position'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Visually hidden but a real, focusable input — the same arrangement
           PhotoField uses, and for the same reason: a bare <input type="file">
