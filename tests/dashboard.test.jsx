@@ -234,14 +234,31 @@ afterEach(() => {
 })
 
 describe('Dashboard — loading, scoping and errors', () => {
-  it('shows a spinner on first load and nothing else', () => {
+  it('shows a skeleton on first load and nothing else', () => {
     listEventsMock.mockReturnValue(new Promise(() => {}))
     listPlayersMock.mockReturnValue(new Promise(() => {}))
 
     renderDashboard()
 
     expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.getByTestId('dashboard-skeleton')).toBeInTheDocument()
     expect(screen.queryByText(/Quins vs/)).not.toBeInTheDocument()
+  })
+
+  // ⚠️ THE SKELETON REPLACED A SPINNER, AND THE SPINNER'S ONE VIRTUE MUST
+  // SURVIVE IT. The placeholder blocks are all aria-hidden, so without a
+  // visually-hidden sentence inside the live region a screen reader would be
+  // told nothing at all is happening — which is worse than the spinner was.
+  it('still announces the load in words, even though the blocks are hidden', () => {
+    listEventsMock.mockReturnValue(new Promise(() => {}))
+    listPlayersMock.mockReturnValue(new Promise(() => {}))
+
+    renderDashboard()
+
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(within(status).getByText('Loading your dashboard…')).toBeInTheDocument()
+    expect(screen.getByTestId('dashboard-skeleton')).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('asks for events and players scoped to the visible teams only', async () => {
@@ -674,6 +691,34 @@ describe('Dashboard — upcoming list and last result', () => {
       .getAllByTestId('fixture-title')
       .map((node) => node.textContent)
     expect(titles).toEqual(['Session 0', 'Session 1', 'Session 2', 'Session 3', 'Session 4'])
+  })
+
+  // The staggered entrance (15 Aug 2026). jsdom runs no animations, so what is
+  // pinned is the only part that can actually be wrong: the per-row delay, and
+  // the fact that it is an inline style rather than a class Tailwind would
+  // never have generated.
+  it('staggers the upcoming rows by 40ms each, in order', async () => {
+    renderDashboard()
+
+    const list = await screen.findByTestId('upcoming-list')
+    const rows = within(list).getAllByTestId('fixture-row')
+    expect(rows.map((row) => row.style.animationDelay)).toEqual(
+      rows.map((_, index) => `${index * 40}ms`),
+    )
+    rows.forEach((row) => expect(row.className).toContain('animate-rise-in'))
+  })
+
+  // ⚠️ THE ROWS MUST BE DIRECT CHILDREN OF THE CARD. Wrapping each one in a
+  // <div> to carry the animation makes every row its wrapper's `:last-child`
+  // and strips the divider from the whole list — measured in Chromium, and the
+  // reason FixtureRow takes className/style at all. See
+  // tests/fixture-row-state-edge.test.jsx.
+  it('renders each row as a direct child of the list card, not inside a wrapper', async () => {
+    renderDashboard()
+
+    const list = await screen.findByTestId('upcoming-list')
+    const rows = within(list).getAllByTestId('fixture-row')
+    rows.forEach((row) => expect(row.parentElement).toBe(list))
   })
 
   // Task 14. The dashboard opens the same EventDetail as the schedule, so it

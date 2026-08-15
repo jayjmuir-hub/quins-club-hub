@@ -10,6 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
+- 🎨 **THE HOME REDESIGN, REBUILT ON A DASHBOARD THAT MOVED UNDER IT.** PR #79
+  previewed this on 13 Aug and was never merged; `main` moved 59 commits and
+  changed all three files it touched, so this is a rebuild rather than a rebase.
+  Shipped: the 3px state edge on every fixture row, the skeleton replacing the
+  first-load spinner, the hero's radial highlight and red→green hairline, the
+  40ms staggered entrance, and the 2.2s pulse on the eyebrow dot.
+  ⚠️ **#79's STAGGER WAS A SILENT BUG AND IS NOT WHAT SHIPPED.** It wrapped each
+  row in a `<div>`; the row carries `last:border-b-0`, so inside a wrapper every
+  row is its parent's `:last-child` and the divider vanishes from the WHOLE list.
+  Measured in Chromium — five rows went from 1/1/1/1/0 px of bottom border to
+  0/0/0/0/0. `FixtureRow` now takes `className`/`style` so the row stays a direct
+  child of the Card, and both test files pin the structure.
+  ⚠️ **#79's SKELETON HELD THE WRONG HEIGHT.** Written against the 13 Aug screen,
+  which has since gained a greeting and the fortnight strip. Every number in it
+  is now a browser measurement, listed in the component. The hero is TALLER on a
+  phone than on a desktop — 214 against 170 — because the headline wraps.
+  ⚠️ **THE FIRST SCREENFUL IS HELD; THE PAGE STILL GROWS BELOW IT.** Measured at
+  390×844: the loading block goes from 110px with the spinner to 942px with the
+  skeleton. That is what stops the lurch. The document is ~1800px loaded, so
+  content below the fold still arrives — the claim is "nothing above the fold
+  moves", not "nothing moves".
+  ⚠️ **THE DELAY CAP IS UNREACHABLE AND SAYS SO IN THE CODE.** `upcoming` is
+  sliced to five, so `Math.min(index, 6)` never binds. Kept as a guard for the
+  day the slice changes, rather than left looking load-bearing.
+  ⚠️ **`harness/stubs/events.js` NOW SHIFTS ITS DATES TO TODAY.** Pinned to July
+  2026 they had aged into the past, so the harness rendered neither the hero nor
+  a single Upcoming row — which is why #79 shipped its hero unverified and said
+  so in its own description. The literals stay (they encode same-day, same-series
+  and day-boundary relationships) and the set moves by one constant.
+
 - `61ba5a3` — 📓 **THE REAL MERGE ROUTE, AND `docs-check` FAILING IN BOTH DIRECTIONS.**
   ⚠️ **`gh pr merge --auto` DOES NOT WORK HERE** — auto-merge is off as a repository
   setting, and the trap is that it APPEARS to succeed when the checks are already
@@ -44,7 +74,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 14 Aug 2026
 
-- 📓 **A LICENCE AND A SECURITY POLICY, ON A PUBLIC REPO THAT HAD NEITHER.**
+- `e5c583e` — 📓 **A LICENCE AND A SECURITY POLICY, ON A PUBLIC REPO THAT HAD NEITHER.**
   `LICENSE.md` is **all rights reserved, Abu Dhabi Harlequins RFC** — Jay's call,
   14 Aug. The repo is public for transparency and for security review, and that
   is now stated rather than inferred; the club's name, crest and photographs are

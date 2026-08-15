@@ -1,9 +1,11 @@
 // Harness stub replacing src/data/events.js via a Vite alias. Same public
 // shape (listEvents, subscribeEvents) as the real module, but returns a fixed
-// fixture set instead of querying Supabase. Fixtures are pinned to July 2026
-// (the repo's "today" is 2026-07-27) so the Calendar tab's default month is
-// densely populated, and cover both teams, all three event types, and a mix
-// of scored (Results) and unscored (Upcoming) rows.
+// fixture set instead of querying Supabase. They cover both teams, all three
+// event types, and a mix of scored (Results) and unscored (Upcoming) rows.
+//
+// ⚠️ THE DATES BELOW ARE WRITTEN AGAINST 2026-07-27 AND SHIFTED TO TODAY at the
+// bottom of this file. Read that block before changing any of them — the
+// literals are a shape, not a schedule.
 
 const T1 = 't1' // U12 Boys
 const T2 = 't2' // U14 Boys
@@ -215,6 +217,43 @@ export const EVENTS = [
     result_them: null,
   },
 ]
+
+// ── The dates above are RELATIVE, not absolute ──────────────────────────────
+//
+// ⚠️ THEY ARE WRITTEN AS LITERALS AND THEN SHIFTED, AND BOTH HALVES MATTER.
+// Every literal above encodes a deliberate RELATIONSHIP — e6/e7/e13 share a day
+// so the calendar's multi-dot cell fires, e6/e12 share a series, e-boundary is
+// 21:00 UTC so it lands on the following day in Abu Dhabi. Rewriting them as
+// `today + n` by hand would put all of that at the mercy of whoever edits next.
+// Shifting the whole set by one constant preserves every relationship exactly.
+//
+// ⚠️ THE REASON THIS EXISTS: pinned to July 2026, the set aged into the past and
+// the Dashboard correctly rendered NEITHER the next-fixture hero NOR a single
+// Upcoming row — `nextFixture` was null and `toPlay` was empty. PR #79 shipped
+// its hero unverified in the browser for exactly this reason and said so in its
+// own description. A verification harness that silently stops being able to
+// render the thing under test is the same rot as the two dead screen imports
+// documented in harness/main.jsx, and it deserved the same permanent fix rather
+// than another hand-edit.
+const ANCHOR = Date.UTC(2026, 6, 27) // the "today" the literals above were written against
+const DAY_MS = 24 * 60 * 60 * 1000
+// Whole days only, and floored to UTC midnight at both ends, so the shift never
+// moves an event's time of day — which is what would break e-boundary.
+const todayUTC = (() => {
+  const now = new Date()
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+})()
+const SHIFT_DAYS = Math.round((todayUTC - ANCHOR) / DAY_MS)
+
+function shift(iso) {
+  if (!iso) return iso
+  return new Date(new Date(iso).getTime() + SHIFT_DAYS * DAY_MS).toISOString()
+}
+
+for (const event of EVENTS) {
+  event.starts_at = shift(event.starts_at)
+  event.ends_at = shift(event.ends_at)
+}
 
 export async function listEvents({ teamIds } = {}) {
   if (Array.isArray(teamIds) && teamIds.length === 0) return []
