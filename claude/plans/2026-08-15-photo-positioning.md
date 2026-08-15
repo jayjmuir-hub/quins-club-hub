@@ -184,7 +184,47 @@ proves a photo feature is the one a parent sees, not the one that saved it.**
 and the real tiles share one `focusToObjectPosition`, so a preview that lies can
 now only lie about the SHAPE. Re-measure it when the tile layout changes.
 
+## Phase 4c — the safe zone on the stage ✅ shipped 15 Aug 2026
+
+Jay: *"can't we have a circle on the photo preview that shows which parts of the
+pic will actually appear?"* The three previews showed what each shape keeps, but
+reading three small crops and inferring a rule from them is work. The stage now
+draws the region that survives **every** shape, dimmed outside.
+
+⚠️ **A CIRCLE INSCRIBED IN THE REGION WAS BUILT FIRST AND WAS WRONG — CAUGHT BY
+LOOKING AT IT IN CHROMIUM.** On a 4:3 photo the safe zone is 18% wide and 71%
+tall, so the largest circle that fits is an 18% blob floating at mid-height. A
+face placed near the top of the frame fell OUTSIDE it **while the Featured
+preview two inches below plainly showed that face.** An overlay that contradicts
+the preview beside it is worse than no overlay. It is drawn as the actual window
+with fully rounded ends instead — still a ring around a face, no longer a lie.
+The regression is pinned by `safeWindow` *"contains the focal point that produced
+it"*.
+
+⚠️ **THE INTERSECTION IS JUST THE NARROWEST WINDOW, AND IT IS PROVED RATHER THAN
+ASSUMED.** All three windows are positioned by the same focal point, so for
+widths `a < b` the narrower nests inside the wider: left edges `f(1-a) ≥ f(1-b)`,
+and the right-hand gap is `(b-a)(1-f) ≥ 0`. So a per-axis minimum is exact and no
+rectangle intersection is needed.
+
+⚠️ **AND THE STAGE HAD A LATENT DRAG BUG THE OVERLAY FORCED INTO THE OPEN.** It
+was `w-full object-contain`, so a PORTRAIT photo — which a head shot usually is —
+sat pillarboxed inside a wider interactive box while the drag maths measured that
+box. Measured at 390px: the box was 358 wide and the photo 210, so **148px of
+dead grey strip registered as photo**, and every position in between was skewed.
+The box is shrink-wrapped to the image now, which is also what lets the overlay
+be positioned in plain percentages with nothing to measure.
+
+⚠️ **THE FOCAL-POINT MARKER SHRANK FROM 24px TO 12px** because at 24 it was over a
+third of the safe zone's width and the two rings read as one confused diagram.
+
 ## Phase 5 — the tall lead tile (not started, and it is Jay's call)
+
+⚠️ **THE OVERLAY ABOVE NOW MAKES THIS PROBLEM VISIBLE RATHER THAN THEORETICAL.**
+The safe zone is 18% of a 4:3 photo's width *because* the lead tile is 1:4 —
+anybody positioning a photo can now see how little is guaranteed. If phase 5 ever
+caps the lead's aspect, the zone widens on its own and `PHOTO_SHAPES` must be
+re-measured with it.
 
 The lead tile is 1:4 at a six-person squad, which is a poor shape for a person
 however well positioned. Options: cap the lead's row span (puts tiles back

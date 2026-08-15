@@ -52,6 +52,70 @@ export const PHOTO_SHAPES = [
 export { DEFAULT_FOCUS, clampFocus, focusToObjectPosition } from '../lib/photoFocus.js'
 
 /**
+ * The part of the photo that survives EVERY shape, as fractions of the photo's
+ * own width and height.
+ *
+ * ⚠️ THE THREE SHAPES DISAGREE VIOLENTLY, WHICH IS THE WHOLE REASON THIS EXISTS.
+ * The lead tile is a 1:4 strip and the half tile is 1.9:1 landscape — one keeps
+ * a narrow vertical band of a photo and the other a wide horizontal one. What
+ * they have in common is smaller than either, and it is the only region a person
+ * can be *told* will show up. Anything else is a promise one of the shapes will
+ * break.
+ *
+ * ⚠️ THE INTERSECTION IS JUST THE NARROWEST WINDOW, AND THAT IS PROVED RATHER
+ * THAN ASSUMED. Every shape's window is positioned by the SAME focal point, so
+ * for windows of width `a < b` the narrower one is contained in the wider:
+ * its left edge is `f(1-a) ≥ f(1-b)`, and the gap at the right is
+ * `(b-a)(1-f) ≥ 0`. So the windows nest and taking the minimum of each axis is
+ * exact — no rectangle intersection is needed.
+ *
+ * @param photoAspect the photo's own width ÷ height
+ */
+export function safeZone(photoAspect) {
+  const p = Number.isFinite(photoAspect) && photoAspect > 0 ? photoAspect : 1
+  let width = 1
+  let height = 1
+  for (const { ratio } of PHOTO_SHAPES) {
+    // `object-cover` scales to fill, so the axis that overflows is the one that
+    // gets cropped: a photo WIDER than its box loses width, a taller one height.
+    width = Math.min(width, p > ratio ? ratio / p : 1)
+    height = Math.min(height, p < ratio ? p / ratio : 1)
+  }
+  return { width, height }
+}
+
+/**
+ * Where the safe zone sits on the photo for a given focal point — left, top,
+ * width and height, all as fractions of the photo's own box.
+ *
+ * ⚠️ THE REGION ITSELF, NOT A CIRCLE INSCRIBED IN IT, AND THAT REVERSAL WAS
+ * FORCED BY LOOKING AT IT. The first version drew the largest CIRCLE that fits,
+ * which is the shape Jay asked for and is badly wrong in the commonest case: on
+ * a 4:3 photo the safe zone is 18% wide and 71% tall, so the inscribed circle is
+ * an 18% blob floating at mid-height — and a face placed near the top sat
+ * OUTSIDE it while the Featured preview beside it plainly showed that face. An
+ * overlay that contradicts the preview two inches below it is worse than none.
+ * The zone is drawn with fully rounded ends instead, so it still reads as a ring
+ * around a face without claiming a region smaller than the truth.
+ *
+ * ⚠️ POSITIONED BY THE WINDOW, NOT BY THE POINT, AND THE DIFFERENCE SHOWS AT THE
+ * EDGES. `object-position: 0% 50%` does not centre the crop on the left edge —
+ * it BUTTS the window against it. So dragging the point into a corner moves the
+ * point while the zone stops, which is exactly what the real tiles do and is the
+ * most useful thing this overlay teaches.
+ */
+export function safeWindow(photoAspect, focus) {
+  const { width, height } = safeZone(photoAspect)
+  const { x, y } = clampFocus(focus ?? DEFAULT_FOCUS)
+  return {
+    left: (x / 100) * (1 - width),
+    top: (y / 100) * (1 - height),
+    width,
+    height,
+  }
+}
+
+/**
  * ⚠️ IMAGE TYPES ONLY, AND CHECKED RATHER THAN TRUSTED. A drop target accepts
  * anything the OS will hand it — a folder, a PDF, a 40MB video. The file input
  * has `accept`, which drag-and-drop bypasses entirely, so the same rule has to
@@ -164,7 +228,14 @@ export function PhotoDropZone({ onFile, disabled = false, label = 'Add a photo' 
 export function PhotoPositioner({ url, focus, onFocusChange, disabled = false }) {
   const stageRef = useRef(null)
   const [dragging, setDragging] = useState(false)
+  // ⚠️ THE PHOTO'S OWN ASPECT RATIO, READ OFF THE DECODED IMAGE. The guide
+  // circle cannot be drawn without it — how much of a photo a shape keeps
+  // depends entirely on how that photo's proportions compare to the shape's.
+  // Null until the image loads, and the overlay simply does not render until
+  // then; a circle drawn from a guess would be a circle in the wrong place.
+  const [aspect, setAspect] = useState(null)
   const point = clampFocus(focus ?? DEFAULT_FOCUS)
+  const zone = aspect ? safeWindow(aspect, point) : null
 
   const setFromEvent = useCallback(
     (event) => {
@@ -210,33 +281,94 @@ export function PhotoPositioner({ url, focus, onFocusChange, disabled = false })
 
   return (
     <div>
-      <div
-        ref={stageRef}
-        data-testid="photo-stage"
-        role="application"
-        aria-label="Position the photo. Drag, or use the arrow keys."
-        tabIndex={disabled ? -1 : 0}
-        onPointerDown={onPointerDown}
-        onPointerMove={(e) => dragging && setFromEvent(e)}
-        onPointerUp={() => setDragging(false)}
-        onPointerCancel={() => setDragging(false)}
-        onKeyDown={onKeyDown}
-        className="relative w-full touch-none select-none overflow-hidden rounded-card bg-surface-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-      >
-        <img src={url} alt="" className="block max-h-[280px] w-full object-contain" />
+      {/* ⚠️ THE INTERACTIVE BOX IS NOW THE PHOTO ITSELF, NOT A FULL-WIDTH FRAME
+          AROUND IT, AND THAT IS A CORRECTNESS FIX AS WELL AS AN OVERLAY ONE.
+          It was `w-full object-contain`, so a PORTRAIT photo — which a head shot
+          usually is — was pillarboxed inside a wider box, and the drag maths
+          measured that box: a tap on the empty grey strip beside the photo
+          produced a focal point past the edge of the image, and every position
+          in between was skewed. Shrink-wrapping the box to the image makes the
+          percentages exact, and it is what lets the overlay be positioned in
+          plain percentages with no measuring. */}
+      <div className="flex justify-center rounded-card bg-surface-sunk">
+        <div
+          ref={stageRef}
+          data-testid="photo-stage"
+          role="application"
+          aria-label="Position the photo. Drag, or use the arrow keys."
+          tabIndex={disabled ? -1 : 0}
+          onPointerDown={onPointerDown}
+          onPointerMove={(e) => dragging && setFromEvent(e)}
+          onPointerUp={() => setDragging(false)}
+          onPointerCancel={() => setDragging(false)}
+          onKeyDown={onKeyDown}
+          className="relative touch-none select-none overflow-hidden rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          <img
+            src={url}
+            alt=""
+            onLoad={(e) => {
+              const { naturalWidth: w, naturalHeight: h } = e.currentTarget
+              if (w > 0 && h > 0) setAspect(w / h)
+            }}
+            className="block h-auto max-h-[280px] w-auto max-w-full"
+          />
 
-        {/* The point itself. Two rings so it stays visible on a light photo and
-            a dark one without knowing which it is. */}
-        <span
-          aria-hidden="true"
-          data-testid="photo-focus-point"
-          style={{ left: `${point.x}%`, top: `${point.y}%` }}
-          className="pointer-events-none absolute -ml-3 -mt-3 h-6 w-6 rounded-full border-2 border-white ring-2 ring-black/40"
-        />
+          {/* ⚠️ THE ANSWER TO "WHICH PARTS OF THE PIC WILL ACTUALLY APPEAR" —
+              Jay, 15 Aug 2026. The three previews below show what each shape
+              keeps, but reading three small crops and inferring a rule from them
+              is work; this states the rule directly on the photo being dragged.
+
+              ⚠️ IT IS A SPOTLIGHT, NOT A MASK, AND THE DIM IS DELIBERATELY LIGHT.
+              What is outside the circle is not invisible — it appears in SOME
+              shapes and not others, which is precisely the thing that cannot be
+              drawn as a single crop. A heavy dim would claim it is cut, which is
+              false; keeping the rest of the photo clearly legible says "this
+              might show" while the ring says "this definitely will".
+
+              The huge spread `box-shadow` is what dims everything outside a
+              round hole in one element. It is clipped by the stage's
+              `overflow-hidden`. */}
+          {zone && (
+            <span
+              aria-hidden="true"
+              data-testid="photo-safe-zone"
+              style={{
+                left: `${zone.left * 100}%`,
+                top: `${zone.top * 100}%`,
+                width: `${zone.width * 100}%`,
+                height: `${zone.height * 100}%`,
+              }}
+              className="pointer-events-none absolute rounded-full border-2 border-dashed border-white/95 shadow-[0_0_0_9999px_rgba(0,0,0,.3)] ring-1 ring-black/50"
+            />
+          )}
+
+          {/* The point itself. Two rings so it stays visible on a light photo and
+              a dark one without knowing which it is.
+
+              ⚠️ 12px AND SOLID, NOT A 24px HOLLOW RING, SINCE THE GUIDE CIRCLE
+              LANDED — measured in Chromium, 15 Aug 2026. The safe circle on a
+              4:3 photo is 66px, so a 24px ring of the same shape sat inside it
+              at over a third its size and the two read as one confused
+              diagram. A small filled dot is unmistakably "the point I am
+              dragging" and leaves the ring to mean the region. */}
+          <span
+            aria-hidden="true"
+            data-testid="photo-focus-point"
+            style={{ left: `${point.x}%`, top: `${point.y}%` }}
+            className="pointer-events-none absolute -ml-1.5 -mt-1.5 h-3 w-3 rounded-full bg-white ring-2 ring-black/50"
+          />
+        </div>
       </div>
 
+      {/* ⚠️ "EVERY SHAPE", NOT "THE PHOTO WILL BE CROPPED TO THIS". The circle is
+          the part that survives ALL THREE shapes, so it is a floor and not a
+          frame — and saying it the other way round would have people shrinking
+          a face to fit a circle it does not need to fit. */}
       <p className="mt-1.5 text-[12.5px] text-ink-faint">
-        Drag to say where the face is. Everything below updates as you move it.
+        Drag to say where the face is. Whatever sits inside the dashed outline
+        shows up everywhere — on the big tile, the small ones and the little
+        round one.
       </p>
 
       <div className="mt-2.5 flex flex-wrap items-end gap-3">

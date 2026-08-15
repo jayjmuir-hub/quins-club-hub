@@ -10,7 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
-- 🐞 **THE PHOTO POSITIONER NEVER MOVED A SINGLE PHOTO ON THE SCREENS IT WAS
+- 🎯 **THE PICKER NOW SHOWS WHICH PARTS OF A PHOTO WILL ACTUALLY APPEAR.** Jay:
+  *"can't we have a circle on the photo preview that shows which parts of the pic
+  will actually appear?"* The stage draws the region that survives **every** one
+  of the three shapes, dimmed outside it, moving as the point moves.
+  ⚠️ **A CIRCLE INSCRIBED IN THAT REGION WAS BUILT FIRST AND WAS WRONG, AND ONLY
+  LOOKING AT IT IN CHROMIUM CAUGHT IT.** On a 4:3 photo the safe zone is 18% wide
+  and 71% tall, so the largest circle that fits is an 18% blob at mid-height — and
+  a face near the top of the frame fell OUTSIDE it **while the Featured preview
+  two inches below plainly showed that face.** An overlay contradicting the
+  preview beside it is worse than none. Drawn as the actual window with fully
+  rounded ends instead; the regression is pinned by a test.
+  ⚠️ **AND IT EXPOSED A LATENT DRAG BUG.** The stage was `w-full object-contain`,
+  so a PORTRAIT photo — which a head shot usually is — sat pillarboxed inside a
+  wider interactive box while the drag maths measured that box. Measured at 390px:
+  the box was 358 wide against a 210px photo, so **148px of dead grey strip
+  registered as photo** and every position in between was skewed. The box is
+  shrink-wrapped to the image now, which is also what lets the overlay be
+  positioned in plain percentages with nothing to measure.
+  ⚠️ **THE INTERSECTION IS A PER-AXIS MINIMUM, AND THAT IS PROVED RATHER THAN
+  ASSUMED** — all three windows are placed by the same focal point, so the
+  narrower always nests inside the wider. Three separate faults were injected and
+  each was caught; the focal-point marker shrank 24px → 12px because at 24 it was
+  over a third of the zone's width and the two rings read as one diagram.
+
+- `102423a` — 🐞 **THE PHOTO POSITIONER NEVER MOVED A SINGLE PHOTO ON THE SCREENS IT WAS
   BUILT FOR.** Jay, on the U18B head coach's tile: *"no matter how many times i
   try to adjust this head coaches photo, it always cuts off the top of his head
   in that double tall pill, like it isn't adjusting the photo in the pill at
