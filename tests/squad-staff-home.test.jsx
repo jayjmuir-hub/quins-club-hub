@@ -54,7 +54,7 @@ vi.mock('../src/data/staff.js', () => ({
   listMySquadStaff: (...args) => listMySquadStaffMock(...args),
 }))
 
-import SquadStaffCard from '../src/components/SquadStaffCard.jsx'
+import SquadStaffCard, { leadIndex, tileSpans } from '../src/components/SquadStaffCard.jsx'
 import Dashboard from '../src/screens/Dashboard.jsx'
 import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
@@ -214,6 +214,376 @@ describe('SquadStaffCard', () => {
     expect(screen.queryByText(/has no coach/i)).not.toBeInTheDocument()
     // The card is still drawn — the squad name must not vanish.
     expect(screen.getByText('U13 Mixed Contact')).toBeInTheDocument()
+  })
+})
+
+// ── The tile mosaic (15 Aug 2026) ───────────────────────────────────────────
+
+const MANAGER_PRIYA = {
+  membershipId: 'ms-3',
+  role: 'manager',
+  title: 'Team Manager',
+  name: 'Priyanka Ramachandran',
+  email: 'priya@example.com',
+  phone: '+971551112233',
+  photoPath: null,
+  photoUrl: null,
+}
+const COACH_DAN = {
+  membershipId: 'ms-4',
+  role: 'coach',
+  title: 'Assistant Coach',
+  name: 'Dan Whitfield',
+  email: 'dan@example.com',
+  phone: '+971509876543',
+  photoPath: null,
+  photoUrl: null,
+}
+
+function person(n) {
+  return { ...COACH_DAN, membershipId: `gen-${n}`, name: `Person ${n}`, title: 'Assistant Coach' }
+}
+
+describe('leadIndex — who gets the big tile', () => {
+  // ⚠️ THE RULE IS TITLE, NEVER ROLE, AND src/data/staff.js IS WHY. It sorts by
+  // name in two places and says both times that role order "reads as a
+  // hierarchy the club has not agreed to". Featuring by role would restate that
+  // hierarchy at twice the size, so the lead is whoever the club chose to CALL
+  // a head — a string an admin typed, not something this code inferred.
+  it('features whoever is titled a head, wherever they sit in the list', () => {
+    expect(leadIndex([MEDIC_SAM, COACH_ROSA, MANAGER_PRIYA])).toBe(1)
+  })
+
+  it('does not care about case', () => {
+    expect(leadIndex([{ ...COACH_ROSA, title: 'head coach' }])).toBe(0)
+  })
+
+  // ⚠️ WORD BOUNDARY, NOT `includes`. "Overhead", "Forehead" and — the one that
+  // matters here — a title like "Overheads and Kit" would all match a substring
+  // test and quietly promote the wrong person to the biggest tile on the screen.
+  it('does not match head inside another word', () => {
+    expect(leadIndex([{ ...COACH_ROSA, title: 'Overheads and Kit' }])).toBe(-1)
+  })
+
+  it('features nobody when no title says so, which is most squads', () => {
+    expect(leadIndex([MEDIC_SAM, MANAGER_PRIYA])).toBe(-1)
+    expect(leadIndex([{ ...COACH_ROSA, title: null }])).toBe(-1)
+    expect(leadIndex([])).toBe(-1)
+  })
+})
+
+describe('tileSpans — the mosaic never leaves a hole', () => {
+  // The sizes the club actually has, measured 15 Aug 2026: eleven squads with
+  // nobody, two with one person, one with four and one with six.
+  it('gives a lone person the full width rather than half a row', () => {
+    expect(tileSpans(1, true)).toEqual(['wide'])
+    expect(tileSpans(1, false)).toEqual(['wide'])
+  })
+
+  // ⚠️ A LEAD NEEDS THREE PEOPLE TO BE WORTH IT. With two, the tall tile has a
+  // single half-height tile beside it and the other half of that column is a
+  // hole — the "feature" is a gap.
+  it('refuses the tall tile below three people', () => {
+    expect(tileSpans(2, true)).toEqual(['half', 'half'])
+  })
+
+  it('stacks two tiles beside the lead at three', () => {
+    expect(tileSpans(3, true)).toEqual(['lead', 'half', 'half'])
+  })
+
+  // Four is the size that exposed the rule: the fourth tile would sit alone on
+  // row three with a hole beside it.
+  it('widens the odd last tile at four', () => {
+    expect(tileSpans(4, true)).toEqual(['lead', 'half', 'half', 'wide'])
+  })
+
+  it('leaves a full last row alone at five', () => {
+    expect(tileSpans(5, true)).toEqual(['lead', 'half', 'half', 'half', 'half'])
+  })
+
+  it('widens the last of six', () => {
+    expect(tileSpans(6, true)).toEqual(['lead', 'half', 'half', 'half', 'half', 'wide'])
+  })
+
+  it('pairs them off evenly when nobody leads', () => {
+    expect(tileSpans(4, false)).toEqual(['half', 'half', 'half', 'half'])
+    expect(tileSpans(3, false)).toEqual(['half', 'half', 'wide'])
+  })
+
+  // The invariant behind every case above, stated once so a new size cannot
+  // quietly break it: no tile is ever left alone on a row.
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])('never leaves a lone half tile at %i', (n) => {
+    for (const hasLead of [true, false]) {
+      const spans = tileSpans(n, hasLead)
+      const lead = spans.filter((s) => s === 'lead').length
+      // Columns consumed after the lead's own column-worth of rows.
+      const halves = spans.filter((s) => s === 'half').length
+      const flowing = lead ? halves - 2 : halves
+      expect(flowing % 2).toBe(0)
+    }
+  })
+})
+
+describe('SquadStaffCard — the contact buttons', () => {
+  it('offers call, WhatsApp and email, each with a name a screen reader can use', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA]} />)
+
+    expect(screen.getByRole('link', { name: 'Call Rosa Ferreira' })).toHaveAttribute(
+      'href',
+      'tel:+971500000001',
+    )
+    // ⚠️ BARE DIGITS. `wa.me/+971...` opens WhatsApp on an error rather than on
+    // a conversation, and it fails quietly enough to ship.
+    expect(
+      screen.getByRole('link', { name: 'Message Rosa Ferreira on WhatsApp' }),
+    ).toHaveAttribute('href', 'https://wa.me/971500000001')
+    expect(screen.getByRole('link', { name: 'Email Rosa Ferreira' })).toHaveAttribute(
+      'href',
+      'mailto:rosa@example.com',
+    )
+  })
+
+  it('drops both phone buttons together when there is no number', () => {
+    render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[{ ...COACH_ROSA, phone: null }]}
+      />,
+    )
+
+    expect(screen.queryByRole('link', { name: /Call/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /WhatsApp/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Email/ })).toBeInTheDocument()
+  })
+
+  // ⚠️ jsdom COMPUTES NO CSS, so the 44px floor cannot be measured here — the
+  // class token is the only thing this environment can hold. The width was
+  // measured in Chromium instead: at 320px the three buttons needed 144px in a
+  // 140px tile and the last one was CLIPPED rather than overflowing, because
+  // the tile clips. See the breakpoint note in SquadStaffCard.jsx.
+  it('keeps every contact button at the 44px tap-target floor', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA]} />)
+
+    for (const link of screen.getAllByRole('link')) {
+      expect(link.className).toContain('h-11')
+      expect(link.className).toContain('w-11')
+    }
+  })
+})
+
+describe('SquadStaffCard — the mosaic on screen', () => {
+  it('gives the titled head the lead tile and nobody else', () => {
+    render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[MEDIC_SAM, COACH_ROSA, MANAGER_PRIYA]}
+      />,
+    )
+
+    const tiles = screen.getAllByTestId('squad-staff-person')
+    expect(tiles.map((t) => t.dataset.span)).toEqual(['lead', 'half', 'half'])
+    // The lead is moved to the front; everyone else keeps the order the data
+    // module chose, which is by name.
+    expect(tiles[0]).toHaveTextContent('Rosa Ferreira')
+    expect(tiles.filter((t) => t.dataset.featured === 'true')).toHaveLength(1)
+  })
+
+  it('lays a squad out evenly when nobody is titled a head', () => {
+    render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={[MEDIC_SAM, MANAGER_PRIYA]} />,
+    )
+
+    const tiles = screen.getAllByTestId('squad-staff-person')
+    expect(tiles.map((t) => t.dataset.span)).toEqual(['half', 'half'])
+    expect(tiles.some((t) => t.dataset.featured === 'true')).toBe(false)
+  })
+
+  it('lays out the four- and six-person squads the club really has', () => {
+    const { rerender } = render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[COACH_ROSA, MEDIC_SAM, COACH_DAN, MANAGER_PRIYA]}
+      />,
+    )
+    expect(screen.getAllByTestId('squad-staff-person').map((t) => t.dataset.span)).toEqual([
+      'lead',
+      'half',
+      'half',
+      'wide',
+    ])
+
+    rerender(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[COACH_ROSA, MEDIC_SAM, COACH_DAN, MANAGER_PRIYA, person(5), person(6)]}
+      />,
+    )
+    expect(screen.getAllByTestId('squad-staff-person').map((t) => t.dataset.span)).toEqual([
+      'lead',
+      'half',
+      'half',
+      'half',
+      'half',
+      'wide',
+    ])
+  })
+
+  // ⚠️ THE MONOGRAM IS THE ORDINARY CASE, NOT AN ERROR STATE. Thirteen of the
+  // club's fifteen staff have no photo, so a wall of these is what this
+  // component mostly renders — and none of them may announce itself.
+  it('renders the monogram without an image and without saying so', () => {
+    const { container } = render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={[MANAGER_PRIYA]} />,
+    )
+
+    expect(container.querySelector('img')).toBeNull()
+    expect(screen.getByText('PR')).toBeInTheDocument()
+    expect(screen.queryByText(/no photo/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Priyanka Ramachandran')).toBeInTheDocument()
+  })
+})
+
+describe('SquadStaffCard — collapsing a squad', () => {
+  // ⚠️ JAY'S CEILING, 15 Aug 2026: "we have parents who could have up to 5 age
+  // groups worth of players". Measured in Chromium: an open four-person squad
+  // is 488px and a collapsed one is 44px, so five squads goes from 2,440px —
+  // about three phone screens — to 664px.
+  const FOUR = [COACH_ROSA, MEDIC_SAM, COACH_DAN, MANAGER_PRIYA]
+
+  it('opens by default, because most parents have one squad', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} />)
+
+    expect(screen.getByTestId('squad-staff-toggle')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getAllByTestId('squad-staff-person')).toHaveLength(4)
+  })
+
+  it('starts closed when told to, and says who is inside without opening', () => {
+    render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} defaultOpen={false} />,
+    )
+
+    const toggle = screen.getByTestId('squad-staff-toggle')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    // The count is on the header, so the row still reports what it is hiding.
+    expect(toggle).toHaveTextContent('U13 Mixed Contact')
+    expect(toggle).toHaveTextContent('4')
+  })
+
+  it('opens and closes on tap', () => {
+    render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} defaultOpen={false} />,
+    )
+
+    const toggle = screen.getByTestId('squad-staff-toggle')
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  // ⚠️ THE PANEL STAYS IN THE DOM WHILE CLOSED. A disclosure whose
+  // `aria-controls` points at an id that does not exist is broken exactly when
+  // the pointer matters, which is while it is closed.
+  it('keeps aria-controls pointing at a real element while closed', () => {
+    render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} defaultOpen={false} />,
+    )
+
+    const id = screen.getByTestId('squad-staff-toggle').getAttribute('aria-controls')
+    expect(id).toBeTruthy()
+    expect(document.getElementById(id)).toBeInTheDocument()
+  })
+
+  // ⚠️ THE REGRESSION GUARD FOR A BUG jsdom CANNOT SEE. Preflight's
+  // `[hidden] { display: none }` and the `.grid` utility have the same
+  // specificity and the utility comes later, so the `hidden` ATTRIBUTE alone
+  // left the panel fully rendered — measured at 484px tall in Chromium while
+  // "hidden". The display class has to be swapped too, and that is what this
+  // pins, because a jsdom assertion on visibility would pass either way.
+  it('swaps the display class as well as setting hidden', () => {
+    render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} defaultOpen={false} />,
+    )
+
+    const toggle = screen.getByTestId('squad-staff-toggle')
+    const id = toggle.getAttribute('aria-controls')
+    const closed = document.getElementById(id)
+    expect(closed).toHaveAttribute('hidden')
+    expect(closed.className.split(/\s+/)).toContain('hidden')
+    expect(closed.className.split(/\s+/)).not.toContain('grid')
+
+    // ⚠️ TOGGLED, NOT RE-RENDERED WITH A NEW PROP. `defaultOpen` seeds
+    // useState, so changing the prop on an already-mounted card does nothing —
+    // which is correct (it is a default, not a controlled value) and is why the
+    // first version of this test failed.
+    fireEvent.click(toggle)
+    const opened = document.getElementById(id)
+    expect(opened).not.toHaveAttribute('hidden')
+    expect(opened.className.split(/\s+/)).toContain('grid')
+  })
+
+  // ⚠️ A disclosure that opens onto one sentence wastes a tap to say "still
+  // nothing", and this is the state eleven of fifteen squads are in.
+  it('gives an empty squad no toggle at all', () => {
+    render(<SquadStaffCard squadName="U16 Girls" staff={[]} defaultOpen={false} />)
+
+    expect(screen.queryByTestId('squad-staff-toggle')).not.toBeInTheDocument()
+    expect(
+      screen.getByText('No coach, team manager or medic listed for this squad yet.'),
+    ).toBeInTheDocument()
+  })
+
+  it('keeps the toggle at the 44px tap-target floor', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={FOUR} />)
+
+    expect(screen.getByTestId('squad-staff-toggle').className).toContain('min-h-[44px]')
+  })
+})
+
+describe('Squad contacts on the Dashboard — which squad is open', () => {
+  // ⚠️ THE WIRING, NOT THE COMPONENT. SquadStaffCard's own collapse is covered
+  // above; what cannot be seen from inside it is WHICH card gets the open one,
+  // and that is the half worth pinning — passing `defaultOpen` to all of them,
+  // or to none, both leave a screen that looks plausible.
+  it('opens the first squad and collapses the rest', async () => {
+    useMembershipsMock.mockReturnValue(
+      membershipValue([
+        { id: 'm1', role: 'parent', team_id: 'team-u13', player_id: 'p1' },
+        { id: 'm2', role: 'parent', team_id: 'team-u16', player_id: 'p2' },
+        { id: 'm3', role: 'parent', team_id: 'team-u18', player_id: 'p3' },
+      ]),
+    )
+    listMySquadStaffMock.mockResolvedValue(
+      new Map([
+        ['team-u13', [COACH_ROSA, MEDIC_SAM]],
+        ['team-u16', [COACH_ROSA, MEDIC_SAM]],
+        ['team-u18', [COACH_ROSA, MEDIC_SAM]],
+      ]),
+    )
+
+    renderDashboard()
+
+    const toggles = await screen.findAllByTestId('squad-staff-toggle')
+    expect(toggles.map((t) => t.getAttribute('aria-expanded'))).toEqual([
+      'true',
+      'false',
+      'false',
+    ])
+  })
+
+  // ⚠️ THE COMMON CASE MUST NOT PAY FOR THE RARE ONE. Ten of the club's twelve
+  // parents are attached to exactly one squad, and for them nothing about this
+  // feature should be visible at all.
+  it('leaves a single-squad parent with an open card', async () => {
+    useMembershipsMock.mockReturnValue(
+      membershipValue([{ id: 'm1', role: 'parent', team_id: 'team-u13', player_id: 'p1' }]),
+    )
+    listMySquadStaffMock.mockResolvedValue(new Map([['team-u13', [COACH_ROSA]]]))
+
+    renderDashboard()
+
+    const toggle = await screen.findByTestId('squad-staff-toggle')
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
   })
 })
 
