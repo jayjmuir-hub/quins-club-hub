@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
+import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
+import PhotoPositioner, {
+  PhotoDropZone,
+  DEFAULT_FOCUS,
+  clampFocus,
+  focusToObjectPosition,
+} from '../components/PhotoPositioner.jsx'
 import { listSquadStaff, setMembershipTitle } from '../data/staff.js'
+import { setStaffPhoto, signStaffPhotoUrl, uploadStaffPhoto } from '../data/photos.js'
+import { initials } from '../lib/playerFormat.js'
 import { STAFF_TITLES, labelForRole } from '../lib/scope.js'
 
 // The Staff tab of /admin — every squad, and who looks after it.
@@ -47,7 +56,142 @@ function SectionTitle({ children }) {
  * principle as every write in src/data/: a refusal that renders as success is
  * worse than an error.
  */
-function StaffRow({ member, onSaved }) {
+
+/**
+ * The photo control on a staff row.
+ *
+ * ⚠️ IT EXISTS BECAUSE A RULING WAS REVERSED, AND THE REVERSAL IS THE REASON
+ * THIS SCREEN IS THE RIGHT HOME FOR IT. Staff photos were own-photo-only until
+ * 15 Aug 2026; two of the club's fifteen staff had one and most were never
+ * going to log in to change that. See
+ * claude/decisions/2026-08-15-admin-may-set-staff-photos.md.
+ *
+ * ⚠️ IT UPLOADS IMMEDIATELY, LIKE MyPhotoField AND UNLIKE PhotoField. There is
+ * no form here to defer to, so the upload IS the action — and the order matters
+ * for the same reason MyPhotoField documents: the object lands first, and if
+ * RECORDING it then fails the just-uploaded object is deleted, so a failure
+ * leaves no file that nothing points at.
+ *
+ * ⚠️ THE POSITION IS SAVED WITH THE KEY, IN ONE CALL. `set_staff_photo` takes
+ * both, so there is no window where a photo exists with nobody having said
+ * where the face is.
+ */
+function StaffPhoto({ member, onPhoto }) {
+  const [file, setFile] = useState(null)
+  const [localUrl, setLocalUrl] = useState(null)
+  const [focus, setFocus] = useState(clampFocus(member.focus))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const [open, setOpen] = useState(false)
+
+  function take(chosen) {
+    setError(null)
+    setFile(chosen)
+    // ⚠️ REVOKED, not merely replaced. Choosing three photos in a row would
+    // otherwise leak two object URLs for as long as the screen is open.
+    setLocalUrl((old) => {
+      if (old) URL.revokeObjectURL(old)
+      return URL.createObjectURL(chosen)
+    })
+    setFocus(DEFAULT_FOCUS)
+  }
+
+  async function save() {
+    setBusy(true)
+    setError(null)
+    let key = null
+    try {
+      if (file) {
+        key = await uploadStaffPhoto(member.profileId, file)
+      }
+      const saved = await setStaffPhoto(member.profileId, key ?? member.photoPath, focus)
+      onPhoto(member.membershipId, saved)
+      close()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function close() {
+    setOpen(false)
+    setFile(null)
+    setLocalUrl((old) => {
+      if (old) URL.revokeObjectURL(old)
+      return null
+    })
+  }
+
+  const shown = localUrl ?? member.photoUrl
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        data-testid="staff-photo-open"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-2 rounded-[10px] border border-line px-2 py-1 text-[12.5px] font-bold text-ink-muted hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      >
+        <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-[9px] bg-brand/10 text-[11px] font-extrabold text-brand-deep">
+          {member.photoUrl ? (
+            <img
+              src={member.photoUrl}
+              alt=""
+              style={{ objectPosition: focusToObjectPosition(member.focus) }}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            initials(member.name)
+          )}
+        </span>
+        {member.photoUrl ? 'Change photo' : 'Add photo'}
+      </button>
+    )
+  }
+
+  return (
+    <div data-testid="staff-photo-editor" className="w-full rounded-card border border-line bg-surface-mute p-3">
+      {shown ? (
+        <PhotoPositioner url={shown} focus={focus} onFocusChange={setFocus} disabled={busy} />
+      ) : (
+        <PhotoDropZone onFile={take} disabled={busy} label={`Add a photo for ${member.name}`} />
+      )}
+
+      {error && (
+        <p role="alert" className="mt-2 text-[12.5px] font-bold text-brand">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button onClick={save} disabled={busy || (!file && !member.photoPath)}>
+          {busy ? 'Saving…' : 'Save'}
+        </Button>
+        <Button variant="ghost" onClick={close} disabled={busy}>
+          Cancel
+        </Button>
+        {shown && !busy && (
+          <button
+            type="button"
+            onClick={() => {
+              setFile(null)
+              setLocalUrl((old) => {
+                if (old) URL.revokeObjectURL(old)
+                return null
+              })
+            }}
+            className="text-[12.5px] font-semibold text-brand underline"
+          >
+            Choose a different photo
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function StaffRow({ member, onSaved, onPhoto }) {
   const [title, setTitle] = useState(member.title ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -90,6 +234,10 @@ function StaffRow({ member, onSaved }) {
         <span>{member.phone ?? 'No phone number'}</span>
       </div>
 
+      <div className="mt-2">
+        <StaffPhoto member={member} onPhoto={onPhoto} />
+      </div>
+
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <label className="text-[12.5px] font-bold text-ink-muted" htmlFor={`title-${member.membershipId}`}>
           Title
@@ -115,7 +263,7 @@ function StaffRow({ member, onSaved }) {
   )
 }
 
-function SquadCard({ squad, onSaved }) {
+function SquadCard({ squad, onSaved, onPhoto }) {
   return (
     <Card className="mb-3" data-testid="squad-card">
       <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
@@ -133,7 +281,7 @@ function SquadCard({ squad, onSaved }) {
         </div>
       ) : (
         squad.staff.map((member) => (
-          <StaffRow key={member.membershipId} member={member} onSaved={onSaved} />
+          <StaffRow key={member.membershipId} member={member} onSaved={onSaved} onPhoto={onPhoto} />
         ))
       )}
     </Card>
@@ -167,6 +315,35 @@ export default function AdminStaff() {
         ...squad,
         staff: squad.staff.map((member) =>
           member.membershipId === membershipId ? { ...member, title } : member,
+        ),
+      })),
+    )
+  }, [])
+
+  // ⚠️ PATCHED IN PLACE FOR THE SAME REASON, AND WITH ONE EXTRA CARE: the URL
+  // has to be re-signed. `staff-photos` is a private bucket, so the row's
+  // `photoUrl` is a SIGNED url that the RPC's return value does not carry — it
+  // returns the profile row, which holds only the key. Reusing the local object
+  // URL would show the right face until the next reload and then break; asking
+  // for a fresh signature keeps what is on screen and what is stored the same
+  // thing.
+  const onPhoto = useCallback(async (membershipId, profile) => {
+    const url = profile?.photo_path ? await signStaffPhotoUrl(profile.photo_path) : null
+    setSquads((current) =>
+      (current ?? []).map((squad) => ({
+        ...squad,
+        staff: squad.staff.map((member) =>
+          member.membershipId === membershipId
+            ? {
+                ...member,
+                photoPath: profile?.photo_path ?? null,
+                photoUrl: url,
+                focus:
+                  profile?.photo_focus_x == null && profile?.photo_focus_y == null
+                    ? null
+                    : { x: profile.photo_focus_x, y: profile.photo_focus_y },
+              }
+            : member,
         ),
       })),
     )
@@ -217,7 +394,9 @@ export default function AdminStaff() {
       {squads.length === 0 ? (
         <Empty message="This club has no squads yet." />
       ) : (
-        squads.map((squad) => <SquadCard key={squad.id} squad={squad} onSaved={onSaved} />)
+        squads.map((squad) => (
+          <SquadCard key={squad.id} squad={squad} onSaved={onSaved} onPhoto={onPhoto} />
+        ))
       )}
     </div>
   )

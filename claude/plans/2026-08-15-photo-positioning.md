@@ -1,7 +1,8 @@
 # Photo positioning — drag and drop, and where the face is
 
-**STATUS: PHASES 1 AND 2 SHIPPED — the picker, the columns and the write path,
-all applied to production 15 Aug 2026. PHASES 3-5 NOT STARTED.**
+**STATUS: PHASES 1, 2 AND 4 SHIPPED — the picker, the columns, the write path,
+and the admin-for-staff upload. PHASE 3 (the four existing self-serve fields)
+and PHASE 5 (the tall lead tile) NOT STARTED.**
 
 Jay, 15 Aug 2026:
 
@@ -96,16 +97,22 @@ Four call sites, and they do not behave the same today:
 ⚠️ **THAT DIFFERENCE IS DELIBERATE AND MUST SURVIVE.** Both files argue for it in
 their own headers. The picker is shared; the upload timing is not.
 
-## Phase 4 — admin acting for staff (not started)
+## Phase 4 — admin acting for staff ✅ shipped 15 Aug 2026
 
-`/admin/staff` has no photo path at all today. This is the one that actually gets
-faces onto the site this season: **two of the club's fifteen staff have a photo**,
-and most will not log in to fix that.
+A photo control on every `/admin/staff` row: drop zone, positioner, save.
 
-⚠️ **IT NEEDS A NEW RPC AND IT IS THE ONLY PART OF THIS PLAN THAT WIDENS WHO CAN
-WRITE WHAT.** `set_my_photo` is self-only by design. An admin-for-staff path must
-be its own function, checking `private.is_admin(club_id)` — not a relaxation of
-the existing one.
+⚠️ **IT REQUIRED REVERSING A RULING, TWICE.** Staff photos were own-photo-only;
+Jay overruled that, and then widened it again to match the player-photo rule
+after *"just like teamsnap, sometimes photos need to be uploaded by staff when
+parents forget"*. `claude/decisions/2026-08-15-admin-may-set-staff-photos.md`.
+
+⚠️ **`uploadStaffPhoto` NEEDED NO SIBLING.** It already took a profile id and
+built the key from it — what blocked an admin was the STORAGE POLICY, not the
+client. Worth remembering before writing a parallel function for the next case.
+
+⚠️ **THE SIGNED URL IS RE-FETCHED AFTER SAVING.** `staff-photos` is private, so
+the RPC returns only the key; reusing the local object URL would show the right
+face until the next reload and then break.
 
 ## Phase 5 — the tall lead tile (not started, and it is Jay's call)
 

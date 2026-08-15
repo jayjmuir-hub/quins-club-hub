@@ -68,3 +68,14 @@ export async function deleteStaffPhoto() {
 export async function setOwnPlayerPhoto(playerId, photoPath) {
   return { id: playerId, photo_path: photoPath }
 }
+
+/**
+ * ⚠️ ADDED BECAUSE tests/harness-stubs.test.js DEMANDED IT, WITHIN SECONDS OF
+ * `setStaffPhoto` LANDING IN src/data/photos.js. That guard exists because
+ * harness/main.jsx imports every screen into one bundle, so a missing named
+ * export is an unresolved import that blanks EVERY scenario rather than one.
+ * It has now caught the same class of omission three times.
+ */
+export async function setStaffPhoto(profileId, photoPath, focus = null) {
+  return { id: profileId, photo_path: photoPath ?? null, photo_focus_x: focus?.x ?? null, photo_focus_y: focus?.y ?? null }
+}

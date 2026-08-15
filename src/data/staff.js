@@ -53,7 +53,7 @@ export async function listSquadStaff() {
       const { data, error } = await withCap(
         supabase
           .from('memberships')
-          .select('id, team_id, role, title, profiles(full_name, email, phone)')
+          .select('id, profile_id, team_id, role, title, profiles(full_name, email, phone, photo_path, photo_focus_x, photo_focus_y)')
           .in('role', SQUAD_STAFF_ROLES)
           .eq('status', 'active')
           .not('team_id', 'is', null),
@@ -63,10 +63,23 @@ export async function listSquadStaff() {
     })(),
   ])
 
+  // ⚠️ SIGNED IN ONE BATCH, NOT PER ROW. `staff-photos` is a private bucket, so
+  // every face needs a signed URL — and this screen lists the WHOLE club, so a
+  // signature per row would be one request per staff member. The member-facing
+  // listMySquadStaff already does it this way; this is the same call.
+  const urls = await signStaffPhotoUrls(staff.map((row) => row.profiles?.photo_path))
+
   const byTeam = new Map()
   for (const row of staff) {
     const list = byTeam.get(row.team_id) ?? []
-    list.push(toStaffMember(row))
+    list.push({
+      ...toStaffMember(row),
+      photoUrl: urls[row.profiles?.photo_path] ?? null,
+      focus:
+        row.profiles?.photo_focus_x == null && row.profiles?.photo_focus_y == null
+          ? null
+          : { x: row.profiles.photo_focus_x, y: row.profiles.photo_focus_y },
+    })
     byTeam.set(row.team_id, list)
   }
 
@@ -98,6 +111,10 @@ export function toStaffMember(row) {
   const email = String(row.profiles?.email ?? '').trim()
   return {
     membershipId: row.id,
+    // ⚠️ THE PROFILE ID, NOT ONLY THE MEMBERSHIP ID. A photo key is built from
+    // the PROFILE (`<profile-id>/<timestamp>.jpg`) and `set_staff_photo` keys
+    // off it too, so a shape carrying only the membership id cannot upload.
+    profileId: row.profile_id ?? null,
     role: row.role,
     title: String(row.title ?? '').trim() || null,
     name: name || email || 'No name yet',
