@@ -17,7 +17,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `"license": "UNLICENSED"` in the same breath, folded into a pull request that
   was going to deploy anyway.
 
-- 🗄️ **THE FOCAL POINT REACHES THE DATABASE — PHASE 2, APPLIED TO PRODUCTION.**
+- 👀 **THE LIVE SITE WAS FINALLY LOOKED AT, AND IT IS FINE.** Eight deploys in a
+  day — three UI features, a react-router major, a layout change — every one
+  verified in a harness against invented data and none seen by a person. Jay
+  opened it on a phone at the end of the day and reported no problems.
+  ⚠️ **WHAT THAT DOES AND DOES NOT ESTABLISH.** It closes the failure nobody
+  could have detected from here: sign-in and tab navigation work under
+  react-router 7. It is one person on one device looking — not a per-item check,
+  and **the contact tiles have still never been drawn with a real photograph.**
+  `claude/open-items.md` keeps the narrower items open for that reason.
+
+- `550e72e` — 🗄️ **THE FOCAL POINT REACHES THE DATABASE — PHASE 2, APPLIED TO PRODUCTION.**
   `photo_focus_x` / `photo_focus_y` on `players` and `profiles`, plus
   `set_my_photo_focus` and `set_own_player_photo_focus`.
   ⚠️ **PROVED THE CHECK BITES** rather than trusting a `success: true` —
