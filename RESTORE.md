@@ -79,6 +79,15 @@ clicking it opens the detail sheet. The **"Open"** button in the last column sti
 but is no longer the only way in. **Four** columns edit in place — position, age group,
 captain and **gender** (added 7 Aug), not the three this said.
 
+⚠️ **`FixtureRow` MUST STAY A DIRECT CHILD OF ITS LIST, AND WRAPPING IT IS A SILENT BUG.**
+The row carries `last:border-b-0` — CSS `:last-child` — so wrapping each row in its own
+`<div>` (to hold an animation, a link, anything) makes EVERY row its wrapper's last child
+and strips the divider from the whole list, not just the final one. Measured in Chromium
+15 Aug 2026: five rows went from 1/1/1/1/0 px of bottom border to 0/0/0/0/0. This is why
+the component takes `className` and `style` — pass them instead of wrapping.
+⚠️ **jsdom CANNOT SEE IT**, because it computes no CSS, so the guard is structural:
+`tests/dashboard.test.jsx` asserts each row's `parentElement` IS the list card.
+
 **`PhoneInput` takes `country` + `national` + `onCountryChange` + `onNationalChange`** —
 not `value`/`onChange`. Phones are stored E.164 and split for editing with
 `splitPhone`/`joinPhone` (`src/lib/phone.js`). Formatting is deliberately NOT applied
@@ -114,6 +123,15 @@ real rendering. Assert class tokens, and verify anything visual in Chromium via 
 **jsdom has no `URL.createObjectURL`.** Touching a file input without the stub in
 `src/test/setup.js` throws inside an effect and React unmounts the ENTIRE tree — an empty
 `<body>` and an error mentioning nothing about object URLs.
+
+⚠️ **THE HARNESS'S EVENT DATES ARE RELATIVE TO TODAY, AND THAT IS A FIX, NOT A FLOURISH.**
+`harness/stubs/events.js` writes its fixtures as literals against 2026-07-27 and shifts the
+whole set to today by one constant at the bottom of the file. Pinned to July they aged into
+the past, and the Dashboard then correctly rendered NEITHER the next-fixture hero NOR a
+single Upcoming row — so the harness silently stopped being able to show the thing under
+test, and PR #79 shipped its hero unverified for exactly that reason. **Keep the literals
+when you edit them**: they encode same-day, same-series and day-boundary relationships that
+`today + n` by hand would lose.
 
 **`harness/` stubs must mirror the real modules, and `tests/harness-stubs.test.js` enforces
 it.** Add an alias in `harness/vite.config.js` without a matching stub — or add an export to
