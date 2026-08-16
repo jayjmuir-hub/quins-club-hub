@@ -31,7 +31,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   asked, so the new branch was unreachable in every case in the file. Plan:
   `claude/plans/2026-08-16-account-creation-redesign.md`.
 
-- 🐞 **"VIEW AS" MADE THE SIGN-IN GATE FORGET YOUR CHILDREN.** Jay, hours after
+- `e7e7c38` — 🐞 **"VIEW AS" MADE THE SIGN-IN GATE FORGET YOUR CHILDREN.** Jay, hours after
   the gate shipped, with two sons already linked: *"this has popped up twice in
   my own account… actually, it is specific to when i change viewing as"*.
   ⚠️ **A PREVIEW REPLACES THE EFFECTIVE MEMBERSHIPS WITH ONE SYNTHETIC ROW, AND
