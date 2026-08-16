@@ -10,6 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
+- ✨ **THE MATCH SHEET IS FILLED IN OFF THE FORM ON A PHONE.** The fixed-width fix
+  earlier today made RCM's facsimile LEGIBLE on a phone and left it awful to FILL
+  IN — 22 names into 40px boxes, scrolling sideways, standing at a pitch. Jay:
+  *"i think we should go with the stacked mobile version"*. Below 900px every
+  value is typed in a new `MatchSheetEntry` and the facsimile becomes a PREVIEW of
+  what Share sends; at 900px and above the paper fits and nothing changes.
+  ⚠️ **RENDERED, NOT CSS-HIDDEN, AND `src/lib/useMediaQuery.js` ALREADY SAID WHY.**
+  Both branches emit the same fields, so a `hidden` class would leave two of
+  everything in the DOM and `getByLabelText('Player 1')` would match twice — the
+  roster hit this exact wall first.
+  ⚠️ **THE LABELS ARE IDENTICAL ACROSS THE TWO BRANCHES, AND THAT IS THE DESIGN.**
+  jsdom has no `matchMedia`, so the whole suite runs the phone branch — and every
+  pre-existing match-sheet test passed untouched, because they query names rather
+  than layouts.
+  ⚠️ **THE PREVIEW IS NOT PIXEL-IDENTICAL TO THE PAPER AND THE NUMBER IS WRITTEN
+  DOWN: 1090px against 1115px, 2%, one to four pixels across ~20 rows.** Same
+  columns, same content, nothing clipped — the spans grow with their text. It is
+  recorded rather than rounded off because the bug this screen was fixed for this
+  morning was a form 501px too wide, and the way that stays away is treating a
+  growing number as a regression.
+  ⚠️ **TWO TRAPS FOUND BY MEASURING RATHER THAN REASONING.** A `disabled` checkbox
+  is greyed by every browser, so the obvious way to make the preview inert would
+  have reintroduced a phone/laptop mismatch by the back door — `pointer-events-none`
+  plus `tabIndex={-1}` renders identically. And the FR tap target was 34×60: tall
+  enough, too narrow, which is the easy half of the 44px floor to pass and the easy
+  half to miss.
+
 - `d576bb1` — 🐞 **THE MATCH SHEET WAS UNREADABLE ON A PHONE, AND THE SHARED IMAGE WAS THE
   SAME BUG, NOT A SECOND ONE.** Jay shared a sheet from his phone and it arrived
   mangled — "COMPETITION" printed over the competition's name, HOME TEAM and

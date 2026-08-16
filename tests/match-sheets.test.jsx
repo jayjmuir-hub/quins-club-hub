@@ -822,3 +822,149 @@ describe('MatchSheet — the 22 come from the lineup', () => {
     expect(screen.getByTestId('match-sheet-squad')).toBeInTheDocument()
   })
 })
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Filling it in on a phone — 16 Aug 2026
+   ══════════════════════════════════════════════════════════════════════════
+
+   ⚠️ WHY THIS EXISTS. The fixed-width fix earlier the same day made the sheet
+   LEGIBLE on a phone and left it awful to FILL IN: 22 names into 40px boxes,
+   scrolling sideways, standing on a pitch. Jay: *"i think we should go with the
+   stacked mobile version"*. Below 900px every value is typed in
+   MatchSheetEntry and the facsimile becomes a preview of what Share sends.
+
+   ⚠️ THE WHOLE SUITE ABOVE RUNS ON THE PHONE BRANCH AND DID NOT CHANGE. jsdom
+   has no matchMedia, so useMediaQuery returns false and the entry form is what
+   renders — and because its aria-labels are IDENTICAL to the facsimile's, every
+   pre-existing test kept passing without knowing the layout moved. That is the
+   design, not a coincidence: if the two ever disagree, this file goes red.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Renders the PAPER branch — the one jsdom never picks by default.
+ *
+ * ⚠️ STUBBED PER TEST, NOT IN SHARED SETUP, which is what src/lib/useMediaQuery.js
+ * asks for: it keeps "this test is about the wide layout" visible in the test
+ * rather than buried somewhere every other test also reads.
+ */
+function widenToPaper() {
+  const original = window.matchMedia
+  window.matchMedia = (query) => ({
+    matches: true,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+  })
+  return () => {
+    if (original === undefined) delete window.matchMedia
+    else window.matchMedia = original
+  }
+}
+
+describe('MatchSheet — filling it in when the paper does not fit', () => {
+  it('gives a phone the stacked form, and the paper keeps its own boxes', async () => {
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    // The phone branch: one editor, and it is not the facsimile.
+    expect(screen.getByTestId('match-sheet-entry')).toBeInTheDocument()
+    const paper = within(screen.getByTestId('match-sheet-facsimile'))
+    expect(paper.queryByLabelText('Player 1')).toBeNull()
+    expect(screen.getByLabelText('Player 1')).toBeInTheDocument()
+  })
+
+  it('⚠️ leaves the wide layout exactly as it was — typed ON the form', async () => {
+    const restore = widenToPaper()
+    try {
+      mount(<MatchSheet />)
+      await screen.findByTestId('match-sheet-facsimile')
+
+      expect(screen.queryByTestId('match-sheet-entry')).toBeNull()
+      // The box is back inside the facsimile, and it is an input again.
+      const paper = within(screen.getByTestId('match-sheet-facsimile'))
+      expect(paper.getByLabelText('Player 1').tagName).toBe('INPUT')
+      expect(paper.getByLabelText('Card 1 colour').tagName).toBe('SELECT')
+    } finally {
+      restore()
+    }
+  })
+
+  it('⚠️ types once and the preview follows — there is only one copy of the value', async () => {
+    const { user } = mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    await user.type(screen.getByLabelText('Player 1'), 'Rory Ellingham')
+
+    // The facsimile has no input for slot 1 on a phone, so the name can only be
+    // there as rendered text — which is what Share photographs.
+    expect(screen.getByTestId('match-sheet-facsimile')).toHaveTextContent('Rory Ellingham')
+  })
+
+  it('counts what is filled in, as a guide and never as a gate', async () => {
+    const { user } = mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    expect(screen.getByTestId('entry-filled-count')).toHaveTextContent('0 of 22')
+    await user.type(screen.getByLabelText('Player 1'), 'Rory Ellingham')
+    expect(screen.getByTestId('entry-filled-count')).toHaveTextContent('1 of 22')
+
+    // A short squad is normal and must still be submittable — the count says so
+    // and nothing acts on it.
+    expect(screen.getByRole('button', { name: /^submit$/i })).not.toBeDisabled()
+  })
+
+  it('⚠️ the card TIME box writes `minute`, the column that actually exists', async () => {
+    // The label is RCM's ("TIME") and the column is the database's (`minute`).
+    // Wiring the box to a key called `time` writes a field nothing reads, so the
+    // value vanishes on save with no error — which is how this was written the
+    // first time and why the assertion is on what reached saveMatchSheetCards.
+    const { user } = mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    await user.selectOptions(screen.getByLabelText('Card 1 colour'), 'yellow')
+    await user.type(screen.getByLabelText('Card 1 time'), '31')
+    await user.click(screen.getByRole('button', { name: /save draft/i }))
+
+    await waitFor(() => expect(saveCardsMock).toHaveBeenCalled())
+    const [, cards] = saveCardsMock.mock.calls[0]
+    expect(cards[0]).toMatchObject({ colour: 'yellow', minute: 31 })
+  })
+
+  it('⚠️ FR stays a real tick on the preview, not a greyed-out one', async () => {
+    // A `disabled` checkbox is greyed by every browser, so the PNG from a phone
+    // would stop matching the PNG from a laptop — the exact bug this screen was
+    // fixed for hours earlier. The preview box must be un-disabled and merely
+    // unreachable.
+    const { user } = mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    await user.click(screen.getByLabelText('Front row cover for player 1'))
+
+    const paper = screen.getByTestId('match-sheet-facsimile')
+    const boxes = paper.querySelectorAll('input[type="checkbox"]')
+    expect(boxes.length).toBe(22) // the form has 22, and a short squad is normal
+    expect(boxes[0].checked).toBe(true)
+    expect(boxes[0].disabled).toBe(false)
+  })
+
+  it('carries the manager, medical and captain boxes too, not only the 22', async () => {
+    // The facsimile is not editable on a phone, so anything it holds that is not
+    // in the stacked form is a field a coach simply cannot fill in.
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    const entry = within(screen.getByTestId('match-sheet-entry'))
+    for (const label of [
+      'Team captain',
+      'Medical notes',
+      'Team manager',
+      'Team manager phone',
+      'Card 1 reason',
+      'Front row cover for player 22',
+    ]) {
+      expect(entry.getByLabelText(label)).toBeInTheDocument()
+    }
+  })
+})
