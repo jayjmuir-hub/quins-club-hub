@@ -129,10 +129,21 @@ export default function NoticeRow({ notice, teamsById, unread, stat, expired, on
         {/* ── What it says ─────────────────────────────────────────────── */}
         <div className="mt-3">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            {unread && !expired && (
-              <span className="h-2 w-2 shrink-0 rounded-full bg-brand" aria-hidden="true" />
-            )}
+            {/* ⚠️ THE DOT IS INSIDE THE HEADING, NOT A FLEX SIBLING OF IT. As a
+                sibling in a wrapping row it was stranded on a line of its own
+                the moment a title ran past one line — a lone red dot above a
+                heading, which reads as a bullet nobody asked for. Inline-block
+                inside the text flows with the first word and cannot separate
+                from it however the title wraps.
+                ⚠️ SHAPE AS WELL AS COLOUR — paired with the "New" for screen
+                readers below, never colour alone (claude/specs/accessibility.md). */}
             <h3 className="text-[16px] font-extrabold leading-[1.3] tracking-[-.2px] text-ink">
+              {unread && !expired && (
+                <span
+                  aria-hidden="true"
+                  className="mr-2 inline-block h-2 w-2 rounded-full bg-brand align-middle"
+                />
+              )}
               {notice.title}
             </h3>
             {unread && !expired && <span className="sr-only">New</span>}

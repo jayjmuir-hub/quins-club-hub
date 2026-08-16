@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 // "Post a notice", wherever the person already is.
 //
@@ -105,5 +107,69 @@ describe('PostNoticeAction', () => {
     await user.click(screen.getByTestId('post-notice-action'))
     expect(screen.getByText('U14B Contact')).toBeInTheDocument()
     expect(screen.getByText('U16 Girls')).toBeInTheDocument()
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Where it sits, and how wide — 16 Aug 2026
+   ══════════════════════════════════════════════════════════════════════════
+
+   Jay, after the first placement shipped: *"the post a notice should not be at
+   the top of the screen, it should be in the quick actions section, also in More
+   the post a notice tab expands the entire width of the screen"*.
+
+   ⚠️ ASSERTED AS CLASS TOKENS, NOT AS MEASURED WIDTHS. jsdom applies no CSS, so
+   every width it reports is 0 — `w-full` is what actually decides this once real
+   CSS runs, and it is therefore what can be pinned. Same convention, and the
+   same reasoning, as tests/app-shell.test.jsx and tests/page-header-wrap.test.js.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('where the post action sits', () => {
+  const COACH = [{ role: 'coach', status: 'active', team_id: 't1' }]
+
+  it('honours `full` when the caller asks for it, and not otherwise', () => {
+    useMembershipsMock.mockReturnValue(ctx(COACH))
+    const { unmount } = render(<PostNoticeAction variant="secondary" full />)
+    expect(screen.getByTestId('post-notice-action').className).toContain('w-full')
+    unmount()
+
+    render(<PostNoticeAction variant="secondary" />)
+    expect(screen.getByTestId('post-notice-action').className).not.toContain('w-full')
+  })
+
+  // ⚠️ THE CALL SITES, WHICH IS THE PART THAT WAS ACTUALLY WRONG. The two cases
+  // above prove the PROP works and would both stay green with More still passing
+  // `full` — which is exactly the bug Jay reported. jsdom has no layout engine,
+  // so neither screen's width can be measured here; the source is what decides
+  // it, and pinning the source is the honest proxy. Same reasoning, and the same
+  // shape, as tests/page-header-wrap.test.js.
+  it('⚠️ Home stretches it and More does not — asserted at the call sites', () => {
+    const more = readFileSync(join(process.cwd(), 'src/screens/More.jsx'), 'utf8')
+    const dash = readFileSync(join(process.cwd(), 'src/screens/Dashboard.jsx'), 'utf8')
+
+    const moreCall = more.match(/<PostNoticeAction[^/]*\/>/)
+    const dashCall = dash.match(/<PostNoticeAction[^/]*\/>/)
+    expect(moreCall, 'More renders the post action').not.toBeNull()
+    expect(dashCall, 'Home renders the post action').not.toBeNull()
+
+    // ⚠️ SPACE-DELIMITED, NOT A WORD-BOUNDARY REGEX. A bare 'full' substring
+    // would also match `fullWidth` or `data-full`; the JSX prop is always
+    // surrounded by spaces, so this says the same thing without an escape.
+    expect(moreCall[0]).not.toContain(' full ')
+    expect(dashCall[0]).toContain(' full ')
+  })
+
+  // ⚠️ AND THAT IT IS IN QUICK ACTIONS, NOT ABOVE THE HERO — the other half of
+  // what Jay reported. Dashboard's own comments defend the space between the
+  // noticeboard and the next fixture harder than anything else on that screen.
+  it('⚠️ Home renders it inside the Quick actions card', () => {
+    const dash = readFileSync(join(process.cwd(), 'src/screens/Dashboard.jsx'), 'utf8')
+    const quickActions = dash.slice(
+      dash.indexOf('function QuickActions('),
+      dash.indexOf('export default function Dashboard('),
+    )
+    expect(quickActions).toContain('<PostNoticeAction')
+    // Exactly one, so it cannot also be sitting somewhere else on the screen.
+    expect(dash.match(/<PostNoticeAction/g)).toHaveLength(1)
   })
 })

@@ -412,7 +412,15 @@ export default function More() {
             WRITE one, and the route to that was More → Notices → wait → find a
             button. PostNoticeAction renders nothing at all for somebody who may
             not post, so this card is unchanged for a parent. */}
-        <PostNoticeAction className="mt-3" full />
+        {/* ⚠️ NOT `full` — Jay, 16 Aug 2026: "in More the post a notice tab
+            expands the entire width of the screen". A stretched button reads as
+            the card's primary action, and this card's primary action is the LINK
+            above it; the button is the secondary thing you can also do here.
+            Home is the opposite case and does pass `full`, because there it sits
+            in the Quick actions stack where every button is full-width and a
+            short one would be the odd one out. Same component, caller decides —
+            which is why `full` is a prop and not baked in. */}
+        <PostNoticeAction className="mt-3" variant="secondary" />
       </Card>
 
       {/* ⚠️ EVERY MEMBER SEES THIS, and that is the ruling rather than an
