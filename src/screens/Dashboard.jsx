@@ -17,7 +17,12 @@ import PostNoticeAction from '../components/PostNoticeAction.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
 import { listMySquadStaff } from '../data/staff.js'
-import { listMyReads, listNotices, markNoticesRead } from '../data/announcements.js'
+import {
+  listMyReads,
+  listNotices,
+  markNoticesRead,
+  subscribeNotices,
+} from '../data/announcements.js'
 import { pinnedNotices } from '../lib/notices.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -585,6 +590,17 @@ export default function Dashboard() {
       mounted = false
     }
   }, [memberships, noticeToken])
+
+  // ⚠️ REALTIME, BECAUSE THE EFFECT ABOVE RUNS ONCE AND THEN NEVER AGAIN.
+  // Jay, 16 Aug 2026: "notices are not appearing instantly on home screen, they
+  // only show up when i click refresh… if i don't hit refresh they never show
+  // up". `noticeToken` only covers a notice THIS person posts; one posted by
+  // anybody else never arrived until a reload.
+  //
+  // ⚠️ IT BUMPS THE TOKEN RATHER THAN REFETCHING HERE. One loader, one place —
+  // a second fetch path would be a second thing to keep in step with the reads
+  // and the error handling above.
+  useEffect(() => subscribeNotices(() => setNoticeToken((n) => n + 1)), [])
 
   // ⚠️ A THIRD SEPARATE READ, for the same reason as the staff one above: the
   // noticeboard shares no number with the stat tiles, so a failed notice read

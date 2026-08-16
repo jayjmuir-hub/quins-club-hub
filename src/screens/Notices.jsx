@@ -13,6 +13,7 @@ import {
   markNoticesRead,
   noticeAudience,
   noticeStats,
+  subscribeNotices,
 } from '../data/announcements.js'
 import { useAuth } from '../lib/auth.jsx'
 import { formatTableDate, formatTime } from '../lib/eventFormat.js'
@@ -215,6 +216,12 @@ export default function Notices() {
   useEffect(() => {
     load()
   }, [load])
+
+  // ⚠️ THE BOARD ITSELF ALSO NEEDED THIS, not just Home. Somebody sitting on
+  // /notices while a coach posts one would have watched an unchanged screen —
+  // and this is the screen where a person came specifically to read them, so
+  // silence here is the more misleading of the two.
+  useEffect(() => subscribeNotices(load), [load])
 
   // ⚠️ MARKED READ ON ARRIVAL, AND ONLY THE ONES ON SCREEN. This is what makes
   // the count mean "it appeared in front of them" — which is the strongest claim

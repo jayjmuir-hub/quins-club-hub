@@ -50,6 +50,7 @@ import {
   countSeriesFrom,
   deleteSeriesFrom,
 } from '../src/data/events.js'
+import { subscribeNotices } from '../src/data/announcements.js'
 import {
   listPlayers,
   getPlayerContact,
@@ -2553,5 +2554,93 @@ describe('approveMembership', () => {
   it('refuses to call at all without a membership id', async () => {
     await expect(approveMembership(undefined)).rejects.toThrow(/needs a membershipId/i)
     expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+})
+
+// --- subscribeNotices -----------------------------------------------------
+//
+// ⚠️ THE CLIENT WAS NEVER THE HARD PART. Jay, 16 Aug 2026: "notices are not
+// appearing instantly on home screen, they only show up when i click refresh".
+// `announcements` was not in the `supabase_realtime` publication — measured,
+// one table in it — so Postgres emitted nothing and any subscription would have
+// sat open receiving nothing, exactly as `subscribeEvents` did until 13 Aug.
+// These tests pin the CLIENT contract; the publication is
+// db/migrations/20260816_realtime_publication_announcements.sql, and no unit
+// test in this suite can see it. If notices ever go quiet again, check there
+// FIRST — the code being right is not evidence.
+
+describe('subscribeNotices', () => {
+  it('subscribes to postgres_changes on announcements and returns an unsubscribe', () => {
+    const channel = createChannel()
+    supabase.channel.mockReturnValue(channel)
+
+    const unsubscribe = subscribeNotices(vi.fn())
+
+    expect(channel.on).toHaveBeenCalledWith(
+      'postgres_changes',
+      expect.objectContaining({ event: '*', schema: 'public', table: 'announcements' }),
+      expect.any(Function),
+    )
+    expect(channel.subscribe).toHaveBeenCalled()
+    expect(typeof unsubscribe).toBe('function')
+  })
+
+  // ⚠️ SAME LOAD-BEARING ASSERTION AS subscribeEvents, AND FOR THE SAME REASON.
+  // `announcements` is replica identity DEFAULT — confirmed on production — so a
+  // DELETE payload carries the primary key only. A `team_id` filter would match
+  // nothing on a delete and a notice taken down would stay on every other
+  // screen until a reload.
+  it('passes NO server-side filter — a filter would drop deletes', () => {
+    const channel = createChannel()
+    supabase.channel.mockReturnValue(channel)
+
+    subscribeNotices(vi.fn())
+
+    const [, config] = channel.on.mock.calls[0]
+    expect(config).not.toHaveProperty('filter')
+  })
+
+  it('coalesces a burst into ONE callback', () => {
+    vi.useFakeTimers()
+    try {
+      const channel = createChannel()
+      supabase.channel.mockReturnValue(channel)
+      const callback = vi.fn()
+
+      subscribeNotices(callback, { debounceMs: 400 })
+      const [, , onChange] = channel.on.mock.calls[0]
+
+      onChange({})
+      onChange({})
+      expect(callback).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(400)
+      expect(callback).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // ⚠️ THE CALLBACK IS A setState. A change arriving just before a screen
+  // unmounts would otherwise fire afterwards, into a component that is gone.
+  it('⚠️ cancels a pending fire when unsubscribed', () => {
+    vi.useFakeTimers()
+    try {
+      const channel = createChannel()
+      supabase.channel.mockReturnValue(channel)
+      const callback = vi.fn()
+
+      const unsubscribe = subscribeNotices(callback, { debounceMs: 400 })
+      const [, , onChange] = channel.on.mock.calls[0]
+
+      onChange({})
+      unsubscribe()
+      vi.advanceTimersByTime(400)
+
+      expect(callback).not.toHaveBeenCalled()
+      expect(supabase.removeChannel).toHaveBeenCalledWith(channel)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- ✨ **THE SIGN-IN GATE NOW ASKS FOR A PHONE, AND WHETHER YOU HAVE A PLAYER.**
+- 🐞 **NOTICES NOW APPEAR WITHOUT A REFRESH.** Jay: *"notices are not appearing
+  instantly on home screen, they only show up when i click refresh… if i don't
+  hit refresh they never show up"*. Home fetched once on mount and had no
+  subscription; the token added earlier only covered a notice you posted
+  yourself, so one posted by anybody else never arrived.
+  ⚠️ **THE CLIENT WAS NEVER THE HARD PART, AND THIS REPO HAD ALREADY PAID TO
+  LEARN THAT.** `announcements` was not in the `supabase_realtime` publication —
+  measured before writing a line, and the publication held exactly ONE table.
+  A `subscribeNotices` written on its own would have reproduced
+  `subscribeEvents`' own documented bug precisely: correct-looking code, a
+  socket open and silent, no error anywhere. Both halves shipped together.
+  ⚠️ **NO SERVER-SIDE FILTER, AND THE OBVIOUS OPTIMISATION IS A BUG.**
+  `announcements` is replica identity DEFAULT — confirmed on production — so a
+  DELETE payload carries the primary key only. A `team_id` filter would match
+  nothing on a delete and a notice taken down would stay on everybody else's
+  screen. RLS already scopes delivery.
+  ⚠️ **THE BOARD SUBSCRIBES TOO, not just Home** — /notices is the screen
+  somebody came specifically to read them on, so silence there is the more
+  misleading of the two.
+
+- `52fa234` — ✨ **THE SIGN-IN GATE NOW ASKS FOR A PHONE, AND WHETHER YOU HAVE A PLAYER.**
   Jay: *"force people to fill out their full name and phone number… also force
   them to add a player or confirm again 1 time they don't have a player"*.
   ⚠️ **THE NAME HALF WAS ALREADY WORKING, AND MEASURING SAID SO BEFORE ANYTHING

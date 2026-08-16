@@ -17,6 +17,11 @@ vi.mock('../src/data/announcements.js', () => ({
   deleteNotice: vi.fn(),
   listMyReads: vi.fn(),
   markNoticesRead: vi.fn(),
+  // ⚠️ REALTIME (16 Aug 2026). An unmocked export is `undefined`, and this one
+  // is called in an effect — so every case in this file died before rendering.
+  // It must also return an unsubscribe FUNCTION: the effect returns whatever
+  // this gives back, and React calls it on cleanup.
+  subscribeNotices: () => () => {},
 }))
 
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => ({ user: { id: 'me' } }) }))
