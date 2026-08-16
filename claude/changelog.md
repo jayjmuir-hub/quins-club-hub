@@ -10,7 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- ✨ **DATE OF BIRTH HAS A HOME, AND IT IS NOT A COLUMN ON `players`.** Jay:
+- 🔒 **AN INVITE IS NOW WORTH ONLY WHAT THE PERSON SENDING IT COULD ALREADY
+  APPROVE.** Schema for the Invite button on a parent row (Jay: *"if the father
+  adds the mother for example"*).
+  ⛔ **`accept_invite` DID NOT NAME `status` AT ALL** — measured on live, not read
+  off the repo — so every accepted invite inherited the memberships default of
+  `active`. Harmless while only an admin-only form made invites. A safeguarding
+  hole the moment a PARENT could make one: `active` satisfies `can_see_team`, and
+  `player read` is squad-wide, so the father typing any address into the contacts
+  box would have handed that address every U12 child's name, photo and every
+  family's phone number, with nobody at the club checking it.
+  ⚠️ **`invites.grant_status` IS A STORED VALUE, NOT A DERIVED RULE.**
+  `accept_invite` reads a column instead of growing a second security judgement
+  that has to stay in step with the first. Default `active`, so the existing
+  admin form is untouched.
+  ⚠️ **THE RULE KEYS ON `can_approve_team`, NOT ON "IS THE CALLER STAFF" — AND
+  THE DIFFERENCE IS A MEDIC.** Medic is in `can_edit_team` and NOT in
+  `can_approve_team`, so a medic may press the button and their invite lands
+  **pending**: nobody may grant by the back door what they cannot grant by the
+  front one. **The invariant for any future role: nobody can mint an invite worth
+  more than they could approve.**
+
+- `aff8a0e` — ✨ **DATE OF BIRTH HAS A HOME, AND IT IS NOT A COLUMN ON `players`.** Jay:
   *"i think we need to have date of birth"* — reversing the standing ruling in
   `src/lib/ageGroup.js` that the club holds no DOBs.
   ⛔ **A COLUMN ON `players` WOULD HAVE PUBLISHED EVERY CHILD'S BIRTHDAY TO

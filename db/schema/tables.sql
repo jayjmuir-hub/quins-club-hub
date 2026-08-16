@@ -375,6 +375,11 @@ CREATE TABLE public.player_parents (
   created_at    timestamptz          DEFAULT now(),
   CONSTRAINT player_parents_pkey           PRIMARY KEY (id),
   CONSTRAINT player_parents_player_id_fkey FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+  -- !! ADDED 16 Aug 2026 (invite_parent). When invite_parent last minted an
+  -- !! invite for this row; drives the button's Invite / Sent / Joined states.
+  -- !! ⚠️ NOT PROOF OF DELIVERY. The send is a separate step and can fail after
+  -- !! this is stamped. It records that we ASKED, never that anything arrived.
+  invited_at    timestamptz,
   CONSTRAINT player_parents_name_not_blank CHECK ((btrim(full_name) <> ''::text))
 );
 ALTER TABLE public.player_parents ENABLE ROW LEVEL SECURITY;
@@ -890,6 +895,19 @@ CREATE TABLE public.invites (
   team_id      uuid,
   player_id    uuid,
   token        uuid        NOT NULL DEFAULT gen_random_uuid(),
+  -- !! ADDED 16 Aug 2026 (invite_grant_status). The memberships.status an
+  -- !! accepted invite creates. Read by public.accept_invite.
+  -- !! ⛔ IT EXISTS BECAUSE accept_invite DID NOT NAME `status` AT ALL, so every
+  -- !! accepted invite inherited the memberships default of 'active'. Invisible
+  -- !! and harmless while only an admin-only form made invites; a safeguarding
+  -- !! hole the moment public.invite_parent let a PARENT make one, because
+  -- !! 'active' satisfies can_see_team and `player read` is squad-wide.
+  -- !! ⚠️ DEFAULT 'active' IS LOAD-BEARING: InviteForm names no such column and
+  -- !! must keep the behaviour it has always had.
+  -- !! ⚠️ THE CHECK MIRRORS memberships_status_check ON PURPOSE. If the two ever
+  -- !! disagree an invite is BURNT — accepted_at is stamped, then the membership
+  -- !! insert fails on the constraint, half way through a SECURITY DEFINER call.
+  grant_status text        NOT NULL DEFAULT 'active'::text,
   created_by   uuid,
   created_at   timestamptz NOT NULL DEFAULT now(),
   accepted_at  timestamptz,
