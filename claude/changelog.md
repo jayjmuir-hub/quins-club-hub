@@ -37,7 +37,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   RUNS** — `VITE_*` is substituted at build time, so adding the variable alone
   changes nothing. Two faults injected and both caught.
 
-- 📡 **THE MONITORING ASSERTIONS ARE WRITTEN DOWN AND RUNNABLE, AND ONE OF THEM
+- `7bb870d` — 📡 **THE MONITORING ASSERTIONS ARE WRITTEN DOWN AND RUNNABLE, AND ONE OF THEM
   IS THE OPPOSITE OF WHAT ANYBODY WOULD CONFIGURE.** `npm run check:live`
   (`scripts/live-check.mjs`, no dependencies, no credentials) plus
   `claude/runbooks/monitoring.md`. The accounts are still Jay's and still
