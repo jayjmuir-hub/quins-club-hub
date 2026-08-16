@@ -76,7 +76,7 @@ re-created. 6–8 are the durable shape.
 
 ---
 
-## 1 · The mirror question
+## 1 · The mirror question — ✅ BUILT AND VERIFIED LIVE, 16 Aug 2026
 
 A person holding no staff membership and no recorded answer is asked once, in the
 existing sign-in gate: **do you do anything else at the club?** Answers are *no,
@@ -104,6 +104,53 @@ never read that squad's children. It creates a **pending** membership through a
 
 ⚠️ **A PLAYER-ONLY ACCOUNT IS NOT ASKED**, for the same reason it is not asked
 for a phone number.
+
+### What the live probe actually proved — and the run that proved nothing
+
+Both migrations applied, then exercised against production inside a transaction
+that raises at the end. **The first run was worthless and is recorded because of
+it.** It picked the squad with the lowest `sort_order`, which is `U6 Tag` —
+**0 players and 0 events** — so "a pending coach sees 0 players" was a statement
+about an empty table, not about RLS. That is the trap `CLAUDE.md` rule 6 names,
+met for the third time on this project.
+
+Re-run against `U16B`, which has real rows, **with a control**:
+
+| | players | events | parent contacts |
+|---|---|---|---|
+| control, no RLS | 4 | 35 | — |
+| stranger, no memberships | 0 | 0 | — |
+| **pending coach** | **0** | **35** | **0** |
+| flipped to `active` | 4 | — | — |
+
+The flip is what makes the zero evidence: the same query returns 4 the moment
+the status changes, so the 0 is `status` doing its job rather than the query
+finding nothing. Also proved in the same run: `role = 'admin'` refused (22023),
+an unknown squad refused (22023), the created row is
+`pending / coach / player_id NULL / is_super false / rights 0`, `club_id` derived
+from the squad, and a second call returns the **same row** rather than tripping
+`memberships_unique_grant`.
+
+⚠️ **AND THE ACL WAS WRONG ON FIRST APPLY.** The migration claimed anon was
+excluded; `pg_proc.proacl` said otherwise, because Supabase's default privileges
+grant EXECUTE to anon on creation and `revoke … from public` does not remove an
+explicit grant. Revoked, re-read, and the migration file now carries the extra
+line. `register_my_player` has the same grant and was deliberately left alone —
+`claude/open-items.md`.
+
+### Three injected faults, each caught by one test
+
+| Fault | Test that failed |
+|---|---|
+| gate on `memberships` instead of `realMemberships` | *does not open while previewing as a parent* |
+| drop `'admin'` from the staff-role list | *never asks an admin* |
+| record "no role" as well as sending the request | *sends the squad and the role, and does NOT record "no role"* |
+
+⚠️ **AND THE SUITE WAS GREEN BEFORE ANY OF THOSE TESTS EXISTED.** Adding the
+fourth step broke nothing, which read as "it works" and meant "the new branch is
+unreachable": the file's default fixture is an **admin**, who is correctly never
+asked. A gate step can be added to this component and be tested by nothing at
+all — check the fixture's role before believing a green run here.
 
 ## 2 · Split every name into first and family
 

@@ -73,6 +73,33 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Cheap (under an hour each)
 
+- **`public.register_my_player` is executable by `anon`, and it looks deliberate
+  when it is not.** Measured on production 16 Aug 2026 while adding
+  `request_staff_role`:
+
+  ```
+  register_my_player   postgres=X anon=X authenticated=X service_role=X
+  accept_invite        postgres=X        authenticated=X service_role=X
+  claim_roster_access  postgres=X        authenticated=X service_role=X
+  set_admin_rights     postgres=X        authenticated=X service_role=X
+  ```
+
+  ⚠️ **NOT A HOLE, WHICH IS WHY IT IS HERE AND NOT HIGHER UP.** Every guard in
+  that function keys on `auth.uid()`, so an anon caller is refused at the first
+  line with `42501`. The problem is that three comparable RPCs do *not* carry the
+  grant, so anybody reading the ACLs will conclude the difference was a decision.
+  It was not: Supabase ships `ALTER DEFAULT PRIVILEGES … GRANT EXECUTE ON
+  FUNCTIONS TO anon, authenticated, service_role`, so a new function arrives with
+  an EXPLICIT anon grant, and `revoke all … from public` does not remove it —
+  it only removes the implicit PUBLIC entry. Whoever wrote the tightened three
+  added an explicit `revoke … from anon`; whoever wrote this one did not.
+
+  Fix is one statement (`revoke execute on function public.register_my_player(…)
+  from anon`) plus the same line in its migration file. ⚠️ **Deliberately NOT
+  done on 16 Aug**: it touches the live registration path for tidiness rather
+  than for a defect, and the club is mid-onboarding. `request_staff_role` was
+  tightened at creation and carries the full explanation in its migration header.
+
 - ✅ ~~**No dependency scanning.** No Dependabot, no `npm audit` step.~~ —
   **both shipped 15 Aug 2026.** `.github/dependabot.yml` watches npm weekly and
   the workflow actions monthly, grouped so minor and patch arrive as one

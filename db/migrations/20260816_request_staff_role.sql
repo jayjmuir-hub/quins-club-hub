@@ -154,9 +154,25 @@ end;
 $function$
 ;
 
--- Same grant shape as register_my_player: nobody by default, `authenticated`
--- explicitly. ⚠️ NOT `anon` — every guard above keys on auth.uid(), and an anon
--- caller would only ever reach the 42501 on line one, but granting it would
--- advertise the function to an unauthenticated caller for no reason.
+-- ⚠️ `revoke ... from public` IS NOT ENOUGH ON SUPABASE, AND THIS WAS MEASURED
+-- RATHER THAN ASSUMED. This file originally carried only the two lines below
+-- and claimed in a comment that anon was excluded. It was not: reading
+-- `pg_proc.proacl` straight after applying showed
+--
+--     postgres=X/postgres anon=X/postgres authenticated=X/postgres service_role=X/postgres
+--
+-- Supabase ships `ALTER DEFAULT PRIVILEGES ... GRANT EXECUTE ON FUNCTIONS TO
+-- anon, authenticated, service_role`, so a newly created function arrives with
+-- anon holding an EXPLICIT grant. `revoke from public` removes the implicit
+-- PUBLIC entry and leaves that explicit one untouched.
+--
+-- ⚠️ AND `public.register_my_player` HAS THE SAME anon GRANT ON PRODUCTION FOR
+-- THE SAME REASON — measured 16 Aug 2026. It is not a hole: every guard in both
+-- functions keys on auth.uid() and an anon caller is refused at the first line.
+-- It is recorded because three other public RPCs (accept_invite,
+-- claim_roster_access, set_admin_rights) do NOT carry it, so the schema looks
+-- deliberate and is not. Left alone here rather than tidied — see
+-- claude/open-items.md.
 revoke all on function public.request_staff_role(uuid, text) from public;
+revoke execute on function public.request_staff_role(uuid, text) from anon;
 grant execute on function public.request_staff_role(uuid, text) to authenticated;
