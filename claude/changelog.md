@@ -10,7 +10,35 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
-- 🎯 **THE PICKER NOW SHOWS WHICH PARTS OF A PHOTO WILL ACTUALLY APPEAR.** Jay:
+- 🔍 **A REVIEW PASS OVER THE PHOTO FEATURE — four findings, ranked and fixed.**
+  **1)** Every admin "Change photo" was STRANDING THE OLD OBJECT in a private
+  bucket of real people's photographs, forever — and a failure after upload
+  stranded the new one. Invisible to the suite, which mocks the data layer; the
+  fix copies MyPhotoField's ordering and the new tests pin CALL ORDER, proved
+  able to fail by fault injection.
+  **2)** The drop zone accepted photos the uploaders reject: `image/*` let a
+  HEIC — every iPhone's default — through to a BLANK preview and a failure two
+  steps later. Drop filter, `accept` attribute and uploaders now name the same
+  three types.
+  **3)** Admin could add and change a photo but never REMOVE one; the RPC always
+  allowed it. A Remove button now exists — row first, object second.
+  **4)** Dragging the focal point re-rendered four images per pointer event; an
+  rAF gate makes it one update per painted frame, for the mid-range Android this
+  app is built for.
+  ⚠️ **THE SUITE WAS ALSO SILENTLY DOUBLED — 125 files ran as 250.** Another
+  session's agent worktree at `.claude/worktrees/<name>/` is a full checkout of
+  this repo INSIDE this repo, and the `**/` include collected every test twice —
+  the duplicates running against the WORKTREE'S OLDER SOURCE, so their result
+  said nothing about the code under edit. The include is now anchored to
+  `tests/`, where every tracked test file lives (measured: 126 there, 0
+  elsewhere).
+  ⚠️ **TWO FIX ATTEMPTS DIED SILENTLY FIRST, BECAUSE `test:` ALREADY HAD AN
+  `include:` LOWER IN THE SAME OBJECT.** A duplicate key in an object literal is
+  not an error — the later one wins — and every probe of the earlier one reads
+  as "the config is being ignored". Twenty minutes of theory; one
+  `grep -n include vite.config.js` answered it.
+
+- `f4c36f6` — 🎯 **THE PICKER NOW SHOWS WHICH PARTS OF A PHOTO WILL ACTUALLY APPEAR.** Jay:
   *"can't we have a circle on the photo preview that shows which parts of the pic
   will actually appear?"* The stage draws the region that survives **every** one
   of the three shapes, dimmed outside it, moving as the point moves.

@@ -116,13 +116,23 @@ export function safeWindow(photoAspect, focus) {
 }
 
 /**
- * ⚠️ IMAGE TYPES ONLY, AND CHECKED RATHER THAN TRUSTED. A drop target accepts
- * anything the OS will hand it — a folder, a PDF, a 40MB video. The file input
- * has `accept`, which drag-and-drop bypasses entirely, so the same rule has to
- * live in code or the two routes disagree.
+ * ⚠️ THE EXACT TYPES THE UPLOADERS ACCEPT, NOT `image/*` — REVIEW FINDING,
+ * 15 Aug 2026. The first version passed anything `image/*`, but both
+ * `uploadStaffPhoto` and `uploadPlayerPhoto` refuse everything outside this
+ * list. So a dropped HEIC — the DEFAULT format of every iPhone — was accepted
+ * here, previewed as a BLANK rectangle (browsers cannot render HEIC), and then
+ * failed at save with an error two steps removed from the mistake. The whole
+ * point of this check is that the drop route and the input route agree; it was
+ * agreeing with the wrong thing.
+ *
+ * ⚠️ KEPT IN STEP WITH `ALLOWED_TYPES` IN src/data/photos.js BY EYE, not by
+ * import: this component must stay importable without the Supabase client,
+ * which photos.js drags in at module scope.
  */
+export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
 export function isAcceptableImage(file) {
-  return Boolean(file) && typeof file.type === 'string' && file.type.startsWith('image/')
+  return Boolean(file) && ACCEPTED_IMAGE_TYPES.includes(file.type)
 }
 
 function UploadIcon(props) {
@@ -198,7 +208,7 @@ export function PhotoDropZone({ onFile, disabled = false, label = 'Add a photo' 
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPTED_IMAGE_TYPES.join(",")}
         className="sr-only"
         aria-label={label}
         onChange={(e) => {
@@ -211,7 +221,7 @@ export function PhotoDropZone({ onFile, disabled = false, label = 'Add a photo' 
 
       {rejected && (
         <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger">
-          That is not an image. Choose a JPEG or PNG.
+          That photo is in a format the site cannot use. Choose a JPEG, PNG or WebP.
         </p>
       )}
     </div>
@@ -227,6 +237,7 @@ export function PhotoDropZone({ onFile, disabled = false, label = 'Add a photo' 
  */
 export function PhotoPositioner({ url, focus, onFocusChange, disabled = false }) {
   const stageRef = useRef(null)
+  const frameRef = useRef(0)
   const [dragging, setDragging] = useState(false)
   // ⚠️ THE PHOTO'S OWN ASPECT RATIO, READ OFF THE DECODED IMAGE. The guide
   // circle cannot be drawn without it — how much of a photo a shape keeps
@@ -298,7 +309,19 @@ export function PhotoPositioner({ url, focus, onFocusChange, disabled = false })
           aria-label="Position the photo. Drag, or use the arrow keys."
           tabIndex={disabled ? -1 : 0}
           onPointerDown={onPointerDown}
-          onPointerMove={(e) => dragging && setFromEvent(e)}
+          // ⚠️ ONE UPDATE PER FRAME, NOT PER EVENT — review finding, 15 Aug
+          // 2026. Pointer events fire faster than the display refreshes, and
+          // every update re-renders the stage plus all three previews; on the
+          // mid-range Android this app is built for, an un-throttled drag is
+          // visibly janky. clientX/Y are captured before the frame callback.
+          onPointerMove={(e) => {
+            if (!dragging || frameRef.current) return
+            const { clientX, clientY } = e
+            frameRef.current = requestAnimationFrame(() => {
+              frameRef.current = 0
+              setFromEvent({ clientX, clientY })
+            })
+          }}
           onPointerUp={() => setDragging(false)}
           onPointerCancel={() => setDragging(false)}
           onKeyDown={onKeyDown}

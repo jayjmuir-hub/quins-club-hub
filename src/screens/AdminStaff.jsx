@@ -10,7 +10,7 @@ import PhotoPositioner, {
   focusToObjectPosition,
 } from '../components/PhotoPositioner.jsx'
 import { listSquadStaff, setMembershipTitle } from '../data/staff.js'
-import { setStaffPhoto, signStaffPhotoUrl, uploadStaffPhoto } from '../data/photos.js'
+import { deleteStaffPhoto, setStaffPhoto, signStaffPhotoUrl, uploadStaffPhoto } from '../data/photos.js'
 import { initials } from '../lib/playerFormat.js'
 import { STAFF_TITLES, labelForRole } from '../lib/scope.js'
 
@@ -104,15 +104,55 @@ function StaffPhoto({ member, onPhoto }) {
     setFocus(DEFAULT_FOCUS)
   }
 
+  // ⚠️ THE ORDERING HERE IS MyPhotoField'S, COPIED WITH ITS REASONING, AND THE
+  // FIRST VERSION OF THIS FUNCTION HAD NEITHER HALF. Every "Change photo" was
+  // stranding the PREVIOUS object in the bucket forever — a private bucket
+  // holding photographs of real people — and a failure after the upload landed
+  // stranded the NEW one. Found in review, not by a test: the suite mocks the
+  // data layer, so an orphaned storage object is invisible to it.
+  //
+  // Upload, record, and only then delete the old object — deleting first
+  // would, on a failed record, leave the profile pointing at a file that no
+  // longer exists. On failure, delete the just-uploaded object. Both deletes
+  // are best-effort: an orphan is untidy, and must never turn a good save into
+  // a visible error.
   async function save() {
     setBusy(true)
     setError(null)
+    const previous = member.photoPath
     let key = null
     try {
       if (file) {
         key = await uploadStaffPhoto(member.profileId, file)
       }
-      const saved = await setStaffPhoto(member.profileId, key ?? member.photoPath, focus)
+      const nextPath = key ?? member.photoPath
+      const saved = await setStaffPhoto(member.profileId, nextPath, focus)
+      if (previous && previous !== nextPath) {
+        deleteStaffPhoto(previous)
+      }
+      onPhoto(member.membershipId, saved)
+      close()
+    } catch (err) {
+      if (key) deleteStaffPhoto(key)
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // ⚠️ REMOVE EXISTS BECAUSE THE RPC ALWAYS ALLOWED IT AND THE UI NEVER OFFERED
+  // IT — an admin who put the wrong photo on the wrong person could only fix it
+  // by overwriting with another photo. Row first, object second, for the reason
+  // MyPhotoField.remove() records: the row is the only thing anyone reads, so
+  // clearing it is what makes the photo gone; a failed object delete then
+  // leaves an unreferenced file rather than a profile pointing at a missing one.
+  async function removePhoto() {
+    setBusy(true)
+    setError(null)
+    const previous = member.photoPath
+    try {
+      const saved = await setStaffPhoto(member.profileId, null, null)
+      if (previous) deleteStaffPhoto(previous)
       onPhoto(member.membershipId, saved)
       close()
     } catch (err) {
@@ -182,6 +222,11 @@ function StaffPhoto({ member, onPhoto }) {
         <Button variant="ghost" onClick={close} disabled={busy}>
           Cancel
         </Button>
+        {member.photoPath && !replacing && (
+          <Button variant="ghost" onClick={removePhoto} disabled={busy} data-testid="staff-photo-remove">
+            Remove photo
+          </Button>
+        )}
         {shown && !busy && (
           <button
             type="button"
