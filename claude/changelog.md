@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 🐞 **SENTRY IS LIVE, AND THE LAZY LOAD HOLDS ON THE REAL BUNDLE.** DSN added in
+- 📓 **`state-of-play.md` STILL SAID "NO MONITORING EXISTS AT ALL".** It is
+  reading-order step 3, so the highest-traffic file after `CLAUDE.md` was telling
+  every new session something that had been false for hours. Corrected, and Jay's
+  position on the staff-attachment item recorded — *it resolves as staff sign in,
+  it is not blocking* — so the next session stops raising it as the top priority.
+  ⚠️ **The file went to 81 lines, one over its own stated ceiling**, and was
+  trimmed rather than excused; the detail belongs in the runbook.
+
+- `d4c06af` — 🐞 **SENTRY IS LIVE, AND THE LAZY LOAD HOLDS ON THE REAL BUNDLE.** DSN added in
   Netlify and the site rebuilt, EU region. Proven by firing an unhandled rejection
   on the live site: the SDK chunk loaded on demand, POSTed to the ingest endpoint,
   got **200**, and the issue appeared in Sentry.
