@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { getMyProfile, updateProfileNames } from '../data/members.js'
-import { createAccessRequest, getMyAccessRequest } from '../data/accessRequests.js'
+import {
+  createAccessRequest,
+  getMyAccessRequest,
+  listSquadsForRequest,
+} from '../data/accessRequests.js'
 import Button from './Button.jsx'
 
 // What a signed-in account with NO membership sees. Replaces the older
@@ -25,8 +29,29 @@ import Button from './Button.jsx'
 // This screen deliberately shows NO club data, because it has none to show:
 // every SELECT policy in the database bottoms out in a memberships row for
 // auth.uid(), so this user reads zero rows from every table including teams.
-// That is also why the note below is free text rather than a squad picker —
-// there is nothing to populate a dropdown with.
+// That is also why the note below was free text rather than a squad picker for
+// its first fortnight: there was nothing to populate a dropdown with.
+//
+// ⚠️ THE SQUAD LIST NOW COMES FROM AN RPC, WHICH IS THE ONLY WAY IT COULD.
+// `public.list_squads_for_access_request` is SECURITY DEFINER and returns three
+// columns to any signed-in caller — see
+// db/migrations/20260816_access_request_role_and_squad.sql for why that is
+// narrower and better than widening the `teams` policy. The sentence above still
+// holds for every other table: this screen shows no club data it has not been
+// handed deliberately.
+
+// ⚠️ NO 'admin'. Every role here is squad-scoped and granted by a coach or
+// manager approving a stranger; admin is club-wide and granted by an existing
+// admin on a different screen. The CHECK constraint in the migration holds the
+// same list, and the database is the one that matters — if these ever disagree,
+// a request fails on save rather than being quietly downgraded.
+const REQUESTABLE_ROLES = [
+  { value: 'parent', label: 'Parent or guardian' },
+  { value: 'player', label: 'Player' },
+  { value: 'coach', label: 'Coach' },
+  { value: 'manager', label: 'Team manager' },
+  { value: 'medic', label: 'Medic or physio' },
+]
 
 function Shell({ title, children }) {
   return (
@@ -48,8 +73,33 @@ export default function RequestAccess({ userId, email, children }) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [note, setNote] = useState('')
+  // ⚠️ REQUIRED SINCE 16 Aug 2026. Jay: "i still have account requests coming in
+  // and have no idea who they are because they don't type any extra info". The
+  // free-text note stays, but it is no longer the only thing an admin gets.
+  const [role, setRole] = useState('')
+  const [teamId, setTeamId] = useState('')
+  const [squads, setSquads] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+
+  // ⚠️ ITS OWN EFFECT, AND A FAILURE HERE IS NOT A FAILURE OF THE SCREEN. The
+  // request check below decides WHICH branch renders; this only fills a picker.
+  // If the RPC is unreachable the form still has to appear — an empty squad list
+  // is handled at the control, which says so, rather than by showing somebody
+  // locked out of the club a page that will not load.
+  useEffect(() => {
+    let mounted = true
+    listSquadsForRequest()
+      .then((rows) => {
+        if (mounted) setSquads(rows)
+      })
+      .catch(() => {
+        if (mounted) setSquads([])
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   useEffect(() => {
     // Defensive only: RequireAuth guarantees a session above this, so a
@@ -119,7 +169,7 @@ export default function RequestAccess({ userId, email, children }) {
         firstName: first,
         lastName: lastName.trim(),
       })
-      const created = await createAccessRequest({ profileId: userId, note })
+      const created = await createAccessRequest({ profileId: userId, note, role, teamId })
       setRequest(created)
     } catch (err) {
       setError(err.message || 'Something went wrong sending your request. Try again.')
@@ -286,11 +336,74 @@ export default function RequestAccess({ userId, email, children }) {
           className="w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand"
         />
 
+        {/* ── WHO ARE YOU, AND FOR WHICH SQUAD ────────────────────────────
+            ⚠️ BOTH REQUIRED, AND `required` HERE IS THE CONVENIENCE RATHER THAN
+            THE RULE. The INSERT policy refuses a row without them
+            (db/migrations/20260816_access_request_require_role.sql); this just
+            means somebody finds out before they press the button instead of
+            after. ── */}
+        <label
+          htmlFor="request-role"
+          className="mb-1.5 mt-4 block text-xs font-bold uppercase tracking-wide text-ink-faint"
+        >
+          I am a
+        </label>
+        <select
+          id="request-role"
+          name="role"
+          required
+          value={role}
+          onChange={(event) => setRole(event.target.value)}
+          className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-base text-ink focus:border-brand"
+        >
+          {/* ⚠️ NO PRESELECTED ROLE. Defaulting to "Parent" would be right most
+              of the time and would mean every coach who did not notice the
+              dropdown files as a parent — which is the same "no idea who they
+              are" problem wearing a more confident face. */}
+          <option value="">Choose one…</option>
+          {REQUESTABLE_ROLES.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
+        <label
+          htmlFor="request-team"
+          className="mb-1.5 mt-4 block text-xs font-bold uppercase tracking-wide text-ink-faint"
+        >
+          Age group
+        </label>
+        <select
+          id="request-team"
+          name="teamId"
+          required
+          disabled={squads.length === 0}
+          value={teamId}
+          onChange={(event) => setTeamId(event.target.value)}
+          className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-base text-ink focus:border-brand disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="">
+            {squads.length === 0 ? 'Loading squads…' : 'Choose one…'}
+          </option>
+          {squads.map((squad) => (
+            <option key={squad.id} value={squad.id}>
+              {squad.name}
+            </option>
+          ))}
+        </select>
+        {/* ⚠️ SAYS WHAT TO DO ABOUT THE LIMIT RATHER THAN HIDING IT. One squad
+            is what the row can hold, and a parent with three children has a
+            real answer to give — the note below is where it goes. */}
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+          More than one child, or more than one squad? Pick the eldest and say so below.
+        </p>
+
         <label
           htmlFor="request-note"
           className="mb-1.5 mt-4 block text-xs font-bold uppercase tracking-wide text-ink-faint"
         >
-          Who are you at the club? <span className="font-semibold normal-case">(optional)</span>
+          Anything else? <span className="font-semibold normal-case">(optional)</span>
         </label>
         <textarea
           id="request-note"
@@ -298,7 +411,7 @@ export default function RequestAccess({ userId, email, children }) {
           rows={3}
           value={note}
           onChange={(event) => setNote(event.target.value)}
-          placeholder="e.g. Parent of Sam Muir, U10"
+          placeholder="e.g. also a younger sibling in U8 Tag"
           className="w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand"
         />
 

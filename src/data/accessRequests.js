@@ -31,7 +31,7 @@ export async function getMyAccessRequest(profileId) {
 
   const { data, error } = await supabase
     .from('access_requests')
-    .select('id, profile_id, note, status, created_at')
+    .select('id, profile_id, note, status, created_at, requested_role, requested_team_id')
     .eq('profile_id', profileId)
     .maybeSingle()
 
@@ -50,19 +50,53 @@ export async function getMyAccessRequest(profileId) {
  * trimmed to null rather than stored as an empty string so the admin screen
  * can tell "said nothing" from "said something blank".
  */
-export async function createAccessRequest({ profileId, note } = {}) {
+export async function createAccessRequest({ profileId, note, role, teamId } = {}) {
   if (!profileId) throw new Error('createAccessRequest needs a profileId.')
 
   const trimmed = typeof note === 'string' ? note.trim() : ''
 
   const { data, error } = await supabase
     .from('access_requests')
-    .insert({ profile_id: profileId, note: trimmed || null })
+    .insert({
+      profile_id: profileId,
+      note: trimmed || null,
+      // ⚠️ REQUIRED SINCE 16 Aug 2026, AND THE INSERT POLICY IS WHAT REQUIRES
+      // THEM. Jay: "i still have account requests coming in and have no idea who
+      // they are because they don't type any extra info". Sending null here does
+      // not produce a row with blanks — it is refused by
+      // `access request insert own`, which is the point: the form is the
+      // convenience and the policy is the gate.
+      requested_role: role || null,
+      requested_team_id: teamId || null,
+    })
     .select()
     .maybeSingle()
 
   if (error) throw error
   return data
+}
+
+/**
+ * The club's squads, for the access-request form's picker.
+ *
+ * ⚠️ AN RPC AND NOT A TABLE READ, AND THAT IS THE WHOLE REASON IT EXISTS. The
+ * person filling this form in has no membership row, and every SELECT policy in
+ * the schema bottoms out in one — so `from('teams').select()` returns an empty
+ * list for them, not an error. A dropdown built on it would silently have no
+ * options, which is exactly the failure the free-text note existed to avoid.
+ *
+ * `public.list_squads_for_access_request` is SECURITY DEFINER and returns three
+ * columns. See db/migrations/20260816_access_request_role_and_squad.sql for why
+ * it is a function rather than a wider policy on `teams`.
+ *
+ * Returns [] rather than throwing when the call fails: the form still has to be
+ * submittable-looking while it loads, and the caller decides what an empty list
+ * means on screen.
+ */
+export async function listSquadsForRequest() {
+  const { data, error } = await supabase.rpc('list_squads_for_access_request')
+  if (error) throw error
+  return data ?? []
 }
 
 /**
@@ -74,7 +108,10 @@ export async function createAccessRequest({ profileId, note } = {}) {
 export async function listAccessRequests() {
   const { data, error } = await supabase
     .from('access_requests')
-    .select('id, profile_id, note, status, created_at, decided_at, decided_by')
+    .select(
+      'id, profile_id, note, status, created_at, decided_at, decided_by,' +
+        ' requested_role, requested_team_id',
+    )
     .order('created_at', { ascending: false })
 
   if (error) throw error

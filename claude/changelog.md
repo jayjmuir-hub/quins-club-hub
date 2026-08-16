@@ -10,7 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 🗄️ **THE SQUADS LOST THEIR " Contact" SUFFIX — a live data change, applied to
+- ✨ **AN ACCESS REQUEST NOW SAYS WHO IS ASKING AND FOR WHICH SQUAD.** Jay: *"i
+  still have account requests coming in and have no idea who they are because
+  they don't type any extra info"*. A required role and a required age group,
+  with the free-text note kept for the rest.
+  ⚠️ **THE FREE TEXT WAS NOT LAZINESS — IT WAS THE ONLY THING THAT COULD WORK.**
+  Every SELECT policy in the schema bottoms out in a memberships row for
+  `auth.uid()`, so the person filling this form in reads ZERO ROWS FROM EVERY
+  TABLE, `teams` included. There was nothing to populate a dropdown with. The
+  picker is fed by a new SECURITY DEFINER RPC returning three columns —
+  narrower than widening the `teams` policy, and the same shape as
+  `claim_roster_access`.
+  ⚠️ **THE INSERT POLICY IS THE GATE, NOT THE `<select>`.** A required dropdown
+  means somebody finds out before they press the button; the policy is what makes
+  a blank request impossible to file.
+  ⚠️ **AND THE MIGRATION IS DELIBERATELY IN TWO HALVES, IN A FIXED ORDER.**
+  Columns and RPC first (additive, safe against the running app), then the form
+  deploys, then the policy tightens. Landing the policy with the columns would
+  refuse every signup in between — a stranger trying to join the club told, in
+  effect, that they are not allowed, with nothing on screen to explain it.
+  ⚠️ **FOUR MOCKS AND A HARNESS STUB HAD TO GAIN THE NEW EXPORT**, and an
+  unmocked one is `undefined` — called in an effect, it throws before anything
+  renders, so the whole file goes red at once. `tests/harness-stubs.test.js` caught
+  its half, the fifth time that guard has earned its keep.
+
+- `1611380` — 🗄️ **THE SQUADS LOST THEIR " Contact" SUFFIX — a live data change, applied to
   production.** Jay: *"we need to remove the word contact from age groups that
   have it, its implied already"*. Ten of fifteen squads carried it; U6-U8 Tag and
   the two QR squads are untouched, because Tag is the distinction the word was
