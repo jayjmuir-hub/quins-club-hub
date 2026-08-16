@@ -10,7 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- ✨ **AN ACCESS REQUEST NOW SAYS WHO IS ASKING AND FOR WHICH SQUAD.** Jay: *"i
+- ✨ **ACCOUNTS CAN BE VIEWED BY TYPE.** Jay: *"we need to be able to view
+  accounts by type, Parent/Player, Coach, Manager, etc"*. A chip row above the
+  list — Everyone, then one per role somebody actually holds, each carrying its
+  count.
+  ⚠️ **THE COUNTS ARE PEOPLE, NOT MEMBERSHIP ROWS**, and that is the whole
+  correctness question here. `memberships` has no unique constraint, so a coach
+  who also has a child holds two rows and is ONE person; counting rows would put
+  a number on the chip that the list beneath it could never match. Verified in a
+  real browser: every chip's number equals the rows it produces.
+  ⚠️ **SOMEBODY WITH TWO ROLES APPEARS UNDER BOTH**, which is correct rather
+  than duplication — filtering to the first role found would hide a coach from
+  the coach list.
+  ⚠️ **THE HEADER COUNT DOES NOT MOVE.** "N with access" is a fact about the
+  club, not about the filter; a number that changed on every tap is a counter
+  people stop believing.
+  ⚠️ **AND THE APPROVAL QUEUE IS NEVER FILTERED.** Asking who the coaches are is
+  not asking to see fewer people waiting to be let in, and a pending request
+  hidden behind a chip is how one sits unnoticed for a week.
+  ⚠️ **NO CHIP FOR A ROLE NOBODY HOLDS, AND NO ROW BELOW TWO KINDS** — the same
+  rule Schedule, Roster and Notices follow: a single pill that cannot change
+  anything is furniture.
+
+- `ff112f8` — ✨ **AN ACCESS REQUEST NOW SAYS WHO IS ASKING AND FOR WHICH SQUAD.** Jay: *"i
   still have account requests coming in and have no idea who they are because
   they don't type any extra info"*. A required role and a required age group,
   with the free-text note kept for the rest.

@@ -1603,3 +1603,143 @@ describe('Accounts — the edit person sheet', () => {
     expect(within(dialog).getByLabelText('First name')).toHaveValue('Saeeda')
   })
 })
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Viewing accounts by type — 16 Aug 2026
+   ══════════════════════════════════════════════════════════════════════════
+
+   Jay: "in the Accounts section, we need to be able to view accounts by type,
+   Parent/Player, Coach, Manager, etc".
+
+   ⚠️ THE FIXTURES ARE WHY THESE TESTS ARE WORTH HAVING. Sara holds a coach row
+   AND a parent row — legitimate data, memberships has no unique constraint —
+   so the four MEMBER_ROWS are only three PEOPLE. Everything below turns on that
+   distinction, because a chip counting rows would promise a number the list it
+   filters could never show.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('Accounts — viewing by type', () => {
+  const showFilter = async () => {
+    useMembershipsMock.mockReturnValue(memberships(ADMIN))
+    setup()
+    return screen.findByTestId('account-type-filter')
+  }
+
+  it('offers one chip per kind of account actually held, in a stable order', async () => {
+    const row = await showFilter()
+    const labels = [...row.querySelectorAll('button')].map((b) => b.textContent.trim())
+
+    // ⚠️ COUNTS ARE PEOPLE. Four membership rows, three people: Jay (admin),
+    // Sara (coach AND parent), Ali (parent). So Parent is 2 and not 3.
+    expect(labels).toEqual(['Everyone 3', 'Admin 1', 'Coach 1', 'Parent 2'])
+
+    // ⚠️ AND NO CHIP FOR A ROLE NOBODY HOLDS. Six chips on a club with three
+    // kinds of account is three dead controls, and a control that never does
+    // anything teaches people the row is decorative.
+    expect(labels.join(' ')).not.toMatch(/medic|player|team manager/i)
+  })
+
+  // ⚠️ THE CASE THE DE-DUPLICATION EXISTS FOR, AND IT WAS MISSING. The fixtures
+  // above have nobody holding two rows of the SAME role, so counting rows and
+  // counting people give identical numbers and the test could not fail. Proved
+  // by injecting exactly that fault, 16 Aug 2026: all 71 passed.
+  //
+  // A coach of two squads is ONE coach. `memberships` has no unique constraint,
+  // and coaching two age groups is ordinary — twelve of the club's fifteen
+  // squads shared staff in August 2026.
+  it('⚠️ counts a two-squad coach once, not twice', async () => {
+    listClubMembersMock.mockResolvedValue([
+      JAY_ADMIN,
+      SARA_COACH,
+      { ...SARA_COACH, id: 'mem-sara-coach-2', team_id: 'team-u12', teams: { name: 'U12 Boys' } },
+    ])
+    useMembershipsMock.mockReturnValue(memberships(ADMIN))
+    setup()
+
+    const row = await screen.findByTestId('account-type-filter')
+    const labels = [...row.querySelectorAll('button')].map((b) => b.textContent.trim())
+    // Three membership rows, two people, and Sara is one coach.
+    expect(labels).toEqual(['Everyone 2', 'Admin 1', 'Coach 1'])
+
+    await userEvent.setup().click(
+      [...row.querySelectorAll('button')].find((b) => b.textContent.startsWith('Coach')),
+    )
+    expect(screen.getAllByTestId('account-person')).toHaveLength(1)
+  })
+
+  it('narrows the list to that kind, and the chip count is what appears', async () => {
+    const user = userEvent.setup()
+    const row = await showFilter()
+    expect(await screen.findAllByTestId('account-person')).toHaveLength(3)
+
+    await user.click([...row.querySelectorAll('button')].find((b) => b.textContent.startsWith('Coach')))
+    expect(screen.getAllByTestId('account-person')).toHaveLength(1)
+    expect(screen.getByText('Sara Coach')).toBeInTheDocument()
+    expect(screen.queryByText('Ali Parent')).toBeNull()
+  })
+
+  // ⚠️ THE SAME PERSON UNDER TWO CHIPS IS CORRECT, NOT A DUPLICATE. Sara really
+  // is both, and a filter that showed her under only the first role found would
+  // hide a coach from the coach list.
+  it('⚠️ shows somebody holding two roles under both of them', async () => {
+    const user = userEvent.setup()
+    const row = await showFilter()
+    const chip = (name) => [...row.querySelectorAll('button')].find((b) => b.textContent.startsWith(name))
+
+    await user.click(chip('Coach'))
+    expect(screen.getByText('Sara Coach')).toBeInTheDocument()
+
+    await user.click(chip('Parent'))
+    expect(screen.getByText('Sara Coach')).toBeInTheDocument()
+    expect(screen.getByText('Ali Parent')).toBeInTheDocument()
+    expect(screen.getAllByTestId('account-person')).toHaveLength(2)
+  })
+
+  // ⚠️ THE HEADER IS A FACT ABOUT THE CLUB, NOT ABOUT THE FILTER. A count that
+  // moved every time somebody tapped a chip is a counter people stop believing.
+  it('⚠️ leaves the "with access" count alone while the list narrows', async () => {
+    const user = userEvent.setup()
+    const row = await showFilter()
+    expect(screen.getByText(/3 with access/)).toBeInTheDocument()
+
+    await user.click([...row.querySelectorAll('button')].find((b) => b.textContent.startsWith('Admin')))
+    expect(screen.getAllByTestId('account-person')).toHaveLength(1)
+    expect(screen.getByText(/3 with access/)).toBeInTheDocument()
+  })
+
+  // ⚠️ THE APPROVAL QUEUE IS NOT FILTERED, DELIBERATELY. Somebody asking who
+  // the coaches are is not asking to be shown fewer people waiting to be let
+  // in, and a pending request hidden behind a filter is how one sits unnoticed
+  // for a week.
+  it('⚠️ never hides the approval queue behind the filter', async () => {
+    const user = userEvent.setup()
+    const row = await showFilter()
+    const queueBefore = screen.queryByTestId('pending-approvals')
+
+    await user.click([...row.querySelectorAll('button')].find((b) => b.textContent.startsWith('Admin')))
+    expect(screen.queryByTestId('pending-approvals')).toEqual(queueBefore)
+  })
+
+  it('goes back to everyone', async () => {
+    const user = userEvent.setup()
+    const row = await showFilter()
+    const btns = () => [...row.querySelectorAll('button')]
+
+    await user.click(btns().find((b) => b.textContent.startsWith('Admin')))
+    expect(screen.getAllByTestId('account-person')).toHaveLength(1)
+
+    await user.click(btns().find((b) => b.textContent.startsWith('Everyone')))
+    expect(screen.getAllByTestId('account-person')).toHaveLength(3)
+  })
+
+  // ⚠️ ONE KIND OF ACCOUNT MEANS NO ROW AT ALL — the rule Schedule, Roster and
+  // Notices all follow. A single pill that cannot change anything is furniture.
+  it('⚠️ hides the whole row when there is only one kind to choose', async () => {
+    listClubMembersMock.mockResolvedValue([JAY_ADMIN])
+    useMembershipsMock.mockReturnValue(memberships(ADMIN))
+    setup()
+
+    await screen.findByTestId('account-person')
+    expect(screen.queryByTestId('account-type-filter')).toBeNull()
+  })
+})

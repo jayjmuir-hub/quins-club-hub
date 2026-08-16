@@ -54,6 +54,12 @@ const MUTED_ON_PAPER = 'text-ink-muted'
 // 'manager' (Team Manager) and 'medic' grant exactly what 'coach' grants —
 // see SQUAD_STAFF_ROLES — so switching a row between the three changes the
 // label and nothing else about what that person can do.
+// ⚠️ THE "SHOW EVERYTHING" SENTINEL IS A STRING, NOT null OR ''. Both of those
+// are values a role could plausibly take one day (an unset role, a blank one),
+// and a filter whose "all" is indistinguishable from "unset" silently stops
+// filtering. Same spelling as Notices' own ALL.
+const ALL_ROLES = 'all'
+
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'coach', label: 'Coach' },
@@ -466,6 +472,9 @@ export default function Accounts() {
   // Per-profile dismiss/restore state, keyed by profile id.
   const [triageState, setTriageState] = useState({})
   const [showDismissed, setShowDismissed] = useState(false)
+  // Which kind of account the list is narrowed to. Jay, 16 Aug 2026: "we need to
+  // be able to view accounts by type, Parent/Player, Coach, Manager, etc".
+  const [roleFilter, setRoleFilter] = useState(ALL_ROLES)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
@@ -619,6 +628,33 @@ export default function Accounts() {
   const pendingMembers = members.filter((member) => member.status === 'pending')
 
   const groups = groupByProfile(activeMembers)
+
+  // ⚠️ COUNTED OVER PEOPLE, NOT OVER MEMBERSHIP ROWS. Somebody who coaches two
+  // squads holds two coach rows and is ONE coach; counting rows would put a
+  // number on the chip that no list underneath it could ever match.
+  const roleCounts = useMemo(() => {
+    const counts = new Map()
+    for (const group of groups) {
+      const roles = new Set(group.memberships.map((member) => member.role))
+      for (const role of roles) counts.set(role, (counts.get(role) ?? 0) + 1)
+    }
+    return counts
+  }, [groups])
+
+  // ⚠️ ONLY THE ROLES SOMEBODY ACTUALLY HOLDS. Six chips on a club with three
+  // kinds of account is four dead controls, and the two that do nothing teach
+  // people the row is decorative. ROLE_OPTIONS still decides the ORDER, so the
+  // row cannot reshuffle itself as memberships change.
+  const availableRoles = ROLE_OPTIONS.filter((option) => roleCounts.has(option.value))
+
+  // ⚠️ `groups` STAYS THE WHOLE SET AND THE HEADER KEEPS COUNTING IT. "12 with
+  // access" is a fact about the club, not about the filter — recomputing it
+  // against the narrowed list would make the number change every time somebody
+  // taps a chip, which is the sort of counter people stop believing.
+  const shownGroups =
+    roleFilter === ALL_ROLES
+      ? groups
+      : groups.filter((group) => group.memberships.some((member) => member.role === roleFilter))
   const isFirstLoad = loading && members.length === 0
 
   // ⚠️ LOOKED UP FROM `groups` EVERY RENDER RATHER THAN HELD IN STATE. The
@@ -1412,9 +1448,66 @@ export default function Accounts() {
         </Card>
       )}
 
-      {!isFirstLoad && !error && groups.length > 0 && (
+      {/* ── VIEW BY TYPE ─────────────────────────────────────────────────────
+          ⚠️ HIDDEN BELOW TWO KINDS, the same rule Schedule, Roster and Notices
+          follow — a single pill that cannot change anything is furniture.
+
+          ⚠️ IT NARROWS THE LIST BELOW AND NOTHING ELSE. The approval queue and
+          the waiting list are their own sections with their own jobs: somebody
+          filtering to "Coach" is asking who the coaches ARE, not asking to be
+          shown fewer people waiting to be let in. Hiding a pending request
+          behind a filter is how one sits unnoticed for a week. ── */}
+      {!isFirstLoad && !error && availableRoles.length > 1 && (
+        <div className="mb-3.5 flex flex-wrap gap-2" data-testid="account-type-filter">
+          <button
+            type="button"
+            onClick={() => setRoleFilter(ALL_ROLES)}
+            aria-pressed={roleFilter === ALL_ROLES}
+            className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
+              roleFilter === ALL_ROLES
+                ? 'border-ink bg-ink text-white'
+                : 'border-line bg-surface-card text-ink-muted'
+            }`}
+          >
+            Everyone {groups.length}
+          </button>
+          {availableRoles.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setRoleFilter(option.value)}
+              aria-pressed={roleFilter === option.value}
+              className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
+                roleFilter === option.value
+                  ? 'border-ink bg-ink text-white'
+                  : 'border-line bg-surface-card text-ink-muted'
+              }`}
+            >
+              {/* ⚠️ THE COUNT IS HALF THE POINT OF THE CHIP. "Coach 4" answers
+                  "how many coaches are there" without anybody tapping it, which
+                  is most of what "view accounts by type" was asked for. */}
+              {option.label} {roleCounts.get(option.value)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ⚠️ A FILTER THAT MATCHES NOBODY IS NOT THE SAME EMPTY STATE AS A CLUB
+          WITH NO ACCOUNTS, and saying "nobody has access yet" to somebody who
+          can see eleven accounts a tap away would read as data loss. This state
+          is only reachable in the moment between the last holder of a role
+          losing it and the chip row re-rendering without that chip. */}
+      {!isFirstLoad && !error && groups.length > 0 && shownGroups.length === 0 && (
+        <Card>
+          <Empty
+            message={`Nobody holds that kind of account. Tap Everyone to see all ${groups.length}.`}
+          />
+        </Card>
+      )}
+
+      {!isFirstLoad && !error && shownGroups.length > 0 && (
         <div className="flex flex-col gap-3">
-          {groups.map((group) => {
+          {shownGroups.map((group) => {
             const displayName = group.name ?? 'Unnamed member'
             // One line summarising the access rows, so the list still answers
             // "what is this person?" without opening anything.
