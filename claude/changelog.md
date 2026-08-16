@@ -48,7 +48,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
-- 🧹 **A DELETED PLAYER'S PHOTOGRAPH USED TO OUTLIVE THEM, AND NOW SOMETHING
+- `4945f5c` — 🧹 **A DELETED PLAYER'S PHOTOGRAPH USED TO OUTLIVE THEM, AND NOW SOMETHING
   COUNTS THE ONES THAT SLIP THROUGH.** Found while clearing five orphans by hand
   after the positioner bug: `deletePlayer` removed the row and left the file, and
   account deletion did the same. Both now delete the object.
