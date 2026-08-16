@@ -10,6 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
+- `60e6005` — 📓 **THE MATCH SHEET'S "NEVER EXERCISED" ITEM WAS ABOUT TO MISLEAD.**
+  Still true that no coach has filed one for a real match — but the sheet had by
+  then been opened and shared from a phone, and three bugs fell out and were
+  fixed, so `open-items.md` would have sent the next session hunting for bugs
+  that no longer exist. Also cited `d576bb1`, and recorded the `shareImage.js`
+  desktop-download observation as an open item rather than fixing it unprovoked.
+
 - ✨ **THE MATCH SHEET IS FILLED IN OFF THE FORM ON A PHONE.** The fixed-width fix
   earlier today made RCM's facsimile LEGIBLE on a phone and left it awful to FILL
   IN — 22 names into 40px boxes, scrolling sideways, standing at a pitch. Jay:
