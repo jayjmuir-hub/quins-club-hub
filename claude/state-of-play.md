@@ -34,8 +34,13 @@ person using them, and none of those bugs had a failing test.
 - **Most squads have nobody attached on `/admin/staff`**, so the Home "Squad
   contacts" card shows its empty state to most of the club. Data entry, not code.
   Run the query below rather than trusting this sentence.
-- **No monitoring exists at all.** An uptime check and a Sentry account are both
-  account creations, so they are his. See `claude/open-items.md`.
+  ⚠️ **JAY'S POSITION: this resolves itself as staff sign in, and it is not
+  blocking.** Do not keep raising it as the top priority; he has heard it.
+
+✅ **Monitoring is no longer on this list** — two uptime monitors and Sentry are
+LIVE, each proved by making it fire. ⚠️ **Read
+`claude/runbooks/monitoring.md` before touching either**; two things there are
+load-bearing and easy to undo by tidying.
 
 ## Tabled — do not start, do not offer, do not ask again
 
