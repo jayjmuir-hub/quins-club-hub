@@ -96,11 +96,21 @@ export default function MatchSheetEntry({
           it tells the referee who may pack down there.
         </p>
 
-        <ul className="mt-2.5">
+        {/* ⚠️ TWO-UP ON A WIDE SCREEN, AND A `desktop:` CLASS IS THE RIGHT TOOL
+            HERE where useMediaQuery was the right tool for the editor itself.
+            The distinction is the one that hook's own header draws: this is the
+            SAME list in the same DOM order, laid out in two columns, so nothing
+            is duplicated and jsdom sees exactly one of each field. A JS switch
+            would buy nothing and cost a listener and a re-render.
+            ⚠️ `first:border-t-0` HAD TO GO — with two columns the thirteenth row
+            starts a new column and needs its top rule as much as any other.
+            Padding the list instead keeps the first row from crowding the text
+            above it in either layout. */}
+        <ul className="mt-2.5 desktop:grid desktop:grid-cols-2 desktop:gap-x-5">
           {slots.map((row, index) => (
             <li
               key={row.slot}
-              className="flex items-center gap-2.5 border-t border-line py-2 first:border-t-0"
+              className="flex items-center gap-2.5 border-t border-line py-2"
             >
               <span
                 aria-hidden="true"
