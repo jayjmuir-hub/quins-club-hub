@@ -33,31 +33,33 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   WhatsApp link on a phone. Nobody has weighed that trade yet, and this line
   exists so the next person knows the switch is there and untouched rather than
   considered and rejected.
-- **No monitoring, alerting or error tracking.** Detection today is somebody
-  telling Jay. Two free first steps: an uptime monitor on `/` **and**
-  `/calendar.ics`, and Sentry's free tier wired into `ErrorBoundary`'s
-  `componentDidCatch`, which already exists for it.
-  ⚠️ **The `/calendar.ics` check must assert `content-type: text/calendar`, not a
-  200** — the SPA catch-all answers any unknown path with `index.html`.
-  ⚠️ **A monitor that has never fired is not a monitor.** Pause the Netlify site
-  once and confirm the email arrives.
-  ✅ **`claude/runbooks/monitoring.md` HAS THE SETUP, 16 Aug 2026.** Two uptime
-  monitors and a Sentry DSN. The accounts are Jay's and still uncreated, so this
-  item stays open.
-  ⚠️ **A FIRST PASS BUILT AN ELABORATE WORKAROUND FOR NOT HOLDING A TOKEN, AND
-  JAY CUT IT: *"i just want simple, not over engineered"*.** A tokenless
-  `/calendar.ics` returns 404, so the monitor was to be configured to treat 404
-  as healthy — which reads as a misconfiguration to anyone who sees it, ruled out
-  most free tiers, and was WEAKER: the edge function deliberately returns the
-  same 404 whether the token is missing or Supabase is unreachable, so it stayed
-  green through a database outage. The monitor now carries Jay's OWN token and
-  expects an ordinary 200 plus a `BEGIN:VCALENDAR` keyword, which catches the
-  database case too. **The keyword is still load-bearing**: if the `/calendar.ics`
-  proxy rule were lost, the path would fall through to the SPA catch-all and
-  return 200 with the app's HTML.
-  ⚠️ **AND `live-check.mjs` (deleted 16 Aug 2026) WAS DELETED RATHER THAN KEPT.** It was written
-  for the tokenless design; with the monitors running it checked nothing they do
-  not, and a second thing to maintain is not free.
+- 🟡 **Monitoring — PARTLY DONE, 16 Aug 2026.** "Detection today is somebody
+  telling Jay" was the 13 Aug audit's finding. Two **Better Stack** monitors are
+  now live on the free tier, 3-minute checks, e-mail alerts:
+  `https://adhquins-clubhub.com/` and the calendar feed at
+  `/calendar.ics?token=<Jay's token>`. ✅ **E-mail delivery is PROVEN** — Jay ran
+  *Send test alert* and it arrived.
+  ⬜ **STILL OUTSTANDING, AND IT IS THE HALF THAT MATTERS: nobody has proved the
+  monitors NOTICE AN OUTAGE.** The test alert exercised the e-mail path only.
+  Pause the Netlify site once, confirm both go red, and record the delay here —
+  that number is the real detection window. **A monitor that has never fired is
+  not a monitor.**
+  ⬜ **Sentry is built and switched off** (`src/lib/errorReporting.js`); it needs
+  a project, `VITE_SENTRY_DSN` in Netlify and a redeploy. Both are Jay's.
+  ⚠️ **KEYWORD MATCHING IS A PAID FEATURE ON BETTER STACK, AND THE RUNBOOK SAID
+  OTHERWISE UNTIL IT WAS SEEN ON THE SIGNUP SCREEN.** The 'Alert us when' dropdown
+  carries a **Billable** badge; its keyword and status-code options exist in the UI
+  but selecting one risks moving the account to a paid tier. So both monitors use
+  the free "URL becomes unavailable" check. **The recommendation had been written
+  from research rather than from the product**, which is the same failure as the
+  Sentry bundle-size estimate three items down.
+  ⚠️ **THE ONE FAILURE THIS CANNOT SEE**: if the `/calendar.ics` proxy rule were
+  deleted from `netlify.toml`, the path would fall through to the SPA catch-all
+  and answer **200 with the app's HTML** — every calendar subscription in the club
+  broken, monitor green. Everything else is caught, because the monitor carries a
+  real token and the feed only answers 200 when it genuinely built. **Do not swap
+  provider to close it**: UptimeRobot's free tier has keyword monitors but is
+  personal/non-commercial only, and StatusCake deactivates accounts idle 90 days.
 
 ## Cheap (under an hour each)
 
