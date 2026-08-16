@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase.js'
+import { deleteStaffPhoto } from './photos.js'
 
 // Account deletion — the client half of public.delete_my_account().
 //
@@ -22,7 +23,51 @@ const LAST_ADMIN = /only admin/i
 export const LAST_ADMIN_MESSAGE =
   'You are the only admin, so you cannot delete your account yet. Make someone else an admin first — then this will work.'
 
+/**
+ * Removes the caller's own staff photo, if they have one, BEFORE the account
+ * goes.
+ *
+ * ⚠️ THE ORDER IS FORCED AND IT IS THE OPPOSITE OF `deletePlayer`'s. Everywhere
+ * else this codebase deletes the row first and the object second, so a failed
+ * cleanup leaves a recoverable orphan rather than a live row pointing at a
+ * missing file. Here that is not available: deleting the account destroys the
+ * SESSION, and the storage policy authorises this delete by `auth.uid()` — so
+ * after the RPC there is no longer any caller permitted to remove the file.
+ * It is now or never.
+ *
+ * ⚠️ AND IT MUST NEVER BLOCK THE DELETION. Someone asking for their account to
+ * be deleted does not get told "no" because a file did not delete; the RPC runs
+ * regardless and a failure here leaves an orphan for the nightly scan to report.
+ * The cost of the forced ordering is the reverse case — the photo is gone and
+ * then the RPC refuses (last admin) — which loses a head shot the person can
+ * simply upload again. That is the cheaper of the two failures by a distance.
+ *
+ * ⚠️ SQL CANNOT DO THIS. `storage.objects` refuses direct deletion
+ * (`protect_delete`, 42501), so `delete_my_account` cannot clean up after
+ * itself however much it would like to. See RESTORE.md.
+ */
+async function removeMyPhotoBeforeDeletion() {
+  try {
+    const { data } = await supabase.auth.getUser()
+    const id = data?.user?.id
+    if (!id) return
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('photo_path')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (profile?.photo_path) await deleteStaffPhoto(profile.photo_path)
+  } catch {
+    // Swallowed on purpose — see the note above. An orphaned object is the
+    // acceptable outcome; a blocked account deletion is not.
+  }
+}
+
 export async function deleteMyAccount() {
+  await removeMyPhotoBeforeDeletion()
+
   const { error } = await supabase.rpc('delete_my_account')
 
   if (error) {

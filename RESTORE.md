@@ -357,6 +357,33 @@ functions with zero imports. Screens catch and render errors in a `role="alert"`
 Data modules never import React.
 
 
+### Photo storage — deleting an object, and what a stranded one means
+
+⚠️ **YOU CANNOT DELETE A STORAGE OBJECT WITH SQL, AND THE ESCAPE HATCH IS A TRAP.**
+`storage.objects` carries a `protect_delete` trigger that raises 42501 on any direct
+DELETE: *"Direct deletion from storage tables is not allowed. Use the Storage API
+instead."* There is a `storage.allow_delete_query` setting that disables it — **do not use
+it.** It removes the ROW while leaving the actual file in the backing store, so the
+photograph still exists and nothing points at it any more. That is not a delete; it is
+destroying the evidence of one. Supabase's own hint says as much: *"This prevents
+accidental data loss from orphaned objects."*
+
+**So a real deletion needs the Storage API** — `supabase.storage.from(b).remove([key])`
+with a session that satisfies the bucket's delete policy, or the dashboard. Measured
+15 Aug 2026, when five orphans had to be cleared by hand.
+
+⚠️ **`player-photos` IS MIRRORED OFF-SITE AND `staff-photos` IS NOT.**
+`supabase/functions/backup-player-photos/index.ts` pins `SOURCE_BUCKET = 'player-photos'`
+and nothing mirrors the staff bucket. **Deleting a staff photo is therefore
+irreversible**, while a player photo survives in R2 — and that mirror is APPEND ONLY, so
+deleting the Supabase object does not remove the copy. Both halves matter: never write an
+automated sweep over `staff-photos` on the assumption it can be undone, and never tell
+anyone a child's photograph has been erased on the strength of a Supabase delete alone.
+
+⚠️ **A STRANDED OBJECT IS A PHOTOGRAPH OF A PERSON, NOT A WASTED BYTE.** The five found on
+15 Aug totalled 203 KB — the cost was never storage. `deletePlayer` still removes the row
+and leaves the file, so a departed child's photograph outlives their record.
+
 ### Safeguarding — contact details
 
 **Never render a loading state for `getPlayerContact`.** Render nothing until a row arrives.

@@ -10,7 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
-- 🔗 **A SECOND RUN OF ENTRIES IN THIS FILE WAS ATTRIBUTED TO THE WRONG COMMIT —
+- 🧹 **A DELETED PLAYER'S PHOTOGRAPH USED TO OUTLIVE THEM, AND NOW SOMETHING
+  COUNTS THE ONES THAT SLIP THROUGH.** Found while clearing five orphans by hand
+  after the positioner bug: `deletePlayer` removed the row and left the file, and
+  account deletion did the same. Both now delete the object.
+  ⚠️ **A STORAGE OBJECT CANNOT BE A CASCADE, AND THAT IS NOT A DESIGN CHOICE.**
+  `storage.objects` refuses direct SQL deletion outright — a `protect_delete`
+  trigger raising 42501 — so no trigger, cascade or database function can reach
+  one. `delete_my_account` could not clean up after itself if it wanted to. The
+  Storage API is the only route, which means a CLIENT has to do it.
+  ⚠️ **AND THE TWO PATHS ORDER THEMSELVES OPPOSITELY, WHICH LOOKS LIKE AN
+  INCONSISTENCY UNTIL YOU TRY IT THE OTHER WAY.** `deletePlayer` deletes the row
+  first, so a failed cleanup leaves a recoverable orphan rather than a live row
+  pointing at a missing file. Account deletion CANNOT: the RPC destroys the
+  session, and the storage policy authorises by `auth.uid()`, so afterwards
+  nobody is permitted to remove the file. It is now or never. Pinned by a test
+  asserting the call order, because it is exactly the kind of thing a later
+  reader tidies into the house pattern.
+  ⚠️ **THE NIGHTLY SCAN REPORTS AND DOES NOT DELETE — Jay's call, 16 Aug 2026**,
+  taken over an auto-sweeping version on one fact: `staff-photos` is mirrored
+  NOWHERE (`backup-player-photos` pins `SOURCE_BUCKET = 'player-photos'`), so a
+  scheduled delete there has no safety net and a bug that wrongly cleared
+  `photo_path` would become permanent loss, on a timer, unwatched. Counting is
+  reversible. **Do not "finish" it by adding a delete.**
+  ⚠️ **THE 24-HOUR GRACE PERIOD IS LOAD-BEARING EVEN FOR A COUNTER.** An upload
+  and the row write that records it are not atomic, so an object seconds old with
+  nothing pointing at it is a photo mid-save. Measured on live: only one staff
+  object is currently older than a day, so without the grace period the very
+  first run would have reported a bucket full of orphans.
+
+- `42b2456` — 🔗 **A SECOND RUN OF ENTRIES IN THIS FILE WAS ATTRIBUTED TO THE WRONG COMMIT —
   the Dependabot block, which the pull request below spotted and deliberately
   left alone.** Four entries each carried the SHA of the entry beneath them:
   *"the squad tiles line up"* held `199d4ec`, a react-router bump; *"React Router

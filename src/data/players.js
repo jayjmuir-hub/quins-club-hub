@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { fetchAllPages, fetchByIds } from './limits.js'
+import { deletePlayerPhoto } from './photos.js'
 
 // Data access for the players and player_contacts tables. RLS already
 // restricts rows to what the calling user's memberships allow. player_contacts
@@ -219,11 +220,35 @@ export async function insertPlayers(rows) {
  * declared ON DELETE CASCADE, so the contact row goes with it, atomically and
  * server-side. Issuing a second client-side delete would add a failure mode
  * the database does not have (contact deleted, player left behind).
+ *
+ * ⚠️ THE PHOTO IS NOT A CASCADE AND CANNOT BE ONE, WHICH IS WHY IT IS DONE HERE
+ * BY HAND. A storage object is not a row with a foreign key to this one — and
+ * `storage.objects` refuses direct SQL deletion outright (`protect_delete`,
+ * 42501), so no trigger, cascade or database function can reach it. The Storage
+ * API is the only route, which means a CLIENT has to do it. See RESTORE.md.
+ *
+ * ⚠️ UNTIL 16 Aug 2026 IT WAS SIMPLY NOT DONE, and a deleted child's photograph
+ * outlived their record indefinitely, in a private bucket, with nothing pointing
+ * at it. That is a safeguarding problem rather than an untidy one.
+ *
+ * ⚠️ ROW FIRST, OBJECT SECOND — the ordering `AdminStaff` settled for the same
+ * reason. If the row delete is refused there is nothing to clean up and the
+ * photo must survive; if the object delete fails afterwards the result is an
+ * orphan, which is recoverable and which the nightly scan reports. The reverse
+ * order risks a live row pointing at a file that no longer exists, which is a
+ * broken face on a screen rather than a tidy-up job.
  */
 export async function deletePlayer(id) {
   const { data, error } = await supabase.from('players').delete().eq('id', id).select()
   if (error) throw error
   if (!data || data.length === 0) throw new Error(REFUSED_PLAYER_DELETE)
+
+  // ⚠️ BEST-EFFORT, AND DELIBERATELY NOT AWAITED INTO THE CALLER'S ERROR PATH.
+  // `deletePlayerPhoto` swallows its own failures by design: the player IS
+  // deleted by this point, so reporting "could not delete" would tell a coach
+  // the removal failed when it did not.
+  const photoPath = data[0]?.photo_path
+  if (photoPath) await deletePlayerPhoto(photoPath)
 }
 
 /**
