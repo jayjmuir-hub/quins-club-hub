@@ -26,19 +26,24 @@ import Button from './Button.jsx'
 //                      would be offering a button that cannot work.
 //   - couldn't load -> the plain message, never a broken form
 //
-// This screen deliberately shows NO club data, because it has none to show:
-// every SELECT policy in the database bottoms out in a memberships row for
-// auth.uid(), so this user reads zero rows from every table including teams.
-// That is also why the note below was free text rather than a squad picker for
-// its first fortnight: there was nothing to populate a dropdown with.
+// This screen deliberately shows almost NO club data, because it has almost
+// none to show: nearly every SELECT policy in the database bottoms out in a
+// memberships row for auth.uid(), so this user reads zero rows from players,
+// memberships, events and the rest.
 //
-// ⚠️ THE SQUAD LIST NOW COMES FROM AN RPC, WHICH IS THE ONLY WAY IT COULD.
-// `public.list_squads_for_access_request` is SECURITY DEFINER and returns three
-// columns to any signed-in caller — see
-// db/migrations/20260816_access_request_role_and_squad.sql for why that is
-// narrower and better than widening the `teams` policy. The sentence above still
-// holds for every other table: this screen shows no club data it has not been
-// handed deliberately.
+// ⚠️ `teams` IS THE EXCEPTION, AND THIS COMMENT ASSERTED THE OPPOSITE UNTIL
+// 16 Aug 2026. It said the note below was free text "because there is nothing
+// to populate a dropdown with", and a whole SECURITY DEFINER function was
+// written on the strength of that sentence before anybody checked it. The
+// `team read` policy is `auth.uid() IS NOT NULL`: any signed-in caller reads
+// every squad. Measured on production — 15 teams against 0 players, 0
+// memberships and 0 events for the same impersonated user, which is the control
+// that proves RLS was applied rather than bypassed.
+//
+// ⚠️ THE CLAIM IS CORRECTED RATHER THAN DELETED, because it was load-bearing:
+// it is why this form had no squad picker for its first fortnight. It still
+// holds for every other table here, and `auth.uid() IS NOT NULL` still excludes
+// `anon`, so nothing on this screen is readable without a session.
 
 // ⚠️ NO 'admin'. Every role here is squad-scoped and granted by a coach or
 // manager approving a stranger; admin is club-wide and granted by an existing

@@ -79,22 +79,32 @@ export async function createAccessRequest({ profileId, note, role, teamId } = {}
 /**
  * The club's squads, for the access-request form's picker.
  *
- * ⚠️ AN RPC AND NOT A TABLE READ, AND THAT IS THE WHOLE REASON IT EXISTS. The
- * person filling this form in has no membership row, and every SELECT policy in
- * the schema bottoms out in one — so `from('teams').select()` returns an empty
- * list for them, not an error. A dropdown built on it would silently have no
- * options, which is exactly the failure the free-text note existed to avoid.
+ * ⚠️ AN ORDINARY TABLE READ, AND THE FIRST VERSION OF THIS WAS AN RPC. It was
+ * written against the header in src/components/RequestAccess.jsx, which says
+ * every SELECT policy "bottoms out in a memberships row for auth.uid(), so this
+ * user reads zero rows from every table including teams".
  *
- * `public.list_squads_for_access_request` is SECURITY DEFINER and returns three
- * columns. See db/migrations/20260816_access_request_role_and_squad.sql for why
- * it is a function rather than a wider policy on `teams`.
+ * ⚠️ THAT IS FALSE FOR `teams`, MEASURED ON PRODUCTION 16 Aug 2026. The
+ * `team read` policy is `auth.uid() IS NOT NULL` — any signed-in caller reads
+ * every squad. Impersonating a membership-less user returned 15 teams against
+ * 0 players, 0 memberships and 0 events in the same query, which is the control
+ * proving RLS was applied rather than bypassed. The SECURITY DEFINER function
+ * was created, measured, and dropped the same hour; it was solving a problem
+ * that did not exist.
  *
- * Returns [] rather than throwing when the call fails: the form still has to be
- * submittable-looking while it loads, and the caller decides what an empty list
- * means on screen.
+ * ⚠️ IT IS STILL NOT PUBLIC. `auth.uid() IS NOT NULL` excludes `anon`, so this
+ * needs a session — which the caller has, since RequestAccess renders behind
+ * RequireAuth. The header's claim holds for every OTHER table on that screen.
+ *
+ * Throws rather than swallowing: the caller decides what an empty list means on
+ * screen, and a picker with no options is a state the form has to handle anyway.
  */
 export async function listSquadsForRequest() {
-  const { data, error } = await supabase.rpc('list_squads_for_access_request')
+  const { data, error } = await supabase
+    .from('teams')
+    .select('id, name, sort_order')
+    .order('sort_order', { ascending: true })
+
   if (error) throw error
   return data ?? []
 }

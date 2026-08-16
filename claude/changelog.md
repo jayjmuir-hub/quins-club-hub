@@ -14,13 +14,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   still have account requests coming in and have no idea who they are because
   they don't type any extra info"*. A required role and a required age group,
   with the free-text note kept for the rest.
-  ⚠️ **THE FREE TEXT WAS NOT LAZINESS — IT WAS THE ONLY THING THAT COULD WORK.**
-  Every SELECT policy in the schema bottoms out in a memberships row for
-  `auth.uid()`, so the person filling this form in reads ZERO ROWS FROM EVERY
-  TABLE, `teams` included. There was nothing to populate a dropdown with. The
-  picker is fed by a new SECURITY DEFINER RPC returning three columns —
-  narrower than widening the `teams` policy, and the same shape as
-  `claim_roster_access`.
+  ⚠️ **AND THE REASON IT WAS FREE TEXT TURNED OUT TO BE FALSE.**
+  `RequestAccess.jsx` stated that every SELECT policy bottoms out in a
+  memberships row, so this user "reads zero rows from every table including
+  teams" — and a whole SECURITY DEFINER RPC was written on the strength of that
+  sentence before anybody checked it. **The `team read` policy is
+  `auth.uid() IS NOT NULL`: any signed-in caller reads every squad.** Measured on
+  production — 15 teams against 0 players, 0 memberships and 0 events for the
+  same impersonated user, which is the control proving RLS was applied rather
+  than bypassed. The function was created, measured and dropped the same hour;
+  the form reads `teams` directly. **The claim in that header is corrected rather
+  than deleted** — it was load-bearing, it is why the form had no picker for a
+  fortnight, and it still holds for every other table on that screen.
   ⚠️ **THE INSERT POLICY IS THE GATE, NOT THE `<select>`.** A required dropdown
   means somebody finds out before they press the button; the policy is what makes
   a blank request impossible to file.

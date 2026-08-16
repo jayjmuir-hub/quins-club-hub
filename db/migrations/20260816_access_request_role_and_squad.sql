@@ -4,15 +4,24 @@
 -- groups when creating an account, i still have account requests coming in and
 -- have no idea who they are because they don't type any extra info".
 --
--- ⚠️ THE REASON IT WAS FREE TEXT IS A REAL CONSTRAINT, NOT AN OVERSIGHT, and it
--- is the whole difficulty of this change. src/components/RequestAccess.jsx says
--- it plainly: every SELECT policy in this schema bottoms out in a memberships
--- row for auth.uid(), so a person with no membership reads ZERO ROWS FROM EVERY
--- TABLE, `teams` included. There was nothing to populate a dropdown with. A note
--- box was the only thing that could work.
+-- ⚠️ NO RPC, AND THE FIRST VERSION OF THIS MIGRATION HAD ONE. It added a
+-- SECURITY DEFINER `list_squads_for_access_request()` on the strength of the
+-- header in src/components/RequestAccess.jsx, which states that "every SELECT
+-- policy in the database bottoms out in a memberships row for auth.uid(), so
+-- this user reads zero rows from every table including teams".
 --
--- So this migration does two things: it adds the columns, and it gives a
--- membership-less caller a way to see the squad list at all.
+-- ⚠️ THAT SENTENCE IS FALSE FOR `teams`, AND IT WAS MEASURED RATHER THAN
+-- ASSUMED, 16 Aug 2026. The `team read` policy is `auth.uid() IS NOT NULL` —
+-- any signed-in caller reads every squad. Impersonating a membership-less user
+-- on production returned 15 teams, against 0 players, 0 memberships and 0
+-- events in the same breath, which is the control proving RLS was being applied
+-- rather than bypassed.
+--
+-- So the form reads `teams` directly and this migration only adds columns. The
+-- function was created, measured, and dropped again the same hour. The comment
+-- in RequestAccess.jsx is corrected rather than deleted — it was a load-bearing
+-- claim, and the next person to reason from it deserves to know which half of
+-- it holds.
 --
 -- ⚠️ IT DELIBERATELY DOES NOT ENFORCE THE REQUIREMENT. That is
 -- 20260816_access_request_require_role.sql, and it MUST NOT RUN UNTIL THE NEW
@@ -45,39 +54,5 @@ alter table public.access_requests
   add constraint access_requests_requested_role_check
   check (requested_role is null
          or requested_role in ('parent', 'player', 'coach', 'manager', 'medic'));
-
--- 2 ── THE SQUAD LIST, FOR SOMEBODY WHO CAN READ NOTHING ────────────────────
---
--- ⚠️ A NARROW SECURITY DEFINER FUNCTION, NOT A WIDER `teams` POLICY. Widening
--- the table's SELECT to every authenticated user would be simpler and is the
--- wrong shape: it grants a standing read of `teams` — including `scoring_kinds`
--- and `self_registration_allowed` — to anyone who can sign up, forever, to solve
--- a problem that exists for one form. This returns three columns and nothing
--- else. Same reasoning, and the same shape, as `claim_roster_access`: a person
--- with no memberships needs exactly one thing, so give them exactly that.
---
--- ⚠️ THE auth.uid() GUARD MATCHES THE OTHER DEFINER FUNCTIONS in this schema.
--- Without it the function is callable by `anon` if the grant is ever widened,
--- and a squad list is not something to hand an unauthenticated caller.
-create or replace function public.list_squads_for_access_request()
-returns table (id uuid, name text, sort_order integer)
-language plpgsql
-security definer
-set search_path to 'public'
-as $function$
-begin
-  if auth.uid() is null then
-    raise exception 'You must be signed in.' using errcode = '42501';
-  end if;
-
-  return query
-    select t.id, t.name, t.sort_order
-      from public.teams t
-     order by t.sort_order, t.name;
-end;
-$function$;
-
-revoke all on function public.list_squads_for_access_request() from public;
-grant execute on function public.list_squads_for_access_request() to authenticated;
 
 commit;
