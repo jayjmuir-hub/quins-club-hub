@@ -25,7 +25,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   purpose: a parent may edit their own child's birthday, so a DOB may only make
   the under-13 contact gate STRICTER, never relax it.
 
-- ✨ **EVERY NAME IS TWO BOXES NOW.** Jay: *"children name and any other name
+- `f6da486` — ✨ **EVERY NAME IS TWO BOXES NOW.** ⚠️ *This squash carried the
+  entry below it as well — one merge, two items.* Jay: *"children name and any other name
   should be two blocks First Name and Last Name, this will stop people only
   putting a first name"*.
   ⚠️ **THE PROBLEM WAS THE INPUT, NOT THE COLUMN.** One column behind one text
