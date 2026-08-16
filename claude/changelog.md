@@ -36,7 +36,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   "view as" row — a fixture that does not match a real row hides the thing it was
   built to reveal.
 
-- 🐞 **A "VIEW AS" PREVIEW COULD NOT POST A NOTICE, AND THE BOARD LOOKED EMPTY.**
+- `1c67b5b` — 🐞 **A "VIEW AS" PREVIEW COULD NOT POST A NOTICE, AND THE BOARD LOOKED EMPTY.**
   Jay, previewing as a coach: *"i don't see the ability to post a notice for
   comms, the link takes me to a page with nothing there"*. `syntheticMemberships`
   built a row with role, team_id, player_id and club_id — the fields `scope.js`
