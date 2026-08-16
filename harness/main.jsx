@@ -32,6 +32,7 @@ import PhotoPositioner, {
   DEFAULT_FOCUS,
 } from '../src/components/PhotoPositioner.jsx'
 import NoticeRowScenario from './notice-row.jsx'
+import StaffVariants from './staff-variants.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
@@ -1055,6 +1056,9 @@ const scenarios = {
   // precisely so the thing Jay looks at can be looked at. See the `notices`
   // scenario above for the Home card, which is a different component.
   'notice-row': () => <NoticeRowScenario />,
+
+  // Throwaway design review for the Staff screen (16 Aug 2026).
+  'staff-variants': () => <StaffVariants />,
 }
 
 const params = new URLSearchParams(window.location.search)

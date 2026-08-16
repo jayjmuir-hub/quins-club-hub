@@ -160,6 +160,10 @@ const SCENARIOS = [
   // phone — the widest thing on it is a long squad name beside a long role
   // beside a "Pinned" chip, which is exactly the row that wraps or does not.
   'notice-row',
+  // ⚠️ THROWAWAY (16 Aug 2026) — three candidate Staff designs, side by side,
+  // for Jay to pick from. Listed because it is a scenario and this file's own
+  // rule is that every scenario is listed; DELETE BOTH when the winner ships.
+  'staff-variants',
 ]
 
 // A pixel of slack. Sub-pixel layout rounding can put scrollWidth one above
