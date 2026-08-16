@@ -86,10 +86,13 @@ export async function listMySquadStaff() {
           photoPath: null,
           photoUrl: null,
         },
-        // ⚠️ FOUR PEOPLE, NOT TWO, SINCE THE TILE MOSAIC LANDED (15 Aug 2026).
-        // At two, `tileSpans()` never produces a lead tile at all — the layout
-        // under test simply does not appear, and the harness would show a
-        // perfectly tidy two-up grid while the mosaic went unverified. Four is
+        // ⚠️ FOUR PEOPLE HERE, AND A SEPARATE TWO-PERSON SQUAD BELOW.
+        // This note read "FOUR PEOPLE, NOT TWO… at two, `tileSpans()` never
+        // produces a lead tile at all", which was true until 16 Aug 2026 and is
+        // not any more: Jay compared a two-person squad against a six-person one
+        // and asked why the head coach was smaller, so the threshold dropped to
+        // two. Two is now its own layout — a tall tile, one tile beside it, and
+        // a deliberate hole — and `t2` below exists to show it. Four is
         // the smallest size that exercises every branch at once: a lead, the
         // two tiles that stack beside it, and the odd last tile that has to go
         // full width rather than sit alone on its row. It is also a size the
@@ -145,6 +148,37 @@ export async function listMySquadStaff() {
           name: 'Grace Mbeki',
           email: 'grace.mbeki@adhquins-clubhub.com',
           phone: '+971544445555',
+          photoPath: null,
+          photoUrl: null,
+        },
+      ],
+    ],
+    // ⚠️ THE TWO-PERSON SQUAD, ADDED 16 Aug 2026. It is the shape Jay reported
+    // against — a titled head coach and one other — and it is the ONLY size
+    // where the lead tile leaves a hole beside its lower half. That hole is the
+    // accepted cost of rendering a head coach the same size in every squad, so
+    // it needs to be visible in the harness rather than argued about from a
+    // span array. Invented names, as everything published from this repo is.
+    [
+      't2',
+      [
+        {
+          membershipId: 'stub-ms-7',
+          role: 'coach',
+          title: 'Head Coach',
+          name: 'Aran Selvaratnam',
+          email: 'aran.selvaratnam@adhquins-clubhub.com',
+          phone: null,
+          photoPath: null,
+          photoUrl: null,
+        },
+        {
+          membershipId: 'stub-ms-8',
+          role: 'manager',
+          title: 'Team Manager',
+          name: 'Kelly Amiri',
+          email: 'kelly.amiri@adhquins-clubhub.com',
+          phone: '+971566667777',
           photoPath: null,
           photoUrl: null,
         },

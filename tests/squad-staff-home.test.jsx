@@ -335,10 +335,20 @@ describe('tileSpans — the lead is two tiles tall and the rest flow around it',
     expect(tileSpans(1, false)).toEqual(['wide'])
   })
 
-  // ⚠️ A LEAD NEEDS THREE PEOPLE TO BE WORTH IT. With two, the tall tile has one
-  // half-height tile beside it and the other half of that column is a hole.
-  it('refuses the tall tile below three people', () => {
-    expect(tileSpans(2, true)).toEqual(['half', 'half'])
+  // ⚠️ TWO IS ENOUGH, AND THIS TEST ASSERTED THE OPPOSITE UNTIL 16 Aug 2026.
+  // It read "refuses the tall tile below three people", on the reasoning that
+  // the tall tile leaves a hole beside its lower half at two. The hole is real.
+  // It lost to consistency: Jay, comparing a two-person squad with a six-person
+  // one on the same screen — "the U13 head coach bubble is not the standard
+  // double size". A head coach is a head coach at either size of squad, and the
+  // same job rendered two ways one above the other reads as a bug.
+  it('⚠️ gives the lead the tall tile at two people, hole and all', () => {
+    expect(tileSpans(2, true)).toEqual(['lead', 'half'])
+  })
+
+  // Still no tall tile without somebody titled to earn it.
+  it('leaves a two-person squad with no head coach as an even pair', () => {
+    expect(tileSpans(2, false)).toEqual(['half', 'half'])
   })
 
   it('stacks two tiles beside the lead at three', () => {

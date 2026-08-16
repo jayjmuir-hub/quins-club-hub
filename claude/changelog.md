@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 🐞 **"VIEW AS" MADE THE SIGN-IN GATE FORGET YOUR CHILDREN.** Jay, hours after
+- 💄 **A HEAD COACH IS THE SAME SIZE IN EVERY SQUAD.** Jay: *"head coach without
+  a picture for U13 compared to the head coach with picture for U16, the U13
+  head coach bubble is not the standard double size"*.
+  ⚠️ **THE CAUSE WAS THE HEADCOUNT, NOT THE PHOTOGRAPH.** `tileSpans` refused a
+  lead tile below THREE people; U13 Mixed has two staff and U16B has six. The
+  photo was a coincidence of which squads are which size.
+  ⚠️ **THIS REVERSES A RULING, AND THE OLD ONE WAS NOT WRONG — IT WAS
+  OUTWEIGHED.** It read: "A LEAD NEEDS THREE PEOPLE TO BE WORTH IT. With two,
+  the tall tile has one half-height tile beside it and the other half of that
+  column is a hole." That hole is real and still there. It lost because the
+  inconsistency is more visible: the two squads sit one above the other on Home,
+  and the same job rendered at two sizes reads as a bug — which is exactly how
+  it was reported. A gap reads as a squad with room for more staff, which is
+  true. It is also consistent with the neighbouring ruling, where Jay chose a
+  gap over a stretched tile.
+  ⚠️ **THE HARNESS NOW CARRIES A TWO-PERSON SQUAD**, because that size is its own
+  layout and the stub's own comment said four-not-two precisely because two
+  produced no lead tile. Measured with it: the lead is 280px in both the
+  two-person and the six-person squad.
+
+- `e7e7c38` — 🐞 **"VIEW AS" MADE THE SIGN-IN GATE FORGET YOUR CHILDREN.** Jay, hours after
   the gate shipped, with two sons already linked: *"this has popped up twice in
   my own account… actually, it is specific to when i change viewing as"*.
   ⚠️ **A PREVIEW REPLACES THE EFFECTIVE MEMBERSHIPS WITH ONE SYNTHETIC ROW, AND
