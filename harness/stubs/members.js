@@ -573,3 +573,24 @@ export async function setAdminRights(membershipId, isSuper, rights) {
   window.__writes.push({ op: 'set-admin-rights', membershipId, isSuper, rights })
   return { id: membershipId, is_super: Boolean(isSuper), admin_rights: rights ?? [] }
 }
+
+// ⚠️ THE SIGN-IN GATE'S TWO WRITES (16 Aug 2026). tests/harness-stubs.test.js
+// demanded these the moment src/data/members.js gained them — the sixth time
+// that guard has earned its keep. The harness never writes, so both simply echo
+// a plausible row back: a stub that threw here would make NamePrompt look broken
+// in every scenario that renders AppShell.
+export async function confirmMyDetails({ profileId, firstName, lastName, phone } = {}) {
+  return {
+    id: profileId,
+    first_name: firstName ?? null,
+    last_name: lastName ?? null,
+    full_name: [firstName, lastName].filter(Boolean).join(' '),
+    phone: phone ?? null,
+    name_confirmed_at: '2026-08-16T12:00:00.000Z',
+    no_player_confirmed_at: null,
+  }
+}
+
+export async function confirmNoPlayer({ profileId } = {}) {
+  return { id: profileId, no_player_confirmed_at: '2026-08-16T12:00:00.000Z' }
+}

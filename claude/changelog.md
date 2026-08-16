@@ -10,7 +10,35 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 💄 **THE STAFF SCREEN IS AN INDEX THAT EXPANDS.** Jay picked this from three
+- ✨ **THE SIGN-IN GATE NOW ASKS FOR A PHONE, AND WHETHER YOU HAVE A PLAYER.**
+  Jay: *"force people to fill out their full name and phone number… also force
+  them to add a player or confirm again 1 time they don't have a player"*.
+  ⚠️ **THE NAME HALF WAS ALREADY WORKING, AND MEASURING SAID SO BEFORE ANYTHING
+  WAS BUILT.** Of 27 profiles: 1 with no name, 0 that had confirmed a blank one
+  — the gate has no hole — against **14 with no phone**. The "Unnamed member" Jay
+  saw is somebody who has not signed in since; `NamePrompt` will stop them next
+  time. So the phone and the player question were the real gaps.
+  ⚠️ **"1 TIME" IS WHY THERE IS A NEW COLUMN.** `profiles.no_player_confirmed_at`
+  records the answer, so a coach with no children at the club is not asked at
+  every sign-in forever — which is how a gate becomes something people dismiss
+  without reading.
+  ⚠️ **THE COLUMN GRANT IS THE PART THAT WOULD HAVE FAILED SILENTLY.**
+  `authenticated` holds UPDATE on `profiles` for five NAMED columns; RLS grants
+  rows, column privileges grant columns, and a policy permitting the row says
+  nothing about a column nobody was granted. Granted in the same migration —
+  the trap `memberships.title` already documented, met a second time and seen
+  coming.
+  ⚠️ **A PLAYER-ONLY ACCOUNT IS ASKED NEITHER.** Not for a phone, because this
+  app already refuses to let an under-13 hold their own contact details, and a
+  gate demanding one from a child is the app arguing with its own safeguarding.
+  Not to add a player, because it IS the player.
+  ⚠️ **AND ONE OF THE NEW TESTS FAILED AGAINST A CALL A DIFFERENT TEST MADE.**
+  `tests/name-prompt.test.jsx` resets its mocks BY NAME rather than with
+  `vi.clearAllMocks()`, so a newly added mock keeps its call count across cases.
+  The component was right and the harness was wrong, which is the more expensive
+  way round.
+
+- `811745a` — 💄 **THE STAFF SCREEN IS AN INDEX THAT EXPANDS.** Jay picked this from three
   options built in the harness — C, opening in place like B. Every squad is one
   row: name, the jobs present, overlapped monogram bubbles, and a **Gap** chip
   where nobody is attached. Tapping unfolds that squad's people underneath, and
