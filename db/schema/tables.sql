@@ -194,6 +194,13 @@ CREATE TABLE public.profiles (
   -- not yet confirmed their own name, and the app shows a hard gate before
   -- letting them in. ⚠️ The migration deliberately stamped all four existing
   -- profiles as confirmed, so to see the gate you must NULL it by hand.
+  -- !! Added 16 Aug 2026 for the sign-in gate: "I don't have a player at the
+  -- !! club", recorded once so it stops being asked. A TIMESTAMP like
+  -- !! name_confirmed_at beside it, because false and null are
+  -- !! indistinguishable in a boolean written by an app that has not asked yet.
+  -- !! ⚠️ NEEDS ITS OWN COLUMN GRANT — see db/schema/grants.sql. authenticated
+  -- !! holds UPDATE on named columns only.
+  no_player_confirmed_at timestamptz,
   name_confirmed_at timestamptz,
   -- Added 2026-08-08 (profile_phone_and_column_grants). Column comment as
   -- stored: "The signed-in person's own number, stored E.164. Distinct from

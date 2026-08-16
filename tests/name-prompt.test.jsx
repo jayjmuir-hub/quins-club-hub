@@ -22,7 +22,8 @@ import { MemoryRouter } from 'react-router-dom'
 const useAuthMock = vi.fn()
 const useMembershipsMock = vi.fn()
 const getMyProfileMock = vi.fn()
-const updateProfileNamesMock = vi.fn()
+const confirmMyDetailsMock = vi.fn()
+const confirmNoPlayerMock = vi.fn()
 const getMyAccessRequestMock = vi.fn()
 const createAccessRequestMock = vi.fn()
 
@@ -36,7 +37,8 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 
 vi.mock('../src/data/members.js', () => ({
   getMyProfile: (...args) => getMyProfileMock(...args),
-  updateProfileNames: (...args) => updateProfileNamesMock(...args),
+  confirmMyDetails: (...args) => confirmMyDetailsMock(...args),
+  confirmNoPlayer: (...args) => confirmNoPlayerMock(...args),
 }))
 
 vi.mock('../src/data/accessRequests.js', () => ({
@@ -79,6 +81,11 @@ const GATE_TITLE = /what should we call you/i
 // An UNCONFIRMED profile that already carries a name. This is the Google case
 // and it is the important one: full_name is populated, so any implementation
 // that gates on "is the name blank" would let it straight through.
+// ⚠️ THE DEFAULT ANSWERS THE TWO NEWER GATES, so every case below it stays
+// about the NAME — which is what those cases were written for. The phone and
+// player gates get their own block at the end of this file, where the fixture
+// deliberately withholds each in turn. Without this the whole suite would drift
+// into testing three things at once and being clear about none of them.
 function unconfirmed(overrides = {}) {
   return {
     id: 'u-1',
@@ -87,15 +94,24 @@ function unconfirmed(overrides = {}) {
     last_name: 'Muir',
     name_confirmed_at: null,
     email: 'jay@example.com',
+    phone: '+971500000000',
+    no_player_confirmed_at: '2026-08-01T00:00:00Z',
     ...overrides,
   }
 }
 
 beforeEach(() => {
+  // ⚠️ RESET BY NAME, NOT vi.clearAllMocks(), WHICH MAKES A NEW MOCK EASY TO
+  // MISS — and one was, on 16 Aug 2026. `confirmNoPlayerMock` was added to the
+  // seeding below and not to this list, so its CALL COUNT leaked from one test
+  // into the next: "does not record a confirmation when they choose to add one"
+  // failed against a call the previous case had made. The component was right
+  // and the harness was wrong, which is the more expensive way round.
   useAuthMock.mockReset()
+  confirmNoPlayerMock.mockReset()
   useMembershipsMock.mockReset()
   getMyProfileMock.mockReset()
-  updateProfileNamesMock.mockReset()
+  confirmMyDetailsMock.mockReset()
   getMyAccessRequestMock.mockReset()
   createAccessRequestMock.mockReset()
   getMyAccessRequestMock.mockResolvedValue(null)
@@ -111,7 +127,12 @@ beforeEach(() => {
   })
   useMembershipsMock.mockReturnValue(loaded())
   getMyProfileMock.mockResolvedValue(unconfirmed())
-  updateProfileNamesMock.mockResolvedValue({ id: 'u-1', name_confirmed_at: '2026-08-06T12:00:00Z' })
+  confirmMyDetailsMock.mockResolvedValue({
+    id: 'u-1',
+    name_confirmed_at: '2026-08-06T12:00:00Z',
+    no_player_confirmed_at: '2026-08-01T00:00:00Z',
+  })
+  confirmNoPlayerMock.mockResolvedValue({ id: 'u-1', no_player_confirmed_at: '2026-08-16T12:00:00Z' })
 })
 
 describe('NamePrompt — the sign-in name gate', () => {
@@ -177,7 +198,7 @@ describe('NamePrompt — the sign-in name gate', () => {
 
   // --- saving --------------------------------------------------------------
 
-  it('saves first and family name via updateProfileNames', async () => {
+  it('saves first and family name via confirmMyDetails', async () => {
     const user = userEvent.setup()
     await openGate()
 
@@ -186,7 +207,7 @@ describe('NamePrompt — the sign-in name gate', () => {
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
     await waitFor(() =>
-      expect(updateProfileNamesMock).toHaveBeenCalledWith({
+      expect(confirmMyDetailsMock).toHaveBeenCalledWith({
         profileId: 'u-1',
         firstName: 'Jay',
         lastName: 'Muir',
@@ -212,7 +233,7 @@ describe('NamePrompt — the sign-in name gate', () => {
   // remounts, which is what any route change does.
   it('primes the profile cache, so the name it just took reaches the masthead', async () => {
     const user = userEvent.setup()
-    updateProfileNamesMock.mockResolvedValue(
+    confirmMyDetailsMock.mockResolvedValue(
       unconfirmed({
         full_name: 'Jay Muir',
         first_name: 'Jay',
@@ -224,7 +245,7 @@ describe('NamePrompt — the sign-in name gate', () => {
     await user.clear(screen.getByLabelText(/first name/i))
     await user.type(screen.getByLabelText(/first name/i), 'Jay')
     await user.click(screen.getByRole('button', { name: /continue/i }))
-    await waitFor(() => expect(updateProfileNamesMock).toHaveBeenCalled())
+    await waitFor(() => expect(confirmMyDetailsMock).toHaveBeenCalled())
 
     cleanup()
     renderShell()
@@ -250,7 +271,7 @@ describe('NamePrompt — the sign-in name gate', () => {
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
     await waitFor(() =>
-      expect(updateProfileNamesMock).toHaveBeenCalledWith({
+      expect(confirmMyDetailsMock).toHaveBeenCalledWith({
         profileId: 'u-1',
         firstName: 'Ronaldinho',
         lastName: '',
@@ -266,13 +287,13 @@ describe('NamePrompt — the sign-in name gate', () => {
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/enter your first name/i)
-    expect(updateProfileNamesMock).not.toHaveBeenCalled()
+    expect(confirmMyDetailsMock).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: GATE_TITLE })).toBeInTheDocument()
   })
 
   it('surfaces a save failure and keeps the gate open', async () => {
     const user = userEvent.setup()
-    updateProfileNamesMock.mockRejectedValue(new Error('permission denied for table profiles'))
+    confirmMyDetailsMock.mockRejectedValue(new Error('permission denied for table profiles'))
     await openGate()
 
     await user.click(screen.getByRole('button', { name: /continue/i }))
@@ -321,3 +342,158 @@ async function openGate() {
   renderShell()
   return screen.findByRole('dialog', { name: GATE_TITLE })
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The phone and player gates — 16 Aug 2026
+   ══════════════════════════════════════════════════════════════════════════
+
+   Jay: "we need to have a pop up that forces people to fill out their full name
+   and phone number later on when they login again, if they haven't fill that
+   out, also force them to add a player or confirm again 1 time they don't have
+   a player".
+
+   ⚠️ MEASURED BEFORE BUILDING: 14 of 27 profiles had no phone, against 1 with no
+   name. The name half of that request was already working — `NamePrompt` has
+   been a hard gate since 6 Aug — so the phone and the player question are the
+   parts that were actually missing.
+
+   ⚠️ THE FIXTURE ABOVE ANSWERS BOTH BY DEFAULT so the older cases stay about the
+   name. Each case here withholds exactly one thing.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('NamePrompt — the phone gate', () => {
+  const noPhone = (overrides = {}) =>
+    unconfirmed({ phone: null, name_confirmed_at: '2026-08-01T00:00:00Z', ...overrides })
+
+  it('opens for somebody who has confirmed a name but has no phone', async () => {
+    getMyProfileMock.mockResolvedValue(noPhone())
+    renderShell()
+
+    expect(await screen.findByLabelText(/phone number/i)).toBeInTheDocument()
+  })
+
+  // ⚠️ THE ONE THAT KEEPS IT FROM BEING A NAG. Somebody who already gave a
+  // number must not be made to re-enter it to get past a gate they are only
+  // meeting for the name.
+  it('⚠️ does not ask for a phone when one is already on file', async () => {
+    getMyProfileMock.mockResolvedValue(unconfirmed())
+    renderShell()
+
+    await screen.findByLabelText(/first name/i)
+    expect(screen.queryByLabelText(/phone number/i)).toBeNull()
+  })
+
+  // ⚠️ SAFEGUARDING, NOT TIDINESS. This app already refuses to let an under-13
+  // hold their own contact details (allowsOwnContact). A gate that demands a
+  // phone number from a child account is the app arguing with its own rule.
+  it('⚠️ never asks a player-only account for a phone', async () => {
+    useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'player', team_id: 't1' }] }))
+    getMyProfileMock.mockResolvedValue(noPhone({ name_confirmed_at: null }))
+    renderShell()
+
+    await screen.findByLabelText(/first name/i)
+    expect(screen.queryByLabelText(/phone number/i)).toBeNull()
+  })
+
+  it('refuses to close without one, and does not call the data layer', async () => {
+    getMyProfileMock.mockResolvedValue(noPhone())
+    const user = userEvent.setup()
+    renderShell()
+
+    await screen.findByLabelText(/phone number/i)
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/phone number/i)
+    expect(confirmMyDetailsMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('NamePrompt — the player gate', () => {
+  const noPlayer = (overrides = {}) =>
+    unconfirmed({
+      name_confirmed_at: '2026-08-01T00:00:00Z',
+      no_player_confirmed_at: null,
+      ...overrides,
+    })
+
+  it('asks somebody with no linked child', async () => {
+    getMyProfileMock.mockResolvedValue(noPlayer())
+    renderShell()
+
+    expect(await screen.findByText(/do you have a player at the club/i)).toBeInTheDocument()
+  })
+
+  // ⚠️ THE "1 TIME" IN THE REQUEST, AND THE WHOLE REASON THE COLUMN EXISTS. A
+  // coach with no children at the club would otherwise meet this at every
+  // sign-in forever, which is how a gate becomes something people dismiss
+  // without reading.
+  it('⚠️ never asks again once somebody has said they have none', async () => {
+    getMyProfileMock.mockResolvedValue(
+      noPlayer({ no_player_confirmed_at: '2026-08-10T00:00:00Z' }),
+    )
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByText(/do you have a player/i)).toBeNull()
+    expect(screen.queryByLabelText(/first name/i)).toBeNull()
+  })
+
+  it('⚠️ never asks somebody who already has a child linked', async () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({ memberships: [{ role: 'parent', team_id: 't1', player_id: 'p1' }] }),
+    )
+    getMyProfileMock.mockResolvedValue(noPlayer())
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByText(/do you have a player/i)).toBeNull()
+  })
+
+  it('⚠️ never asks a player-only account — it IS the player', async () => {
+    useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'player', team_id: 't1' }] }))
+    getMyProfileMock.mockResolvedValue(noPlayer())
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByText(/do you have a player/i)).toBeNull()
+  })
+
+  it('records the answer and closes', async () => {
+    getMyProfileMock.mockResolvedValue(noPlayer())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('no-player'))
+
+    await waitFor(() => expect(confirmNoPlayerMock).toHaveBeenCalledWith({ profileId: 'u-1' }))
+    await waitFor(() => expect(screen.queryByText(/do you have a player/i)).toBeNull())
+  })
+
+  // ⚠️ THE SECOND HALF OF THE GATE, NOT A SECOND GATE. Somebody who arrives
+  // needing both must not have the app flash between two sheets — the details
+  // step hands straight over.
+  it('⚠️ follows the details step straight into the player question', async () => {
+    getMyProfileMock.mockResolvedValue(unconfirmed({ no_player_confirmed_at: null }))
+    confirmMyDetailsMock.mockResolvedValue({
+      id: 'u-1',
+      name_confirmed_at: '2026-08-16T12:00:00Z',
+      no_player_confirmed_at: null,
+    })
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByRole('button', { name: /continue/i }))
+    expect(await screen.findByText(/do you have a player at the club/i)).toBeInTheDocument()
+  })
+
+  // ⚠️ TAPPING "Add my player" IS NOT AN ANSWER. Somebody who taps it and then
+  // abandons the form still has no player, so the gate is right to ask again.
+  it('⚠️ does not record a confirmation when they choose to add one', async () => {
+    getMyProfileMock.mockResolvedValue(noPlayer())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByRole('button', { name: /add my player/i }))
+    expect(confirmNoPlayerMock).not.toHaveBeenCalled()
+  })
+})

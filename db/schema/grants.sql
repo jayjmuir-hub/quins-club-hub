@@ -240,6 +240,7 @@
 --   profiles.last_name          authenticated   UPDATE
 --   profiles.name_confirmed_at  authenticated   UPDATE
 --   profiles.phone              authenticated   UPDATE
+--   profiles.no_player_confirmed_at  authenticated  SELECT, UPDATE  ← 16 Aug 2026
 --
 --   memberships.profile_id      authenticated   UPDATE
 --   memberships.club_id         authenticated   UPDATE
@@ -248,6 +249,14 @@
 --   memberships.role            authenticated   UPDATE
 --   memberships.status          authenticated   UPDATE
 --   memberships.title           authenticated   UPDATE   ← 13 Aug 2026
+--
+-- ⚠️ `profiles.no_player_confirmed_at` IS THE SECOND TIME THIS TRAP WAS MET AND
+-- THE FIRST TIME IT WAS SEEN COMING. Added 16 Aug 2026 for the sign-in gate,
+-- with its grant in the same migration — because `memberships.title` below had
+-- already shown what happens without one. It also needs SELECT, unlike the five
+-- above it: those are covered by the table-level SELECT `authenticated` still
+-- holds, and so is this one — the explicit grant is belt-and-braces against a
+-- future revoke, and costs nothing.
 --
 -- ⚠️ `memberships.title` IS WHY THIS SECTION IS NOT BOOKKEEPING. It is the first
 -- column added to `memberships` since the table-level UPDATE was revoked, and

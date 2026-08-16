@@ -197,7 +197,12 @@ export async function getMyProfile(userId) {
     // has one, and the upload appears to succeed and then vanish on reload.
     // Silent, and it looks like a storage problem rather than a missing word.
     .select(
-      'id, full_name, first_name, last_name, name_confirmed_at, email, phone, photo_path, created_at',
+      // ⚠️ `no_player_confirmed_at` ADDED 16 Aug 2026, AND THE SIGN-IN GATE
+      // READS IT. A column missing from this list is `undefined` on the object,
+      // not absent — so the gate would read "never confirmed" for somebody who
+      // had, and ask them again at every sign-in. Exactly the failure the
+      // photo_path comment above records, in a different column.
+      'id, full_name, first_name, last_name, name_confirmed_at, email, phone, photo_path, created_at, no_player_confirmed_at',
     )
     .eq('id', userId)
     .maybeSingle()
@@ -1123,5 +1128,83 @@ export async function setAdminRights(membershipId, isSuper, rights) {
   // because the one thing that must never happen is reporting a save that did
   // not occur.
   if (!data) throw new Error('That change was not saved. You may not be a super admin.')
+  return data
+}
+
+/**
+ * The sign-in gate's write: name, phone, and "you have told us" in one update.
+ *
+ * ⚠️ ONE STATEMENT, NOT updateProfileNames FOLLOWED BY updateMyProfile. Two
+ * writes means a window where the name is confirmed and the phone is not — and
+ * the gate reopens on the phone step alone next login, which reads as the app
+ * having lost the answer. One update or none.
+ *
+ * ⚠️ `name_confirmed_at` IS STAMPED HERE and that is what closes the name gate
+ * for good. NamePrompt's own header explains why it is a timestamp rather than
+ * "is the name blank": a Google sign-up arrives with a name already populated,
+ * and it is exactly those names most likely to be wrong.
+ *
+ * ⚠️ THE PHONE IS OPTIONAL TO THIS FUNCTION, NOT TO THE GATE. A player-only
+ * account is not asked for one (safeguarding: this app already refuses to let
+ * an under-13 hold their own contact details — see allowsOwnContact), so the
+ * caller decides whether it was required and passes what it has.
+ */
+export async function confirmMyDetails({ profileId, firstName, lastName, phone } = {}) {
+  if (!profileId) throw new Error('confirmMyDetails needs a profileId.')
+
+  const first = typeof firstName === 'string' ? firstName.trim() : ''
+  const last = typeof lastName === 'string' ? lastName.trim() : ''
+  if (!first) throw new Error('Enter your first name.')
+
+  const patch = {
+    first_name: first,
+    last_name: last || null,
+    name_confirmed_at: new Date().toISOString(),
+  }
+  // ⚠️ ONLY SENT WHEN THERE IS ONE. Writing null over a phone somebody already
+  // has, because this gate did not ask them for it, would be the gate deleting
+  // data it exists to collect.
+  const trimmedPhone = typeof phone === 'string' ? phone.trim() : ''
+  if (trimmedPhone) patch.phone = trimmedPhone
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(patch)
+    .eq('id', profileId)
+    .select('id, first_name, last_name, full_name, phone, name_confirmed_at, no_player_confirmed_at')
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error("We couldn't save that. Try again.")
+  return data
+}
+
+/**
+ * Records, once, that this person has no player at the club.
+ *
+ * ⚠️ THE POINT IS THAT IT IS ASKED ONCE. Jay, 16 Aug 2026: "force them to add a
+ * player or confirm again 1 time they don't have a player". A coach with no
+ * children at the club would otherwise meet the same question at every sign-in
+ * forever, which is how a gate becomes something people learn to dismiss
+ * without reading.
+ *
+ * ⚠️ `no_player_confirmed_at` NEEDS ITS OWN COLUMN GRANT. `authenticated` holds
+ * UPDATE on public.profiles for named columns only, so this write is refused
+ * without the grant in
+ * db/migrations/20260816_profile_no_player_confirmed.sql. A refusal here is
+ * invisible in the UI — the gate simply reopens next login.
+ */
+export async function confirmNoPlayer({ profileId } = {}) {
+  if (!profileId) throw new Error('confirmNoPlayer needs a profileId.')
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ no_player_confirmed_at: new Date().toISOString() })
+    .eq('id', profileId)
+    .select('id, no_player_confirmed_at')
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error("We couldn't save that. Try again.")
   return data
 }
