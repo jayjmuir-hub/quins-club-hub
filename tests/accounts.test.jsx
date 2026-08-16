@@ -1743,3 +1743,120 @@ describe('Accounts — viewing by type', () => {
     expect(screen.queryByTestId('account-type-filter')).toBeNull()
   })
 })
+
+/* ══════════════════════════════════════════════════════════════════════════
+   "Waiting for access" — showing what we already know, 16 Aug 2026
+   ══════════════════════════════════════════════════════════════════════════
+
+   Jay, of a card carrying nothing but an email address: "still getting these
+   with no idea who they are or what they are requesting".
+
+   ⚠️ THE APP KNEW. Measured on production: that person held TWO PENDING
+   MEMBERSHIP ROWS — parent, U10 Mixed, with a child; parent, U12 Mixed, with a
+   child — written by self-registration, and this card rendered none of it.
+   Pending rows are excluded from the access list below (a pending row is not
+   access), and "excluded from the list" had quietly come to mean "excluded from
+   the screen".
+
+   ⚠️ AND IT IS NOT ALWAYS THE WHOLE TRUTH. That person was in fact the U12
+   coach — self-registration files everyone as a parent, because that is the form
+   they came through. The wording is "registered as" for exactly that reason:
+   it reports what was RECORDED, which is what lets an admin recognise somebody
+   and then correct it.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('Accounts — a waiting person carries what they asked for', () => {
+  const SELF_REGISTERED = {
+    id: 'profile-newcomer',
+    full_name: '',
+    email: 'newcomer@example.com',
+    created_at: '2026-08-16T15:40:00Z',
+  }
+
+  const waitingRow = () =>
+    within(screen.getByTestId('waiting-for-access'))
+      .getAllByTestId('waiting-person')
+      .find((r) => r.textContent.includes('newcomer@example.com'))
+
+  it('shows the role and squad the request form was told', async () => {
+    listPendingProfilesMock.mockResolvedValue([...PROFILE_ROWS, SELF_REGISTERED])
+    listAccessRequestsMock.mockResolvedValue([
+      {
+        id: 'req-new',
+        profile_id: 'profile-newcomer',
+        status: 'pending',
+        note: null,
+        requested_role: 'coach',
+        requested_team_id: 'team-u10',
+        created_at: '2026-08-16T15:40:00Z',
+      },
+    ])
+    setup()
+
+    await screen.findByText('Sara Coach')
+    const asked = within(waitingRow()).getByTestId('requested-as')
+    expect(asked).toHaveTextContent(/Asked as/i)
+    expect(asked).toHaveTextContent('Coach')
+    expect(asked).toHaveTextContent('U10')
+  })
+
+  // ⚠️ THE SEVEN REQUESTS THAT PREDATE THE ROLE COLUMNS MUST NOT RENDER AN
+  // EMPTY LINE. A bare "Asked as" with nothing after it reads as a rendering
+  // fault, which is worse than the silence it replaced.
+  it('⚠️ says nothing rather than something blank for a request made before the change', async () => {
+    listPendingProfilesMock.mockResolvedValue([...PROFILE_ROWS, SELF_REGISTERED])
+    listAccessRequestsMock.mockResolvedValue([
+      {
+        id: 'req-old',
+        profile_id: 'profile-newcomer',
+        status: 'pending',
+        note: 'Parent of someone, somewhere',
+        requested_role: null,
+        requested_team_id: null,
+        created_at: '2026-08-13T09:00:00Z',
+      },
+    ])
+    setup()
+
+    await screen.findByText('Sara Coach')
+    const row = waitingRow()
+    expect(within(row).queryByTestId('requested-as')).toBeNull()
+    expect(within(row).getByTestId('request-note')).toHaveTextContent('Parent of someone')
+  })
+
+  // ⚠️ A TOMBSTONE FOR AN ATTEMPT THAT COULD NOT WORK. The first version of
+  // this block tried to show a self-registered parent's squads and children on
+  // the waiting card, on the strength of production data showing exactly that
+  // on their PENDING membership rows. It can never render: `unattached` in
+  // Accounts.jsx subtracts every profile holding ANY membership row, pending
+  // included, so such a person is not in this list at all — they are in Pending
+  // approvals, which already names the child, the squad and the adult.
+  //
+  // Kept as a test because the mistake is an easy one to repeat, and because
+  // the pending-row fixture below is what proves the exclusion is real.
+  it('⚠️ is not even listed once they hold a pending membership row', async () => {
+    listPendingProfilesMock.mockResolvedValue([...PROFILE_ROWS, SELF_REGISTERED])
+    listClubMembersMock.mockResolvedValue([
+      ...MEMBER_ROWS,
+      {
+        id: 'm-new-1',
+        profile_id: 'profile-newcomer',
+        role: 'parent',
+        status: 'pending',
+        team_id: 'team-u10',
+        player_id: 'player-omar',
+        created_at: '2026-08-16T15:40:00Z',
+        profiles: { full_name: '', email: 'newcomer@example.com' },
+        teams: { name: 'U10 Mixed' },
+        players: { full_name: 'Omar Haddad' },
+      },
+    ])
+    setup()
+
+    await screen.findByText('Sara Coach')
+    expect(waitingRow()).toBeUndefined()
+    // ...and the information is on the approvals card instead, where the child
+    // leads because that is the decision being made.
+    expect(within(screen.getByTestId('pending-approvals')).getByText('Omar Haddad')).toBeInTheDocument()
+  })
+})
