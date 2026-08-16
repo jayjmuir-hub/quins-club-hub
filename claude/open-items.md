@@ -44,6 +44,18 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   ✅ **THE ASSERTIONS ARE NOW WRITTEN DOWN AND RUNNABLE — `npm run check:live`,
   16 Aug 2026 — and `claude/runbooks/monitoring.md` has the click-by-click.**
   The accounts are still Jay's and still uncreated, so this item stays open.
+  ✅ **ERROR TRACKING IS BUILT AND INERT — `src/lib/errorReporting.js`, 16 Aug
+  2026.** Lazy-loaded, so the SDK is fetched only once something has already
+  thrown; wired into `ErrorBoundary` AND into a global rejection handler, because
+  a boundary catches render errors only and this app's failures are mostly
+  rejected Supabase calls. **It sends nothing until `VITE_SENTRY_DSN` is set in
+  Netlify and a build runs** — that is Jay's, and until then the whole path is
+  dead-code eliminated out of the bundle entirely.
+  ⚠️ **THE SIZE ESTIMATE THIS DECISION WAS TAKEN ON WAS WRONG BY 5×.** The
+  runbook said `@sentry/react` costs "25-30 KB gzip, about 11%". Measured after
+  installing: **159 KB gzip, +61%** against a 260 KB main bundle. The choice was
+  right anyway and is now more obviously so — but the number was a recollection
+  presented as a measurement, which is the thing this repo keeps being bitten by.
   ⚠️ **AND THE LINE ABOVE ABOUT `text/calendar` IS HALF RIGHT, WHICH IS WORSE
   THAN WRONG.** Measured against production: an unauthenticated `/calendar.ics`
   returns **404 `text/plain`**, because the Netlify rule proxies it to the edge
