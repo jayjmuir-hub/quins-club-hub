@@ -333,9 +333,21 @@ function NextFixtureHero({ event, teamName }) {
   )
 }
 
-// Quick actions (design-system.md §5.1). Every role gets the same two
-// navigation actions; a read-only role additionally gets a line saying why
-// there is nothing else here.
+// Quick actions (design-system.md §5.1). Two navigation actions every role
+// gets, a WRITE action for anyone who may post a notice, and for a read-only
+// role a line saying why there is nothing else here.
+//
+// ⚠️ THE POST ACTION LEADS, AND THE ORDER IS AN ARGUMENT RATHER THAN A
+// PREFERENCE. The two below it go to Schedule and Roster — which are also the
+// second and third tabs of the bottom nav, reachable from every screen in the
+// app. Posting a notice has no other route at all. The item with no alternative
+// belongs above the two with one.
+//
+// ⚠️ AND IT MOVED HERE FROM ABOVE THE HERO — Jay, 16 Aug 2026: "the post a
+// notice should not be at the top of the screen, it should be in the quick
+// actions section". The first placement put it between the noticeboard and the
+// next fixture, which is the one piece of vertical space this screen's own
+// comments defend hardest.
 //
 // The prototype's admin/coach variant also lists "Add fixture or training"
 // and "Add a player". Those are absent, not disabled, and deliberately so:
@@ -346,10 +358,15 @@ function NextFixtureHero({ event, teamName }) {
 // matters more here than there, because this is the landing screen and so
 // the first thing a coach sees. The card gains the two buttons when the
 // forms land, whichever way it renders today.
-function QuickActions({ canEdit, readOnlyRole }) {
+function QuickActions({ canEdit, readOnlyRole, onPosted }) {
   return (
     <Card data-testid="quick-actions" className="p-[14px]">
       <div className="flex flex-col gap-2.5">
+        {/* ⚠️ NO ARROW ON THIS ONE. The badge means "this goes somewhere" —
+            Button.jsx is explicit that Save/Cancel do not get one — and this
+            opens a sheet in place. That is the whole point of it. */}
+        <PostNoticeAction variant="secondary" full onPosted={onPosted} />
+
         {/* These two GO somewhere, which is exactly the case the club site
             marks with its rotating arrow badge. Save/Cancel buttons do not
             get one — see Button.jsx. */}
@@ -806,23 +823,6 @@ export default function Dashboard() {
           this decision has to be re-made. */}
       <NoticeBoard notices={notices} readIds={noticeReads} teamsById={teamsById} />
 
-      {/* ⚠️ POSTING FROM HOME — Jay, 16 Aug 2026, after asking for the same on
-          More. A coach at a pitch should be able to write one from the screen
-          they already have open.
-
-          ⚠️ AND IT IS A DELIBERATE, SMALL DEPARTURE FROM THE RULE DIRECTLY
-          ABOVE. That note says nothing may push the hero down on the ordinary
-          week, and this can — but only for somebody who may POST, which is
-          coaches, managers and admins, never a parent: PostNoticeAction renders
-          null for everyone else. The ordinary week for the overwhelming majority
-          of this app's users is unchanged. If it ever renders for a parent, that
-          decision has to be re-made. */}
-      <PostNoticeAction
-        className="mb-3.5"
-        variant="secondary"
-        full
-        onPosted={() => setNoticeToken((n) => n + 1)}
-      />
 
       {nextFixture && (
         <NextFixtureHero
@@ -956,7 +956,11 @@ export default function Dashboard() {
             desktop:mt-0 hands the spacing back to first:mt-0 at width. */}
         <div className="mt-[18px] desktop:mt-0">
           <BlockTitle>Quick actions</BlockTitle>
-          <QuickActions canEdit={canEdit} readOnlyRole={readOnlyRole} />
+          <QuickActions
+            canEdit={canEdit}
+            readOnlyRole={readOnlyRole}
+            onPosted={() => setNoticeToken((n) => n + 1)}
+          />
 
           <BlockTitle>Last result</BlockTitle>
           <Card data-testid="last-result" className="overflow-hidden">

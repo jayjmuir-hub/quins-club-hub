@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
+- 💄 **THE POST ACTION MOVED INTO QUICK ACTIONS, AND HOME NOW DRAWS THE SAME
+  NOTICE CARD AS /notices.** Three corrections to the same afternoon's work,
+  all reported by Jay against the live site.
+  ⚠️ **The first placement sat between the noticeboard and the next fixture** —
+  the one piece of vertical space Dashboard's own comments defend hardest. It is
+  in the Quick actions card now, and it LEADS that card: the two buttons below it
+  go to Schedule and Roster, which are also tabs on the bottom nav, so the item
+  with no other route belongs above the two with one.
+  ⚠️ **`full` on More was wrong** — a stretched button read as the card's primary
+  action when the card's primary action is the LINK above it. Home keeps `full`,
+  because there it sits in a stack of full-width buttons. Same component; the
+  caller decides.
+  ⚠️ **AND HOME HAD ITS OWN NOTICE RENDERING, WHICH IS THE REAL LESSON.**
+  `NoticeBoard` carried a terser `NoticeItem` on the theory that Home points at
+  the board rather than being it. The moment the board's card was redesigned, one
+  notice looked two ways — *"it doesn't look like how the same notice looks in the
+  notice section"*. The terser version is DELETED rather than restyled to match:
+  restyling keeps the mechanism and drifts again at the next change. This is the
+  third time today one thing has been rendered twice.
+  ⚠️ **THE HARNESS FIXTURES HAD THE SAME MISSING `status` THAT CAUSED THE
+  ORIGINAL BUG.** Ten membership literals in `harness/main.jsx` carried no
+  status, so the harness could not render the post button at all and quietly
+  showed less than the app does. Fixed, and it is the same shape of fault as the
+  "view as" row — a fixture that does not match a real row hides the thing it was
+  built to reveal.
+
 - 🐞 **A "VIEW AS" PREVIEW COULD NOT POST A NOTICE, AND THE BOARD LOOKED EMPTY.**
   Jay, previewing as a coach: *"i don't see the ability to post a notice for
   comms, the link takes me to a page with nothing there"*. `syntheticMemberships`

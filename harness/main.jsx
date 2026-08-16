@@ -123,8 +123,8 @@ const COACH_EMAIL = 'coach.sam@adhq.example'
 const JAY_EMAIL = 'jayjmuir@gmail.com'
 
 const COACH_MEMBERSHIPS = [
-  { id: 'm1', role: 'coach', team_id: 't1', player_id: null },
-  { id: 'm2', role: 'coach', team_id: 't2', player_id: null },
+  { id: 'm1', status: 'active', role: 'coach', team_id: 't1', player_id: null },
+  { id: 'm2', status: 'active', role: 'coach', team_id: 't2', player_id: null },
 ]
 const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 const TEAMS = [
@@ -137,9 +137,9 @@ const TEAMS = [
 // branch fire at all; three is what it actually looks like in the club, and
 // it is what puts enough pills in the row to test the 375px overflow.
 const COACH_THREE_MEMBERSHIPS = [
-  { id: 'm1', role: 'coach', team_id: 't1', player_id: null },
-  { id: 'm2', role: 'coach', team_id: 't2', player_id: null },
-  { id: 'm3', role: 'coach', team_id: 't3', player_id: null },
+  { id: 'm1', status: 'active', role: 'coach', team_id: 't1', player_id: null },
+  { id: 'm2', status: 'active', role: 'coach', team_id: 't2', player_id: null },
+  { id: 'm3', status: 'active', role: 'coach', team_id: 't3', player_id: null },
 ]
 const TEAMS_THREE = [...TEAMS, { id: 't3', club_id: CLUB_ID, name: 'U16 Boys', sort_order: 8 }]
 
@@ -155,7 +155,7 @@ function Shell({ authValue, membershipValue, route = '/', children }) {
   )
 }
 
-const ADMIN_MEMBERSHIPS = [{ id: 'm0', role: 'admin', team_id: null, player_id: null }]
+const ADMIN_MEMBERSHIPS = [{ id: 'm0', status: 'active', role: 'admin', team_id: null, player_id: null }]
 
 function scheduleScenario(memberships, teams = TEAMS) {
   return () => (
@@ -203,7 +203,7 @@ function dashboardScenario(memberships, teams = TEAMS) {
   )
 }
 
-const PARENT_MEMBERSHIPS = [{ id: 'm4', role: 'parent', team_id: 't1', player_id: 'p1' }]
+const PARENT_MEMBERSHIPS = [{ id: 'm4', status: 'active', role: 'parent', team_id: 't1', player_id: 'p1' }]
 
 // ⚠️ THE MINIS — U10 and below (15 Aug 2026). ALL FIVE of the club's minis
 // squads, and the count is the point rather than thoroughness for its own sake.
@@ -237,7 +237,7 @@ const MINIS_PARENT = MINIS_TEAMS.map((team, index) => ({
 // A coach of one squad: the team filter is hidden and the list groups by
 // position. Task 12's grouping rule turns on team count, so this is the
 // scenario that renders the Forwards/Backs/Other headings.
-const COACH_ONE_TEAM = [{ id: 'm1', role: 'coach', team_id: 't1', player_id: null }]
+const COACH_ONE_TEAM = [{ id: 'm1', status: 'active', role: 'coach', team_id: 't1', player_id: null }]
 
 const scenarios = {
   login: () => (
@@ -664,7 +664,7 @@ const scenarios = {
       admin: ADMIN_MEMBERSHIPS,
       coach: COACH_MEMBERSHIPS,
       parent: PARENT_MEMBERSHIPS,
-      player: [{ id: 'm5', role: 'player', team_id: 't1', player_id: 'p1' }],
+      player: [{ id: 'm5', status: 'active', role: 'player', team_id: 't1', player_id: 'p1' }],
     }
     const memberships = membershipsByWho[who] ?? ADMIN_MEMBERSHIPS
     return (
