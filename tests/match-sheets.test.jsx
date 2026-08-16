@@ -27,6 +27,7 @@ const saveMatchSheetMock = vi.fn()
 const saveSlotsMock = vi.fn()
 const saveCardsMock = vi.fn()
 const setStatusMock = vi.fn()
+const listLineupsMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -51,6 +52,15 @@ vi.mock('../src/data/events.js', () => ({
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
   listContactsForPlayers: async () => [],
+}))
+// The lineup the sheet seeds its 22 boxes from (16 Aug 2026). Mocked for the
+// same reason players.js is: the real module reaches Supabase at import time.
+vi.mock('../src/data/lineups.js', () => ({
+  listLineups: (...a) => listLineupsMock(...a),
+  createLineup: async () => ({}),
+  updateLineup: async () => ({}),
+  saveLineupPlayers: async () => [],
+  deleteLineup: async () => {},
 }))
 vi.mock('../src/data/matchSheets.js', async () => {
   const actual = await vi.importActual('../src/data/matchSheets.js')
@@ -126,6 +136,11 @@ beforeEach(() => {
     { id: 'p2', team_id: 't-u14b', full_name: 'Tom Fletcher' },
   ])
   getMatchSheetMock.mockResolvedValue(null)
+  // ⚠️ NO LINEUP BY DEFAULT. The seeding is a feature and must be asked for
+  // explicitly, exactly like the manager prefill above — every test that is not
+  // about it must still see 22 empty boxes, or a name appearing on the form
+  // would stop being evidence of anything.
+  listLineupsMock.mockResolvedValue([])
   listMatchSheetsForMock.mockResolvedValue(new Map())
   // ⚠️ THE EMBED IS PART OF THE RETURN because saveMatchSheet asks for it. A
   // mock that omits it would blank the TEAM line on save and no test would say
@@ -637,5 +652,173 @@ describe('YouthDashboard — the Club Youth Manager list', () => {
     mount(<YouthDashboard />, asYouth)
     await screen.findByTestId('youth-match-row')
     expect(screen.getAllByTestId('youth-match-row')).toHaveLength(1)
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The 22, seeded from the coach's lineup — 16 Aug 2026
+   ══════════════════════════════════════════════════════════════════════════
+
+   ⚠️ WHY THIS EXISTS. Jay, 16 Aug 2026: "names are not auto populating into
+   them". They never had. The sheet's only help was the `squad-players`
+   datalist on each box — a typeahead you discover by starting to type, on a
+   phone, at the side of a pitch — while `lineups` already held exactly who
+   played. The sheet was simply not asking.
+
+   ⚠️ THE MERGE RULE IS THE PART WORTH PINNING. Seeding fills BLANK rows only,
+   because a sheet that has been worked on is a record of somebody's decision;
+   the deliberate overwrite is the Refill button, which is why it is the only
+   control on the screen that asks twice.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** The squad the mocked lineup draws from. Invented names, as this repo requires. */
+const SQUAD = [
+  { id: 'p1', team_id: 't-u14b', full_name: 'Zara Ali' },
+  { id: 'p2', team_id: 't-u14b', full_name: 'Tom Fletcher' },
+  { id: 'p3', team_id: 't-u14b', full_name: 'Idris Bakhtiari' },
+]
+
+/** Slot N's box, by the aria-label SlotCells gives it. */
+const slotBox = (n) => screen.getByLabelText(`Player ${n}`)
+
+describe('MatchSheet — the 22 come from the lineup', () => {
+  beforeEach(() => {
+    listPlayersMock.mockResolvedValue(SQUAD)
+  })
+
+  const LINEUP = {
+    id: 'ln-1',
+    event_id: 'e-1',
+    label: null,
+    lineup_players: [
+      // ⚠️ DELIBERATELY OUT OF ORDER IN THE ARRAY. `sort_order` is what the
+      // coach arranged and it is the only thing that may decide the order —
+      // a test whose fixture is already sorted proves nothing about the sort.
+      { id: 'lp-3', player_id: 'p3', role: 'replacement', sort_order: 0 },
+      { id: 'lp-2', player_id: 'p2', role: 'starter', sort_order: 1 },
+      { id: 'lp-1', player_id: 'p1', role: 'starter', sort_order: 0 },
+    ],
+  }
+
+  it('fills the blank boxes, starters first and then replacements', async () => {
+    listLineupsMock.mockResolvedValue([LINEUP])
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    expect(slotBox(1)).toHaveValue('Zara Ali')
+    expect(slotBox(2)).toHaveValue('Tom Fletcher')
+    // ⚠️ SLOT 3, NOT SLOT 16. The replacement follows the starters immediately
+    // rather than waiting for a 15-man block, because `players_per_side` is the
+    // coach's choice per lineup — a squad playing 10s would otherwise file a
+    // form with five blank rows in the middle of it.
+    expect(slotBox(3)).toHaveValue('Idris Bakhtiari')
+    expect(slotBox(4)).toHaveValue('')
+  })
+
+  it('⚠️ never overwrites a row the sheet already had', async () => {
+    listLineupsMock.mockResolvedValue([LINEUP])
+    getMatchSheetMock.mockResolvedValue({
+      id: 'ms-1',
+      status: 'draft',
+      league_team: { id: 'lt-2', rcm_name: 'ADHQ2', division: 'B' },
+      slots: [{ slot: 1, player_id: null, full_name: 'Rory Ellingham', front_row: true }],
+      cards: [],
+    })
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    // The hand-typed name survives, and the lineup fills in around it.
+    expect(slotBox(1)).toHaveValue('Rory Ellingham')
+    expect(slotBox(2)).toHaveValue('Zara Ali')
+  })
+
+  it('⚠️ does not list a player twice when the sheet already names them', async () => {
+    listLineupsMock.mockResolvedValue([LINEUP])
+    getMatchSheetMock.mockResolvedValue({
+      id: 'ms-1',
+      status: 'draft',
+      league_team: { id: 'lt-2', rcm_name: 'ADHQ2', division: 'B' },
+      // Same player the lineup starts with, already on the sheet and LINKED.
+      slots: [{ slot: 5, player_id: 'p1', full_name: 'Zara Ali', front_row: false }],
+      cards: [],
+    })
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    const named = [...Array(22).keys()]
+      .map((i) => slotBox(i + 1).value)
+      .filter((value) => value === 'Zara Ali')
+    expect(named).toHaveLength(1)
+  })
+
+  it('⚠️ never ticks FR — a lineup records positions, not front-row cover', async () => {
+    listLineupsMock.mockResolvedValue([LINEUP])
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    expect(screen.getByLabelText('Front row cover for player 1')).not.toBeChecked()
+    expect(screen.getByLabelText('Front row cover for player 2')).not.toBeChecked()
+  })
+
+  it('says how to get names on the form when no team has been picked', async () => {
+    listLineupsMock.mockResolvedValue([])
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    const squad = within(screen.getByTestId('match-sheet-squad'))
+    expect(squad.getByText(/no team was picked/i)).toBeInTheDocument()
+    expect(squad.queryByRole('button', { name: /refill/i })).toBeNull()
+  })
+
+  it('⚠️ Refill asks twice before it throws the form away', async () => {
+    listLineupsMock.mockResolvedValue([LINEUP])
+    getMatchSheetMock.mockResolvedValue({
+      id: 'ms-1',
+      status: 'draft',
+      league_team: { id: 'lt-2', rcm_name: 'ADHQ2', division: 'B' },
+      slots: [{ slot: 1, player_id: null, full_name: 'Rory Ellingham', front_row: true }],
+      cards: [],
+    })
+    const { user } = mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+    expect(slotBox(1)).toHaveValue('Rory Ellingham')
+
+    // ARM. Nothing has changed yet — this is the whole point of the two steps.
+    await user.click(screen.getByRole('button', { name: /refill from the team sheet/i }))
+    expect(slotBox(1)).toHaveValue('Rory Ellingham')
+
+    // Backing out leaves the form exactly as it was.
+    await user.click(screen.getByRole('button', { name: /keep what/i }))
+    expect(slotBox(1)).toHaveValue('Rory Ellingham')
+
+    // CONFIRM. Now the lineup replaces the lot, FR ticks included — front row
+    // cover is a claim about a named player, not about a row number.
+    await user.click(screen.getByRole('button', { name: /refill from the team sheet/i }))
+    await user.click(screen.getByRole('button', { name: /yes, replace the 22/i }))
+    expect(slotBox(1)).toHaveValue('Zara Ali')
+    expect(screen.getByLabelText('Front row cover for player 1')).not.toBeChecked()
+  })
+
+  it('names each lineup, because a squad can field two teams in a day', async () => {
+    listLineupsMock.mockResolvedValue([
+      { ...LINEUP, id: 'ln-a', label: 'Game 1' },
+      { ...LINEUP, id: 'ln-b', label: 'Game 2' },
+    ])
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    expect(screen.getByRole('button', { name: /refill from .Game 1./i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /refill from .Game 2./i })).toBeInTheDocument()
+  })
+
+  it('⚠️ opens the sheet anyway when the lineups cannot be read', async () => {
+    // A lineup is a convenience. The sheet is the governing body's document and
+    // must open with an empty 22 rather than an error card.
+    listLineupsMock.mockRejectedValue(new Error('offline'))
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    expect(slotBox(1)).toHaveValue('')
+    expect(screen.getByTestId('match-sheet-squad')).toBeInTheDocument()
   })
 })

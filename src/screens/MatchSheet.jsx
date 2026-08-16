@@ -4,6 +4,7 @@ import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { getEvent, upsertEvent } from '../data/events.js'
+import { listLineups } from '../data/lineups.js'
 import { listPlayers } from '../data/players.js'
 import {
   SLOT_COUNT,
@@ -20,6 +21,7 @@ import { eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { shareElementAsImage } from '../lib/shareImage.js'
 import { deadlineLabel, isOverdue, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
+import { namesFromLineup } from '../lib/lineupSquad.js'
 import { isMinisTeam } from '../lib/minis.js'
 import {
   SCORE_KINDS,
@@ -191,6 +193,46 @@ function slotsFrom(stored) {
   return base
 }
 
+/**
+ * Fills the BLANK rows from a lineup, and never touches a filled one.
+ *
+ * ⚠️ THE SAME RULE THE MANAGER PREFILL USES, AND FOR THE SAME REASON. A sheet
+ * that has been worked on is a record of what somebody decided; a lineup edited
+ * after they started must not quietly rewrite it. The coach who WANTS the new
+ * lineup presses Refill, which is the other function below and says so.
+ *
+ * ⚠️ A PLAYER ALREADY ON THE SHEET IS NOT ADDED AGAIN. Without this, a coach who
+ * typed three names by hand and then reloaded would find those three players
+ * listed twice — once where they typed them and once where the lineup put them —
+ * which the governing body reads as a 25-man squad.
+ */
+function withLineup(slots, picks) {
+  if (!picks.length) return slots
+  const taken = new Set(slots.map((row) => row.player_id).filter(Boolean))
+  const queue = picks.filter((pick) => !taken.has(pick.player_id))
+  return slots.map((row) => {
+    if (String(row.full_name ?? '').trim() !== '') return row
+    const next = queue.shift()
+    return next ? { ...row, player_id: next.player_id, full_name: next.full_name } : row
+  })
+}
+
+/**
+ * Replaces all 22 rows with a lineup. The deliberate, confirmed action.
+ *
+ * ⚠️ THE FR TICKS GO WITH THE NAMES. Front row cover is a SAFETY declaration
+ * about a named player (see SlotCells); leaving a tick behind on a row whose
+ * occupant just changed would tell a referee that somebody can pack down at
+ * hooker on the strength of who used to be in that box.
+ */
+function slotsFromLineup(picks) {
+  const base = emptySlots()
+  picks.slice(0, SLOT_COUNT).forEach((pick, index) => {
+    base[index] = { ...base[index], player_id: pick.player_id, full_name: pick.full_name }
+  })
+  return base
+}
+
 function emptyCards() {
   return Array.from({ length: CARD_ROWS }, () => ({
     half: '',
@@ -210,6 +252,7 @@ export default function MatchSheet() {
 
   const [event, setEvent] = useState(null)
   const [squad, setSquad] = useState([])
+  const [lineups, setLineups] = useState([])
   const [sheet, setSheet] = useState(null)
   const [slots, setSlots] = useState(emptySlots)
   const [cardRows, setCardRows] = useState(emptyCards)
@@ -233,6 +276,10 @@ export default function MatchSheet() {
   const [saveError, setSaveError] = useState(null)
   const [saved, setSaved] = useState(false)
   const [sharing, setSharing] = useState(false)
+  // The id of the lineup whose Refill has been ARMED, or null. Two-step inline
+  // confirm — never a native confirm(), which blocks the event loop and is
+  // untestable (RESTORE.md; the pattern is Notices' NoticeRow).
+  const [confirmRefill, setConfirmRefill] = useState(null)
   const printRef = useRef(null)
 
   useEffect(() => {
@@ -254,16 +301,33 @@ export default function MatchSheet() {
         // would let a coach file a player from another age group, which the
         // governing body receives as a wrong team sheet rather than an obvious
         // slip — the same reasoning listLeagueTeams' teamId argument carries.
-        const [players, existing] = await Promise.all([
+        //
+        // ⚠️ THE LINEUP IS FETCHED HERE, NOT IN A SECOND EFFECT, AND THE
+        // SEEDING HAPPENS ON THIS LINE. The names to seed with need BOTH the
+        // squad (for the names — `lineup_players` holds none) and the saved
+        // sheet (to know which rows are already filled), and the two arrive
+        // independently. Doing it in an effect that watches all three would
+        // need the same once-per-mount ref the manager prefill carries, and for
+        // a worse reason: it would run again on any later re-render and refill
+        // a row the coach had just cleared.
+        //
+        // ⚠️ A FAILURE TO READ LINEUPS IS NOT A FAILURE TO OPEN THE SHEET. The
+        // sheet is the governing body's document and must open with an empty 22
+        // rather than an error — the same `.catch(() => [])` the squad read has
+        // carried since this screen was written.
+        const [players, existing, fixtureLineups] = await Promise.all([
           listPlayers({ teamIds: [row.team_id] }).catch(() => []),
           getMatchSheet(eventId),
+          listLineups(eventId).catch(() => []),
         ])
         if (!mounted) return
 
         setSquad(players)
+        setLineups(fixtureLineups)
+        setSlots(withLineup(slotsFrom(existing?.slots), namesFromLineup(fixtureLineups[0], players)))
+
         if (existing) {
           setSheet(existing)
-          setSlots(slotsFrom(existing.slots))
           if (existing.cards?.length) {
             const filled = existing.cards.map((card) => ({
               half: card.half ?? '',
@@ -346,6 +410,21 @@ export default function MatchSheet() {
   function setSlot(index, patch) {
     setSaved(false)
     setSlots((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+  }
+
+  /**
+   * Throws away the 22 and rebuilds them from a lineup. Armed, then confirmed.
+   *
+   * ⚠️ THIS REPLACES, IT DOES NOT MERGE, AND THAT IS THE WHOLE POINT OF IT. The
+   * merge already happened on load, and a merge cannot express "I dropped two
+   * players and the lineup is now right" — the dropped pair would survive in the
+   * rows the coach had not cleared. Because it is destructive it is the only
+   * control on this screen that needs a second tap.
+   */
+  function refillFromLineup(lineup) {
+    setSaved(false)
+    setConfirmRefill(null)
+    setSlots(slotsFromLineup(namesFromLineup(lineup, squad)))
   }
 
   /** Links a typed name back to a roster player when it matches one exactly. */
@@ -793,275 +872,384 @@ export default function MatchSheet() {
               </p>
             )}
         </Card>
+
+        {/* ── SQUAD ─────────────────────────────────────────────────────────
+            ⚠️ THE NAMES COME FROM THE LINEUP, and this card is the only place
+            that says so. Before 16 Aug 2026 the 22 boxes were blank on every
+            sheet and the only help was the typeahead below — which a coach only
+            discovers by starting to type a name, on a phone, at the side of a
+            pitch. The lineup already holds who played; the sheet was simply
+            never asking it.
+
+            ⚠️ ALSO OUTSIDE THE FACSIMILE. Like the Score card, this is how the
+            form is FILLED and never part of what is sent. ── */}
+        <Card className="mt-3.5 p-3.5" data-testid="match-sheet-squad">
+          <h3 className="text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+            Squad
+          </h3>
+          {lineups.length === 0 ? (
+            <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
+              No team was picked for this fixture, so the 22 below start blank. Pick one on the{' '}
+              <button
+                type="button"
+                className="font-bold text-brand underline"
+                onClick={() => navigate(`/lineup/${eventId}`)}
+              >
+                team sheet
+              </button>{' '}
+              and it will fill this form in for you next time.
+            </p>
+          ) : (
+            <>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
+                Blank rows were filled from the team you picked, starters first. Refill to throw
+                away what is on the form and take the lineup as it stands now.{' '}
+                {/* ⚠️ SAID OUT LOUD, because FR is a SAFETY declaration and a
+                    coach who assumes it came across would file a sheet telling
+                    a referee nobody can cover the front row. The lineup records
+                    positions, not front-row COVER, and the two are different
+                    questions. */}
+                <strong className="text-ink">The FR ticks are never filled in for you</strong> — a
+                lineup records positions, not who can cover the front row.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2.5">
+                {lineups.map((lineup) =>
+                  confirmRefill === lineup.id ? (
+                    <Fragment key={lineup.id}>
+                      <Button variant="danger" onClick={() => refillFromLineup(lineup)}>
+                        Yes, replace the 22
+                      </Button>
+                      <Button variant="secondary" onClick={() => setConfirmRefill(null)}>
+                        Keep what&rsquo;s there
+                      </Button>
+                    </Fragment>
+                  ) : (
+                    <Button
+                      key={lineup.id}
+                      variant="dangerQuiet"
+                      onClick={() => setConfirmRefill(lineup.id)}
+                    >
+                      {/* A squad can field two teams in a day (a tournament), so
+                          the lineup's own label is what tells them apart. */}
+                      Refill from {lineup.label ? `“${lineup.label}”` : 'the team sheet'}
+                    </Button>
+                  ),
+                )}
+              </div>
+            </>
+          )}
+        </Card>
+
+        {/* ⚠️ PHONE ONLY, AND IT IS AN INSTRUCTION RATHER THAN AN APOLOGY. The
+            form below is a fixed 860px because it is a facsimile of a piece of
+            paper; see the note on the block itself. */}
+        <p className="mt-3.5 text-[12.5px] font-semibold text-ink-muted sm:hidden">
+          The form below is RCM&rsquo;s, at its real size. Scroll it sideways, or pinch to zoom out
+          and see all of it.
+        </p>
       </div>
 
       {/* ── The facsimile. This block is what html2canvas photographs, so
              everything inside it must read as a COMPLETED FORM rather than as
              an editor: hairline grid, square corners, no brand colour beyond
              the red RCM prints, and inputs invisible until you put a caret in
-             one. ── */}
-      <div
-        ref={printRef}
-        data-testid="match-sheet-facsimile"
-        className="mx-auto max-w-[860px] border border-black bg-white p-3 text-black"
-      >
-        <header className="mb-2 text-center">
-          <h1 className="text-[15px] font-bold leading-tight text-rcm">
-            Rugby Club Management (RCM)- OFFICIAL MATCH RESULT SHEET
-          </h1>
-          <p className="text-[13px] font-bold text-rcm">(to be filled in be each team)</p>
-        </header>
+             one. ──
 
-        {/* CLUB and TEAM share a line, labels red. TEAM is the LEAGUE team —
-            the field that made this project depend on Project 1. */}
-        <div className="mb-1.5 flex flex-wrap gap-x-12 gap-y-1 text-[13px]">
-          <span>
-            <strong className="text-rcm">CLUB:</strong> AD Harlequins
-          </span>
-          <span>
-            <strong className="text-rcm">TEAM:</strong> {ourName}
-          </span>
-        </div>
+          ⚠️ A FIXED 860px, NOT `max-w`, AND THE SCROLLER AROUND IT IS THE OTHER
+          HALF OF THE SAME FIX (16 Aug 2026). Jay shared a sheet from his phone
+          and it arrived mangled: "COMPETITION" printed straight over the
+          competition's name, HOME TEAM and FINAL SCORE wrapped and clipped.
+          Nothing was wrong with the share. The first row of this table is a
+          single `colSpan={8}` instruction strip, so `table-fixed` divides the
+          width into EIGHT EQUAL COLUMNS — 103px each at desktop, where it is
+          perfect, and ~40px each at 375px, where "COMPETITION" is a single
+          unbreakable word half again wider than its cell. html2canvas
+          photographs what is on the screen, so the phone's broken layout is
+          exactly what reached WhatsApp.
 
-        <table className="w-full table-fixed border-collapse text-[11.5px]">
-          <tbody>
-            <tr>
-              <td colSpan={8} className={`${CELL} font-bold uppercase leading-tight`}>
-                Please complete on phone or laptop with full name of all squad memebers as per
-                registration and identify front row replacements with a &ldquo;✓&rdquo; in the FR
-                column;
-              </td>
-            </tr>
-            <tr>
-              <th className={`${CELL} text-left`}>HOME TEAM</th>
-              <td className={CELL} colSpan={3}>{homeName}</td>
-              <th className={`${CELL} text-center`}>vs</th>
-              <th className={`${CELL} text-left`}>AWAY TEAM</th>
-              <td className={CELL} colSpan={2}>{awayName}</td>
-            </tr>
-            {/* ⚠️ DERIVED, NOT TYPED — since 12 Aug 2026. These four boxes were
-                free text and are now read out of the fixture's components, via
-                the same totalFor() the database mirrors. The entry boxes are in
-                the Score card above, which is never photographed. A coach who
-                could type here could file a sheet whose FINAL SCORE did not
-                match its own TRIES, and nothing would have said so.
+          ⚠️ SO THE WIDTH MUST NOT DEPEND ON THE VIEWPORT AT ALL. A governing
+          body's form has a shape; there is no responsive version of it, and
+          every attempt to make one produces a document RCM did not issue. Jay
+          chose fixed-width-and-scroll on 16 Aug over shrink-to-fit. The
+          consequence is deliberate: the PNG is identical from a phone and from
+          a laptop, because the layout no longer knows the difference.
 
-                ⚠️ THE PAIRS ARE POSITIONAL — HOME then AWAY, never us and them.
-                An away fixture puts our score in the right-hand pair. */}
-            <tr>
-              <th className={`${CELL} text-left`}>FINAL SCORE</th>
-              <td className={CELL} data-testid="sheet-home-score">{homeScore ?? ''}</td>
-              <th className={`${CELL} text-left`}>TRIES</th>
-              <td className={CELL} data-testid="sheet-home-tries">{homeTries ?? ''}</td>
-              <td className={CELL} />
-              <th className={`${CELL} text-left`}>FINAL SCORE</th>
-              <td className={CELL} data-testid="sheet-away-score">{awayScore ?? ''}</td>
-              <th className={`${CELL} text-left`}>
-                TRIES <span data-testid="sheet-away-tries">{awayTries ?? ''}</span>
-              </th>
-            </tr>
-            <tr>
-              <th className={`${CELL} text-left`}>DATE</th>
-              <td className={CELL}>{formDate}</td>
-              <th className={`${CELL} text-left`}>VENUE</th>
-              <td className={CELL} colSpan={3}>{event.venue || ''}</td>
-              <th className={`${CELL} text-left`}>KICK OFF TIME</th>
-              <td className={CELL}>{eventTimeLabel(event)}</td>
-            </tr>
-            <tr>
-              <th className={`${CELL} text-left`}>COMPETITION</th>
-              <td className={CELL} colSpan={7}>{competitionLine}</td>
-            </tr>
-          </tbody>
-        </table>
+          ⚠️ THE `overflow-x-auto` WRAPPER IS LOAD-BEARING, not styling. Without
+          it an 860px child at 375px makes the DOCUMENT wider than the viewport,
+          which is the failure `harness/check-overflow.mjs` exists to catch — and
+          it does not clip politely, it breaks the masthead and every fixed
+          element on the page. Run `npm run check:overflow` after touching this.
+          ── */}
+      <div className="overflow-x-auto">
+        <div
+          ref={printRef}
+          data-testid="match-sheet-facsimile"
+          className="mx-auto w-[860px] border border-black bg-white p-3 text-black"
+        >
+          <header className="mb-2 text-center">
+            <h1 className="text-[15px] font-bold leading-tight text-rcm">
+              Rugby Club Management (RCM)- OFFICIAL MATCH RESULT SHEET
+            </h1>
+            <p className="text-[13px] font-bold text-rcm">(to be filled in be each team)</p>
+          </header>
 
-        {/* ── The 22, in TWO COLUMNS: 1-12 left, 13-22 right, each with FR. ── */}
-        <datalist id="squad-players">
-          {squad.map((player) => (
-            <option key={player.id} value={player.full_name} />
-          ))}
-        </datalist>
-        <table className="mt-1.5 w-full table-fixed border-collapse text-[11.5px]">
-          <tbody>
-            <tr>
-              <th className={`${CELL} w-[26px]`} />
-              <th className={`${CELL} text-left`}>TEAM NAME:</th>
-              <th className={`${CELL} w-[34px] text-center`}>FR</th>
-              <th className={`${CELL} w-[26px]`} />
-              <th className={`${CELL} text-left`}>
-                TEAM CAPTAIN:{' '}
-                <Cell
-                  list="squad-players"
-                  aria-label="Team captain"
-                  value={fields.captain_name}
-                  onChange={setField('captain_name')}
-                />
-              </th>
-              <th className={`${CELL} w-[34px] text-center`}>FR</th>
-            </tr>
-            {LEFT_COLUMN.map((left) => {
-              const right = left + LEFT_COLUMN.length
-              return (
-                <tr key={left}>
-                  <SlotCells slots={slots} index={left - 1} onName={nameChanged} onSet={setSlot} />
-                  {right <= SLOT_COUNT ? (
-                    <SlotCells slots={slots} index={right - 1} onName={nameChanged} onSet={setSlot} />
-                  ) : (
-                    <>
-                      <td className={CELL} />
-                      <td className={CELL} />
-                      <td className={CELL} />
-                    </>
-                  )}
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+          {/* CLUB and TEAM share a line, labels red. TEAM is the LEAGUE team —
+              the field that made this project depend on Project 1. */}
+          <div className="mb-1.5 flex flex-wrap gap-x-12 gap-y-1 text-[13px]">
+            <span>
+              <strong className="text-rcm">CLUB:</strong> AD Harlequins
+            </span>
+            <span>
+              <strong className="text-rcm">TEAM:</strong> {ourName}
+            </span>
+          </div>
 
-        {/* ── Discipline. Own team only, as the form says. ── */}
-        <table className="mt-1.5 w-full table-fixed border-collapse text-[11.5px]">
-          <tbody>
-            <tr>
-              <td colSpan={6} className={`${CELL} text-center font-bold`}>
-                DISCIPLINE – RED OR YELLOW CARDS (Players of your team only; please include timings
-                &amp; half)
-              </td>
-            </tr>
-            <tr>
-              <th className={`${CELL} w-[56px]`}>HALF</th>
-              <th className={`${CELL} w-[56px]`}>TIME</th>
-              <th className={`${CELL} w-[48px]`}>R/Y</th>
-              <th className={`${CELL} w-[44px]`}>NO</th>
-              <th className={CELL}>FULL NAME</th>
-              <th className={CELL}>REASON</th>
-            </tr>
-            {cardRows.map((card, index) => (
-              <tr key={index}>
-                <td className={CELL}>
-                  <Cell aria-label={`Card ${index + 1} half`} value={card.half} onChange={setCard(index, 'half')} />
-                </td>
-                <td className={CELL}>
-                  <Cell aria-label={`Card ${index + 1} time`} value={card.minute} onChange={setCard(index, 'minute')} />
-                </td>
-                <td className={CELL}>
-                  {/* ⚠️ A SELECT, not free text: the column is R or Y, and the
-                      colour CHECK constraint accepts nothing else. A typed "yel"
-                      would fail the save with a constraint error on a field
-                      somebody thought they had filled in correctly. */}
-                  <select
-                    aria-label={`Card ${index + 1} colour`}
-                    value={card.colour}
-                    onChange={setCard(index, 'colour')}
-                    className="w-full bg-transparent text-[11.5px] outline-none"
-                  >
-                    <option value="" />
-                    <option value="yellow">Y</option>
-                    <option value="red">R</option>
-                  </select>
-                </td>
-                <td className={CELL}>
-                  <Cell aria-label={`Card ${index + 1} number`} value={card.slot} onChange={setCard(index, 'slot')} />
-                </td>
-                <td className={CELL}>
-                  <Cell
-                    list="squad-players"
-                    aria-label={`Card ${index + 1} name`}
-                    value={card.full_name}
-                    onChange={setCard(index, 'full_name')}
-                  />
-                </td>
-                <td className={CELL}>
-                  <Cell aria-label={`Card ${index + 1} reason`} value={card.reason} onChange={setCard(index, 'reason')} />
+          <table className="w-full table-fixed border-collapse text-[11.5px]">
+            <tbody>
+              <tr>
+                <td colSpan={8} className={`${CELL} font-bold uppercase leading-tight`}>
+                  Please complete on phone or laptop with full name of all squad memebers as per
+                  registration and identify front row replacements with a &ldquo;✓&rdquo; in the FR
+                  column;
                 </td>
               </tr>
+              <tr>
+                <th className={`${CELL} text-left`}>HOME TEAM</th>
+                <td className={CELL} colSpan={3}>{homeName}</td>
+                <th className={`${CELL} text-center`}>vs</th>
+                <th className={`${CELL} text-left`}>AWAY TEAM</th>
+                <td className={CELL} colSpan={2}>{awayName}</td>
+              </tr>
+              {/* ⚠️ DERIVED, NOT TYPED — since 12 Aug 2026. These four boxes were
+                  free text and are now read out of the fixture's components, via
+                  the same totalFor() the database mirrors. The entry boxes are in
+                  the Score card above, which is never photographed. A coach who
+                  could type here could file a sheet whose FINAL SCORE did not
+                  match its own TRIES, and nothing would have said so.
+
+                  ⚠️ THE PAIRS ARE POSITIONAL — HOME then AWAY, never us and them.
+                  An away fixture puts our score in the right-hand pair. */}
+              <tr>
+                <th className={`${CELL} text-left`}>FINAL SCORE</th>
+                <td className={CELL} data-testid="sheet-home-score">{homeScore ?? ''}</td>
+                <th className={`${CELL} text-left`}>TRIES</th>
+                <td className={CELL} data-testid="sheet-home-tries">{homeTries ?? ''}</td>
+                {/* ⚠️ THE AWAY TRIES HAD NO BOX UNTIL 16 Aug 2026, and the two
+                    halves of this row were not the same shape. The number was
+                    printed INSIDE the "TRIES" heading cell — "TRIES 5" — while
+                    the eighth column went to an empty spacer sitting mid-row.
+                    On a governing body's form that reads as a label somebody
+                    scribbled on, not as a filled-in box, and the home side one
+                    cell to the left did it properly. Eight cells, four pairs,
+                    both sides identical. */}
+                <th className={`${CELL} text-left`}>FINAL SCORE</th>
+                <td className={CELL} data-testid="sheet-away-score">{awayScore ?? ''}</td>
+                <th className={`${CELL} text-left`}>TRIES</th>
+                <td className={CELL} data-testid="sheet-away-tries">{awayTries ?? ''}</td>
+              </tr>
+              <tr>
+                <th className={`${CELL} text-left`}>DATE</th>
+                <td className={CELL}>{formDate}</td>
+                <th className={`${CELL} text-left`}>VENUE</th>
+                <td className={CELL} colSpan={3}>{event.venue || ''}</td>
+                <th className={`${CELL} text-left`}>KICK OFF TIME</th>
+                <td className={CELL}>{eventTimeLabel(event)}</td>
+              </tr>
+              <tr>
+                <th className={`${CELL} text-left`}>COMPETITION</th>
+                <td className={CELL} colSpan={7}>{competitionLine}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* ── The 22, in TWO COLUMNS: 1-12 left, 13-22 right, each with FR. ── */}
+          <datalist id="squad-players">
+            {squad.map((player) => (
+              <option key={player.id} value={player.full_name} />
             ))}
-          </tbody>
-        </table>
+          </datalist>
+          <table className="mt-1.5 w-full table-fixed border-collapse text-[11.5px]">
+            <tbody>
+              <tr>
+                <th className={`${CELL} w-[26px]`} />
+                <th className={`${CELL} text-left`}>TEAM NAME:</th>
+                <th className={`${CELL} w-[34px] text-center`}>FR</th>
+                <th className={`${CELL} w-[26px]`} />
+                <th className={`${CELL} text-left`}>
+                  TEAM CAPTAIN:{' '}
+                  <Cell
+                    list="squad-players"
+                    aria-label="Team captain"
+                    value={fields.captain_name}
+                    onChange={setField('captain_name')}
+                  />
+                </th>
+                <th className={`${CELL} w-[34px] text-center`}>FR</th>
+              </tr>
+              {LEFT_COLUMN.map((left) => {
+                const right = left + LEFT_COLUMN.length
+                return (
+                  <tr key={left}>
+                    <SlotCells slots={slots} index={left - 1} onName={nameChanged} onSet={setSlot} />
+                    {right <= SLOT_COUNT ? (
+                      <SlotCells slots={slots} index={right - 1} onName={nameChanged} onSet={setSlot} />
+                    ) : (
+                      <>
+                        <td className={CELL} />
+                        <td className={CELL} />
+                        <td className={CELL} />
+                      </>
+                    )}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
 
-        {/* ── Medical. ── */}
-        <table className="mt-1.5 w-full border-collapse text-[11.5px]">
-          <tbody>
-            <tr>
-              <td className={`${CELL} font-bold uppercase leading-tight`}>
-                Medical issues (concussion &amp; serious injury of your team) or any other medical
-                items of note:
-              </td>
-            </tr>
-            <tr>
-              <td className={CELL}>
-                <textarea
-                  aria-label="Medical notes"
-                  rows={3}
-                  value={fields.medical_notes}
-                  onChange={setField('medical_notes')}
-                  className="w-full resize-none bg-transparent text-[11.5px] outline-none"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          {/* ── Discipline. Own team only, as the form says. ── */}
+          <table className="mt-1.5 w-full table-fixed border-collapse text-[11.5px]">
+            <tbody>
+              <tr>
+                <td colSpan={6} className={`${CELL} text-center font-bold`}>
+                  DISCIPLINE – RED OR YELLOW CARDS (Players of your team only; please include timings
+                  &amp; half)
+                </td>
+              </tr>
+              <tr>
+                <th className={`${CELL} w-[56px]`}>HALF</th>
+                <th className={`${CELL} w-[56px]`}>TIME</th>
+                <th className={`${CELL} w-[48px]`}>R/Y</th>
+                <th className={`${CELL} w-[44px]`}>NO</th>
+                <th className={CELL}>FULL NAME</th>
+                <th className={CELL}>REASON</th>
+              </tr>
+              {cardRows.map((card, index) => (
+                <tr key={index}>
+                  <td className={CELL}>
+                    <Cell aria-label={`Card ${index + 1} half`} value={card.half} onChange={setCard(index, 'half')} />
+                  </td>
+                  <td className={CELL}>
+                    <Cell aria-label={`Card ${index + 1} time`} value={card.minute} onChange={setCard(index, 'minute')} />
+                  </td>
+                  <td className={CELL}>
+                    {/* ⚠️ A SELECT, not free text: the column is R or Y, and the
+                        colour CHECK constraint accepts nothing else. A typed "yel"
+                        would fail the save with a constraint error on a field
+                        somebody thought they had filled in correctly. */}
+                    <select
+                      aria-label={`Card ${index + 1} colour`}
+                      value={card.colour}
+                      onChange={setCard(index, 'colour')}
+                      className="w-full bg-transparent text-[11.5px] outline-none"
+                    >
+                      <option value="" />
+                      <option value="yellow">Y</option>
+                      <option value="red">R</option>
+                    </select>
+                  </td>
+                  <td className={CELL}>
+                    <Cell aria-label={`Card ${index + 1} number`} value={card.slot} onChange={setCard(index, 'slot')} />
+                  </td>
+                  <td className={CELL}>
+                    <Cell
+                      list="squad-players"
+                      aria-label={`Card ${index + 1} name`}
+                      value={card.full_name}
+                      onChange={setCard(index, 'full_name')}
+                    />
+                  </td>
+                  <td className={CELL}>
+                    <Cell aria-label={`Card ${index + 1} reason`} value={card.reason} onChange={setCard(index, 'reason')} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        {/* ── Manager. The form marks the signature optional. ── */}
-        <table className="mt-1.5 w-full border-collapse text-[11.5px]">
-          <tbody>
-            <tr>
-              <td className={`${CELL} font-bold underline`}>Team Manager/Coach details</td>
-            </tr>
-            <tr>
-              <td className={CELL}>
-                <span className="font-bold">NAME:</span>{' '}
-                <Cell
-                  aria-label="Team manager"
-                  value={fields.manager_name}
-                  onChange={setField('manager_name')}
-                />
-              </td>
-            </tr>
-            {/* ⚠️ PHONE IS NOT ON RCM'S PAPER FORM — it is an addition Jay asked
-                for on 12 Aug 2026, so that whoever receives the sheet can reach
-                the person who filed it. Kept in the same footer block and in the
-                same hand as NAME, because it is part of the same answer to
-                "who filled this in", and a stray field elsewhere on a governing
-                body's form reads as a mistake. */}
-            <tr>
-              <td className={CELL}>
-                <span className="font-bold">PHONE:</span>{' '}
-                <Cell
-                  aria-label="Team manager phone"
-                  type="tel"
-                  value={fields.manager_phone}
-                  onChange={setField('manager_phone')}
-                />
-              </td>
-            </tr>
-            <tr>
-              <td className={`${CELL} py-5`}>
-                <span className="font-bold">SIGNATURE:</span>{' '}
-                <span className="text-[10px]">(optional)</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          {/* ── Medical. ── */}
+          <table className="mt-1.5 w-full border-collapse text-[11.5px]">
+            <tbody>
+              <tr>
+                <td className={`${CELL} font-bold uppercase leading-tight`}>
+                  Medical issues (concussion &amp; serious injury of your team) or any other medical
+                  items of note:
+                </td>
+              </tr>
+              <tr>
+                <td className={CELL}>
+                  <textarea
+                    aria-label="Medical notes"
+                    rows={3}
+                    value={fields.medical_notes}
+                    onChange={setField('medical_notes')}
+                    className="w-full resize-none bg-transparent text-[11.5px] outline-none"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-        {/* ⚠️ THE INSTRUCTIONS ARE REPRODUCED, NOT SUMMARISED. They are the
-            authority for the deadline rule, and item 5 is the authority for
-            this sheet not applying to the senior competitions at all. */}
-        <div className="mt-2 text-[10.5px] leading-snug">
-          <p className="font-bold">Instructions:</p>
-          <ol className="ml-5 list-decimal">
-            <li>All teams to complete this form, per game they play.</li>
-            <li>
-              All completed forms need to be submitted to RCM through their RCC/CLUB Whatsapp
-              group. (Can be saved file or screen shot/picture of form).
-            </li>
-            <li>
-              U11 to u16 Games, QR, Contact, Boys and Girls need to submitted within 24hours of
-              completion of game.
-            </li>
-            <li>U18 Boys &amp; Girls, WXV, W7s need to be submitted 1hour in advance of Kick Off.</li>
-            <li>WAP, DIV1, DIV2 Games are completed on sportslive app.</li>
-          </ol>
+          {/* ── Manager. The form marks the signature optional. ── */}
+          <table className="mt-1.5 w-full border-collapse text-[11.5px]">
+            <tbody>
+              <tr>
+                <td className={`${CELL} font-bold underline`}>Team Manager/Coach details</td>
+              </tr>
+              <tr>
+                <td className={CELL}>
+                  <span className="font-bold">NAME:</span>{' '}
+                  <Cell
+                    aria-label="Team manager"
+                    value={fields.manager_name}
+                    onChange={setField('manager_name')}
+                  />
+                </td>
+              </tr>
+              {/* ⚠️ PHONE IS NOT ON RCM'S PAPER FORM — it is an addition Jay asked
+                  for on 12 Aug 2026, so that whoever receives the sheet can reach
+                  the person who filed it. Kept in the same footer block and in the
+                  same hand as NAME, because it is part of the same answer to
+                  "who filled this in", and a stray field elsewhere on a governing
+                  body's form reads as a mistake. */}
+              <tr>
+                <td className={CELL}>
+                  <span className="font-bold">PHONE:</span>{' '}
+                  <Cell
+                    aria-label="Team manager phone"
+                    type="tel"
+                    value={fields.manager_phone}
+                    onChange={setField('manager_phone')}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className={`${CELL} py-5`}>
+                  <span className="font-bold">SIGNATURE:</span>{' '}
+                  <span className="text-[10px]">(optional)</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* ⚠️ THE INSTRUCTIONS ARE REPRODUCED, NOT SUMMARISED. They are the
+              authority for the deadline rule, and item 5 is the authority for
+              this sheet not applying to the senior competitions at all. */}
+          <div className="mt-2 text-[10.5px] leading-snug">
+            <p className="font-bold">Instructions:</p>
+            <ol className="ml-5 list-decimal">
+              <li>All teams to complete this form, per game they play.</li>
+              <li>
+                All completed forms need to be submitted to RCM through their RCC/CLUB Whatsapp
+                group. (Can be saved file or screen shot/picture of form).
+              </li>
+              <li>
+                U11 to u16 Games, QR, Contact, Boys and Girls need to submitted within 24hours of
+                completion of game.
+              </li>
+              <li>U18 Boys &amp; Girls, WXV, W7s need to be submitted 1hour in advance of Kick Off.</li>
+              <li>WAP, DIV1, DIV2 Games are completed on sportslive app.</li>
+            </ol>
+          </div>
         </div>
       </div>
     </section>

@@ -80,6 +80,13 @@ export default defineConfig({
         find: /^\.\.\/data\/matchSheets\.js$/,
         replacement: path.resolve(__dirname, 'stubs/matchSheets.js'),
       },
+      // The lineup the match sheet seeds its 22 boxes from (16 Aug 2026).
+      // MatchSheet.jsx and Lineup.jsx both live in src/screens/, so the one
+      // specifier-text rule covers both.
+      {
+        find: /^\.\.\/data\/lineups\.js$/,
+        replacement: path.resolve(__dirname, 'stubs/lineups.js'),
+      },
       // The pitch allocation screen (12 Aug 2026). Allocation.jsx is in
       // src/screens/, one level below src/, so the specifier text matches the
       // same rule shape as every alias above.

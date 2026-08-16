@@ -10,6 +10,42 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
+- 🐞 **THE MATCH SHEET WAS UNREADABLE ON A PHONE, AND THE SHARED IMAGE WAS THE
+  SAME BUG, NOT A SECOND ONE.** Jay shared a sheet from his phone and it arrived
+  mangled — "COMPETITION" printed over the competition's name, HOME TEAM and
+  FINAL SCORE wrapped and clipped. Nothing was wrong with the share. The
+  facsimile's first row is a single `colSpan={8}` instruction strip, so
+  `table-fixed` divides the width into EIGHT EQUAL COLUMNS: 103px each at
+  desktop, where it is perfect, and ~40px at 375px, where "COMPETITION" is one
+  unbreakable word half again wider than its cell. html2canvas photographs the
+  screen, so the phone's broken layout is what reached WhatsApp.
+  **Fixed by taking the viewport out of it**: a fixed `w-[860px]` inside an
+  `overflow-x-auto` wrapper (Jay chose scroll-and-pinch over shrink-to-fit).
+  ⚠️ **MEASURED, NOT ASSUMED: the PNG from a 375px viewport is now 1720×2230**
+  — 860 × the `scale: 2` — i.e. byte-for-byte the shape a laptop produces.
+  ⚠️ **THE WRAPPER IS LOAD-BEARING AND THE FAULT INJECTION PROVED IT.** Strip
+  `overflow-x-auto` and the DOCUMENT goes to 876px at a 390px viewport, which is
+  the failure `harness/check-overflow.mjs` exists to catch and which breaks the
+  masthead three layers away. All five of that gate's widths measured clean.
+
+- 🐞 **THE AWAY TRIES HAD NO BOX.** The number was printed inside the "TRIES"
+  heading — "TRIES 5" — while the row's eighth column went to an empty spacer,
+  so the two halves of a symmetric form were not the same shape. Eight cells,
+  four pairs, both sides identical.
+
+- ✨ **THE 22 NOW COME FROM THE LINEUP.** Jay: *"names are not auto populating
+  into them"* — they never had. The sheet's only help was the `squad-players`
+  datalist, a typeahead you discover by starting to type, on a phone, at the
+  side of a pitch, while `lineups` already held exactly who played. Blank rows
+  fill from the fixture's lineup on open, starters first then replacements;
+  a two-step **Refill** re-pulls a lineup changed after the sheet was started.
+  ⚠️ **SEQUENTIAL, NOT 1-15 AND 16-22.** `players_per_side` is the coach's
+  choice per lineup, so a squad playing 10s would file a form with five blank
+  rows in the middle of it.
+  ⚠️ **AND FR IS NEVER TICKED FOR THEM.** Front row cover is a SAFETY
+  declaration; a lineup records positions, which is a different question. The
+  screen says so out loud rather than leaving a coach to assume it carried over.
+
 - 📓 **`state-of-play.md` STILL SAID "NO MONITORING EXISTS AT ALL".** It is
   reading-order step 3, so the highest-traffic file after `CLAUDE.md` was telling
   every new session something that had been false for hours. Corrected, and Jay's
