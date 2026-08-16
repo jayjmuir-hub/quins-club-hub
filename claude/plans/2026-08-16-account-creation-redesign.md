@@ -288,6 +288,35 @@ the row, and refuses unless the caller passes `can_edit_team` or
 `is_own_player`. There is then no way to ask it for anything except *parent of
 this child*.
 
+### ⛔ BLOCKER FOUND 16 Aug 2026, BEFORE ANY CODE WAS WRITTEN
+
+**`public.accept_invite` does not mention `status` anywhere.** Measured on the
+live database, not read off this repo:
+
+```sql
+select position('status' in pg_get_functiondef(p.oid)) > 0 …  -- false
+```
+
+Both of its `insert into public.memberships (…)` statements name five columns
+and omit `status`, so **every accepted invite inherits the column default,
+which is `'active'`.**
+
+Consequences for the design below, and they point in opposite directions:
+
+- **Coach- or admin-invited → `active` costs nothing.** It is already the
+  behaviour. Nothing needs changing for that half.
+- **Parent-invited → `pending` REQUIRES CHANGING `accept_invite`**, which is
+  wrapped in `## SECURITY-CRITICAL ##` banners in `db/schema/functions.sql` and
+  is the function that turns a token into access. It would have to learn who
+  created the invite and choose a status from it.
+
+⚠️ **DO NOT DO THAT AS A SIDE EFFECT OF BUILDING A BUTTON.** Either give
+`invites` its own column recording the status to grant (so `accept_invite` reads
+a value rather than deriving a rule), or accept that a parent-initiated invite
+lands active and drop that half of the design. **Both are Jay's call**, and the
+second is a real safeguarding decision rather than a simplification: it would let
+a parent hand a squad-wide roster to somebody no member of staff has ever seen.
+
 **Where the two invites differ, and why:**
 
 - **Staff invites → the parent lands `active`.** A coach deliberately named
