@@ -365,11 +365,21 @@ CREATE TABLE public.access_requests (
   created_at  timestamptz          DEFAULT now(),
   decided_at  timestamptz,
   decided_by  uuid,
+  -- !! Added 16 Aug 2026 so a request says WHO is asking and for WHICH squad.
+  -- !! Nullable despite being required: the seven rows that predate them have
+  -- !! neither, and the requirement is enforced on the INSERT policy, which
+  -- !! applies to new rows only. NOT NULL cannot express that distinction.
+  requested_role     text,
+  requested_team_id  uuid,
   CONSTRAINT access_requests_pkey            PRIMARY KEY (id),
   CONSTRAINT access_requests_profile_id_key  UNIQUE (profile_id),
   CONSTRAINT access_requests_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT access_requests_decided_by_fkey FOREIGN KEY (decided_by) REFERENCES profiles(id) ON DELETE SET NULL,
-  CONSTRAINT access_requests_status_check    CHECK ((status = ANY (ARRAY['pending'::text, 'dismissed'::text])))
+  CONSTRAINT access_requests_status_check    CHECK ((status = ANY (ARRAY['pending'::text, 'dismissed'::text]))),
+  CONSTRAINT access_requests_requested_team_id_fkey FOREIGN KEY (requested_team_id) REFERENCES teams(id) ON DELETE SET NULL,
+  -- !! No 'admin'. Squad roles are granted by a coach or manager approving a
+  -- !! stranger; admin is club-wide and granted by an existing admin elsewhere.
+  CONSTRAINT access_requests_requested_role_check CHECK ((requested_role IS NULL OR requested_role = ANY (ARRAY['parent'::text, 'player'::text, 'coach'::text, 'manager'::text, 'medic'::text])))
 );
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
 

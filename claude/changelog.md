@@ -10,7 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 🗄️ **THE SQUADS LOST THEIR " Contact" SUFFIX — a live data change, applied to
+- ✨ **AN ACCESS REQUEST NOW SAYS WHO IS ASKING AND FOR WHICH SQUAD.** Jay: *"i
+  still have account requests coming in and have no idea who they are because
+  they don't type any extra info"*. A required role and a required age group,
+  with the free-text note kept for the rest.
+  ⚠️ **AND THE REASON IT WAS FREE TEXT TURNED OUT TO BE FALSE.**
+  `RequestAccess.jsx` stated that every SELECT policy bottoms out in a
+  memberships row, so this user "reads zero rows from every table including
+  teams" — and a whole SECURITY DEFINER RPC was written on the strength of that
+  sentence before anybody checked it. **The `team read` policy is
+  `auth.uid() IS NOT NULL`: any signed-in caller reads every squad.** Measured on
+  production — 15 teams against 0 players, 0 memberships and 0 events for the
+  same impersonated user, which is the control proving RLS was applied rather
+  than bypassed. The function was created, measured and dropped the same hour;
+  the form reads `teams` directly. **The claim in that header is corrected rather
+  than deleted** — it was load-bearing, it is why the form had no picker for a
+  fortnight, and it still holds for every other table on that screen.
+  ⚠️ **THE INSERT POLICY IS THE GATE, NOT THE `<select>`.** A required dropdown
+  means somebody finds out before they press the button; the policy is what makes
+  a blank request impossible to file.
+  ⚠️ **AND THE MIGRATION IS DELIBERATELY IN TWO HALVES, IN A FIXED ORDER.**
+  Columns and RPC first (additive, safe against the running app), then the form
+  deploys, then the policy tightens. Landing the policy with the columns would
+  refuse every signup in between — a stranger trying to join the club told, in
+  effect, that they are not allowed, with nothing on screen to explain it.
+  ⚠️ **FOUR MOCKS AND A HARNESS STUB HAD TO GAIN THE NEW EXPORT**, and an
+  unmocked one is `undefined` — called in an effect, it throws before anything
+  renders, so the whole file goes red at once. `tests/harness-stubs.test.js` caught
+  its half, the fifth time that guard has earned its keep.
+
+- `1611380` — 🗄️ **THE SQUADS LOST THEIR " Contact" SUFFIX — a live data change, applied to
   production.** Jay: *"we need to remove the word contact from age groups that
   have it, its implied already"*. Ten of fifteen squads carried it; U6-U8 Tag and
   the two QR squads are untouched, because Tag is the distinction the word was

@@ -24,6 +24,7 @@ const getMyProfileMock = vi.fn()
 const updateProfileNamesMock = vi.fn()
 const getMyAccessRequestMock = vi.fn()
 const createAccessRequestMock = vi.fn()
+const listSquadsMock = vi.fn()
 
 vi.mock('../src/data/members.js', () => ({
   getMyProfile: (...args) => getMyProfileMock(...args),
@@ -33,6 +34,12 @@ vi.mock('../src/data/members.js', () => ({
 vi.mock('../src/data/accessRequests.js', () => ({
   getMyAccessRequest: (...args) => getMyAccessRequestMock(...args),
   createAccessRequest: (...args) => createAccessRequestMock(...args),
+  // ⚠️ THE SQUAD PICKER'S SOURCE (16 Aug 2026). Every test in this file failed
+  // the moment the form gained it — not because the picker was wrong, but
+  // because an unmocked export is `undefined` and calling it in an effect throws
+  // before anything renders. Worth stating: this list is the component's
+  // dependency surface, and a partial mock fails loudly rather than subtly.
+  listSquadsForRequest: (...args) => listSquadsMock(...args),
 }))
 
 // Import after vi.mock so this binds to the mocked modules.
@@ -52,6 +59,12 @@ function renderIt(props = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   getMyAccessRequestMock.mockResolvedValue(null)
+  // Two squads, so "only the ones offered" is a real assertion rather than a
+  // list of one. Invented names, as everything published from this repo must be.
+  listSquadsMock.mockResolvedValue([
+    { id: 't-u10', name: 'U10 Mixed', sort_order: 5 },
+    { id: 't-u14b', name: 'U14B', sort_order: 10 },
+  ])
   getMyProfileMock.mockResolvedValue({
     id: USER_ID,
     full_name: '',
@@ -122,7 +135,9 @@ describe('RequestAccess', () => {
     await screen.findByRole('button', { name: /request access/i })
     await user.type(screen.getByLabelText(/first name/i), 'Nina')
     await user.type(screen.getByLabelText(/family name/i), 'Newcomer')
-    await user.type(screen.getByLabelText(/who are you at the club/i), 'Parent of Sam, U10')
+    await user.selectOptions(screen.getByLabelText(/i am a/i), 'parent')
+    await user.selectOptions(screen.getByLabelText(/age group/i), 't-u10')
+    await user.type(screen.getByLabelText(/anything else/i), 'Also a sibling in U8 Tag')
     await user.click(screen.getByRole('button', { name: /request access/i }))
 
     await waitFor(() =>
@@ -132,16 +147,81 @@ describe('RequestAccess', () => {
         lastName: 'Newcomer',
       }),
     )
+    // ⚠️ THE ROLE AND THE SQUAD ARE THE POINT OF THIS TEST NOW. Jay, 16 Aug
+    // 2026: "i still have account requests coming in and have no idea who they
+    // are". A request that reaches the database without these is the failure,
+    // and the INSERT policy refuses it — so this asserts what was SENT rather
+    // than what rendered.
     expect(createAccessRequestMock).toHaveBeenCalledWith({
       profileId: USER_ID,
-      note: 'Parent of Sam, U10',
+      note: 'Also a sibling in U8 Tag',
+      role: 'parent',
+      teamId: 't-u10',
     })
 
     // The confirmation replaces the form — no way to send a second request,
     // which matches the UNIQUE key that would refuse one anyway.
     expect(await screen.findByText(/request is with the club/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /request access/i })).toBeNull()
-    expect(screen.getByText(/Parent of Sam, U10/)).toBeInTheDocument()
+    expect(screen.getByText(/Also a sibling in U8 Tag/)).toBeInTheDocument()
+  })
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Forcing a role and a squad — 16 Aug 2026
+  // ══════════════════════════════════════════════════════════════════════
+  //
+  // ⚠️ THE FORM IS NOT THE GATE. The INSERT policy refuses a row without these
+  // (db/migrations/20260816_access_request_require_role.sql) and that is what
+  // actually makes "no idea who they are" impossible. These cases cover the
+  // half a person experiences: that the choices are OFFERED, that nothing is
+  // preselected, and that what they pick is what gets sent.
+
+  it('offers every requestable role, with nothing preselected', async () => {
+    renderIt()
+    const select = await screen.findByLabelText(/i am a/i)
+
+    // ⚠️ NO DEFAULT. "Parent" would be right most of the time, which is exactly
+    // why it is wrong: every coach who did not notice the dropdown would file as
+    // a parent, and that is the same problem wearing a more confident face.
+    expect(select).toHaveValue('')
+
+    const labels = [...select.options].map((o) => o.textContent)
+    expect(labels).toEqual([
+      'Choose one…',
+      'Parent or guardian',
+      'Player',
+      'Coach',
+      'Team manager',
+      'Medic or physio',
+    ])
+    // ⚠️ ADMIN IS NOT SELF-SERVICE. It is club-wide and granted by an existing
+    // admin on another screen; the CHECK constraint holds the same list.
+    expect(labels.join(' ')).not.toMatch(/admin/i)
+  })
+
+  it('⚠️ lists the squads from the RPC, because it can read the table', async () => {
+    // A person with no membership reads zero rows from `teams`. If this ever
+    // goes back to a table read the picker is silently EMPTY, not broken — the
+    // failure this whole migration exists to avoid.
+    renderIt()
+    const select = await screen.findByLabelText(/age group/i)
+    await waitFor(() => expect(select.options.length).toBe(3))
+    expect([...select.options].map((o) => o.textContent)).toEqual([
+      'Choose one…',
+      'U10 Mixed',
+      'U14B',
+    ])
+  })
+
+  it('⚠️ still renders a usable form when the squad list cannot be fetched', async () => {
+    // The RPC failing must not take the screen down. Somebody locked out of the
+    // club seeing a page that will not load has no way forward at all.
+    listSquadsMock.mockRejectedValue(new Error('offline'))
+    renderIt()
+
+    expect(await screen.findByRole('button', { name: /request access/i })).toBeInTheDocument()
+    const select = await screen.findByLabelText(/age group/i)
+    await waitFor(() => expect(select).toBeDisabled())
   })
 
   it('refuses to send a nameless request, and never writes anything', async () => {

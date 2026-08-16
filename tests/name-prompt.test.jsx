@@ -40,6 +40,9 @@ vi.mock('../src/data/members.js', () => ({
 }))
 
 vi.mock('../src/data/accessRequests.js', () => ({
+  // The squad picker's source (16 Aug 2026). An unmocked export is undefined,
+  // and calling it in an effect throws before anything renders.
+  listSquadsForRequest: async () => [],
   getMyAccessRequest: (...args) => getMyAccessRequestMock(...args),
   createAccessRequest: (...args) => createAccessRequestMock(...args),
 }))
