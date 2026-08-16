@@ -1178,3 +1178,62 @@ CREATE POLICY "announcement read own reads" ON public.announcement_reads
 
 CREATE POLICY "announcement mark read" ON public.announcement_reads
   FOR INSERT WITH CHECK ((profile_id = ( SELECT auth.uid() AS uid)));
+
+
+-- ---------------------------------------------------------------------
+-- player_private  (3 policies)                          ADDED 2026-08-16
+--
+-- ⛔ THE TABLE EXISTS BECAUSE A COLUMN COULD NOT WORK. `player read` is
+-- can_see_team(team_id) OR is_own_player(id), and can_see_team is SQUAD-WIDE —
+-- so a `date_of_birth` column on public.players would be readable by EVERY
+-- PARENT IN THE SQUAD. RLS grants ROWS, not COLUMNS, and a parent and a coach
+-- are the same `authenticated` role, so no policy can hide one column of
+-- players from a parent while showing them the rest of the row.
+--
+-- ⚠️ THE SCHEMA HAD ALREADY MET THIS AND SOLVED IT THE SAME WAY — see the table
+-- comment on public.player_grades. This is that pattern, second use.
+--
+-- The pair below is deliberately the SAME PAIR player_parents runs: the people
+-- who may see a child's parents' phone numbers are exactly the people who may
+-- see that child's birthday. `is_own_player` is membership-based, so it covers
+-- a parent AND a self-registered player reading their own row.
+--
+-- ⚠️ A PARENT MAY WRITE, NOT JUST READ. The family is the source of truth for a
+-- birthday; staff-write-only would route every correction through a volunteer.
+-- ⚠️ CONSEQUENCE, AND IT IS NOT YET HANDLED: src/lib/ageGroup.js's
+-- allowsOwnContact decides whether a child may hold their own email and phone,
+-- and it currently infers age from the SQUAD NAME. If it is ever re-pointed at
+-- this column, a DOB must only be allowed to make that stricter, never to relax
+-- it — otherwise a parent editing a birthday could unlock the under-13 gate.
+--
+-- WITH CHECK repeats each predicate deliberately: without it an owner could
+-- UPDATE their row and set player_id to another child, moving a birthday onto
+-- somebody else's record. Same trap "contact edit own" documents.
+--
+-- Proved on production 16 Aug 2026, rolled back, WITH A CONTROL:
+--   control (no RLS)         2 rows exist
+--   parent of child A        1   (own child only)
+--   parent A reading B       0
+--   parent updates own       1 row
+--   parent updates team-mate 0 rows
+--   coach of the squad       2
+-- ---------------------------------------------------------------------
+CREATE POLICY "player private read" ON public.player_private
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((private.can_edit_team(( SELECT p.team_id
+     FROM players p
+    WHERE (p.id = player_private.player_id))) OR private.is_own_player(player_id)));
+
+CREATE POLICY "player private edit own" ON public.player_private
+  AS PERMISSIVE FOR ALL TO public
+  USING (private.is_own_player(player_id))
+  WITH CHECK (private.is_own_player(player_id));
+
+CREATE POLICY "player private edit" ON public.player_private
+  AS PERMISSIVE FOR ALL TO public
+  USING (private.can_edit_team(( SELECT p.team_id
+     FROM players p
+    WHERE (p.id = player_private.player_id))))
+  WITH CHECK (private.can_edit_team(( SELECT p.team_id
+     FROM players p
+    WHERE (p.id = player_private.player_id))));

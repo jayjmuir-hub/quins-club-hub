@@ -1644,3 +1644,45 @@ ALTER TABLE public.lineup_players ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX lineups_event_idx         ON public.lineups        USING btree (event_id);
 CREATE INDEX lineup_players_lineup_idx ON public.lineup_players USING btree (lineup_id, sort_order);
+
+
+-- ---------------------------------------------------------------------
+-- public.player_private                                 ADDED 2026-08-16
+--
+-- Per-player fields that must NOT be squad-readable. Currently one: a date of
+-- birth. Jay, 16 Aug 2026: "i think we need to have date of birth".
+--
+-- ⚠️ THIS REVERSES A STANDING RULING. src/lib/ageGroup.js states that "the club
+-- does not hold DOBs in this app" and derives age from squad names. That was
+-- correct while nothing needed a real age. It is now HISTORY plus a pointer,
+-- not current instruction — but nothing has been re-pointed at this column yet.
+--
+-- ⛔ ADMISSION RULE, and it is the whole reason the table exists: a field
+-- belongs here if A PARENT OF A TEAM-MATE MUST NOT SEE IT. Anything they may see
+-- stays on public.players. A column on players cannot be hidden from them by any
+-- mechanism this schema has — `player read` is squad-wide and RLS grants rows,
+-- not columns.
+--
+-- ⚠️ PRIMARY KEY IS player_id. One row per child, so two contradictory
+-- birthdays cannot exist and there is no ordering question to get wrong.
+-- ON DELETE CASCADE: a deleted player takes their private row with them.
+--
+-- Policies in policies.sql (3). Grants are Supabase's defaults for a new public
+-- table — verified after applying rather than assumed: `authenticated` holds
+-- SELECT/INSERT/UPDATE/DELETE, `anon` holds nothing.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.player_private (
+  player_id     uuid        NOT NULL,
+  date_of_birth date,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz,
+  CONSTRAINT player_private_pkey PRIMARY KEY (player_id),
+  CONSTRAINT player_private_player_id_fkey FOREIGN KEY (player_id)
+    REFERENCES public.players(id) ON DELETE CASCADE,
+  -- Bounds, not a format check. A future birthday and a 120-year-old under-12
+  -- are both typos, and both are refused at the database rather than in a form
+  -- a second writer could bypass.
+  CONSTRAINT player_private_dob_sane
+    CHECK ((date_of_birth IS NULL)
+           OR ((date_of_birth > '1900-01-01'::date) AND (date_of_birth <= CURRENT_DATE)))
+);
