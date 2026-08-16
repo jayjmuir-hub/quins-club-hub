@@ -8,6 +8,44 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 16 Aug 2026
+
+- 📡 **THE MONITORING ASSERTIONS ARE WRITTEN DOWN AND RUNNABLE, AND ONE OF THEM
+  IS THE OPPOSITE OF WHAT ANYBODY WOULD CONFIGURE.** `npm run check:live`
+  (`scripts/live-check.mjs`, no dependencies, no credentials) plus
+  `claude/runbooks/monitoring.md`. The accounts are still Jay's and still
+  uncreated — this is the half that did not need one.
+  ⚠️ **A `/calendar.ics` MONITOR EXPECTING 200 IS GREEN EXACTLY WHEN THE CALENDAR
+  FEED BREAKS.** Measured against production: unauthenticated, that path returns
+  **404 `text/plain`** — the Netlify rule proxies it to the edge function, which
+  refuses a missing token, and that is the healthy state. If the proxy rule were
+  ever lost the path would fall through to the SPA catch-all and return **200
+  `text/html`**: every calendar subscription in the club silently broken, and a
+  naive uptime check reporting success. So healthy is 404 and the failure
+  signature is 200. `open-items.md` half-caught this — it said to assert
+  `text/calendar`, which is right for a request carrying a token and wrong for a
+  monitor, because a monitor must not hold one: a calendar token grants access to
+  a family's fixtures.
+  ⚠️ **THE CHECK CARRIES ITS OWN CONTROL**, because "not the SPA catch-all" would
+  otherwise pass for the wrong reason if the whole site were down — a known-bogus
+  path must still return the catch-all for the calendar assertion to mean
+  anything. Proved by pointing the checker at a local dev server, which has SPA
+  fallback and no Netlify proxy: the two calendar assertions failed with the
+  right message while the control passed.
+  ⚠️ **AND IT CRASHED INSTEAD OF FAILING — EXIT 127, NOT 1.** `process.exit(1)`
+  tears the loop down while undici still holds a keep-alive socket, tripping a
+  libuv assertion on Windows/Node 24. A CI job would have reported a broken
+  script rather than a failed check, which is the fastest way to get a check
+  ignored. Fixed with `process.exitCode` and `connection: close`; both exit codes
+  then measured, 1 and 0.
+  ⚠️ **A GREEN CALENDAR CHECK CANNOT SEE A DATABASE OUTAGE**, deliberately: a
+  non-uuid token is rejected by shape before Postgres is touched, and the
+  function returns the same 404 for "no such token" as for "database down"
+  because distinguishing them hands a token-guesser an oracle.
+  **Sentry is NOT wired in and that is a decision waiting on Jay** — the main
+  bundle is 260 KB gzip and `@sentry/react` adds ~11%. Three options are set out
+  in the runbook; `ErrorBoundary.componentDidCatch` already has the hook.
+
 ## 15 Aug 2026
 
 - 🧹 **A DELETED PLAYER'S PHOTOGRAPH USED TO OUTLIVE THEM, AND NOW SOMETHING

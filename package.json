@@ -16,7 +16,8 @@
     "db:check": "node scripts/db-check.mjs",
     "mail:dmarc": "node scripts/dmarc-summary.mjs",
     "check:overflow": "node harness/check-overflow.mjs",
-    "harness": "vite --config harness/vite.config.js"
+    "harness": "vite --config harness/vite.config.js",
+    "check:live": "node scripts/live-check.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

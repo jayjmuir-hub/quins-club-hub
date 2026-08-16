@@ -41,6 +41,22 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   200** — the SPA catch-all answers any unknown path with `index.html`.
   ⚠️ **A monitor that has never fired is not a monitor.** Pause the Netlify site
   once and confirm the email arrives.
+  ✅ **THE ASSERTIONS ARE NOW WRITTEN DOWN AND RUNNABLE — `npm run check:live`,
+  16 Aug 2026 — and `claude/runbooks/monitoring.md` has the click-by-click.**
+  The accounts are still Jay's and still uncreated, so this item stays open.
+  ⚠️ **AND THE LINE ABOVE ABOUT `text/calendar` IS HALF RIGHT, WHICH IS WORSE
+  THAN WRONG.** Measured against production: an unauthenticated `/calendar.ics`
+  returns **404 `text/plain`**, because the Netlify rule proxies it to the edge
+  function and that function refuses a missing token. `text/calendar` is what a
+  request carrying a REAL token gets — and a monitor must not hold one, since a
+  calendar token grants access to a family's fixtures. So the assertion is
+  **404 + `text/plain` is healthy, 200 + `text/html` is the failure signature**,
+  the latter being the SPA catch-all reappearing if the proxy rule is ever lost.
+  A monitor configured for "expect 200" would be green exactly then.
+  ⚠️ **AND A GREEN CALENDAR CHECK CANNOT SEE A DATABASE OUTAGE.** A non-uuid
+  token is rejected by shape before the function touches Postgres, and the
+  function deliberately returns the same 404 for "no such token" as for "database
+  down" — distinguishing them would hand a token-guesser an oracle.
 
 ## Cheap (under an hour each)
 
