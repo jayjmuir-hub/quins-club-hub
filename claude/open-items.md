@@ -33,7 +33,7 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   WhatsApp link on a phone. Nobody has weighed that trade yet, and this line
   exists so the next person knows the switch is there and untouched rather than
   considered and rejected.
-- 🟡 **Monitoring — PARTLY DONE, 16 Aug 2026.** "Detection today is somebody
+- ✅ **Monitoring — DONE, 16 Aug 2026.** "Detection today is somebody
   telling Jay" was the 13 Aug audit's finding. Two **Better Stack** monitors are
   now live on the free tier, 3-minute checks, e-mail alerts:
   `https://adhquins-clubhub.com/` and the calendar feed at
@@ -46,8 +46,16 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   ⚠️ **DETECTION WAS UNDER A MINUTE, NOT THE THREE THE CHECK INTERVAL IMPLIES** —
   worth knowing before anyone "fixes" the frequency on the strength of the
   setting rather than the measurement.
-  ⬜ **Sentry is built and switched off** (`src/lib/errorReporting.js`); it needs
-  a project, `VITE_SENTRY_DSN` in Netlify and a redeploy. Both are Jay's.
+  ✅ **SENTRY IS LIVE TOO — 16 Aug 2026**, EU region, proven by firing a real
+  unhandled rejection on the live site: the lazy chunk loaded, POSTed, got 200,
+  and the issue appeared. The entry bundle grew **0.3 KB** (259.6 → 259.9 gzip);
+  the 159 KB SDK stays in its own chunk.
+  ⚠️ **STACK TRACES ARE MINIFIED** — the smoke-test issue reads `?(<anonymous>)`
+  as its location.
+  No source maps are uploaded, so an error gives the message, page, browser and
+  affected count but no file and line. **The trigger for adding them is the first
+  real error nobody can place**, not a tidiness urge — it costs a build secret and
+  a Vite plugin.
   ⚠️ **KEYWORD MATCHING IS A PAID FEATURE ON BETTER STACK, AND THE RUNBOOK SAID
   OTHERWISE UNTIL IT WAS SEEN ON THE SIGNUP SCREEN.** The 'Alert us when' dropdown
   carries a **Billable** badge; its keyword and status-code options exist in the UI

@@ -10,7 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 🔎 **AN UNKNOWN CALENDAR TOKEN GETS A CALENDAR, NOT A 404 — and two changelog
+- 🐞 **SENTRY IS LIVE, AND THE LAZY LOAD HOLDS ON THE REAL BUNDLE.** DSN added in
+  Netlify and the site rebuilt, EU region. Proven by firing an unhandled rejection
+  on the live site: the SDK chunk loaded on demand, POSTed to the ingest endpoint,
+  got **200**, and the issue appeared in Sentry.
+  ⚠️ **THE MEASUREMENT THAT MATTERS: the entry chunk grew 0.3 KB** — 259.6 →
+  259.9 KB gzip — while the 159.3 KB SDK sits in its own chunk fetched only on a
+  crash. **Count `captureException` in the entry to check this: 1 is our call
+  site, 11 would be the SDK**, and 11 means somebody has "tidied" the dynamic
+  import into a top-level one and every phone is paying for it.
+  ⚠️ **AND OUR OWN IGNORE GATE NEARLY SWALLOWED THE DEPLOY.** The last commits
+  were docs-only, so `scripts/netlify-ignore.mjs` would have CANCELLED a normal
+  "Deploy project" — the env var never baked in, nothing visibly wrong. Predicted
+  before clicking by running the gate with the real refs (exit 0 = skip), and
+  **Deploy project without cache** used instead, which the gate always builds.
+  A redeploy after an env-var change is exactly when this trap fires.
+  ⚠️ **STACK TRACES ARE MINIFIED — SEEN, NOT PREDICTED.** The smoke-test issue
+  reads `?(<anonymous>)` as its location. No source maps are uploaded, so an error
+  gives the message, page, browser and affected count, but no file and line. The
+  trigger for adding them is the first real error nobody can place; it costs a
+  build secret and a Vite plugin.
+
+- `cf2ebae` — 🔎 **AN UNKNOWN CALENDAR TOKEN GETS A CALENDAR, NOT A 404 — and two changelog
   entries above this one say otherwise.** Found by accident: a monitoring drill
   was about to be built on a made-up token, on the assumption it would fail. It
   returns **200 with a valid, EMPTY calendar** (254 bytes, zero events).
