@@ -374,7 +374,7 @@ function QuickActions({ canEdit, readOnlyRole, onPosted }) {
           {canEdit ? 'View full schedule' : 'View schedule'}
         </Button>
         <Button as={Link} to="/roster" variant="secondary" full arrow>
-          View team list
+          View roster
         </Button>
 
         {/* The role noun comes from roleLabel(), the same source as the scope
