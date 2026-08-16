@@ -185,6 +185,27 @@ describe('who may post', () => {
     const medic = [{ role: 'medic', status: 'active', team_id: 't2' }]
     expect(postableTeams(medic, teams).map((t) => t.id)).toEqual(['t2'])
   })
+
+  // ⚠️ A TOMBSTONE. THIS IS THE BUG JAY HIT ON 16 Aug 2026, AND THE FIX IS NOT
+  // HERE — do not loosen this to make a preview work.
+  //
+  // Every other case in this block passes an explicit `status`, which is
+  // precisely why they all stayed green while the live app was broken: the one
+  // shape never exercised was a row with NO status at all, and that is exactly
+  // what syntheticMemberships() built for "view as". An admin previewing as a
+  // coach therefore got no composer, silently, because a preview quietly
+  // holding fewer rights has no error path to notice.
+  //
+  // Being strict here is CORRECT. The database check is `status = 'active'`, so
+  // a client that guessed "no status means active" would offer a composer the
+  // database refuses — somebody writes three paragraphs and then loses them.
+  // The row is what was wrong, and src/lib/memberships.jsx now sets
+  // `status: 'active'` on it.
+  it('⚠️ offers a membership with NO status nothing — the fix belongs on the row', () => {
+    const noStatus = [{ role: 'coach', team_id: 't1' }]
+    expect(canPostNotice(noStatus)).toBe(false)
+    expect(postableTeams(noStatus, teams)).toEqual([])
+  })
 })
 
 describe('seenSummary', () => {

@@ -57,8 +57,32 @@ function writeStoredViewAs(viewAs) {
 
 /**
  * The membership set screens should act on. Normally the real rows; while
- * previewing, a single synthetic row whose shape matches the fields scope.js
- * reads (role, team_id, player_id) plus club_id for anything that needs it.
+ * previewing, a single synthetic row shaped like the real thing.
+ *
+ * ⚠️ `status: 'active'` IS LOAD-BEARING AND WAS MISSING UNTIL 16 Aug 2026.
+ * Jay, previewing as a coach: *"i don't see the ability to post a notice… the
+ * link takes me to a page with nothing there"*. This row carried role, team_id,
+ * player_id and club_id — the fields `scope.js` reads, which is exactly what
+ * this comment used to say it matched. `src/lib/notices.js` came later and
+ * mirrors `private.can_edit_team` MORE closely than scope.js does: it requires
+ * `status === 'active'`. Against a row with no status at all, `postableScopes`
+ * skipped every membership, `canPostNotice` returned false, and the composer
+ * button simply did not render.
+ *
+ * ⚠️ THE FAILURE WAS SILENT AND LOOKED LIKE AN EMPTY FEATURE, which is why it
+ * survived. There is no error path here — a preview just quietly has fewer
+ * rights than the person being previewed, and the noticeboard has no rows yet
+ * either, so "nothing there" read as "nothing posted".
+ *
+ * ⚠️ SO THE SHAPE IS THE CONTRACT, NOT THE FIELD LIST. Anything a real
+ * membership row carries that a predicate might read belongs here. A new
+ * predicate reading a column this row omits fails the same way: closed, quiet,
+ * and only in preview. tests/memberships.test.jsx asserts this object with
+ * toEqual for that reason — a field going missing has to fail somewhere.
+ *
+ * ⚠️ AND IT IS STILL NOT 'pending' — `isPendingOnly` in scope.js depends on a
+ * preview never counting as pending. 'active' satisfies that far more robustly
+ * than the absent field it used to rely on; see the note there.
  */
 function syntheticMemberships(viewAs, realMemberships) {
   if (!viewAs) return realMemberships
@@ -70,6 +94,7 @@ function syntheticMemberships(viewAs, realMemberships) {
       team_id: viewAs.teamId,
       player_id: null,
       club_id: clubId,
+      status: 'active',
     },
   ]
 }

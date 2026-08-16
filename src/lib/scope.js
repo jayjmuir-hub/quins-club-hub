@@ -214,12 +214,18 @@ export function hasAdminRight(memberships, right) {
  * and is waiting for nobody — they get the "add your player" screen, which is
  * a different state with a different answer.
  *
- * ⚠️ A "view as" preview is also FALSE, and that rests on one strict equals:
- * syntheticMemberships() in src/lib/memberships.jsx builds a row with no
- * `status` field at all, so `undefined === 'pending'` is false. That is the
- * right answer — an admin previewing a squad is not pending — but if this ever
- * becomes a truthiness or `!= 'active'` check, an admin previewing as a parent
- * gets told they are waiting for approval.
+ * ⚠️ A "view as" preview is also FALSE, and it no longer rests on a missing
+ * field. syntheticMemberships() in src/lib/memberships.jsx now sets
+ * `status: 'active'` explicitly — it used to build a row with no `status` at
+ * all, and this note used to say so and call it the right answer. It was the
+ * right answer HERE and the wrong one everywhere else: `src/lib/notices.js`
+ * requires `status === 'active'`, so a preview silently could not post a
+ * notice (16 Aug 2026).
+ *
+ * The consequence for this function is that it is now robust rather than
+ * lucky. It was correct because `undefined === 'pending'` is false, which
+ * would have broken the moment anyone wrote `!= 'active'` instead; with a real
+ * 'active' on the row, both spellings give the same answer.
  *
  * Like everything in this file this decides only what the UI shows. RLS is
  * what actually withholds the squad from a pending member.

@@ -332,6 +332,16 @@ describe('MembershipProvider view-as preview', () => {
     await user.click(screen.getByRole('button', { name: 'Preview' }))
 
     const effective = JSON.parse(screen.getByTestId('memberships').textContent)
+    // ⚠️ `status: 'active'` IS PART OF THE SHAPE AND THIS IS AN EXACT MATCH ON
+    // PURPOSE. It was missing until 16 Aug 2026 and cost a whole feature in
+    // preview: src/lib/notices.js mirrors private.can_edit_team and requires
+    // `status === 'active'`, so against a row without one, postableScopes
+    // skipped every membership and an admin previewing as a coach got no
+    // "Post a notice" button at all — silently, because a preview quietly
+    // having fewer rights has no error path.
+    //
+    // toEqual on the whole object rather than a property check, so a field
+    // going MISSING fails here too. That is the failure mode this row has.
     expect(effective).toEqual([
       {
         id: 'view-as',
@@ -339,6 +349,7 @@ describe('MembershipProvider view-as preview', () => {
         team_id: 'team-1',
         player_id: null,
         club_id: 'club-ad',
+        status: 'active',
       },
     ])
     expect(screen.getByTestId('real')).toHaveTextContent('m-admin')
