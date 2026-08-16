@@ -46,7 +46,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   declaration; a lineup records positions, which is a different question. The
   screen says so out loud rather than leaving a coach to assume it carried over.
 
-- 📓 **`state-of-play.md` STILL SAID "NO MONITORING EXISTS AT ALL".** It is
+- `dceb2eb` — 📓 **`state-of-play.md` STILL SAID "NO MONITORING EXISTS AT ALL".** It is
   reading-order step 3, so the highest-traffic file after `CLAUDE.md` was telling
   every new session something that had been false for hours. Corrected, and Jay's
   position on the staff-attachment item recorded — *it resolves as staff sign in,

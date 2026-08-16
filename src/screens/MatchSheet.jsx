@@ -940,10 +940,17 @@ export default function MatchSheet() {
           )}
         </Card>
 
-        {/* ⚠️ PHONE ONLY, AND IT IS AN INSTRUCTION RATHER THAN AN APOLOGY. The
-            form below is a fixed 860px because it is a facsimile of a piece of
-            paper; see the note on the block itself. */}
-        <p className="mt-3.5 text-[12.5px] font-semibold text-ink-muted sm:hidden">
+        {/* ⚠️ AN INSTRUCTION RATHER THAN AN APOLOGY. The form below is a fixed
+            860px because it is a facsimile of a piece of paper; see the note on
+            the block itself.
+
+            ⚠️ 900px, NOT THE `sm` BREAKPOINT. The obvious `sm:hidden` is wrong
+            by 260px: `sm` is 640, and the form needs 860 plus its own border and
+            padding — so on every tablet and small laptop between the two the
+            hint would vanish while the sideways scroll it explains is still
+            there. The number belongs to the form's width, not to a breakpoint
+            scale, which is exactly what an arbitrary variant is for. */}
+        <p className="mt-3.5 text-[12.5px] font-semibold text-ink-muted min-[900px]:hidden">
           The form below is RCM&rsquo;s, at its real size. Scroll it sideways, or pinch to zoom out
           and see all of it.
         </p>
