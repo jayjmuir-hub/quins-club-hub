@@ -10,7 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 15 Aug 2026
 
-- 🔍 **A REVIEW PASS OVER THE PHOTO FEATURE — four findings, ranked and fixed.**
+- 🔗 **A SECOND RUN OF ENTRIES IN THIS FILE WAS ATTRIBUTED TO THE WRONG COMMIT —
+  the Dependabot block, which the pull request below spotted and deliberately
+  left alone.** Four entries each carried the SHA of the entry beneath them:
+  *"the squad tiles line up"* held `199d4ec`, a react-router bump; *"React Router
+  6 → 7"* held `09fc372`, jsdom; *"jsdom 25 → 30"* held `b3628c7`, vitest; and
+  *"vitest 2 → 4"* held `a24b360`, an `actions/setup-node` bump. Repaired by
+  matching each headline against `git log -1 --format=%s` for the SHA it cites,
+  over every entry in the file rather than only the flagged ones.
+  ⚠️ **SAME OFF-BY-ONE AS THE PHOTO RUN, DIFFERENT CAUSE.** There a later pass
+  filled blank slots by position. Here each commit stamped the previous merge's
+  SHA onto its OWN new entry instead of onto the entry below — plainly visible in
+  the diffs of `b3628c7`, `09fc372` and `199d4ec`, every one of which adds a
+  brand-new entry already carrying somebody else's SHA.
+  ⚠️ **IT IS NOT A UNIFORM SHIFT, WHICH IS WHY GUESSING WOULD HAVE FAILED — and
+  the previous pull request was right not to.** `ebce0b1` legitimately backs TWO
+  adjacent entries, the picker and the tile column being two halves of one pull
+  request, so the run stops there; and `a9bef62`, `fffb123` and `d480aa2` below
+  it were already correct. A blanket "move every SHA down one" would have broken
+  both ends of the block.
+  ⚠️ **`a24b360` HAD NO HONEST SLOT AT ALL, AND THAT IS WHERE THE RUN STARTED.**
+  Its pull request added no entry, reasoning that the actions entry already
+  covered both halves — but the coverage check reads only the SHA at the start of
+  a `- ` item and cannot see a commit named in prose, so it stayed uncited and
+  the next pull request paid for it by stamping the vitest entry. It now has its
+  own bullet, which is what the check was always asking for.
+  ⚠️ **`docs:check` STILL CANNOT SEE ANY OF THIS**, said here for the second time
+  in two pull requests because it is the reason both shifts survived: the check
+  asks whether each SHA EXISTS and whether every commit appears SOMEWHERE, and a
+  shifted attribution satisfies both. **The only detector is headline against
+  commit subject, and it is worth running across the whole file** — doing so here
+  is what confirmed the rest of the changelog is sound and that the entries which
+  merely word things differently from their commit subjects are fine.
+
+- `e4d3c23` — 🔍 **A REVIEW PASS OVER THE PHOTO FEATURE — four findings, ranked and fixed.**
   **1)** Every admin "Change photo" was STRANDING THE OLD OBJECT in a private
   bucket of real people's photographs, forever — and a failure after upload
   stranded the new one. Invisible to the suite, which mocks the data layer; the
@@ -105,9 +138,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   it asks whether each SHA EXISTS and whether every commit appears SOMEWHERE,
   and a uniform shift satisfies both. Repaired by matching each entry's headline
   to the commit subject.
-  ⚠️ **A SECOND, OLDER SHIFT IS STILL THERE**, across the Dependabot block
-  (`ebce0b1` through `a24b360`), and is deliberately left alone rather than
-  guessed at in a bugfix. It is a separate piece of work.
+  ⚠️ **A SECOND, OLDER SHIFT WAS FOUND HERE AND DELIBERATELY LEFT ALONE**, across
+  the Dependabot block (`ebce0b1` through `a24b360`), rather than guessed at
+  inside a bugfix. **Repaired since — see the entry above.**
 
 - `a9891de` — 📓 **THREE FEATURES WENT LIVE AND NOBODY HAD LOOKED AT ANY OF THEM**,
   recorded in `claude/open-items.md` as UNVERIFIED rather than working, with the
@@ -294,7 +327,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   CHECK rather than one text column, because the value is user-controlled and
   ends up in a style attribute, and two integers cannot carry anything else.
 
-- `199d4ec` — 🧱 **THE SQUAD TILES LINE UP: THE LEAD OWNS THE LEFT COLUMN, EVERYONE ELSE THE
+- `ebce0b1` — 🧱 **THE SQUAD TILES LINE UP: THE LEAD OWNS THE LEFT COLUMN, EVERYONE ELSE THE
   RIGHT.** Jay, looking at the real six-person squad: *"only head coach should be
   furthest left, then the rest should be to the right"*. The old rule gave the
   lead two rows and let the remainder wrap BELOW it and back to the left margin,
@@ -313,7 +346,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   at six. Flagged rather than quietly capped, because capping it puts tiles back
   under the lead, which is the thing this change removed.
 
-- `09fc372` — 🛣️ **REACT ROUTER 6 → 7, AND THE PRODUCTION ADVISORIES GO TO ZERO.** This is
+- `199d4ec` — 🛣️ **REACT ROUTER 6 → 7, AND THE PRODUCTION ADVISORIES GO TO ZERO.** This is
   the one that mattered: `npm audit --omit=dev` was 2 moderate for weeks and is
   now **0**. The whole tree is down to 4, from 10 when scanning was switched on
   this morning.
@@ -329,7 +362,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   and v7 accepts it without complaint — those flags are the default now, so the
   prop is inert rather than wrong. Harmless to leave, tidier to remove.
 
-- `b3628c7` — 🏗️ **jsdom 25 → 30, AND IT COSTS TEST TIME.** Five majors of standards and
+- `09fc372` — 🏗️ **jsdom 25 → 30, AND IT COSTS TEST TIME.** Five majors of standards and
   security fixes in the environment 123 test files render into. All 2413 tests
   pass unchanged.
   ⚠️ **IT ROUGHLY DOUBLES THE jsdom BUILD COST, MEASURED RATHER THAN FEARED.** On
@@ -344,7 +377,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   99s on jsdom 25 to 124s on 30.** It is a devDependency either way — nothing here
   reaches a phone.
 
-- `a24b360` — 🧪 **VITEST 2 → 4, AND THE CRITICAL ADVISORY GOES WITH IT.** `npm audit` drops
+- `b3628c7` — 🧪 **VITEST 2 → 4, AND THE CRITICAL ADVISORY GOES WITH IT.** `npm audit` drops
   from 10 findings to 6 — **zero critical**, where the critical was vitest itself.
   A dev dependency, so it never reached a phone; it did run on maintainers'
   laptops.
@@ -356,6 +389,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   custom reporter module — which reads like a project failure and is not. Nothing
   in this repo uses it; it is written down because it is an easy flag to reach for
   when reading CI output, and the error names nothing helpful.
+
+- `a24b360` — 🤖 **`actions/setup-node` 4 → 7 — the other half of the actions
+  bump.** Dependabot raises a major on its own, so the two halves arrived as two
+  pull requests; the entry below carries the reasoning and the proof for both.
+  ⚠️ **THIS BULLET EXISTS BECAUSE THE COVERAGE CHECK COUNTS BULLETS, NOT PROSE.**
+  `docs-check` reads only the SHA at the START of a `- ` item, so an entry that
+  names a second commit in its body leaves that commit uncited. The pull request
+  behind this one decided against "a second entry saying the same thing twice"
+  and put the citation on the NEXT entry instead — which is exactly where the run
+  of wrong attributions above began. Two short bullets is the price of one honest
+  attribution, and it is cheaper than the alternative turned out to be.
 
 - `a9bef62` — 🤖 **THE WORKFLOW ACTIONS GO 4 → 7** — `actions/checkout`, and
   `actions/setup-node` in the pull request behind it. Three majors each, on
