@@ -935,7 +935,8 @@ describe('More — adding another child', () => {
     renderMore()
     await u.click(await screen.findByTestId('add-another-player'))
 
-    await u.type(await screen.findByLabelText(/player's full name/i), 'Rory Muir')
+    await u.type(await screen.findByLabelText(/player's first name/i), 'Rory')
+      await u.type(screen.getByLabelText(/player's family name/i), 'Muir')
     await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
     await u.click(screen.getByRole('button', { name: /add this player/i }))
 
@@ -1036,7 +1037,8 @@ describe('More — the registrant’s own name', () => {
 
     await u.type(await screen.findByLabelText(/your first name/i), 'Jay')
     await u.type(screen.getByLabelText(/your family name/i), 'Muir')
-    await u.type(screen.getByLabelText(/player's full name/i), 'Rory Muir')
+    await u.type(screen.getByLabelText(/player's first name/i), 'Rory')
+      await u.type(screen.getByLabelText(/player's family name/i), 'Muir')
     await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
     await u.click(screen.getByRole('button', { name: /add this player/i }))
 
@@ -1070,7 +1072,8 @@ describe('More — the registrant’s own name', () => {
     renderMore()
     await u.click(await screen.findByTestId('add-another-player'))
 
-    await u.type(await screen.findByLabelText(/player's full name/i), 'Rory Muir')
+    await u.type(await screen.findByLabelText(/player's first name/i), 'Rory')
+      await u.type(screen.getByLabelText(/player's family name/i), 'Muir')
     await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
     await u.click(screen.getByRole('button', { name: /add this player/i }))
 
@@ -1111,7 +1114,8 @@ describe('More — the registrant’s own name', () => {
     // refusal it exists to exercise — it would stop at client-side validation
     // and pass for the wrong reason.
     await u.type(screen.getByLabelText(/your family name/i), 'Muir')
-    await u.type(screen.getByLabelText(/player's full name/i), 'Rory Muir')
+    await u.type(screen.getByLabelText(/player's first name/i), 'Rory')
+      await u.type(screen.getByLabelText(/player's family name/i), 'Muir')
     await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
     await u.click(screen.getByRole('button', { name: /add this player/i }))
 

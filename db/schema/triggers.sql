@@ -266,3 +266,44 @@ execute function private.notify_access_request();
 -- ---------------------------------------------------------------------
 CREATE TRIGGER announcements_provenance BEFORE INSERT ON public.announcements FOR EACH ROW EXECUTE FUNCTION private.set_announcement_provenance();
 CREATE TRIGGER announcements_touch BEFORE UPDATE ON public.announcements FOR EACH ROW EXECUTE FUNCTION private.touch_announcement();
+
+
+-- ---------------------------------------------------------------------
+-- public.players        → players_sync_name          ADDED 2026-08-16
+-- public.player_parents → player_parents_sync_name   ADDED 2026-08-16
+--
+-- ⚠️ THERE ARE NOW EIGHT TRIGGERS, NOT SIX. Both of these run
+-- private.sync_person_name(), added by migration split_player_and_parent_names.
+-- They are the players/player_parents counterpart of profiles_sync_name, and
+-- the function body is deliberately a copy of private.sync_profile_name rather
+-- than a generalisation of it — including its 8 Aug single-word fix, where a
+-- one-word name must become a FIRST name and not a last one.
+--
+-- ⚠️ WHY THE COPY IS THE RIGHT CALL. sync_profile_name is pinned to
+-- `search_path TO ''` and is load-bearing for the sign-in name gate. Rewriting
+-- it to serve three tables would put every profile's name behind a change made
+-- for a roster problem. Two functions that are textually identical today are
+-- cheaper than one function two features depend on.
+--
+-- BOTH directions, on INSERT and UPDATE:
+--   write full_name          -> first_name/last_name are derived
+--   write first_name/last_name -> full_name is composed
+--   write both in one statement -> first/last WIN (they are the explicit input)
+--
+-- ⚠️ THIS IS WHY THE NAME SPLIT CHANGED NO READERS. Around thirty files read
+-- players.full_name; all of them still work, because full_name is still
+-- maintained. Do not "finish the migration" by dropping it.
+--
+-- Proved on production 16 Aug 2026 inside a rolled-back transaction, all seven
+-- cases: full->split, split->full, one word (last stays NULL), update full,
+-- update split, both-at-once, and the same reconciler on player_parents.
+-- ---------------------------------------------------------------------
+CREATE TRIGGER players_sync_name
+  BEFORE INSERT OR UPDATE ON public.players
+  FOR EACH ROW
+  EXECUTE FUNCTION private.sync_person_name();
+
+CREATE TRIGGER player_parents_sync_name
+  BEFORE INSERT OR UPDATE ON public.player_parents
+  FOR EACH ROW
+  EXECUTE FUNCTION private.sync_person_name();

@@ -201,6 +201,18 @@ CREATE TABLE public.profiles (
   -- !! ⚠️ NEEDS ITS OWN COLUMN GRANT — see db/schema/grants.sql. authenticated
   -- !! holds UPDATE on named columns only.
   no_player_confirmed_at timestamptz,
+  -- !! Added 16 Aug 2026, hours after the column above and as its exact mirror:
+  -- !! "I don't do a job at the club", for the gate's fourth step. Sign-up forks
+  -- !! two ways and each door loses the other half of who somebody is — the
+  -- !! column above covers the staff door, this one covers the parent door,
+  -- !! which had no mirror and produced a real coach filed as a parent.
+  -- !! ⚠️ ITS OWN COLUMN GRANT, same trap, and the failure is INVISIBLE: without
+  -- !! it the write is refused and the gate simply reopens next sign-in, which
+  -- !! looks identical to never having been answered.
+  -- !! ⚠️ NOT the counterpart of "yes" — a person who DOES do a job says so with
+  -- !! a membership row (public.request_staff_role, pending). Only the "no" lives
+  -- !! here, because only the "no" has nowhere else to be recorded.
+  no_role_confirmed_at timestamptz,
   name_confirmed_at timestamptz,
   -- Added 2026-08-08 (profile_phone_and_column_grants). Column comment as
   -- stored: "The signed-in person's own number, stored E.164. Distinct from
@@ -258,6 +270,20 @@ CREATE TABLE public.players (
   club_id     uuid        NOT NULL,
   team_id     uuid        NOT NULL,
   full_name   text        NOT NULL,
+  -- !! Added 16 Aug 2026 (split_player_and_parent_names). Jay: "children name
+  -- !! and any other name should be two blocks First Name and Last Name, this
+  -- !! will stop people only putting a first name". One column behind one box
+  -- !! got one word, and the live roster carried a child with a first name and
+  -- !! nothing else.
+  -- !! ⚠️ full_name IS STILL THE DISPLAY VALUE and is NOT derived-and-forgotten:
+  -- !! private.sync_person_name (triggers.sql) reconciles all three BOTH WAYS,
+  -- !! so the ~30 files reading full_name were untouched by this change. Write
+  -- !! either side.
+  -- !! ⚠️ NOT A GENERATED COLUMN, for the same reason profiles.full_name is not:
+  -- !! register_my_player, PlayerForm and the importer all write it directly and
+  -- !! would break on first save.
+  first_name  text,
+  last_name   text,
   jersey_num  integer,
   position    text,
   is_captain  boolean              DEFAULT false,
@@ -333,6 +359,14 @@ CREATE TABLE public.player_parents (
   id            uuid        NOT NULL DEFAULT gen_random_uuid(),
   player_id     uuid        NOT NULL,
   full_name     text        NOT NULL,
+  -- !! Added 16 Aug 2026 (split_player_and_parent_names), same reconciler as
+  -- !! public.players above — "any other name" in Jay's request is this table.
+  -- !! ⚠️ THE CHECK BELOW STILL GUARDS full_name AND ONLY full_name. A row with
+  -- !! a blank first_name and a populated full_name is legal and is what an old
+  -- !! writer produces; the trigger fills the split in. Do not add a NOT NULL
+  -- !! here without also changing every writer.
+  first_name    text,
+  last_name     text,
   relationship  text,
   email         text,
   phone         text,

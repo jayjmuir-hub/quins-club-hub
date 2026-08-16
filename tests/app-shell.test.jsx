@@ -285,7 +285,7 @@ describe('AppShell', () => {
     renderShell()
 
     expect(await screen.findByRole('button', { name: /add my player/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/player's full name/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/player's first name/i)).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'U13' })).toBeInTheDocument()
     expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()

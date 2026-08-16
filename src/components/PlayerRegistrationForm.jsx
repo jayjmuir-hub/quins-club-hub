@@ -110,7 +110,21 @@ function blankRow() {
     // guard against something that has not happened, not a fix for something
     // that did — and no test in this repo discriminates on it.
     key: `row-${nextRowKey}`,
-    fullName: '',
+    // ⚠️ TWO FIELDS SINCE 16 Aug 2026, AND THE SPLIT IS THE FIX RATHER THAN
+    // TIDINESS. Jay: "children name and any other name should be two blocks
+    // First Name and Last Name, this will stop people only putting a first
+    // name". One box got one word, and the live roster has a child on it with a
+    // first name and nothing else — nothing to sort by and nothing for a coach
+    // to recognise.
+    //
+    // ⚠️ THE DATABASE STILL HOLDS `full_name` AS THE DISPLAY VALUE, kept in step
+    // both ways by private.sync_person_name (20260816_split_player_and_parent_names).
+    // So these two are joined on the way out and around thirty readers of
+    // full_name are untouched. Do NOT "simplify" this by sending first/last to
+    // register_my_player — its signature is public and already carries six
+    // parameters, and the trigger makes the join lossless.
+    firstName: '',
+    lastName: '',
     teamId: '',
     // null, not '' — matches players.gender, which is nullable and has a CHECK
     // that refuses the empty string. Most squads never ask for it.
@@ -156,8 +170,23 @@ const CONFIRM_FOR_CODE = {
  * is the blank one they have not filled in yet.
  */
 function rowLabel(row, index) {
-  const name = row.fullName.trim()
+  const name = joinName(row)
   return name || `player ${index + 1}`
+}
+
+/**
+ * The two boxes as the one value the database takes.
+ *
+ * ⚠️ `concat_ws`-shaped rather than a plain template: a missing family name must
+ * produce "Kwame", never "Kwame " with a trailing space, because the trigger
+ * splits on whitespace and a trailing space would make the last name an empty
+ * string rather than null.
+ */
+function joinName(row) {
+  return [row.firstName, row.lastName]
+    .map((part) => String(part ?? '').trim())
+    .filter(Boolean)
+    .join(' ')
 }
 
 /**
@@ -165,7 +194,25 @@ function rowLabel(row, index) {
  * controls stay per-row: both answers are about the individual child, not about
  * the family, and a single-gender squad in row 2 must not make row 1 ask.
  */
-function PlayerRow({ row, index, total, teams, disabled, onChange, onRemove }) {
+/**
+ * `askingOwnName` is the "About you" fieldset's presence, and it exists here for
+ * exactly one reason.
+ *
+ * ⚠️ SPLITTING THE NAME INTO TWO BOXES CREATED A LABEL COLLISION THAT DID NOT
+ * EXIST BEFORE. A self-registering player's field used to be "Your full name"
+ * while the registrant fieldset asked "Your first name" — different strings. As
+ * two boxes they both want to be "Your first name", and two identically
+ * labelled inputs on one form is a screen-reader ambiguity as well as an
+ * untestable one.
+ *
+ * Resolved by construction rather than by inventing a clumsier label: the warm
+ * wording is used only when the fieldset is absent, which is the common case —
+ * anybody who has already told us their name. When both would be on screen the
+ * row goes back to "Player's first name", and the "Who are you registering?"
+ * control immediately above it is what says the player is them.
+ */
+function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange, onRemove }) {
+  const selfNamed = row.selfRegister && !askingOwnName
   const selectedTeam = teams.find((team) => team.id === row.teamId)
   const genderRequired = squadRequiresGender(selectedTeam?.name)
   // ⚠️ THE SQUAD DECIDES, AND IT COMES FROM A COLUMN —
@@ -176,22 +223,23 @@ function PlayerRow({ row, index, total, teams, disabled, onChange, onRemove }) {
   // only decides whether to ASK.
   const canSelfRegister = selectedTeam?.self_registration_allowed === true
 
-  const nameId = `register-player-name-${row.key}`
+  const firstId = `register-player-first-${row.key}`
+  const lastId = `register-player-last-${row.key}`
   const teamId = `register-player-team-${row.key}`
 
   return (
     <li data-testid="player-row" className={index === 0 ? '' : 'mt-5 border-t border-line pt-4'}>
       <div className="mb-1.5 flex items-baseline justify-between gap-3">
-        <label htmlFor={nameId} className={`${LABEL} mb-0`}>
-          {/* Follows the answer below: a 16-year-old filling in "Player's full
+        <label htmlFor={firstId} className={`${LABEL} mb-0`}>
+          {/* Follows the answer below: a 16-year-old filling in "Player's first
               name" about themselves reads as a form written for somebody else.
-              Numbered only once there is more than one row — "Player 1's full
+              Numbered only once there is more than one row — "Player 1's first
               name" on a lone field is bureaucratic noise. */}
-          {row.selfRegister
-            ? 'Your full name'
+          {selfNamed
+            ? 'Your first name'
             : total === 1
-              ? "Player's full name"
-              : `Player ${index + 1}'s full name`}
+              ? "Player's first name"
+              : `Player ${index + 1}'s first name`}
         </label>
         {/* Never on the first row: a list you can empty is a form with no
             fields, and "add a player" with nothing to fill in is a dead end. */}
@@ -209,20 +257,52 @@ function PlayerRow({ row, index, total, teams, disabled, onChange, onRemove }) {
       </div>
 
       <input
-        id={nameId}
-        name="playerName"
+        id={firstId}
+        name="playerFirstName"
         type="text"
         autoComplete="off"
         maxLength={NAME_MAX}
-        value={row.fullName}
+        value={row.firstName}
         disabled={disabled}
-        // ⚠️ EDITING THE NAME WITHDRAWS THE CONFIRMATION, and that is not
+        // ⚠️ EDITING EITHER NAME WITHDRAWS THE CONFIRMATION, and that is not
         // tidiness. The tick means "yes, THIS name is deliberate" — carrying it
         // across a rewrite would let somebody confirm a warning about one name
         // and then submit a different one with the guard already switched off.
+        // Both boxes clear it, because either one changes who this is.
         onChange={(event) =>
           onChange({
-            fullName: event.target.value,
+            firstName: event.target.value,
+            needsConfirm: null,
+            confirmDuplicate: false,
+            confirmSelfName: false,
+          })
+        }
+        className={FIELD}
+      />
+
+      {/* ⚠️ REQUIRED, AND NOT MARKED OPTIONAL — unlike the family-name box on
+          NamePrompt and the You card, which say so and mean it. The argument
+          firstProblem() already makes for the REGISTRANT's own name applies with
+          more force to a child: this name is how a coach tells one twelve-year-old
+          from another on a team sheet, and "Marco" does not do that. */}
+      <label htmlFor={lastId} className={`${LABEL} mt-4`}>
+        {selfNamed
+          ? 'Your family name'
+          : total === 1
+            ? "Player's family name"
+            : `Player ${index + 1}'s family name`}
+      </label>
+      <input
+        id={lastId}
+        name="playerLastName"
+        type="text"
+        autoComplete="off"
+        maxLength={NAME_MAX}
+        value={row.lastName}
+        disabled={disabled}
+        onChange={(event) =>
+          onChange({
+            lastName: event.target.value,
             needsConfirm: null,
             confirmDuplicate: false,
             confirmSelfName: false,
@@ -426,13 +506,31 @@ export default function PlayerRegistrationForm({
 
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index]
-      const name = row.fullName.trim()
+      const first = row.firstName.trim()
+      const last = row.lastName.trim()
+      const name = joinName(row)
       const team = sortedTeams.find((candidate) => candidate.id === row.teamId)
 
-      if (!name) {
+      if (!first) {
         return rows.length === 1
-          ? "Enter your player's name."
-          : `Enter a name for player ${index + 1}.`
+          ? "Enter your player's first name."
+          : `Enter a first name for player ${index + 1}.`
+      }
+      // ⚠️ THE FAMILY NAME IS REQUIRED HERE TOO, AND THE REASONING IS THE SAME
+      // ONE THE REGISTRANT'S OWN NAME CARRIES ABOVE — with more force, not less.
+      // A coach approving this is being asked to recognise a CHILD they may
+      // never have met, from a squad of children whose first names repeat. The
+      // live roster already carries one player with a first name and nothing
+      // else, which is the row that caused this change.
+      //
+      // ⚠️ IF A GENUINE MONONYM EVER REGISTERS, THIS IS THE LINE TO REVISIT AND
+      // AN ESCAPE HATCH IS THE FIX, NOT DELETING THE REQUIREMENT. Same ruling as
+      // the registrant field. Measured before it was imposed there: zero of the
+      // club's adults and zero of its players had a single-word name by choice.
+      if (!last) {
+        return rows.length === 1
+          ? "Enter your player's family name — a first name alone isn't enough for a coach to tell one child from another."
+          : `Enter a family name for player ${index + 1}.`
       }
       if (name.length > NAME_MAX) {
         return `${name.slice(0, 20)}… is too long — ${NAME_MAX} characters at most.`
@@ -502,7 +600,10 @@ export default function PlayerRegistrationForm({
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index]
       const team = sortedTeams.find((candidate) => candidate.id === row.teamId)
-      const name = row.fullName.trim()
+      // The two boxes as the one value register_my_player takes. The database
+      // splits it straight back apart — see joinName and the sync_person_name
+      // trigger — so nothing is lost by joining here.
+      const name = joinName(row)
       try {
         // ⚠️ `canSelfRegister &&` is not belt-and-braces, it is the guard. The
         // reset in the select's onChange covers changing squad; this covers the
@@ -643,6 +744,7 @@ export default function PlayerRegistrationForm({
             total={rows.length}
             teams={sortedTeams}
             disabled={submitting}
+            askingOwnName={needsName}
             onChange={(patch) => updateRow(row.key, patch)}
             onRemove={() => removeRow(row.key)}
           />
