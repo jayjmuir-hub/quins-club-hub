@@ -10,7 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 🟢 **MONITORING IS ACTUALLY ON — two Better Stack monitors, live, 16 Aug 2026.**
+- 🔎 **AN UNKNOWN CALENDAR TOKEN GETS A CALENDAR, NOT A 404 — and two changelog
+  entries above this one say otherwise.** Found by accident: a monitoring drill
+  was about to be built on a made-up token, on the assumption it would fail. It
+  returns **200 with a valid, EMPTY calendar** (254 bytes, zero events).
+  ⚠️ **THE CAUSE IS A FILTER, NOT A GUARD.** `calendar_events_for_token` selects
+  events `where exists (… calendar_tokens … memberships …)`, so a token nobody
+  holds makes that EXISTS false for every row and the RPC returns an EMPTY SET
+  rather than raising. The edge function then builds a well-formed calendar out
+  of nothing.
+  ⚠️ **THE CORRECTION.** Entries below claim the function "returns the same 404
+  whether the token is missing or Supabase is unreachable". It does not. A
+  missing or malformed token is refused on SHAPE with 404 before Postgres is
+  touched; an RPC failure returns **503**; an unknown-but-valid token returns 200.
+  The CONCLUSION drawn from the wrong reason still holds — a tokenless probe
+  cannot see a database outage — but only because it never reaches the database
+  at all. The full table is now in `RESTORE.md`.
+  ⚠️ **THE CONSEQUENCE WORTH A DECISION**: `reset_my_calendar_token` exists, so
+  when somebody resets their token the OLD subscription in their phone keeps
+  succeeding — 200, valid calendar, no events, forever, with no error a calendar
+  app could show. Right for privacy, silent for a legitimate person who mistyped
+  or reset. Left as-is pending Jay; changing it to 404 would tell a prober which
+  tokens exist.
+
+- `f4f3973` — 🟢 **MONITORING IS ACTUALLY ON — two Better Stack monitors, live, 16 Aug 2026.**
   `https://adhquins-clubhub.com/` and the calendar feed at
   `/calendar.ics?token=…`, both 3-minute checks with e-mail alerts. Set up in
   Jay's own browser with him watching. ✅ **E-mail delivery proved on the spot**
