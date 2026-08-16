@@ -38,6 +38,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   nothing pointing at it is a photo mid-save. Measured on live: only one staff
   object is currently older than a day, so without the grace period the very
   first run would have reported a bucket full of orphans.
+  ⚠️ **APPLIED TO PRODUCTION 16 Aug 2026, AND THE CAPTURE FOUND A GRANT NOBODY
+  ASKED FOR.** A new table in `public` inherits Supabase's default privileges, so
+  `photo_orphan_scans` arrived with the full SELECT/INSERT/UPDATE/DELETE set
+  granted to `authenticated`. RLS has no policies so nothing was readable — which
+  is exactly what makes it a trap rather than a harmless leftover: **the day
+  somebody adds a policy for an admin screen, the ceiling is already open and the
+  policy is the only thing deciding.** Revoked in a second migration. `anon` was
+  checked with `has_table_privilege` rather than assumed, and held nothing —
+  `20260814_revoke_anon_table_privileges.sql` only ever touched the tables that
+  existed then.
+  ⚠️ **THE HARNESS WAS RUN AGAINST LIVE AND ITS THREE INJECTIONS ALL FIRED** —
+  a stranded object found, a just-uploaded one correctly ignored, a row repointed
+  at a missing file found — so the four zeros above it mean something. ⚠️ **AND
+  THE ROLLBACK WAS PROVED BEFORE THE HARNESS RAN, NOT AFTER**, because one of
+  those faults repoints a LIVE profile: a throwaway `create table` inside
+  `begin … rollback` was confirmed gone first. Object counts were 5 and 10 before
+  and after.
 
 - `42b2456` — 🔗 **A SECOND RUN OF ENTRIES IN THIS FILE WAS ATTRIBUTED TO THE WRONG COMMIT —
   the Dependabot block, which the pull request below spotted and deliberately

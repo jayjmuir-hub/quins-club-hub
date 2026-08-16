@@ -1394,6 +1394,43 @@ CREATE TABLE public.photo_backup_runs (
 
 ALTER TABLE public.photo_backup_runs ADD CONSTRAINT photo_backup_runs_pkey PRIMARY KEY (id);
 
+
+-- ---------------------------------------------------------------------
+-- public.photo_orphan_scans  (16 Aug 2026, 20260816_photo_orphan_scan.sql)
+--
+-- One row per bucket per run of public.scan_photo_orphans(), scheduled nightly
+-- by pg_cron. Counts storage objects that nothing references.
+--
+-- ⚠️ IT REPORTS. IT DOES NOT DELETE, and that is Jay's ruling rather than an
+-- unfinished feature. `staff-photos` is mirrored NOWHERE — backup-player-photos
+-- pins SOURCE_BUCKET = 'player-photos' — so a scheduled delete on it would be
+-- unrecoverable. **Do not "finish" this by adding one.**
+--
+-- ⚠️ AND SQL COULD NOT DELETE EVEN IF ASKED. storage.objects carries a
+-- `protect_delete` trigger raising 42501 on any direct DELETE; the
+-- storage.allow_delete_query escape hatch drops the ROW and leaves the FILE.
+-- See RESTORE.md.
+--
+-- ⚠️ `missing_files` IS THE MORE SERIOUS COLUMN. `orphaned` counts files nobody
+-- points at — untidy, and a photograph outliving its purpose. `missing_files`
+-- counts ROWS pointing at an object that is GONE, which renders as a broken face
+-- on a parent's screen and is what an over-eager cleanup produces. It should
+-- never be anything but zero.
+CREATE TABLE public.photo_orphan_scans (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  scanned_at timestamptz NOT NULL DEFAULT now(),
+  bucket text NOT NULL,
+  objects integer NOT NULL,
+  referenced integer NOT NULL,
+  orphaned integer NOT NULL,
+  missing_files integer NOT NULL,
+  -- Capped at fifty by the function, so a human can act without re-deriving the
+  -- set. Keys are `<uuid>/<timestamp>.<ext>` — no names.
+  orphan_keys text[] NOT NULL DEFAULT '{}'::text[]
+);
+
+ALTER TABLE public.photo_orphan_scans ADD CONSTRAINT photo_orphan_scans_pkey PRIMARY KEY (id);
+
 CREATE INDEX photo_backup_runs_started_idx ON public.photo_backup_runs USING btree (started_at DESC);
 
 ALTER TABLE public.photo_backup_runs ENABLE ROW LEVEL SECURITY;

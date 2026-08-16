@@ -2743,3 +2743,94 @@ $function$
 REVOKE ALL ON FUNCTION private.name_match_key(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION private.name_match_key(text) FROM anon;
 GRANT EXECUTE ON FUNCTION private.name_match_key(text) TO authenticated;
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  public.scan_photo_orphans  (16 Aug 2026, 20260816_photo_orphan_scan.sql)
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- Counts storage objects that nothing references, into public.photo_orphan_scans.
+-- Scheduled nightly by pg_cron as `scan-photo-orphans` at 41 22 * * *.
+--
+-- ⚠️ IT COUNTS. IT DOES NOT DELETE — Jay's ruling, 16 Aug 2026, taken over an
+-- auto-sweeping version on one fact: `staff-photos` is mirrored NOWHERE
+-- (backup-player-photos pins SOURCE_BUCKET = 'player-photos'), so a scheduled
+-- delete there has no safety net and a bug wrongly clearing `photo_path` would
+-- become permanent loss, on a timer, unwatched. **Do not add a delete.**
+--
+-- ⚠️ AND IT COULD NOT DELETE IF IT WANTED TO. storage.objects carries a
+-- `protect_delete` trigger that raises 42501 on any direct SQL DELETE. The
+-- `storage.allow_delete_query` escape hatch drops the ROW and leaves the FILE,
+-- which is not a delete but losing track of a photograph. RESTORE.md carries
+-- the same warning.
+--
+-- ⚠️ THE `_grace` DEFAULT IS LOAD-BEARING AND MUST MATCH db/tests/photo-orphans.sql.
+-- An upload and the row write that records it are NOT atomic — MyPhotoField
+-- uploads, then calls set_my_photo — so an object seconds old with nothing
+-- pointing at it is a photo mid-save, not an orphan. Measured 16 Aug 2026: only
+-- ONE staff object was older than a day, so without the grace period the first
+-- run would have reported the bucket as almost entirely orphaned.
+--
+-- ⚠️ NOT EXECUTABLE BY ANY BROWSER ROLE, and that is the point of the revokes
+-- below rather than tidiness: this is SECURITY DEFINER over storage.objects, so
+-- EXECUTE for `authenticated` would hand every signed-in parent a census of
+-- every photograph in the club. `anon` is revoked BY NAME because Supabase's
+-- default privileges grant to it explicitly and a bare `revoke from public`
+-- does NOT remove it — the finding of 20260813_revoke_anon_execute.sql.
+CREATE OR REPLACE FUNCTION public.scan_photo_orphans(_grace interval DEFAULT '24:00:00'::interval)
+ RETURNS SETOF photo_orphan_scans
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  scanned public.photo_orphan_scans;
+begin
+  insert into public.photo_orphan_scans (bucket, objects, referenced, orphaned, missing_files, orphan_keys)
+  select 'player-photos',
+         count(*),
+         count(*) filter (where referenced),
+         count(*) filter (where not referenced),
+         (select count(*) from public.players p
+           where p.photo_path is not null
+             and not exists (select 1 from storage.objects o
+                              where o.bucket_id = 'player-photos' and o.name = p.photo_path)),
+         coalesce((array_agg(name order by created_at) filter (where not referenced))[1:50], '{}')
+    from (
+      select o.name, o.created_at,
+             exists (select 1 from public.players p where p.photo_path = o.name) as referenced
+        from storage.objects o
+       where o.bucket_id = 'player-photos'
+         and o.created_at < now() - _grace
+    ) s
+  returning * into scanned;
+  return next scanned;
+
+  insert into public.photo_orphan_scans (bucket, objects, referenced, orphaned, missing_files, orphan_keys)
+  select 'staff-photos',
+         count(*),
+         count(*) filter (where referenced),
+         count(*) filter (where not referenced),
+         (select count(*) from public.profiles pr
+           where pr.photo_path is not null
+             and not exists (select 1 from storage.objects o
+                              where o.bucket_id = 'staff-photos' and o.name = pr.photo_path)),
+         coalesce((array_agg(name order by created_at) filter (where not referenced))[1:50], '{}')
+    from (
+      select o.name, o.created_at,
+             exists (select 1 from public.profiles pr where pr.photo_path = o.name) as referenced
+        from storage.objects o
+       where o.bucket_id = 'staff-photos'
+         and o.created_at < now() - _grace
+    ) s
+  returning * into scanned;
+  return next scanned;
+end;
+$function$
+;
+
+-- proacl as captured: {postgres=X/postgres,service_role=X/postgres}
+REVOKE ALL ON FUNCTION public.scan_photo_orphans(interval) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.scan_photo_orphans(interval) FROM anon;
+REVOKE ALL ON FUNCTION public.scan_photo_orphans(interval) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.scan_photo_orphans(interval) TO service_role;

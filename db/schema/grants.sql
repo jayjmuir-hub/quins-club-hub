@@ -172,6 +172,25 @@
 --                     Supabase's default privileges had already given
 --                     service_role everything, and a GRANT cannot take a
 --                     privilege away. Measured after applying, not assumed.
+--   photo_orphan_scans postgres, service_role                       ALL 8
+--   photo_orphan_scans authenticated   ← NOTHING AT ALL
+--   photo_orphan_scans anon            ← NOTHING AT ALL
+--                     ⚠️ ADDED 16 Aug 2026, and the SECOND table where `anon`
+--                     holds nothing — but the FIRST where `authenticated` holds
+--                     nothing either. Measured after applying: the table came
+--                     out of `create table` with the full set granted to
+--                     `authenticated` by Supabase's DEFAULT PRIVILEGES, and it
+--                     was revoked in the same migration.
+--                     ⚠️ RLS ALREADY DENIED EVERYTHING (the table has NO
+--                     policies), so that grant was inert — and that is exactly
+--                     why it was worth taking back rather than shrugging at.
+--                     The day somebody adds a policy for an admin screen the
+--                     ceiling would already be wide open, and the policy would
+--                     be the only thing deciding. Grants are the ceiling, RLS
+--                     is the gate.
+--                     ⚠️ A RE-CAPTURE SHOWING EITHER ROLE BACK IS DRIFT, not a
+--                     version difference — the revokes are in
+--                     db/migrations/20260816_photo_orphan_scan.sql.
 --   pitch_requests    anon, authenticated, postgres, service_role   ALL 8
 --   pitches           anon, authenticated, postgres, service_role   ALL 8
 --   player_contacts   anon, authenticated, postgres, service_role   ALL 8

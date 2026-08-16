@@ -60,10 +60,26 @@ alter table public.photo_orphan_scans enable row level security;
 
 -- ⚠️ NO POLICY, DELIBERATELY, WHICH MEANS NO ROLE READS IT THROUGH PostgREST.
 -- RLS with zero policies denies everything, and `service_role` bypasses RLS
--- entirely — so the scan is readable by the SQL editor and by
--- `npm run photos:orphans`, and by nothing the browser can reach. There is no
--- screen for this yet; when there is one, it gets a policy written for it
--- rather than inheriting a wide one now.
+-- entirely — so the scan is readable from SQL and by nothing the browser can
+-- reach. There is no screen for this yet; when there is one, it gets a policy
+-- written for it rather than inheriting a wide one now.
+
+-- ⚠️ AND THE DEFAULT GRANTS HAD TO BE TAKEN BACK, WHICH THE `enable row level
+-- security` ABOVE DOES NOT DO. Measured after applying: a new table in `public`
+-- inherits Supabase's default privileges, and `authenticated` came out holding
+-- the full SELECT/INSERT/UPDATE/DELETE set. Nothing is readable today because
+-- RLS has no policies — which is exactly what makes it a trap rather than a
+-- harmless leftover: **the day somebody adds a policy for an admin screen, the
+-- ceiling is already wide open and the policy is the only thing deciding.**
+-- Grants are the ceiling, RLS is the gate, and this repo has been bitten by the
+-- two being confused before.
+--
+-- `anon` was already granted nothing — checked with `has_table_privilege`, not
+-- assumed, because `20260814_revoke_anon_table_privileges.sql` only ever touched
+-- the tables that existed then. `service_role` keeps everything: it bypasses RLS
+-- and it is what runs the scheduled scan.
+revoke all on public.photo_orphan_scans from authenticated;
+revoke all on public.photo_orphan_scans from anon;
 
 -- ══ 2. The scan ════════════════════════════════════════════════════════════
 --
