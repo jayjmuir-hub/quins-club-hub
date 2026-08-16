@@ -242,3 +242,68 @@ export async function noticeAudience(id) {
   if (error) throw error
   return data ?? []
 }
+
+// ── Realtime ────────────────────────────────────────────────────────────────
+
+/** Coalescing window, matching REALTIME_DEBOUNCE_MS in src/data/events.js. */
+export const NOTICE_REALTIME_DEBOUNCE_MS = 400
+
+let noticeChannelSeq = 0
+
+/**
+ * Subscribes to realtime changes on `announcements`. Returns an unsubscribe
+ * function — call it from a useEffect cleanup.
+ *
+ * ⚠️ THE PUBLICATION IS THE OTHER HALF, AND WITHOUT IT THIS DOES NOTHING.
+ * Jay, 16 Aug 2026: "notices are not appearing instantly on home screen, they
+ * only show up when i click refresh". `announcements` was not in
+ * `supabase_realtime` — measured, one table in it, `events` — so Postgres
+ * emitted no changes at all. See
+ * db/migrations/20260816_realtime_publication_announcements.sql. This is the
+ * exact bug `subscribeEvents` documents having shipped once already: correct
+ * client code, silent socket, no error anywhere.
+ *
+ * ⚠️ NO `filter`, DELIBERATELY, AND THE OBVIOUS OPTIMISATION IS A BUG. Filtering
+ * on `team_id` would break DELETEs: `announcements` is replica identity DEFAULT,
+ * so a delete payload carries the primary key only, `team_id` is absent, the
+ * filter matches nothing, and a notice taken down stays on everybody else's
+ * screen. RLS already scopes delivery per subscriber, so a filter buys nothing
+ * and costs that.
+ *
+ * ⚠️ THE PAYLOAD IS NOT PASSED ON. Callers get "something changed, re-read",
+ * which is the only thing that stays correct once a burst is coalesced — a
+ * debounced group of changes has no single meaningful payload.
+ *
+ * @param callback   invoked with NO arguments, at most once per debounce window
+ * @param debounceMs injectable purely so tests need not wait in real time
+ */
+export function subscribeNotices(callback, { debounceMs = NOTICE_REALTIME_DEBOUNCE_MS } = {}) {
+  let timer = null
+
+  function onChange() {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = null
+      callback()
+    }, debounceMs)
+  }
+
+  const channel = supabase
+    .channel(`announcements-changes-${++noticeChannelSeq}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, onChange)
+    .subscribe()
+
+  let unsubscribed = false
+  return () => {
+    if (unsubscribed) return
+    unsubscribed = true
+    // ⚠️ CANCEL THE PENDING FIRE, for the reason subscribeEvents gives: a change
+    // arriving just before a screen unmounts would otherwise call back
+    // afterwards, and the callback is a setState into a component that is gone.
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
+    }
+    supabase.removeChannel(channel)
+  }
+}
