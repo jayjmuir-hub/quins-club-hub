@@ -725,6 +725,19 @@ export default function Accounts() {
   // already waved away (status 'dismissed') - including strangers who never
   // asked at all, which is the case the old screen had no answer for.
   const requestByProfile = new Map(requests.map((row) => [row.profile_id, row]))
+
+  // ⚠️ A NOTE FOR THE NEXT PERSON WHO TRIES TO PUT MEMBERSHIP INFO ON THE
+  // WAITING CARD. It cannot appear there, and the attempt was made on
+  // 16 Aug 2026 before the test caught it: `unattached` above subtracts every
+  // profile holding ANY membership row, pending included. So somebody who
+  // self-registered a child is not in "Waiting for access" at all — they are in
+  // Pending approvals, which already names the CHILD, the SQUAD and the adult
+  // who added them.
+  //
+  // The waiting list is the people the app knows nothing else about: a login and
+  // whatever they typed into the request form. That form is therefore the only
+  // place more information can come from, which is why it now requires a role
+  // and a squad (20260816_access_request_require_role.sql).
   const dismissedIds = new Set(
     requests.filter((row) => row.status === 'dismissed').map((row) => row.profile_id),
   )
@@ -1290,6 +1303,26 @@ export default function Accounts() {
                         {/* Their own words. This is the whole reason the
                             request row exists: "Parent of Sam Muir, U10" is
                             what makes an unknown email actionable. */}
+                        {/* ⚠️ WHAT THEY TOLD THE FORM, when they used it. The
+                            role and squad have been required since 16 Aug
+                            2026; the seven requests that predate that carry
+                            neither, which is why both halves are guarded
+                            rather than assumed. */}
+                        {(request?.requested_role || request?.requested_team_id) && (
+                          <span
+                            data-testid="requested-as"
+                            className={`mt-1 block text-[12.5px] font-semibold ${MUTED_ON_PAPER}`}
+                          >
+                            Asked as{' '}
+                            {ROLE_OPTIONS.find((o) => o.value === request.requested_role)?.label ??
+                              request.requested_role ??
+                              'someone'}
+                            {request.requested_team_id
+                              ? ` · ${teamsById.get(request.requested_team_id)?.name ?? 'a squad'}`
+                              : ''}
+                          </span>
+                        )}
+
                         {request?.note && (
                           <span
                             data-testid="request-note"

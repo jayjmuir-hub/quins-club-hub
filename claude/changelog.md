@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 🐞 **NOTICES NOW APPEAR WITHOUT A REFRESH.** Jay: *"notices are not appearing
+- ✨ **A WAITING PERSON'S CARD NOW SAYS WHAT THEY ASKED FOR.** The role and squad
+  the request form collects since this morning are rendered on the card, so
+  "Asked as Coach · U14B" appears instead of a bare address.
+  ⚠️ **AND THE OTHER HALF OF THE PLAN COULD NOT WORK, WHICH THE TEST FOUND.**
+  The intent was also to show a self-registered parent's squads and children,
+  on the strength of production data showing exactly that on their PENDING
+  membership rows. It can never render: `unattached` in Accounts.jsx subtracts
+  every profile holding ANY membership row, pending included — so such a person
+  is not in "Waiting for access" at all. They are in **Pending approvals**, which
+  already names the child, the squad and the adult who added them.
+  ⚠️ **SO THE FEATURE WAS DELETED AND A TOMBSTONE TEST PUT IN ITS PLACE**, with
+  a note at the subtraction. The mistake is easy to repeat: the data genuinely
+  exists, on a person who genuinely is waiting, on a screen that genuinely
+  cannot show them.
+  ⚠️ **A REQUEST MADE BEFORE THIS MORNING RENDERS NOTHING RATHER THAN A BARE
+  "Asked as"** — seven of them predate the columns, and an empty label reads as
+  a rendering fault, which is worse than the silence it replaced.
+
+- `cff3c7e` — 🐞 **NOTICES NOW APPEAR WITHOUT A REFRESH.** Jay: *"notices are not appearing
   instantly on home screen, they only show up when i click refresh… if i don't
   hit refresh they never show up"*. Home fetched once on mount and had no
   subscription; the token added earlier only covered a notice you posted
