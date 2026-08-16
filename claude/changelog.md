@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 🐞 **THE MATCH SHEET WAS UNREADABLE ON A PHONE, AND THE SHARED IMAGE WAS THE
+- `d576bb1` — 🐞 **THE MATCH SHEET WAS UNREADABLE ON A PHONE, AND THE SHARED IMAGE WAS THE
   SAME BUG, NOT A SECOND ONE.** Jay shared a sheet from his phone and it arrived
   mangled — "COMPETITION" printed over the competition's name, HOME TEAM and
   FINAL SCORE wrapped and clipped. Nothing was wrong with the share. The
