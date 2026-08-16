@@ -265,7 +265,7 @@ Two things follow in the same change:
   refuses a blank and permits a contradiction. A wrong-looking date is usually a
   typo and occasionally a genuine dispensation.
 
-## 4 · Invite from a parent row
+## 4 · Invite from a parent row — 🟡 SCHEMA DONE, NO BUTTON YET
 
 An adult on `player_parents` is the club's knowledge of a person written in the
 wrong table. Put an **Invite** button on the row.
@@ -288,7 +288,22 @@ the row, and refuses unless the caller passes `can_edit_team` or
 `is_own_player`. There is then no way to ask it for anything except *parent of
 this child*.
 
-### ⛔ BLOCKER FOUND 16 Aug 2026, BEFORE ANY CODE WAS WRITTEN
+### ✅ RESOLVED 16 Aug 2026 — Jay chose the column. Verified live, rolled back.
+
+| caller | grant_status |
+|---|---|
+| the child's own parent | pending |
+| coach or manager of the squad | active |
+| **medic of the squad** | **pending** |
+| a stranger | refused, 42501 |
+
+⚠️ **THE MEDIC ROW IS THE ONE THAT MATTERS AND IT IS NOT AN EDGE CASE.**  includes medic;  does NOT. So a medic may press the button (they may edit the row) and their invite lands PENDING — a medic must not grant by the back door what they cannot grant by the front one.
+
+⚠️ **THE INVARIANT, AND THE TEST FOR ANY FUTURE ROLE: nobody can mint an invite worth more than they could approve.** That is why the rule keys on  and NOT on "is the caller staff".
+
+Also proved: pressing twice returns the SAME invite rather than a second live token; an address that already has an account is refused (42710) because accept_invite would build a duplicate membership;  is stamped. And on accept_invite itself — an invite with  omitted still lands  (the existing admin form, unchanged), a pending one lands pending and sees **1** player rather than the squad's 4, and the separate  sibling branch carries the status too (2 rows, 0 not-pending).
+
+### ⛔ THE BLOCKER, AS FOUND — kept because it is why the column exists
 
 **`public.accept_invite` does not mention `status` anywhere.** Measured on the
 live database, not read off this repo:
