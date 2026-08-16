@@ -6,6 +6,7 @@ import {
   audienceLabel,
   authorLine,
   canPostNotice,
+  postedLabel,
   currentNotices,
   isExpired,
   MAX_PINNED_ON_HOME,
@@ -218,5 +219,56 @@ describe('seenSummary', () => {
   it('says nothing at all when there is no audience', () => {
     expect(seenSummary({ audience_count: 0, seen_count: 0 })).toBeNull()
     expect(seenSummary(null)).toBeNull()
+  })
+})
+
+describe('postedLabel', () => {
+  const NOW = new Date('2026-08-16T12:00:00.000Z').getTime()
+  const ago = (ms) => new Date(NOW - ms).toISOString()
+  const MIN = 60_000
+  const HOUR = 60 * MIN
+  const DAY = 24 * HOUR
+
+  it('reads as a person posting, not as a timestamp', () => {
+    expect(postedLabel(ago(10 * 1000), NOW)).toBe('Just now')
+    expect(postedLabel(ago(20 * MIN), NOW)).toBe('20 min ago')
+    expect(postedLabel(ago(3 * HOUR), NOW)).toBe('3 hours ago')
+    expect(postedLabel(ago(DAY), NOW)).toBe('Yesterday')
+    expect(postedLabel(ago(3 * DAY), NOW)).toBe('3 days ago')
+  })
+
+  it('singularises one hour', () => {
+    expect(postedLabel(ago(HOUR), NOW)).toBe('1 hour ago')
+  })
+
+  // ⚠️ THE POINT OF THE CUT. "37 days ago" is arithmetic the reader has to
+  // undo; a date is the answer. A week is the horizon a club notice lives on.
+  it('⚠️ switches to an absolute date after a week', () => {
+    expect(postedLabel(ago(8 * DAY), NOW)).toBe('8 Aug')
+    expect(postedLabel(ago(40 * DAY), NOW)).toBe('7 Jul')
+  })
+
+  // ⚠️ CLUB TIME. Dubai is UTC+4, so 20:30Z on the 5th is 00:30 on the 6th at
+  // the club — they posted it on the 6th, and that is what a parent must read
+  // wherever they happen to be. A UTC formatter prints "5 Aug".
+  //
+  // ⚠️ AND IT HAS TO BE MORE THAN A WEEK OLD TO TEST THIS AT ALL. The first
+  // version of this case used a date four days back and asserted "12 Aug"; it
+  // failed with "4 days ago", which was the FUNCTION being right and the test
+  // being wrong. Inside the week there is no absolute date to check the zone of.
+  it('⚠️ formats the absolute date in club time, not in whatever zone reads it', () => {
+    expect(postedLabel('2026-08-05T20:30:00.000Z', NOW)).toBe('6 Aug')
+  })
+
+  // Clock skew between a phone and the database is real and small; "in -3
+  // minutes" is never the honest rendering of it.
+  it('⚠️ a future timestamp reads as Just now, never as negative time', () => {
+    expect(postedLabel(new Date(NOW + 5 * MIN).toISOString(), NOW)).toBe('Just now')
+  })
+
+  it('is empty rather than "Invalid Date" for missing or junk input', () => {
+    expect(postedLabel(null, NOW)).toBe('')
+    expect(postedLabel(undefined, NOW)).toBe('')
+    expect(postedLabel('not a date', NOW)).toBe('')
   })
 })

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import PostNoticeAction from '../components/PostNoticeAction.jsx'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
@@ -406,6 +407,12 @@ export default function More() {
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
           Everything the club and your squads have posted.
         </p>
+        {/* ⚠️ POSTING HAPPENS HERE, NOT BEHIND THE LINK ABOVE — Jay, 16 Aug
+            2026. A coach reaching for the noticeboard from a pitch wanted to
+            WRITE one, and the route to that was More → Notices → wait → find a
+            button. PostNoticeAction renders nothing at all for somebody who may
+            not post, so this card is unchanged for a parent. */}
+        <PostNoticeAction className="mt-3" full />
       </Card>
 
       {/* ⚠️ EVERY MEMBER SEES THIS, and that is the ruling rather than an

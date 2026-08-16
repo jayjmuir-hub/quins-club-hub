@@ -31,6 +31,7 @@ import PhotoPositioner, {
   PhotoDropZone,
   DEFAULT_FOCUS,
 } from '../src/components/PhotoPositioner.jsx'
+import NoticeRowScenario from './notice-row.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
@@ -1048,6 +1049,12 @@ const scenarios = {
   // collapses to the same answer — the drag maths is exactly the part the unit
   // tests cannot reach. Drag it here instead.
   'photo-positioner': () => <PhotoPositionerScenario />,
+
+  // ⚠️ THE /notices SCREEN ITSELF IS STILL NOT HERE — it reads three tables.
+  // This is its CARD, extracted to src/components/NoticeRow.jsx on 16 Aug 2026
+  // precisely so the thing Jay looks at can be looked at. See the `notices`
+  // scenario above for the Home card, which is a different component.
+  'notice-row': () => <NoticeRowScenario />,
 }
 
 const params = new URLSearchParams(window.location.search)
