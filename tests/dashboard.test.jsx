@@ -89,16 +89,26 @@ const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
 const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
 const TEAMS = [TEAM_FIRST_XV, TEAM_U10] // deliberately unsorted; visibleTeams sorts
 
+// ⚠️ `status: 'active'` ON EVERY ROW, AND IT WAS MISSING UNTIL 16 Aug 2026.
+// These fixtures were green for the wrong reason: `canPostNotice` requires an
+// active status (it mirrors private.can_edit_team), so a coach without one
+// silently could not post — which meant the Quick actions assertions below
+// passed while never exercising the button that was added to that card. This is
+// the THIRD place the same gap turned up in one day, after the "view as"
+// synthetic row and the harness fixtures.
+//
+// A fixture that does not match the shape of a real row does not simplify a
+// test; it quietly narrows what the test covers.
 const COACH = [
-  { id: 'm1', role: 'coach', team_id: 'team-u10' },
-  { id: 'm2', role: 'coach', team_id: 'team-1xv' },
+  { id: 'm1', status: 'active', role: 'coach', team_id: 'team-u10' },
+  { id: 'm2', status: 'active', role: 'coach', team_id: 'team-1xv' },
 ]
-const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
-const ADMIN = [{ id: 'm0', role: 'admin', team_id: null }]
-const PLAYER = [{ id: 'm5', role: 'player', team_id: 'team-u10', player_id: 'p1' }]
+const PARENT = [{ id: 'm3', status: 'active', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
+const ADMIN = [{ id: 'm0', status: 'active', role: 'admin', team_id: null }]
+const PLAYER = [{ id: 'm5', status: 'active', role: 'player', team_id: 'team-u10', player_id: 'p1' }]
 // A coach row with no resolvable team. canEditTeam refuses it deliberately;
 // a raw `role === 'coach'` check would grant on it.
-const TEAMLESS_COACH = [{ id: 'm6', role: 'coach', team_id: null }]
+const TEAMLESS_COACH = [{ id: 'm6', status: 'active', role: 'coach', team_id: null }]
 
 // 2026-07-24T13:00Z = 17:00 Abu Dhabi = 4 days 8 hours after NOW.
 const NEXT_MATCH = {
@@ -829,20 +839,25 @@ describe('Dashboard — quick actions', () => {
       .concat(within(screen.getByTestId('quick-actions')).queryAllByRole('button'))
       .map((node) => node.textContent.trim())
 
-  it('offers a coach navigation only — no add actions until Tasks 14/15 build them', async () => {
+  // ⚠️ THE HELPER ABOVE RETURNS LINKS THEN BUTTONS, NOT DOM ORDER. "Post a
+  // notice" renders FIRST in the card and last in this list, because it is the
+  // only <button> among two <a>s. Asserting the helper's order rather than the
+  // card's is what this file has always done; the card's own order is pinned in
+  // tests/post-notice-action.test.jsx instead.
+  it('offers a coach the post action and the two navigations', async () => {
     renderDashboard()
     await screen.findByTestId('stat-players')
 
-    expect(actionNames()).toEqual(['View full schedule', 'View team list'])
+    expect(actionNames()).toEqual(['View full schedule', 'View roster', 'Post a notice'])
   })
 
-  it('offers an admin the same, and no read-only explanation', async () => {
+  it('offers an admin the same three, and no read-only explanation', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(ADMIN))
 
     renderDashboard()
     await screen.findByTestId('stat-players')
 
-    expect(actionNames()).toEqual(['View full schedule', 'View team list'])
+    expect(actionNames()).toEqual(['View full schedule', 'View roster', 'Post a notice'])
     expect(screen.queryByText(/you're signed in as a/i)).not.toBeInTheDocument()
   })
 
@@ -857,7 +872,7 @@ describe('Dashboard — quick actions', () => {
     // they actually assert on is the right signal.
     await screen.findByTestId('quick-actions')
 
-    expect(actionNames()).toEqual(['View schedule', 'View team list'])
+    expect(actionNames()).toEqual(['View schedule', 'View roster'])
     expect(screen.getByText(/signed in as a parent/i)).toBeInTheDocument()
   })
 
@@ -869,7 +884,7 @@ describe('Dashboard — quick actions', () => {
     renderDashboard()
     await screen.findByTestId('quick-actions')
 
-    expect(actionNames()).toEqual(['View schedule', 'View team list'])
+    expect(actionNames()).toEqual(['View schedule', 'View roster'])
     expect(screen.getByText(/signed in as a player/i)).toBeInTheDocument()
     expect(screen.queryByText(/signed in as a parent/i)).not.toBeInTheDocument()
   })
@@ -884,18 +899,18 @@ describe('Dashboard — quick actions', () => {
 
     // canEditTeam refuses a null team_id, so this coach gets the read-only
     // card rather than an action pointing at a form with no squad to pick.
-    expect(actionNames()).toEqual(['View schedule', 'View team list'])
+    expect(actionNames()).toEqual(['View schedule', 'View roster'])
     expect(screen.getByText(/signed in as a coach/i)).toBeInTheDocument()
   })
 
-  it('links to the full schedule and the team list', async () => {
+  it('links to the full schedule and the roster', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
 
     renderDashboard()
     await screen.findByTestId('quick-actions')
 
     expect(screen.getByRole('link', { name: /schedule/i })).toHaveAttribute('href', '/schedule')
-    expect(screen.getByRole('link', { name: /team list/i })).toHaveAttribute('href', '/roster')
+    expect(screen.getByRole('link', { name: /roster/i })).toHaveAttribute('href', '/roster')
   })
 })
 

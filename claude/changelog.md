@@ -10,7 +10,39 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 💄 **THE POST ACTION MOVED INTO QUICK ACTIONS, AND HOME NOW DRAWS THE SAME
+- 🗄️ **THE SQUADS LOST THEIR " Contact" SUFFIX — a live data change, applied to
+  production.** Jay: *"we need to remove the word contact from age groups that
+  have it, its implied already"*. Ten of fifteen squads carried it; U6-U8 Tag and
+  the two QR squads are untouched, because Tag is the distinction the word was
+  ever making. `db/migrations/20260816_squad_names_drop_contact.sql`.
+  ⚠️ **DATA, NOT DISPLAY, AND THAT WAS THE CHOICE.** `teams.name` is the single
+  source — `information_schema` shows no other text column in `public` holding a
+  squad name. Stripping it in the UI would have left the database saying one
+  thing and every human seeing another.
+  ⚠️ **EVERY CLASSIFIER WAS PROVED UNCHANGED BEFORE IT RAN**, not reasoned about:
+  all ten squad-name predicates in `src/lib` run against all fifteen names, before
+  and after. Identical. They read the leading `U`+digits for the band and the
+  letter TOUCHING those digits for gender — never the words "Contact" or "Tag".
+  The only differences were the squad name inside user-facing message text, which
+  is the point.
+  ⚠️ **ANCHORED `\s+Contact$`, NEVER `replace(name,'Contact','')`**, and the
+  migration raises if any row is left carrying the suffix.
+
+- 💄 **"View team list" is now "View roster" on Home**, and it is sentence case
+  because that is the app's convention — measured, not assumed: the only Title
+  Case strings in `src/` are proper nouns ("Club Youth Manager", "Google
+  Calendar", "Quins Club Hub"). Jay asked whether the lowercase was deliberate;
+  it is, and he kept it.
+
+- 🧪 **THE DASHBOARD TEST FIXTURES CARRIED NO `status`, SO THEY WERE GREEN FOR
+  THE WRONG REASON.** `canPostNotice` mirrors `private.can_edit_team` and needs
+  an active status, so every Quick actions assertion passed while never
+  exercising the post button that card had just gained. **Third place the same
+  gap appeared in one day**, after the "view as" synthetic row and the harness
+  fixtures. A fixture that does not match a real row does not simplify a test; it
+  quietly narrows it.
+
+- `55a7a00` — 💄 **THE POST ACTION MOVED INTO QUICK ACTIONS, AND HOME NOW DRAWS THE SAME
   NOTICE CARD AS /notices.** Three corrections to the same afternoon's work,
   all reported by Jay against the live site.
   ⚠️ **The first placement sat between the noticeboard and the next fixture** —
