@@ -574,11 +574,11 @@ export async function setAdminRights(membershipId, isSuper, rights) {
   return { id: membershipId, is_super: Boolean(isSuper), admin_rights: rights ?? [] }
 }
 
-// ⚠️ THE SIGN-IN GATE'S TWO WRITES (16 Aug 2026). tests/harness-stubs.test.js
+// ⚠️ THE SIGN-IN GATE'S WRITES (16 Aug 2026). tests/harness-stubs.test.js
 // demanded these the moment src/data/members.js gained them — the sixth time
-// that guard has earned its keep. The harness never writes, so both simply echo
-// a plausible row back: a stub that threw here would make NamePrompt look broken
-// in every scenario that renders AppShell.
+// that guard has earned its keep. The harness never writes, so each simply
+// echoes a plausible row back: a stub that threw here would make NamePrompt look
+// broken in every scenario that renders AppShell.
 export async function confirmMyDetails({ profileId, firstName, lastName, phone } = {}) {
   return {
     id: profileId,
@@ -593,4 +593,24 @@ export async function confirmMyDetails({ profileId, firstName, lastName, phone }
 
 export async function confirmNoPlayer({ profileId } = {}) {
   return { id: profileId, no_player_confirmed_at: '2026-08-16T12:00:00.000Z' }
+}
+
+export async function confirmNoRole({ profileId } = {}) {
+  return { id: profileId, no_role_confirmed_at: '2026-08-16T12:00:00.000Z' }
+}
+
+// The fourth gate step's write. ⚠️ Echoes a PENDING row, because that is what
+// the real RPC creates and the distinction is the whole safety property — a
+// stub returning 'active' would make a harness scenario show squad data the
+// live app would refuse.
+export async function requestStaffRole(teamId, role) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'request-staff-role', teamId, role })
+  return {
+    id: 'stub-staff-request',
+    team_id: teamId,
+    role,
+    status: 'pending',
+    player_id: null,
+  }
 }

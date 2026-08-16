@@ -168,24 +168,84 @@ async function sendMail(bcc: string[], subject: string, html: string, text: stri
  * !! AND NO "the button below": there is no button in a plain-text part, and an
  * instruction pointing at something not present reads as a broken email.
  */
-function plainText(
-  playerName: string,
-  teamName: string,
-  parentName: string,
-  parentEmail: string,
-): string {
+/**
+ * !! TWO KINDS OF PENDING ROW REACH THIS FUNCTION, AND UNTIL 16 Aug 2026 IT
+ * ASSUMED THERE WAS ONE.
+ *
+ *   a parent registering a child   -> player_id set, role 'parent'
+ *   somebody claiming a staff job  -> player_id NULL, role coach/manager/medic
+ *
+ * The second arrived with public.request_staff_role (the sign-in gate's "do you
+ * do anything else at the club?" step). Both fire the same
+ * notify_pending_membership trigger, and with one wording the staff case read
+ * "Someone has registered A new player in U12 Mixed" — a sentence in which every
+ * single fact is wrong.
+ *
+ * `playerName` null is what distinguishes them, NOT the role: the role is what
+ * is being CLAIMED and is attacker-controlled in the sense that matters here
+ * (the requester chooses it), whereas the presence of a player row is a fact
+ * about what was actually created.
+ */
+type Ask = {
+  parentName: string
+  teamName: string
+  playerName: string | null
+  roleLabel: string | null
+  parentEmail: string
+}
+
+/**
+ * How each claimable role reads in a sentence.
+ *
+ * !! ONLY THE THREE REQUESTABLE ONES. 'admin' is deliberately absent — it is
+ * never requestable (public.request_staff_role refuses it, and so does the
+ * CHECK on access_requests), so an entry here would describe a row this
+ * function can never receive. 'parent' and 'player' are absent because those
+ * rows always carry a player and take the other branch.
+ *
+ * !! AND AN UNKNOWN ROLE FALLS BACK TO "volunteer" RATHER THAN PRINTING THE RAW
+ * VALUE. The role is chosen by the person asking; echoing it verbatim into an
+ * email would let a request put arbitrary text in front of four volunteers.
+ */
+const ROLE_LABELS: Record<string, string> = {
+  coach: 'coach',
+  manager: 'team manager',
+  medic: 'medic or physio',
+}
+
+/** The one sentence that differs, built once so both renderings agree. */
+function claimSentence(ask: Ask): string {
+  return ask.playerName
+    ? `${ask.parentName} has registered ${ask.playerName} in ${ask.teamName}.`
+    : `${ask.parentName} says they are a ${ask.roleLabel ?? 'volunteer'} for ${ask.teamName}.`
+}
+
+/**
+ * What the person can and cannot see meanwhile. Also differs — a staff claimant
+ * has no child to be shown, so the parent wording would be promising a
+ * volunteer something that does not exist for them.
+ */
+function caveatSentence(ask: Ask): string {
+  return ask.playerName
+    ? "Until someone approves them they can see their own child and the squad's " +
+        "fixtures - enough to set availability - and nothing else. Not the squad " +
+        "roster, not other families' contact details."
+    : "Until someone approves them they can see the squad's fixtures and nothing " +
+        "else. Not the squad roster, not the players, not any family's contact " +
+        'details. Approve only if you know who this is.'
+}
+
+function plainText(ask: Ask): string {
   return [
     'ABU DHABI HARLEQUINS',
     '',
     'Someone is waiting to be approved',
     '',
-    `${parentName} has registered ${playerName} in ${teamName}.`,
+    claimSentence(ask),
     '',
-    "Until someone approves them they can see their own child and the squad's",
-    'fixtures - enough to set availability - and nothing else. Not the squad',
-    "roster, not other families' contact details.",
+    caveatSentence(ask),
     '',
-    `Registered with ${parentEmail}`,
+    `Asked from ${ask.parentEmail}`,
     '',
     'Review it in the Club Hub:',
     `${APP_URL}/approvals`,
@@ -195,7 +255,7 @@ function plainText(
   ].join('\n')
 }
 
-function template(playerName: string, teamName: string, parentName: string, parentEmail: string): string {
+function template(ask: Ask): string {
   return `<!doctype html>
 <html>
   <body style="margin:0;padding:24px;background:#f5f4f3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;">
@@ -203,16 +263,13 @@ function template(playerName: string, teamName: string, parentName: string, pare
       <p style="margin:0 0 4px;font-size:12px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#8e1526;">Abu Dhabi Harlequins</p>
       <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">Someone is waiting to be approved</h1>
       <p style="margin:0 0 16px;font-size:15px;line-height:1.55;">
-        <strong>${escapeHtml(parentName)}</strong> has registered
-        <strong>${escapeHtml(playerName)}</strong> in <strong>${escapeHtml(teamName)}</strong>.
+        ${escapeHtml(claimSentence(ask))}
       </p>
       <p style="margin:0 0 20px;font-size:14px;line-height:1.55;color:#5c5854;">
-        Until someone approves them they can see their own child and the squad's
-        fixtures - enough to set availability - and nothing else. Not the squad
-        roster, not other families' contact details.
+        ${escapeHtml(caveatSentence(ask))}
       </p>
       <p style="margin:0 0 20px;font-size:14px;line-height:1.55;color:#5c5854;">
-        Registered with ${escapeHtml(parentEmail)}
+        Asked from ${escapeHtml(ask.parentEmail)}
       </p>
       <a href="${escapeHtml(APP_URL)}/approvals"
          style="display:inline-block;background:#8e1526;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 20px;border-radius:11px;">
@@ -256,7 +313,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
     //    request body - see the security note at the top.
     const rows = await db(
       `memberships?id=eq.${encodeURIComponent(membershipId)}` +
-        '&select=id,status,club_id,team_id,profiles(full_name,email),players(full_name),teams(name)',
+        // !! `role` ADDED 16 Aug 2026. Without it this function could not tell a
+        //    parent registering a child from somebody claiming a staff job, and
+        //    named the wrong thing in the one sentence that matters.
+        '&select=id,status,role,club_id,team_id,profiles(full_name,email),players(full_name),teams(name)',
     )
     const membership = rows[0]
     if (!membership) {
@@ -305,16 +365,26 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     // One set of values, both renderings - so the plain-text part, which almost
     // nobody looks at, cannot drift from the HTML.
-    const playerName = membership.players?.full_name ?? 'A new player'
+    //
+    // !! `playerName` IS NULL RATHER THAN A FALLBACK STRING WHEN THERE IS NO
+    //    PLAYER, and the difference is the whole fix. The old default was
+    //    'A new player', which turned a staff claim into a confident sentence
+    //    about a child who does not exist.
+    const playerName = membership.players?.full_name ?? null
     const teamName = membership.teams?.name ?? 'their age group'
     const parentName = membership.profiles?.full_name?.trim() || 'Someone'
     const parentEmail = membership.profiles?.email ?? 'an address we could not read'
+    const roleLabel = ROLE_LABELS[membership.role as string] ?? null
+
+    const ask: Ask = { parentName, teamName, playerName, roleLabel, parentEmail }
 
     await sendMail(
       recipients,
-      `Approval needed: ${playerName} in ${teamName}`,
-      template(playerName, teamName, parentName, parentEmail),
-      plainText(playerName, teamName, parentName, parentEmail),
+      playerName
+        ? `Approval needed: ${playerName} in ${teamName}`
+        : `Approval needed: ${parentName} says they are a ${roleLabel ?? 'volunteer'} for ${teamName}`,
+      template(ask),
+      plainText(ask),
     )
 
     return new Response(JSON.stringify({ sent: recipients.length }), { status: 200 })

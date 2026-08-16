@@ -201,6 +201,18 @@ CREATE TABLE public.profiles (
   -- !! ⚠️ NEEDS ITS OWN COLUMN GRANT — see db/schema/grants.sql. authenticated
   -- !! holds UPDATE on named columns only.
   no_player_confirmed_at timestamptz,
+  -- !! Added 16 Aug 2026, hours after the column above and as its exact mirror:
+  -- !! "I don't do a job at the club", for the gate's fourth step. Sign-up forks
+  -- !! two ways and each door loses the other half of who somebody is — the
+  -- !! column above covers the staff door, this one covers the parent door,
+  -- !! which had no mirror and produced a real coach filed as a parent.
+  -- !! ⚠️ ITS OWN COLUMN GRANT, same trap, and the failure is INVISIBLE: without
+  -- !! it the write is refused and the gate simply reopens next sign-in, which
+  -- !! looks identical to never having been answered.
+  -- !! ⚠️ NOT the counterpart of "yes" — a person who DOES do a job says so with
+  -- !! a membership row (public.request_staff_role, pending). Only the "no" lives
+  -- !! here, because only the "no" has nowhere else to be recorded.
+  no_role_confirmed_at timestamptz,
   name_confirmed_at timestamptz,
   -- Added 2026-08-08 (profile_phone_and_column_grants). Column comment as
   -- stored: "The signed-in person's own number, stored E.164. Distinct from

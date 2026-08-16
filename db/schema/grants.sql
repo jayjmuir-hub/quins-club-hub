@@ -241,6 +241,7 @@
 --   profiles.name_confirmed_at  authenticated   UPDATE
 --   profiles.phone              authenticated   UPDATE
 --   profiles.no_player_confirmed_at  authenticated  SELECT, UPDATE  ← 16 Aug 2026
+--   profiles.no_role_confirmed_at    authenticated  SELECT, UPDATE  ← 16 Aug 2026
 --
 --   memberships.profile_id      authenticated   UPDATE
 --   memberships.club_id         authenticated   UPDATE
@@ -257,6 +258,14 @@
 -- above it: those are covered by the table-level SELECT `authenticated` still
 -- holds, and so is this one — the explicit grant is belt-and-braces against a
 -- future revoke, and costs nothing.
+--
+-- ⚠️ `profiles.no_role_confirmed_at` IS THE MIRROR OF IT, added hours later the
+-- same day (20260816_profile_no_role_confirmed.sql) for the fourth step of the
+-- same gate — "do you do anything else at the club?". Identical shape, identical
+-- trap: without the UPDATE grant the answer is refused, nothing surfaces, and
+-- the person is asked again at every sign-in forever. ⚠️ **A REOPENED GATE LOOKS
+-- EXACTLY LIKE A GATE THAT WAS NEVER ANSWERED**, which is what makes this
+-- particular missing grant invisible rather than merely broken.
 --
 -- ⚠️ `memberships.title` IS WHY THIS SECTION IS NOT BOOKKEEPING. It is the first
 -- column added to `memberships` since the table-level UPDATE was revoked, and

@@ -3,20 +3,42 @@ import { useNavigate } from 'react-router-dom'
 import Sheet from './Sheet.jsx'
 import Button from './Button.jsx'
 import PhoneInput from './PhoneInput.jsx'
-import { confirmMyDetails, confirmNoPlayer, getMyProfile } from '../data/members.js'
+import {
+  confirmMyDetails,
+  confirmNoPlayer,
+  confirmNoRole,
+  getMyProfile,
+  requestStaffRole,
+} from '../data/members.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 import { primeMyProfileCache } from '../lib/useMyProfile.js'
 
-// The sign-in gate: who you are, how to reach you, and whether you have a
-// player at the club — asked once each, before the app is usable.
+// The sign-in gate: who you are, how to reach you, whether you have a player at
+// the club, and whether you do a job here — asked once each, before the app is
+// usable.
 //
 // ⚠️ THE FILE IS STILL CALLED NamePrompt AND THAT IS NOW NARROWER THAN WHAT IT
-// DOES (16 Aug 2026). It gates three things. The name is deliberately kept
+// DOES (16 Aug 2026). It gates four things. The name is deliberately kept
 // because a dozen comments across src/ refer to this component by it and a
 // rename that leaves those stale trades one inaccuracy for twelve; the rename
 // is a sweep worth doing on its own, not as a side effect of adding a field.
+//
+// ⚠️ THE FOURTH STEP IS THE MIRROR OF THE THIRD, AND THE ASYMMETRY IT CLOSES IS
+// WHY IT EXISTS. Sign-up forks two ways in AppShell — "Add your player", or
+// "I'm not adding a player" — and whichever door somebody takes, the other half
+// of who they are is never asked for again. The player step (added earlier the
+// same day) covers the staff door. Nothing covered the parent door, so a coach
+// who registered his son was filed as a parent and stayed one. Jay, 16 Aug 2026,
+// having found a real one: "he got through without asking to be designated a
+// coach".
+//
+// ⚠️ AND THE SIGN-UP SCREEN COULD NOT HAVE FIXED IT. AppShell mounts
+// AddYourPlayer only while `memberships.length === 0`, so once a first child is
+// registered the question can never be put there again — which also means every
+// coach already miscategorised today is unreachable from there. They all meet
+// this gate.
 //
 // ⚠️ WHY PHONE WAS ADDED. Jay, 16 Aug 2026: "we need to have a pop up that
 // forces people to fill out their full name and phone number later on when they
@@ -76,13 +98,22 @@ const INPUT =
 export default function NamePrompt() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { realMemberships, loading: membershipsLoading } = useMemberships()
+  const { realMemberships, teams, loading: membershipsLoading } = useMemberships()
   const userId = user?.id ?? null
 
   const [profileId, setProfileId] = useState(null)
-  // 'details' | 'player' | null. Null is the closed gate.
+  // 'details' | 'player' | 'role' | null. Null is the closed gate.
   const [step, setStep] = useState(null)
   const [needPhone, setNeedPhone] = useState(false)
+  // ⚠️ WHETHER THE ROLE STEP IS STILL DUE, HELD SEPARATELY FROM `step`. The
+  // details and player steps both have to decide what comes next, and asking
+  // "was the role question needed?" at that moment means re-reading a profile
+  // row we already have. Captured once when the gate opens instead.
+  const [needRole, setNeedRole] = useState(false)
+  // null until they say they do a job here; then the two selects appear.
+  const [claimingRole, setClaimingRole] = useState(false)
+  const [staffRole, setStaffRole] = useState('')
+  const [staffTeamId, setStaffTeamId] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [phoneCountry, setPhoneCountry] = useState(() => splitPhone('').country)
@@ -122,6 +153,19 @@ export default function NamePrompt() {
   const playerOnly =
     (realMemberships ?? []).length > 0 &&
     (realMemberships ?? []).every((m) => m.role === 'player')
+  // ⚠️ 'admin' IS IN THIS LIST AND THE OTHER THREE ARE THE REQUESTABLE ONES.
+  // A club admin plainly does a job here, and asking them would be the app
+  // interrogating somebody about a fact it is holding. 'admin' is deliberately
+  // NOT requestable (see request_staff_role and REQUESTABLE_ROLES) — it is only
+  // ever granted by an existing admin — but it absolutely counts as an answer.
+  //
+  // ⚠️ ANY STATUS COUNTS, PENDING INCLUDED. Somebody who asked yesterday and is
+  // still waiting has already told us; asking again tomorrow would read as the
+  // app having lost their answer, and a second identical request is refused by
+  // memberships_unique_grant anyway.
+  const hasStaffRole = (realMemberships ?? []).some((m) =>
+    ['coach', 'manager', 'medic', 'admin'].includes(m.role),
+  )
 
   useEffect(() => {
     if (!userId || settled.current) return undefined
@@ -143,8 +187,13 @@ export default function NamePrompt() {
         const phoneNeeded =
           !playerOnly && !String(profile.phone ?? '').trim()
         const playerNeeded = !playerOnly && !hasPlayer && !profile.no_player_confirmed_at
+        // ⚠️ THE MIRROR OF THE LINE ABOVE, AND IT READS THE SAME WAY. Exempt for
+        // a player-only account for the same reason it is exempt from the phone
+        // question — it is a child, and a gate that asks a twelve-year-old which
+        // squad they coach is the app not knowing who it is talking to.
+        const roleNeeded = !playerOnly && !hasStaffRole && !profile.no_role_confirmed_at
 
-        if (!nameNeeded && !phoneNeeded && !playerNeeded) return
+        if (!nameNeeded && !phoneNeeded && !playerNeeded && !roleNeeded) return
 
         setProfileId(profile.id)
         // Prefill with whatever we already hold, so a Google user confirms
@@ -155,12 +204,18 @@ export default function NamePrompt() {
         setPhoneCountry(split.country)
         setPhoneNational(split.national)
         setNeedPhone(phoneNeeded)
+        setNeedRole(roleNeeded)
 
         // ⚠️ DETAILS FIRST, ALWAYS, EVEN WHEN ONLY THE PLAYER STEP IS DUE. The
         // details sheet is skipped outright in that case (below); ordering it
         // first keeps "who are you" ahead of "what do you have", which is the
         // order the answers make sense in.
-        setStep(nameNeeded || phoneNeeded ? 'details' : 'player')
+        // ⚠️ THE THREE-WAY IS AN ORDERED FALL-THROUGH, NOT A CHOICE. Each step
+        // is skipped only when it is not due, and the LAST one is reachable on
+        // its own — which is the common case for this addition: every existing
+        // parent has a name, a phone and a child, and needs only the role
+        // question.
+        setStep(nameNeeded || phoneNeeded ? 'details' : playerNeeded ? 'player' : 'role')
       })
       .catch(() => {
         // Deliberately silent, and deliberately leaves the gate CLOSED.
@@ -169,7 +224,7 @@ export default function NamePrompt() {
     return () => {
       active = false
     }
-  }, [userId, membershipsLoading, hasPlayer, playerOnly])
+  }, [userId, membershipsLoading, hasPlayer, playerOnly, hasStaffRole])
 
   function handleSubmit(domEvent) {
     domEvent.preventDefault()
@@ -224,6 +279,16 @@ export default function NamePrompt() {
           setStep('player')
           return
         }
+        // ⚠️ `needRole`, NOT `updated.no_role_confirmed_at`. The line above can
+        // read the fresh row because confirmMyDetails selects that column; it
+        // does not select this one, and adding it would make a name save depend
+        // on a column belonging to a different question. The captured value is
+        // correct in any case — nothing between the gate opening and here can
+        // have answered the role question.
+        if (needRole) {
+          setStep('role')
+          return
+        }
         settled.current = true
         setStep(null)
       })
@@ -240,6 +305,69 @@ export default function NamePrompt() {
     setSaving(true)
     setError(null)
     confirmNoPlayer({ profileId })
+      .then(() => {
+        // ⚠️ STRAIGHT ON TO THE ROLE QUESTION, AND THIS IS THE MOST USEFUL
+        // MOMENT IT IS EVER ASKED. Somebody who has just said they have no child
+        // at the club is, almost by definition, here for a job — a coach, a
+        // manager, a volunteer. Closing the gate here would file the person the
+        // club knows least about as nothing at all.
+        if (needRole) {
+          setStep('role')
+          return
+        }
+        settled.current = true
+        setStep(null)
+      })
+      .catch((err) => setError(err))
+      .finally(() => setSaving(false))
+  }
+
+  // "No, I don't do a job here." Recorded once, exactly like handleNoPlayer —
+  // see confirmNoRole's header for why the answer is stored rather than the
+  // question being re-asked at every sign-in.
+  function handleNoRole() {
+    if (saving) return
+    setSaving(true)
+    setError(null)
+    confirmNoRole({ profileId })
+      .then(() => {
+        settled.current = true
+        setStep(null)
+      })
+      .catch((err) => setError(err))
+      .finally(() => setSaving(false))
+  }
+
+  /**
+   * "Yes — I coach / manage / medic this squad."
+   *
+   * ⚠️ IT ASKS, IT DOES NOT GRANT. request_staff_role writes a PENDING
+   * membership, which attaches this person to the squad's fixtures and to
+   * nothing else. The sheet's copy says so, because somebody who taps this and
+   * then finds the squad roster empty will otherwise assume the app is broken.
+   *
+   * ⚠️ NOTHING IS STAMPED ON THE PROFILE HERE. `no_role_confirmed_at` means "I
+   * told you I have no job", and this person told us the opposite — the
+   * membership row IS the answer, and `hasStaffRole` reads it on the next load
+   * whatever its status. Writing both would record two contradictory answers to
+   * one question.
+   */
+  function handleClaimRole(domEvent) {
+    domEvent.preventDefault()
+    if (saving) return
+
+    if (!staffRole) {
+      setError(new Error('Choose whether you coach, manage or medic.'))
+      return
+    }
+    if (!staffTeamId) {
+      setError(new Error('Choose which squad.'))
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    requestStaffRole(staffTeamId, staffRole)
       .then(() => {
         settled.current = true
         setStep(null)
@@ -301,6 +429,161 @@ export default function NamePrompt() {
         >
           {saving ? 'Saving…' : "I don't have a player at the club"}
         </Button>
+      </Sheet>
+    )
+  }
+
+  if (step === 'role') {
+    // sort_order then name — the ordering every other age-group list in the app
+    // uses (Accounts, InviteForm, AccessBuilder, PlayerRegistrationForm). A
+    // coach scanning for their squad should find it where they expect it.
+    const sortedTeams = [...(teams ?? [])].sort((a, b) => {
+      const orderDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      if (orderDiff !== 0) return orderDiff
+      return String(a.name).localeCompare(String(b.name))
+    })
+
+    return (
+      <Sheet open dismissible={false} onClose={() => {}} title="One more thing">
+        <form onSubmit={handleClaimRole} noValidate>
+          <p className="mb-3.5 text-sm leading-relaxed text-ink-muted">
+            {hasPlayer
+              ? 'Do you do anything else at the club besides being a parent? Plenty of ' +
+                'coaches and managers have children here too, and we only have you down ' +
+                'as a parent.'
+              : 'What do you do at the club? We only ask this once.'}
+          </p>
+
+          {error && (
+            <p
+              role="alert"
+              className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+            >
+              {error.message || "We couldn't save that. Try again."}
+            </p>
+          )}
+
+          {/* ⚠️ THE SELECTS APPEAR ONLY AFTER THEY SAY YES, and that ordering is
+              deliberate. Showing two empty dropdowns to a parent who does no job
+              here asks them to work out that the answer is to ignore both and
+              press the grey button underneath. */}
+          {!claimingRole ? (
+            <>
+              <Button
+                size="lg"
+                full
+                disabled={saving}
+                onClick={() => {
+                  setClaimingRole(true)
+                  setError(null)
+                }}
+                data-testid="claim-role"
+              >
+                Yes — I coach, manage or medic a squad
+              </Button>
+              {/* ⚠️ SECONDARY, NOT EQUAL — the same weighting as the player step.
+                  The club would rather someone told it about a job than took the
+                  quicker way out of a sheet. */}
+              <Button
+                variant="secondary"
+                size="lg"
+                full
+                className="mt-2.5"
+                disabled={saving}
+                onClick={handleNoRole}
+                data-testid="no-role"
+              >
+                {saving ? 'Saving…' : hasPlayer ? "No, I'm just a parent" : 'No, nothing yet'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="mb-3.5">
+                <label className={LABEL} htmlFor="name-prompt-staff-role">
+                  What do you do
+                </label>
+                <select
+                  id="name-prompt-staff-role"
+                  value={staffRole}
+                  disabled={saving}
+                  onChange={(domEvent) => {
+                    setStaffRole(domEvent.target.value)
+                    if (error) setError(null)
+                  }}
+                  className={INPUT}
+                >
+                  {/* No preselected role, for the reason RequestAccess states:
+                      a default that is right most of the time means everyone who
+                      does not read the control files as the default. */}
+                  <option value="">Choose one…</option>
+                  <option value="coach">Coach</option>
+                  <option value="manager">Team manager</option>
+                  <option value="medic">Medic or physio</option>
+                </select>
+              </div>
+
+              <div className="mb-3.5">
+                <label className={LABEL} htmlFor="name-prompt-staff-team">
+                  Which squad
+                </label>
+                <select
+                  id="name-prompt-staff-team"
+                  value={staffTeamId}
+                  disabled={saving || sortedTeams.length === 0}
+                  onChange={(domEvent) => {
+                    setStaffTeamId(domEvent.target.value)
+                    if (error) setError(null)
+                  }}
+                  className={INPUT}
+                >
+                  <option value="">
+                    {sortedTeams.length === 0 ? 'Loading squads…' : 'Choose one…'}
+                  </option>
+                  {sortedTeams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+                {/* ⚠️ SAYS WHAT TO DO ABOUT THE LIMIT RATHER THAN HIDING IT —
+                    the same wording problem RequestAccess's squad picker has.
+                    One row holds one squad, and a coach across two age groups
+                    has a real answer to give. */}
+                <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+                  More than one squad? Add the first here — you can ask about the rest
+                  once a coach or admin has approved this one.
+                </p>
+              </div>
+
+              {/* ⚠️ SAID BEFORE THEY PRESS IT, NOT AFTER. Somebody who asks to be
+                  a coach and then finds the squad roster empty will assume the
+                  app is broken; being told in advance that this waits for
+                  approval turns the same screen into the expected outcome. */}
+              <p className="mb-3.5 rounded-[11px] bg-surface px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-muted">
+                A club admin checks this, so you won&apos;t see the squad&apos;s players
+                until they&apos;ve approved you. They&apos;re emailed as soon as you ask.
+              </p>
+
+              <Button type="submit" size="lg" full disabled={saving}>
+                {saving ? 'Sending…' : 'Send this to the club'}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                full
+                className="mt-2.5"
+                disabled={saving}
+                onClick={() => {
+                  setClaimingRole(false)
+                  setError(null)
+                }}
+              >
+                Back
+              </Button>
+            </>
+          )}
+        </form>
       </Sheet>
     )
   }

@@ -202,7 +202,12 @@ export async function getMyProfile(userId) {
       // not absent — so the gate would read "never confirmed" for somebody who
       // had, and ask them again at every sign-in. Exactly the failure the
       // photo_path comment above records, in a different column.
-      'id, full_name, first_name, last_name, name_confirmed_at, email, phone, photo_path, created_at, no_player_confirmed_at',
+      // ⚠️ `no_role_confirmed_at` ADDED 16 Aug 2026 and reads exactly the same
+      // way — it is the mirror question ("do you do anything else at the
+      // club?"), and leaving it off this list has the identical silent failure:
+      // the gate would read undefined as "never answered" and ask a coach who
+      // has already told us, at every sign-in.
+      'id, full_name, first_name, last_name, name_confirmed_at, email, phone, photo_path, created_at, no_player_confirmed_at, no_role_confirmed_at',
     )
     .eq('id', userId)
     .maybeSingle()
@@ -1207,4 +1212,83 @@ export async function confirmNoPlayer({ profileId } = {}) {
   if (error) throw error
   if (!data) throw new Error("We couldn't save that. Try again.")
   return data
+}
+
+/**
+ * Records, once, that this person does no job at the club — the mirror of
+ * confirmNoPlayer directly above.
+ *
+ * ⚠️ WHY THE MIRROR EXISTS. Sign-up forks two ways and each door loses the other
+ * half of who somebody is. The staff door has asked "do you have a player?"
+ * since earlier on 16 Aug; the parent door asked nothing, so a coach who
+ * registered their child was filed as a parent and stayed one. Jay found a real
+ * one the same day: "he got through without asking to be designated a coach".
+ *
+ * ⚠️ SAME COLUMN-GRANT TRAP as confirmNoPlayer, and it fails the same silent
+ * way — the write is refused, nothing surfaces, and the gate simply reopens next
+ * sign-in. See db/migrations/20260816_profile_no_role_confirmed.sql.
+ */
+export async function confirmNoRole({ profileId } = {}) {
+  if (!profileId) throw new Error('confirmNoRole needs a profileId.')
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ no_role_confirmed_at: new Date().toISOString() })
+    .eq('id', profileId)
+    .select('id, no_role_confirmed_at')
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error("We couldn't save that. Try again.")
+  return data
+}
+
+// The errcodes public.request_staff_role raises, turned into sentences a
+// volunteer can act on. Same shape and same reasoning as REGISTER_MESSAGES
+// above: the mapping lives here so the SQL can keep raising codes rather than
+// prose, and anything unmapped falls through to the server's own message.
+const STAFF_ROLE_MESSAGES = {
+  42501:
+    'Please confirm your email address first. Check your inbox for the confirmation ' +
+    'link from when you signed up, then try again.',
+  22023:
+    "We couldn't use that. Pick a squad from the list and choose coach, team manager " +
+    'or medic. If the list looks out of date, reload the page.',
+  42901:
+    'You already have five squad requests waiting. Once a coach or admin has approved ' +
+    'those you can ask about more squads.',
+}
+
+const STAFF_ROLE_FALLBACK = "We couldn't send that request. Try again in a moment."
+
+/**
+ * Asks to be recognised as staff on one squad. Returns the membership row.
+ *
+ * ⚠️ IT GRANTS NOTHING AND MUST NEVER BE DESCRIBED AS THOUGH IT DOES. The row it
+ * creates is `status = 'pending'`, which attaches the person to the squad's
+ * FIXTURES and to nothing else — `private.can_see_team` requires 'active'. A
+ * stranger who types the name of a squad does not thereby read that squad's
+ * children, and that is the entire reason the pending state exists.
+ *
+ * ⚠️ IDEMPOTENT BY DESIGN. The function returns an existing row rather than
+ * raising on a repeat, because `memberships_unique_grant` would otherwise turn a
+ * double-tap into a raw database error on a gate that can re-render.
+ */
+export async function requestStaffRole(teamId, role) {
+  if (!teamId) throw new Error('requestStaffRole needs a squad.')
+
+  const { data, error } = await supabase.rpc('request_staff_role', {
+    p_team_id: teamId,
+    p_role: role,
+  })
+
+  if (error) {
+    const friendly = STAFF_ROLE_MESSAGES[error.code] ?? error.message ?? STAFF_ROLE_FALLBACK
+    const wrapped = new Error(friendly)
+    // `.code` survives so a caller can branch on the reason without matching
+    // on wording — the same contract registerMyPlayer offers.
+    wrapped.code = error.code
+    throw wrapped
+  }
+  return data ?? null
 }

@@ -24,6 +24,8 @@ const useMembershipsMock = vi.fn()
 const getMyProfileMock = vi.fn()
 const confirmMyDetailsMock = vi.fn()
 const confirmNoPlayerMock = vi.fn()
+const confirmNoRoleMock = vi.fn()
+const requestStaffRoleMock = vi.fn()
 const getMyAccessRequestMock = vi.fn()
 const createAccessRequestMock = vi.fn()
 
@@ -39,6 +41,8 @@ vi.mock('../src/data/members.js', () => ({
   getMyProfile: (...args) => getMyProfileMock(...args),
   confirmMyDetails: (...args) => confirmMyDetailsMock(...args),
   confirmNoPlayer: (...args) => confirmNoPlayerMock(...args),
+  confirmNoRole: (...args) => confirmNoRoleMock(...args),
+  requestStaffRole: (...args) => requestStaffRoleMock(...args),
 }))
 
 vi.mock('../src/data/accessRequests.js', () => ({
@@ -102,6 +106,10 @@ function unconfirmed(overrides = {}) {
     email: 'jay@example.com',
     phone: '+971500000000',
     no_player_confirmed_at: '2026-08-01T00:00:00Z',
+    // ⚠️ ANSWERED HERE FOR THE SAME REASON no_player_confirmed_at IS — so every
+    // case above stays about the thing it was written for. The role gate has its
+    // own block at the end of this file, where the fixture withholds it.
+    no_role_confirmed_at: '2026-08-01T00:00:00Z',
     ...overrides,
   }
 }
@@ -115,6 +123,8 @@ beforeEach(() => {
   // and the harness was wrong, which is the more expensive way round.
   useAuthMock.mockReset()
   confirmNoPlayerMock.mockReset()
+  confirmNoRoleMock.mockReset()
+  requestStaffRoleMock.mockReset()
   useMembershipsMock.mockReset()
   getMyProfileMock.mockReset()
   confirmMyDetailsMock.mockReset()
@@ -139,6 +149,13 @@ beforeEach(() => {
     no_player_confirmed_at: '2026-08-01T00:00:00Z',
   })
   confirmNoPlayerMock.mockResolvedValue({ id: 'u-1', no_player_confirmed_at: '2026-08-16T12:00:00Z' })
+  confirmNoRoleMock.mockResolvedValue({ id: 'u-1', no_role_confirmed_at: '2026-08-16T12:00:00Z' })
+  requestStaffRoleMock.mockResolvedValue({
+    id: 'm-new',
+    role: 'coach',
+    team_id: 't-u12',
+    status: 'pending',
+  })
 })
 
 describe('NamePrompt — the sign-in name gate', () => {
@@ -579,5 +596,204 @@ describe('NamePrompt — a preview must not reopen the gate', () => {
 
     await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
     expect(screen.queryByLabelText(/phone number/i)).toBeNull()
+  })
+})
+
+// ── THE ROLE GATE — the mirror of the player gate ──────────────────────────
+//
+// ⚠️ THE BUG THIS EXISTS FOR IS A REAL ROW. Jay, 16 Aug 2026, about a coach who
+// had signed up through the parent door: "he got through without asking to be
+// designated a coach". Sign-up forks two ways and whichever door somebody takes,
+// the other half of who they are is never asked for again. The player gate
+// covers the staff door. Nothing covered the parent door until this.
+describe('NamePrompt — the role gate', () => {
+  // A parent of one, fully answered on every OTHER gate, who has never been
+  // asked what they do at the club. This is the shape of the real row exactly.
+  const parentOfOne = (overrides = {}) =>
+    loaded({
+      memberships: [{ role: 'parent', team_id: 't-u12', player_id: 'p1', status: 'active' }],
+      teams: [
+        { id: 't-u12', name: 'U12 Mixed', sort_order: 2 },
+        { id: 't-u10', name: 'U10 Mixed', sort_order: 1 },
+      ],
+      ...overrides,
+    })
+
+  const unasked = (overrides = {}) =>
+    unconfirmed({
+      name_confirmed_at: '2026-08-01T00:00:00Z',
+      no_role_confirmed_at: null,
+      ...overrides,
+    })
+
+  it('asks a parent who has never said what they do', async () => {
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    renderShell()
+
+    expect(await screen.findByText(/besides being a parent/i)).toBeInTheDocument()
+  })
+
+  it('⚠️ never asks again once somebody has said they do nothing else', async () => {
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked({ no_role_confirmed_at: '2026-08-10T00:00:00Z' }))
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByText(/besides being a parent/i)).toBeNull()
+    expect(screen.queryByTestId('claim-role')).toBeNull()
+  })
+
+  it('⚠️ never asks somebody who already holds a staff role', async () => {
+    useMembershipsMock.mockReturnValue(
+      parentOfOne({
+        memberships: [
+          { role: 'parent', team_id: 't-u12', player_id: 'p1', status: 'active' },
+          { role: 'coach', team_id: 't-u12', player_id: null, status: 'active' },
+        ],
+      }),
+    )
+    getMyProfileMock.mockResolvedValue(unasked())
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByTestId('claim-role')).toBeNull()
+  })
+
+  // ⚠️ PENDING COUNTS. Somebody who asked yesterday and is still waiting has
+  // already answered; asking again would read as the app losing their request,
+  // and memberships_unique_grant would refuse the duplicate anyway.
+  it('⚠️ never asks somebody whose staff request is still pending', async () => {
+    useMembershipsMock.mockReturnValue(
+      parentOfOne({
+        memberships: [
+          { role: 'parent', team_id: 't-u12', player_id: 'p1', status: 'active' },
+          { role: 'manager', team_id: 't-u10', player_id: null, status: 'pending' },
+        ],
+      }),
+    )
+    getMyProfileMock.mockResolvedValue(unasked())
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByTestId('claim-role')).toBeNull()
+  })
+
+  it('⚠️ never asks an admin — they plainly do a job here', async () => {
+    useMembershipsMock.mockReturnValue(
+      parentOfOne({ memberships: [{ role: 'admin', team_id: null, status: 'active' }] }),
+    )
+    getMyProfileMock.mockResolvedValue(unasked())
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByTestId('claim-role')).toBeNull()
+  })
+
+  it('⚠️ never asks a player-only account which squad they coach', async () => {
+    useMembershipsMock.mockReturnValue(
+      parentOfOne({ memberships: [{ role: 'player', team_id: 't-u12', status: 'active' }] }),
+    )
+    getMyProfileMock.mockResolvedValue(unasked())
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByTestId('claim-role')).toBeNull()
+  })
+
+  // ⚠️ THE 16 AUG BUG, IN ITS THIRD FORM. A preview replaces the effective
+  // memberships with ONE synthetic row, so an admin previewing "parent" looks
+  // like somebody with no staff role. Gate on realMemberships or this fires
+  // every time Jay switches.
+  it('⚠️ does not open while previewing as a parent', async () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({
+        memberships: [{ id: 'view-as', role: 'parent', team_id: 't-u12', status: 'active' }],
+        realMemberships: [{ role: 'admin', team_id: null, status: 'active' }],
+        viewAs: { role: 'parent', teamId: 't-u12' },
+      }),
+    )
+    getMyProfileMock.mockResolvedValue(unasked())
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByTestId('claim-role')).toBeNull()
+  })
+
+  it('records "just a parent" and closes', async () => {
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    const user = userEvent.setup()
+    renderShell()
+
+    await screen.findByTestId('no-role')
+    await user.click(screen.getByTestId('no-role'))
+
+    await waitFor(() => expect(confirmNoRoleMock).toHaveBeenCalledWith({ profileId: 'u-1' }))
+    await waitFor(() => expect(screen.queryByTestId('no-role')).toBeNull())
+    expect(requestStaffRoleMock).not.toHaveBeenCalled()
+  })
+
+  it('sends the squad and the role, and does NOT record "no role"', async () => {
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('claim-role'))
+    await user.selectOptions(await screen.findByLabelText(/what do you do/i), 'coach')
+    await user.selectOptions(screen.getByLabelText(/which squad/i), 't-u12')
+    await user.click(screen.getByRole('button', { name: /send this to the club/i }))
+
+    await waitFor(() => expect(requestStaffRoleMock).toHaveBeenCalledWith('t-u12', 'coach'))
+    // ⚠️ THE TWO ANSWERS ARE MUTUALLY EXCLUSIVE. `no_role_confirmed_at` means
+    // "I told you I have no job"; this person told us the opposite, and the
+    // membership row IS the answer. Writing both would record two contradictory
+    // answers to one question.
+    expect(confirmNoRoleMock).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByTestId('claim-role')).toBeNull())
+  })
+
+  it('refuses to send without a squad, and does not call the data layer', async () => {
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('claim-role'))
+    await user.selectOptions(await screen.findByLabelText(/what do you do/i), 'coach')
+    await user.click(screen.getByRole('button', { name: /send this to the club/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/which squad/i)
+    expect(requestStaffRoleMock).not.toHaveBeenCalled()
+  })
+
+  // The squads are listed in the app's usual order, not insertion order — a
+  // coach scanning for their age group should find it where every other list
+  // in the app puts it.
+  it('lists squads in sort_order', async () => {
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('claim-role'))
+    const squad = await screen.findByLabelText(/which squad/i)
+    const names = Array.from(squad.querySelectorAll('option')).map((option) => option.textContent)
+    expect(names).toEqual(['Choose one…', 'U10 Mixed', 'U12 Mixed'])
+  })
+
+  // ⚠️ THE MOST USEFUL MOMENT THE QUESTION IS EVER PUT. Somebody who has just
+  // said they have no child here is, almost by definition, here for a job.
+  it('follows straight on from the no-player answer', async () => {
+    useMembershipsMock.mockReturnValue(
+      parentOfOne({ memberships: [{ role: 'parent', team_id: 't-u12', status: 'active' }] }),
+    )
+    getMyProfileMock.mockResolvedValue(unasked({ no_player_confirmed_at: null }))
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('no-player'))
+    expect(await screen.findByTestId('claim-role')).toBeInTheDocument()
   })
 })
