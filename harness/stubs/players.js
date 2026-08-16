@@ -186,3 +186,21 @@ export async function upsertContact(contact) {
   }
   return { ...contact }
 }
+
+// ⚠️ public.player_private (16 Aug 2026). tests/harness-stubs.test.js demanded
+// these the moment src/data/players.js gained them — the seventh time that
+// guard has earned its keep.
+//
+// ⚠️ getPlayerDob RETURNS NULL, AND NULL IS THE HONEST ANSWER HERE. In the real
+// app null means "not set OR we may not see it", and callers must not tell those
+// apart — a parent looking at a team-mate gets null from RLS. A stub returning a
+// date would make every harness scenario show a birthday the live app hides.
+export async function getPlayerDob() {
+  return null
+}
+
+export async function setPlayerDob(playerId, dob) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'set-player-dob', playerId, dob })
+  return { player_id: playerId, date_of_birth: dob ?? null }
+}

@@ -206,7 +206,7 @@ argument applies to the child.
 Callers to change: `PlayerRegistrationForm`, `PlayerForm`, `MyPlayerForm`,
 `ParentsEditor`, and `playerImport`.
 
-## 3 · Date of birth, in its own table — 🟡 TABLE DONE, NOTHING WRITES TO IT YET
+## 3 · Date of birth — ✅ TABLE AND REGISTRATION FIELD DONE, 16 Aug 2026
 
 **Done, 16 Aug 2026:** `public.player_private`, three policies, applied and
 proved on production. ⚠️ **Nothing in the app reads or writes it yet** — the

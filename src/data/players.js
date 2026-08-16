@@ -283,3 +283,60 @@ export async function upsertContact(contact) {
   if (!data) throw new Error(REFUSED_CONTACT)
   return data
 }
+
+// ── public.player_private ──────────────────────────────────────────────────
+//
+// ⚠️ A SEPARATE TABLE, AND THE SEPARATION IS THE SAFEGUARDING PROPERTY RATHER
+// THAN TIDINESS. `player read` is squad-wide, and RLS grants ROWS not COLUMNS,
+// so a date_of_birth column on `players` would be readable by every parent in
+// the squad — a directory of every child's birthday. Its policies are the pair
+// `player_parents` runs: staff for that squad, or the child's own family.
+// See db/migrations/20260816_player_private_dob.sql.
+//
+// ⚠️ AN EMPTY RESULT IS THE NORMAL OUTCOME FOR SOMEBODY LOOKING AT A TEAM-MATE,
+// not an error. Nothing here interprets that — the screen decides.
+
+/**
+ * Writes one child's date of birth. Upserts, because the row is keyed on the
+ * player and a correction is the common case.
+ *
+ * `dob` is an ISO date string (YYYY-MM-DD) or null. Null CLEARS it rather than
+ * being ignored: a birthday entered wrongly must be removable by the family who
+ * entered it.
+ */
+export async function setPlayerDob(playerId, dob) {
+  if (!playerId) throw new Error('setPlayerDob needs a player.')
+
+  const { data, error } = await supabase
+    .from('player_private')
+    .upsert(
+      { player_id: playerId, date_of_birth: dob || null, updated_at: new Date().toISOString() },
+      { onConflict: 'player_id' },
+    )
+    .select('player_id, date_of_birth')
+    .maybeSingle()
+
+  if (error) throw error
+  return data ?? null
+}
+
+/**
+ * One child's date of birth, or null.
+ *
+ * ⚠️ NULL MEANS "we cannot see it OR it is not set", and the caller must not
+ * distinguish them. A parent reading a team-mate gets null from RLS and a child
+ * with no birthday on file gets null from the column; treating the first as an
+ * error would show a parent a failure every time they opened a squad list.
+ */
+export async function getPlayerDob(playerId) {
+  if (!playerId) return null
+
+  const { data, error } = await supabase
+    .from('player_private')
+    .select('player_id, date_of_birth')
+    .eq('player_id', playerId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data?.date_of_birth ?? null
+}

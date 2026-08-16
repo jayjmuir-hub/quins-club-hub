@@ -3,6 +3,7 @@ import Button from './Button.jsx'
 import Segmented from './Segmented.jsx'
 import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
 import { registerMyPlayer, updateProfileNames } from '../data/members.js'
+import { setPlayerDob } from '../data/players.js'
 import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
 
 // A parent registers ONE OR MORE children in one go.
@@ -71,6 +72,11 @@ const LABEL = 'mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-f
 // code this screen then has to translate.
 const NAME_MAX = 80
 
+// Today, ISO. Bounds the date input so the obvious typo is caught before a
+// round trip. ⚠️ The database refuses a future date independently
+// (player_private_dob_sane), so this is convenience and not the rule.
+const TODAY = new Date().toISOString().slice(0, 10)
+
 // ⚠️ THE SAME 5 THE DATABASE ENFORCES, AND IT IS A CEILING ON ROWS ON SCREEN,
 // not a count of children the parent has. `register_my_player` refuses a 6th
 // PENDING membership per profile (errcode 42901), so a parent with three
@@ -125,6 +131,16 @@ function blankRow() {
     // parameters, and the trigger makes the join lossless.
     firstName: '',
     lastName: '',
+    // ISO yyyy-mm-dd, straight off <input type="date">.
+    //
+    // ⚠️ IT IS WRITTEN BY A SECOND CALL, NOT BY register_my_player. It lives in
+    // public.player_private, whose whole purpose is that a column on `players`
+    // would be readable by every parent in the squad — see
+    // db/migrations/20260816_player_private_dob.sql. Widening the RPC's
+    // signature to take it would have put a sensitive value through a function
+    // that returns a membership, and the failure modes are handled per row
+    // below instead.
+    dob: '',
     teamId: '',
     // null, not '' — matches players.gender, which is nullable and has a CHECK
     // that refuses the empty string. Most squads never ask for it.
@@ -225,6 +241,7 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
 
   const firstId = `register-player-first-${row.key}`
   const lastId = `register-player-last-${row.key}`
+  const dobId = `register-player-dob-${row.key}`
   const teamId = `register-player-team-${row.key}`
 
   return (
@@ -335,6 +352,26 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
           <span>{CONFIRM_LABELS[row.needsConfirm]}</span>
         </label>
       )}
+
+      {/* ⚠️ ABOVE THE AGE GROUP, DELIBERATELY. The date is the fact; the squad is
+          a decision made from it. Asking for the squad first invites a guess and
+          then makes the date look like paperwork confirming it. */}
+      <label htmlFor={dobId} className={`${LABEL} mt-4`}>
+        {selfNamed ? 'Your date of birth' : total === 1 ? 'Date of birth' : `Player ${index + 1}'s date of birth`}
+      </label>
+      <input
+        id={dobId}
+        name="playerDob"
+        type="date"
+        value={row.dob}
+        disabled={disabled}
+        // The database refuses a future date and anything before 1900
+        // (player_private_dob_sane). These bounds only save a round trip.
+        max={TODAY}
+        min="1900-01-02"
+        onChange={(event) => onChange({ dob: event.target.value })}
+        className={FIELD}
+      />
 
       <label htmlFor={teamId} className={`${LABEL} mt-4`}>
         {total === 1 ? 'Age group' : `Player ${index + 1}'s age group`}
@@ -532,6 +569,17 @@ export default function PlayerRegistrationForm({
           ? "Enter your player's family name — a first name alone isn't enough for a coach to tell one child from another."
           : `Enter a family name for player ${index + 1}.`
       }
+      // ⚠️ REQUIRED. A youth club that cannot say how old a child is cannot
+      // check the age group they were put in, and the squad name has been the
+      // only age signal in this app until now (src/lib/ageGroup.js).
+      if (!row.dob) {
+        return rows.length === 1
+          ? "Enter your player's date of birth."
+          : `Enter a date of birth for ${rowLabel(row, index)}.`
+      }
+      if (row.dob > TODAY) {
+        return `${rowLabel(row, index)}'s date of birth cannot be in the future.`
+      }
       if (name.length > NAME_MAX) {
         return `${name.slice(0, 20)}… is too long — ${NAME_MAX} characters at most.`
       }
@@ -597,6 +645,9 @@ export default function PlayerRegistrationForm({
     // player per call is the RPC's shape, and sequential is what makes a
     // partial failure something we can describe.
     const done = []
+    // Children who registered but whose birthday did not save. Deliberately not
+    // an error — see the note at the write below.
+    const missedDob = []
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index]
       const team = sortedTeams.find((candidate) => candidate.id === row.teamId)
@@ -612,10 +663,31 @@ export default function PlayerRegistrationForm({
         const canSelfRegister = team?.self_registration_allowed === true
         // eslint-disable-next-line no-await-in-loop -- sequential is the design;
         // see the header note on partial failure.
-        await registerMyPlayer(name, row.teamId, row.gender, canSelfRegister && row.selfRegister, {
+        const created = await registerMyPlayer(name, row.teamId, row.gender, canSelfRegister && row.selfRegister, {
           confirmDuplicate: row.confirmDuplicate === true,
           confirmSelfName: row.confirmSelfName === true,
         })
+        // ⚠️ THE BIRTHDAY IS A SECOND WRITE, AND A FAILURE HERE MUST NOT LOOK
+        // LIKE A FAILED REGISTRATION. The child exists the moment the call above
+        // returns — its transaction is committed and there is no delete path —
+        // so throwing out of here would tell a parent their child was not added
+        // when it was, and the obvious response is to submit again.
+        //
+        // The player id comes off the membership register_my_player returns;
+        // there is no other way to learn it, because a pending parent cannot
+        // read `players` by name.
+        if (created?.player_id && row.dob) {
+          try {
+            await setPlayerDob(created.player_id, row.dob)
+          } catch {
+            // Swallowed on purpose, and recorded rather than surfaced: the
+            // registration succeeded and the queue row is correct. A coach can
+            // add the date, and the completeness card (plan item 6) is what is
+            // meant to chase it. Turning this into an alert would train parents
+            // to re-submit a child who is already registered.
+            missedDob.push(name)
+          }
+        }
         done.push(name)
       } catch (err) {
         // registerMyPlayer has already turned the RPC's error code into a
