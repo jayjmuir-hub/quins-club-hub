@@ -1,68 +1,104 @@
 # Monitoring
 
-**Detection used to be somebody telling Jay.** Two uptime monitors and an error
-tracker fix that. Both are account creations, so both are Jay's.
+**Detection used to be somebody telling Jay.** Two uptime monitors now watch the
+site, and an error tracker is built but switched off.
 
-## The two monitors
+## What is live — set up 16 Aug 2026
 
-Provider: **Better Stack** free tier — 10 monitors, 3-minute checks, no
-non-commercial restriction. (UptimeRobot's free tier is personal-use-only since
-Dec 2024; StatusCake deactivates an account that does not log in every 90 days.
-Both were ruled out on that, not on features.)
+**Better Stack**, free tier. Both monitors check every 3 minutes and alert by
+e-mail.
 
-| | URL | expect |
+| monitor | URL | check |
 |---|---|---|
-| **1. The app** | `https://adhquins-clubhub.com/` | 200 |
-| **2. The calendar feed** | `https://adhquins-clubhub.com/calendar.ics?token=<Jay's token>` | 200, body contains `BEGIN:VCALENDAR` |
+| `adhquins-clubhub.com` | `https://adhquins-clubhub.com/` | URL becomes unavailable |
+| `Quins calendar feed` | `/calendar.ics?token=<Jay's token>` | URL becomes unavailable |
 
-Jay's token is the one in his own calendar subscribe URL, from the app.
+Jay's token comes from **More → Add to calendar** in the app. It exposes fixtures
+for squads he can already see — which this repo treats as not sensitive — and it
+can be rotated. Do not use a parent's.
 
-⚠️ **THE CALENDAR MONITOR NEEDS THE TOKEN, AND AN EARLIER VERSION OF THIS FILE
-WENT TO SOME LENGTHS TO AVOID IT.** Without a token that URL returns 404, so the
-monitor had to be configured to treat 404 as healthy — which reads as a mistake
-to anyone who sees it, ruled out most free tiers, and bought a WEAKER check: the
-edge function deliberately returns the same 404 whether the token is missing or
-Supabase is unreachable, so a tokenless monitor stays green through a database
-outage. With the token, an ordinary "expect 200" catches that too.
+✅ **BOTH PROVEN, 16 Aug 2026 — the drill was actually run, not just written
+down.** E-mail delivery via *Send test alert*, and detection by disabling the
+live site. Numbers below.
 
-⚠️ **THE KEYWORD IS NOT DECORATION.** If the `/calendar.ics` proxy rule in
-`netlify.toml` were ever lost, the path would fall through to the SPA catch-all
-and return **200 with the app's HTML** — every calendar subscription in the club
-broken, and a status-code-only check reporting success. `BEGIN:VCALENDAR` is what
-notices.
+## ⚠️ Keyword matching is a PAID feature — do not select it
 
-⚠️ **The token exposes fixtures for the squads Jay can see**, which this repo
-already treats as not sensitive (it is why pending members can read them). It is
-his own token and can be rotated. Do not use a parent's.
+The **Alert us when** dropdown carries a **Billable** badge and the note
+*"Upgrade your account to enable more options."* Its keyword and status-code
+options are visible in the UI but are **not on the free plan**, and selecting one
+risks moving the account onto a paid tier.
 
-## ⚠️ Then prove it fires — this is the step that matters
+⚠️ **AN EARLIER VERSION OF THIS FILE TOLD YOU TO USE A KEYWORD MONITOR WITH
+`BEGIN:VCALENDAR`.** That was written from research rather than from the signup
+screen, and it was wrong. Both monitors use the free *"URL becomes unavailable"*
+check.
 
-**A monitor that has never fired is not a monitor.**
+**What that costs, which is less than it sounds** — because the calendar monitor
+carries a real token, the feed only answers 200 when it genuinely built:
 
-1. At a quiet time — early morning UAE, not before a Saturday fixture; **this is
-   a real outage** — Netlify → `quins-club-hub` → **Site configuration → Status →
-   Pause site**.
-2. Wait for the alert. **Time it.** That is the real detection window.
-3. Un-pause, and confirm the recovery alert arrives too.
+| failure | caught |
+|---|---|
+| Site down | ✅ |
+| Calendar edge function down | ✅ |
+| Supabase down | ✅ |
+| `/calendar.ics` proxy rule deleted from `netlify.toml` → 200 with the app's HTML | ❌ |
 
-This is also how to find out whether the free tier sends phone push or only
-email, which is worth knowing before an outage rather than during one.
+Only the last slips through, and only somebody editing `netlify.toml` can cause
+it. ⚠️ **Do not switch provider to close it.** UptimeRobot's free tier does
+include keyword monitors, but its free plan is **personal, non-commercial use
+only** (since Dec 2024), and StatusCake deactivates an account that does not log
+in every 90 days. Neither trade is worth one rare, self-inflicted regression.
 
-## Error tracking
+## ✅ The drill — run 16 Aug 2026
 
-Built and merged, and **sends nothing until a DSN exists** — with none set, the
-Sentry SDK is not even in the bundle. `src/lib/errorReporting.js`.
+**A monitor that has never fired is not a monitor.** The test alert proved the
+e-mail PATH only, so the site was actually taken down.
 
-1. Create a Sentry project (platform **React**) and copy the **DSN**.
-2. Netlify → **Site configuration → Environment variables** →
+| | |
+|---|---|
+| Disabled | **09:44:04 UTC** |
+| Site returning 404 | 09:44:05 |
+| **Incident opened, both monitors** | **09:44** — *"Status 404"* |
+| E-mail alerts received | confirmed by Jay |
+| Re-enabled | **09:48:19** |
+| Site serving 200 again | 09:48:20 — under a second |
+| Incidents auto-resolved | by 09:52 |
+| **Total outage** | **4m 15s** |
+
+⚠️ **DETECTION WAS UNDER A MINUTE, NOT THE THREE THE INTERVAL IMPLIES.** The
+check frequency is 3 minutes, so the obvious expectation is up to 3 minutes of
+blindness; the incident opened within the same minute as the pause. Do not
+"correct" the check interval on the strength of the 3-minute number — the
+measured behaviour is better than the setting suggests.
+
+⚠️ **THE CONTROL IS NOT CALLED "PAUSE".** Netlify → `quins-club-hub` →
+**Project configuration → General → Danger zone → Project availability →
+Disable project**, and **Enable project** in the same place to restore. It is
+reversible — Netlify's own words are *"You can re-enable your project anytime"* —
+and restoration was effectively instant.
+⚠️ **`Delete this project` SITS DIRECTLY BELOW IT** in the same Danger zone, and
+that one has no undo. Read the button before clicking it.
+
+**Redo this if the provider, the alert address or the monitor set changes.** It
+is the only thing that distinguishes a monitor from a decoration.
+
+## Error tracking — built, switched off
+
+`src/lib/errorReporting.js`. **Sends nothing until a DSN exists** — with none
+set, the Sentry SDK is not even in the bundle.
+
+1. Create a Sentry project (platform **React**). ⚠️ The data region is chosen at
+   signup and **cannot be changed later** — pick EU.
+2. Copy the **DSN**. ⚠️ **Ignore the onboarding wizard** — the code is already
+   written, and `npx @sentry/wizard` would install a second copy and undo the
+   lazy-loading.
+3. Netlify → **Site configuration → Environment variables** →
    `VITE_SENTRY_DSN = <the DSN>`.
-3. ⚠️ **Redeploy.** `VITE_*` is substituted at BUILD time, so the variable alone
+4. ⚠️ **Redeploy.** `VITE_*` is substituted at BUILD time, so the variable alone
    changes nothing.
-4. Prove it fires: open the live site, and in the browser console run
-   `Promise.reject(new Error('sentry smoke test'))`. It should appear in Sentry
-   within a minute. Same rule as above — an error tracker that has never received
-   an event is not one.
+5. Prove it fires: on the live site, in the browser console, run
+   `Promise.reject(new Error('sentry smoke test'))`. It should reach Sentry
+   within a minute.
 
-⚠️ **The SDK is lazy-loaded and must stay that way.** It is 159 KB gzip against a
-260 KB bundle; loading it normally would be a 61% tax on every phone for code
-that does nothing until something crashes. See `src/lib/errorReporting.js`.
+⚠️ **The SDK is lazy-loaded and must stay that way** — 159 KB gzip against a
+260 KB bundle. See `src/lib/errorReporting.js`.

@@ -64,7 +64,7 @@ line elsewhere, it is stale — fix it, don't obey it.
 | `claude/runbooks/session-and-push.md` | How to start a session, and the summary push procedure. Read before you push |
 | `claude/runbooks/db-harnesses.md` | **How to RUN `db/tests/`, and why it is safe against production.** `npm run db:check`. Read it before writing a harness or before believing one is green |
 | `claude/runbooks/dmarc-reports.md` | **Why the daily "Report Domain: …" mail arrives, and the one line of it worth reacting to.** `npm run mail:dmarc`. Read it BEFORE treating a spoofed subdomain as an incident — the reports are the protection working, and the only serious case is a spoof that PASSED |
-| `claude/runbooks/monitoring.md` | **How the club finds out it is broken without being told.** Two uptime monitors and Sentry, all three of which Jay must switch on. ⚠️ The calendar monitor needs a real token and a `BEGIN:VCALENDAR` keyword — a status-code-only check goes green if the proxy rule is lost |
+| `claude/runbooks/monitoring.md` | **How the club finds out it is broken without being told.** Two Better Stack monitors are LIVE; Sentry is built but off. ⚠️ Keyword matching is a PAID option there — the free check cannot see the one case where `/calendar.ics` answers 200 with the app's HTML |
 | `claude/runbooks/deploy.md`, `email-and-domain.md`, `first-admin.md`, `e2e-roles.md`, `scope-mail-send.md`, `player-photo-backup.md`, `backup-restore-drill.md` | Operational procedures |
 | `claude/writing-to-github-from-claude.md` | The exact push route, and the ways it has failed |
 | `claude/archive/quins-v1-mvp.md` | The original implementation plan. History |

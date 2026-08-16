@@ -10,7 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- ✂️ **THE MONITORING WORK WAS CUT BACK — Jay: *"i just want simple, not over
+- 🟢 **MONITORING IS ACTUALLY ON — two Better Stack monitors, live, 16 Aug 2026.**
+  `https://adhquins-clubhub.com/` and the calendar feed at
+  `/calendar.ics?token=…`, both 3-minute checks with e-mail alerts. Set up in
+  Jay's own browser with him watching. ✅ **E-mail delivery proved on the spot**
+  via *Send test alert*.
+  ⚠️ **AND THE RUNBOOK'S CENTRAL INSTRUCTION WAS WRONG UNTIL THE SIGNUP SCREEN
+  DISPROVED IT.** It said to use a keyword monitor asserting `BEGIN:VCALENDAR`.
+  On Better Stack the *Alert us when* dropdown carries a **Billable** badge —
+  keyword and status-code options are visible but **not on the free plan**, and
+  selecting one risks moving the account to a paid tier. It was not selected.
+  **That recommendation had been written from research rather than from the
+  product**, which is the same failure as the Sentry bundle-size estimate the
+  day before: a claim made confidently about a thing nobody had opened.
+  ⚠️ **THE RESULTING GAP IS ONE CASE, AND IT IS NAMED RATHER THAN PAPERED OVER**:
+  if the `/calendar.ics` proxy rule were deleted from `netlify.toml`, the path
+  falls through to the SPA catch-all and answers 200 with the app's HTML —
+  monitor green, every calendar subscription in the club dead. Everything else is
+  caught, because the monitor carries a REAL token and the feed only answers 200
+  when it genuinely built. Not worth swapping provider for: UptimeRobot's free
+  tier has keyword monitors but is personal/non-commercial only, and StatusCake
+  deactivates accounts idle for 90 days.
+  ✅ **AND THE DRILL WAS ACTUALLY RUN, WHICH IS THE WHOLE POINT.** The live site
+  was disabled for **4m 15s** (09:44:04 → 09:48:19 UTC) on Jay's say-so. Both
+  monitors opened an incident at **09:44** — *"Status 404"* — the e-mail alerts
+  arrived, and the incidents auto-resolved by 09:52. Restoration was under a
+  second.
+  ⚠️ **DETECTION WAS UNDER A MINUTE, NOT THE THREE THE CHECK INTERVAL IMPLIES.**
+  Written down so nobody later "fixes" the frequency from the setting rather than
+  from the measurement.
+  ⚠️ **AND THE NETLIFY CONTROL IS NOT CALLED "PAUSE"** — it is **Project
+  configuration → General → Danger zone → Disable project**, with `Delete this
+  project` immediately below it in the same panel and no undo on that one.
+
+- `bca0e02` — ✂️ **THE MONITORING WORK WAS CUT BACK — Jay: *"i just want simple, not over
   engineered"*.** He was right, and the over-engineering had a single root: a
   self-imposed rule that the monitor must not hold a calendar token.
   ⚠️ **THAT ONE CONSTRAINT PRODUCED ALL OF IT.** Without a token
