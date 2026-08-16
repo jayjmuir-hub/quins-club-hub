@@ -76,7 +76,7 @@ const INPUT =
 export default function NamePrompt() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { memberships, loading: membershipsLoading } = useMemberships()
+  const { realMemberships, loading: membershipsLoading } = useMemberships()
   const userId = user?.id ?? null
 
   const [profileId, setProfileId] = useState(null)
@@ -95,17 +95,33 @@ export default function NamePrompt() {
   // could reopen the gate over the top of whatever the person went on to do.
   const settled = useRef(false)
 
-  // ⚠️ READ OFF THE MEMBERSHIPS, NOT OFF A COUNT OF PLAYERS. A parent's link to
-  // a child IS a membership row carrying player_id — that is what
+  // ⚠️ `realMemberships`, NEVER THE EFFECTIVE SET, AND THIS SHIPPED WRONG.
+  // Jay, 16 Aug 2026, with two sons already linked: "this has popped up twice in
+  // my own account… actually, it is specific to when i change viewing as".
+  //
+  // A "view as" preview replaces the effective memberships with ONE SYNTHETIC
+  // ROW, and that row hardcodes `player_id: null` (see syntheticMemberships in
+  // src/lib/memberships.jsx). So an admin previewing any role looked, to this
+  // gate, like somebody with no children at the club — and got asked, every
+  // time they switched.
+  //
+  // The rule is the one src/lib/memberships.jsx already states for the switcher
+  // and the banner: gate on `realMemberships`. Whether you have a child at the
+  // club is a FACT ABOUT YOU, not about the role you are pretending to be, and a
+  // preview is cosmetic. The same applies to `playerOnly` below — previewing as
+  // a player would otherwise exempt an admin from the phone question.
+  //
+  // ⚠️ A parent's link to a child IS a membership row carrying player_id — what
   // self-registration creates — so this is the same fact the rest of the app
   // uses rather than a second query that could disagree with it.
-  const hasPlayer = (memberships ?? []).some((m) => m.player_id)
+  const hasPlayer = (realMemberships ?? []).some((m) => m.player_id)
   // ⚠️ `every`, AND AN EMPTY LIST IS NOT PLAYER-ONLY. Somebody with no
   // memberships at all is a stranger waiting for access, and `[].every()` is
   // true — which would silently exempt exactly the people the club knows least
   // about from every question on this gate.
   const playerOnly =
-    (memberships ?? []).length > 0 && (memberships ?? []).every((m) => m.role === 'player')
+    (realMemberships ?? []).length > 0 &&
+    (realMemberships ?? []).every((m) => m.role === 'player')
 
   useEffect(() => {
     if (!userId || settled.current) return undefined

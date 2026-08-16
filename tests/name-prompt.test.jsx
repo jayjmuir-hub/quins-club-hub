@@ -66,8 +66,14 @@ function renderShell() {
 }
 
 function loaded(overrides = {}) {
+  const memberships = overrides.memberships ?? [{ role: 'admin', team_id: null }]
   return {
-    memberships: [{ role: 'admin', team_id: null }],
+    memberships,
+    // ⚠️ MIRRORS THE REAL PROVIDER: `realMemberships` is the truth and
+    // `memberships` is what screens act on, and they DIFFER during a preview.
+    // Defaulting them to the same array keeps every existing case honest while
+    // letting the preview cases below set them apart deliberately.
+    realMemberships: memberships,
     teams: [],
     loading: false,
     error: null,
@@ -495,5 +501,83 @@ describe('NamePrompt — the player gate', () => {
 
     await user.click(await screen.findByRole('button', { name: /add my player/i }))
     expect(confirmNoPlayerMock).not.toHaveBeenCalled()
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
+   "View as" must not make the gate forget your children — 16 Aug 2026
+   ══════════════════════════════════════════════════════════════════════════
+
+   Jay, with two sons already linked: "this has popped up twice in my own
+   account… actually, it is specific to when i change viewing as".
+
+   ⚠️ A PREVIEW REPLACES THE EFFECTIVE MEMBERSHIPS WITH ONE SYNTHETIC ROW, and
+   that row hardcodes `player_id: null` — see syntheticMemberships in
+   src/lib/memberships.jsx. Reading the effective set therefore made an admin
+   with two children look like somebody with none, every time they switched.
+
+   The rule is the one that file already states for the switcher and the banner:
+   gate on `realMemberships`. A preview is cosmetic; whether you have a child at
+   the club is a fact about you.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('NamePrompt — a preview must not reopen the gate', () => {
+  // Exactly what the provider builds while previewing: the real rows say this
+  // person is a parent of two, the effective row says nothing at all.
+  const previewing = () =>
+    loaded({
+      memberships: [
+        { id: 'view-as', role: 'coach', team_id: 't1', player_id: null, status: 'active' },
+      ],
+      realMemberships: [
+        { role: 'admin', team_id: null, player_id: null, status: 'active' },
+        { role: 'parent', team_id: 't-u13', player_id: 'p1', status: 'active' },
+        { role: 'parent', team_id: 't-u16', player_id: 'p2', status: 'active' },
+      ],
+      viewAs: { role: 'coach', teamId: 't1' },
+    })
+
+  it('⚠️ does not ask an admin with children whether they have a player', async () => {
+    useMembershipsMock.mockReturnValue(previewing())
+    getMyProfileMock.mockResolvedValue(
+      unconfirmed({ name_confirmed_at: '2026-08-01T00:00:00Z', no_player_confirmed_at: null }),
+    )
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByText(/do you have a player at the club/i)).toBeNull()
+  })
+
+  // ⚠️ THE OTHER HALF OF THE SAME MISTAKE. Previewing as a player would have
+  // exempted an admin from the phone question, because playerOnly read the
+  // effective set too.
+  it('⚠️ still asks for a phone while previewing as a player', async () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({
+        memberships: [{ id: 'view-as', role: 'player', team_id: 't1', status: 'active' }],
+        realMemberships: [{ role: 'admin', team_id: null, status: 'active' }],
+        viewAs: { role: 'player', teamId: 't1' },
+      }),
+    )
+    getMyProfileMock.mockResolvedValue(
+      unconfirmed({ phone: null, name_confirmed_at: '2026-08-01T00:00:00Z' }),
+    )
+    renderShell()
+
+    expect(await screen.findByLabelText(/phone number/i)).toBeInTheDocument()
+  })
+
+  // And a genuine player-only account — not a preview — is still exempt.
+  it('leaves a real player-only account alone', async () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({ memberships: [{ role: 'player', team_id: 't1', status: 'active' }] }),
+    )
+    getMyProfileMock.mockResolvedValue(
+      unconfirmed({ phone: null, name_confirmed_at: '2026-08-01T00:00:00Z' }),
+    )
+    renderShell()
+
+    await waitFor(() => expect(getMyProfileMock).toHaveBeenCalled())
+    expect(screen.queryByLabelText(/phone number/i)).toBeNull()
   })
 })
