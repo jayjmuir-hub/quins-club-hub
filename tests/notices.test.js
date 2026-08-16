@@ -1,7 +1,24 @@
 // @vitest-environment node
 // Nothing in this file touches the DOM, and a jsdom costs ~1.3s to build. The
 // measurement and the rule are in vite.config.js.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterAll } from 'vitest'
+
+// ⚠️ PROCESS ZONE, AND IT IS THE DIFFERENCE BETWEEN A CHECK AND A DECORATION.
+// `postedLabel` formats its absolute date in Asia/Dubai on purpose. Without this
+// line the suite runs in the MACHINE's zone — and this app is built in Abu
+// Dhabi, where local time already IS club time, so the assertion passed
+// identically with the `timeZone` option deleted. Measured 16 Aug 2026 by
+// deleting it: 31 passed. A test that cannot fail is not a test.
+//
+// New York because it is a long way the other side of UTC, so a date that
+// straddles midnight in Dubai lands on a different day here and the two cannot
+// be confused. Same reasoning, and the same spelling, as the fixture suites.
+const ORIGINAL_TZ = process.env.TZ
+process.env.TZ = 'America/New_York'
+afterAll(() => {
+  if (ORIGINAL_TZ === undefined) delete process.env.TZ
+  else process.env.TZ = ORIGINAL_TZ
+})
 import {
   audienceLabel,
   authorLine,
