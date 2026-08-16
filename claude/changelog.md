@@ -10,7 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 🐛 **ERROR TRACKING, LOADED ONLY ONCE SOMETHING HAS ALREADY GONE WRONG.**
+- ✂️ **THE MONITORING WORK WAS CUT BACK — Jay: *"i just want simple, not over
+  engineered"*.** He was right, and the over-engineering had a single root: a
+  self-imposed rule that the monitor must not hold a calendar token.
+  ⚠️ **THAT ONE CONSTRAINT PRODUCED ALL OF IT.** Without a token
+  `/calendar.ics` returns 404, so the monitor had to be configured to treat 404
+  as healthy — an assertion that reads as a misconfiguration to anyone who later
+  sees it, that ruled out most free tiers (UptimeRobot puts custom status codes
+  behind the Pro plan), and that needed two pages of prose to justify. **And it
+  bought a WEAKER check**: the edge function deliberately returns the same 404
+  whether the token is missing or Supabase is unreachable, so the monitor stayed
+  green through a total database outage.
+  ⚠️ **THE ORDINARY VERSION IS STRICTLY BETTER.** The monitor now carries Jay's
+  OWN token and expects a plain 200 with a `BEGIN:VCALENDAR` keyword — which
+  catches the database case as well, needs no exotic provider, and looks like
+  what it is. The token exposes fixtures for squads he can already see, which
+  this repo has long treated as not sensitive.
+  ⚠️ **AND THE SCRIPT WAS DELETED, NOT KEPT "JUST IN CASE".** `live-check.mjs`
+  was written for the tokenless design; with two monitors running it checked
+  nothing they do not. `docs:check` caught the dangling path references on the
+  way out, which is the check working.
+  **Kept:** the Sentry work, which is genuinely small, and the runbook, now a
+  third of its length.
+
+- `4ec95c3` — 🐛 **ERROR TRACKING, LOADED ONLY ONCE SOMETHING HAS ALREADY GONE WRONG.**
   `src/lib/errorReporting.js`, wired into `ErrorBoundary.componentDidCatch` and
   into `main.jsx`. Jay picked the lazy-load option of the three in
   `claude/runbooks/monitoring.md`.
@@ -39,7 +62,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 - `7bb870d` — 📡 **THE MONITORING ASSERTIONS ARE WRITTEN DOWN AND RUNNABLE, AND ONE OF THEM
   IS THE OPPOSITE OF WHAT ANYBODY WOULD CONFIGURE.** `npm run check:live`
-  (`scripts/live-check.mjs`, no dependencies, no credentials) plus
+  (`live-check.mjs` (deleted 16 Aug 2026), no dependencies, no credentials) plus
   `claude/runbooks/monitoring.md`. The accounts are still Jay's and still
   uncreated — this is the half that did not need one.
   ⚠️ **A `/calendar.ics` MONITOR EXPECTING 200 IS GREEN EXACTLY WHEN THE CALENDAR

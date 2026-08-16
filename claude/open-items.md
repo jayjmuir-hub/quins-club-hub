@@ -41,34 +41,23 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   200** — the SPA catch-all answers any unknown path with `index.html`.
   ⚠️ **A monitor that has never fired is not a monitor.** Pause the Netlify site
   once and confirm the email arrives.
-  ✅ **THE ASSERTIONS ARE NOW WRITTEN DOWN AND RUNNABLE — `npm run check:live`,
-  16 Aug 2026 — and `claude/runbooks/monitoring.md` has the click-by-click.**
-  The accounts are still Jay's and still uncreated, so this item stays open.
-  ✅ **ERROR TRACKING IS BUILT AND INERT — `src/lib/errorReporting.js`, 16 Aug
-  2026.** Lazy-loaded, so the SDK is fetched only once something has already
-  thrown; wired into `ErrorBoundary` AND into a global rejection handler, because
-  a boundary catches render errors only and this app's failures are mostly
-  rejected Supabase calls. **It sends nothing until `VITE_SENTRY_DSN` is set in
-  Netlify and a build runs** — that is Jay's, and until then the whole path is
-  dead-code eliminated out of the bundle entirely.
-  ⚠️ **THE SIZE ESTIMATE THIS DECISION WAS TAKEN ON WAS WRONG BY 5×.** The
-  runbook said `@sentry/react` costs "25-30 KB gzip, about 11%". Measured after
-  installing: **159 KB gzip, +61%** against a 260 KB main bundle. The choice was
-  right anyway and is now more obviously so — but the number was a recollection
-  presented as a measurement, which is the thing this repo keeps being bitten by.
-  ⚠️ **AND THE LINE ABOVE ABOUT `text/calendar` IS HALF RIGHT, WHICH IS WORSE
-  THAN WRONG.** Measured against production: an unauthenticated `/calendar.ics`
-  returns **404 `text/plain`**, because the Netlify rule proxies it to the edge
-  function and that function refuses a missing token. `text/calendar` is what a
-  request carrying a REAL token gets — and a monitor must not hold one, since a
-  calendar token grants access to a family's fixtures. So the assertion is
-  **404 + `text/plain` is healthy, 200 + `text/html` is the failure signature**,
-  the latter being the SPA catch-all reappearing if the proxy rule is ever lost.
-  A monitor configured for "expect 200" would be green exactly then.
-  ⚠️ **AND A GREEN CALENDAR CHECK CANNOT SEE A DATABASE OUTAGE.** A non-uuid
-  token is rejected by shape before the function touches Postgres, and the
-  function deliberately returns the same 404 for "no such token" as for "database
-  down" — distinguishing them would hand a token-guesser an oracle.
+  ✅ **`claude/runbooks/monitoring.md` HAS THE SETUP, 16 Aug 2026.** Two uptime
+  monitors and a Sentry DSN. The accounts are Jay's and still uncreated, so this
+  item stays open.
+  ⚠️ **A FIRST PASS BUILT AN ELABORATE WORKAROUND FOR NOT HOLDING A TOKEN, AND
+  JAY CUT IT: *"i just want simple, not over engineered"*.** A tokenless
+  `/calendar.ics` returns 404, so the monitor was to be configured to treat 404
+  as healthy — which reads as a misconfiguration to anyone who sees it, ruled out
+  most free tiers, and was WEAKER: the edge function deliberately returns the
+  same 404 whether the token is missing or Supabase is unreachable, so it stayed
+  green through a database outage. The monitor now carries Jay's OWN token and
+  expects an ordinary 200 plus a `BEGIN:VCALENDAR` keyword, which catches the
+  database case too. **The keyword is still load-bearing**: if the `/calendar.ics`
+  proxy rule were lost, the path would fall through to the SPA catch-all and
+  return 200 with the app's HTML.
+  ⚠️ **AND `live-check.mjs` (deleted 16 Aug 2026) WAS DELETED RATHER THAN KEPT.** It was written
+  for the tokenless design; with the monitors running it checked nothing they do
+  not, and a second thing to maintain is not free.
 
 ## Cheap (under an hour each)
 
