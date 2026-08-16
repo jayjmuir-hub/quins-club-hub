@@ -152,7 +152,38 @@ unreachable": the file's default fixture is an **admin**, who is correctly never
 asked. A gate step can be added to this component and be tested by nothing at
 all — check the fixture's role before believing a green run here.
 
-## 2 · Split every name into first and family
+## 2 · Split every name into first and family — 🟡 SCHEMA + SIGN-UP DONE
+
+**Done, 16 Aug 2026:** the columns, `private.sync_person_name` on both tables,
+the backfill, and the **registration form** — which is the form that produced the
+one-word row.
+
+**Still to do, and deliberately not started:** the two-box treatment on
+`PlayerForm` (admin), `MyPlayerForm` (a parent editing their own child) and
+`ParentsEditor`. Those screens still write `full_name` in one box, which the
+trigger splits correctly — so they are **correct but not yet improved**. Nothing
+is broken by leaving them; they simply do not enforce a family name.
+
+### Verified on production
+
+| | rows | have first | have last | one-word split right way round | recomposes to `full_name` |
+|---|---|---|---|---|---|
+| `players` | 26 | 26 | 25 | 1 of 1 | all |
+| `player_parents` | 29 | 29 | 29 | — | all |
+
+The single one-word player is the row that prompted the change, and it landed as
+a **first** name with a null family name — the 8 Aug bug, not reintroduced.
+
+⚠️ **AND THE COLUMN GRANTS WERE CHECKED RATHER THAN ASSUMED.** `players` went
+13 → 15 granted columns and `player_parents` 9 → 11, which is what proves the
+UPDATE grant is **table-level** and the new columns inherited it. Had it been
+column-level (as it is on `profiles`, 7 of 13), every save through the new form
+would have failed with something that reads exactly like an RLS refusal.
+
+Trigger proved live in a rolled-back transaction, all seven cases: full→split,
+split→full, one word (last stays NULL), update full, update split,
+both-at-once (first/last win), and the same reconciler on `player_parents`.
+
 
 `players.full_name` and `player_parents.full_name` are single columns behind
 single inputs, and **a single box gets a single word** — which is how a child

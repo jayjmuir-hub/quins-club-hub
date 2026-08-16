@@ -10,6 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
+- ✨ **EVERY NAME IS TWO BOXES NOW.** Jay: *"children name and any other name
+  should be two blocks First Name and Last Name, this will stop people only
+  putting a first name"*.
+  ⚠️ **THE PROBLEM WAS THE INPUT, NOT THE COLUMN.** One column behind one text
+  box gets one word, and the live roster carried a child with a first name and
+  nothing else. `players` and `player_parents` gain `first_name`/`last_name`,
+  reconciled with `full_name` **both ways** by `private.sync_person_name` —
+  a deliberate copy of `sync_profile_name`, including its 8 Aug single-word fix,
+  so a one-word name becomes a FIRST name and never a last one.
+  ⚠️ **NOTHING THAT READS `full_name` CHANGED**, which is the whole point of the
+  trigger: around thirty files do.
+  ⚠️ **THE BACKFILL DOES NOT GO THROUGH THE TRIGGER**, because the 6 Aug profiles
+  backfill ran `set full_name = full_name`, hit the `is distinct from` guard, and
+  did nothing while reporting success. This one writes the split columns directly
+  and then ABORTS the migration if any row still has a full name and no first
+  name.
+  ⚠️ **SPLITTING THE FIELD CREATED A LABEL COLLISION THAT DID NOT EXIST BEFORE** —
+  a self-registering player's box and the "About you" fieldset both wanted to be
+  "Your first name". Resolved by construction: the warm wording is used only when
+  the fieldset is absent.
+
 - ✨ **THE SIGN-IN GATE NOW ASKS THE OTHER HALF OF THE QUESTION.** Jay, about a
   real coach with a real account: *"he got through without asking to be
   designated a coach"*.

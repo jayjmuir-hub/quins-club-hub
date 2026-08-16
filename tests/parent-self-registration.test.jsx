@@ -190,7 +190,8 @@ describe('Add your player — a signed-in account with no access', () => {
     // Trailing spaces on purpose: a name typed on a phone keyboard picks them
     // up constantly, and the database's own guard trims before it checks for
     // blank — so the client trimming too is what keeps the two in step.
-    await user.type(screen.getByLabelText(/player's full name/i), '  Chidi Okafor  ')
+    await user.type(screen.getByLabelText(/player's first name/i), '  Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor  ')
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -264,7 +265,8 @@ describe('Add your player — a signed-in account with no access', () => {
       const user = userEvent.setup()
       renderShell()
 
-      await user.type(screen.getByLabelText(/player's full name/i), 'Amara Bello')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Amara')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Bello')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -279,7 +281,8 @@ describe('Add your player — a signed-in account with no access', () => {
       const user = userEvent.setup()
       renderShell()
 
-      await user.type(screen.getByLabelText(/player's full name/i), 'Amara Bello')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Amara')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Bello')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
       await user.click(screen.getByRole('radio', { name: /^female$/i }))
       await user.click(screen.getByRole('button', { name: /add my player/i }))
@@ -298,7 +301,8 @@ describe('Add your player — a signed-in account with no access', () => {
       const user = userEvent.setup()
       renderShell()
 
-      await user.type(screen.getByLabelText(/player's full name/i), 'Sam Reid')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Sam')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Reid')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
       await user.click(screen.getByRole('radio', { name: /^male$/i }))
       await user.click(screen.getByRole('button', { name: /add my player/i }))
@@ -348,10 +352,17 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
       await user.click(screen.getByRole('radio', { name: /i'm the player/i }))
 
-      // The label follows the answer — "Player's full name" is a form written
+      // The label follows the answer — "Player's first name" is a form written
       // about somebody else.
-      const nameField = screen.getByLabelText(/your full name/i)
-      await user.type(nameField, 'Tobi Adeyemi')
+      //
+      // ⚠️ AND THAT WORDING IS NOW CONDITIONAL. Splitting the name into two
+      // boxes (16 Aug 2026) made it collide with the "About you" fieldset, which
+      // asks the same two questions of the same person — so the warm wording is
+      // used only when that fieldset is absent. The default fixture carries
+      // name_confirmed_at, which is why it is absent here. See PlayerRow's
+      // `selfNamed`.
+      await user.type(screen.getByLabelText(/your first name/i), 'Tobi')
+      await user.type(screen.getByLabelText(/your family name/i), 'Adeyemi')
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
       await waitFor(() =>
@@ -373,7 +384,8 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.click(screen.getByRole('radio', { name: /i'm the player/i }))
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
 
-      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
       await waitFor(() =>
@@ -403,12 +415,14 @@ describe('Add your player — a signed-in account with no access', () => {
 
       renderShell()
 
-      await user.type(screen.getByLabelText(/player 1's full name|player's full name/i), 'Chidi Okafor')
+      await user.type(screen.getByLabelText(/player 1's first name|player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player 1's family name|player's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
 
       await user.click(screen.getByRole('button', { name: /add another child/i }))
 
-      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
+      await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
 
       await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
@@ -443,10 +457,12 @@ describe('Add your player — a signed-in account with no access', () => {
       const user = userEvent.setup()
       renderShell()
 
-      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add another child/i }))
-      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
+      await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
       // Row 2 has no age group.
       await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
 
@@ -473,10 +489,12 @@ describe('Add your player — a signed-in account with no access', () => {
 
       renderShell()
 
-      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add another child/i }))
-      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
+      await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
       await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
 
@@ -501,10 +519,12 @@ describe('Add your player — a signed-in account with no access', () => {
 
       renderShell()
 
-      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add another child/i }))
-      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
+      await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
       await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
 
@@ -512,7 +532,8 @@ describe('Add your player — a signed-in account with no access', () => {
 
       // One row left, and it is Ada's.
       expect(screen.getAllByTestId('player-row')).toHaveLength(1)
-      expect(screen.getByLabelText(/player's full name/i)).toHaveValue('Ada Okafor')
+      expect(screen.getByLabelText(/player's first name/i)).toHaveValue('Ada')
+      expect(screen.getByLabelText(/player's family name/i)).toHaveValue('Okafor')
 
       registerMyPlayerMock.mockResolvedValueOnce({ id: 'mm-2', status: 'pending' })
       await user.click(screen.getByRole('button', { name: /add my player/i }))
@@ -539,10 +560,12 @@ describe('Add your player — a signed-in account with no access', () => {
 
       renderShell()
 
-      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add another child/i }))
-      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
+      await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
       await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
 
@@ -584,9 +607,11 @@ describe('Add your player — a signed-in account with no access', () => {
       const user = userEvent.setup()
       renderShell()
 
-      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.click(screen.getByRole('button', { name: /add another child/i }))
-      await user.type(screen.getByLabelText(/player 2's full name/i), 'Ada Okafor')
+      await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
+      await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
 
       await user.click(screen.getByRole('button', { name: /remove ada okafor/i }))
 
@@ -594,7 +619,8 @@ describe('Add your player — a signed-in account with no access', () => {
       // ⚠️ THE BUG A KEYED LIST EXISTS TO PREVENT. With index keys, removing a
       // row leaves the survivor holding the removed row's input state — so this
       // would read "Ada Okafor" while claiming to be player 1.
-      expect(screen.getByLabelText(/player's full name/i)).toHaveValue('Chidi Okafor')
+      expect(screen.getByLabelText(/player's first name/i)).toHaveValue('Chidi')
+      expect(screen.getByLabelText(/player's family name/i)).toHaveValue('Okafor')
     })
 
     // The first row can never be removed: a list you can empty is a form with
@@ -632,7 +658,7 @@ describe('Add your player — a signed-in account with no access', () => {
     it('is not asked for when the person has already given it', async () => {
       renderShell()
       // The default fixture carries name_confirmed_at.
-      expect(await screen.findByLabelText(/player's full name/i)).toBeInTheDocument()
+      expect(await screen.findByLabelText(/player's first name/i)).toBeInTheDocument()
       expect(screen.queryByLabelText(/your first name/i)).not.toBeInTheDocument()
     })
 
@@ -654,7 +680,8 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
       await user.type(screen.getByLabelText(/your family name/i), 'Okafor')
-      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -674,7 +701,8 @@ describe('Add your player — a signed-in account with no access', () => {
       unnamed()
       renderShell()
 
-      await user.type(await screen.findByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.type(await screen.findByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -701,7 +729,8 @@ describe('Add your player — a signed-in account with no access', () => {
       renderShell()
 
       await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
-      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -720,7 +749,8 @@ describe('Add your player — a signed-in account with no access', () => {
       renderShell()
 
       await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
-      await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
       await screen.findByRole('alert')
@@ -757,7 +787,7 @@ describe('Add your player — a signed-in account with no access', () => {
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/enter your player's name/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/enter your player's first name/i)
     expect(registerMyPlayerMock).not.toHaveBeenCalled()
   })
 
@@ -765,7 +795,8 @@ describe('Add your player — a signed-in account with no access', () => {
     const user = userEvent.setup()
     renderShell()
 
-    await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+    await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
     // ⚠️ THE WORDING NAMES THE CHILD SINCE 13 Aug 2026, and the change is not
@@ -792,7 +823,8 @@ describe('Add your player — a signed-in account with no access', () => {
 
     renderShell()
 
-    await user.type(screen.getByLabelText(/player's full name/i), 'Chidi Okafor')
+    await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -1211,7 +1243,13 @@ function refusal(code, message) {
 }
 
 async function submitOneChild(user, name, teamId) {
-  await user.type(screen.getByLabelText(/player's full name/i), name)
+  // Split at the last space: callers pass a whole name and the form now takes
+  // two boxes. A one-word name goes in the FIRST box, which is the same rule
+  // private.sync_person_name applies in the database.
+  const parts = String(name).trim().split(/\s+/)
+  const last = parts.length > 1 ? parts.pop() : ''
+  await user.type(screen.getByLabelText(/player's first name/i), parts.join(' '))
+  if (last) await user.type(screen.getByLabelText(/player's family name/i), last)
   await user.selectOptions(screen.getByLabelText(/age group/i), teamId)
   await user.click(screen.getByRole('button', { name: /add my player/i }))
 }
@@ -1314,7 +1352,10 @@ describe('Add your player — the duplicate guards', () => {
     // Carrying it across a rewrite would let somebody confirm a warning about
     // one name and then submit a different one with the guard already off.
     registerMyPlayerMock.mockResolvedValue({ id: 'm-new', status: 'pending' })
-    await user.type(screen.getByLabelText(/player's full name/i), ' Jr')
+    // ⚠️ THE FAMILY BOX, DELIBERATELY. Since the split (16 Aug 2026) EITHER box
+    // must withdraw the tick, because either one changes who this is — and the
+    // family name is the half a "…Jr" edit actually lands on.
+    await user.type(screen.getByLabelText(/player's family name/i), ' Jr')
     expect(
       screen.queryByRole('checkbox', { name: /different player who happens/i }),
     ).not.toBeInTheDocument()

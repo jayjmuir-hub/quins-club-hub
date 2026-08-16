@@ -270,6 +270,20 @@ CREATE TABLE public.players (
   club_id     uuid        NOT NULL,
   team_id     uuid        NOT NULL,
   full_name   text        NOT NULL,
+  -- !! Added 16 Aug 2026 (split_player_and_parent_names). Jay: "children name
+  -- !! and any other name should be two blocks First Name and Last Name, this
+  -- !! will stop people only putting a first name". One column behind one box
+  -- !! got one word, and the live roster carried a child with a first name and
+  -- !! nothing else.
+  -- !! ⚠️ full_name IS STILL THE DISPLAY VALUE and is NOT derived-and-forgotten:
+  -- !! private.sync_person_name (triggers.sql) reconciles all three BOTH WAYS,
+  -- !! so the ~30 files reading full_name were untouched by this change. Write
+  -- !! either side.
+  -- !! ⚠️ NOT A GENERATED COLUMN, for the same reason profiles.full_name is not:
+  -- !! register_my_player, PlayerForm and the importer all write it directly and
+  -- !! would break on first save.
+  first_name  text,
+  last_name   text,
   jersey_num  integer,
   position    text,
   is_captain  boolean              DEFAULT false,
@@ -345,6 +359,14 @@ CREATE TABLE public.player_parents (
   id            uuid        NOT NULL DEFAULT gen_random_uuid(),
   player_id     uuid        NOT NULL,
   full_name     text        NOT NULL,
+  -- !! Added 16 Aug 2026 (split_player_and_parent_names), same reconciler as
+  -- !! public.players above — "any other name" in Jay's request is this table.
+  -- !! ⚠️ THE CHECK BELOW STILL GUARDS full_name AND ONLY full_name. A row with
+  -- !! a blank first_name and a populated full_name is legal and is what an old
+  -- !! writer produces; the trigger fills the split in. Do not add a NOT NULL
+  -- !! here without also changing every writer.
+  first_name    text,
+  last_name     text,
   relationship  text,
   email         text,
   phone         text,
