@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
@@ -875,17 +875,52 @@ describe('MatchSheet — filling it in when the paper does not fit', () => {
     expect(screen.getByLabelText('Player 1')).toBeInTheDocument()
   })
 
-  it('⚠️ leaves the wide layout exactly as it was — typed ON the form', async () => {
+  it('⚠️ THE FORM IS NEVER TYPED ON, AT ANY WIDTH — one rendering, one PNG', async () => {
+    // ⚠️ THIS TEST REPLACED ITS OWN OPPOSITE. Until 16 Aug 2026 it asserted that
+    // a wide screen put the inputs back INSIDE the facsimile — which is exactly
+    // the arrangement that produced two renderings of one document and let them
+    // drift by 25px within hours. The rule now is that there is nothing to
+    // drift: the sheet is display-only everywhere, and the editor is beside it.
+    //
+    // Stubbing matchMedia wide is what makes this an assertion rather than a
+    // restatement of jsdom's default — the wide branch is the one that used to
+    // behave differently, so it is the one worth pinning.
     const restore = widenToPaper()
     try {
       mount(<MatchSheet />)
       await screen.findByTestId('match-sheet-facsimile')
 
-      expect(screen.queryByTestId('match-sheet-entry')).toBeNull()
-      // The box is back inside the facsimile, and it is an input again.
-      const paper = within(screen.getByTestId('match-sheet-facsimile'))
-      expect(paper.getByLabelText('Player 1').tagName).toBe('INPUT')
-      expect(paper.getByLabelText('Card 1 colour').tagName).toBe('SELECT')
+      expect(screen.getByTestId('match-sheet-entry')).toBeInTheDocument()
+
+      const paper = screen.getByTestId('match-sheet-facsimile')
+      expect(paper.querySelectorAll('input:not([type="checkbox"]), select, textarea')).toHaveLength(
+        0,
+      )
+      // The FR boxes stay, because they are what the tick is DRAWN with — but
+      // none of them is reachable, and none is `disabled` (which would grey it
+      // and change what gets photographed).
+      const boxes = [...paper.querySelectorAll('input[type="checkbox"]')]
+      expect(boxes).toHaveLength(22)
+      expect(boxes.every((box) => box.disabled === false && box.tabIndex === -1)).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('⚠️ renders the same DOM wide as narrow — the two paths are gone', async () => {
+    // The strongest available statement of "one rendering" short of comparing
+    // pixels: the photographed block must come out byte-identical whichever
+    // branch of the old switch would have been taken.
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+    const narrow = screen.getByTestId('match-sheet-facsimile').innerHTML
+    cleanup()
+
+    const restore = widenToPaper()
+    try {
+      mount(<MatchSheet />)
+      await screen.findByTestId('match-sheet-facsimile')
+      expect(screen.getByTestId('match-sheet-facsimile').innerHTML).toBe(narrow)
     } finally {
       restore()
     }

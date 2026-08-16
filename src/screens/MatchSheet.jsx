@@ -15,7 +15,6 @@ import {
   saveMatchSheetSlots,
   setMatchSheetStatus,
 } from '../data/matchSheets.js'
-import { useMediaQuery } from '../lib/useMediaQuery.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import { canEditTeam } from '../lib/scope.js'
@@ -71,22 +70,6 @@ const LEFT_COLUMN = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 /** The five blank discipline rows the paper form provides. */
 const CARD_ROWS = 5
 
-/**
- * Wide enough to fill the form in ON the form.
- *
- * ⚠️ 900px IS THE FACSIMILE'S OWN WIDTH, NOT A BREAKPOINT FROM THE SCALE. The
- * form is a fixed 860px plus its border and padding — 886 — so this is "the
- * paper fits, with a little air", and it is deliberately NOT `desktop` (820px)
- * from tailwind.config.js. At 820 the paper does not fit and the coach would be
- * typing into 40px boxes while scrolling sideways, which is the whole thing this
- * exists to stop.
- *
- * ⚠️ ONE SOURCE OF TRUTH. This replaced a `min-[900px]:hidden` class that had
- * the same number written in it, so the number lived in two places for exactly
- * one commit.
- */
-const FITS_THE_PAPER = '(min-width: 900px)'
-
 /** The two sides, in the order the columns are laid out. */
 const SIDES = ['us', 'them']
 
@@ -140,104 +123,78 @@ function kindSentence(kinds) {
 }
 
 /**
- * An input that reads as a filled-in box rather than a form control.
+ * One filled-in box on the form. TEXT — never a control, at any width.
  *
- * ⚠️ NO BORDER AND NO BACKGROUND ON PURPOSE. The table cell already draws the
- * box; a control with its own chrome would photograph as an app screenshot
- * instead of as a completed form, which is the one thing this page is for.
+ * ⚠️ NO BORDER AND NO BACKGROUND. The table cell already draws the box; a
+ * control with its own chrome would photograph as an app screenshot instead of
+ * as a completed form, which is the one thing this page is for.
+ *
+ * ⚠️ THE EDITABLE BRANCH IS GONE — Jay, 16 Aug 2026, and it is a deletion worth
+ * understanding rather than restoring. For four hours this took a `preview` flag
+ * and rendered an <input> above 900px and a <span> below, which meant TWO
+ * renderings of a document whose whole purpose is to be photographed and sent.
+ * They drifted immediately and measurably: 1115px from a laptop, 1090px from a
+ * phone. Every fix for that was another min-height matched to another control.
+ *
+ * ⚠️ NOW THERE IS ONE PATH, SO THE PNG IS IDENTICAL BY CONSTRUCTION rather than
+ * by maintenance — there is no second rendering left to disagree with. Editing
+ * happens in MatchSheetEntry at every width. **Do not add an input back here.**
+ * The pull to do it is real, because typing on the paper is pleasant on a
+ * laptop; the cost is that a governing body starts receiving two different
+ * documents depending on what the coach happened to be holding.
+ *
+ * ⚠️ AND IT GROWS WITH ITS CONTENT, so no value is ever clipped. The min-height
+ * only stops an EMPTY box collapsing the row it sits in.
  */
-function Cell({ value, onChange, list, preview, ...rest }) {
-  // ⚠️ A SPAN IN PREVIEW, SIZED TO THE CONTROL IT REPLACES. On a phone the
-  // facsimile is not the editor (MatchSheetEntry is), so these become read-only
-  // text — and the form still has to photograph the same from a phone as from a
-  // laptop, which is the whole point of the fixed 860px width.
-  //
-  // ⚠️ 14.375px IS MEASURED, NOT CHOSEN. Tailwind's preflight zeroes the padding
-  // and border on form controls, so this input is exactly its line-height —
-  // `leading-tight` on `text-[11.5px]`. An earlier guess of `min-h-[16px]` plus
-  // `py-px` was 2px PROUD on every row, in the opposite direction to the comment
-  // that justified it. Measure the control, do not reason about it.
-  //
-  // ⚠️ THE TWO ARE NOT PIXEL-IDENTICAL AND THIS IS THE HONEST NUMBER: measured
-  // 16 Aug 2026 in Chromium, the whole form is 1115px on the paper branch and
-  // 1090px in preview — 25px, or 2%, spread as one to four pixels across about
-  // twenty rows. Column widths, content and structure are the same; only some
-  // empty controls sit fractionally taller than the text that replaces them.
-  // **Do not read that as licence to let it drift.** The bug this screen was
-  // fixed for was a form 501px too wide with its labels printed over each
-  // other, and the way that is kept away is by treating a growing number here as
-  // a regression. If it ever matters exactly, the answer is not more min-heights
-  // — it is to render the facsimile in preview at EVERY width and let the
-  // stacked form be the only editor, which collapses the two paths into one.
-  //
-  // ⚠️ AND IT GROWS WITH ITS CONTENT, so no value is ever clipped by a height
-  // here being a pixel out — the residual is empty-box geometry, never text.
-  if (preview) {
-    return (
-      <span className="block min-h-[14.375px] w-full min-w-0 text-[11.5px] leading-tight">
-        {value ?? ''}
-      </span>
-    )
-  }
+function Cell({ value }) {
+  // ⚠️ 14.375px IS MEASURED, NOT CHOSEN. It is the height the <input> that used
+  // to live here actually had: Tailwind's preflight zeroes padding and border on
+  // form controls, so the control was exactly its own line-height — `leading-tight`
+  // on `text-[11.5px]`. Kept because the ROW heights of the finished form were
+  // tuned around it, and an empty box that collapses is a form with a squashed
+  // row in the middle of it. An earlier guess of 16px plus `py-px` was 2px proud
+  // on every row, in the opposite direction to the comment that justified it —
+  // measure the control, do not reason about it.
   return (
-    <input
-      {...rest}
-      list={list}
-      value={value ?? ''}
-      onChange={onChange}
-      className="w-full min-w-0 bg-transparent text-[11.5px] leading-tight outline-none"
-    />
+    <span className="block min-h-[14.375px] w-full min-w-0 text-[11.5px] leading-tight">
+      {value ?? ''}
+    </span>
   )
 }
 
-/** One numbered squad row: number, name, FR tick. */
-function SlotCells({ slots, index, onName, onSet, preview }) {
+/** One numbered squad row on the finished form: number, name, FR tick. */
+function SlotCells({ slots, index }) {
   const row = slots[index]
   return (
     <>
       <td className={`${CELL} text-center font-bold`}>{row.slot}</td>
       <td className={CELL}>
-        <Cell
-          preview={preview}
-          list="squad-players"
-          aria-label={`Player ${row.slot}`}
-          value={row.full_name}
-          onChange={(domEvent) => onName(index, domEvent.target.value)}
-        />
+        <Cell value={row.full_name} />
       </td>
       <td className={`${CELL} text-center`}>
         {/* ⚠️ The FR column is a SAFETY declaration — it tells the referee which
             replacements can cover the front row. Not decoration.
 
-            ⚠️ STILL A CHECKBOX IN PREVIEW — NOT A "✓" CHARACTER, AND NOT
-            `disabled` EITHER. The paper form does ask for a tick, and drawing
-            one would arguably be more faithful; it would also mean the PNG from
-            a phone stopped matching the PNG from a laptop, which is precisely
-            the bug this screen was just fixed for. Whether BOTH branches should
-            become a tick is a separate question with one answer, not two.
-            ⚠️ AND `disabled` IS THE TRAP INSIDE THE TRAP: every browser greys a
-            disabled checkbox, so it would have reintroduced the same mismatch
-            by the back door. `pointer-events-none` + `tabIndex={-1}` renders
-            byte-identically to the live control while being unreachable by
-            touch or keyboard. `readOnly` is there only to stop React warning
-            about a checked box with no onChange. */}
-        {preview ? (
-          <input
-            type="checkbox"
-            checked={row.front_row}
-            readOnly
-            tabIndex={-1}
-            aria-hidden="true"
-            className="pointer-events-none"
-          />
-        ) : (
-          <input
-            type="checkbox"
-            aria-label={`Front row cover for player ${row.slot}`}
-            checked={row.front_row}
-            onChange={(domEvent) => onSet(index, { front_row: domEvent.target.checked })}
-          />
-        )}
+            ⚠️ A CHECKBOX AND NOT A "✓" CHARACTER. The paper form does ask for a
+            tick and drawing one would be more faithful still — but the box is
+            what every sheet filed from this app has carried, and changing the
+            mark on a governing body's form is a decision for Jay rather than a
+            side effect of a refactor.
+
+            ⚠️ NOT `disabled`, WHICH IS THE TRAP: every browser greys a disabled
+            checkbox, so it would quietly change what gets photographed.
+            `pointer-events-none` + `tabIndex={-1}` renders identically to a live
+            control while being unreachable by touch or keyboard, and `readOnly`
+            is there only to stop React warning about a checked box with no
+            onChange. The tick is SET in MatchSheetEntry. */}
+        <input
+          type="checkbox"
+          checked={row.front_row}
+          readOnly
+          tabIndex={-1}
+          aria-hidden="true"
+          className="pointer-events-none"
+        />
       </td>
     </>
   )
@@ -476,15 +433,6 @@ export default function MatchSheet() {
   // match_sheets is the real boundary; this only avoids showing a form the
   // database would refuse to save.
   const mayEdit = event ? canEditTeam(memberships, event.team_id) : false
-
-  // ⚠️ FALSE UNDER jsdom, AND THAT IS LOAD-BEARING FOR THE WHOLE SUITE.
-  // useMediaQuery returns false when matchMedia is missing, so every existing
-  // test renders the PHONE branch — where MatchSheetEntry holds the inputs. The
-  // labels there are identical to the facsimile's, so those tests keep passing
-  // without knowing which layout they are looking at. A test that wants the
-  // paper branch stubs window.matchMedia itself.
-  const fitsThePaper = useMediaQuery(FITS_THE_PAPER)
-  const preview = !fitsThePaper
 
   const setField = (key) => (domEvent) => {
     setSaved(false)
@@ -1024,41 +972,58 @@ export default function MatchSheet() {
           )}
         </Card>
 
-        {/* ── FILLING IT IN, WHEN THE PAPER DOES NOT FIT ────────────────────
-            ⚠️ THE EDITOR MOVES OFF THE FORM, THE FORM DOES NOT MOVE. Jay,
-            16 Aug 2026, after the fixed-width fix landed: the sheet was legible
-            on a phone and still awful to FILL IN — 22 names into 40px boxes,
-            scrolling sideways, standing on a pitch. So below 900px every value
-            is typed here and the facsimile becomes a preview of what will be
-            sent. Above it, the paper fits and typing on it is pleasant, so
-            nothing changes.
+        {/* ── FILLING IT IN. THE ONLY EDITOR, AT EVERY WIDTH ────────────────
+            ⚠️ THE FORM IS NEVER TYPED ON — Jay, 16 Aug 2026. This started as a
+            phone-only measure, because a fixed 860px facsimile is legible on a
+            phone and awful to fill in: 22 names into 40px boxes, scrolling
+            sideways, standing at a pitch. It became unconditional for a better
+            reason. A width-dependent editor meant TWO renderings of a document
+            whose only job is to be photographed and sent, and they drifted
+            within hours — 1115px from a laptop against 1090px from a phone.
 
-            ⚠️ RENDERED, NOT HIDDEN. Both branches emit the same fields, so a
-            `min-[900px]:hidden` class would leave two of everything in the DOM
-            — see the header on src/lib/useMediaQuery.js, which exists because
-            the roster hit exactly this. ── */}
-        {preview && (
-          <MatchSheetEntry
-            slots={slots}
-            onName={nameChanged}
-            onSlot={setSlot}
-            cardRows={cardRows}
-            onCard={setCard}
-            fields={fields}
-            onField={setField}
-          />
-        )}
+            ⚠️ SO THE POINT IS NOT THAT THE STACKED FORM IS NICER. It is that
+            there is now ONE rendering of the sheet, so a phone and a laptop
+            cannot produce different documents. The Score card above has worked
+            this way since 12 Aug for the same reason: values are typed beside
+            the form and the form only ever displays them.
+
+            ⚠️ THE 22 GO TWO-UP ON A WIDE SCREEN, and that is a `desktop:` class
+            inside MatchSheetEntry rather than a second component — same DOM,
+            same order, different columns. Presentation-only differences are
+            exactly what the Tailwind prefix is for; it is duplicated CONTENT
+            that needs `useMediaQuery`, and there is none here any more. ── */}
+        {/* ⚠️ MOVED OUT OF THE FACSIMILE, 16 Aug 2026. It used to sit inside
+            the photographed block, back when the boxes on the form were the
+            things being typed into. Nothing in there is a control any more, so
+            its only consumer is the editor below — and html2canvas no longer has
+            to walk a list of every player in the squad to render a form that
+            cannot use it. A <datalist> draws nothing either way; this is about
+            the id living next to the inputs that name it. */}
+        <datalist id="squad-players">
+          {squad.map((player) => (
+            <option key={player.id} value={player.full_name} />
+          ))}
+        </datalist>
+        <MatchSheetEntry
+          slots={slots}
+          onName={nameChanged}
+          onSlot={setSlot}
+          cardRows={cardRows}
+          onCard={setCard}
+          fields={fields}
+          onField={setField}
+        />
       </div>
 
-      {/* ⚠️ SAYS WHICH THING IT IS. On a phone the block below is no longer
-          something you fill in, and a form full of untypeable boxes reads as
-          broken rather than as a preview unless it is labelled. */}
-      {preview && (
-        <p className="mb-1.5 text-[12.5px] font-semibold text-ink-muted print:hidden">
-          Below is RCM&rsquo;s form at its real size — this is exactly what Share sends. Scroll
-          it sideways, or pinch to zoom out and see all of it.
-        </p>
-      )}
+      {/* ⚠️ SAYS WHICH THING IT IS. A form full of boxes nobody can type in
+          reads as broken rather than as a finished document unless it is
+          labelled — and this is the one block on the screen that is not a
+          control but the artefact itself. */}
+      <p className="mb-1.5 text-[12.5px] font-semibold text-ink-muted print:hidden">
+        Below is RCM&rsquo;s form at its real size, and it is exactly what{' '}
+        <strong className="text-ink">Share</strong> sends. Fill it in above; on a narrow screen,
+        scroll it sideways or pinch to zoom out.
+      </p>
 
       {/* ── The facsimile. This block is what html2canvas photographs, so
              everything inside it must read as a COMPLETED FORM rather than as
@@ -1174,11 +1139,6 @@ export default function MatchSheet() {
           </table>
 
           {/* ── The 22, in TWO COLUMNS: 1-12 left, 13-22 right, each with FR. ── */}
-          <datalist id="squad-players">
-            {squad.map((player) => (
-              <option key={player.id} value={player.full_name} />
-            ))}
-          </datalist>
           <table className="mt-1.5 w-full table-fixed border-collapse text-[11.5px]">
             <tbody>
               <tr>
@@ -1188,13 +1148,7 @@ export default function MatchSheet() {
                 <th className={`${CELL} w-[26px]`} />
                 <th className={`${CELL} text-left`}>
                   TEAM CAPTAIN:{' '}
-                  <Cell
-                    preview={preview}
-                    list="squad-players"
-                    aria-label="Team captain"
-                    value={fields.captain_name}
-                    onChange={setField('captain_name')}
-                  />
+                  <Cell value={fields.captain_name} />
                 </th>
                 <th className={`${CELL} w-[34px] text-center`}>FR</th>
               </tr>
@@ -1202,9 +1156,9 @@ export default function MatchSheet() {
                 const right = left + LEFT_COLUMN.length
                 return (
                   <tr key={left}>
-                    <SlotCells slots={slots} index={left - 1} onName={nameChanged} onSet={setSlot} preview={preview} />
+                    <SlotCells slots={slots} index={left - 1} />
                     {right <= SLOT_COUNT ? (
-                      <SlotCells slots={slots} index={right - 1} onName={nameChanged} onSet={setSlot} preview={preview} />
+                      <SlotCells slots={slots} index={right - 1} />
                     ) : (
                       <>
                         <td className={CELL} />
@@ -1238,59 +1192,37 @@ export default function MatchSheet() {
               {cardRows.map((card, index) => (
                 <tr key={index}>
                   <td className={CELL}>
-                    <Cell preview={preview} aria-label={`Card ${index + 1} half`} value={card.half} onChange={setCard(index, 'half')} />
+                    <Cell value={card.half} />
                   </td>
                   <td className={CELL}>
-                    <Cell preview={preview} aria-label={`Card ${index + 1} time`} value={card.minute} onChange={setCard(index, 'minute')} />
+                    <Cell value={card.minute} />
                   </td>
                   <td className={CELL}>
-                    {/* ⚠️ A SELECT, not free text: the column is R or Y, and the
-                        colour CHECK constraint accepts nothing else. A typed "yel"
-                        would fail the save with a constraint error on a field
-                        somebody thought they had filled in correctly.
+                    {/* ⚠️ "Y" AND "R" ARE RCM'S OWN NOTATION for this column, and
+                        the select that used to be here is in MatchSheetEntry —
+                        as a select, because the `colour` CHECK constraint takes
+                        'yellow' or 'red' and nothing else, so free text fails the
+                        save on a field somebody thought they had filled in.
 
-                        ⚠️ AND IT IS NOT A `Cell`, WHICH IS WHY IT WAS THE ONE
-                        FIELD THE PREVIEW PASS MISSED. Every other box on this
-                        form goes through Cell and got `preview` threaded through
-                        it; this one is hand-rolled, so it needed its own branch
-                        and did not get one until the suite found two controls
-                        answering to "Card 1 colour". If a new control is ever
-                        added here that is not a Cell, it needs this too.
-
-                        The 17px below is the select's MEASURED height, so the
-                        five card rows keep the height they have with the
-                        control in them. */}
-                    {preview ? (
-                      <span className="block min-h-[17px] w-full text-[11.5px] leading-tight">
-                        {card.colour === 'yellow' ? 'Y' : card.colour === 'red' ? 'R' : ''}
-                      </span>
-                    ) : (
-                      <select
-                        aria-label={`Card ${index + 1} colour`}
-                        value={card.colour}
-                        onChange={setCard(index, 'colour')}
-                        className="w-full bg-transparent text-[11.5px] outline-none"
-                      >
-                        <option value="" />
-                        <option value="yellow">Y</option>
-                        <option value="red">R</option>
-                      </select>
-                    )}
+                        ⚠️ 17px IS THE SELECT'S MEASURED HEIGHT, kept so the five
+                        card rows stand as tall as they did when the control was
+                        here. This was also the ONE field the width-dependent
+                        version missed, because it is the only box on the form
+                        that never went through Cell — the suite caught it by
+                        finding two controls answering to "Card 1 colour". Now
+                        there is nothing to miss: no box here is a control. */}
+                    <span className="block min-h-[17px] w-full text-[11.5px] leading-tight">
+                      {card.colour === 'yellow' ? 'Y' : card.colour === 'red' ? 'R' : ''}
+                    </span>
                   </td>
                   <td className={CELL}>
-                    <Cell preview={preview} aria-label={`Card ${index + 1} number`} value={card.slot} onChange={setCard(index, 'slot')} />
+                    <Cell value={card.slot} />
                   </td>
                   <td className={CELL}>
-                    <Cell
-                      preview={preview}
-                      list="squad-players"
-                      aria-label={`Card ${index + 1} name`}
-                      value={card.full_name}
-                      onChange={setCard(index, 'full_name')}
-                    />
+                    <Cell value={card.full_name} />
                   </td>
                   <td className={CELL}>
-                    <Cell preview={preview} aria-label={`Card ${index + 1} reason`} value={card.reason} onChange={setCard(index, 'reason')} />
+                    <Cell value={card.reason} />
                   </td>
                 </tr>
               ))}
@@ -1315,19 +1247,17 @@ export default function MatchSheet() {
                       box that shrank to fit. The medical box is the one field
                       on this form where losing a line break can matter.
                       55px is the measured height of the `rows={3}` textarea. */}
-                  {preview ? (
-                    <p className="min-h-[55px] w-full whitespace-pre-line text-[11.5px] leading-tight">
-                      {fields.medical_notes}
-                    </p>
-                  ) : (
-                    <textarea
-                      aria-label="Medical notes"
-                      rows={3}
-                      value={fields.medical_notes}
-                      onChange={setField('medical_notes')}
-                      className="w-full resize-none bg-transparent text-[11.5px] outline-none"
-                    />
-                  )}
+                  {/* ⚠️ `whitespace-pre-line`, AND IT IS THE ONE FIELD WHERE THAT
+                      MATTERS. A medical note is the only value on this form that
+                      a coach would deliberately write over several lines, and
+                      collapsing it to a run-on line is how "concussion, off after
+                      20" and the next entry become one sentence.
+                      ⚠️ 55px is the measured height of the `rows={3}` textarea
+                      this replaced, so an empty medical box reserves the space
+                      RCM's form gives it instead of shrinking to nothing. */}
+                  <p className="min-h-[55px] w-full whitespace-pre-line text-[11.5px] leading-tight">
+                    {fields.medical_notes}
+                  </p>
                 </td>
               </tr>
             </tbody>
@@ -1342,12 +1272,7 @@ export default function MatchSheet() {
               <tr>
                 <td className={CELL}>
                   <span className="font-bold">NAME:</span>{' '}
-                  <Cell
-                    preview={preview}
-                    aria-label="Team manager"
-                    value={fields.manager_name}
-                    onChange={setField('manager_name')}
-                  />
+                  <Cell value={fields.manager_name} />
                 </td>
               </tr>
               {/* ⚠️ PHONE IS NOT ON RCM'S PAPER FORM — it is an addition Jay asked
@@ -1359,13 +1284,7 @@ export default function MatchSheet() {
               <tr>
                 <td className={CELL}>
                   <span className="font-bold">PHONE:</span>{' '}
-                  <Cell
-                    preview={preview}
-                    aria-label="Team manager phone"
-                    type="tel"
-                    value={fields.manager_phone}
-                    onChange={setField('manager_phone')}
-                  />
+                  <Cell value={fields.manager_phone} />
                 </td>
               </tr>
               <tr>

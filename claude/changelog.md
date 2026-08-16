@@ -10,6 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
+- ♻️ **THE MATCH SHEET IS NEVER TYPED ON, AT ANY WIDTH — AND THE PNG IS NOW
+  IDENTICAL BY CONSTRUCTION.** Jay: *"make the facsimile a preview at every
+  width"*. The width-dependent editor added hours earlier meant TWO renderings of
+  a document whose only job is to be photographed and sent, and they had already
+  drifted 25px. Deleting the editable branch deletes the drift: **measured
+  1720×2182 from a 375px viewport and 1720×2182 from a 1400px one**, with the
+  photographed block byte-identical (`innerHTML` equal, same table heights).
+  ⚠️ **AND `useMediaQuery` WENT WITH IT.** The hook, the 900px query and the
+  `preview` prop threaded through eleven call sites are all gone; `Cell` takes a
+  value and nothing else. **Do not put an input back on the form** — typing on
+  the paper is pleasant on a laptop, and the price is a governing body receiving
+  two different documents depending on what the coach was holding.
+  ⚠️ **THE 22 GO TWO-UP ON A WIDE SCREEN VIA A `desktop:` CLASS, NOT THE HOOK**,
+  which is the distinction `src/lib/useMediaQuery.js` draws: same DOM, same
+  order, two columns. Duplicated CONTENT needs JS; presentation does not, and
+  there is no duplicated content left.
+  ⚠️ **A TEST NOW ASSERTS ITS OWN OPPOSITE.** The case that pinned "a wide screen
+  puts the inputs back on the form" is replaced by one pinning that the form
+  holds no controls at any width, plus a DOM-equality check across both branches.
+
 - `60e6005` — 📓 **THE MATCH SHEET'S "NEVER EXERCISED" ITEM WAS ABOUT TO MISLEAD.**
   Still true that no coach has filed one for a real match — but the sheet had by
   then been opened and shared from a phone, and three bugs fell out and were
@@ -17,7 +37,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   that no longer exist. Also cited `d576bb1`, and recorded the `shareImage.js`
   desktop-download observation as an open item rather than fixing it unprovoked.
 
-- ✨ **THE MATCH SHEET IS FILLED IN OFF THE FORM ON A PHONE.** The fixed-width fix
+- `0a4525f` — ✨ **THE MATCH SHEET IS FILLED IN OFF THE FORM ON A PHONE.** The fixed-width fix
   earlier today made RCM's facsimile LEGIBLE on a phone and left it awful to FILL
   IN — 22 names into 40px boxes, scrolling sideways, standing at a pitch. Jay:
   *"i think we should go with the stacked mobile version"*. Below 900px every
