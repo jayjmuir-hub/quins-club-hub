@@ -39,11 +39,13 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   `https://adhquins-clubhub.com/` and the calendar feed at
   `/calendar.ics?token=<Jay's token>`. ✅ **E-mail delivery is PROVEN** — Jay ran
   *Send test alert* and it arrived.
-  ⬜ **STILL OUTSTANDING, AND IT IS THE HALF THAT MATTERS: nobody has proved the
-  monitors NOTICE AN OUTAGE.** The test alert exercised the e-mail path only.
-  Pause the Netlify site once, confirm both go red, and record the delay here —
-  that number is the real detection window. **A monitor that has never fired is
-  not a monitor.**
+  ✅ **DETECTION IS PROVEN TOO — the drill was RUN, 16 Aug 2026, not just written
+  down.** The live site was disabled for **4m 15s** (09:44:04 to 09:48:19 UTC).
+  Both monitors opened an incident at **09:44**, e-mail alerts arrived, and the
+  incidents auto-resolved by 09:52 once the site was back.
+  ⚠️ **DETECTION WAS UNDER A MINUTE, NOT THE THREE THE CHECK INTERVAL IMPLIES** —
+  worth knowing before anyone "fixes" the frequency on the strength of the
+  setting rather than the measurement.
   ⬜ **Sentry is built and switched off** (`src/lib/errorReporting.js`); it needs
   a project, `VITE_SENTRY_DSN` in Netlify and a redeploy. Both are Jay's.
   ⚠️ **KEYWORD MATCHING IS A PAID FEATURE ON BETTER STACK, AND THE RUNBOOK SAID

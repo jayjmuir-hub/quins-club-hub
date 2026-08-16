@@ -17,8 +17,9 @@ Jay's token comes from **More → Add to calendar** in the app. It exposes fixtu
 for squads he can already see — which this repo treats as not sensitive — and it
 can be rotated. Do not use a parent's.
 
-✅ **E-mail delivery is PROVEN** — Jay ran *Send test alert* on 16 Aug and it
-arrived. ⬜ **Detection is NOT yet proven**; see the pause drill below.
+✅ **BOTH PROVEN, 16 Aug 2026 — the drill was actually run, not just written
+down.** E-mail delivery via *Send test alert*, and detection by disabling the
+live site. Numbers below.
 
 ## ⚠️ Keyword matching is a PAID feature — do not select it
 
@@ -48,17 +49,38 @@ include keyword monitors, but its free plan is **personal, non-commercial use
 only** (since Dec 2024), and StatusCake deactivates an account that does not log
 in every 90 days. Neither trade is worth one rare, self-inflicted regression.
 
-## ⚠️ The pause drill — still outstanding
+## ✅ The drill — run 16 Aug 2026
 
 **A monitor that has never fired is not a monitor.** The test alert proved the
-e-mail PATH; it did not prove the monitors notice an outage.
+e-mail PATH only, so the site was actually taken down.
 
-1. Pick a quiet time — early morning UAE, not before a Saturday fixture.
-   **This is a real outage.**
-2. Netlify → `quins-club-hub` → **Site configuration → Status → Pause site**.
-3. Both monitors should go red. **Time how long it takes** — that is the real
-   detection window, and it belongs in `claude/open-items.md`.
-4. Un-pause; confirm the recovery alerts arrive.
+| | |
+|---|---|
+| Disabled | **09:44:04 UTC** |
+| Site returning 404 | 09:44:05 |
+| **Incident opened, both monitors** | **09:44** — *"Status 404"* |
+| E-mail alerts received | confirmed by Jay |
+| Re-enabled | **09:48:19** |
+| Site serving 200 again | 09:48:20 — under a second |
+| Incidents auto-resolved | by 09:52 |
+| **Total outage** | **4m 15s** |
+
+⚠️ **DETECTION WAS UNDER A MINUTE, NOT THE THREE THE INTERVAL IMPLIES.** The
+check frequency is 3 minutes, so the obvious expectation is up to 3 minutes of
+blindness; the incident opened within the same minute as the pause. Do not
+"correct" the check interval on the strength of the 3-minute number — the
+measured behaviour is better than the setting suggests.
+
+⚠️ **THE CONTROL IS NOT CALLED "PAUSE".** Netlify → `quins-club-hub` →
+**Project configuration → General → Danger zone → Project availability →
+Disable project**, and **Enable project** in the same place to restore. It is
+reversible — Netlify's own words are *"You can re-enable your project anytime"* —
+and restoration was effectively instant.
+⚠️ **`Delete this project` SITS DIRECTLY BELOW IT** in the same Danger zone, and
+that one has no undo. Read the button before clicking it.
+
+**Redo this if the provider, the alert address or the monitor set changes.** It
+is the only thing that distinguishes a monitor from a decoration.
 
 ## Error tracking — built, switched off
 

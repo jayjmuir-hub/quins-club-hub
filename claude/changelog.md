@@ -31,9 +31,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   when it genuinely built. Not worth swapping provider for: UptimeRobot's free
   tier has keyword monitors but is personal/non-commercial only, and StatusCake
   deactivates accounts idle for 90 days.
-  ⚠️ **DETECTION IS STILL UNPROVEN.** The test alert exercised the e-mail PATH,
-  not the monitors noticing an outage. The pause drill is outstanding and stays
-  in `claude/open-items.md` until the measured delay is written there.
+  ✅ **AND THE DRILL WAS ACTUALLY RUN, WHICH IS THE WHOLE POINT.** The live site
+  was disabled for **4m 15s** (09:44:04 → 09:48:19 UTC) on Jay's say-so. Both
+  monitors opened an incident at **09:44** — *"Status 404"* — the e-mail alerts
+  arrived, and the incidents auto-resolved by 09:52. Restoration was under a
+  second.
+  ⚠️ **DETECTION WAS UNDER A MINUTE, NOT THE THREE THE CHECK INTERVAL IMPLIES.**
+  Written down so nobody later "fixes" the frequency from the setting rather than
+  from the measurement.
+  ⚠️ **AND THE NETLIFY CONTROL IS NOT CALLED "PAUSE"** — it is **Project
+  configuration → General → Danger zone → Disable project**, with `Delete this
+  project` immediately below it in the same panel and no undo on that one.
 
 - `bca0e02` — ✂️ **THE MONITORING WORK WAS CUT BACK — Jay: *"i just want simple, not over
   engineered"*.** He was right, and the over-engineering had a single root: a
