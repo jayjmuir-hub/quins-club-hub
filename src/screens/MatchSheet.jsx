@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
+import MatchSheetEntry from '../components/MatchSheetEntry.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { getEvent, upsertEvent } from '../data/events.js'
 import { listLineups } from '../data/lineups.js'
@@ -14,6 +15,7 @@ import {
   saveMatchSheetSlots,
   setMatchSheetStatus,
 } from '../data/matchSheets.js'
+import { useMediaQuery } from '../lib/useMediaQuery.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import { canEditTeam } from '../lib/scope.js'
@@ -68,6 +70,22 @@ const LEFT_COLUMN = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 /** The five blank discipline rows the paper form provides. */
 const CARD_ROWS = 5
+
+/**
+ * Wide enough to fill the form in ON the form.
+ *
+ * ⚠️ 900px IS THE FACSIMILE'S OWN WIDTH, NOT A BREAKPOINT FROM THE SCALE. The
+ * form is a fixed 860px plus its border and padding — 886 — so this is "the
+ * paper fits, with a little air", and it is deliberately NOT `desktop` (820px)
+ * from tailwind.config.js. At 820 the paper does not fit and the coach would be
+ * typing into 40px boxes while scrolling sideways, which is the whole thing this
+ * exists to stop.
+ *
+ * ⚠️ ONE SOURCE OF TRUTH. This replaced a `min-[900px]:hidden` class that had
+ * the same number written in it, so the number lived in two places for exactly
+ * one commit.
+ */
+const FITS_THE_PAPER = '(min-width: 900px)'
 
 /** The two sides, in the order the columns are laid out. */
 const SIDES = ['us', 'them']
@@ -128,7 +146,39 @@ function kindSentence(kinds) {
  * box; a control with its own chrome would photograph as an app screenshot
  * instead of as a completed form, which is the one thing this page is for.
  */
-function Cell({ value, onChange, list, ...rest }) {
+function Cell({ value, onChange, list, preview, ...rest }) {
+  // ⚠️ A SPAN IN PREVIEW, SIZED TO THE CONTROL IT REPLACES. On a phone the
+  // facsimile is not the editor (MatchSheetEntry is), so these become read-only
+  // text — and the form still has to photograph the same from a phone as from a
+  // laptop, which is the whole point of the fixed 860px width.
+  //
+  // ⚠️ 14.375px IS MEASURED, NOT CHOSEN. Tailwind's preflight zeroes the padding
+  // and border on form controls, so this input is exactly its line-height —
+  // `leading-tight` on `text-[11.5px]`. An earlier guess of `min-h-[16px]` plus
+  // `py-px` was 2px PROUD on every row, in the opposite direction to the comment
+  // that justified it. Measure the control, do not reason about it.
+  //
+  // ⚠️ THE TWO ARE NOT PIXEL-IDENTICAL AND THIS IS THE HONEST NUMBER: measured
+  // 16 Aug 2026 in Chromium, the whole form is 1115px on the paper branch and
+  // 1090px in preview — 25px, or 2%, spread as one to four pixels across about
+  // twenty rows. Column widths, content and structure are the same; only some
+  // empty controls sit fractionally taller than the text that replaces them.
+  // **Do not read that as licence to let it drift.** The bug this screen was
+  // fixed for was a form 501px too wide with its labels printed over each
+  // other, and the way that is kept away is by treating a growing number here as
+  // a regression. If it ever matters exactly, the answer is not more min-heights
+  // — it is to render the facsimile in preview at EVERY width and let the
+  // stacked form be the only editor, which collapses the two paths into one.
+  //
+  // ⚠️ AND IT GROWS WITH ITS CONTENT, so no value is ever clipped by a height
+  // here being a pixel out — the residual is empty-box geometry, never text.
+  if (preview) {
+    return (
+      <span className="block min-h-[14.375px] w-full min-w-0 text-[11.5px] leading-tight">
+        {value ?? ''}
+      </span>
+    )
+  }
   return (
     <input
       {...rest}
@@ -141,13 +191,14 @@ function Cell({ value, onChange, list, ...rest }) {
 }
 
 /** One numbered squad row: number, name, FR tick. */
-function SlotCells({ slots, index, onName, onSet }) {
+function SlotCells({ slots, index, onName, onSet, preview }) {
   const row = slots[index]
   return (
     <>
       <td className={`${CELL} text-center font-bold`}>{row.slot}</td>
       <td className={CELL}>
         <Cell
+          preview={preview}
           list="squad-players"
           aria-label={`Player ${row.slot}`}
           value={row.full_name}
@@ -156,13 +207,37 @@ function SlotCells({ slots, index, onName, onSet }) {
       </td>
       <td className={`${CELL} text-center`}>
         {/* ⚠️ The FR column is a SAFETY declaration — it tells the referee which
-            replacements can cover the front row. Not decoration. */}
-        <input
-          type="checkbox"
-          aria-label={`Front row cover for player ${row.slot}`}
-          checked={row.front_row}
-          onChange={(domEvent) => onSet(index, { front_row: domEvent.target.checked })}
-        />
+            replacements can cover the front row. Not decoration.
+
+            ⚠️ STILL A CHECKBOX IN PREVIEW — NOT A "✓" CHARACTER, AND NOT
+            `disabled` EITHER. The paper form does ask for a tick, and drawing
+            one would arguably be more faithful; it would also mean the PNG from
+            a phone stopped matching the PNG from a laptop, which is precisely
+            the bug this screen was just fixed for. Whether BOTH branches should
+            become a tick is a separate question with one answer, not two.
+            ⚠️ AND `disabled` IS THE TRAP INSIDE THE TRAP: every browser greys a
+            disabled checkbox, so it would have reintroduced the same mismatch
+            by the back door. `pointer-events-none` + `tabIndex={-1}` renders
+            byte-identically to the live control while being unreachable by
+            touch or keyboard. `readOnly` is there only to stop React warning
+            about a checked box with no onChange. */}
+        {preview ? (
+          <input
+            type="checkbox"
+            checked={row.front_row}
+            readOnly
+            tabIndex={-1}
+            aria-hidden="true"
+            className="pointer-events-none"
+          />
+        ) : (
+          <input
+            type="checkbox"
+            aria-label={`Front row cover for player ${row.slot}`}
+            checked={row.front_row}
+            onChange={(domEvent) => onSet(index, { front_row: domEvent.target.checked })}
+          />
+        )}
       </td>
     </>
   )
@@ -401,6 +476,15 @@ export default function MatchSheet() {
   // match_sheets is the real boundary; this only avoids showing a form the
   // database would refuse to save.
   const mayEdit = event ? canEditTeam(memberships, event.team_id) : false
+
+  // ⚠️ FALSE UNDER jsdom, AND THAT IS LOAD-BEARING FOR THE WHOLE SUITE.
+  // useMediaQuery returns false when matchMedia is missing, so every existing
+  // test renders the PHONE branch — where MatchSheetEntry holds the inputs. The
+  // labels there are identical to the facsimile's, so those tests keep passing
+  // without knowing which layout they are looking at. A test that wants the
+  // paper branch stubs window.matchMedia itself.
+  const fitsThePaper = useMediaQuery(FITS_THE_PAPER)
+  const preview = !fitsThePaper
 
   const setField = (key) => (domEvent) => {
     setSaved(false)
@@ -940,21 +1024,41 @@ export default function MatchSheet() {
           )}
         </Card>
 
-        {/* ⚠️ AN INSTRUCTION RATHER THAN AN APOLOGY. The form below is a fixed
-            860px because it is a facsimile of a piece of paper; see the note on
-            the block itself.
+        {/* ── FILLING IT IN, WHEN THE PAPER DOES NOT FIT ────────────────────
+            ⚠️ THE EDITOR MOVES OFF THE FORM, THE FORM DOES NOT MOVE. Jay,
+            16 Aug 2026, after the fixed-width fix landed: the sheet was legible
+            on a phone and still awful to FILL IN — 22 names into 40px boxes,
+            scrolling sideways, standing on a pitch. So below 900px every value
+            is typed here and the facsimile becomes a preview of what will be
+            sent. Above it, the paper fits and typing on it is pleasant, so
+            nothing changes.
 
-            ⚠️ 900px, NOT THE `sm` BREAKPOINT. The obvious `sm:hidden` is wrong
-            by 260px: `sm` is 640, and the form needs 860 plus its own border and
-            padding — so on every tablet and small laptop between the two the
-            hint would vanish while the sideways scroll it explains is still
-            there. The number belongs to the form's width, not to a breakpoint
-            scale, which is exactly what an arbitrary variant is for. */}
-        <p className="mt-3.5 text-[12.5px] font-semibold text-ink-muted min-[900px]:hidden">
-          The form below is RCM&rsquo;s, at its real size. Scroll it sideways, or pinch to zoom out
-          and see all of it.
-        </p>
+            ⚠️ RENDERED, NOT HIDDEN. Both branches emit the same fields, so a
+            `min-[900px]:hidden` class would leave two of everything in the DOM
+            — see the header on src/lib/useMediaQuery.js, which exists because
+            the roster hit exactly this. ── */}
+        {preview && (
+          <MatchSheetEntry
+            slots={slots}
+            onName={nameChanged}
+            onSlot={setSlot}
+            cardRows={cardRows}
+            onCard={setCard}
+            fields={fields}
+            onField={setField}
+          />
+        )}
       </div>
+
+      {/* ⚠️ SAYS WHICH THING IT IS. On a phone the block below is no longer
+          something you fill in, and a form full of untypeable boxes reads as
+          broken rather than as a preview unless it is labelled. */}
+      {preview && (
+        <p className="mb-1.5 text-[12.5px] font-semibold text-ink-muted print:hidden">
+          Below is RCM&rsquo;s form at its real size — this is exactly what Share sends. Scroll
+          it sideways, or pinch to zoom out and see all of it.
+        </p>
+      )}
 
       {/* ── The facsimile. This block is what html2canvas photographs, so
              everything inside it must read as a COMPLETED FORM rather than as
@@ -1085,6 +1189,7 @@ export default function MatchSheet() {
                 <th className={`${CELL} text-left`}>
                   TEAM CAPTAIN:{' '}
                   <Cell
+                    preview={preview}
                     list="squad-players"
                     aria-label="Team captain"
                     value={fields.captain_name}
@@ -1097,9 +1202,9 @@ export default function MatchSheet() {
                 const right = left + LEFT_COLUMN.length
                 return (
                   <tr key={left}>
-                    <SlotCells slots={slots} index={left - 1} onName={nameChanged} onSet={setSlot} />
+                    <SlotCells slots={slots} index={left - 1} onName={nameChanged} onSet={setSlot} preview={preview} />
                     {right <= SLOT_COUNT ? (
-                      <SlotCells slots={slots} index={right - 1} onName={nameChanged} onSet={setSlot} />
+                      <SlotCells slots={slots} index={right - 1} onName={nameChanged} onSet={setSlot} preview={preview} />
                     ) : (
                       <>
                         <td className={CELL} />
@@ -1133,32 +1238,51 @@ export default function MatchSheet() {
               {cardRows.map((card, index) => (
                 <tr key={index}>
                   <td className={CELL}>
-                    <Cell aria-label={`Card ${index + 1} half`} value={card.half} onChange={setCard(index, 'half')} />
+                    <Cell preview={preview} aria-label={`Card ${index + 1} half`} value={card.half} onChange={setCard(index, 'half')} />
                   </td>
                   <td className={CELL}>
-                    <Cell aria-label={`Card ${index + 1} time`} value={card.minute} onChange={setCard(index, 'minute')} />
+                    <Cell preview={preview} aria-label={`Card ${index + 1} time`} value={card.minute} onChange={setCard(index, 'minute')} />
                   </td>
                   <td className={CELL}>
                     {/* ⚠️ A SELECT, not free text: the column is R or Y, and the
                         colour CHECK constraint accepts nothing else. A typed "yel"
                         would fail the save with a constraint error on a field
-                        somebody thought they had filled in correctly. */}
-                    <select
-                      aria-label={`Card ${index + 1} colour`}
-                      value={card.colour}
-                      onChange={setCard(index, 'colour')}
-                      className="w-full bg-transparent text-[11.5px] outline-none"
-                    >
-                      <option value="" />
-                      <option value="yellow">Y</option>
-                      <option value="red">R</option>
-                    </select>
+                        somebody thought they had filled in correctly.
+
+                        ⚠️ AND IT IS NOT A `Cell`, WHICH IS WHY IT WAS THE ONE
+                        FIELD THE PREVIEW PASS MISSED. Every other box on this
+                        form goes through Cell and got `preview` threaded through
+                        it; this one is hand-rolled, so it needed its own branch
+                        and did not get one until the suite found two controls
+                        answering to "Card 1 colour". If a new control is ever
+                        added here that is not a Cell, it needs this too.
+
+                        The 17px below is the select's MEASURED height, so the
+                        five card rows keep the height they have with the
+                        control in them. */}
+                    {preview ? (
+                      <span className="block min-h-[17px] w-full text-[11.5px] leading-tight">
+                        {card.colour === 'yellow' ? 'Y' : card.colour === 'red' ? 'R' : ''}
+                      </span>
+                    ) : (
+                      <select
+                        aria-label={`Card ${index + 1} colour`}
+                        value={card.colour}
+                        onChange={setCard(index, 'colour')}
+                        className="w-full bg-transparent text-[11.5px] outline-none"
+                      >
+                        <option value="" />
+                        <option value="yellow">Y</option>
+                        <option value="red">R</option>
+                      </select>
+                    )}
                   </td>
                   <td className={CELL}>
-                    <Cell aria-label={`Card ${index + 1} number`} value={card.slot} onChange={setCard(index, 'slot')} />
+                    <Cell preview={preview} aria-label={`Card ${index + 1} number`} value={card.slot} onChange={setCard(index, 'slot')} />
                   </td>
                   <td className={CELL}>
                     <Cell
+                      preview={preview}
                       list="squad-players"
                       aria-label={`Card ${index + 1} name`}
                       value={card.full_name}
@@ -1166,7 +1290,7 @@ export default function MatchSheet() {
                     />
                   </td>
                   <td className={CELL}>
-                    <Cell aria-label={`Card ${index + 1} reason`} value={card.reason} onChange={setCard(index, 'reason')} />
+                    <Cell preview={preview} aria-label={`Card ${index + 1} reason`} value={card.reason} onChange={setCard(index, 'reason')} />
                   </td>
                 </tr>
               ))}
@@ -1184,13 +1308,26 @@ export default function MatchSheet() {
               </tr>
               <tr>
                 <td className={CELL}>
-                  <textarea
-                    aria-label="Medical notes"
-                    rows={3}
-                    value={fields.medical_notes}
-                    onChange={setField('medical_notes')}
-                    className="w-full resize-none bg-transparent text-[11.5px] outline-none"
-                  />
+                  {/* ⚠️ `whitespace-pre-line` AND THREE ROWS' WORTH OF HEIGHT.
+                      A textarea keeps its newlines and reserves `rows={3}`
+                      whatever is in it; a span would collapse both, so a phone
+                      would photograph a medical note as one run-on line in a
+                      box that shrank to fit. The medical box is the one field
+                      on this form where losing a line break can matter.
+                      55px is the measured height of the `rows={3}` textarea. */}
+                  {preview ? (
+                    <p className="min-h-[55px] w-full whitespace-pre-line text-[11.5px] leading-tight">
+                      {fields.medical_notes}
+                    </p>
+                  ) : (
+                    <textarea
+                      aria-label="Medical notes"
+                      rows={3}
+                      value={fields.medical_notes}
+                      onChange={setField('medical_notes')}
+                      className="w-full resize-none bg-transparent text-[11.5px] outline-none"
+                    />
+                  )}
                 </td>
               </tr>
             </tbody>
@@ -1206,6 +1343,7 @@ export default function MatchSheet() {
                 <td className={CELL}>
                   <span className="font-bold">NAME:</span>{' '}
                   <Cell
+                    preview={preview}
                     aria-label="Team manager"
                     value={fields.manager_name}
                     onChange={setField('manager_name')}
@@ -1222,6 +1360,7 @@ export default function MatchSheet() {
                 <td className={CELL}>
                   <span className="font-bold">PHONE:</span>{' '}
                   <Cell
+                    preview={preview}
                     aria-label="Team manager phone"
                     type="tel"
                     value={fields.manager_phone}
