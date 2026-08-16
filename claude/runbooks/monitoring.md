@@ -82,23 +82,54 @@ that one has no undo. Read the button before clicking it.
 **Redo this if the provider, the alert address or the monitor set changes.** It
 is the only thing that distinguishes a monitor from a decoration.
 
-## Error tracking — built, switched off
+## ✅ Error tracking — LIVE since 16 Aug 2026
 
-`src/lib/errorReporting.js`. **Sends nothing until a DSN exists** — with none
-set, the Sentry SDK is not even in the bundle.
+`src/lib/errorReporting.js`, sending to the **EU** Sentry region. Proven by
+firing `Promise.reject(new Error(…))` on the live site: the SDK chunk loaded on
+demand, POSTed to the ingest endpoint, got **200**, and the issue appeared in
+Sentry. An error tracker that has never received an event is not one; this one
+has.
 
-1. Create a Sentry project (platform **React**). ⚠️ The data region is chosen at
-   signup and **cannot be changed later** — pick EU.
-2. Copy the **DSN**. ⚠️ **Ignore the onboarding wizard** — the code is already
-   written, and `npx @sentry/wizard` would install a second copy and undo the
-   lazy-loading.
+Measured on the deployed bundle:
+
+| | |
+|---|---|
+| Entry chunk | 944 KB raw / **259.9 KB gzip** (259.6 before the DSN) |
+| `captureException` in the entry | **1** — our call site only |
+| Sentry SDK | its own chunk, **159.3 KB gzip**, fetched only on a crash |
+
+⚠️ **THE ENTRY GREW BY 0.3 KB. THE SDK IS NOT IN IT** — verify by counting
+`captureException` in the entry bundle: **1 is our call site, 11 would be the
+SDK**. If that number is ever 11, the lazy import has been "tidied" into a
+top-level one and every phone is paying 159 KB for it.
+
+⚠️ **STACK TRACES ARE MINIFIED — SEEN, NOT PREDICTED.** The smoke-test issue
+shows its location as `?(<anonymous>)`. No source maps are uploaded, so an error
+gives you the MESSAGE, the page, the browser and the number of people affected,
+but not a file and line. Usually enough in a codebase this size. Uploading source
+maps needs a Sentry auth token as a build secret plus a Vite plugin — deliberately
+not done. **The honest trigger for revisiting is the first real error nobody can
+place**, not a tidiness urge.
+
+### If it ever needs setting up again
+
+1. Sentry project, platform **React**. ⚠️ The data region is chosen at signup and
+   **cannot be changed later** — pick EU.
+2. Copy the **DSN**. ⚠️ **Ignore the onboarding wizard** — `npx @sentry/wizard`
+   would install a second copy and undo the lazy-loading.
 3. Netlify → **Site configuration → Environment variables** →
-   `VITE_SENTRY_DSN = <the DSN>`.
-4. ⚠️ **Redeploy.** `VITE_*` is substituted at BUILD time, so the variable alone
-   changes nothing.
-5. Prove it fires: on the live site, in the browser console, run
-   `Promise.reject(new Error('sentry smoke test'))`. It should reach Sentry
-   within a minute.
+   `VITE_SENTRY_DSN`. Do NOT tick "Contains secret values": the DSN is a
+   write-only ingest key that ships in the client bundle by design, and marking
+   it secret only complicates the build.
+4. ⚠️ **REDEPLOY — AND "Deploy project" IS THE WRONG ONE IF THE LAST COMMITS WERE
+   DOCS.** `scripts/netlify-ignore.mjs` compares the diff and will CANCEL the
+   build, so the variable never gets baked in and nothing looks wrong. Use
+   **Trigger deploy → Deploy project without cache**, which the gate always
+   builds ("no cached commit to compare against"). Predict it first:
+   `CACHED_COMMIT_REF=<last built> COMMIT_REF=<head> node scripts/netlify-ignore.mjs`
+   — exit 0 means it would skip.
+5. Prove it fires: on the live site console, run
+   `Promise.reject(new Error('sentry smoke test'))`.
 
 ⚠️ **The SDK is lazy-loaded and must stay that way** — 159 KB gzip against a
 260 KB bundle. See `src/lib/errorReporting.js`.
