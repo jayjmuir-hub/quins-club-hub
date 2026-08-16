@@ -18,6 +18,23 @@
 // Example, for a sandbox with a shared toolchain install:
 //   PLAYWRIGHT_MODULE=/opt/node-tools/node_modules/playwright/index.mjs \
 //     node harness/shoot-roster.mjs
+//
+// ⚠️ ON WINDOWS IT MUST BE A `file:///` URL, AND THE EXAMPLE ABOVE IS THE TRAP.
+// `import()` takes a URL, not a path, so a bare Windows absolute path fails with
+// ERR_UNSUPPORTED_ESM_URL_SCHEME — "Received protocol 'c:'" — which reads as a
+// broken Playwright install rather than a malformed specifier. The POSIX example
+// works only because a leading `/` is already a valid relative URL. Measured
+// 16 Aug 2026, running the overflow gate from a worktree against the OTHER
+// jay-pc clone's install (CLAUDE.md records that there are two):
+//   PLAYWRIGHT_MODULE=file:///C:/Users/jayjm/GitHub/quins-club-hub/node_modules/playwright/index.mjs \
+//     node harness/check-overflow.mjs
+//
+// ⚠️ THIS IS THE ROUTE TO USE FROM A WORKTREE, and it beats installing a second
+// copy. A git worktree's own `node_modules` is EMPTY — Node resolves the app's
+// dependencies by walking up to the parent clone, which is why `npm test` and
+// `npm run build` work there while an absolute `<repo>/node_modules/...` path
+// does not. `tests/pwa-build.test.js` builds exactly such a path for vite's bin
+// and is the one suite that fails in a worktree for that reason alone.
 
 export async function loadChromium() {
   const candidates = [process.env.PLAYWRIGHT_MODULE, 'playwright'].filter(Boolean)
