@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- ✨ **EVERY NAME IS TWO BOXES NOW.** Jay: *"children name and any other name
+- ✨ **DATE OF BIRTH HAS A HOME, AND IT IS NOT A COLUMN ON `players`.** Jay:
+  *"i think we need to have date of birth"* — reversing the standing ruling in
+  `src/lib/ageGroup.js` that the club holds no DOBs.
+  ⛔ **A COLUMN ON `players` WOULD HAVE PUBLISHED EVERY CHILD'S BIRTHDAY TO
+  EVERY PARENT IN THE SQUAD.** `player read` is squad-wide, RLS grants ROWS not
+  COLUMNS, and a parent and a coach are the same `authenticated` role — so no
+  policy could hide one column from a team-mate's parent. `public.player_grades`
+  had already met this and solved it the same way; this is that pattern, second
+  use. New table `public.player_private`, policies `can_edit_team OR
+  is_own_player` — the same pair `player_parents` runs.
+  ⚠️ **NOTHING WRITES TO IT YET.** The registration field and the
+  `allowsOwnContact` re-point are the other half. The re-point is deferred on
+  purpose: a parent may edit their own child's birthday, so a DOB may only make
+  the under-13 contact gate STRICTER, never relax it.
+
+- `f6da486` — ✨ **EVERY NAME IS TWO BOXES NOW.** ⚠️ *This squash carried the
+  entry below it as well — one merge, two items.* Jay: *"children name and any other name
   should be two blocks First Name and Last Name, this will stop people only
   putting a first name"*.
   ⚠️ **THE PROBLEM WAS THE INPUT, NOT THE COLUMN.** One column behind one text

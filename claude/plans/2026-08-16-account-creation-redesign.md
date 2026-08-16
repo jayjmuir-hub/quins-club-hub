@@ -206,7 +206,36 @@ argument applies to the child.
 Callers to change: `PlayerRegistrationForm`, `PlayerForm`, `MyPlayerForm`,
 `ParentsEditor`, and `playerImport`.
 
-## 3 · Date of birth, in its own table
+## 3 · Date of birth, in its own table — 🟡 TABLE DONE, NOTHING WRITES TO IT YET
+
+**Done, 16 Aug 2026:** `public.player_private`, three policies, applied and
+proved on production. ⚠️ **Nothing in the app reads or writes it yet** — the
+registration field and the `allowsOwnContact` re-point are the remaining half,
+and until one of them lands this table is correct and empty.
+
+### Proved on production, rolled back, with a control
+
+| | rows visible |
+|---|---|
+| control, no RLS | 2 |
+| **parent of child A** | **1** — their own only |
+| parent of A reading B | 0 |
+| parent updating own child | 1 row |
+| **parent updating a team-mate** | **0 rows** |
+| coach of the squad | 2 |
+
+Grants read back rather than assumed: `authenticated` holds
+SELECT/INSERT/UPDATE/DELETE from Supabase's defaults, `anon` holds nothing.
+
+⚠️ **THE `allowsOwnContact` RE-POINT IS NOT A TIDY-UP AND MUST NOT BE DONE
+CASUALLY.** A parent may write their own child's birthday — deliberately, since
+the family is the source of truth. That means a DOB may only ever make the
+under-13 contact gate **stricter**, never relax it, or a parent editing a
+birthday could unlock a field the club's own rule forbids. The call sites also
+take a squad NAME today, not a player, so re-pointing is a real refactor rather
+than a one-line change. Deferred on purpose.
+
+## 3 · Date of birth — the original reasoning
 
 Jay's call, 16 Aug: *"i think we need to have date of birth"*. It was argued
 against first — `src/lib/ageGroup.js` records the standing ruling that the club
