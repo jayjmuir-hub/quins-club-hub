@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- ✨ **A WAITING PERSON'S CARD NOW SAYS WHAT THEY ASKED FOR.** The role and squad
+- 🐞 **"VIEW AS" MADE THE SIGN-IN GATE FORGET YOUR CHILDREN.** Jay, hours after
+  the gate shipped, with two sons already linked: *"this has popped up twice in
+  my own account… actually, it is specific to when i change viewing as"*.
+  ⚠️ **A PREVIEW REPLACES THE EFFECTIVE MEMBERSHIPS WITH ONE SYNTHETIC ROW, AND
+  THAT ROW HARDCODES `player_id: null`.** The gate read the effective set, so an
+  admin previewing any role looked like somebody with no children — and was
+  asked, every time they switched.
+  ⚠️ **THE RULE WAS ALREADY WRITTEN DOWN AND I DID NOT APPLY IT.**
+  `src/lib/memberships.jsx` states it for the switcher and the banner: gate on
+  `realMemberships`. A preview is cosmetic; whether you have a child at the club
+  is a fact about you, not about the role you are pretending to be.
+  ⚠️ **`playerOnly` HAD THE SAME FAULT** — previewing as a player would have
+  exempted an admin from the phone question.
+  ⚠️ **AND THE TEST HELPER HID IT**, because it returned one array for both
+  `memberships` and `realMemberships`. It now mirrors the provider, which is
+  what lets a preview case set them apart.
+
+- `7f86ba3` — ✨ **A WAITING PERSON'S CARD NOW SAYS WHAT THEY ASKED FOR.** The role and squad
   the request form collects since this morning are rendered on the card, so
   "Asked as Coach · U14B" appears instead of a bare address.
   ⚠️ **AND THE OTHER HALF OF THE PLAN COULD NOT WORK, WHICH THE TEST FOUND.**
