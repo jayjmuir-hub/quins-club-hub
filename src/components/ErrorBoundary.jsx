@@ -1,5 +1,6 @@
 import React from 'react'
 import { clearCachedApiResponses } from '../lib/apiCache.js'
+import { reportError } from '../lib/errorReporting.js'
 import Button from './Button.jsx'
 
 // The screen a person gets instead of a blank white page.
@@ -62,15 +63,27 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    // ⚠️ THE ONLY RECORD THAT A CRASH HAPPENED. There is no Sentry, no
-    // logging service and no alerting in this project (13 Aug audit), so this
-    // console line and whatever the person tells Jay is the entire trail.
-    // When error tracking is added, it hooks in HERE and nowhere else.
+    // ⚠️ THE CONSOLE LINE STAYS, AND IS STILL THE ONLY RECORD MOST OF THE TIME.
+    // Error tracking is switched on by a build-time DSN which is absent today,
+    // so without this line a crash would leave no trail at all — and even with
+    // Sentry running, the console is what someone reads over a parent's shoulder
+    // at the side of a pitch.
     if (this.props.onError) {
       this.props.onError(error, info)
     } else {
       console.error('[Quins] Unhandled render error:', error, info?.componentStack)
     }
+
+    // ⚠️ REPORTED WHETHER OR NOT A CALLER SUPPLIED `onError`, and that asymmetry
+    // with the branch above is deliberate: `onError` is a rendering concern (a
+    // caller wanting to know), and error TRACKING must not be switchable off by
+    // a caller happening to pass a callback.
+    //
+    // ⚠️ NOT AWAITED, AND IT CANNOT THROW. `reportError` loads Sentry lazily —
+    // the SDK is not in the main bundle, see src/lib/errorReporting.js — and
+    // swallows every failure of its own, because this is already the error path
+    // and making it worse is the one unacceptable outcome.
+    reportError(error, { componentStack: info?.componentStack })
   }
 
   handleRetry = () => {

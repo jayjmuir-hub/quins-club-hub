@@ -103,31 +103,64 @@ failed and was therefore vacuous.
 ⚠️ **Pausing the site IS an outage.** Do it at a time when nobody is looking —
 early morning UAE, not before a Saturday fixture.
 
-## Step 3 — error tracking (not done, and it needs a decision first)
+## Step 3 — error tracking ✅ built, and inert until a DSN exists
 
-`ErrorBoundary.componentDidCatch` already has the hook — it calls
-`this.props.onError` when given one and falls back to `console.error`. Wiring
-Sentry in is small.
+`src/lib/errorReporting.js`, wired into `ErrorBoundary.componentDidCatch` and
+into `main.jsx`. Jay chose the lazy-load option on 16 Aug 2026.
 
-⚠️ **THE DECISION IS BUNDLE SIZE, AND IT IS JAY'S.** Measured 16 Aug 2026: the
-main bundle is **260 KB gzip**. `@sentry/react` adds roughly 25-30 KB gzip —
-about 11% — to an app opened on phones on pitch-side mobile data.
+⚠️ **AND THE NUMBER THAT DECISION WAS TAKEN ON WAS WRONG, IN THE DIRECTION THAT
+MAKES IT MORE RIGHT.** This runbook said `@sentry/react` adds "roughly 25-30 KB
+gzip — about 11%". **Measured after installing it: the SDK chunk is 482 KB raw /
+159 KB gzip.** Against a 260 KB main bundle that is **+61%**, not 11%. Loading it
+normally was never the modest option it was presented as.
 
-Three options, and none is obviously right:
+Measured, both ways:
 
-1. **Lazy-load Sentry inside `componentDidCatch`** — `await import('@sentry/react')`
-   only once a crash has already happened. Costs nothing for the people who never
-   crash, which is nearly everyone. Loses breadcrumbs and global handlers, so an
-   unhandled promise rejection (the likelier failure in a data-fetching app) is
-   not captured unless a small `window.onunhandledrejection` hook is added
-   alongside it.
-2. **Load it normally** — full fidelity, 11% bigger for everyone.
-3. **Neither** — keep `console.error` and accept that a crash is only ever
-   diagnosed by asking the person what it said.
+| build | entry chunk (what every phone downloads) | Sentry |
+|---|---|---|
+| before | 943 KB raw / **260.0 KB gzip** | — |
+| with the DSN unset | 944 KB raw / **259.6 KB gzip** | not emitted at all |
+| with a DSN set | 944 KB raw / **259.8 KB gzip** | separate chunk, 159 KB gzip |
 
-⚠️ **DO NOT ADD THE DEPENDENCY BEFORE THE DSN EXISTS.** A Sentry account and its
-DSN are an account creation, so they are Jay's, and code that ships an
-uninitialised SDK is 30 KB doing nothing.
+Two things worth keeping:
+
+- **With no DSN the whole path is dead-code eliminated.** `import.meta.env` is
+  substituted at build time, so `if (!DSN) return` becomes unreachable code and
+  Rollup drops the dynamic import — the SDK is not merely unloaded, it is not in
+  `dist/` at all. Verified by searching the bundle for `captureException`: absent.
+- **With a DSN it splits properly.** The entry chunk grew by 0.2 KB gzip — the
+  call site and the config object — and the SDK went to its own chunk, fetched
+  only when something throws.
+
+### What it does
+
+- **Render crashes** → `ErrorBoundary.componentDidCatch` → `reportError`.
+- **Unhandled promise rejections and window errors** →
+  `installGlobalErrorReporting()`, called from `main.jsx` before render.
+  ⚠️ **This is not redundant.** An error boundary catches errors thrown during
+  RENDER and nothing else; a rejected Supabase call never reaches one, and in
+  this app that is where the failures are. Without it, the lazy-load option would
+  have bought error tracking for the rarest kind of fault only.
+- **A failed `<img>` is not reported.** `window.onerror` fires for those with
+  `event.error === null`, and reporting them fills the project with "Script
+  error" noise from other people's ad blockers.
+
+⚠️ **NOTHING IS SENT, AND NO CHUNK IS FETCHED, UNTIL `VITE_SENTRY_DSN` EXISTS.**
+
+### Turning it on (Jay, ~5 minutes)
+
+1. Create a Sentry account and a project (**React** platform). Free tier is ample
+   — this club will generate almost no events.
+2. Copy the project's **DSN**. ⚠️ It is a write-only ingest key and is not a
+   secret in the way the Supabase service key is — it ships in the client bundle
+   by design. It still does not belong in a chat or a commit.
+3. Netlify → the `quins-club-hub` project → **Site configuration → Environment
+   variables** → add `VITE_SENTRY_DSN`.
+4. ⚠️ **REDEPLOY.** `VITE_*` variables are substituted at BUILD time, so adding
+   the variable changes nothing until a build runs.
+5. ⚠️ **PROVE IT FIRES**, exactly as with the uptime monitor. Trigger a real
+   crash and confirm the event arrives in Sentry — an error tracker that has
+   never received an event is not an error tracker.
 
 ## Related
 

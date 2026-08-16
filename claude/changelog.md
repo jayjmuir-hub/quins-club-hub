@@ -10,7 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 📡 **THE MONITORING ASSERTIONS ARE WRITTEN DOWN AND RUNNABLE, AND ONE OF THEM
+- 🐛 **ERROR TRACKING, LOADED ONLY ONCE SOMETHING HAS ALREADY GONE WRONG.**
+  `src/lib/errorReporting.js`, wired into `ErrorBoundary.componentDidCatch` and
+  into `main.jsx`. Jay picked the lazy-load option of the three in
+  `claude/runbooks/monitoring.md`.
+  ⚠️ **AND THE NUMBER THAT DECISION WAS PRESENTED ON WAS WRONG BY FIVE TIMES, IN
+  THE DIRECTION THAT MAKES THE CHOICE MORE RIGHT.** The options said
+  `@sentry/react` costs "25-30 KB gzip, about 11%". **Measured after installing
+  it: 482 KB raw / 159 KB gzip — +61% against a 260 KB main bundle.** Loading it
+  normally was never the modest option it was described as. The estimate was a
+  recollection dressed as a measurement, which is exactly what this repo keeps
+  being bitten by; the correction is in the runbook and in `open-items.md`.
+  ⚠️ **MEASURED BOTH WAYS, BECAUSE "IT IS LAZY" IS A CLAIM ABOUT THE BUILD.**
+  With `VITE_SENTRY_DSN` unset the entry chunk is 259.6 KB gzip and **no Sentry
+  code is emitted at all** — `import.meta.env` is substituted at build time, so
+  `if (!DSN) return` makes the dynamic import unreachable and Rollup drops it;
+  `captureException` is absent from `dist/`. With a DSN set the entry chunk is
+  259.8 KB — plus 0.2 KB for the call site — and the SDK goes to its own chunk.
+  ⚠️ **THE GLOBAL HANDLER IS NOT REDUNDANT WITH THE BOUNDARY, AND WITHOUT IT THIS
+  WOULD HAVE BEEN NEARLY POINTLESS.** An error boundary catches errors thrown
+  during RENDER and nothing else — a rejected Supabase call never reaches one, and
+  in this app that is where the failures are. A failed `<img>` is deliberately
+  NOT reported: `window.onerror` fires for those with a null `error`, and they
+  are how an error tracker fills with other people's ad-blocker noise.
+  ⚠️ **IT SENDS NOTHING UNTIL JAY SETS `VITE_SENTRY_DSN` IN NETLIFY AND A BUILD
+  RUNS** — `VITE_*` is substituted at build time, so adding the variable alone
+  changes nothing. Two faults injected and both caught.
+
+- `7bb870d` — 📡 **THE MONITORING ASSERTIONS ARE WRITTEN DOWN AND RUNNABLE, AND ONE OF THEM
   IS THE OPPOSITE OF WHAT ANYBODY WOULD CONFIGURE.** `npm run check:live`
   (`scripts/live-check.mjs`, no dependencies, no credentials) plus
   `claude/runbooks/monitoring.md`. The accounts are still Jay's and still
