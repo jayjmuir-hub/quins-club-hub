@@ -357,6 +357,43 @@ functions with zero imports. Screens catch and render errors in a `role="alert"`
 Data modules never import React.
 
 
+### `/calendar.ics` — the three answers, and why an unknown token gets a calendar
+
+Measured against production 16 Aug 2026, except the 503 which is read from
+`supabase/functions/calendar/index.ts`:
+
+| request | answer |
+|---|---|
+| no token, or a token that is not a uuid | **404** `text/plain` "Not found" — refused on SHAPE, before Postgres is touched |
+| a well-formed uuid that matches no token | **200** `text/calendar`, a VALID BUT EMPTY calendar (254 bytes, zero `VEVENT`s) |
+| a real token | 200 `text/calendar` with events |
+| the RPC call failing (database down) | **503** "Unavailable" |
+
+⚠️ **AN UNKNOWN TOKEN IS NOT AN ERROR, AND THAT SURPRISES EVERYONE INCLUDING THE
+PERSON WHO WROTE THIS TABLE.** `public.calendar_events_for_token` filters events
+with `where exists (select 1 from calendar_tokens ct join memberships m …)`. A
+token nobody holds makes that EXISTS false for every row, so the function returns
+an EMPTY RESULT SET rather than raising — and the edge function dutifully builds
+a well-formed calendar with no events in it.
+
+⚠️ **THE CONSEQUENCE IS SILENT AND IS THE HALF WORTH KNOWING.**
+`reset_my_calendar_token` exists, so a token CAN be replaced. When it is, the old
+subscription sitting in somebody's phone **keeps succeeding** — 200, a valid
+calendar, no events, forever. Their fixtures simply vanish with no error for the
+calendar app to show. Good for privacy (the old token stops returning data
+immediately); confusing for a legitimate person who reset their token or mistyped
+a URL, and indistinguishable from "the club has no fixtures".
+
+⚠️ **DO NOT "FIX" IT TO 404 WITHOUT WEIGHING THE ORACLE.** Answering 404 for an
+unknown token while answering 200 for a real-but-empty one tells anybody probing
+which tokens exist. The tokens are 122-bit uuids so the risk is slight — but it
+is the reason the current behaviour is defensible, and the code comment beside
+the 503 is reaching for the same idea.
+
+⚠️ **AND IT MEANS A MONITOR CANNOT PROBE THIS ENDPOINT WITH A FAKE TOKEN.** A
+made-up uuid returns 200 forever, so a "watch it fail" drill built on one tests
+nothing. Found by trying exactly that, 16 Aug 2026.
+
 ### Photo storage — deleting an object, and what a stranded one means
 
 ⚠️ **YOU CANNOT DELETE A STORAGE OBJECT WITH SQL, AND THE ESCAPE HATCH IS A TRAP.**
