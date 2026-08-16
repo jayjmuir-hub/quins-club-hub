@@ -1639,6 +1639,34 @@ describe('Accounts — viewing by type', () => {
     expect(labels.join(' ')).not.toMatch(/medic|player|team manager/i)
   })
 
+  // ⚠️ THE CASE THE DE-DUPLICATION EXISTS FOR, AND IT WAS MISSING. The fixtures
+  // above have nobody holding two rows of the SAME role, so counting rows and
+  // counting people give identical numbers and the test could not fail. Proved
+  // by injecting exactly that fault, 16 Aug 2026: all 71 passed.
+  //
+  // A coach of two squads is ONE coach. `memberships` has no unique constraint,
+  // and coaching two age groups is ordinary — twelve of the club's fifteen
+  // squads shared staff in August 2026.
+  it('⚠️ counts a two-squad coach once, not twice', async () => {
+    listClubMembersMock.mockResolvedValue([
+      JAY_ADMIN,
+      SARA_COACH,
+      { ...SARA_COACH, id: 'mem-sara-coach-2', team_id: 'team-u12', teams: { name: 'U12 Boys' } },
+    ])
+    useMembershipsMock.mockReturnValue(memberships(ADMIN))
+    setup()
+
+    const row = await screen.findByTestId('account-type-filter')
+    const labels = [...row.querySelectorAll('button')].map((b) => b.textContent.trim())
+    // Three membership rows, two people, and Sara is one coach.
+    expect(labels).toEqual(['Everyone 2', 'Admin 1', 'Coach 1'])
+
+    await userEvent.setup().click(
+      [...row.querySelectorAll('button')].find((b) => b.textContent.startsWith('Coach')),
+    )
+    expect(screen.getAllByTestId('account-person')).toHaveLength(1)
+  })
+
   it('narrows the list to that kind, and the chip count is what appears', async () => {
     const user = userEvent.setup()
     const row = await showFilter()
