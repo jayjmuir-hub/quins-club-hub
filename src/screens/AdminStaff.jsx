@@ -39,6 +39,51 @@ import { STAFF_TITLES, labelForRole } from '../lib/scope.js'
 // change. This screen tells you WHERE the gaps are; Accounts is where you fill
 // them.
 
+// The monogram's gradient, keyed to role — the same three tokens
+// SquadStaffCard uses on Home, so a coach is the same colour in both places.
+// Decorative: the role is written in words beside every bubble that carries it.
+const TONE = {
+  coach: 'bg-monogram-coach',
+  manager: 'bg-monogram-manager',
+  medic: 'bg-monogram-medic',
+}
+
+/**
+ * A person, as a circle.
+ *
+ * ⚠️ ALWAYS THE INITIALS, NEVER THE PHOTO, IN THE COLLAPSED ROW. Two of the
+ * club's staff have a photo; a row that mixed faces and monograms would read as
+ * broken rather than as partly-filled, and the photo has a job lower down where
+ * it is large enough to recognise anybody by.
+ */
+function Bubble({ member, size = 'h-9 w-9', text = 'text-[11px]' }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`grid ${size} shrink-0 place-items-center rounded-full ${text} font-extrabold text-ink-invert ${TONE[member.role] ?? 'bg-monogram-manager'}`}
+    >
+      {initials(member.name)}
+    </span>
+  )
+}
+
+function Chevron({ open }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={`h-4 w-4 shrink-0 text-ink-faint transition-transform duration-150 ${open ? 'rotate-90' : ''}`}
+    >
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  )
+}
+
 function SectionTitle({ children }) {
   return (
     <h3 className="mb-2.5 ml-0.5 mt-[18px] text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted first:mt-0">
@@ -321,34 +366,143 @@ function StaffRow({ member, onSaved, onPhoto }) {
   )
 }
 
-function SquadCard({ squad, onSaved, onPhoto }) {
-  return (
-    <Card className="mb-3" data-testid="squad-card">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
-        <h4 className="text-[15px] font-extrabold text-ink">{squad.name}</h4>
-        <span className="text-[12.5px] text-ink-faint">
-          {squad.staff.length === 0
-            ? 'Nobody yet'
-            : `${squad.staff.length} ${squad.staff.length === 1 ? 'person' : 'people'}`}
-        </span>
-      </div>
+/**
+ * One squad, collapsed to a line — and its staff underneath when opened.
+ *
+ * ⚠️ AN INDEX THAT EXPANDS, RATHER THAN FIFTEEN CARDS. Jay picked this shape on
+ * 16 Aug 2026 from three options, and the reason it wins is what this screen is
+ * usually LOOKING at: most squads have nobody attached, so a card each produced
+ * a page of near-identical empty boxes that had to be scrolled past to find the
+ * two that were filled. Collapsed, every squad fits on one screen and the gaps
+ * are the thing that stands out.
+ *
+ * ⚠️ IT EXPANDS IN PLACE AND SEVERAL MAY BE OPEN AT ONCE — also Jay's call, over
+ * a squad detail screen and over an accordion that closes the last one. Opening
+ * a squad must not cost you sight of the others, because the task is a sweep:
+ * "who is missing" is answered by comparing rows, not by visiting them.
+ *
+ * ⚠️ THE EXPANDED ROWS KEEP EVERY CONTROL VISIBLE. This screen is an EDITOR —
+ * the title field and the photo uploader live on each person — and the Home
+ * contacts card it borrows its look from is read-only. Moving editing behind a
+ * second tap would have made it prettier and worse.
+ */
+function SquadRow({ squad, open, onToggle, onSaved, onPhoto }) {
+  const panelId = `squad-panel-${squad.id}`
+  const missing = squad.staff.length === 0
+  // ⚠️ THE TITLE, FALLING BACK TO THE ROLE — Jay, 16 Aug 2026: "should be Head
+  // Coach, Assistant Coach, Team Manager, Medic". The membership ROLE is the
+  // permission ('coach'); the TITLE is the job somebody actually does, and a
+  // squad with a head coach and an assistant reads as "Coach · Coach" if you
+  // summarise by role. The title is the more specific true thing, so it wins
+  // where it is set — and a squad staffed by somebody who never got one still
+  // says "Coach" rather than nothing.
+  //
+  // ⚠️ DISTINCT, NOT ONE ENTRY PER PERSON. Two assistant coaches read as
+  // "Assistant Coach · Assistant Coach", which says nothing the bubbles beside
+  // it do not already show.
+  const roleSummary = [
+    ...new Set(
+      squad.staff.map((member) => member.title?.trim() || labelForRole(member.role) || ''),
+    ),
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
-      {squad.staff.length === 0 ? (
-        <div className="border-t border-line">
-          <Empty message="No coach, team manager or medic yet. Add one from the Accounts tab." />
+  return (
+    <div className="border-b border-line last:border-b-0" data-testid="squad-card">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="flex w-full items-center gap-3 px-3.5 py-3 text-left hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-extrabold text-ink">{squad.name}</span>
+          {/* ⚠️ THE GAP IS SAID IN WORDS AND IN COLOUR, never colour alone —
+              claude/specs/accessibility.md. */}
+          <span
+            className={`block text-[12px] font-semibold ${missing ? 'text-brand' : 'text-ink-muted'}`}
+          >
+            {missing ? 'No coach, manager or medic' : roleSummary}
+          </span>
+        </span>
+
+        {missing ? (
+          <span className="shrink-0 rounded-[8px] bg-danger-bg px-2 py-1 text-[11px] font-extrabold uppercase tracking-[.4px] text-brand-deep">
+            Gap
+          </span>
+        ) : (
+          // ⚠️ OVERLAPPED, AND CAPPED AT FOUR. A squad with six staff would
+          // otherwise push the chevron off a 320px screen — the exact way this
+          // app has made the whole document wider than the viewport before.
+          <span className="flex shrink-0 -space-x-2">
+            {squad.staff.slice(0, 4).map((member) => (
+              <span key={member.membershipId} className="rounded-full ring-2 ring-surface-card">
+                <Bubble member={member} />
+              </span>
+            ))}
+            {squad.staff.length > 4 && (
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-mute text-[11px] font-extrabold text-ink-muted ring-2 ring-surface-card">
+                +{squad.staff.length - 4}
+              </span>
+            )}
+          </span>
+        )}
+
+        <Chevron open={open} />
+      </button>
+
+      {/* ⚠️ UNMOUNTED WHEN CLOSED, NOT HIDDEN. Each staff row holds an input
+          with its own state and a photo uploader; keeping fifteen squads'
+          worth mounted would put every one of them in the document, and a
+          `hidden` input is still focusable by a screen reader. */}
+      {open && (
+        <div id={panelId} className="border-t border-line bg-surface-sunk">
+          {missing ? (
+            <p className="px-3.5 py-3 text-[12.5px] leading-relaxed text-ink-muted">
+              No coach, team manager or medic yet. Attach one from the{' '}
+              <strong className="text-ink">Accounts</strong> tab — this screen shows who is
+              attached, it cannot grant access.
+            </p>
+          ) : (
+            squad.staff.map((member) => (
+              <StaffRow
+                key={member.membershipId}
+                member={member}
+                onSaved={onSaved}
+                onPhoto={onPhoto}
+              />
+            ))
+          )}
         </div>
-      ) : (
-        squad.staff.map((member) => (
-          <StaffRow key={member.membershipId} member={member} onSaved={onSaved} onPhoto={onPhoto} />
-        ))
       )}
-    </Card>
+    </div>
   )
 }
 
 export default function AdminStaff() {
   const [squads, setSquads] = useState(null)
   const [error, setError] = useState(null)
+  // ⚠️ A SET, AND SEVERAL MAY BE OPEN AT ONCE — Jay's choice, 16 Aug 2026, over
+  // an accordion that closes the last one. The task this screen serves is a
+  // SWEEP: "which squads have nobody" is answered by comparing rows, and an
+  // accordion that shuts the previous squad makes comparing two of them
+  // impossible without remembering the first.
+  //
+  // ⚠️ NOTHING IS OPEN ON ARRIVAL. Fifteen open squads is the wall of cards this
+  // redesign replaced, and the collapsed list IS the answer to the question the
+  // screen is usually asked.
+  const [openIds, setOpenIds] = useState(() => new Set())
+
+  const toggle = useCallback((id) => {
+    setOpenIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   const load = useCallback(async () => {
     setError(null)
@@ -452,9 +606,22 @@ export default function AdminStaff() {
       {squads.length === 0 ? (
         <Empty message="This club has no squads yet." />
       ) : (
-        squads.map((squad) => (
-          <SquadCard key={squad.id} squad={squad} onSaved={onSaved} onPhoto={onPhoto} />
-        ))
+        // ⚠️ ONE CARD FOR THE WHOLE LIST, NOT ONE PER SQUAD. The card-each layout
+        // is what made fifteen squads a page of near-identical boxes; a single
+        // bordered list is what lets the eye run down the names and stop on the
+        // gaps.
+        <Card className="overflow-hidden">
+          {squads.map((squad) => (
+            <SquadRow
+              key={squad.id}
+              squad={squad}
+              open={openIds.has(squad.id)}
+              onToggle={() => toggle(squad.id)}
+              onSaved={onSaved}
+              onPhoto={onPhoto}
+            />
+          ))}
+        </Card>
       )}
     </div>
   )
