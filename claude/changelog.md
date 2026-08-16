@@ -31,7 +31,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   front one. **The invariant for any future role: nobody can mint an invite worth
   more than they could approve.**
 
-- ✨ **DATE OF BIRTH HAS A HOME, AND IT IS NOT A COLUMN ON `players`.** Jay:
+- `aff8a0e` — ✨ **DATE OF BIRTH HAS A HOME, AND IT IS NOT A COLUMN ON `players`.** Jay:
   *"i think we need to have date of birth"* — reversing the standing ruling in
   `src/lib/ageGroup.js` that the club holds no DOBs.
   ⛔ **A COLUMN ON `players` WOULD HAVE PUBLISHED EVERY CHILD'S BIRTHDAY TO
