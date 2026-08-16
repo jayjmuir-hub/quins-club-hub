@@ -307,6 +307,16 @@ proves you wrong.**
 ## Shipped but never exercised by a real person
 
 - **The match sheet** — no coach has filled one in during a real match.
+  ⚠️ **BUT IT HAS NOW HAD ITS FIRST REAL ENCOUNTER, AND THAT CHANGES WHAT THIS
+  ITEM MEANS.** Jay opened it on a phone and shared one on 16 Aug 2026. Three
+  bugs fell out, all fixed and live in `d576bb1`: the facsimile collapsed at
+  phone width and the share photographed the collapse, the away TRIES had no
+  box, and the 22 never populated from the lineup. **So this is no longer
+  "untouched by reality" — the KNOWN bugs are gone, and what is left is the
+  half nobody can test from a desk**: a coach filling one in for a real match,
+  and the picture arriving at RCM — the same open question already recorded
+  against the lineup image, and for the same reason: both go through
+  `src/lib/shareImage.js`, and no query can see a WhatsApp group.
 - **The scoring model** — no coach has entered a real score.
 - **Staff photos** — nobody has uploaded one in the real app.
 - **The photo backup restores** — copying is not restoring, and nobody has ever got a
@@ -414,6 +424,20 @@ green suite and has never been exercised by a human on the live site.
     Measured at 390×844: the loading block goes from 110px to 942px, against a
     loaded page of about 1,800. The honest claim is "nothing above the fold
     moves", and whether that is enough is a question only a phone can answer.
+- **`src/lib/shareImage.js` revokes its blob URL on the line after `link.click()`,
+  and never puts the anchor in the document.** DESKTOP DOWNLOAD PATH ONLY — the
+  phone takes the `navigator.canShare({files})` branch above it and never reaches
+  this code, so it cannot be behind any share problem reported from a phone.
+  Chrome tolerates both (the download starts synchronously inside `click()`);
+  Firefox has historically required the anchor to be IN the DOM, and an immediate
+  revoke is a documented race elsewhere.
+  ⚠️ **NOT FIXED, AND DELIBERATELY SO: IT HAS NEVER BEEN SEEN TO FAIL.** Noticed
+  16 Aug 2026 only because instrumenting the share to measure the PNG's size
+  revoked the URL before an async reader could load it — which is a fact about
+  the instrument, not evidence about Firefox. Fixing shared code on a hunch is
+  how a working path acquires a regression. **The trigger is somebody reporting
+  that Share does nothing on a desktop browser**; the fix is two lines
+  (`document.body.append(link)` … `link.remove()`, and revoke on a later tick).
 - **The lineup image has never been seen to reach a WhatsApp group.** Rows exist
   in `lineups` and `lineup_players` — measured 15 Aug 2026, so a team HAS been
   picked and saved against production — but the image is the actual deliverable
