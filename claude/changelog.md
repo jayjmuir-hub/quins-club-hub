@@ -10,7 +10,51 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- ♻️ **THE MATCH SHEET IS NEVER TYPED ON, AT ANY WIDTH — AND THE PNG IS NOW
+- 🐞 **A "VIEW AS" PREVIEW COULD NOT POST A NOTICE, AND THE BOARD LOOKED EMPTY.**
+  Jay, previewing as a coach: *"i don't see the ability to post a notice for
+  comms, the link takes me to a page with nothing there"*. `syntheticMemberships`
+  built a row with role, team_id, player_id and club_id — the fields `scope.js`
+  reads — while `src/lib/notices.js` mirrors `private.can_edit_team` more closely
+  and requires `status === 'active'`. Against a row with no status,
+  `canPostNotice` returned false and the button did not render.
+  ⚠️ **IT SURVIVED BECAUSE IT FAILS SILENTLY.** A preview quietly holding fewer
+  rights has no error path, and the noticeboard has no rows yet, so "nothing
+  there" read as "nothing posted".
+  ⚠️ **EVERY EXISTING TEST PASSED AN EXPLICIT `status`**, which is exactly why
+  they stayed green. The shape never exercised was a row without one — now a
+  tombstone test, because the fix belongs on the ROW and not on the predicate:
+  the database checks `status = 'active'`, so a lenient client would offer a
+  composer the database refuses.
+
+- ✨ **POSTING A NOTICE IS NO LONGER A PLACE YOU GO.** Jay: *"need the ability to
+  post the comm from the more screen, not a seperate screen"*, then Home as well.
+  New `PostNoticeAction` opens the composer in place on both; the composer itself
+  moved out of the screen into `src/components/NoticeComposer.jsx` because one
+  behaviour in three places is three copies that drift.
+  ⚠️ **IT RENDERS NOTHING FOR SOMEBODY WHO MAY NOT POST**, which is what makes
+  the Home placement survivable — Dashboard's own note forbids pushing the hero
+  down on an ordinary week, and for a parent nothing changes at all.
+
+- 💄 **THE NOTICE CARD WAS BLAND AND NOW LEADS WITH THE PERSON.** Jay: *"i don't
+  like how the notice looks, too bland"* — shown three treatments and picked a
+  combination. Monogram tile, author and role lead; a coloured edge stripe and an
+  audience mark carry club-wide (red) against squad (green); the title is bigger
+  and the body has room.
+  ⚠️ **COLOUR IS NEVER THE ONLY CHANNEL** — the audience is also a word on the
+  chip and a drawn mark, so a colour-blind reader loses nothing.
+  ⚠️ **THE CARD SHOWED NO TIME AT ALL**, which is much of why it read as
+  system-generated. `created_at` was already selected and already ordered the
+  list; `postedLabel` now renders it, relative for a week and an absolute club-time
+  date after that.
+  ⚠️ **THE FIRST DRAFT USED EMOJI AND THAT IS BANNED** — `design-system.md` says
+  100% inline SVG, no emoji, and this app already ships SVG flags because Windows
+  renders emoji flags as two letters.
+  ⚠️ **AND THE SCREEN HAD NO HARNESS SCENARIO AT ALL**, which is how a bland card
+  shipped unreviewed: it reads three tables, so it was only ever reviewed as JSX.
+  `NoticeRow` is now a pure-props component with its own scenario in the overflow
+  gate.
+
+- `29cff96` — ♻️ **THE MATCH SHEET IS NEVER TYPED ON, AT ANY WIDTH — AND THE PNG IS NOW
   IDENTICAL BY CONSTRUCTION.** Jay: *"make the facsimile a preview at every
   width"*. The width-dependent editor added hours earlier meant TWO renderings of
   a document whose only job is to be photographed and sent, and they had already

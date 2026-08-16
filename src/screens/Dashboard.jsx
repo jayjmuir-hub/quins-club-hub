@@ -13,6 +13,7 @@ import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import SquadStaffCard from '../components/SquadStaffCard.jsx'
 import NoticeBoard from '../components/NoticeBoard.jsx'
+import PostNoticeAction from '../components/PostNoticeAction.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
 import { listMySquadStaff } from '../data/staff.js'
@@ -442,6 +443,10 @@ export default function Dashboard() {
   // null until the first read settles, so the board can stay absent rather than
   // flashing an empty card under the greeting on every load.
   const [notices, setNotices] = useState(null)
+  // Bumped when this person posts one, so the card they just wrote appears
+  // without a reload. Deliberately separate from `reloadToken`, which realtime
+  // bumps on `events` — see the note on the effect below.
+  const [noticeToken, setNoticeToken] = useState(0)
   const [noticeReads, setNoticeReads] = useState(() => new Set())
   const [loading, setLoading] = useState(true)
   const [settled, setSettled] = useState(false)
@@ -562,7 +567,7 @@ export default function Dashboard() {
     return () => {
       mounted = false
     }
-  }, [memberships])
+  }, [memberships, noticeToken])
 
   // ⚠️ A THIRD SEPARATE READ, for the same reason as the staff one above: the
   // noticeboard shares no number with the stat tiles, so a failed notice read
@@ -800,6 +805,24 @@ export default function Dashboard() {
           the departure survivable — if it ever starts rendering a placeholder,
           this decision has to be re-made. */}
       <NoticeBoard notices={notices} readIds={noticeReads} teamsById={teamsById} />
+
+      {/* ⚠️ POSTING FROM HOME — Jay, 16 Aug 2026, after asking for the same on
+          More. A coach at a pitch should be able to write one from the screen
+          they already have open.
+
+          ⚠️ AND IT IS A DELIBERATE, SMALL DEPARTURE FROM THE RULE DIRECTLY
+          ABOVE. That note says nothing may push the hero down on the ordinary
+          week, and this can — but only for somebody who may POST, which is
+          coaches, managers and admins, never a parent: PostNoticeAction renders
+          null for everyone else. The ordinary week for the overwhelming majority
+          of this app's users is unchanged. If it ever renders for a parent, that
+          decision has to be re-made. */}
+      <PostNoticeAction
+        className="mb-3.5"
+        variant="secondary"
+        full
+        onPosted={() => setNoticeToken((n) => n + 1)}
+      />
 
       {nextFixture && (
         <NextFixtureHero

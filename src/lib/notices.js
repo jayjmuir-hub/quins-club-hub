@@ -168,3 +168,60 @@ export function seenSummary(stat) {
   if (audience <= 0) return null
   return `${stat.seen_count ?? 0} of ${audience} seen`
 }
+
+/**
+ * "Just now", "20 min ago", "3 hours ago", "Yesterday", "12 Aug".
+ *
+ * ⚠️ THE CARD SHOWED NO TIME AT ALL UNTIL 16 Aug 2026, which is a large part of
+ * why Jay called it bland — a notice with no date reads as something the app is
+ * displaying rather than something a person posted at a moment. `created_at` was
+ * already selected and already used for ordering; nothing was showing it.
+ *
+ * ⚠️ RELATIVE ONLY FOR THE FIRST WEEK, THEN AN ABSOLUTE DATE. "37 days ago" is
+ * arithmetic the reader has to undo; "12 Aug" is the answer. The cut is at a
+ * week because that is the horizon a club notice actually lives on — training
+ * changes, kit collection, a fixture moving.
+ *
+ * ⚠️ CLUB TIME (`Asia/Dubai`) FOR THE ABSOLUTE FORM, like every other date this
+ * app prints. A parent in another timezone reading "11 Aug" for a notice the
+ * club posted on the 12th is a small wrongness that costs a phone call.
+ *
+ * ⚠️ `now` IS AN ARGUMENT so this is testable without faking the clock — the
+ * same shape `isExpired`, `currentNotices` and `pinnedNotices` in this file
+ * already use.
+ *
+ * @param {string|Date|null|undefined} createdAt
+ * @param {number|Date} [now]
+ * @returns {string} never null — a card always has room for this and an empty
+ *   slot in the meta line reads as a rendering fault rather than missing data.
+ */
+export function postedLabel(createdAt, now = Date.now()) {
+  if (!createdAt) return ''
+  const then = new Date(createdAt)
+  const thenMs = then.getTime()
+  if (!Number.isFinite(thenMs)) return ''
+
+  const nowMs = now instanceof Date ? now.getTime() : now
+  const seconds = Math.floor((nowMs - thenMs) / 1000)
+
+  // ⚠️ A FUTURE TIMESTAMP READS AS "Just now", NOT "in -3 minutes". Clock skew
+  // between a phone and the database is real and small; the honest rendering of
+  // "a moment either side of now" is the same phrase for both.
+  if (seconds < 60) return 'Just now'
+
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min ago`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`
+
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days} days ago`
+
+  return then.toLocaleDateString('en-GB', {
+    timeZone: 'Asia/Dubai',
+    day: 'numeric',
+    month: 'short',
+  })
+}

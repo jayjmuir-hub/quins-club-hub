@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import { Empty } from '../components/Empty.jsx'
+import NoticeComposer from '../components/NoticeComposer.jsx'
+import NoticeRow from '../components/NoticeRow.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { Sheet } from '../components/Sheet.jsx'
 import {
-  createNotice,
   deleteNotice,
   listMyReads,
   listNotices,
@@ -16,15 +17,7 @@ import {
 import { useAuth } from '../lib/auth.jsx'
 import { formatTableDate, formatTime } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import {
-  audienceLabel,
-  authorLine,
-  canPostNotice,
-  currentNotices,
-  isExpired,
-  postableTeams,
-  seenSummary,
-} from '../lib/notices.js'
+import { canPostNotice, currentNotices, isExpired, postableTeams } from '../lib/notices.js'
 import { visibleTeams } from '../lib/scope.js'
 
 // The noticeboard — /notices. Phase 1 of claude/plans/2026-08-14-notices.md.
@@ -48,187 +41,9 @@ import { visibleTeams } from '../lib/scope.js'
 
 const ALL = 'all'
 
-// ⚠️ RELATIVE DURATIONS, NOT A DATE PICKER, AND THAT IS A TIMEZONE DECISION.
-// RESTORE.md: every time in this app is Abu Dhabi time, and a naive
-// `new Date(\`${d}T${t}\`)` resolves in the BROWSER's zone — so a date input
-// would need Dubai-anchored interpretation, and a committee member setting
-// "expires 20 Aug" from London would get a notice that vanished at 8pm on the
-// 19th. A duration has no such ambiguity: it is measured from now, which is the
-// same instant everywhere. It is also what people actually mean — "leave this up
-// for a week", not "delete this at midnight on a specific date".
-const EXPIRY_CHOICES = [
-  { key: 'none', label: 'Until I remove it', days: null },
-  { key: 'week', label: 'A week', days: 7 },
-  { key: 'fortnight', label: 'Two weeks', days: 14 },
-  { key: 'month', label: 'A month', days: 30 },
-]
 
-const FIELD =
-  'w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none transition focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
-const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 
-function expiryFromChoice(key) {
-  const choice = EXPIRY_CHOICES.find((c) => c.key === key)
-  if (!choice?.days) return null
-  return new Date(Date.now() + choice.days * 24 * 60 * 60 * 1000).toISOString()
-}
 
-/* ══════════════════════════════════════════════════════════════════════════
-   The composer
-   ══════════════════════════════════════════════════════════════════════════ */
-
-function Composer({ open, onClose, teams, clubWide, onPosted }) {
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  // ⚠️ THE DEFAULT SCOPE IS THE NARROWEST ONE AVAILABLE. An admin who holds
-  // club-wide could have this default to "Whole club", and the cost of a
-  // mis-tap there is every family in the club. A coach's only option is their
-  // squad anyway, so defaulting to teams[0] is right for both and safe for one.
-  const [scope, setScope] = useState(() => teams[0]?.id ?? (clubWide ? '' : ''))
-  const [pinned, setPinned] = useState(false)
-  const [expiry, setExpiry] = useState('none')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
-
-  const clubWideChosen = scope === ''
-  const recipientsHint = clubWideChosen
-    ? 'Everyone in the club will see this.'
-    : 'Everyone attached to that squad will see this.'
-
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      await createNotice({
-        title,
-        body,
-        teamId: clubWideChosen ? null : scope,
-        pinned,
-        expiresAt: expiryFromChoice(expiry),
-      })
-      setTitle('')
-      setBody('')
-      setPinned(false)
-      setExpiry('none')
-      onPosted()
-      onClose()
-    } catch (err) {
-      setError(err.message || 'That notice could not be posted. Try again.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Sheet open={open} onClose={onClose} title="Post a notice">
-      <form onSubmit={handleSubmit}>
-        {error && (
-          <p
-            role="alert"
-            className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
-          >
-            {error}
-          </p>
-        )}
-
-        <label className={LABEL} htmlFor="notice-scope">
-          Who sees it
-        </label>
-        <select
-          id="notice-scope"
-          className={FIELD}
-          value={scope}
-          disabled={saving}
-          onChange={(event) => setScope(event.target.value)}
-        >
-          {/* ⚠️ CLUB-WIDE IS LAST, NOT FIRST. A select opens on its current
-              value, but a person scanning the list should meet their squads
-              before the option that reaches every family in the club. */}
-          {teams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {team.name}
-            </option>
-          ))}
-          {clubWide && <option value="">Whole club</option>}
-        </select>
-        <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted" data-testid="scope-hint">
-          {recipientsHint}
-        </p>
-
-        <div className="mt-3.5">
-          <label className={LABEL} htmlFor="notice-title">
-            Title
-          </label>
-          <input
-            id="notice-title"
-            type="text"
-            className={FIELD}
-            value={title}
-            disabled={saving}
-            maxLength={120}
-            onChange={(event) => setTitle(event.target.value)}
-          />
-        </div>
-
-        <div className="mt-3.5">
-          <label className={LABEL} htmlFor="notice-body">
-            Notice
-          </label>
-          <textarea
-            id="notice-body"
-            rows={5}
-            className={FIELD}
-            value={body}
-            disabled={saving}
-            onChange={(event) => setBody(event.target.value)}
-          />
-        </div>
-
-        <div className="mt-3.5">
-          <label className={LABEL} htmlFor="notice-expiry">
-            Keep it up for
-          </label>
-          <select
-            id="notice-expiry"
-            className={FIELD}
-            value={expiry}
-            disabled={saving}
-            onChange={(event) => setExpiry(event.target.value)}
-          >
-            {EXPIRY_CHOICES.map((choice) => (
-              <option key={choice.key} value={choice.key}>
-                {choice.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <label className="mt-3.5 flex items-center gap-2.5 text-[14px] font-semibold text-ink">
-          <input
-            type="checkbox"
-            checked={pinned}
-            disabled={saving}
-            onChange={(event) => setPinned(event.target.checked)}
-            className="h-4 w-4 accent-brand"
-          />
-          Pin it to the home screen
-        </label>
-
-        <div className="mt-4 flex items-center gap-3">
-          <Button type="submit" disabled={saving || !title.trim() || !body.trim()}>
-            {saving ? 'Posting…' : 'Post'}
-          </Button>
-          {!saving && (
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-          )}
-        </div>
-      </form>
-    </Sheet>
-  )
-}
 
 /* ══════════════════════════════════════════════════════════════════════════
    Read receipts
@@ -349,103 +164,6 @@ function Receipts({ notice, onClose }) {
         </>
       )}
     </Sheet>
-  )
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   One notice in the list
-   ══════════════════════════════════════════════════════════════════════════ */
-
-function NoticeRow({ notice, teamsById, unread, stat, expired, onOpenReceipts, onDelete }) {
-  // ⚠️ TWO-STEP INLINE CONFIRM, NEVER A NATIVE confirm(). Established in Task
-  // 14: a native dialog blocks the event loop and hangs the browser check dead.
-  const [confirming, setConfirming] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const author = authorLine(notice)
-  const summary = seenSummary(stat)
-
-  return (
-    <Card className="mb-2.5" data-testid="notice-row">
-      <div className="px-4 py-3">
-        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-          {unread && !expired && (
-            <span className="h-2 w-2 shrink-0 rounded-full bg-brand" aria-hidden="true" />
-          )}
-          <h3 className="text-[15px] font-bold text-ink">{notice.title}</h3>
-          {unread && !expired && <span className="sr-only">New</span>}
-          <span className="text-[12px] font-semibold text-ink-muted">
-            {audienceLabel(notice, teamsById)}
-          </span>
-          {expired && (
-            <span className="rounded-[6px] bg-surface-mute px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-[.4px] text-ink-muted">
-              Expired
-            </span>
-          )}
-        </div>
-
-        <p className="mt-1.5 whitespace-pre-line text-[13.5px] leading-relaxed text-ink">
-          {notice.body}
-        </p>
-
-        {author && <p className="mt-2 text-[12px] font-semibold text-ink-faint">{author}</p>}
-
-        {/* Only rendered for somebody the database will give numbers to — the
-            author, or an admin. `noticeStats` returns an empty map for everyone
-            else, so this whole row simply does not appear for a parent. */}
-        {(summary || onDelete) && (
-          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-2.5">
-            {summary && (
-              <button
-                type="button"
-                data-testid="open-receipts"
-                onClick={() => onOpenReceipts(notice)}
-                className="text-[13px] font-bold text-brand underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              >
-                {summary}
-              </button>
-            )}
-
-            {onDelete && !confirming && (
-              <button
-                type="button"
-                data-testid="delete-notice"
-                onClick={() => setConfirming(true)}
-                className="text-[13px] font-bold text-ink-muted underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              >
-                Take it down
-              </button>
-            )}
-
-            {onDelete && confirming && (
-              <span className="flex items-center gap-2.5">
-                <span className="text-[13px] text-ink-muted">Take it down?</span>
-                <Button
-                  variant="danger"
-                  disabled={busy}
-                  data-testid="confirm-delete-notice"
-                  onClick={async () => {
-                    setBusy(true)
-                    try {
-                      await onDelete(notice)
-                    } finally {
-                      setBusy(false)
-                      setConfirming(false)
-                    }
-                  }}
-                >
-                  {busy ? 'Removing…' : 'Yes'}
-                </Button>
-                {!busy && (
-                  <Button variant="ghost" onClick={() => setConfirming(false)}>
-                    Keep it
-                  </Button>
-                )}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    </Card>
   )
 }
 
@@ -630,7 +348,7 @@ export default function Notices() {
       ))}
 
       {mayPost && (
-        <Composer
+        <NoticeComposer
           open={composerOpen}
           onClose={() => setComposerOpen(false)}
           teams={composerTeams}

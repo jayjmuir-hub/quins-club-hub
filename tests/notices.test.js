@@ -1,11 +1,29 @@
 // @vitest-environment node
 // Nothing in this file touches the DOM, and a jsdom costs ~1.3s to build. The
 // measurement and the rule are in vite.config.js.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterAll } from 'vitest'
+
+// ⚠️ PROCESS ZONE, AND IT IS THE DIFFERENCE BETWEEN A CHECK AND A DECORATION.
+// `postedLabel` formats its absolute date in Asia/Dubai on purpose. Without this
+// line the suite runs in the MACHINE's zone — and this app is built in Abu
+// Dhabi, where local time already IS club time, so the assertion passed
+// identically with the `timeZone` option deleted. Measured 16 Aug 2026 by
+// deleting it: 31 passed. A test that cannot fail is not a test.
+//
+// New York because it is a long way the other side of UTC, so a date that
+// straddles midnight in Dubai lands on a different day here and the two cannot
+// be confused. Same reasoning, and the same spelling, as the fixture suites.
+const ORIGINAL_TZ = process.env.TZ
+process.env.TZ = 'America/New_York'
+afterAll(() => {
+  if (ORIGINAL_TZ === undefined) delete process.env.TZ
+  else process.env.TZ = ORIGINAL_TZ
+})
 import {
   audienceLabel,
   authorLine,
   canPostNotice,
+  postedLabel,
   currentNotices,
   isExpired,
   MAX_PINNED_ON_HOME,
@@ -185,6 +203,27 @@ describe('who may post', () => {
     const medic = [{ role: 'medic', status: 'active', team_id: 't2' }]
     expect(postableTeams(medic, teams).map((t) => t.id)).toEqual(['t2'])
   })
+
+  // ⚠️ A TOMBSTONE. THIS IS THE BUG JAY HIT ON 16 Aug 2026, AND THE FIX IS NOT
+  // HERE — do not loosen this to make a preview work.
+  //
+  // Every other case in this block passes an explicit `status`, which is
+  // precisely why they all stayed green while the live app was broken: the one
+  // shape never exercised was a row with NO status at all, and that is exactly
+  // what syntheticMemberships() built for "view as". An admin previewing as a
+  // coach therefore got no composer, silently, because a preview quietly
+  // holding fewer rights has no error path to notice.
+  //
+  // Being strict here is CORRECT. The database check is `status = 'active'`, so
+  // a client that guessed "no status means active" would offer a composer the
+  // database refuses — somebody writes three paragraphs and then loses them.
+  // The row is what was wrong, and src/lib/memberships.jsx now sets
+  // `status: 'active'` on it.
+  it('⚠️ offers a membership with NO status nothing — the fix belongs on the row', () => {
+    const noStatus = [{ role: 'coach', team_id: 't1' }]
+    expect(canPostNotice(noStatus)).toBe(false)
+    expect(postableTeams(noStatus, teams)).toEqual([])
+  })
 })
 
 describe('seenSummary', () => {
@@ -197,5 +236,56 @@ describe('seenSummary', () => {
   it('says nothing at all when there is no audience', () => {
     expect(seenSummary({ audience_count: 0, seen_count: 0 })).toBeNull()
     expect(seenSummary(null)).toBeNull()
+  })
+})
+
+describe('postedLabel', () => {
+  const NOW = new Date('2026-08-16T12:00:00.000Z').getTime()
+  const ago = (ms) => new Date(NOW - ms).toISOString()
+  const MIN = 60_000
+  const HOUR = 60 * MIN
+  const DAY = 24 * HOUR
+
+  it('reads as a person posting, not as a timestamp', () => {
+    expect(postedLabel(ago(10 * 1000), NOW)).toBe('Just now')
+    expect(postedLabel(ago(20 * MIN), NOW)).toBe('20 min ago')
+    expect(postedLabel(ago(3 * HOUR), NOW)).toBe('3 hours ago')
+    expect(postedLabel(ago(DAY), NOW)).toBe('Yesterday')
+    expect(postedLabel(ago(3 * DAY), NOW)).toBe('3 days ago')
+  })
+
+  it('singularises one hour', () => {
+    expect(postedLabel(ago(HOUR), NOW)).toBe('1 hour ago')
+  })
+
+  // ⚠️ THE POINT OF THE CUT. "37 days ago" is arithmetic the reader has to
+  // undo; a date is the answer. A week is the horizon a club notice lives on.
+  it('⚠️ switches to an absolute date after a week', () => {
+    expect(postedLabel(ago(8 * DAY), NOW)).toBe('8 Aug')
+    expect(postedLabel(ago(40 * DAY), NOW)).toBe('7 Jul')
+  })
+
+  // ⚠️ CLUB TIME. Dubai is UTC+4, so 20:30Z on the 5th is 00:30 on the 6th at
+  // the club — they posted it on the 6th, and that is what a parent must read
+  // wherever they happen to be. A UTC formatter prints "5 Aug".
+  //
+  // ⚠️ AND IT HAS TO BE MORE THAN A WEEK OLD TO TEST THIS AT ALL. The first
+  // version of this case used a date four days back and asserted "12 Aug"; it
+  // failed with "4 days ago", which was the FUNCTION being right and the test
+  // being wrong. Inside the week there is no absolute date to check the zone of.
+  it('⚠️ formats the absolute date in club time, not in whatever zone reads it', () => {
+    expect(postedLabel('2026-08-05T20:30:00.000Z', NOW)).toBe('6 Aug')
+  })
+
+  // Clock skew between a phone and the database is real and small; "in -3
+  // minutes" is never the honest rendering of it.
+  it('⚠️ a future timestamp reads as Just now, never as negative time', () => {
+    expect(postedLabel(new Date(NOW + 5 * MIN).toISOString(), NOW)).toBe('Just now')
+  })
+
+  it('is empty rather than "Invalid Date" for missing or junk input', () => {
+    expect(postedLabel(null, NOW)).toBe('')
+    expect(postedLabel(undefined, NOW)).toBe('')
+    expect(postedLabel('not a date', NOW)).toBe('')
   })
 })

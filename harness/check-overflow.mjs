@@ -155,6 +155,11 @@ const SCENARIOS = [
   // is genuinely measured. ?view= is not swept here - the gate loads the
   // default (Day); the month grid was measured by hand at every width.
   'allocation',
+  // The noticeboard CARD (16 Aug 2026). Routed nowhere and inside no Sheet, so
+  // this one is measured for real. A notice is free text written by a coach on a
+  // phone — the widest thing on it is a long squad name beside a long role
+  // beside a "Pinned" chip, which is exactly the row that wraps or does not.
+  'notice-row',
 ]
 
 // A pixel of slack. Sub-pixel layout rounding can put scrollWidth one above
