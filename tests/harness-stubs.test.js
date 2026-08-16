@@ -62,6 +62,14 @@ const ALIASES = [
   // blank one scenario — it stops the harness booting at all, with a module-
   // scope throw from src/lib/supabase.js rather than an unresolved import.
   ['harness/stubs/staff.js', 'src/data/staff.js'],
+  // The lineup the RCM match sheet seeds its 22 boxes from, 16 Aug 2026.
+  //
+  // ⚠️ FIFTH TIME, AND THE COUNT ASSERTION CAUGHT IT AGAIN — 15 vs 14. The
+  // pattern is now unmistakable: every single alias added to
+  // harness/vite.config.js since this guard was written has been added without
+  // this list, and every one of them has been caught here rather than by
+  // somebody opening the harness and finding it blank.
+  ['harness/stubs/lineups.js', 'src/data/lineups.js'],
 ]
 
 function read(relative) {

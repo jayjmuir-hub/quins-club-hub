@@ -50,6 +50,16 @@ vi.mock('../src/data/events.js', () => ({
   countSeriesFrom: async () => 0,
   deleteSeriesFrom: async () => {},
 }))
+// MatchSheet reads lineups to seed its 22 boxes (16 Aug 2026). Mocked here for
+// the same reason every other data module in this file is: the real one imports
+// src/lib/supabase.js at module scope.
+vi.mock('../src/data/lineups.js', () => ({
+  listLineups: async () => [],
+  createLineup: async () => ({}),
+  updateLineup: async () => ({}),
+  saveLineupPlayers: async () => [],
+  deleteLineup: async () => {},
+}))
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
   listContactsForPlayers: async () => [],
