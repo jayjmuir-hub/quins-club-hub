@@ -10,7 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- ✨ **ACCOUNTS CAN BE VIEWED BY TYPE.** Jay: *"we need to be able to view
+- 💄 **THE STAFF SCREEN IS AN INDEX THAT EXPANDS.** Jay picked this from three
+  options built in the harness — C, opening in place like B. Every squad is one
+  row: name, the jobs present, overlapped monogram bubbles, and a **Gap** chip
+  where nobody is attached. Tapping unfolds that squad's people underneath, and
+  several may be open at once.
+  ⚠️ **THE SHAPE FOLLOWS WHAT THE SCREEN IS USUALLY LOOKING AT.** Most squads
+  have nobody attached, so a card each was a page of near-identical empty boxes
+  to scroll past. Collapsed, every squad fits on one screen and the gaps are what
+  stands out — which is what the summary line has always led with.
+  ⚠️ **SEVERAL OPEN AT ONCE, DELIBERATELY.** The task is a sweep; an accordion
+  that shuts the last squad makes comparing two of them impossible.
+  ⚠️ **EDITING STAYED VISIBLE.** This screen is an EDITOR — title field and photo
+  uploader per person — and the Home contacts card it borrows its look from is
+  read-only. Moving those behind a second tap would have been prettier and worse.
+  ⚠️ **THE SUMMARY NOW READS THE TITLE, NOT THE ROLE** — Jay: *"should be Head
+  Coach, Assistant Coach, Team Manager, Medic"*. The role is the permission
+  (`coach`); the title is the job, and a squad with a head coach and an assistant
+  reads as "Coach · Coach" if you summarise by role.
+  ⚠️ **AND "Physio" BECAME "Medic" IN `STAFF_TITLES`, OVERTURNING A RULING** that
+  deliberately left medic without a title of its own. The repetition it avoided
+  is invisible; the cost was that the only medical suggestion on offer was a word
+  this club does not use.
+
+- `f910037` — ✨ **ACCOUNTS CAN BE VIEWED BY TYPE.** Jay: *"we need to be able to view
   accounts by type, Parent/Player, Coach, Manager, etc"*. A chip row above the
   list — Everyone, then one per role somebody actually holds, each carrying its
   count.

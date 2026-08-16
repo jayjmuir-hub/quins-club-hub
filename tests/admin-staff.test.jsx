@@ -58,14 +58,33 @@ const MEDIC = {
 }
 
 const SQUADS = [
-  { id: 't-u13', name: 'U13 Mixed Contact', staff: [COACH, MEDIC] },
-  { id: 't-u14', name: 'U14B Contact', staff: [] },
-  { id: 't-u16', name: 'U16B Contact', staff: [] },
+  { id: 't-u13', name: 'U13 Mixed', staff: [COACH, MEDIC] },
+  { id: 't-u14', name: 'U14B', staff: [] },
+  { id: 't-u16', name: 'U16B', staff: [] },
 ]
 
 function renderStaff() {
   const user = userEvent.setup()
   return { user, ...render(<AdminStaff />) }
+}
+
+// ⚠️ EVERY SQUAD IS COLLAPSED ON ARRIVAL SINCE 16 Aug 2026, so anything that
+// asserts on a staff row has to open one first. That is the design rather than
+// an obstacle: the collapsed list IS the answer to the question this screen is
+// usually asked — "which squads have nobody" — and fifteen open squads was the
+// wall of near-identical cards the redesign replaced.
+async function openSquad(user, squadName = 'U13 Mixed') {
+  await user.click(await screen.findByRole('button', { name: new RegExp(squadName, 'i') }))
+}
+
+// Name-agnostic: opens every squad. Used by the photo block, whose fixtures
+// name their squad differently in almost every case and whose subject is the
+// upload wiring rather than which squad the person is in.
+async function openEverySquad(user) {
+  const rows = await screen.findAllByTestId('squad-card')
+  for (const row of rows) {
+    await user.click(within(row).getAllByRole('button')[0])
+  }
 }
 
 beforeEach(() => {
@@ -78,9 +97,9 @@ describe('AdminStaff — the squads with nobody', () => {
   it('lists every squad, including the ones with no staff', async () => {
     renderStaff()
 
-    expect(await screen.findByText('U13 Mixed Contact')).toBeInTheDocument()
-    expect(screen.getByText('U14B Contact')).toBeInTheDocument()
-    expect(screen.getByText('U16B Contact')).toBeInTheDocument()
+    expect(await screen.findByText('U13 Mixed')).toBeInTheDocument()
+    expect(screen.getByText('U14B')).toBeInTheDocument()
+    expect(screen.getByText('U16B')).toBeInTheDocument()
     expect(screen.getAllByTestId('squad-card')).toHaveLength(3)
   })
 
@@ -111,19 +130,26 @@ describe('AdminStaff — the squads with nobody', () => {
     expect(screen.queryByTestId('squad-card')).not.toBeInTheDocument()
   })
 
-  it('an empty squad says what to do about it', async () => {
-    renderStaff()
+  it('an empty squad is flagged while collapsed, and says what to do when opened', async () => {
+    const { user } = renderStaff()
 
     const cards = await screen.findAllByTestId('squad-card')
-    const u14 = cards.find((card) => within(card).queryByText('U14B Contact'))
+    const u14 = cards.find((card) => within(card).queryByText('U14B'))
+    // ⚠️ THE GAP READS WITHOUT OPENING ANYTHING — the point of the collapsed
+    // row. Said in WORDS as well as colour and a chip, never colour alone
+    // (claude/specs/accessibility.md).
+    expect(within(u14).getByText(/No coach, manager or medic/)).toBeInTheDocument()
+    expect(within(u14).getByText('Gap')).toBeInTheDocument()
+
+    await openSquad(user, 'U14B')
     expect(within(u14).getByText(/No coach, team manager or medic yet/)).toBeInTheDocument()
-    expect(within(u14).getByText('Nobody yet')).toBeInTheDocument()
   })
 })
 
 describe('AdminStaff — a person', () => {
   it('shows the role label, not the raw role', async () => {
-    renderStaff()
+    const { user } = renderStaff()
+    await openSquad(user)
 
     expect(await screen.findByText('Coach')).toBeInTheDocument()
     expect(screen.getByText('Medic')).toBeInTheDocument()
@@ -131,7 +157,8 @@ describe('AdminStaff — a person', () => {
   })
 
   it('shows contact details, and says when there is no phone number', async () => {
-    renderStaff()
+    const { user } = renderStaff()
+    await openSquad(user)
 
     expect(await screen.findByText('alex@example.com')).toBeInTheDocument()
     expect(screen.getByText('+971500000001')).toBeInTheDocument()
@@ -144,6 +171,7 @@ describe('AdminStaff — a person', () => {
 describe('AdminStaff — setting a title', () => {
   it('saves on blur and keeps the new value on screen', async () => {
     const { user } = renderStaff()
+    await openSquad(user)
 
     const input = await screen.findByLabelText('Title', { selector: '#title-m-coach' })
     await user.clear(input)
@@ -159,6 +187,7 @@ describe('AdminStaff — setting a title', () => {
 
   it('does not write when the title has not changed', async () => {
     const { user } = renderStaff()
+    await openSquad(user)
 
     const input = await screen.findByLabelText('Title', { selector: '#title-m-coach' })
     await user.click(input)
@@ -174,6 +203,7 @@ describe('AdminStaff — setting a title', () => {
   it('puts the field back and says why when the save is refused', async () => {
     setMembershipTitleMock.mockRejectedValue(new Error('You may not have permission.'))
     const { user } = renderStaff()
+    await openSquad(user)
 
     const input = await screen.findByLabelText('Title', { selector: '#title-m-coach' })
     await user.clear(input)
@@ -185,9 +215,10 @@ describe('AdminStaff — setting a title', () => {
   })
 
   it('offers the suggested titles without forcing them', async () => {
-    renderStaff()
+    const { user } = renderStaff()
+    await openSquad(user)
 
-    await screen.findByText('U13 Mixed Contact')
+    await screen.findByText('U13 Mixed')
     const options = document.querySelectorAll('#staff-titles option')
     const values = Array.from(options).map((option) => option.value)
     expect(values).toContain('Head Coach')
@@ -228,7 +259,11 @@ describe('AdminStaff — setting a photo for somebody else', () => {
   it('offers a photo control on every staff row', async () => {
     listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [COACH, MEDIC] }])
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
 
     const buttons = await screen.findAllByTestId('staff-photo-open')
     expect(buttons).toHaveLength(2)
@@ -244,14 +279,22 @@ describe('AdminStaff — setting a photo for somebody else', () => {
       },
     ])
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
     expect(await screen.findByTestId('staff-photo-open')).toHaveTextContent(/change photo/i)
   })
 
   it('opens a drop zone naming the person, so an admin cannot lose track of whose photo it is', async () => {
     listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [COACH] }])
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
     await userEvent.click(await screen.findByTestId('staff-photo-open'))
 
     expect(screen.getByTestId('staff-photo-editor')).toBeInTheDocument()
@@ -266,7 +309,11 @@ describe('AdminStaff — setting a photo for somebody else', () => {
   it('uploads against the profile id and records the key with the focal point', async () => {
     listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [COACH] }])
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
     await userEvent.click(await screen.findByTestId('staff-photo-open'))
 
     const file = new File(['x'], 'face.jpg', { type: 'image/jpeg' })
@@ -288,7 +335,11 @@ describe('AdminStaff — setting a photo for somebody else', () => {
   it('re-signs the stored key rather than trusting the local preview', async () => {
     listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [COACH] }])
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
     await userEvent.click(await screen.findByTestId('staff-photo-open'))
     await userEvent.upload(
       screen.getByLabelText(/Add a photo for Alex Morgan/i),
@@ -303,7 +354,11 @@ describe('AdminStaff — setting a photo for somebody else', () => {
     listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [COACH] }])
     uploadStaffPhotoMock.mockRejectedValue(new Error('That photo is too large. The limit is 5 MB.'))
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
     await userEvent.click(await screen.findByTestId('staff-photo-open'))
     await userEvent.upload(
       screen.getByLabelText(/Add a photo for Alex Morgan/i),
@@ -351,7 +406,11 @@ describe('AdminStaff — changing a photo that already exists', () => {
   it('opens on the positioner, because repositioning is the common case', async () => {
     listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
     await userEvent.click(await screen.findByTestId('staff-photo-open'))
 
     expect(screen.getByTestId('photo-stage')).toBeInTheDocument()
@@ -363,7 +422,11 @@ describe('AdminStaff — changing a photo that already exists', () => {
   it('reaches a file picker via "Choose a different photo"', async () => {
     listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
     await userEvent.click(await screen.findByTestId('staff-photo-open'))
     await userEvent.click(screen.getByTestId('staff-photo-replace'))
 
@@ -375,7 +438,11 @@ describe('AdminStaff — changing a photo that already exists', () => {
   it('uploads the replacement and records the new key', async () => {
     listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
     await userEvent.click(await screen.findByTestId('staff-photo-open'))
     await userEvent.click(screen.getByTestId('staff-photo-replace'))
 
@@ -393,7 +460,11 @@ describe('AdminStaff — changing a photo that already exists', () => {
   it('disables Save while replacing until a file is chosen', async () => {
     listSquadStaffMock.mockResolvedValue([{ id: 't1', name: 'U12 Boys', staff: [WITH_PHOTO] }])
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
     await userEvent.click(await screen.findByTestId('staff-photo-open'))
     await userEvent.click(screen.getByTestId('staff-photo-replace'))
 
@@ -426,7 +497,9 @@ describe('AdminStaff — replacement does not strand storage objects', () => {
   })
 
   async function replaceWith(file) {
+    const user = userEvent.setup()
     render(<AdminStaff />)
+    await openEverySquad(user)
     await userEvent.click(await screen.findByTestId('staff-photo-open'))
     await userEvent.click(screen.getByTestId('staff-photo-replace'))
     await userEvent.upload(screen.getByLabelText(/Add a photo for Alex Morgan/i), file)
@@ -466,7 +539,11 @@ describe('AdminStaff — replacement does not strand storage objects', () => {
       id: 'p-coach', photo_path: null, photo_focus_x: null, photo_focus_y: null,
     })
 
+    const user = userEvent.setup()
+
     render(<AdminStaff />)
+
+    await openEverySquad(user)
     await userEvent.click(await screen.findByTestId('staff-photo-open'))
     await userEvent.click(screen.getByTestId('staff-photo-remove'))
 

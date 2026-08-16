@@ -135,9 +135,22 @@ export const ADMIN_RIGHTS = ['youth', 'media', 'pitches']
 // a title, that is the bug — the same rule that stops a squad RENAME handing
 // somebody a role (20260806_claim_roster_access.sql).
 //
-// ⚠️ MEDIC HAS NO TITLE OF ITS OWN HERE on purpose: "Medic" is already the role
-// label, so a title would be repeating it. A club with a physio types one.
-export const STAFF_TITLES = ['Head Coach', 'Assistant Coach', 'Team Manager', 'Physio']
+// ⚠️ JAY'S FOUR, VERBATIM, 16 Aug 2026: "should be Head Coach, Assistant Coach,
+// Team Manager, Medic".
+//
+// ⚠️ THIS OVERTURNS A PRIOR RULING THAT SAT HERE, and the old one is worth
+// knowing because it was not silly. It read: "MEDIC HAS NO TITLE OF ITS OWN
+// HERE on purpose: 'Medic' is already the role label, so a title would be
+// repeating it. A club with a physio types one." The fourth suggestion was
+// "Physio" on that reasoning.
+//
+// It loses to the person who uses the screen. The repetition it avoided is
+// invisible — the picker offers titles, and a medic choosing "Medic" sees one
+// word, not two — while the cost was real: the only medical title on offer was
+// one this club does not use, so the field's suggestions were wrong for the
+// commonest case in order to be tidy about the rarest. "A club with a physio
+// types one" is still true, and now cuts the other way.
+export const STAFF_TITLES = ['Head Coach', 'Assistant Coach', 'Team Manager', 'Medic']
 
 // ⚠️ JAY'S EXACT WORDING, 12 Aug 2026, AND TWO OF THE THREE ARE NOT JOB TITLES.
 // "we aren't going to use human names anymore, only Club Youth Manager, Pitch
