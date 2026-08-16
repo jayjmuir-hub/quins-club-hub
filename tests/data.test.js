@@ -28,6 +28,17 @@ vi.mock('../src/lib/supabase.js', () => ({
   },
 }))
 
+// ⚠️ MOCKED BECAUSE `deletePlayer` NOW REACHES STORAGE, and the client mock
+// above has no `storage` key — a real `deletePlayerPhoto` would throw on
+// `supabase.storage.from` before it could swallow anything. Mocking it also
+// makes the interesting assertion possible: that the photo is deleted with the
+// key the deleted ROW carried, rather than one refetched afterwards from a row
+// that no longer exists.
+const deletePlayerPhotoMock = vi.fn().mockResolvedValue(true)
+vi.mock('../src/data/photos.js', () => ({
+  deletePlayerPhoto: (...args) => deletePlayerPhotoMock(...args),
+}))
+
 import { supabase } from '../src/lib/supabase.js'
 import { MAX_ROWS, MAX_TOTAL_ROWS } from '../src/data/limits.js'
 import {
@@ -137,6 +148,9 @@ beforeEach(() => {
   supabase.rpc.mockReset()
   supabase.channel.mockReset()
   supabase.removeChannel.mockReset()
+  // ⚠️ `mockClear`, NOT `mockReset` — reset would drop the resolved value set
+  // where it is declared and hand `deletePlayer` an undefined to await.
+  deletePlayerPhotoMock.mockClear()
 })
 
 // --- listEvents -------------------------------------------------------
@@ -967,6 +981,58 @@ describe('deletePlayer', () => {
     supabase.from.mockReturnValue(builder)
 
     await expect(deletePlayer('p-1')).rejects.toThrow(/permission|not allowed|couldn.t delete/i)
+  })
+
+  // ⚠️ UNTIL 16 Aug 2026 THE PHOTO WAS SIMPLY LEFT BEHIND, so a deleted child's
+  // photograph outlived their record indefinitely in a private bucket with
+  // nothing pointing at it. A storage object cannot be a cascade — SQL is
+  // refused outright by `protect_delete` — so the client has to do it.
+  it('deletes the photo object too', async () => {
+    const { builder } = createQueryBuilder({
+      data: [{ id: 'p-1', photo_path: 'p-1/1699999999999.jpg' }],
+    })
+    supabase.from.mockReturnValue(builder)
+
+    await deletePlayer('p-1')
+
+    expect(deletePlayerPhotoMock).toHaveBeenCalledWith('p-1/1699999999999.jpg')
+  })
+
+  // ⚠️ THE KEY COMES FROM THE DELETED ROW, WHICH IS THE ONLY PLACE IT CAN. Once
+  // the row is gone there is nothing left to look it up from — this is why the
+  // delete carries `.select()` rather than being fire-and-forget.
+  it('takes the key from the row it just deleted', async () => {
+    const { builder, calls } = createQueryBuilder({
+      data: [{ id: 'p-1', photo_path: 'p-1/1.jpg' }],
+    })
+    supabase.from.mockReturnValue(builder)
+
+    await deletePlayer('p-1')
+
+    expect(builder.select).toHaveBeenCalled()
+    expect(calls.eq[0]).toEqual(['id', 'p-1'])
+    expect(deletePlayerPhotoMock).toHaveBeenCalledWith('p-1/1.jpg')
+  })
+
+  it('does not call storage for a player with no photo', async () => {
+    const { builder } = createQueryBuilder({ data: [{ id: 'p-1', photo_path: null }] })
+    supabase.from.mockReturnValue(builder)
+
+    await deletePlayer('p-1')
+
+    expect(deletePlayerPhotoMock).not.toHaveBeenCalled()
+  })
+
+  // ⚠️ THE ROW GOES FIRST AND THE OBJECT SECOND. On a refusal there is nothing
+  // to clean up and the photo must SURVIVE — deleting it after a refused row
+  // delete would destroy a photograph belonging to a player who is still on the
+  // roster, which is the worst outcome available here.
+  it('leaves the photo alone when the row delete is refused', async () => {
+    const { builder } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(deletePlayer('p-1')).rejects.toThrow()
+    expect(deletePlayerPhotoMock).not.toHaveBeenCalled()
   })
 })
 

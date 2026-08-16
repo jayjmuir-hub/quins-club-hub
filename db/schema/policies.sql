@@ -140,6 +140,12 @@ ALTER TABLE public.invites         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.league_teams    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.memberships     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.photo_backup_runs ENABLE ROW LEVEL SECURITY;  -- added 13 Aug 2026
+-- ⚠️ RLS ON AND **ZERO POLICIES**, WHICH IS NOT AN OVERSIGHT — it is what makes
+-- the table unreachable from the browser. RLS with no policy denies every role
+-- that does not bypass it, and `service_role` (which runs the nightly scan)
+-- does bypass it. A future admin screen gets a policy written FOR it; do not
+-- add one speculatively. added 16 Aug 2026
+ALTER TABLE public.photo_orphan_scans ENABLE ROW LEVEL SECURITY;  -- added 16 Aug 2026
 ALTER TABLE public.social_ideas      ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026, captured 13 Aug
 ALTER TABLE public.pitch_requests  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pitches         ENABLE ROW LEVEL SECURITY;
