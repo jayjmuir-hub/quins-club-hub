@@ -25,7 +25,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the guard exists or not. Three cases were written for the field itself; the
   blank guard was fault-injected and fails exactly one of them.
 
-- 🔒 **AN INVITE IS NOW WORTH ONLY WHAT THE PERSON SENDING IT COULD ALREADY
+- `31b9ed5` — 🔒 **AN INVITE IS NOW WORTH ONLY WHAT THE PERSON SENDING IT COULD ALREADY
   APPROVE.** Schema for the Invite button on a parent row (Jay: *"if the father
   adds the mother for example"*).
   ⛔ **`accept_invite` DID NOT NAME `status` AT ALL** — measured on live, not read
