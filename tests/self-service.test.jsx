@@ -147,7 +147,9 @@ describe('Self-service profile editing', () => {
 
     // The coach's form owns the club-controlled fields; the self-service one
     // does not render them at all.
-    expect(await screen.findByLabelText('Full name')).toBeInTheDocument()
+    expect(
+      await screen.findByLabelText('First name', { selector: '#player-first-name' }),
+    ).toBeInTheDocument()
   })
 
   it('never renders the club-controlled fields in the self-service form', async () => {
@@ -158,7 +160,7 @@ describe('Self-service profile editing', () => {
 
     // Absent, not disabled. A disabled input is a field someone will
     // eventually be tempted to enable.
-    expect(screen.queryByLabelText('Full name')).toBeNull()
+    expect(screen.queryByLabelText('First name', { selector: '#player-first-name' })).toBeNull()
     expect(screen.queryByLabelText('Position')).toBeNull()
     expect(screen.queryByLabelText('Age group')).toBeNull()
     expect(screen.getByText(/set by the club/i)).toBeInTheDocument()

@@ -50,12 +50,21 @@ import Button from './Button.jsx'
 // admin on a different screen. The CHECK constraint in the migration holds the
 // same list, and the database is the one that matters — if these ever disagree,
 // a request fails on save rather than being quietly downgraded.
+//
+// ⚠️ 'volunteer' IS A ROLE SOMEBODY MAY CLAIM AND NOBODY MAY HOLD, added
+// 17 Aug 2026 (Jay's call — see the head of
+// db/migrations/20260817_access_request_volunteer_role.sql). Until then a
+// committee member had to claim one of the other five, which is the "no idea
+// who they are" problem wearing a role that fits even worse. It is deliberately
+// NOT in `memberships_role_check`, so an admin approving one still chooses what
+// access they actually get, and nothing can grant "volunteer" by accident.
 const REQUESTABLE_ROLES = [
   { value: 'parent', label: 'Parent or guardian' },
   { value: 'player', label: 'Player' },
   { value: 'coach', label: 'Coach' },
   { value: 'manager', label: 'Team manager' },
   { value: 'medic', label: 'Medic or physio' },
+  { value: 'volunteer', label: 'Committee or volunteer' },
 ]
 
 function Shell({ title, children }) {
@@ -399,9 +408,18 @@ export default function RequestAccess({ userId, email, children }) {
         </select>
         {/* ⚠️ SAYS WHAT TO DO ABOUT THE LIMIT RATHER THAN HIDING IT. One squad
             is what the row can hold, and a parent with three children has a
-            real answer to give — the note below is where it goes. */}
+            real answer to give — the note below is where it goes.
+
+            ⚠️ AND A VOLUNTEER STILL HAS TO PICK ONE. Jay's call, 17 Aug 2026,
+            over relaxing the policy: every request naming a squad is what lets
+            an admin tell one waiting stranger from another, and that rule is
+            four days old. For a club-wide committee member the squad means
+            "who to ask about me", not "what I do there" — so the wording
+            changes rather than the field. */}
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
-          More than one child, or more than one squad? Pick the eldest and say so below.
+          {role === 'volunteer'
+            ? 'No squad of your own? Pick whichever one knows you best — it just tells us who to ask about you.'
+            : 'More than one child, or more than one squad? Pick the eldest and say so below.'}
         </p>
 
         <label

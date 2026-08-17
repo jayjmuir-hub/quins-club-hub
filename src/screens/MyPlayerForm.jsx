@@ -18,7 +18,7 @@ import {
 } from '../data/photos.js'
 import { allowsOwnContact } from '../lib/ageGroup.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
-import { toEditorRows, toSaveRows } from '../lib/parentRows.js'
+import { parentNameProblem, toEditorRows, toSaveRows } from '../lib/parentRows.js'
 
 // The self-service form: what a PARENT or the PLAYER themselves can change on
 // their own record — the photo, the player's own contact details, the
@@ -125,6 +125,19 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
       setError(genderRequiredMessage(team.name))
       return
     }
+
+    // ⚠️ THE SAME RULE PlayerForm ENFORCES, FROM THE SAME FUNCTION. Two screens
+    // write player_parents and they are the only two things that do; a second
+    // copy of "both names" here would be a rule free to disagree with the
+    // other, and the one nobody tested would be the one that let a one-word
+    // name through. Checked before `saving` is set, for the reason above: the
+    // photo upload below is the first irreversible side effect.
+    const parentProblem = parentNameProblem(parents)
+    if (parentProblem) {
+      setError(parentProblem)
+      return
+    }
+
     setSaving(true)
     setError(null)
 

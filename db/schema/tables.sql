@@ -425,7 +425,14 @@ CREATE TABLE public.access_requests (
   CONSTRAINT access_requests_requested_team_id_fkey FOREIGN KEY (requested_team_id) REFERENCES teams(id) ON DELETE SET NULL,
   -- !! No 'admin'. Squad roles are granted by a coach or manager approving a
   -- !! stranger; admin is club-wide and granted by an existing admin elsewhere.
-  CONSTRAINT access_requests_requested_role_check CHECK ((requested_role IS NULL OR requested_role = ANY (ARRAY['parent'::text, 'player'::text, 'coach'::text, 'manager'::text, 'medic'::text])))
+  -- !! 'volunteer' ADDED 17 Aug 2026, AND IT IS THE ONE VALUE HERE THAT IS NOT A
+  -- !! MEMBERSHIP ROLE. This column is what somebody SAYS they are;
+  -- !! memberships.role is what they may be granted, and its own CHECK refuses
+  -- !! 'volunteer' on purpose — so an admin approving a committee member still
+  -- !! chooses what access they get. Do not add it there to make the two lists
+  -- !! match: can_see_team and can_edit_team read that table, and a role that
+  -- !! grants nothing is a row each of them would have to learn to ignore.
+  CONSTRAINT access_requests_requested_role_check CHECK ((requested_role IS NULL OR requested_role = ANY (ARRAY['parent'::text, 'player'::text, 'coach'::text, 'manager'::text, 'medic'::text, 'volunteer'::text])))
 );
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
 

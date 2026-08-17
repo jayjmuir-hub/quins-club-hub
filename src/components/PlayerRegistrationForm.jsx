@@ -461,12 +461,29 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
  * `submitLabel` differs by caller ("Add my player" at sign-up reads wrong as
  * the label on a sheet opened from a list of children you already have).
  */
+/**
+ * ⚠️ `defaultSelfRegister` APPLIES TO THE FIRST ROW ONLY, AND IT IS AN ANSWER
+ * CARRIED IN RATHER THAN A PREFERENCE. The roll-call asks "do you play here
+ * yourself?" before this form is ever rendered; without this the tick would
+ * change nothing and the person would be asked the same question again, per row,
+ * by a control they have already answered. A row ADDED afterwards is a different
+ * person and defaults to false, which is why this is not simply the new default.
+ *
+ * ⚠️ IT CANNOT SMUGGLE A SELF-REGISTRATION PAST A SQUAD THAT FORBIDS ONE. The
+ * squad decides, from `teams.self_registration_allowed`: choosing one that
+ * forbids it clears the flag (the select's onChange), and the submit forces
+ * `canSelfRegister && row.selfRegister` again on the way out. Both guards
+ * predate this prop and are what make it safe to set before a squad is picked.
+ */
 export default function PlayerRegistrationForm({
   teams = [],
   onDone,
   submitLabel = 'Add my player',
+  defaultSelfRegister = false,
 }) {
-  const [rows, setRows] = useState(() => [blankRow()])
+  const [rows, setRows] = useState(() => [
+    { ...blankRow(), selfRegister: Boolean(defaultSelfRegister) },
+  ])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   // The registrant's own name — see the header note. `profile` resolves

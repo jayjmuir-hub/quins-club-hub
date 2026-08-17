@@ -1,9 +1,15 @@
 # Plan — account creation, rebuilt around who a person actually is
 
-**STATUS: IN PROGRESS, opened 16 Aug 2026.** Eight items, built in the order
-below. Each ships on its own and none blocks the next, so this can stop after any
-of them. **Update this line as items land** — a plan that says IN PROGRESS after
-it shipped is the failure mode `docs:check` rule 5 exists to catch.
+**STATUS: IN PROGRESS, opened 16 Aug 2026. Items 1, 2, 4 and 5 have SHIPPED; 3 is
+half-shipped; 4b is blocked on Jay; 6–8 are not started.** Each ships on its own
+and none blocks the next, so this can stop after any of them. **Update this line
+as items land** — a plan that says IN PROGRESS after it shipped is the failure
+mode `docs:check` rule 5 exists to catch.
+
+⚠️ **THE FORK IS GONE (item 5, 17 Aug), WHICH IS THE ONE CHANGE THE REST OF THIS
+PLAN WAS WRITTEN AROUND.** The diagnosis below still describes the app as having
+two mutually exclusive doors. It does not any more — it is kept because it is why
+everything else here exists.
 
 ## What Jay reported
 
@@ -60,19 +66,24 @@ select count(*) from public.players pl
 
 ## Build order
 
-| # | Item | Size |
-|---|---|---|
-| 1 | The mirror question — *do you do anything else at the club?* | small |
-| 2 | Split every name into first and family | small |
-| 3 | Date of birth, in its own table | medium |
-| 4 | Invite from a parent row | medium |
-| 5 | The roll-call replaces the fork | medium |
-| 6 | Completeness debt | medium |
-| 7 | Link adults to accounts | medium |
-| 8 | Vouching, from the club's side | large |
+| # | Item | Size | State |
+|---|---|---|---|
+| 1 | The mirror question — *do you do anything else at the club?* | small | ✅ 16 Aug |
+| 2 | Split every name into first and family | small | ✅ 17 Aug |
+| 3 | Date of birth, in its own table | medium | 🟡 table + registration field |
+| 4 | Invite from a parent row | medium | ✅ 17 Aug |
+| 4b | …and the email that actually posts it | medium | ⛔ **blocked on Jay** |
+| 5 | The roll-call replaces the fork | medium | ✅ 17 Aug |
+| 6 | Completeness debt | medium | not started |
+| 7 | Link adults to accounts | medium | not started |
+| 8 | Vouching, from the club's side | large | not started |
 
 Items 1–4 close holes that are open on a live club today. 5 stops the hole being
 re-created. 6–8 are the durable shape.
+
+⚠️ **WHAT IS LEFT OF 3 IS THE `allowsOwnContact` RE-POINT, AND IT IS DEFERRED ON
+PURPOSE** — see the item. It is a real refactor with a safeguarding rule inside
+it, not a tidy-up.
 
 ---
 
@@ -152,17 +163,71 @@ unreachable": the file's default fixture is an **admin**, who is correctly never
 asked. A gate step can be added to this component and be tested by nothing at
 all — check the fixture's role before believing a green run here.
 
-## 2 · Split every name into first and family — 🟡 SCHEMA + SIGN-UP DONE
+## 2 · Split every name into first and family — ✅ COMPLETE, 17 Aug 2026
 
 **Done, 16 Aug 2026:** the columns, `private.sync_person_name` on both tables,
 the backfill, and the **registration form** — which is the form that produced the
 one-word row.
 
-**Still to do, and deliberately not started:** the two-box treatment on
-`PlayerForm` (admin), `MyPlayerForm` (a parent editing their own child) and
-`ParentsEditor`. Those screens still write `full_name` in one box, which the
-trigger splits correctly — so they are **correct but not yet improved**. Nothing
-is broken by leaving them; they simply do not enforce a family name.
+**Done, 17 Aug 2026:** `PlayerForm`, `MyPlayerForm` and `ParentsEditor`. Every
+box in the app that names a person is now two.
+
+⚠️ **THESE THREE WRITE `first_name`/`last_name` DIRECTLY, WHERE THE REGISTRATION
+FORM JOINS — AND THAT IS NOT AN INCONSISTENCY TO TIDY UP.** `register_my_player`
+takes one `p_full_name` parameter and widening a public signature was the larger
+change. These write the table, so they need not — and **must not**, because the
+join is lossy in one direction: the trigger takes the **last word** as the family
+name, so *"Anna van der Berg"* joined and re-split comes back as *"Anna van der"
+/ "Berg"*. Writing both columns takes the trigger's names-win branch instead.
+`full_name` is sent as well, computed exactly as the trigger recomputes it, so a
+row written while the trigger was somehow absent still carries a correct display
+name for its thirty-odd readers.
+
+⚠️ **AND THERE IS NO CLIENT-SIDE SPLIT OF `full_name` ANYWHERE, NOT EVEN AS A
+FALLBACK.** The rule — a one-word name is a **first** name — has been got
+backwards once already (`20260808_sync_profile_name_single_word`), and a second
+copy of it in JavaScript would be invisible until somebody sorted a roster. The
+backfill filled every existing row and its migration **aborts** if it did not, so
+an empty box means an empty column.
+
+### The family name is required, and grandfathered on players only
+
+| | rule |
+|---|---|
+| a NEW player | both names |
+| an EXISTING player who arrived without one | still saves — nobody may **blank** one that exists |
+| a parent row | both names, no grandfathering |
+
+⚠️ **THE GRANDFATHER CLAUSE IS NOT A COMPROMISE, IT IS THE `ParentsEditor`
+RULING APPLIED AGAIN.** At least one live player row has a first name and nothing
+else. Demanding a family name there blocks a coach fixing a typo in a position
+until they invent a surname they may not know — which is exactly why "at least
+one parent" warns instead of blocking.
+
+⚠️ **PARENT ROWS GET NO SUCH CLAUSE BECAUSE THERE IS NOTHING TO GRANDFATHER, AND
+THIS WAS MEASURED RATHER THAN ASSUMED.** Every parent row has both names, and
+`PlayerForm` and `MyPlayerForm` are the **only** writers of `player_parents` —
+`invite_parent` is the only function in either schema that even mentions the
+table, and it does not insert. So the rule closes the door rather than locking
+somebody out from behind it. It lives in **one** function, `parentNameProblem`,
+called by both screens, and is checked **before any write**: the parent rows are
+saved last, so catching it there would refuse a save that had mostly happened.
+
+### Four injected faults, each caught by one test
+
+| Fault | Test that failed |
+|---|---|
+| drop the family-name requirement | *refuses a new player with a first name and nothing else* |
+| drop the grandfather clause | *still saves an existing player who arrived without a family name* |
+| require only a first name on a parent row | *refuses a parent with a first name and nothing else* (both screens) |
+| send parent rows as `full_name` only | *writes first_name and last_name alongside full_name* |
+
+⚠️ **AND THE FOURTH ONE WAS GREEN WHEN IT WAS FIRST INJECTED.** Every screen test
+asserts what is handed to `saveParents`; `toRow` is below that line and nothing
+looked at it. The test that catches it had to be written against the built
+insert, in `tests/parents-photos.test.js`. **This is the third time on this
+project that a suite has gone green over an untested new branch** — check what
+the existing tests can actually see before believing one.
 
 ### Verified on production
 
@@ -205,6 +270,15 @@ argument applies to the child.
 
 Callers to change: `PlayerRegistrationForm`, `PlayerForm`, `MyPlayerForm`,
 `ParentsEditor`, and `playerImport`.
+
+⚠️ **`playerImport` WAS DELIBERATELY LEFT ALONE, 17 Aug 2026, AND IT IS THE ONE
+ITEM ON THAT LIST THAT IS NOT DONE.** A CSV carries one name column; splitting it
+would be a client-side copy of the trigger's rule, which is the thing this item
+refuses to have (see the note above). The importer keeps writing `full_name` and
+the trigger keeps splitting it — correct for "First Last", and wrong in the same
+way it has always been for a two-word family name. **The fix is a second CSV
+column, not a smarter split**, and it belongs to whoever next changes the import
+format.
 
 ## 3 · Date of birth — ✅ TABLE AND REGISTRATION FIELD DONE, 16 Aug 2026
 
@@ -265,10 +339,80 @@ Two things follow in the same change:
   refuses a blank and permits a contradiction. A wrong-looking date is usually a
   typo and occasionally a genuine dispensation.
 
-## 4 · Invite from a parent row — 🟡 SCHEMA DONE, NO BUTTON YET
+## 4 · Invite from a parent row — ✅ BUILT, 17 Aug 2026
 
 An adult on `player_parents` is the club's knowledge of a person written in the
 wrong table. Put an **Invite** button on the row.
+
+**Done, 17 Aug 2026:** `src/components/InviteParentButton.jsx`, rendered by
+`ParentsEditor` — so it appears on **both** surfaces at once, `PlayerForm` (a
+coach, manager, medic or admin) and `MyPlayerForm` (a parent editing their own
+child). That pair IS `can_edit_team OR is_own_player`, so there is **no role
+check in the component**: a second rule up there would be free to disagree with
+the one in the database, and the wrong one would be the one nobody tested.
+
+⚠️ **THE TRAP THE COMPONENT EXISTS TO CLOSE, AND IT IS NOT THE ONE THE SCHEMA
+CLOSED.** `invite_parent` reads the address off the ROW. Inside a form, that
+makes a half-edited row dangerous: correct the address, press Invite before
+Save, and the **old** address gets the account while the screen shows the new
+one. So the editor row carries `savedEmail` beside `email` and the button
+withdraws while they differ, saying why. Case and whitespace are ignored, since
+the server lowercases and trims.
+
+⚠️ **IT SHOWS A LINK, NOT A SENT EMAIL — AND THAT IS THE HONEST STATE OF THIS
+APP.** No edge function posts invite mail; `InviteForm` has always shown the
+accept link for a human to send. A button claiming "invitation sent" would be
+the only screen in the app promising a mail nobody posted. **Jay asked for an
+email** ("*click to send that person an email invitation*"), so the send is a
+real remaining piece and is written up as item 4b below.
+
+**States built: Invite → Invited \<when\> → (Joined awaits item 7).** `Joined`
+cannot be computed today: it needs `player_parents.profile_id`, because a client
+may not read `profiles` for anybody but itself. The refusal covers the gap in the
+meantime — inviting somebody who already has an account is refused with 42710 and
+the sentence says to ask an admin to connect them.
+
+### Four injected faults, each caught by exactly one test
+
+`tests/invite-parent.test.jsx`. ⚠️ **Only the Supabase CLIENT is mocked**, not
+`src/data/parents.js` — mocking one layer lower is what lets a test read the
+actual RPC arguments and assert that **no email address is ever sent to the
+server**. Mocking the data module would have proved only that the component
+called a function.
+
+| Fault | Test that failed |
+|---|---|
+| treat an edited address as saved | *withdraws the button while the typed address differs* |
+| pass the email as a second RPC argument | *asks the server for the ROW, and never sends the address* |
+| hard-code the "goes to the approval queue" sentence | *says an invite it can grant needs nothing further* |
+| pass any `error.message` through to the screen | *does not read out an error the function did not write* |
+
+### Verified against production, read-only, 17 Aug 2026
+
+`player_parents.invited_at` exists and `authenticated` holds SELECT on **all 12**
+of the table's columns — which is what makes `listParents`' `select('*')` safe
+after the migration, and is the same table-level-versus-column-level question
+that item 2 had to answer. `invite_parent` exists with EXECUTE for
+`authenticated` and **not** `anon`, so the 16 Aug ACL trap did not recur.
+
+## 4b · The invite email — NOT BUILT, and blocked on a hand step
+
+Pressing Invite creates the invite; a human still sends the link. To make it a
+real email, the proven shape is already in this repo twice over: an AFTER INSERT
+trigger on `invites` calling a `notify-invite` edge function through `pg_net`,
+exactly as `db/migrations/20260809_notify_pending_membership.sql` calls
+`notify-approval`. Read that migration's header before writing it — the three
+prerequisites, the fail-closed shared secret and the "it must never fail the
+write" ordering all apply unchanged.
+
+⚠️ **IT NEEDS TWO VAULT SECRETS AND ONE DASHBOARD ENV VAR, WHICH IS JAY'S HAND
+STEP** — there is no MCP tool for Edge Function secrets. Until it is done the
+function answers 503 and no mail is sent, which is the intended failure.
+
+⚠️ **AND THE RECIPIENT IS AN ADULT WHO HAS NOT ASKED FOR ANYTHING**, unlike every
+existing notification, which goes to volunteers who signed up. That is a
+different consent question and it is Jay's, not a detail to settle while
+building.
 
 **Who sees it: exactly who can already edit the row.** `parent edit own`
 (`is_own_player`) and `parent edit` (`can_edit_team` — coach, manager, medic on
@@ -351,7 +495,148 @@ without the middle state two coaches invite the same person on the same evening.
 An invited parent skips sign-up entirely: every answer the roll-call would ask
 for is already on the row that invited them.
 
-## 5 · The roll-call replaces the fork
+## 5 · The roll-call replaces the fork — ✅ BUILT, 17 Aug 2026
+
+**What was established before writing any of it, and it changes the shape:**
+
+⚠️ **THE GATE IS THE PROVIDER'S SNAPSHOT, NOT THE DATABASE — WHICH IS WHAT MAKES
+A MULTI-ANSWER SCREEN POSSIBLE AT ALL.** `AppShell` renders the zero-membership
+route while `memberships.length === 0`, and that array only changes when
+something calls `reload()`. `register_my_player` and `request_staff_role` both
+create rows without telling the provider. So a roll-call can write **several**
+answers and stay on screen throughout, provided it holds `reload()` back until
+the last one. Wire `onDone` straight to `reload` — as `AddYourPlayer` does today
+— and the screen vanishes the instant the first answer lands, taking every
+remaining question with it. **That is the trap, and it is silent.**
+
+✅ **A SQUAD PICKER WORKS FOR A STRANGER.** `team read` is
+`(SELECT auth.uid()) IS NOT NULL`, measured from `pg_policy` on 17 Aug. Three
+files said otherwise; see the correction in `AddYourPlayer.jsx`'s header.
+
+✅ **Three of the four answers already have a server-side home.** *Child* and
+*I play here myself* are `register_my_player` (one `PlayerRegistrationForm`
+covers both — it asks "who are you registering?" per row). *Coach, manager or
+medic* is `request_staff_role`, which a zero-membership caller may use: it needs
+a confirmed email and nothing else.
+
+### ✅ RESOLVED 17 Aug 2026 — Jay chose the role, and kept the squad
+
+Offered three options: add `volunteer` and keep the squad requirement; add it and
+relax the requirement; or drop the fourth box. **He chose the first.**
+`db/migrations/20260817_access_request_volunteer_role.sql`, applied and proved in
+a transaction that rolled back — `volunteer` accepted, an invented `chairman`
+still refused `23514`, which is the control proving the widened CHECK still
+checks.
+
+⚠️ **CLAIMABLE, NOT GRANTABLE, AND THE MIGRATION GUARDS BOTH DIRECTIONS.**
+`requested_role` is a statement; `memberships.role` is a grant and still refuses
+`volunteer`. The migration **aborts** if it ever reaches `memberships_role_check`.
+Do not finish that job: `can_see_team` and `can_edit_team` read that table, and a
+role granting nothing is a row each of them would have to learn to ignore.
+
+⚠️ **A VOLUNTEER'S SQUAD MEANS "WHO TO ASK ABOUT ME", NOT "WHAT I DO THERE".**
+That is the trade Jay took over relaxing a four-day-old policy, and relaxing it
+is the thing not to do quietly later. The wording under the picker changes for a
+volunteer; the field does not.
+
+**It is already reachable** — `RequestAccess` offers it today, so the fourth
+answer has a home before the roll-call that needs it exists.
+
+### ⛔ THE BLOCKER AS FOUND — kept because it is why the role exists
+
+`access_requests` is the only queue for somebody with no squad, and **it cannot
+hold this person**:
+
+```
+access_requests_requested_role_check
+  CHECK (requested_role IS NULL OR requested_role = ANY
+         (ARRAY['parent','player','coach','manager','medic']))
+```
+
+and the INSERT policy added on 16 Aug **requires both** a role and a squad. A
+committee member is none of those five and may belong to no squad at all. So
+today the only way to file one is to make them claim a role they do not hold —
+which is the "no idea who they are" bug, reintroduced by the screen built to
+kill it.
+
+⚠️ **DO NOT SETTLE THIS WHILE BUILDING A SCREEN.** Widening the CHECK is
+additive and small. **Relaxing the squad requirement is not**: that requirement
+is four days old, was added at Jay's explicit request, and is the reason an admin
+can now tell one waiting stranger from another.
+
+⚠️ **AND DO NOT SHIP THE ROLL-CALL WITH THIS ANSWER HALF-WIRED.** A tick that
+records nothing is worse than no tick: the whole argument for the screen is that
+*"leaving a box empty is a recorded claim, not an absence"*. A fourth box that
+quietly drops what it was told breaks the only promise the screen makes.
+
+### What shipped
+
+`src/components/RollCall.jsx`. One screen: your name (only if the club does not
+already have it), four boxes, nothing pre-selected, then a section per ticked
+answer, then **one** `reload()`. `AddYourPlayer` and `RequestAccess` survive as
+sections of it; `askingForAccess` and the *"I'm not adding a player"* button are
+gone from `AppShell`.
+
+Two things were added while building that the design did not have:
+
+- ⚠️ **THE STAFF SECTION CAN BE SKIPPED, AND THAT IS NOT POLISH.** Somebody who
+  ticked it by mistake, or whose squad is not in the list, would otherwise be
+  stranded there with the children they came to register permanently out of
+  reach behind it. It writes nothing, so the mirror gate asks again next
+  sign-in.
+- **"I play here myself" seeds the first registration row** rather than being a
+  tick that changes nothing. Safe because the squad decides twice — the select's
+  `onChange` clears the flag for a squad that forbids self-registration, and the
+  submit forces `canSelfRegister && row.selfRegister` again.
+
+### ⚠️ FOUR INJECTED FAULTS, AND THE FIRST ONE SURVIVED
+
+| Fault | Test that failed |
+|---|---|
+| pre-select an answer | *offers every answer, with nothing pre-selected* (and 7 more) |
+| drop the family-name requirement | *requires a family name, unlike the sign-in gate* |
+| ignore an existing access request on mount | *goes straight to the state of their request* |
+| **wire `reload` to the registration section** | **nothing — see below** |
+
+⛔ **THE RELOAD FAULT — THE ONE THING THIS SCREEN TURNS ON — LEFT ALL SEVENTEEN
+TESTS GREEN.** Every case that finished with the players section had it **last**,
+where reloading is correct, and the only case that continued afterwards finished
+with **staff**. The bug is invisible except in a run where a question follows the
+registration form. The case that catches it — tick a child *and* "I help the club
+another way", register the child, and the volunteer question must still be
+standing — was written afterwards and fails on the fault.
+
+⚠️ **THAT IS THE FOURTH TIME ON THIS PROJECT A SUITE HAS GONE GREEN OVER AN
+UNTESTED BRANCH.** Check what the existing cases can actually SEE before
+believing one.
+
+### The design, worked out before any of it was written
+
+One screen, ticks, then a section per ticked answer, then **one** `reload()` at
+the very end. Removes `askingForAccess` from `AppShell` and the *"I'm not adding
+a player"* button with it. Four things were established while designing it, and
+each of them is a trap if it is rediscovered the hard way:
+
+1. ⚠️ **`reload()` GOES LAST, ONCE.** See the note above — wiring it to the first
+   section's `onDone`, as `AddYourPlayer` does today, unmounts the screen and
+   silently discards every remaining answer.
+2. ⚠️ **THE NAME IS ASKED FIRST, BEFORE ANY WRITE.** `request_staff_role` creates
+   a pending membership that appears in a coach's approval queue rendered from
+   `profiles.full_name`, so a coach who never gave a name arrives as *"Unnamed
+   member"*. `PlayerRegistrationForm` already solves this for its own path — an
+   "About you" fieldset shown only when `name_confirmed_at` is null — and asking
+   once at the top of the roll-call makes that fieldset correctly disappear.
+   `RequestAccess` writes the name for the same reason. **Three paths, one
+   question, asked once.**
+3. **`RequestAccess` keeps owning everything about an access request** — the
+   form, *"Request sent"*, and *"Access not approved"*. The roll-call must not
+   grow its own copies of those three states; a person who asked yesterday and
+   signs in today has to meet them, not the ticks again.
+4. **One `PlayerRegistrationForm` covers both *I have a child here* and *I play
+   here myself*** — it already asks "who are you registering?" per row, gated on
+   `teams.self_registration_allowed`.
+
+## 5 · The roll-call — the original reasoning
 
 One screen, tick everything that applies, all of which can be true:
 

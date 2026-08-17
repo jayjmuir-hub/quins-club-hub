@@ -8,9 +8,107 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 17 Aug 2026
+
+- ✨ **ONE ROLL-CALL REPLACES THE FORK AT THE FRONT DOOR.** The point of the whole
+  account-creation plan. `AppShell` rendered "Add your player" with a button
+  saying *"I'm not adding a player"* that swapped in the ask-the-club form —
+  **mutually exclusive**, so the branch somebody picked in their first ten seconds
+  decided what the club knew about them from then on. The parent door never asked
+  whether they also coach; the staff door never asked whether they have children
+  here. Jay: *"i have coaches signing up without adding their kids, its chaotic
+  right now"*. Now: who are you, what brings you here, nothing pre-selected, tick
+  everything true — and every ticked answer is taken in turn.
+  ⚠️ **THE RELOAD GOES LAST, EXACTLY ONCE.** The screen renders while
+  `memberships.length === 0` and only `reload()` changes that; the two RPCs create
+  rows without telling the provider, which is what lets one screen write several
+  answers and stay put. Wire it to a section and the screen unmounts on the first
+  answer with every remaining question unasked — no error, nothing to notice.
+  ⚠️ **THE NAME IS ASKED BEFORE ANY WRITE**, or a coach reaches an approval queue
+  as "Unnamed member" — and **both names are required**, which is deliberately NOT
+  the sign-in gate's rule: this is a stranger asking to reach a children's squad.
+  ⛔ **AND THE RELOAD FAULT — THE ONE THING THE SCREEN TURNS ON — LEFT ALL
+  SEVENTEEN TESTS GREEN WHEN INJECTED.** Every case that ended with the
+  registration section had it LAST, where reloading is correct. Only a run with a
+  question AFTER it can see the bug. That case exists now.
+
+- 🔒 **A VOLUNTEER CAN SAY SO, WITHOUT CLAIMING A ROLE THEY DO NOT HOLD.** Jay's
+  call from three options while item 5 of the account plan was being designed:
+  add `volunteer` to `access_requests`, and KEEP the squad requirement.
+  `access_requests` is the only queue for somebody with no squad and it could not
+  hold a committee member — the CHECK accepted exactly the five roles describing a
+  parent, a player or squad staff — so the only way to file one was to claim a
+  role that fits even worse than saying nothing.
+  ⚠️ **CLAIMABLE, NOT GRANTABLE.** `memberships.role` still refuses it, so an
+  admin approving one chooses what access they actually get. The migration guards
+  BOTH directions and aborts if `volunteer` ever reaches `memberships_role_check`
+  — `can_see_team` and `can_edit_team` read that table, and a role granting
+  nothing is a row each would have to learn to ignore.
+  ⚠️ **THE SQUAD REQUIREMENT IS UNTOUCHED** — four days old, added at Jay's
+  request, and the reason an admin can tell one waiting stranger from another. For
+  a volunteer it means "who to ask about me", so the wording changes and the field
+  does not.
+  Proved on production in a transaction that rolled back: `volunteer` accepted, an
+  invented `chairman` still refused `23514`.
+  ❌ **AND A THIRD COPY OF A ROTTED SENTENCE IS CORRECTED.** `AddYourPlayer`'s
+  header said `team read` is membership-scoped and its widening migration was
+  "written but NOT applied". Measured from `pg_policy`: it is
+  `auth.uid() IS NOT NULL`, applied 8 Aug. `RESTORE.md` has been right since
+  9 Aug; `RequestAccess`'s identical claim was corrected on 16 Aug, where
+  believing it had already cost a SECURITY DEFINER function written and dropped
+  the same hour.
+
+- ✨ **TWO NAME BOXES EVERYWHERE A PERSON IS NAMED, not just at sign-up.** Finishes
+  the split that shipped its columns on 16 Aug: `PlayerForm`, `MyPlayerForm` and
+  `ParentsEditor` all asked for one box, so a coach adding a player could still
+  produce the row that started this.
+  ⚠️ **THESE THREE WRITE `first_name`/`last_name` DIRECTLY WHERE THE REGISTRATION
+  FORM JOINS, AND THAT IS NOT AN INCONSISTENCY.** The join is lossy in one
+  direction: `private.sync_person_name` takes the LAST word as the family name, so
+  "Anna van der Berg" joined and re-split comes back as "Anna van der" / "Berg".
+  Writing both columns takes the trigger's names-win branch. `register_my_player`
+  cannot — it takes one `p_full_name` — which is why it still joins.
+  ⚠️ **NO CLIENT-SIDE SPLIT OF `full_name`, NOT EVEN AS A FALLBACK.** A one-word
+  name is a FIRST name; that rule has been got backwards once already and a second
+  copy in JavaScript would be invisible until somebody sorted a roster.
+  ⚠️ **THE FAMILY NAME IS REQUIRED, AND GRANDFATHERED ON PLAYERS ONLY** — an
+  existing row that arrived without one still saves, because blocking it would
+  stop a coach fixing a typo until they invented a surname they may not know.
+  Parent rows get no clause: every one has both names, and the two forms are the
+  only writers of the table.
+  ⛔ **AND THE SUITE WENT GREEN WITH THE MAIN WRITE UNTESTED.** Removing
+  `first_name`/`last_name` from `toRow` — which would have sent `full_name` alone,
+  re-split wrongly — failed nothing. Every screen test asserts what is handed to
+  `saveParents`; nothing looked below that line. The test that catches it is
+  against the built insert.
+
+- ✨ **THE INVITE BUTTON ON A PARENT ROW.** The other half of the schema that shipped
+  in `31b9ed5`: a contact row is the club's knowledge of an adult written in the
+  wrong table, and this turns it into an offer of an account. Lives in
+  `ParentsEditor`, so it appears for a coach editing a squad's player and for a
+  parent editing their own child in the same change — that pair IS
+  `can_edit_team OR is_own_player`, which is why the component holds **no role
+  check of its own**.
+  ⚠️ **THE TRAP IT CLOSES IS NOT THE ONE THE SCHEMA CLOSED.** `invite_parent`
+  reads the address off the ROW, deliberately — an address as a parameter would
+  turn "invite this row" into "invite anyone, attached to this row's child". In a
+  form that makes a half-edited row dangerous: correct the address, press Invite
+  before Save, and the OLD address gets the account while the screen shows the
+  new one. Editor rows now carry `savedEmail` beside `email` and the button
+  withdraws while they differ. ⚠️ **`savedEmail` IS NOT A DUPLICATE — deleting it
+  as one re-opens exactly that.**
+  ⚠️ **IT SHOWS A LINK, NOT A SENT EMAIL.** Nothing in this app posts invite mail
+  (`InviteForm` has always worked this way), so a button saying "invitation sent"
+  would be the only screen promising a mail nobody posted. Jay asked for the
+  email; it is written up as item 4b of the plan and needs a Vault secret only he
+  can set.
+  ⚠️ **AND WHAT IT SAYS AFTERWARDS IS READ OFF THE RETURNED ROW, NEVER GUESSED
+  FROM THE PRESSER'S ROLE** — the two disagree for a medic. Pending says it goes
+  to the approval queue; active says there is nothing left to queue.
+
 ## 16 Aug 2026
 
-- ✨ **REGISTRATION ASKS FOR A DATE OF BIRTH, AND IT IS REQUIRED.** The field that
+- `a50f746` — ✨ **REGISTRATION ASKS FOR A DATE OF BIRTH, AND IT IS REQUIRED.** The field that
   makes `player_private` real — until this the table was correct and empty.
   ⚠️ **A SECOND WRITE, NOT A WIDER RPC.** The player id comes off the membership
   `register_my_player` returns; there is no other way to learn it, because a

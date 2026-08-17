@@ -6,8 +6,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin, isPendingOnly, roleLabel } from '../lib/scope.js'
 import Nav from './Nav.jsx'
 import NamePrompt from './NamePrompt.jsx'
-import AddYourPlayer from './AddYourPlayer.jsx'
-import RequestAccess from './RequestAccess.jsx'
+import RollCall from './RollCall.jsx'
 // ViewAsBanner only — the switcher itself moved to the Admin screen on
 // 7 Aug 2026. See the long note at its old call site below.
 import { ViewAsBanner, ViewAsSwitcher } from './ViewAsSwitcher.jsx'
@@ -160,24 +159,31 @@ function PendingApprovalBanner() {
 // app knew nothing about, and every person who ever hit it stayed in the
 // admin's waiting list forever with no way to be cleared. RequestAccess
 // replaced it with the approval gate — see
-// db/migrations/20260804_access_requests.sql — and since 8 Aug 2026
-// AddYourPlayer sits in FRONT of it as the primary route (parent
+// db/migrations/20260804_access_requests.sql — and from 8 Aug 2026
+// AddYourPlayer sat in FRONT of it as the primary route (parent
 // self-registration, spec claude/decisions/2026-08-08-parent-self-registration.md).
-// Both are still mounted: registering a child is what most people are here to
-// do, but a coach or a committee member has no child to register and must not
-// be stranded on a form that does not describe them.
+//
+// ❌ THOSE TWO WERE MUTUALLY EXCLUSIVE, AND THAT WAS THE BUG. Whichever door a
+// person picked decided what the club knew about them: the parent route never
+// asked whether they also coach, and the staff route never asked whether they
+// have children here. Jay, 16 Aug 2026: "i have coaches signing up without
+// adding their kids, its chaotic right now". Since 17 Aug there is ONE route —
+// RollCall — which asks both, and everything else, at the same time. Both
+// components survive as SECTIONS of it.
 
 export default function AppShell({ children }) {
   const { user, signOut } = useAuth()
   const { firstName } = useMyProfile()
   const { memberships, teams, loading, error, reload } = useMemberships()
   const location = useLocation()
-  // Which of the two zero-membership routes is showing. State, not a route:
-  // both are dead ends by nature and a URL for either would be a page someone
-  // could bookmark and return to after they had access. Resets on reload,
-  // which is correct — the question "are you adding a player?" is asked fresh
-  // every time somebody arrives with no access.
-  const [askingForAccess, setAskingForAccess] = useState(false)
+  // ❌ `askingForAccess` IS GONE — 17 Aug 2026. It held which of TWO mutually
+  // exclusive zero-membership routes was showing, and that fork is the bug the
+  // account-creation plan opens with: the branch a person picked in their first
+  // ten seconds decided what the club knew about them from then on, and neither
+  // side ever asked about the other. RollCall asks once and takes every answer
+  // that is true. Still state and still not a route, for the reason this note
+  // gave before: it is a dead end by nature, and a URL for it would be a page
+  // somebody could bookmark and return to after they had access.
 
   const isMoreRoute = location.pathname === '/more'
   const ready = !loading && !error && memberships.length > 0
@@ -548,37 +554,29 @@ export default function AppShell({ children }) {
             <SignOutControl signOut={signOut} className="mt-5" />
           </ErrorState>
         )}
-        {!loading && !error && memberships.length === 0 && !askingForAccess && (
-          <AddYourPlayer
+        {!loading && !error && memberships.length === 0 && (
+          <RollCall
             teams={teams}
-            // ⚠️ THE RELOAD IS NOT OPTIONAL. register_my_player creates the
-            // membership server-side; this provider holds a snapshot taken
-            // before it existed, and nothing pushes the new row to it. Without
-            // this the parent submits successfully and stays on the form,
-            // which reads as "it didn't work" — and the obvious response is to
-            // submit again, which is how somebody reaches the five-pending
-            // limit without ever meaning to.
-            onRegistered={reload}
-            onAskForAccess={() => setAskingForAccess(true)}
+            userId={user?.id}
+            email={user?.email}
+            // ⚠️ THE RELOAD IS NOT OPTIONAL, AND IT BELONGS TO THE ROLL-CALL
+            // RATHER THAN TO ANY ONE SECTION OF IT. register_my_player and
+            // request_staff_role create rows server-side; this provider holds a
+            // snapshot taken before they existed, and nothing pushes the new row
+            // to it. Without a reload the person submits successfully and stays
+            // on the form, which reads as "it didn't work" — and the obvious
+            // response is to submit again, which is how somebody reaches the
+            // five-pending limit without ever meaning to.
+            //
+            // ⚠️ AND WIRING IT TO A SECTION IS THE OTHER FAILURE, WHICH IS
+            // SILENT. This whole branch is gated on `memberships.length === 0`,
+            // so reloading after the FIRST answer unmounts the screen with every
+            // remaining question still unasked. RollCall calls this once, at the
+            // end. See rule 1 in its header.
+            onDone={reload}
           >
             <SignOutControl signOut={signOut} className="mt-5" />
-          </AddYourPlayer>
-        )}
-        {!loading && !error && memberships.length === 0 && askingForAccess && (
-          <RequestAccess userId={user?.id} email={user?.email}>
-            {/* A way back. Someone who opened this by mistake, or who read it
-                and realised they do have a child to register, must not have to
-                sign out and in again to reach the other route. */}
-            <Button
-              variant="secondary"
-              full
-              onClick={() => setAskingForAccess(false)}
-              className="mt-4"
-            >
-              Add a player instead
-            </Button>
-            <SignOutControl signOut={signOut} className="mt-5" />
-          </RequestAccess>
+          </RollCall>
         )}
         {ready && (
           <>

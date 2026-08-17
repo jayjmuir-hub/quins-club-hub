@@ -168,7 +168,8 @@ describe('PlayerForm — a minis player', () => {
     expect(screen.queryByText(/positions they can play/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^position$/i)).not.toBeInTheDocument()
     // The fields that are NOT about picking a competitive team stay put.
-    expect(screen.getByLabelText(/full name/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('First name', { selector: '#player-first-name' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Family name', { selector: '#player-last-name' })).toBeInTheDocument()
     expect(screen.getByLabelText(/age group/i)).toBeInTheDocument()
   })
 

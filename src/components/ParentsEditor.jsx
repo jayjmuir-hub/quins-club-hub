@@ -1,5 +1,6 @@
 import PhoneInput from './PhoneInput.jsx'
 import Button from './Button.jsx'
+import InviteParentButton from './InviteParentButton.jsx'
 import { RELATIONSHIPS } from '../lib/relationships.js'
 import { DEFAULT_COUNTRY } from '../lib/phone.js'
 
@@ -15,6 +16,15 @@ import { DEFAULT_COUNTRY } from '../lib/phone.js'
 // the save, and splitting those would mean two places deciding what a valid
 // row is.
 //
+// ⚠️ ONE EXCEPTION, ADDED 17 Aug 2026, AND IT IS DELIBERATELY SELF-CONTAINED:
+// InviteParentButton calls public.invite_parent itself. That action is not part
+// of the form's save — it acts on the row ALREADY IN THE DATABASE, and pressing
+// it is not something Save should undo, retry or be able to lose. Threading it
+// out as an `onInvite` callback would have put an identical per-row state
+// machine (sending / link / refusal) into BOTH PlayerForm and MyPlayerForm,
+// which is precisely the shape src/lib/parentRows.js exists to stop repeating.
+// The rest of this file still holds no data access, and should not grow any.
+//
 // "AT LEAST ONE PARENT" IS A WARNING, NEVER A BLOCK (Jay's ruling). ~159
 // existing players have no parent rows, the bulk importer creates players
 // with none, and a hard requirement would make every one of those records
@@ -29,7 +39,12 @@ const INPUT =
 
 export function emptyParent() {
   return {
-    full_name: '',
+    // ⚠️ TWO FIELDS, NOT `full_name`. One box gets one word — the same rule
+    // that produced a child on the live roster with a first name and nothing
+    // else. src/lib/parentRows.js rebuilds full_name on the way to the
+    // database; nothing in the editor holds it.
+    first_name: '',
+    last_name: '',
     relationship: '',
     email: '',
     phoneCountry: DEFAULT_COUNTRY,
@@ -101,18 +116,40 @@ export default function ParentsEditor({ parents, onChange, disabled = false }) {
             </button>
           </div>
 
+          {/* ⚠️ TWO BOXES, AND BOTH ARE REQUIRED — the rule is in
+              parentNameProblem (src/lib/parentRows.js), enforced by whichever
+              screen owns the save, because this component does no validation
+              gating. It BLOCKS rather than warns, unlike the "no parent on
+              file" note above: there is nothing to grandfather here, since
+              every existing parent row has both names and these two forms are
+              the only writers of the table. */}
           <div className="mb-3.5">
-            <label className={LABEL} htmlFor={`parent-name-${index}`}>
-              Full name
+            <label className={LABEL} htmlFor={`parent-first-name-${index}`}>
+              First name
             </label>
             <input
-              id={`parent-name-${index}`}
+              id={`parent-first-name-${index}`}
               type="text"
               className={INPUT}
-              value={parent.full_name}
+              value={parent.first_name ?? ''}
               disabled={disabled}
-              placeholder="e.g. Sara Fletcher"
-              onChange={(event) => update(index, { full_name: event.target.value })}
+              placeholder="e.g. Sara"
+              onChange={(event) => update(index, { first_name: event.target.value })}
+            />
+          </div>
+
+          <div className="mb-3.5">
+            <label className={LABEL} htmlFor={`parent-last-name-${index}`}>
+              Family name
+            </label>
+            <input
+              id={`parent-last-name-${index}`}
+              type="text"
+              className={INPUT}
+              value={parent.last_name ?? ''}
+              disabled={disabled}
+              placeholder="e.g. Fletcher"
+              onChange={(event) => update(index, { last_name: event.target.value })}
             />
           </div>
 
@@ -167,6 +204,11 @@ export default function ParentsEditor({ parents, onChange, disabled = false }) {
               onChange={(event) => update(index, { email: event.target.value })}
             />
           </div>
+
+          {/* Directly under the Email box, because the address IS what the
+              invite is made of — see InviteParentButton for what it does when
+              the box and the database disagree. */}
+          <InviteParentButton parent={parent} disabled={disabled} />
 
           {/* A radio, not a checkbox: "main contact" is one-of-many, and a
               checkbox would let a coach tick two and leave the app to guess. */}

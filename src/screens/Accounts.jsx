@@ -69,6 +69,17 @@ const ROLE_OPTIONS = [
   { value: 'player', label: 'Player' },
 ]
 
+// ⚠️ WHAT SOMEBODY CLAIMED TO BE, WHICH IS NOT THE SAME LIST AS WHAT THEY MAY BE
+// GRANTED. `access_requests.requested_role` and `memberships.role` are different
+// columns with different CHECKs, and since 17 Aug they genuinely differ:
+// 'volunteer' is claimable and deliberately not grantable, so an admin approving
+// one still chooses what access they actually get. Only the entries that ROLE_OPTIONS
+// cannot label belong here — everything else falls through to it, so the two
+// cannot drift into disagreeing about "Coach".
+const CLAIMED_ROLE_LABELS = {
+  volunteer: 'Committee or volunteer',
+}
+
 // Same borderless-until-hover treatment RosterTable uses for its in-place
 // selects, so a dense list of accounts doesn't read as a wall of form fields.
 const INLINE_CONTROL =
@@ -1314,7 +1325,16 @@ export default function Accounts() {
                             className={`mt-1 block text-[12.5px] font-semibold ${MUTED_ON_PAPER}`}
                           >
                             Asked as{' '}
-                            {ROLE_OPTIONS.find((o) => o.value === request.requested_role)?.label ??
+                            {/* ⚠️ ROLE_OPTIONS IS THE GRANTABLE LIST AND THIS IS
+                                A CLAIMED ONE, SO THEY DO NOT MATCH. 'volunteer'
+                                exists on access_requests and deliberately not on
+                                memberships (17 Aug 2026), so it would fall
+                                through to the raw value and read as a lowercase
+                                stray word. CLAIMED_ROLE_LABELS covers the
+                                difference; the raw fallback stays for the seven
+                                rows that predate the column. */}
+                            {CLAIMED_ROLE_LABELS[request.requested_role] ??
+                              ROLE_OPTIONS.find((o) => o.value === request.requested_role)?.label ??
                               request.requested_role ??
                               'someone'}
                             {request.requested_team_id

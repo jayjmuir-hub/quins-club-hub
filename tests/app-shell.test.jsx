@@ -25,11 +25,17 @@ vi.mock('../src/lib/auth.jsx', () => ({
 vi.mock('../src/data/members.js', () => ({
   getMyProfile: (...args) => getMyProfileMock(...args),
   updateProfileName: (...args) => updateProfileNameMock(...args),
-  // AddYourPlayer (the zero-membership primary route since 8 Aug 2026) calls
-  // this. Its own behaviour is covered by
-  // tests/parent-self-registration.test.jsx; here it only has to exist so
-  // nothing in this file can reach a real Supabase client.
+  // AddYourPlayer (a section of the roll-call since 17 Aug 2026) calls this.
+  // Its own behaviour is covered by tests/parent-self-registration.test.jsx;
+  // here it only has to exist so nothing in this file can reach a real Supabase
+  // client.
   registerMyPlayer: (...args) => registerMyPlayerMock(...args),
+  // ⚠️ THE ROLL-CALL'S OWN TWO WRITES. An unmocked export is `undefined`, and
+  // calling one mid-submit throws from inside a promise chain — which surfaces
+  // as the screen simply not advancing, with nothing in the output naming the
+  // cause.
+  updateProfileNames: (...args) => updateProfileNamesMock(...args),
+  requestStaffRole: (...args) => requestStaffRoleMock(...args),
 }))
 
 vi.mock('../src/data/accessRequests.js', () => ({
@@ -54,6 +60,25 @@ const updateProfileNameMock = vi.fn()
 const getMyAccessRequestMock = vi.fn()
 const createAccessRequestMock = vi.fn()
 const registerMyPlayerMock = vi.fn()
+const updateProfileNamesMock = vi.fn()
+const requestStaffRoleMock = vi.fn()
+
+/**
+ * The roll-call stands in front of every zero-membership route since 17 Aug
+ * 2026: who are you, and what brings you here. The default profile fixture in
+ * this file has no `name_confirmed_at`, so the name is asked too — which is the
+ * point of asking it there, and is what stops a coach reaching an approval queue
+ * as "Unnamed member".
+ */
+async function answerRollCall(user, ticks = [/child playing here/i]) {
+  for (const tick of ticks) {
+    // eslint-disable-next-line no-await-in-loop -- each click must land first.
+    await user.click(await screen.findByRole('checkbox', { name: tick }))
+  }
+  await user.type(screen.getByLabelText(/your first name/i), 'Jay')
+  await user.type(screen.getByLabelText(/your family name/i), 'Tester')
+  await user.click(screen.getByRole('button', { name: /^continue$/i }))
+}
 
 const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
 
@@ -102,6 +127,16 @@ beforeEach(() => {
   getMyAccessRequestMock.mockResolvedValue(null)
   getMyProfileMock.mockResolvedValue({ id: 'user-1', full_name: '', email: 'jay@example.com' })
   createAccessRequestMock.mockResolvedValue({ id: 'req-1', status: 'pending' })
+  // ⚠️ RESOLVED, NOT MERELY DEFINED. A bare vi.fn() returns undefined, and the
+  // roll-call does `.then(...)` on it — which throws inside a promise chain and
+  // surfaces as the screen simply not advancing.
+  updateProfileNamesMock.mockResolvedValue({
+    id: 'user-1',
+    first_name: 'Jay',
+    last_name: 'Tester',
+    name_confirmed_at: '2026-08-17T00:00:00Z',
+  })
+  requestStaffRoleMock.mockResolvedValue({ id: 'mm-staff', status: 'pending' })
 })
 
 describe('AppShell', () => {
@@ -277,12 +312,19 @@ describe('AppShell', () => {
   // The invariant this test actually exists for is unchanged and still
   // asserted: routed content stays hidden, and sign-out stays reachable from
   // whatever a person with no access is shown.
-  it('offers the add-your-player route instead of routed content, with a way out', async () => {
+  it('offers the roll-call instead of routed content, with a way out', async () => {
+    const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(
       loaded({ memberships: [], teams: [{ id: 't-u13', name: 'U13', sort_order: 3 }] }),
     )
 
     renderShell()
+
+    // ⚠️ THE ROLL-CALL COMES FIRST SINCE 17 Aug 2026. The registration form is
+    // now one SECTION of it, reached by ticking rather than by default — which
+    // is the whole change: a coach who also has children here answers both
+    // instead of picking a door and never being asked about the other.
+    await answerRollCall(user)
 
     expect(await screen.findByRole('button', { name: /add my player/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/player's first name/i)).toBeInTheDocument()
@@ -291,10 +333,12 @@ describe('AppShell', () => {
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
   })
 
-  // The secondary route, and the reason it is kept: not everybody signing in
-  // is a parent. A coach or a committee member has no child to register, and
-  // before self-registration this screen was the only way in for them.
-  it('keeps the ask-the-club route reachable, and reversible', async () => {
+  // ❌ THE FORK IS GONE. This test used to click "I'm not adding a player" and
+  // then "Add a player instead" — the two halves of a branch that made the
+  // routes mutually exclusive, which is the bug the account-creation plan opens
+  // with. Both answers are now boxes on one screen, so the thing worth asserting
+  // is that ticking BOTH gets both, in order.
+  it('takes every answer that is true, one after another', async () => {
     const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(
       loaded({ memberships: [], teams: [{ id: 't-u13', name: 'U13', sort_order: 3 }] }),
@@ -302,16 +346,11 @@ describe('AppShell', () => {
 
     renderShell()
 
-    await user.click(await screen.findByRole('button', { name: /not adding a player/i }))
+    await answerRollCall(user, [/child playing here/i, /help the club another way/i])
 
-    expect(await screen.findByText(/jay@example.com/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /request access/i })).toBeInTheDocument()
-    expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
-
-    // Back again. Someone who opened this by mistake must not have to sign out
-    // and in to reach the form they actually wanted.
-    await user.click(screen.getByRole('button', { name: /add a player instead/i }))
+    // Children first…
     expect(await screen.findByRole('button', { name: /add my player/i })).toBeInTheDocument()
+    expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
   })
 
   it('sign-out from the zero-membership state calls signOut', async () => {

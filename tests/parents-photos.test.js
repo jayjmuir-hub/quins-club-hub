@@ -208,6 +208,38 @@ describe('saveParents', () => {
     expect(calls.insert[0][0]).toHaveLength(1)
   })
 
+  // ⚠️ ALL THREE NAME COLUMNS REACH THE DATABASE, AND THIS IS THE ONLY TEST
+  // THAT CAN SEE IT. The screen tests assert what is handed to saveParents;
+  // everything below that line is inside this module. Dropping first_name and
+  // last_name from toRow left the whole suite green — and would have sent
+  // full_name alone, which private.sync_person_name re-splits by taking the LAST
+  // word as the family name. "Anna van der Berg" comes back as "Anna van der".
+  it('writes first_name and last_name alongside full_name', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'new-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await saveParents('player-1', [
+      { full_name: 'Anna van der Berg', first_name: ' Anna ', last_name: ' van der Berg ' },
+    ])
+
+    expect(calls.insert[0][0][0]).toMatchObject({
+      full_name: 'Anna van der Berg',
+      first_name: 'Anna',
+      last_name: 'van der Berg',
+    })
+  })
+
+  // A blank family name is null rather than '', for the same reason every other
+  // blank in this module is: "cleared" and "never set" must be one state.
+  it('sends a blank family name as null', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [{ id: 'new-1' }] })
+    supabase.from.mockReturnValue(builder)
+
+    await saveParents('player-1', [{ full_name: 'Kwame', first_name: 'Kwame', last_name: '' }])
+
+    expect(calls.insert[0][0][0].last_name).toBeNull()
+  })
+
   it('reports a refusal when the database updates nothing', async () => {
     // RLS filtering a write out is a successful "zero rows" as far as
     // PostgREST is concerned — it must not be reported as a save.

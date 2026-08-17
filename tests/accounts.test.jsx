@@ -1800,6 +1800,31 @@ describe('Accounts — a waiting person carries what they asked for', () => {
     expect(asked).toHaveTextContent('U10')
   })
 
+  // ⚠️ 'volunteer' IS CLAIMABLE AND NOT GRANTABLE, so it is NOT in ROLE_OPTIONS
+  // — the grantable list this line used to be labelled from. Without its own
+  // entry it falls through to the raw column value and an admin reads a
+  // lowercase stray word in the middle of a sentence.
+  it('labels a claimed role that nobody can be granted', async () => {
+    listPendingProfilesMock.mockResolvedValue([...PROFILE_ROWS, SELF_REGISTERED])
+    listAccessRequestsMock.mockResolvedValue([
+      {
+        id: 'req-vol',
+        profile_id: 'profile-newcomer',
+        status: 'pending',
+        note: null,
+        requested_role: 'volunteer',
+        requested_team_id: 'team-u10',
+        created_at: '2026-08-17T09:00:00Z',
+      },
+    ])
+    setup()
+
+    await screen.findByText('Sara Coach')
+    const asked = within(waitingRow()).getByTestId('requested-as')
+    expect(asked).toHaveTextContent('Committee or volunteer')
+    expect(asked).not.toHaveTextContent(/asked as volunteer/i)
+  })
+
   // ⚠️ THE SEVEN REQUESTS THAT PREDATE THE ROLE COLUMNS MUST NOT RENDER AN
   // EMPTY LINE. A bare "Asked as" with nothing after it reads as a rendering
   // fault, which is worse than the silence it replaced.

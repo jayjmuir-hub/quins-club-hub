@@ -88,6 +88,48 @@ the component takes `className` and `style` — pass them instead of wrapping.
 ⚠️ **jsdom CANNOT SEE IT**, because it computes no CSS, so the guard is structural:
 `tests/dashboard.test.jsx` asserts each row's `parentElement` IS the list card.
 
+⚠️ **THE ZERO-MEMBERSHIP SCREEN IS `RollCall`, AND ITS ONE INVISIBLE RULE IS THAT
+`reload()` FIRES ONCE, AT THE END.** `AppShell` renders it while
+`memberships.length === 0`, and only the provider's `reload` changes that array —
+so `register_my_player` and `request_staff_role` creating rows without telling the
+provider is what lets one screen collect several answers and stay on screen.
+**Wiring `reload` to a section's own `onDone` unmounts the whole screen the moment
+the first answer lands, with every remaining question unasked, no error and
+nothing visible.** ⚠️ **And a test suite cannot see it unless a case has a question
+AFTER the registration section** — injected on 17 Aug, all seventeen roll-call
+tests stayed green.
+
+⚠️ **THE REGISTRANT'S FAMILY NAME IS REQUIRED THERE AND OPTIONAL IN `NamePrompt`,
+AND THAT IS NOT DRIFT.** The gate confirms somebody the club already holds a
+membership for (one-word names are real, and a gate nobody can pass is worse than
+a sortable list). The roll-call is a stranger asking to reach a children's squad,
+where a coach has to recognise the queue row. `PlayerRegistrationForm`'s
+`firstProblem()` made the same call for the same person.
+
+⚠️ **A PERSON'S NAME IS TWO BOXES IN EVERY FORM, AND THE FORMS DISAGREE ABOUT WHAT
+THEY WRITE — ON PURPOSE.** `PlayerForm`, `MyPlayerForm` and `ParentsEditor` write
+`first_name`/`last_name` (plus `full_name`, computed identically to what the
+trigger would); `PlayerRegistrationForm` joins into one `p_full_name` because
+`register_my_player`'s signature takes one. **Do not "unify" them by making the
+first three join**: `private.sync_person_name` splits on the LAST word, so
+"Anna van der Berg" round-trips to "Anna van der" / "Berg". ⚠️ **And never split a
+`full_name` in JavaScript, even as a fallback** — a one-word name is a FIRST name,
+that rule has already been got backwards once in SQL, and a JS copy of it would
+be invisible until somebody sorted a roster. The 16 Aug backfill filled every row
+and aborts if it did not, so an empty box means an empty column.
+⚠️ **A test fixture with only `full_name` is a shape the database cannot produce**
+and now renders two empty name boxes, which the forms refuse to save.
+
+⚠️ **`ParentsEditor` ROWS CARRY BOTH `email` AND `savedEmail`, AND DELETING THE SECOND AS A
+DUPLICATE RE-OPENS A REAL HOLE.** `email` is bound to an input and is whatever is being
+typed; `savedEmail` is what the database holds (`toEditorRows`, `src/lib/parentRows.js`).
+`public.invite_parent` reads the address **off the row, server-side** — it takes a row id
+and nothing else, deliberately — so pressing Invite on an edited-but-unsaved row would
+email the OLD address while the screen showed the new one, with nothing looking wrong.
+`InviteParentButton` compares the two and withdraws itself while they differ. The
+comparison is case- and whitespace-insensitive, because the server lowercases and trims
+before it looks anything up.
+
 **`PhoneInput` takes `country` + `national` + `onCountryChange` + `onNationalChange`** —
 not `value`/`onChange`. Phones are stored E.164 and split for editing with
 `splitPhone`/`joinPhone` (`src/lib/phone.js`). Formatting is deliberately NOT applied
