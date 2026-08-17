@@ -362,8 +362,16 @@ function checkGrantCapture() {
     const f = `db/migrations/${name}`
     const text = withoutDollarQuotes(readFileSync(join(ROOT, f), 'utf8'))
 
-    for (const stmt of text.split(';')) {
-      if (!/^\s*(grant|revoke)\b/i.test(stmt.replace(/^\s*--.*$/gm, ''))) continue
+    for (const raw of text.split(';')) {
+      // ⚠️ COMMENTS ARE STRIPPED ONCE AND EVERY TEST BELOW USES THE RESULT.
+      // They used to be stripped for the DETECTION and not for the EXTRACTION,
+      // so the table name came out of whatever the comment said. A migration
+      // whose comment contained the words "ON TOP OF RLS" was reported as
+      // granting on a table called "TOP" — a failure naming a table that does
+      // not exist, for a migration whose grant was perfectly captured.
+      // Found 17 Aug 2026 by writing that comment.
+      const stmt = raw.replace(/^\s*--.*$/gm, '')
+      if (!/^\s*(grant|revoke)\b/i.test(stmt)) continue
       // Captured elsewhere, on purpose.
       if (/\bon\s+(all\s+)?functions?\b/i.test(stmt)) continue
       if (/\bon\s+(schema|sequence|database|type)\b/i.test(stmt)) continue

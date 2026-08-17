@@ -540,3 +540,31 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.player_grades    TO authenticated
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.player_positions TO authenticated;
 REVOKE ALL ON public.player_grades    FROM anon;
 REVOKE ALL ON public.player_positions FROM anon;
+
+-- ---------------------------------------------------------------------
+-- membership_audit  (17 Aug 2026) — the one table in this file that a client
+-- may READ and may not WRITE, and the only one where that asymmetry is the
+-- entire point.
+--
+-- ⚠️ THE PRIVILEGES ARE A SECOND, INDEPENDENT REFUSAL BENEATH RLS. The table has
+-- ONE policy, `for select` scoped to `private.is_super_admin()`, and no write
+-- policy at all — so RLS already denies every write by default. These revokes
+-- mean a policy added later by mistake still cannot make the log editable
+-- without somebody also changing this line.
+--
+-- ⚠️ TRUNCATE IS REVOKED, AND IT IS THE ONE THAT IS EASY TO MISS. Supabase
+-- grants it to `authenticated` by default on every new table. PostgREST exposes
+-- no truncate verb so it is not reachable today — but "not reachable through the
+-- API we happen to use" is not a property to rest an audit log on. The first
+-- probe of this table tested INSERT, UPDATE and DELETE and left TRUNCATE in
+-- place; measured afterwards and removed.
+--
+-- ✅ `anon` APPEARS NOWHERE for this table, and REFERENCES/TRIGGER remain for
+-- `authenticated` — Supabase defaults, inert through PostgREST, and the same
+-- judgement this file already records for lineups and player_grades.
+--
+-- Measured 17 Aug 2026: authenticated holds SELECT (plus REFERENCES, TRIGGER)
+-- and nothing that can change or remove a row.
+-- ---------------------------------------------------------------------
+GRANT SELECT ON public.membership_audit TO authenticated;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.membership_audit FROM anon, authenticated;

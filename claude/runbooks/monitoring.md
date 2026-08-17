@@ -133,3 +133,48 @@ place**, not a tidiness urge.
 
 ⚠️ **The SDK is lazy-loaded and must stay that way** — 159 KB gzip against a
 260 KB bundle. See `src/lib/errorReporting.js`.
+
+
+## Bot sign-ups, and the threshold for turning on Turnstile
+
+Jay asked on 17 Aug 2026 whether to add Cloudflare Turnstile. **Not yet — and
+here is the number that would change the answer**, so it is a decision with a
+trigger rather than a hunch.
+
+⚠️ **A BOT ACCOUNT GETS NOTHING HERE, WHICH IS WHY THIS IS NOT URGENT.** A signup
+with no membership reads zero rows from every table that matters — that is the
+whole point of the approval gate. Junk signups are noise in the waiting list on
+`/accounts`, not a breach. Measured 17 Aug: 29 accounts, all confirmed, none
+stranded.
+
+⚠️ **THE RISK IS NOT JUNK ACCOUNTS, IT IS EMAIL REPUTATION.** Every signup
+attempt sends a confirmation through Resend, on the SAME sending domain as the
+auth mail. A signup flood would not breach anything, but it could get
+`send.adhquins-clubhub.com` flagged — **and that takes SIGN-IN down with it**,
+which is the failure `supabase/functions/notify-approval/index.ts` already warns
+about at length.
+
+**So watch `/signup` volume, not account count.** The query, over the last 24
+hours (Supabase keeps logs for a limited window — this cannot answer "last
+month"):
+
+```sql
+-- Sign-up attempts by hour, and how many were refused.
+select formatDateTime(timestamp, '%Y-%m-%d %H:00') as hour,
+       count(*)                                    as attempts,
+       countIf(log_attributes['error'] != '')      as refused
+  from logs
+ where source = 'auth_logs' and log_attributes['path'] = '/signup'
+ group by hour order by hour desc
+```
+
+**The trigger: sign-up attempts an order of magnitude above the club's own
+onboarding rate, from addresses nobody recognises.** A busy real day is a squad's
+worth of parents; a bot day is hundreds. If that happens, Turnstile is the right
+tool and **Supabase supports it natively** — Authentication → Attack Protection →
+CAPTCHA (hCaptcha or Turnstile), a project setting plus a token passed from the
+client. It is not a build.
+
+⚠️ **DO NOT TURN IT ON PRE-EMPTIVELY.** It puts a challenge in front of every
+real parent to solve a problem that is not happening, on the one screen where
+losing somebody costs the club a member.
