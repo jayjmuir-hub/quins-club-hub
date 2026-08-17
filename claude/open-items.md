@@ -441,6 +441,15 @@ Run `get_advisors` rather than trusting this list. As of 14 Aug 2026:
 different claim and the one this repo has confused before. Each shipped with a
 green suite and has never been exercised by a human on the live site.
 
+- **The staff-request queue has never been seen with a real row in it.** Built
+  17 Aug 2026 after Jay found a coach's request rendered as "Unnamed player".
+  ⚠️ **AND IT CANNOT BE SEEN TODAY**: production has **zero** pending
+  memberships — the one real staff request was approved by Jay, deliberately,
+  at 11:16 UTC that morning. So the section is correct-by-test and unseen by
+  anyone, and it renders only when non-empty, meaning the live site shows
+  exactly what it showed before. **The first real look at it will be the next
+  person who asks to help with a squad.**
+  ⚠️ Its vouching controls are also unexercised — `membership_vouches` is empty.
 - **The tier-eligibility warning has never had anything to render.** It was
   verified present in the live bundle on the day it shipped, which proves the code
   deployed and proves nothing else. **Measured on production 17 Aug 2026: the club

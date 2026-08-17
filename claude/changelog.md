@@ -10,6 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 🧑‍🏫 **STAFF ASKING FOR ACCESS GET THEIR OWN QUEUE, INSTEAD OF APPEARING AS
+  "Unnamed player".** Jay's call over correcting the label in place: approving a
+  coach and approving a child are different decisions and should not share a
+  heading. The new section names the person, the ROLE and the SQUAD, says in
+  plain words what approving grants — a coach's view of that age group,
+  including every family's contact details — and puts the role in the button's
+  own accessible name, because "Approve" beside a card headed *"Players waiting
+  to be approved"* is how the two got confused in the first place.
+  ⚠️ **A PARTITION, NOT A FILTER, AND THE DIFFERENCE IS LOAD-BEARING.**
+  `PendingApprovals` carries an explicit rule against client-side filtering —
+  RLS decides who sees which rows. Every pending row still renders; `player_id`
+  decides only WHICH of the two sections it lands in, so nothing can go missing
+  by being neither. Split on `player_id` rather than `role`, because 'parent' is
+  also what somebody registering a second child holds.
+  ⛔ **AND THE FIRST ATTEMPT FIXED ONE OF TWO RENDER SITES.** `Accounts.jsx`
+  renders the queue twice — once in the approver-only early return, once in the
+  admin view — and the first edit changed only the former, so every new test
+  failed against the admin path still showing "Unnamed player". **The same
+  mistake as the bug being fixed**, one layer up: a second surface nobody
+  audited. It was found because the tests ran as an admin; a coach-only fixture
+  would have passed. ⚠️ **It was hidden for one round by a `head_limit` on the
+  grep that looked for the render sites** — an incomplete search read as a
+  complete one, which `CLAUDE.md` rule 6 exists to stop.
+
 - ⛔ **ASKING TO COACH A SQUAD WAS ENOUGH TO APPROVE PEOPLE INTO IT.**
   `private.can_approve_team` tested role and team and never `status`, unlike its
   two siblings `can_see_team` and `can_edit_team`. Harmless until 16 Aug, when
