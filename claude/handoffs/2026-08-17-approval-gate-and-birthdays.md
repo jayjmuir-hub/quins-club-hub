@@ -131,7 +131,7 @@ exists and is withheld.
 ## Traps met, for whoever meets them next
 
 - ⛔ **NEVER KEEP COMMITTING TO A BRANCH AFTER IT IS SQUASH-MERGED.** #219 was
-  built on `claude/dob-prompt-spec` after that branch had already merged as
+  built on the `dob-prompt-spec` branch after it had already merged as
   `f506a7f` and been deleted, so it carried both the pre-squash commits and
   main's squashed version of the same work. GitHub reported `CONFLICTING`; the
   fix was to cut a fresh branch from `origin/main` and re-apply the nine changed
@@ -160,6 +160,16 @@ exists and is withheld.
 - ⚠️ **Temporal dead zone.** `agePlayerIds` read `canEditAnything` seventy lines
   before its `const`, which would have thrown on mount for everybody. Caught by
   reading declaration order, not by a test.
+- ⚠️ **NEVER WRITE A `claude/…` BRANCH NAME INTO A DOC — `docs:check` READS IT AS
+  A FILE PATH.** This very file failed CI on its first push for writing the
+  branch that #219 was built on. Branches here are named `claude/<something>`,
+  which is indistinguishable from a path under `claude/`. Write *"the
+  `<something>` branch"* instead.
+- ⚠️ **AND IT PASSED LOCALLY FIRST, BECAUSE `docs:check` ONLY SCANS *TRACKED*
+  MARKDOWN.** A brand-new file is invisible to it until `git add`, so running the
+  check while writing says nothing about the file being written. `CLAUDE.md`
+  already says to run it after the COMMIT for the changelog rule; **the same
+  applies to every new file, for a different reason.**
 - ⚠️ **The worktree has no `.env` and no `vite` in its own `node_modules`.**
   The first means a block of tests fails to COLLECT (copy `.env` from the parent
   clone — it is gitignored); the second means `tests/pwa-build.test.js` fails at
