@@ -10,6 +10,97 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ⚡ **EVERY MEMBER WAS DOWNLOADING 400 COUNTRY FLAGS BEFORE THE FIRST PAINT, AND
+  AGAIN INTO THEIR PWA INSTALL.** One line in `vite.config.js`:
+  `index.css` **475.15 → 84.31 kB (gzip 95.74 → 18.37)**, precache
+  **1682.76 → 1301.08 KiB**, flags inlined **400 → 0**.
+  ⚠️ **THE LIBRARY WAS INNOCENT AND THAT IS WHY IT SURVIVED SO LONG.**
+  `flag-icons` is 2.36 kB gzip on its own — measure the package and you conclude
+  the finding is wrong. The bulk came from Vite's `assetsInlineLimit`, which
+  writes any asset under 4096 bytes into the stylesheet as a `data:` URI, and
+  most national flags compress under that. **88.6% of the built CSS was `.fi-`
+  rules.**
+  ⚠️ **IT RESTORES WHAT `PhoneInput`'s HEADER ALREADY CLAIMED** — "the browser
+  only fetches the handful actually painted" — for a picker that draws ONE flag,
+  on two forms, in sessions most members never open.
+  ⚠️ **AND THE `globIgnores` AIMED AT EXACTLY THIS MATCHES NOTHING.** Deleting all
+  three patterns rebuilds an identical precache; what keeps flags out is
+  vite-plugin-pwa's default `globPatterns`. It watched a door the flags never
+  used while they walked in through the stylesheet. Kept, with the measurement
+  written beside it.
+  ✅ Guarded by three new assertions in `tests/pwa-build.test.js`, **proved by
+  deleting the option and watching two of them go red**. ⚠️ One control fired
+  during development and earned its place: the precache assertion found **zero**
+  manifest entries and would have passed vacuously — that file's build inherits
+  `VITEST`, so `vite.config.js` flips `NODE_ENV` to test and emits an
+  UNMINIFIED worker with `"url":` rather than `url:`. **The build that file
+  asserts on is not the build that ships.**
+  ⚠️ **THE `React.lazy` HALF WAS MEASURED AND NOT TAKEN**: −27.26 kB gzip off
+  first paint, but the precache does not move, because Workbox precaches the new
+  chunks too. Splitting defers bytes; this removed them. Both in
+  `claude/open-items.md`.
+
+- 🧹 **A SECOND SOURCE OF TRUTH FOR "the match sheet starts at U11", DELETED.**
+  `SHEET_FROM_AGE = 11` in `src/lib/matchSheetDeadline.js` was read by nothing —
+  the rule is enforced by `isMinisBand()`, i.e. `MINIS_MAX_AGE = 10` in
+  `src/lib/minis.js`. ⚠️ **THE RISK WAS NOT THE DUPLICATION BUT WHICH COPY A
+  READER TRUSTS**: it sat beside three constants that ARE the rule they name, so
+  moving `MINIS_MAX_AGE` would have left this file declaring 11 while behaving
+  differently, with nothing to fail. `minis.js` already argues this exact point
+  about its own three boundaries.
+  ⚠️ **IT IS THE ONLY DEAD CODE THE SWEEP FOUND WORTH REMOVING**, out of 442
+  exports scanned with both a positive and a negative control. The other
+  candidates were checked and LEFT: `updateSW` looks unused but the expression
+  registers the service worker and the export is the documented hook for a
+  refresh banner; 36 more are error-message constants this repo deliberately
+  exports so tests can assert by reference; 75 are exported for testability.
+  **"Almost nothing is dead" is the finding, not a failed search.**
+
+- 🧪 **RESPONSIVE SWEEP — 157 scenario/width pairs, zero overflow, all mounted.**
+  33 harness scenarios at 320/375/768/1280, and the five sheet-free ones across
+  nine widths to 1440. ⚠️ **THE DESKTOP HALF IS NEW** — `harness/check-overflow.mjs`
+  stops at 414, and its own header says the portal chooser "has to be looked at in
+  a real browser at desktop width". It now has been: the chooser renders the
+  "needs a bigger screen" card at 375 and its real content at 1280, clean.
+  ⚠️ **A `rendered` FLAG IS DOING REAL WORK HERE.** The first attempt loaded 32
+  iframes at once, and 18 never mounted — every one reporting `overflow: 0`, i.e.
+  a clean run from a blank page. The sweep also proves it can SEE an overflow
+  before believing it cannot: injecting a 900px element moves the figure 0 → 580
+  and names the element.
+  ⚠️ **SHEETS REMAIN INVISIBLE TO THIS**, as `check-overflow.mjs` documents —
+  `position:fixed` contents are not in `scrollWidth`. Unchanged, and not claimed.
+
+- 🧹 **A SHIPPED PLAN THAT STILL SAID "not yet merged", AND A RULE IN IT THAT WOULD
+  HAVE UNDONE THE FEATURE.** `claude/plans/2026-08-17-birthday-backfill-prompt.md`
+  described work that went live as `f506a7f` (#218) hours earlier.
+  ⚠️ **THE STATUS LINE WAS THE LEAST OF IT.** Its "What must not happen" section
+  still read *"IT MUST STAY SKIPPABLE AND MUST NEVER BLOCK THE APP"* — the exact
+  rule Jay overruled to get the hard gate — so the file instructed the next session
+  to break the thing it documents. Both struck through with the reversal and the
+  argument that beat them, rather than deleted; the sign-out inside the sheet is
+  named as load-bearing, because it is the only reason a blocking step is not a
+  lock-out. The "three questions … not built until these are answered" heading was
+  answered before the work shipped and is now marked as such.
+  ⚠️ **AND CHASING IT FOUND ONE THING STILL OWED IN CODE.** The plan said "fix the
+  wording when this ships" about `AdminNeedsAttention`'s *"Each family is already
+  being asked on their own screen"*. It shipped; the wording did not change, and it
+  is still live. **The correction is no longer the one that line intended** —
+  `missingForPlayer` reports dob, parent phone and gender, and the gate closed only
+  the first, so the sentence went from uniformly misleading to true for one gap and
+  false for two. **Recorded for a decision, deliberately not changed here**: it is
+  live copy on a screen a registrar reads, and this was a documentation change.
+  ⚠️ **FOURTH FALSE PLAN STATUS IN FOUR DAYS**, after the tiers plan twice and the
+  lineups plan once. The mechanism is the same every time and is now written down:
+  **the header is written when the work is BUILT, and merging is a separate act
+  nobody comes back for.**
+
+- `5f9e772` — ⬆️ **jest-dom 6.9.1 → 7.0.1.** The squash SHA for the entry below,
+  which could not cite itself. ⚠️ **A Dependabot pull request cannot ever write
+  this line** — the bot commits no changelog entry, so every one of them leaves a
+  SHA for the next human pull request to pick up, and `docs-check` in CI demands
+  it the moment a new branch is cut. That is the whole reason this repo's rule
+  says to cite the previous squash SHA as the FIRST edit on a branch.
+
 - ⬆️ **jest-dom 6.9.1 → 7.0.1, AND THE OTHER FOUR MAJORS PARKED WITH REASONS.**
   Dependabot opened five at once; this is the only one where anything but the
   changelog was wrong. The four parked ones are in `claude/open-items.md` with the

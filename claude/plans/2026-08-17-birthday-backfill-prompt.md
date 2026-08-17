@@ -1,8 +1,18 @@
 # Asking existing families for the birthdays we added after they signed up
 
-**STATUS: BUILT 17 Aug 2026, not yet merged. Jay answered the three questions
-below with one decision: make it a HARD GATE, asked once, with no way past it
-except entering the dates — "please add this info to continue".**
+**STATUS: SHIPPED 17 Aug 2026 as `f506a7f` (#218), merged to `main` and live.**
+Jay answered the three questions at the foot of this file with one decision: make
+it a HARD GATE, asked once, with no way past it except entering the dates —
+"please add this info to continue".
+
+⚠️ **THIS LINE SAID "BUILT … not yet merged" FOR THE REST OF THE DAY AFTER IT
+MERGED**, which is the fourth time this repo has carried a false status claim in a
+plan — the same failure as `claude/plans/2026-08-14-tiers-and-game-time.md`, twice,
+and `claude/plans/2026-08-14-match-lineups.md`. **The pattern is now specific
+enough to name: the status header is written at the moment the work is BUILT, and
+merging is a separate act nobody comes back for.** Verified before correcting, not
+asserted: `f506a7f` is on `main`, and the `birthday` step, its `needBirthday`
+capture and the sheet's sign-out are all in `src/components/NamePrompt.jsx`.
 
 ⚠️ **THAT ANSWERS ALL THREE AT ONCE AND MAKES THE SNOOZE COLUMN UNNECESSARY.**
 There is no re-ask schedule because there is no skip; there is no recorded "I'd
@@ -79,6 +89,16 @@ There are two family-facing surfaces and neither works for this:
 screen", and that line is true in the letter and false in the effect.** It is
 what made this look handled. Fix the wording when this ships.
 
+⛔ **IT SHIPPED AND THE WORDING WAS NOT FIXED — still live at
+`src/screens/AdminNeedsAttention.jsx:207`, checked 17 Aug 2026.** ⚠️ **AND THE
+CORRECTION IS NO LONGER THE ONE THIS LINE HAD IN MIND, WHICH IS WHY IT WANTS A
+DECISION RATHER THAN A FIND-AND-REPLACE.** `missingForPlayer` reports three gaps —
+**dob, parent phone, gender** — and the hard gate closed exactly one of them. So
+the sentence went from uniformly misleading to **true for birthdays and still
+false for the other two**, which are chased only by the completeness card on
+`/more`, the screen this plan measured as the one no parent opens. A registrar
+reading that sentence today is told all three are handled when one is.
+
 ## What to build
 
 A **fourth step in `NamePrompt`**, reusing the machinery that already exists
@@ -140,15 +160,31 @@ ambushed into a play-up conversation.
 
 ## What must not happen
 
-⚠️ **IT MUST STAY SKIPPABLE AND MUST NEVER BLOCK THE APP.** `NamePrompt`'s own
-header states this and its sheet already behaves this way. A parent who wants to
-check Saturday's fixture must be able to.
+⛔ **THE FIRST TWO RULES BELOW WERE OVERRULED BY JAY BEFORE THIS SHIPPED, AND THE
+BUILT GATE DELIBERATELY BREAKS BOTH. DO NOT "FIX" IT BACK.** They are kept rather
+than deleted because the reasoning is still sound and still governs every OTHER
+step on that sheet — but read as instructions about the birthday step they are
+now the opposite of what is on `main`, and a session acting on them would
+re-open the hole the gate was built to close. The argument that beat them: a
+birthday is already mandatory for every new registration, so a skippable ask for
+the pre-16-August families asks the club to accept two standards for the same
+required field.
 
-⚠️ **AND IT MUST NOT ASK FOREVER.** `YourPlayers` records the reasoning already:
-*"A chase with no visible end is ignored by about the third sign-in, and once
-ignored it is worse than nothing: it trains people to skip the one place the club
-asks them for something."* This is the hardest part of the design and it is
-question 1 below.
+- ~~⚠️ **IT MUST STAY SKIPPABLE AND MUST NEVER BLOCK THE APP.** `NamePrompt`'s own
+  header states this and its sheet already behaves this way. A parent who wants to
+  check Saturday's fixture must be able to.~~ — **REVERSED.** It blocks, and the
+  compensation is the sign-out inside the sheet: `AppShell`'s rule is *"someone who
+  cannot get in must always be able to get out"*, and the exit is what keeps a
+  blocking step from being a lock-out. ⚠️ **THAT EXIT IS LOAD-BEARING, NOT
+  DECORATION** — it is the only reason the reversal is safe, so anything that
+  tidies it away re-creates the objection rather than answering it.
+- ~~⚠️ **AND IT MUST NOT ASK FOREVER.** `YourPlayers` records the reasoning already:
+  *"A chase with no visible end is ignored by about the third sign-in, and once
+  ignored it is worse than nothing: it trains people to skip the one place the club
+  asks them for something."*~~ — **MOOT RATHER THAN REVERSED**, and the difference
+  matters. It cannot ask forever because it cannot be skipped: the first ask is the
+  last one. The quoted reasoning is about CHASES, and it still governs the
+  completeness card and the two gaps below that are still chased that way.
 
 ⚠️ **A PLAYER-ONLY ACCOUNT MUST BE EXEMPT**, the same way it is exempt from the
 phone and role steps — `playerOnly` in `NamePrompt`. That account belongs to a
@@ -169,7 +205,14 @@ safeguarding field is the app not knowing who it is talking to.
   carry `status`** (17 Aug). Anything new here must too; a fixture missing a
   NOT NULL column is what hid the approval-gate hole.
 
-## ⚠️ Three questions for Jay — this is not built until these are answered
+## ✅ Three questions for Jay — all three answered, by one decision
+
+**Answered 17 Aug 2026 and kept here for the reasoning, not as an open ask.** The
+hard gate settles all three at once: there is no re-ask schedule because there is
+no skip (1), no recorded "I'd rather not" because declining is not an answer the
+club can take on a field it already requires (2), and the prompt earns its place
+because it is the only surface a family cannot miss (3). **The heading said "this
+is not built until these are answered" until after it had shipped.**
 
 1. **How often does it re-ask somebody who skips?** Every sign-in trains people
    to dismiss it. Options: once only; every sign-in until answered; or snooze
