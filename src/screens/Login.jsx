@@ -104,6 +104,43 @@ const EMAIL_SEND_FAILED_MESSAGE =
 const WEAK_PASSWORD_MESSAGE =
   'That password doesn’t meet the requirements. Check the list below the password box.'
 
+// ⚠️ `weak_password` COVERS THREE DIFFERENT REFUSALS AND THIS APP TREATED THEM
+// AS ONE. Found 17 Aug 2026, on Jay's own sign-up: every rule in the checklist
+// was ticked green and the form still refused, saying "check the list below" —
+// pointing at the one thing that was not the problem.
+//
+// supabase-js's AuthWeakPasswordError carries `reasons`, and the set is exactly
+// (auth-js 2.112.3, lib/types.js):
+//
+//     ['length', 'characters', 'pwned']
+//
+// The first two ARE the checklist. The third is Supabase's leaked-password
+// protection — the password appears in the Have I Been Pwned corpus — and has
+// nothing to do with the rules on screen. All three arrive with
+// `code: 'weak_password'`, which is why one message swallowed all three.
+//
+// ⚠️ THE MESSAGE HAS TO SAY THE RULES ARE FINE, because the person is looking at
+// five green ticks while being told they failed. Telling them to check a list
+// that is already satisfied is how somebody concludes the app is broken and
+// gives up — which for a sign-up screen means the club loses a member.
+const PWNED_PASSWORD_MESSAGE =
+  'That password meets the rules below, but it has appeared in a known data breach — so it can’t be used here. Pick a different one and you’ll go straight through.'
+
+/**
+ * Whether this refusal is the leaked-password check rather than the rules.
+ *
+ * ⚠️ `reasons` FIRST, PROSE SECOND. The array is the stable contract; the
+ * sentence is GoTrue's and can be reworded without warning. The fallback exists
+ * because a response that arrives without `reasons` — an older server, a proxy
+ * that drops the body — would otherwise fall back to the message that sends
+ * somebody to a checklist they have already satisfied.
+ */
+function isPwnedPassword(error, raw) {
+  const reasons = Array.isArray(error?.reasons) ? error.reasons : []
+  if (reasons.includes('pwned')) return true
+  return /known to be weak|easy to guess|data breach|pwned/i.test(raw)
+}
+
 // "Invalid login credentials" is accurate and unhelpful. The overwhelmingly
 // common cause during onboarding is not a wrong password — it is someone who
 // registered and never opened the confirmation email, or who is trying to sign
@@ -119,7 +156,11 @@ export function friendlyAuthError(error, fallback) {
   const code = typeof error?.code === 'string' ? error.code : ''
 
   if (code === 'weak_password' || /password should (be|contain)/i.test(raw)) {
-    return WEAK_PASSWORD_MESSAGE
+    // ⚠️ THE LEAKED-PASSWORD CASE IS CHECKED FIRST, INSIDE THIS BRANCH RATHER
+    // THAN BEFORE IT, so both refusals stay visibly part of the same GoTrue
+    // error rather than looking like two unrelated conditions somebody could
+    // reorder safely.
+    return isPwnedPassword(error, raw) ? PWNED_PASSWORD_MESSAGE : WEAK_PASSWORD_MESSAGE
   }
   if (code === 'email_not_confirmed' || /email not confirmed/i.test(raw)) {
     return EMAIL_NOT_CONFIRMED_MESSAGE

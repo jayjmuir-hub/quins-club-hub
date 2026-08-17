@@ -17,6 +17,19 @@
 // green, the parent presses the button, and GoTrue rejects it with the raw
 // message below. Drift the other way merely nags them for no reason.
 //
+// ⚠️ AND THERE IS A REFUSAL THIS FILE CAN NEVER PREDICT: LEAKED-PASSWORD
+// PROTECTION. Supabase checks the password against the Have I Been Pwned corpus,
+// so a password satisfying every rule here is still refused if it has appeared
+// in a breach. Found 17 Aug 2026 on a real sign-up — five green ticks and a
+// refusal.
+//
+// ⚠️ DO NOT TRY TO MIRROR THAT HERE. It needs a live k-anonymity lookup against a
+// third-party API, on every keystroke, to answer a question the server already
+// answers authoritatively at submit. `friendlyAuthError` in src/screens/Login.jsx
+// distinguishes it instead, from the `reasons` array on the error, and says the
+// rules were met — the checklist stays a checklist and does not pretend to be
+// the whole rule.
+//
 // The exact text GoTrue returns when this is violated — measured, not guessed:
 //
 //   "Password should contain at least one character of each:
