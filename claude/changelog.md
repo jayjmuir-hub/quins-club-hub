@@ -10,6 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 🎨 **A HEAD COACH IS THE SAME SIZE IN EVERY SQUAD.** Jay, 16 Aug, comparing two
+  cards on Home: *"the U13 head coach bubble is not the standard double size"*.
+  `tileSpans` refused the tall lead tile below three people, and the squads that
+  looked wrong were simply the small ones — U13 Mixed has two staff, U16B six.
+  **The photograph was a red herring; the cause was the headcount.**
+  ⚠️ **THIS REVERSES A RULING THAT WAS NOT WRONG, ONLY OUTWEIGHED.** At two people
+  the tall tile leaves a hole beside its lower half — that hole is real and still
+  there. It loses to consistency, because the two squads sit one above the other
+  and the same job rendered at two sizes reads as a bug. Same trade Jay already
+  took one ruling below it, having seen both.
+  ⚠️ **A SPAN ARRAY IS NOT A SIZE.** `tileSpans(2, true)` says `['lead', 'half']`;
+  the size lives in `SPAN_CLASS`, so a lead that lost its class tokens would have
+  satisfied every assertion in that file. The new test compares the two-person
+  lead against the six-person one and demands the same className and inline
+  `gridRow`. Both new assertions were proved against an injected `count >= 3`.
+  ⚠️ **AND THE HARNESS STUB CONTRADICTED ITSELF FOR A DAY** — `listSquadStaff`
+  hard-coded `t2` as empty while `listMySquadStaff` gave it two people, out of the
+  same file. Both now read the map; the empty-squad case moved to `t3`.
+  ⚠️ **REVIVED FROM #192, WHICH NEVER MERGED** — its branch went `CONFLICTING` on
+  `claude/changelog.md` and sat open for a day while the bug stayed live. Re-cut
+  from `origin/main`, which is the only way back from that state.
+
+- `571f70d` — 👀 **AN AGE ON THE ROSTER AND THE BIRTHDAY ON THE PLAYER SHEET.**
+  The squash SHA for the entry below, which could not cite itself. ⚠️ **This line
+  was written by #221 and arrives here instead, because that pull request was
+  closed unmerged** (Jay's call) — so its handoff for the 17 Aug afternoon does
+  not land, and the traps from that day survive only in its own description.
+
 - 👀 **A COACH OR ADMIN CAN NOW SEE A BIRTHDAY, NOT JUST EDIT ONE.** Jay, having
   entered the first two: *"where as a coach or admin can i see them?"* The answer
   was nowhere but the edit form, one child at a time — no age on the roster, no
