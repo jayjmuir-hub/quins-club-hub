@@ -10,6 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ⬆️ **jest-dom 6.9.1 → 7.0.1, AND THE OTHER FOUR MAJORS PARKED WITH REASONS.**
+  Dependabot opened five at once; this is the only one where anything but the
+  changelog was wrong. The four parked ones are in `claude/open-items.md` with the
+  error each actually produces — react 19 blocked by `react-dom` (the mirror of
+  #152), vite 8 and plugin-react 6 **mutually blocking** because plugin-react 6
+  demands `vite ^8` exactly, and tailwind 4 failing in the BUILD rather than the
+  install because `src/index.css` is v3-shaped.
+  ⚠️ **EVERY DEPENDABOT PULL REQUEST HERE IS RED ON `docs-check` AND IT NEVER MEANS
+  ANYTHING** — the bot writes no changelog entry, so the check correctly reports a
+  missing commit. #198's only real failure was that. **Read the `test` line.** How
+  to take one is now in `claude/runbooks/session-and-push.md`.
+  ⚠️ **A GREEN SUITE IS WEAK EVIDENCE FOR A MATCHER MAJOR**, because a matcher that
+  loosened rather than vanished passes silently — a removed one throws
+  `is not a function` and gets caught. `toHaveStyle` was fed a wrong value under
+  v7 and both tests using it failed, which is what makes 138 files and a full pass
+  mean something. Its branch was also **25 commits behind** and was rebased first.
+
+- `0f9fdb5` — 🧰 **THREE WAYS OPENING A PULL REQUEST FAILS.** The squash SHA for
+  the entry below, which could not cite itself.
+
 - 🧰 **THREE WAYS OPENING A PULL REQUEST FAILS THAT LOOK LIKE YOUR MISTAKE**, in
   `claude/runbooks/session-and-push.md`. All three were met opening #222.
   GitHub can **503 on API writes while reads stay green**, and `git push` is
