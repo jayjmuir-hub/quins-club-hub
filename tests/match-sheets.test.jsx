@@ -51,7 +51,9 @@ vi.mock('../src/data/events.js', () => ({
 }))
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
-  listContactsForPlayers: async () => [],
+  listContactsForPlayers: async () => [],
+  // The completeness card on YourPlayers reads this (17 Aug 2026).
+  listPlayerPrivate: async () => [],
 }))
 // The lineup the sheet seeds its 22 boxes from (16 Aug 2026). Mocked for the
 // same reason players.js is: the real module reaches Supabase at import time.

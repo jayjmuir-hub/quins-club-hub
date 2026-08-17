@@ -10,6 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ✨ **THE CLUB ASKS FOR WHAT IT IS MISSING, ONCE, AND THEN STOPS.** Item 6 — the
+  half of Jay's original complaint still open: *"i can't have people signing up
+  without complete information"*. One shared rule (`src/lib/completeness.js`) and
+  the first of its three surfaces: a card on the family's own screen.
+  ⚠️ **IT DISAPPEARS WHEN THERE IS NOTHING LEFT TO ASK, AND THAT IS THE WHOLE
+  CONTRACT.** A chase with no visible end is ignored by about the third sign-in,
+  and once ignored it trains people to skip the one place the club asks them for
+  something.
+  ⚠️ **SO THE LIST IS SHORT, AND THE MEASUREMENT DECIDED IT RATHER THAN THE OTHER
+  WAY ROUND.** A thing qualifies only if the reader can fix it themselves AND it
+  is exceptional. **Position is excluded and must stay excluded** — it is a
+  coach's judgement, not a parent's, and at **23 of 26 players** it is the normal
+  state of a youth club. Listing it would put a card on almost every screen,
+  permanently: the exact failure this design exists to avoid.
+  ⚠️ **AN UNKNOWN IS NOT A GAP.** `undefined` means "we did not look" — a parent
+  reading a team-mate gets null from RLS, and treating that as "no birthday on
+  file" would nag somebody about a child that is not theirs.
+  **Still to wire: the approval-queue chip and the admin list.** The rule is
+  shared and ready for both.
+
 - `044399c` — 🔒 **A CHANGE LOG FOR CHANGES TO RIGHTS.** Jay: *"we need a change log for
   changes to rights"*. `public.membership_audit`, append-only, recording who
   granted, changed or revoked whose access and when. `memberships` held the

@@ -29,7 +29,9 @@ vi.mock('../src/lib/auth.jsx', () => ({
 }))
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
-  listContactsForPlayers: (...args) => listContactsForPlayersMock(...args),
+  listContactsForPlayers: (...args) => listContactsForPlayersMock(...args),
+  // The completeness card on YourPlayers reads this (17 Aug 2026).
+  listPlayerPrivate: async () => [],
 }))
 vi.mock('../src/data/members.js', () => ({
   listClubMembers: vi.fn(),

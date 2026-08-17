@@ -62,7 +62,9 @@ vi.mock('../src/data/lineups.js', () => ({
 }))
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
-  listContactsForPlayers: async () => [],
+  listContactsForPlayers: async () => [],
+  // The completeness card on YourPlayers reads this (17 Aug 2026).
+  listPlayerPrivate: async () => [],
 }))
 vi.mock('../src/data/matchSheets.js', async () => {
   const actual = await vi.importActual('../src/data/matchSheets.js')

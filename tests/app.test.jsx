@@ -56,7 +56,9 @@ vi.mock('../src/data/players.js', () => ({
   listPlayers: () => new Promise(() => {}),
   getPlayerContact: () => new Promise(() => {}),
   // /admin/club (AdminClub) and the Accounts tab both read players.js.
-  listContactsForPlayers: () => new Promise(() => {}),
+  listContactsForPlayers: () => new Promise(() => {}),
+  // The completeness card on YourPlayers reads this (17 Aug 2026).
+  listPlayerPrivate: async () => [],
 }))
 
 // "/more" renders the real More screen (admin-dashboard plan, 2026-08-05),

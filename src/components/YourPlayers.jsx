@@ -4,9 +4,11 @@ import PlayerAvatar from './PlayerAvatar.jsx'
 import PlayerRegistrationForm from './PlayerRegistrationForm.jsx'
 import Sheet from './Sheet.jsx'
 import MyPlayerForm from '../screens/MyPlayerForm.jsx'
-import { listPlayers, listContactsForPlayers } from '../data/players.js'
+import { listPlayers, listContactsForPlayers, listPlayerPrivate } from '../data/players.js'
 import { listParentsForPlayers } from '../data/parents.js'
 import { formatPhone } from '../lib/phone.js'
+import { missingForFamily } from '../lib/completeness.js'
+import useMyProfile from '../lib/useMyProfile.js'
 import Button from './Button.jsx'
 
 // "Your players" on the More screen: what the club actually holds about the
@@ -85,6 +87,11 @@ function canAddPlayers(memberships) {
 }
 
 export default function YourPlayers({ memberships = [], teams = [], reload }) {
+  // For the completeness card below: the signed-in adult's own row, which is
+  // where their phone number lives. Cached at module level by the hook, so this
+  // costs nothing on a screen that has already asked for it.
+  const { profile } = useMyProfile()
+
   // The player ids this account is actually attached to. Not "every player in
   // a squad I can see" — a coach can see 30 players and none of them are
   // theirs. Only a membership row carrying a player_id makes a player yours.
@@ -94,6 +101,10 @@ export default function YourPlayers({ memberships = [], teams = [], reload }) {
   const [players, setPlayers] = useState([])
   const [contacts, setContacts] = useState({})
   const [parents, setParents] = useState({})
+  // player id -> date of birth (or null when the row exists and is empty). A
+  // Map, so an ABSENT key is distinguishable from a null value — see the note
+  // where it is filled, and completeness.js for why the difference matters.
+  const [dobs, setDobs] = useState(() => new Map())
   const [loaded, setLoaded] = useState(false)
   // The player whose form is open, or null. Holds the ROW, not an id: the
   // form needs the whole player and this component already has it.
@@ -124,10 +135,21 @@ export default function YourPlayers({ memberships = [], teams = [], reload }) {
       listPlayers({ teamIds }),
       listContactsForPlayers(playerIds),
       listParentsForPlayers(playerIds),
+      // ⚠️ THE BIRTHDAYS OF THIS ACCOUNT'S OWN CHILDREN, AND NOBODY ELSE'S. RLS
+      // narrows it to `can_edit_team OR is_own_player`, and `playerIds` is
+      // already only the children this membership carries — so a coach opening
+      // their own home screen does not pull their squad's birthdays into it.
+      listPlayerPrivate(playerIds),
     ])
-      .then(([allPlayers, contactRows, parentRows]) => {
+      .then(([allPlayers, contactRows, parentRows, privateRows]) => {
         if (!active) return
         setPlayers((allPlayers ?? []).filter((p) => playerIds.includes(p.id)))
+        // ⚠️ A MAP OF WHAT CAME BACK, NOT OF WHAT WAS ASKED FOR. A child with no
+        // row at all is missing from this map, and `dobByPlayer.get(id)` is
+        // `undefined` — which completeness.js reads as "we did not look" rather
+        // than "there is none". The `?? null` at the call site is what turns a
+        // successful read with no row into a real gap.
+        setDobs(new Map((privateRows ?? []).map((row) => [row.player_id, row.date_of_birth ?? null])))
         // ⚠️ BOTH OF THESE RETURN ARRAYS, NOT MAPS. Shipped once assuming
         // `contacts[playerId]`, which on an array is silently `undefined` —
         // so the contact and parent rows rendered as nothing at all, in
@@ -179,8 +201,62 @@ export default function YourPlayers({ memberships = [], teams = [], reload }) {
     setReloadToken((n) => n + 1)
   }
 
+  // ⚠️ EVERYTHING THE CLUB IS STILL MISSING ABOUT THIS FAMILY, FROM ONE SHARED
+  // RULE (src/lib/completeness.js) rather than from conditions written here. Two
+  // more surfaces will read the same function, and three copies of "what counts
+  // as missing" is three answers.
+  //
+  // ⚠️ `dobs.get(id) ?? null` IS LOAD-BEARING. An absent key means the read
+  // returned no row for that child — which IS a missing birthday — while
+  // `undefined` passed through would mean "we did not look" and say nothing. The
+  // coalesce is what turns a successful empty read into a real gap.
+  const missing = missingForFamily({
+    profile,
+    children: players.map((player) => ({
+      player,
+      team: teams.find((t) => t.id === player.team_id),
+      dateOfBirth: dobs.get(player.id) ?? null,
+      parentCount: (parents[player.id] ?? []).length,
+    })),
+  })
+
   return (
     <>
+      {/* ⚠️ IT RENDERS NOTHING WHEN THERE IS NOTHING MISSING, AND THAT IS THE
+          WHOLE CONTRACT — not an optimisation. A chase with no visible end is
+          ignored by about the third sign-in, and once ignored it is worse than
+          nothing: it trains people to skip the one place the club asks them for
+          something. The card disappearing is the reward for finishing it.
+
+          ⚠️ role="status", NOT role="alert". Nothing here is wrong or urgent —
+          it is a list of things the club would like. An alert would announce it
+          over whatever a screen-reader user was doing. */}
+      {missing.length > 0 && (
+        <section
+          data-testid="completeness-card"
+          role="status"
+          className="mb-2.5 mt-[18px] rounded-[14px] border border-line bg-warn-bg p-[14px]"
+        >
+          <h3 className="text-[13px] font-extrabold uppercase tracking-[.8px] text-ink">
+            Could you fill these in?
+          </h3>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
+            The club is missing a few things. You can add them from the buttons below —
+            it only takes a minute, and this note goes away once they&apos;re in.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {missing.map((item) => (
+              <li key={item.id} className="flex items-start gap-2 text-[13px] text-ink">
+                <span aria-hidden="true" className="mt-[2px] text-brand">
+                  •
+                </span>
+                <span>{item.label}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* The heading lives INSIDE this component, not in More, so that a
           coach with no child at the club gets no orphaned "Your players"
           title sitting above nothing. */}
