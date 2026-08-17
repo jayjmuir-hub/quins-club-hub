@@ -10,6 +10,38 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ⛔ **ASKING TO COACH A SQUAD WAS ENOUGH TO APPROVE PEOPLE INTO IT.**
+  `private.can_approve_team` tested role and team and never `status`, unlike its
+  two siblings `can_see_team` and `can_edit_team`. Harmless until 16 Aug, when
+  `request_staff_role` made a PENDING staff row possible for the first time —
+  after which a person who signed up and asked to coach a squad could approve
+  their own request and admit other families' children to it.
+  `db/migrations/20260817_approve_requires_active_membership.sql`.
+  ⚠️ **FOUND BY CHASING A COSMETIC BUG.** Jay sent a screenshot of "Unnamed
+  player" in the live approval queue. Nothing was missing — all 26 players have
+  a name — the row was a coach's staff request, which carries no player, shown
+  by a queue whose only filter is `status = 'pending'`. The label was the
+  symptom; the gate was the disease.
+  ⚠️ **MEASURED, THEN RE-MEASURED WITH THE FIX, IN A ROLLED-BACK TRANSACTION ON
+  PRODUCTION** with an invented club so no live row took part — **pending coach
+  ALLOWED → refused (42501)**, while both controls (active coach of the squad
+  ALLOWED, coach of another squad refused) did not move. `db/tests/approve-status-gate.sql`.
+  ⚠️ **IT WAS NOT ONLY THE BUTTON:** `can_squad_staff_see_pending` calls the
+  same function and backs the policy exposing a registrant's NAME and EMAIL.
+  ⛔ **AND THE REASON NOTHING CAUGHT IT IS THE PART WORTH KEEPING.** Every
+  membership fixture in `tests/` omitted `status` — a column that is NOT NULL —
+  so no test in the suite could tell a request from access; `canApproveAnything`
+  and `canApproveTeam` had no unit tests at all; and
+  `db/tests/rls-squad-staff-approval.sql` makes every staff row `'active'`,
+  correctly, because on 9 Aug a pending one could not exist. **A new writer
+  arrived and the old readers — screen, gate, harness, fixtures — were never
+  audited.** The new assertions were proved by injecting the real historical
+  fault (no status test at all) and watching seven of them fail.
+  ⚠️ **`private.is_admin` HAS THE SAME OMISSION AND WAS LEFT ALONE ON PURPOSE** —
+  unreachable today (zero non-active admin rows, and `request_staff_role` cannot
+  create one), and it backs most of the admin RLS surface. Recorded in
+  `claude/open-items.md` rather than fixed in passing.
+
 - 📝 **THE "NOT BUILT, DELIBERATELY" NOTE OUTLIVED THE PLAN THAT SAID THE SAME
   THING.** `2ac2782` corrected `claude/plans/2026-08-14-tiers-and-game-time.md`
   for claiming the eligibility warning was unbuilt; `claude/open-items.md` carried

@@ -300,6 +300,43 @@ proves you wrong.**
   a `SECURITY DEFINER` function, and worth revoking grants that were never meant
   to exist. **Low priority and honestly labelled as such.**
 
+## The status check the approval gate never had
+
+- ✅ **FIXED — `private.can_approve_team` did not require `status = 'active'`.**
+  Found 17 Aug 2026 by chasing an "Unnamed player" in the live approval queue,
+  which turned out to be a `request_staff_role` row. Its two siblings
+  (`can_see_team`, `can_edit_team`) both carry the test; this one did not, and
+  had not needed to until a pending STAFF row became possible on 16 Aug.
+  Measured on production in a rolled-back transaction with an invented club —
+  **pending coach: ALLOWED; active coach: ALLOWED; coach of another squad:
+  refused** — then re-measured with the fix applied inside the same transaction,
+  where only the first line changed.
+  `db/migrations/20260817_approve_requires_active_membership.sql`,
+  `db/tests/approve-status-gate.sql`, and the client half in `src/lib/scope.js`.
+  ⚠️ **IT WAS NOT ONLY THE APPROVE BUTTON.**
+  `private.can_squad_staff_see_pending` calls `can_approve_team`, and backs the
+  policy letting an approver read a pending registrant's NAME and EMAIL. So the
+  same omission exposed those to somebody who had merely asked to coach.
+  ⚠️ **AND THE EXISTING HARNESS COULD NOT HAVE CAUGHT IT.**
+  `db/tests/rls-squad-staff-approval.sql` tests a medic, a coach of another
+  squad, and a parent self-approving — but every staff row in its fixture is
+  `'active'`, because when it was written on 9 Aug a pending staff row could not
+  exist. Same for every membership fixture in `tests/` — none carried a `status`
+  at all, though the column is NOT NULL. **A new writer was added and the old
+  readers were not audited: the screen, the SQL gate, and the tests all missed
+  it for the same reason.**
+
+- ⚠️ **`private.is_admin` HAS THE SAME OMISSION AND WAS DELIBERATELY LEFT.**
+  It tests role and club and never status. **Not reachable today** — measured
+  17 Aug 2026, production held **zero** admin memberships that were not active,
+  and `request_staff_role` refuses any role but coach/manager/medic, so nothing
+  can currently create one. It was left alone because `is_admin` backs most of
+  the admin RLS surface, and adding a condition to it changes the blast radius
+  from one function to every admin policy on a live site.
+  **Re-measure the count before assuming it is still unreachable**; the moment
+  any path can create a pending admin row, this becomes the same bug with a
+  bigger radius.
+
 ## Real gaps, no cheap fix
 
 - 🟡 **No audit log — NARROWED 17 Aug 2026, NOT CLOSED.** `public.membership_audit`
