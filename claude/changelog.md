@@ -10,6 +10,37 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 🧹 **A SHIPPED PLAN THAT STILL SAID "not yet merged", AND A RULE IN IT THAT WOULD
+  HAVE UNDONE THE FEATURE.** `claude/plans/2026-08-17-birthday-backfill-prompt.md`
+  described work that went live as `f506a7f` (#218) hours earlier.
+  ⚠️ **THE STATUS LINE WAS THE LEAST OF IT.** Its "What must not happen" section
+  still read *"IT MUST STAY SKIPPABLE AND MUST NEVER BLOCK THE APP"* — the exact
+  rule Jay overruled to get the hard gate — so the file instructed the next session
+  to break the thing it documents. Both struck through with the reversal and the
+  argument that beat them, rather than deleted; the sign-out inside the sheet is
+  named as load-bearing, because it is the only reason a blocking step is not a
+  lock-out. The "three questions … not built until these are answered" heading was
+  answered before the work shipped and is now marked as such.
+  ⚠️ **AND CHASING IT FOUND ONE THING STILL OWED IN CODE.** The plan said "fix the
+  wording when this ships" about `AdminNeedsAttention`'s *"Each family is already
+  being asked on their own screen"*. It shipped; the wording did not change, and it
+  is still live. **The correction is no longer the one that line intended** —
+  `missingForPlayer` reports dob, parent phone and gender, and the gate closed only
+  the first, so the sentence went from uniformly misleading to true for one gap and
+  false for two. **Recorded for a decision, deliberately not changed here**: it is
+  live copy on a screen a registrar reads, and this was a documentation change.
+  ⚠️ **FOURTH FALSE PLAN STATUS IN FOUR DAYS**, after the tiers plan twice and the
+  lineups plan once. The mechanism is the same every time and is now written down:
+  **the header is written when the work is BUILT, and merging is a separate act
+  nobody comes back for.**
+
+- `5f9e772` — ⬆️ **jest-dom 6.9.1 → 7.0.1.** The squash SHA for the entry below,
+  which could not cite itself. ⚠️ **A Dependabot pull request cannot ever write
+  this line** — the bot commits no changelog entry, so every one of them leaves a
+  SHA for the next human pull request to pick up, and `docs-check` in CI demands
+  it the moment a new branch is cut. That is the whole reason this repo's rule
+  says to cite the previous squash SHA as the FIRST edit on a branch.
+
 - ⬆️ **jest-dom 6.9.1 → 7.0.1, AND THE OTHER FOUR MAJORS PARKED WITH REASONS.**
   Dependabot opened five at once; this is the only one where anything but the
   changelog was wrong. The four parked ones are in `claude/open-items.md` with the
