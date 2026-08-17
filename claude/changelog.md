@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 📝 **SESSION RECORD FOR THE AFTERNOON.**
+  `claude/handoffs/2026-08-17-approval-gate-and-birthdays.md` — #217, #218 and
+  #220, the traps, and the state measured on the day. Separate from the morning's
+  handoff, which covers #208–#213.
+  ⚠️ **THE THREAD RUNNING THROUGH ALL THREE IS WORTH THE READ:** every fix
+  started with Jay looking at a screen, none started with a failing test, and the
+  suite was green throughout. None was a wrong calculation — **each was a missing
+  surface**, which is the class of bug a test suite cannot find for you.
+
+- `571f70d` — 👀 **AN AGE ON THE ROSTER AND THE BIRTHDAY ON THE PLAYER SHEET.**
+  The squash SHA for the entry below, which could not cite itself.
+
 - 👀 **A COACH OR ADMIN CAN NOW SEE A BIRTHDAY, NOT JUST EDIT ONE.** Jay, having
   entered the first two: *"where as a coach or admin can i see them?"* The answer
   was nowhere but the edit form, one child at a time — no age on the roster, no
