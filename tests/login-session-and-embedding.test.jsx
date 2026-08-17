@@ -145,6 +145,65 @@ describe('friendlyAuthError — the mail-hook 500', () => {
   })
 })
 
+/* ══════════════════════════════════════════════════════════════════════════
+   `weak_password` IS THREE DIFFERENT REFUSALS — 17 Aug 2026
+   ══════════════════════════════════════════════════════════════════════════
+
+   Found on Jay's own sign-up: every rule in the checklist ticked green, and the
+   form still refused with "check the list below the password box" — pointing at
+   the one thing that was not the problem.
+
+   supabase-js's AuthWeakPasswordError carries `reasons`, and the set is exactly
+   ['length', 'characters', 'pwned'] (auth-js 2.112.3, lib/types.js). The first
+   two ARE the checklist; the third is Supabase's leaked-password protection and
+   has nothing to do with the rules on screen. All three arrive with
+   `code: 'weak_password'`, which is how one message swallowed all three. */
+describe('friendlyAuthError — a password refused for being breached', () => {
+  function weak(reasons, message) {
+    const error = new Error(message)
+    error.code = 'weak_password'
+    error.reasons = reasons
+    return error
+  }
+
+  // ⚠️ THE ASSERTION THAT MATTERS: it must NOT send somebody to the checklist.
+  // They are looking at five green ticks.
+  it('does not point at the checklist when the rules were met', () => {
+    const out = friendlyAuthError(
+      weak(['pwned'], 'Password is known to be weak and easy to guess, please choose a different one.'),
+      'fallback',
+    )
+    expect(out).not.toMatch(/list below/i)
+    expect(out).toMatch(/data breach/i)
+    // And it says the rules are fine, which is what resolves the contradiction
+    // on screen between a green checklist and a red banner.
+    expect(out).toMatch(/meets the rules/i)
+  })
+
+  it('still points at the checklist for the reasons that ARE the checklist', () => {
+    expect(friendlyAuthError(weak(['length'], 'Password should be at least 8 characters'), 'x'))
+      .toMatch(/list below/i)
+    expect(friendlyAuthError(weak(['characters'], 'Password should contain at least one character of each'), 'x'))
+      .toMatch(/list below/i)
+  })
+
+  // ⚠️ `reasons` FIRST, PROSE SECOND — but the prose fallback has to work, or a
+  // response that arrives without the array (an older server, a proxy that drops
+  // the body) lands back on the wrong message.
+  it('falls back to the wording when the reasons array is missing', () => {
+    const bare = new Error('Password is known to be weak and easy to guess, please choose a different one.')
+    bare.code = 'weak_password'
+    expect(friendlyAuthError(bare, 'x')).toMatch(/data breach/i)
+  })
+
+  // The reasons array can carry more than one, and a breached password that is
+  // ALSO too short is still most usefully described as breached — changing it is
+  // the only thing that fixes both.
+  it('treats a mixed answer as breached', () => {
+    expect(friendlyAuthError(weak(['length', 'pwned'], 'weak'), 'x')).toMatch(/data breach/i)
+  })
+})
+
 describe('friendlyAuthError — the password-era translations', () => {
   // Added 8 Aug 2026 with password auth. Three failures a parent will
   // genuinely meet, each of which GoTrue describes in a way that is either

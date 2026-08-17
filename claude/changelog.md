@@ -10,7 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- ✨ **AN ADULT IS LINKED TO THEIR ACCOUNT, AND THE INVITE BUTTON GAINS ITS THIRD
+- 🐛 **A PASSWORD THAT MET EVERY RULE WAS REFUSED, AND THE APP BLAMED THE RULES.**
+  Found on Jay's own sign-up: five green ticks in the checklist, and a red banner
+  saying *"check the list below the password box"* — pointing at the one thing
+  that was not the problem.
+  ⚠️ **`weak_password` IS THREE DIFFERENT REFUSALS.** supabase-js's
+  `AuthWeakPasswordError` carries `reasons`, and the set is exactly
+  `['length', 'characters', 'pwned']`. The first two ARE the checklist; the third
+  is Supabase's leaked-password protection, which has nothing to do with the
+  rules on screen. All three arrive with the same `code`, so one message
+  swallowed all three.
+  Now the breached case says so, **and says the rules were met** — which is what
+  resolves the contradiction between a green checklist and a red banner. Telling
+  somebody to check a list they have already satisfied is how they conclude the
+  app is broken and give up, and on a sign-up screen that costs the club a member.
+  ⚠️ **`reasons` FIRST, PROSE SECOND.** The array is the stable contract; GoTrue's
+  sentence can be reworded without warning. The prose fallback exists for a
+  response that arrives without the array.
+
+⚠️ **THE ENTRIES BELOW SHIPPED AS ONE SQUASH, `0d22f32` (#204)** — the play-up
+chip, the invite email, and the adult-to-account link. Kept apart because they
+are three separate decisions.
+
+- `0d22f32` — ✨ **AN ADULT IS LINKED TO THEIR ACCOUNT, AND THE INVITE BUTTON GAINS ITS THIRD
   STATE.** `player_parents.profile_id`, filled by `link_my_parent_rows()` on
   sign-in. Invite → Invited → **Joined**; until now the button could not tell an
   adult who had accepted from one who never opened the email, because a client
