@@ -310,7 +310,24 @@ birthday could unlock a field the club's own rule forbids. The call sites also
 take a squad NAME today, not a player, so re-pointing is a real refactor rather
 than a one-line change. Deferred on purpose.
 
-### ⛔ AND THERE IS A SECOND REASON, FOUND 17 Aug, WHICH IS THE HARDER ONE
+### ✅ THE CUT-OFF IS 31 AUGUST — answered 17 Aug from the tournament repo
+
+Jay: *"check the adhjrt.com repo for age bands"*. It was there all along, in
+`…\GitHub\adhjrt`, `Quins JRT.dc.html`:
+
+> UAERF age-grade cut-off: a player's age group is fixed by their age at midnight
+> 31 August — "Under X" means they are exactly X−1 on that date.
+
+Ported to `src/lib/ageGrade.js` with the band table, the ladder and the girls'
+allowance. **So the re-point below is no longer blocked — just not done.** It is
+ordinary work now, with the safeguarding rule still attached: a DOB may only ever
+make the gate STRICTER.
+
+⚠️ **THE EMIRATI U18 EXCEPTION IS NOT ENFORCED IN EITHER APP** — UAERF gives
+Emirati U18 players a 31 December cut-off and neither app collects nationality.
+Inherited deliberately, with its reasoning, rather than quietly dropped.
+
+### ⛔ THE SECOND REASON, AS FOUND — kept because it is why the model is careful
 
 ⚠️ **RUGBY AGE BANDS ARE SEASON-RELATIVE AND A BIRTHDAY IS NOT.** "U13" means
 under 13 **as at a cut-off date**, so a U13 squad is mostly **twelve-year-olds**
@@ -329,6 +346,31 @@ rows** there is no data to infer it from.
 `ageGroup.js`'s header no longer invites the re-point — it used to say "if a DOB
 column ever lands, `allowsOwnContact` is the one place to re-point", which is now
 a sentence pointing at a trap.
+
+### 🟡 PLAYING UP — the model shipped, the notification did not
+
+Jay, 17 Aug: *"we need the ability for players to play up one age group with a
+notification"*. The **rules half is built and tested** — `src/lib/ageGrade.js`,
+the consent tick on `PlayerRegistrationForm`, and a refusal to save a play-up
+nobody consented to. What is **not** built is the notification.
+
+⚠️ **AND THE OBVIOUS ROUTE FOR IT IS A TRAP.** The registration already emails
+the squad's coaches, managers and admins through `notify_pending_membership` →
+`notify-approval`, which is exactly the right audience. But that function is Deno
+and cannot import `src/lib/ageGrade.js`, so teaching it to work out a play-up
+means **a third copy of the UAERF model** — one in the tournament repo, one here,
+one in an edge function. Two copies already have to be kept in step by hand.
+
+**Do it by storing the answer instead.** The client knows it is a play-up at the
+moment of consent, so record it (`player_private` already takes a second write
+for the date of birth right after registration) and let the email read a column
+rather than re-derive a rule. That also fixes the ordering problem: the
+membership insert — and so the email — fires **before** the DOB write lands, so
+anything derived at trigger time would be reading a row that does not exist yet.
+
+⚠️ **AND THE APPROVAL QUEUE IS THE NOTIFICATION THAT ALREADY WORKS.** The coach
+who has to act sees the pending row on screen; a chip there needs no secret, no
+edge-function deploy and no third copy.
 
 ### ✅ THE OTHER HALF SHIPPED — the age-group check, 17 Aug 2026
 

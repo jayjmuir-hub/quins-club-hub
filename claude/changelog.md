@@ -10,22 +10,35 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- ✨ **THE REGISTRATION FORM CHECKS THE BIRTHDAY AGAINST THE AGE GROUP.** Born 2010
-  and picked U12 → it asks whether that is right. ⚠️ **IT ASKS, IT DOES NOT
-  REFUSE** — the same asymmetry as the gender rule, which refuses a blank and
-  permits a contradiction.
-  ⛔ **AND THE OBVIOUS IMPLEMENTATION WOULD HAVE FIRED ON MOST OF THE CLUB.
-  RUGBY AGE BANDS ARE SEASON-RELATIVE AND A BIRTHDAY IS NOT** — "U13" means under
-  13 as at a cut-off date, so a U13 squad is mostly TWELVE-year-olds for most of
-  the season. Nothing in the schema, the docs or `src/` records the cut-off
-  (searched). So nothing converts a birthday into a band and compares it for
-  equality: it takes the two bands a child could plausibly be in, allows a year
-  of grace on each end, and speaks only outside that.
-  ⚠️ **THE SAME FACT BLOCKS THE `allowsOwnContact` RE-POINT**, which was the other
-  half of item 3 and is now waiting on one fact from Jay rather than on effort. A
-  gate asking "is this child 13 today" would take the own-contact field away from
-  nearly a whole U13 squad the club's own rule permits it for. `ageGroup.js`'s
-  header used to invite that re-point; it now warns against it.
+- ✨ **PLAYING UP AN AGE GROUP, UNDER THE REAL UAERF RULES.** Jay: *"check the
+  adhjrt.com repo for age bands … we need the ability for players to play up one
+  age group with a notification"*. The tournament site has held the whole model
+  since July — cut-off, band per group, ladder, and the wider allowance for the
+  girls' squads — so this is a **port of it**, and the club's 15 squads map onto
+  its 15 age groups exactly. A play-up asks for the parent's consent and refuses
+  without it; a genuine mismatch only warns.
+  ⚠️ **THE CUT-OFF IS 31 AUGUST**, so "Under X" means exactly X−1 on that date, a
+  U13 squad is mostly TWELVE-year-olds, and the governing cut-off is LAST August
+  for eight months in twelve.
+  ⚠️ **THE MODEL IS HYBRID AND NEITHER HALF WORKS ALONE — ported as a pure ladder
+  first, and two tests caught it.** Boys and mixed walk one rung of the LADDER,
+  because subtracting years is wrong at the double bands (a 14-year-old in U18B
+  is ONE group below — U16B is for 14s *and* 15s). Girls subtract YEARS and allow
+  two, because the ladder has HOLES (no group at 12 at all between U12G and
+  U14G) and one hop steps over a real twelve-year-old — which refused a live
+  registration on the tournament site in July.
+  ❌ **THIS SUPERSEDES A TOLERANCE MODEL WRITTEN THE SAME MORNING**, which guessed
+  a plausible band from "age today" because nothing in this repo recorded the
+  cut-off. Honest while the fact was unknown, wrong to keep once it was known —
+  deleted rather than left beside the real one.
+  ⚠️ **AND TWO TEST FILES SILENTLY DEPENDED ON THE REAL CLOCK.** Eligibility moves
+  every 31 August, so a fixed birthday changes squad on that date; both now pin
+  it, with `toFake: ['Date']` only — faking the timers as well hangs userEvent
+  and reads as a test that never finishes.
+  ⚠️ **THE `allowsOwnContact` RE-POINT IS STILL NOT DONE, AND IS NO LONGER
+  BLOCKED — only deferred.** The cut-off is known now, so it is ordinary work
+  with a safeguarding rule inside it: a DOB may only ever make that gate
+  STRICTER, because a parent may write their own child's birthday.
 
 ⚠️ **THE FIVE ENTRIES BELOW SHIPPED AS ONE SQUASH, `821c4dd` (#202).** They are kept
 apart because they are five separate decisions, and a reader looking for why
