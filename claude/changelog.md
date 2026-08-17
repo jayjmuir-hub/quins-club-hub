@@ -10,6 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 🗓️ **THERE IS NOW SOMEWHERE TO ENTER A DATE OF BIRTH — THERE WASN'T.** Jay,
+  17 Aug 2026: *"are you sure there is a place to put the DOB's? because last
+  time i checked there wasn't anywhere to enter them"*. He was right and the
+  claim above it was wrong: what had been verified was that the DATA layer
+  allowed the write, not that any screen offered the field. **The only writer in
+  the entire app was `PlayerRegistrationForm`, which a family passes through
+  once** — so a date entered wrongly was permanent, for parent, coach and admin
+  alike. The field is now on `MyPlayerForm` (a family fixes their own child's)
+  and `PlayerForm` (a coach or admin enters or corrects any in their squads).
+  ⚠️ **AND THE COMPLETENESS CARD HAD BEEN TELLING FAMILIES A FALSEHOOD.** *"You
+  can add them from the buttons below"* — the button below opened `MyPlayerForm`,
+  which had no such field. Live on `/more` since the card shipped.
+  ⛔ **CHASING IT TURNED UP A SECOND BUG, IN THE WRITER ITSELF.** `setPlayerDob`
+  writes `plays_up_confirmed_at: playsUp ? now : null`, so **any** call that
+  omits the flag ERASES a parent's recorded play-up consent. Correct for the
+  registration form, which asks both questions together; wrong for every edit
+  surface, and wrong for the sign-in gate added the same day. **Measured on
+  production in a rolled-back transaction on an invented child:** the old writer
+  erased the agreement, a birthday-only write kept it, and a control proved the
+  birthday-only write still inserts correctly when no row exists. New
+  `updatePlayerDob` omits the column entirely; three tests assert which writer is
+  reached, and injecting the old one turns the right one red in each file.
+
 - 🎂 **THE SIGN-IN GATE NOW ASKS FOR THE BIRTHDAYS THE CLUB STARTED REQUIRING
   AFTER PEOPLE SIGNED UP — AND THIS ONE CANNOT BE SKIPPED.** Jay, 17 Aug 2026:
   *"we could just do it once and make it unskippable? something like please add

@@ -17,6 +17,22 @@ short of a deploy. So the assertions that matter most are the ones about NOT
 firing: the read fails open, a player-only account is exempt, an account with no
 linked child is exempt, and a child with a birthday on file is left alone.
 
+⚠️ **AND THE PLAN'S CENTRAL CLAIM WAS HALF WRONG, WHICH JAY CAUGHT.** It said
+"no migration and no new write path" because `setPlayerDob` exists and the RLS
+permits a family to write. Both true, and both about the DATA layer. **No screen
+offered the field.** The only writer in the app was `PlayerRegistrationForm`,
+which a family passes through once — so nobody, parent or coach or admin, could
+correct a wrong date, and the option this session offered Jay ("you collect them
+and type them in") was never available. The field is now on `MyPlayerForm` and
+`PlayerForm` as well.
+
+⚠️ **CHASING THAT FOUND A SECOND BUG IN THE WRITER.** `setPlayerDob` writes
+`plays_up_confirmed_at: playsUp ? now : null`, so any call omitting the flag
+ERASES a parent's recorded consent — including the gate below, on the case where
+a row exists with a null birthday. Measured on production in a rolled-back
+transaction, with a control for the no-row-yet path. `updatePlayerDob` omits the
+column; three test files now assert which writer is reached.
+
 **Built:** the `birthday` step in `src/components/NamePrompt.jsx`, between
 `player` and `role`. **Sign-out lives inside the sheet** — it is the only step on
 that gate that cannot be answered "no", so it is the only one that needs an exit
