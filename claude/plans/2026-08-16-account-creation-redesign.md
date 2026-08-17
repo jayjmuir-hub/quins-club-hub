@@ -153,17 +153,71 @@ unreachable": the file's default fixture is an **admin**, who is correctly never
 asked. A gate step can be added to this component and be tested by nothing at
 all — check the fixture's role before believing a green run here.
 
-## 2 · Split every name into first and family — 🟡 SCHEMA + SIGN-UP DONE
+## 2 · Split every name into first and family — ✅ COMPLETE, 17 Aug 2026
 
 **Done, 16 Aug 2026:** the columns, `private.sync_person_name` on both tables,
 the backfill, and the **registration form** — which is the form that produced the
 one-word row.
 
-**Still to do, and deliberately not started:** the two-box treatment on
-`PlayerForm` (admin), `MyPlayerForm` (a parent editing their own child) and
-`ParentsEditor`. Those screens still write `full_name` in one box, which the
-trigger splits correctly — so they are **correct but not yet improved**. Nothing
-is broken by leaving them; they simply do not enforce a family name.
+**Done, 17 Aug 2026:** `PlayerForm`, `MyPlayerForm` and `ParentsEditor`. Every
+box in the app that names a person is now two.
+
+⚠️ **THESE THREE WRITE `first_name`/`last_name` DIRECTLY, WHERE THE REGISTRATION
+FORM JOINS — AND THAT IS NOT AN INCONSISTENCY TO TIDY UP.** `register_my_player`
+takes one `p_full_name` parameter and widening a public signature was the larger
+change. These write the table, so they need not — and **must not**, because the
+join is lossy in one direction: the trigger takes the **last word** as the family
+name, so *"Anna van der Berg"* joined and re-split comes back as *"Anna van der"
+/ "Berg"*. Writing both columns takes the trigger's names-win branch instead.
+`full_name` is sent as well, computed exactly as the trigger recomputes it, so a
+row written while the trigger was somehow absent still carries a correct display
+name for its thirty-odd readers.
+
+⚠️ **AND THERE IS NO CLIENT-SIDE SPLIT OF `full_name` ANYWHERE, NOT EVEN AS A
+FALLBACK.** The rule — a one-word name is a **first** name — has been got
+backwards once already (`20260808_sync_profile_name_single_word`), and a second
+copy of it in JavaScript would be invisible until somebody sorted a roster. The
+backfill filled every existing row and its migration **aborts** if it did not, so
+an empty box means an empty column.
+
+### The family name is required, and grandfathered on players only
+
+| | rule |
+|---|---|
+| a NEW player | both names |
+| an EXISTING player who arrived without one | still saves — nobody may **blank** one that exists |
+| a parent row | both names, no grandfathering |
+
+⚠️ **THE GRANDFATHER CLAUSE IS NOT A COMPROMISE, IT IS THE `ParentsEditor`
+RULING APPLIED AGAIN.** At least one live player row has a first name and nothing
+else. Demanding a family name there blocks a coach fixing a typo in a position
+until they invent a surname they may not know — which is exactly why "at least
+one parent" warns instead of blocking.
+
+⚠️ **PARENT ROWS GET NO SUCH CLAUSE BECAUSE THERE IS NOTHING TO GRANDFATHER, AND
+THIS WAS MEASURED RATHER THAN ASSUMED.** Every parent row has both names, and
+`PlayerForm` and `MyPlayerForm` are the **only** writers of `player_parents` —
+`invite_parent` is the only function in either schema that even mentions the
+table, and it does not insert. So the rule closes the door rather than locking
+somebody out from behind it. It lives in **one** function, `parentNameProblem`,
+called by both screens, and is checked **before any write**: the parent rows are
+saved last, so catching it there would refuse a save that had mostly happened.
+
+### Four injected faults, each caught by one test
+
+| Fault | Test that failed |
+|---|---|
+| drop the family-name requirement | *refuses a new player with a first name and nothing else* |
+| drop the grandfather clause | *still saves an existing player who arrived without a family name* |
+| require only a first name on a parent row | *refuses a parent with a first name and nothing else* (both screens) |
+| send parent rows as `full_name` only | *writes first_name and last_name alongside full_name* |
+
+⚠️ **AND THE FOURTH ONE WAS GREEN WHEN IT WAS FIRST INJECTED.** Every screen test
+asserts what is handed to `saveParents`; `toRow` is below that line and nothing
+looked at it. The test that catches it had to be written against the built
+insert, in `tests/parents-photos.test.js`. **This is the third time on this
+project that a suite has gone green over an untested new branch** — check what
+the existing tests can actually see before believing one.
 
 ### Verified on production
 
@@ -206,6 +260,15 @@ argument applies to the child.
 
 Callers to change: `PlayerRegistrationForm`, `PlayerForm`, `MyPlayerForm`,
 `ParentsEditor`, and `playerImport`.
+
+⚠️ **`playerImport` WAS DELIBERATELY LEFT ALONE, 17 Aug 2026, AND IT IS THE ONE
+ITEM ON THAT LIST THAT IS NOT DONE.** A CSV carries one name column; splitting it
+would be a client-side copy of the trigger's rule, which is the thing this item
+refuses to have (see the note above). The importer keeps writing `full_name` and
+the trigger keeps splitting it — correct for "First Last", and wrong in the same
+way it has always been for a two-word family name. **The fix is a second CSV
+column, not a smarter split**, and it belongs to whoever next changes the import
+format.
 
 ## 3 · Date of birth — ✅ TABLE AND REGISTRATION FIELD DONE, 16 Aug 2026
 

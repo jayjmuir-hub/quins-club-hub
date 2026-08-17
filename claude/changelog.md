@@ -10,6 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ✨ **TWO NAME BOXES EVERYWHERE A PERSON IS NAMED, not just at sign-up.** Finishes
+  the split that shipped its columns on 16 Aug: `PlayerForm`, `MyPlayerForm` and
+  `ParentsEditor` all asked for one box, so a coach adding a player could still
+  produce the row that started this.
+  ⚠️ **THESE THREE WRITE `first_name`/`last_name` DIRECTLY WHERE THE REGISTRATION
+  FORM JOINS, AND THAT IS NOT AN INCONSISTENCY.** The join is lossy in one
+  direction: `private.sync_person_name` takes the LAST word as the family name, so
+  "Anna van der Berg" joined and re-split comes back as "Anna van der" / "Berg".
+  Writing both columns takes the trigger's names-win branch. `register_my_player`
+  cannot — it takes one `p_full_name` — which is why it still joins.
+  ⚠️ **NO CLIENT-SIDE SPLIT OF `full_name`, NOT EVEN AS A FALLBACK.** A one-word
+  name is a FIRST name; that rule has been got backwards once already and a second
+  copy in JavaScript would be invisible until somebody sorted a roster.
+  ⚠️ **THE FAMILY NAME IS REQUIRED, AND GRANDFATHERED ON PLAYERS ONLY** — an
+  existing row that arrived without one still saves, because blocking it would
+  stop a coach fixing a typo until they invented a surname they may not know.
+  Parent rows get no clause: every one has both names, and the two forms are the
+  only writers of the table.
+  ⛔ **AND THE SUITE WENT GREEN WITH THE MAIN WRITE UNTESTED.** Removing
+  `first_name`/`last_name` from `toRow` — which would have sent `full_name` alone,
+  re-split wrongly — failed nothing. Every screen test asserts what is handed to
+  `saveParents`; nothing looked below that line. The test that catches it is
+  against the built insert.
+
 - ✨ **THE INVITE BUTTON ON A PARENT ROW.** The other half of the schema that shipped
   in `31b9ed5`: a contact row is the club's knowledge of an adult written in the
   wrong table, and this turns it into an offer of an account. Lives in

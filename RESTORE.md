@@ -88,6 +88,20 @@ the component takes `className` and `style` — pass them instead of wrapping.
 ⚠️ **jsdom CANNOT SEE IT**, because it computes no CSS, so the guard is structural:
 `tests/dashboard.test.jsx` asserts each row's `parentElement` IS the list card.
 
+⚠️ **A PERSON'S NAME IS TWO BOXES IN EVERY FORM, AND THE FORMS DISAGREE ABOUT WHAT
+THEY WRITE — ON PURPOSE.** `PlayerForm`, `MyPlayerForm` and `ParentsEditor` write
+`first_name`/`last_name` (plus `full_name`, computed identically to what the
+trigger would); `PlayerRegistrationForm` joins into one `p_full_name` because
+`register_my_player`'s signature takes one. **Do not "unify" them by making the
+first three join**: `private.sync_person_name` splits on the LAST word, so
+"Anna van der Berg" round-trips to "Anna van der" / "Berg". ⚠️ **And never split a
+`full_name` in JavaScript, even as a fallback** — a one-word name is a FIRST name,
+that rule has already been got backwards once in SQL, and a JS copy of it would
+be invisible until somebody sorted a roster. The 16 Aug backfill filled every row
+and aborts if it did not, so an empty box means an empty column.
+⚠️ **A test fixture with only `full_name` is a shape the database cannot produce**
+and now renders two empty name boxes, which the forms refuse to save.
+
 ⚠️ **`ParentsEditor` ROWS CARRY BOTH `email` AND `savedEmail`, AND DELETING THE SECOND AS A
 DUPLICATE RE-OPENS A REAL HOLE.** `email` is bound to an input and is whatever is being
 typed; `savedEmail` is what the database holds (`toEditorRows`, `src/lib/parentRows.js`).
