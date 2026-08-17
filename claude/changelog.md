@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- ⛔ **THE AGE CUT-OFF WAS A YEAR BEHIND, AND IT WAS BLOCKING REAL
+- 📝 **SESSION RECORD, AND TWO STALE CLAIMS CORRECTED.**
+  `claude/handoffs/2026-08-17-account-creation-and-the-season-cutoff.md` — six
+  merged pull requests, the traps met, and the state measured on the day.
+  ⚠️ **`claude/plans/2026-08-14-tiers-and-game-time.md` SAID "PHASE 2 NOT YET
+  MERGED" AND "no player has been graded", AND BOTH WERE FALSE.** Phase 2 is on
+  `main`; the club had **4 graded players, 6 multi-position rows and 1 fixture
+  carrying a tier**. Somebody had been using it for days while the plan said
+  nobody could. Corrected, and the correction is written as a warning to re-run
+  the counts rather than as a fresh number that will rot the same way.
+
+- `b291df7` — ⛔ **THE AGE CUT-OFF WAS A YEAR BEHIND, AND IT WAS BLOCKING REAL
   REGISTRATIONS.** Jay, 17 Aug 2026, reading the age-band table: *"i think this is
   wrong because we are doing this for the upcoming season that starts sept 1st"*.
   He was right, and the fault was live.

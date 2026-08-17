@@ -1,14 +1,25 @@
 # A/B/C tiers, player grading, and game time
 
-**STATUS: PHASES 1 AND 2 BUILT; PHASE 2 NOT YET MERGED.** Phase 1 (game time)
-shipped as `1419a21`. Phase 2 — `events.tier`, `player_grades`, `player_positions`
-— is applied to production and on `feat/tiers-and-positions`. ⚠️ **Unexercised: no
-player has been graded and no multi-position player exists yet.** ⚠️ **The
-ELIGIBILITY WARNING in the lineup picker is NOT built** — the data now supports it
-(a fixture knows its tier, a player knows their grade) but nothing compares them.
-Phase 3 (minutes) is not started and is still waiting on Jay's answer that fair
-game time means appearances, which he has since given: **appearances**, so minutes
-may never be needed.
+**STATUS: PHASES 1 AND 2 SHIPPED AND MERGED.** Phase 1 (game time) shipped as
+`1419a21`. Phase 2 — `events.tier`, `player_grades`, `player_positions` — is on
+`main` and applied to production.
+
+⚠️ **THIS LINE SAID "PHASE 2 NOT YET MERGED" AND "no player has been graded and
+no multi-position player exists yet" UNTIL 17 Aug 2026, AND BOTH WERE FALSE.**
+Measured that day: `db/migrations/20260814_tiers_and_player_grades.sql`,
+`src/data/playerTiers.js` and the Roster/PlayerForm wiring are all on `main`, and
+the club had **4 graded players, 6 multi-position rows and 1 fixture carrying a
+tier**. Somebody had been using it for days while this file said nobody could.
+**Re-run the counts rather than trusting the previous sentence** — that is the
+whole reason it is written here as a warning and not as a number.
+
+⚠️ **THE ELIGIBILITY WARNING IN THE LINEUP PICKER IS STILL NOT BUILT** — the data
+supports it (a fixture knows its tier, a player knows their grade) but nothing
+compares them. **This is the agreed next piece of work as of 17 Aug 2026.**
+
+Phase 3 (minutes) is not started and was waiting on Jay's answer that fair game
+time means appearances, which he has since given: **appearances**, so minutes may
+never be needed.
 
 Jay, 14 Aug 2026: *"need to be able to designate players as A, B, or C league
 players and also track matches played per player"*; then, correcting a wrong
