@@ -103,7 +103,24 @@ export function tileSpans(count, hasLead) {
   // ⚠️ THE SINGLE-PERSON CASE IS STILL FULL WIDTH, AND THAT IS NOT THE SAME
   // CASE. With one tile there is no set for it to be the odd one out of, and a
   // half-width tile alone on a row is a card that looks truncated.
-  const lead = hasLead && count >= 3
+  // ⚠️ TWO IS ENOUGH — Jay, 16 Aug 2026, comparing a two-person squad against a
+  // six-person one: "the U13 head coach bubble is not the standard double size".
+  //
+  // ⚠️ THIS REVERSES THE THRESHOLD DIRECTLY BELOW IT, AND THE OLD REASONING WAS
+  // NOT WRONG — it was outweighed. It read: "A LEAD NEEDS THREE PEOPLE TO BE
+  // WORTH IT. With two, the tall tile has one half-height tile beside it and the
+  // other half of that column is a hole." That hole is real and still there.
+  //
+  // What tipped it is that the inconsistency is more visible than the hole. A
+  // head coach is a head coach whether their squad has two staff or six, and a
+  // club scrolling Home sees the two squads one above the other — where the same
+  // job rendered at two different sizes reads as a bug, which is exactly how it
+  // was reported. The gap reads as a squad with room for more staff, which is
+  // true.
+  //
+  // ⚠️ IT IS ALSO CONSISTENT WITH THE RULING BELOW on the odd last tile: Jay
+  // chose a gap over a stretched tile there too, having seen both.
+  const lead = hasLead && count >= 2
   const spans = new Array(count).fill('half')
   if (lead) spans[0] = 'lead'
   return spans
