@@ -87,6 +87,33 @@ gh pr merge <n> --squash
 something is wrong. ⚠️ **`main` is the production branch, so a merge is a live
 release** — CLAUDE.md rule 3 still applies and Jay's explicit yes comes first.
 
+### ⚠️ Merging a Dependabot pull request takes two extra steps, always
+
+**Every Dependabot pull request in this repo is red on `docs-check`, and it is
+never about the dependency.** The bot writes no changelog entry, and its branch
+was cut from whatever `main` was at the time — so the check correctly reports a
+commit missing from the changelog. Measured 17 Aug 2026: #198's *only* failure
+was `commit missing from changelog: 31b9ed5`, while `test` passed. **Do not read
+a red Dependabot pull request as a broken dependency.** Read the `test` line.
+
+So, for each one worth taking:
+
+```bash
+git fetch origin dependabot/<branch>
+git checkout -B dependabot/<branch> FETCH_HEAD
+git rebase origin/main          # its branch can be 25 commits behind
+npm install --include=dev       # the lock file changed; install it
+npm run build && npm test       # a matcher or build-tool major can pass vacuously
+# ...add the changelog entry, citing the previous squash SHA...
+git push --force-with-lease
+```
+
+⚠️ **A green suite is weaker evidence than usual for a MATCHER major**, because a
+matcher that loosened rather than vanished passes silently — a removed one throws
+`is not a function` and the suite catches it. Break one on purpose: under jest-dom
+7, `toHaveStyle` was fed a wrong value and both tests using it failed, which is
+what makes the green run mean something.
+
 ### ⚠️ Two ways opening a pull request fails that look like your mistake
 
 Both met on 17 Aug 2026 while opening #222, and neither is a bad command.

@@ -179,6 +179,43 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   it alters the runtime a live release is built on, which is Jay's call and not a
   side effect of a test speed-up.
 
+## The four dependency majors, parked 17 Aug 2026
+
+**Dependabot opened five majors at 00:15 on 17 Aug. One was taken; these four were
+parked, each for a measured reason and not for nervousness.** Jay's call, having
+been shown what each one actually fails with. ⚠️ **Every one of them is ALSO red on
+`docs-check`, which is structural and means nothing** — see
+`claude/runbooks/session-and-push.md`. **Read the `test` line, not the tick count.**
+
+- **react 18.3.1 → 19.2.8.** `ERESOLVE` at install: `react-dom` stays at 18.3.1
+  and the peer ranges cannot be satisfied. ⚠️ **The exact mirror of #152**, which
+  bumped `react-dom` and left `react` behind — so this has now failed in both
+  directions, which is the evidence that it is a migration and not a bump. Both
+  packages have to move in one change. The ruling above still stands.
+- **vite 5.4.21 → 8.2.1 and `@vitejs/plugin-react` 4.7.0 → 6.0.5 are MUTUALLY
+  BLOCKING, and that is the useful finding.** Each fails alone: vite 8 because
+  plugin-react 4 refuses it, plugin-react 6 because it declares
+  `"vite": "^8.0.0"` — **exactly 8, not "7 or newer"** — against a root on 5. One
+  pull request carrying both would resolve.
+  ⚠️ **THE RISK IS NOT THE PACKAGES, IT IS NODE.** Both require
+  `^20.19.0 || >=22.12.0` (read off the registry, 17 Aug 2026). CI pins 24, so CI
+  would go green — and **Netlify's build Node is still unpinned**, three items up
+  in this file, so a green CI run would not be proving the production build.
+  **Pin Netlify's Node first, or this lands as a release nobody has tested.**
+- **tailwindcss 3.4.19 → 4.3.3 is a migration, and the install is not what
+  breaks.** `npm ci` succeeds; **the BUILD fails on `src/index.css`**. Three things
+  in this repo are v3-shaped: the `@tailwind base/components/utilities` trio at the
+  top of that file, `postcss.config.js` naming `tailwindcss` directly where v4
+  wants `@tailwindcss/postcss`, and a **377-line `tailwind.config.js`** that v4
+  expects as CSS-first `@theme`.
+  ⚠️ **THERE IS A REAL PRIZE IN IT, WHICH IS WHY THIS IS PARKED RATHER THAN
+  REFUSED.** `src/index.css`'s token layer exists only to mirror
+  `tailwind.config.js` "exactly", by hand, with a comment telling the next person
+  to change both — v4 would make them one source and delete that whole class of
+  drift. It is a day's careful work against the visual contract of a live site,
+  with `claude/specs/design-system.md` to keep in step. **It wants a plan, not a
+  merge.**
+
 ## One migration each
 
 - **`anon` holds full table privileges on `public`.** ⚠️ **Re-measured 14 Aug 2026:
