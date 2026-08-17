@@ -10,7 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- ✨ **ONE ROLL-CALL REPLACES THE FORK AT THE FRONT DOOR.** The point of the whole
+⚠️ **THE FIVE ENTRIES BELOW SHIPPED AS ONE SQUASH, `821c4dd` (#202).** They are kept
+apart because they are five separate decisions, and a reader looking for why
+`savedEmail` exists should not have to read about the roll-call to find it.
+
+- ✨ **ONE ROLL-CALL REPLACES THE FORK AT THE FRONT DOOR.** — `821c4dd` The point of the whole
   account-creation plan. `AppShell` rendered "Add your player" with a button
   saying *"I'm not adding a player"* that swapped in the ask-the-club form —
   **mutually exclusive**, so the branch somebody picked in their first ten seconds

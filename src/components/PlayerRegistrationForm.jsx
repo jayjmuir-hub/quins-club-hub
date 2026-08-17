@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Button from './Button.jsx'
 import Segmented from './Segmented.jsx'
 import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
+import { dobBandMismatch } from '../lib/ageGroup.js'
 import { registerMyPlayer, updateProfileNames } from '../data/members.js'
 import { setPlayerDob } from '../data/players.js'
 import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
@@ -239,6 +240,10 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
   // only decides whether to ASK.
   const canSelfRegister = selectedTeam?.self_registration_allowed === true
 
+  // Null until BOTH answers are on screen, so nobody is questioned about a
+  // squad they have not picked yet.
+  const bandWarning = dobBandMismatch(selectedTeam?.name, row.dob)
+
   const firstId = `register-player-first-${row.key}`
   const lastId = `register-player-last-${row.key}`
   const dobId = `register-player-dob-${row.key}`
@@ -406,6 +411,26 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
           </option>
         ))}
       </select>
+
+      {/* ⚠️ IT ASKS, IT DOES NOT REFUSE — role="status", not role="alert", and
+          the Save button beside it stays live. Same asymmetry as the gender
+          rule, which refuses a BLANK and permits a CONTRADICTION: a
+          wrong-looking date is usually a typo and occasionally a genuine
+          dispensation, and a form that blocks the second to catch the first is
+          a form that stops the club registering a real child.
+
+          ⚠️ AND THE TOLERANCE IS WIDE ON PURPOSE. Rugby age bands are
+          season-relative — a U13 squad is mostly twelve-year-olds — and this app
+          does not know the cut-off date. See dobBandMismatch in
+          src/lib/ageGroup.js before tightening this. */}
+      {bandWarning && (
+        <p
+          role="status"
+          className="mt-2 rounded-[11px] bg-warn-bg px-3 py-2.5 text-sm leading-relaxed text-ink"
+        >
+          {bandWarning}
+        </p>
+      )}
 
       {/* ⚠️ CONDITIONAL on the SQUAD's column, and it appears ABOVE the gender
           field on purpose: "who is this?" changes the meaning of every question

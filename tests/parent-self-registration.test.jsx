@@ -921,6 +921,52 @@ describe('Add your player — a signed-in account with no access', () => {
     expect(screen.getByRole('button', { name: /add my player/i })).toBeEnabled()
   })
 
+  // ── The birthday against the age group (17 Aug 2026) ──────────────────
+  //
+  // ⚠️ IT ASKS, IT DOES NOT REFUSE. Same asymmetry as the gender rule, which
+  // refuses a BLANK and permits a CONTRADICTION: a wrong-looking date is usually
+  // a typo and occasionally a genuine dispensation, and a form that blocks the
+  // second to catch the first stops the club registering a real child.
+  it('questions a birthday a long way from the age group, and still saves it', async () => {
+    const user = userEvent.setup()
+    await renderShell()
+
+    await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+    await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+    // Sixteen, in U13.
+    await user.type(screen.getByLabelText(/date of birth/i), '2010-03-04')
+    await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+
+    expect(await screen.findByText(/check the date and the age group/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+    await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalled())
+  })
+
+  // ⚠️ THE CASE A NAIVE CHECK GETS WRONG, AND THE REASON THE TOLERANCE IS WIDE.
+  // Rugby age bands are season-relative: a U13 squad is mostly twelve-year-olds
+  // for most of the season. A check that questioned this would fire on most of
+  // the club and be switched off within a week.
+  it('says nothing about a twelve-year-old in U13', async () => {
+    const user = userEvent.setup()
+    await renderShell()
+
+    await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+    await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+
+    expect(screen.queryByText(/check the date and the age group/i)).not.toBeInTheDocument()
+  })
+
+  it('asks nothing until both answers are on screen', async () => {
+    const user = userEvent.setup()
+    await renderShell()
+
+    await user.type(screen.getByLabelText(/date of birth/i), '2010-03-04')
+
+    // A birthday with no squad beside it is the form arguing with a blank.
+    expect(screen.queryByText(/check the date and the age group/i)).not.toBeInTheDocument()
+  })
+
   // ❌ THIS COMMENT DESCRIBED A REAL PRODUCTION STATE AND NO LONGER DOES. It
   // said `team read` is "EXISTS a membership row for auth.uid() in this club",
   // so a zero-membership person reads ZERO teams, and that the migration
