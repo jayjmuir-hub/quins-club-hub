@@ -10,7 +10,47 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- 🐛 **A PASSWORD THAT MET EVERY RULE WAS REFUSED, AND THE APP BLAMED THE RULES.**
+- 🔒 **A CHANGE LOG FOR CHANGES TO RIGHTS.** Jay: *"we need a change log for
+  changes to rights"*. `public.membership_audit`, append-only, recording who
+  granted, changed or revoked whose access and when. `memberships` held the
+  current state and no history, so "who made this person an admin" has been
+  unanswerable since the app existed.
+  ⚠️ **WRITTEN BY A TRIGGER, NEVER BY THE APP.** Access is granted from at least
+  six places; an audit the client writes is one a client can skip, and worse, one
+  a NEW granting path silently forgets forever.
+  ⚠️ **APPEND-ONLY, ENFORCED BY ABSENCE.** One SELECT policy and no others — RLS
+  denies by default, so no client can write or alter a row whatever their role,
+  with table privileges revoked as a second independent refusal. **Proved: a
+  signed-in admin could not update, delete or forge a row.**
+  ⚠️ **SUPER ADMINS ONLY** (Jay's call). The first version said
+  `is_admin(club_id)`, which is wrong once stated: this records what ADMINS do,
+  so every admin reading it lets the audited read their own audit.
+  ⚠️ **AND TRUNCATE WAS STILL GRANTED** — a Supabase default on every new table.
+  Unreachable through PostgREST, but "not reachable through the API we happen to
+  use" is not a property to rest an audit log on. The first probe tested INSERT,
+  UPDATE and DELETE and left it in place.
+  ⛔ **THE FIRST READ PROBE REPORTED A PASS THAT MEANT NOTHING.** It checked that
+  "an ordinary club admin sees 0" — but **this club has no ordinary admin**, every
+  one is super, so it measured a NULL user. Re-run after creating a real
+  non-super admin inside the transaction and asserting `is_admin()` returns true
+  for them first: control 1, that admin **0**, super admin **1**.
+  ⚠️ **NO FOREIGN KEYS, DELIBERATELY** — an FK to `memberships` would make it
+  impossible to record the most interesting event, a revoke, and a cascade from
+  `profiles` would erase somebody's history with their account.
+  ⚠️ **`auth.uid()` NULL IS RECORDED AS `system`, NOT LEFT BLANK** — a cron or
+  service-role write is "the system did it", not "nobody did it".
+  Live probe: granted 1, changed 2, revoked 1 — and a title-only edit correctly
+  wrote **nothing**, which is what keeps the log readable.
+  **No screen reads it yet**; the data is the time-sensitive half.
+
+- 📄 **A THRESHOLD FOR TURNSTILE, RATHER THAN A HUNCH** —
+  `claude/runbooks/monitoring.md`. Not turned on: a bot account reads zero rows
+  here, so junk signups are noise rather than a breach. ⚠️ **The risk is email
+  reputation, not accounts** — every attempt sends confirmation mail on the same
+  domain as the auth mail, and getting that flagged takes SIGN-IN down. So the
+  thing to watch is `/signup` volume, and the runbook carries the query.
+
+- `f2ed3b0` — 🐛 **A PASSWORD THAT MET EVERY RULE WAS REFUSED, AND THE APP BLAMED THE RULES.**
   Found on Jay's own sign-up: five green ticks in the checklist, and a red banner
   saying *"check the list below the password box"* — pointing at the one thing
   that was not the problem.
