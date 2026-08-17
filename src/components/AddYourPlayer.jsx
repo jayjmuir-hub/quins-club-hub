@@ -1,15 +1,20 @@
-import Button from './Button.jsx'
 import PlayerRegistrationForm from './PlayerRegistrationForm.jsx'
 
-// What a signed-in account with NO membership sees FIRST: add your player.
+// The "add your player" SECTION of the roll-call (RollCall.jsx). It was the
+// whole zero-membership screen until 17 Aug 2026.
 //
 // Under roster auto-onboarding the primary path was "your squads appear by
 // themselves"; under parent self-registration (Jay's ruling 8 Aug 2026, spec
 // claude/decisions/2026-08-08-parent-self-registration.md) there is no seeded
-// roster to match against, so every parent arrives here and registers their
-// own child. RequestAccess — "tell the club who you are and wait" — is still
-// mounted alongside this, but as the SECONDARY route, for someone who is not
-// registering a child at all: a coach, a committee member, a volunteer.
+// roster to match against, so a parent registers their own child here.
+//
+// ❌ IT IS NO LONGER ONE HALF OF A FORK. RequestAccess used to be mounted
+// alongside it as "the SECONDARY route", reached by a button saying "I'm not
+// adding a player" — and the two were mutually exclusive, which is the bug the
+// account-creation plan opens with: a coach who came through this door was
+// never asked whether he coaches, and the door he did not pick was never
+// mentioned again. This renders when the roll-call was TOLD there is a child
+// or a player here, alongside whatever else was true.
 //
 // ⚠️ THE FIELDS THEMSELVES MOVED TO PlayerRegistrationForm.jsx ON 13 AUG 2026,
 // when a parent gained the ability to register more than one child. This file
@@ -58,21 +63,33 @@ function Shell({ title, children }) {
 
 /**
  * `teams` comes from the membership provider, which already loads them — this
- * component never queries. `onRegistered` must reload that provider: the new
- * pending membership is what makes the app render at all, and nothing else
- * tells the provider it exists.
+ * component never queries.
  *
- * `onAskForAccess` switches to RequestAccess. `children` is the sign-out
- * control, passed in from AppShell exactly as RequestAccess takes it — someone
- * who cannot get in must always be able to get out.
+ * ⚠️ `onRegistered` NO LONGER MEANS "RELOAD THE PROVIDER", AND THE DIFFERENCE IS
+ * LOAD-BEARING SINCE 17 Aug 2026. This is one SECTION of the roll-call
+ * (RollCall.jsx), which may still have questions to ask after this one — so it
+ * means "this section is finished" and the roll-call decides when to reload.
+ * Reloading here would unmount the entire zero-membership screen the instant the
+ * first child was registered, taking every remaining question with it, silently.
+ *
+ * `children` is the sign-out control, passed in from above — someone who cannot
+ * get in must always be able to get out.
+ *
+ * ❌ `onAskForAccess` AND THE "I'm not adding a player" BUTTON ARE GONE. That
+ * button WAS the fork this plan exists to remove: the branch a person picked in
+ * their first ten seconds decided what the club knew about them from then on,
+ * and neither side ever asked about the other. The roll-call asks once and takes
+ * every answer that is true.
  */
-export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess, children }) {
-  const secondary = (
-    <Button variant="secondary" full onClick={onAskForAccess} className="mt-4">
-      I&apos;m not adding a player
-    </Button>
-  )
-
+export default function AddYourPlayer({
+  teams = [],
+  onRegistered,
+  // Carried through from the roll-call's "I play here myself" tick. See the
+  // prop's note in PlayerRegistrationForm: it seeds the FIRST row only, and the
+  // squad still decides whether a self-registration is allowed at all.
+  selfRegistering = false,
+  children,
+}) {
   // Reached only when the teams read actually failed — see the header. The copy
   // already said "we couldn't load", which was the honest wording for a state
   // the comment above it was describing as normal.
@@ -84,7 +101,6 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
           pick from yet. Tell the club who you are instead and someone will connect
           you.
         </p>
-        {secondary}
         {children}
       </Shell>
     )
@@ -114,13 +130,12 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
         the family.
       </p>
 
-      <PlayerRegistrationForm teams={teams} onDone={onRegistered} submitLabel="Add my player" />
-
-      {/* The old route, kept and kept working. Not everyone signing in is a
-          parent — a coach, a team manager or a committee member has no child to
-          register and would otherwise be stuck on a form that does not describe
-          them. */}
-      {secondary}
+      <PlayerRegistrationForm
+        teams={teams}
+        onDone={onRegistered}
+        submitLabel="Add my player"
+        defaultSelfRegister={selfRegistering}
+      />
 
       {children}
     </Shell>

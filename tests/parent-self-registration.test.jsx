@@ -147,12 +147,51 @@ function shellState(overrides = {}) {
   }
 }
 
-function renderShell(children = <div>Routed content</div>) {
-  return render(
+/**
+ * ⚠️ THE ROLL-CALL NOW STANDS IN FRONT OF THE REGISTRATION FORM — 17 Aug 2026.
+ * AppShell no longer renders "Add your player" to a zero-membership account; it
+ * renders RollCall, which asks who you are and takes every answer that is true.
+ * So this ticks "I have a child playing here" and presses Continue, which is the
+ * path every test below was written for.
+ *
+ * ⚠️ IT DECIDES FROM THE MOCKED PROVIDER STATE RATHER THAN PROBING THE DOM. A
+ * shell rendered WITH memberships never shows the roll-call, and a query that
+ * waits for a checkbox that will never appear costs a timeout per test and
+ * reports it as a failure of whatever the test was actually about.
+ *
+ * Pass `{ answer: null }` to stop on the roll-call itself.
+ */
+async function renderShell(children = <div>Routed content</div>, { answer = 'child' } = {}) {
+  const result = render(
     <MemoryRouter initialEntries={['/']} future={routerFuture}>
       <AppShell>{children}</AppShell>
     </MemoryRouter>,
   )
+
+  const state = useMembershipsMock()
+  const showsRollCall = !state.loading && !state.error && state.memberships.length === 0
+  if (!answer || !showsRollCall) return result
+
+  await answerRollCall(userEvent.setup())
+  return result
+}
+
+/**
+ * Ticks the given answers, fills the name when the roll-call is asking for one,
+ * and presses Continue. Split out so a test that cares about the name step can
+ * render with `{ answer: null }` and drive this itself.
+ */
+async function answerRollCall(user, { ticks = [/child playing here/i], firstName, lastName } = {}) {
+  for (const tick of ticks) {
+    // eslint-disable-next-line no-await-in-loop -- each click must land before
+    // the next box is queried.
+    await user.click(await screen.findByRole('checkbox', { name: tick }))
+  }
+  if (firstName) {
+    await user.type(screen.getByLabelText(/your first name/i), firstName)
+    await user.type(screen.getByLabelText(/your family name/i), lastName ?? '')
+  }
+  await user.click(screen.getByRole('button', { name: /^continue$/i }))
 }
 
 beforeEach(() => {
@@ -190,7 +229,7 @@ describe('Add your player — a signed-in account with no access', () => {
     const reload = vi.fn()
     useMembershipsMock.mockReturnValue(shellState({ reload }))
 
-    renderShell()
+    await renderShell()
 
     // Trailing spaces on purpose: a name typed on a phone keyboard picks them
     // up constantly, and the database's own guard trims before it checks for
@@ -223,7 +262,7 @@ describe('Add your player — a signed-in account with no access', () => {
   })
 
   it('sorts the age groups the way every other list in the app does', async () => {
-    renderShell()
+    await renderShell()
 
     const options = within(screen.getByLabelText(/age group/i)).getAllByRole('option')
     expect(options.map((option) => option.textContent)).toEqual([
@@ -247,7 +286,7 @@ describe('Add your player — a signed-in account with no access', () => {
   describe('gender on a single-gender squad', () => {
     it('does not ask for gender on a mixed squad', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
@@ -260,7 +299,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
     it('reveals the field as soon as a single-gender squad is chosen', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
@@ -273,7 +312,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
     it('refuses a blank gender without spending a round trip', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Amara')
       await user.type(screen.getByLabelText(/player's family name/i), 'Bello')
@@ -290,7 +329,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
     it('passes the chosen gender through as the third argument', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Amara')
       await user.type(screen.getByLabelText(/player's family name/i), 'Bello')
@@ -311,7 +350,7 @@ describe('Add your player — a signed-in account with no access', () => {
     // correct them. Only ABSENCE is refused.
     it('lets a contradictory gender through rather than blocking it', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Sam')
       await user.type(screen.getByLabelText(/player's family name/i), 'Reid')
@@ -336,7 +375,7 @@ describe('Add your player — a signed-in account with no access', () => {
   describe('a player at U13 or above registering themselves', () => {
     it('does not ask the question at all for a squad that does not allow it', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
@@ -352,7 +391,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
     it('defaults to "my child", so a distracted parent cannot register themselves by accident', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
@@ -365,7 +404,7 @@ describe('Add your player — a signed-in account with no access', () => {
     it('sends the flag, and renames the field to match who is answering', async () => {
       const user = userEvent.setup()
       registerMyPlayerMock.mockResolvedValue({ id: 'mm-9', status: 'pending' })
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
@@ -398,7 +437,7 @@ describe('Add your player — a signed-in account with no access', () => {
     it('forgets the answer when the squad changes to one that cannot self-register', async () => {
       const user = userEvent.setup()
       registerMyPlayerMock.mockResolvedValue({ id: 'mm-10', status: 'pending' })
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
@@ -435,7 +474,7 @@ describe('Add your player — a signed-in account with no access', () => {
       const reload = vi.fn()
       useMembershipsMock.mockReturnValue(shellState({ reload }))
 
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/player 1's first name|player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player 1's family name|player's family name/i), 'Okafor')
@@ -465,7 +504,7 @@ describe('Add your player — a signed-in account with no access', () => {
     // would record a gender the parent never gave for the other child.
     it('asks for gender only on the row whose squad demands it', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
@@ -482,7 +521,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
     it('names the row that is incomplete rather than saying "your player"', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
@@ -518,7 +557,7 @@ describe('Add your player — a signed-in account with no access', () => {
         .mockResolvedValueOnce({ id: 'mm-1', status: 'pending' })
         .mockRejectedValueOnce(refusal)
 
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
@@ -550,7 +589,7 @@ describe('Add your player — a signed-in account with no access', () => {
         .mockResolvedValueOnce({ id: 'mm-1', status: 'pending' })
         .mockRejectedValueOnce(refusal)
 
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
@@ -593,7 +632,7 @@ describe('Add your player — a signed-in account with no access', () => {
         .mockResolvedValueOnce({ id: 'mm-1', status: 'pending' })
         .mockRejectedValueOnce(refusal)
 
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
@@ -616,14 +655,14 @@ describe('Add your player — a signed-in account with no access', () => {
     // fresh form it reads as "skip this", on the one screen whose entire
     // purpose is not to be skipped.
     it('does not offer that way through before anything has saved', async () => {
-      renderShell()
+      await renderShell()
 
       expect(screen.queryByRole('button', { name: /continue without them/i })).not.toBeInTheDocument()
     })
 
     it('stops at five rows and says why', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       const addAnother = () => screen.getByRole('button', { name: /add another child/i })
       for (let i = 0; i < 4; i += 1) {
@@ -642,7 +681,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
     it('lets a row be removed again, without disturbing the others', async () => {
       const user = userEvent.setup()
-      renderShell()
+      await renderShell()
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
@@ -663,7 +702,7 @@ describe('Add your player — a signed-in account with no access', () => {
     // The first row can never be removed: a list you can empty is a form with
     // no fields.
     it('does not let the only row be removed', async () => {
-      renderShell()
+      await renderShell()
 
       expect(screen.queryByRole('button', { name: /^remove/i })).not.toBeInTheDocument()
     })
@@ -693,7 +732,7 @@ describe('Add your player — a signed-in account with no access', () => {
     }
 
     it('is not asked for when the person has already given it', async () => {
-      renderShell()
+      await renderShell()
       // The default fixture carries name_confirmed_at.
       expect(await screen.findByLabelText(/player's first name/i)).toBeInTheDocument()
       expect(screen.queryByLabelText(/your first name/i)).not.toBeInTheDocument()
@@ -713,10 +752,9 @@ describe('Add your player — a signed-in account with no access', () => {
         return { id: 'mm-new', status: 'pending' }
       })
 
-      renderShell()
+      await renderShell(undefined, { answer: null })
 
-      await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
-      await user.type(screen.getByLabelText(/your family name/i), 'Okafor')
+      await answerRollCall(user, { firstName: 'Hannah', lastName: 'Okafor' })
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
       await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
@@ -729,25 +767,29 @@ describe('Add your player — a signed-in account with no access', () => {
         firstName: 'Hannah',
         lastName: 'Okafor',
       })
-      // ⚠️ THE ASSERTION THAT IS THE FIX. Reverse these two and the race is
-      // back exactly as it was.
+      // ⚠️ THE ASSERTION THAT IS THE FIX, AND IT IS STRONGER SINCE THE ROLL-CALL
+      // TOOK THE QUESTION OVER. The name is now written before the registration
+      // form is even RENDERED, so the two cannot race at all — where before they
+      // were two branches of one submit handler, in an order that could be
+      // reversed by a tidy-up.
       expect(order).toEqual(['name', 'child'])
     })
 
-    it('refuses to register anything while it is blank', async () => {
+    it('refuses to go on while it is blank, and writes nothing', async () => {
       const user = userEvent.setup()
       unnamed()
-      renderShell()
+      await renderShell(undefined, { answer: null })
 
-      await user.type(await screen.findByLabelText(/player's first name/i), 'Chidi')
-      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
-      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
-      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
-      await user.click(screen.getByRole('button', { name: /add my player/i }))
+      await user.click(await screen.findByRole('checkbox', { name: /child playing here/i }))
+      await user.click(screen.getByRole('button', { name: /^continue$/i }))
 
-      expect(await screen.findByRole('alert')).toHaveTextContent(/your own first name/i)
+      expect(await screen.findByRole('alert')).toHaveTextContent(/your first name/i)
       expect(registerMyPlayerMock).not.toHaveBeenCalled()
       expect(updateProfileNamesMock).not.toHaveBeenCalled()
+      // ⚠️ AND IT DID NOT MOVE ON. A refusal that still advanced would put the
+      // person in front of the registration form with the queue row nameless,
+      // which is the exact failure this question was moved forward to stop.
+      expect(screen.queryByLabelText(/player's first name/i)).not.toBeInTheDocument()
     })
 
     // ⚠️ INVERTED 13 Aug 2026 (Jay). This asserted that a first name ALONE was
@@ -765,14 +807,11 @@ describe('Add your player — a signed-in account with no access', () => {
     it('refuses a first name alone, unlike every other name field in the app', async () => {
       const user = userEvent.setup()
       unnamed()
-      renderShell()
+      await renderShell(undefined, { answer: null })
 
-      await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
-      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
-      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
-      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
-      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
-      await user.click(screen.getByRole('button', { name: /add my player/i }))
+      await user.click(await screen.findByRole('checkbox', { name: /child playing here/i }))
+      await user.type(screen.getByLabelText(/your first name/i), 'Hannah')
+      await user.click(screen.getByRole('button', { name: /^continue$/i }))
 
       expect(await screen.findByRole('alert')).toHaveTextContent(/family name/i)
       // Nothing written, in either direction — the name is checked before any
@@ -786,18 +825,15 @@ describe('Add your player — a signed-in account with no access', () => {
     it('accepts it once the family name is given', async () => {
       const user = userEvent.setup()
       unnamed()
-      renderShell()
+      await renderShell(undefined, { answer: null })
 
-      await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
-      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
-      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
-      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
-      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
-      await user.click(screen.getByRole('button', { name: /add my player/i }))
+      await user.click(await screen.findByRole('checkbox', { name: /child playing here/i }))
+      await user.type(screen.getByLabelText(/your first name/i), 'Hannah')
+      await user.click(screen.getByRole('button', { name: /^continue$/i }))
       await screen.findByRole('alert')
 
       await user.type(screen.getByLabelText(/your family name/i), 'Okafor')
-      await user.click(screen.getByRole('button', { name: /add my player/i }))
+      await user.click(screen.getByRole('button', { name: /^continue$/i }))
 
       await waitFor(() =>
         expect(updateProfileNamesMock).toHaveBeenCalledWith({
@@ -806,14 +842,18 @@ describe('Add your player — a signed-in account with no access', () => {
           lastName: 'Okafor',
         }),
       )
-      await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalled())
+      // And it lands on the registration form, which is what "accepted" means
+      // here: the answer was taken AND the next question was put.
+      expect(await screen.findByLabelText(/player's first name/i)).toBeInTheDocument()
     })
 
     // ⚠️ AND THE FIELD MUST NOT SAY "optional", because it no longer is. The
-    // label is the only thing telling somebody the rules before they submit.
+    // label is the only thing telling somebody the rules before they submit —
+    // and the same field IS optional in NamePrompt and RequestAccess, so the
+    // wording is the only thing distinguishing the two rules.
     it('does not label the family name optional', async () => {
       unnamed()
-      renderShell()
+      await renderShell(undefined, { answer: null })
 
       const label = await screen.findByLabelText(/your family name/i)
       expect(label).toBeInTheDocument()
@@ -823,7 +863,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
   it('will not submit a blank name, and does not spend a round trip finding out', async () => {
     const user = userEvent.setup()
-    renderShell()
+    await renderShell()
 
     await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
@@ -836,7 +876,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
   it('will not submit without an age group either', async () => {
     const user = userEvent.setup()
-    renderShell()
+    await renderShell()
 
     await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
@@ -867,7 +907,7 @@ describe('Add your player — a signed-in account with no access', () => {
     refusal.code = '42501'
     registerMyPlayerMock.mockRejectedValue(refusal)
 
-    renderShell()
+    await renderShell()
 
     await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
@@ -881,35 +921,40 @@ describe('Add your player — a signed-in account with no access', () => {
     expect(screen.getByRole('button', { name: /add my player/i })).toBeEnabled()
   })
 
-  // ⚠️ THIS IS A REAL PRODUCTION STATE, NOT A DEFENSIVE BRANCH. `team read`
-  // is "EXISTS a membership row for auth.uid() in this club", so a person with
-  // ZERO memberships reads ZERO teams — which is exactly the person this
-  // screen is for. Until that policy is widened (see
-  // db/migrations/20260808_teams_readable_before_registration.sql, written but
-  // NOT applied) this is what every self-registering parent will actually see,
-  // and it has to be honest and offer a way forward rather than rendering an
-  // empty dropdown.
-  it('says so, and offers the other route, when no age groups came back', async () => {
+  // ❌ THIS COMMENT DESCRIBED A REAL PRODUCTION STATE AND NO LONGER DOES. It
+  // said `team read` is "EXISTS a membership row for auth.uid() in this club",
+  // so a zero-membership person reads ZERO teams, and that the migration
+  // widening it was "written but NOT applied". Measured from pg_policy on
+  // 17 Aug 2026: it is `auth.uid() IS NOT NULL`, and it was applied on 8 Aug.
+  // The branch survives as a genuine failure case — a teams read that failed —
+  // which is what the copy always said. RESTORE.md has been right since 9 Aug.
+  it('says so when no age groups came back, and still offers the way out', async () => {
     useMembershipsMock.mockReturnValue(shellState({ teams: [] }))
 
-    renderShell()
+    await renderShell()
 
     expect(await screen.findByText(/couldn't load the club's age groups/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/age group/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /not adding a player/i })).toBeInTheDocument()
+    // Someone who cannot get in must always be able to get out.
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
   })
 
-  it('keeps the ask-the-club route for someone with no child to register', async () => {
+  // ⚠️ THE FORK IS GONE, AND THIS TEST IS WHERE IT USED TO BE PROVED. It clicked
+  // "I'm not adding a player" — a button that made the two routes MUTUALLY
+  // EXCLUSIVE, which is the bug the whole account-creation plan opens with.
+  // Reaching RequestAccess is now a TICK rather than a branch, so a coach who
+  // also has children here answers both instead of choosing.
+  it('reaches the ask-the-club route by ticking it, not by giving up the other', async () => {
     const user = userEvent.setup()
-    renderShell()
+    await renderShell(undefined, { answer: null })
 
-    await user.click(await screen.findByRole('button', { name: /not adding a player/i }))
+    await answerRollCall(user, { ticks: [/help the club another way/i] })
 
-    // RequestAccess, unchanged — a coach or committee member still gets the
-    // route that existed before self-registration.
     expect(await screen.findByRole('button', { name: /request access/i })).toBeInTheDocument()
     expect(screen.getByText('hannah@example.com')).toBeInTheDocument()
+    // ⚠️ AND THE OTHER ANSWER IS STILL AVAILABLE ON THE WAY IN. This is the
+    // assertion the old test could not make: both boxes exist at once.
+    expect(screen.queryByRole('button', { name: /not adding a player/i })).toBeNull()
   })
 })
 
@@ -940,7 +985,7 @@ describe('A member waiting to be approved', () => {
   it('does not tell a waiting parent that nobody was emailed', async () => {
     useMembershipsMock.mockReturnValue(shellState({ memberships: [PENDING_MEMBERSHIP] }))
 
-    renderShell()
+    await renderShell()
 
     const banner = await screen.findByTestId('pending-approval')
     expect(banner).not.toHaveTextContent(/nobody is emailed/i)
@@ -952,7 +997,7 @@ describe('A member waiting to be approved', () => {
   it('sees the waiting banner ABOVE the app, not instead of it', async () => {
     useMembershipsMock.mockReturnValue(shellState({ memberships: [PENDING_MEMBERSHIP] }))
 
-    renderShell()
+    await renderShell()
 
     expect(await screen.findByTestId('pending-approval')).toHaveTextContent(
       /waiting to be approved/i,
@@ -1001,14 +1046,14 @@ describe('A member waiting to be approved', () => {
       }),
     )
 
-    renderShell()
+    await renderShell()
 
     expect(await screen.findByText('Routed content')).toBeInTheDocument()
     expect(screen.queryByTestId('pending-approval')).not.toBeInTheDocument()
   })
 
   it('is not shown to somebody with no memberships at all', async () => {
-    renderShell()
+    await renderShell()
 
     expect(await screen.findByRole('button', { name: /add my player/i })).toBeInTheDocument()
     expect(screen.queryByTestId('pending-approval')).not.toBeInTheDocument()
@@ -1310,7 +1355,7 @@ describe('Add your player — the duplicate guards', () => {
       refusal('42710', 'Someone with that name is already registered in U13.'),
     )
 
-    renderShell()
+    await renderShell()
     await submitOneChild(user, 'Chidi Okafor', TEAM_U13.id)
 
     // ⚠️ THE SERVER'S WORDING, NOT A LOCAL ONE. It names the squad and says
@@ -1328,7 +1373,7 @@ describe('Add your player — the duplicate guards', () => {
       refusal('42710', 'Someone with that name is already registered in U13.'),
     )
 
-    renderShell()
+    await renderShell()
     await submitOneChild(user, 'Chidi Okafor', TEAM_U13.id)
     await screen.findByRole('alert')
 
@@ -1359,7 +1404,7 @@ describe('Add your player — the duplicate guards', () => {
       refusal('42809', 'That is your own name, but you have said you are registering a child.'),
     )
 
-    renderShell()
+    await renderShell()
     await submitOneChild(user, 'Chidi Okafor', TEAM_U13.id)
     await screen.findByRole('alert')
 
@@ -1391,7 +1436,7 @@ describe('Add your player — the duplicate guards', () => {
       refusal('42710', 'Someone with that name is already registered in U13.'),
     )
 
-    renderShell()
+    await renderShell()
     await submitOneChild(user, 'Chidi Okafor', TEAM_U13.id)
     await screen.findByRole('alert')
     await user.click(screen.getByRole('checkbox', { name: /different player who happens/i }))
@@ -1427,7 +1472,7 @@ describe('Add your player — the duplicate guards', () => {
       refusal('42901', 'You already have 5 players waiting to be approved.'),
     )
 
-    renderShell()
+    await renderShell()
     await submitOneChild(user, 'Chidi Okafor', TEAM_U13.id)
     await screen.findByRole('alert')
 
@@ -1446,7 +1491,7 @@ describe('Add your player — the duplicate guards', () => {
 describe('Add your player — the date of birth', () => {
   it('refuses a blank one without spending a round trip', async () => {
     const user = userEvent.setup()
-    renderShell()
+    await renderShell()
 
     await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
     await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
@@ -1464,7 +1509,7 @@ describe('Add your player — the date of birth', () => {
     const user = userEvent.setup()
     registerMyPlayerMock.mockResolvedValue({ id: 'mm-1', status: 'pending', player_id: 'p-42' })
     setPlayerDobMock.mockResolvedValue({ player_id: 'p-42', date_of_birth: '2014-03-04' })
-    renderShell()
+    await renderShell()
 
     await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
     await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
@@ -1484,7 +1529,7 @@ describe('Add your player — the date of birth', () => {
     const user = userEvent.setup()
     registerMyPlayerMock.mockResolvedValue({ id: 'mm-1', status: 'pending', player_id: 'p-42' })
     setPlayerDobMock.mockRejectedValue(new Error('network'))
-    renderShell()
+    await renderShell()
 
     await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
     await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
