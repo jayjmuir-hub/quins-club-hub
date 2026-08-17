@@ -20,6 +20,9 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 }))
 
 vi.mock('../src/data/players.js', () => ({
+  // ⚠️ The roster reads birthdays for staff since 17 Aug 2026 to show an age.
+  // An omitted export is undefined and throws from inside an effect.
+  listPlayerPrivate: () => Promise.resolve([]),
   listPlayers: (...a) => listPlayersMock(...a),
   getPlayerContact: vi.fn().mockResolvedValue(null),
   upsertPlayer: vi.fn(),

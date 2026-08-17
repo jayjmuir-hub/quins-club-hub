@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Unit tests for src/screens/Roster.jsx + src/screens/PlayerDetail.jsx
@@ -17,6 +17,8 @@ import userEvent from '@testing-library/user-event'
 
 const useMembershipsMock = vi.fn()
 const listPlayersMock = vi.fn()
+const listPlayerPrivateMock = vi.fn(() => Promise.resolve([]))
+const getPlayerDobMock = vi.fn(() => Promise.resolve(null))
 const getPlayerContactMock = vi.fn()
 
 const listParentsMock = vi.fn()
@@ -39,8 +41,14 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
-  getPlayerDob: vi.fn(() => Promise.resolve(null)),
+  getPlayerDob: (...args) => getPlayerDobMock(...args),
   getPlayerContact: (...args) => getPlayerContactMock(...args),
+  // ⚠️ THE ROSTER READS BIRTHDAYS FOR STAFF SINCE 17 Aug 2026, to show an age
+  // beside each name. A vi.mock factory replaces the whole module, so an
+  // omitted export is undefined and throws from inside an effect — which is
+  // what happened when this was added: twelve tests failed at once with an
+  // error about the MOCK, not about the roster.
+  listPlayerPrivate: (...args) => listPlayerPrivateMock(...args),
 }))
 
 // Import after vi.mock so this binds to the mocked modules.
@@ -146,6 +154,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   useMembershipsMock.mockReturnValue(memberships(ADMIN))
   listPlayersMock.mockResolvedValue(ALL_PLAYERS)
+  listPlayerPrivateMock.mockReset()
+  listPlayerPrivateMock.mockResolvedValue([])
+  getPlayerDobMock.mockReset()
+  getPlayerDobMock.mockResolvedValue(null)
   getPlayerContactMock.mockResolvedValue(null)
   listParentsMock.mockResolvedValue([])
 })
@@ -785,5 +797,115 @@ describe('PlayerDetail — the U13 own-contact boundary', () => {
 
     expect(await within(dialog).findByText(/player contact/i)).toBeInTheDocument()
     expect(within(dialog).getByRole('link', { name: 'craig@example.com' })).toBeInTheDocument()
+  })
+})
+
+describe('PlayerDetail — date of birth', () => {
+  async function openCraig(user) {
+    await screen.findByText('Craig Muir')
+    await user.click(screen.getByRole('button', { name: /Craig Muir/ }))
+    return screen.getByRole('dialog')
+  }
+
+  it('shows the date and the age it works out to', async () => {
+    getPlayerDobMock.mockResolvedValue('2015-03-04')
+    const { user } = setup()
+    const dialog = await openCraig(user)
+
+    const block = await within(dialog).findByTestId('player-birthday')
+    expect(block).toHaveTextContent(/4 March 2015/)
+    // The age is computed by the club's own ageAt, so pin the shape not a
+    // number that would rot every March.
+    expect(block).toHaveTextContent(/\(\d+\)/)
+  })
+
+  // ⚠️ THE SAFEGUARDING CASE, AND IT IS THIS SCREEN'S EXISTING RULE. Parents
+  // reach PlayerDetail, and player_private is readable only by squad staff or
+  // the child's own family — so a parent looking at a team-mate gets null from
+  // RLS, exactly like a child with no birthday recorded. Both must render
+  // NOTHING: an empty "Date of birth" row would announce that one exists and
+  // is being withheld. Same contract the contact block above is built on.
+  it('renders nothing at all when there is no birthday to show', async () => {
+    getPlayerDobMock.mockResolvedValue(null)
+    const { user } = setup()
+    const dialog = await openCraig(user)
+
+    await within(dialog).findByText('Craig Muir')
+    expect(within(dialog).queryByTestId('player-birthday')).toBeNull()
+    expect(within(dialog).queryByText(/date of birth/i)).toBeNull()
+  })
+
+  it('renders nothing when the read fails, rather than an error card', async () => {
+    getPlayerDobMock.mockRejectedValue(new Error('network'))
+    const { user } = setup()
+    const dialog = await openCraig(user)
+
+    await within(dialog).findByText('Craig Muir')
+    expect(within(dialog).queryByTestId('player-birthday')).toBeNull()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════
+//  AGES — 17 Aug 2026
+//
+//  Jay, having entered the first birthdays: "where as a coach or admin can i
+//  see them?" The answer was nowhere but the edit form, one child at a time.
+//
+//  ⚠️ THE READ IS STAFF-ONLY AND IS NOT ISSUED AT ALL FOR A PARENT, which is
+//  the assertion that matters most here. `player_private` is readable by squad
+//  staff or the child's own family, so a parent would get null for every
+//  team-mate — a roster of blanks, and a request the database refuses. The
+//  Tier column already works this way; ages follow it.
+// ══════════════════════════════════════════════════════════════════════════
+describe('Roster — ages', () => {
+  // 2015-03-04 against a fixed today is 11; the exact number matters less than
+  // that it is COMPUTED, so a change to the club's age rule moves it here too.
+  const BORN_2015 = [{ player_id: 'p-flanker', date_of_birth: '2015-03-04' }]
+
+  it('shows an age beside the name for a coach', async () => {
+    listPlayerPrivateMock.mockResolvedValue(BORN_2015)
+    useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
+    setup()
+
+    const row = (await screen.findAllByTestId('player-row')).find((node) =>
+      within(node).queryByText('Tom Fletcher'),
+    )
+    // The meta line reads "position · squad · gender · age". Asserting on the
+    // row's text rather than a testid keeps this about what a coach can READ.
+    await waitFor(() => expect(row.textContent).toMatch(/Flanker · U12 · \d+/))
+  })
+
+  it('shows no age for a player with no birthday on file', async () => {
+    listPlayerPrivateMock.mockResolvedValue([])
+    useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
+    setup()
+
+    const row = (await screen.findAllByTestId('player-row')).find((node) =>
+      within(node).queryByText('Tom Fletcher'),
+    )
+    // "Flanker · U12" and nothing after it — no trailing separator, no blank.
+    expect(row.textContent).not.toMatch(/U12 · \d/)
+  })
+
+  // ⚠️ THE CONTROL, AND IT ASSERTS THE ABSENCE OF A REQUEST rather than the
+  // absence of a number. A parent's read would be refused by RLS and the
+  // roster would look identical either way — so checking the screen alone
+  // would pass against a version that queried every child's birthday.
+  it('never reads birthdays at all for a parent', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    setup()
+
+    await screen.findAllByTestId('player-row')
+    expect(listPlayerPrivateMock).not.toHaveBeenCalled()
+  })
+
+  // The other half of the control: staff DO cause the read, so the assertion
+  // above is about the role rather than about the query never running.
+  it('does read them for a coach', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
+    setup()
+
+    await screen.findAllByTestId('player-row')
+    await waitFor(() => expect(listPlayerPrivateMock).toHaveBeenCalled())
   })
 })

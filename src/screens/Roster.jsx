@@ -14,7 +14,10 @@ import PlayerDetail from './PlayerDetail.jsx'
 import PlayerForm from './PlayerForm.jsx'
 import MyPlayerForm from './MyPlayerForm.jsx'
 import PlayerImport from './PlayerImport.jsx'
-import { listPlayers } from '../data/players.js'
+import { listPlayers, listPlayerPrivate } from '../data/players.js'
+// The club's own age function, so a number on the roster cannot drift from the
+// one that decides which squad a child belongs in.
+import { ageAt } from '../lib/ageGrade.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, isOwnPlayer, isSquadStaffRole, roleLabel, visibleTeams } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
@@ -107,7 +110,7 @@ function ChevronRightIcon(props) {
   )
 }
 
-function PlayerRow({ player, teamName, photoUrl, onSelect }) {
+function PlayerRow({ player, teamName, photoUrl, age = null, onSelect }) {
   return (
     <button
       type="button"
@@ -144,9 +147,16 @@ function PlayerRow({ player, teamName, photoUrl, onSelect }) {
             entirely when not recorded — which is most players. A third line
             reading "Not recorded" on two thirds of a 53-player squad is
             noise, and a blank one is worse. */}
+        {/* ⚠️ THE AGE IS APPENDED AND OMITTED WHEN UNKNOWN, exactly like gender
+            beside it — for the same reason its comment gives. Most children had
+            no birthday on file when this shipped, and "Age not set" on two
+            thirds of a squad is noise while a blank is worse. It also appears
+            only for staff: the screen does not read a birthday at all for a
+            parent, so this is never half-filled. */}
         <span className="mt-0.5 block text-[12.5px] text-ink-faint">
           {player.position || 'Position not set'} · {teamName}
           {genderLabel(player.gender) ? ` · ${genderLabel(player.gender)}` : ''}
+          {Number.isFinite(age) ? ` · ${age}` : ''}
         </span>
       </span>
 
@@ -155,7 +165,7 @@ function PlayerRow({ player, teamName, photoUrl, onSelect }) {
   )
 }
 
-function RosterGroup({ label, players, teamsById, photoUrls, onSelect }) {
+function RosterGroup({ label, players, teamsById, photoUrls, ageByPlayer, onSelect }) {
   return (
     <div className="mb-4 last:mb-0">
       <h3 className={`mb-2 flex items-center gap-2 text-[12.5px] font-extrabold uppercase tracking-[.5px] ${MUTED_ON_PAPER}`}>
@@ -174,6 +184,7 @@ function RosterGroup({ label, players, teamsById, photoUrls, onSelect }) {
             player={player}
             teamName={teamsById.get(player.team_id)?.name ?? 'No age group'}
             photoUrl={player.photo_path ? photoUrls?.[player.photo_path] : undefined}
+            age={ageByPlayer?.get(player.id) ?? null}
             onSelect={onSelect}
           />
         ))}
@@ -223,6 +234,9 @@ export default function Roster() {
   // call rather than per row: a 30-player squad would otherwise issue 30
   // sequential signing requests before the first face appeared.
   const [photoUrls, setPhotoUrls] = useState({})
+  // player id -> whole years old today, for the squads in view. Empty for
+  // anybody who is not staff — see the effect below.
+  const [ageByPlayer, setAgeByPlayer] = useState(() => new Map())
 
   // Sign every head shot in the loaded set in one call. Keyed on the joined
   // path list rather than on `players` so a re-render that produces an
@@ -245,6 +259,7 @@ export default function Roster() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoPathKey])
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
@@ -285,6 +300,56 @@ export default function Roster() {
   // private.can_edit_team). Asking the helper rather than testing the string
   // is what stops the next role needing an edit here.
   const canEditAnything = admin || memberships.some((membership) => isSquadStaffRole(membership.role))
+
+  // ⚠️ STAFF ONLY, AND THE READ IS NOT ISSUED AT ALL OTHERWISE — the same rule
+  // the Tier column follows below, for the same reason. RLS on `player_private`
+  // is squad staff OR the child's own family, so a parent would get null for
+  // every team-mate and a roster of blanks. Not issuing the query is better
+  // than issuing one that is refused: one fewer request, and "who may see a
+  // birthday" stays a single decision rather than two that could disagree.
+  //
+  // ⚠️ SCOPED TO THE PLAYERS IN VIEW, never club-wide. This is the VALUE read,
+  // not the presence read — listPlayerPrivatePresence's header warns against
+  // hoovering up birthdays to answer a question that only needed a count. Here
+  // the values are the answer, so the narrowing comes from the id list instead.
+  //
+  // ⚠️ DECLARED AFTER canEditAnything ON PURPOSE. It read it from above at
+  // first, which is a temporal dead zone error — the screen would have thrown
+  // on mount for everybody.
+  const agePlayerIds = canEditAnything ? players.map((row) => row.id) : []
+  const agePlayerKey = agePlayerIds.join(',')
+
+  useEffect(() => {
+    if (agePlayerIds.length === 0) {
+      setAgeByPlayer(new Map())
+      return undefined
+    }
+    let mounted = true
+    const today = new Date()
+    listPlayerPrivate(agePlayerIds)
+      .then((rows) => {
+        if (!mounted) return
+        setAgeByPlayer(
+          new Map(
+            (rows ?? [])
+              .map((row) => [row.player_id, ageAt(row.date_of_birth, today)])
+              // A row with no birthday, or an unparseable one, contributes
+              // nothing rather than an entry every row would have to test.
+              .filter(([, age]) => Number.isFinite(age)),
+          ),
+        )
+      })
+      // Swallowed: an age is decoration on a screen whose job is the roster. A
+      // failed read shows no ages, exactly like a squad with none recorded.
+      .catch(() => {
+        if (mounted) setAgeByPlayer(new Map())
+      })
+    return () => {
+      mounted = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the ids, not the
+    // rows: `players` is rebuilt on every render and would restart this forever.
+  }, [agePlayerKey])
 
   // ⚠️ COACH-ONLY, AND GATED HERE AS WELL AS BY RLS. The roster is a screen a
   // PARENT sees; RLS refuses player_grades to them, but a refusal that arrives
@@ -793,6 +858,7 @@ export default function Roster() {
             players={group.players}
             teamsById={teamsById}
             photoUrls={photoUrls}
+            ageByPlayer={ageByPlayer}
             onSelect={setSelectedPlayerId}
           />
         ))}

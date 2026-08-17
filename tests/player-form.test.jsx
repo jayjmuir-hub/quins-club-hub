@@ -24,6 +24,7 @@ const upsertContactMock = vi.fn()
 const getPlayerDobMock = vi.fn(() => Promise.resolve(null))
 const setPlayerDobMock = vi.fn()
 const updatePlayerDobMock = vi.fn(() => Promise.resolve({}))
+const listPlayerPrivateMock = vi.fn(() => Promise.resolve([]))
 
 const listParentsMock = vi.fn()
 const saveParentsMock = vi.fn()
@@ -74,6 +75,11 @@ vi.mock('../src/data/players.js', () => ({
   // recorded consent. See updatePlayerDob's header in src/data/players.js.
   setPlayerDob: (...args) => setPlayerDobMock(...args),
   updatePlayerDob: (...args) => updatePlayerDobMock(...args),
+  // ⚠️ THIS FILE ALSO RENDERS <Roster/> (the wiring blocks at the bottom), and
+  // the roster reads birthdays for staff since 17 Aug 2026 to show an age. An
+  // omitted export is undefined and throws from inside an effect — ten tests
+  // here failed at once with an error naming the MOCK, not the component.
+  listPlayerPrivate: (...args) => listPlayerPrivateMock(...args),
 }))
 
 // Imported after vi.mock so these bind to the mocked module.
@@ -187,6 +193,8 @@ beforeEach(() => {
   // is also what RLS returns to somebody who may not see one.
   getPlayerDobMock.mockResolvedValue(null)
   updatePlayerDobMock.mockResolvedValue({})
+  listPlayerPrivateMock.mockReset()
+  listPlayerPrivateMock.mockResolvedValue([])
 })
 
 // ══════════════════════════════════════════════════════════════════════════
