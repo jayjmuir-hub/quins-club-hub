@@ -45,6 +45,7 @@ const updateMembershipRoleMock = vi.fn()
 const deleteMembershipMock = vi.fn()
 const updateProfileNameMock = vi.fn()
 const listPlayersMock = vi.fn()
+const setPlayerDobMock = vi.fn()
 const listEventsMock = vi.fn()
 const subscribeEventsMock = vi.fn()
 const listAvailabilityMock = vi.fn()
@@ -85,6 +86,10 @@ vi.mock('../src/data/accessRequests.js', () => ({
 
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
+  // The date-of-birth write (16 Aug 2026). ⚠️ An unmocked export is `undefined`,
+  // and calling it mid-submit throws AFTER the child is already registered —
+  // which is precisely the failure the third case below exists to describe.
+  setPlayerDob: (...args) => setPlayerDobMock(...args),
 }))
 
 vi.mock('../src/data/events.js', () => ({
@@ -192,6 +197,7 @@ describe('Add your player — a signed-in account with no access', () => {
     // blank — so the client trimming too is what keeps the two in step.
     await user.type(screen.getByLabelText(/player's first name/i), '  Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor  ')
+    await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -243,6 +249,8 @@ describe('Add your player — a signed-in account with no access', () => {
       const user = userEvent.setup()
       renderShell()
 
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       // Seven of the club's eighteen squads need this. Asking the other
       // eleven's families anyway is how an optional question gets answered
@@ -253,6 +261,8 @@ describe('Add your player — a signed-in account with no access', () => {
     it('reveals the field as soon as a single-gender squad is chosen', async () => {
       const user = userEvent.setup()
       renderShell()
+
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
       expect(screen.getByRole('radio', { name: /^female$/i })).toBeInTheDocument()
@@ -267,6 +277,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Amara')
       await user.type(screen.getByLabelText(/player's family name/i), 'Bello')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -283,6 +294,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Amara')
       await user.type(screen.getByLabelText(/player's family name/i), 'Bello')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
       await user.click(screen.getByRole('radio', { name: /^female$/i }))
       await user.click(screen.getByRole('button', { name: /add my player/i }))
@@ -303,6 +315,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Sam')
       await user.type(screen.getByLabelText(/player's family name/i), 'Reid')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
       await user.click(screen.getByRole('radio', { name: /^male$/i }))
       await user.click(screen.getByRole('button', { name: /add my player/i }))
@@ -325,11 +338,14 @@ describe('Add your player — a signed-in account with no access', () => {
       const user = userEvent.setup()
       renderShell()
 
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
 
       expect(screen.queryByRole('radio', { name: /i'm the player/i })).not.toBeInTheDocument()
       // ⚠️ The negative above is only worth something if the control can be
       // found when it IS there. Same run, same query, the allowed squad.
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
       expect(screen.getByRole('radio', { name: /i'm the player/i })).toBeInTheDocument()
     })
@@ -337,6 +353,8 @@ describe('Add your player — a signed-in account with no access', () => {
     it('defaults to "my child", so a distracted parent cannot register themselves by accident', async () => {
       const user = userEvent.setup()
       renderShell()
+
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
 
@@ -348,6 +366,8 @@ describe('Add your player — a signed-in account with no access', () => {
       const user = userEvent.setup()
       registerMyPlayerMock.mockResolvedValue({ id: 'mm-9', status: 'pending' })
       renderShell()
+
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
       await user.click(screen.getByRole('radio', { name: /i'm the player/i }))
@@ -379,6 +399,8 @@ describe('Add your player — a signed-in account with no access', () => {
       const user = userEvent.setup()
       registerMyPlayerMock.mockResolvedValue({ id: 'mm-10', status: 'pending' })
       renderShell()
+
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
 
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
       await user.click(screen.getByRole('radio', { name: /i'm the player/i }))
@@ -417,12 +439,14 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player 1's first name|player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player 1's family name|player's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
 
       await user.click(screen.getByRole('button', { name: /add another child/i }))
 
       await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
       await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/player 2's date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
 
       await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
@@ -443,8 +467,11 @@ describe('Add your player — a signed-in account with no access', () => {
       const user = userEvent.setup()
       renderShell()
 
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add another child/i }))
+      await user.type(screen.getByLabelText(/player 2's date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16G.id)
 
       // Exactly one gender control on the page, and the explanation names the
@@ -459,10 +486,14 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add another child/i }))
       await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
       await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
+      // Filled: the date-of-birth guard runs first, and this case is about the
+      // age group naming the right ROW.
+      await user.type(screen.getByLabelText(/player 2's date of birth/i), '2015-06-01')
       // Row 2 has no age group.
       await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
 
@@ -491,10 +522,12 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add another child/i }))
       await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
       await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/player 2's date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
       await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
 
@@ -521,10 +554,12 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add another child/i }))
       await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
       await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/player 2's date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
       await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
 
@@ -562,10 +597,12 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add another child/i }))
       await user.type(screen.getByLabelText(/player 2's first name/i), 'Ada')
       await user.type(screen.getByLabelText(/player 2's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/player 2's date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/player 2's age group/i), TEAM_U16.id)
       await user.click(screen.getByRole('button', { name: /add these 2 players/i }))
 
@@ -682,6 +719,7 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.type(screen.getByLabelText(/your family name/i), 'Okafor')
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -703,6 +741,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(await screen.findByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -731,6 +770,7 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -751,6 +791,7 @@ describe('Add your player — a signed-in account with no access', () => {
       await user.type(await screen.findByLabelText(/your first name/i), 'Hannah')
       await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
       await screen.findByRole('alert')
@@ -784,6 +825,8 @@ describe('Add your player — a signed-in account with no access', () => {
     const user = userEvent.setup()
     renderShell()
 
+    await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -797,6 +840,9 @@ describe('Add your player — a signed-in account with no access', () => {
 
     await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+    // Filled, because the date-of-birth guard runs BEFORE the age-group one and
+    // this case is about the age group.
+    await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
     // ⚠️ THE WORDING NAMES THE CHILD SINCE 13 Aug 2026, and the change is not
@@ -825,6 +871,7 @@ describe('Add your player — a signed-in account with no access', () => {
 
     await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
       await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+    await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -1250,6 +1297,7 @@ async function submitOneChild(user, name, teamId) {
   const last = parts.length > 1 ? parts.pop() : ''
   await user.type(screen.getByLabelText(/player's first name/i), parts.join(' '))
   if (last) await user.type(screen.getByLabelText(/player's family name/i), last)
+  await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
   await user.selectOptions(screen.getByLabelText(/age group/i), teamId)
   await user.click(screen.getByRole('button', { name: /add my player/i }))
 }
@@ -1386,5 +1434,65 @@ describe('Add your player — the duplicate guards', () => {
     // A pending-cap refusal is not something a tick can forgive, and offering
     // one would imply it is.
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+})
+
+// ── DATE OF BIRTH ─────────────────────────────────────────────────────────
+//
+// ⚠️ WITHOUT THESE TWO THE FIELD WOULD BE UNTESTED WHILE THE SUITE WENT GREEN.
+// Adding the input meant filling it in ~30 existing cases; every one of those
+// passes whether the guard exists or not, and none of them looks at the write.
+// The same shape of gap the role gate had on the same day.
+describe('Add your player — the date of birth', () => {
+  it('refuses a blank one without spending a round trip', async () => {
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+    await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+    await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/date of birth/i)
+    expect(registerMyPlayerMock).not.toHaveBeenCalled()
+  })
+
+  // ⚠️ AGAINST THE PLAYER ID THE RPC RETURNED, and there is no other way to
+  // learn it: a pending parent cannot read `players` by name, so a lookup here
+  // would return nothing and the birthday would be written against undefined.
+  it('writes it against the player id the registration returned', async () => {
+    const user = userEvent.setup()
+    registerMyPlayerMock.mockResolvedValue({ id: 'mm-1', status: 'pending', player_id: 'p-42' })
+    setPlayerDobMock.mockResolvedValue({ player_id: 'p-42', date_of_birth: '2014-03-04' })
+    renderShell()
+
+    await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+    await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+    await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+    await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    await waitFor(() => expect(setPlayerDobMock).toHaveBeenCalledWith('p-42', '2014-03-04'))
+  })
+
+  // ⚠️ THE CHILD IS ALREADY REGISTERED WHEN THIS WRITE RUNS. Its transaction is
+  // committed and there is no delete path, so surfacing a failure here would
+  // tell a parent their child was not added when it was — and the obvious
+  // response is to submit again, which is how somebody reaches the five-pending
+  // limit without meaning to.
+  it('does not report a failed birthday as a failed registration', async () => {
+    const user = userEvent.setup()
+    registerMyPlayerMock.mockResolvedValue({ id: 'mm-1', status: 'pending', player_id: 'p-42' })
+    setPlayerDobMock.mockRejectedValue(new Error('network'))
+    renderShell()
+
+    await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+    await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+    await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+    await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    await waitFor(() => expect(setPlayerDobMock).toHaveBeenCalled())
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })

@@ -64,6 +64,7 @@ vi.mock('../src/data/players.js', () => ({
   getPlayerContact: async () => null,
   upsertContact: async () => ({}),
   setOwnPlayerGender: async () => ({}),
+  setPlayerDob: async () => ({}),
 }))
 
 vi.mock('../src/data/parents.js', () => ({
@@ -937,6 +938,7 @@ describe('More — adding another child', () => {
 
     await u.type(await screen.findByLabelText(/player's first name/i), 'Rory')
       await u.type(screen.getByLabelText(/player's family name/i), 'Muir')
+    await u.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
     await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
     await u.click(screen.getByRole('button', { name: /add this player/i }))
 
@@ -1039,6 +1041,7 @@ describe('More — the registrant’s own name', () => {
     await u.type(screen.getByLabelText(/your family name/i), 'Muir')
     await u.type(screen.getByLabelText(/player's first name/i), 'Rory')
       await u.type(screen.getByLabelText(/player's family name/i), 'Muir')
+    await u.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
     await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
     await u.click(screen.getByRole('button', { name: /add this player/i }))
 
@@ -1074,6 +1077,7 @@ describe('More — the registrant’s own name', () => {
 
     await u.type(await screen.findByLabelText(/player's first name/i), 'Rory')
       await u.type(screen.getByLabelText(/player's family name/i), 'Muir')
+    await u.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
     await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
     await u.click(screen.getByRole('button', { name: /add this player/i }))
 
@@ -1116,6 +1120,7 @@ describe('More — the registrant’s own name', () => {
     await u.type(screen.getByLabelText(/your family name/i), 'Muir')
     await u.type(screen.getByLabelText(/player's first name/i), 'Rory')
       await u.type(screen.getByLabelText(/player's family name/i), 'Muir')
+    await u.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
     await u.selectOptions(screen.getByLabelText(/age group/i), 'team-u10')
     await u.click(screen.getByRole('button', { name: /add this player/i }))
 

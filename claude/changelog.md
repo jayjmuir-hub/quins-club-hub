@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 16 Aug 2026
 
-- 🔒 **AN INVITE IS NOW WORTH ONLY WHAT THE PERSON SENDING IT COULD ALREADY
+- ✨ **REGISTRATION ASKS FOR A DATE OF BIRTH, AND IT IS REQUIRED.** The field that
+  makes `player_private` real — until this the table was correct and empty.
+  ⚠️ **A SECOND WRITE, NOT A WIDER RPC.** The player id comes off the membership
+  `register_my_player` returns; there is no other way to learn it, because a
+  pending parent cannot read `players` by name.
+  ⚠️ **A FAILED BIRTHDAY IS NOT A FAILED REGISTRATION.** The child exists the
+  moment the first call returns and there is no delete path, so a failure here is
+  swallowed rather than surfaced — telling a parent their child was not added
+  when it was invites a re-submit, which is how somebody reaches the five-pending
+  limit without meaning to.
+  ⚠️ **AND THE SUITE WOULD HAVE GONE GREEN WITH THE FIELD UNTESTED.** Adding the
+  input meant filling it in ~30 existing cases, every one of which passes whether
+  the guard exists or not. Three cases were written for the field itself; the
+  blank guard was fault-injected and fails exactly one of them.
+
+- `31b9ed5` — 🔒 **AN INVITE IS NOW WORTH ONLY WHAT THE PERSON SENDING IT COULD ALREADY
   APPROVE.** Schema for the Invite button on a parent row (Jay: *"if the father
   adds the mother for example"*).
   ⛔ **`accept_invite` DID NOT NAME `status` AT ALL** — measured on live, not read
