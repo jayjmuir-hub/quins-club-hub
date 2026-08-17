@@ -485,7 +485,107 @@ without the middle state two coaches invite the same person on the same evening.
 An invited parent skips sign-up entirely: every answer the roll-call would ask
 for is already on the row that invited them.
 
-## 5 · The roll-call replaces the fork
+## 5 · The roll-call replaces the fork — 🟡 DESIGNED AND UNBLOCKED, NOT BUILT
+
+**What was established before writing any of it, and it changes the shape:**
+
+⚠️ **THE GATE IS THE PROVIDER'S SNAPSHOT, NOT THE DATABASE — WHICH IS WHAT MAKES
+A MULTI-ANSWER SCREEN POSSIBLE AT ALL.** `AppShell` renders the zero-membership
+route while `memberships.length === 0`, and that array only changes when
+something calls `reload()`. `register_my_player` and `request_staff_role` both
+create rows without telling the provider. So a roll-call can write **several**
+answers and stay on screen throughout, provided it holds `reload()` back until
+the last one. Wire `onDone` straight to `reload` — as `AddYourPlayer` does today
+— and the screen vanishes the instant the first answer lands, taking every
+remaining question with it. **That is the trap, and it is silent.**
+
+✅ **A SQUAD PICKER WORKS FOR A STRANGER.** `team read` is
+`(SELECT auth.uid()) IS NOT NULL`, measured from `pg_policy` on 17 Aug. Three
+files said otherwise; see the correction in `AddYourPlayer.jsx`'s header.
+
+✅ **Three of the four answers already have a server-side home.** *Child* and
+*I play here myself* are `register_my_player` (one `PlayerRegistrationForm`
+covers both — it asks "who are you registering?" per row). *Coach, manager or
+medic* is `request_staff_role`, which a zero-membership caller may use: it needs
+a confirmed email and nothing else.
+
+### ✅ RESOLVED 17 Aug 2026 — Jay chose the role, and kept the squad
+
+Offered three options: add `volunteer` and keep the squad requirement; add it and
+relax the requirement; or drop the fourth box. **He chose the first.**
+`db/migrations/20260817_access_request_volunteer_role.sql`, applied and proved in
+a transaction that rolled back — `volunteer` accepted, an invented `chairman`
+still refused `23514`, which is the control proving the widened CHECK still
+checks.
+
+⚠️ **CLAIMABLE, NOT GRANTABLE, AND THE MIGRATION GUARDS BOTH DIRECTIONS.**
+`requested_role` is a statement; `memberships.role` is a grant and still refuses
+`volunteer`. The migration **aborts** if it ever reaches `memberships_role_check`.
+Do not finish that job: `can_see_team` and `can_edit_team` read that table, and a
+role granting nothing is a row each of them would have to learn to ignore.
+
+⚠️ **A VOLUNTEER'S SQUAD MEANS "WHO TO ASK ABOUT ME", NOT "WHAT I DO THERE".**
+That is the trade Jay took over relaxing a four-day-old policy, and relaxing it
+is the thing not to do quietly later. The wording under the picker changes for a
+volunteer; the field does not.
+
+**It is already reachable** — `RequestAccess` offers it today, so the fourth
+answer has a home before the roll-call that needs it exists.
+
+### ⛔ THE BLOCKER AS FOUND — kept because it is why the role exists
+
+`access_requests` is the only queue for somebody with no squad, and **it cannot
+hold this person**:
+
+```
+access_requests_requested_role_check
+  CHECK (requested_role IS NULL OR requested_role = ANY
+         (ARRAY['parent','player','coach','manager','medic']))
+```
+
+and the INSERT policy added on 16 Aug **requires both** a role and a squad. A
+committee member is none of those five and may belong to no squad at all. So
+today the only way to file one is to make them claim a role they do not hold —
+which is the "no idea who they are" bug, reintroduced by the screen built to
+kill it.
+
+⚠️ **DO NOT SETTLE THIS WHILE BUILDING A SCREEN.** Widening the CHECK is
+additive and small. **Relaxing the squad requirement is not**: that requirement
+is four days old, was added at Jay's explicit request, and is the reason an admin
+can now tell one waiting stranger from another.
+
+⚠️ **AND DO NOT SHIP THE ROLL-CALL WITH THIS ANSWER HALF-WIRED.** A tick that
+records nothing is worse than no tick: the whole argument for the screen is that
+*"leaving a box empty is a recorded claim, not an absence"*. A fourth box that
+quietly drops what it was told breaks the only promise the screen makes.
+
+### The build — everything worked out, none of it written
+
+One screen, ticks, then a section per ticked answer, then **one** `reload()` at
+the very end. Removes `askingForAccess` from `AppShell` and the *"I'm not adding
+a player"* button with it. Four things were established while designing it, and
+each of them is a trap if it is rediscovered the hard way:
+
+1. ⚠️ **`reload()` GOES LAST, ONCE.** See the note above — wiring it to the first
+   section's `onDone`, as `AddYourPlayer` does today, unmounts the screen and
+   silently discards every remaining answer.
+2. ⚠️ **THE NAME IS ASKED FIRST, BEFORE ANY WRITE.** `request_staff_role` creates
+   a pending membership that appears in a coach's approval queue rendered from
+   `profiles.full_name`, so a coach who never gave a name arrives as *"Unnamed
+   member"*. `PlayerRegistrationForm` already solves this for its own path — an
+   "About you" fieldset shown only when `name_confirmed_at` is null — and asking
+   once at the top of the roll-call makes that fieldset correctly disappear.
+   `RequestAccess` writes the name for the same reason. **Three paths, one
+   question, asked once.**
+3. **`RequestAccess` keeps owning everything about an access request** — the
+   form, *"Request sent"*, and *"Access not approved"*. The roll-call must not
+   grow its own copies of those three states; a person who asked yesterday and
+   signs in today has to meet them, not the ticks again.
+4. **One `PlayerRegistrationForm` covers both *I have a child here* and *I play
+   here myself*** — it already asks "who are you registering?" per row, gated on
+   `teams.self_registration_allowed`.
+
+## 5 · The roll-call — the original reasoning
 
 One screen, tick everything that applies, all of which can be true:
 

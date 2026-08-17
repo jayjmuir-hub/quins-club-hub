@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 🔒 **A VOLUNTEER CAN SAY SO, WITHOUT CLAIMING A ROLE THEY DO NOT HOLD.** Jay's
+  call from three options while item 5 of the account plan was being designed:
+  add `volunteer` to `access_requests`, and KEEP the squad requirement.
+  `access_requests` is the only queue for somebody with no squad and it could not
+  hold a committee member — the CHECK accepted exactly the five roles describing a
+  parent, a player or squad staff — so the only way to file one was to claim a
+  role that fits even worse than saying nothing.
+  ⚠️ **CLAIMABLE, NOT GRANTABLE.** `memberships.role` still refuses it, so an
+  admin approving one chooses what access they actually get. The migration guards
+  BOTH directions and aborts if `volunteer` ever reaches `memberships_role_check`
+  — `can_see_team` and `can_edit_team` read that table, and a role granting
+  nothing is a row each would have to learn to ignore.
+  ⚠️ **THE SQUAD REQUIREMENT IS UNTOUCHED** — four days old, added at Jay's
+  request, and the reason an admin can tell one waiting stranger from another. For
+  a volunteer it means "who to ask about me", so the wording changes and the field
+  does not.
+  Proved on production in a transaction that rolled back: `volunteer` accepted, an
+  invented `chairman` still refused `23514`.
+  ❌ **AND A THIRD COPY OF A ROTTED SENTENCE IS CORRECTED.** `AddYourPlayer`'s
+  header said `team read` is membership-scoped and its widening migration was
+  "written but NOT applied". Measured from `pg_policy`: it is
+  `auth.uid() IS NOT NULL`, applied 8 Aug. `RESTORE.md` has been right since
+  9 Aug; `RequestAccess`'s identical claim was corrected on 16 Aug, where
+  believing it had already cost a SECURITY DEFINER function written and dropped
+  the same hour.
+
 - ✨ **TWO NAME BOXES EVERYWHERE A PERSON IS NAMED, not just at sign-up.** Finishes
   the split that shipped its columns on 16 Aug: `PlayerForm`, `MyPlayerForm` and
   `ParentsEditor` all asked for one box, so a coach adding a player could still
