@@ -87,6 +87,44 @@ gh pr merge <n> --squash
 something is wrong. ⚠️ **`main` is the production branch, so a merge is a live
 release** — CLAUDE.md rule 3 still applies and Jay's explicit yes comes first.
 
+### ⚠️ Two ways opening a pull request fails that look like your mistake
+
+Both met on 17 Aug 2026 while opening #222, and neither is a bad command.
+
+1. **`gh pr create` and `gh pr merge` go through GitHub's GraphQL API, and GitHub
+   can 503 on WRITES while READS stay green.** For about fifteen minutes every
+   `gh pr list` and every `gh api …/pulls/<n>` answered normally while every
+   create returned *"No server is currently available to service your request"*.
+   **A read that works is not evidence that a write will.** The way through is the
+   REST endpoint, which is a different service:
+   `gh api repos/jayjmuir-hub/quins-club-hub/pulls --method POST --input pr.json`.
+   ⚠️ **`git push` IS UNAFFECTED** — that is the git protocol, not the API — so the
+   branch can be safely on the remote while no pull request can be opened for it.
+   Retry the create rather than rewriting it.
+2. **⚠️ NEVER BUILD THE BODY INSIDE A DOUBLE-QUOTED SHELL STRING.** Every
+   `` `word` `` in it is command substitution, so the shell RUNS the backticked
+   tokens and drops them: the comment closing #221 posted with three holes where
+   `571f70d`, `docs:check` and `main` had been, and had to be corrected with a
+   PATCH afterwards. Nothing warns you — the API accepts the mangled text happily.
+   **Every body in this repo is dense with backticks**, so this is the normal case
+   and not an edge one. Write it with a **quoted** heredoc and hand over a file:
+
+```bash
+cat > body.md <<'EOF'
+Body text with `backticks` and $dollars, taken literally.
+EOF
+python -c "import json;json.dump({'body':open('body.md',encoding='utf-8').read()},open('pr.json','w',encoding='utf-8'))"
+gh api repos/jayjmuir-hub/quins-club-hub/pulls --method POST --input pr.json --jq .html_url
+```
+
+⚠️ **`gh pr merge --delete-branch` PRINTS A `fatal:` AND STILL MERGES, IN A
+WORKTREE.** It reported ``failed to run git: fatal: 'main' is already used by
+worktree at 'C:/Users/jayjm/Quins Club Hub'`` — that is its attempt to check
+`main` out locally AFTER the merge, which another worktree already holds. The
+merge and the remote branch delete had both happened. **Check
+`gh api …/pulls/<n> --jq .merged` before treating it as a failure and retrying**,
+or the retry is what causes the real problem.
+
 **Do not rely on the Claude GitHub *connector*.** It returned `Bad credentials` across
 multiple sessions and is a different credential from the PC's git. The PC route above is
 the reliable one.
