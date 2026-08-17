@@ -10,7 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- ✨ **AND THE APPROVAL QUEUE SAYS WHAT A RECORD IS MISSING, AT THE MOMENT OF
+- 🔒 **"DO YOU KNOW THEM?" — THE ANSWER NOBODY COULD GIVE BEFORE.** Item 8, and
+  the largest safeguarding win left in the plan. The approval queue now takes two
+  answers from the people already being asked to approve somebody: **I know
+  them** / **I don't**.
+  ⚠️ **"I DON'T" IS THE VALUABLE ONE, AND IT REJECTS NOBODY.** It blocks no
+  approval and hides no row — the Approve button beside it is unchanged. What it
+  does is make an unrecognised adult asking to reach a children's squad visible
+  AS unrecognised, instead of identical to everyone else in the queue.
+  ⚠️ **ANSWERED IN THE APP, NEVER FROM AN EMAIL LINK.** The obvious build is two
+  links in the notification. A link acting on somebody's behalf without a session
+  needs a TOKEN, and a token in an email is a credential in an email — forwarded,
+  quoted in a reply, sitting in a mailbox somebody else opens. There is no cost to
+  requiring a session: the coach must sign in to approve anyway.
+  ⚠️ **THE WRITE POLICY PINS `voucher_id` TO `auth.uid()`.** Without it a coach
+  could attribute an opinion to a colleague — worse than no signal, for a signal
+  whose whole purpose is *who recognised them*. **Proved: refused.**
+  ⚠️ **AND A MEDIC IS OUTSIDE THE SET**, matching `invite_parent`: a medic cannot
+  approve, so a medic's opinion must not sit in the queue looking like one that
+  counts. Proved with a **created** medic fixture, since the club has none — a
+  found one would have been null and measured a stranger.
+  Changing your mind REPLACES rather than adds: one answer per person per
+  request, so a correction is not a second vote.
+  ⚠️ **AND NO STANDING "0 know them"** on a request nobody has looked at yet —
+  that reads as a verdict rather than the absence of one.
+
+- `06a39d2` — ✨ **AND THE APPROVAL QUEUE SAYS WHAT A RECORD IS MISSING, AT THE MOMENT OF
   APPROVAL.** The second of the completeness rule's three surfaces. This is the
   one place a coach is already looking at a record and deciding about it — a gap
   named here gets fixed, where the same gap on a list nobody opens does not.

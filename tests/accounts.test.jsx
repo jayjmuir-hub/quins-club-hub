@@ -17,6 +17,8 @@ const grantMembershipsMock = vi.fn()
 const listPlayersMock = vi.fn()
 const listPlayerPrivateMock = vi.fn()
 const listParentsForPlayersMock = vi.fn()
+const listVouchesMock = vi.fn()
+const setVouchMock = vi.fn()
 const listAccessRequestsMock = vi.fn()
 const dismissAccessRequestMock = vi.fn()
 const restoreAccessRequestMock = vi.fn()
@@ -62,6 +64,24 @@ vi.mock('../src/data/players.js', () => ({
 // parent rows alongside player_private, in ONE Promise.all — so an unmocked
 // export here does not fail loudly, it REJECTS the pair and silently clears BOTH
 // chips, including the play-up one that has nothing to do with parents.
+vi.mock('../src/data/vouches.js', () => ({
+  listVouches: (...args) => listVouchesMock(...args),
+  setVouch: (...args) => setVouchMock(...args),
+  // ⚠️ NOT MOCKED AWAY: tallyVouches is a pure function and the screen's counts
+  // are only as right as it is. Stubbing it would test the mock's arithmetic.
+  tallyVouches: (rows, voucherId) => {
+    const byMembership = new Map()
+    for (const row of rows ?? []) {
+      const t = byMembership.get(row.membership_id) ?? { known: 0, unknown: 0, mine: null }
+      if (row.answer === 'known') t.known += 1
+      if (row.answer === 'unknown') t.unknown += 1
+      if (voucherId && row.voucher_id === voucherId) t.mine = row.answer
+      byMembership.set(row.membership_id, t)
+    }
+    return byMembership
+  },
+}))
+
 vi.mock('../src/data/parents.js', () => ({
   listParentsForPlayers: (...args) => listParentsForPlayersMock(...args),
 }))
@@ -253,6 +273,8 @@ beforeEach(() => {
   // that showed it everywhere would make its absence the thing to assert.
   listPlayerPrivateMock.mockResolvedValue([])
   listParentsForPlayersMock.mockResolvedValue([])
+  listVouchesMock.mockResolvedValue([])
+  setVouchMock.mockResolvedValue({ membership_id: 'mem-pending', answer: 'unknown' })
   // Default: nobody has asked and nobody has been dismissed, so the waiting
   // list behaves exactly as it did before this feature existed.
   listAccessRequestsMock.mockResolvedValue([])
@@ -1873,6 +1895,8 @@ describe('Accounts — a waiting person carries what they asked for', () => {
     // No birthday row at all, and no parent rows.
     listPlayerPrivateMock.mockResolvedValue([])
     listParentsForPlayersMock.mockResolvedValue([])
+  listVouchesMock.mockResolvedValue([])
+  setVouchMock.mockResolvedValue({ membership_id: 'mem-pending', answer: 'unknown' })
     setup()
 
     const row = await screen.findByTestId('pending-membership')
@@ -1947,6 +1971,97 @@ describe('Accounts — a waiting person carries what they asked for', () => {
 
     const row = await screen.findByTestId('pending-membership')
     expect(await within(row).findByTestId('missing-details')).toHaveTextContent(/boys’ or girls’/i)
+  })
+
+  // ── "Do you know them?" — item 8, 17 Aug 2026 ─────────────────────────
+  //
+  // ⚠️ "I DON'T" IS THE VALUABLE ANSWER AND THE ONE NOBODY COULD GIVE BEFORE.
+  // It rejects nobody and blocks nothing — it makes an unrecognised adult
+  // asking to reach a children's squad visible AS unrecognised, instead of
+  // identical to everyone else in the queue.
+  it('offers both answers, and neither of them is a rejection', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    expect(within(row).getByRole('button', { name: /i know them/i })).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: /i don’t/i })).toBeInTheDocument()
+    // ⚠️ THE WORDING MATTERS AS MUCH AS THE BUTTON. Nothing here may read as a
+    // refusal — the Approve button is the only verdict on this card.
+    expect(within(row).queryByRole('button', { name: /reject|deny|refuse/i })).toBeNull()
+  })
+
+  it('records the answer against the signed-in person', async () => {
+    const user = userEvent.setup()
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    await user.click(within(row).getByRole('button', { name: /i don’t/i }))
+
+    await waitFor(() => expect(setVouchMock).toHaveBeenCalled())
+    expect(setVouchMock.mock.calls[0][0]).toMatchObject({
+      membershipId: 'mem-pending',
+      voucherId: SELF_ID,
+      answer: 'unknown',
+    })
+  })
+
+  // ⚠️ IT MUST NOT BLOCK APPROVAL. The whole design is that this is information,
+  // not a gate — the refusal is a human's to make with the button beside it.
+  it('leaves Approve working whatever the answer', async () => {
+    const user = userEvent.setup()
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    await user.click(within(row).getByRole('button', { name: /i don’t/i }))
+    await waitFor(() => expect(setVouchMock).toHaveBeenCalled())
+
+    expect(within(row).getByRole('button', { name: /approve/i })).toBeEnabled()
+  })
+
+  it('shows the caller’s own answer as pressed', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    listVouchesMock.mockResolvedValue([
+      { membership_id: 'mem-pending', voucher_id: SELF_ID, answer: 'known', at: '2026-08-17T09:00:00Z' },
+    ])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    await waitFor(() =>
+      expect(within(row).getByRole('button', { name: /i know them/i })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      ),
+    )
+  })
+
+  // ⚠️ NO STANDING "0 KNOW THEM" ON A FRESH REQUEST. A tally on a person nobody
+  // has looked at yet reads as a verdict rather than an absence of one.
+  it('says nothing at all until somebody has answered', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    listVouchesMock.mockResolvedValue([])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    await within(row).findByRole('button', { name: /i know them/i })
+    expect(within(row).queryByTestId('vouch-tally')).toBeNull()
+  })
+
+  it('counts what the squad has said', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    listVouchesMock.mockResolvedValue([
+      { membership_id: 'mem-pending', voucher_id: 'coach-a', answer: 'known' },
+      { membership_id: 'mem-pending', voucher_id: 'coach-b', answer: 'unknown' },
+      { membership_id: 'mem-pending', voucher_id: 'coach-c', answer: 'unknown' },
+    ])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    const tally = await within(row).findByTestId('vouch-tally')
+    expect(tally).toHaveTextContent('1 know them')
+    expect(tally).toHaveTextContent('2 don’t')
   })
 
   // ⚠️ AND IT ASKS ONLY ABOUT THE ROWS IN THE QUEUE. player_private holds

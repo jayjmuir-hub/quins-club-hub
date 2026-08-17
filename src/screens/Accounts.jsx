@@ -25,6 +25,7 @@ import {
 import { listPlayerPrivate, listPlayers } from '../data/players.js'
 import { listParentsForPlayers } from '../data/parents.js'
 import { missingForPlayer } from '../lib/completeness.js'
+import { listVouches, setVouch, tallyVouches } from '../data/vouches.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canApproveAnything, isAdmin, isSuperAdmin } from '../lib/scope.js'
@@ -78,6 +79,14 @@ const ROLE_OPTIONS = [
 // one still chooses what access they actually get. Only the entries that ROLE_OPTIONS
 // cannot label belong here — everything else falls through to it, so the two
 // cannot drift into disagreeing about "Coach".
+// ⚠️ THE WORDING IS THE FEATURE. "I don't" is not "reject" and must never read
+// as one — it says a name means nothing to this coach, which is information
+// rather than a verdict. Nobody is refused by answering it.
+const VOUCH_ANSWERS = [
+  { value: 'known', label: 'I know them' },
+  { value: 'unknown', label: 'I don’t' },
+]
+
 const CLAIMED_ROLE_LABELS = {
   volunteer: 'Committee or volunteer',
 }
@@ -259,6 +268,8 @@ function PendingApprovals({
   onApprove,
   playsUpByPlayer = new Set(),
   gapsByPlayer = new Map(),
+  vouchesByMembership = new Map(),
+  onVouch = () => {},
 }) {
   return (
     <section data-testid="pending-approvals" className="mb-5">
@@ -293,6 +304,7 @@ function PendingApprovals({
           const registered = formatJoined(member.created_at)
           const playsUp = member.player_id ? playsUpByPlayer.has(member.player_id) : false
           const gaps = (member.player_id ? gapsByPlayer.get(member.player_id) : null) ?? []
+          const vouch = vouchesByMembership.get(member.id) ?? { known: 0, unknown: 0, mine: null }
 
           return (
             <Card
@@ -362,6 +374,50 @@ function PendingApprovals({
                     Still missing: {gaps.map((gap) => gap.label).join(', ')}
                   </span>
                 )}
+
+                {/* ⚠️ "Do you know them?" — item 8, and the SECOND answer is the
+                    one that did not exist before. It rejects nobody and blocks
+                    nothing: the Approve button beside it is unchanged. What it
+                    does is let a coach say a name means nothing to them, so an
+                    unrecognised adult asking to reach a children's squad stops
+                    looking identical to everyone else in the queue.
+
+                    ⚠️ ANSWERED HERE RATHER THAN FROM THE EMAIL, and that is a
+                    safeguarding decision rather than a convenience one — a
+                    one-click email link needs a token, and a token in an email
+                    is a credential in an email. The coach has to sign in to
+                    approve anyway. See db/migrations/20260817_membership_vouches.sql. */}
+                <span data-testid="vouch" className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className={`text-[12.5px] ${MUTED_ON_PAPER}`}>Do you know them?</span>
+                  {VOUCH_ANSWERS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={vouch.mine === option.value}
+                      disabled={Boolean(state.saving)}
+                      onClick={() => onVouch(member, option.value)}
+                      className={[
+                        'rounded-[6px] border px-2 py-0.5 text-[12px] font-bold transition',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                        vouch.mine === option.value
+                          ? 'border-brand bg-brand text-white'
+                          : 'border-line bg-surface-card text-ink hover:border-brand',
+                      ].join(' ')}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                  {/* ⚠️ THE COUNT IS SHOWN ONLY WHEN SOMEBODY HAS ANSWERED. A
+                      standing "0 know them" on every fresh request would read as
+                      a verdict on a person nobody has looked at yet. */}
+                  {vouch.known + vouch.unknown > 0 && (
+                    <span data-testid="vouch-tally" className={`text-[12px] ${MUTED_ON_PAPER}`}>
+                      {vouch.known > 0 && `${vouch.known} know them`}
+                      {vouch.known > 0 && vouch.unknown > 0 && ' · '}
+                      {vouch.unknown > 0 && `${vouch.unknown} don’t`}
+                    </span>
+                  )}
+                </span>
                 <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
                   Added by {personName}
                   {/* Only when the name slot is holding an actual name \u2014
@@ -510,6 +566,10 @@ export default function Accounts() {
   // persona they are previewing would never see.
   const viewerIsSuper = isSuperAdmin(memberships)
   const { user } = useAuth()
+  // The signed-in person's own id, for the vouch buttons: mine on each tally
+  // is what makes a pressed button show as pressed, and a control that does not
+  // show its own state reads as one that did not save.
+  const selfId = user?.id ?? null
   const admin = isAdmin(memberships)
   // ⚠️ TWO GATES NOW, AND THEY ARE NOT THE SAME QUESTION.
   //   admin    — the whole screen: the member list, roles, squads, invites,
@@ -706,6 +766,9 @@ export default function Accounts() {
   // shared rule in src/lib/completeness.js. The SECOND of that rule's three
   // surfaces (item 6); the family's own card is the first.
   const [gapsByPlayer, setGapsByPlayer] = useState(() => new Map())
+  // membership id -> { known, unknown, mine }. Item 8: who recognises the person
+  // in the queue. See src/data/vouches.js.
+  const [vouchesByMembership, setVouchesByMembership] = useState(() => new Map())
 
   useEffect(() => {
     if (pendingPlayerIds.length === 0) {
@@ -781,6 +844,64 @@ export default function Accounts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the ids,
     // like the memo above; `pendingMembers` is rebuilt every render.
   }, [pendingPlayerIds])
+
+  // ⚠️ KEYED ON THE MEMBERSHIP IDS, NOT THE PLAYER IDS, and it is a SEPARATE
+  // effect from the one above. A pending STAFF claim has no player at all — and
+  // that is precisely the request vouching matters most for, a stranger saying
+  // they coach. Folding this into the effect above would silently skip every one
+  // of them, because that effect returns early when there are no player ids.
+  const pendingMembershipIds = useMemo(
+    () => pendingMembers.map((member) => member.id).filter(Boolean),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the ids, not the rows.
+    [pendingMembers.map((member) => member.id).filter(Boolean).sort().join(',')],
+  )
+
+  const loadVouches = useCallback(() => {
+    if (pendingMembershipIds.length === 0) {
+      setVouchesByMembership(new Map())
+      return Promise.resolve()
+    }
+    return listVouches(pendingMembershipIds)
+      .then((rows) => setVouchesByMembership(tallyVouches(rows, selfId)))
+      // Swallowed: the buttons still work and the Approve button is untouched.
+      // A failed read of an advisory tally must not take the queue down.
+      .catch(() => setVouchesByMembership(new Map()))
+  }, [pendingMembershipIds, selfId])
+
+  useEffect(() => {
+    let active = true
+    loadVouches().finally(() => {
+      if (!active) setVouchesByMembership((current) => current)
+    })
+    return () => {
+      active = false
+    }
+  }, [loadVouches])
+
+  /**
+   * ⚠️ RE-READS RATHER THAN PATCHING STATE LOCALLY. The tally shown is the
+   * WHOLE squad's answers, not just this coach's, so guessing the new counts
+   * here would drift from what anybody else has said in the meantime — and this
+   * is a safeguarding signal, where a number that is confidently wrong is worse
+   * than one that is a second late.
+   */
+  async function handleVouch(member, answer) {
+    if (!selfId) return
+    try {
+      await setVouch({
+        membershipId: member.id,
+        voucherId: selfId,
+        clubId: member.club_id,
+        teamId: member.team_id ?? null,
+        answer,
+      })
+      await loadVouches()
+    } catch {
+      // Deliberately silent, like the reads above: the answer is advisory, the
+      // Approve button is not, and an error banner over the queue would make an
+      // optional question look like a broken one.
+    }
+  }
 
   const groups = groupByProfile(activeMembers)
 
@@ -1305,6 +1426,8 @@ export default function Accounts() {
             onApprove={approve}
             playsUpByPlayer={playsUpByPlayer}
             gapsByPlayer={gapsByPlayer}
+            vouchesByMembership={vouchesByMembership}
+            onVouch={handleVouch}
           />
         )}
       </section>
@@ -1368,6 +1491,8 @@ export default function Accounts() {
           onApprove={approve}
           playsUpByPlayer={playsUpByPlayer}
           gapsByPlayer={gapsByPlayer}
+          vouchesByMembership={vouchesByMembership}
+          onVouch={handleVouch}
         />
       )}
 

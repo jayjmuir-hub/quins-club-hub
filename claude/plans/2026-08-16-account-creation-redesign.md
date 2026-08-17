@@ -1,8 +1,7 @@
 # Plan — account creation, rebuilt around who a person actually is
 
 **STATUS: IN PROGRESS, opened 16 Aug 2026. Items 1, 2, 4, 4b, 5 and 7 have
-SHIPPED; 3 is all but its last piece; 6 has its rule and two of three surfaces;
-8 is not started.** Each ships on its own and none blocks the next, so this can
+SHIPPED; 3 is all but its last piece; 6 has its rule and two of three surfaces.** Each ships on its own and none blocks the next, so this can
 stop after any of them. **Update this line as items land** — a plan that says IN PROGRESS after it shipped is the failure
 mode `docs:check` rule 5 exists to catch.
 
@@ -76,7 +75,7 @@ select count(*) from public.players pl
 | 5 | The roll-call replaces the fork | medium | ✅ 17 Aug |
 | 6 | Completeness debt | medium | 🟡 the rule + 2 of 3 surfaces |
 | 7 | Link adults to accounts | medium | ✅ 17 Aug |
-| 8 | Vouching, from the club's side | large | not started |
+| 8 | Vouching, from the club's side | large | ✅ 17 Aug |
 
 Items 1–4 close holes that are open on a live club today. 5 stops the hole being
 re-created. 6–8 are the durable shape.
@@ -938,7 +937,50 @@ enumeration oracle.
 It is also what gives item 4's button its **Joined** state, and what stops the
 same human existing as three unlinked records.
 
-## 8 · Vouching, from the club's side
+## 8 · Vouching, from the club's side — ✅ BUILT, 17 Aug 2026
+
+`public.membership_vouches` plus two buttons on each pending row: **I know them**
+/ **I don't**.
+
+⚠️ **ANSWERED IN THE APP, NOT FROM THE EMAIL — AND THAT IS A SAFEGUARDING
+DECISION RATHER THAN A CONVENIENCE ONE.** The plan says *"give that notification
+two answers"*, and the obvious build is two links. A link that acts on somebody's
+behalf without a session needs a **token**, and a token in an email is a
+credential in an email: forwarded, quoted in a reply, or in a mailbox somebody
+else opens. `invites.token` is exactly that, which is why `notify-invite` has one
+recipient and no bcc. A vouch is a signal about a named adult reaching children —
+the last thing to make actionable by anybody holding a URL. **And there is no
+cost**: the coach must sign in to approve anyway, and the email already links to
+`/approvals`.
+
+⚠️ **IT REJECTS NOBODY.** The Approve button beside it is untouched, and nothing
+in `src/data/vouches.js` should ever grow a way to turn an answer into a refusal.
+The refusal is a human's to make, on the same screen.
+
+### Verified on production, rolled back
+
+Against a real pending **staff claim** — a stranger saying they coach, which is
+the case this exists for.
+
+| | |
+|---|---|
+| a coach who can approve | wrote 1 row |
+| changing their mind | answer replaced, **still 1 row** |
+| **vouching as another coach** | **refused** |
+| a real medic on that squad | `can_approve = false`, reads **0** |
+| a stranger | reads 0 |
+| control, no RLS | 1 |
+
+⚠️ **THE MEDIC IS A CREATED FIXTURE, NOT A FOUND ONE.** The club has none, and a
+found one would have been null — measuring a stranger while looking like it
+measured a medic, exactly as the first `membership_audit` read probe did.
+
+| Fault | Test that failed |
+|---|---|
+| show the tally on a request nobody has answered | *says nothing at all until somebody has answered* |
+| send somebody else's id as the voucher | *records the answer against the signed-in person* |
+
+## 8 · The original reasoning
 
 ⚠️ **A "WHO AT THE CLUB KNOWS YOU?" DROPDOWN WAS DESIGNED AND KILLED. Do not
 rebuild it.** A person with no membership reads exactly one row — their own
