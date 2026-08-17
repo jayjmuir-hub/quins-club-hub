@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- 🔒 **A CHANGE LOG FOR CHANGES TO RIGHTS.** Jay: *"we need a change log for
+- `044399c` — 🔒 **A CHANGE LOG FOR CHANGES TO RIGHTS.** Jay: *"we need a change log for
   changes to rights"*. `public.membership_audit`, append-only, recording who
   granted, changed or revoked whose access and when. `memberships` held the
   current state and no history, so "who made this person an admin" has been
