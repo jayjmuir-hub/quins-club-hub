@@ -464,6 +464,160 @@ function PendingApprovals({
 }
 
 /**
+ * Staff asking for access — a SEPARATE queue from the players one above.
+ *
+ * ⚠️ WHY THIS EXISTS, 17 Aug 2026. `request_staff_role` (16 Aug) created a
+ * second kind of pending membership: a coach/manager/medic row with NO
+ * player_id. The players queue splits on `status` alone, so a staff request
+ * fell straight into it and rendered as "Unnamed player" — a person asking for
+ * access to a children's squad, shown as a child, under a heading promising the
+ * approver they were admitting a player. Jay saw one on the live site.
+ *
+ * ⚠️ THE LABEL WAS THE SYMPTOM. The same day it turned out
+ * private.can_approve_team had no `status = 'active'` test, so the person in
+ * that card could have approved themselves. That is fixed in
+ * 20260817_approve_requires_active_membership. This component is the other
+ * half: making the decision legible to whoever is taking it.
+ *
+ * ⚠️ THIS SPLIT PARTITIONS, IT DOES NOT FILTER — and the distinction matters
+ * because the comment on PendingApprovals forbids the other thing. Every
+ * pending row still renders; `player_id` decides only WHICH section it lands
+ * in. No row can go missing by being neither, and none can be hidden from a
+ * coach the database chose to show them.
+ *
+ * ⚠️ THE ROLE IS NAMED ON THE BUTTON, not only in the text. Approving here
+ * grants access to a squad's children — their names, their contact details —
+ * and the old card said "Approve" beside a person it called a player.
+ */
+function PendingStaffRequests({
+  members,
+  teamsById,
+  rowState,
+  onApprove,
+  vouchesByMembership = new Map(),
+  onVouch = () => {},
+}) {
+  return (
+    <section data-testid="pending-staff" className="mb-5">
+      <h3 className="text-[16px] font-extrabold tracking-[-0.2px] text-ink">
+        Staff asking for access
+      </h3>
+      <p className={`mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
+        These people have asked to help with a squad. They are not players and no
+        child is attached. Approving gives them a coach’s view of that age group —
+        the roster, and every family’s contact details — so approve someone you
+        know, or ask another coach below.
+      </p>
+
+      <div className="mt-2.5 flex flex-col gap-3">
+        {members.map((member) => {
+          const state = rowState[member.id] ?? {}
+          // Same fallback ladder as the players queue: a row can legitimately be
+          // nameless for a few minutes, because the membership is what puts them
+          // here and NamePrompt cannot run until they have one.
+          const personEmail = member.profiles?.email?.trim() || null
+          const realName = member.profiles?.full_name?.trim() || null
+          const personName = realName || personEmail || 'someone who has not given their name'
+          const roleLabel =
+            ROLE_OPTIONS.find((option) => option.value === member.role)?.label ?? member.role
+          const teamName = member.team_id
+            ? teamsById.get(member.team_id)?.name ?? member.teams?.name ?? null
+            : null
+          const asking = teamName ? `${roleLabel} · ${teamName}` : roleLabel
+          const registered = formatJoined(member.created_at)
+          const vouch = vouchesByMembership.get(member.id) ?? { known: 0, unknown: 0, mine: null }
+
+          return (
+            <Card
+              key={member.id}
+              data-testid="pending-staff-request"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[14px] py-3"
+            >
+              <span
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-surface-mute text-[12px] font-extrabold tracking-[.5px] text-ink-muted"
+                aria-hidden="true"
+              >
+                {initials(personName)}
+              </span>
+
+              <div className="min-w-0">
+                {/* THE PERSON leads here, not a child — the opposite of the
+                    players queue, and for the same reason: the decision is
+                    about whoever is named first. */}
+                <span className="block text-[15px] font-bold text-ink">{personName}</span>
+                <span data-testid="staff-asking" className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
+                  Asking to be {asking}
+                </span>
+
+                <span data-testid="vouch" className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className={`text-[12.5px] ${MUTED_ON_PAPER}`}>Do you know them?</span>
+                  {VOUCH_ANSWERS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={vouch.mine === option.value}
+                      disabled={Boolean(state.saving)}
+                      onClick={() => onVouch(member, option.value)}
+                      className={[
+                        'rounded-[6px] border px-2 py-0.5 text-[12px] font-bold transition',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                        vouch.mine === option.value
+                          ? 'border-brand bg-brand text-white'
+                          : 'border-line bg-surface-card text-ink hover:border-brand',
+                      ].join(' ')}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                  {vouch.known + vouch.unknown > 0 && (
+                    <span data-testid="vouch-tally" className={`text-[12px] ${MUTED_ON_PAPER}`}>
+                      {vouch.known > 0 && `${vouch.known} know them`}
+                      {vouch.known > 0 && vouch.unknown > 0 && ' · '}
+                      {vouch.unknown > 0 && `${vouch.unknown} don’t`}
+                    </span>
+                  )}
+                </span>
+
+                {(personEmail || registered) && (
+                  <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
+                    {realName && personEmail ? personEmail : ''}
+                    {realName && personEmail && registered ? ' · ' : ''}
+                    {registered ? `asked ${registered}` : ''}
+                  </span>
+                )}
+              </div>
+
+              <span className="flex-1" />
+
+              {/* ⚠️ THE ROLE AND THE SQUAD ARE IN THE ACCESSIBLE NAME. A button
+                  reading only "Approve" is what let a staff request look like a
+                  child's registration in the first place. */}
+              <Button
+                size="sm"
+                aria-label={`Approve ${personName} as ${asking}`}
+                disabled={Boolean(state.saving)}
+                onClick={() => onApprove(member)}
+              >
+                {state.saving ? 'Approving…' : `Approve as ${roleLabel}`}
+              </Button>
+
+              {state.error && (
+                <span
+                  role="alert"
+                  className="basis-full text-[12.5px] font-semibold text-brand-deep"
+                >
+                  {state.error}
+                </span>
+              )}
+            </Card>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+/**
  * Name and phone for ONE person, as an admin sees them.
  *
  * ⚠️ EMAIL IS RENDERED AND NOT EDITABLE, and that is a database fact rather
@@ -748,6 +902,20 @@ export default function Accounts() {
   // real access rather than being quietly hidden from the main list.
   const activeMembers = members.filter((member) => member.status !== 'pending')
   const pendingMembers = members.filter((member) => member.status === 'pending')
+
+  // ⚠️ A PARTITION, NOT A FILTER — 17 Aug 2026, and the difference is the whole
+  // reason this is allowed to exist next to the "no client-side filter" rule
+  // above. Every pending row goes into exactly one of these two, so nothing can
+  // be hidden from an approver the database chose to show. `player_id` is the
+  // discriminator because it is the thing that actually differs:
+  // register_my_player attaches a child, request_staff_role leaves it null.
+  //
+  // ⚠️ NOT `role`, WHICH WOULD BE THE OBVIOUS CHOICE AND IS WRONG. A parent row
+  // and a staff row can both name a squad, and 'parent' is also what somebody
+  // registering a second child holds — the question is "is there a child on this
+  // row", and player_id answers it directly instead of by inference.
+  const pendingPlayerMembers = pendingMembers.filter((member) => member.player_id)
+  const pendingStaffMembers = pendingMembers.filter((member) => !member.player_id)
 
   // ⚠️ SCOPED TO THE PENDING ROWS, NOT THE WHOLE ROSTER, AND THAT IS A
   // SAFEGUARDING CHOICE RATHER THAN AN OPTIMISATION. player_private holds
@@ -1418,9 +1586,25 @@ export default function Accounts() {
             database, and a second filter here would be a place for the two to
             disagree. If this list ever shows a squad they do not coach, the
             policy is wrong and that is what needs fixing. */}
-        {!isFirstLoad && !error && pendingMembers.length > 0 && (
+        {/* ⚠️ STAFF FIRST, AND DELIBERATELY. It is the rarer queue and the more
+            consequential one — approving here hands an adult a squad of
+            children's contact details — so it must not sit below a long list of
+            registrations. It renders only when non-empty, so on an ordinary day
+            the players queue is still the first thing on the screen. */}
+        {!isFirstLoad && !error && pendingStaffMembers.length > 0 && (
+          <PendingStaffRequests
+            members={pendingStaffMembers}
+            teamsById={teamsById}
+            rowState={rowState}
+            onApprove={approve}
+            vouchesByMembership={vouchesByMembership}
+            onVouch={handleVouch}
+          />
+        )}
+
+        {!isFirstLoad && !error && pendingPlayerMembers.length > 0 && (
           <PendingApprovals
-            members={pendingMembers}
+            members={pendingPlayerMembers}
             teamsById={teamsById}
             rowState={rowState}
             onApprove={approve}
@@ -1483,9 +1667,25 @@ export default function Accounts() {
           always render because their empty state carries a fact an admin needs
           ("anyone who signs up will appear here"); this one would only be
           telling them that the thing that has not happened has not happened. */}
-      {!isFirstLoad && !error && pendingMembers.length > 0 && (
+      {/* ⚠️ THE SECOND OF TWO RENDER SITES, AND THE EASY ONE TO MISS. The
+          approver-only early return above renders the same pair of queues; this
+          is the admin view. A change made to one and not the other is exactly
+          how the staff request ended up in the players queue in the first
+          place, one layer up. Change both. */}
+      {!isFirstLoad && !error && pendingStaffMembers.length > 0 && (
+        <PendingStaffRequests
+          members={pendingStaffMembers}
+          teamsById={teamsById}
+          rowState={rowState}
+          onApprove={approve}
+          vouchesByMembership={vouchesByMembership}
+          onVouch={handleVouch}
+        />
+      )}
+
+      {!isFirstLoad && !error && pendingPlayerMembers.length > 0 && (
         <PendingApprovals
-          members={pendingMembers}
+          members={pendingPlayerMembers}
           teamsById={teamsById}
           rowState={rowState}
           onApprove={approve}

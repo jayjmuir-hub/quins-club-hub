@@ -2199,3 +2199,113 @@ describe('Accounts — a waiting person carries what they asked for', () => {
     expect(within(screen.getByTestId('pending-approvals')).getByText('Omar Haddad')).toBeInTheDocument()
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════
+//  STAFF ASKING FOR ACCESS — a separate queue, 17 Aug 2026
+//
+//  ⚠️ THE BUG THIS REPLACES WAS LIVE AND JAY SAW IT. `request_staff_role`
+//  (16 Aug) inserts a coach membership with NO player_id. The players queue
+//  splits on `status` alone, so the request landed there and rendered as
+//  "Unnamed player" — an adult asking to reach a children's squad, shown as a
+//  child, under a heading telling the approver they were admitting a player.
+//
+//  ⚠️ THE FIXTURES BELOW DIFFER BY ONE FIELD — player_id — BECAUSE THAT IS THE
+//  ONLY THING THAT DISTINGUISHES THEM ON THE ROW. Same status, same squad. A
+//  split that keyed on `role` instead would still get these two right and would
+//  be wrong about a parent registering a second child.
+// ══════════════════════════════════════════════════════════════════════════
+describe('Accounts — staff asking for access', () => {
+  const STAFF_REQUEST = {
+    id: 'mem-staff-req',
+    profile_id: 'profile-newcoach',
+    role: 'coach',
+    status: 'pending',
+    team_id: 'team-u10',
+    player_id: null, // the whole difference
+    created_at: '2026-08-17T10:41:00Z',
+    profiles: { full_name: 'Marek Osgoode', email: 'marek@example.invalid' },
+    teams: { name: 'U10' },
+  }
+
+  const PLAYER_REQUEST = {
+    id: 'mem-player-req',
+    profile_id: 'profile-newparent',
+    role: 'parent',
+    status: 'pending',
+    team_id: 'team-u10',
+    player_id: 'player-rory',
+    created_at: '2026-08-17T08:00:00Z',
+    profiles: { full_name: 'Priya Aldenbrook', email: 'priya@example.invalid' },
+    teams: { name: 'U10' },
+    players: { full_name: 'Rory Aldenbrook', gender: 'male' },
+  }
+
+  it('puts a staff request in its own section, never the players queue', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, STAFF_REQUEST])
+    setup()
+
+    const staff = await screen.findByTestId('pending-staff')
+    expect(within(staff).getByText('Marek Osgoode')).toBeInTheDocument()
+    // The players queue must not render at all for a staff-only backlog.
+    expect(screen.queryByTestId('pending-approvals')).toBeNull()
+  })
+
+  // ⚠️ THE ORIGINAL SYMPTOM, PINNED. If this string comes back, the partition
+  // has been undone.
+  it('never calls a staff request an unnamed player', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, STAFF_REQUEST])
+    setup()
+
+    await screen.findByTestId('pending-staff')
+    expect(screen.queryByText(/unnamed player/i)).toBeNull()
+  })
+
+  it('says which role and squad is being granted', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, STAFF_REQUEST])
+    setup()
+
+    const staff = await screen.findByTestId('pending-staff')
+    expect(within(staff).getByTestId('staff-asking')).toHaveTextContent(/Coach/)
+    expect(within(staff).getByTestId('staff-asking')).toHaveTextContent(/U10/)
+  })
+
+  // ⚠️ THE ROLE IS IN THE BUTTON'S ACCESSIBLE NAME, not only in body text. A
+  // button reading "Approve" beside a card headed "Players waiting to be
+  // approved" is exactly how this got mistaken for a child's registration.
+  it('names the role on the approve button itself', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, STAFF_REQUEST])
+    setup()
+
+    const staff = await screen.findByTestId('pending-staff')
+    expect(
+      within(staff).getByRole('button', { name: /approve marek osgoode as coach/i }),
+    ).toBeInTheDocument()
+  })
+
+  // ⚠️ THE CONTROL, AND IT IS NOT PADDING. Without it, a "fix" that routed
+  // EVERY pending row into the staff section would pass every test above while
+  // breaking the queue the club actually uses each day.
+  it('still sends a real player registration to the players queue', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PLAYER_REQUEST])
+    setup()
+
+    const queue = await screen.findByTestId('pending-approvals')
+    expect(within(queue).getByText('Rory Aldenbrook')).toBeInTheDocument()
+    expect(screen.queryByTestId('pending-staff')).toBeNull()
+  })
+
+  // Both at once: the partition must lose neither, which is the property that
+  // makes this a split rather than the client-side filter PendingApprovals'
+  // header forbids.
+  it('shows both queues when both kinds are waiting, and drops nothing', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, STAFF_REQUEST, PLAYER_REQUEST])
+    setup()
+
+    const staff = await screen.findByTestId('pending-staff')
+    const queue = await screen.findByTestId('pending-approvals')
+    expect(within(staff).getByText('Marek Osgoode')).toBeInTheDocument()
+    expect(within(queue).getByText('Rory Aldenbrook')).toBeInTheDocument()
+    expect(screen.getAllByTestId('pending-staff-request')).toHaveLength(1)
+    expect(screen.getAllByTestId('pending-membership')).toHaveLength(1)
+  })
+})

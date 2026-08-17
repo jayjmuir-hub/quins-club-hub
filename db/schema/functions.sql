@@ -1336,6 +1336,23 @@ GRANT EXECUTE ON FUNCTION private.is_attached_to_team(uuid) TO anon;  -- inert f
 --
 -- The migration's own guard asserts can_approve_team(null) is false, so a
 -- membership row with no team_id is not approvable by anybody.
+--
+-- ⚠️ `and m.status = 'active'` ADDED 17 Aug 2026 by
+-- 20260817_approve_requires_active_membership, AND ITS ABSENCE WAS A LIVE HOLE
+-- rather than an untidiness. Until then this function asked only about role and
+-- team, so once public.request_staff_role (20260816) made a PENDING staff row
+-- possible, asking to coach a squad satisfied this gate for that squad —
+-- approving your own request, and admitting other families' children.
+--
+-- ⚠️ IT REACHED FURTHER THAN THE BUTTON. private.can_squad_staff_see_pending
+-- below calls this function, and backs the policy letting an approver read a
+-- pending registrant's NAME and EMAIL. Measured after the fix: a pending coach
+-- sees 0 such profiles where an active coach of the same squad sees them.
+--
+-- ⚠️ private.is_admin STILL HAS THE SAME OMISSION, deliberately — it is
+-- unreachable today (nothing can create a non-active admin row) and it backs
+-- most of the admin RLS surface. claude/open-items.md carries the reasoning and
+-- the re-measurement it depends on.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.can_approve_team(_team uuid)
  RETURNS boolean
@@ -1345,6 +1362,7 @@ CREATE OR REPLACE FUNCTION private.can_approve_team(_team uuid)
 AS $function$
   select exists (select 1 from memberships m
     where m.profile_id = auth.uid()
+      and m.status = 'active'
       and ((m.role = 'admin' and m.club_id = (select club_id from teams where id = _team))
            or (m.role in ('coach','manager') and m.team_id = _team)));
 $function$
