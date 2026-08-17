@@ -8,9 +8,35 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 17 Aug 2026
+
+- ✨ **THE INVITE BUTTON ON A PARENT ROW.** The other half of the schema that shipped
+  in `31b9ed5`: a contact row is the club's knowledge of an adult written in the
+  wrong table, and this turns it into an offer of an account. Lives in
+  `ParentsEditor`, so it appears for a coach editing a squad's player and for a
+  parent editing their own child in the same change — that pair IS
+  `can_edit_team OR is_own_player`, which is why the component holds **no role
+  check of its own**.
+  ⚠️ **THE TRAP IT CLOSES IS NOT THE ONE THE SCHEMA CLOSED.** `invite_parent`
+  reads the address off the ROW, deliberately — an address as a parameter would
+  turn "invite this row" into "invite anyone, attached to this row's child". In a
+  form that makes a half-edited row dangerous: correct the address, press Invite
+  before Save, and the OLD address gets the account while the screen shows the
+  new one. Editor rows now carry `savedEmail` beside `email` and the button
+  withdraws while they differ. ⚠️ **`savedEmail` IS NOT A DUPLICATE — deleting it
+  as one re-opens exactly that.**
+  ⚠️ **IT SHOWS A LINK, NOT A SENT EMAIL.** Nothing in this app posts invite mail
+  (`InviteForm` has always worked this way), so a button saying "invitation sent"
+  would be the only screen promising a mail nobody posted. Jay asked for the
+  email; it is written up as item 4b of the plan and needs a Vault secret only he
+  can set.
+  ⚠️ **AND WHAT IT SAYS AFTERWARDS IS READ OFF THE RETURNED ROW, NEVER GUESSED
+  FROM THE PRESSER'S ROLE** — the two disagree for a medic. Pending says it goes
+  to the approval queue; active says there is nothing left to queue.
+
 ## 16 Aug 2026
 
-- ✨ **REGISTRATION ASKS FOR A DATE OF BIRTH, AND IT IS REQUIRED.** The field that
+- `a50f746` — ✨ **REGISTRATION ASKS FOR A DATE OF BIRTH, AND IT IS REQUIRED.** The field that
   makes `player_private` real — until this the table was correct and empty.
   ⚠️ **A SECOND WRITE, NOT A WIDER RPC.** The player id comes off the membership
   `register_my_player` returns; there is no other way to learn it, because a

@@ -88,6 +88,16 @@ the component takes `className` and `style` — pass them instead of wrapping.
 ⚠️ **jsdom CANNOT SEE IT**, because it computes no CSS, so the guard is structural:
 `tests/dashboard.test.jsx` asserts each row's `parentElement` IS the list card.
 
+⚠️ **`ParentsEditor` ROWS CARRY BOTH `email` AND `savedEmail`, AND DELETING THE SECOND AS A
+DUPLICATE RE-OPENS A REAL HOLE.** `email` is bound to an input and is whatever is being
+typed; `savedEmail` is what the database holds (`toEditorRows`, `src/lib/parentRows.js`).
+`public.invite_parent` reads the address **off the row, server-side** — it takes a row id
+and nothing else, deliberately — so pressing Invite on an edited-but-unsaved row would
+email the OLD address while the screen showed the new one, with nothing looking wrong.
+`InviteParentButton` compares the two and withdraws itself while they differ. The
+comparison is case- and whitespace-insensitive, because the server lowercases and trims
+before it looks anything up.
+
 **`PhoneInput` takes `country` + `national` + `onCountryChange` + `onNationalChange`** —
 not `value`/`onChange`. Phones are stored E.164 and split for editing with
 `splitPhone`/`joinPhone` (`src/lib/phone.js`). Formatting is deliberately NOT applied

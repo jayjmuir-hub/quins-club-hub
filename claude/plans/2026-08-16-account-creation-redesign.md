@@ -66,6 +66,7 @@ select count(*) from public.players pl
 | 2 | Split every name into first and family | small |
 | 3 | Date of birth, in its own table | medium |
 | 4 | Invite from a parent row | medium |
+| 4b | …and the email that actually posts it | medium, **blocked on Jay** |
 | 5 | The roll-call replaces the fork | medium |
 | 6 | Completeness debt | medium |
 | 7 | Link adults to accounts | medium |
@@ -265,10 +266,80 @@ Two things follow in the same change:
   refuses a blank and permits a contradiction. A wrong-looking date is usually a
   typo and occasionally a genuine dispensation.
 
-## 4 · Invite from a parent row — 🟡 SCHEMA DONE, NO BUTTON YET
+## 4 · Invite from a parent row — ✅ BUILT, 17 Aug 2026
 
 An adult on `player_parents` is the club's knowledge of a person written in the
 wrong table. Put an **Invite** button on the row.
+
+**Done, 17 Aug 2026:** `src/components/InviteParentButton.jsx`, rendered by
+`ParentsEditor` — so it appears on **both** surfaces at once, `PlayerForm` (a
+coach, manager, medic or admin) and `MyPlayerForm` (a parent editing their own
+child). That pair IS `can_edit_team OR is_own_player`, so there is **no role
+check in the component**: a second rule up there would be free to disagree with
+the one in the database, and the wrong one would be the one nobody tested.
+
+⚠️ **THE TRAP THE COMPONENT EXISTS TO CLOSE, AND IT IS NOT THE ONE THE SCHEMA
+CLOSED.** `invite_parent` reads the address off the ROW. Inside a form, that
+makes a half-edited row dangerous: correct the address, press Invite before
+Save, and the **old** address gets the account while the screen shows the new
+one. So the editor row carries `savedEmail` beside `email` and the button
+withdraws while they differ, saying why. Case and whitespace are ignored, since
+the server lowercases and trims.
+
+⚠️ **IT SHOWS A LINK, NOT A SENT EMAIL — AND THAT IS THE HONEST STATE OF THIS
+APP.** No edge function posts invite mail; `InviteForm` has always shown the
+accept link for a human to send. A button claiming "invitation sent" would be
+the only screen in the app promising a mail nobody posted. **Jay asked for an
+email** ("*click to send that person an email invitation*"), so the send is a
+real remaining piece and is written up as item 4b below.
+
+**States built: Invite → Invited \<when\> → (Joined awaits item 7).** `Joined`
+cannot be computed today: it needs `player_parents.profile_id`, because a client
+may not read `profiles` for anybody but itself. The refusal covers the gap in the
+meantime — inviting somebody who already has an account is refused with 42710 and
+the sentence says to ask an admin to connect them.
+
+### Four injected faults, each caught by exactly one test
+
+`tests/invite-parent.test.jsx`. ⚠️ **Only the Supabase CLIENT is mocked**, not
+`src/data/parents.js` — mocking one layer lower is what lets a test read the
+actual RPC arguments and assert that **no email address is ever sent to the
+server**. Mocking the data module would have proved only that the component
+called a function.
+
+| Fault | Test that failed |
+|---|---|
+| treat an edited address as saved | *withdraws the button while the typed address differs* |
+| pass the email as a second RPC argument | *asks the server for the ROW, and never sends the address* |
+| hard-code the "goes to the approval queue" sentence | *says an invite it can grant needs nothing further* |
+| pass any `error.message` through to the screen | *does not read out an error the function did not write* |
+
+### Verified against production, read-only, 17 Aug 2026
+
+`player_parents.invited_at` exists and `authenticated` holds SELECT on **all 12**
+of the table's columns — which is what makes `listParents`' `select('*')` safe
+after the migration, and is the same table-level-versus-column-level question
+that item 2 had to answer. `invite_parent` exists with EXECUTE for
+`authenticated` and **not** `anon`, so the 16 Aug ACL trap did not recur.
+
+## 4b · The invite email — NOT BUILT, and blocked on a hand step
+
+Pressing Invite creates the invite; a human still sends the link. To make it a
+real email, the proven shape is already in this repo twice over: an AFTER INSERT
+trigger on `invites` calling a `notify-invite` edge function through `pg_net`,
+exactly as `db/migrations/20260809_notify_pending_membership.sql` calls
+`notify-approval`. Read that migration's header before writing it — the three
+prerequisites, the fail-closed shared secret and the "it must never fail the
+write" ordering all apply unchanged.
+
+⚠️ **IT NEEDS TWO VAULT SECRETS AND ONE DASHBOARD ENV VAR, WHICH IS JAY'S HAND
+STEP** — there is no MCP tool for Edge Function secrets. Until it is done the
+function answers 503 and no mail is sent, which is the intended failure.
+
+⚠️ **AND THE RECIPIENT IS AN ADULT WHO HAS NOT ASKED FOR ANYTHING**, unlike every
+existing notification, which goes to volunteers who signed up. That is a
+different consent question and it is Jay's, not a detail to settle while
+building.
 
 **Who sees it: exactly who can already edit the row.** `parent edit own`
 (`is_own_player`) and `parent edit` (`can_edit_team` — coach, manager, medic on
