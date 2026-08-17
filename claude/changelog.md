@@ -10,7 +10,44 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- 🔒 **A CHANGE LOG FOR CHANGES TO RIGHTS.** Jay: *"we need a change log for
+- ✨ **AND THE APPROVAL QUEUE SAYS WHAT A RECORD IS MISSING, AT THE MOMENT OF
+  APPROVAL.** The second of the completeness rule's three surfaces. This is the
+  one place a coach is already looking at a record and deciding about it — a gap
+  named here gets fixed, where the same gap on a list nobody opens does not.
+  ⚠️ **IT DOES NOT BLOCK APPROVAL**, and must not: a missing birthday is a record
+  to chase, not a reason to leave a real family waiting.
+  ⛔ **AND THE FIRST VERSION BROKE THE RULE IT WAS BUILT ON.** The queue's embed
+  was `players(full_name)`, so `gender` was UNDEFINED — not absent — and every
+  pending player in a single-gender squad was reported as missing one.
+  completeness.js's whole principle is that an **unknown is not a gap**; the
+  wiring has to supply the field for that to hold. The embed now carries it.
+  ⚠️ **AND REMOVING IT AGAIN FAILED NOTHING IN THE SCREEN'S OWN TESTS**, because
+  they mock `listClubMembers` and hand the component a `players` object they
+  wrote themselves — the mock encoding the assumption instead of the contract,
+  the same trap as the array-versus-map bug in `YourPlayers`. The assertion that
+  catches it lives at the data layer, on the select string.
+
+- ✨ **THE CLUB ASKS FOR WHAT IT IS MISSING, ONCE, AND THEN STOPS.** Item 6 — the
+  half of Jay's original complaint still open: *"i can't have people signing up
+  without complete information"*. One shared rule (`src/lib/completeness.js`) and
+  the first of its three surfaces: a card on the family's own screen.
+  ⚠️ **IT DISAPPEARS WHEN THERE IS NOTHING LEFT TO ASK, AND THAT IS THE WHOLE
+  CONTRACT.** A chase with no visible end is ignored by about the third sign-in,
+  and once ignored it trains people to skip the one place the club asks them for
+  something.
+  ⚠️ **SO THE LIST IS SHORT, AND THE MEASUREMENT DECIDED IT RATHER THAN THE OTHER
+  WAY ROUND.** A thing qualifies only if the reader can fix it themselves AND it
+  is exceptional. **Position is excluded and must stay excluded** — it is a
+  coach's judgement, not a parent's, and at **23 of 26 players** it is the normal
+  state of a youth club. Listing it would put a card on almost every screen,
+  permanently: the exact failure this design exists to avoid.
+  ⚠️ **AN UNKNOWN IS NOT A GAP.** `undefined` means "we did not look" — a parent
+  reading a team-mate gets null from RLS, and treating that as "no birthday on
+  file" would nag somebody about a child that is not theirs.
+  **Still to wire: the approval-queue chip and the admin list.** The rule is
+  shared and ready for both.
+
+- `044399c` — 🔒 **A CHANGE LOG FOR CHANGES TO RIGHTS.** Jay: *"we need a change log for
   changes to rights"*. `public.membership_audit`, append-only, recording who
   granted, changed or revoked whose access and when. `memberships` held the
   current state and no history, so "who made this person an admin" has been

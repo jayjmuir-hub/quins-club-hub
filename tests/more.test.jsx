@@ -20,6 +20,7 @@ const updateMyProfileMock = vi.fn()
 const listPlayersMock = vi.fn()
 const listContactsForPlayersMock = vi.fn()
 const listParentsForPlayersMock = vi.fn()
+const listPlayerPrivateMock = vi.fn()
 const registerMyPlayerMock = vi.fn()
 const updateProfileNamesMock = vi.fn()
 
@@ -61,6 +62,8 @@ vi.mock('../src/data/members.js', () => ({
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
   listContactsForPlayers: (...a) => listContactsForPlayersMock(...a),
+  // The completeness card on YourPlayers reads this (17 Aug 2026).
+  listPlayerPrivate: (...a) => listPlayerPrivateMock(...a),
   getPlayerContact: async () => null,
   upsertContact: async () => ({}),
   setOwnPlayerGender: async () => ({}),
@@ -132,6 +135,7 @@ beforeEach(() => {
   listPlayersMock.mockResolvedValue([])
   listContactsForPlayersMock.mockResolvedValue([])
   listParentsForPlayersMock.mockResolvedValue([])
+  listPlayerPrivateMock.mockResolvedValue([])
   // The profile row the You card fills itself in from. `phone` has been on
   // this row since 8 Aug 2026; null is the normal case — nobody has one yet.
   getMyProfileMock.mockResolvedValue({
@@ -198,6 +202,68 @@ describe('More — your players', () => {
     const card = await screen.findByTestId('your-player')
     expect(within(card).getByText('Tom Muir')).toBeInTheDocument()
     expect(within(card).getByText(/U10 · Flanker/)).toBeInTheDocument()
+  })
+
+  /* ══════════════════════════════════════════════════════════════════════
+     The completeness card — item 6, 17 Aug 2026
+     ══════════════════════════════════════════════════════════════════════
+
+     Jay: "i can't have people signing up without complete information".
+
+     ⚠️ THE ASSERTION THAT MATTERS IS THE ABSENCE ONE. The card DISAPPEARS when
+     nothing is missing — that is the whole contract, and the reason it works
+     where a permanent banner does not. A chase with no visible end is ignored by
+     about the third sign-in, and once ignored it trains people to skip the one
+     place the club asks them for something. The rules themselves are unit-tested
+     in tests/completeness.test.js; these cover the wiring. */
+  it('asks for what is missing, naming the child', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    listPlayersMock.mockResolvedValue([PLAYER])
+    // No birthday on file, and no parent row.
+    listParentsForPlayersMock.mockResolvedValue([])
+  listPlayerPrivateMock.mockResolvedValue([])
+
+    renderMore()
+
+    const card = await screen.findByTestId('completeness-card')
+    // ⚠️ NAMED, so a parent of three knows which child each line is about — and
+    // asserted on the line itself rather than on "Tom appears somewhere in the
+    // card", which every line would satisfy.
+    expect(within(card).getByText(/Tom Muir’s date of birth/i)).toBeInTheDocument()
+    expect(within(card).getByText(/parent or carer’s phone number for Tom Muir/i)).toBeInTheDocument()
+    // The adult's own gap is in the same list — one card, not one per subject.
+    expect(within(card).getByText(/your phone number/i)).toBeInTheDocument()
+  })
+
+  // ⚠️ THE CONTRACT. Everything on file -> the card is not rendered at all.
+  //
+  // ⚠️ AND THE ADULT'S OWN PHONE HAS TO BE FILLED IN TOO, which is what the
+  // first version of this test forgot: the card correctly stayed on screen for
+  // the parent's missing number while every child detail was complete. One
+  // family, one list — a card that vanished while something was still missing
+  // would be the worse bug.
+  it('disappears once there is nothing left to ask for', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    getMyProfileMock.mockResolvedValue({
+      id: 'user-1',
+      first_name: 'Jay',
+      last_name: 'Muir',
+      email: 'jay@example.com',
+      phone: '+971501234567',
+      name_confirmed_at: '2026-08-01T00:00:00Z',
+    })
+    listPlayersMock.mockResolvedValue([PLAYER])
+    listParentsForPlayersMock.mockResolvedValue([
+      { id: 'pp-1', player_id: 'p1', full_name: 'Jay Muir', relationship: 'Father' },
+    ])
+    listPlayerPrivateMock.mockResolvedValue([
+      { player_id: 'p1', date_of_birth: '2015-03-04', plays_up_confirmed_at: null },
+    ])
+
+    renderMore()
+
+    await screen.findByTestId('your-player')
+    expect(screen.queryByTestId('completeness-card')).toBeNull()
   })
 
   it('shows the contact and parent rows the club holds', async () => {

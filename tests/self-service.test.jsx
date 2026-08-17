@@ -32,7 +32,9 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
-  listContactsForPlayers: (...a) => listContactsForPlayersMock(...a),
+  listContactsForPlayers: (...a) => listContactsForPlayersMock(...a),
+  // The completeness card on YourPlayers reads this (17 Aug 2026).
+  listPlayerPrivate: async () => [],
   getPlayerContact: (...a) => getPlayerContactMock(...a),
   upsertContact: (...a) => upsertContactMock(...a),
   deletePlayer: (...a) => deletePlayerMock(...a),
