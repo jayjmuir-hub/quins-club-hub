@@ -1,7 +1,8 @@
 # Plan — account creation, rebuilt around who a person actually is
 
-**STATUS: IN PROGRESS, opened 16 Aug 2026. Items 1, 2, 4 and 5 have SHIPPED; 3 is
-half-shipped; 4b is blocked on Jay; 6–8 are not started.** Each ships on its own
+**STATUS: IN PROGRESS, opened 16 Aug 2026. Items 1, 2, 4, 4b, 5 and 7 have
+SHIPPED; 3 is all but its last piece; 6 and 8 are not started.** Each ships on its
+own
 and none blocks the next, so this can stop after any of them. **Update this line
 as items land** — a plan that says IN PROGRESS after it shipped is the failure
 mode `docs:check` rule 5 exists to catch.
@@ -75,16 +76,16 @@ select count(*) from public.players pl
 | 4b | …and the email that actually posts it | medium | ✅ 17 Aug — one real send outstanding |
 | 5 | The roll-call replaces the fork | medium | ✅ 17 Aug |
 | 6 | Completeness debt | medium | not started |
-| 7 | Link adults to accounts | medium | not started |
+| 7 | Link adults to accounts | medium | ✅ 17 Aug |
 | 8 | Vouching, from the club's side | large | not started |
 
 Items 1–4 close holes that are open on a live club today. 5 stops the hole being
 re-created. 6–8 are the durable shape.
 
-⚠️ **WHAT IS LEFT OF 3 IS THE `allowsOwnContact` RE-POINT, AND IT IS NOW BLOCKED
-RATHER THAN MERELY DEFERRED.** It needs the date the club counts age groups
-from — see the item. Without it the re-point would take the own-contact field
-away from most of a U13 squad.
+⚠️ **WHAT IS LEFT OF 3 IS THE `allowsOwnContact` RE-POINT, AND IT IS NO LONGER
+BLOCKED** — the cut-off turned out to be recorded in the tournament repo (31
+August, UAERF). It is ordinary work now, with a safeguarding rule inside it: a
+DOB may only ever make that gate **stricter**.
 
 ---
 
@@ -829,7 +830,45 @@ approval queue's chip, a card on the person's own home screen, and an admin
 contract and the reason it works where a permanent banner does not. A chase with
 no visible end is ignored by about the third sign-in.
 
-## 7 · Link adults to accounts
+## 7 · Link adults to accounts — ✅ BUILT, 17 Aug 2026
+
+`player_parents.profile_id`, filled by `public.link_my_parent_rows()` when
+somebody signs in with no access, and the Invite button's third state:
+**Invite → Invited → Joined**.
+
+⚠️ **THE PLAN SAID "`claim_roster_access` GENERALISED FROM CHILDREN TO ADULTS".
+THAT WOULD HAVE OPENED A HOLE, AND THE FUNCTION DELIBERATELY IS NOT THAT.**
+`claim_roster_access` matches an email and **creates a membership**. Safe where
+it is: the address lives on `player_contacts`, the child's own contact details,
+which **only staff can write**. `player_parents.email` is an address a **parent**
+can type, for their own child, under `parent edit own`. A claim granting access
+on that basis would mean: type an address into the contacts box, sign in as it,
+hold a membership on that squad — which is exactly what `invite_parent` exists to
+prevent, and why that function routes the same journey through an invite whose
+`grant_status` is `'active'` only if the sender could already approve.
+
+**So this sets one column and creates nothing.** The migration carries a guard
+that ABORTS if the function body ever mentions `memberships`. ⚠️ **If a future
+change makes it insert one, it re-opens the hole item 4 closed.**
+
+### Proved on production, rolled back, with the case that matters last
+
+| | |
+|---|---|
+| linked, case-insensitively, across two children | **2** |
+| a second call | **0** — an already-linked row is never re-stamped |
+| a row already claimed by another account | untouched |
+| **memberships before → after** | **48 → 48 — IT GRANTS NOTHING** |
+
+⚠️ **THAT LAST ROW IS THE ONE TO KEEP.** The other three would all pass for a
+function that also handed out access.
+
+⚠️ **AND THE LINKING CALL HAS ITS OWN `try`/`catch`**, separate from the claim
+beside it in `memberships.jsx`. A failure here must not cost somebody the claim
+that actually gets them into the app; the two are unrelated, and folding them
+together would let a tidiness win break a route in.
+
+## 7 · The original reasoning
 
 `player_parents.profile_id`, nullable, plus a claim on sign-in for an email that
 matches — `claim_roster_access` generalised from children to adults. Safe for the

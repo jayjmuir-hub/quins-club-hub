@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ✨ **AN ADULT IS LINKED TO THEIR ACCOUNT, AND THE INVITE BUTTON GAINS ITS THIRD
+  STATE.** `player_parents.profile_id`, filled by `link_my_parent_rows()` on
+  sign-in. Invite → Invited → **Joined**; until now the button could not tell an
+  adult who had accepted from one who never opened the email, because a client
+  may not read `profiles` for anybody but itself.
+  ⚠️ **THE PLAN SAID "`claim_roster_access` GENERALISED TO ADULTS". THAT WOULD
+  HAVE OPENED A HOLE.** That function matches an email and CREATES A MEMBERSHIP —
+  safe where it is, because `player_contacts.email` is written only by staff.
+  `player_parents.email` is an address a PARENT can type for their own child, so
+  the same trick would mean: type an address into the contacts box, sign in as
+  it, hold a membership on that squad. Precisely what `invite_parent` exists to
+  prevent. **So this sets one column and creates nothing**, and its migration
+  ABORTS if the function body ever mentions `memberships`.
+  ⚠️ **PROVED BY THE ROW THAT MATTERS: memberships 48 → 48.** The other checks —
+  2 rows linked case-insensitively, a second call linking 0, another account's
+  claim untouched — would all pass for a function that also handed out access.
+
 - ✉️ **THE INVITE EMAIL IS LIVE.** `notify-invite`, fired by an AFTER INSERT
   trigger on `invites`. Jay's calls: the sender is NAMED, and it fires for EVERY
   invite — the admin form no longer makes anybody copy a link out by hand.
