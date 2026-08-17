@@ -347,7 +347,47 @@ rows** there is no data to infer it from.
 column ever lands, `allowsOwnContact` is the one place to re-point", which is now
 a sentence pointing at a trap.
 
-### 🟡 PLAYING UP — the model shipped, the notification did not
+### ✅ PLAYING UP — model and notification both shipped, 17 Aug 2026
+
+`player_private.plays_up_confirmed_at`, written on the same call as the birthday,
+and a **Playing up** chip on the approval queue.
+
+⚠️ **THE CHIP IS THE NOTIFICATION, AND THAT IS THE DESIGN RATHER THAN THE CHEAP
+OPTION.** The person who has to ACT is the coach reading that queue; an email is
+only a prompt to come and look at exactly that card. It also costs no Vault
+secret, no edge-function deploy, and — see below — no third copy of the age
+model. **If an email is wanted later it reads the column**; the work is item 4b's
+shape, not a new derivation.
+
+⚠️ **THE COLUMN IS A DECISION, NOT A DERIVED FACT.** The birthday and the squad
+say a play-up is POSSIBLE; the column says a parent **ticked the box**. Deriving
+it at read time would show "playing up" for a family who never agreed to
+anything.
+
+⚠️ **AND THE TICK ALONE IS NOT THE ANSWER EITHER.** A parent can tick, then
+change the squad or the date to one that is no longer a play-up — the tick
+survives in React state. The check is re-run at submit, so a consent is only
+recorded while it is still true.
+
+⚠️ **THE QUEUE ASKS ONLY ABOUT ITS OWN ROWS.** `player_private` holds children's
+birthdays; reading it for the whole roster to label a handful of pending cards
+would pull the club's birthday list into an admin's browser. RLS would permit
+that, which is why the narrowing is deliberate — and asserted by a test.
+
+| Fault | Test that failed |
+|---|---|
+| trust the tick without re-checking the dates | *does not record a consent the dates no longer justify* |
+| show the chip for any private row | *says nothing for a child with a birthday but no confirmation* |
+| widen the read to the whole roster | *asks only about the players in the queue* |
+
+⚠️ **AND THE LIVE RLS PROBE REPORTED A HOLE THAT WAS NOT ONE, FIRST TIME.** Its
+"a different parent in the same squad" fixture also held a **coach** role there,
+which legitimately grants `can_edit_team`. In this club a lot of parents are
+coaches. Re-run excluding anyone with a staff role anywhere: own parent **1**,
+team-mate's parent **0**, stranger **0**, control **1**. **A fixture picked by
+role name is not a fixture picked by rights.**
+
+### 🟡 WHY IT IS NOT AN EMAIL — the trap in the obvious route
 
 Jay, 17 Aug: *"we need the ability for players to play up one age group with a
 notification"*. The **rules half is built and tested** — `src/lib/ageGrade.js`,

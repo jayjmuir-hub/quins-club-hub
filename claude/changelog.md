@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- ✨ **PLAYING UP AN AGE GROUP, UNDER THE REAL UAERF RULES.** Jay: *"check the
+- ✨ **THE PLAY-UP IS RECORDED, AND THE COACH WHO MUST APPROVE IT IS TOLD.**
+  `player_private.plays_up_confirmed_at`, written on the same call as the
+  birthday, and a **Playing up** chip on the approval queue.
+  ⚠️ **A CHIP RATHER THAN AN EMAIL, BY DESIGN.** The person who has to ACT is the
+  coach reading that queue — an email is only a prompt to come and look at that
+  card. It also needs no Vault secret, no edge-function deploy and no **third**
+  copy of the UAERF model: a Deno function cannot import `src/lib/ageGrade.js`,
+  and two copies already have to be kept in step by hand across two repos.
+  ⚠️ **THE COLUMN IS A DECISION, NOT A DERIVED FACT** — the dates say a play-up is
+  possible, the column says a parent ticked the box. Deriving it server-side is
+  impossible anyway: the membership insert fires the notification trigger BEFORE
+  the birthday is written.
+  ⚠️ **AND THE TICK ALONE IS NOT THE ANSWER** — a parent can tick and then change
+  the squad, so the check is re-run at submit.
+  ⚠️ **THE LIVE RLS PROBE REPORTED A HOLE THAT WAS NOT ONE.** Its "another parent
+  in the same squad" fixture also held a coach role there. A lot of parents at
+  this club are coaches; a fixture picked by role NAME is not one picked by
+  RIGHTS. Re-run properly: own parent 1, team-mate's parent 0, stranger 0.
+
+- `9a60be2` — ✨ **PLAYING UP AN AGE GROUP, UNDER THE REAL UAERF RULES.** Jay: *"check the
   adhjrt.com repo for age bands … we need the ability for players to play up one
   age group with a notification"*. The tournament site has held the whole model
   since July — cut-off, band per group, ladder, and the wider allowance for the
