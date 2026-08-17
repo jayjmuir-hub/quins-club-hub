@@ -114,7 +114,13 @@ export async function listClubMembers() {
     // including it fails the whole statement rather than quietly desyncing the
     // address an admin reads when deciding whether to approve a stranger.
     .select(
-      '*, profiles(full_name, first_name, last_name, email, phone), teams(name), players(full_name)',
+      // ⚠️ `gender` ADDED 17 Aug 2026 FOR THE APPROVAL QUEUE'S "still missing"
+      // LINE, and it is not decoration. Without it the queue cannot tell a
+      // player with no gender recorded from one it simply never asked about —
+      // and completeness.js's whole rule is that an UNKNOWN is not a GAP. The
+      // first version of that chip reported a missing gender for every pending
+      // player in a single-gender squad, because the embed did not carry it.
+      '*, profiles(full_name, first_name, last_name, email, phone), teams(name), players(full_name, gender)',
     )
   if (error) throw error
   return data ?? []

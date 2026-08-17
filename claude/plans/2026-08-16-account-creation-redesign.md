@@ -1,10 +1,9 @@
 # Plan — account creation, rebuilt around who a person actually is
 
 **STATUS: IN PROGRESS, opened 16 Aug 2026. Items 1, 2, 4, 4b, 5 and 7 have
-SHIPPED; 3 is all but its last piece; 6 has its rule and one of three surfaces;
+SHIPPED; 3 is all but its last piece; 6 has its rule and two of three surfaces;
 8 is not started.** Each ships on its own and none blocks the next, so this can
-stop after any of them. **Update this line
-as items land** — a plan that says IN PROGRESS after it shipped is the failure
+stop after any of them. **Update this line as items land** — a plan that says IN PROGRESS after it shipped is the failure
 mode `docs:check` rule 5 exists to catch.
 
 ⚠️ **THE FORK IS GONE (item 5, 17 Aug), WHICH IS THE ONE CHANGE THE REST OF THIS
@@ -75,7 +74,7 @@ select count(*) from public.players pl
 | 4 | Invite from a parent row | medium | ✅ 17 Aug |
 | 4b | …and the email that actually posts it | medium | ✅ 17 Aug — one real send outstanding |
 | 5 | The roll-call replaces the fork | medium | ✅ 17 Aug |
-| 6 | Completeness debt | medium | 🟡 the rule + the family's own card |
+| 6 | Completeness debt | medium | 🟡 the rule + 2 of 3 surfaces |
 | 7 | Link adults to accounts | medium | ✅ 17 Aug |
 | 8 | Vouching, from the club's side | large | not started |
 
@@ -822,10 +821,25 @@ player"* button with it.
 
 ## 6 · Completeness debt — 🟡 THE RULE AND THE FIRST SURFACE, 17 Aug 2026
 
-`src/lib/completeness.js`, pure and shared, plus the card on the person's own
-screen (`YourPlayers`). ⚠️ **The approval-queue chip and the admin
-"records needing attention" list still read nothing** — the function exists for
-all three, and the remaining two are wiring.
+`src/lib/completeness.js`, pure and shared, plus **two** of its three surfaces:
+the card on the family's own screen (`YourPlayers`) and the *"Still missing"*
+line on the approval queue. ⚠️ **The admin "records needing attention" list still
+reads nothing** — the rule exists for it and only the wiring is left.
+
+⚠️ **THE QUEUE LINE DOES NOT BLOCK APPROVAL, AND MUST NOT.** A missing birthday
+is a record to chase, not a reason to leave a real family waiting. It is placed
+there because it is the one moment a coach is already looking at the record and
+deciding about it — the same gap on a list nobody opens is a gap nobody fixes.
+
+⛔ **AND THE FIRST VERSION OF IT BROKE THE RULE IT WAS BUILT ON.** The queue's
+embed was `players(full_name)`, so `gender` was **undefined rather than absent**,
+and every pending player in a single-gender squad was reported as missing one.
+*An unknown is not a gap* — and the wiring has to supply the field for that to
+hold. ⚠️ **Removing it again failed NOTHING in the screen's own tests**, which
+mock `listClubMembers` and hand the component a `players` object they wrote
+themselves: the mock encoding the assumption instead of the contract, the same
+trap as the array-versus-map bug in `YourPlayers`. The assertion that catches it
+lives at the data layer, on the select string.
 
 ### ⚠️ THE LIST IS SHORT, AND THE MEASUREMENT DECIDED IT
 

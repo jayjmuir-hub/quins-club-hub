@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ✨ **AND THE APPROVAL QUEUE SAYS WHAT A RECORD IS MISSING, AT THE MOMENT OF
+  APPROVAL.** The second of the completeness rule's three surfaces. This is the
+  one place a coach is already looking at a record and deciding about it — a gap
+  named here gets fixed, where the same gap on a list nobody opens does not.
+  ⚠️ **IT DOES NOT BLOCK APPROVAL**, and must not: a missing birthday is a record
+  to chase, not a reason to leave a real family waiting.
+  ⛔ **AND THE FIRST VERSION BROKE THE RULE IT WAS BUILT ON.** The queue's embed
+  was `players(full_name)`, so `gender` was UNDEFINED — not absent — and every
+  pending player in a single-gender squad was reported as missing one.
+  completeness.js's whole principle is that an **unknown is not a gap**; the
+  wiring has to supply the field for that to hold. The embed now carries it.
+  ⚠️ **AND REMOVING IT AGAIN FAILED NOTHING IN THE SCREEN'S OWN TESTS**, because
+  they mock `listClubMembers` and hand the component a `players` object they
+  wrote themselves — the mock encoding the assumption instead of the contract,
+  the same trap as the array-versus-map bug in `YourPlayers`. The assertion that
+  catches it lives at the data layer, on the select string.
+
 - ✨ **THE CLUB ASKS FOR WHAT IT IS MISSING, ONCE, AND THEN STOPS.** Item 6 — the
   half of Jay's original complaint still open: *"i can't have people signing up
   without complete information"*. One shared rule (`src/lib/completeness.js`) and

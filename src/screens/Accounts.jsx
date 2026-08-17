@@ -23,6 +23,8 @@ import {
   restoreAccessRequest,
 } from '../data/accessRequests.js'
 import { listPlayerPrivate, listPlayers } from '../data/players.js'
+import { listParentsForPlayers } from '../data/parents.js'
+import { missingForPlayer } from '../lib/completeness.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canApproveAnything, isAdmin, isSuperAdmin } from '../lib/scope.js'
@@ -250,7 +252,14 @@ function formatJoined(value) {
  * may approve. A client-side filter as well would be a second rule free to
  * disagree with the first, and the wrong one would be the one nobody tested.
  */
-function PendingApprovals({ members, teamsById, rowState, onApprove, playsUpByPlayer = new Set() }) {
+function PendingApprovals({
+  members,
+  teamsById,
+  rowState,
+  onApprove,
+  playsUpByPlayer = new Set(),
+  gapsByPlayer = new Map(),
+}) {
   return (
     <section data-testid="pending-approvals" className="mb-5">
       <h3 className="text-[16px] font-extrabold tracking-[-0.2px] text-ink">
@@ -283,6 +292,7 @@ function PendingApprovals({ members, teamsById, rowState, onApprove, playsUpByPl
             : null
           const registered = formatJoined(member.created_at)
           const playsUp = member.player_id ? playsUpByPlayer.has(member.player_id) : false
+          const gaps = (member.player_id ? gapsByPlayer.get(member.player_id) : null) ?? []
 
           return (
             <Card
@@ -333,6 +343,25 @@ function PendingApprovals({ members, teamsById, rowState, onApprove, playsUpByPl
                     </span>
                   )}
                 </span>
+
+                {/* ⚠️ WHAT THE RECORD IS STILL MISSING, SHOWN AT THE MOMENT OF
+                    APPROVAL — the second surface of the shared rule in
+                    src/lib/completeness.js. This is the one place a coach is
+                    already looking at the record and deciding about it, so a gap
+                    named here is a gap somebody can act on; the same gap on a
+                    list nobody opens is a gap nobody fixes.
+
+                    ⚠️ IT DOES NOT BLOCK APPROVAL, and must not. A missing
+                    birthday is a record to chase, not a reason to leave a real
+                    family waiting — the Approve button beside this stays live. */}
+                {gaps.length > 0 && (
+                  <span
+                    data-testid="missing-details"
+                    className={`mt-1 block text-[12.5px] ${MUTED_ON_PAPER}`}
+                  >
+                    Still missing: {gaps.map((gap) => gap.label).join(', ')}
+                  </span>
+                )}
                 <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
                   Added by {personName}
                   {/* Only when the name slot is holding an actual name \u2014
@@ -673,32 +702,84 @@ export default function Accounts() {
     [pendingMembers.map((member) => member.player_id).filter(Boolean).sort().join(',')],
   )
   const [playsUpByPlayer, setPlaysUpByPlayer] = useState(() => new Set())
+  // player id -> what the club is still missing about that child, from the
+  // shared rule in src/lib/completeness.js. The SECOND of that rule's three
+  // surfaces (item 6); the family's own card is the first.
+  const [gapsByPlayer, setGapsByPlayer] = useState(() => new Map())
 
   useEffect(() => {
     if (pendingPlayerIds.length === 0) {
       setPlaysUpByPlayer(new Set())
+      setGapsByPlayer(new Map())
       return undefined
     }
 
     let active = true
-    listPlayerPrivate(pendingPlayerIds)
-      .then((rows) => {
+    // ⚠️ BOTH READS, SAME SCOPE — the pending rows and nothing else. See the
+    // note above pendingPlayerIds: widening either one pulls the club's
+    // children's birthdays and contact rows into an admin's browser to answer a
+    // question about a handful of cards.
+    Promise.all([listPlayerPrivate(pendingPlayerIds), listParentsForPlayers(pendingPlayerIds)])
+      .then(([privateRows, parentRows]) => {
         if (!active) return
         setPlaysUpByPlayer(
-          new Set(rows.filter((row) => row.plays_up_confirmed_at).map((row) => row.player_id)),
+          new Set(privateRows.filter((row) => row.plays_up_confirmed_at).map((row) => row.player_id)),
+        )
+
+        const dobByPlayer = new Map(
+          privateRows.map((row) => [row.player_id, row.date_of_birth ?? null]),
+        )
+        const parentCounts = new Map()
+        for (const row of parentRows ?? []) {
+          parentCounts.set(row.player_id, (parentCounts.get(row.player_id) ?? 0) + 1)
+        }
+
+        setGapsByPlayer(
+          new Map(
+            pendingMembers
+              .filter((member) => member.player_id)
+              .map((member) => [
+                member.player_id,
+                missingForPlayer({
+                  // ⚠️ `gender` COMES FROM THE EMBED AND MUST KEEP COMING FROM
+                  // IT. listClubMembers selects `players(full_name, gender)`
+                  // precisely so this line can tell "no gender recorded" from
+                  // "we never asked" — completeness.js's rule is that an unknown
+                  // is not a gap, and the first version of this chip broke it by
+                  // building a player object without the field at all. Every
+                  // pending player in a single-gender squad was reported as
+                  // missing a gender.
+                  player: {
+                    id: member.player_id,
+                    full_name: member.players?.full_name ?? null,
+                    gender: member.players?.gender ?? null,
+                  },
+                  team: member.team_id ? teamsById.get(member.team_id) ?? member.teams : null,
+                  // ⚠️ `?? null` — an absent key means the read came back with no
+                  // row, which IS a missing birthday. `undefined` would mean "we
+                  // did not look" and say nothing. Same rule as YourPlayers.
+                  dateOfBirth: dobByPlayer.get(member.player_id) ?? null,
+                  parentCount: parentCounts.get(member.player_id) ?? 0,
+                }),
+              ]),
+          ),
         )
       })
-      // ⚠️ SWALLOWED, AND THE CHIP SIMPLY DOES NOT APPEAR. This is one extra
-      // fact on a card that is already complete without it; turning a failed
-      // read into an error state would take the whole approval queue down over
-      // a label.
+      // ⚠️ SWALLOWED, AND THE CHIPS SIMPLY DO NOT APPEAR. These are extra facts
+      // on a card that is already complete without them; turning a failed read
+      // into an error state would take the whole approval queue down over a
+      // label, and the queue is how anybody gets approved at all.
       .catch(() => {
-        if (active) setPlaysUpByPlayer(new Set())
+        if (!active) return
+        setPlaysUpByPlayer(new Set())
+        setGapsByPlayer(new Map())
       })
 
     return () => {
       active = false
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the ids,
+    // like the memo above; `pendingMembers` is rebuilt every render.
   }, [pendingPlayerIds])
 
   const groups = groupByProfile(activeMembers)
@@ -1223,6 +1304,7 @@ export default function Accounts() {
             rowState={rowState}
             onApprove={approve}
             playsUpByPlayer={playsUpByPlayer}
+            gapsByPlayer={gapsByPlayer}
           />
         )}
       </section>
@@ -1285,6 +1367,7 @@ export default function Accounts() {
           rowState={rowState}
           onApprove={approve}
           playsUpByPlayer={playsUpByPlayer}
+          gapsByPlayer={gapsByPlayer}
         />
       )}
 

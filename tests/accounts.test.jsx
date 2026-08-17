@@ -16,6 +16,7 @@ const listPendingProfilesMock = vi.fn()
 const grantMembershipsMock = vi.fn()
 const listPlayersMock = vi.fn()
 const listPlayerPrivateMock = vi.fn()
+const listParentsForPlayersMock = vi.fn()
 const listAccessRequestsMock = vi.fn()
 const dismissAccessRequestMock = vi.fn()
 const restoreAccessRequestMock = vi.fn()
@@ -57,6 +58,14 @@ vi.mock('../src/data/players.js', () => ({
 }))
 
 // The approval gate: who asked for access, and who has been dismissed.
+// ⚠️ ADDED 17 Aug 2026 WITH THE COMPLETENESS CHIP. The approval queue now reads
+// parent rows alongside player_private, in ONE Promise.all — so an unmocked
+// export here does not fail loudly, it REJECTS the pair and silently clears BOTH
+// chips, including the play-up one that has nothing to do with parents.
+vi.mock('../src/data/parents.js', () => ({
+  listParentsForPlayers: (...args) => listParentsForPlayersMock(...args),
+}))
+
 vi.mock('../src/data/accessRequests.js', () => ({
   listAccessRequests: (...args) => listAccessRequestsMock(...args),
   dismissAccessRequest: (...args) => dismissAccessRequestMock(...args),
@@ -243,6 +252,7 @@ beforeEach(() => {
   // Nobody is playing up by default: the chip is the exception, and a fixture
   // that showed it everywhere would make its absence the thing to assert.
   listPlayerPrivateMock.mockResolvedValue([])
+  listParentsForPlayersMock.mockResolvedValue([])
   // Default: nobody has asked and nobody has been dismissed, so the waiting
   // list behaves exactly as it did before this feature existed.
   listAccessRequestsMock.mockResolvedValue([])
@@ -1828,7 +1838,12 @@ describe('Accounts — a waiting person carries what they asked for', () => {
     created_at: '2026-08-17T08:00:00Z',
     profiles: { full_name: 'Nadia Farrow', email: 'nadia@example.com' },
     teams: { name: 'U12 Mixed' },
-    players: { full_name: 'Chidi Farrow' },
+    // ⚠️ `gender` IS PART OF THE EMBED (players(full_name, gender)) AND THE
+    // FIXTURE CARRIES IT. Its absence is what made the first version of the
+    // "still missing" chip report a gender gap for every pending player in a
+    // single-gender squad — the queue could not tell "none recorded" from "never
+    // asked". team-u12 is "U12 Boys" in this file, which is single-gender.
+    players: { full_name: 'Chidi Farrow', gender: 'male' },
   }
 
   it('marks a pending player who is playing up', async () => {
@@ -1844,6 +1859,94 @@ describe('Accounts — a waiting person carries what they asked for', () => {
 
     const row = await screen.findByTestId('pending-membership')
     expect(within(row).getByTestId('playing-up')).toHaveTextContent(/playing up/i)
+  })
+
+  // ── What the record is still missing, at the moment of approval ───────
+  //
+  // The SECOND surface of the shared rule in src/lib/completeness.js (the
+  // family's own card is the first). This is the one place a coach is already
+  // looking at the record and deciding about it — a gap named here is a gap
+  // somebody acts on, where the same gap on a list nobody opens is a gap nobody
+  // fixes.
+  it('names what is still missing about a pending player', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    // No birthday row at all, and no parent rows.
+    listPlayerPrivateMock.mockResolvedValue([])
+    listParentsForPlayersMock.mockResolvedValue([])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    const missing = await within(row).findByTestId('missing-details')
+    expect(missing).toHaveTextContent(/date of birth/i)
+    expect(missing).toHaveTextContent(/parent or carer/i)
+  })
+
+  // ⚠️ IT MUST NOT BLOCK APPROVAL. A missing birthday is a record to chase, not
+  // a reason to leave a real family waiting.
+  it('still lets the coach approve while something is missing', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    await within(row).findByTestId('missing-details')
+    expect(within(row).getByRole('button', { name: /approve/i })).toBeEnabled()
+  })
+
+  it('says nothing when the record is complete', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    listPlayerPrivateMock.mockResolvedValue([
+      { player_id: 'player-chidi', date_of_birth: '2015-03-04', plays_up_confirmed_at: null },
+    ])
+    listParentsForPlayersMock.mockResolvedValue([
+      { id: 'pp-1', player_id: 'player-chidi', full_name: 'Nadia Farrow' },
+    ])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    await within(row).findByRole('button', { name: /approve/i })
+    expect(within(row).queryByTestId('missing-details')).toBeNull()
+  })
+
+  // ⚠️ THE BUG THIS CHIP SHIPPED WITH FOR TEN MINUTES, AND THE RULE IT BROKE.
+  // The queue's embed was `players(full_name)`, so the gender was UNDEFINED —
+  // not absent — and every pending player in a single-gender squad was reported
+  // as missing one. completeness.js's whole rule is that an unknown is not a
+  // gap; the wiring has to supply the field for that rule to hold.
+  it('does not invent a missing gender it was never told about', async () => {
+    listClubMembersMock.mockResolvedValue([
+      ...MEMBER_ROWS,
+      // team-u12 is "U12 Boys" here — single-gender, so the rule DOES apply.
+      { ...PENDING_REGISTRATION, players: { full_name: 'Chidi Farrow', gender: 'male' } },
+    ])
+    listPlayerPrivateMock.mockResolvedValue([
+      { player_id: 'player-chidi', date_of_birth: '2015-03-04', plays_up_confirmed_at: null },
+    ])
+    listParentsForPlayersMock.mockResolvedValue([
+      { id: 'pp-1', player_id: 'player-chidi', full_name: 'Nadia Farrow' },
+    ])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    await within(row).findByRole('button', { name: /approve/i })
+    expect(within(row).queryByTestId('missing-details')).toBeNull()
+  })
+
+  // …and it DOES ask when the squad requires one and none is recorded.
+  it('asks for a gender when the squad is single-gender and none is on file', async () => {
+    listClubMembersMock.mockResolvedValue([
+      ...MEMBER_ROWS,
+      { ...PENDING_REGISTRATION, players: { full_name: 'Chidi Farrow', gender: null } },
+    ])
+    listPlayerPrivateMock.mockResolvedValue([
+      { player_id: 'player-chidi', date_of_birth: '2015-03-04', plays_up_confirmed_at: null },
+    ])
+    listParentsForPlayersMock.mockResolvedValue([
+      { id: 'pp-1', player_id: 'player-chidi', full_name: 'Nadia Farrow' },
+    ])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    expect(await within(row).findByTestId('missing-details')).toHaveTextContent(/boys’ or girls’/i)
   })
 
   // ⚠️ AND IT ASKS ONLY ABOUT THE ROWS IN THE QUEUE. player_private holds

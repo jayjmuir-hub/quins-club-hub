@@ -1385,8 +1385,32 @@ describe('listClubMembers select shape', () => {
     // had no phone control at all. A regression to the old embed leaves the
     // sheet's fields blank and, worse, saving then writes those blanks back.
     expect(builder.select).toHaveBeenCalledWith(
-      '*, profiles(full_name, first_name, last_name, email, phone), teams(name), players(full_name)',
+      '*, profiles(full_name, first_name, last_name, email, phone), teams(name), players(full_name, gender)',
     )
+  })
+
+  // ⚠️ `gender` IS IN THE EMBED FOR A REASON THAT IS INVISIBLE FROM THE SCREEN,
+  // AND ITS OWN TEST EXISTS BECAUSE THE SCREEN'S TESTS CANNOT SEE IT.
+  //
+  // The approval queue's "still missing" line asks completeness.js what a
+  // pending player's record lacks, and that rule's central principle is that an
+  // UNKNOWN IS NOT A GAP. Without this column the queue cannot tell a player
+  // with no gender recorded from one it never asked about — and the first
+  // version of that chip reported a missing gender for every pending player in a
+  // single-gender squad.
+  //
+  // ⚠️ REMOVING IT FAILS NOTHING IN tests/accounts.test.jsx, WHICH IS WHY THIS
+  // CASE IS HERE. That file mocks listClubMembers and hands the component a
+  // `players` object it wrote itself, so the real embed string is never
+  // exercised there — the mock encodes the assumption instead of the contract.
+  // Same trap as the array-versus-map bug recorded in YourPlayers.
+  it('carries the gender the approval queue needs to avoid inventing a gap', async () => {
+    const { builder } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await listClubMembers()
+
+    expect(builder.select.mock.calls[0][0]).toMatch(/players\([^)]*\bgender\b[^)]*\)/)
   })
 
   // Task 5. The players embed is what the Accounts screen's "Linked player"
@@ -1404,7 +1428,12 @@ describe('listClubMembers select shape', () => {
     await listClubMembers()
 
     const selectArg = builder.select.mock.calls[0][0]
-    expect(selectArg).toContain('players(full_name)')
+    // ⚠️ MATCHED ON THE EMBED, NOT ON THE EXACT COLUMN LIST. This asserted
+    // `players(full_name)` literally until 17 Aug 2026, when `gender` was added
+    // for the approval queue — so a legitimate widening of the embed failed a
+    // test about the FKEY HINT, which is what this case is actually for. The
+    // column list has its own assertions above.
+    expect(selectArg).toMatch(/players\(/)
     expect(selectArg).not.toContain('!')
   })
 })
