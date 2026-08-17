@@ -36,6 +36,12 @@ vi.mock('../src/data/lineups.js', () => ({
 }))
 // html2canvas is lazily imported by the share path and never reached here.
 vi.mock('../src/lib/shareImage.js', () => ({ shareElementAsImage: vi.fn() }))
+// ⚠️ MOCKED TO KEEP THIS FILE HERMETIC, NOT BECAUSE ANYTHING HERE READS A GRADE.
+// The eligibility warning made Lineup import playerTiers, and the screen swallows
+// that read's failure by design — so without this mock the suite still PASSED
+// while making a real Supabase request per test and paying for the timeout. Grades
+// themselves are tested in tests/lineup-eligibility.test.jsx.
+vi.mock('../src/data/playerTiers.js', () => ({ listPlayerGrades: vi.fn(async () => new Map()) }))
 
 import Lineup from '../src/screens/Lineup.jsx'
 

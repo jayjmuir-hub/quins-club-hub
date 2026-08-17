@@ -8,8 +8,10 @@ import { getEvent } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
 import { listAvailability } from '../data/availability.js'
 import { createLineup, listLineups, saveLineupPlayers, updateLineup } from '../data/lineups.js'
+import { listPlayerGrades } from '../data/playerTiers.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam } from '../lib/scope.js'
+import { TIER_OK, tierEligibility } from '../lib/tierEligibility.js'
 import {
   eventDate,
   eventTimeLabel,
@@ -75,31 +77,67 @@ function StatusChip({ status }) {
   )
 }
 
-function PickedRow({ player, status, onRemove, onToggleRole }) {
+/**
+ * The grade-against-tier warning, or nothing at all.
+ *
+ * ⚠️ A SECOND LINE UNDER THE NAME, NOT A CHIP IN THE ROW. The row already carries
+ * a status chip and two buttons and there is no width left on a phone; this also
+ * needs a sentence rather than two words, which is the other half of why a chip is
+ * wrong here.
+ *
+ * ⚠️ THE GRADE LETTER APPEARS ONLY WHERE THERE IS A MISMATCH — Jay's call, 17 Aug
+ * 2026, over badging every row the way the coach Roster does. The letter is an
+ * ability judgement about a child and this screen gets held up pitch-side with
+ * parents standing next to it. Where it earns its place it explains the warning;
+ * everywhere else it is a label on a child for no reason.
+ *
+ * ⚠️ NOT role="alert". One per row would announce a dozen alerts on load; as plain
+ * text a screen reader reads it in row order, next to the name it belongs to.
+ */
+function TierWarning({ fixtureTier, grade }) {
+  const { status, message } = tierEligibility(fixtureTier, grade)
+  if (status === TIER_OK) return null
   return (
-    <li className="flex items-center gap-2 border-b border-line py-2 last:border-b-0">
-      <span className="min-w-0 flex-1 truncate text-[14.5px] font-bold text-ink">
-        {player.full_name}
-      </span>
-      {/* ⚠️ THE WARNING IS ON THE PICKED ROW, NOT ONLY IN THE POOL. Once somebody
-          is in the team the pool is scrolled away, and "did I pick anyone who
-          said no?" is exactly the question a coach asks at the end. */}
-      <StatusChip status={status} />
-      <button
-        type="button"
-        onClick={onToggleRole}
-        className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-brand hover:bg-surface-mute"
-      >
-        {player.role === ROLE_STARTER ? '→ Bench' : '→ Start'}
-      </button>
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${player.full_name}`}
-        className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-ink-muted hover:bg-surface-mute"
-      >
-        Remove
-      </button>
+    <p className="mt-0.5 text-[12px] font-semibold leading-snug text-warn-ink">{message}</p>
+  )
+}
+
+function PickedRow({ player, status, fixtureTier, grade, onRemove, onToggleRole }) {
+  return (
+    <li className="border-b border-line py-2 last:border-b-0">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-[14.5px] font-bold text-ink">
+          {player.full_name}
+        </span>
+        {/* ⚠️ THE WARNING IS ON THE PICKED ROW, NOT ONLY IN THE POOL. Once somebody
+            is in the team the pool is scrolled away, and "did I pick anyone who
+            said no?" is exactly the question a coach asks at the end. */}
+        <StatusChip status={status} />
+        <button
+          type="button"
+          onClick={onToggleRole}
+          className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-brand hover:bg-surface-mute"
+        >
+          {player.role === ROLE_STARTER ? '→ Bench' : '→ Start'}
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${player.full_name}`}
+          className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-ink-muted hover:bg-surface-mute"
+        >
+          Remove
+        </button>
+      </div>
+      {/* ⚠️ UNDER THE WHOLE ROW, NOT INSIDE THE NAME'S COLUMN — AND THE NUMBERS ARE
+          THE REASON. Measured in a real browser at 375px: sharing the flex-1 column
+          with the status chip and both buttons left the sentence 122px wide, wrapped
+          it to FOUR lines and made the row 108px tall against a 42px unwarned
+          baseline. Full width gives it 322px, one line, 62px. ⚠️ jsdom CANNOT SEE
+          EITHER NUMBER — every assertion in the suite passed on the 108px version —
+          so do not "tidy" this back inside the flex row. A structural test in
+          tests/lineup-eligibility.test.jsx stands guard in jsdom's place. */}
+      <TierWarning fixtureTier={fixtureTier} grade={grade} />
     </li>
   )
 }
@@ -112,6 +150,9 @@ export default function Lineup() {
   const [event, setEvent] = useState(null)
   const [players, setPlayers] = useState([])
   const [statuses, setStatuses] = useState(() => new Map())
+  // player_id -> { player_id, tier, note }. Empty is the normal case, not a
+  // failure — see listPlayerGrades.
+  const [grades, setGrades] = useState(() => new Map())
   const [lineupId, setLineupId] = useState(null)
   // [{ player_id, role, position, sort_order }]
   const [picked, setPicked] = useState([])
@@ -141,6 +182,20 @@ export default function Lineup() {
         if (!mounted) return
         setPlayers(playerRows)
         setStatuses(statusMap(availabilityRows))
+
+        // ⚠️ ITS FAILURE IS SWALLOWED, UNLIKE EVERYTHING ELSE ON THIS SCREEN, AND
+        // THAT IS THE POINT. Picking a team is the job; a grade is decoration on
+        // top of it. `player_grades` is coach-only, and playerTiers.js warns that
+        // an empty read is the NORMAL case rather than a failure — so a refusal
+        // here must leave the lineup loading, saving and sharing exactly as it
+        // would have, not raise the screen's error banner over a missing warning.
+        // Awaited rather than left floating so there is no second render in which
+        // the warnings are absent; the catch is what stops the await mattering.
+        const gradeRows = await listPlayerGrades(playerRows.map((p) => p.id)).catch(
+          () => new Map(),
+        )
+        if (!mounted) return
+        setGrades(gradeRows)
 
         // ⚠️ THE FIRST lineup, not "the" lineup — event_id is deliberately not
         // unique (see the migration). Phase 1 edits one; a tournament day with
@@ -404,6 +459,8 @@ export default function Lineup() {
                 key={p.player_id}
                 player={{ ...playersById.get(p.player_id), role: p.role }}
                 status={statuses.get(p.player_id)}
+                fixtureTier={event?.tier}
+                grade={grades.get(p.player_id)?.tier}
                 onRemove={() => remove(p.player_id)}
                 onToggleRole={() => toggleRole(p.player_id)}
               />
@@ -439,6 +496,8 @@ export default function Lineup() {
                 key={p.player_id}
                 player={{ ...playersById.get(p.player_id), role: p.role }}
                 status={statuses.get(p.player_id)}
+                fixtureTier={event?.tier}
+                grade={grades.get(p.player_id)?.tier}
                 onRemove={() => remove(p.player_id)}
                 onToggleRole={() => toggleRole(p.player_id)}
               />
@@ -499,27 +558,37 @@ export default function Lineup() {
               </p>
               <ul>
                 {list.map((player) => (
-                  <li
-                    key={player.id}
-                    className="flex items-center gap-2 border-b border-line py-2 last:border-b-0"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-[14.5px] text-ink">
-                      {player.full_name}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => add(player.id, ROLE_STARTER)}
-                      className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
-                    >
-                      Start
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => add(player.id, ROLE_REPLACEMENT)}
-                      className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
-                    >
-                      Bench
-                    </button>
+                  <li key={player.id} className="border-b border-line py-2 last:border-b-0">
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-[14.5px] text-ink">
+                        {player.full_name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => add(player.id, ROLE_STARTER)}
+                        className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
+                      >
+                        Start
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => add(player.id, ROLE_REPLACEMENT)}
+                        className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
+                      >
+                        Bench
+                      </button>
+                    </div>
+                    {/* ⚠️ THE WARNING IS HERE AS WELL AS ON THE PICKED ROWS, for the
+                        reason StatusChip already gives above: the pool is where the
+                        choice is MADE, and the picked list is where it is reviewed. A
+                        warning in only one of the two either arrives too late or is
+                        never re-read.
+                        ⚠️ AND IT SITS UNDER THE ROW, NOT IN THE NAME'S COLUMN — see
+                        PickedRow for the measurements that decided that. */}
+                    <TierWarning
+                      fixtureTier={event?.tier}
+                      grade={grades.get(player.id)?.tier}
+                    />
                   </li>
                 ))}
               </ul>
