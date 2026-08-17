@@ -10,6 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ✉️ **THE INVITE EMAIL IS LIVE.** `notify-invite`, fired by an AFTER INSERT
+  trigger on `invites`. Jay's calls: the sender is NAMED, and it fires for EVERY
+  invite — the admin form no longer makes anybody copy a link out by hand.
+  ⚠️ **IT IS NOT LIKE THE OTHER THREE NOTIFIERS, AND THAT IS THE DANGEROUS PART.**
+  They mail a GROUP in bcc about work waiting. This mails ONE PERSON and the
+  message contains a **credential** — `invites.token` IS the authentication. No
+  bcc, no cc, one recipient read off the row, request body carrying an id and
+  nothing else.
+  ⚠️ **IT MUST NOT READ `invite_targets`** — a multi-target invite writes the
+  invite row first and the targets second, so the trigger sees none, every time.
+  ❌ **AND THE "HAND STEP ONLY JAY CAN DO" DID NOT EXIST.** The plan said two
+  Vault secrets and a dashboard env var; in fact all the notifiers share
+  `approval_notify_secret` and Edge Function env vars are PROJECT-WIDE, so a new
+  function already has it. Proved by the first curl answering **401, not 503**.
+  ⚠️ **`net.http_request_queue.body` IS `bytea`** — casting it straight to jsonb
+  fails with an error that reads like a malformed body and is not one. The
+  9 Aug runbook's verify snippet has the same gap.
+  **Outstanding: one real send**, which needs a real inbox and is Jay's.
+
 - ✨ **THE PLAY-UP IS RECORDED, AND THE COACH WHO MUST APPROVE IT IS TOLD.**
   `player_private.plays_up_confirmed_at`, written on the same call as the
   birthday, and a **Playing up** chip on the approval queue.

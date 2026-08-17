@@ -128,24 +128,39 @@ end $$;
 
 commit;
 
--- ── VERIFY (run it; do not assume) ─────────────────────────────────────
--- ⚠️ INSIDE A TRANSACTION THAT ROLLS BACK. pg_net queues into a table, so the
--- rollback un-queues the request and no mail is ever sent:
+-- ── VERIFIED ON PRODUCTION, 17 Aug 2026 ────────────────────────────────
 --
---   begin;
---   select count(*) from net.http_request_queue;                  -- before
---   insert into public.invites (club_id, email, role, team_id, created_by)
---   values ('<club>', 'nobody@example.com', 'parent', '<team>', '<a profile>');
---   select count(*) from net.http_request_queue;                  -- must be +1
---   select (headers->>'x-approval-secret')
---            = (select decrypted_secret from vault.decrypted_secrets
---                where name = 'approval_notify_secret') as secret_matches,
---          url, body
---     from net.http_request_queue order by id desc limit 1;
---   rollback;
+-- ⚠️ `net.http_request_queue.body` IS `bytea`, NOT `jsonb`. Selecting it raw
+-- prints a hex blob, and casting it straight to jsonb fails with "invalid input
+-- syntax for type json … Token \ is invalid" — which reads like a malformed body
+-- and is nothing of the kind. `convert_from(body, 'utf8')::jsonb` is the answer.
+-- ⚠️ The VERIFY block in 20260809_notify_pending_membership.sql selects `body`
+-- plainly and would show the same hex; it is not wrong, but it cannot show what
+-- it looks like it shows.
 --
--- And the endpoint itself, with plain curl and NO JWT — which is what proves
--- verify_jwt is genuinely off, the setting the MCP deploy tool silently
--- defaults back to true:
---   no secret header  -> 401 "unauthorised"  (503 if the env var is unset)
---   wrong secret      -> 401 "unauthorised"
+-- Inside a transaction that ROLLED BACK — pg_net queues into a table, so the
+-- rollback un-queues the request and no mail was ever sent:
+--
+--   queue                      0 -> 1     (the trigger fired)
+--   url                        …/functions/v1/notify-invite
+--   invite_id matches the row  true
+--   body is ONLY the id        true       ⚠️ the open-relay guard
+--   secret matches vault       true
+--
+-- Then re-read after the rollback: 0 queued requests, 0 test invites, trigger
+-- still installed. ⚠️ THAT SECOND READ IS THE ONE WORTH KEEPING — a queued row
+-- that survived would have sent a REAL email on the next pg_net tick.
+--
+-- And the endpoint itself, with plain curl and no JWT:
+--   no secret header  -> 401, body "unauthorised"
+--   wrong secret      -> 401, body "unauthorised"
+--
+-- ⚠️ THE BODY TEXT IS THE PROOF THAT verify_jwt IS OFF, NOT THE STATUS CODE.
+-- With verification ON the gateway also answers 401 — but with ITS message,
+-- before this function runs. "unauthorised" is this function's own string, so
+-- seeing it means the request reached the code. The MCP deploy tool silently
+-- defaults verify_jwt back to true; this is how to tell.
+--
+-- ⚠️ AND 401 RATHER THAN 503 PROVED THE SHARED SECRET IS ALREADY SET for a
+-- brand-new function — Edge Function env vars are PROJECT-WIDE on Supabase.
+-- 503 is the fail-closed answer when APPROVAL_NOTIFY_SECRET is missing.

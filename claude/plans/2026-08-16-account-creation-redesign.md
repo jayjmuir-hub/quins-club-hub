@@ -72,7 +72,7 @@ select count(*) from public.players pl
 | 2 | Split every name into first and family | small | ✅ 17 Aug |
 | 3 | Date of birth, in its own table | medium | 🟡 all but the contact re-point, which needs **one fact from Jay** |
 | 4 | Invite from a parent row | medium | ✅ 17 Aug |
-| 4b | …and the email that actually posts it | medium | ⛔ **blocked on Jay** |
+| 4b | …and the email that actually posts it | medium | ✅ 17 Aug — one real send outstanding |
 | 5 | The roll-call replaces the fork | medium | ✅ 17 Aug |
 | 6 | Completeness debt | medium | not started |
 | 7 | Link adults to accounts | medium | not started |
@@ -523,7 +523,42 @@ after the migration, and is the same table-level-versus-column-level question
 that item 2 had to answer. `invite_parent` exists with EXECUTE for
 `authenticated` and **not** `anon`, so the 16 Aug ACL trap did not recur.
 
-## 4b · The invite email — NOT BUILT, and blocked on a hand step
+## 4b · The invite email — ✅ LIVE, 17 Aug 2026, awaiting one real send
+
+`supabase/functions/notify-invite/index.ts` + `db/migrations/20260817_notify_invite.sql`,
+both deployed and applied. Jay settled the three open questions: **yes**, the
+sender is **named**, and it fires for **every** invite.
+
+❌ **AND THE HAND STEP THIS SECTION WARNED ABOUT DID NOT EXIST.** It said two
+Vault secrets and one dashboard env var were needed, which made it look blocked
+on Jay for a day. In fact all three existing notifiers **share**
+`approval_notify_secret`, and Edge Function env vars are **project-wide** on
+Supabase — so a brand-new function already has it. The only new vault entry was
+the function's URL, which is not a secret. **Measured, not assumed:** the first
+curl answered **401, not 503**, and 503 is the fail-closed answer when the env
+var is missing.
+
+⚠️ **THIS NOTIFIER IS NOT LIKE THE OTHER THREE, AND THE DIFFERENCE IS THE
+DANGEROUS PART.** They mail a GROUP of volunteers, in bcc, about work waiting.
+This mails ONE PERSON and puts a **credential** in the message — `invites.token`
+is the whole of the authentication. So: no bcc, no cc, exactly one recipient read
+off the row, and a request body carrying an id and nothing else. Copying the
+squad's coaches "for visibility", as the others deliberately do, would hand every
+one of them a working link into somebody else's account.
+
+⚠️ **IT MUST NOT READ `invite_targets`.** A multi-target invite is TWO writes —
+the invite row, then the targets — so the trigger fires before they exist and a
+query returns zero, every time. An email listing "the children you'll be linked
+to" would list none: silently, and only in the multi-child case.
+
+### What is left: one real send, and it is Jay's
+
+Everything is proved except that a mail actually arrives, and that needs a real
+inbox. Put Jay's own address on a real `player_parents` row, press **Invite**,
+and confirm the mail lands **and the accept link works**. ⚠️ **Do not test this
+against a club member's address.**
+
+### ⛔ THE BLOCKER AS ORIGINALLY WRITTEN — kept, because it was wrong
 
 Pressing Invite creates the invite; a human still sends the link. To make it a
 real email, the proven shape is already in this repo twice over: an AFTER INSERT
