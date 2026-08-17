@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -194,7 +194,21 @@ async function answerRollCall(user, { ticks = [/child playing here/i], firstName
   await user.click(screen.getByRole('button', { name: /^continue$/i }))
 }
 
+// ⚠️ THE CLOCK IS PINNED, AND WITHOUT THIS THE WHOLE FILE ROTS EVERY 31 AUGUST.
+// Age-grade eligibility is judged at the 31 August cut-off (src/lib/ageGrade.js),
+// so which squad a fixed date of birth belongs to CHANGES on that date every
+// year. Every DOB below is chosen to fit its squad for the 2026/27 season; left
+// on the real clock they would start reporting play-ups on 31 Aug 2027, in tests
+// about something else entirely.
+//
+// ⚠️ `toFake: ['Date']` ONLY. Faking the timers as well would hang userEvent,
+// which schedules its own — and the failure looks like a test that simply never
+// finishes rather than one that was configured wrongly.
+const IN_SEASON = new Date('2026-11-07T09:00:00Z')
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(IN_SEASON)
   // useMyProfile caches at module level keyed by user id; without this the
   // first test's profile leaks into every later one.
   clearMyProfileCache()
@@ -221,6 +235,10 @@ beforeEach(() => {
     role: 'parent',
     status: 'pending',
   })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('Add your player — a signed-in account with no access', () => {
@@ -316,7 +334,10 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Amara')
       await user.type(screen.getByLabelText(/player's family name/i), 'Bello')
-      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+      // ⚠️ 15 AT THE 31 Aug 2026 CUT-OFF, WHICH IS WHAT U16G IS FOR. A date that
+      // made this a play-up would demand the consent tick and refuse the save,
+      // failing a test that is about gender for a reason that is not gender.
+      await user.type(screen.getByLabelText(/date of birth/i), '2011-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
       await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -333,7 +354,10 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Amara')
       await user.type(screen.getByLabelText(/player's family name/i), 'Bello')
-      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+      // ⚠️ 15 AT THE 31 Aug 2026 CUT-OFF, WHICH IS WHAT U16G IS FOR. A date that
+      // made this a play-up would demand the consent tick and refuse the save,
+      // failing a test that is about gender for a reason that is not gender.
+      await user.type(screen.getByLabelText(/date of birth/i), '2011-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
       await user.click(screen.getByRole('radio', { name: /^female$/i }))
       await user.click(screen.getByRole('button', { name: /add my player/i }))
@@ -354,7 +378,10 @@ describe('Add your player — a signed-in account with no access', () => {
 
       await user.type(screen.getByLabelText(/player's first name/i), 'Sam')
       await user.type(screen.getByLabelText(/player's family name/i), 'Reid')
-      await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+      // 15 at the 31 Aug 2026 cut-off — the age U16G is for. See the note in
+      // the test above: a play-up would refuse this save for a reason that has
+      // nothing to do with the gender rule under test.
+      await user.type(screen.getByLabelText(/date of birth/i), '2011-03-04')
       await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U16G.id)
       await user.click(screen.getByRole('radio', { name: /^male$/i }))
       await user.click(screen.getByRole('button', { name: /add my player/i }))
@@ -923,17 +950,21 @@ describe('Add your player — a signed-in account with no access', () => {
 
   // ── The birthday against the age group (17 Aug 2026) ──────────────────
   //
-  // ⚠️ IT ASKS, IT DOES NOT REFUSE. Same asymmetry as the gender rule, which
-  // refuses a BLANK and permits a CONTRADICTION: a wrong-looking date is usually
-  // a typo and occasionally a genuine dispensation, and a form that blocks the
-  // second to catch the first stops the club registering a real child.
-  it('questions a birthday a long way from the age group, and still saves it', async () => {
+  // ⚠️ TWO DIFFERENT ANSWERS, AND THE DIFFERENCE IS THE FEATURE. A MISMATCH is
+  // probably a typo, so it warns and still saves — blocking typos would block
+  // genuine dispensations too. A PLAY-UP is not a mistake at all: it is
+  // permitted under UAERF rules WITH the parent's consent, so it asks for that
+  // consent and refuses without it.
+  //
+  // Ages are judged at the 31 August cut-off, and the clock is pinned for this
+  // whole file — see the note by beforeEach.
+  it('warns about a real mismatch, and still saves it', async () => {
     const user = userEvent.setup()
     await renderShell()
 
     await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
     await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
-    // Sixteen, in U13.
+    // 16 at the cut-off, registered for U13.
     await user.type(screen.getByLabelText(/date of birth/i), '2010-03-04')
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
 
@@ -943,10 +974,9 @@ describe('Add your player — a signed-in account with no access', () => {
     await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalled())
   })
 
-  // ⚠️ THE CASE A NAIVE CHECK GETS WRONG, AND THE REASON THE TOLERANCE IS WIDE.
-  // Rugby age bands are season-relative: a U13 squad is mostly twelve-year-olds
-  // for most of the season. A check that questioned this would fire on most of
-  // the club and be switched off within a week.
+  // ⚠️ THE CASE A NAIVE "IS THIS CHILD 13 TODAY" CHECK GETS WRONG, AND IT IS THE
+  // NORMAL STATE OF A U13 SQUAD rather than an edge case. A check that
+  // questioned this would fire on most of the club.
   it('says nothing about a twelve-year-old in U13', async () => {
     const user = userEvent.setup()
     await renderShell()
@@ -955,6 +985,7 @@ describe('Add your player — a signed-in account with no access', () => {
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
 
     expect(screen.queryByText(/check the date and the age group/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/play up an age group/i)).not.toBeInTheDocument()
   })
 
   it('asks nothing until both answers are on screen', async () => {
@@ -965,6 +996,60 @@ describe('Add your player — a signed-in account with no access', () => {
 
     // A birthday with no squad beside it is the form arguing with a blank.
     expect(screen.queryByText(/check the date and the age group/i)).not.toBeInTheDocument()
+  })
+
+  // ── Playing up an age group (Jay, 17 Aug 2026) ────────────────────────
+  //
+  // "we need the ability for players to play up one age group with a
+  // notification". Permitted under UAERF rules with parent/guardian consent;
+  // the model and the ladder are ported from the tournament site — see
+  // src/lib/ageGrade.js.
+  it('offers the play-up tick, and refuses to save until it is ticked', async () => {
+    const user = userEvent.setup()
+    await renderShell()
+
+    await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+    await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+    // 11 at the 31 Aug 2026 cut-off — U12's age — registered for U13.
+    await user.type(screen.getByLabelText(/date of birth/i), '2015-03-04')
+    await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+
+    expect(await screen.findByText(/one age group below/i)).toBeInTheDocument()
+    // ⚠️ IT SAYS THE CLUB WILL BE TOLD, BEFORE THE TICK RATHER THAN AFTER. A
+    // consent given without knowing that is not the consent being asked for.
+    expect(screen.getByText(/coaches will be told/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/tick to confirm/i)
+    expect(registerMyPlayerMock).not.toHaveBeenCalled()
+  })
+
+  it('saves once the parent has ticked it', async () => {
+    const user = userEvent.setup()
+    await renderShell()
+
+    await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+    await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+    await user.type(screen.getByLabelText(/date of birth/i), '2015-03-04')
+    await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+    await user.click(await screen.findByRole('checkbox', { name: /play up an age group/i }))
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalled())
+  })
+
+  // ⚠️ A MISMATCH IS NOT OFFERED THE TICK. Consent is for a decision the rules
+  // allow; a sixteen-year-old in U13 is not a play-up under any reading, and
+  // offering a box to wave it through would turn a warning into a formality.
+  it('does not offer consent for something the rules do not allow', async () => {
+    const user = userEvent.setup()
+    await renderShell()
+
+    await user.type(screen.getByLabelText(/date of birth/i), '2010-03-04')
+    await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+
+    expect(screen.queryByRole('checkbox', { name: /play up an age group/i })).toBeNull()
   })
 
   // ❌ THIS COMMENT DESCRIBED A REAL PRODUCTION STATE AND NO LONGER DOES. It
@@ -1393,6 +1478,10 @@ async function submitOneChild(user, name, teamId) {
   await user.click(screen.getByRole('button', { name: /add my player/i }))
 }
 
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 describe('Add your player — the duplicate guards', () => {
   it('shows the server’s sentence when the player is already on the roster', async () => {
     const user = userEvent.setup()
@@ -1534,6 +1623,10 @@ describe('Add your player — the duplicate guards', () => {
 // Adding the input meant filling it in ~30 existing cases; every one of those
 // passes whether the guard exists or not, and none of them looks at the write.
 // The same shape of gap the role gate had on the same day.
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 describe('Add your player — the date of birth', () => {
   it('refuses a blank one without spending a round trip', async () => {
     const user = userEvent.setup()

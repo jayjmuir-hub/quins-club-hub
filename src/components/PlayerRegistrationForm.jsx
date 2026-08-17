@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Button from './Button.jsx'
 import Segmented from './Segmented.jsx'
 import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
-import { dobBandMismatch } from '../lib/ageGroup.js'
+import { MISMATCH, PLAY_UP, ageGradeCheck } from '../lib/ageGrade.js'
 import { registerMyPlayer, updateProfileNames } from '../data/members.js'
 import { setPlayerDob } from '../data/players.js'
 import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
@@ -162,6 +162,12 @@ function blankRow() {
     needsConfirm: null,
     confirmDuplicate: false,
     confirmSelfName: false,
+    // ⚠️ THE PARENT'S SAY-SO FOR PLAYING UP AN AGE GROUP (17 Aug 2026). Only
+    // ever asked for when the birthday and the squad make it a play-up under
+    // UAERF rules — see src/lib/ageGrade.js. It is a recorded DECISION, not a
+    // derived fact: the dates say a play-up is possible, the tick says somebody
+    // chose it.
+    playUpConsent: false,
   }
 }
 
@@ -240,9 +246,9 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
   // only decides whether to ASK.
   const canSelfRegister = selectedTeam?.self_registration_allowed === true
 
-  // Null until BOTH answers are on screen, so nobody is questioned about a
+  // Silent until BOTH answers are on screen, so nobody is questioned about a
   // squad they have not picked yet.
-  const bandWarning = dobBandMismatch(selectedTeam?.name, row.dob)
+  const ageCheck = ageGradeCheck(selectedTeam?.name, row.dob)
 
   const firstId = `register-player-first-${row.key}`
   const lastId = `register-player-last-${row.key}`
@@ -412,24 +418,45 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
         ))}
       </select>
 
-      {/* ⚠️ IT ASKS, IT DOES NOT REFUSE — role="status", not role="alert", and
-          the Save button beside it stays live. Same asymmetry as the gender
-          rule, which refuses a BLANK and permits a CONTRADICTION: a
-          wrong-looking date is usually a typo and occasionally a genuine
-          dispensation, and a form that blocks the second to catch the first is
-          a form that stops the club registering a real child.
+      {/* ⚠️ TWO DIFFERENT ANSWERS, AND THE DIFFERENCE IS THE FEATURE.
+          A MISMATCH warns and still saves — the club's standing ruling for this
+          picker, the same asymmetry as the gender rule, which refuses a BLANK
+          and permits a CONTRADICTION. A PLAY-UP is not a mistake at all: it is
+          allowed under UAERF rules with the parent's consent, so it asks for
+          that consent rather than warning about it.
 
-          ⚠️ AND THE TOLERANCE IS WIDE ON PURPOSE. Rugby age bands are
-          season-relative — a U13 squad is mostly twelve-year-olds — and this app
-          does not know the cut-off date. See dobBandMismatch in
-          src/lib/ageGroup.js before tightening this. */}
-      {bandWarning && (
+          ⚠️ THE AGE IS TAKEN AT THE 31 AUGUST CUT-OFF, NEVER TODAY. A U13 squad
+          is mostly twelve-year-olds for most of the season. See
+          src/lib/ageGrade.js before touching any of this. */}
+      {ageCheck.status === MISMATCH && (
         <p
           role="status"
           className="mt-2 rounded-[11px] bg-warn-bg px-3 py-2.5 text-sm leading-relaxed text-ink"
         >
-          {bandWarning}
+          {ageCheck.message}
         </p>
+      )}
+
+      {ageCheck.status === PLAY_UP && (
+        <div className="mt-2 rounded-[11px] bg-warn-bg px-3 py-2.5">
+          <p role="status" className="text-sm leading-relaxed text-ink">
+            {ageCheck.message}
+          </p>
+          {/* ⚠️ AN EXPLICIT TICK, NOT AN INFERENCE FROM THE DATES. Playing up is
+              the parent's decision to make and the club's to know about; a
+              consent nobody gave is not a consent. The tournament site takes the
+              same tick for the same reason. */}
+          <label className="mt-2.5 flex cursor-pointer items-start gap-2.5 text-sm font-semibold text-ink">
+            <input
+              type="checkbox"
+              checked={row.playUpConsent === true}
+              disabled={disabled}
+              onChange={(event) => onChange({ playUpConsent: event.target.checked })}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-[color:var(--maroon)]"
+            />
+            Yes, I&apos;m happy for them to play up an age group.
+          </label>
+        </div>
       )}
 
       {/* ⚠️ CONDITIONAL on the SQUAD's column, and it appears ABOVE the gender
@@ -637,6 +664,18 @@ export default function PlayerRegistrationForm({
       // refused. Do not "tighten" this into a match check.
       if (team && squadRequiresGender(team.name) && !row.gender) {
         return genderRequiredMessage(team.name)
+      }
+      // ⚠️ A PLAY-UP NEEDS THE PARENT TO SAY SO, AND THIS IS A REFUSAL WHERE THE
+      // MISMATCH BESIDE IT IS ONLY A WARNING. The difference is what each one
+      // means: a mismatch is probably a typo, and blocking typos would block
+      // genuine dispensations too. A play-up is not a mistake — it is a real
+      // decision, permitted under UAERF rules WITH consent, and the club is
+      // about to be told a child is playing outside their own age group. A
+      // consent nobody gave is not a consent.
+      if (team && ageGradeCheck(team.name, row.dob).status === PLAY_UP && !row.playUpConsent) {
+        return rows.length === 1
+          ? 'Tick to confirm you are happy for them to play up an age group.'
+          : `Tick to confirm ${rowLabel(row, index)} may play up an age group.`
       }
     }
     return null

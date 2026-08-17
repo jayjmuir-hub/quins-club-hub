@@ -9,13 +9,16 @@
 // ⚠️ THE CLUB *DOES* HOLD DATES OF BIRTH SINCE 16 Aug 2026 (public.player_private),
 // AND `allowsOwnContact` IS STILL NOT RE-POINTED AT THEM. This note used to say
 // "if a DOB column ever lands, allowsOwnContact is the one place to re-point".
-// It landed. Do not do that re-point on the strength of that sentence — see the
-// long note on `dobBandMismatch` below, and item 3 of
-// claude/plans/2026-08-16-account-creation-redesign.md. The short version:
-// RUGBY AGE BANDS ARE SEASON-RELATIVE AND A BIRTHDAY IS NOT, so a U13 squad is
-// full of twelve-year-olds for most of the season, and a naive "is this child 13
-// today?" check would strip the own-contact field from nearly a whole squad the
-// club's own rule permits it for.
+// It landed, and that sentence points at a trap: RUGBY AGE BANDS ARE
+// SEASON-RELATIVE AND A BIRTHDAY IS NOT. A U13 squad is mostly TWELVE-year-olds
+// for most of the season, so "is this child 13 today?" would strip the
+// own-contact field from nearly a whole squad the club's own rule permits it for.
+//
+// ⚠️ ANYTHING REASONING ABOUT A CHILD'S AGE BELONGS IN src/lib/ageGrade.js, which
+// asks it AT THE 31 AUGUST CUT-OFF. If this gate is ever re-pointed it goes
+// through there, and it may only ever make the rule STRICTER — a parent may
+// write their own child's birthday, so the other direction would let a family
+// unlock a field the club forbids.
 //
 // THE RULE (Jay, 3 Aug 2026): a player in U13 or above may optionally hold
 // their own email and phone. Below U13 they may not, and the forms must not
@@ -81,109 +84,3 @@ export function allowsOwnContact(teamName) {
   return band >= OWN_CONTACT_MIN_AGE
 }
 
-// ══ THE DATE OF BIRTH, AND WHAT IT MAY AND MAY NOT BE USED FOR ═══════════
-//
-// ⚠️ READ THIS BEFORE WIRING A BIRTHDAY INTO ANY AGE DECISION.
-//
-// Rugby age bands are SEASON-RELATIVE: "U13" means under 13 as at the season's
-// cut-off date, so a U13 squad is mostly TWELVE-year-olds for most of the
-// season. A birthday is not season-relative. The two therefore disagree by
-// design, not occasionally — and the size of the disagreement is up to a full
-// year in either direction depending on where in the season you ask.
-//
-// ⚠️ AND THIS APP DOES NOT KNOW THE CUT-OFF DATE. Nothing in the schema, the
-// docs or this file records it (searched 17 Aug 2026). So NOTHING here converts
-// a birthday into a band and compares it for equality. It only ever asks
-// "is this so far out that a human should look?", with a deliberately wide
-// tolerance, and the answer is a QUESTION rather than a refusal.
-//
-// ⚠️ WHICH IS ALSO WHY `allowsOwnContact` ABOVE STILL TAKES ONLY A SQUAD NAME.
-// A gate keyed on "is this child 13 today" would refuse most of a U13 squad the
-// club's own rule permits. If that re-point is ever made it needs the cut-off
-// date, from Jay, and it must only ever make the gate STRICTER — a parent may
-// write their own child's birthday, so the opposite direction would let a
-// family unlock a field the club forbids.
-
-/**
- * The age a senior side implies. Deliberately generous — colts and first-team
- * squads overlap, and this is only ever used to ask a question.
- */
-export const SENIOR_MIN_AGE = 16
-
-/**
- * ⚠️ ONE YEAR OF GRACE ON TOP OF AN ALREADY-WIDE WINDOW, AND THE WIDTH IS THE
- * WHOLE POINT. Playing up an age group is normal and playing down happens with a
- * dispensation; the failure this catches is the one nobody argues with — a child
- * born in 2010 registered into U12. A tight tolerance here would fire on half
- * the club and be switched off within a week.
- */
-export const BAND_GRACE_YEARS = 1
-
-/** Whole years between two dates. Returns null for anything unparseable. */
-export function ageOnDate(dateOfBirth, today) {
-  if (typeof dateOfBirth !== 'string' || dateOfBirth.trim() === '') return null
-  const born = new Date(`${dateOfBirth.trim()}T00:00:00Z`)
-  if (Number.isNaN(born.getTime())) return null
-  const now = today instanceof Date && !Number.isNaN(today.getTime()) ? today : new Date()
-
-  let age = now.getUTCFullYear() - born.getUTCFullYear()
-  const monthDiff = now.getUTCMonth() - born.getUTCMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < born.getUTCDate())) age -= 1
-  return age
-}
-
-/**
- * The two bands a child of this age could plausibly be in, given that the
- * cut-off is unknown.
- *
- * A child aged A is under A+1 today, so A+1 is the usual band; if their birthday
- * fell after the cut-off they were a year younger then, which puts them in A+2.
- * Both are legitimate, and which one applies depends on a date this app does not
- * hold.
- */
-function plausibleBands(age) {
-  return [age + 1, age + 2]
-}
-
-/**
- * How far outside the plausible window a chosen squad sits, in years — 0 when it
- * is fine. Exported for the tests; the sentence below is what screens use.
- */
-export function bandDistance(teamName, dateOfBirth, today) {
-  const age = ageOnDate(dateOfBirth, today)
-  if (age === null || age < 0) return 0
-
-  const band = ageBandFromTeamName(teamName)
-  const [low, high] = plausibleBands(age)
-
-  // A senior side has no band. Judge it on the age alone: an adult squad is
-  // wrong for a small child and right for everybody else.
-  if (band === null) {
-    if (typeof teamName !== 'string' || teamName.trim() === '') return 0
-    return age >= SENIOR_MIN_AGE ? 0 : SENIOR_MIN_AGE - age
-  }
-
-  if (band < low) return low - band
-  if (band > high) return band - high
-  return 0
-}
-
-/**
- * A sentence to show when a birthday and a squad disagree badly, or null.
- *
- * ⚠️ IT ASKS, IT DOES NOT REFUSE — the same asymmetry as the gender rule, which
- * refuses a BLANK and permits a CONTRADICTION. A wrong-looking date is usually a
- * typo and occasionally a genuine dispensation, and a form that blocks the
- * second to catch the first is a form that stops the club registering a real
- * child.
- */
-export function dobBandMismatch(teamName, dateOfBirth, today) {
-  const distance = bandDistance(teamName, dateOfBirth, today)
-  if (distance <= BAND_GRACE_YEARS) return null
-
-  const age = ageOnDate(dateOfBirth, today)
-  return (
-    `That birthday makes them ${age}, which looks a long way from ${String(teamName).trim()}. ` +
-    'Check the date and the age group — you can still save if it is right.'
-  )
-}
