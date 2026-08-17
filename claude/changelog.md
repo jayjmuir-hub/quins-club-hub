@@ -28,7 +28,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   sentence can be reworded without warning. The prose fallback exists for a
   response that arrives without the array.
 
-- ✨ **AN ADULT IS LINKED TO THEIR ACCOUNT, AND THE INVITE BUTTON GAINS ITS THIRD
+⚠️ **THE ENTRIES BELOW SHIPPED AS ONE SQUASH, `0d22f32` (#204)** — the play-up
+chip, the invite email, and the adult-to-account link. Kept apart because they
+are three separate decisions.
+
+- `0d22f32` — ✨ **AN ADULT IS LINKED TO THEIR ACCOUNT, AND THE INVITE BUTTON GAINS ITS THIRD
   STATE.** `player_parents.profile_id`, filled by `link_my_parent_rows()` on
   sign-in. Invite → Invited → **Joined**; until now the button could not tell an
   adult who had accepted from one who never opened the email, because a client
