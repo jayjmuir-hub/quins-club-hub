@@ -26,6 +26,11 @@ const confirmMyDetailsMock = vi.fn()
 const confirmNoPlayerMock = vi.fn()
 const confirmNoRoleMock = vi.fn()
 const requestStaffRoleMock = vi.fn()
+const updateProfileNamesMock = vi.fn(async () => ({
+  id: 'user-1',
+  first_name: 'Jay',
+  name_confirmed_at: '2026-08-17T00:00:00Z',
+}))
 const getMyAccessRequestMock = vi.fn()
 const createAccessRequestMock = vi.fn()
 
@@ -43,6 +48,14 @@ vi.mock('../src/data/members.js', () => ({
   confirmNoPlayer: (...args) => confirmNoPlayerMock(...args),
   confirmNoRole: (...args) => confirmNoRoleMock(...args),
   requestStaffRole: (...args) => requestStaffRoleMock(...args),
+  // ⚠️ THE ROLL-CALL'S NAME WRITE, ADDED 17 Aug 2026. This file renders the
+  // whole AppShell, so the zero-membership test below walks through RollCall —
+  // which asks for a name and calls this. Missing, it threw from inside a
+  // promise chain: the test still PASSED (it only asserts a dialog is absent)
+  // while vitest logged "No updateProfileNames export is defined". A passing
+  // test with an unhandled error underneath it is the shape that hides the next
+  // real one.
+  updateProfileNames: (...args) => updateProfileNamesMock(...args),
 }))
 
 vi.mock('../src/data/accessRequests.js', () => ({
@@ -334,28 +347,35 @@ describe('NamePrompt — the sign-in name gate', () => {
     expect(screen.getByText('Routed content')).toBeInTheDocument()
   })
 
-  // ⚠️ REPOINTED 8 Aug 2026, and the reason matters more than the edit. The
-  // zero-membership branch of AppShell used to render RequestAccess directly;
-  // it now renders AddYourPlayer first, with RequestAccess as the secondary
-  // route behind a button (parent self-registration). So the old
-  // `waitFor(getMyAccessRequestMock called)` could never resolve, and the
-  // assertion after it would never have run.
+  // ⚠️ REPOINTED TWICE, AND THE SECOND TIME IS THE INTERESTING ONE.
   //
-  // The point of the test is unchanged: the name gate must never appear over a
-  // screen that is telling somebody they have no access. Both zero-access
-  // screens are checked now, because the gate would be equally wrong on either.
-  it('never shows to someone with no access — on either zero-access screen', async () => {
+  // 8 Aug 2026: the zero-membership branch stopped rendering RequestAccess
+  // directly and rendered AddYourPlayer first, with RequestAccess behind a
+  // button — so the old `waitFor(getMyAccessRequestMock called)` could never
+  // resolve and the assertion after it never ran.
+  //
+  // 17 Aug 2026: that fork is GONE. AppShell renders RollCall, and both former
+  // screens are sections of it. The gate would be wrong on any of them, so this
+  // walks the roll-call rather than clicking between two doors.
+  //
+  // ⚠️ THE POINT IS UNCHANGED AND IS WHY THIS TEST SURVIVES EVERY REWRITE: the
+  // name gate must never appear over a screen that is telling somebody they have
+  // no access — and NamePrompt is mounted in AppShell's `ready` branch, which
+  // requires a membership, so this is the assertion that keeps it there.
+  it('never shows to someone with no access — on any part of the roll-call', async () => {
     const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(
       loaded({ memberships: [], teams: [{ id: 't1', name: 'U13', sort_order: 1 }] }),
     )
     renderShell()
 
-    expect(await screen.findByRole('button', { name: /add my player/i })).toBeInTheDocument()
+    // The ask itself.
+    await user.click(await screen.findByRole('checkbox', { name: /help the club another way/i }))
     expect(screen.queryByRole('dialog', { name: GATE_TITLE })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /not adding a player/i }))
+    await user.click(screen.getByRole('button', { name: /^continue$/i }))
 
+    // …and the ask-the-club section behind it.
     await waitFor(() => expect(getMyAccessRequestMock).toHaveBeenCalled())
     expect(screen.queryByRole('dialog', { name: GATE_TITLE })).not.toBeInTheDocument()
   })

@@ -232,6 +232,32 @@ describe('the sections', () => {
     expect(await screen.findByLabelText(/player's first name/i)).toBeInTheDocument()
   })
 
+  // ⚠️ THE SAME RULE FROM THE OTHER SIDE, AND THE TEST ABOVE DOES NOT COVER IT.
+  // Injecting the fault — `onRegistered={onDone}` on the players section — left
+  // the whole file green, because the case above finishes the STAFF section and
+  // every other case had players LAST, where reloading is correct. Only a run
+  // with a question AFTER the registration form can see it. That is exactly the
+  // "check what the existing tests can actually see" trap this project keeps
+  // meeting.
+  it('does not reload when a question still follows the registration form', async () => {
+    const user = userEvent.setup()
+    const { onDone } = renderRollCall()
+
+    await user.click(await screen.findByRole('checkbox', { name: /child playing here/i }))
+    await user.click(box(/help the club another way/i))
+    await user.click(screen.getByRole('button', CONTINUE))
+
+    await user.type(await screen.findByLabelText(/player's first name/i), 'Ada')
+    await user.type(screen.getByLabelText(/player's family name/i), 'Ashby')
+    await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+    await user.selectOptions(screen.getByLabelText(/age group/i), 't-u13')
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    // The volunteer question is still to come, so the screen must stay.
+    expect(await screen.findByRole('button', { name: /request access/i })).toBeInTheDocument()
+    expect(onDone).not.toHaveBeenCalled()
+  })
+
   it('reloads once, after the last answer', async () => {
     const user = userEvent.setup()
     const { onDone } = renderRollCall()
