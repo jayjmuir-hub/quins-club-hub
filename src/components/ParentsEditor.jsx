@@ -1,5 +1,6 @@
 import PhoneInput from './PhoneInput.jsx'
 import Button from './Button.jsx'
+import InviteParentButton from './InviteParentButton.jsx'
 import { RELATIONSHIPS } from '../lib/relationships.js'
 import { DEFAULT_COUNTRY } from '../lib/phone.js'
 
@@ -14,6 +15,15 @@ import { DEFAULT_COUNTRY } from '../lib/phone.js'
 // takes rows and emits rows. PlayerForm owns the list because PlayerForm owns
 // the save, and splitting those would mean two places deciding what a valid
 // row is.
+//
+// ⚠️ ONE EXCEPTION, ADDED 17 Aug 2026, AND IT IS DELIBERATELY SELF-CONTAINED:
+// InviteParentButton calls public.invite_parent itself. That action is not part
+// of the form's save — it acts on the row ALREADY IN THE DATABASE, and pressing
+// it is not something Save should undo, retry or be able to lose. Threading it
+// out as an `onInvite` callback would have put an identical per-row state
+// machine (sending / link / refusal) into BOTH PlayerForm and MyPlayerForm,
+// which is precisely the shape src/lib/parentRows.js exists to stop repeating.
+// The rest of this file still holds no data access, and should not grow any.
 //
 // "AT LEAST ONE PARENT" IS A WARNING, NEVER A BLOCK (Jay's ruling). ~159
 // existing players have no parent rows, the bulk importer creates players
@@ -167,6 +177,11 @@ export default function ParentsEditor({ parents, onChange, disabled = false }) {
               onChange={(event) => update(index, { email: event.target.value })}
             />
           </div>
+
+          {/* Directly under the Email box, because the address IS what the
+              invite is made of — see InviteParentButton for what it does when
+              the box and the database disagree. */}
+          <InviteParentButton parent={parent} disabled={disabled} />
 
           {/* A radio, not a checkbox: "main contact" is one-of-many, and a
               checkbox would let a coach tick two and leave the app to guess. */}

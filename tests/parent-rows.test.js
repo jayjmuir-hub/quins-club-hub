@@ -68,6 +68,29 @@ describe('toEditorRows', () => {
     expect(toEditorRows(undefined)).toEqual([])
     expect(toEditorRows([null])[0].full_name).toBe('')
   })
+
+  // ⚠️ `savedEmail` IS WHAT THE DATABASE HOLDS; `email` becomes whatever is
+  // being typed. The Invite button compares the two and refuses while they
+  // differ, because public.invite_parent emails the address ON THE ROW — so
+  // without this pair, a corrected address typed but not saved would send an
+  // account to the old one, with nothing on screen looking wrong.
+  it('records the stored email separately from the one bound to the input', () => {
+    const [row] = toEditorRows([DB_ROW])
+    expect(row.email).toBe('hannah@example.com')
+    expect(row.savedEmail).toBe('hannah@example.com')
+  })
+
+  it('leaves savedEmail empty rather than null when there is no address', () => {
+    const [row] = toEditorRows([{ id: 'pp-2', email: null }])
+    expect(row.savedEmail).toBe('')
+  })
+
+  it('carries invited_at through, and null when nobody has ever been invited', () => {
+    expect(toEditorRows([{ ...DB_ROW, invited_at: '2026-08-16T09:00:00Z' }])[0].invited_at).toBe(
+      '2026-08-16T09:00:00Z',
+    )
+    expect(toEditorRows([DB_ROW])[0].invited_at).toBeNull()
+  })
 })
 
 describe('toSaveRows', () => {

@@ -7,14 +7,23 @@ import { fetchByIds } from './limits.js'
 //
 // SAFEGUARDING, and the reason this is not just another table: player_parents
 // carries adults' names, emails and phone numbers attached to named children.
-// Its two RLS policies are copied verbatim from player_contacts —
-//   read : can_edit_team(player's team) OR is_own_player(player_id)
-//   edit : can_edit_team(player's team)
+// Its two RLS policies are copied verbatim from player_contacts, and BOTH ARE
+// `FOR ALL` — there is no separate read policy, because `parent read` was
+// dropped on 6 Aug 2026 as redundant beside them:
+//   parent edit own : is_own_player(player_id)
+//   parent edit     : can_edit_team(player's team)
 // — so a parent reads their own child's rows and nobody else's, and an empty
 // result is the NORMAL outcome for a parent looking at a team-mate, not an
 // error. Nothing in this module tries to interpret that: it reports what came
 // back and lets the screen decide, which for PlayerDetail means rendering
 // nothing at all rather than a "hidden" note.
+//
+// ⚠️ THIS HEADER SAID `edit : can_edit_team` ONLY UNTIL 17 Aug 2026, AND THAT
+// WAS WRONG IN THE DIRECTION THAT MATTERS. `parent edit own` has existed since
+// 4 Aug and is the reason a parent can add the other parent to their own child
+// at all — the exact case public.invite_parent below is built for. A reader who
+// believed the old line would have concluded the Invite button needed a new
+// permission for parents, and given them one.
 //
 // Rows are ordered primary-first, then by sort_order, then name, so a
 // player's main contact is always the first row on screen.
@@ -158,6 +167,77 @@ export async function saveParents(playerId, parents) {
   }
 
   return saved
+}
+
+// ── invite_parent: turning a contact row into an offer of an account ───────
+//
+// The codes public.invite_parent raises, and what each one covers:
+//
+//   42501  two raises: not signed in, and "you cannot invite that person" —
+//          the caller is neither is_own_player nor can_edit_team. The first is
+//          unreachable from this app (every screen holding this button renders
+//          behind RequireAuth).
+//   22023  four raises: the row is gone, it points at no player, it has no
+//          email on file, or the address has no @ in it.
+//   42710  one raise: that address already has an account.
+//
+// ⚠️ THERE IS DELIBERATELY NO MESSAGE MAP HERE, AND THE ABSENCE IS THE SAME
+// DECISION src/data/members.js MAKES FOR 22004. Every one of those raises was
+// written as a sentence for the person pressing the button, and each one NAMES
+// WHAT TO DO — "Add one first", "Ask an admin to connect them instead". A
+// generic entry per code would replace exactly the half that explains the
+// refusal.
+//
+// ⚠️ BUT ONLY THOSE CODES ARE TRUSTED, AND THAT IS WHY THIS IS KEYED ON
+// `error.code` RATHER THAN SIMPLY PASSING `error.message` THROUGH. A dropped
+// connection, a 401 from an expired session or a PostgREST schema-cache miss
+// also arrive as an `error` with a `message`, and none of those sentences were
+// written for a coach standing on a pitch.
+const INVITE_CODES = new Set(['42501', '22023', '42710'])
+
+const INVITE_FALLBACK = "We couldn't send that invite. Try again in a moment."
+
+/**
+ * Offers an account to the adult on one `player_parents` row, via the
+ * `public.invite_parent` SECURITY DEFINER RPC. Returns the `invites` row.
+ *
+ * ⚠️ ONE ARGUMENT, AND THE EMAIL IS NOT ONE OF THEM. The address is read off
+ * the row inside the function — the property that makes `claim_roster_access`
+ * safe. Passing it would turn "invite this row" into "invite anybody, and
+ * attach them to this row's child", so do not add a parameter for it here
+ * however convenient it looks at a call site.
+ *
+ * ⚠️ WHAT COMES BACK MAY BE AN INVITE THAT ALREADY EXISTED. The function is
+ * idempotent on (email, player, not yet accepted): a second press returns the
+ * outstanding invite rather than minting a second live token. So a caller must
+ * not read a returned row as proof that an email was just created — only that
+ * one is outstanding.
+ *
+ * ⚠️ AND `grant_status` ON THE RETURNED ROW IS WORTH SHOWING THE PRESSER. It is
+ * 'active' only when the caller could already approve that squad; a parent's
+ * and a medic's invites come back 'pending'. The button says which, because
+ * "sent" alone would let a parent believe they had just granted access.
+ */
+export async function inviteParent(parentRowId) {
+  if (!parentRowId) throw new Error('inviteParent needs a parent row id.')
+
+  const { data, error } = await supabase.rpc('invite_parent', { p_parent_row: parentRowId })
+
+  if (error) {
+    const thrown = new Error(
+      INVITE_CODES.has(String(error.code)) && error.message ? error.message : INVITE_FALLBACK,
+    )
+    // Preserved so a caller can branch on the reason without going anywhere
+    // near the wording, matching registerMyPlayer.
+    thrown.code = error.code
+    throw thrown
+  }
+
+  // A function returning a composite type gives PostgREST one object; an array
+  // would mean the signature changed underneath us, and taking [0] silently
+  // would hide that.
+  if (!data || Array.isArray(data)) throw new Error(INVITE_FALLBACK)
+  return data
 }
 
 /** Deletes one parent row by id. Throws when the database removed nothing. */

@@ -32,6 +32,14 @@ import { joinPhone, splitPhone } from './phone.js'
  * Tolerates a null/absent phone (the common case) and nulls in every text
  * column: the editor binds these straight to inputs, and React logs a warning
  * and switches an input to uncontrolled the moment its value is null.
+ *
+ * ⚠️ `savedEmail` IS NOT A DUPLICATE OF `email`, AND IT IS WHAT STOPS AN INVITE
+ * GOING TO THE WRONG ADDRESS. `email` is bound to an input and becomes whatever
+ * the user is typing; `savedEmail` is what the database actually holds. The
+ * Invite button reads NEITHER — public.invite_parent reads the address off the
+ * row server-side — so the two differing means the button would email the OLD
+ * address while the screen showed the new one. Keeping both lets the button
+ * refuse and say "save first" instead. See InviteParentButton.
  */
 export function toEditorRows(rows) {
   if (!Array.isArray(rows)) return []
@@ -42,6 +50,10 @@ export function toEditorRows(rows) {
       full_name: row?.full_name ?? '',
       relationship: row?.relationship ?? '',
       email: row?.email ?? '',
+      savedEmail: row?.email ?? '',
+      // When public.invite_parent last created an invite for this row. Null for
+      // a row nobody has ever invited, which is every row before 17 Aug 2026.
+      invited_at: row?.invited_at ?? null,
       phoneCountry: country,
       phoneNational: national,
       is_primary: Boolean(row?.is_primary),
@@ -56,6 +68,13 @@ export function toEditorRows(rows) {
  * an editor row that still carries a stale `phone` key — from a row read
  * before this module existed, or from a future change to the editor — win over
  * the freshly joined value, which is the original bug wearing a different hat.
+ *
+ * The spread also carries `savedEmail` and `invited_at` straight back out, and
+ * that is harmless rather than sloppy: `toRow` in src/data/parents.js names
+ * every column it writes, so a key it does not name never reaches the database.
+ * ⚠️ IF THAT EVER BECOMES A BLIND `insert(row)`, THESE TWO BECOME A FAILED
+ * INSERT ON AN UNKNOWN COLUMN — and `savedEmail` would be the one to delete,
+ * never `email`.
  */
 export function toSaveRows(rows) {
   if (!Array.isArray(rows)) return []
