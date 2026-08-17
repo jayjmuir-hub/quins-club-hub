@@ -1,4 +1,4 @@
-import { adminRightLabel, hasAdminRight } from './scope.js'
+import { adminRightLabel, hasAdminRight, isSuperAdmin } from './scope.js'
 
 // The admin portals — /admin is a chooser, and each job is its own space with
 // its own tabs. Ruling: claude/decisions/2026-08-12-admin-portals.md.
@@ -46,6 +46,19 @@ export const PORTALS = [
       // Staff anywhere earlier would silently change where every admin arrives.
       // Same trap the Allocation note below records, from the other direction.
       { to: '/admin/staff', label: 'Staff' },
+      // ⚠️ SUPER ADMINS ONLY, AND THIS IS THE FIRST TAB IN THE FILE THAT IS NOT
+      // VISIBLE TO EVERY HOLDER OF ITS PORTAL. The portal gate is `right`, and
+      // Club Admin has none — every admin holds it. This log records what
+      // ADMINS do, so its audience is one step narrower than its portal's, and
+      // `right: null` cannot express that.
+      //
+      // ⚠️ IT STAYS IN THIS LIST RATHER THAN BEING ADDED CONDITIONALLY, so that
+      // portalForPath still recognises /admin/rights-log as Club Admin for an
+      // ordinary admin who pastes the URL. They land inside the portal and the
+      // screen tells them why it is not for them, which is the behaviour every
+      // other admin route already has. visibleTabs is what keeps it out of the
+      // row; RLS is what keeps the rows out of the response.
+      { to: '/admin/rights-log', label: 'Rights log', superOnly: true },
     ],
   },
   {
@@ -82,6 +95,25 @@ export const PORTALS = [
     ],
   },
 ]
+
+/**
+ * The tabs this person should be OFFERED.
+ *
+ * ⚠️ THIS NARROWS THE ROW, NOT THE ACCESS — the same warning at the top of this
+ * file, and it matters more here than anywhere else in it. A tab hidden from a
+ * navigation bar is not a permission; `/admin/rights-log` stays typeable, the
+ * screen repeats its own check, and `membership_audit`'s read policy is the
+ * only thing that decides whether a row comes back.
+ *
+ * ⚠️ NOT MERGED INTO isPortalOpen. That answers "can this card be entered",
+ * which is about the portal; this answers "which of its screens are yours",
+ * which is about the tabs inside one. Collapsing them would mean a super-only
+ * tab could close a portal every admin is supposed to hold.
+ */
+export function visibleTabs(portal, memberships) {
+  const superAdmin = isSuperAdmin(memberships)
+  return portal.tabs.filter((tab) => !tab.superOnly || superAdmin)
+}
 
 /** The words on the card and above the tabs. One home, in scope.js. */
 export function portalLabel(portal) {

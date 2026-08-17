@@ -10,6 +10,45 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 🔒 **AND NOW SOMEBODY CAN READ IT — `/admin/rights-log`.** The audit trigger
+  shipped the day before with **nothing anywhere that could open it**. A log
+  nobody can read is not accountability; it is a table that looks like
+  accountability in the schema and answers nothing at the moment somebody asks
+  who made a stranger an admin.
+  ⚠️ **THE FIRST ADMIN TAB WHOSE AUDIENCE IS NARROWER THAN ITS PORTAL'S.** Club
+  Admin has no `right` — every admin holds it — so `src/lib/portals.js` gained
+  `visibleTabs`. **Hiding a tab grants nothing and hides no data**: the URL still
+  resolves to Club Admin for an ordinary admin, the screen explains itself, and
+  `membership_audit`'s `is_super_admin()` policy is the only thing that decides
+  whether a row comes back. **Asserted both ways, in the same portal.**
+  ⚠️ **IT ISSUES NO QUERY AT ALL FOR A NON-SUPER**, and that is asserted
+  separately from the message. A screen that renders the refusal *after* asking
+  is one that relies on being refused — which nobody notices when a policy
+  changes.
+  ⚠️ **A PENDING GRANT READS AS A REQUEST, NOT AS ACCESS.** Almost every row
+  starts life pending, and "Given Coach" for a claim nobody approved describes a
+  hole that does not exist — on the one screen somebody opens when they suspect
+  one does.
+  ⚠️ **THE HEADLINE COUNTS ELEVATIONS, NOT ENTRIES.** "213 changes" says a log
+  exists; "9 of them handed somebody access" is the number the screen was opened
+  to find. Same reasoning as the Staff tab's gap count.
+  ⚠️ **NULL IS "the system", A MISSING PROFILE IS "an account since deleted".**
+  Never a blank — an unexplained gap in an audit log is indistinguishable from a
+  lost one, and the table has no foreign keys precisely so it outlives the rows
+  it names.
+  ⛔ **THE TABLE IS EMPTY, AND THAT LOOKED IDENTICAL TO A TRIGGER THAT NEVER
+  FIRED.** Confirmed the negative before trusting it (rule 6): trigger present
+  and enabled, then a rolled-back probe took one membership pending → active and
+  the count went **0 → 2**. Empty means nothing has changed since 17 Aug, not
+  that nothing is recorded. The probe also settled two shapes the formatter
+  guesses at — `old_rights` arrives as `{}` rather than null, and a write with no
+  session records `actor_kind = 'system'`.
+  ⚠️ **AND THE SCREEN'S OWN TESTS COULD NOT HAVE CAUGHT A DROPPED COLUMN** — they
+  mock `src/data/audit.js`, so a missing `new_is_super` is `undefined` and the
+  screen renders happily around it, silently never printing "Made a super admin".
+  The select assertion is in `tests/data.test.js`, the same place and for the
+  same reason as `listClubMembers`'s. **Proved by dropping the column.**
+
 - 🔒 **"DO YOU KNOW THEM?" — THE ANSWER NOBODY COULD GIVE BEFORE.** Item 8, and
   the largest safeguarding win left in the plan. The approval queue now takes two
   answers from the people already being asked to approve somebody: **I know
