@@ -1,4 +1,4 @@
-import { ageBandFromTeamName } from './ageGroup.js'
+import { OWN_CONTACT_MIN_AGE, ageBandFromTeamName, allowsOwnContact } from './ageGroup.js'
 
 // UAERF age-grade eligibility: which squad a child's birthday puts them in, and
 // when they are PLAYING UP.
@@ -168,6 +168,62 @@ export function cutoffFor(today = new Date()) {
   const year = today.getUTCFullYear()
   const thisYears = Date.UTC(year, CUTOFF_MONTH - 1, CUTOFF_DAY)
   return new Date(today.getTime() >= thisYears ? thisYears : Date.UTC(year - 1, CUTOFF_MONTH - 1, CUTOFF_DAY))
+}
+
+/**
+ * Whether a player may hold their OWN email and phone, now that the club has a
+ * birthday to ask.
+ *
+ * This is the `allowsOwnContact` re-point promised since 3 Aug 2026 and deferred
+ * three times — item 3 of claude/plans/2026-08-16-account-creation-redesign.md.
+ *
+ * ══ ⚠️ IT MAY ONLY EVER MAKE THE RULE STRICTER, AND THE CODE SAYS SO IN ONE
+ *    LINE ═══════════════════════════════════════════════════════════════════
+ *
+ * A PARENT MAY WRITE THEIR OWN CHILD'S BIRTHDAY — deliberately, because the
+ * family is the source of truth. So if a birthday could ever OPEN this gate, a
+ * family could unlock a field the club forbids by typing a different year. The
+ * squad answer is computed first and a `false` is returned immediately: the
+ * birthday is consulted only to take the field away, never to offer it.
+ *
+ * ⚠️ IT LIVES HERE, NOT IN ageGroup.js, AND THAT IS NOT PREFERENCE. This module
+ * already imports that one for the band table; putting a DOB-aware gate there
+ * would make the two import each other. The plain squad-name version stays
+ * exported from ageGroup.js for the callers that have no birthday to offer.
+ *
+ * ══ ⚠️ WHY IT ASKS THE CUT-OFF AND NOT "HOW OLD ARE THEY TODAY" ════════════
+ *
+ * Rugby age bands are season-relative and a birthday is not. A U13 squad is
+ * mostly TWELVE-year-olds for most of the season, so "is this child 13 today?"
+ * would strip the field from nearly a whole squad the club's own rule permits it
+ * for — gradually, as birthdays passed, which is the hardest kind of bug to
+ * attribute. `U13` means age 12 at the cut-off, so the threshold here is
+ * `OWN_CONTACT_MIN_AGE - 1`.
+ *
+ * ══ ⚠️ AN UNKNOWN BIRTHDAY CHANGES NOTHING, AND MUST NOT FAIL CLOSED ═══════
+ *
+ * `getPlayerDob` returns null both for "not set" and for "RLS will not show you"
+ * — its own header forbids distinguishing them. Failing closed on null would
+ * strip the field from every child in the club today, because `player_private`
+ * is nearly empty, and it would do it to team-mates' records purely because a
+ * reader could not see them. So an unreadable or absent birthday leaves the
+ * squad's answer exactly as it was.
+ *
+ * @param {object} args
+ * @param {string} args.teamName
+ * @param {string|null} [args.dateOfBirth] ISO date, or null for "we don't know"
+ * @param {Date} [args.today]
+ */
+export function allowsOwnContactFor({ teamName, dateOfBirth = null, today = new Date() } = {}) {
+  const bySquad = allowsOwnContact(teamName)
+  // ⚠️ THE STRICTER-ONLY GUARANTEE, IN ONE RETURN. Everything below can only
+  // turn a true into a false.
+  if (!bySquad) return false
+
+  const cutoffAge = ageAt(dateOfBirth, cutoffFor(today))
+  if (cutoffAge === null) return bySquad
+
+  return cutoffAge >= OWN_CONTACT_MIN_AGE - 1
 }
 
 export const OK = 'ok'

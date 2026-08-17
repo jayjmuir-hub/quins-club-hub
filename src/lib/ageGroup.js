@@ -6,19 +6,26 @@
 // only age signal on a team row, they are club-controlled, stable, and already
 // the thing every screen groups by.
 //
-// ⚠️ THE CLUB *DOES* HOLD DATES OF BIRTH SINCE 16 Aug 2026 (public.player_private),
-// AND `allowsOwnContact` IS STILL NOT RE-POINTED AT THEM. This note used to say
-// "if a DOB column ever lands, allowsOwnContact is the one place to re-point".
-// It landed, and that sentence points at a trap: RUGBY AGE BANDS ARE
-// SEASON-RELATIVE AND A BIRTHDAY IS NOT. A U13 squad is mostly TWELVE-year-olds
-// for most of the season, so "is this child 13 today?" would strip the
-// own-contact field from nearly a whole squad the club's own rule permits it for.
+// ⚠️ THE CLUB HOLDS DATES OF BIRTH SINCE 16 Aug 2026, AND THE RE-POINT IS DONE —
+// BUT IT IS `allowsOwnContactFor` IN src/lib/ageGrade.js, NOT THIS FILE. The
+// version below still answers from the squad name alone, deliberately, and is
+// what a caller with no birthday to offer should keep using.
 //
-// ⚠️ ANYTHING REASONING ABOUT A CHILD'S AGE BELONGS IN src/lib/ageGrade.js, which
-// asks it AT THE 31 AUGUST CUT-OFF. If this gate is ever re-pointed it goes
-// through there, and it may only ever make the rule STRICTER — a parent may
-// write their own child's birthday, so the other direction would let a family
-// unlock a field the club forbids.
+// ⚠️ IT COULD NOT LIVE HERE: ageGrade.js already imports this module for the
+// band table, so a DOB-aware gate in this file would make the two import each
+// other. That is why the two names exist rather than one function growing a
+// second argument.
+//
+// ⚠️ RUGBY AGE BANDS ARE SEASON-RELATIVE AND A BIRTHDAY IS NOT, which is why the
+// re-pointed version asks the age AT THE 31 AUGUST CUT-OFF and never "how old
+// are they today". A U13 squad is mostly TWELVE-year-olds for most of the
+// season, so today's age would strip the field from nearly a whole squad the
+// club's own rule permits it for.
+//
+// ⚠️ AND IT MAY ONLY EVER MAKE THE RULE STRICTER. A parent may write their own
+// child's birthday, so a gate that a birthday could OPEN is one a family can
+// unlock by typing a different year. `allowsOwnContactFor` computes the squad
+// answer first and returns a false immediately.
 //
 // THE RULE (Jay, 3 Aug 2026): a player in U13 or above may optionally hold
 // their own email and phone. Below U13 they may not, and the forms must not

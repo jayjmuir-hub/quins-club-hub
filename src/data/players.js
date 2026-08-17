@@ -361,6 +361,37 @@ export async function listPlayerPrivate(playerIds) {
 }
 
 /**
+ * WHICH children have a private row at all — the ids, and nothing else.
+ *
+ * ⚠️ THIS EXISTS SO THAT THE ADMIN GAP LIST NEVER PULLS A SINGLE BIRTHDAY. That
+ * screen asks one question of every child in the club — "is there a date of
+ * birth on file?" — and `listPlayerPrivate` would answer it by fetching every
+ * date of birth the reader is entitled to, into a browser, to be discarded. The
+ * answer needs the presence of the row, not its contents.
+ *
+ * The whole point of `player_private` being a separate table is that a
+ * team-mate's parent cannot read a birthday (see its migration). A club-wide
+ * sweep that hoovers up the lot on behalf of an admin who only wanted a count is
+ * the same mistake from the other end — permitted by RLS, and still more data in
+ * more places than the question required.
+ *
+ * ⚠️ RETURNS A Set OF player_id, DELIBERATELY, so that there is nothing on the
+ * object for a later caller to start reading. A row list would grow a column the
+ * first time somebody wanted one.
+ */
+export async function listPlayerPrivatePresence(playerIds) {
+  const rows = await fetchByIds(playerIds, async (chunk) => {
+    const { data, error } = await supabase
+      .from('player_private')
+      .select('player_id')
+      .in('player_id', chunk)
+    if (error) throw error
+    return data ?? []
+  })
+  return new Set(rows.map((row) => row.player_id))
+}
+
+/**
  * One child's date of birth, or null.
  *
  * ⚠️ NULL MEANS "we cannot see it OR it is not set", and the caller must not

@@ -13,6 +13,7 @@ import PortalChooser from './screens/PortalChooser.jsx'
 import SocialWhatsOn from './screens/SocialWhatsOn.jsx'
 import SocialIdeas from './screens/SocialIdeas.jsx'
 import AdminClub from './screens/AdminClub.jsx'
+import AdminNeedsAttention from './screens/AdminNeedsAttention.jsx'
 import AdminRightsLog from './screens/AdminRightsLog.jsx'
 import AdminStaff from './screens/AdminStaff.jsx'
 import Accounts from './screens/Accounts.jsx'
@@ -176,6 +177,11 @@ export default function App() {
                 grants nobody anything new. A MEMBER-facing version does need
                 one: claude/plans/2026-08-13-squad-staff-on-home.md. */}
             <Route path="staff" element={<AdminStaff />} />
+            {/* Where the club is missing a birthday, a parent or a gender —
+                the third surface of src/lib/completeness.js. No admin right:
+                every admin is a registrar, and the screen carries no contact
+                detail and no dates. */}
+            <Route path="needs-attention" element={<AdminNeedsAttention />} />
             {/* Who gave whom access, and when. ⚠️ THE ONLY ADMIN ROUTE WHOSE
                 AUDIENCE IS NARROWER THAN AdminDashboard's isAdmin() GATE — it
                 records what admins do, so an ordinary admin must not be its

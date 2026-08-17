@@ -10,7 +10,67 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- 🔒 **AND NOW SOMEBODY CAN READ IT — `/admin/rights-log`.** The audit trigger
+- 🔒 **THE `allowsOwnContact` RE-POINT — PROMISED 3 Aug, DEFERRED THREE TIMES,
+  DONE.** A player's own email and phone are now decided by the squad name **and**
+  the birthday, so **item 3 is complete and the plan is finished.**
+  ⚠️ **THE BIRTHDAY MAY ONLY EVER CLOSE THE GATE, AND THE CODE SAYS SO IN ONE
+  LINE.** A parent writes their own child's birthday — deliberately, the family is
+  the source of truth — so a gate a birthday could OPEN is a gate a family
+  unlocks by typing a different year. `allowsOwnContactFor` computes the squad
+  answer first and returns a `false` immediately. **There is a property test
+  sweeping every squad against every birthday shape asserting the widening
+  direction is unreachable**, not just the cases somebody thought to enumerate.
+  ⚠️ **IT ASKS THE AGE AT THE 31 AUGUST CUT-OFF, NEVER "how old are they
+  today".** Rugby bands are season-relative and a birthday is not: a U13 squad is
+  mostly TWELVE-year-olds for most of the season, so today's age would strip the
+  field from nearly a whole squad the club's own rule permits it for — gradually,
+  as birthdays passed, which is the hardest kind of bug to attribute.
+  ⚠️ **AN UNKNOWN BIRTHDAY CHANGES NOTHING AND MUST NOT FAIL CLOSED.**
+  `getPlayerDob` returns null both for "not set" and for "RLS will not show you".
+  Closing on that would remove the field from every child in a club whose
+  `player_private` is nearly empty, and would do it to team-mates' records purely
+  because the reader could not see them.
+  ⚠️ **ONE HOOK, THREE SCREENS** — `useOwnContactGate`, read by PlayerForm,
+  PlayerDetail and MyPlayerForm. Three copies of "read the birthday, then narrow"
+  is three chances for one of them to fail open, and the one that did would be the
+  one nobody tested. In PlayerForm it is called **above** the `gated` early
+  return, which is a hook-order requirement rather than a style choice.
+  ⚠️ **MyPlayerForm DECLINES TO FETCH, NOT MERELY TO RENDER**, which is why the
+  hook also returns `settled`. Loading a child's email and phone and then hiding
+  them would be correct and would leave the row in the component for the next
+  person to render by accident.
+  ⛔ **AND ONE ASSERTION WAS PASSING WITHOUT TESTING ANYTHING.** "It opens on the
+  squad's answer first, so the fields do not blink" was written against the DOM —
+  but in jsdom `useEffect` flushes inside `render`, so the DOM can only ever show
+  the effect's value and **the `useState` seed the browser actually paints was
+  untested**. Breaking it on purpose left every test green. The probe now records
+  every render and asserts `renders[0]`.
+
+- ✨ **AND THE CLUB CAN SEE ITS OWN GAPS — `/admin/needs-attention`.** The THIRD
+  and last surface of the completeness rule, so item 6 is now complete. The other
+  two ask the person who can fix it at the moment they are already looking; this
+  one answers the club's question — *where are we actually missing things?* — for
+  somebody who opens it deliberately.
+  ⚠️ **IT READS `src/lib/completeness.js`, IT DOES NOT RESTATE IT.** One rule,
+  three surfaces. A second opinion here would be a second answer, and the wrong
+  one would be the one nobody tested.
+  ⚠️ **IT CAN BE EMPTY, AND THAT IS ASSERTED FIRST.** A list that always has rows
+  is one nobody finishes — the same contract the family's disappearing card is
+  built on. **Position stays out**: 23 of 26 players have none, and listing it
+  would put almost every player on this screen forever.
+  ⚠️ **NOT ONE DATE OF BIRTH IS FETCHED.** `player_private` is a separate table
+  precisely so a team-mate's parent cannot read a birthday; a club-wide sweep
+  that pulls every date in order to COUNT the missing ones is the same mistake
+  from the privileged end. New reader `listPlayerPrivatePresence` returns a Set
+  of ids and nothing else, so there is no date on the object for a later change
+  to start rendering. Nothing on the screen is a contact detail.
+  ⚠️ **AND IT SAYS THE FAMILIES ARE ALREADY BEING ASKED**, because the useful
+  next action is usually nothing. Without that line a registrar rings people the
+  app is politely chasing, and one birthday gets asked for twice.
+  ⚠️ **THE SQUAD HEADING CARRIES THE DENOMINATOR** — "1 of 2", not "1". How much
+  work there is and how bad it is are different questions.
+
+- `01ec41f` — 🔒 **AND NOW SOMEBODY CAN READ IT — `/admin/rights-log`.** The audit trigger
   shipped the day before with **nothing anywhere that could open it**. A log
   nobody can read is not accountability; it is a table that looks like
   accountability in the schema and answers nothing at the moment somebody asks

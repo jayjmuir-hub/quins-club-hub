@@ -25,6 +25,7 @@ const listPlayerGradesMock = vi.fn()
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/data/players.js', () => ({
   listPlayers: async () => [],
+  getPlayerDob: vi.fn(() => Promise.resolve(null)),
   getPlayerContact: async () => null,
   upsertPlayer: (...a) => upsertPlayerMock(...a),
   deletePlayer: async () => {},

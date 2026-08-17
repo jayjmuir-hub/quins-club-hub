@@ -16,7 +16,7 @@ import {
   setOwnPlayerPhotoFocus,
   uploadPlayerPhoto,
 } from '../data/photos.js'
-import { allowsOwnContact } from '../lib/ageGroup.js'
+import useOwnContactGate from '../lib/useOwnContactGate.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 import { parentNameProblem, toEditorRows, toSaveRows } from '../lib/parentRows.js'
 
@@ -51,7 +51,17 @@ const FIELD =
 const LABEL = 'mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-faint'
 
 export default function MyPlayerForm({ player, team, onClose, onSaved }) {
-  const showOwnContact = allowsOwnContact(team?.name)
+  // ⚠️ THE BIRTHDAY NARROWS THE SQUAD'S ANSWER, AND CAN ONLY NARROW IT (17 Aug
+  // 2026, the re-point). The squad name decides whether to ask at all; the
+  // birthday can then take the fields away from a child playing up in a squad
+  // old enough to have them. It can never grant them — a parent writes their own
+  // child's birthday, so the other direction is a family unlocking a field the
+  // club forbids. One hook, shared with PlayerForm and PlayerDetail, because
+  // three copies of this is three chances for one of them to fail open.
+  const { allowed: showOwnContact, settled: gateSettled } = useOwnContactGate(
+    player.id,
+    team?.name,
+  )
 
   // ⚠️ Fails OPEN on a missing team, unlike showOwnContact directly above it,
   // which fails CLOSED. The asymmetry is deliberate and worth the two lines:
@@ -90,6 +100,16 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
     // allSettled: a missing contact row is the NORMAL case (and for an
     // under-13 it is withheld by design), so a rejection here must not stop
     // someone editing their parent rows.
+    //
+    // ⚠️ `gateSettled`, NOT `showOwnContact`, AND THE DIFFERENCE IS THE POINT.
+    // The gate answers optimistically with the SQUAD's verdict while the
+    // birthday is still in flight, so acting on it here would fetch a child's
+    // own email and phone and only afterwards discover they may not have one.
+    // Hiding the boxes would still be correct; leaving the row in the component
+    // for the next person to render would not. Waiting costs one extra round
+    // trip behind a spinner that is already on screen.
+    if (!gateSettled) return undefined
+
     Promise.allSettled([listParents(player.id), showOwnContact ? getPlayerContact(player.id) : null])
       .then(([parentsResult, contactResult]) => {
         if (!mounted) return
@@ -112,7 +132,7 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
     return () => {
       mounted = false
     }
-  }, [player.id, showOwnContact])
+  }, [player.id, showOwnContact, gateSettled])
 
   async function handleSubmit(event) {
     event.preventDefault()
