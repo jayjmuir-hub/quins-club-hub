@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 🧰 **THREE WAYS OPENING A PULL REQUEST FAILS THAT LOOK LIKE YOUR MISTAKE**, in
+  `claude/runbooks/session-and-push.md`. All three were met opening #222.
+  GitHub can **503 on API writes while reads stay green**, and `git push` is
+  unaffected — so a branch can sit on the remote with no way to open a pull
+  request for it. A body built inside a double-quoted shell string has its
+  backticked words **executed and removed**, which is how the comment closing #221
+  posted with three holes in it. And `gh pr merge --delete-branch` prints a
+  `fatal:` in a worktree *after* it has already merged.
+
+- `61ff76d` — 🎨 **A HEAD COACH IS THE SAME SIZE IN EVERY SQUAD.** The squash SHA
+  for the entry below, which could not cite itself.
+
 - 🎨 **A HEAD COACH IS THE SAME SIZE IN EVERY SQUAD.** Jay, 16 Aug, comparing two
   cards on Home: *"the U13 head coach bubble is not the standard double size"*.
   `tileSpans` refused the tall lead tile below three people, and the squads that
