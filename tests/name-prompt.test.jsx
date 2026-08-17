@@ -36,6 +36,7 @@ const createAccessRequestMock = vi.fn()
 const listPlayerPrivateMock = vi.fn()
 const listPlayersMock = vi.fn()
 const setPlayerDobMock = vi.fn()
+const updatePlayerDobMock = vi.fn()
 
 vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => useAuthMock(),
@@ -70,7 +71,10 @@ vi.mock('../src/data/players.js', async (importOriginal) => ({
   ...(await importOriginal()),
   listPlayerPrivate: (...args) => listPlayerPrivateMock(...args),
   listPlayers: (...args) => listPlayersMock(...args),
+  // BOTH writers are mocked so a test can assert which one was reached. They
+  // are not interchangeable — see the play-up case below.
   setPlayerDob: (...args) => setPlayerDobMock(...args),
+  updatePlayerDob: (...args) => updatePlayerDobMock(...args),
 }))
 
 vi.mock('../src/data/accessRequests.js', () => ({
@@ -161,6 +165,7 @@ beforeEach(() => {
   listPlayerPrivateMock.mockReset()
   listPlayersMock.mockReset()
   setPlayerDobMock.mockReset()
+  updatePlayerDobMock.mockReset()
   getMyAccessRequestMock.mockResolvedValue(null)
   // ⚠️ THE DEFAULT MEMBERSHIP CARRIES NO player_id, so the birthday gate is not
   // due in any case above and these seeds are never consulted by them. They are
@@ -168,6 +173,7 @@ beforeEach(() => {
   listPlayerPrivateMock.mockResolvedValue([])
   listPlayersMock.mockResolvedValue([])
   setPlayerDobMock.mockResolvedValue({ player_id: 'p-1', date_of_birth: '2015-03-04' })
+  updatePlayerDobMock.mockResolvedValue({ player_id: 'p-1', date_of_birth: '2015-03-04' })
   window.localStorage.clear()
   // useMyProfile's cache is module-level and survives a render, so without this
   // one test's profile row leaks into the next. Same reason
@@ -966,14 +972,21 @@ describe('NamePrompt — the birthday step', () => {
     await user.type(screen.getByTestId('dob-p-1'), '2015-03-04')
     await user.click(screen.getByRole('button', { name: /save and continue/i }))
 
-    await waitFor(() => expect(setPlayerDobMock).toHaveBeenCalledWith('p-1', '2015-03-04'))
+    await waitFor(() => expect(updatePlayerDobMock).toHaveBeenCalledWith('p-1', '2015-03-04'))
     await waitFor(() => expect(screen.queryByText(BIRTHDAY_TITLE)).toBeNull())
   })
 
-  // ⚠️ plays_up_confirmed_at RECORDS A PARENT TICKING A BOX. Writing it here
-  // would invent an agreement nobody gave — PR #213 in reverse. setPlayerDob
-  // defaults the flag to false; this pins that the call site never sets it.
-  it('never records a play-up agreement', async () => {
+  // ⚠️ THIS ASSERTS WHICH WRITER IS USED, AND THE TWO ARE NOT INTERCHANGEABLE.
+  // setPlayerDob writes `plays_up_confirmed_at: playsUp ? now : null`, so calling
+  // it here — with the flag at its default — ERASES a parent's recorded play-up
+  // consent. That is right for the registration form, which asks both questions
+  // together, and wrong here, where nobody is asked about consent at all.
+  //
+  // ⚠️ AND IT IS NOT HYPOTHETICAL FOR THIS STEP. The gate also fires on a row
+  // that EXISTS with a null birthday — see the case above — which is exactly the
+  // row that can already carry an agreement. Measured on production in a
+  // rolled-back transaction: the old writer erased it, updatePlayerDob kept it.
+  it('uses the writer that cannot erase a play-up agreement', async () => {
     const user = userEvent.setup()
     asParent()
     listPlayerPrivateMock.mockResolvedValue([])
@@ -983,9 +996,10 @@ describe('NamePrompt — the birthday step', () => {
     await user.type(screen.getByTestId('dob-p-1'), '2015-03-04')
     await user.click(screen.getByRole('button', { name: /save and continue/i }))
 
-    await waitFor(() => expect(setPlayerDobMock).toHaveBeenCalled())
-    const options = setPlayerDobMock.mock.calls[0][2]
-    expect(options?.playsUp ?? false).toBe(false)
+    await waitFor(() => expect(updatePlayerDobMock).toHaveBeenCalled())
+    expect(setPlayerDobMock).not.toHaveBeenCalled()
+    // Two arguments only — no options object through which the flag could travel.
+    expect(updatePlayerDobMock.mock.calls[0]).toHaveLength(2)
   })
 
   it('refuses a blank date and names the child it wants', async () => {

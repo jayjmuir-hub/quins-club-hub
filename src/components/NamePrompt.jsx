@@ -14,7 +14,7 @@ import {
 // OWN FAMILY WRITE IT (20260816_player_private_dob.sql), so the birthday step
 // below needs NO migration and NO new write path. If one ever appears here,
 // something has been misunderstood.
-import { listPlayerPrivate, listPlayers, setPlayerDob } from '../data/players.js'
+import { listPlayerPrivate, listPlayers, updatePlayerDob } from '../data/players.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { joinPhone, splitPhone } from '../lib/phone.js'
@@ -434,11 +434,15 @@ export default function NamePrompt() {
    * missing. Undoing the good write to make the batch atomic would throw away a
    * real answer to make a failure tidier.
    *
-   * ⚠️ IT MUST NOT WRITE plays_up_confirmed_at. setPlayerDob takes a `playsUp`
-   * flag defaulting false, and that column records A PARENT TICKING A BOX to
-   * agree their child plays up. Setting it from here would invent an agreement
-   * nobody gave — the failure PR #213 was about, in reverse. The flag is left
-   * at its default deliberately; do not "pass it through" from anywhere.
+   * ⚠️ updatePlayerDob, NOT setPlayerDob, AND THE DIFFERENCE IS A REAL BUG THIS
+   * HAD UNTIL IT WAS MEASURED. setPlayerDob writes
+   * `plays_up_confirmed_at: playsUp ? now : null`, so calling it here — with the
+   * flag at its default — would ERASE a parent's recorded play-up consent.
+   * Harmless for a child with no row at all, which is most of them today; not
+   * harmless for the case this very step also fires on, a row that exists with a
+   * null birthday and an agreement already on file. Proved against production in
+   * a rolled-back transaction: the old call erased it, this one keeps it.
+   * That column records A PARENT TICKING A BOX, and nothing here asks them.
    *
    * ⚠️ AND IT DOES NOT CHECK THE AGE GRADE. A birthday may well reveal a child
    * is in the wrong squad, and that is real — but it is the club's problem to
@@ -459,7 +463,7 @@ export default function NamePrompt() {
     setSaving(true)
     setError(null)
     Promise.all(
-      dobChildren.map((child) => setPlayerDob(child.id, String(dobDrafts[child.id]).trim())),
+      dobChildren.map((child) => updatePlayerDob(child.id, String(dobDrafts[child.id]).trim())),
     )
       .then(() => {
         if (needRole) {
