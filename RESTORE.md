@@ -226,6 +226,20 @@ character**, so `U12G QR` matched nothing, the band came back `null`, and
 `/^u(\d{1,2})(?![0-9])/i` now. **The regex was the symptom; the null default was the
 bug.**
 
+**⚠️ THE AGE-GRADE CUT-OFF IS 31 AUGUST, BUT THE APP ROLLS OVER ON 1 JUNE.** Two
+different dates doing two different jobs, and confusing them was a live bug (17 Aug
+2026). `CUTOFF_MONTH`/`CUTOFF_DAY` are **31 August** — the date a child's age is
+measured at. `ROLLOVER_MONTH`/`ROLLOVER_DAY` are **1 June** — the date from which
+`cutoffFor()` starts pointing at the *coming* season's cut-off instead of the one
+just finished. A family registering in July or August is registering for a season
+that has not started, and judging them against the season containing today made
+every child a year too young.
+⚠️ **AND IT ONLY SHOWED ON SINGLE-AGE BANDS.** U16 and U18 span two cut-off ages
+each, so the lower age absorbed the off-by-one and those squads looked fine while
+U9–U14 were all wrong. **Any test of age-grade behaviour written at a mid-season
+date cannot see this class of bug** — `tests/parent-self-registration.test.jsx` is
+frozen at 7 Nov 2026 and was green throughout.
+
 **⚠️ THERE ARE TWO OWN-CONTACT GATES AND THEY ARE NOT INTERCHANGEABLE.**
 `allowsOwnContact(teamName)` in `src/lib/ageGroup.js` answers from the squad name
 alone. `allowsOwnContactFor({ teamName, dateOfBirth })` in `src/lib/ageGrade.js` also

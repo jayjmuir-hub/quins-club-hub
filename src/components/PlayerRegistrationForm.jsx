@@ -248,7 +248,15 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
 
   // Silent until BOTH answers are on screen, so nobody is questioned about a
   // squad they have not picked yet.
-  const ageCheck = ageGradeCheck(selectedTeam?.name, row.dob)
+  //
+  // ⚠️ `squadNames` IS WHAT LETS THE MESSAGE NAME A REAL SQUAD — "That is U12
+  // Mixed" rather than "That is U12" (Jay, 17 Aug 2026). It is the list the
+  // dropdown is already built from, so the squad it names is always one the
+  // parent can actually pick. Passing nothing degrades to the band, which is
+  // why this is an option and not a required argument.
+  const ageCheck = ageGradeCheck(selectedTeam?.name, row.dob, undefined, {
+    squadNames: teams.map((team) => team.name),
+  })
 
   const firstId = `register-player-first-${row.key}`
   const lastId = `register-player-last-${row.key}`

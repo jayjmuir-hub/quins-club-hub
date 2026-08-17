@@ -10,6 +10,48 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ⛔ **THE AGE CUT-OFF WAS A YEAR BEHIND, AND IT WAS BLOCKING REAL
+  REGISTRATIONS.** Jay, 17 Aug 2026, reading the age-band table: *"i think this is
+  wrong because we are doing this for the upcoming season that starts sept 1st"*.
+  He was right, and the fault was live.
+  ⚠️ **`cutoffFor` RETURNED THE CUT-OFF OF THE SEASON CONTAINING TODAY.** The
+  cut-off is 31 August, so on 17 Aug 2026 it pointed at **31 Aug 2025** — while
+  every family registering that week was registering for a season starting in two
+  weeks. Every child came out **one year too young**.
+  ⚠️ **AND IT WAS NOT A COSMETIC WARNING.** `PlayerRegistrationForm` REFUSES to
+  submit an unconsented play-up, so an ordinary U13 registrant was **blocked**
+  until their parent agreed to a play-up that was not happening — and the
+  agreement wrote `plays_up_confirmed_at`, which sends a false *"Playing up"*
+  chip to that squad's coaches. **Wrong data, not just wrong words.**
+  ⚠️ **IT WAS INVISIBLE ON EXACTLY THE SQUADS WHERE IT DID NOT MATTER.** U16 and
+  U18 are DOUBLE bands, so the lower age of the pair absorbed the off-by-one and
+  both came out `ok`; **every single-band squad from U9 to U14 was wrong.** The
+  same shape as the `\b` regex bug in `RESTORE.md` — right by accident in most
+  cases, wrong in the one that counted.
+  ✅ **NOTHING FALSE WAS EVER WRITTEN — MEASURED, NOT ASSUMED.** `player_private`
+  was empty: 0 rows, 0 birthdays, 0 marked as playing up. Caught inside the
+  registration window, by days.
+  **The fix is one constant: the app rolls over to the coming season on 1 JUNE**
+  (Jay's call, over a settings row — nobody has to remember anything each August).
+  ⚠️ **SEPTEMBER TO MAY IS UNCHANGED**, and there are tests either side of that
+  to prove the fix did not just move the bug to the other end of the year.
+  ⚠️ **AND THE WHOLE `parent-self-registration` FILE WAS GREEN THROUGHOUT**, because
+  every case in it is frozen at **7 Nov 2026** — in season, where the old and new
+  cut-offs agree. There is now one test frozen in **August**, which is the only
+  one that could ever have caught this.
+  ✨ **A PLAY-UP MESSAGE NOW NAMES THE SQUAD THE CHILD BELONGS IN** — *"That is
+  U12 Mixed. You have chosen U13 Mixed, which is one age group up."* (Jay's
+  choice.) A parent who picked the wrong age group was being asked to CONSENT
+  rather than shown their mistake, and consenting is much the easier of the two.
+  ⛔ **AND FAULT INJECTION FOUND A GUARD THAT COULD NEVER FIRE.** A branch
+  suppressing *"That is X"* when X was the squad already chosen — with a passing
+  test — turned out to be unreachable: `ownBandForAge` is the exact inverse of
+  `cutoffAgesForTeam`, so that case returns `ok` long before it. Deleting it broke
+  nothing. **281** non-`ok` results across every squad × every age, 176 naming a
+  squad, **none** naming the chosen one. The guard is gone and the sweep is now
+  the test. ⚠️ **Its control was wrong on the first run too** — it demanded all
+  281 carry a name, when ages outside the band table correctly carry none.
+
 - `1d1c206` — 🔒 **THE `allowsOwnContact` RE-POINT — PROMISED 3 Aug, DEFERRED THREE TIMES,
   DONE.** A player's own email and phone are now decided by the squad name **and**
   the birthday, so **item 3 is complete and the plan is finished.**
@@ -46,7 +88,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   untested**. Breaking it on purpose left every test green. The probe now records
   every render and asserts `renders[0]`.
 
-- 📝 **AND `claude/open-items.md`'s "No audit log" IS NARROWED, NOT CLOSED.** The
+- `e572545` — 📝 **AND `claude/open-items.md`'s "No audit log" IS NARROWED, NOT CLOSED.** The
   new rights log covers **one of the four things that item listed** — memberships,
   including super-admin. A deleted player and an edited contact detail still leave
   no trace at all, and the first of those is the more alarming on a club whose
