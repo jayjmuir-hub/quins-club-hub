@@ -2,7 +2,7 @@
 // Nothing in this file touches the DOM, and a jsdom costs ~1.3s to build. The
 // measurement and the rule are in vite.config.js.
 import { describe, it, expect } from 'vitest'
-import { toEditorRows, toSaveRows } from '../src/lib/parentRows.js'
+import { parentNameProblem, toEditorRows, toSaveRows } from '../src/lib/parentRows.js'
 import { splitPhone } from '../src/lib/phone.js'
 
 // src/lib/parentRows.js — the two shape conversions ParentsEditor needs.
@@ -25,10 +25,14 @@ import { splitPhone } from '../src/lib/phone.js'
 // The round-trip test below is the one that matters: it is the property the
 // bug violated.
 
+// All three name columns, because the real table carries all three —
+// private.sync_person_name keeps them in step both ways.
 const DB_ROW = {
   id: 'pp-1',
   player_id: 'p-1',
   full_name: 'Hannah Okafor',
+  first_name: 'Hannah',
+  last_name: 'Okafor',
   relationship: 'Mother',
   email: 'hannah@example.com',
   phone: '+971501234567',
@@ -54,9 +58,10 @@ describe('toEditorRows', () => {
   // uncontrolled the moment its value goes null, so these must be ''.
   it('turns every null text column into an empty string', () => {
     const [row] = toEditorRows([
-      { id: 'pp-2', full_name: null, relationship: null, email: null, phone: null },
+      { id: 'pp-2', first_name: null, last_name: null, relationship: null, email: null, phone: null },
     ])
-    expect(row.full_name).toBe('')
+    expect(row.first_name).toBe('')
+    expect(row.last_name).toBe('')
     expect(row.relationship).toBe('')
     expect(row.email).toBe('')
     expect(row.phoneNational).toBe('')
@@ -66,7 +71,15 @@ describe('toEditorRows', () => {
   it('never throws on junk, and returns [] rather than undefined', () => {
     expect(toEditorRows(null)).toEqual([])
     expect(toEditorRows(undefined)).toEqual([])
-    expect(toEditorRows([null])[0].full_name).toBe('')
+    expect(toEditorRows([null])[0].first_name).toBe('')
+  })
+
+  // ⚠️ AN EDITOR ROW HAS NO `full_name` AT ALL, and that is the point rather
+  // than an omission: a third value describing the same thing would be free to
+  // disagree with the two boxes the moment either is typed in. toSaveRows
+  // rebuilds it on the way out, which is the only place it is ever true.
+  it('carries no full_name onto an editor row', () => {
+    expect(toEditorRows([DB_ROW])[0].full_name).toBeUndefined()
   })
 
   // ⚠️ `savedEmail` IS WHAT THE DATABASE HOLDS; `email` becomes whatever is
@@ -101,12 +114,38 @@ describe('toSaveRows', () => {
 
   it('carries the rest of the row through untouched', () => {
     const [row] = toSaveRows([
-      { id: 'pp-1', full_name: 'Hannah', relationship: 'Mother', email: 'h@e.com', is_primary: true,
-        phoneCountry: 'AE', phoneNational: '501234567' },
+      { id: 'pp-1', first_name: 'Hannah', last_name: 'Okafor', relationship: 'Mother',
+        email: 'h@e.com', is_primary: true, phoneCountry: 'AE', phoneNational: '501234567' },
     ])
     expect(row).toMatchObject({
-      id: 'pp-1', full_name: 'Hannah', relationship: 'Mother', email: 'h@e.com', is_primary: true,
+      id: 'pp-1', first_name: 'Hannah', last_name: 'Okafor', relationship: 'Mother',
+      email: 'h@e.com', is_primary: true,
     })
+  })
+
+  // ⚠️ REBUILT FROM THE TWO BOXES, AND FILTERED RATHER THAN TEMPLATED. A
+  // missing family name must give "Kwame", never "Kwame " — the trigger splits
+  // on whitespace, and a trailing space makes the last name an empty string
+  // instead of a null one.
+  it('rebuilds full_name from the two boxes', () => {
+    expect(toSaveRows([{ first_name: 'Hannah', last_name: 'Okafor' }])[0].full_name).toBe(
+      'Hannah Okafor',
+    )
+    expect(toSaveRows([{ first_name: 'Kwame', last_name: '' }])[0].full_name).toBe('Kwame')
+    expect(toSaveRows([{ first_name: ' Hannah ', last_name: ' Okafor ' }])[0].full_name).toBe(
+      'Hannah Okafor',
+    )
+  })
+
+  // ⚠️ A MULTI-WORD FAMILY NAME IS THE CASE THAT MAKES THE SPLIT COLUMNS WORTH
+  // WRITING AT ALL. The trigger takes the LAST word as the family name, so a
+  // row sent as full_name only would come back as "Anna van der" / "Berg".
+  // Sending first_name and last_name takes the names-win branch instead.
+  it('keeps a two-word family name intact in the columns it writes', () => {
+    const [row] = toSaveRows([{ first_name: 'Anna', last_name: 'van der Berg' }])
+    expect(row.first_name).toBe('Anna')
+    expect(row.last_name).toBe('van der Berg')
+    expect(row.full_name).toBe('Anna van der Berg')
   })
 
   // ⚠️ THE ORDERING. `...row` first, `phone` last. Reversed, a stale `phone`
@@ -131,6 +170,51 @@ describe('toSaveRows', () => {
   it('never throws on junk', () => {
     expect(toSaveRows(null)).toEqual([])
     expect(toSaveRows([null])[0].phone).toBeNull()
+  })
+})
+
+// ══ BOTH NAMES, ONCE, FOR BOTH SCREENS ══════════════════════════════════
+// PlayerForm and MyPlayerForm are the only two writers of public.player_parents
+// — no RPC and no importer touches it — so this function is the whole rule.
+// Written twice, it would be a rule free to disagree with itself, and the copy
+// nobody tested would be the one that let a one-word name through.
+describe('parentNameProblem', () => {
+  const NAMED = { first_name: 'Hannah', last_name: 'Okafor' }
+
+  it('passes a row with both names', () => {
+    expect(parentNameProblem([NAMED])).toBeNull()
+  })
+
+  it('refuses a first name on its own — the bug this item exists to fix', () => {
+    expect(parentNameProblem([{ first_name: 'Hannah' }])).toMatch(/family name/i)
+  })
+
+  it('refuses a family name on its own, which reads as a name and is not one', () => {
+    expect(parentNameProblem([{ last_name: 'Okafor' }])).toMatch(/first name/i)
+  })
+
+  // ⚠️ ADDING A PARENT AND CHANGING YOUR MIND IS NOT AN ERROR. saveParents
+  // drops a row with no name anyway, so refusing here would block a save over a
+  // row that was never going to be written.
+  it('ignores a row nobody typed anything into', () => {
+    expect(parentNameProblem([{ first_name: '', last_name: '', email: '', phoneNational: '' }])).toBeNull()
+    expect(parentNameProblem([])).toBeNull()
+  })
+
+  // ...but a row with contact details in it HAS been started, and a phone
+  // number attached to half a name is exactly the record that helps nobody.
+  it('counts a row as started once it carries an email or a phone', () => {
+    expect(parentNameProblem([{ email: 'h@e.com' }])).toMatch(/first name/i)
+    expect(parentNameProblem([{ phoneNational: '501234567' }])).toMatch(/first name/i)
+  })
+
+  it('checks every row, not just the first', () => {
+    expect(parentNameProblem([NAMED, { first_name: 'Mark' }])).toMatch(/family name/i)
+  })
+
+  it('never throws on junk', () => {
+    expect(parentNameProblem(null)).toBeNull()
+    expect(parentNameProblem([null])).toBeNull()
   })
 })
 

@@ -51,7 +51,17 @@ import PlayerForm from '../src/screens/PlayerForm.jsx'
 const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 const TEAM = { id: 't-u16', club_id: CLUB_ID, name: 'U16', sort_order: 11 }
 const COACH = [{ id: 'm-c', role: 'coach', team_id: 't-u16' }]
-const PLAYER = { id: 'p-1', club_id: CLUB_ID, team_id: 't-u16', full_name: 'Idris Vanterpool' }
+// All three name columns, as a real row carries them — the split pair is what
+// the form's two name boxes bind to, and a fixture with only full_name renders
+// them empty, which the form then refuses to save.
+const PLAYER = {
+  id: 'p-1',
+  club_id: CLUB_ID,
+  team_id: 't-u16',
+  full_name: 'Idris Vanterpool',
+  first_name: 'Idris',
+  last_name: 'Vanterpool',
+}
 
 function renderForm({ player = null } = {}) {
   useMembershipsMock.mockReturnValue({
@@ -82,7 +92,8 @@ describe('multiple positions', () => {
     // the forwards/backs fallback — so the form keeps it in step with the first
     // position rather than rewriting all six readers.
     const user = renderForm()
-    await user.type(screen.getByLabelText('Full name'), 'Idris Vanterpool')
+    await user.type(screen.getByLabelText('First name', { selector: '#player-first-name' }), 'Idris')
+    await user.type(screen.getByLabelText('Family name', { selector: '#player-last-name' }), 'Vanterpool')
     // ⚠️ BY ROLE, NOT BY TEXT. Each position appears TWICE in this form — once
     // as a checkbox chip and once as an <option> in the single-select below it,
     // which is deliberate (the select still serves players with one position).
@@ -101,7 +112,8 @@ describe('multiple positions', () => {
 
   it('leaves the primary alone when nothing is ticked', async () => {
     const user = renderForm()
-    await user.type(screen.getByLabelText('Full name'), 'Idris Vanterpool')
+    await user.type(screen.getByLabelText('First name', { selector: '#player-first-name' }), 'Idris')
+    await user.type(screen.getByLabelText('Family name', { selector: '#player-last-name' }), 'Vanterpool')
     await user.selectOptions(screen.getByLabelText('Position'), 'Wing')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
@@ -114,7 +126,8 @@ describe('multiple positions', () => {
 describe('tier grading', () => {
   it('saves the chosen tier', async () => {
     const user = renderForm()
-    await user.type(screen.getByLabelText('Full name'), 'Idris Vanterpool')
+    await user.type(screen.getByLabelText('First name', { selector: '#player-first-name' }), 'Idris')
+    await user.type(screen.getByLabelText('Family name', { selector: '#player-last-name' }), 'Vanterpool')
     await user.selectOptions(screen.getByLabelText('Tier'), 'B')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
@@ -126,7 +139,8 @@ describe('tier grading', () => {
     // of a grade, not a grade whose value is nothing. Two ways to say ungraded
     // would mean every reader had to check both.
     const user = renderForm()
-    await user.type(screen.getByLabelText('Full name'), 'Idris Vanterpool')
+    await user.type(screen.getByLabelText('First name', { selector: '#player-first-name' }), 'Idris')
+    await user.type(screen.getByLabelText('Family name', { selector: '#player-last-name' }), 'Vanterpool')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     await waitFor(() => expect(setPlayerGradeMock).toHaveBeenCalledWith('p-new', null))
@@ -181,7 +195,8 @@ describe('the write order', () => {
     // player with none — the coach has to be told which of the two to check.
     savePlayerPositionsMock.mockRejectedValue(new Error('nope'))
     const user = renderForm()
-    await user.type(screen.getByLabelText('Full name'), 'Idris Vanterpool')
+    await user.type(screen.getByLabelText('First name', { selector: '#player-first-name' }), 'Idris')
+    await user.type(screen.getByLabelText('Family name', { selector: '#player-last-name' }), 'Vanterpool')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

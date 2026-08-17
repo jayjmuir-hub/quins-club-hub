@@ -85,7 +85,16 @@ const REFUSED_PARENT_DELETE =
 function toRow(parent, playerId, index) {
   return {
     player_id: playerId,
+    // ⚠️ ALL THREE NAME COLUMNS. private.sync_person_name takes its names-win
+    // branch when first/last are present and recomputes full_name identically,
+    // so `full_name` here is not a competing value — it is what keeps the
+    // display name right for the thirty-odd readers of it if the trigger is
+    // ever absent. Sending ONLY full_name would be the lossy direction: the
+    // trigger takes the last word as the family name, so "Anna van der Berg"
+    // would come back split as "Anna van der" / "Berg".
     full_name: String(parent.full_name ?? '').trim(),
+    first_name: String(parent.first_name ?? '').trim() || null,
+    last_name: String(parent.last_name ?? '').trim() || null,
     relationship: String(parent.relationship ?? '').trim() || null,
     email: String(parent.email ?? '').trim() || null,
     phone: String(parent.phone ?? '').trim() || null,

@@ -93,11 +93,33 @@ function hasClassToken(element, token) {
   return element.className.split(/\s+/).includes(token)
 }
 
+// ⚠️ THE PLAYER'S NAME IS TWO BOXES SINCE 17 Aug 2026, AND A PARENT ROW'S BOXES
+// CARRY THE SAME LABELS. So every query for the player's own name is pinned to
+// its own id — a bare getByLabelText('First name') is ambiguous the moment a
+// parent row is on screen, and would fail with a message about multiple
+// elements rather than about the thing under test.
+const firstNameBox = (scope = screen) =>
+  scope.getByLabelText('First name', { selector: '#player-first-name' })
+const lastNameBox = (scope = screen) =>
+  scope.getByLabelText('Family name', { selector: '#player-last-name' })
+
+/** Fills both boxes, which is what a save of a NEW player now requires. */
+async function typePlayerName(user, first, last = '', scope = screen) {
+  if (first) await user.type(firstNameBox(scope), first)
+  if (last) await user.type(lastNameBox(scope), last)
+}
+
+// All three name columns, as a real row carries them: the backfill filled
+// first_name/last_name on every existing player and private.sync_person_name
+// keeps them in step from then on. A fixture with only full_name would render
+// two EMPTY name boxes, which is not a state the database can produce.
 const EXISTING_PLAYER = {
   id: 'p-1',
   club_id: CLUB_ID,
   team_id: 't-u14',
   full_name: 'Dhruv Ramachandran',
+  first_name: 'Dhruv',
+  last_name: 'Ramachandran',
   position: 'Flanker',
   is_captain: true,
 }
@@ -218,7 +240,8 @@ describe('PlayerForm — shape and scoping', () => {
   it('still lets a coach edit a player in a squad they do coach', async () => {
     // The other side of the gate above: it must not refuse the normal case.
     await renderEditForm({ memberships: COACH_U14 })
-    expect(screen.getByLabelText('Full name')).toHaveValue('Dhruv Ramachandran')
+    expect(firstNameBox()).toHaveValue('Dhruv')
+    expect(lastNameBox()).toHaveValue('Ramachandran')
   })
 
   it('tells the two refusals apart rather than blaming the wrong thing', () => {
@@ -288,7 +311,7 @@ describe('PlayerForm — validation', () => {
 
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
-    expect(screen.getByLabelText('Full name')).toHaveAttribute('aria-invalid', 'true')
+    expect(firstNameBox()).toHaveAttribute('aria-invalid', 'true')
   })
 
   it('clears the error and the invalid highlight as soon as the field is fixed', async () => {
@@ -296,12 +319,58 @@ describe('PlayerForm — validation', () => {
     renderForm()
 
     await user.click(screen.getByRole('button', { name: /add player/i }))
-    expect(screen.getByLabelText('Full name')).toHaveAttribute('aria-invalid', 'true')
+    expect(firstNameBox()).toHaveAttribute('aria-invalid', 'true')
 
-    await user.type(screen.getByLabelText('Full name'), 'T')
+    await user.type(firstNameBox(), 'T')
 
-    expect(screen.getByLabelText('Full name')).not.toHaveAttribute('aria-invalid')
+    expect(firstNameBox()).not.toHaveAttribute('aria-invalid')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  // ══ THE FAMILY NAME ═════════════════════════════════════════════════════
+  // One box got one word, and a child reached the live roster with a first name
+  // and nothing else. Two boxes only fix that if the second one is required.
+  it('refuses a new player with a first name and nothing else', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await typePlayerName(user, 'Tom')
+    await user.click(screen.getByRole('button', { name: /add player/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/family name/i)
+    expect(lastNameBox()).toHaveAttribute('aria-invalid', 'true')
+    expect(upsertPlayerMock).not.toHaveBeenCalled()
+  })
+
+  // ⚠️ AND IT IS GRANDFATHERED, DELIBERATELY. This form also edits rows that
+  // already exist, and at least one live row has a first name and nothing else.
+  // Demanding a family name there would block a coach fixing a typo in a
+  // position until they invented a surname they may not know — the same trap
+  // the "at least one parent is a WARNING, never a block" ruling names.
+  it('still saves an existing player who arrived without a family name', async () => {
+    const user = userEvent.setup()
+    await renderEditForm({ player: { ...EXISTING_PLAYER, full_name: 'Dhruv', first_name: 'Dhruv', last_name: null } })
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalledTimes(1))
+    expect(upsertPlayerMock.mock.calls[0][0]).toMatchObject({
+      first_name: 'Dhruv',
+      last_name: null,
+      full_name: 'Dhruv',
+    })
+  })
+
+  // ...but nobody may take one away.
+  it('refuses to blank a family name that the row already had', async () => {
+    const user = userEvent.setup()
+    await renderEditForm()
+
+    await user.clear(lastNameBox())
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/family name/i)
+    expect(upsertPlayerMock).not.toHaveBeenCalled()
   })
 
   it('keeps a failed SAVE on screen while typing, unlike a validation error', async () => {
@@ -312,11 +381,11 @@ describe('PlayerForm — validation', () => {
     upsertPlayerMock.mockRejectedValue(new Error('permission denied for table players'))
     renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.click(screen.getByRole('button', { name: /add player/i }))
     await screen.findByRole('alert')
 
-    await user.type(screen.getByLabelText('Full name'), '!')
+    await user.type(firstNameBox(), '!')
 
     expect(screen.getByRole('alert')).toHaveTextContent('permission denied for table players')
   })
@@ -325,7 +394,7 @@ describe('PlayerForm — validation', () => {
     const user = userEvent.setup()
     renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), '   ')
+    await user.type(firstNameBox(), '   ')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     expect(upsertPlayerMock).not.toHaveBeenCalled()
@@ -337,7 +406,7 @@ describe('PlayerForm — saving a new player', () => {
     const user = userEvent.setup()
     const { onSaved, onClose } = renderForm({ memberships: COACH_TWO })
 
-    await user.type(screen.getByLabelText('Full name'), '  Tom Fletcher  ')
+    await typePlayerName(user, '  Tom  ', '  Fletcher  ')
     await user.selectOptions(screen.getByLabelText('Position'), 'Flanker')
     await user.selectOptions(screen.getByLabelText('Age group'), 't-u14')
     await user.click(screen.getByRole('radio', { name: 'Captain' }))
@@ -347,6 +416,12 @@ describe('PlayerForm — saving a new player', () => {
     expect(upsertPlayerMock.mock.calls[0][0]).toEqual({
       club_id: CLUB_ID,
       team_id: 't-u14',
+      // ⚠️ ALL THREE, AND BOTH SPLIT COLUMNS ARE TRIMMED. The boxes were typed
+      // with leading and trailing spaces on purpose: private.sync_person_name
+      // splits on whitespace, so an untrimmed "Fletcher " would give the row an
+      // empty last name rather than a null one.
+      first_name: 'Tom',
+      last_name: 'Fletcher',
       full_name: 'Tom Fletcher',
       position: 'Flanker',
       is_captain: true,
@@ -372,7 +447,7 @@ describe('PlayerForm — saving a new player', () => {
     const user = userEvent.setup()
     renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
@@ -386,7 +461,7 @@ describe('PlayerForm — saving a new player', () => {
     const user = userEvent.setup()
     renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
@@ -398,7 +473,7 @@ describe('PlayerForm — saving a new player', () => {
     upsertPlayerMock.mockResolvedValue({ id: 'p-fresh', full_name: 'Tom Fletcher' })
     renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.type(screen.getByLabelText('Player phone'), '50 200 1000')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
@@ -425,7 +500,7 @@ describe('PlayerForm — saving a new player', () => {
     })
     renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.type(screen.getByLabelText('Player email'), 'guardian@example.com')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
@@ -440,7 +515,7 @@ describe('PlayerForm — saving a new player', () => {
     const user = userEvent.setup()
     renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.type(screen.getByLabelText('Player email'), '  guardian@example.com  ')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
@@ -457,7 +532,8 @@ describe('PlayerForm — editing an existing player', () => {
     const user = userEvent.setup()
     await renderEditForm({ memberships: COACH_TWO })
 
-    expect(screen.getByLabelText('Full name')).toHaveValue('Dhruv Ramachandran')
+    expect(firstNameBox()).toHaveValue('Dhruv')
+    expect(lastNameBox()).toHaveValue('Ramachandran')
     expect(screen.getByLabelText('Position')).toHaveValue('Flanker')
     expect(screen.getByLabelText('Age group')).toHaveValue('t-u14')
     expect(screen.getByRole('radio', { name: 'Captain' })).toBeChecked()
@@ -585,11 +661,12 @@ describe('PlayerForm — failures', () => {
     upsertPlayerMock.mockRejectedValue(new Error('permission denied for table players'))
     const { onClose } = renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('permission denied for table players')
-    expect(screen.getByLabelText('Full name')).toHaveValue('Tom Fletcher')
+    expect(firstNameBox()).toHaveValue('Tom')
+    expect(lastNameBox()).toHaveValue('Fletcher')
     expect(onClose).not.toHaveBeenCalled()
     expect(upsertContactMock).not.toHaveBeenCalled()
   })
@@ -599,7 +676,7 @@ describe('PlayerForm — failures', () => {
     upsertContactMock.mockRejectedValue(new Error("We couldn't save the contact details."))
     const { onClose } = renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.type(screen.getByLabelText('Player phone'), '50 200 1000')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
@@ -616,7 +693,7 @@ describe('PlayerForm — failures', () => {
     upsertContactMock.mockRejectedValueOnce(new Error('contact write failed'))
     renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.type(screen.getByLabelText('Player phone'), '50 200 1000')
     await user.click(screen.getByRole('button', { name: /add player/i }))
     await screen.findByRole('alert')
@@ -637,7 +714,7 @@ describe('PlayerForm — failures', () => {
     }))
     const { onClose } = renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     expect(await screen.findByRole('button', { name: /saving/i })).toBeDisabled()
@@ -657,7 +734,7 @@ describe('PlayerForm — failures', () => {
     }))
     const { onClose } = renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.click(screen.getByRole('button', { name: /add player/i }))
     await user.click(screen.getByRole('button', { name: /saving/i }))
 
@@ -671,11 +748,12 @@ describe('PlayerForm — failures', () => {
     const user = userEvent.setup()
     renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Faisal Al Mansoori')
+    await typePlayerName(user, 'Faisal', 'Al Mansoori')
     await user.type(screen.getByLabelText('Player phone'), '50 200 1000')
     await user.type(screen.getByLabelText('Player email'), 'guardian@example.com')
 
-    expect(screen.getByLabelText('Full name')).toHaveValue('Faisal Al Mansoori')
+    expect(firstNameBox()).toHaveValue('Faisal')
+    expect(lastNameBox()).toHaveValue('Al Mansoori')
     // The box holds EXACTLY what was typed, spaces and all. The field does
     // not reformat as you type on purpose: rewriting an input's value under
     // the user throws the caret to the end, so correcting a digit in the
@@ -709,7 +787,7 @@ describe('Roster wiring', () => {
     await user.click(await screen.findByRole('button', { name: /add player/i }))
 
     expect(await screen.findByRole('heading', { name: 'Add player' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Full name')).toHaveValue('')
+    expect(firstNameBox()).toHaveValue('')
   })
 
   it('reloads the roster after a save', async () => {
@@ -723,7 +801,7 @@ describe('Roster wiring', () => {
     // Scoped to the sheet: the section head's "Add player" button matches the
     // same name, and the one being clicked here is the form's submit.
     const dialog = screen.getByRole('dialog')
-    await user.type(within(dialog).getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher', within(dialog))
     await user.click(within(dialog).getByRole('button', { name: /^add player$/i }))
 
     await waitFor(() => expect(listPlayersMock.mock.calls.length).toBeGreaterThan(callsBefore))
@@ -905,7 +983,8 @@ describe('PlayerDetail wiring', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit' }))
 
     expect(await screen.findByRole('heading', { name: 'Edit player' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Full name')).toHaveValue('Dhruv Ramachandran')
+    expect(firstNameBox()).toHaveValue('Dhruv')
+    expect(lastNameBox()).toHaveValue('Ramachandran')
   })
 
   it('asks for confirmation before deleting, and does nothing if cancelled', async () => {
@@ -959,7 +1038,7 @@ describe('PlayerForm — parents', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent(/no parent on file/i)
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     const save = screen.getByRole('button', { name: /add player/i })
     expect(save).not.toBeDisabled()
 
@@ -972,10 +1051,11 @@ describe('PlayerForm — parents', () => {
     upsertPlayerMock.mockResolvedValue({ id: 'p-fresh', full_name: 'Tom Fletcher' })
     renderForm()
 
-    await user.type(screen.getByLabelText('Full name'), 'Tom Fletcher')
+    await typePlayerName(user, 'Tom', 'Fletcher')
     await user.click(screen.getByRole('button', { name: /add parent/i }))
 
-    await user.type(screen.getByLabelText('Full name', { selector: '#parent-name-0' }), 'Sara Fletcher')
+    await user.type(screen.getByLabelText('First name', { selector: '#parent-first-name-0' }), 'Sara')
+    await user.type(screen.getByLabelText('Family name', { selector: '#parent-last-name-0' }), 'Fletcher')
     await user.selectOptions(screen.getByLabelText('Relationship'), 'Mother')
     await user.type(screen.getByLabelText('Phone'), '50 200 1000')
     await user.type(screen.getByLabelText('Email'), 'sara@example.com')
@@ -986,6 +1066,11 @@ describe('PlayerForm — parents', () => {
     const [playerId, rows] = saveParentsMock.mock.calls[0]
     expect(playerId).toBe('p-fresh')
     expect(rows[0]).toMatchObject({
+      // ⚠️ ALL THREE. The two boxes are what the person typed; full_name is
+      // rebuilt from them by toSaveRows so that the thirty-odd readers of it
+      // stay correct even if private.sync_person_name is ever absent.
+      first_name: 'Sara',
+      last_name: 'Fletcher',
       full_name: 'Sara Fletcher',
       relationship: 'Mother',
       email: 'sara@example.com',
@@ -994,11 +1079,32 @@ describe('PlayerForm — parents', () => {
     })
   })
 
+  // ⚠️ REFUSED BEFORE ANY WRITE, NOT WHEN THE PARENT ROWS ARE REACHED. The
+  // parents are saved LAST — after the player, the photo and the contact — so
+  // catching a half-named parent down there would refuse a save that had mostly
+  // already happened.
+  it('refuses a parent with a first name and nothing else, before saving anything', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await typePlayerName(user, 'Tom', 'Fletcher')
+    await user.click(screen.getByRole('button', { name: /add parent/i }))
+    await user.type(screen.getByLabelText('First name', { selector: '#parent-first-name-0' }), 'Sara')
+
+    await user.click(screen.getByRole('button', { name: /add player/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/first name and a family name/i)
+    expect(upsertPlayerMock).not.toHaveBeenCalled()
+    expect(saveParentsMock).not.toHaveBeenCalled()
+  })
+
   it('prefills existing parent rows with the phone split across the two controls', async () => {
     listParentsMock.mockResolvedValue([
       {
         id: 'pp-1',
         full_name: 'Sara Fletcher',
+        first_name: 'Sara',
+        last_name: 'Fletcher',
         relationship: 'Mother',
         email: 'sara@example.com',
         phone: '+971502001000',
@@ -1007,8 +1113,11 @@ describe('PlayerForm — parents', () => {
     ])
     await renderEditForm()
 
-    expect(screen.getByLabelText('Full name', { selector: '#parent-name-0' })).toHaveValue(
-      'Sara Fletcher',
+    expect(screen.getByLabelText('First name', { selector: '#parent-first-name-0' })).toHaveValue(
+      'Sara',
+    )
+    expect(screen.getByLabelText('Family name', { selector: '#parent-last-name-0' })).toHaveValue(
+      'Fletcher',
     )
     expect(screen.getByLabelText('Relationship')).toHaveValue('Mother')
     expect(screen.getByLabelText('Phone')).toHaveValue('502001000')

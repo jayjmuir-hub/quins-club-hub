@@ -86,17 +86,28 @@ const TEAM_U16G = { id: 't-u16g', club_id: CLUB, name: 'U16G Contact', sort_orde
 const TEAMS = [TEAM_U14, TEAM_U16G, TEAM_MEN]
 
 const base = { club_id: CLUB, position: 'Flanker', is_captain: false, photo_path: null }
-const MY_CHILD = { ...base, id: 'p-mine', team_id: 't-u14', full_name: 'Tyler Muir', gender: null }
-const A_GIRL = { ...base, id: 'p-girl', team_id: 't-u14', full_name: 'Amy Rose', gender: 'female' }
-const A_BOY = { ...base, id: 'p-boy', team_id: 't-u14', full_name: 'Ben Shaw', gender: 'male' }
-const UNKNOWN = { ...base, id: 'p-unk', team_id: 't-u14', full_name: 'Chris Dale', gender: null }
+
+// ⚠️ EVERY PLAYER FIXTURE CARRIES ALL THREE NAME COLUMNS. The backfill filled
+// first_name/last_name on every existing row and private.sync_person_name keeps
+// them in step, so a row with only full_name is a shape the database cannot
+// produce — and since 17 Aug 2026 it renders two EMPTY name boxes in PlayerForm,
+// which the form then refuses to save. Every save assertion in this file would
+// fail for a reason that has nothing to do with gender.
+const named = (full) => {
+  const parts = full.split(' ')
+  return { full_name: full, first_name: parts[0], last_name: parts.slice(1).join(' ') }
+}
+const MY_CHILD = { ...base, id: 'p-mine', team_id: 't-u14', ...named('Tyler Muir'), gender: null }
+const A_GIRL = { ...base, id: 'p-girl', team_id: 't-u14', ...named('Amy Rose'), gender: 'female' }
+const A_BOY = { ...base, id: 'p-boy', team_id: 't-u14', ...named('Ben Shaw'), gender: 'male' }
+const UNKNOWN = { ...base, id: 'p-unk', team_id: 't-u14', ...named('Chris Dale'), gender: null }
 // In a single-gender squad with NOTHING recorded — the state the requirement
 // exists to stop being saved back unchanged.
 const GIRL_NO_GENDER = {
-  ...base, id: 'p-ng', team_id: 't-u16g', full_name: 'Amara Bello', gender: null,
+  ...base, id: 'p-ng', team_id: 't-u16g', ...named('Amara Bello'), gender: null,
 }
 const WOMAN_IN_MENS = {
-  ...base, id: 'p-wm', team_id: 't-men', full_name: 'Dana Reid', gender: 'female',
+  ...base, id: 'p-wm', team_id: 't-men', ...named('Dana Reid'), gender: 'female',
 }
 
 const PARENT = [{ id: 'm-p', role: 'parent', team_id: 't-u14', player_id: 'p-mine', club_id: CLUB }]
@@ -214,7 +225,7 @@ describe("PlayerForm — the coach's buttons", () => {
     const user = await renderRoster(ADMIN, [UNKNOWN])
     const dialog = await openSheet(user, 'Chris Dale')
     await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
-    await screen.findByLabelText('Full name')
+    await screen.findByLabelText('First name', { selector: '#player-first-name' })
 
     // Not "defaults to Male". Recording an answer nobody gave is the failure
     // mode this asserts against.
@@ -226,7 +237,7 @@ describe("PlayerForm — the coach's buttons", () => {
     const user = await renderRoster(ADMIN, [UNKNOWN])
     const dialog = await openSheet(user, 'Chris Dale')
     await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
-    await screen.findByLabelText('Full name')
+    await screen.findByLabelText('First name', { selector: '#player-first-name' })
 
     await user.click(inForm('Female'))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
@@ -239,7 +250,7 @@ describe("PlayerForm — the coach's buttons", () => {
     const user = await renderRoster(ADMIN, [WOMAN_IN_MENS])
     const dialog = await openSheet(user, 'Dana Reid')
     await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
-    await screen.findByLabelText('Full name')
+    await screen.findByLabelText('First name', { selector: '#player-first-name' })
 
     expect(screen.getByText(/Female player in Senior Men 2nd XV/)).toBeInTheDocument()
 
@@ -253,7 +264,7 @@ describe("PlayerForm — the coach's buttons", () => {
     const user = await renderRoster(ADMIN, [A_GIRL])
     const dialog = await openSheet(user, 'Amy Rose')
     await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
-    await screen.findByLabelText('Full name')
+    await screen.findByLabelText('First name', { selector: '#player-first-name' })
 
     expect(screen.queryByText(/player in U14/)).toBeNull()
   })
@@ -307,7 +318,7 @@ describe('MyPlayerForm — a parent setting it on their own child', () => {
     await screen.findByRole('button', { name: /save changes/i })
 
     // Gender being editable here must not have opened the door to the rest.
-    expect(screen.queryByLabelText('Full name')).toBeNull()
+    expect(screen.queryByLabelText('First name', { selector: '#player-first-name' })).toBeNull()
     expect(screen.queryByLabelText('Age group')).toBeNull()
     expect(screen.queryByLabelText('Position')).toBeNull()
   })
@@ -333,7 +344,7 @@ describe('PlayerForm — gender required on a single-gender squad', () => {
     const user = await renderRoster(ADMIN, [GIRL_NO_GENDER])
     const dialog = await openSheet(user, 'Amara Bello')
     await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
-    await screen.findByLabelText('Full name')
+    await screen.findByLabelText('First name', { selector: '#player-first-name' })
 
     expect(screen.getByText(/Gender \(required\)/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /save changes/i }))
@@ -348,7 +359,7 @@ describe('PlayerForm — gender required on a single-gender squad', () => {
     const user = await renderRoster(ADMIN, [GIRL_NO_GENDER])
     const dialog = await openSheet(user, 'Amara Bello')
     await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
-    await screen.findByLabelText('Full name')
+    await screen.findByLabelText('First name', { selector: '#player-first-name' })
 
     await user.click(inForm('Female'))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
@@ -362,7 +373,7 @@ describe('PlayerForm — gender required on a single-gender squad', () => {
     const user = await renderRoster(ADMIN, [GIRL_NO_GENDER])
     const dialog = await openSheet(user, 'Amara Bello')
     await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
-    await screen.findByLabelText('Full name')
+    await screen.findByLabelText('First name', { selector: '#player-first-name' })
 
     await user.click(inForm('Male'))
     expect(screen.getByText(/Male player in U16G Contact/i)).toBeInTheDocument()
@@ -376,7 +387,7 @@ describe('PlayerForm — gender required on a single-gender squad', () => {
     const user = await renderRoster(ADMIN, [UNKNOWN])
     const dialog = await openSheet(user, 'Chris Dale')
     await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
-    await screen.findByLabelText('Full name')
+    await screen.findByLabelText('First name', { selector: '#player-first-name' })
 
     expect(screen.queryByText(/Gender \(required\)/i)).toBeNull()
     await user.click(screen.getByRole('button', { name: /save changes/i }))
@@ -440,6 +451,8 @@ describe('MyPlayerForm — the parent phone must survive a save', () => {
       id: 'pp-1',
       player_id: 'p-mine',
       full_name: 'Hannah Okafor',
+      first_name: 'Hannah',
+      last_name: 'Okafor',
       relationship: 'Mother',
       email: 'hannah@example.com',
       phone: '+971501234567',
@@ -473,6 +486,26 @@ describe('MyPlayerForm — the parent phone must survive a save', () => {
     await waitFor(() => expect(saveParentsMock).toHaveBeenCalled())
     const [, rows] = saveParentsMock.mock.calls[0]
     expect(rows[0].phone).toBe('+971501234567')
+  })
+
+  // ⚠️ HERE BECAUSE THIS IS WHERE MyPlayerForm'S PARENT ROWS ARE EXERCISED, not
+  // because it is about gender. The rule itself is unit-tested in
+  // tests/parent-rows.test.js; what this pins down is that the OTHER of the two
+  // screens writing player_parents actually asks — the failure mode being a
+  // rule enforced on the coach's form and quietly absent from the parent's.
+  it('refuses to save a parent row with a first name and nothing else', async () => {
+    listParentsMock.mockResolvedValue([])
+    const user = await renderRoster(PARENT, [MY_CHILD])
+    const dialog = await openSheet(user, 'Tyler Muir')
+    await user.click(within(dialog).getByRole('button', { name: /update details/i }))
+    await screen.findByRole('button', { name: /save changes/i })
+
+    await user.click(screen.getByRole('button', { name: /add parent/i }))
+    await user.type(document.getElementById('parent-first-name-0'), 'Hannah')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/first name and a family name/i)
+    expect(saveParentsMock).not.toHaveBeenCalled()
   })
 
   it('saves a phone a parent types for the first time', async () => {
@@ -512,6 +545,8 @@ describe('MyPlayerForm — editing an existing parent phone', () => {
         id: 'pp-1',
         player_id: 'p-mine',
         full_name: 'Hannah Okafor',
+        first_name: 'Hannah',
+        last_name: 'Okafor',
         relationship: 'Mother',
         email: 'hannah@example.com',
         phone: '+971501111111',

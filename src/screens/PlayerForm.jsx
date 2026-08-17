@@ -11,7 +11,7 @@ import { listParents, saveParents } from '../data/parents.js'
 import { deletePlayerPhoto, forgetPhotoUrl, uploadPlayerPhoto } from '../data/photos.js'
 import { allowsOwnContact } from '../lib/ageGroup.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
-import { toEditorRows, toSaveRows } from '../lib/parentRows.js'
+import { parentNameProblem, toEditorRows, toSaveRows } from '../lib/parentRows.js'
 import ParentsEditor from '../components/ParentsEditor.jsx'
 import PhotoField from '../components/PhotoField.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
@@ -100,7 +100,25 @@ function initialValues(player, editableTeams) {
   const fallbackTeamId = editableTeams[0]?.id ?? ''
 
   return {
-    fullName: player?.full_name ?? '',
+    // ⚠️ TWO BOXES SINCE 17 Aug 2026, AND THEY ARE WRITTEN STRAIGHT TO
+    // first_name / last_name RATHER THAN JOINED INTO full_name.
+    // PlayerRegistrationForm joins, because register_my_player takes one
+    // `p_full_name` parameter and widening a public signature was the larger
+    // change. This form writes the table directly, so it does not have to —
+    // and MUST NOT, because the split is lossy in one direction: the trigger
+    // takes the LAST word as the family name, so "Anna van der Berg" joined and
+    // re-split comes back as first "Anna van der", last "Berg". Writing both
+    // columns takes the trigger's names-win branch and nothing is guessed.
+    //
+    // ⚠️ NO CLIENT-SIDE SPLIT OF full_name AS A FALLBACK, DELIBERATELY. It is
+    // tempting and it would be a second copy of a rule that has already been
+    // got backwards once (20260808 sync_profile_name_single_word: a one-word
+    // name is a FIRST name, and the opposite is invisible until somebody sorts
+    // a roster). The backfill filled every existing row and its migration
+    // ABORTS if any row is left with a full_name and no first_name, so an empty
+    // box here means an empty column, which is the truth.
+    firstName: player?.first_name ?? '',
+    lastName: player?.last_name ?? '',
     position: player?.position ?? '',
     unit: player?.unit ?? '',
     // ⚠️ BOTH LOAD ASYNCHRONOUSLY and so start empty rather than from `player`.
@@ -372,8 +390,33 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
     domEvent.preventDefault()
     if (inFlight.current) return
 
-    const fullName = values.fullName.trim()
+    const firstName = values.firstName.trim()
+    const lastName = values.lastName.trim()
     const team = editableTeams.find((candidate) => candidate.id === teamId)
+
+    // ⚠️ THE FAMILY NAME IS REQUIRED, EXCEPT ON A ROW THAT ARRIVED WITHOUT ONE.
+    //
+    // Requiring it outright is what Jay asked for and is right for a NEW
+    // player: "Sarah" is not enough for a coach to recognise a child, and one
+    // box getting one word is the bug this whole item exists to fix.
+    //
+    // But this form also edits rows that already exist, and at least one live
+    // row has a first name and nothing else. Demanding a family name there
+    // would mean a coach fixing a typo in a position is blocked until they
+    // invent a surname they may not know — the same trap the "at least one
+    // parent is a WARNING, never a block" ruling names in ParentsEditor. So the
+    // requirement is grandfathered: it binds unless the stored row was already
+    // blank, and nobody can blank one that exists.
+    const lastNameWasBlank = editing && !String(player?.last_name ?? '').trim()
+    const lastNameMissing = !lastName && !lastNameWasBlank
+
+    // ⚠️ CHECKED HERE, BEFORE ANY WRITE, AND NOT INSIDE ParentsEditor. The
+    // editor is presentational and the parent rows are written LAST — a
+    // half-named parent caught after the player, the photo and the contact had
+    // already been saved would refuse a save that had mostly happened. The rule
+    // itself lives in src/lib/parentRows.js because MyPlayerForm needs the
+    // identical one.
+    const parentProblem = parentsStatus === 'ready' ? parentNameProblem(parents) : null
 
     // ⚠️ GENDER IS REQUIRED ON A SINGLE-GENDER SQUAD (Jay, 9 Aug 2026).
     // Read from the SELECTED squad, so switching the dropdown to U16G Contact
@@ -385,8 +428,19 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
     // way to defeat the warning, and most players have no gender recorded.
     const genderMissing = squadRequiresGender(team?.name) && !values.gender
 
-    const nextInvalid = { fullName: !fullName, teamId: !teamId, gender: genderMissing }
+    const nextInvalid = {
+      firstName: !firstName,
+      lastName: lastNameMissing,
+      teamId: !teamId,
+      gender: genderMissing,
+    }
     setInvalid(nextInvalid)
+
+    if (parentProblem && !Object.values(nextInvalid).some(Boolean)) {
+      setErrorStage('validation')
+      setError(new Error(parentProblem))
+      return
+    }
 
     if (Object.values(nextInvalid).some(Boolean)) {
       setErrorStage('validation')
@@ -395,11 +449,17 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       // know it is the SQUAD that made the field mandatory — otherwise it
       // reads as the app arbitrarily demanding something it didn't want a
       // moment ago.
+      //
+      // The family name gets its own sentence for the same reason: the box is
+      // filled in as far as the coach is concerned (they typed a name), so a
+      // highlight alone reads as the form breaking rather than as a rule.
       setError(
         new Error(
-          genderMissing && fullName && teamId
+          genderMissing && firstName && !lastNameMissing && teamId
             ? genderRequiredMessage(team.name)
-            : 'Fill in the highlighted fields before saving.',
+            : lastNameMissing && firstName && teamId
+              ? 'Add a family name too — a first name alone is not enough for a coach to know which child this is.'
+              : 'Fill in the highlighted fields before saving.',
         ),
       )
       return
@@ -409,7 +469,15 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       ...(savedPlayerId ? { id: savedPlayerId } : null),
       ...(team?.club_id ? { club_id: team.club_id } : null),
       team_id: teamId,
-      full_name: fullName,
+      // ⚠️ ALL THREE, AND full_name IS NOT A SECOND SOURCE OF TRUTH. The
+      // trigger's names-win branch recomputes it as concat_ws(' ', first, last)
+      // — byte-identical to the join below — and then overwrites whatever was
+      // sent. Sending it anyway means a row written while the trigger was
+      // somehow absent still carries the display name every reader wants,
+      // rather than silently keeping the old one.
+      first_name: firstName,
+      last_name: lastName || null,
+      full_name: [firstName, lastName].filter(Boolean).join(' '),
       // ⚠️ STILL THE PRIMARY, AND KEPT IN STEP WITH THE FIRST SELECTED POSITION.
       // Six things read players.position (the roster meta line and its inline
       // editor, YourPlayers, PlayerDetail, the importer, the forwards/backs
@@ -623,18 +691,39 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           bubble is neither announced reliably nor visible to the browser
           check. */}
       <form onSubmit={handleSubmit} noValidate>
+        {/* ⚠️ TWO BOXES, NOT ONE. A single box gets a single word — that is how
+            a child reached the live roster with a first name and nothing else,
+            and it is the whole reason players.first_name / last_name exist.
+            Keep the ids: `player-name` was the old one and nothing outside this
+            file used it, but `player-first-name` / `player-last-name` are what
+            the tests and the label pairs hang off now. */}
         <div className={FIELD}>
-          <label className={LABEL} htmlFor="player-name">
-            Full name
+          <label className={LABEL} htmlFor="player-first-name">
+            First name
           </label>
           <input
-            id="player-name"
+            id="player-first-name"
             type="text"
-            value={values.fullName}
-            onChange={setFromInput('fullName')}
-            aria-invalid={invalid.fullName ? 'true' : undefined}
-            placeholder="e.g. Tom Fletcher"
-            className={inputClasses(invalid.fullName)}
+            value={values.firstName}
+            onChange={setFromInput('firstName')}
+            aria-invalid={invalid.firstName ? 'true' : undefined}
+            placeholder="e.g. Tom"
+            className={inputClasses(invalid.firstName)}
+          />
+        </div>
+
+        <div className={FIELD}>
+          <label className={LABEL} htmlFor="player-last-name">
+            Family name
+          </label>
+          <input
+            id="player-last-name"
+            type="text"
+            value={values.lastName}
+            onChange={setFromInput('lastName')}
+            aria-invalid={invalid.lastName ? 'true' : undefined}
+            placeholder="e.g. Fletcher"
+            className={inputClasses(invalid.lastName)}
           />
         </div>
 

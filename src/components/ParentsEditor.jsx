@@ -39,7 +39,12 @@ const INPUT =
 
 export function emptyParent() {
   return {
-    full_name: '',
+    // ⚠️ TWO FIELDS, NOT `full_name`. One box gets one word — the same rule
+    // that produced a child on the live roster with a first name and nothing
+    // else. src/lib/parentRows.js rebuilds full_name on the way to the
+    // database; nothing in the editor holds it.
+    first_name: '',
+    last_name: '',
     relationship: '',
     email: '',
     phoneCountry: DEFAULT_COUNTRY,
@@ -111,18 +116,40 @@ export default function ParentsEditor({ parents, onChange, disabled = false }) {
             </button>
           </div>
 
+          {/* ⚠️ TWO BOXES, AND BOTH ARE REQUIRED — the rule is in
+              parentNameProblem (src/lib/parentRows.js), enforced by whichever
+              screen owns the save, because this component does no validation
+              gating. It BLOCKS rather than warns, unlike the "no parent on
+              file" note above: there is nothing to grandfather here, since
+              every existing parent row has both names and these two forms are
+              the only writers of the table. */}
           <div className="mb-3.5">
-            <label className={LABEL} htmlFor={`parent-name-${index}`}>
-              Full name
+            <label className={LABEL} htmlFor={`parent-first-name-${index}`}>
+              First name
             </label>
             <input
-              id={`parent-name-${index}`}
+              id={`parent-first-name-${index}`}
               type="text"
               className={INPUT}
-              value={parent.full_name}
+              value={parent.first_name ?? ''}
               disabled={disabled}
-              placeholder="e.g. Sara Fletcher"
-              onChange={(event) => update(index, { full_name: event.target.value })}
+              placeholder="e.g. Sara"
+              onChange={(event) => update(index, { first_name: event.target.value })}
+            />
+          </div>
+
+          <div className="mb-3.5">
+            <label className={LABEL} htmlFor={`parent-last-name-${index}`}>
+              Family name
+            </label>
+            <input
+              id={`parent-last-name-${index}`}
+              type="text"
+              className={INPUT}
+              value={parent.last_name ?? ''}
+              disabled={disabled}
+              placeholder="e.g. Fletcher"
+              onChange={(event) => update(index, { last_name: event.target.value })}
             />
           </div>
 

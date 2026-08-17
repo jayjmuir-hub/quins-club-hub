@@ -68,7 +68,14 @@ export default function InviteParentButton({ parent, disabled = false }) {
   // holds.
   const unsaved = !parent?.id || typed.toLowerCase() !== saved.toLowerCase()
 
-  const who = String(parent?.full_name ?? '').trim() || 'this contact'
+  // ⚠️ BUILT FROM THE TWO BOXES, NOT FROM `full_name` — an editor row has no
+  // such key (see src/lib/parentRows.js), and reading one would silently label
+  // every button "this contact".
+  const who =
+    [parent?.first_name, parent?.last_name]
+      .map((part) => String(part ?? '').trim())
+      .filter(Boolean)
+      .join(' ') || 'this contact'
 
   if (unsaved) {
     return (

@@ -47,7 +47,20 @@ export function toEditorRows(rows) {
     const { country, national } = splitPhone(row?.phone)
     return {
       id: row?.id,
-      full_name: row?.full_name ?? '',
+      // ⚠️ TWO NAME FIELDS SINCE 17 Aug 2026, AND NO `full_name` ON AN EDITOR
+      // ROW AT ALL. Leaving it here would be a third value describing the same
+      // thing, free to disagree with the two boxes the moment either is typed
+      // in. toSaveRows rebuilds it on the way out, which is the only place it
+      // is ever true.
+      //
+      // ⚠️ AND NO CLIENT-SIDE SPLIT OF full_name AS A FALLBACK. The rule (a
+      // one-word name is a FIRST name) has been got backwards once already —
+      // 20260808 sync_profile_name_single_word — and a second copy of it here
+      // would be invisible until somebody sorted a list. The backfill filled
+      // every row and its migration aborts if it did not, so a blank box means
+      // a blank column.
+      first_name: row?.first_name ?? '',
+      last_name: row?.last_name ?? '',
       relationship: row?.relationship ?? '',
       email: row?.email ?? '',
       savedEmail: row?.email ?? '',
@@ -81,5 +94,55 @@ export function toSaveRows(rows) {
   return rows.map((row) => ({
     ...row,
     phone: joinPhone(row?.phoneCountry, row?.phoneNational),
+    // ⚠️ REBUILT HERE, AND WRITTEN ALONGSIDE first_name/last_name RATHER THAN
+    // INSTEAD OF THEM. private.sync_person_name takes the names-win branch and
+    // recomputes this identically (`btrim(concat_ws(' ', fn, ln))`), so this is
+    // not a second source of truth — it is what keeps the display name correct
+    // for every existing reader of full_name if the trigger is ever absent.
+    // ⚠️ FILTERED, NOT TEMPLATED: a missing family name must give "Kwame", never
+    // "Kwame " — a trailing space makes the trigger's split produce an empty
+    // last name rather than a null one.
+    full_name: [row?.first_name, row?.last_name]
+      .map((part) => String(part ?? '').trim())
+      .filter(Boolean)
+      .join(' '),
   }))
+}
+
+/**
+ * The one rule about parent names, defined once because TWO screens save these
+ * rows and a rule written twice is a rule that disagrees with itself.
+ *
+ * ⚠️ BOTH NAMES, AND THIS IS A BLOCK RATHER THAN A WARNING — which is the
+ * opposite of the "at least one parent" rule in ParentsEditor, deliberately.
+ * That one warns because ~159 existing players have no parent row at all and a
+ * hard requirement would make every one of them unsaveable. This one blocks
+ * because there is nothing to grandfather: every parent row in the live
+ * database has both names (measured 16 Aug 2026), and the only two writers of
+ * public.player_parents are the two forms this rule governs — no RPC and no
+ * importer touches the table. So requiring it here closes the door rather than
+ * locking somebody out from behind it.
+ *
+ * A row nobody has typed anything into is ignored: adding a parent and changing
+ * your mind is not an error, and saveParents drops those rows anyway.
+ *
+ * Returns a sentence to show, or null when there is nothing wrong.
+ */
+export function parentNameProblem(rows) {
+  if (!Array.isArray(rows)) return null
+
+  const text = (value) => String(value ?? '').trim()
+
+  for (const row of rows) {
+    const first = text(row?.first_name)
+    const last = text(row?.last_name)
+    const started =
+      first || last || text(row?.email) || text(row?.phoneNational) || text(row?.phone)
+    if (!started) continue
+    if (!first || !last) {
+      return 'Give every parent a first name and a family name — a first name on its own is not enough for a coach to know who to call.'
+    }
+  }
+
+  return null
 }

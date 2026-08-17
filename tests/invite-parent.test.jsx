@@ -30,6 +30,8 @@ const MOTHER = {
   id: 'pp-1',
   player_id: 'p-1',
   full_name: 'Nadia Farrow',
+  first_name: 'Nadia',
+  last_name: 'Farrow',
   relationship: 'Mother',
   email: 'nadia@example.com',
   phone: '+971501234567',
@@ -85,7 +87,7 @@ describe('when the button appears at all', () => {
     const user = userEvent.setup()
     renderEditor([])
     await user.click(screen.getByRole('button', { name: /add parent/i }))
-    await user.type(screen.getByLabelText(/email/i), 'newmum@example.com')
+    await user.type(screen.getByLabelText('Email'), 'newmum@example.com')
 
     expect(screen.getByText(/save this player first/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /invite/i })).toBeNull()
@@ -101,7 +103,7 @@ describe('when the button appears at all', () => {
 
     expect(screen.getByRole('button', { name: /Invite Nadia Farrow/ })).toBeInTheDocument()
 
-    await user.type(screen.getByLabelText(/email/i), 'x')
+    await user.type(screen.getByLabelText('Email'), 'x')
 
     expect(screen.queryByRole('button', { name: /Invite Nadia Farrow/ })).toBeNull()
     expect(screen.getByText(/save this player first/i)).toBeInTheDocument()
@@ -111,7 +113,7 @@ describe('when the button appears at all', () => {
   it('ignores a difference that is only case or whitespace', async () => {
     const user = userEvent.setup()
     renderEditor()
-    const box = screen.getByLabelText(/email/i)
+    const box = screen.getByLabelText('Email')
     await user.clear(box)
     await user.type(box, ' NADIA@example.com ')
 
