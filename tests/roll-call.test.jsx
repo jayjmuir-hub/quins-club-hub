@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -75,7 +75,19 @@ function renderRollCall(props = {}) {
 const box = (name) => screen.getByRole('checkbox', { name })
 const CONTINUE = { name: /^continue$/i }
 
+// ⚠️ THE CLOCK IS PINNED, FOR THE SAME REASON tests/parent-self-registration
+// pins it: age-grade eligibility is judged at the 31 August cut-off, so which
+// squad a fixed birthday belongs to changes on that date every year. The DOB
+// below fits U13 for the 2026/27 season; on the real clock this file would
+// start demanding a play-up consent tick on 31 Aug 2027, in tests about the
+// roll-call.
+//
+// `toFake: ['Date']` only — faking the timers as well hangs userEvent.
+const IN_SEASON = new Date('2026-11-07T09:00:00Z')
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(IN_SEASON)
   clearMyProfileCache()
   vi.clearAllMocks()
   getMyProfileMock.mockResolvedValue({
@@ -94,6 +106,10 @@ beforeEach(() => {
   requestStaffRoleMock.mockResolvedValue({ id: 'mm-staff', status: 'pending' })
   registerMyPlayerMock.mockResolvedValue({ id: 'mm-child', player_id: 'p-1', status: 'pending' })
   setPlayerDobMock.mockResolvedValue({ player_id: 'p-1' })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('the ask', () => {

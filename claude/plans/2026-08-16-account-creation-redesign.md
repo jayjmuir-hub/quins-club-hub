@@ -70,7 +70,7 @@ select count(*) from public.players pl
 |---|---|---|---|
 | 1 | The mirror question — *do you do anything else at the club?* | small | ✅ 16 Aug |
 | 2 | Split every name into first and family | small | ✅ 17 Aug |
-| 3 | Date of birth, in its own table | medium | 🟡 table + registration field |
+| 3 | Date of birth, in its own table | medium | 🟡 all but the contact re-point, which needs **one fact from Jay** |
 | 4 | Invite from a parent row | medium | ✅ 17 Aug |
 | 4b | …and the email that actually posts it | medium | ⛔ **blocked on Jay** |
 | 5 | The roll-call replaces the fork | medium | ✅ 17 Aug |
@@ -81,9 +81,10 @@ select count(*) from public.players pl
 Items 1–4 close holes that are open on a live club today. 5 stops the hole being
 re-created. 6–8 are the durable shape.
 
-⚠️ **WHAT IS LEFT OF 3 IS THE `allowsOwnContact` RE-POINT, AND IT IS DEFERRED ON
-PURPOSE** — see the item. It is a real refactor with a safeguarding rule inside
-it, not a tidy-up.
+⚠️ **WHAT IS LEFT OF 3 IS THE `allowsOwnContact` RE-POINT, AND IT IS NOW BLOCKED
+RATHER THAN MERELY DEFERRED.** It needs the date the club counts age groups
+from — see the item. Without it the re-point would take the own-contact field
+away from most of a U13 squad.
 
 ---
 
@@ -308,6 +309,93 @@ under-13 contact gate **stricter**, never relax it, or a parent editing a
 birthday could unlock a field the club's own rule forbids. The call sites also
 take a squad NAME today, not a player, so re-pointing is a real refactor rather
 than a one-line change. Deferred on purpose.
+
+### ✅ THE CUT-OFF IS 31 AUGUST — answered 17 Aug from the tournament repo
+
+Jay: *"check the adhjrt.com repo for age bands"*. It was there all along, in
+`…\GitHub\adhjrt`, `Quins JRT.dc.html`:
+
+> UAERF age-grade cut-off: a player's age group is fixed by their age at midnight
+> 31 August — "Under X" means they are exactly X−1 on that date.
+
+Ported to `src/lib/ageGrade.js` with the band table, the ladder and the girls'
+allowance. **So the re-point below is no longer blocked — just not done.** It is
+ordinary work now, with the safeguarding rule still attached: a DOB may only ever
+make the gate STRICTER.
+
+⚠️ **THE EMIRATI U18 EXCEPTION IS NOT ENFORCED IN EITHER APP** — UAERF gives
+Emirati U18 players a 31 December cut-off and neither app collects nationality.
+Inherited deliberately, with its reasoning, rather than quietly dropped.
+
+### ⛔ THE SECOND REASON, AS FOUND — kept because it is why the model is careful
+
+⚠️ **RUGBY AGE BANDS ARE SEASON-RELATIVE AND A BIRTHDAY IS NOT.** "U13" means
+under 13 **as at a cut-off date**, so a U13 squad is mostly **twelve-year-olds**
+for most of the season. A gate asking "is this child 13 today?" would therefore
+strip the own-contact field from nearly a whole squad **that the club's own rule
+permits it for** — and it would do so gradually, as birthdays passed, which is
+the hardest kind of bug to attribute.
+
+⚠️ **THE APP DOES NOT KNOW THE CUT-OFF DATE.** Searched the schema, `claude/` and
+`src/` on 17 Aug: nothing records it. So the re-point needs **one fact from
+Jay** — the date the club's age groups are counted from — and it is not
+something to infer from the data, because with `player_private` still at **zero
+rows** there is no data to infer it from.
+
+**Until then `allowsOwnContact` stays keyed on the squad name**, and
+`ageGroup.js`'s header no longer invites the re-point — it used to say "if a DOB
+column ever lands, `allowsOwnContact` is the one place to re-point", which is now
+a sentence pointing at a trap.
+
+### 🟡 PLAYING UP — the model shipped, the notification did not
+
+Jay, 17 Aug: *"we need the ability for players to play up one age group with a
+notification"*. The **rules half is built and tested** — `src/lib/ageGrade.js`,
+the consent tick on `PlayerRegistrationForm`, and a refusal to save a play-up
+nobody consented to. What is **not** built is the notification.
+
+⚠️ **AND THE OBVIOUS ROUTE FOR IT IS A TRAP.** The registration already emails
+the squad's coaches, managers and admins through `notify_pending_membership` →
+`notify-approval`, which is exactly the right audience. But that function is Deno
+and cannot import `src/lib/ageGrade.js`, so teaching it to work out a play-up
+means **a third copy of the UAERF model** — one in the tournament repo, one here,
+one in an edge function. Two copies already have to be kept in step by hand.
+
+**Do it by storing the answer instead.** The client knows it is a play-up at the
+moment of consent, so record it (`player_private` already takes a second write
+for the date of birth right after registration) and let the email read a column
+rather than re-derive a rule. That also fixes the ordering problem: the
+membership insert — and so the email — fires **before** the DOB write lands, so
+anything derived at trigger time would be reading a row that does not exist yet.
+
+⚠️ **AND THE APPROVAL QUEUE IS THE NOTIFICATION THAT ALREADY WORKS.** The coach
+who has to act sees the pending row on screen; a chip there needs no secret, no
+edge-function deploy and no third copy.
+
+### ✅ THE OTHER HALF SHIPPED — the age-group check, 17 Aug 2026
+
+`dobBandMismatch` in `src/lib/ageGroup.js`, shown under the age-group picker in
+`PlayerRegistrationForm`. ⚠️ **IT ASKS, IT DOES NOT REFUSE** — `role="status"`,
+Save stays live.
+
+It does **not** convert a birthday into a band and compare for equality, for the
+reason above. It computes the two bands a child could plausibly be in
+(`age + 1`, `age + 2` — which of them applies depends on the unknown cut-off),
+allows a year of grace on each end, and speaks only outside that. The window
+comes out **wider upwards than downwards**, which fell out of the model rather
+than being designed and is the right way round: a younger child playing up is
+ordinary; an older child in a much younger squad is worth a second look.
+
+| Fault | Test that failed |
+|---|---|
+| collapse the plausible window to the exact age | *says nothing about the same child in U12 or U14*, and the grace test |
+| never render the warning | *questions a birthday a long way from the age group, and still saves it* |
+
+⚠️ **AND THE HEADLINE CASE SURVIVES THE FIRST FAULT ON ITS OWN.** "A
+twelve-year-old in U13 is silent" still passes with the season model removed,
+because the ±1 grace covers it by itself. The model is pinned by the other two
+cases, not by that one — do not read a green run of it as proof the model is
+intact.
 
 ## 3 · Date of birth — the original reasoning
 

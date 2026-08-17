@@ -1,12 +1,24 @@
 // Age-band helpers. Pure, no imports — same rule as src/lib/playerFormat.js
 // and src/lib/scope.js: plain strings in, plain values out, trivially testable.
 //
-// WHY THE SQUAD NAME AND NOT A DATE OF BIRTH: the club does not hold DOBs in
-// this app, and `teams` has no age column — just `name` and `sort_order` (see
-// db/schema/tables.sql). The squad names are the only age signal there is,
-// and they are club-controlled, stable, and already the thing every screen
-// groups by. If a DOB column ever lands, `allowsOwnContact` is the one place
-// to re-point; nothing else in the app reasons about age.
+// WHY THE SQUAD NAME AND NOT A DATE OF BIRTH: `teams` has no age column — just
+// `name` and `sort_order` (see db/schema/tables.sql). The squad names are the
+// only age signal on a team row, they are club-controlled, stable, and already
+// the thing every screen groups by.
+//
+// ⚠️ THE CLUB *DOES* HOLD DATES OF BIRTH SINCE 16 Aug 2026 (public.player_private),
+// AND `allowsOwnContact` IS STILL NOT RE-POINTED AT THEM. This note used to say
+// "if a DOB column ever lands, allowsOwnContact is the one place to re-point".
+// It landed, and that sentence points at a trap: RUGBY AGE BANDS ARE
+// SEASON-RELATIVE AND A BIRTHDAY IS NOT. A U13 squad is mostly TWELVE-year-olds
+// for most of the season, so "is this child 13 today?" would strip the
+// own-contact field from nearly a whole squad the club's own rule permits it for.
+//
+// ⚠️ ANYTHING REASONING ABOUT A CHILD'S AGE BELONGS IN src/lib/ageGrade.js, which
+// asks it AT THE 31 AUGUST CUT-OFF. If this gate is ever re-pointed it goes
+// through there, and it may only ever make the rule STRICTER — a parent may
+// write their own child's birthday, so the other direction would let a family
+// unlock a field the club forbids.
 //
 // THE RULE (Jay, 3 Aug 2026): a player in U13 or above may optionally hold
 // their own email and phone. Below U13 they may not, and the forms must not
@@ -71,3 +83,4 @@ export function allowsOwnContact(teamName) {
   if (band === null) return true // a senior side: adults
   return band >= OWN_CONTACT_MIN_AGE
 }
+
