@@ -137,14 +137,23 @@ describe('sending one', () => {
     expect(JSON.stringify(args)).not.toContain('nadia@example.com')
   })
 
-  it('shows the accept link, because nothing here posts an email', async () => {
+  // ⚠️ THE LINK IS SHOWN *AS WELL AS* THE EMAIL, AND THAT IS NOT LEFTOVER COPY
+  // FROM BEFORE THE MAIL EXISTED (17 Aug 2026). The invite email is queued by a
+  // trigger through pg_net, which does not wait for a result — so a failed send
+  // is SILENT by design, and the person who pressed the button is the only one
+  // who can notice and act. Take the link away and a bounced invite becomes
+  // unrecoverable without an admin.
+  it('shows the accept link as well as saying the email went', async () => {
     const user = userEvent.setup()
     renderEditor()
     await user.click(screen.getByRole('button', { name: /Invite Nadia Farrow/ }))
 
     const link = await screen.findByLabelText(/invite link for Nadia Farrow/i)
     expect(link).toHaveValue(`${window.location.origin}/accept-invite/tok-abc`)
-    expect(screen.getByText(/no automatic email/i)).toBeInTheDocument()
+    expect(screen.getByText(/we've emailed an invite/i)).toBeInTheDocument()
+    // ⚠️ "emailed", NEVER "sent": nothing here has proof of delivery, and
+    // promising one is how somebody stops chasing an invite that never arrived.
+    expect(screen.queryByText(/invitation sent/i)).toBeNull()
   })
 
   // ⚠️ THE TWO SENTENCES BELOW ARE THE FEATURE'S SAFEGUARDING RULE MADE VISIBLE:
@@ -169,6 +178,34 @@ describe('sending one', () => {
 
     expect(await screen.findByText(/as soon as they accept/i)).toBeInTheDocument()
     expect(screen.queryByText(/approval queue/i)).toBeNull()
+  })
+})
+
+// ⚠️ THE THIRD STATE, WHICH ARRIVED LAST. Invite → Invited → JOINED. Until
+// player_parents.profile_id existed the button could not tell an adult who had
+// accepted from one who had never opened the email — a client may not read
+// `profiles` for anybody but itself.
+describe('somebody who already joined', () => {
+  const JOINED = { ...MOTHER, profile_id: 'user-9' }
+
+  it('says so instead of offering an invite', () => {
+    renderEditor([JOINED])
+
+    expect(screen.getByText(/joined/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Invite Nadia Farrow/ })).toBeNull()
+  })
+
+  // ⚠️ CHECKED BEFORE THE ADDRESS, so a joined adult is never offered a button
+  // whose only outcome is a refusal — invite_parent answers 42710 for an
+  // address that already has an account.
+  it('says so even for a row still being edited', async () => {
+    const user = userEvent.setup()
+    renderEditor([JOINED])
+
+    await user.type(screen.getByLabelText('Email'), 'x')
+
+    expect(screen.getByText(/joined/i)).toBeInTheDocument()
+    expect(screen.queryByText(/save this player first/i)).toBeNull()
   })
 })
 

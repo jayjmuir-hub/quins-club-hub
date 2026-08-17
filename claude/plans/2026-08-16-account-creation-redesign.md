@@ -1,7 +1,8 @@
 # Plan — account creation, rebuilt around who a person actually is
 
-**STATUS: IN PROGRESS, opened 16 Aug 2026. Items 1, 2, 4 and 5 have SHIPPED; 3 is
-half-shipped; 4b is blocked on Jay; 6–8 are not started.** Each ships on its own
+**STATUS: IN PROGRESS, opened 16 Aug 2026. Items 1, 2, 4, 4b, 5 and 7 have
+SHIPPED; 3 is all but its last piece; 6 and 8 are not started.** Each ships on its
+own
 and none blocks the next, so this can stop after any of them. **Update this line
 as items land** — a plan that says IN PROGRESS after it shipped is the failure
 mode `docs:check` rule 5 exists to catch.
@@ -72,19 +73,19 @@ select count(*) from public.players pl
 | 2 | Split every name into first and family | small | ✅ 17 Aug |
 | 3 | Date of birth, in its own table | medium | 🟡 all but the contact re-point, which needs **one fact from Jay** |
 | 4 | Invite from a parent row | medium | ✅ 17 Aug |
-| 4b | …and the email that actually posts it | medium | ⛔ **blocked on Jay** |
+| 4b | …and the email that actually posts it | medium | ✅ 17 Aug — one real send outstanding |
 | 5 | The roll-call replaces the fork | medium | ✅ 17 Aug |
 | 6 | Completeness debt | medium | not started |
-| 7 | Link adults to accounts | medium | not started |
+| 7 | Link adults to accounts | medium | ✅ 17 Aug |
 | 8 | Vouching, from the club's side | large | not started |
 
 Items 1–4 close holes that are open on a live club today. 5 stops the hole being
 re-created. 6–8 are the durable shape.
 
-⚠️ **WHAT IS LEFT OF 3 IS THE `allowsOwnContact` RE-POINT, AND IT IS NOW BLOCKED
-RATHER THAN MERELY DEFERRED.** It needs the date the club counts age groups
-from — see the item. Without it the re-point would take the own-contact field
-away from most of a U13 squad.
+⚠️ **WHAT IS LEFT OF 3 IS THE `allowsOwnContact` RE-POINT, AND IT IS NO LONGER
+BLOCKED** — the cut-off turned out to be recorded in the tournament repo (31
+August, UAERF). It is ordinary work now, with a safeguarding rule inside it: a
+DOB may only ever make that gate **stricter**.
 
 ---
 
@@ -347,7 +348,47 @@ rows** there is no data to infer it from.
 column ever lands, `allowsOwnContact` is the one place to re-point", which is now
 a sentence pointing at a trap.
 
-### 🟡 PLAYING UP — the model shipped, the notification did not
+### ✅ PLAYING UP — model and notification both shipped, 17 Aug 2026
+
+`player_private.plays_up_confirmed_at`, written on the same call as the birthday,
+and a **Playing up** chip on the approval queue.
+
+⚠️ **THE CHIP IS THE NOTIFICATION, AND THAT IS THE DESIGN RATHER THAN THE CHEAP
+OPTION.** The person who has to ACT is the coach reading that queue; an email is
+only a prompt to come and look at exactly that card. It also costs no Vault
+secret, no edge-function deploy, and — see below — no third copy of the age
+model. **If an email is wanted later it reads the column**; the work is item 4b's
+shape, not a new derivation.
+
+⚠️ **THE COLUMN IS A DECISION, NOT A DERIVED FACT.** The birthday and the squad
+say a play-up is POSSIBLE; the column says a parent **ticked the box**. Deriving
+it at read time would show "playing up" for a family who never agreed to
+anything.
+
+⚠️ **AND THE TICK ALONE IS NOT THE ANSWER EITHER.** A parent can tick, then
+change the squad or the date to one that is no longer a play-up — the tick
+survives in React state. The check is re-run at submit, so a consent is only
+recorded while it is still true.
+
+⚠️ **THE QUEUE ASKS ONLY ABOUT ITS OWN ROWS.** `player_private` holds children's
+birthdays; reading it for the whole roster to label a handful of pending cards
+would pull the club's birthday list into an admin's browser. RLS would permit
+that, which is why the narrowing is deliberate — and asserted by a test.
+
+| Fault | Test that failed |
+|---|---|
+| trust the tick without re-checking the dates | *does not record a consent the dates no longer justify* |
+| show the chip for any private row | *says nothing for a child with a birthday but no confirmation* |
+| widen the read to the whole roster | *asks only about the players in the queue* |
+
+⚠️ **AND THE LIVE RLS PROBE REPORTED A HOLE THAT WAS NOT ONE, FIRST TIME.** Its
+"a different parent in the same squad" fixture also held a **coach** role there,
+which legitimately grants `can_edit_team`. In this club a lot of parents are
+coaches. Re-run excluding anyone with a staff role anywhere: own parent **1**,
+team-mate's parent **0**, stranger **0**, control **1**. **A fixture picked by
+role name is not a fixture picked by rights.**
+
+### 🟡 WHY IT IS NOT AN EMAIL — the trap in the obvious route
 
 Jay, 17 Aug: *"we need the ability for players to play up one age group with a
 notification"*. The **rules half is built and tested** — `src/lib/ageGrade.js`,
@@ -483,7 +524,42 @@ after the migration, and is the same table-level-versus-column-level question
 that item 2 had to answer. `invite_parent` exists with EXECUTE for
 `authenticated` and **not** `anon`, so the 16 Aug ACL trap did not recur.
 
-## 4b · The invite email — NOT BUILT, and blocked on a hand step
+## 4b · The invite email — ✅ LIVE, 17 Aug 2026, awaiting one real send
+
+`supabase/functions/notify-invite/index.ts` + `db/migrations/20260817_notify_invite.sql`,
+both deployed and applied. Jay settled the three open questions: **yes**, the
+sender is **named**, and it fires for **every** invite.
+
+❌ **AND THE HAND STEP THIS SECTION WARNED ABOUT DID NOT EXIST.** It said two
+Vault secrets and one dashboard env var were needed, which made it look blocked
+on Jay for a day. In fact all three existing notifiers **share**
+`approval_notify_secret`, and Edge Function env vars are **project-wide** on
+Supabase — so a brand-new function already has it. The only new vault entry was
+the function's URL, which is not a secret. **Measured, not assumed:** the first
+curl answered **401, not 503**, and 503 is the fail-closed answer when the env
+var is missing.
+
+⚠️ **THIS NOTIFIER IS NOT LIKE THE OTHER THREE, AND THE DIFFERENCE IS THE
+DANGEROUS PART.** They mail a GROUP of volunteers, in bcc, about work waiting.
+This mails ONE PERSON and puts a **credential** in the message — `invites.token`
+is the whole of the authentication. So: no bcc, no cc, exactly one recipient read
+off the row, and a request body carrying an id and nothing else. Copying the
+squad's coaches "for visibility", as the others deliberately do, would hand every
+one of them a working link into somebody else's account.
+
+⚠️ **IT MUST NOT READ `invite_targets`.** A multi-target invite is TWO writes —
+the invite row, then the targets — so the trigger fires before they exist and a
+query returns zero, every time. An email listing "the children you'll be linked
+to" would list none: silently, and only in the multi-child case.
+
+### What is left: one real send, and it is Jay's
+
+Everything is proved except that a mail actually arrives, and that needs a real
+inbox. Put Jay's own address on a real `player_parents` row, press **Invite**,
+and confirm the mail lands **and the accept link works**. ⚠️ **Do not test this
+against a club member's address.**
+
+### ⛔ THE BLOCKER AS ORIGINALLY WRITTEN — kept, because it was wrong
 
 Pressing Invite creates the invite; a human still sends the link. To make it a
 real email, the proven shape is already in this repo twice over: an AFTER INSERT
@@ -754,7 +830,45 @@ approval queue's chip, a card on the person's own home screen, and an admin
 contract and the reason it works where a permanent banner does not. A chase with
 no visible end is ignored by about the third sign-in.
 
-## 7 · Link adults to accounts
+## 7 · Link adults to accounts — ✅ BUILT, 17 Aug 2026
+
+`player_parents.profile_id`, filled by `public.link_my_parent_rows()` when
+somebody signs in with no access, and the Invite button's third state:
+**Invite → Invited → Joined**.
+
+⚠️ **THE PLAN SAID "`claim_roster_access` GENERALISED FROM CHILDREN TO ADULTS".
+THAT WOULD HAVE OPENED A HOLE, AND THE FUNCTION DELIBERATELY IS NOT THAT.**
+`claim_roster_access` matches an email and **creates a membership**. Safe where
+it is: the address lives on `player_contacts`, the child's own contact details,
+which **only staff can write**. `player_parents.email` is an address a **parent**
+can type, for their own child, under `parent edit own`. A claim granting access
+on that basis would mean: type an address into the contacts box, sign in as it,
+hold a membership on that squad — which is exactly what `invite_parent` exists to
+prevent, and why that function routes the same journey through an invite whose
+`grant_status` is `'active'` only if the sender could already approve.
+
+**So this sets one column and creates nothing.** The migration carries a guard
+that ABORTS if the function body ever mentions `memberships`. ⚠️ **If a future
+change makes it insert one, it re-opens the hole item 4 closed.**
+
+### Proved on production, rolled back, with the case that matters last
+
+| | |
+|---|---|
+| linked, case-insensitively, across two children | **2** |
+| a second call | **0** — an already-linked row is never re-stamped |
+| a row already claimed by another account | untouched |
+| **memberships before → after** | **48 → 48 — IT GRANTS NOTHING** |
+
+⚠️ **THAT LAST ROW IS THE ONE TO KEEP.** The other three would all pass for a
+function that also handed out access.
+
+⚠️ **AND THE LINKING CALL HAS ITS OWN `try`/`catch`**, separate from the claim
+beside it in `memberships.jsx`. A failure here must not cost somebody the claim
+that actually gets them into the app; the two are unrelated, and folding them
+together would let a tidiness win break a route in.
+
+## 7 · The original reasoning
 
 `player_parents.profile_id`, nullable, plus a claim on sign-in for an email that
 matches — `claim_roster_access` generalised from children to adults. Safe for the

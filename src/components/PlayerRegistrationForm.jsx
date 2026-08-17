@@ -759,7 +759,20 @@ export default function PlayerRegistrationForm({
         // read `players` by name.
         if (created?.player_id && row.dob) {
           try {
-            await setPlayerDob(created.player_id, row.dob)
+            // ⚠️ THE PLAY-UP RIDES WITH THE BIRTHDAY, ON THE SAME WRITE. It is
+            // the only place both facts are known at once: the trigger that
+            // emails the squad fires on the membership INSERT above, before this
+            // row exists, so nothing server-side can derive it at that moment.
+            //
+            // ⚠️ AND THE CHECK IS RE-RUN RATHER THAN TRUSTING THE TICK ALONE. A
+            // parent can tick the box and then change the squad or the date to
+            // one that is no longer a play-up; the tick would survive in state
+            // and record a consent for something that is not happening.
+            await setPlayerDob(created.player_id, row.dob, {
+              playsUp:
+                row.playUpConsent === true &&
+                ageGradeCheck(team?.name, row.dob).status === PLAY_UP,
+            })
           } catch {
             // Swallowed on purpose, and recorded rather than surfaced: the
             // registration succeeded and the queue row is correct. A coach can

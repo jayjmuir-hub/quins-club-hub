@@ -48,6 +48,15 @@ export async function saveParents() {
 export async function deleteParent() {}
 
 /**
+ * ⚠️ ZERO, NOT A NUMBER THAT LOOKS BUSY. The harness has no auth, so nothing
+ * matches an address; returning a count would make the provider look as though
+ * it had linked rows that are still unlinked on screen.
+ */
+export async function linkMyParentRows() {
+  return 0
+}
+
+/**
  * ⚠️ NO NETWORK, AND NO REAL TOKEN. The harness runs against stubs, so this
  * hands back an invite shaped exactly like public.invite_parent's return value
  * — including `grant_status`, which is what the button's closing sentence is

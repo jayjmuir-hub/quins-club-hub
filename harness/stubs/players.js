@@ -199,8 +199,24 @@ export async function getPlayerDob() {
   return null
 }
 
-export async function setPlayerDob(playerId, dob) {
+export async function setPlayerDob(playerId, dob, { playsUp = false } = {}) {
   window.__writes = window.__writes || []
-  window.__writes.push({ op: 'set-player-dob', playerId, dob })
-  return { player_id: playerId, date_of_birth: dob ?? null }
+  // ⚠️ `playsUp` IS RECORDED IN THE PROBE, not just accepted. The whole point of
+  // the third argument is that a consent was given; a stub that swallowed it
+  // would make the harness unable to show the one thing worth looking at.
+  window.__writes.push({ op: 'set-player-dob', playerId, dob, playsUp })
+  return {
+    player_id: playerId,
+    date_of_birth: dob ?? null,
+    plays_up_confirmed_at: playsUp ? new Date().toISOString() : null,
+  }
+}
+
+/**
+ * The approval queue's play-up chip reads this. Returns nothing by default:
+ * "playing up" is the exception, and a harness that showed it on every card
+ * would make its absence the thing to look for.
+ */
+export async function listPlayerPrivate() {
+  return []
 }

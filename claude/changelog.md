@@ -10,7 +10,62 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- ✨ **PLAYING UP AN AGE GROUP, UNDER THE REAL UAERF RULES.** Jay: *"check the
+- ✨ **AN ADULT IS LINKED TO THEIR ACCOUNT, AND THE INVITE BUTTON GAINS ITS THIRD
+  STATE.** `player_parents.profile_id`, filled by `link_my_parent_rows()` on
+  sign-in. Invite → Invited → **Joined**; until now the button could not tell an
+  adult who had accepted from one who never opened the email, because a client
+  may not read `profiles` for anybody but itself.
+  ⚠️ **THE PLAN SAID "`claim_roster_access` GENERALISED TO ADULTS". THAT WOULD
+  HAVE OPENED A HOLE.** That function matches an email and CREATES A MEMBERSHIP —
+  safe where it is, because `player_contacts.email` is written only by staff.
+  `player_parents.email` is an address a PARENT can type for their own child, so
+  the same trick would mean: type an address into the contacts box, sign in as
+  it, hold a membership on that squad. Precisely what `invite_parent` exists to
+  prevent. **So this sets one column and creates nothing**, and its migration
+  ABORTS if the function body ever mentions `memberships`.
+  ⚠️ **PROVED BY THE ROW THAT MATTERS: memberships 48 → 48.** The other checks —
+  2 rows linked case-insensitively, a second call linking 0, another account's
+  claim untouched — would all pass for a function that also handed out access.
+
+- ✉️ **THE INVITE EMAIL IS LIVE.** `notify-invite`, fired by an AFTER INSERT
+  trigger on `invites`. Jay's calls: the sender is NAMED, and it fires for EVERY
+  invite — the admin form no longer makes anybody copy a link out by hand.
+  ⚠️ **IT IS NOT LIKE THE OTHER THREE NOTIFIERS, AND THAT IS THE DANGEROUS PART.**
+  They mail a GROUP in bcc about work waiting. This mails ONE PERSON and the
+  message contains a **credential** — `invites.token` IS the authentication. No
+  bcc, no cc, one recipient read off the row, request body carrying an id and
+  nothing else.
+  ⚠️ **IT MUST NOT READ `invite_targets`** — a multi-target invite writes the
+  invite row first and the targets second, so the trigger sees none, every time.
+  ❌ **AND THE "HAND STEP ONLY JAY CAN DO" DID NOT EXIST.** The plan said two
+  Vault secrets and a dashboard env var; in fact all the notifiers share
+  `approval_notify_secret` and Edge Function env vars are PROJECT-WIDE, so a new
+  function already has it. Proved by the first curl answering **401, not 503**.
+  ⚠️ **`net.http_request_queue.body` IS `bytea`** — casting it straight to jsonb
+  fails with an error that reads like a malformed body and is not one. The
+  9 Aug runbook's verify snippet has the same gap.
+  **Outstanding: one real send**, which needs a real inbox and is Jay's.
+
+- ✨ **THE PLAY-UP IS RECORDED, AND THE COACH WHO MUST APPROVE IT IS TOLD.**
+  `player_private.plays_up_confirmed_at`, written on the same call as the
+  birthday, and a **Playing up** chip on the approval queue.
+  ⚠️ **A CHIP RATHER THAN AN EMAIL, BY DESIGN.** The person who has to ACT is the
+  coach reading that queue — an email is only a prompt to come and look at that
+  card. It also needs no Vault secret, no edge-function deploy and no **third**
+  copy of the UAERF model: a Deno function cannot import `src/lib/ageGrade.js`,
+  and two copies already have to be kept in step by hand across two repos.
+  ⚠️ **THE COLUMN IS A DECISION, NOT A DERIVED FACT** — the dates say a play-up is
+  possible, the column says a parent ticked the box. Deriving it server-side is
+  impossible anyway: the membership insert fires the notification trigger BEFORE
+  the birthday is written.
+  ⚠️ **AND THE TICK ALONE IS NOT THE ANSWER** — a parent can tick and then change
+  the squad, so the check is re-run at submit.
+  ⚠️ **THE LIVE RLS PROBE REPORTED A HOLE THAT WAS NOT ONE.** Its "another parent
+  in the same squad" fixture also held a coach role there. A lot of parents at
+  this club are coaches; a fixture picked by role NAME is not one picked by
+  RIGHTS. Re-run properly: own parent 1, team-mate's parent 0, stranger 0.
+
+- `9a60be2` — ✨ **PLAYING UP AN AGE GROUP, UNDER THE REAL UAERF RULES.** Jay: *"check the
   adhjrt.com repo for age bands … we need the ability for players to play up one
   age group with a notification"*. The tournament site has held the whole model
   since July — cut-off, band per group, ladder, and the wider allowance for the

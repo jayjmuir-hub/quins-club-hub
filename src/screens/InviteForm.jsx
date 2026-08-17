@@ -39,10 +39,16 @@ import { visibleTeams } from '../lib/scope.js'
 // hypothetical non-admin refusal into a thrown, visible error rather than a
 // silent no-op, the same as every other write in this codebase.
 //
-// There is no email-sending infrastructure in this build (no constraint here
-// authorises adding a third-party email service), so on success this shows
-// the generated accept link for the admin to copy and send manually, rather
-// than closing the sheet as every other add/edit form does.
+// ❌ "THERE IS NO EMAIL-SENDING INFRASTRUCTURE IN THIS BUILD" — TRUE UNTIL
+// 17 Aug 2026, AND NO LONGER. An AFTER INSERT trigger on `invites` now posts to
+// the `notify-invite` edge function, which mails the invitee. It fires for EVERY
+// invite, including the ones made here (Jay's call: a rule about which invites
+// get emailed is a second rule free to disagree with the first).
+//
+// ⚠️ THE ACCEPT LINK IS STILL SHOWN, AND THAT IS DELIBERATE RATHER THAN
+// LEFTOVER. pg_net queues the request and nothing waits for the result, so a
+// failed send is SILENT by design — the admin who pressed the button is the only
+// person in a position to notice and act.
 
 const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 const FIELD = 'mb-3.5'
@@ -198,9 +204,14 @@ export default function InviteForm({ onClose, onSaved }) {
     <Sheet open onClose={onClose} title="Invite a member">
       {invite ? (
         <div>
+          {/* ⚠️ THE LINK STAYS, AND IT IS NOT LEFTOVER COPY. The email is queued
+              through pg_net by a trigger and nothing waits for the result, so a
+              failed send is silent by design — the admin who pressed the button
+              is the only person who can notice and act. "We've emailed" rather
+              than "sent", because nothing here has proof of delivery. */}
           <p className="mb-3 text-sm leading-relaxed text-ink">
-            Invite created for <strong>{invite.email}</strong>. There&apos;s no automatic email
-            for this yet — copy the link below and send it to them directly.
+            We&apos;ve emailed an invite to <strong>{invite.email}</strong>. If it doesn&apos;t
+            arrive, copy the link below and send it to them directly.
           </p>
           <div className={FIELD}>
             <label className={LABEL} htmlFor="invite-link">

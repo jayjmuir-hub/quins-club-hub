@@ -22,7 +22,7 @@ import {
   listAccessRequests,
   restoreAccessRequest,
 } from '../data/accessRequests.js'
-import { listPlayers } from '../data/players.js'
+import { listPlayerPrivate, listPlayers } from '../data/players.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canApproveAnything, isAdmin, isSuperAdmin } from '../lib/scope.js'
@@ -250,7 +250,7 @@ function formatJoined(value) {
  * may approve. A client-side filter as well would be a second rule free to
  * disagree with the first, and the wrong one would be the one nobody tested.
  */
-function PendingApprovals({ members, teamsById, rowState, onApprove }) {
+function PendingApprovals({ members, teamsById, rowState, onApprove, playsUpByPlayer = new Set() }) {
   return (
     <section data-testid="pending-approvals" className="mb-5">
       <h3 className="text-[16px] font-extrabold tracking-[-0.2px] text-ink">
@@ -282,6 +282,7 @@ function PendingApprovals({ members, teamsById, rowState, onApprove }) {
             ? teamsById.get(member.team_id)?.name ?? member.teams?.name ?? null
             : null
           const registered = formatJoined(member.created_at)
+          const playsUp = member.player_id ? playsUpByPlayer.has(member.player_id) : false
 
           return (
             <Card
@@ -308,6 +309,27 @@ function PendingApprovals({ members, teamsById, rowState, onApprove }) {
                   {teamName && (
                     <span className={`ml-2 text-[12.5px] font-semibold ${MUTED_ON_PAPER}`}>
                       {teamName}
+                    </span>
+                  )}
+                  {/* ⚠️ THIS IS THE NOTIFICATION (Jay, 17 Aug 2026: "play up one
+                      age group with a notification"), and it is on the row
+                      rather than in an email on purpose. The person who has to
+                      ACT is the coach reading this queue; an email is a prompt
+                      to come and look at exactly this card. It also costs no
+                      Vault secret, no edge-function deploy, and — critically —
+                      no THIRD copy of the UAERF age model, which a Deno function
+                      would need because it cannot import src/lib/ageGrade.js.
+
+                      ⚠️ IT READS A STORED DECISION, NEVER A DERIVED ONE. The
+                      column records that a parent TICKED the box; recomputing it
+                      here from the birthday would show "playing up" for a family
+                      who never agreed to anything. */}
+                  {playsUp && (
+                    <span
+                      data-testid="playing-up"
+                      className="ml-2 rounded-[6px] bg-warn-bg px-1.5 py-0.5 text-[11.5px] font-bold uppercase tracking-[.4px] text-ink"
+                    >
+                      Playing up
                     </span>
                   )}
                 </span>
@@ -637,6 +659,47 @@ export default function Accounts() {
   // real access rather than being quietly hidden from the main list.
   const activeMembers = members.filter((member) => member.status !== 'pending')
   const pendingMembers = members.filter((member) => member.status === 'pending')
+
+  // ⚠️ SCOPED TO THE PENDING ROWS, NOT THE WHOLE ROSTER, AND THAT IS A
+  // SAFEGUARDING CHOICE RATHER THAN AN OPTIMISATION. player_private holds
+  // children's birthdays; reading it for every player on the screen would pull
+  // the club's whole birthday list into an admin's browser to answer a question
+  // about the handful of rows in the approval queue. RLS would permit it, which
+  // is exactly why the narrowing has to be deliberate here.
+  const pendingPlayerIds = useMemo(
+    () => [...new Set(pendingMembers.map((member) => member.player_id).filter(Boolean))],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the ids, not the rows:
+    // the array is rebuilt on every render and would restart the effect forever.
+    [pendingMembers.map((member) => member.player_id).filter(Boolean).sort().join(',')],
+  )
+  const [playsUpByPlayer, setPlaysUpByPlayer] = useState(() => new Set())
+
+  useEffect(() => {
+    if (pendingPlayerIds.length === 0) {
+      setPlaysUpByPlayer(new Set())
+      return undefined
+    }
+
+    let active = true
+    listPlayerPrivate(pendingPlayerIds)
+      .then((rows) => {
+        if (!active) return
+        setPlaysUpByPlayer(
+          new Set(rows.filter((row) => row.plays_up_confirmed_at).map((row) => row.player_id)),
+        )
+      })
+      // ⚠️ SWALLOWED, AND THE CHIP SIMPLY DOES NOT APPEAR. This is one extra
+      // fact on a card that is already complete without it; turning a failed
+      // read into an error state would take the whole approval queue down over
+      // a label.
+      .catch(() => {
+        if (active) setPlaysUpByPlayer(new Set())
+      })
+
+    return () => {
+      active = false
+    }
+  }, [pendingPlayerIds])
 
   const groups = groupByProfile(activeMembers)
 
@@ -1159,6 +1222,7 @@ export default function Accounts() {
             teamsById={teamsById}
             rowState={rowState}
             onApprove={approve}
+            playsUpByPlayer={playsUpByPlayer}
           />
         )}
       </section>
@@ -1220,6 +1284,7 @@ export default function Accounts() {
           teamsById={teamsById}
           rowState={rowState}
           onApprove={approve}
+          playsUpByPlayer={playsUpByPlayer}
         />
       )}
 
