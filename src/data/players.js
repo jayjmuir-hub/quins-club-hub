@@ -297,27 +297,67 @@ export async function upsertContact(contact) {
 // not an error. Nothing here interprets that — the screen decides.
 
 /**
- * Writes one child's date of birth. Upserts, because the row is keyed on the
+ * Writes one child's date of birth, and — when the family agreed to it — that
+ * they are playing up an age group. Upserts, because the row is keyed on the
  * player and a correction is the common case.
  *
  * `dob` is an ISO date string (YYYY-MM-DD) or null. Null CLEARS it rather than
  * being ignored: a birthday entered wrongly must be removable by the family who
  * entered it.
+ *
+ * ⚠️ `playsUp` IS A DECISION BEING RECORDED, NOT A FACT BEING DERIVED. The
+ * birthday and the squad say a play-up is POSSIBLE; this says a parent ticked
+ * the box. Working it out from the two columns instead would record a consent
+ * nobody gave — and the column exists precisely so the club can show somebody
+ * agreed. See db/migrations/20260817_player_private_plays_up.sql.
+ *
+ * ⚠️ FALSE CLEARS IT, for the same reason a null date does: a tick given by
+ * mistake, or a birthday corrected so the play-up no longer applies, must be
+ * removable by the people who entered it. A stale "playing up" on a child who is
+ * not is worse than none, because it is the flag a coach acts on.
  */
-export async function setPlayerDob(playerId, dob) {
+export async function setPlayerDob(playerId, dob, { playsUp = false } = {}) {
   if (!playerId) throw new Error('setPlayerDob needs a player.')
 
   const { data, error } = await supabase
     .from('player_private')
     .upsert(
-      { player_id: playerId, date_of_birth: dob || null, updated_at: new Date().toISOString() },
+      {
+        player_id: playerId,
+        date_of_birth: dob || null,
+        plays_up_confirmed_at: playsUp ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: 'player_id' },
     )
-    .select('player_id, date_of_birth')
+    .select('player_id, date_of_birth, plays_up_confirmed_at')
     .maybeSingle()
 
   if (error) throw error
   return data ?? null
+}
+
+/**
+ * The private rows for many children at once. Returns ROWS, like every other
+ * `*ForPlayers` reader here — the caller indexes them.
+ *
+ * Used by the approval queue to mark a pending registration as playing up: the
+ * coach who has to act on it is the person who needs to know.
+ *
+ * ⚠️ A MISSING ROW IS THE NORMAL ANSWER, NOT AN ERROR. RLS gives staff their own
+ * squads and a family their own child, so a list spanning squads legitimately
+ * comes back partial — and a child with no birthday on file has no row at all.
+ * Nothing here interprets that; the screen decides.
+ */
+export async function listPlayerPrivate(playerIds) {
+  return fetchByIds(playerIds, async (chunk) => {
+    const { data, error } = await supabase
+      .from('player_private')
+      .select('player_id, date_of_birth, plays_up_confirmed_at')
+      .in('player_id', chunk)
+    if (error) throw error
+    return data ?? []
+  })
 }
 
 /**

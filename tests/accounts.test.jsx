@@ -15,6 +15,7 @@ const listClubMembersMock = vi.fn()
 const listPendingProfilesMock = vi.fn()
 const grantMembershipsMock = vi.fn()
 const listPlayersMock = vi.fn()
+const listPlayerPrivateMock = vi.fn()
 const listAccessRequestsMock = vi.fn()
 const dismissAccessRequestMock = vi.fn()
 const restoreAccessRequestMock = vi.fn()
@@ -48,6 +49,11 @@ vi.mock('../src/data/members.js', () => ({
 // this screen now touches players.js too.
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
+  // ⚠️ THE APPROVAL QUEUE READS player_private FOR ITS PENDING ROWS (17 Aug
+  // 2026), to mark a child as playing up. An unmocked export is undefined and
+  // calling it in an effect throws before the queue renders at all — which
+  // shows up as every card in this file disappearing, not as a missing chip.
+  listPlayerPrivate: (...args) => listPlayerPrivateMock(...args),
 }))
 
 // The approval gate: who asked for access, and who has been dismissed.
@@ -234,6 +240,9 @@ beforeEach(() => {
   listClubMembersMock.mockResolvedValue(MEMBER_ROWS)
   listPendingProfilesMock.mockResolvedValue(PROFILE_ROWS)
   listPlayersMock.mockResolvedValue(PLAYERS)
+  // Nobody is playing up by default: the chip is the exception, and a fixture
+  // that showed it everywhere would make its absence the thing to assert.
+  listPlayerPrivateMock.mockResolvedValue([])
   // Default: nobody has asked and nobody has been dismissed, so the waiting
   // list behaves exactly as it did before this feature existed.
   listAccessRequestsMock.mockResolvedValue([])
@@ -1798,6 +1807,84 @@ describe('Accounts — a waiting person carries what they asked for', () => {
     expect(asked).toHaveTextContent(/Asked as/i)
     expect(asked).toHaveTextContent('Coach')
     expect(asked).toHaveTextContent('U10')
+  })
+
+  // ── Playing up an age group (Jay, 17 Aug 2026) ────────────────────────
+  //
+  // "the ability for players to play up one age group with a notification". THIS
+  // IS THE NOTIFICATION, and it is on the row rather than in an email on
+  // purpose: the person who has to ACT is the coach reading this queue, and an
+  // email is only a prompt to come and look at exactly this card. It also needs
+  // no Vault secret, no edge-function deploy, and no THIRD copy of the UAERF age
+  // model — a Deno function cannot import src/lib/ageGrade.js.
+  // A registration waiting to be approved: the only rows this queue renders.
+  const PENDING_REGISTRATION = {
+    id: 'mem-pending',
+    profile_id: 'profile-newcomer',
+    role: 'parent',
+    status: 'pending',
+    team_id: 'team-u12',
+    player_id: 'player-chidi',
+    created_at: '2026-08-17T08:00:00Z',
+    profiles: { full_name: 'Nadia Farrow', email: 'nadia@example.com' },
+    teams: { name: 'U12 Mixed' },
+    players: { full_name: 'Chidi Farrow' },
+  }
+
+  it('marks a pending player who is playing up', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    listPlayerPrivateMock.mockResolvedValue([
+      {
+        player_id: 'player-chidi',
+        date_of_birth: '2015-03-04',
+        plays_up_confirmed_at: '2026-08-17T09:00:00Z',
+      },
+    ])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    expect(within(row).getByTestId('playing-up')).toHaveTextContent(/playing up/i)
+  })
+
+  // ⚠️ AND IT ASKS ONLY ABOUT THE ROWS IN THE QUEUE. player_private holds
+  // children's BIRTHDAYS; reading it for the whole roster to label a handful of
+  // pending cards would pull the club's birthday list into an admin's browser.
+  // RLS would permit that, which is exactly why the narrowing has to be
+  // deliberate — and asserted.
+  it('asks only about the players in the queue', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    setup()
+
+    await screen.findByTestId('pending-membership')
+    expect(listPlayerPrivateMock).toHaveBeenCalledWith(['player-chidi'])
+  })
+
+  // ⚠️ IT READS THE STORED DECISION, NEVER RE-DERIVES ONE. A birthday on file
+  // with no confirmation beside it means the family never agreed to anything —
+  // showing "playing up" there would put a claim on a child's record that nobody
+  // made.
+  it('says nothing for a child with a birthday but no confirmation', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    listPlayerPrivateMock.mockResolvedValue([
+      { player_id: 'player-chidi', date_of_birth: '2015-03-04', plays_up_confirmed_at: null },
+    ])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    expect(within(row).queryByTestId('playing-up')).toBeNull()
+  })
+
+  // ⚠️ A FAILED READ MUST NOT TAKE THE QUEUE DOWN. This is one extra label on a
+  // card that is already complete without it, and the queue is how anybody gets
+  // approved at all.
+  it('still renders the queue when the private read fails', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    listPlayerPrivateMock.mockRejectedValue(new Error('offline'))
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    expect(within(row).getByRole('button', { name: /approve/i })).toBeInTheDocument()
+    expect(within(row).queryByTestId('playing-up')).toBeNull()
   })
 
   // ⚠️ 'volunteer' IS CLAIMABLE AND NOT GRANTABLE, so it is NOT in ROLE_OPTIONS

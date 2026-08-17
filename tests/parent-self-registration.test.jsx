@@ -90,6 +90,9 @@ vi.mock('../src/data/players.js', () => ({
   // and calling it mid-submit throws AFTER the child is already registered —
   // which is precisely the failure the third case below exists to describe.
   setPlayerDob: (...args) => setPlayerDobMock(...args),
+  // The approval queue's play-up chip reads this (17 Aug 2026); this file
+  // renders Accounts further down.
+  listPlayerPrivate: async () => [],
 }))
 
 vi.mock('../src/data/events.js', () => ({
@@ -113,6 +116,10 @@ const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
 
 const CLUB_ID = 'club-1'
 const TEAM_U13 = { id: 't-u13', club_id: CLUB_ID, name: 'U13', sort_order: 3 }
+// ⚠️ ONE RUNG BELOW U13, so a child who fits this one is PLAYING UP in that one.
+// Added 17 Aug 2026: without a second squad on the ladder there is no way to
+// test that changing the age group re-decides the play-up.
+const TEAM_U12 = { id: 't-u12', club_id: CLUB_ID, name: 'U12', sort_order: 2 }
 const TEAM_U16 = { id: 't-u16', club_id: CLUB_ID, name: 'U16', sort_order: 6 }
 // A single-gender squad, named exactly as the club names them. Gender is
 // REQUIRED on this one and on nothing else here (Jay, 9 Aug 2026).
@@ -131,7 +138,7 @@ const TEAM_SELF = {
 }
 // Deliberately out of order: the form sorts by sort_order, like every other
 // age-group list in the app.
-const TEAMS = [TEAM_U16G, TEAM_U16, TEAM_U13, TEAM_SELF]
+const TEAMS = [TEAM_U16G, TEAM_U16, TEAM_U13, TEAM_U12, TEAM_SELF]
 
 function shellState(overrides = {}) {
   return {
@@ -285,6 +292,7 @@ describe('Add your player — a signed-in account with no access', () => {
     const options = within(screen.getByLabelText(/age group/i)).getAllByRole('option')
     expect(options.map((option) => option.textContent)).toEqual([
       'Choose an age group…',
+      'U12',
       'U13',
       'U16',
       'U16G Contact',
@@ -1025,8 +1033,10 @@ describe('Add your player — a signed-in account with no access', () => {
     expect(registerMyPlayerMock).not.toHaveBeenCalled()
   })
 
-  it('saves once the parent has ticked it', async () => {
+  it('saves once the parent has ticked it, and records the consent', async () => {
     const user = userEvent.setup()
+    // The default fixture returns no player_id, so the second write never runs.
+    registerMyPlayerMock.mockResolvedValue({ id: 'mm-new', player_id: 'p-42', status: 'pending' })
     await renderShell()
 
     await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
@@ -1037,6 +1047,45 @@ describe('Add your player — a signed-in account with no access', () => {
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
     await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalled())
+    // ⚠️ RIDES WITH THE BIRTHDAY, ON THE SAME WRITE. It is the only moment both
+    // facts are known at once — the trigger that emails the squad fires on the
+    // membership insert, before this row exists, so nothing server-side can
+    // derive it then.
+    await waitFor(() =>
+      expect(setPlayerDobMock).toHaveBeenCalledWith(expect.any(String), '2015-03-04', {
+        playsUp: true,
+      }),
+    )
+  })
+
+  // ⚠️ THE TICK ALONE IS NOT THE ANSWER, AND THIS IS THE CASE THAT PROVES IT. A
+  // parent can tick the box and then change the squad or the date to one that is
+  // no longer a play-up; the tick survives in React state, and recording it
+  // would file a consent for something that is not happening.
+  it('does not record a consent the dates no longer justify', async () => {
+    const user = userEvent.setup()
+    registerMyPlayerMock.mockResolvedValue({ id: 'mm-new', player_id: 'p-42', status: 'pending' })
+    await renderShell()
+
+    await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+    await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+    await user.type(screen.getByLabelText(/date of birth/i), '2015-03-04')
+    await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+    await user.click(await screen.findByRole('checkbox', { name: /play up an age group/i }))
+
+    // ⚠️ THE EXACT LABEL, NOT /age group/i. Once the consent tick is on screen
+    // its own label — "…play up an age group" — matches that pattern too, so the
+    // loose query finds two controls and fails on the ambiguity rather than on
+    // the thing under test.
+    //
+    // Now move them to the squad they actually fit. The tick is still set.
+    await user.selectOptions(screen.getByLabelText('Age group'), TEAM_U12.id)
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    await waitFor(() => expect(setPlayerDobMock).toHaveBeenCalled())
+    expect(setPlayerDobMock).toHaveBeenCalledWith(expect.any(String), '2015-03-04', {
+      playsUp: false,
+    })
   })
 
   // ⚠️ A MISMATCH IS NOT OFFERED THE TICK. Consent is for a decision the rules
@@ -1656,7 +1705,12 @@ describe('Add your player — the date of birth', () => {
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
-    await waitFor(() => expect(setPlayerDobMock).toHaveBeenCalledWith('p-42', '2014-03-04'))
+    // ⚠️ THE THIRD ARGUMENT IS THE PLAY-UP DECISION (17 Aug 2026), and FALSE is
+    // the assertion worth making here: this child fits U13 exactly, so nothing
+    // may record a consent for a play-up that is not happening.
+    await waitFor(() =>
+      expect(setPlayerDobMock).toHaveBeenCalledWith('p-42', '2014-03-04', { playsUp: false }),
+    )
   })
 
   // ⚠️ THE CHILD IS ALREADY REGISTERED WHEN THIS WRITE RUNS. Its transaction is
