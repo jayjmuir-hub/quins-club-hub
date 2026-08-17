@@ -67,6 +67,11 @@ export function toEditorRows(rows) {
       // When public.invite_parent last created an invite for this row. Null for
       // a row nobody has ever invited, which is every row before 17 Aug 2026.
       invited_at: row?.invited_at ?? null,
+      // ⚠️ WHICH ACCOUNT THIS ADULT IS, once their address matched at sign-in.
+      // It is what turns the Invite button's middle state into JOINED, and it
+      // grants nothing — see public.link_my_parent_rows. Carried through the
+      // editor read-only: nothing on screen sets it, and toRow does not write it.
+      profile_id: row?.profile_id ?? null,
       phoneCountry: country,
       phoneNational: national,
       is_primary: Boolean(row?.is_primary),

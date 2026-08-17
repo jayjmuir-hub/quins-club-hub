@@ -58,6 +58,23 @@ export default function InviteParentButton({ parent, disabled = false }) {
   const typed = String(parent?.email ?? '').trim()
   const saved = String(parent?.savedEmail ?? '').trim()
 
+  // ⚠️ THE THIRD STATE, AND IT ARRIVED LAST FOR A REASON. Invite → Invited →
+  // JOINED. Until player_parents.profile_id existed (item 7) this component
+  // could not tell an adult who had accepted from one who had never opened the
+  // email, because a client may not read `profiles` for anybody but itself.
+  //
+  // ⚠️ IT IS CHECKED BEFORE THE ADDRESS, so somebody who has already joined is
+  // never offered an invite — public.invite_parent would refuse it anyway
+  // (42710, "that person already has an account"), and offering a button whose
+  // only outcome is a refusal is worse than offering none.
+  if (parent?.profile_id) {
+    return (
+      <p className={NOTE} role="status">
+        Joined — they have an account and can sign in.
+      </p>
+    )
+  }
+
   // No address anywhere on the row: the empty Email box above is already the
   // prompt, and an Invite button beside it would only be able to refuse.
   if (!typed && !saved) return null

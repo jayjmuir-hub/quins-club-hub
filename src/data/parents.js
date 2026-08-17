@@ -249,6 +249,30 @@ export async function inviteParent(parentRowId) {
   return data
 }
 
+/**
+ * Links the caller's account to any `player_parents` row carrying their address,
+ * via `public.link_my_parent_rows`. Returns how many rows were linked.
+ *
+ * ⚠️ IT LINKS, IT DOES NOT GRANT, AND THE DISTINCTION IS THE WHOLE SAFETY
+ * ARGUMENT. `claim_roster_access` — the function this generalises — matches an
+ * email and CREATES A MEMBERSHIP, which is safe there because the address lives
+ * on `player_contacts` and only staff can write it. `player_parents.email` is an
+ * address a PARENT can type for their own child. A claim that granted access on
+ * that basis would mean: type an address into the contacts box, sign in as it,
+ * and hold a membership on that squad — the exact hole `invite_parent` exists to
+ * avoid. The function sets one column and creates nothing, and its migration
+ * has a guard that ABORTS if it ever mentions `memberships`.
+ *
+ * ⚠️ IT RETURNS A COUNT, NOT THE ROWS. "You were linked to 2 records" tells the
+ * caller nothing about anybody else; returning the rows would hand them
+ * children's names.
+ */
+export async function linkMyParentRows() {
+  const { data, error } = await supabase.rpc('link_my_parent_rows')
+  if (error) throw error
+  return typeof data === 'number' ? data : 0
+}
+
 /** Deletes one parent row by id. Throws when the database removed nothing. */
 export async function deleteParent(id) {
   if (!id) throw new Error('deleteParent needs an id.')

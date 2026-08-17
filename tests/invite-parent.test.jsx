@@ -181,6 +181,34 @@ describe('sending one', () => {
   })
 })
 
+// ⚠️ THE THIRD STATE, WHICH ARRIVED LAST. Invite → Invited → JOINED. Until
+// player_parents.profile_id existed the button could not tell an adult who had
+// accepted from one who had never opened the email — a client may not read
+// `profiles` for anybody but itself.
+describe('somebody who already joined', () => {
+  const JOINED = { ...MOTHER, profile_id: 'user-9' }
+
+  it('says so instead of offering an invite', () => {
+    renderEditor([JOINED])
+
+    expect(screen.getByText(/joined/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Invite Nadia Farrow/ })).toBeNull()
+  })
+
+  // ⚠️ CHECKED BEFORE THE ADDRESS, so a joined adult is never offered a button
+  // whose only outcome is a refusal — invite_parent answers 42710 for an
+  // address that already has an account.
+  it('says so even for a row still being edited', async () => {
+    const user = userEvent.setup()
+    renderEditor([JOINED])
+
+    await user.type(screen.getByLabelText('Email'), 'x')
+
+    expect(screen.getByText(/joined/i)).toBeInTheDocument()
+    expect(screen.queryByText(/save this player first/i)).toBeNull()
+  })
+})
+
 describe('the middle state', () => {
   // Without it, two coaches invite the same person on the same evening and
   // neither ever finds out.

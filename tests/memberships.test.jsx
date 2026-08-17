@@ -572,14 +572,25 @@ describe('MembershipProvider — roster auto-onboarding', () => {
   it('tries once per user, not once per render', async () => {
     // The guard is a ref keyed on the user id. Without it, every reload — and
     // every StrictMode double-invoke — would fire another RPC.
+    //
+    // ⚠️ COUNTED BY NAME SINCE 17 Aug 2026, NOT BY TOTAL RPC CALLS. The
+    // zero-membership branch now makes TWO calls — link_my_parent_rows, then
+    // claim_roster_access — so a bare toHaveBeenCalledTimes(1) fails for a
+    // reason that has nothing to do with the guard under test. Counting the one
+    // that matters keeps the assertion about the guard rather than about how
+    // many RPCs happen to live in that branch.
+    const claims = () => supabase.rpc.mock.calls.filter(([fn]) => fn === 'claim_roster_access')
+
     mockFrom({ memberships: [], teams: [] })
     const user = userEvent.setup()
     renderProvider()
 
-    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(claims()).toHaveLength(1))
     await user.click(screen.getByRole('button', { name: 'Reload' }))
     await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
 
-    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    expect(claims()).toHaveLength(1)
+    // …and the linking call is guarded by the same ref, for the same reason.
+    expect(supabase.rpc.mock.calls.filter(([fn]) => fn === 'link_my_parent_rows')).toHaveLength(1)
   })
 })

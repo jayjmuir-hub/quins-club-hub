@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useAuth } from './auth.jsx'
 import { supabase } from './supabase'
 import { claimRosterAccess, loadMyMemberships } from '../data/members.js'
+import { linkMyParentRows } from '../data/parents.js'
 import { isAdmin } from './scope.js'
 
 // Membership/teams context: loads the current user's membership rows and the
@@ -177,6 +178,25 @@ export function MembershipProvider({ children }) {
           // refresh can retrigger this), and marking afterwards would let
           // both through.
           claimAttemptedFor.current = userId
+
+          // ⚠️ LINK FIRST, AND IT IS NOT PART OF THE CLAIM. link_my_parent_rows
+          // attaches this account to any contact row carrying its address and
+          // GRANTS NOTHING — see src/data/parents.js. It runs here because this
+          // is the one place that already knows "somebody just signed in with no
+          // access", and it is what gives the Invite button its Joined state.
+          //
+          // ⚠️ SEPARATE try/catch FROM THE CLAIM BELOW, DELIBERATELY. A failure
+          // here must not stop the claim that actually gets somebody INTO the
+          // app — the two are unrelated, and folding them together would let a
+          // linking blip cost a parent their access.
+          try {
+            await linkMyParentRows()
+          } catch {
+            // Swallowed: linking is a tidiness win, not a route in. Nobody is
+            // worse off than before if it fails, and there is nothing for them
+            // to do about it.
+          }
+          if (!mounted) return
 
           let claimed = []
           try {
