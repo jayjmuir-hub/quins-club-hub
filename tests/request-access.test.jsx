@@ -193,10 +193,50 @@ describe('RequestAccess', () => {
       'Coach',
       'Team manager',
       'Medic or physio',
+      // ⚠️ ADDED 17 Aug 2026, and it is the answer that had nowhere to go.
+      // Until the CHECK was widened, a committee member had to claim one of the
+      // five above — which is the "no idea who they are" problem wearing a role
+      // that fits even worse.
+      'Committee or volunteer',
     ])
     // ⚠️ ADMIN IS NOT SELF-SERVICE. It is club-wide and granted by an existing
     // admin on another screen; the CHECK constraint holds the same list.
     expect(labels.join(' ')).not.toMatch(/admin/i)
+  })
+
+  // ⚠️ THE SQUAD IS STILL REQUIRED FOR A VOLUNTEER — Jay's call, 17 Aug 2026,
+  // over relaxing the INSERT policy that has demanded one since 16 Aug. What
+  // changes is the sentence under the picker, because for a club-wide committee
+  // member the squad means "who to ask about me" rather than "what I do there",
+  // and the default wording ("pick the eldest") describes a parent.
+  it('tells a volunteer what the squad picker is for', async () => {
+    const user = userEvent.setup()
+    renderIt()
+    const select = await screen.findByLabelText(/i am a/i)
+
+    expect(screen.getByText(/pick the eldest/i)).toBeInTheDocument()
+
+    await user.selectOptions(select, 'volunteer')
+
+    expect(screen.getByText(/whichever one knows you best/i)).toBeInTheDocument()
+    expect(screen.queryByText(/pick the eldest/i)).toBeNull()
+  })
+
+  it('sends volunteer as the claimed role', async () => {
+    const user = userEvent.setup()
+    renderIt()
+
+    await screen.findByRole('button', { name: /request access/i })
+    await user.type(screen.getByLabelText(/first name/i), 'Rowan')
+    await user.selectOptions(await screen.findByLabelText(/i am a/i), 'volunteer')
+    await user.selectOptions(await screen.findByLabelText(/age group/i), 't-u14b')
+    await user.click(screen.getByRole('button', { name: /request access/i }))
+
+    await waitFor(() => expect(createAccessRequestMock).toHaveBeenCalled())
+    expect(createAccessRequestMock.mock.calls[0][0]).toMatchObject({
+      role: 'volunteer',
+      teamId: 't-u14b',
+    })
   })
 
   it('⚠️ lists the squads from the RPC, because it can read the table', async () => {

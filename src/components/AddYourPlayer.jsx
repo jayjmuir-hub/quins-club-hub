@@ -27,20 +27,25 @@ import PlayerRegistrationForm from './PlayerRegistrationForm.jsx'
 // a single new membership row on U16 returned 6 players. Do not "simplify"
 // this into an immediate grant.
 //
-// ⚠️ THE AGE-GROUP LIST CAN LEGITIMATELY BE EMPTY HERE, and that is a database
-// limitation rather than a loading state. `team read` is
+// ❌ THIS BLOCK CLAIMED THE AGE-GROUP LIST IS NORMALLY EMPTY HERE. IT IS NOT,
+// AND HAS NOT BEEN SINCE 8 Aug 2026. It quoted `team read` as
 //
 //     EXISTS (SELECT 1 FROM memberships m
 //              WHERE m.profile_id = auth.uid() AND m.club_id = teams.club_id)
 //
-// — read from the live database on 8 Aug 2026, not from the schema capture —
-// so a person with ZERO memberships reads ZERO teams, which is exactly the
-// person this screen is for. Until that policy is widened (see
-// db/migrations/20260808_teams_readable_before_registration.sql, written but
-// NOT applied) the dropdown has nothing to put in it, and the honest thing is
-// to say so and hand them the secondary route rather than render an empty
-// select that cannot be submitted. RequestAccess's own header comment records
-// the same fact from the other side.
+// and said the migration that widens it was "written but NOT applied". Both
+// halves are wrong. Measured on production 17 Aug 2026, straight from
+// pg_policy: `team read` is `(SELECT auth.uid()) IS NOT NULL`. It was applied as
+// `20260808164111 teams_readable_before_registration`, RESTORE.md has recorded
+// the corrected version since 9 Aug, and src/components/RequestAccess.jsx had
+// the identical stale claim in its own header until 16 Aug — where believing it
+// cost a whole SECURITY DEFINER function, written and dropped the same hour.
+// This is the third copy of one rotted sentence.
+//
+// So a signed-in account with zero memberships reads EVERY squad, and the
+// provider's plain `from('teams').select('*')` returns them. The empty branch
+// below is now a genuine failure case — a read that failed — rather than the
+// expected state, and it stays for that reason and no other.
 
 function Shell({ title, children }) {
   return (
@@ -68,6 +73,9 @@ export default function AddYourPlayer({ teams = [], onRegistered, onAskForAccess
     </Button>
   )
 
+  // Reached only when the teams read actually failed — see the header. The copy
+  // already said "we couldn't load", which was the honest wording for a state
+  // the comment above it was describing as normal.
   if (teams.length === 0) {
     return (
       <Shell title="Let&apos;s get you connected">
