@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- 🔒 **THE `allowsOwnContact` RE-POINT — PROMISED 3 Aug, DEFERRED THREE TIMES,
+- `1d1c206` — 🔒 **THE `allowsOwnContact` RE-POINT — PROMISED 3 Aug, DEFERRED THREE TIMES,
   DONE.** A player's own email and phone are now decided by the squad name **and**
   the birthday, so **item 3 is complete and the plan is finished.**
   ⚠️ **THE BIRTHDAY MAY ONLY EVER CLOSE THE GATE, AND THE CODE SAYS SO IN ONE
@@ -45,6 +45,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the effect's value and **the `useState` seed the browser actually paints was
   untested**. Breaking it on purpose left every test green. The probe now records
   every render and asserts `renders[0]`.
+
+- 📝 **AND `claude/open-items.md`'s "No audit log" IS NARROWED, NOT CLOSED.** The
+  new rights log covers **one of the four things that item listed** — memberships,
+  including super-admin. A deleted player and an edited contact detail still leave
+  no trace at all, and the first of those is the more alarming on a club whose
+  members are children. ⚠️ **The item is corrected in place rather than ticked
+  off**: a finding deleted from that file is a finding that ceases to exist.
 
 - ✨ **AND THE CLUB CAN SEE ITS OWN GAPS — `/admin/needs-attention`.** The THIRD
   and last surface of the completeness rule, so item 6 is now complete. The other

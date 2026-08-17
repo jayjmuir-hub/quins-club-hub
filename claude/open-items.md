@@ -302,10 +302,20 @@ proves you wrong.**
 
 ## Real gaps, no cheap fix
 
-- **No audit log.** Nothing records who deleted a player, revoked a membership, edited
-  a child's contact details or granted super-admin. `events.created_by`,
-  `availability.updated_by` and `attendance.recorded_by` are single overwritten
-  columns, not history.
+- 🟡 **No audit log — NARROWED 17 Aug 2026, NOT CLOSED.** `public.membership_audit`
+  now records every grant, change and revoke of a MEMBERSHIP, including
+  super-admin, written by a trigger on the row and readable at
+  `/admin/rights-log` by super admins only. **⚠️ THAT IS ONE OF THE FOUR THINGS
+  THIS ITEM LISTED.** Still unrecorded: **who deleted a player**, and **who edited
+  a child's contact details**. `events.created_by`, `availability.updated_by` and
+  `attendance.recorded_by` remain single overwritten columns rather than history.
+  ⚠️ **DO NOT READ THE NEW SCREEN AS "we have an audit log".** It answers "who
+  gave this person access", and nothing else — a deleted player still leaves no
+  trace at all, which is the more alarming of the two gaps on a club whose members
+  are children.
+  ⚠️ **AND IT STARTS AT 17 Aug 2026.** There is no history before that date and
+  none can be reconstructed, so an empty log is not evidence that nothing
+  happened. The screen says so in its empty state.
 - **The whole app is one JavaScript chunk** and every parent downloads all of it.
   ⚠️ Re-measure rather than citing an old figure. Two fixes, biggest first:
   `flag-icons` is imported whole for a phone country picker and is most of the CSS
