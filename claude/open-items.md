@@ -404,6 +404,22 @@ Run `get_advisors` rather than trusting this list. As of 14 Aug 2026:
 different claim and the one this repo has confused before. Each shipped with a
 green suite and has never been exercised by a human on the live site.
 
+- **The tier-eligibility warning has never had anything to render.** It was
+  verified present in the live bundle on the day it shipped, which proves the code
+  deployed and proves nothing else. **Measured on production 17 Aug 2026: the club
+  has 1 fixture carrying a tier and 4 graded players, and the two do not overlap.**
+  Seven children are picked on that fixture and **none of them is graded at all**,
+  so there is no row in the database on which the sentence could appear.
+  ✅ **THAT ZERO IS A FACT ABOUT THE CLUB, NOT A BROKEN QUERY** — the control was
+  run: all 4 grades join to real players, and **all 4 graded children ARE picked in
+  lineups**, just in the two lineups whose fixtures carry no tier. So both halves of
+  the feature are in live use and have simply never met.
+  ⚠️ **SO ITS SILENCE ON THE LIVE SITE IS NOT EVIDENCE THAT IT WORKS.** A coach
+  opening that lineup today sees exactly what they would see if the feature had
+  never been built — which is also the state a broken read would produce, since the
+  screen is deliberately built to fall silent rather than fail. **The first real
+  test is a graded child picked for a tiered fixture**, and nothing has produced
+  one yet. Re-run the counts rather than trusting these.
 - **The coach roster's nested grouping** (`cf8a221`, `3044872`) — tier, then
   forwards and backs. Every test runs in jsdom against invented squads. Nobody
   has yet opened the real U16B roster and confirmed the headings, the counts, or
@@ -493,11 +509,24 @@ green suite and has never been exercised by a human on the live site.
 
 ## Not built, and deliberately so
 
-- **Nothing compares a player's grade against a fixture's tier.** Both exist —
+- ✅ ~~**Nothing compares a player's grade against a fixture's tier.** Both exist —
   `player_grades.tier` and `events.tier` — and an eligibility warning in the
   lineup picker ("graded C, this is an A-tier fixture") was offered and not
   taken up. Recorded so the next session knows the data is already there and the
-  absence is a choice, not an oversight.
+  absence is a choice, not an oversight.~~ — **BUILT AND LIVE, 17 Aug 2026**
+  (`ae98b8f`). `src/lib/tierEligibility.js`, rendered by `src/screens/Lineup.jsx`,
+  spec at `claude/plans/2026-08-17-lineup-eligibility-warning.md`. Jay took it up
+  the day after this line recorded that he had not.
+  ⚠️ **THIS FILE WAS THE SECOND PLACE THAT STALE CLAIM SURVIVED, AND IT OUTLIVED
+  THE FIRST BY A COMMIT.** `2ac2782` corrected
+  `claude/plans/2026-08-14-tiers-and-game-time.md` for saying the same feature was
+  unbuilt; this line said it too, in different words, and was not looked for.
+  **The reason generalises: a "deliberately not built" note is a STATUS claim
+  wearing a RULING's clothes.** Everything around it in this file is a finding that
+  stays true until someone acts on it, so nothing about the wording suggests it
+  needs re-reading the moment the thing ships. **When a decision to not build
+  something is reversed, grep for the feature, not for the plan that named it.**
+  The section is kept rather than emptied, per this file's rule at the top.
 
 ## Unexplained
 

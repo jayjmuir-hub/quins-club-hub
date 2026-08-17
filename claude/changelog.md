@@ -10,6 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 📝 **THE "NOT BUILT, DELIBERATELY" NOTE OUTLIVED THE PLAN THAT SAID THE SAME
+  THING.** `2ac2782` corrected `claude/plans/2026-08-14-tiers-and-game-time.md`
+  for claiming the eligibility warning was unbuilt; `claude/open-items.md` carried
+  the identical claim in different words — *"an eligibility warning … was offered
+  and not taken up"* — and survived that commit untouched. Struck through with the
+  evidence rather than deleted, per that file's own rule.
+  ⚠️ **THE SHAPE IS WORTH MORE THAN THE FIX: a "deliberately not built" note is a
+  STATUS claim wearing a RULING's clothes.** Every neighbouring line in that file
+  stays true until somebody acts on it, so nothing in the wording asks to be
+  re-read on the day the thing ships. **When a decision not to build is reversed,
+  grep for the feature, not for the plan that named it.**
+  ⛔ **AND THE FEATURE HAS NEVER HAD ANYTHING TO RENDER, WHICH THE BUNDLE CHECK
+  COULD NOT SEE.** Measured on production: **1 tiered fixture, 4 graded players,
+  and no overlap** — 7 children are picked on that fixture and **0 of them are
+  graded**. Finding both message fragments in the live bundle proved the code
+  deployed; it did not prove a coach has ever seen a warning, and **nobody has**.
+  ✅ **The zero was controlled before being written down**, per rule 6: all 4 grades
+  join to real players and all 4 graded children ARE picked in lineups — on the two
+  fixtures that carry no tier. Both halves are in live use and have never met.
+  Recorded under "shipped but never seen against real data", because silence here
+  is indistinguishable from the feature being absent — the screen is built to fall
+  silent rather than fail.
+
+- `2ac2782` — 📝 **THE PLAN SAID "NOT BUILT" A MINUTE AFTER IT SHIPPED.**
+  `claude/plans/2026-08-14-tiers-and-game-time.md` and the eligibility spec both
+  corrected: the status lines were written before the merge and not revisited
+  after it.
+
 - `ae98b8f` — ⚖️ **THE LINEUP PICKER CAN NOW SEE THAT A GRADE AND A TIER DISAGREE.** The third
   of Jay's 14 Aug ask — *"fair game, eligibility, and milestone"* — and the last
   piece of `claude/plans/2026-08-14-tiers-and-game-time.md` still unbuilt. Both
