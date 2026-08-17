@@ -50,7 +50,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   domain as the auth mail, and getting that flagged takes SIGN-IN down. So the
   thing to watch is `/signup` volume, and the runbook carries the query.
 
-- 🐛 **A PASSWORD THAT MET EVERY RULE WAS REFUSED, AND THE APP BLAMED THE RULES.**
+- `f2ed3b0` — 🐛 **A PASSWORD THAT MET EVERY RULE WAS REFUSED, AND THE APP BLAMED THE RULES.**
   Found on Jay's own sign-up: five green ticks in the checklist, and a red banner
   saying *"check the list below the password box"* — pointing at the one thing
   that was not the problem.
