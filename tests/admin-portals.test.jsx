@@ -257,6 +257,41 @@ describe('AdminDashboard — inside a portal', () => {
     expect(within(tabs).queryByText(/^Club$/)).not.toBeInTheDocument()
   })
 
+  // ⚠️ THE FIRST TAB WHOSE AUDIENCE IS NARROWER THAN ITS PORTAL'S (17 Aug 2026).
+  //    Club Admin has no `right` — every admin holds it — but the Rights log
+  //    records what admins DO, so an ordinary admin must not be among the people
+  //    it is offered to. The pair below is the whole point: same portal, same
+  //    URL, different row.
+  it('⚠️ offers the Rights log to a SUPER admin only, in the same portal', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin([], { is_super: true })))
+    renderAt('/admin/accounts')
+
+    const tabs = screen.getByRole('navigation', { name: /admin sections/i })
+    expect(within(tabs).getAllByRole('link').map((el) => el.textContent)).toEqual([
+      'Accounts',
+      'Squads & league teams',
+      'Staff',
+      'Rights log',
+    ])
+  })
+
+  it('⚠️ hides it from an ordinary club admin, who holds the same portal', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin([])))
+    renderAt('/admin/accounts')
+
+    const tabs = screen.getByRole('navigation', { name: /admin sections/i })
+    expect(within(tabs).queryByText('Rights log')).not.toBeInTheDocument()
+  })
+
+  // ⚠️ HIDING A TAB IS NOT A PERMISSION, and this is the assertion that stops
+  //    anyone reading it as one. The URL must still resolve to the Club Admin
+  //    portal for an ordinary admin — they land inside it and the SCREEN
+  //    explains itself, which is what every other admin route already does. The
+  //    refusal that matters is membership_audit's read policy, not this row.
+  it('⚠️ still maps /admin/rights-log to Club Admin for an ordinary admin', () => {
+    expect(portalForPath('/admin/rights-log')?.key).toBe('club')
+  })
+
   // ⚠️ NOT TIDINESS. A bare `flex` row does not clip when it overruns — the
   //    DOCUMENT gets wider than the viewport, and every element sized to the
   //    viewport then renders short or clipped on screens three away. That is

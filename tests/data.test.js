@@ -89,6 +89,7 @@ import {
   registerMyPlayer,
   approveMembership,
 } from '../src/data/members.js'
+import { listMembershipAudit } from '../src/data/audit.js'
 
 // `count` is separate from `data` because a head:true count request resolves
 // with { data: null, count, error } — the count arrives in its own field and a
@@ -2671,5 +2672,62 @@ describe('subscribeNotices', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+// --- listMembershipAudit ---------------------------------------------
+
+describe('listMembershipAudit', () => {
+  // ⚠️ THIS TEST EXISTS BECAUSE tests/rights-log.test.jsx CANNOT CATCH THIS.
+  // That file mocks src/data/audit.js, so a column dropped from the select
+  // below is `undefined` on every row and the screen renders happily around
+  // it — the exact failure already recorded against listClubMembers, where a
+  // missing `gender` made the completeness queue report a gap for every
+  // player in a single-gender squad. An audit line missing `new_is_super`
+  // would silently stop saying "Made a super admin", which is the single most
+  // important sentence the log can print.
+  it('asks for every column the rights log renders', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await listMembershipAudit()
+
+    expect(supabase.from).toHaveBeenCalledWith('membership_audit')
+    const columns = calls.select[0][0].split(',').map((c) => c.trim())
+    for (const column of [
+      'action',
+      'actor_id',
+      'actor_kind',
+      'old_role',
+      'new_role',
+      'old_status',
+      'new_status',
+      'old_is_super',
+      'new_is_super',
+      'old_rights',
+      'new_rights',
+      'team_id',
+      'profile_id',
+      'at',
+      'id',
+    ]) {
+      expect(columns).toContain(column)
+    }
+  })
+
+  // ⚠️ `id` IS A TIEBREAK, NOT DECORATION. Two memberships changed in the same
+  // transaction share an `at` to the microsecond — an approval that also flips
+  // a role does exactly that — and without a unique final sort key the two
+  // lines can swap places between reads. On a log, an order that is not stable
+  // is an order nobody can quote.
+  it('orders newest first, with a stable tiebreak, and caps the window', async () => {
+    const { builder } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await listMembershipAudit()
+
+    expect(builder.order).toHaveBeenNthCalledWith(1, 'at', { ascending: false })
+    expect(builder.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false })
+    expect(builder.limit).toHaveBeenCalledWith(200)
   })
 })

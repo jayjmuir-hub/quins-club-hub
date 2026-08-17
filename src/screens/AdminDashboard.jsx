@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin } from '../lib/scope.js'
-import { portalForPath, portalLabel } from '../lib/portals.js'
+import { portalForPath, portalLabel, visibleTabs } from '../lib/portals.js'
 
 // The back-end dashboard (admin-dashboard plan, 2026-08-05): one /admin
 // route with two tabs, absorbing what used to be /accounts and the admin
@@ -126,6 +126,13 @@ export default function AdminDashboard() {
   // null at /admin itself, which is the chooser. Everything below keys off it.
   const portal = portalForPath(pathname)
 
+  // ⚠️ THE TAB ROW IS NARROWER THAN THE PORTAL SINCE 17 Aug 2026 — the Rights
+  // log is Club Admin's, but only a super admin is offered it. Read from the
+  // EFFECTIVE set like the gate above, so an admin previewing as a coach loses
+  // the tab along with the screen. Hiding a tab grants nothing and hides no
+  // data: see visibleTabs' header, and membership_audit's read policy.
+  const tabs = portal ? visibleTabs(portal, memberships) : []
+
   if (!isAdmin(memberships)) {
     // Order matters: the previewing case is a strict subset of "not an admin
     // by the effective set", so it has to be tested first or it can never be
@@ -193,7 +200,7 @@ export default function AdminDashboard() {
         {/* ⚠️ NO TAB ROW FOR A ONE-TAB PORTAL. A row of a single tab is chrome
             that says nothing the heading has not already said. Match sheets is
             the current case; Social Media Management will be the next one. */}
-        {portal && portal.tabs.length > 1 && (
+        {portal && tabs.length > 1 && (
           <nav aria-label="Admin sections" className="mb-4 flex flex-wrap gap-2">
             {/* ⚠️ `flex-wrap` ON THIS NAV IS LOAD-BEARING, NOT TIDINESS — added
                 12 Aug 2026 with the "Squads & league teams" rename. The row was
@@ -212,7 +219,7 @@ export default function AdminDashboard() {
                 NavLink is active for its own path AND every path beneath it,
                 so "What's on" would light up while you are standing on
                 "Ideas". Two tabs marked current is worse than none. */}
-            {portal.tabs.map((tab) => (
+            {tabs.map((tab) => (
               <NavLink key={tab.to} to={tab.to} end className={tabClassName}>
                 {tab.label}
               </NavLink>
