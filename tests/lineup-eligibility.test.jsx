@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
 // The eligibility warning in the lineup picker —
 // claude/plans/2026-08-17-lineup-eligibility-warning.md.
@@ -67,7 +67,18 @@ function eventAt(tier) {
   }
 }
 
-/** A saved lineup holding every player, so picked rows and the share card both fill. */
+/**
+ * A saved lineup holding every player, so picked rows and the share card both fill.
+ *
+ * ⚠️ THE A-GRADED CHILD IS THE REPLACEMENT, AND THAT IS NOT AN ARBITRARY CHOICE.
+ * This started as "last player in the list is the replacement", which made the
+ * bench place fall on the UNGRADED child — so a grade leaking into the
+ * replacements list rendered nothing either way and the guard below could not see
+ * it. Proved by injecting exactly that leak and watching the file stay green. It is
+ * the same shape as the age cut-off bug: invisible on precisely the case where it
+ * did not matter. A graded child has to sit on the bench for the bench to be tested
+ * at all.
+ */
 function lineupWithEveryone() {
   return [
     {
@@ -77,7 +88,7 @@ function lineupWithEveryone() {
       notes: '',
       lineup_players: PLAYERS.map((player, index) => ({
         player_id: player.id,
-        role: index === PLAYERS.length - 1 ? 'replacement' : 'starter',
+        role: player.id === 'p-strong' ? 'replacement' : 'starter',
         position: null,
         sort_order: index,
       })),
@@ -150,10 +161,11 @@ describe('the eligibility warning', () => {
     // match finds nothing — the same trap as grepping a bundle for a string that
     // spans a template hole.
     expect(screen.getByText(/Everyone in this squad is in the team/)).toBeInTheDocument()
+    // Rory is the REPLACEMENT and is graded A, so this warning can only be coming
+    // from a bench row — a bench place still puts a child on the team sheet, which
+    // is what an eligibility rule is about.
     expect(screen.getByText(/Graded A — this fixture is B tier/)).toBeInTheDocument()
-    // Tomas is the replacement, and a bench place still puts a child on the sheet.
-    // He is ungraded, so the assertion that matters is that the bench row RENDERS
-    // its warning slot at all — proved by the C-graded starter below.
+    // And Callum is a starter, graded C. Both picked surfaces, one render.
     expect(screen.getByText(/Graded C — this fixture is B tier/)).toBeInTheDocument()
   })
 
@@ -201,6 +213,40 @@ describe('⚠️ the shared image must never carry a grade', () => {
     expect(shared).not.toMatch(/tier/i)
     expect(shared).not.toMatch(/eligib/i)
     expect(shared).not.toMatch(/above their grade/)
+  })
+
+  // ⚠️ THE REAL GUARD, AND THE KEYWORD SCAN ABOVE IS WHY IT EXISTS. That scan was
+  // written first and looked thorough — no "Graded", no "tier", no "eligib". A leak
+  // of the bare LETTER, rendering a replacement as `Tomas Bergqvist (A)`, was then
+  // injected into the share card and the whole file stayed GREEN. A test that would
+  // pass against the very thing it exists to catch reports confidence it has not
+  // earned.
+  //
+  // So this one names no keyword at all: whatever a grade is rendered AS, the card
+  // must not change when the grades do. The card is compared against itself with
+  // every grade removed and nothing else altered.
+  it('renders a card that does not change when the grades do', async () => {
+    await renderScreen({ tier: 'C', lineups: lineupWithEveryone(), grades: GRADES })
+    const graded = document.querySelector('[aria-hidden="true"] .bg-white').textContent
+    const warningsWhenGraded = screen.getAllByText(/Graded [AB] —/).length
+
+    cleanup()
+
+    await renderScreen({ tier: 'C', lineups: lineupWithEveryone(), grades: new Map() })
+    const ungraded = document.querySelector('[aria-hidden="true"] .bg-white').textContent
+    const warningsWhenUngraded = screen.queryAllByText(/Graded/).length
+
+    // ⚠️ THE CONTROL, AND IT IS LOAD-BEARING. Without it the comparison below
+    // would pass perfectly if grades never reached the screen at all — the two
+    // renders would be identical because both were ungraded. This proves the first
+    // render really was graded and the second really was not, so the comparison is
+    // measuring the card and not measuring nothing.
+    expect(warningsWhenGraded).toBeGreaterThan(0)
+    expect(warningsWhenUngraded).toBe(0)
+    expect(graded).toContain('Rory Aldenbrook')
+    expect(graded).toContain('Starting')
+
+    expect(graded).toBe(ungraded)
   })
 
   it('keeps the warnings out of the card even when they are in the picked rows', async () => {
