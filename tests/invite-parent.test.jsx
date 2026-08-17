@@ -137,14 +137,23 @@ describe('sending one', () => {
     expect(JSON.stringify(args)).not.toContain('nadia@example.com')
   })
 
-  it('shows the accept link, because nothing here posts an email', async () => {
+  // ⚠️ THE LINK IS SHOWN *AS WELL AS* THE EMAIL, AND THAT IS NOT LEFTOVER COPY
+  // FROM BEFORE THE MAIL EXISTED (17 Aug 2026). The invite email is queued by a
+  // trigger through pg_net, which does not wait for a result — so a failed send
+  // is SILENT by design, and the person who pressed the button is the only one
+  // who can notice and act. Take the link away and a bounced invite becomes
+  // unrecoverable without an admin.
+  it('shows the accept link as well as saying the email went', async () => {
     const user = userEvent.setup()
     renderEditor()
     await user.click(screen.getByRole('button', { name: /Invite Nadia Farrow/ }))
 
     const link = await screen.findByLabelText(/invite link for Nadia Farrow/i)
     expect(link).toHaveValue(`${window.location.origin}/accept-invite/tok-abc`)
-    expect(screen.getByText(/no automatic email/i)).toBeInTheDocument()
+    expect(screen.getByText(/we've emailed an invite/i)).toBeInTheDocument()
+    // ⚠️ "emailed", NEVER "sent": nothing here has proof of delivery, and
+    // promising one is how somebody stops chasing an invite that never arrived.
+    expect(screen.queryByText(/invitation sent/i)).toBeNull()
   })
 
   // ⚠️ THE TWO SENTENCES BELOW ARE THE FEATURE'S SAFEGUARDING RULE MADE VISIBLE:

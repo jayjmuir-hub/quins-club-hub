@@ -103,19 +103,22 @@ export default function InviteParentButton({ parent, disabled = false }) {
   }
 
   if (invite) {
-    // ⚠️ NO EMAIL IS SENT BY THIS APP, AND THE COPY SAYS SO RATHER THAN LEAVING
-    // IT TO BE DISCOVERED. InviteForm has always shown the link for the admin to
-    // send by hand — there is no invite-sending edge function yet — so a button
-    // that claimed "invitation sent" would be the only screen in the app
-    // promising a mail nobody posted.
+    // ⚠️ THE LINK IS STILL SHOWN, AND THAT IS NOT LEFTOVER COPY. An email can
+    // fail after the invite exists — the trigger queues it through pg_net and
+    // nothing waits for the result, so a dead mail path is silent by design
+    // (db/migrations/20260817_notify_invite.sql). The person who pressed the
+    // button is the only one who can notice and act, so they get the link too.
+    //
+    // ⚠️ IT SAYS "we've emailed" RATHER THAN "sent". Nothing here has proof of
+    // delivery, and promising one is how somebody stops chasing.
     const link = `${window.location.origin}/accept-invite/${invite.token}`
     const pending = invite.grant_status !== 'active'
 
     return (
       <div className="mt-3 rounded-[11px] border border-line bg-surface-card p-3" role="status">
         <p className="text-sm leading-relaxed text-ink">
-          Invite ready for <strong>{invite.email}</strong>. Send them this link — there&apos;s no
-          automatic email for it yet.
+          We&apos;ve emailed an invite to <strong>{invite.email}</strong>. If it doesn&apos;t
+          arrive, send them this link instead.
         </p>
         <input
           type="text"
