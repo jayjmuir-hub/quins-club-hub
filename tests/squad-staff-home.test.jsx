@@ -335,10 +335,20 @@ describe('tileSpans — the lead is two tiles tall and the rest flow around it',
     expect(tileSpans(1, false)).toEqual(['wide'])
   })
 
-  // ⚠️ A LEAD NEEDS THREE PEOPLE TO BE WORTH IT. With two, the tall tile has one
-  // half-height tile beside it and the other half of that column is a hole.
-  it('refuses the tall tile below three people', () => {
-    expect(tileSpans(2, true)).toEqual(['half', 'half'])
+  // ⚠️ TWO IS ENOUGH, AND THIS TEST ASSERTED THE OPPOSITE UNTIL 16 Aug 2026.
+  // It read "refuses the tall tile below three people", on the reasoning that
+  // the tall tile leaves a hole beside its lower half at two. The hole is real.
+  // It lost to consistency: Jay, comparing a two-person squad with a six-person
+  // one on the same screen — "the U13 head coach bubble is not the standard
+  // double size". A head coach is a head coach at either size of squad, and the
+  // same job rendered two ways one above the other reads as a bug.
+  it('⚠️ gives the lead the tall tile at two people, hole and all', () => {
+    expect(tileSpans(2, true)).toEqual(['lead', 'half'])
+  })
+
+  // Still no tall tile without somebody titled to earn it.
+  it('leaves a two-person squad with no head coach as an even pair', () => {
+    expect(tileSpans(2, false)).toEqual(['half', 'half'])
   })
 
   it('stacks two tiles beside the lead at three', () => {
@@ -457,6 +467,38 @@ describe('SquadStaffCard — the mosaic on screen', () => {
     // module chose, which is by name.
     expect(tiles[0]).toHaveTextContent('Rosa Ferreira')
     expect(tiles.filter((t) => t.dataset.featured === 'true')).toHaveLength(1)
+  })
+
+  // ⚠️ THE SHAPE JAY ACTUALLY REPORTED, AND THE ONLY TEST HERE THAT RENDERS IT.
+  // "the U13 head coach bubble is not the standard double size" was a two-person
+  // squad sitting above a six-person one on Home. `tileSpans(2, true)` is
+  // asserted above, but a span array is not a size: the size lives in
+  // SPAN_CLASS, and a lead that lost its class tokens would satisfy every
+  // existing assertion in this file. So this compares the two-person lead
+  // against the six-person one and demands they be the same tile.
+  it('draws the head coach the same size in a two-person squad as in a six', () => {
+    const leadTile = () =>
+      screen.getAllByTestId('squad-staff-person').find((t) => t.dataset.span === 'lead')
+
+    const { rerender } = render(
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA, MANAGER_PRIYA]} />,
+    )
+    const small = leadTile()
+    expect(small).toHaveTextContent('Rosa Ferreira')
+    expect(small.dataset.featured).toBe('true')
+    const smallClass = small.className
+    const smallRow = small.style.gridRow
+
+    rerender(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[COACH_ROSA, MEDIC_SAM, COACH_DAN, MANAGER_PRIYA, person(5), person(6)]}
+      />,
+    )
+    const big = leadTile()
+
+    expect(smallClass).toBe(big.className)
+    expect(smallRow).toBe(big.style.gridRow)
   })
 
   it('lays a squad out evenly when nobody is titled a head', () => {
