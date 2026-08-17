@@ -1,6 +1,17 @@
 # The eligibility warning in the lineup picker
 
-**STATUS: NOT SHIPPED — spec agreed 17 Aug 2026, implementation starting.**
+**STATUS: SHIPPED 17 Aug 2026 as `ae98b8f` (#215), and live on production —
+verified by fetching the bundle from https://adhquins-clubhub.com and finding both
+message fragments, against a known-present and a known-absent control.**
+
+⚠️ **THE BUILT THING DIFFERS FROM THE SPEC BELOW IN ONE PLACE, AND THE SPEC IS THE
+WRONG HALF.** This document says the warning is "a second line under the name",
+inside the name's column. Measured in a real browser at 375px, that gave the
+sentence **122px**, wrapped it to **FOUR lines** and made the row **108px** against
+a 42px unwarned baseline. It ships **under the whole row** instead — 322px, one
+line, 62px. Read `src/screens/Lineup.jsx` for the shape that actually exists; the
+paragraph below is kept because its *reasoning* (a sentence, not a chip) still
+holds and only its placement was wrong.
 
 The third of Jay's 14 Aug ask (`claude/plans/2026-08-14-tiers-and-game-time.md`
 named it *"fair game, eligibility, and milestone"*). Phase 1 built the game-time

@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- ⚖️ **THE LINEUP PICKER CAN NOW SEE THAT A GRADE AND A TIER DISAGREE.** The third
+- `ae98b8f` — ⚖️ **THE LINEUP PICKER CAN NOW SEE THAT A GRADE AND A TIER DISAGREE.** The third
   of Jay's 14 Aug ask — *"fair game, eligibility, and milestone"* — and the last
   piece of `claude/plans/2026-08-14-tiers-and-game-time.md` still unbuilt. Both
   halves of the comparison already existed and held real rows; nothing compared
@@ -28,6 +28,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **"PLAYING UP" IS DELIBERATELY NOT THE WORDING.** This app already uses it for
   a younger child in an older squad, which is what the cut-off fix above was about.
   Asserted by test, because it is the phrase a later edit reaches for.
+  ⛔ **AND THREE THINGS WERE GREEN WHILE BEING WRONG, WHICH IS THE PART WORTH
+  KEEPING.** (1) The share-card guard scanned for "Graded", "tier" and "eligib" and
+  **passed** against an injected leak of the bare LETTER — `Rory Aldenbrook (A)`. It
+  is now a differential naming no keyword: the card rendered with grades must equal
+  the card rendered without them. (2) That injection's FIRST run came back green for
+  the wrong reason — the fixture put the only bench place on the UNGRADED child, so
+  the leak rendered nothing either way. **The same shape as the age cut-off bug:
+  invisible on exactly the case where it did not matter.** (3) The warning wrapped to
+  **FOUR lines** at 375px, making a row 108px against a 42px baseline, and **every
+  assertion in the suite passed on it** — jsdom reports no widths, so it cannot fail
+  on layout. Found by measuring a real browser; guarded by a STRUCTURAL test, because
+  jsdom can see shape even where it cannot see width.
 
 - `08e2b94` — 📝 **SESSION RECORD, AND TWO STALE CLAIMS CORRECTED.**
   `claude/handoffs/2026-08-17-account-creation-and-the-season-cutoff.md` — six
