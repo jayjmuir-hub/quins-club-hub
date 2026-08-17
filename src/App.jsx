@@ -13,6 +13,7 @@ import PortalChooser from './screens/PortalChooser.jsx'
 import SocialWhatsOn from './screens/SocialWhatsOn.jsx'
 import SocialIdeas from './screens/SocialIdeas.jsx'
 import AdminClub from './screens/AdminClub.jsx'
+import AdminRightsLog from './screens/AdminRightsLog.jsx'
 import AdminStaff from './screens/AdminStaff.jsx'
 import Accounts from './screens/Accounts.jsx'
 import Pitches from './screens/Pitches.jsx'
@@ -175,6 +176,14 @@ export default function App() {
                 grants nobody anything new. A MEMBER-facing version does need
                 one: claude/plans/2026-08-13-squad-staff-on-home.md. */}
             <Route path="staff" element={<AdminStaff />} />
+            {/* Who gave whom access, and when. ⚠️ THE ONLY ADMIN ROUTE WHOSE
+                AUDIENCE IS NARROWER THAN AdminDashboard's isAdmin() GATE — it
+                records what admins do, so an ordinary admin must not be its
+                only reader. The screen repeats the super-admin check because a
+                route is linkable and somebody will paste the URL, and
+                membership_audit's read policy (`private.is_super_admin()`, and
+                no other) is what actually decides. */}
+            <Route path="rights-log" element={<AdminRightsLog />} />
             {/* Pitch setup. The `pitches` admin right decides whether the TAB
                 is shown; the screen itself repeats the check, because a route
                 is linkable and somebody will paste the URL. Neither is
