@@ -13,9 +13,17 @@ tier**. Somebody had been using it for days while this file said nobody could.
 **Re-run the counts rather than trusting the previous sentence** — that is the
 whole reason it is written here as a warning and not as a number.
 
-⚠️ **THE ELIGIBILITY WARNING IN THE LINEUP PICKER IS STILL NOT BUILT** — the data
-supports it (a fixture knows its tier, a player knows their grade) but nothing
-compares them. **This is the agreed next piece of work as of 17 Aug 2026.**
+✅ **THE ELIGIBILITY WARNING IN THE LINEUP PICKER IS BUILT** — shipped 17 Aug 2026
+as `ae98b8f` (#215) and live. `src/lib/tierEligibility.js` compares the two, and
+`src/screens/Lineup.jsx` shows the result on the pool, the starters and the bench.
+Spec and the rulings behind it:
+`claude/plans/2026-08-17-lineup-eligibility-warning.md`.
+⚠️ **THIS LINE SAID "STILL NOT BUILT … the agreed next piece of work" UNTIL THE
+MERGE.** It is corrected here rather than deleted because this file has already
+carried two false claims for days (see the warning above), and the pattern is
+always the same: the plan describes the moment it was written and nobody goes back.
+**If you are reading this file to find work, check `git log` for the files it names
+before believing any status line in it.**
 
 Phase 3 (minutes) is not started and was waiting on Jay's answer that fair game
 time means appearances, which he has since given: **appearances**, so minutes may
