@@ -568,3 +568,21 @@ REVOKE ALL ON public.player_positions FROM anon;
 -- ---------------------------------------------------------------------
 GRANT SELECT ON public.membership_audit TO authenticated;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.membership_audit FROM anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- membership_vouches  (17 Aug 2026) — "do you know this person?", answered by
+-- the people already being asked to approve them.
+--
+-- No explicit GRANT or REVOKE: the table takes Supabase's defaults for
+-- `authenticated` and is narrowed entirely by its two policies, both keyed on
+-- `private.can_approve_team` — admins plus the coaches and managers of that
+-- squad. ⚠️ A MEDIC IS OUTSIDE THAT SET, matching invite_parent: a medic cannot
+-- approve, so a medic's opinion must not sit in the queue looking like one that
+-- counts. Proved live 17 Aug with a CREATED medic fixture (the club has none),
+-- printing can_approve = false beside the 0 so the zero is evidence.
+--
+-- ⚠️ THE WRITE POLICY'S `with check` PINS voucher_id TO auth.uid(). Without it a
+-- coach could attribute an opinion to a colleague — which, for a signal whose
+-- entire purpose is "who recognised them", is worse than no signal. Proved:
+-- writing as another coach is REFUSED.
+-- ---------------------------------------------------------------------
