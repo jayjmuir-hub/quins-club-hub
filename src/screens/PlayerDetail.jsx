@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
-import { deletePlayer, getPlayerContact } from '../data/players.js'
+import { deletePlayer, getPlayerContact, getPlayerDob } from '../data/players.js'
 import { listParents } from '../data/parents.js'
 import useOwnContactGate from '../lib/useOwnContactGate.js'
+// The club's own age function, so the number shown here cannot drift from the
+// one that decides which squad a child belongs in.
+import { ageAt } from '../lib/ageGrade.js'
 import { formatPhone } from '../lib/phone.js'
 import { genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
@@ -203,6 +206,81 @@ function ParentsBlock({ playerId }) {
       ))}
     </div>
   )
+}
+
+/**
+ * The child's date of birth and the age it works out to — for whoever is
+ * entitled to see it, and invisible to everyone else.
+ *
+ * ⚠️ IT RENDERS NOTHING WITHOUT A VALUE, WHICH IS THIS FILE'S EXISTING RULE
+ * AND NOT A NEW ONE. ContactBlock states it above: never suggest withheld data
+ * exists. Parents reach this screen, and `player_private` is readable only by
+ * squad staff or the child's own family — so a parent looking at a team-mate
+ * gets null from RLS, identical to a child with no birthday on file. An empty
+ * "Date of birth" row would tell them one exists and is being kept from them.
+ *
+ * ⚠️ getPlayerDob's own header says null means "not set OR you may not see it"
+ * and that callers MUST NOT tell them apart. This one does not try: both render
+ * nothing, which is the only treatment that is honest in both cases.
+ *
+ * ⚠️ THE AGE IS SHOWN ALONGSIDE THE DATE, NOT INSTEAD OF IT. `ageAt` is the
+ * club's own function — the same one the age-grade check uses — so the number
+ * here cannot drift from the number that decides a squad. Showing only an age
+ * would also make a wrong birthday harder to spot, and spotting wrong ones is
+ * half the reason the club is collecting them.
+ */
+function BirthdayBlock({ playerId }) {
+  const [dob, setDob] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    getPlayerDob(playerId)
+      .then((value) => {
+        if (mounted) setDob(value ?? null)
+      })
+      // Swallowed on purpose, like ContactBlock's own read: a failed birthday
+      // read must not put an error card on a screen somebody opened to find a
+      // phone number.
+      .catch(() => {
+        if (mounted) setDob(null)
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [playerId])
+
+  if (loading || !dob) return null
+
+  const age = ageAt(dob, new Date())
+
+  return (
+    <div data-testid="player-birthday" className="mb-4">
+      <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
+        Date of birth
+      </h4>
+      <KeyValue label="Born">
+        {formatBirthday(dob)}
+        {Number.isFinite(age) && (
+          <span className="ml-2 font-semibold text-ink-muted">({age})</span>
+        )}
+      </KeyValue>
+    </div>
+  )
+}
+
+// en-GB, matching every other date this app renders (formatJoined in
+// Accounts.jsx does the same). An ISO string on a parent-facing screen reads as
+// a database field rather than a birthday.
+function formatBirthday(iso) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 function ContactBlock({ playerId }) {
@@ -466,6 +544,14 @@ export default function PlayerDetail({
           )}
         </div>
       </div>
+
+      {/* ⚠️ RENDERS NOTHING WITHOUT A VALUE, AND THAT IS THIS SCREEN'S EXISTING
+          RULE RATHER THAN A NEW ONE — see ContactBlock above: never suggest
+          withheld data exists. Parents reach this screen, and player_private is
+          readable only by squad staff or the child's own family, so a parent
+          looking at a team-mate gets null from RLS. An empty "Date of birth"
+          row would tell them there is one and they may not see it. */}
+      <BirthdayBlock playerId={player.id} />
 
       <ParentsBlock playerId={player.id} />
 

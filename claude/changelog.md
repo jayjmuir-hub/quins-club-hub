@@ -10,6 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 👀 **A COACH OR ADMIN CAN NOW SEE A BIRTHDAY, NOT JUST EDIT ONE.** Jay, having
+  entered the first two: *"where as a coach or admin can i see them?"* The answer
+  was nowhere but the edit form, one child at a time — no age on the roster, no
+  date on the player sheet, and `/admin/needs-attention` only ever said WHO was
+  missing one. An **age** now sits on the roster row beside the gender, and the
+  **date plus the age** on the player sheet.
+  ⚠️ **THE ROSTER READ IS STAFF-ONLY AND IS NOT ISSUED AT ALL OTHERWISE** — the
+  rule the Tier column already follows. `player_private` is readable by squad
+  staff or the child's own family, so a parent would get null for every team-mate
+  and a roster of blanks. **The test for it asserts the absence of the REQUEST,
+  not the absence of a number**: the screen looks identical either way, so a
+  screen-only assertion would pass against a version that queried every child's
+  birthday.
+  ⚠️ **THE PLAYER SHEET RENDERS NOTHING WITHOUT A VALUE**, which is that file's
+  existing contract rather than a new one — parents reach it, and an empty "Date
+  of birth" row would announce that one exists and is being withheld. Proved by
+  making it render the empty row and watching both safeguarding tests fail.
+  ⚠️ **BOTH USE THE CLUB'S OWN `ageAt`**, so a number shown here cannot drift
+  from the one that decides which squad a child belongs in.
+  ⛔ **AND SIX TEST FILES NEEDED A MOCK THEY DID NOT HAVE.** A `vi.mock` factory
+  replaces the whole module, so an omitted export is `undefined` and throws from
+  inside an effect — surfacing as a dozen failures naming the MOCK rather than
+  the component. Every file that renders `Roster` or `PlayerDetail` needed the
+  new reads adding. Worth knowing before adding any data call to a shared screen.
+
+- `f506a7f` — 🎂 **THE BIRTHDAY GATE AND THE PLACES TO ENTER A DATE.** The squash
+  SHA for the two entries below, which could not cite themselves.
+
 - 🗓️ **THERE IS NOW SOMEWHERE TO ENTER A DATE OF BIRTH — THERE WASN'T.** Jay,
   17 Aug 2026: *"are you sure there is a place to put the DOB's? because last
   time i checked there wasn't anywhere to enter them"*. He was right and the
