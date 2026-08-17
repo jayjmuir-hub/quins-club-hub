@@ -212,6 +212,18 @@ export async function setPlayerDob(playerId, dob, { playsUp = false } = {}) {
   }
 }
 
+// ⚠️ THE BIRTHDAY-ONLY WRITER (17 Aug 2026), AND THE PROBE RECORDS THAT IT
+// CARRIES NO playsUp — which is the entire difference from setPlayerDob above.
+// That one clears `plays_up_confirmed_at` when the flag is absent, so using it
+// to fix a typo erases a parent's consent; this one leaves the column alone.
+// A stub that collapsed the two would make the harness unable to show the
+// distinction the real code was changed to make.
+export async function updatePlayerDob(playerId, dob) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'update-player-dob', playerId, dob })
+  return { player_id: playerId, date_of_birth: dob ?? null }
+}
+
 /**
  * The approval queue's play-up chip reads this. Returns nothing by default:
  * "playing up" is the exception, and a harness that showed it on every card

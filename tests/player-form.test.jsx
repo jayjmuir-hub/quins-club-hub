@@ -21,6 +21,9 @@ const getPlayerContactMock = vi.fn()
 const upsertPlayerMock = vi.fn()
 const deletePlayerMock = vi.fn()
 const upsertContactMock = vi.fn()
+const getPlayerDobMock = vi.fn(() => Promise.resolve(null))
+const setPlayerDobMock = vi.fn()
+const updatePlayerDobMock = vi.fn(() => Promise.resolve({}))
 
 const listParentsMock = vi.fn()
 const saveParentsMock = vi.fn()
@@ -60,11 +63,17 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
-  getPlayerDob: vi.fn(() => Promise.resolve(null)),
+  getPlayerDob: (...args) => getPlayerDobMock(...args),
   getPlayerContact: (...args) => getPlayerContactMock(...args),
   upsertPlayer: (...args) => upsertPlayerMock(...args),
   deletePlayer: (...args) => deletePlayerMock(...args),
   upsertContact: (...args) => upsertContactMock(...args),
+  // ⚠️ BOTH WRITERS, so a test can assert WHICH one the form reached. They are
+  // not interchangeable: setPlayerDob also writes `plays_up_confirmed_at`,
+  // defaulting it to null, so using it to correct a typo erases a parent's
+  // recorded consent. See updatePlayerDob's header in src/data/players.js.
+  setPlayerDob: (...args) => setPlayerDobMock(...args),
+  updatePlayerDob: (...args) => updatePlayerDobMock(...args),
 }))
 
 // Imported after vi.mock so these bind to the mocked module.
@@ -171,6 +180,68 @@ beforeEach(() => {
   saveParentsMock.mockReset()
   listParentsMock.mockResolvedValue([])
   saveParentsMock.mockResolvedValue([])
+  getPlayerDobMock.mockReset()
+  setPlayerDobMock.mockReset()
+  updatePlayerDobMock.mockReset()
+  // Null is the honest default: most children have no birthday on file, and it
+  // is also what RLS returns to somebody who may not see one.
+  getPlayerDobMock.mockResolvedValue(null)
+  updatePlayerDobMock.mockResolvedValue({})
+})
+
+// ══════════════════════════════════════════════════════════════════════════
+//  DATE OF BIRTH — 17 Aug 2026
+//
+//  ⚠️ BEFORE THIS, NO SCREEN IN THE APP COULD CORRECT A BIRTHDAY. The only
+//  writer was PlayerRegistrationForm, which a family passes through once, so a
+//  date entered wrongly was permanent for parent, coach and admin alike. Jay:
+//  "last time i checked there wasn't anywhere to enter them".
+// ══════════════════════════════════════════════════════════════════════════
+describe('PlayerForm — date of birth', () => {
+  it('shows what is already on file', async () => {
+    getPlayerDobMock.mockResolvedValue('2015-03-04')
+    await renderEditForm()
+    await waitFor(() => expect(screen.getByTestId('player-dob')).toHaveValue('2015-03-04'))
+  })
+
+  it('leaves the box empty when the club has none', async () => {
+    await renderEditForm()
+    expect(screen.getByTestId('player-dob')).toHaveValue('')
+  })
+
+  // ⚠️ THE ASSERTION THAT MATTERS. setPlayerDob would also write
+  // `plays_up_confirmed_at: null`, so a coach fixing a typo would withdraw a
+  // consent a parent gave and was never asked about here. Measured on
+  // production in a rolled-back transaction: that writer erases it, this one
+  // keeps it.
+  it('saves through the writer that cannot erase a play-up agreement', async () => {
+    const user = userEvent.setup()
+    await renderEditForm()
+
+    await user.type(screen.getByTestId('player-dob'), '2016-04-05')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() =>
+      expect(updatePlayerDobMock).toHaveBeenCalledWith(EXISTING_PLAYER.id, '2016-04-05'),
+    )
+    expect(setPlayerDobMock).not.toHaveBeenCalled()
+  })
+
+  // ⚠️ THE GUARD, AND IT IS NOT AN OPTIMISATION. A coach on a squad whose
+  // birthdays they cannot read gets null from RLS and an empty box; without
+  // this, saving a phone number would write that empty box back over a real
+  // date. Same reasoning as the gender guard in MyPlayerForm.
+  it('does not touch the birthday when the field was never edited', async () => {
+    const user = userEvent.setup()
+    getPlayerDobMock.mockResolvedValue('2015-03-04')
+    await renderEditForm()
+    await waitFor(() => expect(screen.getByTestId('player-dob')).toHaveValue('2015-03-04'))
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
+    expect(updatePlayerDobMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('PlayerForm — shape and scoping', () => {

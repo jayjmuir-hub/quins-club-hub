@@ -6,7 +6,13 @@ import PhotoField from '../components/PhotoField.jsx'
 import ParentsEditor from '../components/ParentsEditor.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
 import Segmented from '../components/Segmented.jsx'
-import { getPlayerContact, setOwnPlayerGender, upsertContact } from '../data/players.js'
+import {
+  getPlayerContact,
+  getPlayerDob,
+  setOwnPlayerGender,
+  updatePlayerDob,
+  upsertContact,
+} from '../data/players.js'
 import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
 import { listParents, saveParents } from '../data/parents.js'
 import {
@@ -92,6 +98,18 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
   // player, so there is nothing to fetch. null when never recorded, which is
   // most players; Segmented renders that as both buttons off.
   const [gender, setGender] = useState(player.gender ?? null)
+  // ⚠️ THE FIRST PLACE AN EXISTING FAMILY CAN CORRECT A BIRTHDAY — 17 Aug 2026.
+  // Until now the ONLY screen in the app that could write one was
+  // PlayerRegistrationForm, which a child passes through once. Jay: "last time i
+  // checked there wasn't anywhere to enter them", and he was right — the
+  // completeness card on /more has been telling families to add a birthday
+  // "from the buttons below" while the button below opened this form, which had
+  // no such field.
+  const [dob, setDob] = useState('')
+  // What was on file when the sheet opened, so the save can tell an edit from an
+  // untouched field. Held separately rather than compared against `player`,
+  // which does not carry the birthday at all — it lives in player_private.
+  const [dobOnFile, setDobOnFile] = useState('')
 
   useEffect(() => {
     let mounted = true
@@ -110,9 +128,28 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
     // trip behind a spinner that is already on screen.
     if (!gateSettled) return undefined
 
-    Promise.allSettled([listParents(player.id), showOwnContact ? getPlayerContact(player.id) : null])
-      .then(([parentsResult, contactResult]) => {
+    // ⚠️ THE BIRTHDAY IS READ HERE RATHER THAN TAKEN FROM useOwnContactGate,
+    // which already fetches one. That hook reads it ONLY when the squad already
+    // allows own contact (U13+) and returns { allowed, settled } rather than the
+    // date — so for a U10 family, the squad this matters most for, it never
+    // fetches at all. Borrowing it would work on exactly the squads that need it
+    // least.
+    Promise.allSettled([
+      listParents(player.id),
+      showOwnContact ? getPlayerContact(player.id) : null,
+      getPlayerDob(player.id),
+    ])
+      .then(([parentsResult, contactResult, dobResult]) => {
         if (!mounted) return
+        // ⚠️ null IS BOTH "none on file" AND "you may not see it", and
+        // getPlayerDob's header says the caller must not tell them apart. A
+        // parent looking at their OWN child can always see it, so for this
+        // screen an empty box means the club has none — which is the thing the
+        // family is being asked to fill in.
+        if (dobResult.status === 'fulfilled') {
+          setDob(dobResult.value ?? '')
+          setDobOnFile(dobResult.value ?? '')
+        }
         // !! toEditorRows, NOT the raw rows. ParentsEditor holds a phone as
         // phoneCountry + phoneNational; handing it the database's single
         // `phone` string rendered the field BLANK for a parent who had one on
@@ -200,6 +237,19 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
       // and pointlessly exercise a privileged write path.
       if ((player.gender ?? null) !== (gender ?? null)) {
         await setOwnPlayerGender(player.id, gender)
+      }
+
+      // ⚠️ updatePlayerDob, NEVER setPlayerDob. The latter also writes
+      // `plays_up_confirmed_at`, defaulting it to null — so saving this form to
+      // fix a typo would erase a parent's recorded play-up consent. Measured on
+      // production in a rolled-back transaction: the old writer erased it, this
+      // one keeps it. See updatePlayerDob's header.
+      //
+      // Sent only when it changed, the same guard the gender write above uses
+      // and for the same reason: an unchanged save should not exercise a write
+      // path at all.
+      if ((dobOnFile ?? '') !== (dob ?? '')) {
+        await updatePlayerDob(player.id, dob || null)
       }
 
       if (showOwnContact) {
@@ -303,6 +353,43 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
               before you can save.
             </p>
           )}
+
+          {/* ⚠️ THE FIELD THAT DID NOT EXIST — 17 Aug 2026. Until now the only
+              screen in the whole app that could write a birthday was the
+              registration form, which a family passes through once. So a date
+              entered wrongly was permanent, and the completeness card on /more
+              has been asking families to add one "from the buttons below" while
+              the button below opened this form, which had no such field. Jay
+              spotted the gap: "last time i checked there wasn't anywhere to
+              enter them".
+
+              ⚠️ IT IS NOT REQUIRED HERE, deliberately, unlike gender above.
+              This form is opened to change a photo or a parent's phone number,
+              and refusing to save any of that because the club is also missing a
+              birthday would block an unrelated edit. The sign-in gate is what
+              actually collects it; this is where it gets corrected.
+
+              ⚠️ AND IT NEVER TOUCHES plays_up_confirmed_at — see the write in
+              handleSubmit. Saving this form must not be able to withdraw a
+              consent nobody was asked about. */}
+          <div className="mt-5">
+            <label className="block">
+              <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+                Date of birth
+              </span>
+              <input
+                type="date"
+                data-testid="my-player-dob"
+                value={dob}
+                disabled={saving}
+                onChange={(event) => setDob(event.target.value)}
+                className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition focus:border-brand"
+              />
+            </label>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-ink-muted">
+              The club uses this to put {player.full_name} in the right age group.
+            </p>
+          </div>
 
           {/* The U13 rule (src/lib/ageGroup.js): an under-13 has no direct
               contact route in the app, so these fields are absent rather than

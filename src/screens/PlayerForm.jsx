@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
-import { getPlayerContact, upsertContact, upsertPlayer } from '../data/players.js'
+import {
+  getPlayerContact,
+  getPlayerDob,
+  updatePlayerDob,
+  upsertContact,
+  upsertPlayer,
+} from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { POSITIONS } from '../lib/positions.js'
@@ -141,6 +147,11 @@ function initialValues(player, editableTeams) {
     phoneCountry: splitPhone('').country,
     phoneNational: '',
     email: '',
+    // ⚠️ NOT ON `player`, AND THAT IS THE POINT. The birthday lives in
+    // player_private, a separate table with its own RLS, precisely so a
+    // team-mate's parent cannot read a squad's birthdays off the players row.
+    // So it starts blank here and is filled in by the read effect below.
+    dob: '',
   }
 }
 
@@ -197,6 +208,9 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   // the first has to be written through as nulls, the second is nothing at
   // all and must not leave an empty row behind.
   const [hadContact, setHadContact] = useState(false)
+  // The birthday as it stood when the form opened, so the save can tell an edit
+  // from an untouched field — the same job `hadContact` does above.
+  const [dobOnFile, setDobOnFile] = useState('')
 
   // The id of the player row this form has already written, if any. Set from
   // the insert's returned row so a retry after a CONTACT failure updates that
@@ -243,11 +257,23 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
     if (!editing || gated) return undefined
     let mounted = true
 
-    Promise.allSettled([listPlayerPositions([player.id]), listPlayerGrades([player.id])]).then(
-      ([positionsResult, gradesResult]) => {
+    Promise.allSettled([
+      listPlayerPositions([player.id]),
+      listPlayerGrades([player.id]),
+      // ⚠️ THE BIRTHDAY, ADDED 17 Aug 2026, AND IT BELONGS IN THIS allSettled
+      // RATHER THAN ITS OWN EFFECT for the reason the comment above gives about
+      // grades: it can legitimately come back null, and that must not take the
+      // form down. `player_private` is readable by squad staff, so a coach
+      // opening a player in their own squad gets it; anybody else gets null and
+      // an empty box, which is the same thing they saw before this existed.
+      getPlayerDob(player.id),
+    ]).then(
+      ([positionsResult, gradesResult, dobResult]) => {
         if (!mounted) return
+        if (dobResult.status === 'fulfilled') setDobOnFile(dobResult.value ?? '')
         setValues((current) => ({
           ...current,
+          dob: dobResult.status === 'fulfilled' ? dobResult.value ?? '' : current.dob,
           positions:
             positionsResult.status === 'fulfilled'
               ? positionsResult.value.get(player.id) ?? []
@@ -581,6 +607,30 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         }
       }
 
+      // --- birthday ---------------------------------------------------
+      // ⚠️ updatePlayerDob, NEVER setPlayerDob. The latter also writes
+      // `plays_up_confirmed_at`, defaulting it to null, so a coach fixing a typo
+      // in a date would erase a parent's recorded play-up consent — a decision
+      // this form never asked them about and must not be able to withdraw.
+      // Measured on production in a rolled-back transaction: the old writer
+      // erased it, this one keeps it.
+      //
+      // Sent only when it changed, so an ordinary save on a squad whose
+      // birthdays the coach cannot read does not write a null over one.
+      if ((values.dob ?? '') !== (dobOnFile ?? '')) {
+        try {
+          await updatePlayerDob(saved.id, values.dob || null)
+          setDobOnFile(values.dob ?? '')
+        } catch (err) {
+          // Same shape as the contact failure below: the player IS saved, and
+          // saying otherwise sends a coach back to re-enter somebody who exists.
+          onSaved?.(saved)
+          setErrorStage('birthday')
+          setError(err)
+          return
+        }
+      }
+
       if (writeContact) {
         try {
           await upsertContact({ player_id: saved.id, phone, email })
@@ -736,6 +786,35 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             aria-invalid={invalid.lastName ? 'true' : undefined}
             placeholder="e.g. Fletcher"
             className={inputClasses(invalid.lastName)}
+          />
+        </div>
+
+        {/* ⚠️ THE FIELD THAT DID NOT EXIST ANYWHERE — 17 Aug 2026. Before this,
+            a birthday could be written by exactly one screen in the app,
+            PlayerRegistrationForm, which a family passes through once. Nobody —
+            not the parent, not a coach, not an admin — could correct a wrong
+            one. Jay found the gap: "last time i checked there wasn't anywhere to
+            enter them".
+
+            ⚠️ IT WRITES player_private, NOT players, and that is why it saves
+            through its own call in handleSubmit rather than riding along in
+            upsertPlayer. The separation is the safeguarding property: a birthday
+            on the players row would be readable by every parent in the squad.
+
+            ⚠️ AND IT NEVER TOUCHES plays_up_confirmed_at. A coach fixing a typo
+            must not be able to withdraw a consent a parent gave. */}
+        <div className={FIELD}>
+          <label className={LABEL} htmlFor="player-dob">
+            Date of birth
+          </label>
+          <input
+            id="player-dob"
+            data-testid="player-dob"
+            type="date"
+            value={values.dob ?? ''}
+            disabled={saving}
+            onChange={(event) => setValues((v) => ({ ...v, dob: event.target.value }))}
+            className={inputClasses(false)}
           />
         </div>
 

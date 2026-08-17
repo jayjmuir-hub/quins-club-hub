@@ -33,6 +33,10 @@ const updateProfileNamesMock = vi.fn(async () => ({
 }))
 const getMyAccessRequestMock = vi.fn()
 const createAccessRequestMock = vi.fn()
+const listPlayerPrivateMock = vi.fn()
+const listPlayersMock = vi.fn()
+const setPlayerDobMock = vi.fn()
+const updatePlayerDobMock = vi.fn()
 
 vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => useAuthMock(),
@@ -56,6 +60,21 @@ vi.mock('../src/data/members.js', () => ({
   // test with an unhandled error underneath it is the shape that hides the next
   // real one.
   updateProfileNames: (...args) => updateProfileNamesMock(...args),
+}))
+
+// ⚠️ SPREAD THE REAL MODULE, DON'T REPLACE IT. This file renders the whole
+// AppShell, and several components under it import from players.js — an
+// exports-only mock makes every unlisted one `undefined`, which throws from
+// inside a promise chain and can leave a test PASSING with the error logged
+// underneath. That exact shape is documented on the members.js mock above.
+vi.mock('../src/data/players.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  listPlayerPrivate: (...args) => listPlayerPrivateMock(...args),
+  listPlayers: (...args) => listPlayersMock(...args),
+  // BOTH writers are mocked so a test can assert which one was reached. They
+  // are not interchangeable — see the play-up case below.
+  setPlayerDob: (...args) => setPlayerDobMock(...args),
+  updatePlayerDob: (...args) => updatePlayerDobMock(...args),
 }))
 
 vi.mock('../src/data/accessRequests.js', () => ({
@@ -143,7 +162,18 @@ beforeEach(() => {
   confirmMyDetailsMock.mockReset()
   getMyAccessRequestMock.mockReset()
   createAccessRequestMock.mockReset()
+  listPlayerPrivateMock.mockReset()
+  listPlayersMock.mockReset()
+  setPlayerDobMock.mockReset()
+  updatePlayerDobMock.mockReset()
   getMyAccessRequestMock.mockResolvedValue(null)
+  // ⚠️ THE DEFAULT MEMBERSHIP CARRIES NO player_id, so the birthday gate is not
+  // due in any case above and these seeds are never consulted by them. They are
+  // here so that an unexpected call returns a sane value rather than undefined.
+  listPlayerPrivateMock.mockResolvedValue([])
+  listPlayersMock.mockResolvedValue([])
+  setPlayerDobMock.mockResolvedValue({ player_id: 'p-1', date_of_birth: '2015-03-04' })
+  updatePlayerDobMock.mockResolvedValue({ player_id: 'p-1', date_of_birth: '2015-03-04' })
   window.localStorage.clear()
   // useMyProfile's cache is module-level and survives a render, so without this
   // one test's profile row leaks into the next. Same reason
@@ -646,6 +676,16 @@ describe('NamePrompt — the role gate', () => {
       ...overrides,
     })
 
+  // ⚠️ A BIRTHDAY ON FILE FOR p1, AND IT IS NOT PADDING — 17 Aug 2026. The
+  // birthday step was added AHEAD of the role step in the fall-through, and
+  // `parentOfOne` carries a linked child. Without this, every case in this block
+  // gets the birthday sheet instead of the role sheet and fails for a reason
+  // that has nothing to do with roles. Same discipline as the file header: each
+  // block answers the OTHER gates so it stays about its own.
+  beforeEach(() => {
+    listPlayerPrivateMock.mockResolvedValue([{ player_id: 'p1', date_of_birth: '2015-03-04' }])
+  })
+
   it('asks a parent who has never said what they do', async () => {
     useMembershipsMock.mockReturnValue(parentOfOne())
     getMyProfileMock.mockResolvedValue(unasked())
@@ -815,5 +855,203 @@ describe('NamePrompt — the role gate', () => {
 
     await user.click(await screen.findByTestId('no-player'))
     expect(await screen.findByTestId('claim-role')).toBeInTheDocument()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════
+//  THE BIRTHDAY STEP — 17 Aug 2026
+//
+//  date_of_birth became required for new registrations on 16 Aug. Everybody who
+//  signed up before that has none, and on 17 Aug `player_private` held ZERO
+//  rows — nothing had asked them. This step asks, once, and unlike every other
+//  step on this gate it CANNOT BE ANSWERED "no" (Jay's call).
+//
+//  ⚠️ WHICH IS WHY HALF THESE CASES ARE ABOUT NOT FIRING. A blocking sheet that
+//  opens when it should not locks the club out of the app with no escape and no
+//  fix short of a deploy, so "does not block" is the assertion that matters most
+//  here — the opposite weighting from the skippable steps above.
+// ══════════════════════════════════════════════════════════════════════════
+describe('NamePrompt — the birthday step', () => {
+  const PARENT = [{ role: 'parent', team_id: 't-u12', player_id: 'p-1' }]
+  const BIRTHDAY_TITLE = /we need one more detail/i
+
+  // Everything already answered EXCEPT the birthday, so each case below is
+  // about that alone — the same discipline the phone and role blocks follow.
+  function settledProfile(overrides = {}) {
+    return unconfirmed({
+      name_confirmed_at: '2026-08-01T00:00:00Z',
+      phone: '+971500000000',
+      no_role_confirmed_at: '2026-08-01T00:00:00Z',
+      ...overrides,
+    })
+  }
+
+  function asParent() {
+    useMembershipsMock.mockReturnValue(loaded({ memberships: PARENT }))
+    getMyProfileMock.mockResolvedValue(settledProfile())
+    listPlayersMock.mockResolvedValue([{ id: 'p-1', full_name: 'Rory Aldenbrook' }])
+  }
+
+  it('asks when a linked child has no private row at all', async () => {
+    asParent()
+    // ⚠️ THE SHAPE PRODUCTION ACTUALLY HAS: no row, so the id is an ABSENT KEY
+    // rather than a null value. A fixture returning a row with a null birthday
+    // would pass a gate that only checked for nulls.
+    listPlayerPrivateMock.mockResolvedValue([])
+    renderShell()
+
+    expect(await screen.findByText(BIRTHDAY_TITLE)).toBeInTheDocument()
+    expect(screen.getByText('Rory Aldenbrook')).toBeInTheDocument()
+  })
+
+  // The other half of the same trap, and a real state: setPlayerDob can write a
+  // row whose date_of_birth is null.
+  it('asks when the row exists but the birthday is null', async () => {
+    asParent()
+    listPlayerPrivateMock.mockResolvedValue([{ player_id: 'p-1', date_of_birth: null }])
+    renderShell()
+
+    expect(await screen.findByText(BIRTHDAY_TITLE)).toBeInTheDocument()
+  })
+
+  it('does not ask once the birthday is on file', async () => {
+    asParent()
+    listPlayerPrivateMock.mockResolvedValue([{ player_id: 'p-1', date_of_birth: '2015-03-04' }])
+    renderShell()
+
+    await screen.findByText('Routed content')
+    expect(screen.queryByText(BIRTHDAY_TITLE)).toBeNull()
+  })
+
+  // ⚠️ THE SAFETY CASE. Every other step fails closed on a read error and costs
+  // a question; this one has no way past, so a failed read that blocked would
+  // take the whole club offline.
+  it('does NOT block when the birthday read fails', async () => {
+    asParent()
+    listPlayerPrivateMock.mockRejectedValue(new Error('network'))
+    renderShell()
+
+    await screen.findByText('Routed content')
+    expect(screen.queryByText(BIRTHDAY_TITLE)).toBeNull()
+  })
+
+  // A player-only account belongs to a CHILD. Exempt for the same reason it is
+  // exempt from the phone and role questions.
+  it('never asks a player-only account', async () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({ memberships: [{ role: 'player', team_id: 't-u12', player_id: 'p-1' }] }),
+    )
+    getMyProfileMock.mockResolvedValue(settledProfile())
+    listPlayerPrivateMock.mockResolvedValue([])
+    renderShell()
+
+    await screen.findByText('Routed content')
+    expect(screen.queryByText(BIRTHDAY_TITLE)).toBeNull()
+    // Not merely unrendered — never even asked, so no read happens either.
+    expect(listPlayerPrivateMock).not.toHaveBeenCalled()
+  })
+
+  it('never asks an account with no linked child', async () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({ memberships: [{ role: 'coach', team_id: 't-u12' }] }),
+    )
+    getMyProfileMock.mockResolvedValue(settledProfile())
+    renderShell()
+
+    await screen.findByText('Routed content')
+    expect(screen.queryByText(BIRTHDAY_TITLE)).toBeNull()
+  })
+
+  it('saves the birthday and closes the gate', async () => {
+    const user = userEvent.setup()
+    asParent()
+    listPlayerPrivateMock.mockResolvedValue([])
+    renderShell()
+
+    await screen.findByText(BIRTHDAY_TITLE)
+    await user.type(screen.getByTestId('dob-p-1'), '2015-03-04')
+    await user.click(screen.getByRole('button', { name: /save and continue/i }))
+
+    await waitFor(() => expect(updatePlayerDobMock).toHaveBeenCalledWith('p-1', '2015-03-04'))
+    await waitFor(() => expect(screen.queryByText(BIRTHDAY_TITLE)).toBeNull())
+  })
+
+  // ⚠️ THIS ASSERTS WHICH WRITER IS USED, AND THE TWO ARE NOT INTERCHANGEABLE.
+  // setPlayerDob writes `plays_up_confirmed_at: playsUp ? now : null`, so calling
+  // it here — with the flag at its default — ERASES a parent's recorded play-up
+  // consent. That is right for the registration form, which asks both questions
+  // together, and wrong here, where nobody is asked about consent at all.
+  //
+  // ⚠️ AND IT IS NOT HYPOTHETICAL FOR THIS STEP. The gate also fires on a row
+  // that EXISTS with a null birthday — see the case above — which is exactly the
+  // row that can already carry an agreement. Measured on production in a
+  // rolled-back transaction: the old writer erased it, updatePlayerDob kept it.
+  it('uses the writer that cannot erase a play-up agreement', async () => {
+    const user = userEvent.setup()
+    asParent()
+    listPlayerPrivateMock.mockResolvedValue([])
+    renderShell()
+
+    await screen.findByText(BIRTHDAY_TITLE)
+    await user.type(screen.getByTestId('dob-p-1'), '2015-03-04')
+    await user.click(screen.getByRole('button', { name: /save and continue/i }))
+
+    await waitFor(() => expect(updatePlayerDobMock).toHaveBeenCalled())
+    expect(setPlayerDobMock).not.toHaveBeenCalled()
+    // Two arguments only — no options object through which the flag could travel.
+    expect(updatePlayerDobMock.mock.calls[0]).toHaveLength(2)
+  })
+
+  it('refuses a blank date and names the child it wants', async () => {
+    const user = userEvent.setup()
+    asParent()
+    listPlayerPrivateMock.mockResolvedValue([])
+    renderShell()
+
+    await screen.findByText(BIRTHDAY_TITLE)
+    await user.click(screen.getByRole('button', { name: /save and continue/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Rory Aldenbrook/)
+    expect(setPlayerDobMock).not.toHaveBeenCalled()
+  })
+
+  // ⚠️ THE ESCAPE HATCH, AND IT IS THE ONLY ONE. The sheet is dismissible={false}
+  // and has no "no" answer, so without this a parent who cannot answer right now
+  // has no route anywhere. AppShell: "someone who cannot get in must always be
+  // able to get out."
+  it('always offers a way out of the account', async () => {
+    const signOut = vi.fn()
+    useAuthMock.mockReturnValue({ user: { id: 'u-1', email: 'jay@example.com' }, signOut })
+    asParent()
+    listPlayerPrivateMock.mockResolvedValue([])
+    const user = userEvent.setup()
+    renderShell()
+
+    await screen.findByText(BIRTHDAY_TITLE)
+    await user.click(screen.getByTestId('birthday-sign-out'))
+    expect(signOut).toHaveBeenCalled()
+  })
+
+  it('asks for every child that is missing one, and only those', async () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({
+        memberships: [
+          { role: 'parent', team_id: 't-u12', player_id: 'p-1' },
+          { role: 'parent', team_id: 't-u10', player_id: 'p-2' },
+        ],
+      }),
+    )
+    getMyProfileMock.mockResolvedValue(settledProfile())
+    listPlayersMock.mockResolvedValue([
+      { id: 'p-1', full_name: 'Rory Aldenbrook' },
+      { id: 'p-2', full_name: 'Sana Aldenbrook' },
+    ])
+    // One known, one not — the sibling with a birthday must not be asked for.
+    listPlayerPrivateMock.mockResolvedValue([{ player_id: 'p-1', date_of_birth: '2015-03-04' }])
+    renderShell()
+
+    await screen.findByText(BIRTHDAY_TITLE)
+    expect(screen.getByTestId('dob-p-2')).toBeInTheDocument()
+    expect(screen.queryByTestId('dob-p-1')).toBeNull()
   })
 })

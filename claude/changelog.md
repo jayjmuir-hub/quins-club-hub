@@ -10,6 +10,74 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 🗓️ **THERE IS NOW SOMEWHERE TO ENTER A DATE OF BIRTH — THERE WASN'T.** Jay,
+  17 Aug 2026: *"are you sure there is a place to put the DOB's? because last
+  time i checked there wasn't anywhere to enter them"*. He was right and the
+  claim above it was wrong: what had been verified was that the DATA layer
+  allowed the write, not that any screen offered the field. **The only writer in
+  the entire app was `PlayerRegistrationForm`, which a family passes through
+  once** — so a date entered wrongly was permanent, for parent, coach and admin
+  alike. The field is now on `MyPlayerForm` (a family fixes their own child's)
+  and `PlayerForm` (a coach or admin enters or corrects any in their squads).
+  ⚠️ **AND THE COMPLETENESS CARD HAD BEEN TELLING FAMILIES A FALSEHOOD.** *"You
+  can add them from the buttons below"* — the button below opened `MyPlayerForm`,
+  which had no such field. Live on `/more` since the card shipped.
+  ⛔ **CHASING IT TURNED UP A SECOND BUG, IN THE WRITER ITSELF.** `setPlayerDob`
+  writes `plays_up_confirmed_at: playsUp ? now : null`, so **any** call that
+  omits the flag ERASES a parent's recorded play-up consent. Correct for the
+  registration form, which asks both questions together; wrong for every edit
+  surface, and wrong for the sign-in gate added the same day. **Measured on
+  production in a rolled-back transaction on an invented child:** the old writer
+  erased the agreement, a birthday-only write kept it, and a control proved the
+  birthday-only write still inserts correctly when no row exists. New
+  `updatePlayerDob` omits the column entirely; three tests assert which writer is
+  reached, and injecting the old one turns the right one red in each file.
+
+- 🎂 **THE SIGN-IN GATE NOW ASKS FOR THE BIRTHDAYS THE CLUB STARTED REQUIRING
+  AFTER PEOPLE SIGNED UP — AND THIS ONE CANNOT BE SKIPPED.** Jay, 17 Aug 2026:
+  *"we could just do it once and make it unskippable? something like please add
+  this info to continue"*. A fourth step in `src/components/NamePrompt.jsx`,
+  between the player and role questions. **No migration**: `setPlayerDob` already
+  existed and `player_private`'s RLS already lets a child's own family write it.
+  ⚠️ **IT IS THE ONLY STEP ON THAT GATE WITH NO "no" ANSWER, SO IT IS THE ONLY
+  ONE CARRYING A SIGN-OUT.** The sheet is `dismissible={false}` like the others,
+  but the others can always be answered; this one cannot, and `AppShell`'s rule —
+  *"someone who cannot get in must always be able to get out"* — would otherwise
+  be broken by it.
+  ⚠️ **THE READ FAILS OPEN, AND ON A BLOCKING GATE THAT IS THE WHOLE SAFETY
+  ARGUMENT.** Every other step fails closed and costs a question; this one has no
+  way past, so a failed read that blocked would take the club offline with no fix
+  short of a deploy.
+  ⛔ **THE TRAP THE SPEC PREDICTED WAS REAL.** `player_private` held ZERO rows, so
+  every child is an ABSENT KEY rather than a null value — a gate checking only
+  for nulls would never have fired, for the exact 26 children it exists for.
+  Injecting that blind version turned **six** assertions red; injecting a
+  fail-CLOSED read turned exactly one red.
+  ⚠️ **IT ALSO REORDERED AN EXISTING GATE, AND FIVE ROLE TESTS CAUGHT IT** — the
+  role block's fixture is a parent with a linked child, who now meets the
+  birthday step first. Fixed in the fixture, not in the ordering.
+  ⚠️ **DO NOT WRITE `plays_up_confirmed_at` FROM HERE**, asserted by test: that
+  column records a parent ticking a box, and setting it would invent an agreement
+  nobody gave — PR #213 in reverse.
+
+- 📋 **THE SPEC IT WAS BUILT FROM: asking existing families for the birthdays the
+  club started requiring after they signed up.**
+  `claude/plans/2026-08-17-birthday-backfill-prompt.md`.
+  ⚠️ **THE MEASUREMENT IS THE POINT OF IT.** `date_of_birth` became required for
+  new registrations on 16 Aug, and on 17 Aug `player_private` held **zero rows** —
+  not one family has filled it in, because nothing asks them. `NamePrompt` has
+  three steps and none mentions a birthday, and the completeness card that does
+  ask lives only on `/more`, which a parent has no reason to open.
+  ⚠️ **`AdminNeedsAttention` SAYS "Each family is already being asked on their own
+  screen", WHICH IS TRUE IN THE LETTER AND FALSE IN THE EFFECT** — and is probably
+  why this looked handled. The plan carries three open questions for Jay, the
+  hardest being how often to re-ask somebody who skips: `YourPlayers` already
+  records that a chase with no visible end is ignored by the third sign-in.
+
+- `954ef90` — ⛔ **A PENDING STAFF REQUEST COULD APPROVE ITSELF, AND LOOKED LIKE A
+  CHILD.** The squash SHA for the two entries below, which could not cite
+  themselves.
+
 - 🧑‍🏫 **STAFF ASKING FOR ACCESS GET THEIR OWN QUEUE, INSTEAD OF APPEARING AS
   "Unnamed player".** Jay's call over correcting the label in place: approving a
   coach and approving a child are different decisions and should not share a

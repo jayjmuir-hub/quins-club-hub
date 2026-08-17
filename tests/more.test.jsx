@@ -68,6 +68,11 @@ vi.mock('../src/data/players.js', () => ({
   upsertContact: async () => ({}),
   setOwnPlayerGender: async () => ({}),
   setPlayerDob: async () => ({}),
+  // MyPlayerForm gained a date-of-birth field on 17 Aug 2026 and reads it on
+  // mount — the same second-consumer problem the comment above records, which
+  // is why both of these are here rather than only the writer.
+  getPlayerDob: async () => null,
+  updatePlayerDob: async () => ({}),
 }))
 
 vi.mock('../src/data/parents.js', () => ({

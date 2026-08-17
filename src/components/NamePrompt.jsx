@@ -10,6 +10,11 @@ import {
   getMyProfile,
   requestStaffRole,
 } from '../data/members.js'
+// ⚠️ setPlayerDob ALREADY EXISTS AND player_private's RLS ALREADY LETS A CHILD'S
+// OWN FAMILY WRITE IT (20260816_player_private_dob.sql), so the birthday step
+// below needs NO migration and NO new write path. If one ever appears here,
+// something has been misunderstood.
+import { listPlayerPrivate, listPlayers, updatePlayerDob } from '../data/players.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { joinPhone, splitPhone } from '../lib/phone.js'
@@ -97,14 +102,30 @@ const INPUT =
 
 export default function NamePrompt() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  // `signOut` is for the birthday sheet's escape hatch — see its comment.
+  const { user, signOut } = useAuth()
   const { realMemberships, teams, loading: membershipsLoading } = useMemberships()
   const userId = user?.id ?? null
 
   const [profileId, setProfileId] = useState(null)
-  // 'details' | 'player' | 'role' | null. Null is the closed gate.
+  // 'details' | 'player' | 'birthday' | 'role' | null. Null is the closed gate.
   const [step, setStep] = useState(null)
   const [needPhone, setNeedPhone] = useState(false)
+  // ⚠️ THE ONLY STEP ON THIS GATE WITH NO WAY PAST IT — Jay, 17 Aug 2026, over a
+  // snooze or a recorded "I'd rather not". A birthday is already mandatory for
+  // every new registration, so this makes the families who signed up before
+  // 16 Aug match; the other steps take an answer of "no", and this one has no
+  // such answer to take.
+  //
+  // ⚠️ WHICH IS WHY THE SHEET CARRIES A SIGN-OUT. Every other step is passable,
+  // so the person always has an exit; this one is not, and AppShell's rule
+  // ("someone who cannot get in must always be able to get out") would otherwise
+  // be broken by the one sheet in the app that cannot be answered "no".
+  const [needBirthday, setNeedBirthday] = useState(false)
+  // [{ id, name }] — this account's OWN children with no birthday on file.
+  const [dobChildren, setDobChildren] = useState([])
+  // player id -> the yyyy-mm-dd string being typed.
+  const [dobDrafts, setDobDrafts] = useState({})
   // ⚠️ WHETHER THE ROLE STEP IS STILL DUE, HELD SEPARATELY FROM `step`. The
   // details and player steps both have to decide what comes next, and asking
   // "was the role question needed?" at that moment means re-reading a profile
@@ -167,6 +188,53 @@ export default function NamePrompt() {
     ['coach', 'manager', 'medic', 'admin'].includes(m.role),
   )
 
+  // ⚠️ THE CHILDREN THIS ACCOUNT IS ATTACHED TO, NOT THE SQUAD. Same rule
+  // YourPlayers states: a coach can see thirty children and none are theirs.
+  // `realMemberships` for the same reason as everything above — a "view as"
+  // preview hardcodes player_id null and would otherwise exempt a parent.
+  const myPlayerIds = [...new Set((realMemberships ?? []).map((m) => m.player_id).filter(Boolean))]
+  const myTeamIds = [...new Set((realMemberships ?? []).map((m) => m.team_id).filter(Boolean))]
+  const playerKey = myPlayerIds.join(',')
+
+  /**
+   * This account's own children with no date of birth on file, newest question
+   * first. Empty means the step is not due.
+   *
+   * ⚠️ IT FAILS OPEN, AND ON A BLOCKING GATE THAT IS THE WHOLE SAFETY ARGUMENT.
+   * Every other step here is passable, so a failed read costs a question. This
+   * one has no way past, so a failed read that returned "due" would lock the
+   * club out of the app with no escape and no fix short of a deploy. A read that
+   * throws returns [] — nobody is blocked by an outage.
+   *
+   * ⚠️ AN ABSENT KEY IS A MISSING BIRTHDAY, AND TODAY IT IS THE ONLY CASE THERE
+   * IS. `listPlayerPrivate` returns only rows that exist, and on 17 Aug 2026
+   * `player_private` held ZERO rows — so every child is an absent key rather
+   * than a null value. `?? null` is what collapses the two, exactly as
+   * YourPlayers does it. Reading presence instead (listPlayerPrivatePresence)
+   * would be wrong for the opposite reason: a row can exist with a null
+   * birthday, and that is still a missing birthday.
+   *
+   * ⚠️ NAMES ARE FETCHED ONLY WHEN SOMETHING IS ACTUALLY MISSING. listPlayers
+   * reads whole squads; doing it before the cheap check would put a squad-wide
+   * read on every sign-in forever, to label a sheet almost nobody will see once
+   * the backfill is done.
+   */
+  async function childrenMissingABirthday() {
+    if (myPlayerIds.length === 0) return []
+    try {
+      const rows = await listPlayerPrivate(myPlayerIds)
+      const dobById = new Map((rows ?? []).map((row) => [row.player_id, row.date_of_birth ?? null]))
+      const missingIds = myPlayerIds.filter((id) => !(dobById.get(id) ?? null))
+      if (missingIds.length === 0) return []
+
+      const roster = await listPlayers({ teamIds: myTeamIds })
+      const nameById = new Map((roster ?? []).map((player) => [player.id, player.full_name]))
+      return missingIds.map((id) => ({ id, name: nameById.get(id) || 'your child' }))
+    } catch {
+      return []
+    }
+  }
+
   useEffect(() => {
     if (!userId || settled.current) return undefined
     // ⚠️ WAIT FOR THE MEMBERSHIPS. They arrive asynchronously, and both
@@ -177,7 +245,7 @@ export default function NamePrompt() {
 
     let active = true
     getMyProfile(userId)
-      .then((profile) => {
+      .then(async (profile) => {
         if (!active || !profile) return
         // ⚠️ THE NAME CONDITION IS STILL `name_confirmed_at`, NOT "is the name
         // blank" — see the header. The phone condition IS emptiness, because
@@ -193,7 +261,15 @@ export default function NamePrompt() {
         // squad they coach is the app not knowing who it is talking to.
         const roleNeeded = !playerOnly && !hasStaffRole && !profile.no_role_confirmed_at
 
-        if (!nameNeeded && !phoneNeeded && !playerNeeded && !roleNeeded) return
+        // ⚠️ EXEMPT FOR A PLAYER-ONLY ACCOUNT, like the phone and role questions.
+        // That account belongs to a CHILD, and a blocking sheet asking a
+        // twelve-year-old to type their own date of birth into a safeguarding
+        // field is the app not knowing who it is talking to.
+        const missingChildren = playerOnly ? [] : await childrenMissingABirthday()
+        const birthdayNeeded = missingChildren.length > 0
+        if (!active) return
+
+        if (!nameNeeded && !phoneNeeded && !playerNeeded && !birthdayNeeded && !roleNeeded) return
 
         setProfileId(profile.id)
         // Prefill with whatever we already hold, so a Google user confirms
@@ -205,6 +281,8 @@ export default function NamePrompt() {
         setPhoneNational(split.national)
         setNeedPhone(phoneNeeded)
         setNeedRole(roleNeeded)
+        setNeedBirthday(birthdayNeeded)
+        setDobChildren(missingChildren)
 
         // ⚠️ DETAILS FIRST, ALWAYS, EVEN WHEN ONLY THE PLAYER STEP IS DUE. The
         // details sheet is skipped outright in that case (below); ordering it
@@ -215,7 +293,15 @@ export default function NamePrompt() {
         // its own — which is the common case for this addition: every existing
         // parent has a name, a phone and a child, and needs only the role
         // question.
-        setStep(nameNeeded || phoneNeeded ? 'details' : playerNeeded ? 'player' : 'role')
+        setStep(
+          nameNeeded || phoneNeeded
+            ? 'details'
+            : playerNeeded
+              ? 'player'
+              : birthdayNeeded
+                ? 'birthday'
+                : 'role',
+        )
       })
       .catch(() => {
         // Deliberately silent, and deliberately leaves the gate CLOSED.
@@ -224,7 +310,10 @@ export default function NamePrompt() {
     return () => {
       active = false
     }
-  }, [userId, membershipsLoading, hasPlayer, playerOnly, hasStaffRole])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- playerKey is the
+    // stable string form of myPlayerIds; the array itself is rebuilt on every
+    // render and would restart the effect forever. Same pattern as Accounts.jsx.
+  }, [userId, membershipsLoading, hasPlayer, playerOnly, hasStaffRole, playerKey])
 
   function handleSubmit(domEvent) {
     domEvent.preventDefault()
@@ -279,6 +368,15 @@ export default function NamePrompt() {
           setStep('player')
           return
         }
+        // ⚠️ BEFORE THE ROLE QUESTION, BECAUSE THIS ONE IS ABOUT THE CHILD and
+        // the role question is about the adult — the same "who are you, then
+        // what do you have" ordering the details step is first for. Captured in
+        // `needBirthday` when the gate opened, for the reason the comment below
+        // gives about needRole: nothing since then can have answered it.
+        if (needBirthday) {
+          setStep('birthday')
+          return
+        }
         // ⚠️ `needRole`, NOT `updated.no_role_confirmed_at`. The line above can
         // read the fresh row because confirmMyDetails selects that column; it
         // does not select this one, and adding it would make a name save depend
@@ -311,6 +409,63 @@ export default function NamePrompt() {
         // at the club is, almost by definition, here for a job — a coach, a
         // manager, a volunteer. Closing the gate here would file the person the
         // club knows least about as nothing at all.
+        if (needRole) {
+          setStep('role')
+          return
+        }
+        settled.current = true
+        setStep(null)
+      })
+      .catch((err) => setError(err))
+      .finally(() => setSaving(false))
+  }
+
+  /**
+   * Saves a birthday for every child the parent filled in.
+   *
+   * ⚠️ EVERY FIELD IS REQUIRED, because this step has no way past it — a save
+   * that accepted a blank would be a skip button wearing a Save label. The
+   * refusal names the child rather than saying "fill in all fields", so a parent
+   * with three children knows which one they missed.
+   *
+   * ⚠️ PARTIAL WRITES ARE KEPT, NOT ROLLED BACK. If the second child's save
+   * fails, the first child's birthday is already stored and correct — and the
+   * gate re-reads on the next sign-in, so it will ask only for what is still
+   * missing. Undoing the good write to make the batch atomic would throw away a
+   * real answer to make a failure tidier.
+   *
+   * ⚠️ updatePlayerDob, NOT setPlayerDob, AND THE DIFFERENCE IS A REAL BUG THIS
+   * HAD UNTIL IT WAS MEASURED. setPlayerDob writes
+   * `plays_up_confirmed_at: playsUp ? now : null`, so calling it here — with the
+   * flag at its default — would ERASE a parent's recorded play-up consent.
+   * Harmless for a child with no row at all, which is most of them today; not
+   * harmless for the case this very step also fires on, a row that exists with a
+   * null birthday and an agreement already on file. Proved against production in
+   * a rolled-back transaction: the old call erased it, this one keeps it.
+   * That column records A PARENT TICKING A BOX, and nothing here asks them.
+   *
+   * ⚠️ AND IT DOES NOT CHECK THE AGE GRADE. A birthday may well reveal a child
+   * is in the wrong squad, and that is real — but it is the club's problem to
+   * work out, not something to ambush a parent with while they are trying to get
+   * into the app. /admin/needs-attention and the coach roster are where it
+   * surfaces. Jay, 17 Aug 2026.
+   */
+  function handleSaveBirthdays(domEvent) {
+    domEvent.preventDefault()
+    if (saving) return
+
+    const missing = dobChildren.find((child) => !String(dobDrafts[child.id] ?? '').trim())
+    if (missing) {
+      setError(new Error(`Enter a date of birth for ${missing.name}.`))
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    Promise.all(
+      dobChildren.map((child) => updatePlayerDob(child.id, String(dobDrafts[child.id]).trim())),
+    )
+      .then(() => {
         if (needRole) {
           setStep('role')
           return
@@ -429,6 +584,69 @@ export default function NamePrompt() {
         >
           {saving ? 'Saving…' : "I don't have a player at the club"}
         </Button>
+      </Sheet>
+    )
+  }
+
+  if (step === 'birthday') {
+    return (
+      <Sheet open dismissible={false} onClose={() => {}} title="We need one more detail">
+        <form onSubmit={handleSaveBirthdays} noValidate>
+          <p className="mb-3.5 text-sm leading-relaxed text-ink-muted">
+            {dobChildren.length === 1
+              ? 'The club needs a date of birth for every player, so we can put them in the ' +
+                'right age group. We started asking for this after you signed up.'
+              : 'The club needs a date of birth for every player, so we can put them in the ' +
+                'right age groups. We started asking for this after you signed up.'}
+          </p>
+
+          {dobChildren.map((child) => (
+            <label key={child.id} className="mb-3 block">
+              <span className="mb-1 block text-[13px] font-bold text-ink">{child.name}</span>
+              <input
+                type="date"
+                required
+                data-testid={`dob-${child.id}`}
+                value={dobDrafts[child.id] ?? ''}
+                onChange={(event) =>
+                  setDobDrafts((prev) => ({ ...prev, [child.id]: event.target.value }))
+                }
+                className="w-full rounded-[11px] border border-line bg-surface-card px-3 py-2.5 text-[15px] text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              />
+            </label>
+          ))}
+
+          {error && (
+            <p
+              role="alert"
+              className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+            >
+              {error.message || "We couldn't save that. Try again."}
+            </p>
+          )}
+
+          <Button type="submit" size="lg" full disabled={saving}>
+            {saving ? 'Saving…' : 'Save and continue'}
+          </Button>
+        </form>
+
+        {/* ⚠️ THE ONLY WAY OUT OF THIS SHEET, AND IT IS NOT DECORATION. Every
+            other step on this gate can be answered "no"; this one cannot, and
+            the sheet is dismissible={false}, so without this control a parent
+            who cannot answer right now has no route anywhere — not even back to
+            the sign-in screen. AppShell states the rule this keeps: "someone who
+            cannot get in must always be able to get out."
+            ⚠️ Deliberately quiet and deliberately last. It is an escape hatch,
+            not an alternative to answering. */}
+        <button
+          type="button"
+          data-testid="birthday-sign-out"
+          disabled={saving}
+          onClick={() => signOut?.()}
+          className="mt-4 block w-full text-center text-[12.5px] font-semibold text-ink-muted underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          Sign out instead
+        </button>
       </Sheet>
     )
   }

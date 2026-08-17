@@ -361,6 +361,56 @@ export async function listPlayerPrivate(playerIds) {
 }
 
 /**
+ * Writes ONE child's date of birth and nothing else — the writer every EDIT
+ * surface uses.
+ *
+ * ⚠️ IT EXISTS BECAUSE setPlayerDob ABOVE CLEARS THE PLAY-UP AGREEMENT, AND THAT
+ * IS CORRECT THERE AND WRONG HERE. That function takes `playsUp` and writes
+ * `plays_up_confirmed_at: playsUp ? now : null` — so calling it to fix a typo in
+ * a birthday silently erases a parent's recorded consent. Right for the
+ * registration form, which always supplies both answers together; wrong for a
+ * coach correcting a date, who is not being asked about consent at all and must
+ * not be able to withdraw it by accident.
+ *
+ * ⚠️ MEASURED, NOT ASSUMED — 17 Aug 2026, against production inside a
+ * rolled-back transaction, on an invented child with an agreement on file:
+ *
+ *   setPlayerDob(id, dob) as it stands ....... birthday updated, agreement ERASED
+ *   this function .......................... birthday updated, agreement KEPT
+ *   this function, no row yet (control) ..... row inserted correctly
+ *
+ * The control matters: omitting a column from an upsert leaves it alone on
+ * CONFLICT, and takes its default on INSERT. Both paths were checked, because a
+ * writer that only worked for existing rows would fail for exactly the 26
+ * children who have none.
+ *
+ * `dob` may be null, which CLEARS the birthday — same rule as setPlayerDob: a
+ * date entered wrongly must be removable by the people who entered it.
+ */
+export async function updatePlayerDob(playerId, dob) {
+  if (!playerId) throw new Error('updatePlayerDob needs a player.')
+
+  const { data, error } = await supabase
+    .from('player_private')
+    .upsert(
+      {
+        player_id: playerId,
+        date_of_birth: dob || null,
+        updated_at: new Date().toISOString(),
+        // ⚠️ plays_up_confirmed_at IS DELIBERATELY ABSENT. Adding it here — even
+        // as null, even "to be explicit" — reintroduces the exact bug this
+        // function exists to avoid.
+      },
+      { onConflict: 'player_id' },
+    )
+    .select('player_id, date_of_birth, plays_up_confirmed_at')
+    .maybeSingle()
+
+  if (error) throw error
+  return data ?? null
+}
+
+/**
  * WHICH children have a private row at all — the ids, and nothing else.
  *
  * ⚠️ THIS EXISTS SO THAT THE ADMIN GAP LIST NEVER PULLS A SINGLE BIRTHDAY. That
