@@ -10,6 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ✨ **ONE ROLL-CALL REPLACES THE FORK AT THE FRONT DOOR.** The point of the whole
+  account-creation plan. `AppShell` rendered "Add your player" with a button
+  saying *"I'm not adding a player"* that swapped in the ask-the-club form —
+  **mutually exclusive**, so the branch somebody picked in their first ten seconds
+  decided what the club knew about them from then on. The parent door never asked
+  whether they also coach; the staff door never asked whether they have children
+  here. Jay: *"i have coaches signing up without adding their kids, its chaotic
+  right now"*. Now: who are you, what brings you here, nothing pre-selected, tick
+  everything true — and every ticked answer is taken in turn.
+  ⚠️ **THE RELOAD GOES LAST, EXACTLY ONCE.** The screen renders while
+  `memberships.length === 0` and only `reload()` changes that; the two RPCs create
+  rows without telling the provider, which is what lets one screen write several
+  answers and stay put. Wire it to a section and the screen unmounts on the first
+  answer with every remaining question unasked — no error, nothing to notice.
+  ⚠️ **THE NAME IS ASKED BEFORE ANY WRITE**, or a coach reaches an approval queue
+  as "Unnamed member" — and **both names are required**, which is deliberately NOT
+  the sign-in gate's rule: this is a stranger asking to reach a children's squad.
+  ⛔ **AND THE RELOAD FAULT — THE ONE THING THE SCREEN TURNS ON — LEFT ALL
+  SEVENTEEN TESTS GREEN WHEN INJECTED.** Every case that ended with the
+  registration section had it LAST, where reloading is correct. Only a run with a
+  question AFTER it can see the bug. That case exists now.
+
 - 🔒 **A VOLUNTEER CAN SAY SO, WITHOUT CLAIMING A ROLE THEY DO NOT HOLD.** Jay's
   call from three options while item 5 of the account plan was being designed:
   add `volunteer` to `access_requests`, and KEEP the squad requirement.

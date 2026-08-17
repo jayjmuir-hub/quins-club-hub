@@ -1,9 +1,15 @@
 # Plan — account creation, rebuilt around who a person actually is
 
-**STATUS: IN PROGRESS, opened 16 Aug 2026.** Eight items, built in the order
-below. Each ships on its own and none blocks the next, so this can stop after any
-of them. **Update this line as items land** — a plan that says IN PROGRESS after
-it shipped is the failure mode `docs:check` rule 5 exists to catch.
+**STATUS: IN PROGRESS, opened 16 Aug 2026. Items 1, 2, 4 and 5 have SHIPPED; 3 is
+half-shipped; 4b is blocked on Jay; 6–8 are not started.** Each ships on its own
+and none blocks the next, so this can stop after any of them. **Update this line
+as items land** — a plan that says IN PROGRESS after it shipped is the failure
+mode `docs:check` rule 5 exists to catch.
+
+⚠️ **THE FORK IS GONE (item 5, 17 Aug), WHICH IS THE ONE CHANGE THE REST OF THIS
+PLAN WAS WRITTEN AROUND.** The diagnosis below still describes the app as having
+two mutually exclusive doors. It does not any more — it is kept because it is why
+everything else here exists.
 
 ## What Jay reported
 
@@ -60,20 +66,24 @@ select count(*) from public.players pl
 
 ## Build order
 
-| # | Item | Size |
-|---|---|---|
-| 1 | The mirror question — *do you do anything else at the club?* | small |
-| 2 | Split every name into first and family | small |
-| 3 | Date of birth, in its own table | medium |
-| 4 | Invite from a parent row | medium |
-| 4b | …and the email that actually posts it | medium, **blocked on Jay** |
-| 5 | The roll-call replaces the fork | medium |
-| 6 | Completeness debt | medium |
-| 7 | Link adults to accounts | medium |
-| 8 | Vouching, from the club's side | large |
+| # | Item | Size | State |
+|---|---|---|---|
+| 1 | The mirror question — *do you do anything else at the club?* | small | ✅ 16 Aug |
+| 2 | Split every name into first and family | small | ✅ 17 Aug |
+| 3 | Date of birth, in its own table | medium | 🟡 table + registration field |
+| 4 | Invite from a parent row | medium | ✅ 17 Aug |
+| 4b | …and the email that actually posts it | medium | ⛔ **blocked on Jay** |
+| 5 | The roll-call replaces the fork | medium | ✅ 17 Aug |
+| 6 | Completeness debt | medium | not started |
+| 7 | Link adults to accounts | medium | not started |
+| 8 | Vouching, from the club's side | large | not started |
 
 Items 1–4 close holes that are open on a live club today. 5 stops the hole being
 re-created. 6–8 are the durable shape.
+
+⚠️ **WHAT IS LEFT OF 3 IS THE `allowsOwnContact` RE-POINT, AND IT IS DEFERRED ON
+PURPOSE** — see the item. It is a real refactor with a safeguarding rule inside
+it, not a tidy-up.
 
 ---
 
@@ -485,7 +495,7 @@ without the middle state two coaches invite the same person on the same evening.
 An invited parent skips sign-up entirely: every answer the roll-call would ask
 for is already on the row that invited them.
 
-## 5 · The roll-call replaces the fork — 🟡 DESIGNED AND UNBLOCKED, NOT BUILT
+## 5 · The roll-call replaces the fork — ✅ BUILT, 17 Aug 2026
 
 **What was established before writing any of it, and it changes the shape:**
 
@@ -559,7 +569,48 @@ records nothing is worse than no tick: the whole argument for the screen is that
 *"leaving a box empty is a recorded claim, not an absence"*. A fourth box that
 quietly drops what it was told breaks the only promise the screen makes.
 
-### The build — everything worked out, none of it written
+### What shipped
+
+`src/components/RollCall.jsx`. One screen: your name (only if the club does not
+already have it), four boxes, nothing pre-selected, then a section per ticked
+answer, then **one** `reload()`. `AddYourPlayer` and `RequestAccess` survive as
+sections of it; `askingForAccess` and the *"I'm not adding a player"* button are
+gone from `AppShell`.
+
+Two things were added while building that the design did not have:
+
+- ⚠️ **THE STAFF SECTION CAN BE SKIPPED, AND THAT IS NOT POLISH.** Somebody who
+  ticked it by mistake, or whose squad is not in the list, would otherwise be
+  stranded there with the children they came to register permanently out of
+  reach behind it. It writes nothing, so the mirror gate asks again next
+  sign-in.
+- **"I play here myself" seeds the first registration row** rather than being a
+  tick that changes nothing. Safe because the squad decides twice — the select's
+  `onChange` clears the flag for a squad that forbids self-registration, and the
+  submit forces `canSelfRegister && row.selfRegister` again.
+
+### ⚠️ FOUR INJECTED FAULTS, AND THE FIRST ONE SURVIVED
+
+| Fault | Test that failed |
+|---|---|
+| pre-select an answer | *offers every answer, with nothing pre-selected* (and 7 more) |
+| drop the family-name requirement | *requires a family name, unlike the sign-in gate* |
+| ignore an existing access request on mount | *goes straight to the state of their request* |
+| **wire `reload` to the registration section** | **nothing — see below** |
+
+⛔ **THE RELOAD FAULT — THE ONE THING THIS SCREEN TURNS ON — LEFT ALL SEVENTEEN
+TESTS GREEN.** Every case that finished with the players section had it **last**,
+where reloading is correct, and the only case that continued afterwards finished
+with **staff**. The bug is invisible except in a run where a question follows the
+registration form. The case that catches it — tick a child *and* "I help the club
+another way", register the child, and the volunteer question must still be
+standing — was written afterwards and fails on the fault.
+
+⚠️ **THAT IS THE FOURTH TIME ON THIS PROJECT A SUITE HAS GONE GREEN OVER AN
+UNTESTED BRANCH.** Check what the existing cases can actually SEE before
+believing one.
+
+### The design, worked out before any of it was written
 
 One screen, ticks, then a section per ticked answer, then **one** `reload()` at
 the very end. Removes `askingForAccess` from `AppShell` and the *"I'm not adding

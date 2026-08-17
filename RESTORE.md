@@ -88,6 +88,24 @@ the component takes `className` and `style` — pass them instead of wrapping.
 ⚠️ **jsdom CANNOT SEE IT**, because it computes no CSS, so the guard is structural:
 `tests/dashboard.test.jsx` asserts each row's `parentElement` IS the list card.
 
+⚠️ **THE ZERO-MEMBERSHIP SCREEN IS `RollCall`, AND ITS ONE INVISIBLE RULE IS THAT
+`reload()` FIRES ONCE, AT THE END.** `AppShell` renders it while
+`memberships.length === 0`, and only the provider's `reload` changes that array —
+so `register_my_player` and `request_staff_role` creating rows without telling the
+provider is what lets one screen collect several answers and stay on screen.
+**Wiring `reload` to a section's own `onDone` unmounts the whole screen the moment
+the first answer lands, with every remaining question unasked, no error and
+nothing visible.** ⚠️ **And a test suite cannot see it unless a case has a question
+AFTER the registration section** — injected on 17 Aug, all seventeen roll-call
+tests stayed green.
+
+⚠️ **THE REGISTRANT'S FAMILY NAME IS REQUIRED THERE AND OPTIONAL IN `NamePrompt`,
+AND THAT IS NOT DRIFT.** The gate confirms somebody the club already holds a
+membership for (one-word names are real, and a gate nobody can pass is worse than
+a sortable list). The roll-call is a stranger asking to reach a children's squad,
+where a coach has to recognise the queue row. `PlayerRegistrationForm`'s
+`firstProblem()` made the same call for the same person.
+
 ⚠️ **A PERSON'S NAME IS TWO BOXES IN EVERY FORM, AND THE FORMS DISAGREE ABOUT WHAT
 THEY WRITE — ON PURPOSE.** `PlayerForm`, `MyPlayerForm` and `ParentsEditor` write
 `first_name`/`last_name` (plus `full_name`, computed identically to what the
