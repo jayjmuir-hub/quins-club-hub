@@ -398,6 +398,43 @@ proves you wrong.**
   people and shipped to everyone.
   ⚠️ `tests/pwa-build.test.js` and `tests/button-sweep.test.js` READ `dist/`, so run
   `npm run build && npm test`, never `npm test` alone, when touching this.
+
+  ✅ **THE FLAG HALF IS FIXED — 17 Aug 2026. The CSS claim was RIGHT and the
+  reason nobody had found was the BUNDLER, not the library.** `flag-icons`
+  itself is 28 kB raw / **2.36 kB gzip** — 2.5% of the stylesheet, so anyone who
+  measured the package would have concluded this item was wrong and moved on.
+  What made it 88.6% of the built CSS was Vite's `build.assetsInlineLimit`
+  (4096 bytes by default), which had written **400 of the 542 flag images
+  straight into `index.css` as `data:` URIs**. Measured on the same build with
+  only that option changed:
+
+  | | before | after |
+  |---|---|---|
+  | `index.css` | 475.15 kB (gzip **95.74**) | 84.31 kB (gzip **18.37**) |
+  | `.fi-` rules | 420,823 of 475,154 chars | unchanged in count, now `url()` refs |
+  | flags inlined | 400 | **0** |
+  | PWA precache | 1682.76 KiB | **1301.08 KiB** |
+
+  ⚠️ **IT COUNTED TWICE, WHICH IS WHY IT BEAT THE JS SPLIT.** The stylesheet is
+  render-blocking AND precached, so ~77 kB gzip of other countries' flags was
+  downloaded before first paint and again into every install — for a component
+  that draws ONE flag, on the registration and profile forms only.
+  ⚠️ **AND `PhoneInput`'s OWN HEADER ALREADY CLAIMED THE FIXED BEHAVIOUR** —
+  "because they are CSS background images the browser only fetches the handful
+  actually painted". True of flag-icons and defeated underneath it. **A design
+  rationale can be correct about the library and wrong about the build.**
+  ⚠️ **THE WORKBOX `globIgnores` AIMED AT THIS AND MATCHES NOTHING** — see the
+  note now in `vite.config.js`. Deleting all three patterns produces an
+  identical precache. It guarded a door the flags never used.
+
+  ⚠️ **THE `React.lazy` HALF IS MEASURED BUT NOT TAKEN, AND THE NUMBER IS THE
+  REASON.** Lazy-loading the twelve `/admin` screens moves the entry chunk
+  283.53 → **256.27 kB gzip** (−27.26) across 14 new chunks. **But the precache
+  went 11 entries/1301.08 KiB to 25 entries/1304.49 KiB — unchanged.** Workbox
+  precaches the new chunks too, so splitting DEFERS bytes off first paint
+  without removing them from the install. It is a real first-paint win and
+  about a third of the flag fix; it wants `globPatterns` thought about at the
+  same time, or the install pays for the admin half regardless.
 - **The calendar token is an unrevocable, non-expiring credential in a URL**, and
   nobody can see if one has leaked. ⛔ **Do not add an expiry** — a feed that dies on
   a timer produces a club-wide "my calendar stopped working" with no way to warn
@@ -617,3 +654,28 @@ green suite and has never been exercised by a human on the live site.
   timeout mechanism fixed on 14 Aug — the file is synchronous and runs in ~160ms. It
   was never reproduced and its message was never recorded. **If a phantom failure
   appears again, capture the MESSAGE, not the file name.**
+
+- 🆕 **THE MESSAGE, CAPTURED — 17 Aug 2026.** A full `npm test` reports
+  **unhandled errors** that fail no test and appear in no single-file run:
+
+  ```
+  Serialized Error: { code: 'ERR_INVALID_ARG_TYPE' }
+  ❯ node_modules/undici/lib/web/fetch/index.js:1119:19
+  ❯ processTicksAndRejections node:internal/process/task_queues:104:5
+  originated in "tests/dashboard-availability.test.jsx" / "tests/dashboard.test.jsx"
+  ```
+
+  ⚠️ **IT IS NOT THE FILE IT NAMES, AND THE COUNT MOVES BETWEEN RUNS** — two
+  errors on one run, three on the next, naming a different pair. Vitest says so
+  itself: the error is thrown *while* that file is running, not by it.
+  ⚠️ **PRE-EXISTING, AND THAT WAS MEASURED RATHER THAN ASSUMED.** The audit that
+  found it ran the full suite on its own branch (3 errors) and again with its
+  changes stashed (2 errors), so it is not attributable to the flag or
+  dead-code work. `tests/dashboard-availability.test.jsx` alone: **2 passed, 0
+  errors.**
+  ⚠️ **IT IS AN UNHANDLED REJECTION IN `undici`'s FETCH, ESCAPING A TEST THAT
+  HAS ALREADY FINISHED** — the shape of a component firing a real request during
+  teardown because a mock did not cover a path. **The suite is green and this is
+  not a failure; it is an un-awaited promise nobody owns**, and the next person
+  to chase it should look for a fetch that outlives its test rather than at
+  either file's assertions.

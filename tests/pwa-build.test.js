@@ -3,7 +3,7 @@
 // measurement and the rule are in vite.config.js.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync, existsSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -57,6 +57,66 @@ beforeAll(() => {
 
 afterAll(() => {
   if (outDir) rmSync(outDir, { recursive: true, force: true })
+})
+
+// ⚠️ THE COUNTRY FLAGS MUST NOT BE INSIDE THE STYLESHEET, and this is the only
+// place that can tell. It is a property of the BUILD — `build.assetsInlineLimit`
+// in vite.config.js — so no unit test on PhoneInput or index.css can see it, and
+// the failure is silent: everything renders correctly either way and the app is
+// simply 77 kB gzip heavier for every member, before first paint and again in
+// the PWA install.
+//
+// ⚠️ IT REGRESSES BY DELETION, WHICH IS THE CASE A SIZE THRESHOLD MISSES. Remove
+// the option and Vite's 4096-byte default silently absorbs 400 of the 542 flag
+// images back into index.css. So this asserts the SHAPE — no flag data: URI, and
+// the flags present as files — rather than a byte count that would need editing
+// every time the design system moves.
+describe('flag images stay out of the render-blocking stylesheet', () => {
+  const cssText = () => {
+    const assets = path.join(outDir, 'assets')
+    const names = readdirSync(assets).filter((f) => f.endsWith('.css'))
+    expect(names.length).toBeGreaterThan(0)
+    return names.map((f) => readFileSync(path.join(assets, f), 'utf-8')).join('\n')
+  }
+
+  it('inlines no flag image as a data: URI', () => {
+    const css = cssText()
+    // Control first: if the stylesheet carried no flag rules at all, the
+    // assertion below would pass against a build that had dropped flag-icons
+    // entirely — a green test for a broken picker.
+    expect(css).toMatch(/\.fi-ae\{/)
+    expect(css.match(/data:image\/svg\+xml/g) ?? []).toHaveLength(0)
+  })
+
+  it('points each flag at an emitted file that exists', () => {
+    const css = cssText()
+    const ref = /\.fi-ae\{background-image:url\(([^)]+)\)\}/.exec(css)
+    expect(ref, 'the UAE flag rule should reference a file').not.toBeNull()
+    const href = ref[1].replace(/["']/g, '')
+    expect(href).toMatch(/^\/assets\/ae-[\w-]+\.svg$/)
+    const onDisk = path.join(outDir, href.replace(/^\//, ''))
+    expect(existsSync(onDisk)).toBe(true)
+    expect(readFileSync(onDisk, 'utf-8')).toContain('<svg')
+  })
+
+  it('keeps every flag out of the precache', () => {
+    const sw = readFileSync(path.join(outDir, 'sw.js'), 'utf-8')
+    // ⚠️ THE KEY IS QUOTED HERE AND BARE IN THE SHIPPED WORKER, AND THE
+    // DIFFERENCE IS THIS FILE'S OWN BUILD. vite.config.js flips NODE_ENV to
+    // 'test' whenever VITEST is set — and the child process spawned in
+    // beforeAll INHERITS VITEST from the runner, so passing NODE_ENV:
+    // 'production' to it does not survive. The build is real, but it is an
+    // unminified one: `"url": "index.html"` here, `url:"index.html"` in
+    // dist/. Matching only the bare form found ZERO entries and the control
+    // below is the only reason that was noticed rather than shipped as a
+    // green test asserting nothing.
+    // ⚠️ SO DO NOT ADD AN ASSERTION HERE THAT DEPENDS ON MINIFICATION.
+    const urls = [...sw.matchAll(/"?url"?\s*:\s*"([^"]+)"/g)].map((m) => m[1])
+    // Control: the manifest must be non-empty, or "no flags precached" is
+    // vacuously true — the exact empty-result trap CLAUDE.md rule 6 is about.
+    expect(urls.length).toBeGreaterThan(5)
+    expect(urls.filter((u) => u.endsWith('.svg'))).toHaveLength(0)
+  })
 })
 
 describe('PWA production build output', () => {

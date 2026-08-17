@@ -37,8 +37,22 @@ export const HOURS_AFTER = 24
 export const HOURS_BEFORE = 1
 /** The band at which the deadline flips to the other side of the match. */
 export const PRE_MATCH_FROM_AGE = 18
-/** The youngest band the form applies to at all. Below this there is no sheet. */
-export const SHEET_FROM_AGE = 11
+
+// ⚠️ THERE WAS A `SHEET_FROM_AGE = 11` HERE AND IT WAS A SECOND SOURCE OF TRUTH.
+// Removed 17 Aug 2026. Its docstring — "the youngest band the form applies to at
+// all" — was accurate, authoritative-looking, and read by nothing: the rule is
+// enforced below by `isMinisBand(band)`, i.e. by `MINIS_MAX_AGE = 10` in
+// src/lib/minis.js, whose own docstring already says "the league starts at U11".
+//
+// ⚠️ THE DANGER WAS NOT THE DUPLICATION, IT WAS WHICH COPY A READER TRUSTS. The
+// unused one sat beside three constants that ARE the rule they name, so it read
+// as equally load-bearing; move `MINIS_MAX_AGE` and this file would have gone on
+// declaring 11 while behaving differently, with nothing to fail. minis.js makes
+// exactly this argument about its own three boundaries — that each is named so
+// no call site has to remember which it meant — and a fourth name for a boundary
+// that already had one is the failure that argument warns about.
+//
+// **If you need the number here, import MINIS_MAX_AGE; do not restate it.**
 
 /**
  * The deadline for a fixture's sheet, or null when there is no rule for it.

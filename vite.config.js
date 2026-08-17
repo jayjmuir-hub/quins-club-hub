@@ -109,6 +109,26 @@ export default defineConfig({
         // IT — the only thing that fetches it is WhatsApp's link scraper, on
         // its own servers. Precaching it would put 100KB into every install's
         // download for a file that renders on nobody's device.
+        //
+        // ⚠️⚠️ THESE THREE PATTERNS MATCH NOTHING, AND HAVE NEVER MATCHED
+        // ANYTHING. MEASURED 17 Aug 2026 — do not read them as protection.
+        // The build emits no `flags/` directory and no `*-flag*.svg`; a flag
+        // lands as `dist/assets/ae-CZRtWSox.svg`, named from its country code
+        // and a hash. Deleting this line entirely and rebuilding produces the
+        // IDENTICAL precache — 11 entries, 1301.08 KiB, zero SVGs — because
+        // what actually keeps flags out is vite-plugin-pwa's default
+        // globPatterns, which never included them. The line is KEPT rather
+        // than removed: it states the intent correctly, and it would start
+        // doing real work the day someone widens globPatterns to take svg.
+        //
+        // ⚠️ AND THE THING IT MEANT TO PREVENT WAS HAPPENING ANYWAY, BY A
+        // ROUTE NO GLOB CAN SEE. Vite inlines assets under
+        // `build.assetsInlineLimit` (4096 bytes by default) straight into the
+        // stylesheet as `data:` URIs — so 400 of the 542 flag images were
+        // living INSIDE index.css, which is precached, while this guard
+        // watched the door they were not using. See the `build` block below
+        // for the measurement and the fix. **A guard is worth what its next
+        // rebuild proves, not what its comment claims.**
         globIgnores: ['**/flags/**', '**/assets/*-flag*.svg', '**/og-image.png'],
         // /calendar.ics is a Netlify proxy to the Supabase edge function, not
         // a route in this app. Workbox's navigateFallback answers ANY
@@ -158,6 +178,44 @@ export default defineConfig({
     }),
   ],
   base: '/',
+  build: {
+    // ⚠️ KEEP THE COUNTRY FLAGS OUT OF THE STYLESHEET. This is the largest
+    // single saving available to this app and it is one line, so it is worth
+    // knowing exactly what it does before anyone "simplifies" it away.
+    //
+    // Vite inlines any asset smaller than `assetsInlineLimit` (default 4096
+    // bytes) into the file that references it, as a `data:` URI. flag-icons
+    // ships 271 countries × two aspect ratios, and most national flags are
+    // simple enough to compress under 4KB — so 400 of the 542 flag images
+    // were being written straight into index.css.
+    //
+    // MEASURED 17 Aug 2026, same build, only this option changed:
+    //
+    //   index.css          475.15 kB → 84.31 kB   (gzip 95.74 → 18.37 kB)
+    //   `.fi-` rule blocks 420,823 of 475,154 chars — 88.6% of the stylesheet
+    //   data: URIs in CSS  400 → 0
+    //   emitted .svg files 142 → 542
+    //   PWA precache       1682.76 KiB → 1301.08 KiB
+    //
+    // ⚠️ THE STYLESHEET IS PRECACHED AND RENDER-BLOCKING, WHICH IS WHY THIS
+    // COUNTS TWICE. Every member downloaded ~77 kB gzip of other countries'
+    // flags before the first paint, and again into their PWA install — for a
+    // component that renders ONE flag, on the registration and profile forms
+    // only. Most sessions never mount it at all.
+    //
+    // ⚠️ IT RESTORES THE BEHAVIOUR PhoneInput's OWN HEADER ALREADY CLAIMS:
+    // "because they are CSS background images the browser only fetches the
+    // handful actually painted". True of flag-icons, and defeated by the
+    // bundler underneath it. The trade is one small request for the flag on
+    // screen (the UAE default is a 266-byte file) instead of 400 flags nobody
+    // asked for, and it is the same trade the workbox comment above already
+    // accepts for the 142 that were always separate files.
+    //
+    // ⚠️ SCOPED TO flag-icons ON PURPOSE. Returning `undefined` leaves Vite's
+    // default judgement in place for every other asset, so small icons
+    // elsewhere keep being inlined and do not each become a request.
+    assetsInlineLimit: (filePath) => (filePath.includes('flag-icons') ? false : undefined),
+  },
   test: {
     // jsdom is the DEFAULT, not the rule. Building one costs ~1.3s per test
     // file, and a third of this suite never touches the DOM — so those files

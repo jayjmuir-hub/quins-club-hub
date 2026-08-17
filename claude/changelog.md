@@ -10,6 +10,66 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ⚡ **EVERY MEMBER WAS DOWNLOADING 400 COUNTRY FLAGS BEFORE THE FIRST PAINT, AND
+  AGAIN INTO THEIR PWA INSTALL.** One line in `vite.config.js`:
+  `index.css` **475.15 → 84.31 kB (gzip 95.74 → 18.37)**, precache
+  **1682.76 → 1301.08 KiB**, flags inlined **400 → 0**.
+  ⚠️ **THE LIBRARY WAS INNOCENT AND THAT IS WHY IT SURVIVED SO LONG.**
+  `flag-icons` is 2.36 kB gzip on its own — measure the package and you conclude
+  the finding is wrong. The bulk came from Vite's `assetsInlineLimit`, which
+  writes any asset under 4096 bytes into the stylesheet as a `data:` URI, and
+  most national flags compress under that. **88.6% of the built CSS was `.fi-`
+  rules.**
+  ⚠️ **IT RESTORES WHAT `PhoneInput`'s HEADER ALREADY CLAIMED** — "the browser
+  only fetches the handful actually painted" — for a picker that draws ONE flag,
+  on two forms, in sessions most members never open.
+  ⚠️ **AND THE `globIgnores` AIMED AT EXACTLY THIS MATCHES NOTHING.** Deleting all
+  three patterns rebuilds an identical precache; what keeps flags out is
+  vite-plugin-pwa's default `globPatterns`. It watched a door the flags never
+  used while they walked in through the stylesheet. Kept, with the measurement
+  written beside it.
+  ✅ Guarded by three new assertions in `tests/pwa-build.test.js`, **proved by
+  deleting the option and watching two of them go red**. ⚠️ One control fired
+  during development and earned its place: the precache assertion found **zero**
+  manifest entries and would have passed vacuously — that file's build inherits
+  `VITEST`, so `vite.config.js` flips `NODE_ENV` to test and emits an
+  UNMINIFIED worker with `"url":` rather than `url:`. **The build that file
+  asserts on is not the build that ships.**
+  ⚠️ **THE `React.lazy` HALF WAS MEASURED AND NOT TAKEN**: −27.26 kB gzip off
+  first paint, but the precache does not move, because Workbox precaches the new
+  chunks too. Splitting defers bytes; this removed them. Both in
+  `claude/open-items.md`.
+
+- 🧹 **A SECOND SOURCE OF TRUTH FOR "the match sheet starts at U11", DELETED.**
+  `SHEET_FROM_AGE = 11` in `src/lib/matchSheetDeadline.js` was read by nothing —
+  the rule is enforced by `isMinisBand()`, i.e. `MINIS_MAX_AGE = 10` in
+  `src/lib/minis.js`. ⚠️ **THE RISK WAS NOT THE DUPLICATION BUT WHICH COPY A
+  READER TRUSTS**: it sat beside three constants that ARE the rule they name, so
+  moving `MINIS_MAX_AGE` would have left this file declaring 11 while behaving
+  differently, with nothing to fail. `minis.js` already argues this exact point
+  about its own three boundaries.
+  ⚠️ **IT IS THE ONLY DEAD CODE THE SWEEP FOUND WORTH REMOVING**, out of 442
+  exports scanned with both a positive and a negative control. The other
+  candidates were checked and LEFT: `updateSW` looks unused but the expression
+  registers the service worker and the export is the documented hook for a
+  refresh banner; 36 more are error-message constants this repo deliberately
+  exports so tests can assert by reference; 75 are exported for testability.
+  **"Almost nothing is dead" is the finding, not a failed search.**
+
+- 🧪 **RESPONSIVE SWEEP — 157 scenario/width pairs, zero overflow, all mounted.**
+  33 harness scenarios at 320/375/768/1280, and the five sheet-free ones across
+  nine widths to 1440. ⚠️ **THE DESKTOP HALF IS NEW** — `harness/check-overflow.mjs`
+  stops at 414, and its own header says the portal chooser "has to be looked at in
+  a real browser at desktop width". It now has been: the chooser renders the
+  "needs a bigger screen" card at 375 and its real content at 1280, clean.
+  ⚠️ **A `rendered` FLAG IS DOING REAL WORK HERE.** The first attempt loaded 32
+  iframes at once, and 18 never mounted — every one reporting `overflow: 0`, i.e.
+  a clean run from a blank page. The sweep also proves it can SEE an overflow
+  before believing it cannot: injecting a 900px element moves the figure 0 → 580
+  and names the element.
+  ⚠️ **SHEETS REMAIN INVISIBLE TO THIS**, as `check-overflow.mjs` documents —
+  `position:fixed` contents are not in `scrollWidth`. Unchanged, and not claimed.
+
 - 🧹 **A SHIPPED PLAN THAT STILL SAID "not yet merged", AND A RULE IN IT THAT WOULD
   HAVE UNDONE THE FEATURE.** `claude/plans/2026-08-17-birthday-backfill-prompt.md`
   described work that went live as `f506a7f` (#218) hours earlier.
