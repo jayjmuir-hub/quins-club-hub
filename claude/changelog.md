@@ -10,11 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- ✨ **THE REGISTRATION FORM CHECKS THE BIRTHDAY AGAINST THE AGE GROUP.** Born 2010
+  and picked U12 → it asks whether that is right. ⚠️ **IT ASKS, IT DOES NOT
+  REFUSE** — the same asymmetry as the gender rule, which refuses a blank and
+  permits a contradiction.
+  ⛔ **AND THE OBVIOUS IMPLEMENTATION WOULD HAVE FIRED ON MOST OF THE CLUB.
+  RUGBY AGE BANDS ARE SEASON-RELATIVE AND A BIRTHDAY IS NOT** — "U13" means under
+  13 as at a cut-off date, so a U13 squad is mostly TWELVE-year-olds for most of
+  the season. Nothing in the schema, the docs or `src/` records the cut-off
+  (searched). So nothing converts a birthday into a band and compares it for
+  equality: it takes the two bands a child could plausibly be in, allows a year
+  of grace on each end, and speaks only outside that.
+  ⚠️ **THE SAME FACT BLOCKS THE `allowsOwnContact` RE-POINT**, which was the other
+  half of item 3 and is now waiting on one fact from Jay rather than on effort. A
+  gate asking "is this child 13 today" would take the own-contact field away from
+  nearly a whole U13 squad the club's own rule permits it for. `ageGroup.js`'s
+  header used to invite that re-point; it now warns against it.
+
 ⚠️ **THE FIVE ENTRIES BELOW SHIPPED AS ONE SQUASH, `821c4dd` (#202).** They are kept
 apart because they are five separate decisions, and a reader looking for why
 `savedEmail` exists should not have to read about the roll-call to find it.
 
-- ✨ **ONE ROLL-CALL REPLACES THE FORK AT THE FRONT DOOR.** — `821c4dd` The point of the whole
+- `821c4dd` — ✨ **ONE ROLL-CALL REPLACES THE FORK AT THE FRONT DOOR.** The point of the whole
   account-creation plan. `AppShell` rendered "Add your player" with a button
   saying *"I'm not adding a player"* that swapped in the ask-the-club form —
   **mutually exclusive**, so the branch somebody picked in their first ten seconds
