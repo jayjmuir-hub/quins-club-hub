@@ -101,9 +101,14 @@ const TEAMS = [TEAM_U12, TEAM_U10] // deliberately unsorted; the screen sorts
 
 const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 
-const ADMIN = [{ id: 'm1', role: 'admin', team_id: null, club_id: CLUB_ID }]
-const COACH = [{ id: 'm2', role: 'coach', team_id: 'team-u10' }]
-const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
+// ⚠️ `status` IS LOAD-BEARING HERE — 17 Aug 2026. memberships.status is NOT
+// NULL in the database, so a fixture without one is a row that cannot exist.
+// Every membership fixture in this suite lacked it, which is why nothing here
+// could tell a PENDING staff request from granted access — the hole found in
+// private.can_approve_team the same day.
+const ADMIN = [{ id: 'm1', role: 'admin', team_id: null, club_id: CLUB_ID, status: 'active' }]
+const COACH = [{ id: 'm2', role: 'coach', team_id: 'team-u10', status: 'active' }]
+const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1', status: 'active' }]
 
 const SELF_ID = 'profile-jay'
 
@@ -466,7 +471,11 @@ describe('Accounts — authorisation gate', () => {
   it('shows a previewing admin the COACH view, not the admin one', async () => {
     useMembershipsMock.mockReturnValue({
       ...memberships(ADMIN),
-      memberships: [{ id: 'view-as', role: 'coach', team_id: 'team-u10', player_id: null }],
+      // `status: 'active'` because the preview stands in for a REAL coach —
+      // a synthetic row without one would be a shape the database cannot hold.
+      memberships: [
+        { id: 'view-as', role: 'coach', team_id: 'team-u10', player_id: null, status: 'active' },
+      ],
       viewAs: { role: 'coach', teamId: 'team-u10' },
     })
 
