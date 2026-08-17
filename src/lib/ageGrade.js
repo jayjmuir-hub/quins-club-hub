@@ -157,17 +157,101 @@ export function ageAt(dateOfBirth, when) {
 }
 
 /**
- * The cut-off date governing a given day.
+ * ⚠️ THE APP LOOKS FORWARD TO THE COMING SEASON FROM 1 JUNE — Jay's call,
+ * 17 Aug 2026, and this constant is the fix for a bug that was live on the
+ * registration form.
  *
- * ⚠️ THE SEASON TURNS OVER ON 31 AUGUST, SO THE ANSWER DEPENDS ON WHEN YOU ASK.
- * In October 2026 the governing cut-off is 31 Aug 2026; in March 2027 it is
- * still 31 Aug 2026; in September 2027 it becomes 31 Aug 2027. Computing it from
- * "this year" alone is wrong for eight months of every twelve.
+ * The cut-off is 31 August, so the obvious reading of "the season containing
+ * today" makes 17 Aug 2026 belong to the 2025/26 season. **A family registering
+ * in August is registering for the season that starts in two weeks**, and
+ * judging them against last year's cut-off makes every child one year too young.
+ *
+ * ⚠️ IT WAS NOT A COSMETIC WARNING. `PlayerRegistrationForm` REFUSES to submit
+ * an unconsented play-up, so a perfectly ordinary U13 registrant was blocked
+ * until their parent agreed to a play-up that was not happening — and the
+ * agreement then wrote `plays_up_confirmed_at`, sending a false "Playing up"
+ * chip to that squad's coaches. Wrong data, not just wrong words.
+ *
+ * ⚠️ AND IT WAS INVISIBLE ON EXACTLY THE SQUADS WHERE IT DID NOT MATTER. U16
+ * and U18 are DOUBLE bands, so the lower age of the pair absorbed the
+ * off-by-one and those two came out `ok`; every single-band squad from U9 to
+ * U14 was wrong. The same shape as the `\b` regex bug in RESTORE.md — right by
+ * accident in most cases, wrong in the one that counted.
+ *
+ * 1 June rather than a settings row, deliberately: it is one constant, it needs
+ * no admin screen, and nobody has to remember to change it every August. The
+ * cost is that a registration between 1 June and 31 August is *assumed* to be
+ * for the coming season, which is the assumption the club actually makes.
+ */
+export const ROLLOVER_MONTH = 6
+export const ROLLOVER_DAY = 1
+
+/**
+ * The cut-off date a registration made today should be judged against.
+ *
+ * ⚠️ THE ANSWER DEPENDS ON WHEN YOU ASK, AND IT IS NOT "this year". In October
+ * 2026 it is 31 Aug 2026; in March 2027 it is still 31 Aug 2026; from 1 June
+ * 2027 it becomes 31 Aug 2027. Computing it from the calendar year alone is
+ * wrong for most of every twelve months.
+ *
+ * ⚠️ ONLY THE SUMMER WINDOW CHANGED. From September to May this returns exactly
+ * what it always did; the difference is 1 June to 30 August, which used to point
+ * back at the season that had just finished.
  */
 export function cutoffFor(today = new Date()) {
   const year = today.getUTCFullYear()
-  const thisYears = Date.UTC(year, CUTOFF_MONTH - 1, CUTOFF_DAY)
-  return new Date(today.getTime() >= thisYears ? thisYears : Date.UTC(year - 1, CUTOFF_MONTH - 1, CUTOFF_DAY))
+  const rollover = Date.UTC(year, ROLLOVER_MONTH - 1, ROLLOVER_DAY)
+  const seasonYear = today.getTime() >= rollover ? year : year - 1
+  return new Date(Date.UTC(seasonYear, CUTOFF_MONTH - 1, CUTOFF_DAY))
+}
+
+/**
+ * The band a child of this cut-off age belongs in — the group they would be in
+ * if nobody moved them.
+ *
+ * ⚠️ A TABLE, NOT `age + 1`, FOR THE SAME REASON PREV_BAND IS. Ages 14 and 15
+ * both belong to U16 and ages 16 and 17 both to U18, because there is no U15 or
+ * U17 competition. Arithmetic gets those four wrong.
+ *
+ * ⚠️ AND THE GIRLS' TABLE IS A PARTIAL OVERRIDE, NOT A REPLACEMENT. The club
+ * runs girls' groups only at U12, U14, U16 and U18; below that girls play in the
+ * mixed groups, and there is no U13G at all. So a girl who is 12 correctly falls
+ * through to U13 — the MIXED squad, which is where she would actually play —
+ * and a girl who is 9 falls through to U10. Deleting the fallback would leave
+ * those children with no answer at all.
+ */
+const OWN_BAND = { 5: 6, 6: 7, 7: 8, 8: 9, 9: 10, 10: 11, 11: 12, 12: 13, 13: 14, 14: 16, 15: 16, 16: 18, 17: 18 }
+const OWN_BAND_GIRLS = { 11: 12, 13: 14, 14: 16, 15: 16, 16: 18, 17: 18 }
+
+export function ownBandForAge(cutoffAge, isGirls = false) {
+  if (isGirls && OWN_BAND_GIRLS[cutoffAge] !== undefined) return OWN_BAND_GIRLS[cutoffAge]
+  return OWN_BAND[cutoffAge] ?? null
+}
+
+/**
+ * The club's own name for that band — "U12 Mixed" rather than "U12" — when the
+ * squad list makes it unambiguous.
+ *
+ * ⚠️ THE REAL SQUAD NAME IS THE WHOLE POINT (Jay, 17 Aug 2026). A parent who
+ * picked the wrong age group from a dropdown needs to see the one they meant,
+ * not a band number they then have to translate. "That is U12" leaves them
+ * choosing between U12 Mixed and U12G QR.
+ *
+ * ⚠️ FALLS BACK TO THE BAND RATHER THAN GUESSING. Two candidate squads with
+ * nothing to choose between them is a case where naming one would be a
+ * coin-flip, and a confident wrong squad is worse than an honest vague one.
+ */
+export function ownSquadLabel(cutoffAge, chosenTeamName, squadNames = []) {
+  const isGirls = girlsGroup(chosenTeamName)
+  const band = ownBandForAge(cutoffAge, isGirls)
+  if (band === null) return null
+
+  const matches = (squadNames ?? []).filter((name) => ageBandFromTeamName(name) === band)
+  // Prefer a squad of the same kind as the one they picked — a girls' squad for
+  // a girls' squad — before falling back to "the only one there is".
+  const sameKind = matches.filter((name) => girlsGroup(name) === isGirls)
+  const best = sameKind.length === 1 ? sameKind : matches
+  return best.length === 1 ? best[0] : `U${band}`
 }
 
 /**
@@ -248,8 +332,8 @@ export const MISMATCH = 'mismatch'
  * the same asymmetry as the gender rule, which refuses a BLANK and permits a
  * CONTRADICTION.
  */
-export function ageGradeCheck(teamName, dateOfBirth, today = new Date()) {
-  const empty = { status: OK, message: '', groupsYoung: 0, cutoffAge: null }
+export function ageGradeCheck(teamName, dateOfBirth, today = new Date(), { squadNames } = {}) {
+  const empty = { status: OK, message: '', groupsYoung: 0, cutoffAge: null, ownSquad: null }
 
   const ages = cutoffAgesForTeam(teamName)
   if (!ages) return empty // a senior side, or a name with no band in it
@@ -265,6 +349,25 @@ export function ageGradeCheck(teamName, dateOfBirth, today = new Date()) {
   const band = ageBandFromTeamName(squad)
   const isGirls = girlsGroup(squad)
 
+  // ⚠️ THE GROUP THEY WOULD BE IN IF NOBODY MOVED THEM — Jay, 17 Aug 2026:
+  // "also show which squad they'd normally be in". A parent who picked the wrong
+  // age group from a dropdown was being asked to CONSENT to a play-up rather
+  // than being shown their mistake, and consenting is the easier of the two
+  // things to do. Naming their own squad is what turns the message from a
+  // permission request into a question they can answer.
+  const ownSquad = ownSquadLabel(cutoffAge, squad, squadNames)
+  // ⚠️ THERE IS NO "unless it is the squad they already picked" GUARD, AND THE
+  // ABSENCE IS DELIBERATE. One was written, and removing it broke NOTHING —
+  // which is how it was found to be unreachable. `ownBandForAge` is the exact
+  // INVERSE of `cutoffAgesForTeam`, so if the child's own band equalled the
+  // chosen squad's band then `ages.includes(cutoffAge)` was already true and
+  // this function returned `ok` well above here.
+  //
+  // Measured across every squad × every age 3–22: **281** non-`ok` results, 176
+  // of them naming a squad, **none** naming the chosen one. The sweep is now a
+  // test, which is what keeps the inverse relationship true.
+  const ownLine = ownSquad ? ` That is ${ownSquad}.` : ''
+
   // ⚠️ ONLY DOWNWARDS. Being OLDER than the squad is never a play-up, and
   // walking the ladder from an age above it would find nothing anyway — but
   // saying so here means the answer does not depend on that happening to be true.
@@ -275,9 +378,10 @@ export function ageGradeCheck(teamName, dateOfBirth, today = new Date()) {
         status: PLAY_UP,
         groupsYoung,
         cutoffAge,
+        ownSquad,
         message:
-          `They are ${cutoffAge} at the ${when} cut-off, which puts them ` +
-          `${groupsYoung === 1 ? 'one age group' : 'two age groups'} below ${squad}. ` +
+          `They are ${cutoffAge} at the ${when} cut-off.${ownLine} You have chosen ` +
+          `${squad}, which is ${groupsYoung === 1 ? 'one age group' : 'two age groups'} up. ` +
           'Playing up is allowed with your say-so, and the squad’s coaches will be told.',
       }
     }
@@ -287,9 +391,10 @@ export function ageGradeCheck(teamName, dateOfBirth, today = new Date()) {
     status: MISMATCH,
     groupsYoung: 0,
     cutoffAge,
+    ownSquad,
     message:
       `${squad} is for players aged ${ages.join(' or ')} at the ${when} cut-off, and this ` +
-      `birthday makes them ${cutoffAge}. Check the date and the age group — you can still ` +
-      'save if it is right.',
+      `birthday makes them ${cutoffAge}.${ownLine} Check the date and the age group — you ` +
+      'can still save if it is right.',
   }
 }

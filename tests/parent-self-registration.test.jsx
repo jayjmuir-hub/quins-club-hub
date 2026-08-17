@@ -1022,7 +1022,12 @@ describe('Add your player — a signed-in account with no access', () => {
     await user.type(screen.getByLabelText(/date of birth/i), '2015-03-04')
     await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
 
-    expect(await screen.findByText(/one age group below/i)).toBeInTheDocument()
+    expect(await screen.findByText(/one age group up/i)).toBeInTheDocument()
+    // ⚠️ AND IT NAMES THE SQUAD THEY BELONG IN (Jay, 17 Aug 2026). A parent who
+    // picked the wrong age group from the dropdown was being asked to CONSENT
+    // to a play-up rather than shown their mistake, and consenting is much the
+    // easier of the two things to do.
+    expect(screen.getByText(/That is U12/i)).toBeInTheDocument()
     // ⚠️ IT SAYS THE CLUB WILL BE TOLD, BEFORE THE TICK RATHER THAN AFTER. A
     // consent given without knowing that is not the consent being asked for.
     expect(screen.getByText(/coaches will be told/i)).toBeInTheDocument()
@@ -1054,6 +1059,50 @@ describe('Add your player — a signed-in account with no access', () => {
     await waitFor(() =>
       expect(setPlayerDobMock).toHaveBeenCalledWith(expect.any(String), '2015-03-04', {
         playsUp: true,
+      }),
+    )
+  })
+
+  // ⚠️ ⚠️ FROZEN IN AUGUST ON PURPOSE, AND IT IS THE ONLY TEST IN THIS FILE THAT
+  // COULD EVER HAVE CAUGHT THE BUG IT GUARDS. Every other case here runs at
+  // `IN_SEASON` (7 Nov 2026), where the old and the new cut-off agree — so the
+  // whole file was green while the live registration form was refusing ordinary
+  // registrations, all through the window when families actually sign up.
+  //
+  // Jay, 17 Aug 2026, looking at the age bands: "i think this is wrong because
+  // we are doing this for the upcoming season that starts sept 1st".
+  //
+  // The failure was not cosmetic. `cutoffFor` returned the cut-off of the season
+  // CONTAINING today, so in August it pointed at 31 Aug 2025 and made every
+  // child a year too young; the form then REFUSED to submit until the parent
+  // consented to a play-up that was not happening, and the consent wrote a false
+  // `plays_up_confirmed_at` that emails the squad's coaches.
+  it('⚠️ in August, an ordinary U13 registrant is not asked to consent to anything', async () => {
+    // 15 Jan 2014 -> 12 at the 31 Aug 2026 cut-off -> a plain U13 next season.
+    vi.setSystemTime(new Date('2026-08-17T09:00:00Z'))
+    const user = userEvent.setup()
+    registerMyPlayerMock.mockResolvedValue({ id: 'mm-new', player_id: 'p-42', status: 'pending' })
+    await renderShell()
+
+    await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+    await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+    await user.type(screen.getByLabelText(/date of birth/i), '2014-01-15')
+    await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+
+    expect(screen.queryByRole('checkbox', { name: /play up an age group/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/age group up/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    // ⚠️ THE SAVE IS THE ASSERTION, NOT THE ABSENT CHECKBOX. A missing control
+    // could mean the rule is right or that the row failed to render at all; a
+    // completed registration can only mean the form let it through.
+    await waitFor(() => expect(registerMyPlayerMock).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(setPlayerDobMock).toHaveBeenCalledWith(expect.any(String), '2014-01-15', {
+        // ⚠️ AND `false`, WHICH IS THE HALF THAT REACHES THE COACHES. A true here
+        // is the false "Playing up" chip on the approval queue.
+        playsUp: false,
       }),
     )
   })
