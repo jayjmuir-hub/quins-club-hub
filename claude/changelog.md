@@ -10,6 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 📋 **SPEC ONLY, NOTHING BUILT: asking existing families for the birthdays the
+  club started requiring after they signed up.**
+  `claude/plans/2026-08-17-birthday-backfill-prompt.md`.
+  ⚠️ **THE MEASUREMENT IS THE POINT OF IT.** `date_of_birth` became required for
+  new registrations on 16 Aug, and on 17 Aug `player_private` held **zero rows** —
+  not one family has filled it in, because nothing asks them. `NamePrompt` has
+  three steps and none mentions a birthday, and the completeness card that does
+  ask lives only on `/more`, which a parent has no reason to open.
+  ⚠️ **`AdminNeedsAttention` SAYS "Each family is already being asked on their own
+  screen", WHICH IS TRUE IN THE LETTER AND FALSE IN THE EFFECT** — and is probably
+  why this looked handled. The plan carries three open questions for Jay, the
+  hardest being how often to re-ask somebody who skips: `YourPlayers` already
+  records that a chase with no visible end is ignored by the third sign-in.
+
+- `954ef90` — ⛔ **A PENDING STAFF REQUEST COULD APPROVE ITSELF, AND LOOKED LIKE A
+  CHILD.** The squash SHA for the two entries below, which could not cite
+  themselves.
+
 - 🧑‍🏫 **STAFF ASKING FOR ACCESS GET THEIR OWN QUEUE, INSTEAD OF APPEARING AS
   "Unnamed player".** Jay's call over correcting the label in place: approving a
   coach and approving a child are different decisions and should not share a
