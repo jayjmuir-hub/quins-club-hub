@@ -104,33 +104,40 @@ function TierWarning({ fixtureTier, grade }) {
 
 function PickedRow({ player, status, fixtureTier, grade, onRemove, onToggleRole }) {
   return (
-    <li className="flex items-center gap-2 border-b border-line py-2 last:border-b-0">
-      {/* ⚠️ THE NAME AND ITS WARNING SHARE ONE flex-1 min-w-0 COLUMN. Putting the
-          warning in its own flex child would let it compete with the name for
-          width and break `truncate` on a long name. */}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[14.5px] font-bold text-ink">{player.full_name}</p>
-        <TierWarning fixtureTier={fixtureTier} grade={grade} />
+    <li className="border-b border-line py-2 last:border-b-0">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-[14.5px] font-bold text-ink">
+          {player.full_name}
+        </span>
+        {/* ⚠️ THE WARNING IS ON THE PICKED ROW, NOT ONLY IN THE POOL. Once somebody
+            is in the team the pool is scrolled away, and "did I pick anyone who
+            said no?" is exactly the question a coach asks at the end. */}
+        <StatusChip status={status} />
+        <button
+          type="button"
+          onClick={onToggleRole}
+          className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-brand hover:bg-surface-mute"
+        >
+          {player.role === ROLE_STARTER ? '→ Bench' : '→ Start'}
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${player.full_name}`}
+          className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-ink-muted hover:bg-surface-mute"
+        >
+          Remove
+        </button>
       </div>
-      {/* ⚠️ THE WARNING IS ON THE PICKED ROW, NOT ONLY IN THE POOL. Once somebody
-          is in the team the pool is scrolled away, and "did I pick anyone who
-          said no?" is exactly the question a coach asks at the end. */}
-      <StatusChip status={status} />
-      <button
-        type="button"
-        onClick={onToggleRole}
-        className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-brand hover:bg-surface-mute"
-      >
-        {player.role === ROLE_STARTER ? '→ Bench' : '→ Start'}
-      </button>
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${player.full_name}`}
-        className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-ink-muted hover:bg-surface-mute"
-      >
-        Remove
-      </button>
+      {/* ⚠️ UNDER THE WHOLE ROW, NOT INSIDE THE NAME'S COLUMN — AND THE NUMBERS ARE
+          THE REASON. Measured in a real browser at 375px: sharing the flex-1 column
+          with the status chip and both buttons left the sentence 122px wide, wrapped
+          it to FOUR lines and made the row 108px tall against a 42px unwarned
+          baseline. Full width gives it 322px, one line, 62px. ⚠️ jsdom CANNOT SEE
+          EITHER NUMBER — every assertion in the suite passed on the 108px version —
+          so do not "tidy" this back inside the flex row. A structural test in
+          tests/lineup-eligibility.test.jsx stands guard in jsdom's place. */}
+      <TierWarning fixtureTier={fixtureTier} grade={grade} />
     </li>
   )
 }
@@ -551,36 +558,37 @@ export default function Lineup() {
               </p>
               <ul>
                 {list.map((player) => (
-                  <li
-                    key={player.id}
-                    className="flex items-center gap-2 border-b border-line py-2 last:border-b-0"
-                  >
-                    {/* ⚠️ THE WARNING IS HERE AS WELL AS ON THE PICKED ROWS, for
-                        the reason StatusChip already gives above: the pool is
-                        where the choice is MADE, and the picked list is where it
-                        is reviewed. A warning in only one of the two is a warning
-                        that arrives too late or is never re-read. */}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14.5px] text-ink">{player.full_name}</p>
-                      <TierWarning
-                        fixtureTier={event?.tier}
-                        grade={grades.get(player.id)?.tier}
-                      />
+                  <li key={player.id} className="border-b border-line py-2 last:border-b-0">
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-[14.5px] text-ink">
+                        {player.full_name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => add(player.id, ROLE_STARTER)}
+                        className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
+                      >
+                        Start
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => add(player.id, ROLE_REPLACEMENT)}
+                        className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
+                      >
+                        Bench
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => add(player.id, ROLE_STARTER)}
-                      className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
-                    >
-                      Start
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => add(player.id, ROLE_REPLACEMENT)}
-                      className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
-                    >
-                      Bench
-                    </button>
+                    {/* ⚠️ THE WARNING IS HERE AS WELL AS ON THE PICKED ROWS, for the
+                        reason StatusChip already gives above: the pool is where the
+                        choice is MADE, and the picked list is where it is reviewed. A
+                        warning in only one of the two either arrives too late or is
+                        never re-read.
+                        ⚠️ AND IT SITS UNDER THE ROW, NOT IN THE NAME'S COLUMN — see
+                        PickedRow for the measurements that decided that. */}
+                    <TierWarning
+                      fixtureTier={event?.tier}
+                      grade={grades.get(player.id)?.tier}
+                    />
                   </li>
                 ))}
               </ul>

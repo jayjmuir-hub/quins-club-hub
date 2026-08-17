@@ -169,6 +169,33 @@ describe('the eligibility warning', () => {
     expect(screen.getByText(/Graded C — this fixture is B tier/)).toBeInTheDocument()
   })
 
+  // ⚠️ A STRUCTURAL STAND-IN FOR A MEASUREMENT jsdom CANNOT MAKE, AND THE NUMBERS
+  // ARE WHY IT EXISTS. Measured in a real browser at 375px: with the sentence inside
+  // the name's flex column, alongside the status chip and both buttons, it was 122px
+  // wide, wrapped to FOUR lines, and made the row 108px tall against a 42px unwarned
+  // baseline. Moved under the row it gets 322px, one line, 62px.
+  //
+  // ⚠️ EVERY OTHER ASSERTION IN THIS FILE PASSED ON THE 108px VERSION. jsdom reports
+  // no widths and no wrapping, so it cannot fail on layout — but it CAN see shape,
+  // and the shape is the thing that was wrong. So: the warning must be a SIBLING of
+  // the flex row, never a descendant of it.
+  it('keeps the warning outside the flex row, where it has the full width', async () => {
+    for (const lineups of [[], lineupWithEveryone()]) {
+      cleanup()
+      await renderScreen({ tier: 'B', lineups })
+
+      const warnings = screen.getAllByText(/Graded [AC] —/)
+      // The control: this configuration really did render warnings to inspect.
+      expect(warnings.length).toBeGreaterThan(0)
+
+      for (const warning of warnings) {
+        // Straight to the <li>, not into a flex column shared with the buttons.
+        expect(warning.parentElement.tagName).toBe('LI')
+        expect(warning.parentElement.className).not.toMatch(/\bflex\b/)
+      }
+    }
+  })
+
   // ⚠️ THE SCREEN MUST SURVIVE A REFUSED GRADE READ. player_grades is coach-only
   // and an empty or failed read is the normal case, not an error. Picking a team
   // is the job; the warning is decoration on top of it.
