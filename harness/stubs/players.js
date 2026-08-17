@@ -220,3 +220,13 @@ export async function setPlayerDob(playerId, dob, { playsUp = false } = {}) {
 export async function listPlayerPrivate() {
   return []
 }
+
+/**
+ * ⚠️ IDS ONLY, AND THE EMPTY SET IS DELIBERATE. /admin/needs-attention reads
+ * this to ask which children have a birthday on file WITHOUT fetching one, so
+ * the harness returning nothing means the gap list is fully populated — which
+ * is the state that screen exists to render.
+ */
+export async function listPlayerPrivatePresence() {
+  return new Set()
+}

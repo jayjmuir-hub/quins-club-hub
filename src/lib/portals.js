@@ -46,6 +46,12 @@ export const PORTALS = [
       // Staff anywhere earlier would silently change where every admin arrives.
       // Same trap the Allocation note below records, from the other direction.
       { to: '/admin/staff', label: 'Staff' },
+      // The third surface of the completeness rule — where the club is actually
+      // missing things. ⚠️ NO `superOnly`: this is a registrar's chase list, and
+      // every admin is one. It carries no contact detail and not one date of
+      // birth (see the screen's header), so it hands nobody anything they could
+      // not already read on the Accounts screen.
+      { to: '/admin/needs-attention', label: 'Needs attention' },
       // ⚠️ SUPER ADMINS ONLY, AND THIS IS THE FIRST TAB IN THE FILE THAT IS NOT
       // VISIBLE TO EVERY HOLDER OF ITS PORTAL. The portal gate is `right`, and
       // Club Admin has none — every admin holds it. This log records what

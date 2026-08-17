@@ -253,6 +253,7 @@ describe('AdminDashboard — inside a portal', () => {
       'Accounts',
       'Squads & league teams',
       'Staff',
+      'Needs attention',
     ])
     expect(within(tabs).queryByText(/^Club$/)).not.toBeInTheDocument()
   })
@@ -271,6 +272,7 @@ describe('AdminDashboard — inside a portal', () => {
       'Accounts',
       'Squads & league teams',
       'Staff',
+      'Needs attention',
       'Rights log',
     ])
   })

@@ -60,6 +60,7 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
+  getPlayerDob: vi.fn(() => Promise.resolve(null)),
   getPlayerContact: (...args) => getPlayerContactMock(...args),
   upsertPlayer: (...args) => upsertPlayerMock(...args),
   deletePlayer: (...args) => deletePlayerMock(...args),

@@ -9,7 +9,7 @@ import { isMinisTeam } from '../lib/minis.js'
 import { listPlayerGrades, listPlayerPositions, savePlayerPositions, setPlayerGrade, TIERS } from '../data/playerTiers.js'
 import { listParents, saveParents } from '../data/parents.js'
 import { deletePlayerPhoto, forgetPhotoUrl, uploadPlayerPhoto } from '../data/photos.js'
-import { allowsOwnContact } from '../lib/ageGroup.js'
+import useOwnContactGate from '../lib/useOwnContactGate.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 import { parentNameProblem, toEditorRows, toSaveRows } from '../lib/parentRows.js'
 import ParentsEditor from '../components/ParentsEditor.jsx'
@@ -367,6 +367,24 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       ? player.team_id
       : editableTeams[0]?.id ?? ''
 
+  // The U13 rule keys off the SELECTED squad, not the player's stored one, so
+  // moving a U12 up to U13 in this form reveals the player-contact fields
+  // immediately rather than only after a save-and-reopen. allowsOwnContact
+  // fails closed on an unknown squad name.
+  const selectedTeam = editableTeams.find((candidate) => candidate.id === teamId)
+  // ⚠️ AND THE BIRTHDAY NARROWS IT FURTHER, NEVER WIDENS IT (17 Aug 2026, the
+  // re-point). Moving a child UP an age group still reveals the fields at once
+  // — that is the squad half, unchanged — but a twelve-year-old moved into U13
+  // now keeps them hidden, because their birthday says so. A parent writes that
+  // birthday, which is exactly why it may only ever close this gate.
+  //
+  // ⚠️ CALLED HERE, ABOVE THE `gated` RETURN BELOW, AND THAT PLACEMENT IS NOT
+  // STYLE. It is a hook, and the early return two lines down is conditional —
+  // calling it after that return would change the hook order the moment somebody
+  // lost edit rights on a squad, which React treats as a broken component rather
+  // than a warning.
+  const { allowed: ownContactAllowed } = useOwnContactGate(player?.id ?? null, selectedTeam?.name)
+
   // A user who can't write here should not be shown a form whose Save button
   // the database is guaranteed to refuse — and, for this form specifically,
   // should not be shown contact fields at all. Both entry points already gate
@@ -641,12 +659,6 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   const contactLoading = contactStatus === 'loading'
   const parentsLoading = parentsStatus === 'loading'
 
-  // The U13 rule keys off the SELECTED squad, not the player's stored one, so
-  // moving a U12 up to U13 in this form reveals the player-contact fields
-  // immediately rather than only after a save-and-reopen. allowsOwnContact
-  // fails closed on an unknown squad name.
-  const selectedTeam = editableTeams.find((candidate) => candidate.id === teamId)
-  const ownContactAllowed = allowsOwnContact(selectedTeam?.name)
 
   // Advisory only, and computed from the SELECTED squad rather than the
   // player's stored one so switching the age-group dropdown updates the note

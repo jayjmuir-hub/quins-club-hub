@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import { deletePlayer, getPlayerContact } from '../data/players.js'
 import { listParents } from '../data/parents.js'
-import { allowsOwnContact } from '../lib/ageGroup.js'
+import useOwnContactGate from '../lib/useOwnContactGate.js'
 import { formatPhone } from '../lib/phone.js'
 import { genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
@@ -419,6 +419,10 @@ export default function PlayerDetail({
   // line on a child's record reads as an omission somebody ought to correct
   // — on hundreds of players, to no one's benefit.
   const gender = genderLabel(player.gender)
+  // ⚠️ THE BIRTHDAY NARROWS THE SQUAD'S ANSWER AND CAN ONLY NARROW IT (17 Aug
+  // 2026, the re-point). A twelve-year-old playing up in U13 loses this block;
+  // nothing a birthday says can add it. See src/lib/useOwnContactGate.js.
+  const { allowed: ownContactAllowed } = useOwnContactGate(player.id, team?.name)
 
   return (
     <Sheet open onClose={onClose} title="Player">
@@ -472,7 +476,7 @@ export default function PlayerDetail({
           invites someone to go and fill it in. allowsOwnContact fails closed
           when the squad is unknown, so a team row that failed to load
           withholds rather than exposes. */}
-      {allowsOwnContact(team?.name) && <ContactBlock playerId={player.id} />}
+      {ownContactAllowed && <ContactBlock playerId={player.id} />}
 
       <FooterActions
         player={player}

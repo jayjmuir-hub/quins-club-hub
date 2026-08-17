@@ -226,6 +226,20 @@ character**, so `U12G QR` matched nothing, the band came back `null`, and
 `/^u(\d{1,2})(?![0-9])/i` now. **The regex was the symptom; the null default was the
 bug.**
 
+**⚠️ THERE ARE TWO OWN-CONTACT GATES AND THEY ARE NOT INTERCHANGEABLE.**
+`allowsOwnContact(teamName)` in `src/lib/ageGroup.js` answers from the squad name
+alone. `allowsOwnContactFor({ teamName, dateOfBirth })` in `src/lib/ageGrade.js` also
+consults the birthday, and **can only ever CLOSE what the first one opened** — a parent
+writes their own child's birthday, so a gate a birthday could open is a gate a family
+unlocks by typing a different year. Screens go through `src/lib/useOwnContactGate.js`,
+which is the only place the birthday is fetched.
+⚠️ **THE DOB-AWARE ONE COULD NOT LIVE IN `ageGroup.js`** — `ageGrade.js` already imports
+that module for the band table, so putting it there makes the two import each other. Two
+names, not one function with a second argument.
+⚠️ **AND IT ASKS THE AGE AT THE 31 AUGUST CUT-OFF, NEVER TODAY.** "U13" means twelve at
+the cut-off, so a U13 squad is mostly twelve-year-olds for most of the season; "is this
+child 13 today?" would strip the field from nearly a whole squad the rule permits it for.
+
 **Gender: blank is REFUSED on a single-gender squad, a MISMATCH is allowed with a loud
 warning.** Two rules pointing opposite ways, and that is deliberate — the club has had
 four women recorded in "Senior Men 2nd XV", and blocking it would make such a player

@@ -37,9 +37,12 @@ vi.mock('../src/lib/auth.jsx', () => ({
 
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
-  listContactsForPlayers: (...args) => listContactsForPlayersMock(...args),
+  listContactsForPlayers: (...args) => listContactsForPlayersMock(...args),
   // The completeness card on YourPlayers reads this (17 Aug 2026).
   listPlayerPrivate: async () => [],
+  // ids only, never dates — /admin/needs-attention (17 Aug 2026).
+  listPlayerPrivatePresence: async () => new Set(),
+  getPlayerDob: async () => null,
 }))
 
 // listClubMembers is mocked purely so the "Club tab does not list club
@@ -176,14 +179,26 @@ describe('AdminDashboard — authorisation gate', () => {
 })
 
 describe('AdminDashboard — tabs', () => {
-  // ⚠️ THREE SINCE 13 Aug 2026 — Staff joined the Club Admin portal. The count
-  // is asserted rather than dropped: it is what would catch a tab silently
-  // disappearing, and "at least two" would pass against exactly that bug.
-  it('renders exactly three tabs, Accounts, Squads & league teams and Staff, as real links', () => {
+  // ⚠️ FOUR SINCE 17 Aug 2026 — "Needs attention" joined Staff (13 Aug) in the
+  // Club Admin portal. The count is asserted rather than dropped: it is what
+  // would catch a tab silently disappearing, and "at least two" would pass
+  // against exactly that bug.
+  //
+  // ⚠️ THE FIXTURE HERE IS AN ORDINARY ADMIN, WHICH IS WHY "Rights log" IS NOT
+  // IN THIS LIST. That tab is super-admins-only, and its own assertions live in
+  // tests/admin-portals.test.jsx, both ways round. If somebody "fixes" this
+  // count by adding it, they have made the audit log readable by the people it
+  // audits — read src/lib/portals.js before changing the number.
+  it('renders exactly four tabs — Accounts, Squads & league teams, Staff, Needs attention', () => {
     renderAdmin()
 
     const tabs = screen.getByRole('navigation', { name: /admin sections/i })
-    expect(tabs.querySelectorAll('a')).toHaveLength(3)
+    expect(tabs.querySelectorAll('a')).toHaveLength(4)
+    expect(screen.getByRole('link', { name: 'Needs attention' })).toHaveAttribute(
+      'href',
+      '/admin/needs-attention',
+    )
+    expect(screen.queryByRole('link', { name: 'Rights log' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Accounts' })).toHaveAttribute('href', '/admin/accounts')
     expect(screen.getByRole('link', { name: 'Squads & league teams' })).toHaveAttribute('href', '/admin/club')
     expect(screen.getByRole('link', { name: 'Staff' })).toHaveAttribute('href', '/admin/staff')

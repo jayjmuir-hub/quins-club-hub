@@ -1,9 +1,9 @@
 # Plan — account creation, rebuilt around who a person actually is
 
-**STATUS: IN PROGRESS, opened 16 Aug 2026. Items 1, 2, 4, 4b, 5 and 7 have
-SHIPPED; 3 is all but its last piece; 6 has its rule and two of three surfaces.** Each ships on its own and none blocks the next, so this can
-stop after any of them. **Update this line as items land** — a plan that says IN PROGRESS after it shipped is the failure
-mode `docs:check` rule 5 exists to catch.
+**STATUS: SHIPPED, 17 Aug 2026. All eight items are done.** Opened 16 Aug;
+items 1, 2, 4, 4b, 5 and 7 landed first, then 8 (vouching), then 6's third
+surface and 3's `allowsOwnContact` re-point — the two pieces that had been
+deferred longest. Nothing here is outstanding.
 
 ⚠️ **THE FORK IS GONE (item 5, 17 Aug), WHICH IS THE ONE CHANGE THE REST OF THIS
 PLAN WAS WRITTEN AROUND.** The diagnosis below still describes the app as having
@@ -69,21 +69,22 @@ select count(*) from public.players pl
 |---|---|---|---|
 | 1 | The mirror question — *do you do anything else at the club?* | small | ✅ 16 Aug |
 | 2 | Split every name into first and family | small | ✅ 17 Aug |
-| 3 | Date of birth, in its own table | medium | 🟡 all but the contact re-point, which needs **one fact from Jay** |
+| 3 | Date of birth, in its own table | medium | ✅ 17 Aug — re-point included |
 | 4 | Invite from a parent row | medium | ✅ 17 Aug |
 | 4b | …and the email that actually posts it | medium | ✅ 17 Aug — one real send outstanding |
 | 5 | The roll-call replaces the fork | medium | ✅ 17 Aug |
-| 6 | Completeness debt | medium | 🟡 the rule + 2 of 3 surfaces |
+| 6 | Completeness debt | medium | ✅ 17 Aug — all three surfaces |
 | 7 | Link adults to accounts | medium | ✅ 17 Aug |
 | 8 | Vouching, from the club's side | large | ✅ 17 Aug |
 
 Items 1–4 close holes that are open on a live club today. 5 stops the hole being
 re-created. 6–8 are the durable shape.
 
-⚠️ **WHAT IS LEFT OF 3 IS THE `allowsOwnContact` RE-POINT, AND IT IS NO LONGER
-BLOCKED** — the cut-off turned out to be recorded in the tournament repo (31
-August, UAERF). It is ordinary work now, with a safeguarding rule inside it: a
-DOB may only ever make that gate **stricter**.
+✅ **AND THE `allowsOwnContact` RE-POINT IS DONE (17 Aug).** It was blocked on
+the cut-off date, which turned out to be recorded in the tournament repo all
+along (31 August, UAERF). The safeguarding rule survived into the code: a DOB
+may only ever make that gate **stricter**, and there is a property test asserting
+the other direction is unreachable for every squad and every birthday shape.
 
 ---
 
@@ -301,13 +302,45 @@ and until one of them lands this table is correct and empty.
 Grants read back rather than assumed: `authenticated` holds
 SELECT/INSERT/UPDATE/DELETE from Supabase's defaults, `anon` holds nothing.
 
-⚠️ **THE `allowsOwnContact` RE-POINT IS NOT A TIDY-UP AND MUST NOT BE DONE
+### ✅ THE RE-POINT — DONE 17 Aug 2026, and the rule survived into the code
+
+⚠️ **THE `allowsOwnContact` RE-POINT WAS NOT A TIDY-UP AND WAS NOT DONE
 CASUALLY.** A parent may write their own child's birthday — deliberately, since
 the family is the source of truth. That means a DOB may only ever make the
 under-13 contact gate **stricter**, never relax it, or a parent editing a
-birthday could unlock a field the club's own rule forbids. The call sites also
-take a squad NAME today, not a player, so re-pointing is a real refactor rather
-than a one-line change. Deferred on purpose.
+birthday could unlock a field the club's own rule forbids.
+
+`allowsOwnContactFor` in `src/lib/ageGrade.js` computes the squad answer first
+and returns a `false` immediately, so everything after that line can only turn a
+true into a false. ⚠️ **AND THERE IS A PROPERTY TEST OVER EVERY SQUAD × EVERY
+BIRTHDAY SHAPE** asserting the widening direction is unreachable — not only the
+cases somebody thought to write down.
+
+⚠️ **IT LIVES IN `ageGrade.js`, NOT `ageGroup.js`, AND THAT IS FORCED.** The
+former already imports the latter for the band table; a DOB-aware gate in
+`ageGroup.js` would make the two import each other. So there are two names rather
+than one function with a second argument, and the plain squad-name version stays
+exported for callers with no birthday to offer.
+
+⚠️ **AND THE THREE CALL SITES SHARE ONE HOOK**, `src/lib/useOwnContactGate.js` —
+PlayerForm, PlayerDetail, MyPlayerForm. The plan warned this was "a real
+refactor rather than a one-line change" because the call sites take a squad NAME
+and not a player; the hook is what absorbed that. Three copies of "read the
+birthday, then narrow" is three chances for one of them to fail open.
+
+| Fault | Test that failed |
+|---|---|
+| let the birthday widen the gate | three, including the every-squad property sweep |
+| ask "how old today" instead of at the cut-off | *leaves a normal U13 player exactly as the squad name had them* |
+| close the gate when the read fails | *keeps the field when the read FAILS* |
+| start the hook closed | *opens on the squad answer from the very first render* |
+
+⛔ **AND THAT LAST TEST WAS PASSING WITHOUT TESTING ANYTHING, UNTIL THE FAULT WAS
+INJECTED.** It asserted against the DOM — but in jsdom `useEffect` flushes inside
+`render`, so the DOM can only ever show the effect's value, and **the `useState`
+seed the browser actually paints for a frame was untested**. Breaking it left
+every assertion green. The probe now records every render and asserts
+`renders[0]`.
 
 ### ✅ THE CUT-OFF IS 31 AUGUST — answered 17 Aug from the tournament repo
 
@@ -818,12 +851,39 @@ confident face. Leaving a box empty is a **recorded claim**, not an absence.
 Removes the `askingForAccess` state from `AppShell` and the *"I'm not adding a
 player"* button with it.
 
-## 6 · Completeness debt — 🟡 THE RULE AND THE FIRST SURFACE, 17 Aug 2026
+## 6 · Completeness debt — ✅ ALL THREE SURFACES, 17 Aug 2026
 
-`src/lib/completeness.js`, pure and shared, plus **two** of its three surfaces:
-the card on the family's own screen (`YourPlayers`) and the *"Still missing"*
-line on the approval queue. ⚠️ **The admin "records needing attention" list still
-reads nothing** — the rule exists for it and only the wiring is left.
+`src/lib/completeness.js`, pure and shared, read by all three of its surfaces:
+the card on the family's own screen (`YourPlayers`), the *"Still missing"* line
+on the approval queue, and — last — the admin list at `/admin/needs-attention`.
+
+### The third surface
+
+⚠️ **IT CAN BE EMPTY, AND THAT IS ASSERTED FIRST.** A list that always has rows
+is one nobody finishes — the same contract the family's disappearing card is
+built on. Position stays out for the same reason it is out of the rule.
+
+⚠️ **NOT ONE DATE OF BIRTH IS FETCHED.** `player_private` is a separate table
+precisely so a team-mate's parent cannot read a birthday; a club-wide sweep that
+pulls every date in order to COUNT the missing ones is the same mistake from the
+privileged end. New reader `listPlayerPrivatePresence` returns a **Set of ids**,
+deliberately, so there is nothing on the object for a later change to start
+rendering. `listParentsForPlayers` already selects no email and no phone, so
+**nothing on the screen is a contact detail** — a property worth keeping.
+
+⚠️ **THE SUMMARY SAYS THE FAMILIES ARE ALREADY BEING ASKED**, because the useful
+next action is usually nothing. Without it a registrar rings people the app is
+politely chasing, and one birthday gets asked for twice.
+
+⚠️ **AND THE SQUAD HEADING CARRIES THE DENOMINATOR** — "1 of 2", not "1". How
+much work there is and how bad it is are different questions.
+
+| Fault | Test that failed |
+|---|---|
+| list every player, not only the incomplete | *can be EMPTY, which is the whole contract* |
+| count the listed rows instead of the squad | *counts the incomplete against the whole squad* |
+| fetch the dates instead of the ids | *never fetches a single date of birth* |
+| drop the "already being asked" line | *says the families are already being asked* |
 
 ⚠️ **THE QUEUE LINE DOES NOT BLOCK APPROVAL, AND MUST NOT.** A missing birthday
 is a record to chase, not a reason to leave a real family waiting. It is placed
