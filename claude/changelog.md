@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- 📝 **SESSION RECORD, AND TWO STALE CLAIMS CORRECTED.**
+- ⚖️ **THE LINEUP PICKER CAN NOW SEE THAT A GRADE AND A TIER DISAGREE.** The third
+  of Jay's 14 Aug ask — *"fair game, eligibility, and milestone"* — and the last
+  piece of `claude/plans/2026-08-14-tiers-and-game-time.md` still unbuilt. Both
+  halves of the comparison already existed and held real rows; nothing compared
+  them. `src/lib/tierEligibility.js` is a pure comparison with no React and no
+  Supabase in it, so its nine pairs plus the empties are swept exhaustively rather
+  than sampled. Spec:
+  `claude/plans/2026-08-17-lineup-eligibility-warning.md`.
+  ⚠️ **BOTH DIRECTIONS WARN, WORDED DIFFERENTLY** (Jay, 17 Aug 2026, offered either
+  alone). Graded below the fixture is a worry about the CHILD; graded above it is
+  the stacking problem an opposition club complains about. Not one template with
+  the letters swapped, and a test asserts the two differ.
+  ⚠️ **THE UNGRADED AND THE UNTIERED ARE SILENT, AND THAT IS THE FEATURE.** Most of
+  the club has no grade, so warning on them would put a warning against nearly
+  every name — and a warning that is always on is furniture.
+  ⚠️ **"PLAYING UP" IS DELIBERATELY NOT THE WORDING.** This app already uses it for
+  a younger child in an older squad, which is what the cut-off fix above was about.
+  Asserted by test, because it is the phrase a later edit reaches for.
+
+- `08e2b94` — 📝 **SESSION RECORD, AND TWO STALE CLAIMS CORRECTED.**
   `claude/handoffs/2026-08-17-account-creation-and-the-season-cutoff.md` — six
   merged pull requests, the traps met, and the state measured on the day.
   ⚠️ **`claude/plans/2026-08-14-tiers-and-game-time.md` SAID "PHASE 2 NOT YET
