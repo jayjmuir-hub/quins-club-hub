@@ -10,7 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
-- 📋 **SPEC ONLY, NOTHING BUILT: asking existing families for the birthdays the
+- 🎂 **THE SIGN-IN GATE NOW ASKS FOR THE BIRTHDAYS THE CLUB STARTED REQUIRING
+  AFTER PEOPLE SIGNED UP — AND THIS ONE CANNOT BE SKIPPED.** Jay, 17 Aug 2026:
+  *"we could just do it once and make it unskippable? something like please add
+  this info to continue"*. A fourth step in `src/components/NamePrompt.jsx`,
+  between the player and role questions. **No migration**: `setPlayerDob` already
+  existed and `player_private`'s RLS already lets a child's own family write it.
+  ⚠️ **IT IS THE ONLY STEP ON THAT GATE WITH NO "no" ANSWER, SO IT IS THE ONLY
+  ONE CARRYING A SIGN-OUT.** The sheet is `dismissible={false}` like the others,
+  but the others can always be answered; this one cannot, and `AppShell`'s rule —
+  *"someone who cannot get in must always be able to get out"* — would otherwise
+  be broken by it.
+  ⚠️ **THE READ FAILS OPEN, AND ON A BLOCKING GATE THAT IS THE WHOLE SAFETY
+  ARGUMENT.** Every other step fails closed and costs a question; this one has no
+  way past, so a failed read that blocked would take the club offline with no fix
+  short of a deploy.
+  ⛔ **THE TRAP THE SPEC PREDICTED WAS REAL.** `player_private` held ZERO rows, so
+  every child is an ABSENT KEY rather than a null value — a gate checking only
+  for nulls would never have fired, for the exact 26 children it exists for.
+  Injecting that blind version turned **six** assertions red; injecting a
+  fail-CLOSED read turned exactly one red.
+  ⚠️ **IT ALSO REORDERED AN EXISTING GATE, AND FIVE ROLE TESTS CAUGHT IT** — the
+  role block's fixture is a parent with a linked child, who now meets the
+  birthday step first. Fixed in the fixture, not in the ordering.
+  ⚠️ **DO NOT WRITE `plays_up_confirmed_at` FROM HERE**, asserted by test: that
+  column records a parent ticking a box, and setting it would invent an agreement
+  nobody gave — PR #213 in reverse.
+
+- 📋 **THE SPEC IT WAS BUILT FROM: asking existing families for the birthdays the
   club started requiring after they signed up.**
   `claude/plans/2026-08-17-birthday-backfill-prompt.md`.
   ⚠️ **THE MEASUREMENT IS THE POINT OF IT.** `date_of_birth` became required for

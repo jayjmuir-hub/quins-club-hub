@@ -1,7 +1,33 @@
 # Asking existing families for the birthdays we added after they signed up
 
-**STATUS: NOT BUILT — spec only, written 17 Aug 2026, awaiting Jay's answers to
-the three open questions at the bottom.**
+**STATUS: BUILT 17 Aug 2026, not yet merged. Jay answered the three questions
+below with one decision: make it a HARD GATE, asked once, with no way past it
+except entering the dates — "please add this info to continue".**
+
+⚠️ **THAT ANSWERS ALL THREE AT ONCE AND MAKES THE SNOOZE COLUMN UNNECESSARY.**
+There is no re-ask schedule because there is no skip; there is no recorded "I'd
+rather not" because a birthday is already mandatory for every new registration
+and this only makes the pre-16-August families match. **No migration was needed
+after all** — not even the one the third question would have required.
+
+⚠️ **AND IT CHANGES WHERE THE RISK SITS, WHICH IS WHY THE TESTS ARE WEIGHTED THE
+WAY THEY ARE.** A skippable prompt that fires wrongly is an annoyance. A blocking
+one that fires wrongly locks the club out of the app with no escape and no fix
+short of a deploy. So the assertions that matter most are the ones about NOT
+firing: the read fails open, a player-only account is exempt, an account with no
+linked child is exempt, and a child with a birthday on file is left alone.
+
+**Built:** the `birthday` step in `src/components/NamePrompt.jsx`, between
+`player` and `role`. **Sign-out lives inside the sheet** — it is the only step on
+that gate that cannot be answered "no", so it is the only one that needs an exit
+of its own (`AppShell`: *"someone who cannot get in must always be able to get
+out"*).
+
+⚠️ **THE ABSENT-KEY TRAP THIS PLAN PREDICTED WAS REAL, AND THE TEST FOR IT WORKS.**
+Injecting the blind version — checking only for a null value, not for a missing
+row — turned **six** assertions red, including the one about the shape production
+actually has. Injecting a fail-CLOSED read turned exactly one red, which is the
+right precision for a single-behaviour assertion.
 
 ## The problem, measured
 
