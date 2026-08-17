@@ -11,6 +11,9 @@ import {
   childPlayerIds,
   SQUAD_STAFF_ROLES,
   isSquadStaffRole,
+  canApproveAnything,
+  canApproveTeam,
+  isActiveMembership,
 } from '../src/lib/scope.js'
 
 // Unit tests for src/lib/scope.js (Task 7: pure membership/scope helpers) and
@@ -669,5 +672,88 @@ describe('visibleTeams — the new roles see their own squad', () => {
     ]
     const visible = visibleTeams([{ role, team_id: 'team-u12' }], teams)
     expect(visible.map((t) => t.name)).toEqual(['U12'])
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════
+//  THE APPROVAL GATE — 17 Aug 2026
+//
+//  ⚠️ NEITHER canApproveAnything NOR canApproveTeam HAD A SINGLE UNIT TEST
+//  UNTIL THIS BLOCK, which is part of why the hole below lived on production.
+//
+//  `public.request_staff_role` (16 Aug) inserts a coach membership with
+//  status 'pending' and player_id null. Both helpers filtered on role and
+//  team and never on status, so that row answered TRUE — the app showed the
+//  approvals queue, and private.can_approve_team had the same omission, so
+//  the Approve button worked. Measured against production inside a rolled-back
+//  transaction: a pending coach could approve; an active coach could too; a
+//  coach of another squad could not. See db/tests/approve-status-gate.sql.
+// ══════════════════════════════════════════════════════════════════════════
+
+const ACTIVE_COACH = { role: 'coach', team_id: 'team-u12', status: 'active' }
+// Identical but for one field. That is the whole point: nothing about the ROLE
+// or the TEAM distinguishes a request from access.
+const PENDING_COACH = { role: 'coach', team_id: 'team-u12', status: 'pending' }
+
+describe('isActiveMembership', () => {
+  it('is true only for a granted row', () => {
+    expect(isActiveMembership(ACTIVE_COACH)).toBe(true)
+    expect(isActiveMembership(PENDING_COACH)).toBe(false)
+  })
+
+  // ⚠️ EXACT EQUALITY, NOT `!== 'pending'`. Accounts.jsx splits its LIST the
+  // other way round on purpose so an odd row shows up rather than vanishing;
+  // a GATE must fail closed, or the same default that avoids hiding somebody
+  // admits them instead.
+  it('fails closed on a row with no status at all', () => {
+    expect(isActiveMembership({ role: 'coach', team_id: 'team-u12' })).toBe(false)
+    expect(isActiveMembership(null)).toBe(false)
+    expect(isActiveMembership(undefined)).toBe(false)
+  })
+})
+
+describe('canApproveAnything — a request is not access', () => {
+  it('lets an active coach and an active manager through', () => {
+    expect(canApproveAnything([ACTIVE_COACH])).toBe(true)
+    expect(canApproveAnything([{ role: 'manager', team_id: 'team-u12', status: 'active' }])).toBe(true)
+  })
+
+  it('refuses a coach whose own request is still pending', () => {
+    expect(canApproveAnything([PENDING_COACH])).toBe(false)
+  })
+
+  it('refuses a pending admin row', () => {
+    expect(canApproveAnything([{ role: 'admin', team_id: null, status: 'pending' }])).toBe(false)
+    expect(canApproveAnything([{ role: 'admin', team_id: null, status: 'active' }])).toBe(true)
+  })
+
+  // ⚠️ THE CONTROL. Somebody can hold both — a parent at the club who has also
+  // asked to coach. The pending row must not grant, and must not TAKE AWAY
+  // whatever the active one already gives.
+  it('still refuses when a pending coach row sits beside an active parent row', () => {
+    expect(
+      canApproveAnything([{ role: 'parent', team_id: 'team-u12', status: 'active' }, PENDING_COACH]),
+    ).toBe(false)
+  })
+
+  it('lets an active coach through even alongside an unrelated pending row', () => {
+    expect(canApproveAnything([PENDING_COACH, ACTIVE_COACH])).toBe(true)
+  })
+})
+
+describe('canApproveTeam — the same rule, per squad', () => {
+  it('lets an active coach approve for their own squad only', () => {
+    expect(canApproveTeam([ACTIVE_COACH], 'team-u12')).toBe(true)
+    expect(canApproveTeam([ACTIVE_COACH], 'team-u14')).toBe(false)
+  })
+
+  it('refuses a pending coach for the very squad they asked about', () => {
+    expect(canApproveTeam([PENDING_COACH], 'team-u12')).toBe(false)
+  })
+
+  // Medic is refused by ROLE, pending coach by STATUS. Keeping both means a
+  // change that re-checks only one of the two cannot pass this file.
+  it('still refuses a medic, active or not', () => {
+    expect(canApproveTeam([{ role: 'medic', team_id: 'team-u12', status: 'active' }], 'team-u12')).toBe(false)
   })
 })

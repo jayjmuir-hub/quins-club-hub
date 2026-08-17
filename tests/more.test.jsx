@@ -103,8 +103,13 @@ const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
 const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
 const TEAMS = [TEAM_FIRST_XV, TEAM_U10] // deliberately unsorted; visibleTeams sorts
 
-const ADMIN = [{ id: 'm1', role: 'admin', team_id: null }]
-const COACH = [{ id: 'm2', role: 'coach', team_id: 'team-u10' }]
+// ⚠️ `status` IS NOT DECORATION ON THESE — 17 Aug 2026. memberships.status is
+// NOT NULL in the database, so a fixture without it is a row that cannot exist,
+// and every membership fixture in this suite lacked one. That is why nothing
+// here could distinguish a PENDING staff request from granted access, which is
+// exactly the hole found in private.can_approve_team the same day.
+const ADMIN = [{ id: 'm1', role: 'admin', team_id: null, status: 'active' }]
+const COACH = [{ id: 'm2', role: 'coach', team_id: 'team-u10', status: 'active' }]
 const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
 
 function memberships(rows, teams = TEAMS) {
@@ -691,9 +696,15 @@ describe('More — the You card is editable', () => {
 // the failure this block exists to catch, and it is invisible in a browser at
 // laptop width.
 describe('More — the approvals link', () => {
-  const COACH_U10 = [{ id: 'm-c', role: 'coach', team_id: 'team-u10', club_id: 'club-1' }]
-  const MANAGER_U10 = [{ id: 'm-m', role: 'manager', team_id: 'team-u10', club_id: 'club-1' }]
-  const MEDIC_U10 = [{ id: 'm-md', role: 'medic', team_id: 'team-u10', club_id: 'club-1' }]
+  const COACH_U10 = [{ id: 'm-c', role: 'coach', team_id: 'team-u10', club_id: 'club-1', status: 'active' }]
+  const MANAGER_U10 = [{ id: 'm-m', role: 'manager', team_id: 'team-u10', club_id: 'club-1', status: 'active' }]
+  const MEDIC_U10 = [{ id: 'm-md', role: 'medic', team_id: 'team-u10', club_id: 'club-1', status: 'active' }]
+  // ⚠️ THE ROW request_staff_role ACTUALLY CREATES: coach, no player, PENDING.
+  // Until 17 Aug 2026 this shape was shown the approvals link and the database
+  // then let it approve. It is a request, not access.
+  const PENDING_COACH_U10 = [
+    { id: 'm-pc', role: 'coach', team_id: 'team-u10', club_id: 'club-1', player_id: null, status: 'pending' },
+  ]
 
   const approvalsLink = () => screen.queryByRole('link', { name: /waiting to be approved/i })
 
@@ -715,6 +726,22 @@ describe('More — the approvals link', () => {
   // deliberately a shorter list — Jay, 9 Aug 2026.
   it('does not offer it to a medic', async () => {
     useMembershipsMock.mockReturnValue(memberships(MEDIC_U10))
+    renderMore()
+    await screen.findByDisplayValue('Jay')
+    expect(approvalsLink()).toBeNull()
+  })
+
+  // ⚠️ THE ONE THAT WAS LIVE — 17 Aug 2026. A pending coach request has the
+  // same role and the same team_id as an approved coach, so every check in this
+  // file passed it through, and private.can_approve_team agreed: the Approve
+  // button then worked. The row must be able to see its own request waiting
+  // WITHOUT being handed the queue that judges it.
+  //
+  // ⚠️ THIS DIFFERS FROM THE MEDIC CASE ABOVE BY ONE FIELD, ON PURPOSE. Medic
+  // is refused by ROLE; this is refused by STATUS. A fix that only re-checked
+  // roles would pass the medic test and still leave this one open.
+  it('does not offer it to a coach whose request is still pending', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PENDING_COACH_U10))
     renderMore()
     await screen.findByDisplayValue('Jay')
     expect(approvalsLink()).toBeNull()

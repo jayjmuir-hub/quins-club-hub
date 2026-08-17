@@ -61,17 +61,51 @@ const ROLE_LABELS = {
 export const APPROVER_ROLES = ['coach', 'manager']
 
 /**
+ * Whether a membership row is GRANTED access rather than a request for it.
+ *
+ * ⚠️ EXACT EQUALITY, MATCHING THE SQL, AND NOT `!== 'pending'`. The Accounts
+ * screen deliberately splits its lists the other way round — a row with an
+ * unexpected status is shown as real access there, so it lands under Revoke
+ * rather than being invisible. That is right for a LIST and wrong for a GATE:
+ * the same default that avoids hiding somebody would, here, admit them.
+ * `memberships.status` is NOT NULL with default 'active', so there is no
+ * legacy row this can strand.
+ *
+ * Mirrors `and m.status = 'active'` in private.can_approve_team,
+ * can_see_team and can_edit_team.
+ */
+export function isActiveMembership(membership) {
+  return membership?.status === 'active'
+}
+
+/**
  * Whether this person may approve registrations for at least one squad, and is
  * therefore worth showing an approvals screen to at all.
  *
  * Admin anywhere counts. A parent or player never does — including a parent of
  * a child in the squad, which is the case that would turn the whole pending
  * design into theatre.
+ *
+ * ⚠️ A PENDING ROW IS A REQUEST, NOT ACCESS — 17 Aug 2026, and this omission
+ * was a live hole rather than an untidiness. `request_staff_role` inserts a
+ * coach membership with status 'pending'; until this test existed, asking to
+ * coach a squad was enough to be shown its approval queue, and
+ * private.can_approve_team agreed, so the Approve button then worked. Measured
+ * against production: a pending coach could approve, an active one could too,
+ * and a coach of another squad could not. See
+ * db/migrations/20260817_approve_requires_active_membership.sql and
+ * db/tests/approve-status-gate.sql.
+ *
+ * ⚠️ loadMyMemberships RETURNS PENDING ROWS and must keep doing so — the app
+ * needs them to tell somebody their request is waiting. The filtering belongs
+ * here, at the question "may you approve", not in the fetch.
  */
 export function canApproveAnything(memberships) {
   if (!memberships) return false
   return memberships.some(
-    (m) => m.role === 'admin' || (APPROVER_ROLES.includes(m.role) && m.team_id != null),
+    (m) =>
+      isActiveMembership(m) &&
+      (m.role === 'admin' || (APPROVER_ROLES.includes(m.role) && m.team_id != null)),
   )
 }
 
@@ -86,7 +120,12 @@ export function canApproveAnything(memberships) {
 export function canApproveTeam(memberships, teamId) {
   if (!memberships || teamId == null) return false
   if (isAdmin(memberships)) return true
-  return memberships.some((m) => APPROVER_ROLES.includes(m.role) && m.team_id === teamId)
+  // ⚠️ isActiveMembership FIRST — see canApproveAnything above. A pending
+  // coach request named this squad and would otherwise answer true for it,
+  // which is precisely the row that must not approve.
+  return memberships.some(
+    (m) => isActiveMembership(m) && APPROVER_ROLES.includes(m.role) && m.team_id === teamId,
+  )
 }
 
 /**

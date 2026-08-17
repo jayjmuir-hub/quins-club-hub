@@ -10,6 +10,90 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 17 Aug 2026
 
+- 🧑‍🏫 **STAFF ASKING FOR ACCESS GET THEIR OWN QUEUE, INSTEAD OF APPEARING AS
+  "Unnamed player".** Jay's call over correcting the label in place: approving a
+  coach and approving a child are different decisions and should not share a
+  heading. The new section names the person, the ROLE and the SQUAD, says in
+  plain words what approving grants — a coach's view of that age group,
+  including every family's contact details — and puts the role in the button's
+  own accessible name, because "Approve" beside a card headed *"Players waiting
+  to be approved"* is how the two got confused in the first place.
+  ⚠️ **A PARTITION, NOT A FILTER, AND THE DIFFERENCE IS LOAD-BEARING.**
+  `PendingApprovals` carries an explicit rule against client-side filtering —
+  RLS decides who sees which rows. Every pending row still renders; `player_id`
+  decides only WHICH of the two sections it lands in, so nothing can go missing
+  by being neither. Split on `player_id` rather than `role`, because 'parent' is
+  also what somebody registering a second child holds.
+  ⛔ **AND THE FIRST ATTEMPT FIXED ONE OF TWO RENDER SITES.** `Accounts.jsx`
+  renders the queue twice — once in the approver-only early return, once in the
+  admin view — and the first edit changed only the former, so every new test
+  failed against the admin path still showing "Unnamed player". **The same
+  mistake as the bug being fixed**, one layer up: a second surface nobody
+  audited. It was found because the tests ran as an admin; a coach-only fixture
+  would have passed. ⚠️ **It was hidden for one round by a `head_limit` on the
+  grep that looked for the render sites** — an incomplete search read as a
+  complete one, which `CLAUDE.md` rule 6 exists to stop.
+
+- ⛔ **ASKING TO COACH A SQUAD WAS ENOUGH TO APPROVE PEOPLE INTO IT.**
+  `private.can_approve_team` tested role and team and never `status`, unlike its
+  two siblings `can_see_team` and `can_edit_team`. Harmless until 16 Aug, when
+  `request_staff_role` made a PENDING staff row possible for the first time —
+  after which a person who signed up and asked to coach a squad could approve
+  their own request and admit other families' children to it.
+  `db/migrations/20260817_approve_requires_active_membership.sql`.
+  ⚠️ **FOUND BY CHASING A COSMETIC BUG.** Jay sent a screenshot of "Unnamed
+  player" in the live approval queue. Nothing was missing — all 26 players have
+  a name — the row was a coach's staff request, which carries no player, shown
+  by a queue whose only filter is `status = 'pending'`. The label was the
+  symptom; the gate was the disease.
+  ⚠️ **MEASURED, THEN RE-MEASURED WITH THE FIX, IN A ROLLED-BACK TRANSACTION ON
+  PRODUCTION** with an invented club so no live row took part — **pending coach
+  ALLOWED → refused (42501)**, while both controls (active coach of the squad
+  ALLOWED, coach of another squad refused) did not move. `db/tests/approve-status-gate.sql`.
+  ⚠️ **IT WAS NOT ONLY THE BUTTON:** `can_squad_staff_see_pending` calls the
+  same function and backs the policy exposing a registrant's NAME and EMAIL.
+  ⛔ **AND THE REASON NOTHING CAUGHT IT IS THE PART WORTH KEEPING.** Every
+  membership fixture in `tests/` omitted `status` — a column that is NOT NULL —
+  so no test in the suite could tell a request from access; `canApproveAnything`
+  and `canApproveTeam` had no unit tests at all; and
+  `db/tests/rls-squad-staff-approval.sql` makes every staff row `'active'`,
+  correctly, because on 9 Aug a pending one could not exist. **A new writer
+  arrived and the old readers — screen, gate, harness, fixtures — were never
+  audited.** The new assertions were proved by injecting the real historical
+  fault (no status test at all) and watching seven of them fail.
+  ⚠️ **`private.is_admin` HAS THE SAME OMISSION AND WAS LEFT ALONE ON PURPOSE** —
+  unreachable today (zero non-active admin rows, and `request_staff_role` cannot
+  create one), and it backs most of the admin RLS surface. Recorded in
+  `claude/open-items.md` rather than fixed in passing.
+
+- 📝 **THE "NOT BUILT, DELIBERATELY" NOTE OUTLIVED THE PLAN THAT SAID THE SAME
+  THING.** `2ac2782` corrected `claude/plans/2026-08-14-tiers-and-game-time.md`
+  for claiming the eligibility warning was unbuilt; `claude/open-items.md` carried
+  the identical claim in different words — *"an eligibility warning … was offered
+  and not taken up"* — and survived that commit untouched. Struck through with the
+  evidence rather than deleted, per that file's own rule.
+  ⚠️ **THE SHAPE IS WORTH MORE THAN THE FIX: a "deliberately not built" note is a
+  STATUS claim wearing a RULING's clothes.** Every neighbouring line in that file
+  stays true until somebody acts on it, so nothing in the wording asks to be
+  re-read on the day the thing ships. **When a decision not to build is reversed,
+  grep for the feature, not for the plan that named it.**
+  ⛔ **AND THE FEATURE HAS NEVER HAD ANYTHING TO RENDER, WHICH THE BUNDLE CHECK
+  COULD NOT SEE.** Measured on production: **1 tiered fixture, 4 graded players,
+  and no overlap** — 7 children are picked on that fixture and **0 of them are
+  graded**. Finding both message fragments in the live bundle proved the code
+  deployed; it did not prove a coach has ever seen a warning, and **nobody has**.
+  ✅ **The zero was controlled before being written down**, per rule 6: all 4 grades
+  join to real players and all 4 graded children ARE picked in lineups — on the two
+  fixtures that carry no tier. Both halves are in live use and have never met.
+  Recorded under "shipped but never seen against real data", because silence here
+  is indistinguishable from the feature being absent — the screen is built to fall
+  silent rather than fail.
+
+- `2ac2782` — 📝 **THE PLAN SAID "NOT BUILT" A MINUTE AFTER IT SHIPPED.**
+  `claude/plans/2026-08-14-tiers-and-game-time.md` and the eligibility spec both
+  corrected: the status lines were written before the merge and not revisited
+  after it.
+
 - `ae98b8f` — ⚖️ **THE LINEUP PICKER CAN NOW SEE THAT A GRADE AND A TIER DISAGREE.** The third
   of Jay's 14 Aug ask — *"fair game, eligibility, and milestone"* — and the last
   piece of `claude/plans/2026-08-14-tiers-and-game-time.md` still unbuilt. Both
