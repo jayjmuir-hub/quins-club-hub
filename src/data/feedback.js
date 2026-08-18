@@ -125,6 +125,43 @@ export async function listFeedback({ open = false } = {}) {
   return data ?? []
 }
 
+// Distinct channel name per subscription, exactly as announcements/events do —
+// two mounts sharing a name silently get one channel between them.
+let feedbackChannelSeq = 0
+
+/**
+ * Subscribes to changes on `feedback`. Returns an unsubscribe function — call
+ * it from a useEffect cleanup. Safe to call more than once.
+ *
+ * ⚠️ NO `filter`, DELIBERATELY, AND FOR TWO SEPARATE REASONS. There is nothing
+ * to filter ON — the admin list wants every report in the club — and a
+ * server-side filter cannot match a DELETE payload under replica identity
+ * DEFAULT, which is the trap recorded in
+ * `db/migrations/20260816_realtime_publication_announcements.sql`.
+ *
+ * ⚠️ RLS DECIDES WHO IS TOLD. `feedback read` is
+ * `submitted_by = auth.uid() or private.is_admin(club_id)`, so an unfiltered
+ * subscription still tells a parent only about their own report.
+ *
+ * ⚠️ AND THE TABLE MUST BE IN THE `supabase_realtime` PUBLICATION OR THIS DOES
+ * NOTHING AT ALL, with no error anywhere — the exact bug `availability` had
+ * from the day it was written until 18 Aug 2026. See
+ * `db/migrations/20260818_realtime_availability_and_feedback.sql`.
+ */
+export function subscribeFeedback(onChange) {
+  const channel = supabase
+    .channel(`feedback-changes-${++feedbackChannelSeq}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'feedback' }, onChange)
+    .subscribe()
+
+  let unsubscribed = false
+  return () => {
+    if (unsubscribed) return
+    unsubscribed = true
+    supabase.removeChannel(channel)
+  }
+}
+
 /**
  * Moves a report through triage.
  *

@@ -10,6 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- 📡 **`availability` HAS BEEN SUBSCRIBING TO NOTHING SINCE IT WAS
+  WRITTEN, AND IT IS NOW FIXED.** `src/data/availability.js` opens a
+  `postgres_changes` channel, its own comment says it "subscribes to realtime
+  changes", and `public.availability` was never in the `supabase_realtime`
+  publication. The socket opens, the subscription succeeds, Postgres emits
+  nothing. A coach watching who has declared In, while parents update on their
+  phones, saw a frozen list with no way to know it was frozen.
+  ⚠️ **THIS IS THE THIRD TIME.** `events` was dead the same way until 13 Aug
+  ("two features silently did not work"), `announcements` until 16 Aug — and the
+  announcements migration NAMED `subscribeAvailability` as the one still
+  outstanding. It was written down and not acted on. **The check is the
+  publication, not the client**, which cannot tell the difference.
+  ✅ **Availability started working the moment the table was published — no
+  deploy needed**, because the client half had been shipped all along.
+  ✅ **The delete gap stays open on purpose, and that is a measurement.**
+  `subscribeAvailability` filters on `event_id`, and a DELETE payload under
+  replica identity DEFAULT carries only the primary key, so the filter could
+  never match one. It cannot bite today: `setAvailability` is an upsert and
+  **nothing deletes an availability row**. The day anything does, the filter
+  must go or the table needs `replica identity full`.
+- 📝 **`feedback` joins it**, and `FeedbackTriage` now subscribes — so a report
+  lands on the admin screen without a refresh, which is what prompted all of
+  this. It re-reads rather than patching from the payload: the payload carries
+  no joined `profiles`, so applying it directly would blank the reporter's name
+  on whichever row just changed.
+- 📧 **The acknowledgement now tells people where to look.** Jay: replies are
+  "in app only", so the ACK is the single place a reporter learns that updates
+  appear behind the `?` under *See what you've already reported*.
+- `e6894bd` — the squash that closed the loop in the app.
+
 - 🔁 **THE LOOP ACTUALLY CLOSES NOW: A MEMBER CAN SEE THEIR OWN REPORT, AND AN
   ADMIN CAN ANSWER IT.** Jay filed two test reports and found three things
   missing within a minute, all three real.

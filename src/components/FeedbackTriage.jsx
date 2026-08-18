@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth.jsx'
 import {
   listFeedback,
   setFeedbackStatus,
+  subscribeFeedback,
   feedbackRef,
   FEEDBACK_STATUSES,
   FEEDBACK_STATUS_LABELS,
@@ -152,6 +153,19 @@ export default function FeedbackTriage() {
   useEffect(() => {
     load()
   }, [load])
+
+  // ⚠️ A NEW REPORT APPEARS WITHOUT A REFRESH — AND THIS IS HALF OF THAT.
+  // The other half is `feedback` being in the `supabase_realtime` publication;
+  // without it this opens a correct-looking channel that receives nothing, with
+  // no error anywhere. That is not hypothetical: it is what `availability` did
+  // from the day it was written until 18 Aug 2026.
+  // See db/migrations/20260818_realtime_availability_and_feedback.sql.
+  //
+  // ⚠️ RE-READ RATHER THAN PATCH FROM THE PAYLOAD. The payload is one row and
+  // carries no joined `profiles`, so applying it directly would blank the
+  // reporter's name on whichever row just changed. The re-read is RLS-scoped
+  // and cheap at this volume.
+  useEffect(() => subscribeFeedback(() => load()), [load])
 
   async function saveNote(row, adminNote) {
     setBusyId(row.id)
