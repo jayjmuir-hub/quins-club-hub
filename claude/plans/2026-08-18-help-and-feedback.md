@@ -1,11 +1,24 @@
 # Plan — one button that lets a member report a problem or suggest a change
 
-**STATUS: BUILT, NOT YET APPLIED — 18 Aug 2026.** The button, the panel, the
-data layer, the admin triage list, both migrations and the edge function are
-written and tested. ⚠️ **NEITHER MIGRATION HAS BEEN RUN AGAINST PRODUCTION AND
-THE FUNCTION IS NOT DEPLOYED**, so on the live site the `?` opens, the form
-fills in, and Send fails — there is no `feedback` table behind it. Applying it
-is the checklist at the bottom of this file.
+**STATUS: DATABASE AND FUNCTION APPLIED — 18 Aug 2026. THE APP IS NOT MERGED,
+AND NO E-MAIL CAN SEND YET.** Both migrations have run against production and
+`notify-feedback` is deployed and ACTIVE with `verify_jwt: false`.
+
+⚠️ **TWO THINGS ARE STILL MISSING, AND EACH FAILS QUIETLY BY DESIGN:**
+
+1. **The front end is unmerged.** Nothing writes to the table yet.
+2. **The vault secrets are unset**, so `private.notify_feedback` raises a
+   warning and returns. Jay sets those; Claude does not touch secrets. Until
+   then a report is filed and shown on the admin screen, and **nobody is
+   e-mailed** — which is the designed failure, not a bug.
+
+Measured on production after applying, not assumed: table exists with 0 rows,
+RLS on, 3 policies, both triggers installed, table-level `UPDATE` to
+`authenticated` revoked, column `UPDATE` grants exactly
+`admin_note, handled_at, handled_by, status`. The deployed function answers
+**503** to an unauthenticated POST — which proves both that it fails closed on a
+missing secret **and** that the gateway is not verifying JWTs, since a 401 would
+mean the request never reached the code.
 
 ## The ask
 

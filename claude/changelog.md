@@ -82,6 +82,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   read it and recommended deleting a live dependency. The status of a running
   service does not belong in a source comment; `claude/runbooks/monitoring.md`
   owns it.
+- `1e3c7bc` — the squash of the help-and-feedback plan.
+  ⚠️ **CITED BY TWO BRANCHES AT ONCE, AND THAT IS NOT A MISTAKE.** The runbook
+  fix and this feature were both cut from `1e3c7bc`, so CI demands the citation
+  from each of them independently — `HEAD~1` on a pull-request run is the base
+  tip. If both merge, this line appears twice and the second one should simply
+  be deleted; adding it to only one branch turns the other red instead.
 - `caddd7f` — the squash of the head-coach work below, which could not cite its
   own SHA.
 - `14e0ce2` — 📧 **THE APPROVAL E-MAILS STOP GOING TO EVERYONE, AND "HEAD COACH" BECOMES DATA.**
