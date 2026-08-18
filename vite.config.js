@@ -28,6 +28,18 @@ const isIntegration = process.env.VITEST_MODE === 'integration'
 // "lusmshimxdcxpnrktlgz.supabase.co" and update it alongside VITE_SUPABASE_URL.
 
 export default defineConfig({
+  // ⚠️ WHICH DEPLOY THE PERSON WAS ON, AND IT IS THE ONE PIECE OF CONTEXT A
+  // BUG REPORT CANNOT RECONSTRUCT AFTERWARDS. Netlify sets COMMIT_REF in the
+  // build environment; a local `npm run build` sets nothing, hence 'dev'.
+  // package.json's version is deliberately NOT used — it is 0.1.0 and has
+  // never been bumped, so it would answer the question with a constant.
+  //
+  // ⚠️ JSON.stringify IS LOAD-BEARING. `define` performs a raw text
+  // substitution, so an unquoted value would paste a bare identifier into the
+  // bundle and throw ReferenceError at runtime rather than at build time.
+  define: {
+    __BUILD_REF__: JSON.stringify((process.env.COMMIT_REF ?? 'dev').slice(0, 7)),
+  },
   plugins: [
     react(),
     VitePWA({

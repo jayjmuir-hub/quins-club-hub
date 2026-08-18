@@ -383,6 +383,35 @@ GRANT UPDATE (status, decision_note, decided_by, decided_at)
 
 
 -- ---------------------------------------------------------------------
+-- public.feedback — COLUMN grants  (captured 18 Aug 2026)
+--
+-- Read from information_schema.table_privileges and .column_privileges after
+-- applying 20260818_feedback.sql — NOT pasted from the migration.
+--
+-- ⚠️ POLICIES AUTHORISE THE ROW; GRANTS AUTHORISE THE COLUMN. "feedback
+-- triage" is FOR UPDATE over the whole row, so without this an admin marking a
+-- report done is also authorised to rewrite what the reporter said — turning
+-- the record into what the admin remembers rather than what was reported.
+--
+-- Verified after applying: table-level UPDATE to `authenticated` is NONE, and
+-- the column list is exactly these four.
+--
+-- ⚠️ `authenticated` DOES HOLD A TABLE-LEVEL **DELETE** GRANT HERE, AND THAT IS
+-- NOT A MISTAKE — IT IS THE SUPABASE DEFAULT, AND IT MEANS THE THING STOPPING A
+-- REPORT BEING DELETED IS THE ABSENCE OF A POLICY, NOT THE ABSENCE OF A GRANT.
+-- 20260818_feedback.sql deliberately creates no DELETE policy: `wontfix` is the
+-- answer to a report nobody will act on, and a deletable report is a findings
+-- list that can be tidied into agreement with itself. **So adding any
+-- permissive delete policy later opens it immediately** — the grant is already
+-- there waiting. Measured, not assumed: authenticated holds DELETE, INSERT,
+-- REFERENCES, SELECT, TRIGGER and TRUNCATE, and no UPDATE.
+-- ---------------------------------------------------------------------
+REVOKE UPDATE ON public.feedback FROM authenticated;
+GRANT UPDATE (status, admin_note, handled_by, handled_at)
+  ON public.feedback TO authenticated;
+
+
+-- ---------------------------------------------------------------------
 -- public.announcements — TABLE and COLUMN grants  (captured 14 Aug 2026)
 --
 -- Captured from information_schema.column_privileges and
