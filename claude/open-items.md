@@ -427,14 +427,40 @@ proves you wrong.**
   note now in `vite.config.js`. Deleting all three patterns produces an
   identical precache. It guarded a door the flags never used.
 
-  ⚠️ **THE `React.lazy` HALF IS MEASURED BUT NOT TAKEN, AND THE NUMBER IS THE
-  REASON.** Lazy-loading the twelve `/admin` screens moves the entry chunk
-  283.53 → **256.27 kB gzip** (−27.26) across 14 new chunks. **But the precache
-  went 11 entries/1301.08 KiB to 25 entries/1304.49 KiB — unchanged.** Workbox
-  precaches the new chunks too, so splitting DEFERS bytes off first paint
-  without removing them from the install. It is a real first-paint win and
-  about a third of the flag fix; it wants `globPatterns` thought about at the
-  same time, or the install pays for the admin half regardless.
+  ✅ ~~**THE `React.lazy` HALF IS MEASURED BUT NOT TAKEN.**~~ — **EXAMINED IN
+  FULL AND CLOSED, 18 Aug 2026. Jay's call.
+  `claude/decisions/2026-08-18-no-route-level-code-splitting.md` is the ruling;
+  read it before re-proposing this.** Built as a spike, measured three ways,
+  reverted — nothing was committed to `src/`.
+
+  ⚠️ **THE SAVING WAS BIGGER THAN THE FIGURE THIS ITEM CARRIED, NOT SMALLER.**
+  The −27.26 kB above covered the `/admin` screens only; splitting the coach
+  screens (`Lineup`, `GameTime`, `MatchSheet`, `Accounts`) as well measured
+  **283.51 → 244.08 kB gzip, −39.43**. It was not refused for being too small.
+
+  ⚠️ **IT WAS REFUSED BECAUSE THE BEST ARGUMENT FOR IT IS FALSE, AND THAT IS
+  THE PART WORTH KEEPING.** The case was that splitting makes every DEPLOY
+  cheaper for members — one chunk today means one edited screen re-downloads
+  the whole app. **Tested: one rendered string changed in `Allocation.jsx` moved
+  EVERY chunk hash, all twenty.** Lazy chunks import their shared code from the
+  entry chunk, so a leaf change bumps the entry, and the entry bump rewrites
+  every sibling's import. **Deploys cost members exactly what they cost today.**
+  Fixing that needs a `manualChunks` vendor split, which is its own piece of work.
+
+  ⚠️ **THE PRECACHE NOTE ABOVE WAS RIGHT AND IS NOW MEASURED FURTHER**: splitting
+  alone takes the install 1301.07 → 1305.66 KiB, i.e. **larger**. Leaving the
+  desktop-only admin chunks out via `globIgnores` gets it to **1228.44 KiB
+  (−72.63)**, and taking `Accounts` with them to 1194.26 KiB — **recommended
+  against**, because `/approvals` renders `Accounts` and that is a coach on a
+  phone at a pitch. A chunk left out of the precache has no offline story at all;
+  `runtimeCaching` covers Supabase REST GETs, not JavaScript.
+
+  ⚠️ **AND THE MEASUREMENT READ FALSE TWICE BEFORE IT READ TRUE.** A comment
+  added to a screen rebuilt byte-identically (the minifier strips it), and so did
+  an exported `const` nobody imports (Rollup tree-shakes it). Both said "one edit
+  changes nothing", the opposite of the truth. **Only an edit to a rendered
+  string moves a hash** — confirm the marker is present in `dist/` before
+  trusting any before/after bundle comparison.
 - **The calendar token is an unrevocable, non-expiring credential in a URL**, and
   nobody can see if one has leaked. ⛔ **Do not add an expiry** — a feed that dies on
   a timer produces a club-wide "my calendar stopped working" with no way to warn
