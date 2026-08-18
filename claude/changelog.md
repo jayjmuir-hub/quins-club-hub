@@ -10,6 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- 🧭 **THE EMAIL RUNBOOK SENDS YOU TO THE WRONG DNS PROVIDER, AND THE WRONG EDIT
+  THERE FAILS SILENTLY.** `claude/runbooks/email-and-domain.md` step 3 said
+  "publish the records in GoDaddy DNS (`ns43`/`ns44.domaincontrol.com`)".
+  **GoDaddy is the registrar only.** Measured 18 Aug 2026:
+  `adhquins-clubhub.com` NS → `dns1`–`dns4.p09.nsone.net`, which is NS1, which is
+  **Netlify** DNS. ⚠️ **An edit in a zone that is not authoritative saves
+  cleanly, looks right and changes nothing** — there is no error to notice.
+  ⚠️ **AND THE RECORDS IT TELLS YOU NOT TO TOUCH ARE NOT WHAT IT SAYS EITHER.**
+  It called the root `@` records "GoDaddy's registrar boilerplate
+  (`include:spf.em.secureserver.net`)". They are **Microsoft 365's** —
+  `MX → …mail.protection.outlook.com`, `v=spf1 include:spf.protection.outlook.com
+  -all`, `MS=ms38515168`, `autodiscover` CNAME — because club mailboxes live
+  there. Breaking those stops club mail arriving, which nobody notices.
+- 📇 **AND A RUNBOOK NOBODY COULD FIND IS NOW IN THE TABLE.**
+  `claude/runbooks/m365-add-alias-to-shared-mailbox.md` was never listed in
+  `CLAUDE.md`, so a session setting up `help@adhquins-clubhub.com` on 18 Aug
+  read every other mail doc and not that one. It holds two things that would
+  have saved the afternoon: **open the M365 admin centre in Edge, not Chrome**
+  (Chrome lands in GoDaddy's cut-down console, where Domains does not exist),
+  and **it argues for an alias on the existing `noreply@` mailbox over a second
+  shared mailbox** — because a second inbox is a second thing to remember to
+  check, which is exactly how two test messages went unnoticed.
+- `1e3c7bc` — the squash of the help-and-feedback plan below.
+
 - ❓ **A HELP AND FEEDBACK BUTTON IS DESIGNED, AND THE HANDOFF THAT ASKED FOR IT
   IS FOUR FACTS OUT OF DATE.** `claude/plans/2026-08-18-help-and-feedback.md`.
   A 44px red `?` floating over every signed-in screen — **costing no layout
