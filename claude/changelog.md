@@ -25,9 +25,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `.ignore` is committed for the first time: ripgrep reads it before
   `.gitignore`, so its `!graft/` is the only thing keeping the index greppable
   while `/graft/` keeps it out of commits.
-  ⚠️ **A DOTFILE BUILDS.** `scripts/netlify-ignore.mjs` skips `claude/`, `docs/`,
-  `db/` and ROOT MARKDOWN only — `/^[^/]+\.md$/` does not match `.gitignore`, so
-  this one deployed where the entry above it did not.
+  ✅ **AND THE SKILL IS NOW COMMITTED, WHICH IS THE POINT OF UNHIDING IT.**
+  `.claude/skills/graft/SKILL.md` travels with the repo so every session gets the
+  same guidance instead of depending on which PC ran the installer — the same
+  reasoning that moved the rules into `CLAUDE.md`. Checked before taking it: no
+  machine paths, nothing secret-shaped, no real names, and **`graft build` does
+  not rewrite it** (its mtime did not move across a full build), so it does not
+  churn the way `.gitignore` does. `.claude/skills/README.md` records why, and
+  what to check when a skill disappears from `git status`.
+  ⚠️ **A DOTFILE BUILDS, AND `.claude/` IS NOT `claude/`.**
+  `scripts/netlify-ignore.mjs` skips `claude/`, `docs/`, `db/` and ROOT MARKDOWN
+  only — `/^[^/]+\.md$/` matches neither `.gitignore` nor `.claude/skills/…`, so
+  this one deployed where the entry above it did not, and every future skill edit
+  will too. **The leading dot is the whole difference.** Measured with
+  `isDeployIrrelevant()`, not assumed.
 
 - ⛔ **ROUTE-LEVEL CODE SPLITTING — BUILT, MEASURED, AND NOT TAKEN.** Jay's call.
   The saving was real and **larger** than the figure on file (283.51 → 244.08 kB
