@@ -2,7 +2,13 @@ import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Sheet } from './Sheet.jsx'
 import Button from './Button.jsx'
-import { submitFeedback, captureContext, feedbackRef } from '../data/feedback.js'
+import {
+  submitFeedback,
+  captureContext,
+  feedbackRef,
+  listFeedback,
+  FEEDBACK_STATUS_LABELS,
+} from '../data/feedback.js'
 
 // The `?` that lets any member say "this is broken" or "this would be better",
 // from any signed-in screen. Design: claude/plans/2026-08-18-help-and-feedback.md.
@@ -80,6 +86,11 @@ export default function HelpButton() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [sentRef, setSentRef] = useState(null)
+  // The member's own reports. `null` means "not fetched yet" and is distinct
+  // from `[]`, which means "fetched, and you have never reported anything" —
+  // those two need different words on screen.
+  const [mine, setMine] = useState(null)
+  const [mineError, setMineError] = useState(null)
 
   const here = routeLabel(location.pathname)
 
@@ -95,6 +106,22 @@ export default function HelpButton() {
     setError(null)
     setSaving(false)
     setSentRef(null)
+    setMine(null)
+    setMineError(null)
+  }
+
+  // ⚠️ FETCHED ON DEMAND, NOT ON OPEN. Most taps of the `?` are somebody about
+  // to report something, not somebody checking on an old one — loading this
+  // every time would put a query behind a button that usually does not need it.
+  async function showMine() {
+    setStep('mine')
+    setMineError(null)
+    try {
+      setMine(await listFeedback())
+    } catch (err) {
+      setMine([])
+      setMineError(err?.message || 'Could not load your reports.')
+    }
   }
 
   function choose(nextKind) {
@@ -189,8 +216,19 @@ export default function HelpButton() {
                 <span className="block text-[13px] text-ink-faint">Something that&rsquo;d make this better</span>
               </span>
             </button>
-            {/* ⚠️ NOT A THIRD BUTTON. See the note at the top of this file. */}
-            <p className="border-t border-line pt-3 text-[13px] text-ink-faint">
+            {/* ⚠️ NOT A THIRD LANE. This is a way BACK to something already
+                reported, not a third kind of thing to report — which is why it
+                is a quiet link under the divider and not a card like the two
+                above. The note at the top of this file still stands: the
+                sorting question has exactly two answers. */}
+            <button
+              type="button"
+              onClick={showMine}
+              className="mb-3 min-h-[44px] w-full border-t border-line pt-3 text-left text-[13px] font-semibold text-brand underline"
+            >
+              See what you&rsquo;ve already reported
+            </button>
+            <p className="text-[13px] text-ink-faint">
               Anything else — just say what&rsquo;s on your mind and Jay will sort it out.
             </p>
           </div>
@@ -239,11 +277,61 @@ export default function HelpButton() {
           </form>
         )}
 
+        {step === 'mine' && (
+          <div>
+            {mine === null && <p className="text-[13px] text-ink-muted">Loading…</p>}
+
+            {mineError && (
+              <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-[13px] font-semibold text-brand-deep">
+                {mineError}
+              </p>
+            )}
+
+            {mine !== null && mine.length === 0 && !mineError && (
+              <p className="mb-4 text-[13px] text-ink-muted">
+                You haven&rsquo;t reported anything yet.
+              </p>
+            )}
+
+            {mine !== null &&
+              mine.map((row) => (
+                <div key={row.id} className="border-b border-line py-3 last:border-b-0">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="rounded-pill bg-surface-sunk px-2 py-0.5 text-[13px] font-semibold text-ink">
+                      {FEEDBACK_STATUS_LABELS[row.status] ?? row.status}
+                    </span>
+                    <span className="text-[13px] text-ink-faint">{feedbackRef(row.ref)}</span>
+                  </div>
+                  <p className="text-[15px] text-ink">{row.body}</p>
+
+                  {/* ⚠️ THE ONLY REPLY CHANNEL, AND IT IS WHY THE NOTE FIELD
+                      EXISTS AT ALL. Jay, 18 Aug 2026, chose in-app over a
+                      second e-mail. So if this does not render the admin's
+                      note, an admin can type an answer that nobody ever
+                      reads. */}
+                  {row.admin_note && (
+                    <p className="mt-2 rounded-[11px] bg-surface-sunk p-3 text-[13px] text-ink">
+                      <span className="font-semibold">From the club: </span>
+                      {row.admin_note}
+                    </p>
+                  )}
+                </div>
+              ))}
+
+            <div className="mt-4">
+              <Button type="button" variant="secondary" onClick={() => setStep('choose')}>
+                Back
+              </Button>
+            </div>
+          </div>
+        )}
+
         {step === 'sent' && (
           <div>
             <p className="mb-2 text-[15px] font-semibold text-ink">Thanks — that&rsquo;s with us</p>
             <p className="mb-4 text-[13px] text-ink-muted">
-              We&rsquo;ve emailed you a copy. Somebody will look at it.
+              We&rsquo;ve emailed you a copy. Any update will show up here under
+              <span className="font-semibold"> See what you&rsquo;ve already reported</span>.
             </p>
             {sentRef && (
               <div className="mb-4 rounded-[11px] bg-surface-sunk p-3 text-center">

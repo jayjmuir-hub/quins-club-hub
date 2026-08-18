@@ -15,6 +15,12 @@ vi.mock('../src/data/feedback.js', () => ({
   feedbackRef: (ref) => (ref == null ? null : `QCH-${String(ref).padStart(4, '0')}`),
   FEEDBACK_STATUSES: ['new', 'in-progress', 'done', 'wontfix'],
   OPEN_STATUSES: ['new', 'in-progress'],
+  FEEDBACK_STATUS_LABELS: {
+    new: 'New',
+    'in-progress': 'In progress',
+    done: 'Done',
+    wontfix: "Won't fix",
+  },
 }))
 
 vi.mock('../src/lib/auth.jsx', () => ({
@@ -122,5 +128,39 @@ describe('openCount', () => {
 
   it('survives no rows at all', () => {
     expect(openCount(undefined)).toBe(0)
+  })
+})
+
+describe('replying to a report', () => {
+  it('saves the reply against the row, keeping the status unchanged', async () => {
+    const user = userEvent.setup()
+    render(<FeedbackTriage />)
+    const box = await screen.findByLabelText(/reply to Priya/i)
+    await user.type(box, 'Fixed it, thanks for telling us')
+    await user.click(screen.getAllByRole('button', { name: /save reply/i })[0])
+
+    await waitFor(() => expect(setFeedbackStatusMock).toHaveBeenCalledTimes(1))
+    // ⚠️ The status argument must be the row's CURRENT status. Passing a
+    // literal here would silently reopen a finished report every time somebody
+    // typed a reply into it.
+    expect(setFeedbackStatusMock.mock.calls[0][1]).toBe('new')
+    expect(setFeedbackStatusMock.mock.calls[0][2]).toMatchObject({
+      adminNote: 'Fixed it, thanks for telling us',
+    })
+  })
+
+  it('will not save until something has actually changed', async () => {
+    render(<FeedbackTriage />)
+    await screen.findByLabelText(/reply to Priya/i)
+    // Nothing typed, so there is nothing to write — an enabled button here
+    // would stamp handled_by/handled_at for a non-event.
+    expect(screen.getAllByRole('button', { name: /save reply/i })[0]).toBeDisabled()
+  })
+
+  it('tells the admin the reply is what the reporter reads', async () => {
+    render(<FeedbackTriage />)
+    expect(await screen.findByTestId('feedback-summary')).toHaveTextContent(
+      /reply you save here is what the reporter reads/i,
+    )
   })
 })

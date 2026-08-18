@@ -14,7 +14,11 @@ import { MemoryRouter } from 'react-router-dom'
 const submitFeedbackMock = vi.fn()
 const captureContextMock = vi.fn(() => ({ route: '/roster' }))
 
+const listFeedbackMock = vi.fn(() => Promise.resolve([]))
+
 vi.mock('../src/data/feedback.js', () => ({
+  listFeedback: (...args) => listFeedbackMock(...args),
+  FEEDBACK_STATUS_LABELS: { new: 'New', 'in-progress': 'In progress', done: 'Done', wontfix: "Won't fix" },
   submitFeedback: (...args) => submitFeedbackMock(...args),
   captureContext: (...args) => captureContextMock(...args),
   feedbackRef: (ref) => (ref == null ? null : `QCH-${String(ref).padStart(4, '0')}`),
@@ -204,5 +208,57 @@ describe('routeLabel', () => {
   it('falls back to the path rather than guessing a label', () => {
     // Ugly beats confidently wrong: an unmapped path shows itself.
     expect(routeLabel('/some/unmapped/thing')).toBe('/some/unmapped/thing')
+  })
+})
+
+describe('a member tracking their own report', () => {
+  it('lists what they sent, with the status and the club reply', async () => {
+    const user = userEvent.setup()
+    listFeedbackMock.mockResolvedValue([
+      {
+        id: 'f1',
+        ref: 7,
+        status: 'in-progress',
+        body: 'Tomas shows as U12 but he is 10',
+        admin_note: 'Good spot — fixing the cut-off date now.',
+      },
+    ])
+    renderAt()
+    await openPanel(user)
+    await user.click(screen.getByRole('button', { name: /already reported/i }))
+
+    expect(await screen.findByText('QCH-0007')).toBeTruthy()
+    expect(screen.getByText(/in progress/i)).toBeTruthy()
+    // ⚠️ THE REPLY IS THE WHOLE POINT. Jay chose in-app over a second email, so
+    // if this stops rendering, admins type answers nobody ever reads.
+    expect(screen.getByText(/fixing the cut-off date/i)).toBeTruthy()
+  })
+
+  it('distinguishes "nothing yet" from "not loaded"', async () => {
+    const user = userEvent.setup()
+    listFeedbackMock.mockResolvedValue([])
+    renderAt()
+    await openPanel(user)
+    await user.click(screen.getByRole('button', { name: /already reported/i }))
+    expect(await screen.findByText(/haven.t reported anything yet/i)).toBeTruthy()
+  })
+
+  it('says so when the list will not load, rather than looking empty', async () => {
+    const user = userEvent.setup()
+    listFeedbackMock.mockRejectedValue(new Error('offline'))
+    renderAt()
+    await openPanel(user)
+    await user.click(screen.getByRole('button', { name: /already reported/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/offline/i)
+  })
+
+  it('tells the reporter where updates will appear, since no email follows', async () => {
+    const user = userEvent.setup()
+    renderAt()
+    await openPanel(user)
+    await user.click(screen.getByRole('button', { name: /something.s broken/i }))
+    await user.type(screen.getByLabelText(/what went wrong/i), 'something')
+    await user.click(screen.getByRole('button', { name: /^send$/i }))
+    expect(await screen.findByText(/already reported/i)).toBeTruthy()
   })
 })

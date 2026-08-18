@@ -10,6 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- 🔁 **THE LOOP ACTUALLY CLOSES NOW: A MEMBER CAN SEE THEIR OWN REPORT, AND AN
+  ADMIN CAN ANSWER IT.** Jay filed two test reports and found three things
+  missing within a minute, all three real.
+  ⚠️ **ONE WAS A LIE ON SCREEN.** The admin summary read *"Members see the
+  status of their own."* They could not — there was no such view anywhere. The
+  read policy had always allowed it and the plan called that arm "a requirement,
+  not a courtesy … without it you report into silence"; it went into the
+  database and never into the app. Line deleted, feature built.
+  ✅ **"See what you've already reported"**, behind the same `?` — the member's
+  own reports, their status, and any reply from the club.
+  ✅ **A Reply box on each admin row**, writing `admin_note`, which existed and
+  was column-granted and had no field.
+  ⚠️ **IN-APP ONLY — Jay: "in app only".** Saving a reply sends nothing. So the
+  acknowledgement e-mail is now **the only place a reporter is told where to
+  look**, and it says so explicitly. Trim that paragraph and the club starts
+  writing replies into a screen nobody has been told to open.
+  ⚠️ **Saving a reply passes the row's CURRENT status back, not a literal** — a
+  literal would silently reopen a finished report every time somebody typed into
+  it. There is a test that fails if that changes.
+- 📡 **AND A LIVE BUG FOUND WHILE ANSWERING "WHY DOESN'T IT UPDATE ON ITS OWN?"**
+  ⚠️ **`availability` SUBSCRIBES TO REALTIME AND RECEIVES NOTHING.**
+  `src/data/availability.js` opens a `postgres_changes` channel and its comment
+  says it works. The table is **not in the `supabase_realtime` publication** —
+  measured, with `announcements` as a control, so the negative means something.
+  The channel opens, the subscription succeeds, no event ever arrives. That is
+  the app's core feature failing silently on a touchline, and it matters more
+  than the feature it was found beside. **Not fixed yet.**
+
 - ❓ **THE `?` IS BUILT: ANY MEMBER CAN REPORT A PROBLEM OR SEND AN IDEA FROM
   ANY SCREEN.** `claude/plans/2026-08-18-help-and-feedback.md`.
   A 44px red circle floating bottom-right, opening a two-step panel — pick a
@@ -66,6 +94,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   and **it argues for an alias on the existing `noreply@` mailbox over a second
   shared mailbox** — because a second inbox is a second thing to remember to
   check, which is exactly how two test messages went unnoticed.
+- `e26dcac` — the squash that put the `?` on the live site.
+  ⚠️ **THIS CITATION IS OWED EVERY TIME, AND IT KEEPS BEING FORGOTTEN.** CI
+  compares `BASELINE..HEAD~1`, and on a pull-request run `HEAD~1` is the **base
+  tip** — so every branch cut from `main` must cite whatever `main` merged last,
+  even though that commit is not the branch's own work. Three PRs in a row went
+  red on exactly this. Cite the previous squash when you cut the branch, not
+  after CI tells you.
 - `52ec10c` — the squash of the DNS-runbook fix above.
 - `1e3c7bc` — the squash of the help-and-feedback plan below.
 

@@ -327,3 +327,50 @@ action on `src/components/ErrorBoundary.jsx`.
   error on its way in, so the message vanished and the control silently snapped
   back. That is precisely how somebody believes they closed a report they did
   not. Reload now happens first.
+
+---
+
+## The loop closes in the app — 18 Aug 2026, after the first live test
+
+Jay filed two test reports and immediately found three things missing. All
+three were real, and one of them was a claim on screen that was not true.
+
+1. **A member had no way to see their own report.** The read policy has always
+   allowed it — `submitted_by = auth.uid() or private.is_admin(club_id)` — and
+   the plan called that arm "a requirement, not a courtesy … without it you
+   report into silence". It went into the database and not into the app.
+2. **An admin could change a status but not answer.** `admin_note` existed,
+   was column-granted and had no field.
+3. ⚠️ **The admin summary said "Members see the status of their own." They
+   could not.** Shipped copy asserting a feature that did not exist. Deleted,
+   and replaced with a line that is true of what is now there.
+
+**What was built:** a third view behind the same `?` — *"See what you've
+already reported"* — listing the member's own reports with status and any club
+reply; and a **Reply** box on each admin row that writes `admin_note`.
+
+⚠️ **IN-APP ONLY — Jay, 18 Aug 2026: "in app only".** Saving a reply sends no
+e-mail. So the acknowledgement is now the one and only place a reporter is told
+where to look, and it says so explicitly. **If that paragraph is ever trimmed,
+the club writes replies into a screen nobody has been told to open.**
+
+⚠️ **`listFeedback()` IS THE SAME CALL FOR BOTH SCREENS**, with no
+`submitted_by` argument, because the policy already says who sees what. A
+filter here would be a second, weaker statement of the same rule — and the
+weaker one is what somebody would later simplify away.
+
+⚠️ **Saving a reply passes the row's CURRENT status back**, not a literal.
+A literal would silently reopen a finished report every time somebody typed
+into it. There is a test that fails if that changes.
+
+### Still open after this
+
+- **Nothing appears without a refresh**, and `feedback` is not in the
+  `supabase_realtime` publication. ⚠️ **Neither is `availability`, which
+  subscribes to realtime and receives nothing** — measured 18 Aug 2026 with
+  `announcements` as a control. That is a live bug in the app's core feature
+  and is worth more than this one.
+- **No delete.** Deliberate — `wontfix` is the answer to a report nobody will
+  act on. ⚠️ **But it also means test rows can only be removed with SQL**, and
+  the sibling feature (`social_ideas`) does grant admins a delete. If test data
+  keeps accumulating, revisit that rather than working around it.

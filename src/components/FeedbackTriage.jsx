@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import Card from './Card.jsx'
 import Empty from './Empty.jsx'
 import Spinner from './Spinner.jsx'
+import Button from './Button.jsx'
 import { useAuth } from '../lib/auth.jsx'
 import {
   listFeedback,
   setFeedbackStatus,
   feedbackRef,
   FEEDBACK_STATUSES,
+  FEEDBACK_STATUS_LABELS,
 } from '../data/feedback.js'
 
 // What members have reported, and what has been done about it.
@@ -30,12 +32,10 @@ import {
 // control, and removing it as redundant would change nothing — which is how a
 // filter gets mistaken for a policy.
 
-const STATUS_LABELS = {
-  new: 'New',
-  'in-progress': 'In progress',
-  done: 'Done',
-  wontfix: "Won't fix",
-}
+// ⚠️ IMPORTED, NOT REDECLARED. The member sees these same words on their own
+// report in HelpButton.jsx, and two copies would drift invisibly — nobody sees
+// both screens at once.
+const STATUS_LABELS = FEEDBACK_STATUS_LABELS
 
 const KIND_LABELS = { bug: 'Problem', idea: 'Suggestion' }
 
@@ -44,8 +44,14 @@ export function openCount(rows) {
   return (rows ?? []).filter((row) => row.status === 'new' || row.status === 'in-progress').length
 }
 
-function ReportRow({ row, onStatus, busy }) {
+function ReportRow({ row, onStatus, onNote, busy }) {
   const who = row.profiles?.full_name ?? 'A member'
+  // Local while typing; committed on Save. A controlled field writing straight
+  // through would fire an update on every keystroke.
+  const [note, setNote] = useState(row.admin_note ?? '')
+  const [noteSaved, setNoteSaved] = useState(false)
+  const dirty = note !== (row.admin_note ?? '')
+
   return (
     <div className="border-b border-line p-3 last:border-b-0">
       <div className="mb-1 flex items-center gap-2">
@@ -80,6 +86,50 @@ function ReportRow({ row, onStatus, busy }) {
           </option>
         ))}
       </select>
+
+      {/* ⚠️ THIS IS THE REPLY, AND IT IS THE ONLY ONE. Jay, 18 Aug 2026, chose
+          in-app over a second e-mail: "in app only". So whatever is typed here
+          is what the reporter reads, on their own report, behind the same `?`
+          they used to send it. Nothing else tells them anything. */}
+      <div className="mt-2">
+        <label
+          htmlFor={`feedback-note-${row.id}`}
+          className="mb-1 block text-[13px] font-semibold text-ink-muted"
+        >
+          Reply to {who.split(' ')[0]}
+        </label>
+        <textarea
+          id={`feedback-note-${row.id}`}
+          value={note}
+          disabled={busy}
+          onChange={(e) => {
+            setNote(e.target.value)
+            setNoteSaved(false)
+          }}
+          rows={2}
+          placeholder="They see this on their own report in the app."
+          className="w-full rounded-[11px] border-[1.5px] border-line px-3 py-2 text-[15px] text-ink focus:border-brand focus:outline-none"
+        />
+        <div className="mt-1 flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busy || !dirty}
+            onClick={async () => {
+              await onNote(row, note)
+              setNoteSaved(true)
+            }}
+          >
+            Save reply
+          </Button>
+          {noteSaved && !dirty && (
+            <span role="status" className="text-[13px] font-semibold text-accent-ink">
+              Saved
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -102,6 +152,25 @@ export default function FeedbackTriage() {
   useEffect(() => {
     load()
   }, [load])
+
+  async function saveNote(row, adminNote) {
+    setBusyId(row.id)
+    setError(null)
+    try {
+      // ⚠️ THE STATUS GOES WITH IT UNCHANGED. setFeedbackStatus is the only
+      // write path, and it always stamps handled_by/handled_at — which is
+      // correct here too: writing a reply IS handling it.
+      await setFeedbackStatus(row.id, row.status, { adminNote, actorId: user?.id })
+      setRows((current) =>
+        (current ?? []).map((r) => (r.id === row.id ? { ...r, admin_note: adminNote } : r)),
+      )
+    } catch (err) {
+      await load()
+      setError(err?.message || 'That reply did not save.')
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   async function changeStatus(row, status) {
     setBusyId(row.id)
@@ -150,7 +219,7 @@ export default function FeedbackTriage() {
       <p className="mb-3 text-sm text-ink-muted" data-testid="feedback-summary">
         {rows.length === 0
           ? 'Nobody has reported anything yet.'
-          : `${open} open, ${rows.length} in total. Members see the status of their own.`}
+          : `${open} open, ${rows.length} in total. A reply you save here is what the reporter reads in the app.`}
       </p>
 
       {error && rows && (
@@ -164,7 +233,13 @@ export default function FeedbackTriage() {
       ) : (
         <Card className="overflow-hidden">
           {rows.map((row) => (
-            <ReportRow key={row.id} row={row} onStatus={changeStatus} busy={busyId === row.id} />
+            <ReportRow
+              key={row.id}
+              row={row}
+              onStatus={changeStatus}
+              onNote={saveNote}
+              busy={busyId === row.id}
+            />
           ))}
         </Card>
       )}
