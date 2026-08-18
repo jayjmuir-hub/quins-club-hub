@@ -10,6 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- 👨‍👩‍👧 **SAVING A CHILD'S PARENT LIST IS NOW ALL-OR-NOTHING.**
+  `public.save_player_parents` does the delete, the updates and the inserts in
+  one statement, replacing up to N+2 separate PostgREST requests that each
+  landed on their own.
+  ⚠️ **THE OPEN ITEM OVERSTATED THIS AND THE CORRECTION IS THE USEFUL PART.**
+  It said a failure "loses a child's parent records". A plain edit was always
+  safe — the DELETE only removed rows not in the submitted set, and every kept
+  row carries an id. The damage needed a row to be REMOVED in the same sitting:
+  the removal applied, the edits did not, and **the screen said the save had
+  failed.** An overstated finding is one the next person disproves and then
+  stops trusting the file.
+  ✅ **Measured on production in a rolled-back transaction: replaying the old
+  sequence left 1 of 2 rows.** Kept as the harness's self-test, because "the row
+  count did not change" would pass against a table nothing ever touches.
+  ⚠️ **`SECURITY INVOKER`, so the two existing policies still decide who may
+  write** — no new authorisation surface, proved by a coach of another squad
+  being refused. If it is ever made `SECURITY DEFINER` it needs a guard the same
+  minute.
+  ⚠️ **It never writes `created_at`, `invited_at` or `profile_id`.** The last two
+  link a parent row to a real account, and no screen shows them beside the fields
+  a coach edits — an UPDATE naming every column would un-invite a parent every
+  time somebody fixed a typo in their phone number.
 - 🔐 **A PENDING ADMIN ROW IS NO LONGER AN ADMIN — and it was FOUR functions,
   not the one every note named.** The deferral the 17 Aug approval fix wrote
   down, taken: `private.is_admin` asked about role and club and never status,
@@ -35,6 +57,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **The test fixtures could not have caught this**: `memberships.status` is
   NOT NULL, and not one membership fixture in `tests/` carried a status at all.
   They now do.
+- `1e820f3` — the squash that closed the admin gates.
 - 📡 **`availability` HAS BEEN SUBSCRIBING TO NOTHING SINCE IT WAS
   WRITTEN, AND IT IS NOW FIXED.** `src/data/availability.js` opens a
   `postgres_changes` channel, its own comment says it "subscribes to realtime

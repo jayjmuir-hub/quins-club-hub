@@ -559,10 +559,48 @@ proves you wrong.**
   a timer produces a club-wide "my calendar stopped working" with no way to warn
   anyone. The cheap fix is visibility: `last_used_at`, shown on the subscribe screen,
   plus an admin-side reset.
-- **`saveParents` is delete-then-write**, so a failure between the two loses a child's
+- ✅ ~~**`saveParents` is delete-then-write**, so a failure between the two loses a child's
   parent records. ⚠️ Not the same as the deliberate two-call split for player
   contacts, where a partial failure surfaces distinctly; here it surfaces as missing
-  data.
+  data.~~ — **FIXED 18 Aug 2026.**
+  `db/migrations/20260818_save_player_parents_atomically.sql`,
+  `db/tests/save-player-parents.sql`, and the client half in `src/data/parents.js`.
+  `public.save_player_parents` does the delete, the updates and the inserts in one
+  statement, so a child's list either ends up exactly as submitted or is untouched.
+
+  ⚠️ **THE LINE ABOVE OVERSTATED IT, AND THE OVERSTATEMENT IS WORTH KEEPING.**
+  "Loses a child's parent records" is not what usually happened. The DELETE only
+  removed rows NOT in the submitted set, so **a plain edit was always safe** —
+  every kept row carries an id and nothing was deleted. The damage needed a row
+  to be **removed in the same sitting**: then the removal applied, the edits did
+  not, and **the screen said the save had failed.** The record left behind was
+  one nobody chose, and the user had been told it did not exist.
+  **An overstated finding is one the next person disproves in five minutes and
+  then stops trusting the file.** The honest version is narrower and still worth
+  fixing.
+
+  ✅ **Measured on production in a rolled-back transaction**: replaying the old
+  delete-then-write sequence left **1 of 2 rows**. That replay is kept as the
+  harness's self-test, because "the row count did not change" is an assertion
+  that would pass against a table nothing ever touches.
+  ⚠️ **AND IT COULD NOT BE MODELLED WITH AN EXCEPTION BLOCK ROUND BOTH HALVES** —
+  `begin … exception` opens a SUBTRANSACTION, which rolls the DELETE back too and
+  makes the old code look atomic. It never was: the DELETE and the UPDATE were
+  separate PostgREST requests, so the first COMMITTED before the second was sent.
+  The harness leaves the DELETE outside any handler and fails only the step after
+  it.
+
+  ⚠️ **THE `PlayerForm` PREFILL GUARD IS STILL LOAD-BEARING.** A failed parent
+  read sets `parentsStatus` to 'error' and the submit handler skips the parent
+  write entirely. That stops an EMPTY editor being saved over rows that were
+  never loaded — a correct-but-unwanted write rather than a failed one, which no
+  amount of atomicity helps with. **Do not delete it as redundant.**
+
+  ⚠️ **THE FUNCTION IS `SECURITY INVOKER`**, so the two existing policies on
+  `player_parents` still decide who may write and this added no authorisation
+  surface. Proved in the harness by a coach of another squad being refused.
+  **If anyone ever makes it `SECURITY DEFINER`, it needs a guard the same
+  minute.**
 - **`social_ideas` uploads the image BEFORE inserting the row**, so a failed insert
   orphans an object that appears on no screen and nothing sweeps.
 - **`supabase_migrations.schema_migrations` is polluted** — many stale rows, a dozen
