@@ -74,6 +74,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   by an edge function with no session on behalf of Google/Apple's calendar
   clients, which is a genuinely different case and still refused by the same
   harness if anyone tries to tidy it away.
+- `3bc4d10` — the squash that closed the anon-grant contradiction.
 - 🧪 **`npm run db:check` RUNS AGAIN — one harness could not fail, so none of
   them ran.** `db/tests/head-coach-flag.sql` printed its six answers under an
   `EXPECTED:` comment and left a human to compare them. `scripts/db-check.mjs`
