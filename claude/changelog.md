@@ -10,6 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- 🧪 **`npm run db:check` RUNS AGAIN — one harness could not fail, so none of
+  them ran.** `db/tests/head-coach-flag.sql` printed its six answers under an
+  `EXPECTED:` comment and left a human to compare them. `scripts/db-check.mjs`
+  throws on a SQL error and nothing else, so a wrong answer read as `ok` — and
+  because the runner validates every file BEFORE it connects and refuses the
+  whole run if one is unsafe, that single omission made every OTHER harness
+  unreachable, including the two added earlier today.
+  ⚠️ **NOTHING WENT RED, AND THAT IS THE PART TO REMEMBER.** The nightly
+  workflow is inert without a `SUPABASE_DB_URL` secret, so it reports "did not
+  run" and passes. A gate nobody can trip is indistinguishable from a gate
+  nobody has tripped.
+  ✅ **The six answers are now judged by `raise exception`, and the sqlstates
+  are part of the assertion** — `23505` is the unique index refusing a second
+  head coach, `23514` is the CHECK refusing a non-coach. A change that swapped
+  one guarantee for the other would leave both lines reading "refused".
+  ✅ **Proved it can fail rather than assuming**: fed a table with one planted
+  wrong answer, the verdict block raised and named it. The fault-injection half
+  gained a control too — dropping the index must flip assertion 3 and leave
+  assertion 4 alone, or the injected fault was wider than the one named.
+  ⚠️ **The nightly is still inert.** Fixing the harness did not add the secret,
+  so these run only when somebody runs them.
 - 👨‍👩‍👧 **SAVING A CHILD'S PARENT LIST IS NOW ALL-OR-NOTHING.**
   `public.save_player_parents` does the delete, the updates and the inserts in
   one statement, replacing up to N+2 separate PostgREST requests that each
@@ -32,6 +53,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   link a parent row to a real account, and no screen shows them beside the fields
   a coach edits — an UPDATE naming every column would un-invite a parent every
   time somebody fixed a typo in their phone number.
+- `f3f108d` — the squash that made the parent save atomic.
 - 🔐 **A PENDING ADMIN ROW IS NO LONGER AN ADMIN — and it was FOUR functions,
   not the one every note named.** The deferral the 17 Aug approval fix wrote
   down, taken: `private.is_admin` asked about role and club and never status,

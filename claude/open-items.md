@@ -439,9 +439,9 @@ proves you wrong.**
   leaves open**, because the name only finds what somebody had already looked
   at.
 
-## ⛔ `npm run db:check` REFUSES TO RUN, AND HAS SINCE 18 Aug 2026
+## ✅ `npm run db:check` RUNS AGAIN — fixed 18 Aug 2026
 
-- **Every SQL harness is currently unrunnable, because ONE of them cannot
+- ✅ ~~**Every SQL harness is currently unrunnable, because ONE of them cannot
   fail.** `scripts/db-check.mjs` checks its files before it connects and stops
   the whole run if any is unsafe. Today it stops on:
 
@@ -465,7 +465,35 @@ proves you wrong.**
   exists, so it reports "did not run" and PASSES. Nothing was ever going to go
   red. **Fix is to wrap that file's expectations in `do $$ … raise exception …
   end $$;`**, which is a small piece of work on somebody else's assertions and
-  wants doing on purpose rather than in passing.
+  wants doing on purpose rather than in passing.~~ — **DONE the same day.**
+  `db/tests/head-coach-flag.sql` now judges its six answers in a `do $$ … raise
+  exception … end $$;` block instead of printing them under an `EXPECTED:`
+  comment for a human to compare.
+
+  ✅ **The runner gets past its static gate**: `npm run db:check` now stops at
+  "no connection string" — which is Jay's to supply — rather than refusing the
+  files. That is the measurement, not the absence of the old message.
+  ✅ **Run against production in a rolled-back transaction: all six pass, and
+  the self-test fires** — dropping the one-head-coach-per-squad index flips
+  assertion 3 from `refused (23505)` to `ALLOWED` while assertion 4 stays
+  `refused (23514)`. That second half is a new control: without it, a fault
+  wider than the one named would flip check 3 for the wrong reason.
+  ✅ **AND THE NEW VERDICT BLOCK WAS PROVED TO FAIL**, by feeding it a table
+  with one planted wrong answer: it raised
+  `HEAD COACH: "1 backfill flags the titled head coach" answered not flagged,
+  expected FLAGGED.` **A check that has never failed is not a check — which is
+  the entire reason this item existed.**
+
+  ⚠️ **THE SQLSTATES ARE PART OF THE ASSERTION NOW.** `23505` is the unique
+  index refusing a second head coach; `23514` is the CHECK refusing a non-coach.
+  A change that swapped one guarantee for the other would leave both lines
+  reading "refused" and the old eyeball comparison would have shrugged.
+
+  ⚠️ **THE NIGHTLY IS STILL INERT.** Fixing the harness did not add the
+  `SUPABASE_DB_URL` secret, so `.github/workflows/db-check.yml` continues to
+  report "did not run" and pass. **Until Jay adds it, these harnesses run only
+  when somebody runs them** — which is the same failure one step further back.
+  Settings → Secrets and variables → Actions → New repository secret.
 
 ## Real gaps, no cheap fix
 
