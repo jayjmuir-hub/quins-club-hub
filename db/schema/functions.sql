@@ -12,6 +12,10 @@
 --   `status = 'active'` on the CALLER's membership row. Grants, volatility,
 --   search_path and security-definer flags all unchanged — verified from
 --   pg_proc after applying, not assumed from CREATE OR REPLACE.
+--   AND public.register_my_player's proacl only (20260818
+--   revoke_anon_execute_register_my_player): `anon` execute revoked, body
+--   unchanged. See the block at its definition for why the grant was never a
+--   decision despite two migrations restating it.
 -- ⚠️ RE-CAPTURED 2026-08-12 — public.calendar_events_for_token only
 --   (20260812 calendar_feed_league_team). Three columns added to its
 --   RETURNS TABLE and a LEFT JOIN to league_teams. See the block at its
@@ -1654,8 +1658,20 @@ $function$
 -- 20260809083640 register_my_player_gender_errcode; p_self_register, the 0A000
 -- guard and the role expression by 20260811085312 self_registration.
 -- prosecdef: true    provolatile: v (VOLATILE)    proconfig: search_path=public
--- proacl: {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,
---          service_role=X/postgres}
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+--
+-- ⚠️ `anon` WAS IN THAT ACL UNTIL 18 Aug 2026, AND REMOVING IT CHANGED NOTHING
+-- A REAL CALLER COULD DO. The function's first line refuses a null
+-- `auth.uid()`, and a signed-in session always executes as `authenticated`
+-- regardless of this grant — only a genuinely anonymous PostgREST call ever
+-- runs as `anon`, and that call was always refused one line in. The grant was
+-- restated by two migrations that DROP-and-CREATE this function's signature
+-- (DROP takes the old ACLs with it), each explaining that it was avoiding a
+-- repeat of an 8 Aug outage, not choosing to keep `anon`. An explicit grant in
+-- a migration is evidence someone typed it, not evidence someone decided it —
+-- see `db/migrations/20260818_revoke_anon_execute_register_my_player.sql` for
+-- the full account, including a second document (`db/tests/grants.sql` §3b)
+-- that had called this grant deliberate for five days on the same misreading.
 --
 -- ⚠️ THERE IS EXACTLY ONE SIGNATURE, AND KEEPING IT THAT WAY IS THE POINT.
 -- register_my_player(text, uuid) went with the gender migration; (text, uuid,

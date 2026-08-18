@@ -10,6 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- 🔓 **`register_my_player` NO LONGER CARRIES AN `anon` EXECUTE GRANT — AND A
+  SECOND FILE HAD CALLED THAT GRANT DELIBERATE FOR FIVE DAYS.** Not a hole: the
+  function's first line refuses a null `auth.uid()`, and only a genuinely
+  anonymous PostgREST call ever executes as `anon` — a signed-in session always
+  runs as `authenticated`, whatever the grant said. So revoking it changed
+  nothing a real caller could do; it only stopped an anonymous caller reaching
+  a line inside the function before being refused.
+  ⚠️ **`claude/open-items.md` found this 16 Aug and correctly called it "looks
+  deliberate when it is not"** — three comparable RPCs carry an explicit
+  `revoke … from anon`, this one didn't, and the difference read as a decision.
+  It sat unfixed because tidying a live registration path felt like the wrong
+  moment mid-onboarding.
+  ⚠️ **`db/tests/grants.sql` §3b, written THREE DAYS EARLIER, had reached the
+  opposite conclusion on the SAME EVIDENCE** — it named this grant "DELIBERATE
+  AND MUST NOT BE TIDIED", citing the two migrations that re-granted it
+  explicitly. Reading those migrations settles it: both are a DROP/CREATE
+  side-effect (dropping a function's old signature does not carry its ACLs to
+  the new one), and each says so in its own comment — restating a grant to
+  avoid a repeat of an 8 Aug outage, not choosing to keep it. **An explicit
+  grant in a migration is evidence someone typed it, not evidence someone
+  decided it** — the exact distinction one part of this repo's own
+  documentation had right and another part had wrong, about the same function,
+  for five days.
+  ✅ **Measured after the revoke, in a rolled-back transaction: a real
+  signed-in call with a bad team id still reaches past the auth/email guards
+  and fails on `22023 "That age group does not exist"`**, identical to before.
+  `calendar_events_for_token` keeps its `anon` grant, untouched — it is called
+  by an edge function with no session on behalf of Google/Apple's calendar
+  clients, which is a genuinely different case and still refused by the same
+  harness if anyone tries to tidy it away.
 - 🧪 **`npm run db:check` RUNS AGAIN — one harness could not fail, so none of
   them ran.** `db/tests/head-coach-flag.sql` printed its six answers under an
   `EXPECTED:` comment and left a human to compare them. `scripts/db-check.mjs`
@@ -31,6 +61,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   assertion 4 alone, or the injected fault was wider than the one named.
   ⚠️ **The nightly is still inert.** Fixing the harness did not add the secret,
   so these run only when somebody runs them.
+- `631fa32` — the squash that made `db:check` runnable again.
 - 👨‍👩‍👧 **SAVING A CHILD'S PARENT LIST IS NOW ALL-OR-NOTHING.**
   `public.save_player_parents` does the delete, the updates and the inserts in
   one statement, replacing up to N+2 separate PostgREST requests that each
