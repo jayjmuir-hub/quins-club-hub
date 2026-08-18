@@ -94,6 +94,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   and **it argues for an alias on the existing `noreply@` mailbox over a second
   shared mailbox** — because a second inbox is a second thing to remember to
   check, which is exactly how two test messages went unnoticed.
+- `e26dcac` — the squash that put the `?` on the live site.
+  ⚠️ **THIS CITATION IS OWED EVERY TIME, AND IT KEEPS BEING FORGOTTEN.** CI
+  compares `BASELINE..HEAD~1`, and on a pull-request run `HEAD~1` is the **base
+  tip** — so every branch cut from `main` must cite whatever `main` merged last,
+  even though that commit is not the branch's own work. Three PRs in a row went
+  red on exactly this. Cite the previous squash when you cut the branch, not
+  after CI tells you.
 - `52ec10c` — the squash of the DNS-runbook fix above.
 - `1e3c7bc` — the squash of the help-and-feedback plan below.
 
