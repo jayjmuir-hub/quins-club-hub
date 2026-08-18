@@ -21,11 +21,20 @@
 // that mattered most (an unhandled promise rejection, which in a data-fetching
 // app is the likelier failure than a render crash).
 //
-// ⚠️ NOTHING HAPPENS WITHOUT A DSN. `VITE_SENTRY_DSN` is a build-time variable
-// and is absent today — Jay has not created the account yet — so every function
-// here is a no-op and no chunk is ever fetched. That is deliberate rather than
-// unfinished: shipping an SDK that initialises against nothing would be all of
-// the cost and none of the benefit.
+// ⚠️ NOTHING HAPPENS WITHOUT A DSN. `VITE_SENTRY_DSN` is a build-time variable,
+// so every function here is a no-op wherever it is unset and no chunk is ever
+// fetched. That is deliberate rather than unfinished: shipping an SDK that
+// initialises against nothing would be all of the cost and none of the benefit.
+// It is unset in local development and in tests, which is why the suite drives
+// this file through setErrorReporterForTests below rather than a real DSN.
+//
+// ⚠️ IT IS SET IN PRODUCTION, AND THIS COMMENT SAID OTHERWISE FOR TWO DAYS.
+// It read "absent today — Jay has not created the account yet" until 18 Aug
+// 2026. Sentry went live on 16 Aug — EU region, proven by firing a real error
+// at the deployed site and watching it arrive — and a code review then read
+// this comment and recommended deleting `@sentry/react` as dead weight.
+// The status of a live service does not belong in a source comment, because
+// nothing recompiles when it changes. `claude/runbooks/monitoring.md` owns it.
 
 // ⚠️ READ ONCE, AT MODULE SCOPE. `import.meta.env` is replaced at BUILD time by
 // Vite, so this is a constant in the bundle — not a lookup, and not something a

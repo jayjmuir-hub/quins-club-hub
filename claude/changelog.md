@@ -10,6 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- ❓ **A HELP AND FEEDBACK BUTTON IS DESIGNED, AND THE HANDOFF THAT ASKED FOR IT
+  IS FOUR FACTS OUT OF DATE.** `claude/plans/2026-08-18-help-and-feedback.md`.
+  A 44px red `?` floating over every signed-in screen — **costing no layout
+  space, because `claude/specs/design-system.md` reserved 100px at the foot of
+  `main` for a FAB that was specified and never built.** Two lanes behind it,
+  one required field, page/device/version captured automatically, screenshot
+  **off** by default because rosters show children.
+  ✅ **`Reply-To` set to the reporter deletes a whole screen from the plan** —
+  the admin's inbox is the triage tool, so no status column and no admin list
+  in the first cut.
+  ⚠️ **The source handoff must not be followed as written.** It says to reuse
+  `src/components/IdeaForm.jsx`, which is the **Instagram post** form, consent
+  copy and all; it says Sentry is off (live since 16 Aug); and its
+  "non-negotiable" colours and fonts both describe the app as it was before the
+  6 Aug retheme. All four corrected in the plan.
+  ⚠️ **Nothing is built.** No component, no table, no function.
+- 🩹 **AND THE STALE HALF OF THAT WAS IN THE CODE.** `src/lib/errorReporting.js`
+  still said "Jay has not created the account yet" — a code review had already
+  read it and recommended deleting a live dependency. The status of a running
+  service does not belong in a source comment; `claude/runbooks/monitoring.md`
+  owns it.
+- `caddd7f` — the squash of the head-coach work below, which could not cite its
+  own SHA.
 - `14e0ce2` — 📧 **THE APPROVAL E-MAILS STOP GOING TO EVERYONE, AND "HEAD COACH" BECOMES DATA.**
   Jay: *"we don't need to email every single admin every time or all the
   coaches in an age group"*. Now super admins, the squad's head coach, and the
