@@ -258,15 +258,34 @@ $$;
 -- the presence of a revoke in the migration text. Reading the SQL is precisely
 -- what produced the wrong belief for a fortnight.
 --
--- ⛔ THE TWO ALLOWED ENTRIES ARE DELIBERATE AND MUST NOT BE "TIDIED":
+-- ⛔ ONE ALLOWED ENTRY IS DELIBERATE AND MUST NOT BE "TIDIED":
 --
 --   calendar_events_for_token — the calendar feed. supabase/functions/calendar
 --     calls it with the publishable key on behalf of Google/Apple, which carry
 --     no session. ⚠️ netlify.toml records that a subscribed URL cannot be
 --     changed remotely, so revoking this breaks every subscribed feed in the
 --     club with no way to warn anyone and no way to repair it.
---   register_my_player — granted `to authenticated, anon` explicitly by
---     20260809_register_my_player_gender.sql and 20260811_self_registration.sql.
+--
+-- ⚠️ `register_my_player` WAS THE SECOND ENTRY HERE UNTIL 18 Aug 2026, AND
+-- CALLING IT "DELIBERATE" WAS THE SAME MISTAKE THIS FILE'S OWN OPENING WARNS
+-- ABOUT — reading the migration text rather than asking why. The citation
+-- above named the two migrations that re-granted it (20260809_register_my_
+-- player_gender.sql, 20260811_self_registration.sql) as if an explicit grant
+-- proved a decision. It did not: `DROP FUNCTION` takes the old signature's
+-- ACLs with it, and both migrations' own comments say they are RESTATING the
+-- prior grant to avoid an outage, not choosing one. Neither migration gives a
+-- reason `anon` specifically needs it, and `claude/open-items.md` found the
+-- real one on 16 Aug — the same accidental-default-privilege pattern nine
+-- OTHER functions carried until someone added the explicit revoke.
+-- ⚠️ THE GRANT WAS ALSO FUNCTIONALLY INERT. `register_my_player`'s first line
+-- is `if auth.uid() is null then raise exception ... using errcode = '42501'`,
+-- and a genuinely anonymous PostgREST call — the only kind that ever executes
+-- as the `anon` ROLE, since a signed-in session runs as `authenticated` —
+-- always has a null `auth.uid()`. So the grant let an anonymous caller reach
+-- the function and be refused one line later, instead of refused at the door.
+-- Revoked in 20260818_revoke_anon_execute_register_my_player.sql. Measured
+-- unchanged by the revoke: a real signed-in registration, and the calendar
+-- feed, both still work — neither one runs this function as `anon`.
 create or replace function pg_temp.check_anon_execute() returns void language plpgsql as $$
 declare
   _unexpected text;
@@ -276,24 +295,19 @@ begin
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.prokind = 'f'
      and has_function_privilege('anon', p.oid, 'execute')
-     and p.proname not in ('calendar_events_for_token', 'register_my_player');
+     and p.proname not in ('calendar_events_for_token');
   if _unexpected is not null then
     raise exception 'anon can EXECUTE functions it should not: %. A `revoke ... from public` in the migration does NOT remove Supabase''s named grant to anon, and a `revoke ... from anon` does not remove a PUBLIC grant. Both are required.', _unexpected;
   end if;
 
   -- ⚠️ THE OTHER DIRECTION, AND IT IS NOT DECORATION. A future session
-  -- "hardening" this by revoking the two allowed entries would take the
+  -- "hardening" this by revoking the one allowed entry would take the
   -- calendar feed off every parent's phone, permanently. This arm turns that
   -- into a red harness instead of a silent outage nobody can undo.
   select string_agg(name, ', ') into _missing from (
     select 'calendar_events_for_token' as name
      where not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                         where n.nspname='public' and p.proname='calendar_events_for_token'
-                          and has_function_privilege('anon', p.oid, 'execute'))
-    union all
-    select 'register_my_player'
-     where not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                        where n.nspname='public' and p.proname='register_my_player'
                           and has_function_privilege('anon', p.oid, 'execute'))
   ) t;
   if _missing is not null then

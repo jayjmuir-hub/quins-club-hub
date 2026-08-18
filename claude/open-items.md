@@ -73,8 +73,8 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Cheap (under an hour each)
 
-- **`public.register_my_player` is executable by `anon`, and it looks deliberate
-  when it is not.** Measured on production 16 Aug 2026 while adding
+- ✅ ~~**`public.register_my_player` is executable by `anon`, and it looks
+  deliberate when it is not.** Measured on production 16 Aug 2026 while adding
   `request_staff_role`:
 
   ```
@@ -92,13 +92,33 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   FUNCTIONS TO anon, authenticated, service_role`, so a new function arrives with
   an EXPLICIT anon grant, and `revoke all … from public` does not remove it —
   it only removes the implicit PUBLIC entry. Whoever wrote the tightened three
-  added an explicit `revoke … from anon`; whoever wrote this one did not.
+  added an explicit `revoke … from anon`; whoever wrote this one did not.~~ —
+  **REVOKED 18 Aug 2026.**
+  `db/migrations/20260818_revoke_anon_execute_register_my_player.sql`.
 
-  Fix is one statement (`revoke execute on function public.register_my_player(…)
-  from anon`) plus the same line in its migration file. ⚠️ **Deliberately NOT
-  done on 16 Aug**: it touches the live registration path for tidiness rather
-  than for a defect, and the club is mid-onboarding. `request_staff_role` was
-  tightened at creation and carries the full explanation in its migration header.
+  ⚠️ **A SEPARATE FILE HAD CALLED THIS GRANT DELIBERATE, FOR FIVE DAYS, ON THE
+  SAME MISREADING THIS ITEM WARNS ABOUT.** `db/tests/grants.sql` §3b — written
+  13 Aug, three days before this item — named `register_my_player` alongside
+  `calendar_events_for_token` as one of "TWO ALLOWED ENTRIES ARE DELIBERATE AND
+  MUST NOT BE TIDIED", citing the two migrations that re-granted it explicitly
+  as evidence of a decision. **An explicit grant is evidence someone typed it,
+  not evidence someone decided it** — reading the two migrations shows both are
+  restating a DROP/CREATE side-effect to avoid an outage, and neither gives a
+  reason `anon` itself needs this function. A harness got the same fact this
+  item was built to catch wrong, in the opposite direction, and would have
+  failed loudly the moment anyone acted on THIS item without also fixing that
+  one. Both are now consistent.
+
+  ⚠️ **AND THE GRANT WAS FUNCTIONALLY INERT, WHICH ANSWERS WHY REVOKING IT
+  BROKE NOTHING.** A PostgREST call only executes as the `anon` role when it
+  carries no session; a signed-in user's calls run as `authenticated` whatever
+  this grant said. So the only caller who could ever reach the function AS
+  `anon` is one the `auth.uid() is null` guard was always going to refuse one
+  line later. Measured after the revoke, inside a rolled-back transaction: a
+  signed-in call with a deliberately bad team id still reaches past the
+  auth/email guards and fails on `22023 "That age group does not exist"` —
+  identical to before. `request_staff_role` was tightened at creation and
+  carries the full explanation in its migration header; this one now matches.
 
 - ✅ ~~**No dependency scanning.** No Dependabot, no `npm audit` step.~~ —
   **both shipped 15 Aug 2026.** `.github/dependabot.yml` watches npm weekly and
@@ -339,13 +359,16 @@ proves you wrong.**
 
 ### The two worth a migration
 
-- **`public.register_my_player` has `anon` EXECUTE and does not need it.** No
-  hole — the body's first statement refuses a null `auth.uid()`, proven above —
-  but the grant is unnecessary, and revoking it is the same reasoning as the
-  14 Aug table-privilege revoke: protection should come from the GRANT, not only
-  from the code behind it. The app calls this as `authenticated`, so nothing
-  legitimate loses access.
-  `revoke execute on function public.register_my_player(text, uuid, text, boolean, boolean, boolean) from anon;`
+- ✅ ~~**`public.register_my_player` has `anon` EXECUTE and does not need it.**
+  No hole — the body's first statement refuses a null `auth.uid()`, proven
+  above — but the grant is unnecessary, and revoking it is the same reasoning
+  as the 14 Aug table-privilege revoke: protection should come from the GRANT,
+  not only from the code behind it. The app calls this as `authenticated`, so
+  nothing legitimate loses access.
+  `revoke execute on function public.register_my_player(text, uuid, text, boolean, boolean, boolean) from anon;`~~
+  — **DONE, 18 Aug 2026.** Full account, and the harness that had called this
+  grant deliberate on the strength of the same misreading, in the "Cheap"
+  section above.
 - **Ten `private.` functions carry an `anon` EXECUTE grant**, including
   `squad_expects_gender`, which is also the one function the advisor flags for a
   mutable `search_path`. ⚠️ **IT IS `SECURITY INVOKER`, SO THE search_path LINT
@@ -690,9 +713,15 @@ Run `get_advisors` rather than trusting this list. As of 14 Aug 2026:
 - ⚠️ **Two lint types are NEWER THAN THE 13 Aug AUDIT and have never been read
   through**: `SECURITY DEFINER` functions executable by `anon`, and by
   `authenticated`. Several are deliberate and documented —
-  `calendar_events_for_token` and `register_my_player` keep `anon` on purpose,
-  and `db/tests/grants.sql` §3b asserts it in BOTH directions. **The rest have
-  not been assessed.** This is a read-through, not an alarm.
+  `calendar_events_for_token` keeps `anon` on purpose, and `db/tests/grants.sql`
+  §3b asserts it in both directions. **The rest have not been assessed.** This
+  is a read-through, not an alarm.
+  ⚠️ **THIS LINE ITSELF CARRIED THE STALE CLAIM UNTIL 18 Aug 2026** — it named
+  `register_my_player` as deliberate too, on the same evidence (an explicit
+  re-grant in two migrations) that `claude/open-items.md`'s "Cheap" section had
+  already, elsewhere in this same file, correctly identified as NOT a decision.
+  Two sections of one file disagreed about one grant for five days. Revoked;
+  see the "Cheap" section entry for the full account.
 
 ## Shipped but never seen against real data
 
