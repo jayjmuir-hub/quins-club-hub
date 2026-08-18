@@ -8,9 +8,25 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 18 Aug 2026
+
+- ⛔ **ROUTE-LEVEL CODE SPLITTING — BUILT, MEASURED, AND NOT TAKEN.** Jay's call.
+  The saving was real and **larger** than the figure on file (283.51 → 244.08 kB
+  gzip, −39.43, against the −27.26 recorded), but the argument that would have
+  carried it turned out to be false: splitting does **not** make deploys cheaper
+  for members. One rendered string changed in `Allocation.jsx` moved **every**
+  chunk hash, because lazy chunks import shared code from the entry chunk, so a
+  leaf change bumps the entry and the entry bump rewrites every sibling.
+  ⚠️ **The measurement read false twice first** — a comment is stripped by the
+  minifier and an unimported `const` is tree-shaken, so both rebuilt
+  byte-identically and said "one edit changes nothing".
+  Nothing was committed to `src/`.
+  `claude/decisions/2026-08-18-no-route-level-code-splitting.md`, and the item in
+  `claude/open-items.md` is struck through rather than removed.
+
 ## 17 Aug 2026
 
-- ⚡ **EVERY MEMBER WAS DOWNLOADING 400 COUNTRY FLAGS BEFORE THE FIRST PAINT, AND
+- `3120dc9` — ⚡ **EVERY MEMBER WAS DOWNLOADING 400 COUNTRY FLAGS BEFORE THE FIRST PAINT, AND
   AGAIN INTO THEIR PWA INSTALL.** One line in `vite.config.js`:
   `index.css` **475.15 → 84.31 kB (gzip 95.74 → 18.37)**, precache
   **1682.76 → 1301.08 KiB**, flags inlined **400 → 0**.
