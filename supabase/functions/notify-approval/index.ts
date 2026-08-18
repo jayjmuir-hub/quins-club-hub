@@ -332,33 +332,62 @@ Deno.serve(async (request: Request): Promise<Response> => {
       return new Response(JSON.stringify({ skipped: 'no longer pending' }), { status: 200 })
     }
 
-    // -- Who to tell: every admin in the club, plus the coaches and team
-    //    managers of THIS squad. Deliberately the same list as
-    //    private.can_approve_team - the people who can act on it.
+    // -- Who to tell: SUPER admins, plus the head coach and team manager(s) of
+    //    THIS squad. Jay, 18 Aug 2026: "we don't need to email every single
+    //    admin every time or all the coaches in an age group".
     //
-    // !! NOT medic, matching the approval rule. A medic cannot approve, so an
-    // email asking them to would be an instruction they cannot follow.
-    const [admins, squadStaff] = await Promise.all([
+    // !! THIS IS DELIBERATELY NARROWER THAN private.can_approve_team, AND THAT
+    //    IS THE CHANGE. It used to be the same list - every admin in the club
+    //    plus every coach and manager on the squad - on the reasoning that the
+    //    people who CAN act should be told. In practice that meant an assistant
+    //    coach got an email for every registration in their age group, and all
+    //    five admins got one whether or not they run registrations.
+    //    Everyone who could approve before still can; they are simply not all
+    //    told. Authority is private.can_approve_team's business, not this
+    //    function's.
+    //
+    // !! NOT medic, unchanged. A medic cannot approve, so an email asking them
+    //    to would be an instruction they cannot follow.
+    //
+    // !! THE HEAD COACH IS A COLUMN, NOT A TITLE MATCH. `memberships.title` is
+    //    free text with no constraints and already holds 'Assistant
+    //    Coach/Medic' on production; matching '%head coach%' would drop a
+    //    recipient silently the first time somebody typed 'HC'. The database
+    //    guarantees at most one per squad
+    //    (memberships_one_head_coach_per_team), so this cannot fan out.
+    //
+    // !! MANAGERS BY ROLE, NOT BY TITLE, and there may be more than one - Jay
+    //    asked for "the team manager or team managers if there is more than
+    //    one". role='manager' and the title 'Team Manager' cover the same
+    //    squads today, and a role cannot break on a typo.
+    const [supers, squadStaff] = await Promise.all([
       db(
         `memberships?club_id=eq.${encodeURIComponent(membership.club_id)}` +
-          '&role=eq.admin&status=eq.active&select=profiles(email)',
+          '&is_super=is.true&status=eq.active&select=profiles(email)',
       ),
       db(
         `memberships?team_id=eq.${encodeURIComponent(membership.team_id)}` +
-          '&role=in.(coach,manager)&status=eq.active&select=profiles(email)',
+          '&status=eq.active&or=(is_head_coach.is.true,role.eq.manager)&select=profiles(email)',
       ),
     ])
 
     const recipients = [...new Set(
-      [...admins, ...squadStaff]
+      [...supers, ...squadStaff]
         .map((row: any) => row?.profiles?.email)
         .filter((email: unknown): email is string => typeof email === 'string' && email.includes('@')),
     )]
 
     if (recipients.length === 0) {
-      // Not an error: a club with no admin and no coach on that squad is a
-      // configuration problem, and sending nothing is the correct outcome.
+      // Not an error: a club with no super admin and nobody running that squad
+      // is a configuration problem, and sending nothing is the correct outcome.
       // Logged because it means somebody's registration will sit unseen.
+      //
+      // !! THE SUPER ADMINS ARE THE FLOOR, and that is what makes the narrowing
+      //    above safe. A squad with no head coach and no manager - measured, one
+      //    of them on 18 Aug 2026 - still reaches the super admins, so a request
+      //    is never lost; the squad simply is not told. This branch therefore
+      //    means there is no active super admin either, which is a different and
+      //    much louder problem.
       console.error(`no recipients for membership ${membershipId} - nobody will be told`)
       return new Response(JSON.stringify({ sent: 0 }), { status: 200 })
     }

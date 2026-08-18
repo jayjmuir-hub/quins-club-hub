@@ -53,7 +53,7 @@ export async function listSquadStaff() {
       const { data, error } = await withCap(
         supabase
           .from('memberships')
-          .select('id, profile_id, team_id, role, title, profiles(full_name, email, phone, photo_path, photo_focus_x, photo_focus_y)')
+          .select('id, profile_id, team_id, role, title, is_head_coach, profiles(full_name, email, phone, photo_path, photo_focus_x, photo_focus_y)')
           .in('role', SQUAD_STAFF_ROLES)
           .eq('status', 'active')
           .not('team_id', 'is', null),
@@ -113,6 +113,12 @@ export function toStaffMember(row) {
     profileId: row.profile_id ?? null,
     role: row.role,
     title: String(row.title ?? '').trim() || null,
+    // ⚠️ THE FLAG, NOT THE TITLE, AND THEY ARE NOT THE SAME QUESTION. `title`
+    // is a label an admin types and it grants nothing; `is_head_coach` is what
+    // the approval e-mails read to decide who hears about a registration. A
+    // squad can say "Head Coach" and not carry the flag — that is exactly the
+    // drift the flag exists to end, and the screen shows both so it is visible.
+    isHeadCoach: row.is_head_coach === true,
     name: name || email || 'No name yet',
     email: email || null,
     phone: String(row.profiles?.phone ?? '').trim() || null,
@@ -284,5 +290,50 @@ export async function setMembershipTitle({ membershipId, title } = {}) {
 
   if (error) throw error
   if (!data) throw new Error(REFUSED_TITLE)
+  return data
+}
+
+export const REFUSED_HEAD_COACH =
+  "We couldn't save that — either you may not change this squad's staff, or the squad already has a head coach."
+
+/**
+ * Makes one membership the squad's head coach, or clears the flag.
+ *
+ * ⚠️ THIS IS WHAT THE APPROVAL E-MAILS READ, and `title` is not. Setting
+ * somebody's title to "Head Coach" changes a label and nothing else; this
+ * changes who is told when a parent registers a child. Both exist on purpose —
+ * see `toStaffMember` above.
+ *
+ * ⚠️ THE EMPTY-RESULT PATTERN IS LOAD-BEARING, exactly as it is for
+ * `setMembershipTitle`: a write RLS refuses returns a perfectly successful
+ * EMPTY result, so without `.maybeSingle()` and this throw, a save the database
+ * rejected looks like a save that worked until the screen is reloaded.
+ *
+ * ⚠️ AND ONE FAILURE HERE IS NOT A PERMISSION PROBLEM AT ALL. The database
+ * holds a partial unique index (`memberships_one_head_coach_per_team`), so
+ * setting a second head coach on a squad raises 23505 rather than returning
+ * empty. That is a real error and reaches the caller as one; the message says
+ * both causes because the screen cannot tell them apart without guessing.
+ * db/tests/head-coach-flag.sql proves the index is what refuses it.
+ *
+ * ⚠️ IF THIS EVER FAILS WITH A PERMISSION ERROR, SUSPECT THE COLUMN GRANT
+ * FIRST, not the policy — `authenticated` holds column-level UPDATE on
+ * `memberships` and `is_head_coach` is writable only because
+ * db/migrations/20260818_membership_head_coach.sql granted that one column.
+ * **Do not "fix" it with a table-level grant**, which would hand every admin
+ * write access to `is_super`.
+ */
+export async function setMembershipHeadCoach({ membershipId, isHeadCoach } = {}) {
+  if (!membershipId) throw new Error('setMembershipHeadCoach needs a membershipId.')
+
+  const { data, error } = await supabase
+    .from('memberships')
+    .update({ is_head_coach: isHeadCoach === true })
+    .eq('id', membershipId)
+    .select('id, is_head_coach')
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(REFUSED_HEAD_COACH)
   return data
 }

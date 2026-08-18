@@ -9,7 +9,7 @@ import PhotoPositioner, {
   clampFocus,
   focusToObjectPosition,
 } from '../components/PhotoPositioner.jsx'
-import { listSquadStaff, setMembershipTitle } from '../data/staff.js'
+import { listSquadStaff, setMembershipTitle, setMembershipHeadCoach } from '../data/staff.js'
 import { deleteStaffPhoto, setStaffPhoto, signStaffPhotoUrl, uploadStaffPhoto } from '../data/photos.js'
 import { initials } from '../lib/playerFormat.js'
 import { STAFF_TITLES, labelForRole } from '../lib/scope.js'
@@ -294,12 +294,38 @@ function StaffPhoto({ member, onPhoto }) {
   )
 }
 
-function StaffRow({ member, onSaved, onPhoto }) {
+function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto }) {
   const [title, setTitle] = useState(member.title ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [headCoach, setHeadCoach] = useState(member.isHeadCoach === true)
+  const [headBusy, setHeadBusy] = useState(false)
+  const [headError, setHeadError] = useState(null)
 
   const roleLabel = labelForRole(member.role)
+
+  // ⚠️ THE BOX GOES BACK ON A FAILURE, and that is the whole point of doing
+  // this here rather than letting the checkbox own its own state. The commonest
+  // failure is the unique index refusing a SECOND head coach — the write fails,
+  // the squad is unchanged, and a box left ticked would say otherwise.
+  async function saveHeadCoach(next) {
+    setHeadCoach(next)
+    setHeadBusy(true)
+    setHeadError(null)
+    try {
+      const saved = await setMembershipHeadCoach({
+        membershipId: member.membershipId,
+        isHeadCoach: next,
+      })
+      setHeadCoach(saved.is_head_coach === true)
+      onHeadCoachSaved(member.membershipId, saved.is_head_coach === true)
+    } catch (err) {
+      setHeadCoach(member.isHeadCoach === true)
+      setHeadError(err.message)
+    } finally {
+      setHeadBusy(false)
+    }
+  }
 
   async function save() {
     const next = title.trim()
@@ -362,6 +388,43 @@ function StaffRow({ member, onSaved, onPhoto }) {
           </span>
         )}
       </div>
+
+      {/* ⚠️ THE FLAG, WHICH IS NOT THE TITLE ABOVE IT, and the two are separate
+          on purpose. The title is a label — it reads nicely on the squad card
+          and grants nothing. THIS decides who is e-mailed when a parent
+          registers a child for this squad. A squad can read "Head Coach" and
+          not carry the flag, which is precisely the drift the flag was added to
+          end, so both are shown together rather than one standing for the other.
+
+          ⚠️ COACHES ONLY. The database refuses the flag on anything else
+          (memberships_head_coach_is_a_squad_coach), so offering it to a manager
+          or a medic would be offering a control that always fails.
+
+          ⚠️ NOT A RADIO GROUP, DELIBERATELY. One head coach per squad is
+          enforced by a unique index, so moving the job is unticking one person
+          and ticking another — two explicit actions. A radio would have to
+          clear-then-set behind the scenes, and a half-failed pair would leave
+          the squad with NO head coach and nobody told about it. */}
+      {member.role === 'coach' && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-[12.5px] font-bold text-ink-muted">
+            <input
+              type="checkbox"
+              checked={headCoach}
+              disabled={headBusy}
+              onChange={(event) => saveHeadCoach(event.target.checked)}
+              className="h-4 w-4 rounded-[4px] border-line text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            />
+            Head coach — gets the approval emails for this squad
+          </label>
+          {headBusy && <span className="text-[12.5px] text-ink-faint">Saving…</span>}
+          {headError && (
+            <span role="alert" className="text-[12.5px] font-bold text-brand">
+              {headError}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -386,7 +449,7 @@ function StaffRow({ member, onSaved, onPhoto }) {
  * contacts card it borrows its look from is read-only. Moving editing behind a
  * second tap would have made it prettier and worse.
  */
-function SquadRow({ squad, open, onToggle, onSaved, onPhoto }) {
+function SquadRow({ squad, open, onToggle, onSaved, onHeadCoachSaved, onPhoto }) {
   const panelId = `squad-panel-${squad.id}`
   const missing = squad.staff.length === 0
   // ⚠️ THE TITLE, FALLING BACK TO THE ROLE — Jay, 16 Aug 2026: "should be Head
@@ -471,6 +534,7 @@ function SquadRow({ squad, open, onToggle, onSaved, onPhoto }) {
                 key={member.membershipId}
                 member={member}
                 onSaved={onSaved}
+                onHeadCoachSaved={onHeadCoachSaved}
                 onPhoto={onPhoto}
               />
             ))
@@ -527,6 +591,23 @@ export default function AdminStaff() {
         ...squad,
         staff: squad.staff.map((member) =>
           member.membershipId === membershipId ? { ...member, title } : member,
+        ),
+      })),
+    )
+  }, [])
+
+  // ⚠️ ONLY THE SAVED ROW MOVES, and it must not try to be clever. One head
+  // coach per squad is enforced by a unique index, so it is tempting to clear
+  // the flag on every other member here the moment one is ticked. That would be
+  // a LIE whenever the write failed: the index refuses the second write, so the
+  // previous head coach still IS one, and the screen would show a squad with
+  // nobody. The row the database confirmed is the only row that changes.
+  const onHeadCoachSaved = useCallback((membershipId, isHeadCoach) => {
+    setSquads((current) =>
+      (current ?? []).map((squad) => ({
+        ...squad,
+        staff: squad.staff.map((member) =>
+          member.membershipId === membershipId ? { ...member, isHeadCoach } : member,
         ),
       })),
     )
@@ -618,6 +699,7 @@ export default function AdminStaff() {
               open={openIds.has(squad.id)}
               onToggle={() => toggle(squad.id)}
               onSaved={onSaved}
+              onHeadCoachSaved={onHeadCoachSaved}
               onPhoto={onPhoto}
             />
           ))}

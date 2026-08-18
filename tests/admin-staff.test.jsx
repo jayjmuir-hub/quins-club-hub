@@ -15,10 +15,12 @@ import userEvent from '@testing-library/user-event'
 
 const listSquadStaffMock = vi.fn()
 const setMembershipTitleMock = vi.fn()
+const setMembershipHeadCoachMock = vi.fn()
 
 vi.mock('../src/data/staff.js', () => ({
   listSquadStaff: (...args) => listSquadStaffMock(...args),
   setMembershipTitle: (...args) => setMembershipTitleMock(...args),
+  setMembershipHeadCoach: (...args) => setMembershipHeadCoachMock(...args),
 }))
 
 // The photo half (15 Aug 2026). Mocked so this file stays network-free; the
@@ -37,11 +39,16 @@ vi.mock('../src/data/photos.js', () => ({
 
 import AdminStaff from '../src/screens/AdminStaff.jsx'
 
+// ⚠️ TITLED 'Head Coach' AND NOT FLAGGED, ON PURPOSE. That combination is the
+// exact drift memberships.is_head_coach was added to end: the label reads right
+// on the squad card while the approval e-mails still do not know who to tell.
+// A fixture where the two agree could not tell the title and the flag apart.
 const COACH = {
   membershipId: 'm-coach',
   profileId: 'p-coach',
   role: 'coach',
   title: 'Head Coach',
+  isHeadCoach: false,
   name: 'Alex Morgan',
   email: 'alex@example.com',
   phone: '+971500000001',
@@ -554,5 +561,70 @@ describe('AdminStaff — replacement does not strand storage objects', () => {
     expect(setStaffPhotoMock.mock.invocationCallOrder[0]).toBeLessThan(
       deleteStaffPhotoMock.mock.invocationCallOrder[0],
     )
+  })
+})
+
+// ── the head-coach flag (18 Aug 2026) ───────────────────────────────────────
+//
+// The approval e-mails go to the head coach, and "head coach" used to mean
+// matching `title` against '%head coach%' — free text, no constraints, and
+// production already holds 'Assistant Coach/Medic'. The flag is the
+// machine-readable half. These assert the SCREEN's half of that.
+describe('the head-coach flag', () => {
+  const headCoachBox = () => screen.getByRole('checkbox', { name: /head coach/i })
+
+  it('offers the flag to a coach and not to a medic', async () => {
+    const { user } = renderStaff()
+    await openEverySquad(user)
+
+    // ⚠️ THE MEDIC IS THE CONTROL, and without it this asserts almost nothing:
+    // a checkbox rendered for every staff row would pass the coach half. The
+    // database refuses the flag on a non-coach, so offering it there would be a
+    // control that always fails.
+    expect(headCoachBox()).toBeInTheDocument()
+    expect(screen.getAllByRole('checkbox', { name: /head coach/i })).toHaveLength(1)
+  })
+
+  it('is unticked for a coach TITLED head coach but not flagged', async () => {
+    const { user } = renderStaff()
+    await openEverySquad(user)
+
+    // The fixture's title says "Head Coach". The flag says otherwise, and the
+    // flag is what the e-mails read.
+    expect(headCoachBox()).not.toBeChecked()
+  })
+
+  it('saves the flag and keeps it ticked', async () => {
+    setMembershipHeadCoachMock.mockResolvedValue({ id: 'm-coach', is_head_coach: true })
+    const { user } = renderStaff()
+    await openEverySquad(user)
+
+    await user.click(headCoachBox())
+
+    await waitFor(() =>
+      expect(setMembershipHeadCoachMock).toHaveBeenCalledWith({
+        membershipId: 'm-coach',
+        isHeadCoach: true,
+      }),
+    )
+    await waitFor(() => expect(headCoachBox()).toBeChecked())
+  })
+
+  // ⚠️ THIS IS THE ONE WORTH HAVING. The commonest real failure is the unique
+  // index refusing a SECOND head coach on a squad — the write fails and the
+  // squad is unchanged. A checkbox left ticked would tell the admin they had
+  // moved the job when they had not, and the next thing they would notice is
+  // an approval e-mail that never arrived.
+  it('puts the box BACK when the database refuses the save', async () => {
+    setMembershipHeadCoachMock.mockRejectedValue(
+      new Error('We couldn’t save that — the squad already has a head coach.'),
+    )
+    const { user } = renderStaff()
+    await openEverySquad(user)
+
+    await user.click(headCoachBox())
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    expect(headCoachBox()).not.toBeChecked()
   })
 })
