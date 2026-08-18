@@ -20,3 +20,12 @@ _transfer.b64
 # .claude/settings.json IS tracked and must stay so - it wires the session
 # guard. settings.local.json is covered by the global gitignore, not here.
 .claude/launch.json
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+# ⚠️ ANCHORED WITH A LEADING SLASH ON PURPOSE. `graft build` writes this rule
+# itself, UNANCHORED, on every fresh clone or worktree — and an unanchored
+# pattern matches a directory named `graft` at ANY depth, which silently
+# swallows `.claude/skills/graft/SKILL.md`, the skill graft itself installs.
+# Proven here with `git check-ignore -v`. Keep the slash, and expect to
+# re-apply it after a graft build in a new worktree.
+/graft/

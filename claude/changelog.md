@@ -10,6 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- `8d30114` — 🧹 **THE graft IGNORE RULE IS ANCHORED, AND `.ignore` IS NOW TRACKED.**
+  `graft build` appends an **unanchored** `graft/` to `.gitignore`, and an
+  unanchored pattern matches a directory of that name at ANY depth — so it
+  silently hid **`.claude/skills/graft/SKILL.md`, the skill graft itself
+  installs**. Proven with `git check-ignore -v`, which named
+  `.gitignore:25:graft/` as the rule doing it.
+  ⚠️ **THIS IS NOT A ONE-OFF — graft REWRITES THE RULE ON EVERY FRESH CLONE OR
+  WORKTREE**, so the main clone was already carrying the anchored fix and the
+  unanchored re-addition underneath it at the same time. The comment now says so,
+  rather than only saying "keep the slash".
+  ✅ Checked BOTH directions, because one way round proves nothing here:
+  `SKILL.md` is no longer ignored, and `graft/INDEX.md` still is.
+  `.ignore` is committed for the first time: ripgrep reads it before
+  `.gitignore`, so its `!graft/` is the only thing keeping the index greppable
+  while `/graft/` keeps it out of commits.
+  ⚠️ **A DOTFILE BUILDS.** `scripts/netlify-ignore.mjs` skips `claude/`, `docs/`,
+  `db/` and ROOT MARKDOWN only — `/^[^/]+\.md$/` does not match `.gitignore`, so
+  this one deployed where the entry above it did not.
+
 - ⛔ **ROUTE-LEVEL CODE SPLITTING — BUILT, MEASURED, AND NOT TAKEN.** Jay's call.
   The saving was real and **larger** than the figure on file (283.51 → 244.08 kB
   gzip, −39.43, against the −27.26 recorded), but the argument that would have

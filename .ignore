@@ -1,0 +1,8 @@
+# Committed on purpose. `graft build` writes this file, and it is what keeps
+# graft's cards greppable: ripgrep reads .ignore BEFORE .gitignore, so the
+# `!graft/` below re-admits the tree to SEARCH while `/graft/` in .gitignore
+# still keeps it out of COMMITS. Without it, `rg` goes blind to the index.
+# The .cache and .graph lines stay excluded - they are noisy machine state.
+!graft/
+graft/.cache/
+graft/.graph/
