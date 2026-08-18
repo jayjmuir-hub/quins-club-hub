@@ -250,6 +250,7 @@
 --   memberships.role            authenticated   UPDATE
 --   memberships.status          authenticated   UPDATE
 --   memberships.title           authenticated   UPDATE   ← 13 Aug 2026
+--   memberships.is_head_coach   authenticated   UPDATE   ← 18 Aug 2026
 --
 -- ⚠️ `profiles.no_player_confirmed_at` IS THE SECOND TIME THIS TRAP WAS MET AND
 -- THE FIRST TIME IT WAS SEEN COMING. Added 16 Aug 2026 for the sign-in gate,

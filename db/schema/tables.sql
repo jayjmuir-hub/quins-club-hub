@@ -569,6 +569,26 @@ CREATE TABLE public.memberships (
   -- refusal. See grants.sql — and do NOT fix such a failure with a table-level
   -- grant, which would hand every admin write access to is_super.
   title         text,
+  -- ── Added 2026-08-18, migration membership_head_coach ──
+  --
+  -- WHICH coach is THE head coach, as data rather than as a string somebody
+  -- typed. The notify functions read this to decide who hears about an
+  -- approval; `title` above stays a label that grants nothing and is read by
+  -- nothing but the screen.
+  --
+  -- ⚠️ THIS IS THE COLUMN `title` DELIBERATELY IS NOT. The comment above says
+  -- anything branching on `title` is a bug — this is what such code should use
+  -- instead. It was added precisely because matching '%head coach%' against
+  -- free text would fail silently: production already holds
+  -- 'Assistant Coach/Medic', and a squad recorded as 'HC' would match nothing
+  -- while nobody learned an e-mail had not been sent.
+  --
+  -- ⚠️ STILL NOT PERMISSION. A head coach can do exactly what a coach can do;
+  -- private.can_edit_team keys off `role` and does not know this column exists.
+  -- It decides who gets TOLD, never who may act.
+  --
+  -- ⚠️ ITS COLUMN GRANT IS LOAD-BEARING, same trap as `title` — see grants.sql.
+  is_head_coach boolean NOT NULL DEFAULT false,
   CONSTRAINT memberships_pkey            PRIMARY KEY (id),
   CONSTRAINT memberships_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT memberships_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
@@ -577,6 +597,12 @@ CREATE TABLE public.memberships (
   -- ⚠️ 'manager' and 'medic' added 2026-08-05 (roles_manager_and_medic). This
   -- file listed only four roles until the 7 Aug re-capture.
   CONSTRAINT memberships_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text, 'medic'::text, 'parent'::text, 'player'::text]))),
+  -- Added 2026-08-18 (membership_head_coach). A head coach is a COACH ON A
+  -- SQUAD; without this the flag could sit on an admin (team_id null) or a
+  -- parent and the notify functions would inherit a recipient that makes no
+  -- sense. Written as `NOT is_head_coach OR ...` so it is silent for every row
+  -- where the flag is false.
+  CONSTRAINT memberships_head_coach_is_a_squad_coach CHECK ((NOT is_head_coach OR (role = 'coach'::text AND team_id IS NOT NULL))),
   -- Added 2026-08-08 (membership_pending_status). Two values only, as found;
   -- there is no 'rejected'/'dismissed' value on this column.
   CONSTRAINT memberships_status_check     CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text]))),
@@ -618,6 +644,21 @@ ALTER TABLE public.memberships ENABLE ROW LEVEL SECURITY;
 -- found; adding `status` to this index would silently reverse it.
 CREATE UNIQUE INDEX memberships_unique_grant ON public.memberships
   USING btree (profile_id, club_id, role, team_id, player_id) NULLS NOT DISTINCT;
+
+-- Added 2026-08-18 (membership_head_coach). ONE head coach per squad, Jay's
+-- ruling, enforced by the database rather than hoped for.
+--
+-- ⚠️ PARTIAL, AND THAT IS WHAT MAKES IT FREE. Rows with the flag false are not
+-- in the index at all, so the ordinary case costs nothing and the many rows
+-- with a null team_id cannot collide with each other. It is also what lets the
+-- notify functions treat "the head coach" as a single recipient instead of
+-- defending against duplicates.
+--
+-- ⚠️ PROVED BY DROPPING IT: db/tests/head-coach-flag.sql sets a second head
+-- coach on one squad and gets 23505; with this index dropped the same update
+-- is ALLOWED. That flip is the evidence the index is what refuses it.
+CREATE UNIQUE INDEX memberships_one_head_coach_per_team ON public.memberships
+  USING btree (team_id) WHERE is_head_coach;
 
 -- Added 2026-08-09 (scale_indexes_and_availability_policy_merge).
 --
