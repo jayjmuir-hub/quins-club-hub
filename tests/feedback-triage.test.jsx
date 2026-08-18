@@ -8,10 +8,13 @@ import userEvent from '@testing-library/user-event'
 
 const listFeedbackMock = vi.fn()
 const setFeedbackStatusMock = vi.fn()
+const unsubscribeSpy = vi.fn()
+const subscribeFeedbackMock = vi.fn(() => unsubscribeSpy)
 
 vi.mock('../src/data/feedback.js', () => ({
   listFeedback: (...args) => listFeedbackMock(...args),
   setFeedbackStatus: (...args) => setFeedbackStatusMock(...args),
+  subscribeFeedback: (...args) => subscribeFeedbackMock(...args),
   feedbackRef: (ref) => (ref == null ? null : `QCH-${String(ref).padStart(4, '0')}`),
   FEEDBACK_STATUSES: ['new', 'in-progress', 'done', 'wontfix'],
   OPEN_STATUSES: ['new', 'in-progress'],
@@ -56,6 +59,8 @@ const rows = [
 beforeEach(() => {
   listFeedbackMock.mockReset()
   setFeedbackStatusMock.mockReset()
+  subscribeFeedbackMock.mockClear()
+  unsubscribeSpy.mockClear()
   listFeedbackMock.mockResolvedValue(rows)
   setFeedbackStatusMock.mockResolvedValue({})
 })
@@ -162,5 +167,32 @@ describe('replying to a report', () => {
     expect(await screen.findByTestId('feedback-summary')).toHaveTextContent(
       /reply you save here is what the reporter reads/i,
     )
+  })
+})
+
+describe('live updates', () => {
+  it('subscribes once, and tears the channel down on unmount', async () => {
+    const view = render(<FeedbackTriage />)
+    await screen.findByTestId('feedback-summary')
+    expect(subscribeFeedbackMock).toHaveBeenCalledTimes(1)
+    // ⚠️ A leaked channel per mount is how an admin ends up with a dozen open
+    // sockets after navigating around, and nothing visible ever goes wrong.
+    view.unmount()
+    expect(unsubscribeSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-reads when a change arrives rather than patching from the payload', async () => {
+    render(<FeedbackTriage />)
+    await screen.findByTestId('feedback-summary')
+    expect(listFeedbackMock).toHaveBeenCalledTimes(1)
+
+    // Fire whatever the component handed to the subscription.
+    const onChange = subscribeFeedbackMock.mock.calls[0][0]
+    await waitFor(() => expect(typeof onChange).toBe('function'))
+    onChange({ eventType: 'INSERT' })
+
+    // ⚠️ Re-read, not patch: the payload carries no joined `profiles`, so
+    // applying it directly would blank the reporter's name on that row.
+    await waitFor(() => expect(listFeedbackMock).toHaveBeenCalledTimes(2))
   })
 })
