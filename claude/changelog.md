@@ -10,6 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- `75bbe35` — 🧹 **TWO STALE DOC CLAIMS, ONE OF WHICH NEARLY GOT LIVE ERROR MONITORING DELETED.**
+  `CLAUDE.md` said *"Sentry is built but off"* for five days after it went live
+  on 16 Aug. A code review read that line and recommended stripping
+  `@sentry/react` as dead weight — which would have removed error reporting from
+  a production app real families use. ⚠️ **`claude/runbooks/monitoring.md` was
+  RIGHT the whole time**; the summary in the file that outranks it was wrong, and
+  a reviewer reasonably trusted the higher-precedence one. **Confirmed live from
+  the DEPLOYED BUNDLE, not from a document** — Sentry/ingest markers present,
+  against a control string known to be there so an empty grep could not read as
+  absence.
+  ⚠️ **THE SECOND ONE IS ANNOTATED, NOT CORRECTED.** `claude/open-items.md`
+  recorded `/calendar.ics` answering **200 `text/calendar`** to a bogus token;
+  re-run 18 Aug it answers **404 `text/plain`, body `Not found`**. The 14 Aug
+  record stands and the change is noted beneath it.
+  ✅ **It is NOT the failure that line exists to catch** — the dangerous case is
+  the SPA catch-all answering 200 with the app's HTML, which the free uptime
+  check cannot see. A plain-text 404 is the edge function refusing, so the proxy
+  is still wired. ✅ **And not a regression from the 18 Aug releases**: the
+  previous production deploy's permalink answers identically.
+  ⚠️ **NOT VERIFIED: that a VALID token still returns 200.** That needs a real
+  token, which is an unrevocable credential in a URL, and it was deliberately not
+  used. The Better Stack monitor carries one; treat its silence as the evidence.
+
 - `a880a61` — 🔌 **graft IS WIRED INTO CLAUDE CODE — HOOKS, STATUSLINE AND MCP.**
   `.mcp.json` runs `npx @nanonets/graft mcp`; `.claude/settings.json` adds a
   session-start hook, a post-edit refresh on `Write|Edit|MultiEdit`, a savings

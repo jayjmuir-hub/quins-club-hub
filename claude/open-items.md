@@ -240,6 +240,24 @@ been shown what each one actually fails with. ⚠️ **Every one of them is ALSO
   charset=utf-8`, a real `BEGIN:VCALENDAR` body**. It is SECURITY DEFINER and
   never depended on an anon table grant, but it is the one thing here that
   could not be repaired if it broke.
+  ⚠️ **THAT PROBE NO LONGER RETURNS 200, AND THE LINE ABOVE IS KEPT AS THE
+  RECORD OF 14 Aug RATHER THAN CORRECTED.** Re-run 18 Aug 2026: a bogus token
+  now answers **404, `content-type: text/plain; charset=UTF-8`, body
+  `Not found`**. The edge function tightened at some point between the two
+  dates — arguably an improvement, since an invalid token no longer receives a
+  valid-looking empty calendar.
+  ✅ **IT IS NOT THE FAILURE THIS LINE EXISTS TO CATCH.** The dangerous case is
+  the SPA catch-all answering **200 with the app's HTML**, which the free uptime
+  check cannot see (`claude/runbooks/monitoring.md`). A plain-text 404 is the
+  edge function itself refusing, so the proxy is still wired.
+  ⚠️ **AND IT IS NOT A REGRESSION FROM THE 18 Aug RELEASES** — measured against
+  the PREVIOUS production deploy's permalink as well as the current one, and
+  both answer identically.
+  ⚠️ **WHAT WAS NOT VERIFIED: THAT A VALID TOKEN STILL RETURNS 200.** That needs
+  a real token, which is an unrevocable credential in a URL (see the item below)
+  and was deliberately not used. **The Better Stack monitor carries a real one
+  and is the thing that would catch a genuine break** — so treat its silence,
+  not this paragraph, as the evidence the feed works.
   ⚠️ **IT REMAINS A PARTIAL FIX:** the
   `postgres` default privilege can be closed, the `supabase_admin` one cannot, so a
   table created down that path still arrives open. The harness walks every table
