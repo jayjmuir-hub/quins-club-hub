@@ -239,15 +239,26 @@ Deno.serve(async (request) => {
         to: [reporterEmail],
         replyTo: HELP_MAILBOX,
         subject: `Thanks — we got it (${reference})`,
+        // ⚠️ IT MUST SAY WHERE UPDATES APPEAR, AND THIS IS THE ONLY PLACE THE
+        // PERSON IS TOLD. Jay, 18 Aug 2026: replies are "in app only" — no
+        // second e-mail when an admin answers. So if this paragraph goes, the
+        // club writes replies into a screen nobody has been told to open.
         html:
           `<p>Thanks for telling us. Somebody at the club will look at it.</p>` +
           `<p>Your reference is <strong>${escapeHtml(reference)}</strong>, and this is what you sent:</p>` +
           `<blockquote>${escapeHtml(row.body)}</blockquote>` +
-          `<p>You can reply to this email if you remember anything else.</p>`,
+          `<p><strong>We'll reply in the app, not by email.</strong> Open the club app, tap the ` +
+          `<strong>?</strong> button on any screen and choose ` +
+          `<strong>See what you've already reported</strong> — your reference and any reply ` +
+          `from the club are there.</p>` +
+          `<p>You can still reply to this email if you remember anything else.</p>`,
         text:
           `Thanks for telling us. Somebody at the club will look at it.\n\n` +
           `Your reference is ${reference}, and this is what you sent:\n\n${row.body}\n\n` +
-          `You can reply to this email if you remember anything else.`,
+          `We'll reply in the app, not by email. Open the club app, tap the ? button on any\n` +
+          `screen and choose "See what you've already reported" - your reference and any\n` +
+          `reply from the club are there.\n\n` +
+          `You can still reply to this email if you remember anything else.`,
       })
     }
 

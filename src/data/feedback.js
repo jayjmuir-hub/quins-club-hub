@@ -18,6 +18,21 @@ const SELECT = `
 /** The statuses an admin may move a report through, in the order they appear. */
 export const FEEDBACK_STATUSES = ['new', 'in-progress', 'done', 'wontfix']
 
+/**
+ * What each status is CALLED, in one place.
+ *
+ * ⚠️ SHARED BY THE ADMIN LIST AND THE MEMBER'S OWN VIEW ON PURPOSE. Two copies
+ * would drift, and the drift would be invisible: the admin would read "Won't
+ * fix" while the person who reported it read something else about the same row,
+ * and neither would ever see both screens at once to notice.
+ */
+export const FEEDBACK_STATUS_LABELS = {
+  new: 'New',
+  'in-progress': 'In progress',
+  done: 'Done',
+  wontfix: "Won't fix",
+}
+
 /** Statuses that still want somebody's attention. Drives the badge count. */
 export const OPEN_STATUSES = ['new', 'in-progress']
 
@@ -95,6 +110,12 @@ export async function submitFeedback({ kind, body, route, context }) {
  * own. A club_id here would read as though it were the control, and the day
  * somebody removes it thinking it redundant, nothing would change — which is
  * exactly how a filter gets mistaken for a policy.
+ *
+ * ⚠️ AND THAT IS WHY THE MEMBER'S "YOUR REPORTS" VIEW CALLS THIS SAME FUNCTION.
+ * It needs no `submitted_by = me` argument, because the policy already says so
+ * — `submitted_by = auth.uid() or private.is_admin(club_id)`. Adding one would
+ * be a second, weaker statement of the same rule, and the weaker one is the one
+ * somebody would later "simplify".
  */
 export async function listFeedback({ open = false } = {}) {
   let query = supabase.from('feedback').select(SELECT)
