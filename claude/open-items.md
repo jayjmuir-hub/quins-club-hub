@@ -73,6 +73,23 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Cheap (under an hour each)
 
+- **`authenticated` holds TRUNCATE on every table it holds anything on**,
+  including `memberships`, `player_parents` and (as of 18 Aug 2026)
+  `push_subscriptions` — found while capturing that table's grants, measured
+  against the first two as controls to confirm it is systemic rather than
+  new. **TRUNCATE is not filtered by RLS at all** — Postgres never applies row
+  security to it — so any signed-in member currently holds the ability to
+  empty any table outright, RLS policies notwithstanding. Source is the same
+  Supabase default privilege documented at the top of `db/schema/grants.sql`
+  (`ALTER DEFAULT PRIVILEGES … GRANT ALL ON TABLES TO authenticated`), which
+  includes TRUNCATE in its "ALL 8" and has never been revoked from it
+  specifically. ⚠️ **PostgREST does not expose TRUNCATE as an operation**, so
+  this is not reachable through the ordinary app — it would take a direct
+  Postgres connection with a stolen `authenticated`-role JWT, a narrower
+  threat than most of what RLS defends against. Likely safe to close with one
+  `revoke truncate on all tables in schema public from authenticated;`, but
+  wants its own harness proving nothing legitimate needs it before applying
+  project-wide.
 - ✅ ~~**`public.register_my_player` is executable by `anon`, and it looks
   deliberate when it is not.** Measured on production 16 Aug 2026 while adding
   `request_staff_role`:
@@ -728,6 +745,19 @@ Run `get_advisors` rather than trusting this list. As of 14 Aug 2026:
 ⚠️ **These are not known-broken. They are known-UNVERIFIED**, which is a
 different claim and the one this repo has confused before. Each shipped with a
 green suite and has never been exercised by a human on the live site.
+
+- **Push notifications have never been received by a real browser.** Built and
+  deployed 18 Aug 2026 — `claude/plans/2026-08-18-push-notifications.md`. Every
+  server-side piece was smoke-tested LIVE against production: a real trigger
+  fire, a real Vault-stored VAPID key, a real signed JWT, real RFC 8291
+  encryption, a real HTTP POST, a real 410 cleaning up its own subscription
+  row. **None of that proves a real browser can decrypt and show one** — the
+  one thing only an actual person, subscribing from an installed PWA, can
+  close. The first real test is a member turning the toggle on in
+  More → Notifications and getting a reply on a report.
+  ⚠️ **On iPhone this needs the app added to the Home Screen first** (iOS
+  16.4+) — the UI says so, but nobody has confirmed that message reads clearly
+  to somebody who has never done it.
 
 - **The staff-request queue has never been seen with a real row in it.** Built
   17 Aug 2026 after Jay found a coach's request rendered as "Unnamed player".

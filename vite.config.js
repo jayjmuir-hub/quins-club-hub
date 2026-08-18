@@ -108,6 +108,15 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Pulls public/push-sw.js's `push` and `notificationclick` listeners
+        // into the GENERATED service worker, rather than switching this whole
+        // app to vite-plugin-pwa's `injectManifest` strategy (which would mean
+        // hand-writing and maintaining the precache/caching setup below
+        // ourselves). `importScripts()` runs the file in the SAME worker
+        // scope Workbox already owns — it is not a second service worker, and
+        // it must stay a classic script with no import/export of its own.
+        // claude/plans/2026-08-18-push-notifications.md.
+        importScripts: ['push-sw.js'],
         // The flag SVGs behind the phone-number country picker are emitted by
         // the build (flag-icons is a CSS file of ~271 background images) but
         // must NOT be precached: that would make every install download every
