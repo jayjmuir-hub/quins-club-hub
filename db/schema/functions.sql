@@ -5,7 +5,8 @@
 -- First captured 2026-08-03; re-captured 2026-08-07;
 -- ⚠️ RE-CAPTURED 2026-08-09 — 29 functions (was 22).
 -- ⚠️ RE-CAPTURED 2026-08-11 — see the block below.
--- ⚠️ RE-CAPTURED 2026-08-18 — the four admin gates only
+-- ⚠️ RE-CAPTURED 2026-08-18 — public.save_player_parents ADDED
+--   (20260818 save_player_parents_atomically), and the four admin gates
 --   (20260818 admin_gates_require_active_membership): private.is_admin,
 --   is_admin_anywhere, shares_admin_club, can_admin_see_pending each gained
 --   `status = 'active'` on the CALLER's membership row. Grants, volatility,
@@ -413,6 +414,57 @@ $function$
 REVOKE EXECUTE ON FUNCTION public.reset_my_calendar_token() FROM PUBLIC;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
 REVOKE EXECUTE ON FUNCTION public.reset_my_calendar_token() FROM anon;  -- REVOKED 13 Aug 2026, 20260813_revoke_anon_execute.sql
 GRANT EXECUTE ON FUNCTION public.reset_my_calendar_token() TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.save_player_parents(uuid, jsonb)          ADDED 18 Aug 2026
+-- prosecdef: FALSE   provolatile: v (VOLATILE)    proconfig: search_path=public
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+--
+-- ⚠️ `service_role` IS IN THAT LIST AND WAS NOT REVOKED. The migration revokes
+-- PUBLIC and anon; service_role keeps Supabase's default grant, as it does on
+-- every other function here. Recorded rather than tidied: service_role bypasses
+-- RLS, so revoking it would be a real change to what an edge function could do,
+-- and nothing has asked for that. Nothing calls this from one today.
+--
+-- ⚠️ `SECURITY INVOKER`, WHICH IS UNUSUAL HERE BUT NOT UNIQUE. Measured 18 Aug
+-- 2026: `my_calendar_token`, `reset_my_calendar_token` and `set_series_time_from`
+-- are invoker too — an earlier draft of this block claimed this was the only
+-- one, which was written from impression rather than from pg_proc.
+--
+-- The choice is deliberate. Most RPCs here are definer-rights with a
+-- hand-written guard at the top, because they need to do something the caller
+-- may not. This one does exactly what the caller could already do — replace a
+-- child's parent rows — in one statement instead of four requests. Left as
+-- invoker, the two policies on public.player_parents keep deciding who may
+-- write:
+--
+--     parent edit      ALL  private.can_edit_team(...)
+--     parent edit own  ALL  private.is_own_player(player_id)
+--
+-- A definer version would have had to reimplement both, and a reimplementation
+-- of an authorisation rule is a second copy of it. **So this function adds no
+-- authorisation surface**, which is why it carries none of the guard paperwork
+-- the 15 Aug advisor walk records for its neighbours.
+-- ⚠️ IF ANYBODY EVER MAKES IT `SECURITY DEFINER`, IT NEEDS A GUARD THE SAME
+-- MINUTE — otherwise any signed-in person could rewrite any child's parents.
+-- db/tests/save-player-parents.sql §4 is the assertion that would notice.
+--
+-- ⚠️ IT NEVER WRITES created_at, invited_at OR profile_id. The last two are the
+-- link to a parent's real ACCOUNT, set by invite_parent, and no screen shows
+-- them beside the fields a coach edits — so an UPDATE naming every column would
+-- silently un-invite a parent whenever somebody fixed a typo in their phone
+-- number. §3 of the harness is that assertion.
+--
+-- ⚠️ THE anon GRANT IS ABSENT ON PURPOSE, unlike register_my_player's. Supabase
+-- ships a default privilege that grants EXECUTE to anon on every new function,
+-- and `revoke all … from public` does not remove it; the migration revokes anon
+-- explicitly. Inert either way here — invoker rights mean anon gains nothing —
+-- but the ACLs now say what was meant.
+--
+-- Body: db/migrations/20260818_save_player_parents_atomically.sql, which
+-- carries the full reasoning. Not repeated here.
+-- ---------------------------------------------------------------------
 
 
 -- ---------------------------------------------------------------------

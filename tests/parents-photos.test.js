@@ -20,6 +20,9 @@ vi.mock('../src/lib/imageResize.js', () => ({
 vi.mock('../src/lib/supabase.js', () => ({
   supabase: {
     from: vi.fn(),
+    // ⚠️ `rpc` ADDED 18 Aug 2026 — saveParents no longer builds its own
+    // delete/update/insert sequence, it calls public.save_player_parents.
+    rpc: vi.fn(),
     storage: { from: vi.fn() },
   },
 }))
@@ -142,70 +145,113 @@ describe('listParentsForPlayers', () => {
 
 // --- saveParents ------------------------------------------------------
 
+// ⚠️ REWRITTEN 18 Aug 2026 AGAINST THE RPC. saveParents used to build a
+// DELETE, then an UPDATE per row, then an INSERT — so these tests asserted on
+// the query builder's calls. It now hands the whole submitted set to
+// public.save_player_parents, which does all three in one statement.
+//
+// ⚠️ EVERY ASSERTION BELOW KEPT ITS REASON, ONLY ITS SUBJECT MOVED. The old
+// versions checked what reached `.insert()` / `.update()`; these check what
+// reaches `_rows`. The one test that could NOT survive the move is the old
+// "reports a refusal when the database updates nothing", because there is no
+// longer a per-row `maybeSingle()` returning null — the function raises 42501
+// instead, and the test asserts that mapping rather than deleting the case.
+//
+// What no test here can see is atomicity itself: a mocked client cannot fail
+// half way through a statement that no longer has a half way. That belongs to
+// db/tests/save-player-parents.sql, which measures it against production.
+function mockRpc({ data = [], error = null } = {}) {
+  const calls = []
+  supabase.rpc.mockImplementation((fn, args) => {
+    calls.push([fn, args])
+    return Promise.resolve({ data, error })
+  })
+  return calls
+}
+
 describe('saveParents', () => {
-  it('deletes rows the user removed, scoped to this player', async () => {
-    const { builder, calls } = createQueryBuilder({ data: [] })
-    supabase.from.mockReturnValue(builder)
+  it('sends the whole set to the RPC in ONE call, with the player id', async () => {
+    const calls = mockRpc()
 
     await saveParents('player-1', [{ id: 'pp-1', full_name: 'Aisha Khan' }])
 
-    expect(calls.delete.length).toBe(1)
-    // Scoped by player_id as well as by id: a bad id can never reach another
-    // player's row, without leaning on RLS to catch it.
-    expect(calls.eq[0]).toEqual(['player_id', 'player-1'])
-    expect(calls.not[0]).toEqual(['id', 'in', '(pp-1)'])
+    // ⚠️ THE COUNT IS THE POINT, not decoration. The defect this replaced was
+    // that a save was several requests and could land in pieces; a second call
+    // appearing here would bring that back without failing anything else.
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    expect(calls[0][0]).toBe('save_player_parents')
+    expect(calls[0][1]._player).toBe('player-1')
+    expect(calls[0][1]._rows).toHaveLength(1)
+    expect(calls[0][1]._rows[0]).toMatchObject({ id: 'pp-1', player_id: 'player-1' })
   })
 
-  it('deletes everything when the list is empty', async () => {
-    const { builder, calls } = createQueryBuilder({ data: [] })
-    supabase.from.mockReturnValue(builder)
+  it('sends an empty set when the user removed every parent', async () => {
+    const calls = mockRpc()
 
     const result = await saveParents('player-1', [])
 
-    expect(calls.delete.length).toBe(1)
-    expect(calls.not).toEqual([]) // nothing excluded from the delete
+    // An empty list is a real instruction — "this child has no parent rows" —
+    // and the function deletes accordingly. It is not a no-op to skip.
+    expect(calls[0][1]._rows).toEqual([])
     expect(result).toEqual([])
   })
 
-  it('inserts rows with no id and blanks become null', async () => {
-    const { builder, calls } = createQueryBuilder({ data: [{ id: 'new-1' }] })
-    supabase.from.mockReturnValue(builder)
+  it('marks a new row with a null id, and blanks become null', async () => {
+    const calls = mockRpc({ data: [{ id: 'new-1' }] })
 
     await saveParents('player-1', [
       { full_name: '  Sara Ahmed  ', relationship: 'Mother', email: '', phone: '050 111 2222' },
     ])
 
-    const inserted = calls.insert[0][0]
-    expect(inserted[0]).toMatchObject({
+    expect(calls[0][1]._rows[0]).toMatchObject({
       player_id: 'player-1',
       full_name: 'Sara Ahmed', // trimmed
       relationship: 'Mother',
       email: null, // '' normalised away, so "cleared" and "never set" match
       phone: '050 111 2222',
+      id: null, // what tells the function to INSERT rather than UPDATE
     })
   })
 
-  it('updates rows that already have an id rather than re-inserting them', async () => {
-    const { builder, calls } = createQueryBuilder({ data: { id: 'pp-1' } })
-    supabase.from.mockReturnValue(builder)
+  it('keeps the id on a row that already exists, so it is updated in place', async () => {
+    const calls = mockRpc({ data: [{ id: 'pp-1' }] })
 
     await saveParents('player-1', [{ id: 'pp-1', full_name: 'Aisha Khan', phone: '050 999' }])
 
-    expect(calls.update.length).toBe(1)
-    expect(calls.insert.length).toBe(0)
-    expect(calls.update[0][0]).toMatchObject({ full_name: 'Aisha Khan', phone: '050 999' })
+    // Identity matters beyond tidiness: created_at, invited_at and profile_id
+    // live on this row, and profile_id is the link to the parent's account.
+    expect(calls[0][1]._rows[0]).toMatchObject({
+      id: 'pp-1',
+      full_name: 'Aisha Khan',
+      phone: '050 999',
+    })
   })
 
   it('drops rows the user started and left nameless', async () => {
-    const { builder, calls } = createQueryBuilder({ data: [{ id: 'new-1' }] })
-    supabase.from.mockReturnValue(builder)
+    const calls = mockRpc({ data: [{ id: 'new-1' }] })
 
     await saveParents('player-1', [
       { full_name: 'Sara Ahmed' },
       { full_name: '   ', phone: '050 000' }, // abandoned half-typed row
     ])
 
-    expect(calls.insert[0][0]).toHaveLength(1)
+    expect(calls[0][1]._rows).toHaveLength(1)
+  })
+
+  it('numbers sort_order across the KEPT rows, not the submitted ones', async () => {
+    // ⚠️ WHY THE CLIENT STILL FILTERS BLANKS EVEN THOUGH THE FUNCTION DOES TOO.
+    // toRow's index becomes sort_order, so filtering after numbering would
+    // leave a gap and the form would come back in a different order than it
+    // went out.
+    const calls = mockRpc({ data: [] })
+
+    await saveParents('player-1', [
+      { full_name: '   ' }, // abandoned, must not take sort_order 0
+      { full_name: 'Sara Ahmed' },
+      { full_name: 'Tom Okafor' },
+    ])
+
+    expect(calls[0][1]._rows.map((r) => r.sort_order)).toEqual([0, 1])
   })
 
   // ⚠️ ALL THREE NAME COLUMNS REACH THE DATABASE, AND THIS IS THE ONLY TEST
@@ -215,14 +261,13 @@ describe('saveParents', () => {
   // full_name alone, which private.sync_person_name re-splits by taking the LAST
   // word as the family name. "Anna van der Berg" comes back as "Anna van der".
   it('writes first_name and last_name alongside full_name', async () => {
-    const { builder, calls } = createQueryBuilder({ data: [{ id: 'new-1' }] })
-    supabase.from.mockReturnValue(builder)
+    const calls = mockRpc({ data: [{ id: 'new-1' }] })
 
     await saveParents('player-1', [
       { full_name: 'Anna van der Berg', first_name: ' Anna ', last_name: ' van der Berg ' },
     ])
 
-    expect(calls.insert[0][0][0]).toMatchObject({
+    expect(calls[0][1]._rows[0]).toMatchObject({
       full_name: 'Anna van der Berg',
       first_name: 'Anna',
       last_name: 'van der Berg',
@@ -232,23 +277,34 @@ describe('saveParents', () => {
   // A blank family name is null rather than '', for the same reason every other
   // blank in this module is: "cleared" and "never set" must be one state.
   it('sends a blank family name as null', async () => {
-    const { builder, calls } = createQueryBuilder({ data: [{ id: 'new-1' }] })
-    supabase.from.mockReturnValue(builder)
+    const calls = mockRpc({ data: [{ id: 'new-1' }] })
 
     await saveParents('player-1', [{ full_name: 'Kwame', first_name: 'Kwame', last_name: '' }])
 
-    expect(calls.insert[0][0][0].last_name).toBeNull()
+    expect(calls[0][1]._rows[0].last_name).toBeNull()
   })
 
-  it('reports a refusal when the database updates nothing', async () => {
-    // RLS filtering a write out is a successful "zero rows" as far as
-    // PostgREST is concerned — it must not be reported as a save.
-    const { builder } = createQueryBuilder({ data: null })
-    supabase.from.mockReturnValue(builder)
+  it('reports a refusal when the function rejects the write', async () => {
+    // 42501 is save_player_parents raising because the ids it was given do not
+    // all belong to this player — the case the old per-row `maybeSingle()`
+    // returning null used to cover. The user must see "permission", not a
+    // Postgres error code.
+    mockRpc({ data: null, error: { code: '42501', message: 'does not belong to this player' } })
 
     await expect(
       saveParents('player-1', [{ id: 'pp-1', full_name: 'Aisha Khan' }]),
     ).rejects.toThrow(/permission/i)
+  })
+
+  it('⚠️ passes any OTHER database error through unchanged', async () => {
+    // Only 42501 means "you may not". Rewriting every failure as a permission
+    // problem would tell a coach with a dropped connection to go and ask an
+    // admin for access.
+    mockRpc({ data: null, error: { code: '08006', message: 'connection failure' } })
+
+    await expect(
+      saveParents('player-1', [{ full_name: 'Aisha Khan' }]),
+    ).rejects.toThrow(/connection failure/)
   })
 
   it('refuses without a player id', async () => {

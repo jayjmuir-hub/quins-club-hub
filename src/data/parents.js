@@ -112,19 +112,36 @@ function toRow(parent, playerId, index) {
  * independent calls means three independent failure modes and a form that can
  * end up half-saved with no coherent thing to tell the user.
  *
- * The order is delete-then-write, and that order matters: doing it the other
- * way round leaves a window where a row the user deleted is still readable
- * alongside its replacement.
+ * ⚠️ ONE RPC SINCE 18 Aug 2026, AND IT IS NOW GENUINELY ATOMIC.
+ * `public.save_player_parents` does the delete, the updates and the inserts in
+ * one statement, so the child's list either ends up exactly as submitted or is
+ * untouched. There is no third outcome.
  *
- * This is NOT atomic — PostgREST has no client-side transaction, so a failure
- * after the delete leaves the removals applied and the writes not. The caller
- * therefore gets a thrown error naming the stage, and the form keeps the
- * user's typed rows on screen so Save can simply be pressed again. Making it
- * genuinely atomic needs a Postgres function; noted as a follow-up rather than
- * pretended at here.
+ * This used to be up to N+2 separate PostgREST requests — one DELETE, one
+ * UPDATE per existing row, one INSERT — each landing on its own because
+ * PostgREST has no client-side transaction. ⚠️ **BE PRECISE ABOUT WHAT THAT
+ * COST**, because the open item overstated it and an overstated bug is one
+ * nobody believes: a plain edit was always safe, since every kept row carries
+ * an id and the DELETE removed nothing. The damage needed a row to be REMOVED
+ * in the same sitting — then the removal applied, the edits did not, and the
+ * screen said the save had failed. The record left behind was one nobody
+ * chose, and the user had been told it did not exist.
+ *
+ * Measured on production before the change, in a rolled-back transaction:
+ * replaying that sequence left 1 of 2 rows. db/tests/save-player-parents.sql
+ * keeps that replay as the self-test, because "the row count did not change"
+ * is an assertion that would pass against a table nothing ever touches.
+ *
+ * ⚠️ THE FUNCTION IS SECURITY INVOKER, so the two policies on
+ * `public.player_parents` still decide who may write and this call has exactly
+ * the permissions the old four did. Nothing here is trusted that was not
+ * trusted before.
  *
  * Rows arriving with an `id` are existing rows and are updated in place, so a
- * parent's row keeps its identity (and its created_at) across an edit.
+ * parent's row keeps its identity — and its `created_at`, `invited_at` and
+ * `profile_id`, which the function never writes. The last two are the link to
+ * a parent's actual account; an UPDATE naming every column would un-invite a
+ * parent every time somebody fixed a typo in their phone number.
  */
 export async function saveParents(playerId, parents) {
   if (!playerId) throw new Error('saveParents needs a player_id.')
@@ -132,50 +149,36 @@ export async function saveParents(playerId, parents) {
 
   // A row whose name is blank is a row the user started and abandoned; the
   // CHECK constraint would reject it anyway, with a far worse message.
+  //
+  // ⚠️ THE FUNCTION DROPS THESE TOO, and the duplication is deliberate rather
+  // than forgotten. This filter also decides `toRow`'s `index`, which becomes
+  // sort_order — so removing it here would number the abandoned rows and leave
+  // gaps in the order the form shows.
   const kept = list.filter((p) => String(p?.full_name ?? '').trim() !== '')
 
-  const keptIds = kept.map((p) => p.id).filter(Boolean)
+  const { data, error } = await supabase.rpc('save_player_parents', {
+    _player: playerId,
+    // toRow already names exactly the columns that may be written, so keys the
+    // editor carries around — `savedEmail`, `invited_at` — never reach the
+    // database. The `id` is added back because the function needs it to tell
+    // an edit from an insert; toRow deliberately does not include it.
+    _rows: kept.map((parent, index) => ({
+      ...toRow(parent, playerId, index),
+      id: parent.id ?? null,
+    })),
+  })
 
-  // Delete anything currently stored for this player that is not in the
-  // submitted set. Scoped by player_id as well as by id so a malformed id
-  // can never reach another player's row — RLS would refuse it too, but this
-  // is one `.eq` and removes the need to rely on that.
-  let removeQuery = supabase.from('player_parents').delete().eq('player_id', playerId)
-  if (keptIds.length > 0) {
-    // PostgREST's `not.in` filter takes a bracketed list, not an array.
-    removeQuery = removeQuery.not('id', 'in', `(${keptIds.join(',')})`)
-  }
-  const { error: deleteError } = await removeQuery
-  if (deleteError) throw deleteError
-
-  if (kept.length === 0) return []
-
-  const updates = kept.filter((p) => p.id)
-  const inserts = kept.filter((p) => !p.id)
-  const saved = []
-
-  for (const [index, parent] of updates.entries()) {
-    const { data, error } = await supabase
-      .from('player_parents')
-      .update(toRow(parent, playerId, index))
-      .eq('id', parent.id)
-      .eq('player_id', playerId)
-      .select()
-      .maybeSingle()
-    if (error) throw error
-    if (!data) throw new Error(REFUSED_PARENT)
-    saved.push(data)
+  if (error) {
+    // ⚠️ 42501 IS THE FUNCTION REFUSING, NOT POSTGREST. It raises that when the
+    // number of rows it updated does not match the number of ids it was given
+    // — an id belonging to another child, or to one this person may not edit.
+    // Mapped to the same sentence the per-row `maybeSingle()` check used to
+    // produce, so the screen reads identically for the same situation.
+    if (error.code === '42501') throw new Error(REFUSED_PARENT)
+    throw error
   }
 
-  if (inserts.length > 0) {
-    const rows = inserts.map((parent, i) => toRow(parent, playerId, updates.length + i))
-    const { data, error } = await supabase.from('player_parents').insert(rows).select()
-    if (error) throw error
-    if (!data || data.length === 0) throw new Error(REFUSED_PARENT)
-    saved.push(...data)
-  }
-
-  return saved
+  return data ?? []
 }
 
 // ── invite_parent: turning a contact row into an offer of an account ───────
