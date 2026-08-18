@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
-- `8d30114` — 🧹 **THE graft IGNORE RULE NEEDED BOTH HALVES, AND EITHER ONE ALONE IS A BUG THAT HAS SHIPPED.**
+- `a880a61` — 🔌 **graft IS WIRED INTO CLAUDE CODE — HOOKS, STATUSLINE AND MCP.**
+  `.mcp.json` runs `npx @nanonets/graft mcp`; `.claude/settings.json` adds a
+  session-start hook, a post-edit refresh on `Write|Edit|MultiEdit`, a savings
+  tally on `Bash|mcp__graft__`, and a statusline. Two shims in
+  `.claude/helpers/` do the resolving.
+  ⚠️ **THE SHIMS BAKE IN ONE MACHINE'S GLOBAL npm PATH AS A FAST-PATH**, which
+  is the shape of machine fact `CLAUDE.md` rule 8 warns about. It is safe
+  because it is a FIRST candidate, not the only one: each is `existsSync`-tested
+  and falls through to package resolution and then `npm root -g`. **Verified the
+  fallback target is real** rather than assumed — `npm root -g` resolves to a
+  directory that actually contains `hooks.js`.
+  ⚠️ **ON THE OTHER PC IT NEEDS graft INSTALLED GLOBALLY.** Without it the shims
+  no-op silently rather than erroring — the right failure, but a silent one, so
+  a statusline that never appears there is the symptom to expect.
+  ⚠️ **`graft/` ITSELF IS STILL NOT COMMITTED AND MUST NOT BE.** The index is
+  derived from the code; a graph built on one PC and read on another sitting on
+  older code is a map that lies. Each machine runs its own `graft build --deep`.
+  Read before committing on a PUBLIC repo: no secrets in any of the four files.
+
+- `96580a8` — 🧹 **THE graft IGNORE RULE NEEDED BOTH HALVES, AND EITHER ONE ALONE IS A BUG THAT HAS SHIPPED.**
   `graft build` writes an **unanchored** `graft/` into `.gitignore`. Unanchored
   matches a directory of that name at ANY depth, so it silently hid
   **`.claude/skills/graft/SKILL.md`, the skill graft itself installs** —
@@ -51,7 +70,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   too. **The leading dot is the whole difference.** Measured with
   `isDeployIrrelevant()`, not assumed.
 
-- ⛔ **ROUTE-LEVEL CODE SPLITTING — BUILT, MEASURED, AND NOT TAKEN.** Jay's call.
+- `8d30114` — ⛔ **ROUTE-LEVEL CODE SPLITTING — BUILT, MEASURED, AND NOT TAKEN.** Jay's call.
   The saving was real and **larger** than the figure on file (283.51 → 244.08 kB
   gzip, −39.43, against the −27.26 recorded), but the argument that would have
   carried it turned out to be false: splitting does **not** make deploys cheaper
