@@ -38,6 +38,12 @@
 -- `grant update on public.memberships to authenticated` would let any admin
 -- make themselves a super admin. 5 alone is satisfied by that disaster.
 -- CLAUDE.md rule 6.
+--
+-- ⚠️ THESE SIX WERE WRITTEN AS SELECTS AND JUDGED BY EYE UNTIL 18 Aug 2026.
+-- The answers were printed with an "EXPECTED:" comment above them and nothing
+-- compared the two, so a wrong answer read as a pass. They are now asserted,
+-- with `raise exception`, in section 4 below — see the note there for why that
+-- stopped every OTHER harness in this directory from running as well.
 
 begin;
 
@@ -138,15 +144,112 @@ begin
   return next;
 end $fn$;
 
--- ── 4. run it unmodified ────────────────────────────────────────────────────
--- EXPECTED: FLAGGED / not flagged / refused (23505) / refused (23514) /
---           GRANTED / refused
-select 'unmodified' as pass, * from pg_temp.head_coach_checks();
+-- ── 4. run it unmodified, and JUDGE the answers ─────────────────────────────
+--
+-- ⚠️ THE `raise exception` BELOW IS THE POINT OF THIS SECTION, AND ITS ABSENCE
+-- MADE THIS FILE — AND EVERY OTHER HARNESS — UNRUNNABLE FOR A DAY.
+-- Until 18 Aug 2026 the two runs below were bare SELECTs with an "EXPECTED:"
+-- comment above them. scripts/db-check.mjs throws on a SQL error and on nothing
+-- else, so a wrong answer printed a row and the runner said `ok`. A human had
+-- to read six strings and compare them against a comment, which is exactly the
+-- silence `claude/runbooks/db-harnesses.md` was written about.
+-- ⚠️ AND THE COST WAS NOT LIMITED TO THIS FILE. The runner checks every harness
+-- BEFORE it connects and refuses the whole run if one cannot fail — so this
+-- file's missing `raise exception` stopped `npm run db:check` from running any
+-- of them. Nothing went red, because .github/workflows/db-check.yml is inert
+-- without a SUPABASE_DB_URL secret and reports "did not run".
+
+create temporary table _r(phase text, check_name text, result text) on commit drop;
+
+insert into _r select 'unmodified', * from pg_temp.head_coach_checks();
+
+do $$
+declare
+  problems text := '';
+  got      text;
+
+  -- The expected answers, in one place so the verdict below reads as a table
+  -- rather than as six paragraphs of prose.
+  expected constant text[][] := array[
+    ['1 backfill flags the titled head coach',  'FLAGGED'         ],
+    ['2 assistant on the same squad untouched', 'not flagged'     ],
+    ['3 a second head coach on the squad',      'refused (23505)' ],  -- unique index
+    ['4 flagging a non-coach',                  'refused (23514)' ],  -- check constraint
+    ['5 authenticated may write is_head_coach', 'GRANTED'         ],
+    ['6 authenticated may NOT write is_super',  'refused'         ]
+  ];
+begin
+  for i in 1 .. array_length(expected, 1) loop
+    select result into got from _r
+     where phase = 'unmodified' and check_name = expected[i][1];
+
+    if got is distinct from expected[i][2] then
+      problems := problems || format(
+        'HEAD COACH: "%s" answered %s, expected %s. ',
+        expected[i][1], coalesce(got, 'NOTHING AT ALL'), expected[i][2]);
+    end if;
+  end loop;
+
+  -- ⚠️ THE SQLSTATES ARE PART OF THE ASSERTION, NOT DECORATION. 23505 is the
+  -- unique index refusing a second head coach and 23514 is the CHECK refusing
+  -- a non-coach. A fix that swapped one guarantee for the other would leave
+  -- both lines reading "refused" and this file would not notice.
+  if problems <> '' then
+    raise exception '%', problems;
+  end if;
+
+  raise notice 'HEAD COACH: all checks passed.';
+end $$;
 
 -- ── 5. inject the real fault: remove the one-per-squad guarantee ────────────
--- EXPECTED: check 3 flips to ALLOWED. If it does not, this file is not testing
--- what it claims, and the index is not what refuses the second head coach.
-drop index if exists memberships_one_head_coach_per_team;
-select 'index dropped' as pass, * from pg_temp.head_coach_checks();
+--
+-- ⚠️ NOT OPTIONAL. Every assertion above is of the form "this is refused", and
+-- a typo'd id or a renamed constraint makes them all vacuously true. The only
+-- way to know the check works is to break the thing on purpose and watch the
+-- answer change. CLAUDE.md rule 6.
 
+drop index if exists memberships_one_head_coach_per_team;
+insert into _r select 'index dropped', * from pg_temp.head_coach_checks();
+
+do $$
+declare
+  got  text;
+  ctl  text;
+begin
+  select result into got from _r
+   where phase = 'index dropped' and check_name = '3 a second head coach on the squad';
+
+  -- The control: dropping the INDEX must not change what the CHECK CONSTRAINT
+  -- refuses. If assertion 4 moved as well, the fault injected was broader than
+  -- the one named and check 3 flipping proves nothing about the index.
+  select result into ctl from _r
+   where phase = 'index dropped' and check_name = '4 flagging a non-coach';
+
+  if got is distinct from 'ALLOWED' then
+    raise exception
+      'SELF-TEST FAILED — the one-head-coach-per-squad index was dropped and a '
+      'second head coach was still %. So the index is NOT what refuses one, and '
+      'assertion 3 above is passing for some other reason. Do not trust a green '
+      'run from this file until that is understood.', coalesce(got, 'not measured');
+  end if;
+
+  if ctl is distinct from 'refused (23514)' then
+    raise exception
+      'SELF-TEST FAILED — dropping the index also changed assertion 4 (now %). '
+      'The injected fault was wider than the one named, so check 3 flipping says '
+      'nothing about the index specifically.', coalesce(ctl, 'not measured');
+  end if;
+
+  raise notice
+    'SELF-TEST PASSED — the check caught it: with the index dropped, a second '
+    'head coach was ALLOWED, while the non-coach constraint still refused.';
+end $$;
+
+-- ── 6. what was measured, for a runner that shows rows rather than notices ──
+select phase, check_name, result from _r order by phase desc, check_name;
+
+-- ⚠️ THE ROLLBACK IS NOT TIDINESS. Section 5 really did DROP an index from
+-- public.memberships on production, and the fixture really did insert a club,
+-- a squad and three memberships. scripts/db-check.mjs refuses any file here
+-- that could commit instead.
 rollback;
