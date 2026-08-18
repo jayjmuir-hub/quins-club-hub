@@ -10,6 +10,47 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- `8d30114` — 🧹 **THE graft IGNORE RULE NEEDED BOTH HALVES, AND EITHER ONE ALONE IS A BUG THAT HAS SHIPPED.**
+  `graft build` writes an **unanchored** `graft/` into `.gitignore`. Unanchored
+  matches a directory of that name at ANY depth, so it silently hid
+  **`.claude/skills/graft/SKILL.md`, the skill graft itself installs** —
+  `git check-ignore -v` named `.gitignore:25:graft/` as the rule doing it.
+  ⚠️ **THE OBVIOUS FIX — ANCHORING IT TO `/graft/` — IS ALSO WRONG, AND WAS
+  CAUGHT ONLY BECAUSE JAY ASKED WHETHER UN-IGNORING WOULD CAUSE PROBLEMS.**
+  Anchored, a graft index at any OTHER depth stops being ignored, and **every
+  agent worktree builds one — 16 MB, 356 files, measured.** Proven with a
+  control: a nested index (probed under `harness/`) is ignored by the unanchored
+  form and **NOT ignored** by the anchored one, while the root `graft/` is
+  ignored by both.
+  What shipped is `graft/` **plus** `!.claude/skills/graft/`. Verified across
+  eight paths: root and nested indexes ignored, `SKILL.md`, `README.md`,
+  `settings.json` and `src/` all visible.
+  ⚠️ **AND THE WORKTREES WERE PROTECTED ONLY BY `.git/info/exclude`, WHICH IS
+  LOCAL AND NEVER COMMITTED.** So the protection existed on one machine and
+  nowhere else; a fresh clone had none. `.claude/worktrees/` is now in
+  `.gitignore`, where it travels. The eight-path check reports `.gitignore`
+  line numbers rather than the local file, which is how it was confirmed.
+  ✅ **THE SKILL IS COMMITTED, WHICH IS THE POINT OF UNHIDING IT.**
+  `.claude/skills/graft/SKILL.md` travels so every session gets the same
+  guidance instead of depending on which PC ran the installer. ⚠️ **`graft/`
+  ITSELF STAYS IGNORED AND MUST** — it is derived from the code, so a graph
+  committed on one PC and pulled onto another sitting on older code is stale
+  and wrong, and a map that lies is worse than none. The SKILL describes
+  graft's CLI, not this codebase, so it cannot rot that way; measured, `graft
+  build` does not rewrite it.
+  ✅ **`.ignore` IS TRACKED** — ripgrep reads it before `.gitignore`, so its
+  `!graft/` is what keeps the cards greppable while `graft/` keeps them out of
+  commits. ⚠️ **THE FIRST TWO ATTEMPTS TO PROVE THAT PROVED NOTHING**: rg also
+  reads the PARENT clone's `.ignore`, so deleting only this one changed no
+  result. With both gone a root-level `rg` found **0** cards; restoring this one
+  alone brought them back.
+  ⚠️ **A DOTFILE BUILDS, AND `.claude/` IS NOT `claude/`.**
+  `scripts/netlify-ignore.mjs` skips `claude/`, `docs/`, `db/` and ROOT MARKDOWN
+  only — `/^[^/]+\.md$/` matches neither `.gitignore` nor `.claude/skills/…`, so
+  this deployed where the entry below did not, and every future skill edit will
+  too. **The leading dot is the whole difference.** Measured with
+  `isDeployIrrelevant()`, not assumed.
+
 - ⛔ **ROUTE-LEVEL CODE SPLITTING — BUILT, MEASURED, AND NOT TAKEN.** Jay's call.
   The saving was real and **larger** than the figure on file (283.51 → 244.08 kB
   gzip, −39.43, against the −27.26 recorded), but the argument that would have

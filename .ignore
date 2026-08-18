@@ -1,0 +1,26 @@
+# Committed on purpose, and it is the SEARCH side only - `graft/` itself stays
+# gitignored and is never committed. `graft build` writes this file. ripgrep
+# reads .ignore BEFORE .gitignore, so `!graft/` re-admits the index to SEARCH
+# while `graft/` in .gitignore keeps it out of COMMITS.
+#
+# VERIFIED 18 Aug 2026, and the first two attempts proved nothing: rg also reads
+# the PARENT clone's .ignore, so deleting only this one changed no result. With
+# BOTH removed a root-level `rg` found 0 graft cards; restoring this one alone
+# brought them back. That is the test - one file at a time is confounded.
+!graft/
+graft/.cache/
+graft/.graph/
+
+# Agent worktrees build their own 16 MB index at .claude/worktrees/<name>/graft/,
+# and `!graft/` above is unanchored, so on its own it would re-admit those too -
+# giving duplicate hits that point at that worktree's OWN OLDER SOURCE. Same
+# trap vite.config.js records for vitest's `include`, where `**/` collected
+# every test twice and the copies ran against stale code.
+#
+# ⚠️ MEASURED, IT IS NOT BITING TODAY, AND THIS LINE IS STILL WORTH KEEPING.
+# Two other things already hide it: rg skips dot-directories unless `--hidden`,
+# and rg reads `.git/info/exclude`, which carries `.claude/worktrees/` on this
+# machine. Both are weaker than they look - the first stops applying the moment
+# somebody passes `--hidden`, and the second is LOCAL and never committed, so it
+# does not exist on a fresh clone. This line is the only copy that travels.
+.claude/worktrees/

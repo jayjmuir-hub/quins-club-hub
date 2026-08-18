@@ -20,3 +20,33 @@ _transfer.b64
 # .claude/settings.json IS tracked and must stay so - it wires the session
 # guard. settings.local.json is covered by the global gitignore, not here.
 .claude/launch.json
+
+# graft's local graph cache - regenerable, not committed (run `graft build`).
+#
+# UNANCHORED ON PURPOSE, with the skill re-included on the next line. Both
+# halves are load-bearing and each one alone is a bug that has actually shipped:
+#
+#   graft/                 alone -> silently hides .claude/skills/graft/SKILL.md,
+#                                   the skill graft itself installs
+#   /graft/                alone -> stops ignoring a graft index at ANY OTHER
+#                                   DEPTH, and every agent worktree builds one
+#                                   (16 MB, 356 files, measured 18 Aug 2026)
+#
+# `graft build` writes the unanchored form itself on every fresh clone or
+# worktree, so expect to re-add the negation line, not the slash.
+# Verified with `git check-ignore -v` in both directions: root and nested graft
+# indexes IGNORED, SKILL.md VISIBLE. Check it that way, never by eye.
+graft/
+!.claude/skills/graft/
+
+# Claude Code's agent worktrees are created INSIDE this clone, at
+# .claude/worktrees/<name>/, so a full second checkout of this repo sits under
+# the working tree.
+#
+# ⚠️ UNTIL 18 Aug 2026 THIS WAS PROTECTED ONLY BY `.git/info/exclude`, WHICH IS
+# LOCAL AND IS NEVER COMMITTED - so the protection existed on whichever machine
+# happened to have written it and nowhere else. The generated content inside
+# (.env, node_modules, dist, graft) is caught at any depth by the rules above,
+# but the SOURCE checkout is not caught by anything. One line here makes the
+# protection travel with the repo instead of depending on a per-machine file.
+.claude/worktrees/
