@@ -78,35 +78,78 @@ Same form for both choices; only the heading and the prompt change.
 
 Tick, "Thanks — that's with us", and a reference number (`QCH-0041`).
 
+### Where reports live — the screen, not the inbox
+
+⚠️ **THE SCREEN IS THE RECORD AND THE E-MAIL IS A PROMPT TO GO AND LOOK AT IT.
+THIS REVERSES AN EARLIER VERSION OF THIS PLAN, AND THE REVERSAL IS THE RIGHT
+WAY ROUND.** Jay, 18 Aug 2026: *"can't we just have the reports go to a section
+of the admin page, keep everything in one place instead of emails"*.
+
+**This app already made that decision once**, and the reasoning is written at the
+top of `supabase/functions/notify-approval/index.ts`: the screen is the source of
+truth, the e-mail is a prompt. Approvals work this way today. Reports match it
+rather than inventing a second pattern.
+
+- Reports appear in a section of `src/screens/AdminNeedsAttention.jsx`, which
+  already exists to be the "things waiting for you" screen, with a count badge.
+- Each carries a status an admin can change: `new` → `in-progress` → `done` /
+  `wontfix`.
+
+⚠️ **What this costs, stated plainly because an earlier draft of this file
+argued the opposite.** The previous version leaned on `Reply-To` to delete the
+admin screen, the status column and the RLS read policy from the first cut, on
+the grounds that a mail client is a serviceable triage tool. It is not: an inbox
+is a bad database, and within a month there is no reliable answer to "which of
+these have I actually dealt with". The screen goes back in. Roughly another half
+day, plus the policy work.
+
 ### What lands in the admin inbox
 
 Subject naming the screen and the reference. The member's words quoted, then
-who / screen / device / version / last error / whether a screenshot is attached.
+**the reporter's name** (Jay, 18 Aug 2026 — asked for explicitly), the screen,
+device, version, last error, and whether a screenshot is attached.
 
-⚠️ **`Reply-To` is set to the reporter's address, and that is what removes an
-entire screen from this plan.** Hitting reply in the inbox answers the member
-directly, so the admin's mail client IS the triage tool. No status column, no
-admin triage list, no audit logging in the first cut.
+**`Reply-To` is still set to the reporter's address.** It no longer carries the
+design, but it makes answering somebody one tap from the notification.
+
+⚠️ **The notification goes to `help@adhquins-clubhub.com`, a Microsoft 365
+SHARED MAILBOX — and mail for this domain is already on M365.** Measured 18 Aug
+2026: `adhquins-clubhub.com` MX resolves to
+`adhquinsclubhub-com02b.mail.protection.outlook.com`, tenant
+`quinsclubhub.onmicrosoft.com`, bought 5 Aug 2026
+(`claude/decisions/2026-08-05-m365-auth-email.md`). A shared mailbox needs **no
+licence**, so this costs nothing.
+⚠️ **`CLAUDE.md` says "do not propose buying an M365 licence", which is the
+4 Aug defederation verdict and is easy to misread as "there is no M365 here".**
+There is. Sending is Resend — `supabase/functions/send-email/index.ts` is the
+authority — and receiving is Microsoft. A session that reads only the rule will
+design a mail-forwarding setup this club does not need.
 
 ## Build order
 
 1. `<HelpButton />` plus the two-step panel in `src/components/Sheet.jsx`,
    mounted once in `src/components/AppShell.jsx` so every signed-in screen gets
    it.
-2. A `feedback` table. Insert-only for any authenticated member; readable by the
-   reporter or an admin, mirroring `src/lib/scope.js`.
-3. `supabase/functions/notify-feedback/index.ts`, copied from
+2. A `feedback` table carrying a `status` (`new` / `in-progress` / `done` /
+   `wontfix`). Insert-only for any authenticated member; readable by the
+   reporter or an admin; **status writable by admins only**, mirroring
+   `src/lib/scope.js`.
+3. The reports section on `src/screens/AdminNeedsAttention.jsx`, with a count
+   badge and a status control. **This is the record.**
+4. `supabase/functions/notify-feedback/index.ts`, copied from
    `supabase/functions/notify-approval/index.ts`: AFTER INSERT trigger,
    `pg_net.http_post`, `verify_jwt: false`, shared secret, fails closed, and
    **cannot fail the member's insert**.
-4. The acknowledgement mail to the reporter.
-5. A plain **"Can't get in? Email us"** mailto on the login screen — see the
-   hole below.
-6. A "report this" action on `src/components/ErrorBoundary.jsx` that opens the
+5. The acknowledgement mail to the reporter.
+6. A plain **"Can't get in? Email us"** mailto to `help@` on the login screen —
+   see the hole below. ⚠️ **This is the one place the mailbox is doing real
+   work**, because a person who cannot sign in cannot reach anything above.
+7. A "report this" action on `src/components/ErrorBoundary.jsx` that opens the
    same panel with the error attached.
 
 Deferred on purpose: screenshots via `html2canvas`, help articles, a search box,
-a public ideas board, an admin triage screen, "was this helpful" voting.
+a public ideas board, "was this helpful" voting, and audit-logging of status
+changes.
 
 ## ⚠️ The hole in the middle of this
 
@@ -136,14 +179,23 @@ Recorded because somebody will make them again.
 - **Two lanes could be one.** A single "tell us anything" box would be simpler
   for the member. Two buttons cost one tap and give the admin a sorted inbox.
 
+## Decided 18 Aug 2026
+
+1. ✅ **Who receives reports** — `help@adhquins-clubhub.com`, a **shared
+   mailbox** in the existing M365 tenant rather than an alias on Jay's account.
+   An alias forwards into a personal inbox and replies leave as that person; a
+   shared mailbox is a destination a second volunteer can be added to later
+   without an app change or a deploy. Neither costs a licence.
+   ⚠️ **Not created yet at the time of writing.** The notification function
+   cannot be finished until it exists.
+2. ✅ **The reporter's name goes in the admin e-mail.** Jay, 18 Aug 2026.
+3. ✅ **Reports live on the admin screen**, not in the inbox — above.
+
 ## Still to be decided
 
-1. **Who receives reports.** A `help@adhquins-clubhub.com` alias forwarded to
-   Jay is recommended over a personal address — the day somebody else helps, it
-   is a forwarding rule rather than an app change and a deploy.
-2. **The reporter's name in the admin email** — almost certainly yes, but it was
-   never explicitly confirmed.
-3. **Reference number format.** `QCH-0041` is a placeholder.
+1. **Reference number format.** `QCH-0041` is a placeholder.
+2. **Whether status changes are audit-logged.** Deferred, not rejected; the
+   rights log at `src/screens/AdminRightsLog.jsx` is the obvious home if so.
 
 ## ⚠️ Stale facts in the source handoff — do not carry them forward
 

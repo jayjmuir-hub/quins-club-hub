@@ -17,9 +17,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `main` for a FAB that was specified and never built.** Two lanes behind it,
   one required field, page/device/version captured automatically, screenshot
   **off** by default because rosters show children.
-  ✅ **`Reply-To` set to the reporter deletes a whole screen from the plan** —
-  the admin's inbox is the triage tool, so no status column and no admin list
-  in the first cut.
+  ⚠️ **REPORTS LIVE ON THE ADMIN SCREEN, NOT IN AN INBOX — AND THIS LINE SAID
+  THE OPPOSITE FOR AN HOUR.** The first draft leaned on `Reply-To` to delete the
+  admin screen, the status column and the read policy, on the grounds that a
+  mail client is a serviceable triage tool. Jay: *"keep everything in one place
+  instead of emails"*. He is right, and **this app already decided it once** —
+  `supabase/functions/notify-approval/index.ts` says the screen is the source of
+  truth and the e-mail is a prompt to go and look. An inbox is a bad database.
+  Reports get a section on `src/screens/AdminNeedsAttention.jsx` with a status;
+  `Reply-To` stays, but as a convenience rather than the design.
+  ✅ **The reporter's name goes in the admin e-mail**, and the destination is
+  `help@adhquins-clubhub.com` as a **shared mailbox** — no licence, and a second
+  volunteer can be added later without a deploy.
+  ⚠️ **MAIL FOR THIS DOMAIN IS ALREADY ON MICROSOFT 365, WHICH `CLAUDE.md` MAKES
+  EASY TO MISS.** Measured: MX is
+  `adhquinsclubhub-com02b.mail.protection.outlook.com`, tenant
+  `quinsclubhub.onmicrosoft.com`. Sending is Resend
+  (`supabase/functions/send-email/index.ts` is the authority), receiving is
+  Microsoft. The rule "do not propose buying an M365 licence" is the 4 Aug
+  defederation verdict and reads as "there is no M365 here". There is.
   ⚠️ **The source handoff must not be followed as written.** It says to reuse
   `src/components/IdeaForm.jsx`, which is the **Instagram post** form, consent
   copy and all; it says Sentry is off (live since 16 Aug); and its
