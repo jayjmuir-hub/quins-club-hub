@@ -10,6 +10,45 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- `14e0ce2` — 📧 **THE APPROVAL E-MAILS STOP GOING TO EVERYONE, AND "HEAD COACH" BECOMES DATA.**
+  Jay: *"we don't need to email every single admin every time or all the
+  coaches in an age group"*. Now super admins, the squad's head coach, and the
+  team manager(s). ⚠️ **BUILT, NOT YET APPLIED** — the migration has not run on
+  production and the functions are not deployed.
+  ⚠️ **THE OBVIOUS IMPLEMENTATION WOULD HAVE FAILED SILENTLY.** There is no
+  head-coach ROLE; it lived in `memberships.title`, which is **free text with
+  zero check constraints** and already holds `Assistant Coach/Medic`. Matching
+  `'%head coach%'` means a squad typed as `HC` matches nothing and an approval
+  e-mail is never sent, which nobody would notice. So: `is_head_coach`, a flag
+  mirroring `is_super`, **not** a seventh role — a head coach's permissions are
+  a coach's exactly.
+  ✅ **Measured before designing**: 5 admins of whom 3 are super; 15 squads, 5
+  staffed, 4 with a Head Coach title, 4 with a manager. **Managers matched by
+  ROLE, not title** — same squads today, and a role cannot break on a typo.
+  ✅ **The recipient rule, proved against a fixture with a head coach AND an
+  assistant**: old rule 6 recipients, new rule 4. The assistant and the
+  non-super admin drop; both managers stay; the medic was never included.
+  ⚠️ **ONE SQUAD REACHES SUPER ADMINS ONLY** — staffed, but no head coach and no
+  manager, and no title to backfill from. Nothing is lost, but that squad is not
+  told. Surfacing it on `/admin/needs-attention` is the follow-up.
+  ⛔ **"Only e-mail after they confirm their address" was asked for, measured,
+  and NOT built**: 0 of 34 users are unconfirmed, and both write paths need a
+  session, so it would filter nothing and be a guard that cannot fire.
+  ⛔ **THE DATABASE BRANCH FAILED AND `CLAUDE.md` WAS WRONG TO RECOMMEND ONE.**
+  A branch came up with **0 tables** against production's 136 migrations —
+  Supabase replays a `migrations` directory under `supabase/` that this repo
+  does not have; ours live in `db/migrations/`.
+  Deleted it; proved the migration with `db/tests/head-coach-flag.sql` in a
+  rolled-back transaction instead, which is better here because a branch has no
+  production data and could not verify the backfill.
+  ✅ **Both new checks were proved able to FAIL.** The harness: a second head
+  coach is `refused (23505)` and becomes `ALLOWED` with the index dropped. The
+  screen: deleting the line that restores the checkbox after a refused save
+  turns exactly one test red.
+  ⚠️ **Two existing tests caught real mistakes** — `staff-roles` refused an
+  inline `=== 'coach'` (now `canHoldHeadCoachFlag` in `src/lib/scope.js`), and
+  `harness-stubs` caught the stub not mirroring the new export.
+
 - `75bbe35` — 🧹 **TWO STALE DOC CLAIMS, ONE OF WHICH NEARLY GOT LIVE ERROR MONITORING DELETED.**
   `CLAUDE.md` said *"Sentry is built but off"* for five days after it went live
   on 16 Aug. A code review read that line and recommended stripping

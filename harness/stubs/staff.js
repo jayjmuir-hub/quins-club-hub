@@ -209,6 +209,18 @@ export async function setMembershipTitle({ membershipId, title } = {}) {
   return { id: membershipId, title: title?.trim() || null }
 }
 
+export const REFUSED_HEAD_COACH =
+  "We couldn't save that — either you may not change this squad's staff, or the squad already has a head coach."
+
+// ⚠️ ALWAYS SUCCEEDS HERE, unlike the real one, and that is the honest limit of
+// a stub: the interesting failure is the unique index refusing a SECOND head
+// coach on a squad, which needs a database. tests/admin-staff.test.jsx covers
+// the refusal by mocking a rejection; this exists so the harness can render the
+// control at all.
+export async function setMembershipHeadCoach({ membershipId, isHeadCoach } = {}) {
+  return { id: membershipId, is_head_coach: isHeadCoach === true }
+}
+
 /**
  * Mirrors the real toStaffMember — a PURE row shaper with no Supabase in it.
  *

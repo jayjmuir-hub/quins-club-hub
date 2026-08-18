@@ -31,6 +31,24 @@ export function isSquadStaffRole(role) {
   return SQUAD_STAFF_ROLES.includes(role)
 }
 
+/**
+ * The role that may carry `memberships.is_head_coach` — 18 Aug 2026.
+ *
+ * ⚠️ IT LIVES HERE BECAUSE tests/staff-roles.test.jsx REFUSES `=== 'coach'`
+ * ANYWHERE IN src/ BUT THIS FILE, and that rule caught the first version of the
+ * head-coach checkbox, which tested the literal inline. The list above is the
+ * one place the roles are named.
+ *
+ * ⚠️ IT MIRRORS A DATABASE CONSTRAINT AND MUST STAY IN STEP.
+ * `memberships_head_coach_is_a_squad_coach` refuses the flag on anything that
+ * is not a coach with a squad, so a UI that offered it more widely would be
+ * offering a control that always fails. The SQL is the real boundary; this only
+ * decides what the screen shows.
+ */
+export function canHoldHeadCoachFlag(role) {
+  return role === SQUAD_STAFF_ROLES[0]
+}
+
 // Precedence decides the ONE label shown for someone holding several rows.
 // Jay's ruling 5 Aug: nobody is expected to hold both coach and manager, so
 // the order between the staff roles is arbitrary but must be stable.

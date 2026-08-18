@@ -1,7 +1,18 @@
 # Plan — a real head-coach flag, and who gets the approval emails
 
-**STATUS: NOT YET BUILT.** Spec only. Jay's rulings of 18 Aug 2026 are recorded
-below; nothing in `db/`, `src/` or `supabase/functions/` has changed.
+**STATUS: BUILT, NOT YET APPLIED — 18 Aug 2026.** The migration, harness, screen
+control and both edge functions are written and tested. ⚠️ **The migration has
+NOT been run against production and the functions have NOT been deployed**, so
+the live club still e-mails every admin and every coach on the squad. Applying
+it is the step below.
+
+⚠️ **THE DATABASE-BRANCH PLAN AT THE BOTTOM OF THIS FILE FAILED AND WAS
+REPLACED.** A branch comes up EMPTY — Supabase replays a `migrations`
+directory under `supabase/` that this repo does not have
+and this repo keeps them in `db/migrations/`. `CLAUDE.md` now records that.
+The migration was proved with `db/tests/head-coach-flag.sql` instead, inside a
+rolled-back transaction against production, which is strictly better here: a
+branch has no production data and could not have verified the backfill.
 
 ## The ask
 
@@ -148,6 +159,24 @@ that passes with the recipient filter removed is worse than none.
   `claude/runbooks/db-harnesses.md` first; `npm run db:check`.
 
 ## Rollout
+
+⚠️⚠️ **ORDER IS NOT OPTIONAL: MIGRATION FIRST, THEN DEPLOY. THE OTHER WAY ROUND
+BREAKS `/admin/staff` COMPLETELY.** `src/data/staff.js` now names
+`is_head_coach` in its `select`, and PostgREST rejects a select naming a column
+that does not exist — so the squad list would fail to load, not degrade. Measured
+18 Aug 2026: the column is **not** on production (`information_schema.columns`
+returns 0). This is the whole reason the plan says the migration is a separate,
+earlier step rather than something the deploy carries with it.
+
+1. **Apply `db/migrations/20260818_membership_head_coach.sql` to production.**
+2. **Then** merge and let the front-end deploy.
+3. **Then** deploy the two edge functions.
+
+⚠️ **The migration is safe to apply ahead of the code**: the column defaults to
+false, nothing reads it yet, and the backfill only sets rows whose title already
+says Head Coach. The reverse order is the one that breaks.
+
+### The original plan, kept for its reasoning
 
 1. Migration on a **database branch** first — Supabase is on Pro, branching is
    available, and it bills by the hour, so create/use/delete.

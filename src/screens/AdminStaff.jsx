@@ -12,7 +12,7 @@ import PhotoPositioner, {
 import { listSquadStaff, setMembershipTitle, setMembershipHeadCoach } from '../data/staff.js'
 import { deleteStaffPhoto, setStaffPhoto, signStaffPhotoUrl, uploadStaffPhoto } from '../data/photos.js'
 import { initials } from '../lib/playerFormat.js'
-import { STAFF_TITLES, labelForRole } from '../lib/scope.js'
+import { STAFF_TITLES, labelForRole, canHoldHeadCoachFlag } from '../lib/scope.js'
 
 // The Staff tab of /admin — every squad, and who looks after it.
 //
@@ -405,7 +405,7 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto }) {
           and ticking another — two explicit actions. A radio would have to
           clear-then-set behind the scenes, and a half-failed pair would leave
           the squad with NO head coach and nobody told about it. */}
-      {member.role === 'coach' && (
+      {canHoldHeadCoachFlag(member.role) && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-[12.5px] font-bold text-ink-muted">
             <input
