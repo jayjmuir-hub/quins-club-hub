@@ -27,10 +27,21 @@ vi.mock('../src/lib/supabase.js', () => ({
 import { supabase } from '../src/lib/supabase.js'
 import { MembershipProvider, useMemberships } from '../src/lib/memberships.jsx'
 
-const MEMBERSHIP_ROW = { id: 'm-1', role: 'coach', team_id: 'team-1', player_id: null }
+// ⚠️ `status: 'active'` on both — the column is NOT NULL in the schema, so a
+// row without one has never existed. isAdmin has required it since 18 Aug 2026
+// (20260818_admin_gates_require_active_membership), and the preview these tests
+// exercise is offered only to an admin.
+const MEMBERSHIP_ROW = {
+  id: 'm-1',
+  role: 'coach',
+  status: 'active',
+  team_id: 'team-1',
+  player_id: null,
+}
 const ADMIN_ROW = {
   id: 'm-admin',
   role: 'admin',
+  status: 'active',
   team_id: null,
   player_id: null,
   club_id: 'club-ad',

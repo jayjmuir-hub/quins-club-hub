@@ -42,7 +42,7 @@ const TEAMS = [TEAM_U14, TEAM_U12] // deliberately unsorted
 const TOM = { id: 'p-1', full_name: 'Tom Fletcher', team_id: 't-u12' }
 const ELLA = { id: 'p-2', full_name: 'Ella Fletcher', team_id: 't-u14' }
 
-const ADMIN = [{ id: 'm-a', role: 'admin', team_id: null }]
+const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
 
 // The five-child family (Jay, 3 Aug 2026: some parents have three, four or
 // five children at the club, in different age groups). Five age groups, and a

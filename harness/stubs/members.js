@@ -25,7 +25,7 @@
 // path renders a block with two access rows, and `mm8` keeps a null name so
 // the "Unnamed member" fallback stays screenshot-able.
 const MEMBERS = [
-  { id: 'mm1', profile_id: 'pr-jay', role: 'admin', team_id: null, player_id: null, created_at: '2026-01-05T09:00:00Z', profiles: { full_name: 'Jay Muir', email: 'jayjmuir@gmail.com' }, teams: null, players: null },
+  { id: 'mm1', profile_id: 'pr-jay', role: 'admin', status: 'active', team_id: null, player_id: null, created_at: '2026-01-05T09:00:00Z', profiles: { full_name: 'Jay Muir', email: 'jayjmuir@gmail.com' }, teams: null, players: null },
   { id: 'mm2', profile_id: 'pr-sam', role: 'coach', team_id: 't1', player_id: null, created_at: '2026-02-01T09:00:00Z', profiles: { full_name: 'Sam Carter', email: 'coach.sam@adhq.example' }, teams: { name: 'U12 Boys' }, players: null },
   { id: 'mm9', profile_id: 'pr-sam', role: 'coach', team_id: 't2', player_id: null, created_at: '2026-02-03T09:00:00Z', profiles: { full_name: 'Sam Carter', email: 'coach.sam@adhq.example' }, teams: { name: 'U14 Boys' }, players: null },
   { id: 'mm3', profile_id: 'pr-aisha', role: 'coach', team_id: 't2', player_id: null, created_at: '2026-02-10T09:00:00Z', profiles: { full_name: 'Aisha Al Marzooqi', email: 'aisha@adhq.example' }, teams: { name: 'U14 Boys' }, players: null },

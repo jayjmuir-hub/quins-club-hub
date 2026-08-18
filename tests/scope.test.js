@@ -14,6 +14,8 @@ import {
   canApproveAnything,
   canApproveTeam,
   isActiveMembership,
+  isSuperAdmin,
+  adminRights,
 } from '../src/lib/scope.js'
 
 // Unit tests for src/lib/scope.js (Task 7: pure membership/scope helpers) and
@@ -36,6 +38,16 @@ const SENIOR_1XV = {
 }
 const ALL_TEAMS = [SENIOR_1XV, U16, U8, U12, U6] // deliberately unsorted
 
+// ⚠️ `status: 'active'` ADDED 18 Aug 2026, AND ITS ABSENCE WAS THE REASON THIS
+// HELPER COULD NOT HAVE CAUGHT THE BUG IT WAS ASKED TO. `memberships.status` is
+// NOT NULL in the schema, so a row without one has never existed in the
+// database — but every fixture here built one, and `isAdmin` answered off role
+// alone, so the two agreed on a shape that cannot occur. The same omission was
+// recorded against db/tests/ on 17 Aug: "every membership fixture in tests/ —
+// none carried a status at all, though the column is NOT NULL."
+//
+// A test that wants a pending row passes one; the default is what a real row
+// looks like.
 function membership(overrides) {
   return {
     id: `m-${Math.random()}`,
@@ -43,6 +55,7 @@ function membership(overrides) {
     club_id: 'club-1',
     team_id: null,
     role: 'player',
+    status: 'active',
     player_id: null,
     created_at: '2026-01-01T00:00:00Z',
     ...overrides,
@@ -51,7 +64,7 @@ function membership(overrides) {
 
 describe('visibleTeams', () => {
   it('returns every team for an admin, even though the admin membership has team_id null', () => {
-    const memberships = [membership({ role: 'admin', team_id: null })]
+    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
 
     const result = visibleTeams(memberships, ALL_TEAMS)
 
@@ -92,7 +105,7 @@ describe('visibleTeams', () => {
 
   it('does not mutate the allTeams array passed in', () => {
     const original = [...ALL_TEAMS]
-    const memberships = [membership({ role: 'admin', team_id: null })]
+    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
 
     visibleTeams(memberships, ALL_TEAMS)
 
@@ -107,7 +120,7 @@ describe('visibleTeams', () => {
   })
 
   it('handles a null or undefined allTeams without throwing', () => {
-    const memberships = [membership({ role: 'admin', team_id: null })]
+    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
 
     expect(visibleTeams(memberships, null)).toEqual([])
     expect(visibleTeams(memberships, undefined)).toEqual([])
@@ -119,7 +132,7 @@ describe('visibleTeams', () => {
     // (a.sort_order ?? 0) - (b.sort_order ?? 0) keeps the result numeric.
     const teamWithoutOrder = { id: 'team-no-order', club_id: 'club-1', name: 'Mystery XV' }
     const teams = [U12, teamWithoutOrder, U6]
-    const memberships = [membership({ role: 'admin', team_id: null })]
+    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
 
     const result = visibleTeams(memberships, teams)
 
@@ -130,7 +143,7 @@ describe('visibleTeams', () => {
 
 describe('canEditTeam', () => {
   it('is true for an admin on any team', () => {
-    const memberships = [membership({ role: 'admin', team_id: null })]
+    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
 
     expect(canEditTeam(memberships, U6.id)).toBe(true)
     expect(canEditTeam(memberships, SENIOR_1XV.id)).toBe(true)
@@ -178,14 +191,14 @@ describe('canEditTeam', () => {
   })
 
   it('is true for an admin on a real team id, but false for an admin on a null teamId', () => {
-    const memberships = [membership({ role: 'admin', team_id: null })]
+    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
 
     expect(canEditTeam(memberships, U12.id)).toBe(true)
     expect(canEditTeam(memberships, null)).toBe(false)
   })
 
   it('is false for a null or undefined teamId even for an admin or coach', () => {
-    const adminMemberships = [membership({ role: 'admin', team_id: null })]
+    const adminMemberships = [membership({ role: 'admin', status: 'active', team_id: null })]
     const coachMemberships = [membership({ role: 'coach', team_id: U12.id })]
 
     expect(canEditTeam(adminMemberships, null)).toBe(false)
@@ -205,10 +218,10 @@ describe('canEditTeam', () => {
 })
 
 describe('isAdmin', () => {
-  it('is true when any membership row has role admin', () => {
+  it('is true when any membership row is an ACTIVE admin', () => {
     const memberships = [
       membership({ role: 'coach', team_id: U12.id }),
-      membership({ role: 'admin', team_id: null }),
+      membership({ role: 'admin', status: 'active', team_id: null }),
     ]
 
     expect(isAdmin(memberships)).toBe(true)
@@ -218,6 +231,46 @@ describe('isAdmin', () => {
     const memberships = [membership({ role: 'coach', team_id: U12.id })]
 
     expect(isAdmin(memberships)).toBe(false)
+  })
+
+  // ⚠️ 18 Aug 2026. The client half of
+  // db/migrations/20260818_admin_gates_require_active_membership.sql, which
+  // added the same test to private.is_admin and its three siblings. A pending
+  // row is a REQUEST for admin, not admin.
+  //
+  // ⚠️ NOTHING CAN CREATE A PENDING ADMIN ROW TODAY — request_staff_role
+  // refuses any role but coach/manager/medic — so this pins a shape the
+  // database cannot currently produce. That is the point: the 17 Aug approval
+  // bug happened because a new writer made a pending STAFF row possible and
+  // the old readers were never audited.
+  it('⚠️ is false for a PENDING admin row — a request for admin is not admin', () => {
+    const memberships = [membership({ role: 'admin', status: 'pending', team_id: null })]
+
+    expect(isAdmin(memberships)).toBe(false)
+  })
+
+  it('⚠️ is true on an active admin row held alongside a pending one', () => {
+    // The "every row must be active" reading would be wrong: somebody who is
+    // already an admin and has separately registered a child is still an admin.
+    const memberships = [
+      membership({ role: 'admin', status: 'active', team_id: null }),
+      membership({ role: 'parent', status: 'pending', team_id: U12.id }),
+    ]
+
+    expect(isAdmin(memberships)).toBe(true)
+  })
+
+  it('⚠️ agrees with isSuperAdmin and adminRights, which already tested status', () => {
+    // The inconsistency this fixed: a single pending super-admin row failed
+    // isSuperAdmin and passed isAdmin, so the same person was and was not an
+    // admin depending on which helper a screen happened to call.
+    const pendingSuper = [
+      membership({ role: 'admin', status: 'pending', team_id: null, is_super: true }),
+    ]
+
+    expect(isAdmin(pendingSuper)).toBe(false)
+    expect(isSuperAdmin(pendingSuper)).toBe(false)
+    expect(adminRights(pendingSuper)).toEqual([])
   })
 
   it('is false for empty, null, or undefined memberships', () => {
@@ -231,7 +284,7 @@ describe('roleLabel', () => {
   it('returns Admin when an admin row is present, regardless of other roles', () => {
     const memberships = [
       membership({ role: 'coach', team_id: U12.id }),
-      membership({ role: 'admin', team_id: null }),
+      membership({ role: 'admin', status: 'active', team_id: null }),
     ]
 
     expect(roleLabel(memberships)).toBe('Admin')
@@ -311,7 +364,7 @@ describe('childPlayerIds', () => {
 
   it('ignores admin/coach rows and null player_ids', () => {
     const memberships = [
-      membership({ role: 'admin', team_id: null, player_id: null }),
+      membership({ role: 'admin', status: 'active', team_id: null, player_id: null }),
       membership({ role: 'coach', team_id: U12.id, player_id: null }),
     ]
 
@@ -649,7 +702,7 @@ describe('roleLabel — the new roles', () => {
       { role: 'medic', team_id: 't' },
       { role: 'manager', team_id: 't' },
       { role: 'coach', team_id: 't' },
-      { role: 'admin', team_id: null },
+      { role: 'admin', status: 'active', team_id: null },
     ]
     expect(roleLabel(all)).toBe('Admin')
     expect(roleLabel(all.slice(0, 5))).toBe('Coach')
@@ -723,8 +776,8 @@ describe('canApproveAnything — a request is not access', () => {
   })
 
   it('refuses a pending admin row', () => {
-    expect(canApproveAnything([{ role: 'admin', team_id: null, status: 'pending' }])).toBe(false)
-    expect(canApproveAnything([{ role: 'admin', team_id: null, status: 'active' }])).toBe(true)
+    expect(canApproveAnything([{ role: 'admin', status: 'active', team_id: null, status: 'pending' }])).toBe(false)
+    expect(canApproveAnything([{ role: 'admin', status: 'active', team_id: null }])).toBe(true)
   })
 
   // ⚠️ THE CONTROL. Somebody can hold both — a parent at the club who has also

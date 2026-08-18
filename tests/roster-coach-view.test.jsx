@@ -113,7 +113,7 @@ describe('columns that repeat themselves are dropped', () => {
 
   it('keeps Age group when more than one squad is in view', async () => {
     useMembershipsMock.mockReturnValue({
-      memberships: [{ id: 'm1', role: 'admin', team_id: null }],
+      memberships: [{ id: 'm1', role: 'admin', status: 'active', team_id: null }],
       teams: [U14A, U16B],
     })
     listPlayersMock.mockResolvedValue([

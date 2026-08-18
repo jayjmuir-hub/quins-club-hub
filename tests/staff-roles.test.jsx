@@ -42,7 +42,7 @@ const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 const TEAM_U12 = { id: 't-u12', club_id: CLUB_ID, name: 'U12', sort_order: 7 }
 const TEAM_U14 = { id: 't-u14', club_id: CLUB_ID, name: 'U14', sort_order: 9 }
 const TEAMS = [TEAM_U14, TEAM_U12]
-const ADMIN = [{ id: 'm-a', role: 'admin', team_id: null, club_id: CLUB_ID }]
+const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null, club_id: CLUB_ID }]
 
 const ROLE = 'Role for the new member'
 

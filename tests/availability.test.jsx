@@ -52,7 +52,7 @@ const PLAYER_ANA = { id: 'p-ana', team_id: 'team-u10', full_name: 'Ana Silva' }
 const PLAYER_JOE = { id: 'p-joe', team_id: 'team-u10', full_name: 'Joe Brown' }
 const ROSTER = [PLAYER_ANA, PLAYER_JOE, PLAYER_TOM]
 
-const ADMIN = [{ id: 'm1', role: 'admin', team_id: null }]
+const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null }]
 const COACH = [{ id: 'm2', role: 'coach', team_id: 'team-u10' }]
 const PARENT_OF_TOM = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p-tom' }]
 

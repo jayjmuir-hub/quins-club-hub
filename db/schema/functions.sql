@@ -5,6 +5,12 @@
 -- First captured 2026-08-03; re-captured 2026-08-07;
 -- ⚠️ RE-CAPTURED 2026-08-09 — 29 functions (was 22).
 -- ⚠️ RE-CAPTURED 2026-08-11 — see the block below.
+-- ⚠️ RE-CAPTURED 2026-08-18 — the four admin gates only
+--   (20260818 admin_gates_require_active_membership): private.is_admin,
+--   is_admin_anywhere, shares_admin_club, can_admin_see_pending each gained
+--   `status = 'active'` on the CALLER's membership row. Grants, volatility,
+--   search_path and security-definer flags all unchanged — verified from
+--   pg_proc after applying, not assumed from CREATE OR REPLACE.
 -- ⚠️ RE-CAPTURED 2026-08-12 — public.calendar_events_for_token only
 --   (20260812 calendar_feed_league_team). Three columns added to its
 --   RETURNS TABLE and a LEFT JOIN to league_teams. See the block at its
@@ -481,6 +487,15 @@ GRANT EXECUTE ON FUNCTION public.set_own_player_photo(uuid, text) TO authenticat
 -- on 6 Aug, so the 7 Aug capture should already have shown it. Safe for the
 -- reason that migration gives: with no JWT auth.uid() is null, the EXISTS
 -- matches nothing, and the function returns false.
+--
+-- ⚠️ `and mine.status = 'active'` ADDED 18 Aug 2026 by
+-- 20260818_admin_gates_require_active_membership, with is_admin,
+-- is_admin_anywhere and shares_admin_club. One of the FOUR spellings of "is
+-- the caller an admin", none of which tested status.
+-- ⚠️ THE TEST IS ON `mine` ONLY, DELIBERATELY. The second EXISTS is about the
+-- TARGET having no membership rows at all, and an admin must be able to see a
+-- person who is waiting — that is the approval queue. Adding a status test
+-- there would hide exactly the people this function exists to reveal.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.can_admin_see_pending(_profile uuid)
  RETURNS boolean
@@ -490,7 +505,9 @@ CREATE OR REPLACE FUNCTION private.can_admin_see_pending(_profile uuid)
 AS $function$
   select exists (
            select 1 from memberships mine
-           where mine.profile_id = auth.uid() and mine.role = 'admin'
+           where mine.profile_id = auth.uid()
+             and mine.status = 'active'
+             and mine.role = 'admin'
          )
      and not exists (
            select 1 from memberships m where m.profile_id = _profile
@@ -656,6 +673,15 @@ $function$
 -- ---------------------------------------------------------------------
 -- private.is_admin(uuid)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,anon=X/postgres}
+--
+-- ⚠️ `and m.status = 'active'` ADDED 18 Aug 2026 by
+-- 20260818_admin_gates_require_active_membership. The deferral recorded in
+-- 20260817_approve_requires_active_membership — and in the note further down
+-- this file, which said this function STILL had the omission — taken.
+-- ⚠️ IT BACKS 15 POLICIES ACROSS 9 TABLES (announcements, feedback, invites,
+-- league_teams, memberships, pitch_requests, pitches, social_ideas, teams),
+-- measured the same day. That blast radius is why it waited, and it is the
+-- reason to read this line before changing anything here again.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.is_admin(_club uuid)
  RETURNS boolean
@@ -664,7 +690,9 @@ CREATE OR REPLACE FUNCTION private.is_admin(_club uuid)
  SET search_path TO 'public'
 AS $function$
   select exists (select 1 from memberships m
-    where m.profile_id = auth.uid() and m.club_id = _club and m.role = 'admin');
+    where m.profile_id = auth.uid()
+      and m.status = 'active'
+      and m.club_id = _club and m.role = 'admin');
 $function$
 ;
 
@@ -684,6 +712,14 @@ GRANT EXECUTE ON FUNCTION private.is_admin(uuid) TO anon;  -- inert: anon has no
 -- cannot be club-scoped the way private.is_admin(club_id) is everywhere else.
 -- Same shape and same single-club assumption as can_admin_see_pending above.
 -- If a second club is ever added, those two need revisiting together.
+--
+-- ⚠️ `and m.status = 'active'` ADDED 18 Aug 2026 by
+-- 20260818_admin_gates_require_active_membership, with is_admin. This one had
+-- never been NAMED as carrying the omission — claude/open-items.md and the note
+-- below both said "private.is_admin", singular — and it was found by asking the
+-- database which functions mention `memberships` without mentioning `status`
+-- rather than by grepping for the name already known. It backs access_requests
+-- and photo_backup_runs.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.is_admin_anywhere()
  RETURNS boolean
@@ -694,6 +730,7 @@ AS $function$
   select exists (
     select 1 from memberships m
      where m.profile_id = auth.uid()
+       and m.status = 'active'
        and m.role = 'admin'
   );
 $function$
@@ -797,6 +834,16 @@ GRANT EXECUTE ON FUNCTION private.photo_team(text) TO authenticated;
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,anon=X/postgres}
 -- ⚠️ CORRECTED 9 Aug 2026: same missing `anon` grant as can_admin_see_pending
 -- above, from the same 6 Aug migration and safe for the same reason.
+--
+-- ⚠️ `and mine.status = 'active'` ADDED 18 Aug 2026 by
+-- 20260818_admin_gates_require_active_membership. This function and
+-- can_admin_see_pending back `profiles`, so the omission was the one that
+-- MATTERED most of the four: a pending admin row could read every member's name
+-- and e-mail. Measured under RLS in a rolled-back transaction, before and after
+-- — 1 row, then 0, with an active admin still reading 1 as the control.
+-- ⚠️ `target` DELIBERATELY HAS NO STATUS TEST. An admin must be able to see a
+-- PENDING registrant; that is the approval queue. Only the caller's own row —
+-- `mine` — decides whether they are an admin.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.shares_admin_club(_profile uuid)
  RETURNS boolean
@@ -810,6 +857,7 @@ AS $function$
     join memberships mine on mine.club_id = target.club_id
     where target.profile_id = _profile
       and mine.profile_id = auth.uid()
+      and mine.status = 'active'
       and mine.role = 'admin'
   );
 $function$
@@ -1349,10 +1397,15 @@ GRANT EXECUTE ON FUNCTION private.is_attached_to_team(uuid) TO anon;  -- inert f
 -- pending registrant's NAME and EMAIL. Measured after the fix: a pending coach
 -- sees 0 such profiles where an active coach of the same squad sees them.
 --
--- ⚠️ private.is_admin STILL HAS THE SAME OMISSION, deliberately — it is
--- unreachable today (nothing can create a non-active admin row) and it backs
--- most of the admin RLS surface. claude/open-items.md carries the reasoning and
--- the re-measurement it depends on.
+-- ✅ private.is_admin NO LONGER HAS THE SAME OMISSION — fixed 18 Aug 2026 by
+-- 20260818_admin_gates_require_active_membership, along with is_admin_anywhere,
+-- shares_admin_club and can_admin_see_pending. This line read "STILL HAS THE
+-- SAME OMISSION, deliberately" for one day.
+-- ⚠️ AND IT NAMED ONE FUNCTION WHERE THERE WERE FOUR. The other three were not
+-- hiding: they were simply never looked for, because the note recorded the name
+-- somebody already knew instead of the QUESTION — "which gates ask about role
+-- and not status?" A deferral is worth writing down as the question, not as the
+-- one instance of it that happened to be found first.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.can_approve_team(_team uuid)
  RETURNS boolean

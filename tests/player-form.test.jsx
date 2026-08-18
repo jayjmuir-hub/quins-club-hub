@@ -97,7 +97,7 @@ const TEAM_U10 = { id: 't-u10', club_id: CLUB_ID, name: 'U10', sort_order: 5 }
 const TEAM_1XV = { id: 't-1xv', club_id: CLUB_ID, name: 'Senior Men 1st XV', sort_order: 13 }
 const TEAMS = [TEAM_1XV, TEAM_U14, TEAM_U16] // deliberately unsorted
 
-const ADMIN = [{ id: 'm-a', role: 'admin', team_id: null }]
+const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
 const COACH_U14 = [{ id: 'm-c', role: 'coach', team_id: 't-u14' }]
 const COACH_TWO = [
   { id: 'm-c1', role: 'coach', team_id: 't-u14' },
