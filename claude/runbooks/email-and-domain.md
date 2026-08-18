@@ -80,16 +80,44 @@ Resend dashboard → **Domains → Add Domain**.
 Resend will show you a small set of DNS records to publish — typically an MX and a TXT
 for SPF, and a TXT (or CNAME) for DKIM, all scoped to the `send.` subdomain.
 
-## 3. YOU — publish the records in GoDaddy DNS
+## 3. YOU — publish the records in NETLIFY DNS
 
-**In GoDaddy DNS** for `adhquins-clubhub.com` (`ns43`/`ns44.domaincontrol.com`), add
+⚠️ **THIS STEP SAID "GoDaddy DNS" UNTIL 18 Aug 2026 AND FOLLOWING IT WOULD HAVE WASTED
+AN AFTERNOON WITH NOTHING TO SHOW.** GoDaddy is the **registrar only**. The domain's
+nameservers were moved to **Netlify**, and edits made in a GoDaddy zone that is not
+authoritative save cleanly, look correct, and change nothing — there is no error to
+notice, which is what makes it expensive. Measured 18 Aug 2026:
+
+```
+adhquins-clubhub.com  NS  →  dns1.p09.nsone.net … dns4.p09.nsone.net
+```
+
+`nsone.net` is NS1, which is what Netlify DNS runs on. The old text named
+`ns43`/`ns44.domaincontrol.com`, which is GoDaddy's — that is no longer what answers for
+this domain. **Re-run `nslookup -type=NS adhquins-clubhub.com` before believing this
+line either**; it has been wrong once.
+
+**In Netlify** → your team → **Domains** → `adhquins-clubhub.com` → **DNS records**, add
 each record Resend showed you, exactly as given — host/name, type, value. They'll be
 named things like `send` and `resend._domainkey.send`, not `@`, because they belong to
 the subdomain.
 
-**Do not touch the existing `@` records** (`v=spf1 include:spf.em.secureserver.net ?all`
-and the rest) — those are GoDaddy's registrar boilerplate on the root, unrelated to this
-and safe to leave alone.
+⚠️ **Do not touch the existing `@` records — and they are NOT what this file used to say
+they were.** The old text called them "GoDaddy's registrar boilerplate
+(`v=spf1 include:spf.em.secureserver.net ?all`)". Measured 18 Aug 2026, the root now
+carries **Microsoft 365's** records, because club mailboxes live there:
+
+```
+adhquins-clubhub.com  MX   →  adhquinsclubhub-com02b.mail.protection.outlook.com
+adhquins-clubhub.com  TXT  →  v=spf1 include:spf.protection.outlook.com -all
+adhquins-clubhub.com  TXT  →  MS=ms38515168          (M365 domain verification)
+autodiscover          CNAME →  autodiscover.outlook.com
+```
+
+**Breaking any of those stops club mail arriving**, which is a much worse failure than
+breaking app sending — nobody notices inbound mail that silently stops. Leave the root
+alone and keep every Resend record on the `send.` subdomain, which is what the
+subdomain-sending decision at the top of this file is for.
 
 Wait 10–30 minutes for propagation, then back in Resend click **Verify**. If it doesn't
 verify within an hour, recheck the exact record values — a missing or extra character in
