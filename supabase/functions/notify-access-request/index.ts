@@ -161,8 +161,18 @@ Deno.serve(async (request: Request): Promise<Response> => {
     // !! NO club_id ON THIS TABLE. An access request comes from somebody with
     // no membership, so there is nothing to derive a club from - the
     // single-club assumption is doing the work, same as in is_admin_anywhere().
+    //
+    // !! SUPER ADMINS ONLY, from 18 Aug 2026. Jay: "we don't need to email
+    //    every single admin every time". This was every active admin - five
+    //    people, of whom three are super. The other two keep every power they
+    //    had; they are simply not told, because an access request is a
+    //    club-level decision and the super admins are the people who own it.
+    //
+    // !! NO SQUAD HALF HERE, unlike notify-approval. An access request has no
+    //    team_id to narrow by - see the note above about there being no
+    //    club_id either - so there is no head coach or manager to add.
     const admins = await db(
-      'memberships?role=eq.admin&status=eq.active&select=profiles(email)',
+      'memberships?is_super=is.true&status=eq.active&select=profiles(email)',
     )
 
     const recipients = [...new Set(
@@ -172,7 +182,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
     )]
 
     if (recipients.length === 0) {
-      console.error(`no active admins - nobody will be told about request ${requestId}`)
+      // !! READS "no active SUPER admins" NOW. Before 18 Aug 2026 this branch
+      //    meant the club had no admin at all; it now fires while ordinary
+      //    admins may still exist, so the log line has to say which.
+      console.error(`no active super admins - nobody will be told about request ${requestId}`)
       return new Response(JSON.stringify({ sent: 0 }), { status: 200 })
     }
 

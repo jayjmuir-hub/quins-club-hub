@@ -285,9 +285,25 @@ know before reasoning about anything:
    `claude/runbooks/backup-restore-drill.md`. Treat "we have backups" as an
    untested claim until that file says otherwise.
 2. **The project no longer pauses after 7 days idle.**
-3. **Database branching is available.** Use one for any migration you are not
-   certain of. ⚠️ **Branches bill BY THE HOUR — create, use, delete.** An idle
-   branch is a standing charge with no owner.
+3. ⛔ **DATABASE BRANCHING DOES NOT WORK ON THIS REPO, AND THIS LINE USED TO SAY
+   IT DID.** It read "use one for any migration you are not certain of" until
+   18 Aug 2026, when one was created and the migration failed on
+   `relation "public.memberships" does not exist`. **A branch comes up EMPTY —
+   measured: 0 public tables, no `private` schema, 0 tracked migrations**, while
+   production has 136. The cause is that Supabase replays a `migrations` directory under
+   `supabase/`, which this repo does not have
+   and **this repo keeps its migrations in `db/migrations/`**, so there is
+   nothing for a branch to replay. Moving them is a real piece of work and
+   nobody has asked for it.
+   ✅ **USE `db/tests/` INSTEAD — a transaction that ROLLS BACK, against
+   production.** `claude/runbooks/db-harnesses.md`. It is not a poor substitute:
+   a branch carries **no production data**, so it could not have verified the
+   head-coach backfill against the real titles, and the rolled-back harness did.
+   ⚠️ **Prove the rollback works before trusting a new runner with DDL** — a
+   throwaway `create table` inside `begin`/`rollback`, then check it is gone
+   WITH A CONTROL that the query can see a table which does exist.
+   ⚠️ **Branches still bill BY THE HOUR if you make one — create, use, delete.**
+   An idle branch is a standing charge with no owner.
 4. **Resend's 100/day cap is gone**, and with it a brake nobody designed. ⚠️ **Do
    not write an allowance number into any file** — read it off the dashboard.
    Every number this repo has recorded has rotted.
