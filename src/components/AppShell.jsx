@@ -14,6 +14,7 @@ import crest from '../assets/crest.png'
 import Button from './Button.jsx'
 import InstallPrompt from './InstallPrompt.jsx'
 import AppButton from './AppButton.jsx'
+import HelpButton from './HelpButton.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
@@ -617,6 +618,18 @@ export default function AppShell({ children }) {
           </>
         )}
       </main>
+
+      {/* ⚠️ OUTSIDE <main>, AND OUTSIDE THE loading/error/ready SPLIT — for the
+          same reason InstallPrompt sits above that split. The moments this is
+          most wanted are the broken ones: a screen that failed to load is
+          precisely when somebody wants to say so, and inside the `ready`
+          branch it would vanish exactly then.
+
+          It is `position: fixed`, so it positions against the viewport
+          wherever it sits in the tree — see the note at the top of Sheet.jsx
+          about no ancestor carrying a transform. Its own note explains why it
+          costs no layout space. */}
+      <HelpButton />
     </div>
   )
 }

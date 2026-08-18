@@ -28,6 +28,16 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+// ⚠️ THE SCREEN GREW A SECOND, UNRELATED SECTION ON 18 Aug 2026 —
+// FeedbackTriage, the reports list (claude/plans/2026-08-18-help-and-feedback.md).
+// It is stubbed out rather than mocked piecemeal, because every assertion in
+// this file is about the COMPLETENESS half and nothing here should start
+// depending on what the reports list happens to render. Its own behaviour is
+// covered by tests/feedback-triage.test.jsx.
+vi.mock('../src/components/FeedbackTriage.jsx', () => ({
+  default: () => null,
+}))
+
 import AdminNeedsAttention from '../src/screens/AdminNeedsAttention.jsx'
 
 // ⚠️ U13B IS SINGLE-GENDER AND U12 MIXED, which is what makes the gender rule

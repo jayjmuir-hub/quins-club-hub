@@ -1,8 +1,11 @@
 # Plan — one button that lets a member report a problem or suggest a change
 
-**STATUS: NOT BUILT — designed 18 Aug 2026, no code written, no migration, no
-function deployed.** This file is the design and the reasoning. Nothing in the
-app has changed.
+**STATUS: BUILT, NOT YET APPLIED — 18 Aug 2026.** The button, the panel, the
+data layer, the admin triage list, both migrations and the edge function are
+written and tested. ⚠️ **NEITHER MIGRATION HAS BEEN RUN AGAINST PRODUCTION AND
+THE FUNCTION IS NOT DEPLOYED**, so on the live site the `?` opens, the form
+fills in, and Send fails — there is no `feedback` table behind it. Applying it
+is the checklist at the bottom of this file.
 
 ## The ask
 
@@ -70,8 +73,12 @@ Same form for both choices; only the heading and the prompt change.
   *"What would make this better?"*
 - A grey block headed **"Sent automatically with your message"**, listing in
   plain words: the page you're on, your phone, the app version.
-- A switch, **off by default**: *"Attach a picture of this screen"*, subtitled
-  *"Off — because rosters show children"*.
+- ⚠️ **A screenshot switch, off by default, was drawn in the mockups and is NOT
+  in the shipped panel.** It belongs with the deferred `html2canvas` work below,
+  and a control that cannot yet do anything is worse than no control. When it
+  lands: **off by default**, labelled *"Attach a picture of this screen"* and
+  subtitled *"Off — because rosters show children"*. That default is the whole
+  point of it and is not a preference to be tuned later.
 - **No name or email field.** They are signed in; the app knows.
 
 ### Step 3 — the acknowledgement
@@ -221,3 +228,64 @@ the retired palette too** — its hexes are `#e11b22`, `#b3141a`, `#eef0f3`,
 - The stale comment in `src/lib/errorReporting.js` should be corrected
   independently of this feature — it has already caused one code review to
   recommend deleting a live dependency.
+
+---
+
+## ⚠️ What is built, and what it does NOT yet do — 18 Aug 2026
+
+| Built and tested | File |
+|---|---|
+| The floating `?` and the two-step panel | `src/components/HelpButton.jsx` |
+| Mounted once, so every signed-in screen has it | `src/components/AppShell.jsx` |
+| The data layer, and the `QCH-0041` reference | `src/data/feedback.js` |
+| The admin triage list — **the record** | `src/components/FeedbackTriage.jsx` |
+| Placed above the completeness list | `src/screens/AdminNeedsAttention.jsx` |
+| The table, RLS, the stamping trigger, column grants | `db/migrations/20260818_feedback.sql` |
+| The notification trigger | `db/migrations/20260818_notify_feedback.sql` |
+| The mail — club, then reporter | `supabase/functions/notify-feedback/index.ts` |
+| "Can't get in? Email us" on the login screen | `src/screens/Login.jsx` |
+| Which deploy the person was on | `vite.config.js` (`__BUILD_REF__`) |
+
+**Deferred, as planned:** screenshots via `html2canvas`, help articles, search,
+a public ideas board, audit-logging of status changes, and the "report this"
+action on `src/components/ErrorBoundary.jsx`.
+
+### ⚠️ The apply checklist — none of this has been done
+
+1. **Run `db/migrations/20260818_feedback.sql`** against production.
+   ⚠️ **Prove it in a rolled-back transaction first** —
+   `claude/runbooks/db-harnesses.md`. A database branch is NOT available here:
+   branches come up empty because Supabase replays `supabase/migrations/` and
+   this repo keeps them in `db/migrations/`.
+2. **Re-capture the grants.** `db/schema/grants.sql` currently carries the
+   migration's INTENT with a warning saying so, because a snapshot that was
+   typed rather than read cannot diff anything. Replace it with a real reading
+   of `information_schema` and delete that warning.
+3. **Deploy `notify-feedback`** with **`verify_jwt: false`**. With it on, the
+   gateway rejects every call before the code runs and no mail is ever sent —
+   silently, because `pg_net` does not read the response.
+4. **Set the vault secrets** `feedback_notify_url` and
+   `feedback_notify_secret`, and the function secret `FEEDBACK_NOTIFY_SECRET`
+   to the same value. Until then the trigger warns and sends nothing, which is
+   the designed failure: the report is still filed.
+5. **Run `db/migrations/20260818_notify_feedback.sql`.** It guards itself — it
+   raises if the trigger did not install.
+6. **File a real report from a phone** and confirm three things: the row
+   appears on `/admin/needs-attention`, the club mail arrives, and the ACK
+   arrives. ⚠️ **CHECK THE JUNK FOLDER.** A new M365 tenant with no sending
+   history junked the first two messages ever sent to `help@` on 18 Aug 2026 —
+   proven, not predicted. If the notification is junked, mark it not-junk and
+   re-test rather than assuming the function is broken.
+
+### ⚠️ Two things found while building, worth keeping
+
+- **A test that could not fail.** The fixture for "one family member must not
+  see another's half-typed report" originally asserted at the choice step,
+  where the textarea is never rendered — so it passed with the state reset
+  deliberately removed. Caught by injecting exactly that fault. It now steps
+  back into the form before asserting.
+- **A real bug, caught by a test rather than by reading.** `FeedbackTriage`
+  reported a failed status change and then reloaded — and the reload clears the
+  error on its way in, so the message vanished and the control silently snapped
+  back. That is precisely how somebody believes they closed a report they did
+  not. Reload now happens first.

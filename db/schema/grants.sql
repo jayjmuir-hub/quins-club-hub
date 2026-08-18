@@ -383,6 +383,25 @@ GRANT UPDATE (status, decision_note, decided_by, decided_at)
 
 
 -- ---------------------------------------------------------------------
+-- public.feedback — COLUMN grants  (written 18 Aug 2026)
+--
+-- ⚠️ NOT YET CAPTURED FROM THE LIVE DATABASE. 20260818_feedback.sql has not
+-- been applied, so unlike every block above this one is the migration's
+-- INTENT rather than a reading of information_schema. **Re-capture it after
+-- applying** and delete this warning — a snapshot that was typed rather than
+-- read cannot diff anything, which is the whole purpose of this file.
+--
+-- ⚠️ POLICIES AUTHORISE THE ROW; GRANTS AUTHORISE THE COLUMN. "feedback
+-- triage" is FOR UPDATE over the whole row, so without this an admin marking a
+-- report done is also authorised to rewrite what the reporter said — turning
+-- the record into what the admin remembers rather than what was reported.
+-- ---------------------------------------------------------------------
+REVOKE UPDATE ON public.feedback FROM authenticated;
+GRANT UPDATE (status, admin_note, handled_by, handled_at)
+  ON public.feedback TO authenticated;
+
+
+-- ---------------------------------------------------------------------
 -- public.announcements — TABLE and COLUMN grants  (captured 14 Aug 2026)
 --
 -- Captured from information_schema.column_privileges and

@@ -6,6 +6,7 @@ import { listPlayers, listPlayerPrivatePresence } from '../data/players.js'
 import { listParentsForPlayers } from '../data/parents.js'
 import { missingForPlayer } from '../lib/completeness.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import FeedbackTriage from '../components/FeedbackTriage.jsx'
 
 // /admin/needs-attention — the THIRD and last surface of the completeness rule
 // (item 6 of claude/plans/2026-08-16-account-creation-redesign.md).
@@ -195,6 +196,13 @@ export default function AdminNeedsAttention() {
 
   return (
     <div>
+      {/* ⚠️ ABOVE the completeness list, and that ordering is the argument.
+          A missing date of birth is a slow, known gap that the family is
+          already being asked about. A report is somebody saying the app is
+          wrong RIGHT NOW, and it is the only item on this screen with a person
+          waiting at the other end of it. */}
+      <FeedbackTriage />
+
       <h3 className="mb-1 text-base font-extrabold text-ink">Records needing attention</h3>
 
       {/* ⚠️ SAYS WHO IS ALREADY BEING ASKED, because the useful next action is

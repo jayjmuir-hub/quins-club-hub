@@ -10,6 +10,41 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- ❓ **THE `?` IS BUILT: ANY MEMBER CAN REPORT A PROBLEM OR SEND AN IDEA FROM
+  ANY SCREEN.** `claude/plans/2026-08-18-help-and-feedback.md`.
+  A 44px red circle floating bottom-right, opening a two-step panel — pick a
+  lane, then one required field. Page, device, viewport, installed-or-not and
+  build ref are captured automatically **and listed to the member in plain
+  words before they send**.
+  ⚠️ **BUILT, NOT YET APPLIED.** Neither migration has run and the function is
+  not deployed, so on the live site Send fails — there is no table behind it.
+  The apply checklist is at the bottom of the plan.
+  ✅ **It costs no layout space, because the room was reserved for it before it
+  existed** — `claude/specs/design-system.md` explains `main`'s 100px bottom
+  padding as "clearance for fixed tab bar + FAB" and specifies a FAB nobody
+  built. z-30, strictly under the tab bar's z-40: a floating control that
+  covers navigation traps the person on the screen.
+  ✅ **The screen is the record** — `src/components/FeedbackTriage.jsx` sits
+  above the completeness list on `/admin/needs-attention`, counts only what is
+  still open, and carries the status. `Reply-To` remains the reporter, as a
+  convenience rather than as the design.
+  ⚠️ **A NOT-YET-APPROVED MEMBER CANNOT FILE ANYTHING, AND THAT IS THE ONE
+  PERSON MOST LIKELY TO WANT TO.** Both the insert policy and the stamping
+  trigger require an ACTIVE membership. Widening either would let anybody who
+  can reach the sign-up form write rows, so the answer is a route out: the form
+  names `help@adhquins-clubhub.com` instead of showing a raw policy error, and
+  the login screen — outside `AppShell`, so the `?` cannot reach it — carries a
+  plain "Can't get in? Email us".
+- 🧪 **AND TWO THINGS THE TESTS CAUGHT THAT READING DID NOT.**
+  ⚠️ **A fixture that could not fail.** "One family member must not see
+  another's half-typed report" asserted at the choice step, where the textarea
+  is never rendered — so it passed with the state reset deliberately removed.
+  Found by injecting exactly that fault; it now steps back into the form first.
+  ⚠️ **A real bug.** The triage list reported a failed status change and then
+  reloaded — and the reload clears the error on its way in, so the message
+  vanished and the control silently snapped back, which is how somebody
+  believes they closed a report they did not. Reload happens first now.
+
 - ❓ **A HELP AND FEEDBACK BUTTON IS DESIGNED, AND THE HANDOFF THAT ASKED FOR IT
   IS FOUR FACTS OUT OF DATE.** `claude/plans/2026-08-18-help-and-feedback.md`.
   A 44px red `?` floating over every signed-in screen — **costing no layout

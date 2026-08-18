@@ -626,6 +626,29 @@ export default function Login({ authError = null, embedded = false }) {
               </button>
             )}
 
+            {/* ⚠️ THE ONE HOLE THE `?` BUTTON CANNOT COVER, AND IT IS THE
+                LIKELIEST PROBLEM ANYBODY WILL EVER HAVE.
+                claude/plans/2026-08-18-help-and-feedback.md puts a floating
+                help button on every signed-in screen — but this screen is
+                outside AppShell by definition, so somebody who cannot get in
+                cannot reach it. That is the exact person who most needs to
+                reach somebody.
+
+                ⚠️ A MAILTO, NOT THE FORM. Making the report form work
+                signed-out means accepting rows from anyone on the internet,
+                which means spam handling, for a case one link covers. The
+                subject is prefilled so the mailbox can see at a glance that
+                this is a locked-out member rather than general help. */}
+            <p className="mt-4 text-center text-sm text-ink-faint">
+              Can&rsquo;t get in?{' '}
+              <a
+                href="mailto:help@adhquins-clubhub.com?subject=Can%27t%20sign%20in"
+                className="font-semibold text-brand underline"
+              >
+                Email us
+              </a>
+            </p>
+
             {/* ⚠️ MOTHBALLED — see SHOW_PASSWORDLESS at the top of this file.
                 Flip that constant to bring both routes back. */}
             {SHOW_PASSWORDLESS && !forgotting && (
