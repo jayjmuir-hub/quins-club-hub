@@ -48,7 +48,22 @@
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const MAIL_FROM = Deno.env.get('MAIL_FROM') ?? ''
-const NOTIFY_SECRET = Deno.env.get('FEEDBACK_NOTIFY_SECRET') ?? ''
+
+// ⚠️ THE SHARED NOTIFY SECRET, NOT ONE OF ITS OWN — AND THIS FILE INVENTED
+// `FEEDBACK_NOTIFY_SECRET` FIRST, WHICH WAS WRONG.
+//
+// `notify-approval`, `notify-invite`, `notify-pitch-request` and the
+// photo-backup cron all authenticate with `approval_notify_secret` and the
+// header `x-approval-secret`. Edge Function secrets are PROJECT-WIDE, so this
+// value is already present here — a new name would have meant generating a
+// credential, pasting it in two places and recording it nowhere, to gain
+// nothing. One more endpoint behind the existing gate is the house pattern
+// (`claude/runbooks/player-photo-backup.md` derives its URL the same way).
+//
+// ⚠️ The trade is real and already accepted: one leaked secret reaches every
+// notify endpoint. Rotating it means changing it everywhere at once. That was
+// the decision when the third caller adopted it, not a new one taken here.
+const NOTIFY_SECRET = Deno.env.get('APPROVAL_NOTIFY_SECRET') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
@@ -137,11 +152,11 @@ const KIND_WORD: Record<string, string> = { bug: 'Problem', idea: 'Suggestion' }
 Deno.serve(async (request) => {
   // Fails closed. An unset secret means refuse, never "allow everything".
   if (!NOTIFY_SECRET) {
-    console.error('FEEDBACK_NOTIFY_SECRET is unset — refusing.')
+    console.error('APPROVAL_NOTIFY_SECRET is unset — refusing.')
     return new Response('not configured', { status: 503 })
   }
 
-  const presented = request.headers.get('x-notify-secret') ?? ''
+  const presented = request.headers.get('x-approval-secret') ?? ''
   if (!timingSafeEqual(presented, NOTIFY_SECRET)) {
     return new Response('forbidden', { status: 403 })
   }

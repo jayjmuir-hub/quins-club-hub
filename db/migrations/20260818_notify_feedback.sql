@@ -31,10 +31,20 @@ declare
 begin
   -- ⚠️ READ FROM VAULT, NEVER HARDCODED. This file is committed to a PUBLIC
   -- repository.
+  -- ⚠️ THE SHARED SECRET, NOT ONE OF ITS OWN. notify_approval, notify_invite,
+  -- notify_pitch_request and the photo-backup cron all use
+  -- `approval_notify_secret` with the header `x-approval-secret`. This file
+  -- named a `feedback_notify_secret` first, which would have meant generating
+  -- and hand-placing a credential to gain nothing.
+  --
+  -- ⚠️ THE URL IS DERIVED, NEVER TYPED — same as `photo_backup_url` in
+  -- claude/runbooks/player-photo-backup.md. Deriving it from
+  -- `approval_notify_url` means the project host cannot drift between secrets
+  -- and nobody has to read, paste or retype a value.
   select decrypted_secret into endpoint
     from vault.decrypted_secrets where name = 'feedback_notify_url';
   select decrypted_secret into secret
-    from vault.decrypted_secrets where name = 'feedback_notify_secret';
+    from vault.decrypted_secrets where name = 'approval_notify_secret';
 
   if endpoint is null or secret is null then
     raise warning 'notify_feedback: vault secrets missing, no email sent for feedback %', new.id;
@@ -48,7 +58,7 @@ begin
     url     := endpoint,
     headers := jsonb_build_object(
                  'Content-Type', 'application/json',
-                 'x-notify-secret', secret),
+                 'x-approval-secret', secret),
     body    := jsonb_build_object('feedback_id', new.id)
   );
 

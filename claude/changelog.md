@@ -82,6 +82,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   read it and recommended deleting a live dependency. The status of a running
   service does not belong in a source comment; `claude/runbooks/monitoring.md`
   owns it.
+- 🔌 **THE FEEDBACK TABLE AND `notify-feedback` ARE LIVE ON PRODUCTION**, and
+  the mail path needed **no secret from Jay** — which an earlier build of it got
+  wrong. It invented `FEEDBACK_NOTIFY_SECRET`, meaning a credential to generate,
+  paste in two places and record nowhere. But `notify-approval`,
+  `notify-invite`, `notify-pitch-request` and the photo-backup cron **already
+  share `approval_notify_secret` and the header `x-approval-secret`**, and Edge
+  Function secrets are **project-wide** — the value was already there.
+  `feedback_notify_url` is **derived** from `approval_notify_url` with
+  `replace()`, the same trick `claude/runbooks/player-photo-backup.md` uses, so
+  the host cannot drift and nobody reads or retypes a value.
+  ✅ **Proved before it was trusted**: the rollback mechanism first (a throwaway
+  `create table` in `begin`/`rollback`, checked gone **with a control** that the
+  query can see a table which does exist), then the whole migration rehearsed
+  the same way with its assertions inside the transaction.
+  ✅ **The endpoint answers 403 to an unauthenticated POST, and that single
+  number is the health check** — 401 would mean `verify_jwt` came back on and no
+  mail can ever send silently; 503 would mean the shared secret is missing.
+  ⚠️ **`authenticated` holds a table-level DELETE grant** (the Supabase
+  default), so what stops a report being deleted is the deliberate ABSENCE of a
+  delete policy, not the absence of a grant. Recorded in `db/schema/grants.sql`.
 - `1e3c7bc` — the squash of the help-and-feedback plan.
   ⚠️ **CITED BY TWO BRANCHES AT ONCE, AND THAT IS NOT A MISTAKE.** The runbook
   fix and this feature were both cut from `1e3c7bc`, so CI demands the citation

@@ -4,21 +4,46 @@
 AND NO E-MAIL CAN SEND YET.** Both migrations have run against production and
 `notify-feedback` is deployed and ACTIVE with `verify_jwt: false`.
 
-⚠️ **TWO THINGS ARE STILL MISSING, AND EACH FAILS QUIETLY BY DESIGN:**
+⚠️ **ONE THING IS STILL MISSING: the front end is unmerged**, so nothing writes
+to the table yet.
 
-1. **The front end is unmerged.** Nothing writes to the table yet.
-2. **The vault secrets are unset**, so `private.notify_feedback` raises a
-   warning and returns. Jay sets those; Claude does not touch secrets. Until
-   then a report is filed and shown on the admin screen, and **nobody is
-   e-mailed** — which is the designed failure, not a bug.
+✅ **THE MAIL PATH NEEDED NO SECRET FROM JAY, AND AN EARLIER VERSION OF THIS
+PLAN SAID IT DID.** The first build invented `FEEDBACK_NOTIFY_SECRET` and would
+have meant generating a credential, pasting it into two places and recording it
+nowhere. That was wrong: `notify-approval`, `notify-invite`,
+`notify-pitch-request` and the photo-backup cron **already share
+`approval_notify_secret` and the header `x-approval-secret`**, and Edge Function
+secrets are **project-wide**, so the value was already present in the new
+function. It now uses the shared gate, and `feedback_notify_url` was **derived**
+from `approval_notify_url` with `replace()` — the same trick
+`claude/runbooks/player-photo-backup.md` uses, so the host cannot drift and
+nobody reads, pastes or retypes a value.
+⚠️ **The trade was already accepted when the third caller adopted it:** one
+leaked secret reaches every notify endpoint, and rotating it means changing it
+everywhere at once. Do not treat that as a decision this feature made.
 
 Measured on production after applying, not assumed: table exists with 0 rows,
 RLS on, 3 policies, both triggers installed, table-level `UPDATE` to
 `authenticated` revoked, column `UPDATE` grants exactly
-`admin_note, handled_at, handled_by, status`. The deployed function answers
-**503** to an unauthenticated POST — which proves both that it fails closed on a
-missing secret **and** that the gateway is not verifying JWTs, since a 401 would
-mean the request never reached the code.
+`admin_note, handled_at, handled_by, status`.
+
+⚠️ **THE STATUS CODE FROM AN UNAUTHENTICATED POST IS THE WHOLE HEALTH CHECK, AND
+IT DISTINGUISHES THREE FAULTS AT ONCE.** Re-run it any time this looks broken:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+  "https://lusmshimxdcxpnrktlgz.supabase.co/functions/v1/notify-feedback" \
+  -H "Content-Type: application/json" -d '{"feedback_id":"x"}'
+```
+
+| Answer | Means |
+|---|---|
+| **403** | ✅ correct. The code ran, found the shared secret, and refused a caller without it |
+| **401** | ⚠️ `verify_jwt` got turned back **on**. The gateway is rejecting Postgres before the code runs, and **no mail will ever send, silently** |
+| **503** | ⚠️ the shared secret is missing from the function's environment |
+
+Measured 18 Aug 2026: **403** with no header, and **403** with a deliberately
+wrong one.
 
 ## The ask
 
