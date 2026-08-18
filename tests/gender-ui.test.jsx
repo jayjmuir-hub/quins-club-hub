@@ -114,7 +114,7 @@ const WOMAN_IN_MENS = {
 }
 
 const PARENT = [{ id: 'm-p', role: 'parent', team_id: 't-u14', player_id: 'p-mine', club_id: CLUB }]
-const ADMIN = [{ id: 'm-a', role: 'admin', team_id: null, club_id: CLUB }]
+const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null, club_id: CLUB }]
 
 function membershipValue(memberships) {
   return { memberships, teams: TEAMS, loading: false, error: null, reload: vi.fn() }

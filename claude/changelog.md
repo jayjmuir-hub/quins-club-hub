@@ -10,6 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- 🔐 **A PENDING ADMIN ROW IS NO LONGER AN ADMIN — and it was FOUR functions,
+  not the one every note named.** The deferral the 17 Aug approval fix wrote
+  down, taken: `private.is_admin` asked about role and club and never status,
+  exactly as `can_approve_team` had. Asking the database which functions mention
+  `memberships` without mentioning `status` turned up three more —
+  `is_admin_anywhere`, `shares_admin_club`, `can_admin_see_pending`.
+  ⚠️ **THE TWO NOBODY HAD NAMED WERE THE TWO THAT MATTERED.**
+  `shares_admin_club` and `can_admin_see_pending` back `profiles`, so the
+  omission let a pending admin row read every member's NAME and E-MAIL — the
+  same thing the 17 Aug bug leaked, by another route. Fixing only `is_admin`
+  would have closed the item and left that open.
+  ✅ **Measured under RLS on production, in a rolled-back transaction with an
+  invented club: a pending admin read 1 profile row of another member before
+  and 0 after, with an active admin reading 1 throughout as the control.**
+  ⚠️ **NOTHING CAN CREATE A PENDING ADMIN ROW TODAY**, which is why this was
+  safe to defer and safe to apply — it is not a reason to have waited longer.
+  The 17 Aug bug happened because a new writer made a pending STAFF row
+  possible and the old readers were never audited.
+  ⚠️ **`is_attached_to_team` and `is_own_player` are LEFT, deliberately** — they
+  answer for parents and players, where a pending row is the ordinary
+  registration state, so changing them would alter what live families see
+  mid-registration under cover of a security fix.
+  ⚠️ **The test fixtures could not have caught this**: `memberships.status` is
+  NOT NULL, and not one membership fixture in `tests/` carried a status at all.
+  They now do.
 - 📡 **`availability` HAS BEEN SUBSCRIBING TO NOTHING SINCE IT WAS
   WRITTEN, AND IT IS NOW FIXED.** `src/data/availability.js` opens a
   `postgres_changes` channel, its own comment says it "subscribes to realtime
@@ -38,6 +63,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 - 📧 **The acknowledgement now tells people where to look.** Jay: replies are
   "in app only", so the ACK is the single place a reporter learns that updates
   appear behind the `?` under *See what you've already reported*.
+- `32c7ce0` — the squash that published the two tables.
 - `e6894bd` — the squash that closed the loop in the app.
 
 - 🔁 **THE LOOP ACTUALLY CLOSES NOW: A MEMBER CAN SEE THEIR OWN REPORT, AND AN

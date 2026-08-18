@@ -98,7 +98,7 @@ const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
 const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
 const TEAMS = [TEAM_FIRST_XV, TEAM_U10] // deliberately unsorted; visibleTeams sorts
 
-const ADMIN = [{ id: 'm1', role: 'admin', team_id: null }]
+const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null }]
 const COACH_ONE_TEAM = [{ id: 'm2', role: 'coach', team_id: 'team-u10' }]
 const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
 

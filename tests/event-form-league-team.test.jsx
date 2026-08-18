@@ -54,7 +54,7 @@ const ADHQ1 = { id: 'lt-1', team_id: 't-u14b', rcm_name: 'ADHQ1', division: 'A',
 const ADHQ2 = { id: 'lt-2', team_id: 't-u14b', rcm_name: 'ADHQ2', division: 'B', is_active: true }
 const ADHQ_U16 = { id: 'lt-9', team_id: 't-u16b', rcm_name: 'ADHQ-U16', division: 'A', is_active: true }
 
-const ADMIN = [{ id: 'm-a', role: 'admin', team_id: null }]
+const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
 
 function renderForm({ event = null } = {}) {
   useMembershipsMock.mockReturnValue({

@@ -102,7 +102,7 @@ function renderShell() {
 }
 
 function loaded(overrides = {}) {
-  const memberships = overrides.memberships ?? [{ role: 'admin', team_id: null }]
+  const memberships = overrides.memberships ?? [{ role: 'admin', status: 'active', team_id: null }]
   return {
     memberships,
     // ⚠️ MIRRORS THE REAL PROVIDER: `realMemberships` is the truth and
@@ -597,7 +597,7 @@ describe('NamePrompt — a preview must not reopen the gate', () => {
         { id: 'view-as', role: 'coach', team_id: 't1', player_id: null, status: 'active' },
       ],
       realMemberships: [
-        { role: 'admin', team_id: null, player_id: null, status: 'active' },
+        { role: 'admin', status: 'active', team_id: null, player_id: null },
         { role: 'parent', team_id: 't-u13', player_id: 'p1', status: 'active' },
         { role: 'parent', team_id: 't-u16', player_id: 'p2', status: 'active' },
       ],
@@ -622,7 +622,7 @@ describe('NamePrompt — a preview must not reopen the gate', () => {
     useMembershipsMock.mockReturnValue(
       loaded({
         memberships: [{ id: 'view-as', role: 'player', team_id: 't1', status: 'active' }],
-        realMemberships: [{ role: 'admin', team_id: null, status: 'active' }],
+        realMemberships: [{ role: 'admin', status: 'active', team_id: null }],
         viewAs: { role: 'player', teamId: 't1' },
       }),
     )
@@ -741,7 +741,7 @@ describe('NamePrompt — the role gate', () => {
 
   it('⚠️ never asks an admin — they plainly do a job here', async () => {
     useMembershipsMock.mockReturnValue(
-      parentOfOne({ memberships: [{ role: 'admin', team_id: null, status: 'active' }] }),
+      parentOfOne({ memberships: [{ role: 'admin', status: 'active', team_id: null }] }),
     )
     getMyProfileMock.mockResolvedValue(unasked())
     renderShell()
@@ -769,7 +769,7 @@ describe('NamePrompt — the role gate', () => {
     useMembershipsMock.mockReturnValue(
       loaded({
         memberships: [{ id: 'view-as', role: 'parent', team_id: 't-u12', status: 'active' }],
-        realMemberships: [{ role: 'admin', team_id: null, status: 'active' }],
+        realMemberships: [{ role: 'admin', status: 'active', team_id: null }],
         viewAs: { role: 'parent', teamId: 't-u12' },
       }),
     )

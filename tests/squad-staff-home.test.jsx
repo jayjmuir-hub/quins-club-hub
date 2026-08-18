@@ -773,7 +773,7 @@ describe('Squad contacts on the Dashboard', () => {
     // RPC genuinely returns the whole club here. The block is built from the
     // person's OWN membership rows, not from what they can see.
     useMembershipsMock.mockReturnValue(
-      membershipValue([{ id: 'm0', role: 'admin', team_id: null }]),
+      membershipValue([{ id: 'm0', role: 'admin', status: 'active', team_id: null }]),
     )
     listMySquadStaffMock.mockResolvedValue(
       new Map([
@@ -799,7 +799,7 @@ describe('Squad contacts on the Dashboard', () => {
     // is that declining actually happens.
     useMembershipsMock.mockReturnValue({
       ...membershipValue([{ id: 'view-as', role: 'parent', team_id: 'team-u16', player_id: null }]),
-      realMemberships: [{ id: 'm0', role: 'admin', team_id: null }],
+      realMemberships: [{ id: 'm0', role: 'admin', status: 'active', team_id: null }],
       viewAs: { role: 'parent', teamId: 'team-u16' },
     })
     listMySquadStaffMock.mockResolvedValue(

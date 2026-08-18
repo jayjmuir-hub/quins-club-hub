@@ -107,7 +107,7 @@ const signedIn = {
   signOut: signOutMock,
 }
 const membershipsLoaded = {
-  memberships: [{ role: 'admin', team_id: null }],
+  memberships: [{ role: 'admin', status: 'active', team_id: null }],
   teams: [],
   loading: false,
   error: null,

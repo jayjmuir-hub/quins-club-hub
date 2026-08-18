@@ -69,7 +69,7 @@ const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
 const TEAM_U12 = { id: 'team-u12', name: 'U12 Boys', sort_order: 6 }
 const TEAMS = [TEAM_U12, TEAM_U10] // deliberately unsorted; the screen sorts
 
-const ADMIN = [{ id: 'm1', role: 'admin', team_id: null }]
+const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null }]
 const COACH = [{ id: 'm2', role: 'coach', team_id: 'team-u10' }]
 const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
 

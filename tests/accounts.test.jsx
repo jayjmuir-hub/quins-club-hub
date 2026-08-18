@@ -106,7 +106,7 @@ const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 // Every membership fixture in this suite lacked it, which is why nothing here
 // could tell a PENDING staff request from granted access — the hole found in
 // private.can_approve_team the same day.
-const ADMIN = [{ id: 'm1', role: 'admin', team_id: null, club_id: CLUB_ID, status: 'active' }]
+const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: CLUB_ID }]
 const COACH = [{ id: 'm2', role: 'coach', team_id: 'team-u10', status: 'active' }]
 const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1', status: 'active' }]
 
@@ -826,7 +826,7 @@ describe('Accounts — last-admin guard', () => {
   it('does not block removing someone else’s admin row', async () => {
     listClubMembersMock.mockResolvedValue([
       JAY_ADMIN,
-      { ...ALI_PARENT, role: 'admin', team_id: null, teams: null },
+      { ...ALI_PARENT, role: 'admin', status: 'active', team_id: null, teams: null },
     ])
 
     const { user } = setup()

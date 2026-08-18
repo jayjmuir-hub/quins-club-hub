@@ -381,7 +381,7 @@ proves you wrong.**
   readers were not audited: the screen, the SQL gate, and the tests all missed
   it for the same reason.**
 
-- ⚠️ **`private.is_admin` HAS THE SAME OMISSION AND WAS DELIBERATELY LEFT.**
+- ✅ ~~**`private.is_admin` HAS THE SAME OMISSION AND WAS DELIBERATELY LEFT.**
   It tests role and club and never status. **Not reachable today** — measured
   17 Aug 2026, production held **zero** admin memberships that were not active,
   and `request_staff_role` refuses any role but coach/manager/medic, so nothing
@@ -390,7 +390,82 @@ proves you wrong.**
   from one function to every admin policy on a live site.
   **Re-measure the count before assuming it is still unreachable**; the moment
   any path can create a pending admin row, this becomes the same bug with a
-  bigger radius.
+  bigger radius.~~ — **APPLIED TO PRODUCTION 18 Aug 2026.** Jay's call, having
+  been shown the blast radius measured rather than described.
+  `db/migrations/20260818_admin_gates_require_active_membership.sql`,
+  `db/tests/admin-status-gate.sql`, and the client half in `src/lib/scope.js`.
+
+  ⚠️ **IT WAS FOUR FUNCTIONS, NOT ONE, AND THE LINE ABOVE NAMED ONLY THE ONE
+  SOMEBODY ALREADY KNEW.** Found by asking production which functions mention
+  `memberships` and not `status`, rather than by grepping for `is_admin`:
+
+  | Function | Backs | Had a status test |
+  |---|---|---|
+  | `private.is_admin(uuid)` | 15 policies, 9 tables | no |
+  | `private.is_admin_anywhere()` | `access_requests`, `photo_backup_runs` | no |
+  | `private.shares_admin_club(uuid)` | `profiles` ×2 | no |
+  | `private.can_admin_see_pending(uuid)` | `profiles` | no |
+
+  ⚠️ **THE LAST TWO WERE THE ONES THAT MATTERED, AND THEY ARE THE ONES NOBODY
+  HAD NAMED.** They back `profiles`, so a pending admin row could read every
+  member's NAME and E-MAIL — the same thing the 17 Aug bug leaked, by a
+  different route. Fixing only `is_admin` would have closed this item while
+  leaving that open.
+
+  ✅ **Measured under RLS, before and after, in a rolled-back transaction on
+  production with an invented club.** A pending admin read **1** profile row
+  belonging to another member before, **0** after; an active admin reads **1**
+  throughout, which is the control that stops "refuse everybody" passing as a
+  fix. The four functions answered `true/true/true/true` to a pending admin
+  before and `false/false/false/false` after, with an ordinary parent `false`
+  throughout as the second control.
+  ✅ **The harness injects the four pre-18 Aug bodies back and confirms it
+  fails** — a green run from it means something.
+
+  ⚠️ **THREE MORE FUNCTIONS OMIT THE TEST AND WERE LEFT, ON PURPOSE.**
+  `private.is_attached_to_team` and `private.is_own_player` answer for PARENTS
+  and PLAYERS too, and **a pending parent row is the ordinary registration
+  state — reachable today, unlike a pending admin.** Whether a parent awaiting
+  approval should see their child's squad is a design question with a real
+  answer either way, not a hole, and changing it under cover of a security fix
+  would alter what live families see mid-registration.
+  `private.may_set_staff_photo` delegates to `is_admin` and `can_edit_team`, so
+  its caller side is already fixed.
+
+  ⚠️ **AND THE DEFERRAL WAS RECORDED IN A WAY THAT COULD NOT FIND THE OTHER
+  THREE.** Both this file and `db/schema/functions.sql` wrote it as
+  "`private.is_admin` still has the same omission" — the NAME already known,
+  not the QUESTION. **A deferral is worth writing down as the question it
+  leaves open**, because the name only finds what somebody had already looked
+  at.
+
+## ⛔ `npm run db:check` REFUSES TO RUN, AND HAS SINCE 18 Aug 2026
+
+- **Every SQL harness is currently unrunnable, because ONE of them cannot
+  fail.** `scripts/db-check.mjs` checks its files before it connects and stops
+  the whole run if any is unsafe. Today it stops on:
+
+  ```
+  db-check: REFUSING TO RUN. These harnesses cannot FAIL:
+    head-coach-flag.sql: no "raise exception" anywhere
+  ```
+
+  `db/tests/head-coach-flag.sql` arrived in `caddd7f` (#228) with its
+  assertions written as SELECTs, which the runner reports `ok` for whatever
+  number comes back. **The runner is right and the harness is wrong** — this is
+  the gate working, not a bug in the gate.
+  ⚠️ **THE COST IS THAT NOTHING ELSE RUNS EITHER.** The refusal is all-or-
+  nothing by design (an unsafe file must not be reachable part way down a run),
+  so every other harness — including `db/tests/admin-status-gate.sql`, added
+  18 Aug — is currently unreachable through its own runner. That is precisely
+  the state `claude/runbooks/db-harnesses.md` exists to prevent: "a check nobody
+  RUNS is not a check."
+  ⚠️ **AND IT WAS NOT NOTICED FOR A REASON WORTH KNOWING**: the nightly
+  `.github/workflows/db-check.yml` is inert until a `SUPABASE_DB_URL` secret
+  exists, so it reports "did not run" and PASSES. Nothing was ever going to go
+  red. **Fix is to wrap that file's expectations in `do $$ … raise exception …
+  end $$;`**, which is a small piece of work on somebody else's assertions and
+  wants doing on purpose rather than in passing.
 
 ## Real gaps, no cheap fix
 

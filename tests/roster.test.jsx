@@ -66,7 +66,7 @@ const TEAM_U12 = { id: 'team-u12', name: 'U12', sort_order: 5 }
 const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
 const TEAMS = [TEAM_FIRST_XV, TEAM_U12] // deliberately unsorted; visibleTeams sorts
 
-const ADMIN = [{ id: 'm1', role: 'admin', team_id: null }]
+const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null }]
 const COACH_ONE_TEAM = [{ id: 'm2', role: 'coach', team_id: 'team-u12' }]
 const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u12', player_id: 'p-flanker' }]
 // A membership pointing at a team that isn't in the teams list — visibleTeams

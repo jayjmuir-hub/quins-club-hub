@@ -147,11 +147,33 @@ export function canApproveTeam(memberships, teamId) {
 }
 
 /**
- * True if any membership row has role 'admin'.
+ * True if any membership row is an ACTIVE admin.
+ *
+ * ⚠️ `isActiveMembership` ADDED 18 Aug 2026, and this function had gone without
+ * it since it was written. It is the client half of
+ * db/migrations/20260818_admin_gates_require_active_membership.sql, which added
+ * the same test to private.is_admin and its three siblings — the deferral
+ * recorded by the 17 Aug approval fix, taken.
+ *
+ * ⚠️ NOTHING CAN CREATE A PENDING ADMIN ROW TODAY, so this changes what nobody
+ * currently sees. `request_staff_role` refuses any role but coach/manager/medic
+ * and `set_admin_rights` writes active; production held zero non-active admin
+ * memberships when this was measured. That is why it was safe to defer and why
+ * it is safe to apply — it is NOT a reason to have left it, because the day a
+ * path creates one is the day this becomes the 17 Aug bug with the whole admin
+ * surface behind it.
+ *
+ * ⚠️ isSuperAdmin and adminRights BOTH ALREADY TESTED status, which is what
+ * made this an inconsistency rather than a design. A person could fail
+ * isSuperAdmin and pass isAdmin off the same row.
+ *
+ * Like everything in this file, this decides only what the UI offers. The
+ * boundary is RLS — 15 policies across 9 tables call private.is_admin, and two
+ * more call private.is_admin_anywhere.
  */
 export function isAdmin(memberships) {
   if (!memberships) return false
-  return memberships.some((m) => m.role === 'admin')
+  return memberships.some((m) => isActiveMembership(m) && m.role === 'admin')
 }
 
 // ══ SUPER ADMIN, AND PER-ADMIN RIGHTS (10 Aug 2026) ═══════════════════════
