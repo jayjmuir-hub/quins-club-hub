@@ -572,29 +572,41 @@ proves you wrong.**
   days. Thirteen are now fixed. **Two remain and are recorded here rather than
   quietly dropped.**
 
-  🔴 **`db/tests/rls-squad-staff-approval.sql` — UNRESOLVED, AND NOT ASSUMED
-  HARMLESS.** After the squad-name drift was fixed it gets all the way to its
-  third assertion and reports `pending membership rows still visible: U16 coach
-  -> 2`. Both pending rows the fixture creates are on the same squad, both are
-  approved during the run — by the manager and by the coach — so the count
-  should end at 0. `public.approve_membership` was checked and does set
-  `status = 'active'`, and the coach's approval is NOT wrapped in an exception
-  handler, so it cannot have been refused without aborting the file.
-  ⚠️ **DO NOT "FIX" THIS BY RELAXING THE ASSERTION.** It is the check that a
-  squad coach cannot see pending registrations after acting on them, and the
-  two candidate explanations — a stale fixture, or RLS genuinely showing a
-  coach rows it should not — are a tidy-up and a disclosure respectively.
-  Resolving it needs the fixture run in a rolled-back transaction with the
-  probe table printed, which is a measurement nobody has taken yet.
+  ✅ **BOTH REMAINING FAILURES WERE RESOLVED THE SAME DAY, AND NEITHER WAS
+  WHAT IT LOOKED LIKE.** All **34 harnesses now pass, with all 34 self-tests
+  firing.**
 
-  🟡 **`db/tests/rls-availability-equivalence.sql` — OBSOLETE, NEEDS
-  REPOINTING, NOT DELETING.** It aborts with "This database is already merged.
-  Run against a pre-merge branch." Its guard looks for three policies —
-  `avail coach manage`, `avail own insert`, `avail own update` — and the merge
-  it was written to verify has happened, so the fault it detects can no longer
-  be injected. **CLAUDE.md rule 7: repoint it, never delete it.** Repointing
-  means restating what the three old policies admitted and asserting the merged
-  policy admits exactly that, the way `notice-push.sql` restates `can_see_team`.
+  ✅ **`rls-squad-staff-approval.sql` was NOT a disclosure.** It reported
+  `pending membership rows still visible: U16 coach -> 2`, which reads exactly
+  like a coach seeing rows they should not. **Measured instead of assumed:**
+  production held 2 genuine pending registrations at the time, the fixture's
+  own two rows were both correctly approved, and a U16B coach was measured
+  seeing **0** pending rows belonging to any other squad. RLS was right.
+  ⚠️ **The harness counted every pending row in the CLUB rather than its own**,
+  so it would have gone red on any night a real family was waiting for
+  approval — a check whose result depended on the live roster. Now scoped to
+  the two profiles it creates.
+
+  ✅ **`rls-availability-equivalence.sql` is REPOINTED, not deleted** (rule 7).
+  It was written to compare a policy merge before and after, and the merge
+  shipped 9 Aug — so the fault could no longer be injected and it aborted every
+  night. The seven-caller matrix it proved is now asserted directly against the
+  merged policies that ship today.
+  ⚠️ **Repointing it caught three real behaviour changes since 9 Aug**, all
+  deliberate and each owned by another migration: a PENDING coach lost access
+  when the admin gates began requiring an active membership (18 Aug); a PENDING
+  parent GAINED the ability to see their own child's answer (the "app lost my
+  answer" fix); and `anon` moved from silently matching nothing to being refused
+  by the table grant (14 Aug).
+  ⚠️ **AND ITS ORIGINAL SELF-TEST HAD QUIETLY STOPPED WORKING.** It dropped the
+  `can_edit_team` arm of `avail read` — load-bearing on 9 Aug, when that
+  function ignored status. Since 18 Aug it requires an active membership, so
+  every caller it admits is already admitted by `can_see_team`: **the arm is
+  redundant today and removing it moves nothing**, meaning the self-test would
+  have passed while proving nothing. It now drops `is_own_player` instead,
+  which genuinely blinds a parent to their own child's answer.
+  ⚠️ **The redundant arm was KEPT.** It costs one boolean and is what stops
+  `avail read` drifting if that status test is ever taken back out.
 
   ⚠️ **AND THE SET THAT HAS NEVER MET ITS OWN RUNNER KEEPS GROWING.**
   `db/tests/approval-push.sql` joined it on 19 Aug 2026. It was proved by
