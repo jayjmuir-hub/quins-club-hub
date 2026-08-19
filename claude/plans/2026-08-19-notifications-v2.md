@@ -156,12 +156,22 @@ than as four things that silently do nothing.
 
 ---
 
-## 3. Prompting — Jay chose BOTH
+## 3. Prompting — Jay chose BOTH ⏳ HALF SHIPPED 19 Aug 2026
 
-- **A dismissible card on Home** for anyone who has not enabled it, explaining
-  what they would get. Covers everybody already signed up.
-- **A prompt at onboarding, once access is approved** — the moment of highest
-  engagement. Covers new families.
+- ✅ **A dismissible card on Home — SHIPPED 19 Aug 2026.**
+  `src/components/NotificationsNudge.jsx`. Silent for anybody already
+  subscribed, anybody who refused, any browser that cannot do it, and anybody
+  who dismissed it — which is what makes its placement above the fixture hero
+  defensible, the same argument NoticeBoard rests on.
+  ⚠️ **It also covers new members**, because Home is where they land. That is
+  not the same as the onboarding prompt below, but it is not nothing.
+- ⏳ **A prompt at onboarding, once access is approved — NOT BUILT.**
+  ⚠️ **DELIBERATELY LEFT, AND THE REASON IS WHERE IT WOULD HAVE TO GO.** The
+  natural home is `NamePrompt`, which is the SIGN-IN GATE: a modal sheet with
+  an ordered fall-through state machine and six separate `setStep(null)` exits.
+  A mistake there does not degrade a feature, it locks the club out of the app.
+  It was left at the end of a long session rather than attempted in a hurry.
+  **Do it with fresh context, and test the exit paths first.**
 
 ⚠️ **Neither may call `requestPermission()` itself.** Both route to the toggle,
 and the person taps there. See the correction above: an unprompted permission

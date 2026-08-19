@@ -10,6 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 🔔 **A CARD ON HOME TELLING PEOPLE NOTIFICATIONS EXIST — because on the day
+  notices learned to notify, there was 1 subscriber out of 31 active
+  members.** Everything built that day reached one person. A feature nobody
+  knows about is not shipped.
+  ⚠️ **IT MUST NEVER CALL `requestPermission()` ITSELF, AND A TEST HOLDS THAT.**
+  Chrome tracks how often a site's permission prompt is dismissed and silently
+  demotes poor performers to a quiet prompt most people never see — one badly
+  placed prompt costs the club the feature permanently, for everyone, and
+  asking more politely later does not undo it. The card explains and links to
+  the toggle; the person taps there, deliberately.
+  ⚠️ **IT RENDERS NOTHING FAR MORE OFTEN THAN IT RENDERS SOMETHING** — silent
+  for anybody already subscribed, anybody who refused, any browser that cannot
+  do it, and anybody who dismissed it. **That property is the whole argument
+  for its placement** above the fixture hero, and it is the same argument
+  NoticeBoard already rests on.
+  ⚠️ **THE iPHONE CASE IS CHECKED FIRST, AND FAULT-INJECTION PROVED IT.**
+  `push.js` reports "unsupported" for a non-installed iPhone, so checking
+  support first would tell the ONE group who most need telling precisely
+  nothing — which is the exact bug `PushNotificationsToggle` shipped with on
+  18 Aug. Reordering the two checks fails exactly that one test.
+  ⚠️ **Dismissal is per DEVICE (localStorage), not per person**, because a push
+  subscription is per device and per browser: dismissing it on a laptop says
+  nothing about the phone somebody would actually want notified.
+  ⏳ **THE OTHER HALF OF THE PROMPTING IS NOT BUILT**, deliberately. The
+  onboarding prompt belongs in `NamePrompt`, which is the SIGN-IN GATE — a
+  modal sheet with an ordered state machine and six exit points, where a
+  mistake locks the club out of the app rather than degrading a feature. Left
+  for fresh context rather than attempted at the end of a long session.
+- `24eb548` — the squash that shipped notice notifications and opt-outs.
+
 - 📣 **A NOTICE NOW SENDS A PUSH NOTIFICATION — AND THE AUDIENCE IS THE WHOLE
   DESIGN.** Jay, 19 Aug 2026: "do the notices notifications next."
   ⚠️ **THE INVARIANT: NEVER NOTIFY ANYBODY WHO COULD NOT READ THE NOTICE.** A
