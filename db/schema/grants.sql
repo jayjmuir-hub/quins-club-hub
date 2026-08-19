@@ -708,3 +708,35 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.membership_audit FROM anon, au
 -- ---------------------------------------------------------------------
 GRANT SELECT, INSERT, DELETE ON public.notification_opt_outs TO authenticated;
 REVOKE ALL ON public.notification_opt_outs FROM anon;
+
+-- ---------------------------------------------------------------------
+-- availability_nudges  (19 Aug 2026) — which people have already been asked
+-- about which match. Written by the scheduled job, read by the edge function.
+--
+-- ⚠️ THE ONLY TABLE IN `public` THAT `authenticated` CANNOT TOUCH AT ALL, and
+-- that is the point rather than an oversight. Every other table here grants a
+-- member something. This one records who has NOT answered — which is nobody
+-- else's business — and no screen reads it, so there is no grant to justify.
+-- RLS is enabled with NO POLICY AT ALL, which is the tightest statement
+-- available: enabled-and-unpoliced denies everyone who is not bypassing it.
+--
+-- ⚠️ MEASURED AFTER CREATION, NOT ASSUMED — `aclexplode` on the live table
+-- returns exactly two grantees, `postgres` (the owner) and `service_role`.
+-- Neither `anon` nor `authenticated` appears, so both the explicit REVOKEs in
+-- the migration and the altered default privilege did what they claim.
+--
+-- ⚠️ TRUNCATE IS ABSENT FOR `authenticated` WITHOUT A REVOKE, for the same
+-- reason notification_opt_outs records above: the `postgres` default privilege
+-- was altered on 19 Aug 2026. This is the second table created since, so it is
+-- the second piece of evidence that the change holds — and
+-- db/tests/truncate-grants.sql walks every table so it stays true.
+--
+-- ⚠️ service_role KEEPS the Supabase default, unrevoked. It is not decoration
+-- here: public.availability_push_subscriptions is SECURITY DEFINER, but the
+-- edge function reaches this table through PostgREST as service_role when the
+-- ledger ever needs inspecting, and removing the grant would make that a
+-- silent 401 rather than an obvious error.
+-- ---------------------------------------------------------------------
+-- (no GRANT lines — anon and authenticated hold nothing on this table)
+REVOKE ALL ON public.availability_nudges FROM anon;
+REVOKE ALL ON public.availability_nudges FROM authenticated;

@@ -152,6 +152,57 @@ were already commented with a warning to change the other; warnings are what we
 had. Proved against an injected fault in BOTH directions — a category in the app
 but not the migration, and the reverse.
 
+## ⏰ ADDENDUM — the availability nudge shipped the same day
+
+**All five notification categories now exist.** The last one is the only
+scheduled job among them: `pg_cron` at 05:23 UTC daily, asking families who have
+not answered, up to 48 hours before a **match**.
+
+⚠️ **MATCHES ONLY, AND THE NUMBER IS THE ARGUMENT.** Measured before designing
+anything: every upcoming event would be **338** notifications; matches only is
+**6**. 62 upcoming events, 2 of them matches.
+
+⚠️ **THE LEDGER IS THE FEATURE.** `public.availability_nudges`, keyed
+(event_id, profile_id), claimed BEFORE the push is queued and carrying a batch
+id the send is keyed on. **A failed send loses a nudge rather than repeating
+it** — chosen deliberately, because there is no email behind this category and
+the family buzzed twice is the family that mutes the app.
+
+### ⚠️ Two verification findings, both worth more than the feature
+
+**1. THE FIRST HARNESS PASSED WHILE TESTING NOTHING.** Both real upcoming
+matches were further out than 48 hours, so the window was empty, the run claimed
+nobody, and every "expect 0" passed for free. **It would have passed against a
+completely broken feature.** It now creates its own match inside the window,
+paired with a training session **at the same moment on the same squad** — a
+control that differs by exactly one column, so a run that claims the training
+cannot be excused by timing, membership or luck.
+
+**2. THE SELF-TEST WAS AIMED AT THE WRONG MECHANISM, AND SAID SO BY FAILING.**
+It removed the not-already-nudged clause from the candidate function and nothing
+noticed. The reason is worth keeping: `on conflict (event_id, profile_id) do
+nothing` means a repeat claim inserts zero rows, `row_count` is 0, and the loop
+skips. **The PRIMARY KEY is the guarantee; that clause only saves a query.** The
+injected fault is now the plausible dangerous edit — "fixing" batch tracking
+with `do update` — which buzzes every unanswered family every morning, and which
+the check does catch.
+
+⚠️ **A SCHEDULE THAT HAS NEVER FIRED IS NOT A SCHEDULE.** Proved with a
+temporary every-minute probe running the real function: three runs, all
+`succeeded` in `cron.job_run_details`, then unscheduled. `cron.job` is back to
+three jobs.
+
+### ⚠️ And a self-inflicted one: a script truncated the changelog to zero bytes
+
+A Python one-liner opened `claude/changelog.md` in `'w'` mode and then threw on
+an emoji escape while encoding. **`open(…, 'w')` truncates before the write,** so
+6,632 lines went to nothing and `docs:check` started reporting commits missing
+from 4 Aug. No work was lost — the file was unmodified on the branch, so
+`git checkout -- claude/changelog.md` restored it exactly — but only because the
+damage happened to a file with nothing uncommitted in it.
+**Edit files with the editing tools, not with a script that truncates on open;
+if a script must write, write a temp file and move it into place.**
+
 ## Still open
 
 - **The changelog cannot cite this session's squash SHA** — a branch SHA stops

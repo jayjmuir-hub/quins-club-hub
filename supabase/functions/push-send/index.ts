@@ -1,6 +1,6 @@
 // Sends a real browser/OS push notification — not an email.
 //
-// TWO triggers, ONE function:
+// FIVE triggers, ONE function:
 //   { feedback_id }     an admin replied to somebody's report
 //                       (AFTER UPDATE on public.feedback, when status or
 //                        admin_note changes)
@@ -8,15 +8,25 @@
 //                       (AFTER INSERT on public.announcements, 19 Aug 2026)
 //   { squad_push }      a fixture was added, changed or cancelled
 //                       (STATEMENT-level triggers on public.events, 19 Aug 2026)
+//   { availability_nudge }
+//                       a match is close and somebody has not said whether
+//                       their child is coming
+//                       (pg_cron -> private.send_availability_nudges,
+//                        19 Aug 2026)
 //   { approval_membership_id }
 //                       somebody is waiting to be approved
 //                       (AFTER INSERT on public.memberships when pending,
 //                        19 Aug 2026)
 //
-// ⚠️ `squad_push` ARRIVES FULLY FORMED — title, body, tag and all — WHICH THE
-// OTHER TWO DO NOT, AND A CANCELLATION IS WHY. By the time this function runs,
-// a cancelled fixture no longer exists; there is nothing left to read. So the
-// trigger builds the text and this only resolves the audience and encrypts.
+// ⚠️ `squad_push` AND `availability_nudge` ARRIVE FULLY FORMED — title, body,
+// tag and all — WHICH THE OTHER THREE DO NOT, AND A CANCELLATION IS WHY. By the
+// time this function runs, a cancelled fixture no longer exists; there is
+// nothing left to read. So those triggers build the text and this only
+// resolves the audience and encrypts.
+//
+// ⚠️ THE COUNT IN THE LINE ABOVE SAID "TWO" WHILE THREE WERE LISTED, from
+// 19 Aug 2026 until the fifth was added the same day. If you add a sixth,
+// change the number — a header nobody maintains is worse than no header.
 //
 // ⚠️ ONE FUNCTION RATHER THAN TWO, AND THE REASON IS THE CRYPTO. A second
 // function would mean a SECOND COPY of hand-rolled ECDH, HKDF, AES-128-GCM and
@@ -381,6 +391,31 @@ async function squadTargets(
 }
 
 /**
+ * The subscriptions one claimed batch of AVAILABILITY NUDGES should go to.
+ *
+ * ⚠️ KEYED ON THE BATCH, NOT ON "who has not answered yet". The scheduler
+ * claims its people into `availability_nudges` BEFORE queueing this, so by now
+ * the candidate query would return nobody — and sending to "everyone
+ * unanswered" would re-buzz anybody an earlier run already nudged.
+ * db/migrations/20260819_availability_nudge.sql owns that reasoning.
+ */
+async function availabilityTargets(eventId: string, batchId: string): Promise<Subscription[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/availability_push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ _event: eventId, _batch: batchId }),
+  })
+  if (!response.ok) {
+    throw new Error(`availability_push_subscriptions failed (${response.status}): ${await response.text()}`)
+  }
+  return await response.json()
+}
+
+/**
  * The subscriptions an APPROVAL REQUEST should go to.
  *
  * ⚠️ THE SAME RULE THE EMAIL USES, HELD IN SQL — super admins plus that
@@ -474,12 +509,14 @@ Deno.serve(async (request) => {
   let announcementId = ''
   let approvalMembershipId = ''
   let squad: Record<string, string> | null = null
+  let nudge: Record<string, string> | null = null
   try {
     const payload = await request.json()
     feedbackId = String(payload?.feedback_id ?? '')
     announcementId = String(payload?.announcement_id ?? '')
     approvalMembershipId = String(payload?.approval_membership_id ?? '')
     squad = payload?.squad_push ?? null
+    nudge = payload?.availability_nudge ?? null
   } catch {
     return new Response('bad request', { status: 400 })
   }
@@ -487,7 +524,7 @@ Deno.serve(async (request) => {
   // asking for, and guessing which it meant is how the wrong people get
   // notified.
   if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0)
-      + (approvalMembershipId ? 1 : 0) !== 1) {
+      + (approvalMembershipId ? 1 : 0) + (nudge ? 1 : 0) !== 1) {
     return new Response('bad request', { status: 400 })
   }
 
@@ -537,6 +574,23 @@ Deno.serve(async (request) => {
         subscriptions: await squadTargets(
           squad.club_id, squad.team_id, squad.actor_id ?? null, squad.category || 'fixture',
         ),
+      }
+    } else if (nudge) {
+      if (!nudge.event_id || !nudge.batch_id || !nudge.title) {
+        return new Response('bad request', { status: 400 })
+      }
+      job = {
+        title: escapeHtmlFree(nudge.title),
+        body: escapeHtmlFree(nudge.body).slice(0, 200),
+        // ⚠️ A PATH, NOT A URL — same rule as squad_push. A caller that could
+        // set the whole url could send somebody anywhere from a notification.
+        url: `${APP_URL}${nudge.path && nudge.path.startsWith('/') ? nudge.path : '/'}`,
+        // Per MATCH, so a second nudge about the same fixture replaces the
+        // first rather than stacking. It should never happen — the ledger is
+        // what prevents it — but the tag means a bug in the ledger costs a
+        // notification the tray collapses rather than one the family sees.
+        tag: escapeHtmlFree(nudge.tag) || `availability-${nudge.event_id}`,
+        subscriptions: await availabilityTargets(nudge.event_id, nudge.batch_id),
       }
     } else if (approvalMembershipId) {
       const rows = await db(
