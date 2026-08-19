@@ -10,6 +10,38 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- ⏰ **THE AVAILABILITY NUDGE — THE FIFTH AND LAST NOTIFICATION CATEGORY, AND
+  THE ONLY ONE THAT IS NOT A ROW-CHANGE TRIGGER.** A daily `pg_cron` job at
+  05:23 UTC (09:23 in the UAE) asks the families who have not said whether their
+  child is playing, up to 48 hours before a match.
+  ⚠️ **MATCHES ONLY, AND A NUMBER DECIDED IT RATHER THAN A PREFERENCE.**
+  Measured against the live club before anything was designed: nudging every
+  upcoming event would be **338 notifications**; matches only is **6**. There
+  are 62 upcoming events and 2 of them are matches. That is not a noisier
+  version of the feature, it is a different and much worse one.
+  ⚠️ **NOBODY IS EVER NUDGED TWICE**, and the guarantee is a claimed ledger —
+  rows inserted BEFORE the push is queued, carrying a batch id the send is keyed
+  on. A failed send therefore LOSES a nudge rather than repeating it, which is
+  deliberate: there is no email behind this category, so the family buzzed twice
+  is the family that mutes the app.
+  ✅ **The schedule was proved to FIRE, not assumed** — a temporary every-minute
+  probe ran the real function three times, all `succeeded`, then was
+  unscheduled. A schedule that has never fired is not a schedule.
+- 🔎 **TWO FINDINGS FROM VERIFYING IT, BOTH WORTH MORE THAN THE CODE.**
+  ⚠️ **The first harness passed while testing nothing.** Both upcoming matches
+  were further out than 48 hours, so the window was EMPTY and every "expect 0"
+  was free — it would have passed against a completely broken feature. It now
+  creates its own match inside the window, paired with a training session at the
+  same moment on the same squad, so the type rule is tested against a control
+  that differs by one column.
+  ⚠️ **And the self-test was aimed at the wrong mechanism.** It removed the
+  not-already-nudged clause and nothing noticed — because `on conflict do
+  nothing` makes a repeat claim insert zero rows. **The PRIMARY KEY is the
+  guarantee; that clause is only belt-and-braces.** The fault injected now is
+  the plausible one: "fixing" batch tracking with `do update`, which would buzz
+  every unanswered family every morning. That fault IS caught.
+- `0c86ba3` — the squash that shipped approval notifications.
+
 - 📓 **THE SECOND 19 Aug SESSION RECORD**,
   `claude/handoffs/2026-08-19-approval-notifications.md` — approval
   notifications, and closing the fixture proof the first session left open.

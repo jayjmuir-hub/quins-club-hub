@@ -57,6 +57,19 @@ export const NOTIFICATION_CATEGORIES = [
     label: 'People waiting to be approved',
     hint: 'When somebody registers for a squad you look after. You will still get the email.',
   },
+  // ⚠️ MATCHES ONLY, AND THE HINT SAYS SO because the alternative was measured
+  // and rejected: nudging for every upcoming event would have been 338
+  // notifications against 6 (19 Aug 2026). Somebody who reads "before a game"
+  // and then gets nothing before training is seeing the feature work.
+  //
+  // ⚠️ THERE IS NO EMAIL BEHIND THIS ONE. Unlike `approval`, switching it off
+  // means nothing else tells you — so the hint does not promise a backstop
+  // that does not exist. db/migrations/20260819_availability_nudge.sql.
+  {
+    key: 'availability',
+    label: 'Availability reminders',
+    hint: 'A reminder before a game if you have not said whether your child is playing.',
+  },
 ]
 
 /**
