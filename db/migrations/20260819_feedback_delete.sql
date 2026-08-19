@@ -1,0 +1,62 @@
+-- 19 Aug 2026 — let an admin DELETE a report.
+--
+-- Jay, 19 Aug 2026: "i still cannot delete help tickets in the admin section."
+--
+-- ⚠️ NOT A BROKEN BUTTON. IT WAS NEVER BUILT, AT ANY LAYER. Measured before
+-- writing a line: `public.feedback` carried exactly three policies —
+-- `feedback create` (INSERT), `feedback read` (SELECT), `feedback triage`
+-- (UPDATE) — and no DELETE policy at all. RLS is enabled, and with no DELETE
+-- policy Postgres denies every delete by default, whatever the table grant
+-- says. `src/data/feedback.js` had no delete function either, so nothing ever
+-- tried. Two independent layers of absence, which is why it presented as a
+-- missing feature rather than an error.
+--
+-- ══ WHY A POLICY AND NOT A `SECURITY DEFINER` FUNCTION ════════════════════
+--
+-- Three of the four verbs on this table are plain policies; the fourth being
+-- an RPC would be the odd one out, and the odd one out is what somebody
+-- reasons about wrongly later. There is nothing here a policy cannot express:
+-- "an admin of the club this report belongs to", which is exactly the
+-- predicate `feedback read` and `feedback triage` already use.
+--
+-- ══ ⚠️ WHAT DELETING ACTUALLY DESTROYS ════════════════════════════════════
+--
+-- `feedback read` is `submitted_by = auth.uid() OR private.is_admin(club_id)`,
+-- so **the member who sent it can see it too**, on /my-reports and behind the
+-- `?` button. A delete removes it from under them with no trace and no
+-- notification. There is no audit row: unlike `memberships`, this table has no
+-- companion log.
+--
+-- ⚠️ SO THIS IS FOR RUBBISH, NOT FOR DISAGREEMENT. Spam, a test, a duplicate,
+-- somebody's cat on the keyboard. A real complaint that has been dealt with
+-- belongs in `done` or `wontfix` — which is what the status column is for, and
+-- what the UI now hides by default so a tidy list is not a reason to destroy
+-- anything. The confirm dialog says so in as many words.
+--
+-- ══ WHO ══════════════════════════════════════════════════════════════════
+--
+-- ⛔ **THE REPORTER CANNOT DELETE THEIR OWN.** Deliberate, and the opposite of
+-- what `feedback read` does. A member deleting their report would remove the
+-- club's record of a problem that may still be real, and "I withdraw it" is
+-- not a thing anybody has asked for. Narrow now; widening later is a one-line
+-- policy change, while walking back a delete that already happened is not.
+--
+-- ⛔ **NOT `is_super_admin`.** `feedback triage` lets any club admin reply and
+-- close; letting the same person clear a duplicate is not a larger power than
+-- the one they already hold over the row.
+
+create policy "feedback remove" on public.feedback
+  for delete using (private.is_admin(club_id));
+
+-- ══ HOW TO VERIFY ════════════════════════════════════════════════════════
+--
+-- `npm run db:check -- feedback-delete`, which is the harness written with
+-- this migration. It proves, inside a rolled-back transaction against
+-- production, that an admin CAN delete and a signed-in non-admin CANNOT —
+-- the second being the assertion that would otherwise be vacuous.
+--
+-- ⚠️ A "cannot delete" CHECK PASSES FOR THE WRONG REASON IF THE ROW WAS NEVER
+-- VISIBLE. A delete that matches no rows reports 0 rows and raises nothing,
+-- exactly like a delete that was refused. The harness therefore proves the
+-- non-admin can SEE nothing and that the admin CAN delete the very same row,
+-- so the zero means "refused" rather than "not found".

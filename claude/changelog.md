@@ -10,6 +10,46 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 🗑️ **HELP TICKETS: RESOLVED ONES ARE HIDDEN, AND AN ADMIN CAN DELETE.** Jay,
+  19 Aug 2026, asked for both — and they answer the same complaint in opposite
+  ways, which is the whole design. **Hiding is the one that had to be good.**
+  If a readable screen could only be had by destroying rows, people would
+  destroy rows; so `done` and `wontfix` drop out of the list by default, with
+  a toggle that says how many are hidden and only appears when something is.
+  ⚠️ **`public.feedback` HAD NO DELETE POLICY AT ALL** — measured, three
+  policies existed (INSERT/SELECT/UPDATE) and none for DELETE, so RLS denied
+  every delete by default. `src/data/feedback.js` had no delete function
+  either. **Two independent layers of absence**, which is why it presented as
+  a missing feature rather than an error.
+  ⛔ **THE REPORTER CANNOT DELETE THEIR OWN, DELIBERATELY** — and that is
+  narrower than `social_ideas`, where a submitter may withdraw one still
+  marked `new`. A withdrawn suggestion costs nothing; a withdrawn REPORT
+  removes the club's record of a problem that may still be real.
+  ⚠️ **DELETING LEAVES NOTHING BEHIND.** No audit row, and `feedback read`
+  admits `submitted_by = auth.uid()` — so it disappears from under the member
+  who wrote it, silently. The confirm names that consequence and points at
+  Done instead, because "I want a tidy list" must not be the reason.
+  ✅ **Verified against production before applying**, in a rolled-back
+  transaction: admin delete BEFORE the policy = 0 rows; the author can SEE
+  their report and still gets 0; the admin then deletes **that same row** = 1.
+  ⚠️ **That pairing is the point — a delete matching no rows and a delete being
+  REFUSED are the same observation.** Both return 0, neither raises. So every
+  "cannot delete" assertion in `db/tests/feedback-delete.sql` carries a
+  visibility count beside it, or it would pass for free.
+  ✅ **Both new UI behaviours proved against injected faults, separately.**
+  Disabling the hiding filter fails exactly the three hiding tests; making
+  Delete fire on the first press fails exactly the four delete tests.
+  ⚠️ **The first attempt did NOT discriminate** — with hiding disabled, the
+  delete tests also went red, because two rows meant two "Delete" buttons and
+  the query was ambiguous. Tests that fail for the wrong reason prove nothing,
+  so the delete tests now render a single row.
+  ✅ **`db/schema/policies.sql` now records `public.feedback` at all.** The
+  table shipped 18 Aug and **its policies were never captured** — a whole
+  table's access rules invisible to a reconciliation, which is the exact
+  failure that directory exists to catch. All four are in, dated.
+  `db/migrations/20260819_feedback_delete.sql`.
+- `60c2cdc` — the squash that recorded the deep-link verification.
+
 - 🎯 **TAPPING A NOTIFICATION NOW TAKES YOU TO THE THING IT IS ABOUT — and the
   bug was two bugs, either of which alone made the fix useless.** Found by Jay
   within minutes of the club's first ever real push notification: he tapped it

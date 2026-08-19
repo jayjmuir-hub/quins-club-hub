@@ -147,6 +147,7 @@ ALTER TABLE public.photo_backup_runs ENABLE ROW LEVEL SECURITY;  -- added 13 Aug
 -- add one speculatively. added 16 Aug 2026
 ALTER TABLE public.photo_orphan_scans ENABLE ROW LEVEL SECURITY;  -- added 16 Aug 2026
 ALTER TABLE public.social_ideas      ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026, captured 13 Aug
+ALTER TABLE public.feedback          ENABLE ROW LEVEL SECURITY;  -- added 18 Aug 2026, captured 19 Aug
 ALTER TABLE public.pitch_requests  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pitches         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.player_contacts ENABLE ROW LEVEL SECURITY;
@@ -1237,3 +1238,49 @@ CREATE POLICY "player private edit" ON public.player_private
   WITH CHECK (private.can_edit_team(( SELECT p.team_id
      FROM players p
     WHERE (p.id = player_private.player_id))));
+
+
+-- ---------------------------------------------------------------------
+-- public.feedback  (4 policies, captured 19 Aug 2026)
+--
+-- ⚠️ THIS TABLE WAS ADDED ON 18 Aug AND WAS MISSING FROM THIS FILE ENTIRELY
+-- UNTIL 19 Aug. Captured now, in the same commit as the migration that added
+-- its fourth policy — which is what README.md asks for and what did not happen
+-- when the table was created. The gap is exactly the failure this directory
+-- exists to catch: a whole table's access rules, invisible to a reconciliation.
+--
+-- ⚠️ ONE POLICY PER VERB, AND THE SELECT IS THE WIDE ONE. A member reads their
+-- OWN report (that is what /my-reports and the `?` sheet show them); an admin
+-- reads the club's. Everything that CHANGES a row is admin-only.
+--
+-- ⚠️ THE DELETE POLICY IS NEW (19 Aug 2026) AND DELIBERATELY NARROWER THAN
+-- social_ideas' EQUIVALENT. `social idea remove` lets the submitter withdraw
+-- their own while still `new`; this one does not let the reporter delete at
+-- all. A withdrawn suggestion costs the club nothing; a withdrawn REPORT
+-- removes the record of a problem that may still be real. Deleting here is for
+-- rubbish — spam, a test, a duplicate — and a handled report belongs in `done`
+-- or `wontfix`, which the admin screen now hides by default so that a tidy
+-- list is never a reason to destroy anything.
+-- db/migrations/20260819_feedback_delete.sql, db/tests/feedback-delete.sql.
+--
+-- ⚠️ THERE IS NO AUDIT ROW. Unlike `memberships`, this table has no companion
+-- log, so a deleted report leaves nothing behind anywhere.
+-- ---------------------------------------------------------------------
+CREATE POLICY "feedback read" ON public.feedback
+  FOR SELECT
+  USING (((submitted_by = auth.uid()) OR private.is_admin(club_id)));
+
+CREATE POLICY "feedback create" ON public.feedback
+  FOR INSERT
+  WITH CHECK (((submitted_by = auth.uid()) AND (EXISTS ( SELECT 1
+     FROM memberships m
+    WHERE ((m.profile_id = auth.uid()) AND (m.club_id = feedback.club_id) AND (m.status = 'active'::text))))));
+
+CREATE POLICY "feedback triage" ON public.feedback
+  FOR UPDATE
+  USING (private.is_admin(club_id))
+  WITH CHECK (private.is_admin(club_id));
+
+CREATE POLICY "feedback remove" ON public.feedback
+  FOR DELETE
+  USING (private.is_admin(club_id));

@@ -76,10 +76,9 @@ select t.name from teams t where not exists (
 ## Test data still in the live database
 
 **Two reports in `public.feedback` carry test text as the club's reply**, left
-over from proving push notifications on a real phone — and ⚠️ **they cannot be
-removed by anyone, from any screen, because `public.feedback` has NO DELETE
-POLICY.** Section 4 of `claude/plans/2026-08-19-notifications-v2.md`; these rows
-are the first real cost of that gap rather than a hypothetical one. Query above.
+over from proving push notifications on a real phone. ✅ **They can now be
+deleted** — an admin has a Delete on each row as of 19 Aug 2026, which they
+could not on the morning of the same day. Jay's to clear or keep.
 
 ⚠️ **Measure before you repeat.** The last warning in this section outlived the
 problem by a week, because it was copied forward instead of re-run.

@@ -1,7 +1,7 @@
 # Plan — notifications v2: categories, prompting, deep links, and ticket tidying
 
-**STATUS: PARTLY SHIPPED — step 1 (the deep-link fix) is built; everything else
-is not.** Written 19 Aug 2026, the morning push notifications were first proved
+**STATUS: PARTLY SHIPPED — steps 1 and 4 are done (the deep-link fix, and the
+help-ticket hiding + delete). Steps 2, 3 and 5 are not.** Written 19 Aug 2026, the morning push notifications were first proved
 on a real device.
 
 ✅ **Step 1 is DEPLOYED and PROVED ON A REAL PHONE, 19 Aug 2026** — both halves,
@@ -163,7 +163,7 @@ ignore the one card that matters.
 
 ---
 
-## 4. Help tickets — Jay chose BOTH
+## 4. Help tickets — Jay chose BOTH ✅ SHIPPED 19 Aug 2026
 
 **(a) Hide resolved by default.** `done` and `wontfix` drop out of the default
 admin list, with a toggle to show them. **No database change** — this is the
@@ -200,8 +200,9 @@ word in the confirm dialog.
    exists as a screen for it to land on. `tests/push-sw.test.js` is new and
    is the thing that could see the bug: written first, it failed on exactly
    the missing `client.navigate()` call, then passed.
-2. **Hide resolved tickets.** No database change, immediate relief.
-3. **Delete tickets** — policy, harness, UI.
+2. ✅ **Hide resolved tickets — DONE 19 Aug 2026.**
+3. ✅ **Delete tickets — DONE 19 Aug 2026**: `feedback remove` policy,
+   `db/tests/feedback-delete.sql`, and a two-step confirm in the admin screen.
 4. **Opt-outs table + the four categories**, notices first (highest value, and
    `announcements` already has the trigger shape to copy).
 5. **Prompting** — Home card, then onboarding.
