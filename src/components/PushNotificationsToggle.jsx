@@ -9,6 +9,11 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from '../lib/push.js'
+import {
+  NOTIFICATION_CATEGORIES,
+  listMyOptOuts,
+  setCategoryEnabled,
+} from '../data/notificationPreferences.js'
 
 // The ONE toggle for the ONE thing push notifications currently do: tell you
 // when somebody replies to a report you filed. claude/plans/2026-08-18-push-
@@ -22,6 +27,10 @@ export default function PushNotificationsToggle() {
   const [checking, setChecking] = useState(true)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState(null)
+  // Categories switched OFF. `null` means "not loaded yet", which is distinct
+  // from `[]` — everything on — and the two need different things on screen.
+  const [optOuts, setOptOuts] = useState(null)
+  const [savingCategory, setSavingCategory] = useState(null)
 
   // ⚠️ RE-CHECKED ON MOUNT, NOT ASSUMED FROM A STORED FLAG. The permission or
   // the subscription itself can change from OUTSIDE this component entirely —
@@ -46,6 +55,48 @@ export default function PushNotificationsToggle() {
       cancelled = true
     }
   }, [])
+
+  // ⚠️ ONLY WHEN SUBSCRIBED. The categories are a filter on something already
+  // flowing; fetching them for somebody who has never turned notifications on
+  // is a query behind a control they cannot see.
+  useEffect(() => {
+    if (!on) return undefined
+    let cancelled = false
+    listMyOptOuts()
+      .then((rows) => {
+        if (!cancelled) setOptOuts(rows)
+      })
+      .catch(() => {
+        // ⚠️ NOT SURFACED AS THE PAGE'S ERROR. Failing to read preferences must
+        // not look like failing to turn notifications on — the master switch
+        // above is the thing somebody just used, and blaming it would send
+        // them to turn it off and on again.
+        if (!cancelled) setOptOuts([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [on])
+
+  async function toggleCategory(key, enabled) {
+    setSavingCategory(key)
+    setError(null)
+    // Optimistic, like the triage status control: the checkbox has already
+    // moved in the DOM, and leaving state behind makes it snap back and forth.
+    setOptOuts((current) =>
+      enabled ? (current ?? []).filter((c) => c !== key) : [...(current ?? []), key],
+    )
+    try {
+      await setCategoryEnabled(user?.id, key, enabled)
+    } catch (err) {
+      setOptOuts((current) =>
+        enabled ? [...(current ?? []), key] : (current ?? []).filter((c) => c !== key),
+      )
+      setError(err.message || "That didn't save. Try again.")
+    } finally {
+      setSavingCategory(null)
+    }
+  }
 
   async function handleToggle() {
     setError(null)
@@ -118,6 +169,44 @@ export default function PushNotificationsToggle() {
       >
         {checking ? 'Checking…' : working ? 'Working…' : on ? 'Turn off' : 'Turn on notifications'}
       </Button>
+
+      {/* ⚠️ HIDDEN UNTIL NOTIFICATIONS ARE ACTUALLY ON. Showing four
+          checkboxes above a switch that is off would offer choices that
+          silently do nothing — the browser permission is what decides whether
+          anything arrives at all, and no preference here can substitute for
+          it. See the correction in
+          claude/plans/2026-08-19-notifications-v2.md: "on by default" is not
+          something this app can do. */}
+      {on && optOuts !== null && (
+        <fieldset className="mt-4 border-t border-line pt-3">
+          <legend className="mb-2 text-[13px] font-semibold text-ink-muted">
+            What to notify me about
+          </legend>
+          {NOTIFICATION_CATEGORIES.map((category) => {
+            const enabled = !optOuts.includes(category.key)
+            return (
+              <label
+                key={category.key}
+                htmlFor={`notify-${category.key}`}
+                className="mb-2.5 flex min-h-[44px] items-start gap-2.5 last:mb-0"
+              >
+                <input
+                  id={`notify-${category.key}`}
+                  type="checkbox"
+                  checked={enabled}
+                  disabled={savingCategory === category.key}
+                  onChange={(e) => toggleCategory(category.key, e.target.checked)}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-brand"
+                />
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-semibold text-ink">{category.label}</span>
+                  <span className="block text-[13px] text-ink-muted">{category.hint}</span>
+                </span>
+              </label>
+            )
+          })}
+        </fieldset>
+      )}
     </>
   )
 }

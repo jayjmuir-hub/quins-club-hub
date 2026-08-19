@@ -1,7 +1,8 @@
 # Plan — notifications v2: categories, prompting, deep links, and ticket tidying
 
-**STATUS: PARTLY SHIPPED — steps 1 and 4 are done (the deep-link fix, and the
-help-ticket hiding + delete). Steps 2, 3 and 5 are not.** Written 19 Aug 2026, the morning push notifications were first proved
+**STATUS: PARTLY SHIPPED — steps 1 and 4 are done, and step 2 is done for the
+FIRST of its four categories (notices), along with the opt-out infrastructure
+the other three will reuse. Step 3 and the remaining categories are not.** Written 19 Aug 2026, the morning push notifications were first proved
 on a real device.
 
 ✅ **Step 1 is DEPLOYED and PROVED ON A REAL PHONE, 19 Aug 2026** — both halves,
@@ -104,13 +105,22 @@ the broken one is the path the existing test never exercised.
 **Jay's four, all chosen 19 Aug**, alongside the reply-to-your-report trigger
 that already ships:
 
-1. **A new notice is posted** — `announcements`.
+1. ✅ **A new notice is posted — SHIPPED 19 Aug 2026.** `announcements`.
+   ⚠️ **The audience is deliberately NARROWER than who may READ it** — squad
+   notices go to the squad, not to admins of other squads. Measured: 126
+   (squad, member) pairs would become 51, sparing 5 people a buzz for every
+   notice in the club. **0 people are notified who cannot read it**, which is
+   the invariant `db/tests/notice-push.sql` exists to hold.
 2. **Fixture added or changed for your squad** — `events`, scoped to squads the
    person's players are in.
 3. **Availability still not set** — a nudge before a fixture. ⚠️ **The only one
    that is not a row-change trigger**; it needs a schedule, so it is the most
    expensive of the four and should ship last.
 4. **Admin: someone needs approving** — a new access or staff request.
+
+✅ **The opt-out table shipped with notices**, so categories 2-4 need only a
+trigger and a branch in `push-send`; the table, the RLS, the UI and the
+`hasOptedOut` check are done.
 
 ### ⚠️ Store opt-OUTS, not preferences
 

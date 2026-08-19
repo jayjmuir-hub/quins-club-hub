@@ -10,6 +10,56 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 📣 **A NOTICE NOW SENDS A PUSH NOTIFICATION — AND THE AUDIENCE IS THE WHOLE
+  DESIGN.** Jay, 19 Aug 2026: "do the notices notifications next."
+  ⚠️ **THE INVARIANT: NEVER NOTIFY ANYBODY WHO COULD NOT READ THE NOTICE.** A
+  notification puts the notice's TITLE on a locked screen. Failing to send one
+  is a product problem; sending one to the wrong person is a disclosure, and
+  it cannot be taken back. The two are not symmetrical and the migration is
+  written around that.
+  ⚠️ **THE AUDIENCE IS DELIBERATELY NARROWER THAN WHO MAY READ.**
+  `announcement read` lets ANY club admin see EVERY squad's notices, so
+  sending on that basis is safe but miserable — measured, 126 (squad, member)
+  pairs against 51, meaning **5 people buzzed for every notice any coach posts
+  for any squad.** Jay chose squad-only. ⚠️ **That makes two rules where there
+  was one, and the second can drift**; `db/tests/notice-push.sql` asserts the
+  SUBSET against live data — everyone notified must be somebody `can_see_team`
+  admits. **0 violations**, and the self-test (widen the audience to the whole
+  club, as somebody "simplifying" would) reports **359**.
+  ⛔ **The author is not notified of their own notice**, an expired notice
+  sends nothing, and an EDIT does not re-notify — INSERT only, because
+  `announcement edit` exists so people fix typos.
+  ⚠️ **A TRAP THAT MADE THE FIRST VERIFICATION LIE.**
+  `private.touch_announcement` pins `author_id`, `club_id`, `team_id` and
+  `created_at` back to their OLD values on every UPDATE — a deliberate
+  immutability guard. So the first test of "the author is not notified"
+  changed the author by UPDATE, changed nothing at all, and **reported the
+  exclusion broken when it was the test that was broken.** The harness now
+  inserts twice.
+  ✅ **ONE EDGE FUNCTION, NOT TWO.** `push-send` now serves `{feedback_id}` and
+  `{announcement_id}`. A second function would have meant a SECOND COPY of
+  hand-rolled ECDH/HKDF/AES-128-GCM/ECDSA — the last thing here that should
+  exist twice. Only the title, body, url and audience differ.
+  ✅ **AND THE AUDIENCE LIVES IN THE DATABASE**, not in TypeScript:
+  `public.notice_push_subscriptions` is one SECURITY DEFINER call granted to
+  `service_role` alone. Splitting a disclosure rule across two deploy targets
+  is exactly how the deep-link bug survived this morning.
+- 🔕 **PER-CATEGORY OPT-OUTS, AND CATEGORIES REALLY DO DEFAULT TO ON.**
+  `notification_opt_outs` stores opt-OUTS: **a row means off, no row means
+  on.** No backfill for anybody who exists, or who joins next season, and the
+  default lives in ONE place rather than a column default AND a constant AND a
+  backfill script. ⚠️ **The argument against is recorded too** — "who wants
+  notice alerts" is now an absence to query rather than a row — and the answer
+  is: revisit only if an admin screen must SHOW everyone's preferences.
+  ⚠️ **The checkboxes are hidden until notifications are actually ON**, because
+  choices above an off master switch silently do nothing; proved by injecting
+  exactly that fault, which fails exactly that one test.
+  ✅ **The new table arrived WITHOUT TRUNCATE and nobody wrote a revoke** — the
+  first table created since this morning's default-privilege change, and
+  therefore the proof it works on a real new table.
+  `db/migrations/20260819_notice_push.sql`, `db/tests/notice-push.sql`.
+- `93374cc` — the squash that shipped hide-resolved and admin delete.
+
 - 🗑️ **HELP TICKETS: RESOLVED ONES ARE HIDDEN, AND AN ADMIN CAN DELETE.** Jay,
   19 Aug 2026, asked for both — and they answer the same complaint in opposite
   ways, which is the whole design. **Hiding is the one that had to be good.**

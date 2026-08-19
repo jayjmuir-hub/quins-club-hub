@@ -678,3 +678,33 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.membership_audit FROM anon, au
 -- entire purpose is "who recognised them", is worse than no signal. Proved:
 -- writing as another coach is REFUSED.
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- notification_opt_outs  (19 Aug 2026) — which kinds of push a person does
+-- NOT want. A row means OFF; no row means ON.
+--
+-- ⚠️ NO UPDATE GRANT, AND THAT IS THE INTERESTING LINE. The row carries no
+-- editable state — it exists or it does not — so UPDATE could only ever be a
+-- way to move somebody else's opt-out onto your own id, or your own onto
+-- theirs. SELECT/INSERT/DELETE is the complete vocabulary.
+--
+-- ⚠️ `anon` IS REVOKED EXPLICITLY AT CREATION rather than left to the default,
+-- the same as push_subscriptions and request_staff_role — because Supabase's
+-- default privileges hand a new object to anon, authenticated and service_role
+-- alike, and only an explicit revoke removes the named grant.
+--
+-- ⚠️ TRUNCATE IS ABSENT WITHOUT ANYBODY WRITING A REVOKE, AND THAT IS NEW.
+-- Every table created before 19 Aug 2026 arrived with TRUNCATE for
+-- `authenticated`; 20260819_revoke_truncate_from_authenticated.sql altered the
+-- `postgres` default privilege so new ones do not. **This is the first table
+-- created since, so its ACL is the proof that change works on a real new
+-- table** — measured false on creation, and db/tests/truncate-grants.sql walks
+-- every table so it stays that way.
+--
+-- ⚠️ service_role KEEPS the Supabase default, unrevoked: nothing reads this
+-- table as service_role today, but public.notice_push_subscriptions is
+-- SECURITY DEFINER and runs as its owner, so a future edge function that needs
+-- to read preferences directly should not have to add a grant back.
+-- ---------------------------------------------------------------------
+GRANT SELECT, INSERT, DELETE ON public.notification_opt_outs TO authenticated;
+REVOKE ALL ON public.notification_opt_outs FROM anon;

@@ -148,6 +148,7 @@ ALTER TABLE public.photo_backup_runs ENABLE ROW LEVEL SECURITY;  -- added 13 Aug
 ALTER TABLE public.photo_orphan_scans ENABLE ROW LEVEL SECURITY;  -- added 16 Aug 2026
 ALTER TABLE public.social_ideas      ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026, captured 13 Aug
 ALTER TABLE public.feedback          ENABLE ROW LEVEL SECURITY;  -- added 18 Aug 2026, captured 19 Aug
+ALTER TABLE public.notification_opt_outs ENABLE ROW LEVEL SECURITY;  -- added 19 Aug 2026
 ALTER TABLE public.pitch_requests  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pitches         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.player_contacts ENABLE ROW LEVEL SECURITY;
@@ -1284,3 +1285,30 @@ CREATE POLICY "feedback triage" ON public.feedback
 CREATE POLICY "feedback remove" ON public.feedback
   FOR DELETE
   USING (private.is_admin(club_id));
+
+
+-- ---------------------------------------------------------------------
+-- public.notification_opt_outs  (1 policy, captured 19 Aug 2026)
+--
+-- ⚠️ ONE POLICY FOR ALL FOUR VERBS, WHICH IS UNUSUAL IN THIS FILE AND CORRECT
+-- HERE. The row carries no state beyond its own existence — it names a person
+-- and a category and that is all — so "is this mine" is the whole rule for
+-- reading it, creating it and removing it alike. Splitting it into four
+-- identical policies would be four places to make the same mistake.
+--
+-- ⚠️ A ROW MEANS **OFF**. No row means ON. That is what makes "notification
+-- categories default to on" true without a backfill, for everybody who exists
+-- and everybody who joins. db/migrations/20260819_notice_push.sql.
+--
+-- ⚠️ NOT READABLE BY ADMINS, DELIBERATELY — unlike almost everything else in
+-- this schema. Nobody needs to see anybody else's preferences, and an admin
+-- who could see them would eventually be asked to change them.
+--
+-- ⚠️ NO UPDATE GRANT AT THE TABLE LEVEL either (see db/schema/grants.sql), so
+-- the WITH CHECK arm only ever governs INSERT in practice. Recorded because
+-- the policy reads as though UPDATE were possible.
+-- ---------------------------------------------------------------------
+CREATE POLICY "opt out is mine" ON public.notification_opt_outs
+  FOR ALL
+  USING ((profile_id = auth.uid()))
+  WITH CHECK ((profile_id = auth.uid()));
