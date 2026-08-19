@@ -156,7 +156,7 @@ than as four things that silently do nothing.
 
 ---
 
-## 3. Prompting — Jay chose BOTH ⏳ HALF SHIPPED 19 Aug 2026
+## 3. Prompting — Jay chose BOTH ✅ SHIPPED 19 Aug 2026
 
 - ✅ **A dismissible card on Home — SHIPPED 19 Aug 2026.**
   `src/components/NotificationsNudge.jsx`. Silent for anybody already
@@ -165,13 +165,24 @@ than as four things that silently do nothing.
   defensible, the same argument NoticeBoard rests on.
   ⚠️ **It also covers new members**, because Home is where they land. That is
   not the same as the onboarding prompt below, but it is not nothing.
-- ⏳ **A prompt at onboarding, once access is approved — NOT BUILT.**
-  ⚠️ **DELIBERATELY LEFT, AND THE REASON IS WHERE IT WOULD HAVE TO GO.** The
-  natural home is `NamePrompt`, which is the SIGN-IN GATE: a modal sheet with
-  an ordered fall-through state machine and six separate `setStep(null)` exits.
-  A mistake there does not degrade a feature, it locks the club out of the app.
-  It was left at the end of a long session rather than attempted in a hurry.
-  **Do it with fresh context, and test the exit paths first.**
+- ✅ **A prompt at onboarding — SHIPPED 19 Aug 2026**, in `NamePrompt`, as the
+  last step of the sign-in gate.
+  ⚠️ **THE GATE IS `dismissible={false}` — A STEP WHOSE BUTTONS DO NOT CLOSE IT
+  LOCKS THE CLUB OUT OF THE APP.** Both controls call `setStep(null)`, and
+  `tests/name-prompt.test.jsx` asserts it, proved against an injected fault.
+  ✅ **ONE DECISION POINT, NOT FIVE.** Five terminal branches called
+  `setStep(null)` directly; they now call `finish()`, which is the only place
+  that decides. Threading a new step through five exits would have been five
+  chances to leave that modal open.
+  ⚠️ **EVERY FAILURE PATH LEAVES THE GATE CLOSING.** Eligibility is decided
+  asynchronously and early so `finish()` stays synchronous; a rejected
+  `isSubscribed()`, an unreadable localStorage, or an unresolved check all
+  leave the flag false. **Missing the offer costs one prompt; a gate that never
+  closes costs the club the app.**
+  ⚠️ **AND THE 51 EXISTING GATE TESTS DID NOT CATCH AN EXTRA STEP.** Injecting
+  "always offer" left all 51 green: they assert a PARTICULAR step went away,
+  not that the gate CLOSED. The new lock-out test is the only thing in the
+  suite that would notice a gate which never closes — do not delete it.
 
 ⚠️ **Neither may call `requestPermission()` itself.** Both route to the toggle,
 and the person taps there. See the correction above: an unprompted permission

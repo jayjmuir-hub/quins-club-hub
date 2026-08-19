@@ -10,6 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 🚪 **THE SIGN-IN GATE NOW OFFERS NOTIFICATIONS AS ITS LAST STEP** — the other
+  half of the prompting, and the half deferred earlier in the day because of
+  where it had to go.
+  ⚠️ **`NamePrompt` IS `dismissible={false}`: A STEP WHOSE BUTTONS DO NOT CLOSE
+  IT LOCKS THE CLUB OUT OF THE APP.** Both controls call `setStep(null)`, and
+  that is asserted against an injected fault — removing the close from "Not
+  now" fails exactly that one test.
+  ✅ **ONE DECISION POINT, REPLACING FIVE.** Five terminal branches called
+  `setStep(null)` directly. They now call `finish()`, the only place that
+  decides. Threading a new step through five exits would have been five chances
+  to leave an undismissable modal open.
+  ⚠️ **EVERY FAILURE PATH LEAVES THE GATE CLOSING.** Eligibility is resolved
+  asynchronously and early so `finish()` stays synchronous — a rejected
+  `isSubscribed()`, an unreadable localStorage, or a check that never resolves
+  all leave it false. **Missing the offer costs one prompt; a gate that never
+  closes costs the club the app.** Asked once per device, and the flag is
+  written when the step is SHOWN rather than answered.
+  ⚠️ **THE 51 EXISTING GATE TESTS DID NOT CATCH AN EXTRA STEP, AND THAT IS
+  WORTH KNOWING.** Injecting "always offer" left every one of them green: they
+  assert that a PARTICULAR step went away, not that the gate CLOSED. The new
+  lock-out test is the only thing in the whole suite that would notice a gate
+  which never closes.
+  ⚠️ **It does not ask the browser for permission**, and must never be changed
+  to — this is the sign-in path, and Chrome demotes sites whose prompt gets
+  dismissed, for everybody, permanently.
+- `7445d44` — the squash that corrected the PowerShell ExecutionPolicy entry.
+
 - 🧭 **`CLAUDE.md` SAID POWERSHELL RUNS AT `Bypass`. IT NEVER HAS — AND THE
   11 Aug "CORRECTION" TURNED A TRUE STATEMENT FALSE.** Measured on cafnet
   19 Aug 2026: `LocalMachine` is **`RemoteSigned`**, and `Process` is `Bypass`

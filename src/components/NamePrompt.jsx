@@ -10,6 +10,7 @@ import {
   getMyProfile,
   requestStaffRole,
 } from '../data/members.js'
+import { isPushSupported, isSubscribed } from '../lib/push.js'
 // ⚠️ setPlayerDob ALREADY EXISTS AND player_private's RLS ALREADY LETS A CHILD'S
 // OWN FAMILY WRITE IT (20260816_player_private_dob.sql), so the birthday step
 // below needs NO migration and NO new write path. If one ever appears here,
@@ -108,8 +109,21 @@ export default function NamePrompt() {
   const userId = user?.id ?? null
 
   const [profileId, setProfileId] = useState(null)
-  // 'details' | 'player' | 'birthday' | 'role' | null. Null is the closed gate.
+  // 'details' | 'player' | 'birthday' | 'role' | 'notifications' | null.
+  // Null is the closed gate.
   const [step, setStep] = useState(null)
+  // ⚠️ WHETHER THE NOTIFICATIONS OFFER IS DUE, DECIDED ASYNCHRONOUSLY AND EARLY
+  // SO THAT `finish()` CAN BE SYNCHRONOUS. Asking the Push API at the moment
+  // the gate closes would mean an await between "answered the last question"
+  // and "the sheet went away", which is the one place in this component where a
+  // hang is not survivable.
+  //
+  // ⚠️ **IT DEFAULTS TO false AND EVERY FAILURE PATH LEAVES IT false.** This
+  // sheet is `dismissible={false}` — the whole gate is a modal nobody can close
+  // — so the dangerous direction is showing a step we did not mean to show.
+  // Missing the offer costs one person one prompt; showing a broken one costs
+  // the club the app. **If in doubt, close the gate.**
+  const [offerNotifications, setOfferNotifications] = useState(false)
   const [needPhone, setNeedPhone] = useState(false)
   // ⚠️ THE ONLY STEP ON THIS GATE WITH NO WAY PAST IT — Jay, 17 Aug 2026, over a
   // snooze or a recorded "I'd rather not". A birthday is already mandatory for
@@ -388,7 +402,7 @@ export default function NamePrompt() {
           return
         }
         settled.current = true
-        setStep(null)
+        finish()
       })
       .catch((err) => {
         setError(err)
@@ -414,7 +428,7 @@ export default function NamePrompt() {
           return
         }
         settled.current = true
-        setStep(null)
+        finish()
       })
       .catch((err) => setError(err))
       .finally(() => setSaving(false))
@@ -471,7 +485,7 @@ export default function NamePrompt() {
           return
         }
         settled.current = true
-        setStep(null)
+        finish()
       })
       .catch((err) => setError(err))
       .finally(() => setSaving(false))
@@ -487,7 +501,7 @@ export default function NamePrompt() {
     confirmNoRole({ profileId })
       .then(() => {
         settled.current = true
-        setStep(null)
+        finish()
       })
       .catch((err) => setError(err))
       .finally(() => setSaving(false))
@@ -525,7 +539,7 @@ export default function NamePrompt() {
     requestStaffRole(staffTeamId, staffRole)
       .then(() => {
         settled.current = true
-        setStep(null)
+        finish()
       })
       .catch((err) => setError(err))
       .finally(() => setSaving(false))
@@ -541,6 +555,67 @@ export default function NamePrompt() {
   // abandons the form still has no player, so the gate is right to ask again
   // next sign-in. Only the explicit "I don't have one" is an answer, which is
   // why this sets `settled` for the SESSION but writes nothing.
+  // ⚠️ ASKED ONCE, EVER, PER DEVICE. A gate nobody can dismiss must not put the
+  // same optional question in front of somebody twice; and a push subscription
+  // is per device and per browser, so the laptop and the phone are genuinely
+  // separate questions. Written the moment the step is SHOWN rather than
+  // answered — somebody who closes the tab on it has still been asked.
+  //
+  // ⚠️ A FAILURE TO READ IT COUNTS AS "ALREADY ASKED", which is the opposite of
+  // NotificationsNudge's default and deliberately so: there, showing again is
+  // harmless; here it is a modal on the sign-in path.
+  function alreadyOfferedNotifications() {
+    try {
+      return localStorage.getItem('quins:notify-offered') === '1'
+    } catch {
+      return true
+    }
+  }
+
+  useEffect(() => {
+    if (alreadyOfferedNotifications() || !isPushSupported()) return undefined
+    let cancelled = false
+    isSubscribed()
+      .then((subscribed) => {
+        if (!cancelled) setOfferNotifications(!subscribed)
+      })
+      .catch(() => {
+        // Deliberately silent, and deliberately leaves the flag false. See the
+        // state declaration: the gate closing is always the safe outcome.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  /**
+   * Closes the gate — or, once, offers notifications on the way out.
+   *
+   * ⚠️ **ONE DECISION POINT, REPLACING FIVE.** Every terminal branch used to
+   * call `setStep(null)` directly, in five separate places. Threading a new
+   * step through all five would have been five chances to leave a modal open
+   * that nobody can dismiss. This is the single place that decides, so there is
+   * exactly one thing to get right and one thing to test.
+   *
+   * ⚠️ **`handleAddPlayer` DELIBERATELY DOES NOT CALL THIS.** It navigates to
+   * /more to add a player, which is a person part-way through a job — putting
+   * an unrelated question in front of them there would interrupt the thing the
+   * gate just sent them to do.
+   */
+  function finish() {
+    if (offerNotifications) {
+      try {
+        localStorage.setItem('quins:notify-offered', '1')
+      } catch {
+        // Then it may be asked again on this device. Harmless next to the
+        // alternative, which is not asking because a write failed.
+      }
+      setStep('notifications')
+      return
+    }
+    setStep(null)
+  }
+
   function handleAddPlayer() {
     settled.current = true
     setStep(null)
@@ -548,6 +623,44 @@ export default function NamePrompt() {
   }
 
   if (!step) return null
+
+  // ⚠️ THE ONLY OPTIONAL STEP ON THIS GATE, AND BOTH BUTTONS CLOSE IT. The
+  // sheet is `dismissible={false}` like every other step here, so there is no
+  // backstop: if neither control called setStep(null) the club would be locked
+  // out of the app. That is the single thing tests/name-prompt.test.jsx must
+  // never stop asserting.
+  //
+  // ⚠️ IT DOES NOT ASK THE BROWSER FOR PERMISSION, and must never be changed to.
+  // Chrome demotes sites whose permission prompt gets dismissed, permanently and
+  // for everybody — see src/components/NotificationsNudge.jsx, which makes the
+  // same point at length. This offers the trip to More; the person taps there.
+  //
+  // ⚠️ AND IT IS LAST ON PURPOSE. Everything above it is something the club
+  // needs from the person; this is the one thing the club is offering them.
+  if (step === 'notifications') {
+    return (
+      <Sheet open dismissible={false} onClose={() => {}} title="Want to be told?">
+        <p className="mb-3.5 text-sm leading-relaxed text-ink-muted">
+          We can send a notification to this device when a notice goes up for your squad, or
+          when somebody replies to something you&rsquo;ve reported. You choose which, and you
+          can turn them off again whenever you like.
+        </p>
+        <div className="flex flex-col gap-2.5">
+          <Button
+            onClick={() => {
+              setStep(null)
+              navigate('/more')
+            }}
+          >
+            Show me how
+          </Button>
+          <Button variant="secondary" onClick={() => setStep(null)}>
+            Not now
+          </Button>
+        </div>
+      </Sheet>
+    )
+  }
 
   if (step === 'player') {
     return (
