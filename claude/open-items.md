@@ -73,23 +73,54 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Cheap (under an hour each)
 
-- **`authenticated` holds TRUNCATE on every table it holds anything on**,
+- ✅ ~~**`authenticated` holds TRUNCATE on every table it holds anything on**,
   including `memberships`, `player_parents` and (as of 18 Aug 2026)
   `push_subscriptions` — found while capturing that table's grants, measured
   against the first two as controls to confirm it is systemic rather than
   new. **TRUNCATE is not filtered by RLS at all** — Postgres never applies row
   security to it — so any signed-in member currently holds the ability to
-  empty any table outright, RLS policies notwithstanding. Source is the same
-  Supabase default privilege documented at the top of `db/schema/grants.sql`
-  (`ALTER DEFAULT PRIVILEGES … GRANT ALL ON TABLES TO authenticated`), which
-  includes TRUNCATE in its "ALL 8" and has never been revoked from it
-  specifically. ⚠️ **PostgREST does not expose TRUNCATE as an operation**, so
-  this is not reachable through the ordinary app — it would take a direct
-  Postgres connection with a stolen `authenticated`-role JWT, a narrower
-  threat than most of what RLS defends against. Likely safe to close with one
-  `revoke truncate on all tables in schema public from authenticated;`, but
-  wants its own harness proving nothing legitimate needs it before applying
-  project-wide.
+  empty any table outright, RLS policies notwithstanding.~~ — **REVOKED
+  19 Aug 2026**, on all 31 tables that had it, plus the `postgres` default
+  privilege so the next table does not arrive with it.
+  `db/migrations/20260819_revoke_truncate_from_authenticated.sql`,
+  `db/tests/truncate-grants.sql`.
+
+  ✅ **"Wants its own harness proving nothing legitimate needs it" — that was
+  this item's condition, and it was met three ways.** No code anywhere issues a
+  SQL TRUNCATE (every `truncate` in `src/` is a Tailwind class); PostgREST
+  exposes no TRUNCATE verb; and **three tables had already been running without
+  it** — `photo_backup_runs` since 13 Aug, `photo_orphan_scans` since 16 Aug,
+  `membership_audit` since 17 Aug — one of them carrying the photo backup the
+  club depends on. The exceptions were the argument, not a footnote.
+
+  ⚠️ **THE CAPABILITY WAS DEMONSTRATED RATHER THAN READ OFF A CATALOGUE ROW.**
+  A throwaway table created down our own migration path, then `set local role
+  authenticated; truncate` — it really emptied. A throwaway rather than
+  `players` on purpose: the real roster would have proved the same thing while
+  taking an ACCESS EXCLUSIVE lock on a live club mid-onboarding, and it would
+  not have shown that the DEFAULT is live as well as the existing grants.
+
+- ⛔ **`authenticated` CAN TRUNCATE `storage.objects`, AND WE ARE NOT ALLOWED TO
+  FIX IT.** Five tables outside `public` — `storage.objects`,
+  `storage.buckets`, `storage.buckets_analytics`, `net.http_request_queue`,
+  `net._http_response`. `storage.objects` is the row behind every player photo,
+  so this is not an academic leftover; the `net` pair carry a PUBLIC grant, so
+  `anon` holds them too. Measured 19 Aug 2026.
+
+  ⚠️ **AND THE WAY THE FIX FAILS IS THE THING TO REMEMBER: A REVOKE ISSUED BY
+  SOMEONE WHO IS NOT THE GRANTOR SUCCEEDS AND DOES NOTHING.** No error, no
+  failed statement — `revoke truncate on storage.objects from authenticated`
+  ran clean as `postgres` and `has_table_privilege` still returned true
+  afterwards. Postgres only removes grants YOU made, and the grantor here is
+  `supabase_storage_admin`. **A migration listing these tables would apply
+  cleanly, review as correct, and be a lie**, which is why
+  `20260819_revoke_truncate_from_authenticated.sql` names them and asserts
+  nothing about them.
+
+  ⚠️ **Do not "fix" this by asserting it in a harness either** — an assertion we
+  know to be false is worse than a gap somebody can read about. This is an item
+  against Supabase, not against us. Same threat model as the `public` one was:
+  no PostgREST verb, so it needs a direct connection with a stolen JWT.
 - ✅ ~~**`public.register_my_player` is executable by `anon`, and it looks
   deliberate when it is not.** Measured on production 16 Aug 2026 while adding
   `request_staff_role`:

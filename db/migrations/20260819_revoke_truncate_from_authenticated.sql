@@ -1,0 +1,181 @@
+-- 19 Aug 2026 — take TRUNCATE away from `authenticated` across all of `public`.
+--
+-- The third in the sequence that began with 20260813_revoke_anon_execute.sql
+-- (function EXECUTE) and 20260814_revoke_anon_table_privileges.sql (table
+-- privileges for `anon`). Same cause — a Supabase default privilege nobody in
+-- this repo chose — but a different role and the one privilege that RLS cannot
+-- do anything about.
+--
+-- ══ ⚠️ WHY THIS ONE IS DIFFERENT FROM THE OTHER TWO ═══════════════════════
+--
+-- The `anon` migrations closed doors that RLS was already holding shut. This
+-- one closes a door RLS **cannot reach at all**.
+--
+--     Postgres never applies row security to TRUNCATE.
+--
+-- Not "the policies happen to allow it" — the mechanism does not exist. Every
+-- other privilege in this schema bottoms out in a policy that checks
+-- `auth.uid()`; a member with TRUNCATE is filtered by nothing whatsoever. The
+-- 60-odd policies this repo relies on have no opinion about it.
+--
+-- ══ WHAT WAS MEASURED ON PRODUCTION, 19 Aug 2026 ══════════════════════════
+--
+-- 31 of the 34 tables in `public` gave `authenticated` TRUNCATE. Three did
+-- not, and all three are tables where somebody closed the default by hand:
+--
+--   photo_orphan_scans   no privilege of any kind          (16 Aug)
+--   photo_backup_runs    SELECT only                       (13 Aug)
+--   membership_audit     REFERENCES, SELECT, TRIGGER       (17 Aug)
+--
+-- ⚠️ THOSE THREE ARE THE ARGUMENT, NOT A FOOTNOTE. They are the evidence that
+-- nothing legitimate needs this privilege: three tables have run without it —
+-- one of them for six days, carrying the photo backup the club depends on —
+-- and nothing broke. This migration makes them the rule instead of the
+-- exception, exactly as 20260814 did for `photo_backup_runs` and `anon`.
+--
+-- Source is Supabase's own default privilege, not anything this repo wrote:
+--
+--     alter default privileges in schema public
+--       grant all on tables to anon, authenticated, service_role;
+--
+-- `ALL` is eight privileges on Postgres 17 and TRUNCATE is one of them, so
+-- every table has been truncatable by any signed-in member from the instant it
+-- was created, and the next one would be too.
+--
+-- ══ ⚠️ THE PRIVILEGE IS REAL CAPABILITY, AND THAT WAS PROVED, NOT ASSUMED ══
+--
+-- A catalogue row saying TRUNCATE is not the same claim as "a member can empty
+-- a table". So it was demonstrated, inside a transaction that rolled back:
+--
+--   create table public.zz_truncate_probe_a (id int);   -- as postgres, our path
+--   insert into public.zz_truncate_probe_a values (1);
+--   set local role authenticated;
+--   truncate public.zz_truncate_probe_a;                -- succeeded
+--   -- rows remaining: 0
+--
+-- ⚠️ A THROWAWAY TABLE RATHER THAN A REAL ONE, ON PURPOSE. Truncating `players`
+-- inside a rolled-back transaction would have proved the same thing and taken
+-- an ACCESS EXCLUSIVE lock on the roster of a live club mid-onboarding. The
+-- probe is created by the same role down the same path, so it inherits the
+-- same grant, and it additionally proves the DEFAULT is live rather than only
+-- the existing tables — which a real table could not have shown.
+--
+-- ══ HOW REACHABLE IS IT ═══════════════════════════════════════════════════
+--
+-- ⚠️ NOT THROUGH THE APP. PostgREST exposes SELECT/INSERT/UPDATE/DELETE and has
+-- no TRUNCATE verb, so nothing a browser can send arrives here. Exploiting it
+-- takes a direct Postgres connection carrying a stolen `authenticated` JWT —
+-- narrower than most of what RLS defends against, which is why this sat in
+-- `claude/open-items.md` under "Cheap" rather than at the top of it.
+--
+-- ⚠️ AND "NOT REACHABLE THROUGH THE API WE HAPPEN TO USE" IS NOT A PROPERTY TO
+-- REST ON. That sentence is lifted from 20260817_membership_audit.sql, which
+-- reached this conclusion for one table and said so. This file is that
+-- judgement applied to the other thirty.
+--
+-- ══ THIS MIGRATION WAS ASKED FOR, IN WRITING, BY db/schema/grants.sql ══════
+--
+-- Two notes in that capture — on `lineups`/`lineup_players` and on
+-- `player_grades`/`player_positions` — recorded the same finding on 14 Aug and
+-- deliberately declined to act on it:
+--
+--     "Left alone deliberately rather than revoked on two tables while
+--      twenty-four others keep it, which would make the schema less
+--      consistent, not more. If it is ever tidied, tidy it schema-wide in
+--      its own migration."
+--
+-- This is that migration. Both notes are updated in the same commit so the
+-- capture stops asking for something that has been done.
+--
+-- ══ ⚠️ WHAT THIS DOES **NOT** CLOSE, AND THE TRAP THAT FOUND IT ═══════════
+--
+-- `authenticated` also holds TRUNCATE on five tables outside `public`:
+--
+--   storage.objects, storage.buckets, storage.buckets_analytics
+--   net.http_request_queue, net._http_response
+--
+-- `storage.objects` is the row behind every player photo, so this is not an
+-- academic leftover. **We cannot revoke any of them**, and the way that
+-- failure presents is the sharpest thing this session found:
+--
+--   ⚠️ A REVOKE ISSUED BY SOMEONE WHO IS NOT THE GRANTOR SUCCEEDS AND DOES
+--      NOTHING. It raises no error. It returns no failure. The privilege is
+--      simply still there afterwards.
+--
+-- Measured, in a rolled-back transaction: `revoke truncate on storage.objects
+-- from authenticated` ran clean, and `has_table_privilege` still returned
+-- true. The grantor is `supabase_storage_admin`; the `net` tables carry a
+-- PUBLIC grant from `supabase_admin`. Postgres only removes grants YOU made.
+--
+-- ⚠️ SO A MIGRATION THAT LISTED THOSE TABLES WOULD HAVE APPLIED CLEANLY, LOOKED
+-- CORRECT IN REVIEW, AND CHANGED NOTHING. They are named here, and asserted
+-- nowhere, because asserting a thing we know to be false is worse than a gap
+-- somebody can read about. `claude/open-items.md` carries them as an open item
+-- against Supabase, not against us.
+--
+-- The same limit applies to the second default-privilege entry for `public`:
+--
+--   set by `postgres`        -> altered below                          ✅
+--   set by `supabase_admin`  -> not ours to alter                      ❌
+--
+-- ⚠️ CONSEQUENCE, AND IT IS WHY THE HARNESS WALKS EVERY TABLE: a table created
+-- by our migrations (which run as `postgres`) now arrives without TRUNCATE. A
+-- table created by Supabase's own machinery as `supabase_admin` still would,
+-- and the default-privilege check alone would not notice. See
+-- db/tests/truncate-grants.sql, part 1b.
+--
+-- ══ WHAT IS DELIBERATELY LEFT ALONE ═══════════════════════════════════════
+--
+-- ⛔ `service_role` KEEPS TRUNCATE. The edge functions run as service_role and
+-- it already holds the service key, which can do anything; removing a
+-- privilege from a role that can grant it back to itself is theatre. Asserted
+-- as a CONTROL in the harness precisely so a future sweep cannot take it by
+-- accident.
+--
+-- ⛔ REFERENCES, TRIGGER and MAINTAIN stay. They are the same Supabase default
+-- and they are not destructive. ⚠️ TRIGGER is the least comfortable of the
+-- three — it would let a member attach an existing function to a table — but
+-- `authenticated` has **no CREATE on schema public** (measured: false), so it
+-- cannot introduce a function to attach. Recorded so the next person knows it
+-- was looked at and left, not missed.
+--
+-- ⛔ SEQUENCES. Untouched, exactly as 20260814 left them, and for the same
+-- reason: this migration is about destroying rows.
+--
+-- ⛔ NO `revoke ... from public` STATEMENT. No table in `public` carries a
+-- PUBLIC grant — measured, zero rows with an aclitem beginning `=`. The
+-- harness checks the OUTCOME with has_table_privilege, which catches a
+-- privilege however it arrived.
+--
+-- ⛔ `anon` IS NOT NAMED. It holds TRUNCATE on nothing in `public` — measured 0
+-- on 19 Aug — because 20260814 already took everything. Naming it would imply
+-- this file is what closed it.
+
+revoke truncate on all tables in schema public from authenticated;
+
+-- Stop the next table arriving with the same grant, as far as we are able.
+alter default privileges for role postgres in schema public
+  revoke truncate on tables from authenticated;
+
+-- ══ HOW TO VERIFY AFTER APPLYING ══════════════════════════════════════════
+--
+-- The whole thing was rehearsed against production inside a rolled-back
+-- transaction before this file was written. Expected results, all measured:
+--
+--   authenticated TRUNCATE on any table in public ...... 0   (was 31)
+--   authenticated SELECT/INSERT/UPDATE/DELETE .......... unchanged
+--   service_role  TRUNCATE ............................. still true
+--   a table created afterwards inherits TRUNCATE ....... false
+--   a table created afterwards inherits SELECT ......... true
+--   `set local role authenticated; truncate <new table>` permission denied
+--
+--   select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+--    where n.nspname = 'public' and c.relkind = 'r'
+--      and has_table_privilege('authenticated', c.oid, 'TRUNCATE');
+--
+-- Then `npm run db:check -- truncate-grants`.
+--
+-- ⚠️ AND SMOKE-TEST THE APP, NOT ONLY THE CATALOGUE. The failure mode of a
+-- sweeping revoke is taking a neighbouring privilege with it, and the roster
+-- going blank for the whole club is not something a grant query would report
+-- as unusual. Sign in, open /roster, save an availability, send a report.

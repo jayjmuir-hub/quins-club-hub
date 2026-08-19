@@ -8,6 +8,56 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 19 Aug 2026
+
+- 🧨 **`authenticated` CAN NO LONGER TRUNCATE ANY TABLE IN `public` — 31 OF 34
+  TABLES, AND THE ONE PRIVILEGE RLS CANNOT FILTER.** Postgres never applies row
+  security to TRUNCATE: not "the policies allowed it", the mechanism does not
+  exist. So every signed-in member held the ability to empty any table outright
+  while all 60-odd policies looked on. Source is Supabase's own
+  `alter default privileges … grant all on tables`, where `ALL` is eight
+  privileges on Postgres 17 and TRUNCATE is one of them.
+  ⚠️ **NOT REACHABLE THROUGH THE APP, AND THAT IS WHY IT SAT IN "Cheap".**
+  PostgREST exposes no TRUNCATE verb, so it needs a direct Postgres connection
+  carrying a stolen `authenticated` JWT. **"Not reachable through the API we
+  happen to use" is not a property to rest on** — a sentence lifted from
+  `20260817_membership_audit.sql`, which reached this conclusion for one table.
+  ✅ **The capability was DEMONSTRATED, not inferred from a catalogue row**: a
+  throwaway table created down our own migration path, then
+  `set local role authenticated; truncate` — it really emptied, inside a
+  transaction that rolled back. A throwaway rather than `players` on purpose:
+  truncating the real roster would have proved the same thing while taking an
+  ACCESS EXCLUSIVE lock on a live club mid-onboarding.
+  ✅ **This migration was asked for IN WRITING by `db/schema/grants.sql`**, twice,
+  on 14 Aug: "if it is ever tidied, tidy it schema-wide in its own migration."
+  Both notes are updated in the same commit so the capture stops asking.
+  ⚠️ **THE SHARPEST FINDING IS A TRAP, AND IT IS NOT ABOUT TRUNCATE: A REVOKE
+  ISSUED BY SOMEONE WHO IS NOT THE GRANTOR SUCCEEDS AND DOES NOTHING.** No
+  error, no warning in the result, privilege still there afterwards. Found
+  because `authenticated` also holds TRUNCATE on `storage.objects` — the row
+  behind every player photo — and on the two `pg_net` queue tables. `revoke
+  truncate on storage.objects from authenticated` ran clean and changed
+  nothing; the grantor is `supabase_storage_admin`, not us. **A migration
+  listing those tables would have applied cleanly, reviewed as correct, and
+  been a lie.** They are named in the migration and asserted nowhere.
+  ⚠️ **The `supabase_admin` default-privilege entry for `public` is the same
+  limitation**, so a table created down that path still arrives truncatable —
+  which is why the harness walks every table instead of trusting the default.
+  ✅ **APPLIED TO PRODUCTION the same day** as
+  `revoke_truncate_from_authenticated`, and measured after rather than assumed:
+  TRUNCATE on **0 of 34** tables, while SELECT 33 / INSERT 31 / UPDATE 25 /
+  DELETE 31 are **unchanged against their pre-change counts** and `service_role`
+  keeps all 34. Smoke-tested as a real signed-in member too — 30 of 30 players
+  and 63 of 63 events still visible, a real availability UPDATE still
+  succeeding, `truncate` refused on both tables. ⚠️ **The UPDATE is what makes
+  the refusal evidence**: same role, same transaction, so the refusal is the
+  privilege removed and not a blanket loss of access.
+  `db/migrations/20260819_revoke_truncate_from_authenticated.sql`,
+  `db/tests/truncate-grants.sql`.
+- `23bfe09` — 📓 the squash that recorded the 18 Aug session and cited the push
+  notifications SHA. Cited here because a commit cannot cite its own, and the
+  one-behind allowance falls to whoever branches next.
+
 ## 18 Aug 2026
 
 - 🔔 **REAL BROWSER PUSH NOTIFICATIONS — FIRST TRIGGER: A REPLY TO YOUR OWN
