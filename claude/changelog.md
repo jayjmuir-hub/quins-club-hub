@@ -45,6 +45,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   control — placeholder credentials produce none, the real key produces them,
   and all 2,954 tests pass either way. **CI is unaffected**: it runs with
   `placeholder.supabase.co`.
+- `c9ff8ea` — the squash that shipped the harness repair and the initplan fix.
 - `f75827e` — the squash that shipped the availability nudge.
 
 - 🚨 **THE NIGHTLY DATABASE CHECK RAN FOR THE FIRST TIME, AND 14 OF 34
