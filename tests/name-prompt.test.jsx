@@ -38,6 +38,17 @@ const listPlayersMock = vi.fn()
 const setPlayerDobMock = vi.fn()
 const updatePlayerDobMock = vi.fn()
 
+// ⚠️ DEFAULTS TO "this browser cannot do push", which is what jsdom really is.
+// Every pre-existing test in this file therefore sees the gate behave exactly
+// as it did before the notifications step was added — which is the point: the
+// step must be invisible unless it is genuinely due.
+const isPushSupportedMock = vi.fn(() => false)
+const isSubscribedMock = vi.fn(async () => true)
+vi.mock('../src/lib/push.js', () => ({
+  isPushSupported: (...a) => isPushSupportedMock(...a),
+  isSubscribed: (...a) => isSubscribedMock(...a),
+}))
+
 vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => useAuthMock(),
 }))
@@ -1053,5 +1064,156 @@ describe('NamePrompt — the birthday step', () => {
     await screen.findByText(BIRTHDAY_TITLE)
     expect(screen.getByTestId('dob-p-2')).toBeInTheDocument()
     expect(screen.queryByTestId('dob-p-1')).toBeNull()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════
+//  THE NOTIFICATIONS OFFER — the last step, and the only optional one.
+//
+//  ⚠️ THIS GATE IS `dismissible={false}`. A step whose buttons do not close it
+//  locks the club out of the app. That is what most of these assert.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe('the notifications offer', () => {
+  // ⚠️ LOCAL COPIES OF THE ROLE BLOCK'S FIXTURES, because those are const-scoped
+  // to that describe. Same discipline the file header sets out: each block
+  // answers every OTHER gate so it stays about its own — here that means a
+  // parent of one with a birthday on file, unasked only about their role, so
+  // the role step is the LAST thing before the gate would close.
+  const parentOfOne = (overrides = {}) =>
+    loaded({
+      memberships: [{ role: 'parent', team_id: 't-u12', player_id: 'p1', status: 'active' }],
+      teams: [{ id: 't-u12', name: 'U12 Mixed', sort_order: 2 }],
+      ...overrides,
+    })
+
+  const unasked = (overrides = {}) =>
+    unconfirmed({
+      name_confirmed_at: '2026-08-01T00:00:00Z',
+      no_role_confirmed_at: null,
+      ...overrides,
+    })
+
+  // ⚠️ A BIRTHDAY ON FILE FOR p1, for the reason the role block states: the
+  // birthday step sits AHEAD of the role step in the fall-through, so without
+  // this every case here gets the birthday sheet and fails for a reason that
+  // has nothing to do with notifications.
+  beforeEach(() => {
+    listPlayerPrivateMock.mockResolvedValue([{ player_id: 'p1', date_of_birth: '2015-03-04' }])
+  })
+
+  function eligible() {
+    isPushSupportedMock.mockReturnValue(true)
+    isSubscribedMock.mockResolvedValue(false)
+    localStorage.clear()
+  }
+
+  it('is offered once the gate has nothing left to ask', async () => {
+    eligible()
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('no-role'))
+    await waitFor(() => expect(confirmNoRoleMock).toHaveBeenCalled())
+    expect(await screen.findByRole('button', { name: /show me how/i })).toBeInTheDocument()
+  })
+
+  // ⚠️ THE ONE THAT MATTERS MOST. If this ever fails, nobody can use the app.
+  it('closes on "Not now" — the gate cannot be dismissed any other way', async () => {
+    eligible()
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('no-role'))
+    await user.click(await screen.findByRole('button', { name: /not now/i }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /not now/i })).toBeNull(),
+    )
+    expect(screen.queryByRole('button', { name: /show me how/i })).toBeNull()
+  })
+
+  it('closes on "Show me how" too, and sends them where the switch is', async () => {
+    eligible()
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('no-role'))
+    await user.click(await screen.findByRole('button', { name: /show me how/i }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /show me how/i })).toBeNull(),
+    )
+  })
+
+  it('is not offered to somebody who already has notifications on', async () => {
+    isPushSupportedMock.mockReturnValue(true)
+    isSubscribedMock.mockResolvedValue(true)
+    localStorage.clear()
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('no-role'))
+    await waitFor(() => expect(screen.queryByTestId('no-role')).toBeNull())
+    expect(screen.queryByRole('button', { name: /show me how/i })).toBeNull()
+  })
+
+  // ⚠️ A GATE NOBODY CAN DISMISS MUST NOT ASK THE SAME OPTIONAL QUESTION TWICE.
+  it('is asked once per device and not again', async () => {
+    eligible()
+    localStorage.setItem('quins:notify-offered', '1')
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('no-role'))
+    await waitFor(() => expect(screen.queryByTestId('no-role')).toBeNull())
+    expect(screen.queryByRole('button', { name: /show me how/i })).toBeNull()
+  })
+
+  // ⚠️ THE LOCK-OUT GUARD. If the Push API throws while we are deciding, the
+  // gate must still close. Missing the offer costs one prompt; a gate that
+  // never closes costs the club the app.
+  it('still closes when the Push API throws while deciding', async () => {
+    isPushSupportedMock.mockReturnValue(true)
+    isSubscribedMock.mockRejectedValue(new Error('service worker unavailable'))
+    localStorage.clear()
+    useMembershipsMock.mockReturnValue(parentOfOne())
+    getMyProfileMock.mockResolvedValue(unasked())
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(await screen.findByTestId('no-role'))
+    await waitFor(() => expect(screen.queryByTestId('no-role')).toBeNull())
+    expect(screen.queryByRole('button', { name: /show me how/i })).toBeNull()
+  })
+
+  // ⚠️ NEVER. Chrome demotes sites whose permission prompt is dismissed, for
+  // everybody, permanently — and this is the sign-in path.
+  it('never asks the browser for permission itself', async () => {
+    eligible()
+    const requestPermission = vi.fn()
+    const original = global.Notification
+    global.Notification = { permission: 'default', requestPermission }
+    try {
+      useMembershipsMock.mockReturnValue(parentOfOne())
+      getMyProfileMock.mockResolvedValue(unasked())
+      const user = userEvent.setup()
+      renderShell()
+      await user.click(await screen.findByTestId('no-role'))
+      await screen.findByRole('button', { name: /show me how/i })
+      expect(requestPermission).not.toHaveBeenCalled()
+    } finally {
+      global.Notification = original
+    }
   })
 })
