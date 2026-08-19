@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 🧹 **`claude/runbooks/monitoring.md` SAID SENTRY WAS SWITCHED OFF, FOR THE
+  SECOND TIME.** The body of that file has said "LIVE since 16 Aug 2026" since
+  it was corrected; its OPENING SUMMARY still said "an error tracker is built
+  but switched off" — and the summary is the part anybody reads.
+  ⚠️ **The first time this claim went stale, a code review believed it and
+  recommended deleting `@sentry/react` as dead weight.** The fix then updated
+  `CLAUDE.md` and the body of the runbook, and missed the header.
+  ⚠️ **The lesson is about where status lives, not about Sentry.** A file
+  stating its own status twice will eventually disagree with itself, and the
+  copy that rots is the one nobody scrolls past. Say it once, or change both.
+- `214c23f` — the squash that made all 34 harnesses pass.
+
 - ✅ **ALL 34 DATABASE HARNESSES PASS, AND ALL 34 SELF-TESTS FIRE.** The last
   two failures were closed, and neither was what it looked like.
   ⚠️ **`rls-squad-staff-approval` was NOT a disclosure**, and that was measured

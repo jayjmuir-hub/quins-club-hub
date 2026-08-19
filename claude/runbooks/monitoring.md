@@ -1,7 +1,21 @@
 # Monitoring
 
 **Detection used to be somebody telling Jay.** Two uptime monitors now watch the
-site, and an error tracker is built but switched off.
+site, and **Sentry is LIVE** — proved 16 Aug 2026 by firing a real error on the
+live site and watching it arrive.
+
+⚠️ **THIS LINE SAID "an error tracker is built but switched off" UNTIL 19 Aug
+2026, AND THAT WAS ALREADY THE SECOND TIME.** `CLAUDE.md` records the first: the
+claim outlived the truth by five days, a code review read it and recommended
+DELETING `@sentry/react` as dead weight. It was corrected there and in the body
+of this file — see "Error tracking — LIVE since 16 Aug 2026" below — **but not
+in this opening summary, which is the part anybody actually reads.**
+
+⚠️ **THE LESSON IS ABOUT WHERE STATUS LIVES, NOT ABOUT SENTRY.** A file that
+states its own status twice will eventually disagree with itself, and the
+summary is the copy that rots unseen because the detail below it looks
+authoritative. **If you change a status in this file, change the top of it too
+— or say it once and link.**
 
 ## What is live — set up 16 Aug 2026
 
