@@ -44,6 +44,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   unreachable — the one device it exists for is exactly the one whose
   feature detection cannot be trusted. Fixed to check independently, first.
   `claude/plans/2026-08-18-push-notifications.md` carries the full account.
+- `0acb302` — the squash that shipped push notifications.
+  ✅ **Deploy confirmed by reading the deployed bytes, not the build log**:
+  `/push-sw.js` serves as `application/javascript` with both listeners,
+  `/sw.js` contains `importScripts("push-sw.js")`, and it is in the precache
+  manifest. ⚠️ **Before the deploy landed, `/push-sw.js` answered 200 with the
+  app's HTML** — the SPA catch-all, the same shape
+  `claude/runbooks/monitoring.md` records for `/calendar.ics`. A 200 on that
+  path is not evidence the file is there; check the content type.
 - 🔓 **`register_my_player` NO LONGER CARRIES AN `anon` EXECUTE GRANT — AND A
   SECOND FILE HAD CALLED THAT GRANT DELIBERATE FOR FIVE DAYS.** Not a hole: the
   function's first line refuses a null `auth.uid()`, and only a genuinely
