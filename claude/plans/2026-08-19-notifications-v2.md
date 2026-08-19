@@ -4,9 +4,8 @@
 is not.** Written 19 Aug 2026, the morning push notifications were first proved
 on a real device.
 
-⚠️ **Step 1 is built but NOT YET DEPLOYED, and it needs TWO deploys, not one** —
-see "Deploying step 1" at the foot of this file. Until both land, tapping a
-notification still leaves you where you were.
+✅ **Step 1 is DEPLOYED and PROVED ON A REAL PHONE, 19 Aug 2026** — both halves,
+and both click paths. See "Deploying step 1" at the foot of this file.
 
 **Origin.** Jay, 19 Aug 2026, immediately after the first successful end-to-end
 push on his Samsung S25 Ultra: *"we need notification turned on my default i
@@ -195,7 +194,7 @@ word in the confirm dialog.
 
 ## Order of work
 
-1. ✅ **The deep-link fix — BUILT 19 Aug 2026.** `public/push-sw.js` now
+1. ✅ **The deep-link fix — SHIPPED AND VERIFIED ON A DEVICE, 19 Aug 2026.** `public/push-sw.js` now
    navigates an already-open window instead of only focusing it,
    `push-send` sends `/my-reports` instead of the app root, and `/my-reports`
    exists as a screen for it to land on. `tests/push-sw.test.js` is new and
@@ -242,3 +241,60 @@ and only one of them was ever broken:**
   `/my-reports`.
 - **app closed** — the `openWindow` path, which was already correct and must
   stay correct.
+
+---
+
+## ✅ How step 1 was actually verified, 19 Aug 2026
+
+**Three real notifications to Jay's Samsung S25 Ultra, over 4G, from the live
+site.** Not a simulation and not a green test run.
+
+| # | App state | Result |
+|---|---|---|
+| 1 | open on More → Notifications | delivered; superseded by #2 before tapping |
+| 2 | **fully closed** | tapped → **app opened on `/my-reports`** (the `openWindow` path) |
+| 3 | **open on Home** | tapped → **jumped straight to `/my-reports`** (the path that was BROKEN) |
+
+Each was fired by updating `admin_note` on a real report and confirmed in the
+Supabase logs: report read → subscription found → **VAPID key fetched** → 200,
+with no `DELETE`, so the push service accepted the endpoint every time.
+
+⚠️ **THE "VAPID KEY FETCHED" STEP IS THE ONE WORTH KNOWING.** When nobody is
+subscribed, `push-send` returns early and never touches the key — which is
+exactly what the 19 Aug morning logs showed, and is how "no subscriptions" and
+"crypto failed" are told apart. A run that reaches `get_push_vapid_private_key`
+has found somebody to send to.
+
+## ✅ AND THIS CLOSED THE 18 Aug OPEN ITEM, WHICH WAS NOT ABOUT DEEP LINKS
+
+`claude/handoffs/2026-08-18-push-notifications-and-grant-audits.md` recorded one
+thing as built, deployed and unproven: **that a real browser can DECRYPT and
+DISPLAY one of these.** The crypto had been verified two ways server-side and
+the handoff was explicit that neither proved interop.
+
+**It is proved now.** Notification #2 arrived on a real Samsung showing the exact
+string written into `admin_note` — so the hand-rolled ECDH → HKDF →
+AES-128-GCM payload was decrypted by Google's push service and Chrome, and the
+ECDSA VAPID signature was accepted. Icon and badge rendered too.
+
+## ⚠️ A Chrome notification that is NOT ours, and will be reported as a bug
+
+An installed PWA running standalone makes **Chrome** post its own persistent
+notification: *"Tap to copy the URL for this app"*, with Share / Open in Chrome
+browser. Jay asked about it within a minute of seeing it.
+
+- **We do not send it and cannot remove it.** It is Chrome giving the user a way
+  to see the URL, since a standalone app has no address bar.
+- **Telling them apart:** ours carries the club crest and is attributed to
+  `adhquins-clubhub.com`; Chrome's carries the Chrome logo and says "Chrome".
+- **It is silenced per-phone**, by long-pressing it and turning off that channel
+  — which does not affect Quins notifications, a different channel.
+- ✅ **It is also confirmation the install worked**, since it only appears for an
+  app launched standalone from the Home Screen.
+
+## ⚠️ Two test reports are now stuck in the live database
+
+`QCH-0008` and `QCH-0009`, Jay's own, carrying test text as the club's reply.
+**They cannot be removed**, because `public.feedback` has no DELETE policy —
+which is section 4 of this plan. They are the first concrete cost of that gap
+rather than a hypothetical one.

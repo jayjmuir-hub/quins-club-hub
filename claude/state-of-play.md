@@ -63,6 +63,10 @@ select (select count(*) from auth.users)                                as login
        (select count(*) from storage.objects
          where bucket_id = 'player-photos')                             as player_photos;
 
+-- reports, and whether any carry a reply (see "Test data" below)
+select ref, status, admin_note is not null as has_reply from public.feedback
+ order by created_at desc;
+
 -- squads with nobody looking after them
 select t.name from teams t where not exists (
   select 1 from memberships m where m.team_id = t.id and m.status = 'active'
@@ -71,7 +75,11 @@ select t.name from teams t where not exists (
 
 ## Test data still in the live database
 
-**None known.** ⚠️ The seeded September this file warned about for a week is
-**gone — measured 14 Aug 2026, zero rows.** That warning was carried into this
-rebuilt file from the old one without being re-run, which is precisely the
-failure this file was rebuilt to stop. **Measure before you repeat.**
+**Two reports in `public.feedback` carry test text as the club's reply**, left
+over from proving push notifications on a real phone — and ⚠️ **they cannot be
+removed by anyone, from any screen, because `public.feedback` has NO DELETE
+POLICY.** Section 4 of `claude/plans/2026-08-19-notifications-v2.md`; these rows
+are the first real cost of that gap rather than a hypothetical one. Query above.
+
+⚠️ **Measure before you repeat.** The last warning in this section outlived the
+problem by a week, because it was copied forward instead of re-run.
