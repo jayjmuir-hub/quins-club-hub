@@ -47,8 +47,23 @@ on conflict (id) do nothing;
 -- A coach on squad A. The parent starts on squad B — NOT the coach's.
 insert into memberships (profile_id, club_id, team_id, role, status)
 select 'dee00000-0000-4000-8000-0000000000c1', club_id, team_id, 'coach', 'active' from _t where n = 1;
-insert into memberships (profile_id, club_id, team_id, role, status)
-select 'dee00000-0000-4000-8000-0000000000f1', club_id, team_id, 'parent', 'active' from _t where n = 2;
+-- ⚠️ A DISPOSABLE CHILD ON EACH SQUAD THE PARENT EVER SITS ON.
+-- `memberships_family_role_needs_player` (20260817) forbids a 'parent' row
+-- with no player_id; this fixture predates it, so the harness died on this
+-- INSERT and asserted nothing. Unnoticed because the nightly db-check was
+-- inert without a SUPABASE_DB_URL secret and passed reporting "did not run".
+--
+-- ⚠️ 'parent' IS THE POINT and must not be swapped for a staff role to
+-- satisfy the constraint — the whole harness is about what a FAMILY member
+-- can reach in the staff-photo bucket.
+insert into players (id, club_id, team_id, full_name)
+select 'dee00000-0000-4000-8000-0000000000e2', club_id, team_id, 'ZZ Probe Child B' from _t where n = 2;
+insert into players (id, club_id, team_id, full_name)
+select 'dee00000-0000-4000-8000-0000000000e1', club_id, team_id, 'ZZ Probe Child A' from _t where n = 1;
+
+insert into memberships (profile_id, club_id, team_id, player_id, role, status)
+select 'dee00000-0000-4000-8000-0000000000f1', club_id, team_id,
+       'dee00000-0000-4000-8000-0000000000e2', 'parent', 'active' from _t where n = 2;
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"dee00000-0000-4000-8000-0000000000f1","role":"authenticated"}';
@@ -99,8 +114,9 @@ end $$;
 --  by "nobody can see anything".
 -- ══════════════════════════════════════════════════════════════════════════
 reset role;
-insert into memberships (profile_id, club_id, team_id, role, status)
-select 'dee00000-0000-4000-8000-0000000000f1', club_id, team_id, 'parent', 'active' from _t where n = 1;
+insert into memberships (profile_id, club_id, team_id, player_id, role, status)
+select 'dee00000-0000-4000-8000-0000000000f1', club_id, team_id,
+       'dee00000-0000-4000-8000-0000000000e1', 'parent', 'active' from _t where n = 1;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"dee00000-0000-4000-8000-0000000000f1","role":"authenticated"}';
 

@@ -100,7 +100,7 @@ select
     order by p.full_name limit 1)                                  as player_id,
   (select id from public.players p where p.team_id = t.id
     order by p.full_name offset 1 limit 1)                         as player2_id
-from public.teams t where t.name = 'U16B Contact';
+from public.teams t where t.name = 'U16B';
 
 -- ⚠️ ABORT on an incomplete fixture. Every count below would otherwise read
 -- 0, which looks exactly like a correctly locked-down caller rather than a

@@ -52,18 +52,18 @@ select t.name,
          when 'U6 Tag'            then array['tries']
          when 'U7 Tag'            then array['tries']
          when 'U8 Tag'            then array['tries']
-         when 'U9 Mixed Contact'  then array['tries']
-         when 'U10 Mixed Contact' then array['tries']
-         when 'U11 Mixed Contact' then array['tries']
-         when 'U12 Mixed Contact' then array['tries','conversions']
+         when 'U9 Mixed'  then array['tries']
+         when 'U10 Mixed' then array['tries']
+         when 'U11 Mixed' then array['tries']
+         when 'U12 Mixed' then array['tries','conversions']
          when 'U12G QR'           then array['tries','conversions']
-         when 'U13 Mixed Contact' then array['tries','conversions']
-         when 'U14B Contact'      then array['tries','conversions','penalties','drops']
+         when 'U13 Mixed' then array['tries','conversions']
+         when 'U14B'      then array['tries','conversions','penalties','drops']
          when 'U14G QR'           then array['tries','conversions','penalties','drops']
-         when 'U16B Contact'      then array['tries','conversions','penalties','drops']
-         when 'U16G Contact'      then array['tries','conversions','penalties','drops']
-         when 'U18B Contact'      then array['tries','conversions','penalties','drops']
-         when 'U18G Contact'      then array['tries','conversions','penalties','drops']
+         when 'U16B'      then array['tries','conversions','penalties','drops']
+         when 'U16G'      then array['tries','conversions','penalties','drops']
+         when 'U18B'      then array['tries','conversions','penalties','drops']
+         when 'U18G'      then array['tries','conversions','penalties','drops']
          else null  -- a squad this file has never heard of: NULL, not a pass
        end as expected,
        -- ⚠️ NULL WHEN THE SQUAD IS UNKNOWN TO THIS FILE, never true. A new squad
@@ -74,18 +74,18 @@ select t.name,
            when 'U6 Tag'            then array['tries']
            when 'U7 Tag'            then array['tries']
            when 'U8 Tag'            then array['tries']
-           when 'U9 Mixed Contact'  then array['tries']
-           when 'U10 Mixed Contact' then array['tries']
-           when 'U11 Mixed Contact' then array['tries']
-           when 'U12 Mixed Contact' then array['tries','conversions']
+           when 'U9 Mixed'  then array['tries']
+           when 'U10 Mixed' then array['tries']
+           when 'U11 Mixed' then array['tries']
+           when 'U12 Mixed' then array['tries','conversions']
            when 'U12G QR'           then array['tries','conversions']
-           when 'U13 Mixed Contact' then array['tries','conversions']
-           when 'U14B Contact'      then array['tries','conversions','penalties','drops']
+           when 'U13 Mixed' then array['tries','conversions']
+           when 'U14B'      then array['tries','conversions','penalties','drops']
            when 'U14G QR'           then array['tries','conversions','penalties','drops']
-           when 'U16B Contact'      then array['tries','conversions','penalties','drops']
-           when 'U16G Contact'      then array['tries','conversions','penalties','drops']
-           when 'U18B Contact'      then array['tries','conversions','penalties','drops']
-           when 'U18G Contact'      then array['tries','conversions','penalties','drops']
+           when 'U16B'      then array['tries','conversions','penalties','drops']
+           when 'U16G'      then array['tries','conversions','penalties','drops']
+           when 'U18B'      then array['tries','conversions','penalties','drops']
+           when 'U18G'      then array['tries','conversions','penalties','drops']
            else null
          end
        end as pass
@@ -102,7 +102,7 @@ declare
   tid uuid;
   got text[];
 begin
-  select id into tid from public.teams where name = 'U10 Mixed Contact';
+  select id into tid from public.teams where name = 'U10 Mixed';
 
   -- The override wins over the band. This is the whole reason it is a COLUMN:
   -- the club can enter a side in a competition that scores differently without
@@ -149,7 +149,20 @@ declare
   r_us int;
   r_them int;
 begin
-  select id, club_id into tid, cid from public.teams where name = 'U16B Contact';
+  select id, club_id into tid, cid from public.teams where name = 'U16B';
+
+  -- ⚠️ A GUARD, BECAUSE THE ABSENCE OF THIS SQUAD USED TO SURFACE AS
+  -- "null value in column club_id violates not-null constraint" — an error
+  -- about the INSERT three lines down, naming a column this file never set,
+  -- which says nothing about the actual cause. The squads were renamed (the
+  -- " Contact" suffix was dropped) and every name in this file went stale.
+  if tid is null then
+    raise exception
+      'SCORING: no squad named U16B exists, so this harness has nothing to '
+      'score. The names in this file must track public.teams.name — they were '
+      'written when squads carried a " Contact" suffix and stopped matching '
+      'when that was dropped.';
+  end if;
 
   -- ⚠️ A ROW THIS FILE CREATED, NEVER ONE IT FOUND. On 12 Aug 2026 a migration
   -- test picked a "seeded" event by group_id, wrote components to it and nulled

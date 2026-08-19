@@ -229,6 +229,41 @@ for (const name of files) {
   } catch (error) {
     results.push({ name, ok: false, notices, error: error.message })
     console.log(`  FAIL  ${name}`)
+
+    // ⚠️ STOP DEAD ON A CREDENTIAL FAILURE. Every harness opens its own
+    // connection, so a wrong password does not fail once — it fails 34 times
+    // in a few seconds, and Supabase's pooler answers the flood by blocking
+    // NEW CONNECTIONS for several minutes (ECIRCUITBREAKER). The credential is
+    // not going to become correct on file 12, so continuing can only turn a
+    // two-second answer into a five-minute lockout.
+    //
+    // ⚠️ MEASURED, NOT IMAGINED: 19 Aug 2026, twice in twenty minutes. The
+    // second time the breaker was still latched from the first, so the run
+    // reported ECIRCUITBREAKER instead of the real cause and the actual
+    // problem — a password reset that had never been applied — stayed hidden
+    // behind an error about rate limiting.
+    //
+    // 28P01 is invalid_password. The circuit-breaker case is matched by text
+    // because it comes from Supavisor rather than Postgres and carries no
+    // SQLSTATE of its own.
+    const credentialFailure =
+      error.code === '28P01' ||
+      error.code === '28000' ||
+      error.code === 'ECIRCUITBREAKER' ||
+      /circuit breaker|too many authentication failures/i.test(error.message ?? '')
+
+    if (credentialFailure) {
+      console.error(
+        `\ndb-check: stopping after the first connection failure.\n\n` +
+          `  ${error.message}\n\n` +
+          `This is the CONNECTION, not the harness. Every file would fail the same\n` +
+          `way, and retrying them trips the pooler's rate limiter — which then\n` +
+          `reports a different error and hides this one.\n\n` +
+          `Check SUPABASE_DB_URL. See claude/runbooks/db-harnesses.md.\n`,
+      )
+      await client.end().catch(() => {})
+      process.exit(1)
+    }
   } finally {
     await client.end().catch(() => {})
   }

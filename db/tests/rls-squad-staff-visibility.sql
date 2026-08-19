@@ -59,8 +59,19 @@ insert into memberships (profile_id, club_id, team_id, role, status)
 select 'cee00000-0000-4000-8000-0000000000c1', club_id, team_id, 'coach', 'pending' from _t where n = 1;
 insert into memberships (profile_id, club_id, team_id, role, status)
 select 'cee00000-0000-4000-8000-0000000000b1', club_id, team_id, 'coach', 'active' from _t where n = 2;
-insert into memberships (profile_id, club_id, team_id, role, status)
-select 'cee00000-0000-4000-8000-0000000000f0', club_id, team_id, 'parent', 'pending' from _t where n = 1;
+-- ⚠️ DISPOSABLE CHILDREN, ONE PER SQUAD THIS PARENT APPEARS ON.
+-- `memberships_family_role_needs_player` (20260817) forbids a 'parent' row
+-- with no player_id. This fixture predates it, so the harness threw here and
+-- asserted nothing — unnoticed because the nightly db-check was inert without
+-- a SUPABASE_DB_URL secret and passed reporting "did not run".
+insert into players (id, club_id, team_id, full_name)
+select 'cee00000-0000-4000-8000-0000000000e1', club_id, team_id, 'ZZ Probe Child A' from _t where n = 1;
+insert into players (id, club_id, team_id, full_name)
+select 'cee00000-0000-4000-8000-0000000000e2', club_id, team_id, 'ZZ Probe Child B' from _t where n = 2;
+
+insert into memberships (profile_id, club_id, team_id, player_id, role, status)
+select 'cee00000-0000-4000-8000-0000000000f0', club_id, team_id,
+       'cee00000-0000-4000-8000-0000000000e1', 'parent', 'pending' from _t where n = 1;
 
 -- ── A. A PENDING member gets nothing ──────────────────────────────────────
 -- The gate is private.can_see_team, which requires status='active'. This is
@@ -105,8 +116,9 @@ insert into _res select 5, 'B can read that coach''s profiles row directly? (exp
 --  forgotten `set local role` produces.
 -- ══════════════════════════════════════════════════════════════════════════
 reset role;
-insert into memberships (profile_id, club_id, team_id, role, status)
-select 'cee00000-0000-4000-8000-0000000000f0', club_id, team_id, 'parent', 'active' from _t where n = 2;
+insert into memberships (profile_id, club_id, team_id, player_id, role, status)
+select 'cee00000-0000-4000-8000-0000000000f0', club_id, team_id,
+       'cee00000-0000-4000-8000-0000000000e2', 'parent', 'active' from _t where n = 2;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"cee00000-0000-4000-8000-0000000000f0","role":"authenticated"}';
 insert into _res select 6, 'C INJECTED: joined squad B, Coach Bee now visible? (expect 1)',
@@ -179,7 +191,20 @@ begin
   end if;
 
   select detail into _d from _res where seq = 7;
-  if _d <> 'team_id,membership_id,full_name,title,role,email,phone' then
+  -- ⚠️ THE LIST IS THE SECURITY BOUNDARY, so it is pinned EXACTLY rather
+  -- than checked for the absence of the two dangerous columns. A test that
+  -- only asserted "is_super is not present" would stay green when the next
+  -- column added is something else nobody meant to publish.
+  --
+  -- ⚠️ EXTENDED 19 Aug 2026 with photo_path, photo_focus_x, photo_focus_y.
+  -- The staff-photo work added them and this line was never updated, because
+  -- this harness could not run — it died earlier on
+  -- `memberships_family_role_needs_player`, and the nightly db-check was inert
+  -- without a SUPABASE_DB_URL secret. The three new columns were reviewed
+  -- before being added here: a photo path and two focal-point numbers are what
+  -- the squad-staff card already renders to the people this function serves.
+  -- **is_super and admin_rights remain absent, which is the point.**
+  if _d <> 'team_id,membership_id,full_name,title,role,email,phone,photo_path,photo_focus_x,photo_focus_y' then
     raise exception 'FAIL: the function returns "%" — the column list is the security boundary. is_super and admin_rights are unreachable only because they are not named.', _d;
   end if;
 
