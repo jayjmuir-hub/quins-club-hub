@@ -20,6 +20,118 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### `20260819_revoke_truncate_from_authenticated` — the privilege RLS cannot filter
+
+✅ **APPLIED 19 Aug 2026 as `revoke_truncate_from_authenticated`.** Measured
+immediately after, not assumed — `authenticated` holds TRUNCATE on **0 of 34**
+tables (was 31), and the four verbs the app uses are **unchanged against their
+pre-change counts**: SELECT 33, INSERT 31, UPDATE 25, DELETE 31. `service_role`
+keeps TRUNCATE on all 34. The `postgres` default privilege grants it on none.
+
+✅ **And smoke-tested as a real signed-in member**, inside a rolled-back
+transaction, because a grant query would not report a blank roster as unusual:
+30 of 30 players, 63 of 63 events, 56 memberships and 8 of 8 availability rows
+visible, a real `UPDATE` of an availability row succeeding — and `truncate`
+refused on both `availability` and `players`.
+⚠️ **That pairing is what makes the refusal evidence.** The same role, in the
+same transaction, could still UPDATE. So the refusal is the privilege that was
+removed and not a blanket loss of access — a negative check that fails for the
+wrong reason proves nothing.
+
+**The reasoning the SQL cannot carry.**
+
+This is the third in a sequence — `20260813_revoke_anon_execute` (function
+EXECUTE), `20260814_revoke_anon_table_privileges` (table privileges for `anon`),
+and now TRUNCATE for `authenticated`. All three close a Supabase default that
+nobody here chose. **The first two are different in kind from this one, and the
+difference is the point.**
+
+The `anon` migrations shut doors that RLS was already holding shut. Every policy
+in `public` is `TO PUBLIC` and bottoms out in `auth.uid()`, so an anonymous
+caller was refused anyway; the revokes bought defence in depth. ⚠️ **TRUNCATE is
+not like that. Postgres never applies row security to it** — not "the policies
+permitted it", the mechanism does not exist. So a signed-in member holding
+TRUNCATE was filtered by nothing at all, and the sixty-odd policies this repo
+depends on had no bearing on it whatsoever.
+
+**Why it sat open for days after being found.** It was filed 18 Aug under
+"Cheap" in `claude/open-items.md` with a condition attached: *wants its own
+harness proving nothing legitimate needs it before applying project-wide*. That
+condition was right and it is why this is a piece of work rather than a
+one-liner.
+
+**How the condition was met — three independent ways, none of them an opinion:**
+
+1. **Nothing in the codebase issues a SQL TRUNCATE.** Every `truncate` in
+   `src/` is the Tailwind class. ⚠️ Before trusting that negative, the search
+   was confirmed able to find something known to be there — the real SQL
+   TRUNCATE in `20260817_membership_audit.sql`.
+2. **PostgREST exposes no TRUNCATE verb**, so nothing a browser can send
+   reaches it.
+3. ⚠️ **Three tables had already been running without it** — `photo_backup_runs`
+   (13 Aug), `photo_orphan_scans` (16 Aug), `membership_audit` (17 Aug), each
+   tightened by hand at creation. **The exceptions are the argument.** One of
+   them carries the photo backup the club depends on, and it has never had
+   TRUNCATE.
+
+**And the capability was demonstrated, not read off a catalogue row.** A grant
+row saying TRUNCATE is a different claim from "a member can empty this table".
+So, inside a transaction that rolled back: create a throwaway table down our own
+migration path, insert a row, `set local role authenticated`, `truncate`. It
+emptied. ⚠️ **A throwaway rather than `players` deliberately** — truncating the
+live roster would have proved the identical thing while taking an ACCESS
+EXCLUSIVE lock on a club mid-onboarding, and it would have shown nothing about
+whether the *default* is still live. The probe showed both.
+
+## ⚠️ The finding worth more than the migration
+
+**A REVOKE ISSUED BY SOMEONE WHO IS NOT THE GRANTOR SUCCEEDS AND DOES NOTHING.**
+
+`authenticated` also holds TRUNCATE on `storage.objects` — the row behind every
+player photo — plus `storage.buckets`, `storage.buckets_analytics` and the two
+`pg_net` queue tables. The obvious response is to add them to the migration.
+
+Measured instead, as `postgres`, in a rolled-back transaction:
+
+```
+revoke truncate on storage.objects from authenticated;   -- ran clean, no error
+has_table_privilege('authenticated','storage.objects','TRUNCATE')  -- still true
+```
+
+Postgres removes only the grants the revoking role itself made. The grantor
+there is `supabase_storage_admin`; on the `net` tables it is a PUBLIC grant from
+`supabase_admin`. **So a migration naming those five tables would have applied
+cleanly, passed review, and been a lie** — and the only signal of failure was a
+privilege that was still there afterwards, which nobody checks unless they
+already suspect it.
+
+⚠️ **This generalises well beyond TRUNCATE**, and it is the reason
+`db/tests/anon-table-grants.sql` and `db/tests/truncate-grants.sql` both assert
+with `has_table_privilege` rather than by reading migration text or a single
+catalogue column. **Assert the outcome; the statement succeeding proves nothing.**
+
+The five tables are named in the migration header and asserted nowhere. An
+assertion known to be false is worse than a documented gap.
+
+## What was deliberately left
+
+- **`service_role` keeps TRUNCATE.** The edge functions run as it and it holds
+  the service key, which can grant anything back to itself; removing a
+  privilege from that role is theatre. ⚠️ It is asserted as a **control** in the
+  harness, so a later sweep cannot take it by accident.
+- **REFERENCES, TRIGGER and MAINTAIN stay.** Same Supabase default, not
+  destructive. ⚠️ TRIGGER is the least comfortable — it would let a member
+  attach an existing function to a table — but `authenticated` has **no CREATE
+  on schema `public`** (measured: false), so it cannot introduce one to attach.
+  Looked at and left, not missed.
+- **Sequences.** Untouched, as `20260814` left them, for the same reason: this
+  migration is about destroying rows.
+- **`anon` is not named.** It holds TRUNCATE on nothing in `public` — measured 0
+  — because `20260814` already took everything. Naming it would imply this file
+  is what closed it.
+
+---
+
 ### `20260814_calendar_feed_competition_type` — the feed learns what a tournament is
 
 ✅ **APPLIED 14 Aug 2026 as `calendar_feed_competition_type`.** Measured after: the

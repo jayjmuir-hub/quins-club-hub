@@ -106,6 +106,29 @@
 -- records that the anon-executable ones all fail safe, by three different
 -- routes. That is a property of each function body, not of the grants — and
 -- this default is why it has to be checked for every new one.
+--
+-- ── ⚠️ AMENDMENTS SINCE THAT CAPTURE. The table above is what was FOUND on
+--    10 Aug 2026 and is left as found; these are the deliberate departures
+--    from it. Two rows in it are no longer true.
+--
+--   `postgres tables anon ALL 8`           -> NONE, 14 Aug 2026
+--       20260814_revoke_anon_table_privileges.sql
+--   `postgres tables authenticated ALL 8`  -> ALL 8 MINUS TRUNCATE, 19 Aug 2026
+--       20260819_revoke_truncate_from_authenticated.sql
+--
+-- ⚠️ THE TWO `supabase_admin` ROWS ARE UNCHANGED AND CANNOT BE CHANGED BY US.
+-- We are not that role. Postgres only removes grants the revoking role itself
+-- made, and — this is the trap — **a revoke by anyone else SUCCEEDS SILENTLY
+-- AND DOES NOTHING.** Measured 19 Aug 2026 against `storage.objects`, whose
+-- grantor is `supabase_storage_admin`: the revoke ran clean and
+-- `has_table_privilege` still returned true.
+--
+-- ⚠️ CONSEQUENCE: a table created by OUR migrations (which run as `postgres`)
+-- now arrives with neither an anon grant nor TRUNCATE. A table created by
+-- Supabase's own machinery as `supabase_admin` still arrives with both, and
+-- nothing in this file would say so. That is why `db/tests/anon-table-grants.sql`
+-- and `db/tests/truncate-grants.sql` walk every table individually instead of
+-- trusting the defaults.
 
 
 -- ── 2. TABLE-LEVEL GRANTS ──────────────────────────────────────────────────
@@ -555,6 +578,13 @@ GRANT EXECUTE ON FUNCTION public.announcement_audience(uuid) TO authenticated;
 -- twenty-four others keep it, which would make the schema less consistent, not
 -- more. **If it is ever tidied, tidy it schema-wide in its own migration.**
 --
+-- ✅ **THAT MIGRATION EXISTS AS OF 19 Aug 2026 AND THIS NOTE IS WHAT ASKED FOR
+-- IT.** `20260819_revoke_truncate_from_authenticated.sql` took TRUNCATE from
+-- `authenticated` on all 31 tables that held it and altered the `postgres`
+-- default so the next one does not. So the TRUNCATE half of the paragraph above
+-- is now history; REFERENCES and TRIGGER remain, and remain deliberate.
+-- `db/tests/truncate-grants.sql` is what keeps it true.
+--
 -- ✅ `anon` DOES NOT APPEAR FOR EITHER TABLE, AND THAT IS THE LOAD-BEARING LINE.
 -- The 14 Aug grants sweep revoked anon across `public`, but it revoked EXISTING
 -- tables — it did not change the DEFAULT PRIVILEGES that decide what a NEW one
@@ -585,6 +615,12 @@ REVOKE ALL ON public.lineup_players FROM anon;
 -- migration granted. Supabase's own `alter default privileges ... grant all on
 -- tables` again — same note as lineups above, same conclusion: inert through
 -- PostgREST, not new, and if it is ever tidied it should be tidied schema-wide.
+--
+-- ✅ **TRUNCATE WAS TIDIED SCHEMA-WIDE ON 19 Aug 2026**, exactly as this note
+-- and the lineups note both asked — `20260819_revoke_truncate_from_authenticated.sql`.
+-- ⚠️ It matters more here than almost anywhere else in this file: `player_grades`
+-- holds a judgement about a child's ability, and TRUNCATE was the one privilege
+-- on it that the policies could not have filtered. REFERENCES and TRIGGER stay.
 --
 -- ✅ `anon` APPEARS FOR NEITHER TABLE. That is the explicit revoke in each
 -- migration, and for player_grades it is the line that matters most in this
