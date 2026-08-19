@@ -566,6 +566,36 @@ proves you wrong.**
   when somebody runs them** — which is the same failure one step further back.
   Settings → Secrets and variables → Actions → New repository secret.
 
+  ✅ **THE SECRET WAS ADDED 19 Aug 2026 AND THE RUNNER NOW RUNS.** What it
+  found on its first real execution is the point of this whole item: **14 of
+  34 harnesses failed**, and they had been failing silently for up to nine
+  days. Thirteen are now fixed. **Two remain and are recorded here rather than
+  quietly dropped.**
+
+  🔴 **`db/tests/rls-squad-staff-approval.sql` — UNRESOLVED, AND NOT ASSUMED
+  HARMLESS.** After the squad-name drift was fixed it gets all the way to its
+  third assertion and reports `pending membership rows still visible: U16 coach
+  -> 2`. Both pending rows the fixture creates are on the same squad, both are
+  approved during the run — by the manager and by the coach — so the count
+  should end at 0. `public.approve_membership` was checked and does set
+  `status = 'active'`, and the coach's approval is NOT wrapped in an exception
+  handler, so it cannot have been refused without aborting the file.
+  ⚠️ **DO NOT "FIX" THIS BY RELAXING THE ASSERTION.** It is the check that a
+  squad coach cannot see pending registrations after acting on them, and the
+  two candidate explanations — a stale fixture, or RLS genuinely showing a
+  coach rows it should not — are a tidy-up and a disclosure respectively.
+  Resolving it needs the fixture run in a rolled-back transaction with the
+  probe table printed, which is a measurement nobody has taken yet.
+
+  🟡 **`db/tests/rls-availability-equivalence.sql` — OBSOLETE, NEEDS
+  REPOINTING, NOT DELETING.** It aborts with "This database is already merged.
+  Run against a pre-merge branch." Its guard looks for three policies —
+  `avail coach manage`, `avail own insert`, `avail own update` — and the merge
+  it was written to verify has happened, so the fault it detects can no longer
+  be injected. **CLAUDE.md rule 7: repoint it, never delete it.** Repointing
+  means restating what the three old policies admitted and asserting the merged
+  policy admits exactly that, the way `notice-push.sql` restates `can_see_team`.
+
   ⚠️ **AND THE SET THAT HAS NEVER MET ITS OWN RUNNER KEEPS GROWING.**
   `db/tests/approval-push.sql` joined it on 19 Aug 2026. It was proved by
   pasting its contents through the Supabase MCP — both parts pass, and part 3's

@@ -43,15 +43,37 @@ values ('00000000-1111-2222-3333-444444444444',
         'authenticated','authenticated','rls-probe@example.invalid', now(),
         '{"full_name":"RLS Probe"}'::jsonb, now(), now());
 
+-- ⚠️ A PLAYER FROM THE SQUAD, NOT ONE BY NAME. This read
+-- `where full_name = 'Test Player One'` — a row that no longer exists, so the
+-- subquery returned NULL and the insert died on
+-- `memberships_family_role_needs_player`. Naming a specific person makes the
+-- fixture depend on the club's live roster, which is exactly what the comment
+-- below warns about for the SQUAD and was never applied to the PLAYER.
 insert into public.memberships (profile_id, club_id, team_id, role, player_id, status)
 select '00000000-1111-2222-3333-444444444444', t.club_id, t.id, 'parent',
-       (select id from public.players where full_name = 'Test Player One'), 'pending'
+       (select p.id from public.players p
+         where p.team_id = t.id order by p.full_name limit 1), 'pending'
 -- ⚠️ RENAMED 9 Aug 2026: this squad was 'U16' until the club's real name list
 -- landed. It KEPT ITS ID through the rename, so the 6 players / 26 events
 -- fixture is literally the same rows. If this select matches nothing the
 -- membership insert quietly inserts zero rows and every count below reads 0 —
 -- which looks like a correctly locked-down parent rather than a dead harness.
-from public.teams t where t.name = 'U16B Contact';
+from public.teams t where t.name = 'U16B'
+  and exists (select 1 from public.players p where p.team_id = t.id);
+
+do $$
+begin
+  -- ⚠️ LOUD, BECAUSE THE SILENT VERSION LOOKS LIKE A PASS. If the squad or
+  -- its players vanish, the insert above adds zero rows and every count below
+  -- reads 0 — indistinguishable from a correctly locked-down pending member,
+  -- which is the very thing this harness exists to prove.
+  if not exists (select 1 from public.memberships
+                  where profile_id = '00000000-1111-2222-3333-444444444444') then
+    raise exception
+      'PENDING MEMBERSHIP: the fixture membership was not created — squad '
+      '"U16B" is missing or has no players. Every zero below would be free.';
+  end if;
+end $$;
 
 select set_config('request.jwt.claims',
        '{"sub":"00000000-1111-2222-3333-444444444444","role":"authenticated"}', true);
@@ -70,10 +92,19 @@ insert into results select 'PENDING',
 -- pending parent SAVED their availability and then could not see it. The write
 -- succeeded, the row vanished, nothing errored, and it read as "the app lost
 -- my answer". Found by reading the policies side by side, not by testing.
+-- ⚠️ THE SAME CHILD THE MEMBERSHIP NAMES, AND AN EVENT ON THAT SQUAD.
+-- This read `where full_name = 'Test Player One'` — a row that no longer
+-- exists — and took the club's earliest event regardless of squad. The null
+-- player made `avail own insert` (is_own_player) refuse, so the harness died
+-- here reporting "new row violates row-level security policy", which reads as
+-- the policy being wrong and was the fixture being empty.
 insert into public.availability (event_id, player_id, status)
-select (select id from public.events order by starts_at limit 1),
-       (select id from public.players where full_name = 'Test Player One'),
-       'in';   -- allowed values are in / out / maybe
+select e.id, m.player_id, 'in'   -- allowed values are in / out / maybe
+  from public.memberships m
+  join public.events e on e.team_id = m.team_id
+ where m.profile_id = '00000000-1111-2222-3333-444444444444'
+ order by e.starts_at
+ limit 1;
 
 insert into results select 'PENDING + saved availability',
        (select count(*) from public.players),

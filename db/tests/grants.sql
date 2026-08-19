@@ -54,8 +54,23 @@ begin;
 create function pg_temp.check_grants() returns void language plpgsql as $fn$
 declare
   granted   text[];
+  -- ⚠️ THIS LIST IS A DECISION, NOT AN INVENTORY. Every name here is a
+  -- column a signed-in member may rewrite on their OWN profile row. Adding one
+  -- because the check went red is exactly the reflex this assertion exists to
+  -- interrupt.
+  --
+  -- ⚠️ no_player_confirmed_at and no_role_confirmed_at ADDED 19 Aug 2026.
+  -- They arrived with self-registration and were granted at that time; the
+  -- expectation here was never updated, and nothing noticed because the file
+  -- could not PARSE (an E-string splice, fixed above) and the nightly
+  -- db-check was inert without a SUPABASE_DB_URL secret. Reviewed before being
+  -- added: both are timestamps a member sets about THEMSELVES — "I have no
+  -- child to add", "I hold no role" — written by the sign-in gate on that
+  -- person's own row. Neither is an identity column and neither is readable as
+  -- a privilege. `email`, `id` and `club_id` remain absent, which is the point.
   expected  text[] := array['first_name','full_name','last_name',
-                            'name_confirmed_at','phone'];
+                            'name_confirmed_at','no_player_confirmed_at',
+                            'no_role_confirmed_at','phone'];
   stray     text;
   unguarded text;
 begin
@@ -69,7 +84,15 @@ begin
       'GRANTS: `authenticated` can UPDATE profiles.email. This is the login '
       'identity, and `profile update club admin` authorises an admin against '
       'every member row in the club — so this is "any admin may rewrite any '
-      E'member\'s login email". See db/schema/grants.sql section 3.';
+      -- ⚠️ A DOUBLED QUOTE, NOT A BACKSLASH ESCAPE. This line was
+      -- E'member\'s login email' — an E-string spliced into a run of ordinary
+      -- adjacent string literals. Postgres will not continue a plain literal
+      -- with an E-literal, so the WHOLE FILE failed to parse and this harness
+      -- asserted nothing whatever. It reported "syntax error at or near
+      -- E'member...", which names the line but not the reason, and it went
+      -- unnoticed because the nightly db-check was inert without a
+      -- SUPABASE_DB_URL secret. '' is the standard escape and needs no prefix.
+      'member''s login email". See db/schema/grants.sql section 3.';
   end if;
 
   -- The other two ungranted columns. Less severe than email, still not a
@@ -82,7 +105,7 @@ begin
     raise exception 'GRANTS: `authenticated` can UPDATE profiles.created_at.';
   end if;
 
-  -- ── 1b. The five granted columns must STILL be granted ───────────────────
+  -- ── 1b. The granted columns must STILL be granted ────────────────────────
   --
   -- ⚠️ THE OTHER DIRECTION, AND THE ONE THAT WOULD BE MISREAD AS AN RLS BUG.
   -- An ungranted column makes the save fail with a permission error that looks
@@ -135,14 +158,46 @@ begin
     and att.attacl is not null
     and (c.relname || '.' || att.attname) <> all (array[
       -- profiles — the login-identity ceiling. See section 3 of grants.sql.
+      --
+      -- ⚠️ THE TWO no_*_confirmed_at COLUMNS ADDED 19 Aug 2026, and this list
+      -- rotted exactly the way its own header predicted it would: they were
+      -- granted with self-registration and nothing here was touched. Both are
+      -- timestamps a member sets about themselves via the sign-in gate.
       'profiles.first_name', 'profiles.full_name', 'profiles.last_name',
-      'profiles.name_confirmed_at', 'profiles.phone',
+      'profiles.name_confirmed_at', 'profiles.no_player_confirmed_at',
+      'profiles.no_role_confirmed_at', 'profiles.phone',
+      -- feedback — the TRIAGE ceiling, added 18 Aug with help-and-feedback and
+      -- recorded in db/schema/grants.sql section "public.feedback — COLUMN
+      -- grants" on the same day. Only this list was missed.
+      --
+      -- ⚠️ THE GRANT IS TO `authenticated`, NOT TO ADMINS — Postgres grants
+      -- cannot see roles the app invents. What limits triage to an admin is the
+      -- `feedback triage` POLICY; what limits it to these four COLUMNS is this
+      -- grant. Neither alone is the control: a member may not reach these
+      -- columns, and an admin may not reach the reporter's own words.
+      'feedback.status', 'feedback.admin_note',
+      'feedback.handled_by', 'feedback.handled_at',
       -- memberships — the super-admin ceiling. `is_super` and `admin_rights`
       -- are DELIBERATELY ABSENT: that absence is what stops an ordinary admin
       -- promoting themselves. 20260810_super_admin_and_rights.sql.
       'memberships.profile_id', 'memberships.club_id', 'memberships.team_id',
       'memberships.player_id', 'memberships.role', 'memberships.status',
       'memberships.title',
+      -- ⚠️ is_head_coach ADDED 18 Aug 2026 (20260818_membership_head_coach).
+      -- It sits beside is_super and admin_rights and is NOT one of them: it
+      -- confers no authority at all, it decides who is TOLD when somebody
+      -- registers for that squad. An admin who set it on themselves would
+      -- receive more email and gain nothing. The unique index
+      -- memberships_one_head_coach_per_team is what stops it fanning out.
+      'memberships.is_head_coach',
+      -- announcements — an author may edit their own notice. ⚠️ `team_id` is
+      -- DELIBERATELY ABSENT and that absence is load-bearing: step 10 of
+      -- db/tests/announcements.sql exists to prove an author cannot re-scope a
+      -- squad notice club-wide after posting, and the ONLY thing preventing it
+      -- is this grant list. Adding team_id "for consistency" would reopen it
+      -- and every policy test would stay green.
+      'announcements.title', 'announcements.body',
+      'announcements.pinned', 'announcements.expires_at',
       -- social_ideas — marking an idea must not rewrite the submitter's words.
       'social_ideas.status', 'social_ideas.decision_note',
       'social_ideas.decided_by', 'social_ideas.decided_at'

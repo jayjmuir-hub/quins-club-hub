@@ -65,28 +65,62 @@ insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at,
 values ('a0000000-0000-4000-8000-00000000000a','00000000-0000-0000-0000-000000000000','authenticated','authenticated','coach@example.invalid', now(), '{}'::jsonb, now(), now()),
        ('a0000000-0000-4000-8000-00000000000b','00000000-0000-0000-0000-000000000000','authenticated','authenticated','twochildren@example.invalid', now(), '{}'::jsonb, now(), now()),
        ('a0000000-0000-4000-8000-00000000000c','00000000-0000-0000-0000-000000000000','authenticated','authenticated','pending@example.invalid', now(), '{}'::jsonb, now(), now()),
-       ('a0000000-0000-4000-8000-00000000000d','00000000-0000-0000-0000-000000000000','authenticated','authenticated','othersquad@example.invalid', now(), '{}'::jsonb, now(), now());
+       ('a0000000-0000-4000-8000-00000000000d','00000000-0000-0000-0000-000000000000','authenticated','authenticated','othersquad@example.invalid', now(), '{}'::jsonb, now(), now()),
+       ('a0000000-0000-4000-8000-00000000000e','00000000-0000-0000-0000-000000000000','authenticated','authenticated','neverreads@example.invalid', now(), '{}'::jsonb, now(), now());
 
 -- See the header: the trigger already made these rows, empty-named.
 update profiles set full_name = 'AAA Test Coach' where id = 'a0000000-0000-4000-8000-00000000000a';
 update profiles set full_name = 'BBB Two Children' where id = 'a0000000-0000-4000-8000-00000000000b';
 update profiles set full_name = 'CCC Pending Parent' where id = 'a0000000-0000-4000-8000-00000000000c';
 update profiles set full_name = 'DDD Other Squad' where id = 'a0000000-0000-4000-8000-00000000000d';
+update profiles set full_name = 'EEE Never Reads' where id = 'a0000000-0000-4000-8000-00000000000e';
 
 insert into teams (id, club_id, name, sort_order) values
  ('a0000000-0000-4000-8000-0000000000f1','00000000-0000-0000-0000-0000000000ad','ZZ Probe Squad', 999),
  ('a0000000-0000-4000-8000-0000000000f2','00000000-0000-0000-0000-0000000000ad','ZZ Other Squad', 998);
 
+-- ⚠️ FOUR CHILDREN, NOT TWO, AND THE EXTRA PAIR IS NOT DECORATION.
+-- `memberships_family_role_needs_player` (20260817) forbids a 'parent' or
+-- 'player' row with no player_id. This fixture predates that constraint and
+-- carried two parents with `null`, so from the day it shipped this harness
+-- could not run at all — it died on the INSERT before asserting anything.
+--
+-- ⚠️ IT WENT UNNOTICED FOR TWO DAYS BECAUSE NOTHING RAN IT. The nightly
+-- db-check was inert without a SUPABASE_DB_URL secret and PASSED while
+-- reporting "did not run". Adding the secret on 19 Aug 2026 is what surfaced
+-- this and twelve like it.
+--
+-- ⚠️ A CHILD EACH, NOT A SHARED ONE. Reusing e1 would make the pending parent
+-- and the two-child parent relatives, which is not what steps 7-9 count.
 insert into players (id, club_id, team_id, full_name) values
  ('a0000000-0000-4000-8000-0000000000e1','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1','ZZ Child One'),
- ('a0000000-0000-4000-8000-0000000000e2','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1','ZZ Child Two');
+ ('a0000000-0000-4000-8000-0000000000e2','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1','ZZ Child Two'),
+ ('a0000000-0000-4000-8000-0000000000e3','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1','ZZ Child Three'),
+ ('a0000000-0000-4000-8000-0000000000e4','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f2','ZZ Child Four'),
+ ('a0000000-0000-4000-8000-0000000000e5','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1','ZZ Child Five');
 
 insert into memberships (profile_id, club_id, team_id, player_id, role, status) values
  ('a0000000-0000-4000-8000-00000000000a','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1', null, 'coach','active'),
  ('a0000000-0000-4000-8000-00000000000b','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1','a0000000-0000-4000-8000-0000000000e1','parent','active'),
  ('a0000000-0000-4000-8000-00000000000b','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1','a0000000-0000-4000-8000-0000000000e2','parent','active'),
- ('a0000000-0000-4000-8000-00000000000c','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1', null, 'parent','pending'),
- ('a0000000-0000-4000-8000-00000000000d','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f2', null, 'parent','active');
+ ('a0000000-0000-4000-8000-00000000000c','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1','a0000000-0000-4000-8000-0000000000e3','parent','pending'),
+ ('a0000000-0000-4000-8000-00000000000d','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f2','a0000000-0000-4000-8000-0000000000e4','parent','active'),
+ -- ⚠️ A SECOND SQUAD PARENT WHO NEVER READS THE NOTICE, ADDED 19 Aug 2026.
+ -- Steps 07-09b assumed the COACH would be in the audience and unread. They
+ -- were written before `announcement_stats` and `announcement_audience` began
+ -- excluding the AUTHOR (14 Aug) — and the coach IS the author here, on
+ -- purpose. Once that landed, the audience was one person who had already
+ -- read, so "unread listed first" had nobody to list and the counts fell to 1.
+ --
+ -- ⚠️ THE STALE EXPECTATIONS WERE NEVER SEEN TO FAIL, because this file
+ -- died earlier on `memberships_family_role_needs_player` and the nightly
+ -- db-check was inert without a SUPABASE_DB_URL secret.
+ --
+ -- ⚠️ ADDING A PERSON RATHER THAN LOWERING THE NUMBERS. Changing "expect 2"
+ -- to "expect 1" would have made every step pass while testing strictly less:
+ -- the dedupe check needs a second body to count, and "unread first" needs
+ -- somebody unread. This restores both.
+ ('a0000000-0000-4000-8000-00000000000e','00000000-0000-0000-0000-0000000000ad','a0000000-0000-4000-8000-0000000000f1','a0000000-0000-4000-8000-0000000000e5','parent','active');
 
 -- ── 1-3. Who may post ─────────────────────────────────────────────────────
 set local role authenticated;
@@ -182,7 +216,8 @@ begin
     join announcements a on a.id = s.announcement_id
    where a.title = 'Kit for Friday';
 
-  -- The coach and the two-child parent. NOT three.
+  -- The two-child parent and the never-reads parent. NOT three, and NOT the
+  -- coach — they authored it, and an author is never in their own audience.
   insert into _r values ('07 audience dedupes two-child parent (expect 2)',
     case when _aud = 2 then '2 - pass' else coalesce(_aud::text,'null') || ' - FAIL' end);
   insert into _r values ('08 seen_count (expect 1)',
@@ -194,11 +229,16 @@ begin
     case when _rows = 2 then '2 - pass' else _rows::text || ' - FAIL' end);
 
   -- Unread first — the whole point of the receipts screen is the people who
-  -- have NOT seen it. The coach has not read their own notice; the parent has.
+  -- have NOT seen it. The two-child parent has read it; EEE has not.
+  --
+  -- ⚠️ IT USED TO EXPECT THE COACH, which stopped being right when the
+  -- author was excluded from their own audience. The coach is now absent
+  -- entirely rather than merely unread, so this needed a different person
+  -- rather than a different name.
   select full_name into _first from announcement_audience(
     (select id from announcements where title = 'Kit for Friday')) limit 1;
-  insert into _r values ('09b unread listed first (expect AAA Test Coach)',
-    case when _first = 'AAA Test Coach' then 'coach - pass' else coalesce(nullif(_first,''),'(blank)') || ' - FAIL' end);
+  insert into _r values ('09b unread listed first (expect EEE Never Reads)',
+    case when _first = 'EEE Never Reads' then 'unread first - pass' else coalesce(nullif(_first,''),'(blank)') || ' - FAIL' end);
 end $$;
 
 -- ── 9c-9e. THE AUTHOR IS NOT IN THEIR OWN AUDIENCE ────────────────────────
@@ -231,9 +271,16 @@ begin
     join announcements a on a.id = s.announcement_id
    where a.title = 'Kit for Friday';
 
-  -- Was 2 (coach + the two-child parent). The coach wrote it.
-  insert into _r values ('09c audience EXCLUDES the author (expect 1)',
-    case when _aud = 1 then '1 - pass' else coalesce(_aud::text,'null') || ' - FAIL' end);
+  -- ⚠️ THREE ACTIVE PEOPLE ON THE SQUAD, MINUS THE AUTHOR, IS TWO.
+  -- The coach wrote it and holds an active membership here, so an audience of
+  -- 3 means the exclusion has been lost. Expecting 2 still discriminates: the
+  -- only way to get it is to drop exactly one person, and the author is the
+  -- only one who should be dropped.
+  --
+  -- ⚠️ It read "expect 1" until 19 Aug 2026, when a second squad parent was
+  -- added so that steps 07-09b could test deduping and "unread first" at all.
+  insert into _r values ('09c audience EXCLUDES the author (expect 2 of 3)',
+    case when _aud = 2 then '2 - pass' else coalesce(_aud::text,'null') || ' - FAIL' end);
 
   -- The parent read it in step 4; the author's own read must not add to this.
   insert into _r values ('09d seen counts the parent only (expect 1)',
@@ -249,8 +296,11 @@ begin
   -- ⚠️ THE LIST AND THE COUNT MUST AGREE. Excluding the author from one and not
   -- the other gives a number that contradicts the names printed under it, which
   -- is worse than the bug being fixed.
-  insert into _r values ('09f audience list agrees with the count (expect 1, the parent)',
-    case when _rows = 1 and _first = 'BBB Two Children' then 'parent - pass'
+  -- ⚠️ AND THE UNREAD ONE IS STILL FIRST. EEE has not read it; the
+  -- two-child parent has, and the author's own read row (inserted just above)
+  -- must not promote them into this list at all.
+  insert into _r values ('09f audience list agrees with the count (expect 2, unread first)',
+    case when _rows = 2 and _first = 'EEE Never Reads' then 'unread first - pass'
          else _rows::text || '/' || coalesce(nullif(_first,''),'(none)') || ' - FAIL' end);
 end $$;
 

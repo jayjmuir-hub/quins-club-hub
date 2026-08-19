@@ -10,6 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- `f75827e` — the squash that shipped the availability nudge.
+
+- 🚨 **THE NIGHTLY DATABASE CHECK RAN FOR THE FIRST TIME, AND 14 OF 34
+  HARNESSES FAILED.** `SUPABASE_DB_URL` was added, so
+  `.github/workflows/db-check.yml` stopped reporting "did not run" and passing.
+  ⚠️ **IT HAD BEEN GREEN FOR THE WORST POSSIBLE REASON** — inert for days while
+  fixtures rotted underneath it. Thirteen are fixed; two are recorded in
+  `claude/open-items.md` rather than quietly dropped.
+  ✅ **ONE GENUINE PRODUCTION DEFECT**: seven RLS policies called `auth.uid()`
+  bare, so Postgres re-evaluated them once per ROW.
+  `db/migrations/20260819_rls_initplan_round_two.sql`. ⚠️ **The harness names
+  only the FIRST offender**, so fixing what the error said would have left six
+  and reported the next one tomorrow — a full `pg_policy` sweep found all
+  seven, **three of them on `storage.objects`, a schema the 14 Aug round never
+  touched.** Equivalence proved in a rolled-back transaction: 7 rewritten, 7
+  character-identical after normalising, 0 bare calls left against 86 policies.
+  ✅ **And the runner now stops dead on a credential failure.** It opened a
+  connection per file, so one wrong password became 34 failed logins and
+  tripped Supabase's pooler circuit breaker — twice in twenty minutes, the
+  second time hiding the real cause behind a rate-limit error.
+- 🔧 **WHAT THE THIRTEEN ACTUALLY WERE**, because the pattern matters more than
+  the fixes: **squads were renamed** (a " Contact" suffix dropped) and five
+  harnesses still named the old ones; **a constraint added 17 Aug**
+  (`memberships_family_role_needs_player`) broke four fixtures that create a
+  parent with no child; **a column list grew** and two allowlists never
+  followed; **one file could not even PARSE** — an E-string spliced into
+  adjacent literals — so `grants.sql` asserted nothing at all while reporting a
+  syntax error nobody read.
+  ⚠️ **Two were the harness being right and the expectation being stale**:
+  `announcement_stats` began excluding the author on 14 Aug, and
+  `notice-push.sql` assumed one device per person until a second phone
+  subscribed. Both were fixed by making the fixture RICHER — adding a squad
+  parent who never reads, and counting devices instead of assuming one —
+  **rather than by lowering the numbers until they passed.**
 - ⏰ **THE AVAILABILITY NUDGE — THE FIFTH AND LAST NOTIFICATION CATEGORY, AND
   THE ONLY ONE THAT IS NOT A ROW-CHANGE TRIGGER.** A daily `pg_cron` job at
   05:23 UTC (09:23 in the UAE) asks the families who have not said whether their

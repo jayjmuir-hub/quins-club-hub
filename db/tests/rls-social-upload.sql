@@ -53,9 +53,25 @@ insert into profiles (id, full_name, email) values
  ('50c1a100-0000-4000-8000-00000000b002','No Memberships','stranger@example.invalid')
 on conflict (id) do nothing;
 
+-- ⚠️ A DISPOSABLE CHILD FIRST. `memberships_family_role_needs_player`
+-- (20260817) forbids a 'parent' row with no player_id, and this fixture
+-- predates it — so the INSERT below threw and the harness asserted nothing
+-- from the day that constraint shipped. Nothing noticed, because the nightly
+-- db-check was inert without a SUPABASE_DB_URL secret and passed while
+-- reporting "did not run".
+--
+-- ⚠️ THE ROLE MATTERS AND MUST STAY 'parent'. What is under test is an
+-- ordinary FAMILY member's access to the social-ideas bucket. Switching to
+-- 'coach' to dodge the constraint would satisfy it and quietly test a
+-- different, more privileged person.
+insert into players (id, club_id, team_id, full_name)
+select '50c1a100-0000-4000-8000-0000000000c1', club_id, id, 'ZZ Probe Child'
+from teams order by sort_order limit 1;
+
 -- Only A gets a membership. B deliberately gets none.
-insert into memberships (profile_id, club_id, team_id, role, status)
-select '50c1a100-0000-4000-8000-00000000a001', club_id, id, 'parent','active'
+insert into memberships (profile_id, club_id, team_id, player_id, role, status)
+select '50c1a100-0000-4000-8000-00000000a001', club_id, id,
+       '50c1a100-0000-4000-8000-0000000000c1', 'parent','active'
 from teams order by sort_order limit 1;
 
 -- ── 1. The stranger must be REFUSED, even under their own prefix ──────────

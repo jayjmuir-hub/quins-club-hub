@@ -36,18 +36,18 @@ select t.name,
          when 'U6 Tag'            then private.squad_expects_gender(t.name) is null
          when 'U7 Tag'            then private.squad_expects_gender(t.name) is null
          when 'U8 Tag'            then private.squad_expects_gender(t.name) is null
-         when 'U9 Mixed Contact'  then private.squad_expects_gender(t.name) is null
-         when 'U10 Mixed Contact' then private.squad_expects_gender(t.name) is null
-         when 'U11 Mixed Contact' then private.squad_expects_gender(t.name) is null
-         when 'U12 Mixed Contact' then private.squad_expects_gender(t.name) is null
+         when 'U9 Mixed'  then private.squad_expects_gender(t.name) is null
+         when 'U10 Mixed' then private.squad_expects_gender(t.name) is null
+         when 'U11 Mixed' then private.squad_expects_gender(t.name) is null
+         when 'U12 Mixed' then private.squad_expects_gender(t.name) is null
          when 'U12G QR'           then private.squad_expects_gender(t.name) = 'female'
-         when 'U13 Mixed Contact' then private.squad_expects_gender(t.name) is null
-         when 'U14B Contact'      then private.squad_expects_gender(t.name) = 'male'
+         when 'U13 Mixed' then private.squad_expects_gender(t.name) is null
+         when 'U14B'      then private.squad_expects_gender(t.name) = 'male'
          when 'U14G QR'           then private.squad_expects_gender(t.name) = 'female'
-         when 'U16B Contact'      then private.squad_expects_gender(t.name) = 'male'
-         when 'U16G Contact'      then private.squad_expects_gender(t.name) = 'female'
-         when 'U18B Contact'      then private.squad_expects_gender(t.name) = 'male'
-         when 'U18G Contact'      then private.squad_expects_gender(t.name) = 'female'
+         when 'U16B'      then private.squad_expects_gender(t.name) = 'male'
+         when 'U16G'      then private.squad_expects_gender(t.name) = 'female'
+         when 'U18B'      then private.squad_expects_gender(t.name) = 'male'
+         when 'U18G'      then private.squad_expects_gender(t.name) = 'female'
          when 'Senior Men 1st XV' then private.squad_expects_gender(t.name) = 'male'
          when 'Senior Men 2nd XV' then private.squad_expects_gender(t.name) = 'male'
          when 'Women''s XV'       then private.squad_expects_gender(t.name) = 'female'
@@ -78,7 +78,7 @@ do $$
 declare
   tid uuid;
 begin
-  select id into tid from public.teams where name = 'U16G Contact';
+  select id into tid from public.teams where name = 'U16G';
   begin
     perform public.register_my_player('Probe A', tid);
     insert into probe values ('single-gender squad, blank gender', 'refused', 'ALLOWED  <<< WRONG');
@@ -104,7 +104,7 @@ begin
                               'REFUSED <<< WRONG: ' || SQLERRM);
   end;
 
-  select id into tid from public.teams where name = 'U13 Mixed Contact';
+  select id into tid from public.teams where name = 'U13 Mixed';
   begin
     perform public.register_my_player('Probe D', tid);
     insert into probe values ('mixed squad, blank gender', 'allowed', 'allowed');

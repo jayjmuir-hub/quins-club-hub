@@ -50,30 +50,30 @@ from (values
 
 insert into public.memberships (profile_id, club_id, team_id, role, status)
 select '00000000-aaaa-0000-0000-000000000001', t.club_id, t.id, 'coach','active'
-  from teams t where t.name='U16B Contact';
+  from teams t where t.name='U16B';
 insert into public.memberships (profile_id, club_id, team_id, role, status)
 select '00000000-aaaa-0000-0000-000000000002', t.club_id, t.id, 'coach','active'
-  from teams t where t.name='U18B Contact';
+  from teams t where t.name='U18B';
 insert into public.memberships (profile_id, club_id, team_id, role, status)
 select '00000000-aaaa-0000-0000-000000000003', t.club_id, t.id, 'medic','active'
-  from teams t where t.name='U16B Contact';
+  from teams t where t.name='U16B';
 insert into public.memberships (profile_id, club_id, team_id, role, status)
 select '00000000-aaaa-0000-0000-000000000005', t.club_id, t.id, 'manager','active'
-  from teams t where t.name='U16B Contact';
+  from teams t where t.name='U16B';
 
 insert into public.players (club_id, team_id, full_name)
-select t.club_id, t.id, 'Harness Child A' from teams t where t.name='U16B Contact';
+select t.club_id, t.id, 'Harness Child A' from teams t where t.name='U16B';
 insert into public.players (club_id, team_id, full_name)
-select t.club_id, t.id, 'Harness Child B' from teams t where t.name='U16B Contact';
+select t.club_id, t.id, 'Harness Child B' from teams t where t.name='U16B';
 
 insert into public.memberships (profile_id, club_id, team_id, role, player_id, status)
 select '00000000-aaaa-0000-0000-000000000004', t.club_id, t.id, 'parent',
        (select id from players where full_name='Harness Child A'), 'pending'
-  from teams t where t.name='U16B Contact';
+  from teams t where t.name='U16B';
 insert into public.memberships (profile_id, club_id, team_id, role, player_id, status)
 select '00000000-aaaa-0000-0000-000000000006', t.club_id, t.id, 'parent',
        (select id from players where full_name='Harness Child B'), 'pending'
-  from teams t where t.name='U16B Contact';
+  from teams t where t.name='U16B';
 
 -- ⚠️ AS OWNER. See the header — this is the whole difference between a test
 -- and a test-shaped thing.

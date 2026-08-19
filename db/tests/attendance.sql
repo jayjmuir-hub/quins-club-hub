@@ -39,6 +39,13 @@ select
   (select id from public.players order by full_name limit 1)                    as player_a,
   (select id from public.players order by full_name offset 1 limit 1)           as player_b;
 
+-- ⚠️ THE FIXTURE TABLE NEEDS A GRANT, because the assertions below run as
+-- `authenticated` and a temp table created by the owner is not readable by
+-- another role. Without it the harness dies on "permission denied for table
+-- fx" — which reads like an RLS refusal and is nothing of the kind. Every
+-- other harness here grants its scratch tables for the same reason.
+grant select on fx to authenticated;
+
 -- ⚠️ IF THE CLUB HAS FEWER THAN TWO PLAYERS this harness silently stops
 -- meaning anything: player_b is null, the second insert does nothing, and
 -- "the parent saw 1 row" becomes trivially true. Fail loudly instead.
@@ -70,9 +77,9 @@ select '00000000-aaaa-bbbb-cccc-00000000000e', t.club_id, t.id, 'training',
 from public.teams t where t.id = (select team_id from fx);
 
 insert into public.attendance (event_id, player_id, status)
-select '00000000-aaaa-bbbb-cccc-00000000000e', player_a, 'present' from fx
+select '00000000-aaaa-bbbb-cccc-00000000000e'::uuid, player_a, 'present' from fx
 union all
-select '00000000-aaaa-bbbb-cccc-00000000000e', player_b, 'absent'  from fx;
+select '00000000-aaaa-bbbb-cccc-00000000000e'::uuid, player_b, 'absent'  from fx;
 
 -- ── Become the parent ──────────────────────────────────────────────────────
 
@@ -108,7 +115,7 @@ do $$
 begin
   begin
     insert into public.attendance (event_id, player_id, status)
-    select '00000000-aaaa-bbbb-cccc-00000000000e', player_a, 'present' from fx;
+    select '00000000-aaaa-bbbb-cccc-00000000000e'::uuid, player_a, 'present' from fx;
     raise exception
       'ATTENDANCE WRITE: A PARENT INSERTED AN ATTENDANCE ROW FOR THEIR OWN '
       'CHILD. The whole value of the number is that somebody else recorded it. '

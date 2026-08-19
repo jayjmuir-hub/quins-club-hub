@@ -42,6 +42,14 @@ declare
   n        int;
   bad      int;
   n_teams  int;
+  -- ⚠️ HOW MANY DEVICES THAT ONE PERSON HAS, WHICH IS NOT ALWAYS ONE.
+  -- push_subscriptions is per DEVICE, not per person, and notice_push_
+  -- subscriptions returns one row per device. This harness asserted a literal
+  -- 1 and went red on 19 Aug 2026 the moment a second phone subscribed —
+  -- reporting "did not reach the one existing subscriber (2 rows)", which
+  -- reads as a delivery failure and was the opposite: it reached them twice,
+  -- correctly, on both devices.
+  n_devices int;
 begin
   -- ── 1a. CONTROL: the walk finds teams and members at all ────────────────
 
@@ -141,11 +149,15 @@ begin
        values ('db:check disposable fixture 2 — rolled back', 'body') returning id into v_mine;
   reset role;
 
+  select count(*) into n_devices
+    from public.push_subscriptions where profile_id = v_sub;
+
   select count(*) into n from public.notice_push_subscriptions(v_theirs);
-  if n <> 1 then
+  if n <> n_devices then
     raise exception
-      'NOTICE PUSH: a notice posted by somebody else did not reach the one '
-      'existing subscriber (% rows). Every "expect 0" below is then free.', n;
+      'NOTICE PUSH: a notice posted by somebody else reached % rows for a '
+      'subscriber holding % device(s). Every "expect 0" below is then free.',
+      n, n_devices;
   end if;
 
   select count(*) into n from public.notice_push_subscriptions(v_mine);
@@ -171,10 +183,11 @@ begin
   -- would satisfy all three "expect 0" assertions.
   update public.announcements set expires_at = null where id = v_theirs;
   select count(*) into n from public.notice_push_subscriptions(v_theirs);
-  if n <> 1 then
+  if n <> n_devices then
     raise exception
       'NOTICE PUSH: the target did not come back once the conditions were '
-      'cleared (% rows). The zeros above therefore prove nothing.', n;
+      'cleared (% rows, expected % device(s)). The zeros above therefore '
+      'prove nothing.', n, n_devices;
   end if;
 
   raise notice 'NOTICE PUSH: all checks passed.';

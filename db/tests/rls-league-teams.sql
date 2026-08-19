@@ -121,10 +121,29 @@ end $$;
 set local role anon;
 set local request.jwt.claims = '';
 
-insert into _r
-select 'anon reads nothing',
-       case when count(*) = 0 then 'PASS' else 'FAIL — anon read the club''s league teams' end
-from league_teams;
+-- ⚠️ WRAPPED, BECAUSE anon NO LONGER REACHES THIS TABLE AT ALL AND THE
+-- REFUSAL IS AN ERROR RATHER THAN AN EMPTY RESULT. 20260814_revoke_anon_table_
+-- privileges took anon's SELECT away, so this bare SELECT stopped returning
+-- zero rows and started ABORTING the file with "permission denied for table
+-- league_teams". The harness then reported a failure about league_teams that
+-- was really about a grant three migrations away.
+--
+-- ⚠️ AND THE TWO OUTCOMES ARE RECORDED SEPARATELY ON PURPOSE. "Refused by
+-- the GRANT" and "allowed through the grant but returned nothing under RLS"
+-- are both acceptable answers to "anon reads nothing", and they are not the
+-- same fact. Collapsing them would let the grant silently become the only
+-- thing protecting this table — which is precisely the arrangement
+-- db/tests/anon-table-grants.sql exists to say this repo does not rely on.
+do $$
+declare _n int;
+begin
+  select count(*) into _n from league_teams;
+  insert into _r values ('anon reads nothing',
+    case when _n = 0 then 'PASS (RLS returned no rows)'
+         else 'FAIL — anon read the club''s league teams' end);
+exception when insufficient_privilege then
+  insert into _r values ('anon reads nothing', 'PASS (refused by the table grant)');
+end $$;
 
 reset role;
 select * from _r order by step;
