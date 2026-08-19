@@ -566,6 +566,18 @@ proves you wrong.**
   when somebody runs them** — which is the same failure one step further back.
   Settings → Secrets and variables → Actions → New repository secret.
 
+  ⚠️ **AND THE SET THAT HAS NEVER MET ITS OWN RUNNER KEEPS GROWING.**
+  `db/tests/approval-push.sql` joined it on 19 Aug 2026. It was proved by
+  pasting its contents through the Supabase MCP — both parts pass, and part 3's
+  self-test fires — but **`npm run db:check` has never executed it**, so the
+  file is verified while the path that is supposed to verify it nightly is not.
+  ⚠️ **THAT DISTINCTION IS THE WHOLE ITEM.** "The harness is green" and "the
+  harness runs" are different claims, and only the first one is true here.
+  ✅ Before trusting the paste route for DDL, the rollback itself was proved:
+  a throwaway `create table` inside `begin`/`rollback` was gone afterwards,
+  **with a control confirming the same query could see a table that does
+  exist** — otherwise the zero proves only that the query found nothing.
+
 ## Real gaps, no cheap fix
 
 - 🟡 **No audit log — NARROWED 17 Aug 2026, NOT CLOSED.** `public.membership_audit`

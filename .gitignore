@@ -50,3 +50,17 @@ graft/
 # but the SOURCE checkout is not caught by anything. One line here makes the
 # protection travel with the repo instead of depending on a per-machine file.
 .claude/worktrees/
+
+# The Supabase CLI's scratch directory, rewritten on every `functions deploy`.
+# Holds a cached CLI version string and the linked project ref — regenerable,
+# and nothing reads it but the CLI.
+#
+# ⚠️ FOLDED IN HERE ON PURPOSE RATHER THAN SHIPPED ALONE, 19 Aug 2026. This
+# file is NOT matched by scripts/netlify-ignore.mjs's root-markdown pattern
+# (`/^[^/]+\.md$/`), so a commit carrying only this one line would trigger a
+# full production build in order to change nothing. The earlier 19 Aug session
+# found it, left it deliberately, and said to fold it into the next change that
+# builds anyway. This is that change — it touches src/, so the gate says
+# "Building" either way. Run the gate to confirm before believing that:
+#   CACHED_COMMIT_REF=<sha> COMMIT_REF=<sha> node scripts/netlify-ignore.mjs
+supabase/.temp/
