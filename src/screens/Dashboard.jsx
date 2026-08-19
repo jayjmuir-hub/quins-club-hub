@@ -13,6 +13,7 @@ import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import SquadStaffCard from '../components/SquadStaffCard.jsx'
 import NoticeBoard from '../components/NoticeBoard.jsx'
+import NotificationsNudge from '../components/NotificationsNudge.jsx'
 import PostNoticeAction from '../components/PostNoticeAction.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
@@ -838,6 +839,15 @@ export default function Dashboard() {
           the departure survivable — if it ever starts rendering a placeholder,
           this decision has to be re-made. */}
       <NoticeBoard notices={notices} readIds={noticeReads} teamsById={teamsById} />
+
+      {/* ⚠️ BELOW THE NOTICEBOARD, ABOVE THE HERO, AND IT COSTS NOTHING WHEN
+          IT DOES NOT APPLY — NotificationsNudge returns null for anybody
+          already subscribed, anybody who said no, any browser that cannot do
+          it, and anybody who dismissed it. Same argument the NoticeBoard
+          placement above rests on.
+          ⚠️ IT MUST NOT MOVE ABOVE THE NOTICEBOARD. A notice somebody posted
+          for the squad this week outranks a prompt about a feature. */}
+      <NotificationsNudge />
 
 
       {nextFixture && (
