@@ -10,6 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 📓 **THE SECOND 19 Aug SESSION RECORD**,
+  `claude/handoffs/2026-08-19-approval-notifications.md` — approval
+  notifications, and closing the fixture proof the first session left open.
+  ⚠️ **It records a split worth knowing before touching anything**: the database
+  and the edge function are LIVE with the approval change and the app is not,
+  because no pull request was raised. The category therefore cannot be switched
+  OFF through the UI yet — absence of a row means on, so it works; there is just
+  no way to decline it until the branch merges.
+  ⚠️ **And the trap that would have looked like a broken feature**: creating a
+  pending membership fires the EMAIL trigger too, so testing the push mails real
+  volunteers unless that trigger is disabled for the insert — which is safe
+  precisely because `disable trigger` takes an ACCESS EXCLUSIVE lock, so a real
+  registration blocks rather than slipping through un-emailed.
+- 🧹 **The Supabase CLI's `.temp` scratch directory is gitignored at last**,
+  folded into a change that was going to build anyway rather than bought with a
+  production build of its own. The gate was run to confirm that, not assumed.
 - 🔔 **SOMEBODY WAITING TO BE APPROVED NOW BUZZES THE PEOPLE WHO CAN APPROVE
   THEM** — the fourth notification category, `db/migrations/20260819_approval_push.sql`.
   ⚠️ **THE AUDIENCE IS THE EMAIL'S, DELIBERATELY**: super admins, plus that
