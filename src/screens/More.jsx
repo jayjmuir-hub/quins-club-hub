@@ -7,6 +7,7 @@ import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
 import IdeaForm from '../components/IdeaForm.jsx'
 import MyPhotoField from '../components/MyPhotoField.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
+import PushNotificationsToggle from '../components/PushNotificationsToggle.jsx'
 import YourPlayers from '../components/YourPlayers.jsx'
 import { updateMyProfile } from '../data/members.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -512,6 +513,19 @@ export default function More() {
           </Card>
         </div>
       )}
+
+      {/* ⚠️ FIRST TRIGGER ONLY — a reply to your own report, and nothing
+          else yet. Jay asked for push notifications directly, 18 Aug 2026,
+          then corrected the first framing: "I don't want more emails, I just
+          want app push notifications." Real Push API, not a second email
+          under a different name. Every member sees this, same reasoning as
+          SendAnIdea above: More is the one screen every role reaches on a
+          phone.
+          claude/plans/2026-08-18-push-notifications.md. */}
+      <SectionTitle>Notifications</SectionTitle>
+      <Card className="p-4">
+        <PushNotificationsToggle />
+      </Card>
 
       {/* Account — the IN-APP half of Google Play's account deletion
           requirement (the other half is the public /delete-account URL, which

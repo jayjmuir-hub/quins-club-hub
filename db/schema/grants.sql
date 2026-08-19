@@ -196,6 +196,32 @@
 --   player_contacts   anon, authenticated, postgres, service_role   ALL 8
 --   player_parents    anon, authenticated, postgres, service_role   ALL 8
 --   players           anon, authenticated, postgres, service_role   ALL 8
+--   push_subscriptions authenticated, postgres, service_role        ALL 8
+--   push_subscriptions anon                                         ← NOTHING AT ALL
+--                     ⚠️ ADDED 18 Aug 2026 — `anon` NOTHING, same shape as
+--                     photo_backup_runs and photo_orphan_scans before it.
+--                     ⚠️ AND THE SAME LESSON photo_backup_runs's note already
+--                     teaches, repeated because it bit again: the migration
+--                     asks for `select, insert, update, delete` on
+--                     `authenticated` and `select, delete` on `service_role`,
+--                     commented as the intended shape. Measured after
+--                     applying: BOTH roles came back with ALL 8, including
+--                     MAINTAIN, REFERENCES, TRIGGER and TRUNCATE never asked
+--                     for. Supabase's default privileges had already handed
+--                     both roles everything at `create table`, and a GRANT
+--                     cannot take a privilege away — only a REVOKE can, and
+--                     none was written for these two. RLS (`push subscription
+--                     own`, owner-only) is what actually scopes `authenticated`
+--                     here; the grant is a ceiling far above it, not the
+--                     boundary the migration's own comment implied.
+--                     ⚠️ TRUNCATE ON `authenticated` IS NOT RLS-FILTERED AT
+--                     ALL — Postgres never applies row security to TRUNCATE,
+--                     so any signed-in member holds the ability to empty this
+--                     table. Not unique to this table (`player_parents` and
+--                     `memberships` carry the identical shape, measured the
+--                     same day) — recorded here rather than fixed, since
+--                     closing it project-wide is a separate piece of work
+--                     this table did not create.
 --   teams             anon, authenticated, postgres, service_role   ALL 8
 --
 --   profiles          anon, postgres, service_role                  ALL 8

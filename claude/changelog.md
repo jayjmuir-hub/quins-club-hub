@@ -10,6 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 18 Aug 2026
 
+- 🔔 **REAL BROWSER PUSH NOTIFICATIONS — FIRST TRIGGER: A REPLY TO YOUR OWN
+  REPORT.** Jay asked for push notifications directly, then corrected the
+  framing: "I don't want more emails, I just want app push notifications."
+  Genuine Web Push (RFC 8291 + RFC 8292 VAPID), not an email under a
+  different name — closes a gap Jay created on purpose the same day, ruling
+  replies "in app only" with no second email.
+  ⚠️ **NO THIRD-PARTY PUSH LIBRARY OR VENDOR.** Every crypto primitive
+  (ECDH, HKDF, AES-128-GCM, ECDSA) is hand-rolled against Deno's
+  `crypto.subtle`, matching `send-email`'s precedent for exactly this
+  reasoning: "an unaudited import in the one place that decides whether to
+  trust a caller is a poor trade." No OneSignal, no Firebase — the whole
+  notification system stays Supabase + Resend.
+  ✅ **Verified twice before being trusted**: a Node-side encrypt/decrypt
+  round trip before the edge function was written, then a LIVE smoke test
+  against the deployed function — a disposable club/report/subscription, a
+  real throwaway P-256 key pair, a real trigger fire, a real VAPID JWT, a
+  real HTTP POST to a public 410-always endpoint, and confirmation the dead
+  subscription deleted itself. The fixture was removed afterward.
+  ⚠️ **NEITHER PROVES A REAL BROWSER CAN DECRYPT AND SHOW ONE.** That needs
+  an actual person subscribing from an installed PWA — the one thing this
+  session could not test itself.
+  ⚠️ **THE VAPID PRIVATE KEY LIVES IN VAULT, NOT A SECOND SECRET STORE.**
+  `public.get_push_vapid_private_key()`, `SECURITY DEFINER`, granted to
+  `service_role` alone — this session had no tooling to set a new Edge
+  Function secret, and Vault is already where this project's secrets live.
+  ⚠️ **THE IPHONE LIMITATION IS IN THE UI, NOT JUST THIS PARAGRAPH.** Push
+  only works on iOS from an installed PWA (16.4+) — a parent with the site
+  open as an ordinary Safari tab sees the exact reason why, not a toggle that
+  silently does nothing.
+  ✅ **A real bug caught by its own tests before shipping**: the Home Screen
+  message was nested inside an "unsupported" check that made it
+  unreachable — the one device it exists for is exactly the one whose
+  feature detection cannot be trusted. Fixed to check independently, first.
+  `claude/plans/2026-08-18-push-notifications.md` carries the full account.
 - 🔓 **`register_my_player` NO LONGER CARRIES AN `anon` EXECUTE GRANT — AND A
   SECOND FILE HAD CALLED THAT GRANT DELIBERATE FOR FIVE DAYS.** Not a hole: the
   function's first line refuses a null `auth.uid()`, and only a genuinely
@@ -40,6 +74,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   by an edge function with no session on behalf of Google/Apple's calendar
   clients, which is a genuinely different case and still refused by the same
   harness if anyone tries to tidy it away.
+- `3bc4d10` — the squash that closed the anon-grant contradiction.
 - 🧪 **`npm run db:check` RUNS AGAIN — one harness could not fail, so none of
   them ran.** `db/tests/head-coach-flag.sql` printed its six answers under an
   `EXPECTED:` comment and left a human to compare them. `scripts/db-check.mjs`

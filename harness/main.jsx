@@ -23,6 +23,7 @@ import EventDetail from '../src/screens/EventDetail.jsx'
 // ⚠️ Same rot as the line above: src/screens/Admin.jsx became AdminClub.jsx.
 // Aliased back to `Admin` so the scenario bodies below don't need touching.
 import Admin from '../src/screens/AdminClub.jsx'
+import More from '../src/screens/More.jsx'
 import Accounts from '../src/screens/Accounts.jsx'
 import AcceptInvite from '../src/screens/AcceptInvite.jsx'
 import MatchSheet from '../src/screens/MatchSheet.jsx'
@@ -657,6 +658,31 @@ const scenarios = {
   // ?who=admin|coach|parent|player picks the membership. Real 15-age-group
   // fixture (TEAMS_15) is used so "Age groups (15)" is genuine, not a
   // 2-3-team stand-in.
+  // The real More screen, added 18 Aug 2026 to see PushNotificationsToggle
+  // rendered against a real Chromium browser rather than only jsdom — the
+  // one thing a unit test cannot show is whether a real click reaches a real
+  // permission prompt. `?who=` reuses the same shape as the `admin` scenario
+  // below.
+  more: () => {
+    const params = new URLSearchParams(window.location.search)
+    const who = params.get('who') || 'parent'
+    const membershipsByWho = {
+      admin: ADMIN_MEMBERSHIPS,
+      coach: COACH_MEMBERSHIPS,
+      parent: PARENT_MEMBERSHIPS,
+    }
+    const memberships = membershipsByWho[who] ?? PARENT_MEMBERSHIPS
+    return (
+      <Shell
+        route="/more"
+        authValue={baseAuth(JAY_EMAIL)}
+        membershipValue={{ memberships, teams: TEAMS_15, loading: false, error: null, reload: noop }}
+      >
+        <More />
+      </Shell>
+    )
+  },
+
   admin: () => {
     const params = new URLSearchParams(window.location.search)
     const who = params.get('who') || 'admin'
