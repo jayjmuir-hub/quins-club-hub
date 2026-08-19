@@ -10,6 +10,41 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 🗓️ **A FIXTURE ADDED, MOVED OR CANCELLED NOW NOTIFIES THE SQUAD — AND THE
+  DESIGN IS ALMOST ENTIRELY ABOUT WHAT IT DOES *NOT* SEND.**
+  ⚠️ **THE RULE: ONLY A STATEMENT THAT TOUCHES EXACTLY ONE FIXTURE EVER
+  NOTIFIES.** Enforced by the mechanism — every trigger is STATEMENT-level with
+  a transition table and returns early unless that table holds one row — not by
+  a heuristic somebody can reason their way past.
+  ⚠️ **MEASURED BEFORE IT WAS DESIGNED: 50 of 63 events were created as part of
+  a repeating series, the biggest series was 18, and 18 rows landed inside one
+  minute.** A row-level trigger would have sent **eighteen notifications to
+  every family in that squad** the first time somebody set up a term of
+  training. **That is not a tuning problem, it is the feature failing** —
+  people do not turn off "too many notifications", they turn off notifications,
+  and one burst costs the club every future fixture alert permanently.
+  ⛔ **A series insert and a bulk delete are both SILENT** (Jay's calls). A term
+  of training appearing is planning; `deleteSeriesFrom` clearing one is the
+  same act in reverse.
+  ⚠️ **AND ENTERING A SCORE MUST NEVER NOTIFY.** `events` carries `result_us`,
+  `tries_us` and eight more like them, so recording a result is an UPDATE on
+  the fixture row — a change trigger watching the whole row would buzz the
+  squad every Saturday afternoon. The trigger names only the parent-facing
+  fields, so **adding a column to that table does not silently add it to the
+  notification.**
+  ✅ **Every "must be silent" assertion is paired with a "must send" on the same
+  mechanism** — otherwise a broken trigger, or a missing vault secret, would
+  satisfy all of them perfectly. `db/tests/fixture-push.sql`; its self-test
+  removes the one-row rule and catches the 3-notification burst.
+  ✅ **The audience REUSES `private.notice_audience`** rather than restating it:
+  a fixture and a squad notice ask the same question, and a second copy would
+  be a second thing to keep in step with `can_see_team`.
+  ⚠️ **A CANCELLED FIXTURE NO LONGER EXISTS when push-send runs**, which is why
+  the trigger builds the notification text and the edge function only resolves
+  the audience and encrypts.
+  `db/migrations/20260819_fixture_push.sql`.
+- `41eb0bc` — the squash that put the notifications offer on the sign-in gate.
+
 - 🚪 **THE SIGN-IN GATE NOW OFFERS NOTIFICATIONS AS ITS LAST STEP** — the other
   half of the prompting, and the half deferred earlier in the day because of
   where it had to go.

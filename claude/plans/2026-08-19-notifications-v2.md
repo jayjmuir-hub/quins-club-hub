@@ -111,8 +111,20 @@ that already ships:
    (squad, member) pairs would become 51, sparing 5 people a buzz for every
    notice in the club. **0 people are notified who cannot read it**, which is
    the invariant `db/tests/notice-push.sql` exists to hold.
-2. **Fixture added or changed for your squad** — `events`, scoped to squads the
-   person's players are in.
+2. ✅ **Fixture added or changed for your squad — SHIPPED 19 Aug 2026.**
+   ⚠️ **THE RULE IS "ONLY A STATEMENT TOUCHING EXACTLY ONE FIXTURE NOTIFIES"**,
+   enforced by STATEMENT-level triggers with transition tables rather than by a
+   heuristic. Measured first: 50 of 63 events were created as a series, the
+   biggest was 18, and 18 landed in one minute — a row-level trigger would have
+   sent 18 notifications to every family in that squad.
+   ⛔ **A series insert and a bulk delete are both silent** (Jay's calls): a
+   term of training appearing is planning, not news, and clearing a term is the
+   same act in reverse. A single new fixture, a single change and a single
+   cancellation each notify.
+   ⚠️ **ENTERING A SCORE MUST NEVER NOTIFY**, and `events` is full of score
+   columns — recording a result is an UPDATE on the fixture row. The change
+   trigger names only the parent-facing fields, so adding a column to that
+   table does not silently add it to the notification.
 3. **Availability still not set** — a nudge before a fixture. ⚠️ **The only one
    that is not a row-change trigger**; it needs a schedule, so it is the most
    expensive of the four and should ship last.
