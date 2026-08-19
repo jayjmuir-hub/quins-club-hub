@@ -10,6 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 📓 **THE 19 Aug SESSION RECORD**, `claude/handoffs/2026-08-19-notifications-v2.md`
+  — nine merges, and the day push notifications went from "proved on one phone"
+  to a feature with four categories, opt-outs and two prompts.
+  ⚠️ **It records the ONE thing still unproven**: a `squad_push` payload has
+  never reached the deployed `push-send`. Fixtures are verified only up to the
+  pg_net queue inside a rolled-back transaction, which means the function never
+  actually ran. ⚠️ **A live test is unusually safe RIGHT NOW and will not stay
+  that way** — the only subscriber is attached to no squad, so a real fixture
+  change sends zero notifications while exercising the whole path in the logs.
+  ✅ **And the process change worth more than any feature**: the Supabase CLI is
+  authenticated on cafnet and Claude's shell can use it, so edge-function
+  deploys are no longer Jay's job. ⚠️ The login itself could not be automated
+  and probably never can — the CLI refuses its device flow in a non-TTY and
+  demands a token, which is the one thing Claude must not handle.
+- `ce82097` — the squash that shipped fixture notifications.
+
 - 🗓️ **A FIXTURE ADDED, MOVED OR CANCELLED NOW NOTIFIES THE SQUAD — AND THE
   DESIGN IS ALMOST ENTIRELY ABOUT WHAT IT DOES *NOT* SEND.**
   ⚠️ **THE RULE: ONLY A STATEMENT THAT TOUCHES EXACTLY ONE FIXTURE EVER
