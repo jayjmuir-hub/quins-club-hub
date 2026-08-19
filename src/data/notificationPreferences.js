@@ -33,6 +33,11 @@ export const NOTIFICATION_CATEGORIES = [
     hint: 'When somebody posts a notice for your squad, or for the whole club.',
   },
   {
+    key: 'fixture',
+    label: 'Fixture changes',
+    hint: 'When a fixture is added, moved or cancelled for your squad.',
+  },
+  {
     key: 'feedback_reply',
     label: 'Replies to your reports',
     hint: 'When somebody at the club answers something you reported.',

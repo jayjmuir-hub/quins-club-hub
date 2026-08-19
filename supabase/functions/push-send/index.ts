@@ -6,6 +6,13 @@
 //                        admin_note changes)
 //   { announcement_id } somebody posted a notice
 //                       (AFTER INSERT on public.announcements, 19 Aug 2026)
+//   { squad_push }      a fixture was added, changed or cancelled
+//                       (STATEMENT-level triggers on public.events, 19 Aug 2026)
+//
+// ⚠️ `squad_push` ARRIVES FULLY FORMED — title, body, tag and all — WHICH THE
+// OTHER TWO DO NOT, AND A CANCELLATION IS WHY. By the time this function runs,
+// a cancelled fixture no longer exists; there is nothing left to read. So the
+// trigger builds the text and this only resolves the audience and encrypts.
 //
 // ⚠️ ONE FUNCTION RATHER THAN TWO, AND THE REASON IS THE CRYPTO. A second
 // function would mean a SECOND COPY of hand-rolled ECDH, HKDF, AES-128-GCM and
@@ -351,6 +358,24 @@ async function hasOptedOut(profileId: string, category: string): Promise<boolean
  * rule across two deploy targets is exactly how the deep-link bug survived on
  * 19 Aug: push-send and push-sw.js each held half of it.
  */
+async function squadTargets(
+  club: string, team: string, actor: string | null, category: string,
+): Promise<Subscription[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/squad_push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ _club: club, _team: team, _actor: actor, _category: category }),
+  })
+  if (!response.ok) {
+    throw new Error(`squad_push_subscriptions failed (${response.status}): ${await response.text()}`)
+  }
+  return await response.json()
+}
+
 async function noticeTargets(announcementId: string): Promise<Subscription[]> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/notice_push_subscriptions`, {
     method: 'POST',
@@ -405,16 +430,19 @@ Deno.serve(async (request) => {
 
   let feedbackId = ''
   let announcementId = ''
+  let squad: Record<string, string> | null = null
   try {
     const payload = await request.json()
     feedbackId = String(payload?.feedback_id ?? '')
     announcementId = String(payload?.announcement_id ?? '')
+    squad = payload?.squad_push ?? null
   } catch {
     return new Response('bad request', { status: 400 })
   }
-  // ⚠️ EXACTLY ONE. Both would be a caller confused about what it is asking
-  // for, and guessing which it meant is how the wrong people get notified.
-  if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) !== 1) {
+  // ⚠️ EXACTLY ONE. More than one would be a caller confused about what it is
+  // asking for, and guessing which it meant is how the wrong people get
+  // notified.
+  if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0) !== 1) {
     return new Response('bad request', { status: 400 })
   }
 
@@ -448,6 +476,22 @@ Deno.serve(async (request) => {
         url: `${APP_URL}/my-reports`,
         tag: `feedback-${feedbackId}`,
         subscriptions,
+      }
+    } else if (squad) {
+      if (!squad.club_id || !squad.team_id || !squad.title) {
+        return new Response('bad request', { status: 400 })
+      }
+      job = {
+        title: escapeHtmlFree(squad.title),
+        body: escapeHtmlFree(squad.body).slice(0, 200),
+        // ⚠️ A PATH, NOT A URL. The trigger names the screen; the origin is
+        // this function's business. A caller that could set the whole url
+        // could send somebody anywhere from a notification.
+        url: `${APP_URL}${squad.path && squad.path.startsWith('/') ? squad.path : '/'}`,
+        tag: escapeHtmlFree(squad.tag) || `squad-${squad.team_id}`,
+        subscriptions: await squadTargets(
+          squad.club_id, squad.team_id, squad.actor_id ?? null, squad.category || 'fixture',
+        ),
       }
     } else {
       const rows = await db(
