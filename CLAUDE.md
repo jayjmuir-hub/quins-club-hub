@@ -233,7 +233,7 @@ before trusting any row.
 |---|---|---|---|
 | Clone path | — | ⚠️ **TWO** — see below | `C:\Users\Jay\GitHub\quins-club-hub` |
 | `NODE_ENV` | `set NODE_ENV` | **not set, at any scope** | **not set, at any scope** |
-| npm from PowerShell | `npm --version` | works (11.16.0); `ExecutionPolicy` is `Bypass` | works; `ExecutionPolicy` is `Bypass` |
+| npm from PowerShell | `npm --version` | ⚠️ **UNKNOWN — the 11 Aug value is withdrawn, see below** | ⚠️ **BLOCKED in Jay's own terminal** — `LocalMachine` is `RemoteSigned`, measured 19 Aug 2026. Use `npx.cmd` |
 | `core.fileMode` | `git config --get core.fileMode` | `false` | `false` |
 | `gh` CLI | `gh auth status` | installed, authenticated as `jayjmuir-hub` (keyring) | installed, authenticated as `jayjmuir-hub` (keyring) |
 
@@ -245,10 +245,61 @@ were wrong**, exactly as this file predicted and as Jay expected.
 - ❌ `NODE_ENV` was *reported* `production`. It is **not set at Process, User or
   Machine scope.** ⚠️ **`npm install --include=dev` stays unconditional anyway**
   — the flag is deliberately not contingent on this row being current.
-- ❌ npm from PowerShell was *reported* blocked, "run npm from `cmd`". It
-  **works**, and `ExecutionPolicy` is `Bypass`.
+- ⚠️ **npm from PowerShell — THIS BULLET WAS ITSELF WRONG, AND IT MADE A TRUE
+  STATEMENT FALSE. WITHDRAWN 19 Aug 2026.** It read: *"was reported blocked,
+  'run npm from `cmd`'. It **works**, and `ExecutionPolicy` is `Bypass`."*
+  **The thing it "corrected" was right.** See the section below.
 - ✅ `core.fileMode` was *reported* `false`. It **is** `false`.
 - `gh` was never checked and is installed and authenticated.
+
+## ⚠️ `ExecutionPolicy` — the fact that was measured in the wrong SHELL
+
+**Measured on cafnet, 19 Aug 2026, `Get-ExecutionPolicy -List`:**
+
+| Scope | Policy |
+|---|---|
+| MachinePolicy | Undefined |
+| UserPolicy | Undefined |
+| **Process** | **Bypass** |
+| CurrentUser | Undefined |
+| **LocalMachine** | **RemoteSigned** |
+
+⚠️ **`Bypass` IS ONLY EVER TRUE INSIDE A PROCESS CLAUDE SPAWNED.** It is set at
+**Process** scope by the tooling, for itself. Jay's own PowerShell window
+inherits `LocalMachine`, which is `RemoteSigned`, and that **blocks the
+unsigned `npx.ps1` wrapper**:
+
+```
+npx : File C:\Program Files
+odejs
+px.ps1 cannot be loaded because running
+scripts is disabled on this system.
+```
+
+⚠️ **AND CLAUDE'S OWN SHELL CANNOT SEE THIS AT ALL.** The Bash tool is Git
+Bash, not PowerShell — it invokes `npx.cmd` and never touches the `.ps1`
+wrapper. So **every command Claude runs succeeds while the identical command
+fails for Jay**, and no amount of testing from Claude's side would ever reveal
+it. That is the entire mechanism, and it is why the 11 Aug "correction" was
+confident and wrong.
+
+**The workaround, for anything handed to Jay to run:** `npx.cmd …` rather than
+`npx …`. Or, for one window only:
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.
+⚠️ **Which of the two actually unblocked `supabase login` on 19 Aug was not
+recorded** — both were offered and the login proceeded. Do not write either one
+down as proven until somebody watches it.
+
+⚠️ **THE jay-pc CELL IS NOW WITHDRAWN, NOT COPIED ACROSS.** The same mechanism
+almost certainly applies there, and that is exactly the reasoning rule 8
+forbids: a machine fact asserted about a machine nobody measured. **Run
+`Get-ExecutionPolicy -List` on jay-pc, in Jay's own terminal, and fill it in.**
+
+⚠️ **THE WIDER LESSON, WHICH IS NOT ABOUT POWERSHELL.** Rule 8 says measure a
+machine fact on the machine. This adds: **measure it in the SHELL, and as the
+USER, that the instruction will actually be run in.** A value measured from
+Claude's process answered a different question from the one being asked, twice
+— and the second time it overwrote a correct answer.
 
 ⚠️ **THERE ARE TWO CLONES ON jay-pc, AND ONLY ONE WAS EVER WRITTEN DOWN.**
 Both were on `main` and clean on 11 Aug 2026.

@@ -10,6 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 🧭 **`CLAUDE.md` SAID POWERSHELL RUNS AT `Bypass`. IT NEVER HAS — AND THE
+  11 Aug "CORRECTION" TURNED A TRUE STATEMENT FALSE.** Measured on cafnet
+  19 Aug 2026: `LocalMachine` is **`RemoteSigned`**, and `Process` is `Bypass`
+  **only because Claude's own tooling sets it, for itself**. Jay's terminal
+  inherits `LocalMachine` and refuses the unsigned `npx.ps1` wrapper.
+  ⚠️ **THE ORIGINAL NOTE WAS RIGHT.** It said "blocked, run npm from `cmd`".
+  The 11 Aug pass overwrote that with "it **works**, and `ExecutionPolicy` is
+  `Bypass`" — measured inside a Claude-spawned process, which was answering a
+  different question. Both the row and that bullet are withdrawn.
+  ⚠️ **AND CLAUDE CANNOT DETECT THIS FROM ITS OWN SIDE, EVER.** The Bash tool
+  is Git Bash, so it calls `npx.cmd` and never touches the `.ps1` wrapper:
+  **every command Claude runs succeeds while the identical command fails for
+  Jay.** Found only because he pasted the actual error — "read the RESPONSE,
+  not the screenshot", earning its place again.
+  ⚠️ **The jay-pc cell is WITHDRAWN, not copied across.** The same mechanism
+  almost certainly applies, and asserting it would be the exact rule-8
+  violation this entry is about.
+  ✅ **The rule gains a clause: measure a machine fact in the SHELL, and as the
+  USER, that the instruction will actually be run in.** Cost twenty minutes of
+  a `supabase login` that could not work.
+- `ea9fa29` — the squash that shipped the notifications card on Home.
+
 - 🔔 **A CARD ON HOME TELLING PEOPLE NOTIFICATIONS EXIST — because on the day
   notices learned to notify, there was 1 subscriber out of 31 active
   members.** Everything built that day reached one person. A feature nobody
