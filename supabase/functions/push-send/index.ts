@@ -371,7 +371,14 @@ Deno.serve(async (request) => {
     const payloadJson = JSON.stringify({
       title,
       body,
-      url: `${APP_URL}/`,
+      // ⚠️ A REAL DESTINATION, NOT THE APP ROOT. This was `${APP_URL}/` until
+      // 19 Aug 2026, when Jay tapped the club's first real push notification
+      // and landed on whatever screen he already had open. Half the fix; the
+      // other half is public/push-sw.js, which used to focus an open window
+      // WITHOUT navigating it, so this url was read only when nothing was
+      // open. Changing either one alone fixes nothing.
+      // claude/plans/2026-08-19-notifications-v2.md.
+      url: `${APP_URL}/my-reports`,
       // Lets the service worker collapse several rapid replies to the SAME
       // report into one notification instead of stacking a tray full of
       // them - see the `tag` handling in public/push-sw.js.

@@ -46,14 +46,48 @@ self.addEventListener('notificationclick', function (event) {
   // parent who taps a notification while the app is already open on their
   // phone should not end up with two tabs of the same PWA.
   //
-  // ⚠️ DOES NOT NAVIGATE TO THE SPECIFIC REPORT. v1 opens the app's root —
-  // finding the reply still means tapping the `?` button and choosing "See
-  // what you've already reported", exactly as the acknowledgement email
-  // already describes. A real deep link is future work, not invented here.
+  // ⚠️ AND IT MUST NAVIGATE THAT TAB, NOT MERELY FOCUS IT. This is the 19 Aug
+  // 2026 bug, found by Jay on the first real notification the club ever
+  // received: the loop below used to `return clients[i].focus()` and stop, so
+  // `url` was read only on the openWindow branch and an already-open app
+  // simply came back to whatever screen it was showing. He tapped a reply to
+  // his report and landed on More -> Notifications.
+  //
+  // ⚠️ THE HAND TEST CANNOT SEE THIS, WHICH IS WHY IT SHIPPED. You turn
+  // notifications on from More -> Notifications, so that is the screen you are
+  // already sitting on when the first one arrives, and "focus" looks right.
+  // tests/push-sw.test.js is the thing that can see it.
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
       for (var i = 0; i < clients.length; i++) {
-        if ('focus' in clients[i]) return clients[i].focus()
+        var client = clients[i]
+        if (!('focus' in client)) continue
+
+        // ⚠️ navigate() REJECTS ON A CLIENT THIS WORKER DOES NOT CONTROL, and
+        // an uncontrolled window is a real state on a first load rather than a
+        // theoretical one. It also does not exist at all in every browser. In
+        // both cases fall back to telling the running app where to go, which
+        // src/lib/notificationRouting.js listens for — a client-side route
+        // instead of a full page load, and the only option left that still
+        // honours the tap.
+        if ('navigate' in client) {
+          return client
+            .navigate(url)
+            .then(function (navigated) {
+              return (navigated || client).focus()
+            })
+            .catch(function () {
+              if ('postMessage' in client) {
+                client.postMessage({ type: 'notification-navigate', url: url })
+              }
+              return client.focus()
+            })
+        }
+
+        if ('postMessage' in client) {
+          client.postMessage({ type: 'notification-navigate', url: url })
+        }
+        return client.focus()
       }
       if (self.clients.openWindow) return self.clients.openWindow(url)
     }),

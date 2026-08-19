@@ -2,12 +2,14 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import { MembershipProvider } from './lib/memberships.jsx'
+import { useNotificationRouting } from './lib/notificationRouting.js'
 import AppShell from './components/AppShell.jsx'
 import Dashboard from './screens/Dashboard.jsx'
 import Schedule from './screens/Schedule.jsx'
 import Roster from './screens/Roster.jsx'
 import More from './screens/More.jsx'
 import Notices from './screens/Notices.jsx'
+import MyReports from './screens/MyReports.jsx'
 import AdminDashboard from './screens/AdminDashboard.jsx'
 import PortalChooser from './screens/PortalChooser.jsx'
 import SocialWhatsOn from './screens/SocialWhatsOn.jsx'
@@ -105,9 +107,19 @@ function Authed() {
 // has thrown, navigating is not a recovery — the fallback's own "Try again"
 // and "Clear saved data" are, and remounting on every route change would hide
 // a persistent failure behind a flicker.
+// Nothing to render — this exists only so the hook sits inside the router.
+function NotificationRouting() {
+  useNotificationRouting()
+  return null
+}
+
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {/* Routes the app when the service worker could not navigate the window
+          itself — see src/lib/notificationRouting.js. Renders nothing; it has
+          to live INSIDE BrowserRouter because it uses useNavigate. */}
+      <NotificationRouting />
       <ErrorBoundary>
       <Routes>
         {/* PUBLIC — no session required, and no MembershipProvider either.
@@ -142,6 +154,13 @@ export default function App() {
           <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
           <Route path="/roster" element={<AppShell><Roster /></AppShell>} />
           <Route path="/more" element={<AppShell><More /></AppShell>} />
+
+          {/* Where "somebody replied to your report" lands (19 Aug 2026).
+              ⚠️ A ROUTE EXISTS AT ALL SO THE NOTIFICATION HAS A DESTINATION.
+              The same list is still in the `?` sheet, which has no URL and so
+              could never be deep-linked to.
+              claude/plans/2026-08-19-notifications-v2.md. */}
+          <Route path="/my-reports" element={<AppShell><MyReports /></AppShell>} />
 
           {/* THE NOTICEBOARD (Jay, 14 Aug 2026).
               ⚠️ DELIBERATELY NOT UNDER /admin, and it is the same reason that
