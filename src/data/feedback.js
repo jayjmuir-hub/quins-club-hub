@@ -197,3 +197,35 @@ export async function setFeedbackStatus(id, status, { adminNote, actorId } = {})
   if (error) throw error
   return data
 }
+
+/**
+ * Deletes a report outright. Admins only — RLS decides, not this function.
+ *
+ * ⚠️ THERE IS NO UNDO AND NO AUDIT ROW. Unlike `memberships`, this table has
+ * no companion log, so a deleted report leaves nothing behind at all. And
+ * `feedback read` admits `submitted_by = auth.uid()`, so it disappears from
+ * under the member who wrote it, silently — they are not told.
+ *
+ * ⚠️ SO THIS IS FOR RUBBISH, NOT FOR "DEALT WITH". Spam, a test, a duplicate.
+ * A real report that has been handled belongs in `done` or `wontfix`, which
+ * FeedbackTriage now hides by default precisely so that a tidy list is never a
+ * reason to destroy somebody's complaint.
+ *
+ * ⚠️ NO `.single()`, DELIBERATELY, AND IT IS THE DIFFERENCE THAT MATTERS HERE.
+ * A delete refused by RLS matches zero rows and returns no error — identical
+ * to a delete of something already gone. `.single()` would turn that silence
+ * into a thrown error and be RIGHT for the wrong reason, since it cannot tell
+ * "refused" from "not found" either. Counting the returned rows and saying so
+ * is honest about which of the two we can actually observe.
+ * db/migrations/20260819_feedback_delete.sql, db/tests/feedback-delete.sql.
+ */
+export async function deleteFeedback(id) {
+  if (!id) throw new Error('deleteFeedback needs a feedback id.')
+
+  const { data, error } = await supabase.from('feedback').delete().eq('id', id).select('id')
+  if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error('That report was not deleted — you may not have admin rights on it.')
+  }
+  return data[0]
+}

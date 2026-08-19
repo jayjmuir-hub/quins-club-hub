@@ -7,10 +7,12 @@ import { useAuth } from '../lib/auth.jsx'
 import {
   listFeedback,
   setFeedbackStatus,
+  deleteFeedback,
   subscribeFeedback,
   feedbackRef,
   FEEDBACK_STATUSES,
   FEEDBACK_STATUS_LABELS,
+  OPEN_STATUSES,
 } from '../data/feedback.js'
 
 // What members have reported, and what has been done about it.
@@ -42,15 +44,35 @@ const KIND_LABELS = { bug: 'Problem', idea: 'Suggestion' }
 
 /** Reports still wanting somebody's attention — what the heading counts. */
 export function openCount(rows) {
-  return (rows ?? []).filter((row) => row.status === 'new' || row.status === 'in-progress').length
+  return (rows ?? []).filter((row) => OPEN_STATUSES.includes(row.status)).length
 }
 
-function ReportRow({ row, onStatus, onNote, busy }) {
+/**
+ * What the list shows. Resolved reports are HIDDEN by default.
+ *
+ * ⚠️ HIDING IS THE ANSWER TO "I CANNOT DELETE THESE", AND DELETING IS NOT.
+ * Jay asked for both on 19 Aug 2026, and they solve different problems: this
+ * one makes the list usable, `deleteFeedback` destroys evidence. If the only
+ * way to get a clean screen were the destructive one, people would use the
+ * destructive one — so the tidy list must not cost anything.
+ *
+ * ⚠️ FILTERED HERE, NOT IN THE QUERY. `listFeedback()` still fetches
+ * everything, because the heading counts totals and the toggle has to be able
+ * to show them without a second round trip. At this volume that is free; if it
+ * ever is not, the count is what needs rethinking, not this filter.
+ */
+export function visibleReports(rows, showResolved) {
+  if (showResolved) return rows ?? []
+  return (rows ?? []).filter((row) => OPEN_STATUSES.includes(row.status))
+}
+
+function ReportRow({ row, onStatus, onNote, onDelete, busy }) {
   const who = row.profiles?.full_name ?? 'A member'
   // Local while typing; committed on Save. A controlled field writing straight
   // through would fire an update on every keystroke.
   const [note, setNote] = useState(row.admin_note ?? '')
   const [noteSaved, setNoteSaved] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const dirty = note !== (row.admin_note ?? '')
 
   return (
@@ -131,6 +153,57 @@ function ReportRow({ row, onStatus, onNote, busy }) {
           )}
         </div>
       </div>
+
+      {/* ⚠️ TWO STEPS, AND `dangerQuiet` ARMS BEFORE `danger` CONFIRMS. The
+          house pattern — Button.jsx spells out why, and RESTORE.md rules out a
+          native confirm(). A single red button that deletes on first press is
+          exactly what this shape exists to prevent.
+
+          ⚠️ THE WARNING NAMES THE PERSON, NOT THE ROW. "It disappears for
+          them too" is the fact an admin needs and cannot otherwise know:
+          `feedback read` admits submitted_by = auth.uid(), so the reporter can
+          see this on /my-reports until the moment it stops existing, with no
+          notification and no audit row anywhere. */}
+      <div className="mt-3 border-t border-line pt-2.5">
+        {confirmingDelete ? (
+          <div>
+            <p className="mb-2 text-[13px] text-ink-muted">
+              Delete {feedbackRef(row.ref)} for good? It disappears for {who.split(' ')[0]} too, and
+              there is no undo. To close something that was dealt with, set it to Done instead.
+            </p>
+            <div className="flex gap-2.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => setConfirmingDelete(false)}
+              >
+                Keep it
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="danger"
+                disabled={busy}
+                onClick={() => onDelete(row)}
+              >
+                Yes, delete
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="dangerQuiet"
+            disabled={busy}
+            onClick={() => setConfirmingDelete(true)}
+          >
+            Delete
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
@@ -140,6 +213,7 @@ export default function FeedbackTriage() {
   const [rows, setRows] = useState(null)
   const [error, setError] = useState(null)
   const [busyId, setBusyId] = useState(null)
+  const [showResolved, setShowResolved] = useState(false)
 
   const load = useCallback(async () => {
     setError(null)
@@ -210,6 +284,29 @@ export default function FeedbackTriage() {
     }
   }
 
+  async function removeReport(row) {
+    setBusyId(row.id)
+    setError(null)
+    try {
+      await deleteFeedback(row.id)
+      // ⚠️ DROPPED FROM STATE RATHER THAN RELOADED. The realtime subscription
+      // will fire a reload anyway, but a DELETE payload under replica identity
+      // DEFAULT carries only the id — so waiting for it would leave the row on
+      // screen for a round trip after the person confirmed. Removing it here
+      // makes the confirm feel like it did something.
+      setRows((current) => (current ?? []).filter((r) => r.id !== row.id))
+    } catch (err) {
+      // ⚠️ RELOAD FIRST, THEN REPORT — the same ordering bug changeStatus
+      // documents. load() clears the error on its way in, so setting the
+      // message first means the reload wipes it and the row silently
+      // reappears with nothing on screen to say why.
+      await load()
+      setError(err?.message || 'That report was not deleted.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   if (error && !rows) {
     return (
       <Card className="p-3">
@@ -224,6 +321,8 @@ export default function FeedbackTriage() {
   if (!rows) return <Spinner />
 
   const open = openCount(rows)
+  const shown = visibleReports(rows, showResolved)
+  const resolved = rows.length - openCount(rows)
 
   return (
     <div className="mb-6">
@@ -236,6 +335,20 @@ export default function FeedbackTriage() {
           : `${open} open, ${rows.length} in total. A reply you save here is what the reporter reads in the app.`}
       </p>
 
+      {/* ⚠️ THE TOGGLE ONLY APPEARS WHEN THERE IS SOMETHING HIDDEN. A control
+          that reads "Show resolved (0)" invites a click that changes nothing,
+          and a list with no resolved reports is not hiding anything to explain. */}
+      {resolved > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowResolved((v) => !v)}
+          data-testid="toggle-resolved"
+          className="mb-3 min-h-[44px] text-sm font-bold text-brand underline"
+        >
+          {showResolved ? 'Hide resolved' : `Show resolved (${resolved})`}
+        </button>
+      )}
+
       {error && rows && (
         <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
           {error}
@@ -244,14 +357,21 @@ export default function FeedbackTriage() {
 
       {rows.length === 0 ? (
         <Empty message="When somebody taps the ? and reports a problem, it lands here." />
+      ) : shown.length === 0 ? (
+        /* ⚠️ A DIFFERENT EMPTY STATE FROM "nothing has ever been reported".
+           Everything here is resolved, which is the good outcome — saying
+           "nobody has reported anything" would be plainly false and would make
+           an admin wonder where the reports went. */
+        <Empty message="Nothing open. Every report has been dealt with." />
       ) : (
         <Card className="overflow-hidden">
-          {rows.map((row) => (
+          {shown.map((row) => (
             <ReportRow
               key={row.id}
               row={row}
               onStatus={changeStatus}
               onNote={saveNote}
+              onDelete={removeReport}
               busy={busyId === row.id}
             />
           ))}
