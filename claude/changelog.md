@@ -35,9 +35,39 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   land — a member's reports previously lived only in the `?` sheet, which has
   no URL. The list is now one shared component, not a second copy that would
   drift where nobody can see both at once.
-  ⚠️ **NOT YET DEPLOYED, AND IT NEEDS TWO DEPLOYS** — Netlify for the app and
-  Supabase for `push-send`, which does NOT deploy with Netlify.
+  ✅ **DEPLOYED — BOTH HALVES — AND PROVED ON A REAL PHONE THE SAME DAY.** Three
+  real notifications to a Samsung S25 Ultra over 4G: app **fully closed** →
+  tapped → opened on `/my-reports`; app **open on Home** → tapped → jumped
+  straight to `/my-reports`, which is the path that was broken. Each confirmed
+  in the Supabase logs as report read → subscription found → VAPID key fetched
+  → 200, with no `DELETE`, so the endpoint was accepted every time.
+  ⚠️ **`push-send` DOES NOT DEPLOY WITH NETLIFY** and was deployed separately.
+  ✅ **Deployed WITHOUT hand-copying 19KB of crypto**: the dashboard's Monaco
+  editor was pointed at the raw file on `main` and `matchesSource: true` checked
+  before the deploy, so what is live is byte-identical to the repo. ⚠️ And
+  `verify_jwt: false` was confirmed intact afterwards — turning it on would
+  break the trigger SILENTLY, which looks exactly like "nobody is subscribed".
   `claude/plans/2026-08-19-notifications-v2.md`.
+- ✅ **AND THAT CLOSED THE 18 Aug OPEN ITEM — A REAL BROWSER HAS NOW DECRYPTED
+  AND DISPLAYED A PUSH NOTIFICATION.** The handoff recorded push as built,
+  deployed and unproven: the crypto was verified two ways server-side and
+  neither showed interop with a real push service. Notification #2 arrived on a
+  real Samsung carrying the exact string written into `admin_note`, so the
+  hand-rolled ECDH → HKDF → AES-128-GCM payload really was decrypted by Chrome
+  and the ECDSA VAPID signature really was accepted by Google.
+  ⚠️ **THE TELL IN THE LOGS IS `get_push_vapid_private_key`.** With nobody
+  subscribed, `push-send` returns before touching the key — which is exactly
+  what the morning's logs showed, and is how "no subscriptions" is told apart
+  from "the crypto failed". They are otherwise identical: a 200 and no
+  notification.
+- ⚠️ **A Chrome notification that is NOT ours and WILL be reported as a bug.**
+  An installed PWA running standalone makes Chrome post its own persistent
+  *"Tap to copy the URL for this app"*. We do not send it and cannot remove it —
+  it is how Chrome offers the URL to an app with no address bar. Ours carries
+  the club crest and `adhquins-clubhub.com`; Chrome's carries the Chrome logo.
+  Silenced per-phone by long-pressing it, without affecting Quins notifications.
+  ✅ It is also proof the Home Screen install worked, since it appears only for
+  a standalone launch.
 - 📋 **A spec for the rest of it**, and the correction it turns on: **"push
   notifications on by default" is not implementable.** The permission belongs
   to the browser, is per DEVICE and per BROWSER rather than per person, and
@@ -49,6 +79,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   exist and none is DELETE, so "I still cannot delete help tickets" is not a
   broken button, it was never built at any layer.
 - `4e6652a` — the squash that revoked TRUNCATE from `authenticated`.
+- `28b0cb2` — the squash that shipped the notification deep-link fix.
 
 - 🧨 **`authenticated` CAN NO LONGER TRUNCATE ANY TABLE IN `public` — 31 OF 34
   TABLES, AND THE ONE PRIVILEGE RLS CANNOT FILTER.** Postgres never applies row
