@@ -9,22 +9,34 @@ close the item that one left open.
 
 ## Where things are
 
-**`bcdfe09` on `claude/continue-f2b407` — COMMITTED, NOT PUSHED.** No pull
-request was raised, deliberately: Jay chose "deploy and apply, no PR yet". So
-the database and the edge function are LIVE with this change and the app is not.
+**Everything is live.** Shipped as pull request #250, in two stages on Jay's
+instruction — first "deploy and apply, no PR yet", then "make everything live".
 
-⚠️ **THAT SPLIT IS THE THING TO KNOW BEFORE TOUCHING ANYTHING.** Approval
-notifications are already sending on production. What is missing is only the
-opt-out switch in the app — `src/data/notificationPreferences.js` lists the
-`approval` category on the branch, not on `main`. So today the category cannot
-be switched off through the UI, because the UI does not know it exists.
-Nobody is stuck: absence of a row means ON, so the notifications work; there is
-simply no way to decline them until the branch merges.
-
-| Live now | Waiting on the PR |
+| What | How it went live |
 |---|---|
-| `push-send` **v6** (approval branch) | the `approval` row in the categories list |
-| migration `approval_push` (constraint, two functions, trigger) | — |
+| `push-send` **v6**, with the approval branch | CLI deploy, `--no-verify-jwt` |
+| migration `approval_push` — constraint, two functions, trigger | applied directly |
+| the `approval` row in the notification settings list | pull request #250 |
+
+⚠️ **THERE WAS A WINDOW WHERE THE FIRST TWO WERE LIVE AND THE THIRD WAS NOT, AND
+IT IS WORTH KNOWING THE SHAPE OF IT.** For about an hour, approval notifications
+were sending while the app had no switch to decline them — because absence of an
+opt-out row means ON, so the feature works the moment the trigger exists.
+**Deploying the database half of an opt-outable feature ships it switched on for
+everybody.** That was fine here (the audience is admins, and they wanted it) but
+it is not the general case: the same order on a parent-facing category would
+buzz the whole club with no way to stop it. **Ship the switch first, or ship
+them together.**
+
+⚠️ **AND A TRAP THAT TURNED `docs:check` RED IN CI WHILE IT PASSED LOCALLY —
+NOT the changelog-SHA asymmetry everybody expects.** Claude Code names its
+agent branches with a `claude/` prefix, and `scripts/docs-check.mjs` resolves
+anything starting `claude/` as a FILE PATH. Writing the branch name into a
+handoff is therefore a broken path reference. **Name the branch without its
+prefix in prose.** It passed locally for a second, unrelated reason worth more
+than the first: `docs:check` only scans TRACKED files, and it was run before
+`git add`, so the new handoff was invisible to it. `CLAUDE.md` already says to
+run it after the COMMIT and not merely after staging; this is what that costs.
 
 ## ✅ The item the last handoff left open is CLOSED
 
@@ -142,8 +154,9 @@ but not the migration, and the reverse.
 
 ## Still open
 
-- **The pull request has not been raised.** The app-side category is committed
-  and unmerged. Merging touches `src/`, so it builds — 15 Netlify credits.
+- **The changelog cannot cite this session's squash SHA** — a branch SHA stops
+  existing at merge, and `main` squash-merges. The NEXT pull request cites it.
+  That is the one-behind rule working, not an omission.
 - **`SUPABASE_DB_URL` is STILL unset**, and `db/tests/approval-push.sql` is one
   more harness that has never met its own runner. See `claude/open-items.md`;
   the distinction that matters is that "the harness is green" and "the harness
