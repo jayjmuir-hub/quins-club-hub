@@ -229,8 +229,25 @@ export async function updatePlayerDob(playerId, dob) {
  * "playing up" is the exception, and a harness that showed it on every card
  * would make its absence the thing to look for.
  */
-export async function listPlayerPrivate() {
-  return []
+export async function listPlayerPrivate(playerIds = []) {
+  // ⚠️ A BIRTHDAY ON FILE IS THE DEFAULT, BECAUSE IT IS THE PRODUCTION STATE.
+  // NamePrompt treats a missing row as a missing birthday and opens its "We
+  // need one more detail" step, so returning [] here put that sheet in front of
+  // every parent scenario in the harness. `?firstLogin=1` (or `?noDob=1`) gives
+  // the old empty answer for anyone who wants the gap case.
+  //
+  // ⚠️ THE PLAY-UP CHIP IS STILL SAFE, AND THAT IS WHY THIS CHANGE IS ALLOWED.
+  // The note above warns that a row on every card would make the chip's absence
+  // the thing to look for — but Accounts.jsx selects on `plays_up_confirmed_at`
+  // (L957), which these rows deliberately DO NOT carry. No chip appears.
+  // ⚠️ What DOES change: Roster and the approval queue derive an AGE from
+  // date_of_birth, so those screens now show one. That is the production state
+  // — the club backfilled birthdays — not a harness artefact.
+  // ⚠️ /admin/needs-attention is untouched: its gap list reads
+  // listPlayerPrivatePresence() below, which still returns an empty Set.
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('firstLogin') === '1' || params.get('noDob') === '1') return []
+  return (playerIds ?? []).map((id) => ({ player_id: id, date_of_birth: '2014-05-02' }))
 }
 
 /**

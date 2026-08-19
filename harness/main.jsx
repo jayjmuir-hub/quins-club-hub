@@ -560,12 +560,20 @@ const scenarios = {
   // ⚠️ THE LONGEST PLAUSIBLE LABELS ON PURPOSE — a venue and pitch a coach
   // would really type, and every optional block switched on — because a
   // cramped row is only cramped at its widest.
+  // ⚠️ `?who=parent` GIVES THE PARENT'S EVENT DETAIL, and the difference is
+  // not cosmetic: a coach sees Edit / Duplicate / Delete and "Request a pitch"
+  // on this sheet and a parent sees none of them. Hard-coding COACH_MEMBERSHIPS
+  // meant the only screenshot this scenario could produce was one no parent
+  // ever sees. Same knob name and default as `availability` above.
   'event-detail': () => (
     <Shell
       route="/schedule"
       authValue={baseAuth(COACH_EMAIL)}
       membershipValue={{
-        memberships: COACH_MEMBERSHIPS,
+        memberships:
+          new URLSearchParams(window.location.search).get('who') === 'parent'
+            ? PARENT_MEMBERSHIPS
+            : COACH_MEMBERSHIPS,
         teams: TEAMS,
         loading: false,
         error: null,
@@ -589,7 +597,7 @@ const scenarios = {
           result_them: null,
         }}
         team={TEAMS.find((t) => t.id === 't1')}
-        canEdit
+        canEdit={new URLSearchParams(window.location.search).get('who') !== 'parent'}
         onClose={noop}
         onEdit={noop}
         onDuplicate={noop}
@@ -960,12 +968,16 @@ const scenarios = {
   // stub returns, driven by ?blankName=1. Without that knob the same scenario
   // is the control case: a named profile, no prompt.
   //
-  // An auth user id is mandatory here and easy to miss: NamePrompt returns
-  // early when user?.id is undefined, and baseAuth() alone supplies only an
-  // email — so every other scenario in this file is silently immune to the
-  // prompt. Skipping writes `quins.namePromptSkipped` = this id to
-  // localStorage, which is what the "does not reappear" check clears between
-  // runs.
+  // ⚠️ THIS COMMENT SAID EVERY OTHER SCENARIO WAS "SILENTLY IMMUNE TO THE
+  // PROMPT" BECAUSE baseAuth() SUPPLIED ONLY AN EMAIL. IT SUPPLIES A USER ID —
+  // see baseAuth above — so nothing was immune, and once the gate grew its
+  // player, role and birthday steps it opened over Home, Roster, Schedule,
+  // Availability and this file's own name-prompt CONTROL case.
+  // ⚠️ WHAT KEEPS THE GATE SHUT IS NOW THE STUB DEFAULTS, NOT THE AUTH SHAPE:
+  // stubs/members.js answers the player and role questions and
+  // stubs/players.js gives every child a birthday, unless `?firstLogin=1` says
+  // otherwise. To SEE the gate, pass that knob (or `?blankName=1` for the name
+  // step alone, which is what shoot-pending.mjs drives).
   'name-prompt': () => (
     <Shell
       route="/"

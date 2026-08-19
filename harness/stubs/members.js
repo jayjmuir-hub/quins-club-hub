@@ -176,6 +176,11 @@ export async function getMyProfile(userId) {
   const params = new URLSearchParams(window.location.search)
   const blank = params.get('blankName') === '1'
   const unconfirmed = params.get('unconfirmedName') === '1'
+  // ⚠️ ONE KNOB FOR "THIS ACCOUNT HAS NEVER FINISHED SIGNING IN". Drives the
+  // player and role questions below, and the missing birthday in
+  // stubs/players.js, so a caller opens the whole gate with one parameter
+  // rather than having to know which three stubs feed it.
+  const firstLogin = params.get('firstLogin') === '1'
   return {
     id: userId,
     full_name: blank ? '' : 'Jay Muir',
@@ -187,6 +192,19 @@ export async function getMyProfile(userId) {
     // ?blankPhone=1 gives the never-recorded case, which is what almost every
     // real row looks like today.
     phone: params.get('blankPhone') === '1' ? null : '+971501234567',
+    // ⚠️ ANSWERED BY DEFAULT, LIKE name_confirmed_at AND phone ABOVE. Both
+    // columns are read by NamePrompt as `!profile.no_player_confirmed_at` /
+    // `!profile.no_role_confirmed_at`, so leaving them undefined opened the
+    // first-login gate on EVERY scenario — over Home, Roster, Schedule and the
+    // rest — and every screenshot of those screens was taken through a sheet a
+    // settled account never sees.
+    // ⚠️ THE DIRECTION MATTERS AND IT IS THE ONE THIS FILE ALREADY USES: the
+    // DEFAULT is the settled account, and a QUERY KNOB produces the incomplete
+    // state (`?blankName=1`, `?blankPhone=1`). `?firstLogin=1` is that knob for
+    // these two. The old shape — unanswered by default — meant every scenario
+    // had to opt OUT of a gate it never wanted, which nothing did.
+    no_player_confirmed_at: firstLogin ? null : '2026-08-06T09:00:00Z',
+    no_role_confirmed_at: firstLogin ? null : '2026-08-06T09:00:00Z',
     created_at: '2026-01-05T09:00:00Z',
   }
 }

@@ -10,6 +10,41 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 🐛 **THE SCREENSHOT HARNESS RENDERED EVERY SCREEN THROUGH THE FIRST-LOGIN
+  GATE, AND NOTHING CAUGHT IT BECAUSE NOTHING LOOKS AT A SCREENSHOT.** Found
+  while shooting a parent guide: the "Do you have a player at the club?" sheet
+  sat on top of Home, Roster, Schedule and Availability in every scenario that
+  reached them.
+  ⚠️ **THE DEFAULT WAS THE BUG, NOT A MISSING KNOB.** The stubs left
+  `no_player_confirmed_at`, `no_role_confirmed_at` and every child's birthday
+  unanswered, so a scenario had to opt OUT of a gate it never wanted — and none
+  did. They now default to the SETTLED account, exactly as `name_confirmed_at`
+  and `phone` already did, and `?firstLogin=1` opens the whole gate in one knob.
+  ⚠️ **`MembershipProvider` NEVER SET `realMemberships`**, which production
+  always does — `src/lib/memberships.jsx` builds it as `realMemberships:
+  memberships`. NamePrompt reads `hasPlayer = (realMemberships ?? []).some(…)`,
+  so every parent scenario looked like an account with no child linked.
+  ⚠️ **IT HAD BROKEN THE HARNESS'S OWN CONTROL CASE**, which is how old the rot
+  is: `shoot-pending.mjs` drives `scenario=name-prompt` as the case that must
+  show NO sheet, and had been getting one.
+  ⚠️ **`event-detail` WAS HARD-CODED TO A COACH**, so the only screenshot it
+  could produce showed Edit / Duplicate / Delete to a parent. `?who=parent` now
+  matches the knob `availability` already carried. ⚠️ `canEdit` is a PROP, not
+  derived from the memberships — swapping those alone moved the masthead and
+  nothing else on the sheet.
+  ✅ **PROVED IN BOTH DIRECTIONS.** Fifteen scenarios assert the gate is SHUT,
+  and two assert it still OPENS (`?firstLogin=1`, `?unconfirmedName=1`): a gate
+  that could no longer be raised would be the same defect wearing the other
+  face. Each case also asserts the page actually rendered, because a blank
+  screen passes "no gate" while proving nothing.
+  ⚠️ **LEFT BROKEN ON PURPOSE.** `shoot-pending.mjs` blocks 4b and 4c fill
+  `#name-prompt-full-name` and click "Not now". Neither exists — the name split
+  into two fields and the skip was deliberately removed — and `?blankName=1` no
+  longer opens the gate at all now that it is not the thing holding it open.
+  What those blocks should assert against today's component is a decision, not
+  a repair, so they are named here rather than guessed at.
+- `dc12ef5` — the squash that corrected the monitoring runbook's Sentry line.
+
 - 🧹 **`claude/runbooks/monitoring.md` SAID SENTRY WAS SWITCHED OFF, FOR THE
   SECOND TIME.** The body of that file has said "LIVE since 16 Aug 2026" since
   it was corrected; its OPENING SUMMARY still said "an error tracker is built
