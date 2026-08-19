@@ -10,6 +10,42 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- ✅ **ALL 34 DATABASE HARNESSES PASS, AND ALL 34 SELF-TESTS FIRE.** The last
+  two failures were closed, and neither was what it looked like.
+  ⚠️ **`rls-squad-staff-approval` was NOT a disclosure**, and that was measured
+  rather than assumed: the fixture counted every pending registration in the
+  CLUB instead of its own two, so it went red simply because two real families
+  were waiting for approval. A U16B coach was measured seeing **0** pending
+  rows from any other squad. **A check whose result depends on the live roster
+  is not a check** — now scoped to the profiles it creates.
+  ✅ **`rls-availability-equivalence` REPOINTED, not deleted** (rule 7). It
+  compared a policy merge before and after; the merge shipped 9 Aug, so the
+  fault could no longer be injected and it aborted every night. The
+  seven-caller matrix it proved is now asserted against the merged policies
+  that ship today.
+- 🔎 **REPOINTING IT CAUGHT FOUR THINGS, THREE INTENDED AND ONE NOT.** Three
+  cells of that matrix have legitimately moved since 9 Aug — a PENDING coach
+  lost access when the admin gates began requiring an active membership; a
+  PENDING parent GAINED sight of their own child's answer (the "app lost my
+  answer" fix); and `anon` moved from silently matching nothing to being
+  refused by the table grant. Each is now recorded against the migration that
+  owns it, so the NEXT movement is visibly new.
+  ⚠️ **AND THE ORIGINAL SELF-TEST HAD QUIETLY STOPPED WORKING.** It dropped the
+  `can_edit_team` arm of `avail read` — load-bearing on 9 Aug, when that
+  function ignored status. Since 18 Aug it requires an ACTIVE membership, so
+  every caller it admits is already admitted by `can_see_team`: **the arm is
+  redundant today and removing it moves nothing**, so the self-test would have
+  passed while proving nothing. It now drops `is_own_player`, which genuinely
+  blinds a parent. ⚠️ **The redundant arm was KEPT** — one boolean, and it is
+  what stops `avail read` drifting if that status test is ever removed again.
+- 🔑 **The stale Supabase publishable key in `.env` is fixed** (29 characters
+  against the live 46; it returned "Invalid API key"). ⚠️ **A side effect worth
+  knowing: the local suite now emits a few unhandled WebSocket errors**, because
+  the realtime client actually connects where it previously could not. Proved by
+  control — placeholder credentials produce none, the real key produces them,
+  and all 2,954 tests pass either way. **CI is unaffected**: it runs with
+  `placeholder.supabase.co`.
+- `c9ff8ea` — the squash that shipped the harness repair and the initplan fix.
 - `f75827e` — the squash that shipped the availability nudge.
 
 - 🚨 **THE NIGHTLY DATABASE CHECK RAN FOR THE FIRST TIME, AND 14 OF 34

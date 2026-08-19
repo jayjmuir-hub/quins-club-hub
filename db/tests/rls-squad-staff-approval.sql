@@ -99,8 +99,22 @@ do $$ declare mid uuid; begin
     insert into probe values ('U18 coach','approve a U16 registration','refused: '||SQLERRM);
   end;
 end $$;
+-- ⚠️ SCOPED TO THIS FIXTURE'S OWN ROWS, AND THAT IS THE WHOLE FIX.
+-- This counted EVERY pending membership in the database, so its answer
+-- depended on whether real families happened to be waiting for approval.
+-- Measured 19 Aug 2026: production held 2 genuine pending registrations, so
+-- the harness reported "pending membership rows still visible: U16 coach -> 2"
+-- and read exactly like a squad coach seeing rows they should not.
+--
+-- ⚠️ IT WAS NOT A DISCLOSURE, AND THAT WAS CHECKED RATHER THAN ASSUMED.
+-- Both real rows were on the coach's OWN squad, and a U16B coach was measured
+-- seeing 0 pending rows belonging to any other squad. RLS was right; the
+-- fixture was counting the club.
 insert into probe select 'U18 coach','pending rows visible',
-  (select count(*)::text from memberships where status='pending');
+  (select count(*)::text from memberships
+    where status='pending'
+      and profile_id in ('00000000-aaaa-0000-0000-000000000004',
+                         '00000000-aaaa-0000-0000-000000000006'));
 reset role;
 
 -- ── U16 medic: right squad, excluded role ──────────────────────────────
@@ -172,8 +186,13 @@ do $$ declare mid uuid; m public.memberships; n int; begin
   get diagnostics n = row_count;
   insert into probe values ('U16 coach','promote a member via the table','rows written: '||n);
 end $$;
+-- Same scoping as the U18 step above — this file's two registrations only,
+-- never the club's.
 insert into probe select 'U16 coach','pending rows visible after approving',
-  (select count(*)::text from memberships where status='pending');
+  (select count(*)::text from memberships
+    where status='pending'
+      and profile_id in ('00000000-aaaa-0000-0000-000000000004',
+                         '00000000-aaaa-0000-0000-000000000006'));
 reset role;
 
 select * from probe;
