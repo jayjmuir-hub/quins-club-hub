@@ -10,6 +10,39 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 🔔 **SOMEBODY WAITING TO BE APPROVED NOW BUZZES THE PEOPLE WHO CAN APPROVE
+  THEM** — the fourth notification category, `db/migrations/20260819_approval_push.sql`.
+  ⚠️ **THE AUDIENCE IS THE EMAIL'S, DELIBERATELY**: super admins, plus that
+  squad's head coach and team manager(s) — not `can_approve_team`, which is
+  wider. Authority is one question and being TOLD is another; everyone who
+  could approve before still can, they are simply not all interrupted.
+  ⚠️ **THE RULE IS NOW WRITTEN TWICE** — TypeScript for the email, SQL for the
+  push — and the migration header says so rather than hiding it. Folding the
+  email onto the SQL function is the right long-term shape and was NOT done,
+  because it means editing the live email path in order to ship a notification.
+  ✅ **The self-test measures what the narrowing is worth: widening the audience
+  to everybody who may approve produces 54 (squad, person) violations**, each
+  one a child's name on the lock screen of somebody the club decided should not
+  receive it. `db/tests/approval-push.sql`.
+  ✅ **And a new test closes the silent boundary**: `tests/notification-categories.test.js`
+  fails if the app offers a category no migration's CHECK constraint states.
+  Without it the opt-out INSERT is refused, the switch still moves, and the
+  notifications keep arriving — with nothing on screen to say so.
+- ✅ **`squad_push` IS NO LONGER UNPROVEN.** The 19 Aug handoff's one open item
+  is closed: a real fixture change drove the whole path on production —
+  statement trigger → `send_fixture_push` → `net.http_post` → deployed
+  `push-send` v5 → `squad_push_subscriptions` → FCM, `200 ok` on two devices,
+  no per-subscription failure logged, and the fixture put straight back.
+  ⚠️ **THE TEST THE HANDOFF PROPOSED COULD NOT HAVE PROVED IT, AND WOULD HAVE
+  LOOKED LIKE A BUG.** `squad_push_subscriptions` excludes the actor and
+  `notify_fixture_changed` passes `auth.uid()` — so a change made in the app by
+  the only subscriber resolves an audience of ZERO and returns a clean 200 with
+  nothing sent. It had to be driven over SQL, where `auth.uid()` is null.
+  ⚠️ **`content` DISCRIMINATES AND IS THE ONLY THING THAT DOES**: `push-send`
+  answers `ok (no subscriptions)` for an empty audience and bare `ok` only
+  after the send loop has run. A 200 alone proves nothing.
+- `9adfa44` — the squash that shipped the 19 Aug session record.
+
 - 📓 **THE 19 Aug SESSION RECORD**, `claude/handoffs/2026-08-19-notifications-v2.md`
   — nine merges, and the day push notifications went from "proved on one phone"
   to a feature with four categories, opt-outs and two prompts.

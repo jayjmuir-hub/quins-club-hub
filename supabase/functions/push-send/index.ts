@@ -8,6 +8,10 @@
 //                       (AFTER INSERT on public.announcements, 19 Aug 2026)
 //   { squad_push }      a fixture was added, changed or cancelled
 //                       (STATEMENT-level triggers on public.events, 19 Aug 2026)
+//   { approval_membership_id }
+//                       somebody is waiting to be approved
+//                       (AFTER INSERT on public.memberships when pending,
+//                        19 Aug 2026)
 //
 // ⚠️ `squad_push` ARRIVES FULLY FORMED — title, body, tag and all — WHICH THE
 // OTHER TWO DO NOT, AND A CANCELLATION IS WHY. By the time this function runs,
@@ -376,6 +380,30 @@ async function squadTargets(
   return await response.json()
 }
 
+/**
+ * The subscriptions an APPROVAL REQUEST should go to.
+ *
+ * ⚠️ THE SAME RULE THE EMAIL USES, HELD IN SQL — super admins plus that
+ * squad's head coach and manager(s), never the requester, and only while the
+ * row is still pending. db/migrations/20260819_approval_push.sql owns it, and
+ * its header explains why that rule is currently written twice.
+ */
+async function approvalTargets(membershipId: string): Promise<Subscription[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/approval_push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ _membership: membershipId }),
+  })
+  if (!response.ok) {
+    throw new Error(`approval_push_subscriptions failed (${response.status}): ${await response.text()}`)
+  }
+  return await response.json()
+}
+
 async function noticeTargets(announcementId: string): Promise<Subscription[]> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/notice_push_subscriptions`, {
     method: 'POST',
@@ -408,6 +436,20 @@ interface Job {
   subscriptions: Subscription[]
 }
 
+/**
+ * How each claimable role reads in a sentence.
+ *
+ * ⚠️ THE SAME THREE notify-approval USES, AND AN UNKNOWN ROLE FALLS BACK TO
+ * "volunteer" RATHER THAN PRINTING THE RAW VALUE. 'admin' is deliberately
+ * absent — it is never requestable (public.request_staff_role refuses it) —
+ * and 'parent'/'player' always carry a player and take the other branch.
+ */
+const APPROVAL_ROLE_LABELS: Record<string, string> = {
+  coach: 'coach',
+  manager: 'team manager',
+  medic: 'medic or physio',
+}
+
 const STATUS_WORD: Record<string, string> = {
   new: 'New',
   'in-progress': 'In progress',
@@ -430,11 +472,13 @@ Deno.serve(async (request) => {
 
   let feedbackId = ''
   let announcementId = ''
+  let approvalMembershipId = ''
   let squad: Record<string, string> | null = null
   try {
     const payload = await request.json()
     feedbackId = String(payload?.feedback_id ?? '')
     announcementId = String(payload?.announcement_id ?? '')
+    approvalMembershipId = String(payload?.approval_membership_id ?? '')
     squad = payload?.squad_push ?? null
   } catch {
     return new Response('bad request', { status: 400 })
@@ -442,7 +486,8 @@ Deno.serve(async (request) => {
   // ⚠️ EXACTLY ONE. More than one would be a caller confused about what it is
   // asking for, and guessing which it meant is how the wrong people get
   // notified.
-  if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0) !== 1) {
+  if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0)
+      + (approvalMembershipId ? 1 : 0) !== 1) {
     return new Response('bad request', { status: 400 })
   }
 
@@ -492,6 +537,54 @@ Deno.serve(async (request) => {
         subscriptions: await squadTargets(
           squad.club_id, squad.team_id, squad.actor_id ?? null, squad.category || 'fixture',
         ),
+      }
+    } else if (approvalMembershipId) {
+      const rows = await db(
+        `memberships?id=eq.${encodeURIComponent(approvalMembershipId)}` +
+          '&select=status,role,profiles(full_name),players(full_name),teams(name)',
+      )
+      const ask = rows?.[0]
+      if (!ask) return new Response('not found', { status: 404 })
+
+      // ⚠️ THE SAME GUARD THE EMAIL MAKES, AND IT IS NOT BELT-AND-BRACES.
+      // pg_net is asynchronous: an admin who approves within a few seconds
+      // would otherwise be buzzed about a queue that is already empty.
+      // approval_push_subscriptions also filters on this, so the audience
+      // would be empty anyway — this returns the clearer body instead of
+      // 'ok (no subscriptions)', which is the line that tells the two cases
+      // apart when reading net._http_response afterwards.
+      if (ask.status !== 'pending') {
+        return new Response('ok (no longer pending)', { status: 200 })
+      }
+
+      const parentName = ask?.profiles?.full_name ?? 'Somebody'
+      const playerName = ask?.players?.full_name ?? null
+      const teamName = ask?.teams?.name ?? 'the club'
+      // ⚠️ AN UNKNOWN ROLE READS AS "volunteer" RATHER THAN PRINTING THE RAW
+      // VALUE — copied deliberately from notify-approval, and it matters more
+      // here than it does there. The role is chosen by the person asking, and
+      // this string lands on a lock screen.
+      const roleLabel = APPROVAL_ROLE_LABELS[ask.role as string] ?? 'volunteer'
+
+      job = {
+        title: 'Waiting to be approved',
+        // The same sentence the email sends, so the two never describe the
+        // same request differently. supabase/functions/notify-approval.
+        body: escapeHtmlFree(
+          playerName
+            ? `${parentName} has registered ${playerName} in ${teamName}.`
+            : `${parentName} says they are a ${roleLabel} for ${teamName}.`,
+        ).slice(0, 200),
+        // ⚠️ THE CANONICAL PATH, NOT `/accounts`. That one still exists but is
+        // only a <Navigate> redirect to this (src/App.jsx). A notification is
+        // the worst place to spend a redirect: the tap already costs a cold
+        // start, and the deep-link fix of 19 Aug is what makes it land at all.
+        url: `${APP_URL}/admin/accounts`,
+        // Per REQUEST, so two people waiting are two notifications rather
+        // than one replacing the other — unlike a notice, where repeats are
+        // about the same thing.
+        tag: `approval-${approvalMembershipId}`,
+        subscriptions: await approvalTargets(approvalMembershipId),
       }
     } else {
       const rows = await db(

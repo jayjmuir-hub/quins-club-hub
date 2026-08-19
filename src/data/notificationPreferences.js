@@ -42,6 +42,21 @@ export const NOTIFICATION_CATEGORIES = [
     label: 'Replies to your reports',
     hint: 'When somebody at the club answers something you reported.',
   },
+  // ⚠️ ONLY EVER SHOWN TO PEOPLE IT CAN REACH. This one is listed for
+  // everybody, but it only ever fires for super admins and a squad's head
+  // coach or team manager — nobody else is in the audience
+  // (db/migrations/20260819_approval_push.sql). A parent who switches it off
+  // is switching off something they were never going to get.
+  //
+  // ⚠️ SWITCHING IT OFF DOES NOT STOP THE EMAIL, and the hint says so on
+  // purpose. The email is unconditional and is the backstop for the whole
+  // approval flow; somebody who turns this off to stop being interrupted must
+  // not believe they have stopped being told.
+  {
+    key: 'approval',
+    label: 'People waiting to be approved',
+    hint: 'When somebody registers for a squad you look after. You will still get the email.',
+  },
 ]
 
 /**
