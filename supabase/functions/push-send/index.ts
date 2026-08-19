@@ -1,8 +1,19 @@
-// Sends a real browser/OS push notification — not an email — when an admin
-// replies to somebody's report.
+// Sends a real browser/OS push notification — not an email.
 //
-// Fired by an AFTER UPDATE trigger on public.feedback, WHEN status or
-// admin_note changes. Design: claude/plans/2026-08-18-push-notifications.md.
+// TWO triggers, ONE function:
+//   { feedback_id }     an admin replied to somebody's report
+//                       (AFTER UPDATE on public.feedback, when status or
+//                        admin_note changes)
+//   { announcement_id } somebody posted a notice
+//                       (AFTER INSERT on public.announcements, 19 Aug 2026)
+//
+// ⚠️ ONE FUNCTION RATHER THAN TWO, AND THE REASON IS THE CRYPTO. A second
+// function would mean a SECOND COPY of hand-rolled ECDH, HKDF, AES-128-GCM and
+// ECDSA — the last thing in this codebase that should exist twice. Everything
+// below the payload is shared; only the title, body, url and audience differ.
+//
+// Design: claude/plans/2026-08-18-push-notifications.md and
+// claude/plans/2026-08-19-notifications-v2.md.
 //
 // == WHY THIS EXISTS AT ALL ==
 //
@@ -315,6 +326,63 @@ function ref(n: unknown): string {
   return `QCH-${String(n ?? '').padStart(4, '0')}`
 }
 
+/**
+ * Has this person switched this category off?
+ *
+ * ⚠️ ABSENCE MEANS ON. `notification_opt_outs` stores opt-OUTS, so a person
+ * with no row wants everything — which is what makes "categories default to
+ * on" true without a backfill. db/migrations/20260819_notice_push.sql.
+ */
+async function hasOptedOut(profileId: string, category: string): Promise<boolean> {
+  const rows = await db(
+    `notification_opt_outs?profile_id=eq.${encodeURIComponent(profileId)}` +
+      `&category=eq.${encodeURIComponent(category)}&select=category`,
+  )
+  return rows.length > 0
+}
+
+/**
+ * The subscriptions a NOTICE should go to.
+ *
+ * ⚠️ THE AUDIENCE IS DECIDED IN THE DATABASE, NOT HERE. This calls one
+ * SECURITY DEFINER function and sends to whatever comes back. Who may be told
+ * about a notice is a disclosure rule — it belongs beside the RLS policy it
+ * deliberately narrows, not in a file that deploys separately. Splitting a
+ * rule across two deploy targets is exactly how the deep-link bug survived on
+ * 19 Aug: push-send and push-sw.js each held half of it.
+ */
+async function noticeTargets(announcementId: string): Promise<Subscription[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/notice_push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ _announcement: announcementId }),
+  })
+  if (!response.ok) {
+    throw new Error(`notice_push_subscriptions failed (${response.status}): ${await response.text()}`)
+  }
+  return await response.json()
+}
+
+interface Subscription {
+  id: string
+  endpoint: string
+  p256dh: string
+  auth: string
+}
+
+/** What one push is: who it goes to, and what it says. */
+interface Job {
+  title: string
+  body: string
+  url: string
+  tag: string
+  subscriptions: Subscription[]
+}
+
 const STATUS_WORD: Record<string, string> = {
   new: 'New',
   'in-progress': 'In progress',
@@ -336,59 +404,101 @@ Deno.serve(async (request) => {
   }
 
   let feedbackId = ''
+  let announcementId = ''
   try {
     const payload = await request.json()
     feedbackId = String(payload?.feedback_id ?? '')
+    announcementId = String(payload?.announcement_id ?? '')
   } catch {
     return new Response('bad request', { status: 400 })
   }
-  if (!feedbackId) return new Response('bad request', { status: 400 })
+  // ⚠️ EXACTLY ONE. Both would be a caller confused about what it is asking
+  // for, and guessing which it meant is how the wrong people get notified.
+  if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) !== 1) {
+    return new Response('bad request', { status: 400 })
+  }
 
   try {
-    const rows = await db(
-      `feedback?id=eq.${encodeURIComponent(feedbackId)}&select=ref,status,admin_note,submitted_by`,
-    )
-    const report = rows?.[0]
-    if (!report) return new Response('not found', { status: 404 })
+    let job: Job
 
-    const subscriptions = await db(
-      `push_subscriptions?profile_id=eq.${encodeURIComponent(report.submitted_by)}&select=id,endpoint,p256dh,auth`,
-    )
-    if (subscriptions.length === 0) {
-      // Not an error - most reporters have never turned the toggle on. The
-      // acknowledgement email sent at submit time is what tells them where
-      // to look either way.
+    if (feedbackId) {
+      const rows = await db(
+        `feedback?id=eq.${encodeURIComponent(feedbackId)}&select=ref,status,admin_note,submitted_by`,
+      )
+      const report = rows?.[0]
+      if (!report) return new Response('not found', { status: 404 })
+
+      // ⚠️ THE REPLY CATEGORY IS OPT-OUTABLE TOO, as of 19 Aug 2026. Absence
+      // means on, so this changes nothing for anybody who has not chosen.
+      if (await hasOptedOut(report.submitted_by, 'feedback_reply')) {
+        return new Response('ok (opted out)', { status: 200 })
+      }
+
+      const subscriptions = await db(
+        `push_subscriptions?profile_id=eq.${encodeURIComponent(report.submitted_by)}&select=id,endpoint,p256dh,auth`,
+      )
+
+      const reference = ref(report.ref)
+      const statusWord = STATUS_WORD[report.status] ?? report.status
+      job = {
+        title: `Your report ${reference}`,
+        body: report.admin_note
+          ? escapeHtmlFree(report.admin_note)
+          : `Now marked: ${statusWord}`,
+        url: `${APP_URL}/my-reports`,
+        tag: `feedback-${feedbackId}`,
+        subscriptions,
+      }
+    } else {
+      const rows = await db(
+        `announcements?id=eq.${encodeURIComponent(announcementId)}&select=title,body`,
+      )
+      const notice = rows?.[0]
+      if (!notice) return new Response('not found', { status: 404 })
+
+      job = {
+        title: escapeHtmlFree(notice.title),
+        // ⚠️ TRIMMED, BECAUSE A NOTIFICATION IS NOT THE NOTICE. Android and
+        // iOS both truncate a long body in the tray anyway; cutting it here
+        // means the encrypted payload stays comfortably inside the single
+        // aes128gcm record this function implements, rather than relying on
+        // nobody ever writing a long notice.
+        body: escapeHtmlFree(notice.body).slice(0, 200),
+        url: `${APP_URL}/notices`,
+        tag: `notice-${announcementId}`,
+        // ⚠️ ONE CALL, AND THE DATABASE DECIDES. Author exclusion, squad
+        // scoping, opt-outs and expiry all live in
+        // public.notice_push_subscriptions.
+        subscriptions: await noticeTargets(announcementId),
+      }
+    }
+
+    if (job.subscriptions.length === 0) {
+      // Not an error - most people have never turned the toggle on.
       return new Response('ok (no subscriptions)', { status: 200 })
     }
 
-    const reference = ref(report.ref)
-    const statusWord = STATUS_WORD[report.status] ?? report.status
-    const title = `Your report ${reference}`
-    const body = report.admin_note
-      ? escapeHtmlFree(report.admin_note)
-      : `Now marked: ${statusWord}`
-
     const payloadJson = JSON.stringify({
-      title,
-      body,
-      // ⚠️ A REAL DESTINATION, NOT THE APP ROOT. This was `${APP_URL}/` until
+      title: job.title,
+      body: job.body,
+      // ⚠️ A REAL DESTINATION, NOT THE APP ROOT. It was `${APP_URL}/` until
       // 19 Aug 2026, when Jay tapped the club's first real push notification
       // and landed on whatever screen he already had open. Half the fix; the
       // other half is public/push-sw.js, which used to focus an open window
       // WITHOUT navigating it, so this url was read only when nothing was
       // open. Changing either one alone fixes nothing.
       // claude/plans/2026-08-19-notifications-v2.md.
-      url: `${APP_URL}/my-reports`,
-      // Lets the service worker collapse several rapid replies to the SAME
-      // report into one notification instead of stacking a tray full of
-      // them - see the `tag` handling in public/push-sw.js.
-      tag: `feedback-${feedbackId}`,
+      url: job.url,
+      // Lets the service worker collapse several pushes about the SAME thing
+      // into one notification instead of stacking a tray full of them - see
+      // the `tag` handling in public/push-sw.js. Per report, or per notice.
+      tag: job.tag,
     })
 
     const privateKey = await getVapidPrivateKey()
     const signingKey = await importVapidSigningKey(privateKey)
 
-    for (const subscription of subscriptions) {
+    for (const subscription of job.subscriptions) {
       try {
         const endpointUrl = new URL(subscription.endpoint)
         const audience = `${endpointUrl.protocol}//${endpointUrl.host}`

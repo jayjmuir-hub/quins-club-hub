@@ -13,6 +13,17 @@ vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => useAuthMock(),
 }))
 
+const listMyOptOutsMock = vi.fn()
+const setCategoryEnabledMock = vi.fn()
+vi.mock('../src/data/notificationPreferences.js', () => ({
+  NOTIFICATION_CATEGORIES: [
+    { key: 'notice', label: 'New notices', hint: 'When somebody posts a notice.' },
+    { key: 'feedback_reply', label: 'Replies to your reports', hint: 'When somebody answers.' },
+  ],
+  listMyOptOuts: (...a) => listMyOptOutsMock(...a),
+  setCategoryEnabled: (...a) => setCategoryEnabledMock(...a),
+}))
+
 vi.mock('../src/lib/push.js', () => ({
   isPushSupported: vi.fn(),
   needsHomeScreenInstall: vi.fn(),
@@ -38,6 +49,10 @@ beforeEach(() => {
   needsHomeScreenInstall.mockReturnValue(false)
   pushPermissionState.mockReturnValue('default')
   isSubscribed.mockResolvedValue(false)
+  listMyOptOutsMock.mockReset()
+  setCategoryEnabledMock.mockReset()
+  listMyOptOutsMock.mockResolvedValue([])
+  setCategoryEnabledMock.mockResolvedValue(undefined)
 })
 
 describe('PushNotificationsToggle', () => {
@@ -140,5 +155,92 @@ describe('PushNotificationsToggle', () => {
     // ⚠️ STILL "Turn on" — a failed attempt must not flip the label to a
     // state the subscription never actually reached.
     expect(button).toHaveTextContent(/turn on/i)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════
+//  CATEGORIES — 19 Aug 2026. Jay: "we need more notification categories not
+//  just the help tickets", and "then people can opt out if they want".
+// ══════════════════════════════════════════════════════════════════════════
+
+describe('notification categories', () => {
+  // ⚠️ THE MOST IMPORTANT ONE. Checkboxes above an OFF master switch would be
+  // choices that silently do nothing: the browser permission decides whether
+  // anything arrives at all, and no preference here can substitute for it.
+  it('are not offered until notifications are actually on', async () => {
+    isSubscribed.mockResolvedValue(false)
+    render(<PushNotificationsToggle />)
+    await screen.findByTestId('push-toggle')
+    expect(screen.queryByLabelText(/new notices/i)).toBeNull()
+    expect(listMyOptOutsMock).not.toHaveBeenCalled()
+  })
+
+  it('are all on by default, because absence of a row means on', async () => {
+    isSubscribed.mockResolvedValue(true)
+    listMyOptOutsMock.mockResolvedValue([])
+    render(<PushNotificationsToggle />)
+
+    expect(await screen.findByLabelText(/new notices/i)).toBeChecked()
+    expect(screen.getByLabelText(/replies to your reports/i)).toBeChecked()
+  })
+
+  it('shows a category as off when an opt-out row exists', async () => {
+    isSubscribed.mockResolvedValue(true)
+    listMyOptOutsMock.mockResolvedValue(['notice'])
+    render(<PushNotificationsToggle />)
+
+    expect(await screen.findByLabelText(/new notices/i)).not.toBeChecked()
+    // ⚠️ The OTHER one must stay on — an opt-out is per category, not a
+    // master off switch wearing a different hat.
+    expect(screen.getByLabelText(/replies to your reports/i)).toBeChecked()
+  })
+
+  it('writes the change through when you switch one off', async () => {
+    const user = userEvent.setup()
+    isSubscribed.mockResolvedValue(true)
+    render(<PushNotificationsToggle />)
+
+    await user.click(await screen.findByLabelText(/new notices/i))
+    await waitFor(() =>
+      expect(setCategoryEnabledMock).toHaveBeenCalledWith('profile-1', 'notice', false),
+    )
+  })
+
+  it('switches one back on by deleting the opt-out', async () => {
+    const user = userEvent.setup()
+    isSubscribed.mockResolvedValue(true)
+    listMyOptOutsMock.mockResolvedValue(['notice'])
+    render(<PushNotificationsToggle />)
+
+    await user.click(await screen.findByLabelText(/new notices/i))
+    await waitFor(() =>
+      expect(setCategoryEnabledMock).toHaveBeenCalledWith('profile-1', 'notice', true),
+    )
+  })
+
+  // ⚠️ THE CHECKBOX MUST GO BACK. An optimistic switch that stays moved after
+  // a failed save is a person believing they turned something off.
+  it('puts the checkbox back and says so when the save fails', async () => {
+    const user = userEvent.setup()
+    isSubscribed.mockResolvedValue(true)
+    setCategoryEnabledMock.mockRejectedValue(new Error('network is down'))
+    render(<PushNotificationsToggle />)
+
+    const box = await screen.findByLabelText(/new notices/i)
+    await user.click(box)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/network is down/i)
+    await waitFor(() => expect(screen.getByLabelText(/new notices/i)).toBeChecked())
+  })
+
+  // ⚠️ A failure to READ preferences must not look like a failure to turn
+  // notifications on - the master switch is what somebody just used.
+  it('falls back to everything-on when the preferences cannot be read', async () => {
+    isSubscribed.mockResolvedValue(true)
+    listMyOptOutsMock.mockRejectedValue(new Error('nope'))
+    render(<PushNotificationsToggle />)
+
+    expect(await screen.findByLabelText(/new notices/i)).toBeChecked()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })
