@@ -10,6 +10,46 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 19 Aug 2026
 
+- 🎯 **TAPPING A NOTIFICATION NOW TAKES YOU TO THE THING IT IS ABOUT — and the
+  bug was two bugs, either of which alone made the fix useless.** Found by Jay
+  within minutes of the club's first ever real push notification: he tapped it
+  and landed on More → Notifications, the screen he already had open.
+  ⚠️ **`public/push-sw.js` focused the open window WITHOUT NAVIGATING IT**, so
+  the payload's `url` was read only on the `openWindow` branch — the one that
+  runs when nothing is open. ⚠️ **And `push-send` sent `${APP_URL}/` anyway**,
+  the app root, which its own comment recorded as a deliberate v1 shortcut.
+  ⚠️ **THE HAND TEST CANNOT SEE THIS, WHICH IS WHY IT SHIPPED.** You turn
+  notifications on from More → Notifications, so that is the screen you are
+  sitting on when the first one arrives, and "focus the open window" looks
+  exactly like success.
+  ✅ **`tests/push-sw.test.js` is new and is the thing that could see it.**
+  That file had NO tests at all; written first, it failed on precisely the
+  missing `client.navigate()` call and passed after the fix — with three other
+  assertions passing throughout, so the harness was never vacuous.
+  ⚠️ **`navigate()` REJECTS ON A WINDOW THE WORKER DOES NOT CONTROL**, a real
+  state on a first load, so it falls back to posting the app a message that
+  `src/lib/notificationRouting.js` routes on. **That order is deliberate**:
+  always-postMessage reads nicer and is worse, because someone on a stale
+  cached bundle would tap and silently go nowhere.
+  ✅ **New `/my-reports` screen**, because the notification needed somewhere to
+  land — a member's reports previously lived only in the `?` sheet, which has
+  no URL. The list is now one shared component, not a second copy that would
+  drift where nobody can see both at once.
+  ⚠️ **NOT YET DEPLOYED, AND IT NEEDS TWO DEPLOYS** — Netlify for the app and
+  Supabase for `push-send`, which does NOT deploy with Netlify.
+  `claude/plans/2026-08-19-notifications-v2.md`.
+- 📋 **A spec for the rest of it**, and the correction it turns on: **"push
+  notifications on by default" is not implementable.** The permission belongs
+  to the browser, is per DEVICE and per BROWSER rather than per person, and
+  prompting on page load makes Chrome demote the site to a quiet prompt nobody
+  sees. What is achievable is the same thing minus the word "default":
+  prominent prompting, and CATEGORIES that default to on so the only decision
+  anyone makes is the one unavoidable tap.
+  ⚠️ **`public.feedback` HAS NO DELETE POLICY**, measured — three policies
+  exist and none is DELETE, so "I still cannot delete help tickets" is not a
+  broken button, it was never built at any layer.
+- `4e6652a` — the squash that revoked TRUNCATE from `authenticated`.
+
 - 🧨 **`authenticated` CAN NO LONGER TRUNCATE ANY TABLE IN `public` — 31 OF 34
   TABLES, AND THE ONE PRIVILEGE RLS CANNOT FILTER.** Postgres never applies row
   security to TRUNCATE: not "the policies allowed it", the mechanism does not

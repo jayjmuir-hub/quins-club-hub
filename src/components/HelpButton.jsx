@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Sheet } from './Sheet.jsx'
 import Button from './Button.jsx'
+import MyReportsList from './MyReportsList.jsx'
 import {
   submitFeedback,
   captureContext,
   feedbackRef,
   listFeedback,
-  FEEDBACK_STATUS_LABELS,
 } from '../data/feedback.js'
 
 // The `?` that lets any member say "this is broken" or "this would be better",
@@ -279,44 +279,10 @@ export default function HelpButton() {
 
         {step === 'mine' && (
           <div>
-            {mine === null && <p className="text-[13px] text-ink-muted">Loading…</p>}
-
-            {mineError && (
-              <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-[13px] font-semibold text-brand-deep">
-                {mineError}
-              </p>
-            )}
-
-            {mine !== null && mine.length === 0 && !mineError && (
-              <p className="mb-4 text-[13px] text-ink-muted">
-                You haven&rsquo;t reported anything yet.
-              </p>
-            )}
-
-            {mine !== null &&
-              mine.map((row) => (
-                <div key={row.id} className="border-b border-line py-3 last:border-b-0">
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className="rounded-pill bg-surface-sunk px-2 py-0.5 text-[13px] font-semibold text-ink">
-                      {FEEDBACK_STATUS_LABELS[row.status] ?? row.status}
-                    </span>
-                    <span className="text-[13px] text-ink-faint">{feedbackRef(row.ref)}</span>
-                  </div>
-                  <p className="text-[15px] text-ink">{row.body}</p>
-
-                  {/* ⚠️ THE ONLY REPLY CHANNEL, AND IT IS WHY THE NOTE FIELD
-                      EXISTS AT ALL. Jay, 18 Aug 2026, chose in-app over a
-                      second e-mail. So if this does not render the admin's
-                      note, an admin can type an answer that nobody ever
-                      reads. */}
-                  {row.admin_note && (
-                    <p className="mt-2 rounded-[11px] bg-surface-sunk p-3 text-[13px] text-ink">
-                      <span className="font-semibold">From the club: </span>
-                      {row.admin_note}
-                    </p>
-                  )}
-                </div>
-              ))}
+            {/* ⚠️ ONE COPY, SHARED WITH /my-reports. Extracted 19 Aug 2026 — a second
+                copy of this list would drift, and the drift would be invisible
+                because nobody has both views open at once. */}
+            <MyReportsList reports={mine} error={mineError} />
 
             <div className="mt-4">
               <Button type="button" variant="secondary" onClick={() => setStep('choose')}>
