@@ -1747,6 +1747,16 @@ export default function Accounts() {
                   const displayName = realName || profile.email || 'No name yet'
                   const label = profile.email || displayName
                   const signedUp = formatJoined(profile.created_at)
+                  // ⚠️ THREE STATES, NOT TWO, AND THE THIRD IS WHY THIS IS NOT
+                  // A PLAIN BOOLEAN. `undefined` means the column was not in the
+                  // row at all — an older cached response, or this code running
+                  // before the migration — and rendering "not yet confirmed" for
+                  // it would state as fact something we simply do not know.
+                  // `null` is the real "never opened the confirmation email".
+                  const emailConfirmed =
+                    profile.email_confirmed_at === undefined
+                      ? undefined
+                      : profile.email_confirmed_at !== null
                   // The second line: the address, unless the heading is already
                   // showing it, plus when they signed up. Built here rather than
                   // inline so the JSX below stays readable.
@@ -1776,6 +1786,28 @@ export default function Accounts() {
                               className="ml-2 rounded-pill bg-brand/10 px-2 py-0.5 align-middle text-[11px] font-bold uppercase tracking-[0.06em] text-brand-deep"
                             >
                               Asked
+                            </span>
+                          )}
+                          {/* ⚠️ THE UNCONFIRMED CASE IS THE ONE THAT CHANGES
+                              WHAT AN ADMIN SHOULD DO, so it is the one that
+                              carries colour. Somebody who never opened the
+                              confirmation email cannot sign in at all — granting
+                              them access achieves nothing until they do, and
+                              before this badge existed their card was
+                              indistinguishable from somebody genuinely waiting.
+                              The confirmed case is deliberately quiet: it is the
+                              normal state, and a list where every card shouts is
+                              a list nobody reads. */}
+                          {emailConfirmed !== undefined && (
+                            <span
+                              data-testid="email-confirmed-badge"
+                              className={`ml-2 rounded-pill px-2 py-0.5 align-middle text-[11px] font-bold uppercase tracking-[0.06em] ${
+                                emailConfirmed
+                                  ? 'bg-surface-mute text-ink-muted'
+                                  : 'bg-warn-bg text-warn-ink'
+                              }`}
+                            >
+                              {emailConfirmed ? 'Email confirmed' : 'Email not yet confirmed'}
                             </span>
                           )}
                         </span>

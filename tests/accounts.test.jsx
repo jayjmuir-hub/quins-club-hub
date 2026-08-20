@@ -2309,3 +2309,67 @@ describe('Accounts — staff asking for access', () => {
     expect(screen.getAllByTestId('pending-membership')).toHaveLength(1)
   })
 })
+
+describe('Accounts — the email-confirmed badge', () => {
+  // ⚠️ WHY THIS BADGE EXISTS. Two very different people land in "Waiting for
+  // access" and their cards were identical: somebody who confirmed, signed in
+  // and is genuinely waiting for an admin, and somebody who created a login and
+  // never opened the confirmation email — who cannot sign in at all, so granting
+  // them access achieves nothing. Measured on production 20 Aug 2026: of five
+  // accounts with no active membership, one was in the second state.
+
+  function waiting() {
+    return screen.getByTestId('waiting-for-access')
+  }
+
+  function pendingWith(extra) {
+    // Only the two genuinely-unattached rows carry the override; the member
+    // rows stay as they are, so this cannot accidentally test the member list.
+    listPendingProfilesMock.mockResolvedValue(
+      PROFILE_ROWS.map((row) =>
+        row.id === JANICE_PENDING.id || row.id === RAW_PENDING.id ? { ...row, ...extra } : row,
+      ),
+    )
+  }
+
+  it('says "not yet confirmed" when the login has never been confirmed', async () => {
+    pendingWith({ email_confirmed_at: null })
+    setup()
+    await screen.findByText('Sara Coach')
+
+    const badges = within(waiting()).getAllByTestId('email-confirmed-badge')
+    expect(badges).toHaveLength(2)
+    badges.forEach((b) => expect(b).toHaveTextContent(/email not yet confirmed/i))
+    // ⚠️ COLOUR IS PART OF THE MESSAGE HERE, not decoration: this is the state
+    // that changes what an admin should do, so it must not render as the quiet
+    // one. Asserting the token means a later restyle has to be deliberate.
+    expect(badges[0].className).toMatch(/bg-warn-bg/)
+  })
+
+  it('says "confirmed" when the login has been confirmed', async () => {
+    pendingWith({ email_confirmed_at: '2026-08-20T09:00:00Z' })
+    setup()
+    await screen.findByText('Sara Coach')
+
+    const badges = within(waiting()).getAllByTestId('email-confirmed-badge')
+    expect(badges).toHaveLength(2)
+    badges.forEach((b) => expect(b).toHaveTextContent(/^email confirmed$/i))
+    // The normal state stays quiet. A list where every card shouts is a list
+    // nobody reads, and the warn colour would then mean nothing.
+    expect(badges[0].className).not.toMatch(/bg-warn-bg/)
+  })
+
+  it('⚠️ says NOTHING when the column is absent, rather than guessing', async () => {
+    // The third state, and the reason this is not a plain boolean. An older
+    // cached response — or this code reaching a database where the migration
+    // has not been applied — returns rows with no such key. Treating that as
+    // "not yet confirmed" would state as fact something we do not know, about
+    // real families, on the screen an admin acts from.
+    pendingWith({})
+    setup()
+    await screen.findByText('Sara Coach')
+
+    expect(within(waiting()).getAllByTestId('waiting-person')).toHaveLength(2)
+    expect(within(waiting()).queryAllByTestId('email-confirmed-badge')).toHaveLength(0)
+  })
+})

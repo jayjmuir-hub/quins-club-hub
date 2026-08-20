@@ -10,6 +10,39 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🏷️ **THE "WAITING FOR ACCESS" LIST NOW SAYS WHETHER THE LOGIN WAS EVER
+  CONFIRMED.** Two very different people land in that list and their cards were
+  identical: somebody who confirmed, signed in and is genuinely waiting for an
+  admin, and somebody who created a login and **never opened the confirmation
+  email** — who cannot sign in at all, so granting them access achieves nothing
+  until they do. Measured on production the day this shipped: of five accounts
+  with no active membership, one was in the second state.
+  ⚠️ **THE OBVIOUS IMPLEMENTATION IS SILENTLY BROKEN, AND THE MIGRATION EXISTS
+  TO AVOID IT.** `email_confirmed_at` lives in `auth.users`, which PostgREST
+  does not expose, so it is mirrored onto `public.profiles` the same way
+  `email` already is. But it CANNOT ride the existing sync:
+  `on_auth_user_email_updated` fires `AFTER UPDATE OF email` with
+  `WHEN (old.email IS DISTINCT FROM new.email)`, and confirming an address does
+  not change the address. That trigger would never fire, the column would sit
+  null forever, and the screen would confidently report every member as
+  unconfirmed. Hence `on_auth_user_email_confirmed`, keyed on the column that
+  actually moves.
+  ⚠️ **THREE STATES IN THE UI, NOT TWO.** `undefined` — the column absent from
+  the row — renders NOTHING. Only `null` means "never confirmed". Treating the
+  two alike would state as fact something we do not know, about real families,
+  on the screen an admin acts from.
+  ⚠️ **ORDER MATTERS: THE MIGRATION GOES FIRST.** PostgREST rejects a select
+  naming a column that does not exist, so shipping the code first would not
+  mean a missing badge — it would error the whole Accounts screen.
+  ✅ **NO NEW GRANT, AND NONE NEEDED**, measured before it was written:
+  `authenticated` already holds table-level SELECT on `profiles` and `anon`
+  holds nothing, so the column is readable exactly where the row already was.
+  `db/tests/email-confirmed-sync.sql` proves the mirror by making the database
+  do it — setting the value and clearing it again — rather than by checking the
+  trigger exists, because the way this breaks is that it silently stops moving.
+- `407e5e4` — the squash that pointed the clone check at the main clone.
+
+
 - 🛡️ **THE CLONE CHECK NOW WATCHES THE MAIN CLONE TOO, WHICH IS THE ONE FOLDER
   IT COULD NEVER SEE.** Measured the same day: the main clone was **35 commits
   behind** while `scripts/session-guard.mjs` reported nothing wrong. Both were

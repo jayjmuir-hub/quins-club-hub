@@ -159,7 +159,14 @@ export async function listClubMembers() {
 export async function listPendingProfiles() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, email, created_at')
+    // ⚠️ email_confirmed_at ADDED 20 Aug 2026, AND THIS IS A COLUMN LIST,
+    // so the column has to be named here or the screen never sees it. It is a
+    // mirror of auth.users.email_confirmed_at kept by on_auth_user_created and
+    // on_auth_user_email_confirmed — db/migrations/20260820_profile_email_confirmed.sql.
+    // ⚠️ THAT MIGRATION MUST BE APPLIED BEFORE THIS LINE SHIPS. PostgREST
+    // rejects a select naming a column that does not exist, so the failure is
+    // not a blank badge — it is the whole Accounts screen erroring.
+    .select('id, full_name, email, created_at, email_confirmed_at')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
