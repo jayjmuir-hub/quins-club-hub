@@ -219,6 +219,40 @@ describe('iOS Safari — instructions, and deliberately no button', () => {
   })
 })
 
+describe('The heading, and the word it deliberately borrows', () => {
+  // ⚠️ NOTHING PINNED THIS COPY UNTIL 20 Aug 2026, WHICH IS WHY IT IS HERE.
+  // Jay asked for "Download the App" because that is the word parents look
+  // for. It is also the one word that is not literally true — nothing is
+  // downloaded from a store — so it is exactly the sort of deliberate wording
+  // that gets "corrected" back by somebody reading the body text.
+  it('says Download the App on Android', async () => {
+    setPlatform({ ua: UA.androidChrome })
+    __setDeferredPromptForTests(fakeEvent())
+    render(<InstallPrompt />)
+    await screen.findByTestId('install-prompt')
+    expect(screen.getByText('Download the App')).toBeInTheDocument()
+  })
+
+  it('says Download the App on iOS Safari too', async () => {
+    setPlatform({ ua: UA.iphoneSafari })
+    render(<InstallPrompt />)
+    await screen.findByTestId('install-prompt')
+    expect(screen.getByText('Download the App')).toBeInTheDocument()
+  })
+
+  // ⚠️ THE HEADING AND THE SAFARI STEP MUST DISAGREE, AND THIS IS THE GUARD.
+  // "Add to Home Screen" is the literal menu item a parent has to find in the
+  // iOS share sheet. Renaming it to match the heading would point at a control
+  // that does not exist — the dead-affordance defect this component's
+  // Android/iOS split exists to avoid.
+  it('⚠️ still names the real Safari menu item, which is NOT "Download"', async () => {
+    setPlatform({ ua: UA.iphoneSafari })
+    render(<InstallPrompt />)
+    await screen.findByTestId('install-prompt')
+    expect(screen.getByText(/add to home screen/i)).toBeInTheDocument()
+  })
+})
+
 describe('Dismissing it', () => {
   it('closes and stays closed on the next render', async () => {
     setPlatform({ ua: UA.iphoneSafari })
