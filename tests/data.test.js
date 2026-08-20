@@ -41,6 +41,7 @@ vi.mock('../src/data/photos.js', () => ({
 
 import { supabase } from '../src/lib/supabase.js'
 import { MAX_ROWS, MAX_TOTAL_ROWS } from '../src/data/limits.js'
+import { createAccessRequest } from '../src/data/accessRequests.js'
 import {
   listEvents,
   subscribeEvents,
@@ -2735,5 +2736,46 @@ describe('listMembershipAudit', () => {
     expect(builder.order).toHaveBeenNthCalledWith(1, 'at', { ascending: false })
     expect(builder.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false })
     expect(builder.limit).toHaveBeenCalledWith(200)
+  })
+})
+
+describe('createAccessRequest', () => {
+  // ⚠️ NO DATA-LAYER TEST EXISTED FOR THIS WRITER UNTIL 20 Aug 2026, and its
+  // absence was proved rather than assumed: deleting requested_team_ids from the
+  // insert left every other test in the suite green. Six files mock this module,
+  // so all of them assert what the CALLER passed and none what is actually sent
+  // to Postgres — the exact shape of a mirror that silently stops moving.
+
+  it('sends every squad as the array, and the FIRST as requested_team_id', async () => {
+    const { builder, calls } = createQueryBuilder({ data: { id: 'req-1' } })
+    supabase.from.mockReturnValue(builder)
+
+    await createAccessRequest({
+      profileId: 'p-1',
+      role: 'parent',
+      teamIds: ['t-a', 't-b', 't-c'],
+    })
+
+    expect(supabase.from).toHaveBeenCalledWith('access_requests')
+    const sent = calls.insert[0][0]
+    expect(sent.requested_team_ids).toEqual(['t-a', 't-b', 't-c'])
+    // ⚠️ THE SINGLE COLUMN IS WHAT THE INSERT POLICY CHECKS. If it ever stops
+    // being populated the row is refused outright, so this is not a duplicate of
+    // the assertion above.
+    expect(sent.requested_team_id).toBe('t-a')
+    expect(sent.requested_role).toBe('parent')
+  })
+
+  it('⚠️ sends null, not an empty array, when no squads were chosen', async () => {
+    // A null reads as "this row predates the column, fall back to the single
+    // one", which is what the card does. An empty array would claim they chose
+    // none, and no backfill was run precisely to keep those two apart.
+    const { builder, calls } = createQueryBuilder({ data: { id: 'req-2' } })
+    supabase.from.mockReturnValue(builder)
+
+    await createAccessRequest({ profileId: 'p-1', role: 'volunteer', teamId: 't-a' })
+
+    expect(calls.insert[0][0].requested_team_ids).toBeNull()
+    expect(calls.insert[0][0].requested_team_id).toBe('t-a')
   })
 })
