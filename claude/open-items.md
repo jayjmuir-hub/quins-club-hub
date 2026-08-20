@@ -608,13 +608,19 @@ proves you wrong.**
   ⚠️ **The redundant arm was KEPT.** It costs one boolean and is what stops
   `avail read` drifting if that status test is ever taken back out.
 
-  ⚠️ **AND THE SET THAT HAS NEVER MET ITS OWN RUNNER KEEPS GROWING.**
-  `db/tests/approval-push.sql` joined it on 19 Aug 2026. It was proved by
-  pasting its contents through the Supabase MCP — both parts pass, and part 3's
-  self-test fires — but **`npm run db:check` has never executed it**, so the
-  file is verified while the path that is supposed to verify it nightly is not.
-  ⚠️ **THAT DISTINCTION IS THE WHOLE ITEM.** "The harness is green" and "the
-  harness runs" are different claims, and only the first one is true here.
+  ✅ **CLOSED 20 Aug 2026 — THE RUNNER RUNS.** This said the set that had never
+  met its own runner "keeps growing", and named `db/tests/approval-push.sql`.
+  `SUPABASE_DB_URL` was set on **19 Aug 12:50 UTC** and the nightly at
+  **20 Aug 04:01 executed 34 harnesses**, approval-push among them, reporting
+  "All harnesses passed." The distinction this item was built on — "the harness
+  is green" versus "the harness runs" — is now true in both directions.
+  ⚠️ **AND IT IMMEDIATELY TAUGHT A THIRD THING, WHICH IS WHY THIS STAYS HERE.**
+  approval-push and notice-push passed that 04:01 run **by coincidence**: both
+  compared the whole audience's notified devices against one person's, equal
+  only while a single person had subscribed. Subscribers went 1 → 8 during the
+  day and both would have gone red the next morning, for a change nobody made.
+  **A green nightly is evidence about the moment it ran and nothing else.**
+  Fixed in `7390a2c`; `claude/runbooks/db-harnesses.md` carries the rule.
   ✅ Before trusting the paste route for DDL, the rollback itself was proved:
   a throwaway `create table` inside `begin`/`rollback` was gone afterwards,
   **with a control confirming the same query could see a table that does

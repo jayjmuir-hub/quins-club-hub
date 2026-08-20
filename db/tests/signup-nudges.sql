@@ -19,9 +19,13 @@
 --
 -- ══ ⚠️ THIS FILE HAD NEVER ONCE BEEN RUN UNTIL 20 Aug 2026 ════════════════
 --
--- It was written, reviewed and committed, and `SUPABASE_DB_URL` has never been
--- set, so `npm run db:check` has never executed it. Two things were wrong that
--- one run would have caught in a second:
+-- It was written, reviewed and committed on 20 August and added AFTER that
+-- morning's nightly `db:check`, so no run had ever reached it.
+-- ⚠️ NOT because the runner is off: `SUPABASE_DB_URL` has been set since
+-- 19 Aug 2026 12:50 UTC and the 20 Aug 04:01 nightly ran 34 harnesses green.
+-- Two handoffs said the secret was "still unset" long after it was set — check
+-- `gh secret list`, do not carry the claim forward. Two things were wrong here
+-- that one run would have caught in a second:
 --
 --   1. THE FIXTURE COULD NOT EXECUTE. It inserted `public.profiles` before
 --      `auth.users`, violating `profiles_id_fkey` on the first statement of its
