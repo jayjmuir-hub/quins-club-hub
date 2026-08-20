@@ -49,6 +49,13 @@ if (!gitDir) process.exit(0)
 
 const problems = []
 const notes = []
+// ⚠️ A THIRD SEVERITY, AND IT EARNS ITS KEEP. An advisory is something wrong
+// somewhere ELSE on this machine — true, worth saying, but it does not make
+// THIS working tree untrustworthy. Filing it under `problems` would print
+// "do not treat the working tree as current" about a tree that is current,
+// and a guard that cries wolf is the failure mode this file was written to
+// avoid (see the header).
+const advisories = []
 
 // ── 1. Shallow ────────────────────────────────────────────────────────────
 // ⚠️ THE LOCAL CHECK, AND THE ONE WITH NO FALSE POSITIVES. A shallow clone
@@ -95,16 +102,74 @@ if (counts) {
   notes.push('Could not compare against origin/main — is the remote configured?')
 }
 
+// ── 3. The MAIN worktree, when this is not it ─────────────────────────────
+// ⚠️ THE GAP THIS CLOSES WAS MEASURED, 20 Aug 2026: the main clone sat 35
+// commits behind while every check above reported nothing. Both were true at
+// once. Sessions run in LINKED WORKTREES, which are cut fresh from origin/main
+// and are therefore current by construction — so the one folder this guard
+// never looked at was precisely the one that could rot, and did. The alarm was
+// pointed at the wrong room.
+//
+// ⚠️ NO SECOND FETCH, ON PURPOSE. Linked worktrees share the common .git, so
+// the origin/main that section 2 just updated is the very ref this reads. A
+// second network call here would double the cost of every session start to
+// re-learn something already known.
+//
+// ⚠️ `git worktree list` PUTS THE MAIN WORKTREE FIRST — that is documented
+// git behaviour, and it is why no path is hard-coded here. An absolute path
+// that happens to exist on the machine a script was written on is not code,
+// it is a local accident; harness/playwright.mjs carries the same warning for
+// the same reason. SESSION_GUARD_MAIN_DIR overrides it, which is how the
+// fault injection below was run.
+const mainDir =
+  process.env.SESSION_GUARD_MAIN_DIR ||
+  (git('worktree list --porcelain') || '').split('\n')[0].replace(/^worktree /, '').trim()
+const here = git('rev-parse --path-format=absolute --show-toplevel')
+
+// Windows gives back a mix of slashes and cases between commands, so compare
+// normalised. Getting this wrong would make the guard nag in the main clone
+// about itself.
+const samePlace = (a, b) =>
+  a && b && a.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() ===
+    b.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+
+if (mainDir && here && !samePlace(mainDir, here)) {
+  const mainCounts = git(`-C "${mainDir}" rev-list --left-right --count origin/main...HEAD`)
+  if (mainCounts) {
+    const [mainBehind] = mainCounts.split(/\s+/).map(Number)
+    if (mainBehind > 0) {
+      // ⚠️ WHY THE DIRTY CHECK IS PART OF THE SAME MESSAGE. On 20 Aug the
+      // pull could not simply be run: two tracked files were locally modified
+      // AND touched by incoming commits, so git refused. Saying "run git pull"
+      // without saying that would send somebody into an error they then have
+      // to diagnose from scratch.
+      const dirty = git(`-C "${mainDir}" status --porcelain`)
+      advisories.push(
+        `The MAIN clone at ${mainDir} is ${mainBehind} commit(s) behind origin/main. ` +
+          'This worktree is fine — that folder is not, and nothing you do here will ' +
+          'update it, which is why it drifts unnoticed. Run ' +
+          `\`git -C "${mainDir}" pull --ff-only\`.` +
+          (dirty
+            ? ' NOTE: it has uncommitted changes, so that pull will REFUSE if any of ' +
+              'them touch files the incoming commits also touch. Commit or stash them first.'
+            : ''),
+      )
+    }
+  }
+}
+
 // ── Output ────────────────────────────────────────────────────────────────
 // Silence when there is nothing wrong. A guard that speaks on every start is a
 // guard people stop reading, which is how the prose version failed.
-if (problems.length === 0 && notes.length === 0) process.exit(0)
+if (problems.length === 0 && notes.length === 0 && advisories.length === 0) process.exit(0)
 
-const lines = [...problems, ...notes]
+const lines = [...problems, ...advisories, ...notes]
 const headline =
   problems.length > 0
     ? `⚠️ Clone check: ${problems.length} problem(s) — see below before doing any work.`
-    : '⚠️ Clone check: could not fully verify this clone.'
+    : advisories.length > 0
+      ? `⚠️ Clone check: this worktree is fine, but ${advisories.length} thing(s) need attention elsewhere.`
+      : '⚠️ Clone check: could not fully verify this clone.'
 
 process.stdout.write(
   JSON.stringify({
@@ -117,7 +182,10 @@ process.stdout.write(
         problems.length > 0
           ? 'Resolve this before reading or changing anything. Do not treat the ' +
             'working tree or the docs as current until it is fixed.'
-          : 'Treat the freshness of this clone as unverified.',
+          : advisories.length > 0
+            ? 'This working tree is current and can be trusted. Tell the user about ' +
+              'the item(s) above, which concern another folder on this machine.'
+            : 'Treat the freshness of this clone as unverified.',
       ].join('\n'),
     },
   }),

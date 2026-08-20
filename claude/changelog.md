@@ -10,6 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🛡️ **THE CLONE CHECK NOW WATCHES THE MAIN CLONE TOO, WHICH IS THE ONE FOLDER
+  IT COULD NEVER SEE.** Measured the same day: the main clone was **35 commits
+  behind** while `scripts/session-guard.mjs` reported nothing wrong. Both were
+  true at once.
+  ⚠️ **THE MECHANISM IS THE WHOLE POINT, AND IT IS NOT NEGLECT.** Sessions run
+  in LINKED WORKTREES, which are cut fresh from `origin/main` and are therefore
+  current *by construction*. The guard checked whichever folder the session
+  opened in, so it checked a folder that could not be stale — and never looked
+  at the one that could. **The alarm was pointed at the wrong room.** No amount
+  of remembering the rule would have caught this; the rule was being followed.
+  ⚠️ **A THIRD SEVERITY, DELIBERATELY.** An advisory says something is wrong
+  ELSEWHERE on the machine. Filing it under `problems` would print "do not
+  treat the working tree as current" about a tree that IS current — a guard
+  that cries wolf is the exact failure this file's header was written against.
+  ⚠️ **NO SECOND FETCH AND NO HARD-CODED PATH.** Linked worktrees share the
+  common `.git`, so the `origin/main` section 2 just fetched is the ref this
+  reads. The main worktree is found via `git worktree list --porcelain`, which
+  lists it first — an absolute path that happens to exist on one machine is a
+  local accident, not code.
+  ⚠️ **IT ALSO WARNS WHEN THE PULL WILL REFUSE.** On 20 Aug the fix was not
+  simply `git pull`: two tracked files were locally modified *and* touched by
+  incoming commits, so git declined. Telling somebody to run a command that
+  will fail, without saying why, just moves the puzzle.
+  ✅ **PROVED IN FOUR STATES, since the hook had no test at all**: silent when
+  everything is current; fires when the main clone is behind; adds the refusal
+  warning when it is behind AND dirty; and stays silent when run FROM the main
+  clone, which is the false positive that would have made it noise.
+- `8344ab6` — the squash that changed the install banner to "Download the App".
+
+
 - ✏️ **THE INSTALL BANNER NOW SAYS "DOWNLOAD THE APP".** Jay, 20 Aug 2026 —
   parents look for a download, and the old heading ("Add Quins to your home
   screen") described the mechanism rather than the thing they wanted.
