@@ -10,6 +10,41 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 📧 **THE TWO CHASE EMAILS WOULD HAVE ARRIVED SECONDS APART.**
+  `db/migrations/20260820_signup_nudge_spacing.sql`, **applied to production**.
+  The original guard asked *"has nudge 1 been sent?"* and never *"how long
+  ago?"* — and `private.send_signup_nudges` loops `array[1, 2]` inside ONE call,
+  so step 1 inserts the nudge-1 row and step 2 finds the row it just wrote **in
+  the same transaction**. Anybody already older than seven days when first
+  chased got both, the second saying it was the last reminder we would send.
+  ⚠️ **Measured against production, not imagined: two accounts, 10 and 11 days
+  old**, would have received both the moment an admin clicked **Restore** —
+  `restoreAccessRequest` DELETEs the request row, so un-dismissing somebody
+  removes the only thing suppressing the chase and their age does the rest.
+  ⚠️ **It is the 20 Aug lesson a third time: what a row MEANS changed under a
+  query reading it.** "Has a nudge-1 row" was written to mean *chased a while
+  ago* and quietly also meant *chased four lines up*.
+  Nudge 2 now needs nudge 1 to be **six days** old. A backlog person still gets
+  both — Jay: *"they should get the email if info is missing"* — six days apart
+  rather than six seconds.
+- 🧪 **`db/tests/signup-nudges.sql` HAD NEVER ONCE BEEN RUN, AND BOTH THINGS
+  WRONG WITH IT WERE INVISIBLE BECAUSE OF THAT.** `SUPABASE_DB_URL` is still
+  unset, so `npm run db:check` has never executed it.
+  ⚠️ **Its fixture could not execute at all** — it inserted `public.profiles`
+  before `auth.users`, violating `profiles_id_fkey` on the first statement of
+  its own setup, and the row was a duplicate anyway because inserting into
+  `auth.users` fires `on_auth_user_created` and the profile appears by itself.
+  ⚠️ **And part 5 ASSERTED THE BUG**, demanding nudge 2 be due the instant the
+  claim row was written. **A harness that has never run is not evidence of
+  anything, and reads like evidence of everything.**
+  Now proved both ways against production inside a rolled-back transaction:
+  **fails at part 5 before the migration, passes all seven after.**
+- 🔎 **Measured, so it is not asked again:** the signup-nudge cron has **never
+  fired** — no row in `cron.job_run_details` at all — because it was scheduled
+  after that day's 07:10 UTC slot. `public.signup_nudges` is empty. The two
+  unfinished accounts are correctly excluded, so the first real fire sends
+  nothing. The funnel is real, not a broken query: 51 users → 49 confirmed → 35
+  over 24h → 2 without a membership → 0 after the volunteer/dismissed rule.
 - 🔒 **A REAL CLUB MEMBER'S NAME AND INBOX WERE IN A PUBLIC REPO, AND SO WAS A
   CHILD'S ADDRESS.** The 20 Aug handoff recorded this as one hard-coded address
   in `harness/stubs/`. It was that, plus the same person's **first name across
@@ -38,6 +73,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   at the harness, which is precisely where the address was sitting.
   ⚠️ `claude/` is deliberately exempt: a check that fails an operational runbook
   is a check that gets switched off.
+- `f27b99a` — the squash that took a real member's name and a child's inbox out of a public repo.
 - `c8009d5` — the squash that recorded the 20 Aug session.
 
 - 📓 **20 Aug session record** —
