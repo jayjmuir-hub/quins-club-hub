@@ -1258,7 +1258,15 @@ describe('Accounts — access builder', () => {
 
   // Jay asked for this explicitly: without it, a parent whose children have
   // not been imported yet cannot be granted anything at all.
-  it('falls back to age groups, with a null player, when the children are not on the roster', async () => {
+  // ⚠️ THIS TEST PINNED A PATH THAT COULD NEVER WORK — rewritten 20 Aug 2026.
+  // It asserted age-group rows with playerId: null for a parent, and the
+  // database refuses exactly that: memberships_family_role_needs_player, CHECK
+  // (role not in ('parent','player') OR player_id IS NOT NULL). It stayed green
+  // because grantMemberships is mocked here, so the guard in src/data/members.js
+  // never ran — which is precisely how the broken control reached production and
+  // answered an admin with a message from a layer they cannot see.
+  it('adds the child and links the parent to the id the database returned', async () => {
+    upsertPlayerMock.mockResolvedValue({ id: 'player-new', team_id: 'team-u12' })
     const { user } = setup()
 
     await screen.findByText('Sara Coach')
@@ -1268,15 +1276,29 @@ describe('Accounts — access builder', () => {
     )
 
     const builder = builderFor('raw@example.com')
+    // The child picker gives way to the add-a-child form, exactly as it does
+    // for a player who is not on the roster.
     expect(within(builder).queryByTestId('player-picker')).toBeNull()
-
-    await tickAgeGroup(user, 'raw@example.com', 'U10')
-    await tickAgeGroup(user, 'raw@example.com', 'U12 Boys')
+    await user.type(within(builder).getByLabelText(/name of the new child/i), 'Rowan Adeyemi')
+    await user.selectOptions(
+      within(builder).getByLabelText(/age group for the new child/i),
+      TEAM_U12.id,
+    )
     await submitAccess(user, 'Give access', 'raw@example.com')
 
+    expect(upsertPlayerMock).toHaveBeenCalledWith({
+      full_name: 'Rowan Adeyemi',
+      team_id: TEAM_U12.id,
+      club_id: CLUB_ID,
+    })
     expect(grantMembershipsMock).toHaveBeenCalledWith([
-      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'parent', teamId: 'team-u10', playerId: null },
-      { profileId: 'profile-raw', clubId: CLUB_ID, role: 'parent', teamId: 'team-u12', playerId: null },
+      {
+        profileId: 'profile-raw',
+        clubId: CLUB_ID,
+        role: 'parent',
+        teamId: TEAM_U12.id,
+        playerId: 'player-new',
+      },
     ])
   })
 

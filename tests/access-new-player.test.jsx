@@ -175,25 +175,39 @@ describe('granting Player access to someone not on the roster', () => {
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
-  it('leaves the parent fallback alone — it must NOT create a player', async () => {
-    // A parent's "not on the roster yet" is age-group rows with player_id
-    // null, and that is deliberate. Only the player role creates.
+  // ⚠️ THIS TEST USED TO PIN A PATH THAT COULD NEVER WORK — rewritten
+  // 20 Aug 2026. It asserted that a parent with "not on the roster yet" builds
+  // an age-group row and creates NO player. The database refuses exactly that
+  // row (`memberships_family_role_needs_player`), so the behaviour it protected
+  // produced a refusal every time an admin used it. A green test over a broken
+  // control is worse than no test: it is why this survived to production.
+  it('adds the child and links the parent to it', async () => {
+    upsertPlayerMock.mockResolvedValue({ id: 'player-new', team_id: 'team-u16b' })
     const { onSubmit, user } = setup()
     await user.selectOptions(screen.getByLabelText(/role for/i), 'parent')
-    // ⚠️ The two roles word this differently on purpose — "Their children
-    // aren't on the roster yet" vs "They're not on the roster yet — add them"
-    // — because they do different things. Matching the shared part rather than
-    // either wording keeps this test about the BEHAVIOUR.
+    // ⚠️ Matching the SHARED part of the two wordings, not either one: both
+    // roles now add the person, but a parent adds a "child" and a player adds
+    // themselves, so the labels differ and the behaviour is what matters here.
     await user.click(screen.getByRole('checkbox', { name: /on the roster yet/i }))
 
-    expect(screen.queryByTestId('new-player-form')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('checkbox', { name: 'U16B Contact' }))
+    // The same form the player role gets — because the same rule applies.
+    expect(screen.getByTestId('new-player-form')).toBeInTheDocument()
+    await user.type(screen.getByLabelText(/name of the new child/i), 'Rowan Adeyemi')
+    await user.selectOptions(screen.getByLabelText(/age group for the new child/i), 'team-u16b')
     await user.click(screen.getByRole('button', { name: /give access/i }))
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
-    expect(upsertPlayerMock).not.toHaveBeenCalled()
+    expect(upsertPlayerMock).toHaveBeenCalledWith({
+      full_name: 'Rowan Adeyemi',
+      team_id: 'team-u16b',
+      club_id: 'club-1',
+    })
+    // ⚠️ role 'parent', NOT 'player'. The branch is shared; hard-coding the
+    // role there would land a parent on their own child's squad as a PLAYER.
+    // And playerId is the id the DATABASE returned — the whole reason this row
+    // can exist at all.
     expect(onSubmit).toHaveBeenCalledWith([
-      { role: 'parent', teamId: 'team-u16b', playerId: null },
+      { role: 'parent', teamId: 'team-u16b', playerId: 'player-new' },
     ])
   })
 })

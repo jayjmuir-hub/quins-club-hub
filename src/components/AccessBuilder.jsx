@@ -57,6 +57,7 @@ export const NO_CHILD_CHOSEN =
 export const NO_PLAYER_CHOSEN =
   "Choose which player this person is — or tick “not on the roster yet” and add them."
 export const NEW_PLAYER_NEEDS_NAME = 'Give the new player a name.'
+export const NEW_CHILD_NEEDS_NAME = "Type the child's name, so they can be added to the roster."
 export const NEW_PLAYER_NEEDS_TEAM = 'Choose an age group for the new player.'
 // ⚠️ SHOULD BE UNREACHABLE, AND EXISTS BECAUSE THE ALTERNATIVE WAS WORSE.
 // players.club_id is NOT NULL, and every squad in the picker carries a club_id,
@@ -139,7 +140,10 @@ export default function AccessBuilder({
   const childMode = role === 'parent' && !noRoster
   // A player who is not on the roster yet gets the new-player form instead of
   // the picker — there is nothing to pick.
-  const newPlayerMode = role === 'player' && noRoster
+  // ⚠️ PARENT AS WELL AS PLAYER, 20 Aug 2026. Both roles need a real player
+  // row before a membership can exist, so both take the same route when the
+  // child is not on the roster yet.
+  const newPlayerMode = (role === 'player' || role === 'parent') && noRoster
   const needsPlayers = childMode || (role === 'player' && !noRoster)
   const needsTeams = isSquadStaffRole(role) || (role === 'parent' && noRoster)
 
@@ -183,7 +187,20 @@ export default function AccessBuilder({
       return { rows: [{ role: 'admin', teamId: null, playerId: null }] }
     }
 
-    if (isSquadStaffRole(role) || (role === 'parent' && noRoster)) {
+    // ⚠️ THE PARENT FALLBACK IS GONE, AND IT COULD NEVER HAVE WORKED. It built
+    // a parent row with playerId: null, and the DATABASE refuses exactly that —
+    // `memberships_family_role_needs_player`, CHECK (role not in ('parent',
+    // 'player') OR player_id IS NOT NULL), Jay's ruling of 14 Aug 2026: "nobody
+    // outside staff should be able to create an account without a player".
+    //
+    // ⚠️ SO THE TICKBOX WAS A CONTROL THAT ALWAYS FAILED, and the refusal came
+    // from src/data/members.js — a layer the admin cannot see — which is why it
+    // read as a mystery rather than as a rule. It reached production because
+    // every test here mocks grantMemberships, so the guard never ran.
+    //
+    // It now does what the player path already did: ADD the child, then link the
+    // parent to it. Same one ruling, honoured instead of contradicted.
+    if (isSquadStaffRole(role)) {
       if (teamIds.length === 0) return { error: NO_TEAM_CHOSEN }
       return { rows: teamIds.map((teamId) => ({ role, teamId, playerId: null })) }
     }
@@ -193,7 +210,9 @@ export default function AccessBuilder({
     // back with a real id — see the note there for why this is not the
     // parent's player_id-null fallback.
     if (newPlayerMode) {
-      if (!newPlayerName.trim()) return { error: NEW_PLAYER_NEEDS_NAME }
+      if (!newPlayerName.trim()) {
+        return { error: role === 'parent' ? NEW_CHILD_NEEDS_NAME : NEW_PLAYER_NEEDS_NAME }
+      }
       if (!newPlayerTeam) return { error: NEW_PLAYER_NEEDS_TEAM }
       // ⚠️ club_id IS MANDATORY ON players AND WAS NOT BEING SENT. This path
       // built { full_name, team_id } only, so the insert hit a NOT NULL
@@ -210,7 +229,10 @@ export default function AccessBuilder({
       return {
         rows: [
           {
-            role: 'player',
+            // ⚠️ `role`, NOT 'player'. This branch now serves a parent too, and
+            // hard-coding it here would silently grant the wrong kind of access —
+            // a parent would land as a PLAYER on their own child's squad.
+            role,
             teamId: newPlayerTeam,
             playerId: null,
             newPlayer: {
@@ -338,13 +360,18 @@ export default function AccessBuilder({
             }}
           />
           {/* ⚠️ The two roles read the same and do DIFFERENT things, which is
-              why the wording differs rather than being shared. For a parent it
-              falls back to age groups with no player row. For a player it ADDS
-              the player, because a player membership with a null player_id
-              would fail is_own_player and the account could never touch its
-              own availability. */}
+              why the wording differs rather than being shared.
+              ⚠️ BOTH ROLES NOW ADD THE PERSON — corrected 20 Aug 2026. This note
+              used to say a parent "falls back to age groups with no player row",
+              and that fallback could never work: the database refuses a parent or
+              player membership with a null player_id
+              (`memberships_family_role_needs_player`), so the tickbox produced a
+              refusal every single time, from a layer the admin cannot see.
+              A player membership with a null player_id would also fail
+              is_own_player, leaving an account unable to touch its own
+              availability — the same rule, read from the other end. */}
           {role === 'parent'
-            ? "Their children aren't on the roster yet"
+            ? "Their child isn't on the roster yet — add them"
             : "They're not on the roster yet — add them"}
         </label>
       )}
@@ -355,12 +382,16 @@ export default function AccessBuilder({
           className="min-w-0 flex-1 basis-full rounded-[11px] border border-line bg-surface-card p-2.5"
         >
           <legend className="mb-1.5 block text-[12px] font-bold uppercase tracking-[.4px] text-ink-muted">
-            {`New player for ${label}`}
+            {role === 'parent' ? `New child for ${label}` : `New player for ${label}`}
           </legend>
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="text"
-              aria-label={`Name of the new player for ${label}`}
+              aria-label={
+                role === 'parent'
+                  ? `Name of the new child for ${label}`
+                  : `Name of the new player for ${label}`
+              }
               placeholder="Full name"
               value={newPlayerName}
               disabled={busy}
@@ -374,7 +405,11 @@ export default function AccessBuilder({
                 in exactly one age group, and a multi-select would invite the
                 contradiction the parent/child comment warns about. */}
             <select
-              aria-label={`Age group for the new player for ${label}`}
+              aria-label={
+                role === 'parent'
+                  ? `Age group for the new child for ${label}`
+                  : `Age group for the new player for ${label}`
+              }
               value={newPlayerTeam}
               disabled={busy}
               onChange={(domEvent) => {

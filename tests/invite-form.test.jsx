@@ -14,6 +14,7 @@ const useAuthMock = vi.fn()
 const useMembershipsMock = vi.fn()
 const createInviteMock = vi.fn()
 const listPlayersMock = vi.fn()
+const upsertPlayerMock = vi.fn()
 
 vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => useAuthMock(),
@@ -29,6 +30,9 @@ vi.mock('../src/data/members.js', () => ({
 
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
+  // ⚠️ AccessBuilder CREATES THE CHILD for a parent whose child is not on the
+  // roster (20 Aug 2026). Unmocked, the export is undefined and the click throws.
+  upsertPlayer: (...args) => upsertPlayerMock(...args),
 }))
 
 // Imported after vi.mock so this binds to the mocked modules.
@@ -443,20 +447,33 @@ describe('InviteForm — creating an invite', () => {
   })
 
   // Jay's explicit fallback: a parent whose children aren't imported yet.
-  it('falls back to age groups for a parent whose children are not on the roster', async () => {
+  // ⚠️ THIS PINNED AN INVITE THAT COULD NEVER BE ACCEPTED — rewritten
+  // 20 Aug 2026. It asserted a parent invite with targets of { playerId: null },
+  // and accept_invite refuses exactly that: "This invite is incomplete — it does
+  // not say which player it is for. Ask an admin to send a new one."
+  //
+  // ⚠️ AND THIS PATH WAS THE CRUELLER OF THE TWO. On the Accounts screen the
+  // admin met the refusal immediately. Here the admin saw success, the invite
+  // went out, and the FAMILY hit the wall days later on a link that looked
+  // broken. The test was green throughout, because createInvite is mocked and
+  // acceptance happens in the database.
+  it('adds the child, so the invite it sends can actually be accepted', async () => {
+    upsertPlayerMock.mockResolvedValue({ id: 'player-new', team_id: 't-u12' })
     const user = userEvent.setup()
     renderForm()
 
     await user.type(screen.getByLabelText('Email'), 'parent@example.com')
     await user.selectOptions(screen.getByLabelText(ROLE), 'parent')
-    await user.click(screen.getByLabelText(/aren.t on the roster yet/i))
-    await pickAgeGroup(user, 'U12')
+    await user.click(screen.getByLabelText(/on the roster yet/i))
+    await user.type(screen.getByLabelText(/name of the new child/i), 'Rowan Adeyemi')
+    await user.selectOptions(screen.getByLabelText(/age group for the new child/i), 't-u12')
     await user.click(screen.getByRole('button', { name: SEND }))
 
     await waitFor(() => expect(createInviteMock).toHaveBeenCalledTimes(1))
+    expect(upsertPlayerMock).toHaveBeenCalled()
     expect(createInviteMock.mock.calls[0][0]).toMatchObject({
       role: 'parent',
-      targets: [{ teamId: 't-u12', playerId: null }],
+      targets: [{ teamId: 't-u12', playerId: 'player-new' }],
     })
   })
 

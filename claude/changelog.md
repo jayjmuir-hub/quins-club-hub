@@ -10,6 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🧩 **A PARENT WHOSE CHILD IS NOT ON THE ROSTER CAN NOW BE APPROVED — BY ADDING
+  THE CHILD.** The tickbox built a parent row with `player_id` null, and the
+  database refuses precisely that:
+  `memberships_family_role_needs_player`, Jay's ruling of 14 Aug 2026 —
+  *"nobody outside staff should be able to create an account without a player"*.
+  So the control failed **every time it was used**, and the refusal surfaced from
+  `src/data/members.js`, a layer the admin cannot see, which is why it read as a
+  mystery rather than as a rule.
+  ⚠️ **THE SAME DEAD END EXISTED IN INVITES, AND IT WAS THE CRUELLER OF THE TWO.**
+  `accept_invite` carries its own guard — *"This invite is incomplete — it does
+  not say which player it is for."* On the Accounts screen the ADMIN met the
+  refusal immediately; on an invite the admin saw success, the mail went out, and
+  the FAMILY hit the wall days later on a link that looked broken.
+  ⚠️ **THREE TESTS PINNED THE IMPOSSIBLE PATH IN PLACE.** All three stayed green
+  because `grantMemberships` and `createInvite` are mocked and acceptance happens
+  in the database — so nothing between the form and Postgres ever ran the rule
+  the form was breaking. A green test over a broken control is worse than no
+  test: it is why this survived to production.
+  ✅ Both roles now take the route the player role always did: add the person,
+  then link. `role` is carried through rather than hard-coded, because that
+  branch is now shared — hard-coding it would land a parent on their own child's
+  squad as a PLAYER.
+- `e0340d2` — the squash that stopped the roll-call becoming a dead end.
+
+
 - 🚑 **THE ROLL-CALL BECAME A DEAD END, AND IT WAS SHIPPED AND CAUGHT THE SAME
   DAY.** Jay asked a question — *"will they be nudged again?"* — and the answer
   turned out to be no, when hours earlier it had been yes.
