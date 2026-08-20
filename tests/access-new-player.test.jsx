@@ -83,7 +83,16 @@ describe('granting Player access to someone not on the roster', () => {
     await user.click(screen.getByRole('button', { name: /give access/i }))
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
-    expect(upsertPlayerMock).toHaveBeenCalledWith({ full_name: 'Tyler Muir', team_id: 'team-u16b' })
+    // ⚠️ club_id ADDED 20 Aug 2026, AND THIS ASSERTION USED TO PIN THE BUG.
+    // It demanded EXACTLY { full_name, team_id }, so it went green while the
+    // live insert was missing a NOT NULL column and an admin was shown the raw
+    // Postgres refusal mid-approval. It is still an exact match on purpose —
+    // an extra column here is a column the database was never asked about.
+    expect(upsertPlayerMock).toHaveBeenCalledWith({
+      full_name: 'Tyler Muir',
+      team_id: 'team-u16b',
+      club_id: 'club-1',
+    })
     expect(onSubmit).toHaveBeenCalledWith([
       { role: 'player', teamId: 'team-u16b', playerId: 'player-new' },
     ])

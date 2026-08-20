@@ -745,6 +745,13 @@ export default function Accounts() {
   // the dismissals an admin has already made (including dismissals of people
   // who never asked). One row per profile - see src/data/accessRequests.js.
   const [requests, setRequests] = useState([])
+  // ⚠️ DID THE REQUESTS READ ACTUALLY SUCCEED? `requests` fails OPEN to `[]`
+  // (see the load below), which is right for the LIST — everyone reappears
+  // rather than someone waiting being hidden. But it is wrong for a label that
+  // says "this person told us nothing": an empty array from a failed read would
+  // put that on every card, stating as fact something we did not manage to ask.
+  // So the badge is gated on this, not on `requests.length`.
+  const [requestsLoaded, setRequestsLoaded] = useState(false)
   // Per-profile dismiss/restore state, keyed by profile id.
   const [triageState, setTriageState] = useState({})
   const [showDismissed, setShowDismissed] = useState(false)
@@ -858,6 +865,7 @@ export default function Accounts() {
         // is the safe direction here - everyone reappears in the waiting
         // list, which is noisier but never hides someone genuinely waiting.
         setRequests(requestsResult.status === 'fulfilled' ? requestsResult.value : [])
+        setRequestsLoaded(requestsResult.status === 'fulfilled')
       })
       .finally(() => {
         if (mounted) setLoading(false)
@@ -1798,6 +1806,25 @@ export default function Accounts() {
                               The confirmed case is deliberately quiet: it is the
                               normal state, and a list where every card shouts is
                               a list nobody reads. */}
+                          {/* ⚠️ THE ABSENCE OF THE "Asked" BADGE WAS INVISIBLE, WHICH
+                              IS THE WHOLE DEFECT. Anybody who creates a login lands
+                              in this list, whether or not they ever told the club
+                              what they wanted — so a person who said nothing looked
+                              identical to one who asked to coach U12. Measured
+                              20 Aug 2026: all three people then waiting had signed
+                              in and none had left a request.
+                              ⚠️ GATED ON requestsLoaded, NOT ON `!request`. The
+                              requests read fails open to an empty array, and
+                              without this guard a dropped connection would label
+                              every genuine request as "said nothing". */}
+                          {requestsLoaded && !request && (
+                            <span
+                              data-testid="no-request-badge"
+                              className="ml-2 rounded-pill bg-warn-bg px-2 py-0.5 align-middle text-[11px] font-bold uppercase tracking-[0.06em] text-warn-ink"
+                            >
+                              Hasn&apos;t said what they need
+                            </span>
+                          )}
                           {emailConfirmed !== undefined && (
                             <span
                               data-testid="email-confirmed-badge"
