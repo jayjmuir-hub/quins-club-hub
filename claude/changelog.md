@@ -10,6 +10,37 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 📮 **NOBODY CHASED THE PEOPLE WHO SIGNED UP AND STOPPED. NOW SOMETHING DOES.**
+  Jay asked *"will they be nudged again?"* and the honest answer was: only if
+  they choose to come back. One email at 24 hours, one at seven days, then
+  silence — cadence and audience both decided here, on Jay's *"you decide, go"*.
+  ⚠️ **THE CAP IS A PRIMARY KEY, NOT A COUNTER.** `signup_nudges` is keyed on
+  (profile_id, nudge_no), so two is two even if somebody re-runs the job by
+  hand. A counter resets; a key does not.
+  ⚠️ **CLAIM FIRST, SEND SECOND** — the rows are written BEFORE the HTTP call, so
+  a failed send cannot mail anybody twice. The cost is the opposite failure, a
+  nudge recorded that never arrived, and for a reminder that is much the cheaper
+  of the two. Same order as `private.send_availability_nudges()`.
+  ⚠️ **"HAS AN ACCESS REQUEST" IS NOT "HAS FINISHED", AND THAT MISTAKE WAS MADE
+  EARLIER THE SAME DAY** — it is what turned the roll-call into a dead end. The
+  rule that survived is the one used here: any membership row means they
+  finished something, a `volunteer` request IS the whole ask, and a DISMISSED
+  request means the club already said no. Chasing any of those three would be
+  worse than chasing nobody.
+  ⚠️ **RLS ON WITH NO POLICY, DELIBERATELY.** `signup_nudges` lists who the club
+  has chased. `authenticated` reads nothing from it; only the SECURITY DEFINER
+  job touches it.
+  ✅ **PROVED AGAINST PRODUCTION, INSIDE A ROLLBACK.** Four accounts — finished,
+  waiting-volunteer, already-refused, interrupted — and only the interrupted one
+  is selected. Then the cap: nudge 1 excludes itself once sent, nudge 2 follows
+  it and never precedes it, and a third is impossible.
+  ✅ **THE FIRST REAL RUN SENT NOTHING, CORRECTLY.** Everybody currently unfinished
+  signed up today and is not yet 24 hours old. A control with the age gate
+  removed returns exactly one person, which is what makes "0" a fact about the
+  data rather than a broken predicate.
+- `cb6c2b9` — the squash that let a parent be approved by adding the child.
+
+
 - 🧩 **A PARENT WHOSE CHILD IS NOT ON THE ROSTER CAN NOW BE APPROVED — BY ADDING
   THE CHILD.** The tickbox built a parent row with `player_id` null, and the
   database refuses precisely that:

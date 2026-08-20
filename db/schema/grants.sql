@@ -740,3 +740,22 @@ REVOKE ALL ON public.notification_opt_outs FROM anon;
 -- (no GRANT lines — anon and authenticated hold nothing on this table)
 REVOKE ALL ON public.availability_nudges FROM anon;
 REVOKE ALL ON public.availability_nudges FROM authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- signup_nudges  (20 Aug 2026) — who has already been chased about an
+-- unfinished sign-up, and which of the two reminders they were sent.
+--
+-- ⚠️ THE SECOND TABLE IN `public` THAT `authenticated` CANNOT TOUCH AT ALL,
+-- for the same reason as availability_nudges above: it is a list of people the
+-- club has had to chase, which is nobody else's business, and no screen reads
+-- it. RLS is enabled with NO POLICY, the tightest statement available.
+--
+-- ⚠️ MEASURED AFTER CREATION, NOT ASSUMED — has_table_privilege on the live
+-- table returns false for authenticated, and pg_policy returns zero rows.
+-- Checked with a control (public.teams, which authenticated CAN read), because
+-- "cannot read it" would also be true of a table that did not exist.
+-- ---------------------------------------------------------------------
+-- (no GRANT lines — anon and authenticated hold nothing on this table)
+REVOKE ALL ON public.signup_nudges FROM anon;
+REVOKE ALL ON public.signup_nudges FROM authenticated;
