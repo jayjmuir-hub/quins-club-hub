@@ -49,7 +49,28 @@ declare
   -- reporting "did not reach the one existing subscriber (2 rows)", which
   -- reads as a delivery failure and was the opposite: it reached them twice,
   -- correctly, on both devices.
+  --
+  -- ⚠️ AND IT WENT RED AGAIN ON 20 Aug 2026, THE SAME MISTAKE ONE LEVEL UP.
+  -- Counting per DEVICE fixed the first version; this one still counted the
+  -- WHOLE AUDIENCE and compared it against ONE PERSON'S devices. That is only
+  -- equal while exactly one person in the club has ever subscribed, which was
+  -- true on 19 Aug — "the only subscriber is Jay" — and was false eight people
+  -- later. It reported "reached 9 rows for 3 device(s)", which reads as a
+  -- fan-out bug and was nothing of the kind: 10 subscriptions, minus the
+  -- poster's own 1, is exactly right.
+  --
+  -- ⚠️ SO THE COUNT IS NOW JOINED BACK TO push_subscriptions AND FILTERED TO
+  -- v_sub. `notice_push_subscriptions` returns (id, endpoint, p256dh, auth)
+  -- and carries NO profile_id, which is what made the loose count look
+  -- reasonable. n_all is the control: it must not be smaller than one person's
+  -- devices, which proves the join is filtering rather than emptying.
+  --
+  -- The rule this keeps relearning: **a harness that grows red as the club
+  -- grows is testing the fixture, not the feature.**
   n_devices int;
+  -- ⚠️ AND HOW MANY DEVICES THE WHOLE AUDIENCE HAS, which is the control for
+  -- the join below: if it were filtering nothing, this and n would be equal.
+  n_all     int;
 begin
   -- ── 1a. CONTROL: the walk finds teams and members at all ────────────────
 
@@ -152,7 +173,10 @@ begin
   select count(*) into n_devices
     from public.push_subscriptions where profile_id = v_sub;
 
-  select count(*) into n from public.notice_push_subscriptions(v_theirs);
+  select count(*) into n
+    from public.notice_push_subscriptions(v_theirs) f
+    join public.push_subscriptions ps on ps.id = f.id
+   where ps.profile_id = v_sub;
   if n <> n_devices then
     raise exception
       'NOTICE PUSH: a notice posted by somebody else reached % rows for a '
@@ -160,20 +184,40 @@ begin
       n, n_devices;
   end if;
 
-  select count(*) into n from public.notice_push_subscriptions(v_mine);
+  -- ⚠️ THE CONTROL FOR THE JOIN. Other people are subscribed too, so the
+  -- unfiltered count must be at least this one person's. If the join were
+  -- returning nothing, every assertion above and below would be free.
+  select count(*) into n_all from public.notice_push_subscriptions(v_theirs);
+  if n_all < n_devices then
+    raise exception
+      'NOTICE PUSH: the whole-audience count (%) is below one person''s devices '
+      '(%), so the join is emptying the result rather than filtering it.',
+      n_all, n_devices;
+  end if;
+
+  select count(*) into n
+    from public.notice_push_subscriptions(v_mine) f
+    join public.push_subscriptions ps on ps.id = f.id
+   where ps.profile_id = v_sub;
   if n <> 0 then
     raise exception 'NOTICE PUSH: the AUTHOR would be notified of their own notice.';
   end if;
 
   insert into public.notification_opt_outs (profile_id, category) values (v_sub, 'notice');
-  select count(*) into n from public.notice_push_subscriptions(v_theirs);
+  select count(*) into n
+    from public.notice_push_subscriptions(v_theirs) f
+    join public.push_subscriptions ps on ps.id = f.id
+   where ps.profile_id = v_sub;
   if n <> 0 then
     raise exception 'NOTICE PUSH: an opt-out row did not stop the notification.';
   end if;
   delete from public.notification_opt_outs where profile_id = v_sub and category = 'notice';
 
   update public.announcements set expires_at = now() - interval '1 hour' where id = v_theirs;
-  select count(*) into n from public.notice_push_subscriptions(v_theirs);
+  select count(*) into n
+    from public.notice_push_subscriptions(v_theirs) f
+    join public.push_subscriptions ps on ps.id = f.id
+   where ps.profile_id = v_sub;
   if n <> 0 then
     raise exception 'NOTICE PUSH: an already-expired notice would still notify.';
   end if;
@@ -182,7 +226,10 @@ begin
   -- target must return. Without this, a function that always returned nothing
   -- would satisfy all three "expect 0" assertions.
   update public.announcements set expires_at = null where id = v_theirs;
-  select count(*) into n from public.notice_push_subscriptions(v_theirs);
+  select count(*) into n
+    from public.notice_push_subscriptions(v_theirs) f
+    join public.push_subscriptions ps on ps.id = f.id
+   where ps.profile_id = v_sub;
   if n <> n_devices then
     raise exception
       'NOTICE PUSH: the target did not come back once the conditions were '

@@ -59,6 +59,21 @@ declare
   bad       int;
   n_teams   int;
   n_supers  int;
+  -- ⚠️ EVERY PER-PERSON COUNT IN 1e IS JOINED BACK TO push_subscriptions AND
+  -- FILTERED TO v_sub, and this is not fussiness. `approval_push_subscriptions`
+  -- returns (id, endpoint, p256dh, auth) for the WHOLE audience and carries no
+  -- profile_id, so an unfiltered count answers a different question from the
+  -- one each assertion is worded as. It went red on 20 Aug 2026 reporting
+  -- "the REQUESTER would be buzzed about their own request" — which was false.
+  -- A SECOND super admin had subscribed, was correctly told, and the count
+  -- could not tell the two of them apart.
+  --
+  -- ⚠️ THE SAME MISTAKE AS db/tests/notice-push.sql, FOUND THE SAME HOUR.
+  -- Both were written when one person had ever subscribed, so "the audience"
+  -- and "this person" were numerically identical and the distinction was
+  -- invisible. **A harness that grows red as the club grows is testing the
+  -- fixture, not the feature.**
+  n_all     int;
 begin
   -- ── 1a. CONTROL: the walk finds teams and super admins at all ───────────
   --
@@ -188,7 +203,9 @@ begin
        values (v_other, v_club, v_team, 'coach', 'pending')
     returning id into v_theirs;
 
-  select count(*) into n from public.approval_push_subscriptions(v_theirs);
+  select count(*) into n from public.approval_push_subscriptions(v_theirs) f
+    join public.push_subscriptions ps on ps.id = f.id
+   where ps.profile_id = v_sub;
   if n < 1 then
     raise exception
       'APPROVAL PUSH: a registration by somebody else did not reach the '
@@ -206,21 +223,36 @@ begin
        values (v_sub, v_club, v_team, 'coach', 'pending')
     returning id into v_mine;
 
-  select count(*) into n from public.approval_push_subscriptions(v_mine);
+  select count(*) into n from public.approval_push_subscriptions(v_mine) f
+    join public.push_subscriptions ps on ps.id = f.id
+   where ps.profile_id = v_sub;
   if n <> 0 then
     raise exception
       'APPROVAL PUSH: the REQUESTER would be buzzed about their own request.';
   end if;
 
+  -- ⚠️ THE CONTROL FOR THE FILTER. Somebody else must still be told, or a
+  -- function returning nothing would satisfy the exclusion above for free.
+  select count(*) into n_all from public.approval_push_subscriptions(v_mine);
+  if n_all < 1 then
+    raise exception
+      'APPROVAL PUSH: nobody at all is told about a pending request (%). The '
+      'requester-exclusion check above is then free.', n_all;
+  end if;
+
   -- (c) an opt-out row silences it.
   insert into public.notification_opt_outs (profile_id, category) values (v_sub, 'approval');
-  select count(*) into n from public.approval_push_subscriptions(v_theirs);
+  select count(*) into n from public.approval_push_subscriptions(v_theirs) f
+    join public.push_subscriptions ps on ps.id = f.id
+   where ps.profile_id = v_sub;
   if n <> 0 then
     raise exception 'APPROVAL PUSH: an opt-out row did not stop the notification.';
   end if;
   delete from public.notification_opt_outs where profile_id = v_sub and category = 'approval';
 
   -- (d) an already-actioned request tells nobody.
+  -- ⚠️ DELIBERATELY UNFILTERED, unlike every other count in 1e: this one is
+  -- about the WHOLE audience. "Nobody at all" is the assertion.
   update public.memberships set status = 'active' where id = v_theirs;
   select count(*) into n from public.approval_push_subscriptions(v_theirs);
   if n <> 0 then
@@ -232,7 +264,9 @@ begin
   -- target must return. Without this, a function that always returned nothing
   -- would satisfy (b), (c) and (d) alike.
   update public.memberships set status = 'pending' where id = v_theirs;
-  select count(*) into n from public.approval_push_subscriptions(v_theirs);
+  select count(*) into n from public.approval_push_subscriptions(v_theirs) f
+    join public.push_subscriptions ps on ps.id = f.id
+   where ps.profile_id = v_sub;
   if n < 1 then
     raise exception
       'APPROVAL PUSH: the target did not come back once the conditions were '

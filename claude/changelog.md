@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🧪 **ALL NINE db/tests HARNESSES RAN FOR THE FIRST TIME, AND THREE OF THEM
+  WERE BROKEN.** `SUPABASE_DB_URL` is still unset, so `npm run db:check` had
+  never executed any of them and the nightly workflow was passing green while
+  checking nothing. Each was run through the Supabase MCP inside its own
+  rolled-back transaction, after proving the runner's rollback with a control.
+  ⚠️ **`db/tests/notice-push.sql` and `db/tests/approval-push.sql` compared the
+  WHOLE AUDIENCE's notified devices against ONE PERSON'S.** Both were written
+  when exactly one person had ever subscribed — "the only subscriber is Jay",
+  19 Aug — so the two numbers were identical and the distinction was invisible.
+  Eight subscribers later, notice-push reported *"reached 9 rows for 3
+  device(s)"* and approval-push reported *"the REQUESTER would be buzzed about
+  their own request"*. **Both were false**: 10 subscriptions minus the poster's
+  own 1 is exactly right, and a second super admin had subscribed and was
+  correctly told. Neither function returns a `profile_id`, which is what made
+  the loose count look reasonable; the counts now join back on the subscription
+  id and filter to the person each assertion is worded about, with an
+  unfiltered control beside them.
+  ⚠️ **The rule: a harness that grows red as the club grows is testing the
+  fixture, not the feature.** `claude/runbooks/db-harnesses.md` carries it, plus
+  which six passed as written and which counts are unfiltered on purpose.
+  ✅ **Every self-test still bites** — each fault injection was re-run after the
+  fix and still caught. Production verified clean afterwards: no harness users,
+  clubs, squads, fixtures, notices, reports or subscriptions, policies intact,
+  and `authenticated` still cannot TRUNCATE.
+- `901a087` — the squash that spaced the two chase emails six days apart.
+
 - 📧 **THE TWO CHASE EMAILS WOULD HAVE ARRIVED SECONDS APART.**
   `db/migrations/20260820_signup_nudge_spacing.sql`, **applied to production**.
   The original guard asked *"has nudge 1 been sent?"* and never *"how long
