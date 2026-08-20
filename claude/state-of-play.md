@@ -45,8 +45,12 @@ load-bearing and easy to undo by tidying.
 ## Tabled — do not start, do not offer, do not ask again
 
 The photo **restore drill**, the **AI build**
-(`claude/plans/2026-08-12-ai-integration.md`), and **training session plans**.
-Jay reopens them or they stay closed. ⚠️ The AI *ruling* — children's data may
+(`claude/plans/2026-08-12-ai-integration.md`), **training session plans**, and
+the **live `squad_push` test** (Jay, 20 Aug 2026). Jay reopens them or they stay
+closed. ⚠️ `squad_push` is still UNPROVEN; when it is reopened, the safe route is
+a fixture change on **U13 Mixed** made by somebody OTHER than Jay — measured, it
+reaches his devices and nobody else's. Being super admin puts you in no squad's
+audience: `notice_audience` keys purely on `team_id`, and the actor is excluded. ⚠️ The AI *ruling* — children's data may
 leave the club, minimised — still stands and still governs;
 `claude/decisions/2026-08-12-childrens-data-may-leave-the-club.md`.
 
