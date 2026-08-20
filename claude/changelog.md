@@ -10,6 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🚑 **THE ROLL-CALL BECAME A DEAD END, AND IT WAS SHIPPED AND CAUGHT THE SAME
+  DAY.** Jay asked a question — *"will they be nudged again?"* — and the answer
+  turned out to be no, when hours earlier it had been yes.
+  ⚠️ **THE MOUNT CHECK READ "HAS A REQUEST" AS "HAS NOTHING LEFT TO DO".** That
+  was true until the same afternoon: only the "I help the club another way" tick
+  wrote an `access_requests` row, so its presence really did mean waiting on an
+  admin. Once the FIRST screen started writing one for everybody, a parent who
+  chose their squads and closed the tab came back to `RequestAccess` — which is
+  TERMINAL — and could never add their child.
+  ⚠️ **`volunteer` IS THE ONLY JOURNEY THAT ENDS THERE, and the reason is
+  structural.** Registering a child and claiming a squad both write a membership
+  row, and this screen only renders while there are none — so anybody still
+  looking at it has completed no section at all, whatever they already asked
+  for. A volunteer is the single case whose request IS the whole ask.
+  ⚠️ **THE LESSON IS ABOUT THE MEANING OF A ROW, NOT ABOUT A BRANCH.** Widening
+  who writes `access_requests` silently changed what reading one means, three
+  files away, with no test in between. Two existing tests kept passing because
+  their fixtures happened to omit a role.
+- `678ee8c` — the squash that put the squads on the first screen.
+
+
 - 🚪 **THE FIRST SCREEN NOW ASKS WHICH SQUADS, AND WRITES THE REQUEST IN THE SAME
   SUBMIT.** Jay: *"is there a way to force people to choose their requested
   access in one shot?"* — and, on the shape of it, **"multi select"**.

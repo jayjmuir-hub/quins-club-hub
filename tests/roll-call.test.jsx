@@ -402,15 +402,38 @@ describe('somebody who already asked', () => {
   // nothing wrong — and being asked the same question twice reads as the app
   // having lost their answer.
   it('goes straight to the state of their request', async () => {
-    getMyAccessRequestMock.mockResolvedValue({ id: 'req-1', status: 'pending', note: null })
+    getMyAccessRequestMock.mockResolvedValue({ id: 'req-1', status: 'pending', note: null, requested_role: 'volunteer' })
     renderRollCall()
 
     expect(await screen.findByText(/request is with the club/i)).toBeInTheDocument()
     expect(screen.queryByRole('checkbox')).toBeNull()
   })
 
+
+  it('⚠️ a PARENT who already asked is NOT sent to the terminal screen', async () => {
+    // ⚠️ THE REGRESSION THIS EXISTS TO STOP, shipped and caught the same day.
+    // Until 20 Aug only the "I help another way" tick wrote a request, so the
+    // presence of one really did mean "waiting on an admin, nothing more to
+    // ask". The first screen now writes one for EVERYBODY — so reading it as
+    // "finished" sent a parent who chose their squads and closed the tab to
+    // RequestAccess, which is terminal, and they could never add their child.
+    //
+    // Registering a child and claiming a squad both write a membership row, and
+    // this screen only renders when there are none — so anyone still seeing it
+    // has finished nothing, whatever they already asked for.
+    getMyAccessRequestMock.mockResolvedValue({
+      id: 'req-1',
+      status: 'pending',
+      note: null,
+      requested_role: 'parent',
+    })
+    renderRollCall()
+
+    expect(await screen.findByRole('checkbox', { name: /child playing here/i })).toBeInTheDocument()
+    expect(screen.queryByText(/request is with the club/i)).toBeNull()
+  })
   it('shows a dismissed person the refusal, not a form', async () => {
-    getMyAccessRequestMock.mockResolvedValue({ id: 'req-1', status: 'dismissed', note: null })
+    getMyAccessRequestMock.mockResolvedValue({ id: 'req-1', status: 'dismissed', note: null, requested_role: 'volunteer' })
     renderRollCall()
 
     expect(await screen.findByText(/hasn't approved access/i)).toBeInTheDocument()
