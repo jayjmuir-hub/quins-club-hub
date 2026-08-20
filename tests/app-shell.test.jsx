@@ -77,6 +77,18 @@ async function answerRollCall(user, ticks = [/child playing here/i]) {
   }
   await user.type(screen.getByLabelText(/your first name/i), 'Jay')
   await user.type(screen.getByLabelText(/your family name/i), 'Tester')
+  // ⚠️ A SQUAD IS REQUIRED ON THE FIRST SCREEN AS OF 20 Aug 2026, so that a
+  // person who stops after this submit has still told the club what they want.
+  const group = screen.queryByRole('group', { name: /which squad/i })
+  if (group) {
+    const boxes = within(group).queryAllByRole('checkbox')
+    if (boxes.length && !boxes.some((box) => box.checked)) await user.click(boxes[0])
+  }
+  const role = screen.queryByLabelText(/what do you do/i)
+  if (role && !role.value) {
+    const first = [...role.options].find((option) => option.value)
+    if (first) await user.selectOptions(role, first.value)
+  }
   await user.click(screen.getByRole('button', { name: /^continue$/i }))
 }
 

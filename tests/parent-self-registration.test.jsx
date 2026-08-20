@@ -198,7 +198,24 @@ async function answerRollCall(user, { ticks = [/child playing here/i], firstName
     await user.type(screen.getByLabelText(/your first name/i), firstName)
     await user.type(screen.getByLabelText(/your family name/i), lastName ?? '')
   }
-  await user.click(screen.getByRole('button', { name: /^continue$/i }))
+  // ⚠️ A SQUAD IS NOW REQUIRED ON THE FIRST SCREEN — 20 Aug 2026. Found by
+  // the fieldset's legend rather than by a squad name, because this file uses
+  // several ('U13', 'U16G Contact') and picks a different one per test.
+  const group = screen.queryByRole('group', { name: /which squad/i })
+  if (group) {
+    const boxes = within(group).queryAllByRole('checkbox')
+    if (boxes.length && !boxes.some((box) => box.checked)) await user.click(boxes[0])
+  }
+  // ⚠️ THE STAFF ROLE IS REQUIRED HERE TOO when the staff box is ticked:
+  // requested_role is CHECKed against a fixed list, so "staff" alone cannot be
+  // written. Left unchosen, the submit is refused and the next screen never
+  // arrives — which reads as a missing screen, not a missing answer.
+  const role = screen.queryByLabelText(/what do you do/i)
+  if (role && !role.value) {
+    const first = [...role.options].find((option) => option.value)
+    if (first) await user.selectOptions(role, first.value)
+  }
+  await user.click(await screen.findByRole('button', { name: /^continue$/i }))
 }
 
 // ⚠️ THE CLOCK IS PINNED, AND WITHOUT THIS THE WHOLE FILE ROTS EVERY 31 AUGUST.
@@ -220,6 +237,12 @@ beforeEach(() => {
   // first test's profile leaks into every later one.
   clearMyProfileCache()
   vi.clearAllMocks()
+  // ⚠️ A DEFAULT RESOLUTION, BECAUSE THE FIRST SCREEN NOW WRITES THE REQUEST.
+  // RollCall records what the person asked for in the same submit as their
+  // name (20 Aug 2026). A bare vi.fn() returns undefined, and the .then on it
+  // throws before the screen advances — which reads as every test in the file
+  // failing to find the NEXT screen, not as a missing mock.
+  createAccessRequestMock.mockResolvedValue({ id: 'req-1', status: 'pending' })
 
   useAuthMock.mockReturnValue({
     user: { id: 'user-1', email: 'hannah@example.com' },
@@ -868,6 +891,18 @@ describe('Add your player — a signed-in account with no access', () => {
       await screen.findByRole('alert')
 
       await user.type(screen.getByLabelText(/your family name/i), 'Okafor')
+      // ⚠️ A SQUAD IS REQUIRED ON THE FIRST SCREEN AS OF 20 Aug 2026, so that a
+      // person who stops after this submit has still told the club what they want.
+      const group = screen.queryByRole('group', { name: /which squad/i })
+      if (group) {
+        const boxes = within(group).queryAllByRole('checkbox')
+        if (boxes.length && !boxes.some((box) => box.checked)) await user.click(boxes[0])
+      }
+      const role = screen.queryByLabelText(/what do you do/i)
+      if (role && !role.value) {
+        const first = [...role.options].find((option) => option.value)
+        if (first) await user.selectOptions(role, first.value)
+      }
       await user.click(screen.getByRole('button', { name: /^continue$/i }))
 
       await waitFor(() =>

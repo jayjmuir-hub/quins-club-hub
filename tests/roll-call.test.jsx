@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // src/components/RollCall.jsx — the one screen a signed-in account with no
@@ -75,6 +75,36 @@ function renderRollCall(props = {}) {
 const box = (name) => screen.getByRole('checkbox', { name })
 const CONTINUE = { name: /^continue$/i }
 
+/**
+ * ⚠️ THE FIRST SCREEN NOW DEMANDS A SQUAD — 20 Aug 2026. It used to take a
+ * tick and a name and let people through; what they actually wanted was asked
+ * on the NEXT screen, so anybody who stopped in between left a named profile
+ * and nothing else. Three people were waiting in exactly that state.
+ *
+ * ⚠️ FOUND BY THE FIELDSET'S LEGEND, NOT BY A SQUAD NAME. Every one of these
+ * files names its squads differently ('U13', 'U12 Boys', 'U16G Contact'), and
+ * a helper that hard-coded one would break the moment a fixture changed for
+ * reasons that have nothing to do with the roll-call.
+ */
+async function pickSquadThenContinue(user) {
+  const group = screen.queryByRole('group', { name: /which squad/i })
+  if (group) {
+    const boxes = within(group).queryAllByRole('checkbox')
+    if (boxes.length && !boxes.some((box) => box.checked)) await user.click(boxes[0])
+  }
+  // ⚠️ THE STAFF ROLE IS REQUIRED HERE TOO when the staff box is ticked:
+  // requested_role is CHECKed against a fixed list, so "staff" alone cannot be
+  // written. Left unchosen, the submit is refused and the next screen never
+  // arrives — which reads as a missing screen, not a missing answer.
+  const role = screen.queryByLabelText(/what do you do/i)
+  if (role && !role.value) {
+    const first = [...role.options].find((option) => option.value)
+    if (first) await user.selectOptions(role, first.value)
+  }
+  await user.click(await screen.findByRole('button', { name: /^continue$/i }))
+}
+
+
 // ⚠️ THE CLOCK IS PINNED, FOR THE SAME REASON tests/parent-self-registration
 // pins it: age-grade eligibility is judged at the 31 August cut-off, so which
 // squad a fixed birthday belongs to changes on that date every year. The DOB
@@ -90,6 +120,12 @@ beforeEach(() => {
   vi.setSystemTime(IN_SEASON)
   clearMyProfileCache()
   vi.clearAllMocks()
+  // ⚠️ A DEFAULT RESOLUTION, BECAUSE THE FIRST SCREEN NOW WRITES THE REQUEST.
+  // RollCall records what the person asked for in the same submit as their
+  // name (20 Aug 2026). A bare vi.fn() returns undefined, and the .then on it
+  // throws before the screen advances — which reads as every test in the file
+  // failing to find the NEXT screen, not as a missing mock.
+  createAccessRequestMock.mockResolvedValue({ id: 'req-1', status: 'pending' })
   getMyProfileMock.mockResolvedValue({
     id: 'user-1',
     first_name: 'Rowan',
@@ -136,7 +172,7 @@ describe('the ask', () => {
     const user = userEvent.setup()
     const { onDone } = renderRollCall()
 
-    await user.click(await screen.findByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/tick at least one/i)
     expect(onDone).not.toHaveBeenCalled()
@@ -195,7 +231,7 @@ describe('the name', () => {
     await user.click(await screen.findByRole('checkbox', { name: /coach, manage or medic/i }))
     await user.type(screen.getByLabelText(/your first name/i), 'Rowan')
     await user.type(screen.getByLabelText(/your family name/i), 'Ashby')
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     await user.selectOptions(await screen.findByLabelText(/what do you do/i), 'coach')
     await user.selectOptions(screen.getByLabelText(/which squad/i), 't-u13')
@@ -217,7 +253,7 @@ describe('the name', () => {
 
     await user.click(await screen.findByRole('checkbox', { name: /child playing here/i }))
     await user.type(screen.getByLabelText(/your first name/i), 'Rowan')
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/family name/i)
     expect(updateProfileNamesMock).not.toHaveBeenCalled()
@@ -235,7 +271,7 @@ describe('the sections', () => {
 
     await user.click(await screen.findByRole('checkbox', { name: /child playing here/i }))
     await user.click(box(/coach, manage or medic/i))
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     // Staff first, and finishing it must NOT end the screen.
     await user.selectOptions(await screen.findByLabelText(/what do you do/i), 'coach')
@@ -261,7 +297,7 @@ describe('the sections', () => {
 
     await user.click(await screen.findByRole('checkbox', { name: /child playing here/i }))
     await user.click(box(/help the club another way/i))
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     await user.type(await screen.findByLabelText(/player's first name/i), 'Ada')
     await user.type(screen.getByLabelText(/player's family name/i), 'Ashby')
@@ -279,7 +315,7 @@ describe('the sections', () => {
     const { onDone } = renderRollCall()
 
     await user.click(await screen.findByRole('checkbox', { name: /child playing here/i }))
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     await user.type(await screen.findByLabelText(/player's first name/i), 'Ada')
     await user.type(screen.getByLabelText(/player's family name/i), 'Ashby')
@@ -295,7 +331,7 @@ describe('the sections', () => {
     renderRollCall()
 
     await user.click(await screen.findByRole('checkbox', { name: /coach, manage or medic/i }))
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     await user.selectOptions(await screen.findByLabelText(/what do you do/i), 'medic')
     await user.selectOptions(screen.getByLabelText(/which squad/i), 't-u16')
@@ -313,7 +349,7 @@ describe('the sections', () => {
 
     await user.click(await screen.findByRole('checkbox', { name: /child playing here/i }))
     await user.click(box(/coach, manage or medic/i))
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     await user.click(await screen.findByRole('button', { name: /skip this for now/i }))
 
@@ -326,7 +362,7 @@ describe('the sections', () => {
     renderRollCall()
 
     await user.click(await screen.findByRole('checkbox', { name: /coach, manage or medic/i }))
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     await user.selectOptions(await screen.findByLabelText(/what do you do/i), 'coach')
     await user.click(screen.getByRole('button', { name: /ask to be approved/i }))
@@ -343,7 +379,7 @@ describe('the sections', () => {
     renderRollCall()
 
     await user.click(await screen.findByRole('checkbox', { name: /coach, manage or medic/i }))
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     expect(await screen.findByText(/approves this/i)).toBeInTheDocument()
     expect(screen.getByText(/not the players/i)).toBeInTheDocument()
@@ -354,7 +390,7 @@ describe('the sections', () => {
     renderRollCall()
 
     await user.click(await screen.findByRole('checkbox', { name: /help the club another way/i }))
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
 
     expect(await screen.findByRole('button', { name: /request access/i })).toBeInTheDocument()
   })
@@ -404,7 +440,64 @@ describe('the way out', () => {
     expect(await screen.findByRole('button', { name: /sign out/i })).toBeInTheDocument()
 
     await user.click(box(/coach, manage or medic/i))
-    await user.click(screen.getByRole('button', CONTINUE))
+    await pickSquadThenContinue(user)
     expect(await screen.findByRole('button', { name: /sign out/i })).toBeInTheDocument()
+  })
+})
+
+describe('the squads, asked on the first screen', () => {
+  // ⚠️ THE WHOLE POINT OF THE CHANGE, 20 Aug 2026. The name used to be saved on
+  // screen one and what the person actually WANTED on screen two, so anybody who
+  // stopped in between left a named profile and nothing else. Measured on
+  // production that day: three people waiting, all confirmed, all signed in,
+  // none with a request row, two of them named.
+
+  async function tick(user, name) {
+    await user.click(await screen.findByRole('checkbox', { name }))
+  }
+
+  it('records every squad chosen, not just the first', async () => {
+    const user = userEvent.setup()
+    renderRollCall()
+
+    await tick(user, /child playing here/i)
+    const squads = await screen.findByRole('group', { name: /which squad/i })
+    const boxes = within(squads).getAllByRole('checkbox')
+    await user.click(boxes[0])
+    await user.click(boxes[1])
+    await user.click(await screen.findByRole('button', { name: /^continue$/i }))
+
+    await waitFor(() => expect(createAccessRequestMock).toHaveBeenCalled())
+    const sent = createAccessRequestMock.mock.calls[0][0]
+    expect(sent.teamIds).toHaveLength(2)
+    expect(sent.role).toBe('parent')
+    expect(sent.profileId).toBe('user-1')
+  })
+
+  it('⚠️ refuses to continue with no squad, rather than recording a name and nothing else', async () => {
+    const user = userEvent.setup()
+    renderRollCall()
+
+    await tick(user, /child playing here/i)
+    await user.click(await screen.findByRole('button', { name: /^continue$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/at least one squad/i)
+    expect(createAccessRequestMock).not.toHaveBeenCalled()
+  })
+
+  it('⚠️ asks which staff role, because "staff" alone cannot be written', async () => {
+    // requested_role is CHECKed against a fixed list and the INSERT policy
+    // requires it. Coach, manager and medic are three different claims and
+    // guessing one would put a wrong answer in front of whoever approves it.
+    const user = userEvent.setup()
+    renderRollCall()
+
+    await tick(user, /coach, manage or medic/i)
+    const squads = await screen.findByRole('group', { name: /which squad/i })
+    await user.click(within(squads).getAllByRole('checkbox')[0])
+    await user.click(await screen.findByRole('button', { name: /^continue$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/coach, manage or medic/i)
+    expect(createAccessRequestMock).not.toHaveBeenCalled()
   })
 })

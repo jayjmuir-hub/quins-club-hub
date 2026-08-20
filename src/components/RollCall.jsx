@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Button from './Button.jsx'
 import AddYourPlayer from './AddYourPlayer.jsx'
 import RequestAccess from './RequestAccess.jsx'
-import { getMyAccessRequest } from '../data/accessRequests.js'
+import { createAccessRequest, getMyAccessRequest } from '../data/accessRequests.js'
 import { getMyProfile, requestStaffRole, updateProfileNames } from '../data/members.js'
 import { primeMyProfileCache } from '../lib/useMyProfile.js'
 
@@ -90,6 +90,9 @@ const ANSWERS = [
 // ends on its own confirmation and there is nothing to come back to.
 const SECTION_ORDER = ['staff', 'players', 'helper']
 
+const NO_SQUAD_CHOSEN =
+  'Choose at least one squad — it is how the club knows who to send your request to.'
+
 const STAFF_ROLES = [
   { value: 'coach', label: 'Coach' },
   { value: 'manager', label: 'Team manager' },
@@ -133,10 +136,20 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
   const [needsName, setNeedsName] = useState(false)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  // ⚠️ THE SQUADS ARE ASKED ON THE FIRST SCREEN AS OF 20 Aug 2026, and the
+  // reason is a measurement, not a preference. The name used to be saved on
+  // screen one and what the person actually WANTED on screen two, so anybody
+  // who stopped in between left a named profile and nothing else: three people
+  // were waiting in that exact state, two of them named. Asking here means the
+  // one mandatory submit already carries an answer an admin can act on.
+  const [squadIds, setSquadIds] = useState([])
   const [staffRole, setStaffRole] = useState('')
   const [staffTeamId, setStaffTeamId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  // Guards the one write against a re-submit — the sections can send somebody
+  // back here, and the UNIQUE key would refuse a second insert anyway.
+  const alreadyAsked = useRef(false)
 
   // ⚠️ TWO READS, AND NEITHER MAY STOP THE SCREEN RENDERING. Somebody locked
   // out of the club must never meet a page that will not load.
@@ -237,14 +250,52 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
       return
     }
 
-    // Nothing to save: they already told us their name, so go straight on.
-    if (!needsName) {
-      startSections()
+    // ⚠️ AT LEAST ONE SQUAD, ALWAYS. This is the whole point of moving the
+    // question here: without it the submit records that somebody exists and
+    // nothing about what they need, which is the state this change exists to
+    // end.
+    // ⚠️ REQUIRED ONLY WHEN THERE IS SOMETHING TO CHOOSE. AddYourPlayer
+    // already has a branch for "we could not load the club's age groups" and
+    // offers a way onward; demanding a squad when the list came back EMPTY
+    // would strand that person on the first screen with no control that could
+    // ever satisfy it — the dead-affordance defect this codebase has shipped
+    // once already. Caught by tests/parent-self-registration.test.jsx, which
+    // renders exactly that case.
+    if (teams.length > 0 && squadIds.length === 0) {
+      setError(new Error(NO_SQUAD_CHOSEN))
+      return
+    }
+    // ⚠️ AND THE STAFF ROLE, WHEN THEY CLAIM ONE. access_requests.requested_role
+    // is CHECKed against a fixed list and the INSERT policy requires it, so
+    // "staff" alone cannot be written — coach, manager and medic are three
+    // different answers and guessing one would put a wrong claim in front of
+    // whoever approves it.
+    if (answers.staff && !staffRole) {
+      setError(new Error('Choose whether you coach, manage or medic.'))
       return
     }
 
     setSaving(true)
     setError(null)
+
+    // ⚠️ THE NAME AND THE REQUEST GO TOGETHER OR NOT AT ALL — that is the fix.
+    // `recordAsk` runs after the name save (which stamps name_confirmed_at, the
+    // thing request_staff_role is gated on) and before the sections, so the
+    // club learns what this person wants even if they close the tab on the very
+    // next screen.
+    const finish = () => {
+      recordAsk()
+        .then(() => startSections())
+        .catch((err) => setError(err))
+        .finally(() => setSaving(false))
+    }
+
+    // Nothing to save: they already told us their name, so go straight on.
+    if (!needsName) {
+      finish()
+      return
+    }
+
     updateProfileNames({ profileId: userId, firstName: first, lastName: last })
       .then((updated) => {
         // ⚠️ THE CACHE IS MODULE-LEVEL AND NEVER INVALIDATES ITSELF, so without
@@ -253,10 +304,62 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
         // NamePrompt primes it after its own save for exactly this reason.
         primeMyProfileCache(userId, updated)
         setNeedsName(false)
-        startSections()
+        finish()
       })
-      .catch((err) => setError(err))
-      .finally(() => setSaving(false))
+      .catch((err) => {
+        setError(err)
+        setSaving(false)
+      })
+  }
+
+  /**
+   * Writes the "this is what I am asking for" row, once.
+   *
+   * ⚠️ A DUPLICATE IS NOT AN ERROR. access_requests carries UNIQUE
+   * (profile_id), and somebody who asked yesterday and signs in again today
+   * reaches this path a second time. Postgres answers 23505; there is nothing
+   * to fix and nothing to tell them, so it resolves. Any OTHER failure is
+   * surfaced — a silent catch here would recreate the exact hole this change
+   * closes.
+   */
+  function recordAsk() {
+    if (alreadyAsked.current) return Promise.resolve(null)
+    const role = claimedRole()
+    if (!role) return Promise.resolve(null)
+    return createAccessRequest({
+      profileId: userId,
+      role,
+      teamIds: squadIds,
+    })
+      .then((row) => {
+        alreadyAsked.current = true
+        return row
+      })
+      .catch((err) => {
+        if (err?.code === '23505') {
+          alreadyAsked.current = true
+          return null
+        }
+        throw err
+      })
+  }
+
+  /**
+   * Which single role to record, from ticks that allow several.
+   *
+   * ⚠️ THE ORDER IS THE CLUB'S PRIORITY, NOT A TIE-BREAK. A person who both
+   * has a child here and coaches is, to whoever approves them, a coach first:
+   * the staff claim is the one that needs a decision, and the parent claim
+   * resolves itself when they register the child. `requested_role` holds one
+   * value by CHECK constraint, so something has to choose, and this is the
+   * choice — written down rather than left to whichever tick came first.
+   */
+  function claimedRole() {
+    if (answers.staff) return staffRole || null
+    if (answers.child) return 'parent'
+    if (answers.self) return 'player'
+    if (answers.helper) return 'volunteer'
+    return null
   }
 
   function startSections() {
@@ -513,6 +616,77 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
             </label>
           ))}
         </fieldset>
+
+        {/* ⚠️ STAFF ROLE ASKED HERE, NOT ONLY ON THE LATER STAFF SCREEN.
+            requested_role is required by the INSERT policy and CHECKed against a
+            fixed list, so a request cannot be written from the "I coach, manage
+            or medic" tick alone. The staff screen still asks — it needs the one
+            squad it attaches the pending membership to — and arrives pre-filled
+            from here. */}
+        {answers.staff && (
+          <div className="mb-4">
+            <label className={LABEL} htmlFor="roll-call-claimed-role">
+              What do you do
+            </label>
+            <select
+              id="roll-call-claimed-role"
+              className={INPUT}
+              value={staffRole}
+              disabled={saving}
+              onChange={(event) => {
+                setStaffRole(event.target.value)
+                if (error) setError(null)
+              }}
+            >
+              <option value="">Choose…</option>
+              {STAFF_ROLES.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* ⚠️ MULTI-SELECT, ON JAY'S INSTRUCTION, 20 Aug 2026. "some parents
+            have 3, 4 or even 5 children at the club, across different age
+            groups" is already on the record against the minis work, and one
+            squad per request cannot express it. The first squad ticked is what
+            satisfies the INSERT policy; the array carries the rest. */}
+        {teams.length > 0 && (
+        <fieldset className="mb-4 border-0 p-0">
+          <legend className={`${LABEL} p-0`}>
+            Which squad? Tick every one that applies
+          </legend>
+          <div className="max-h-60 overflow-y-auto rounded-[11px] border border-line p-1.5">
+            {sortTeams(teams).map((team) => (
+              <label
+                key={team.id}
+                className="flex cursor-pointer items-center gap-3 rounded-[8px] px-2 py-2 transition hover:bg-surface-mute"
+              >
+                <input
+                  type="checkbox"
+                  checked={squadIds.includes(team.id)}
+                  disabled={saving}
+                  onChange={() => {
+                    setSquadIds((current) =>
+                      current.includes(team.id)
+                        ? current.filter((id) => id !== team.id)
+                        : [...current, team.id],
+                    )
+                    if (error) setError(null)
+                  }}
+                  className="h-5 w-5 shrink-0 accent-[color:var(--maroon)]"
+                />
+                <span className="text-sm font-semibold text-ink">{team.name}</span>
+              </label>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+            Not sure which? Pick the closest — an admin can change it.
+          </p>
+        </fieldset>
+        )}
 
         <Button type="submit" size="lg" full disabled={saving}>
           {saving ? 'Saving…' : 'Continue'}

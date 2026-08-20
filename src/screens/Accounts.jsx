@@ -1869,9 +1869,26 @@ export default function Accounts() {
                               ROLE_OPTIONS.find((o) => o.value === request.requested_role)?.label ??
                               request.requested_role ??
                               'someone'}
-                            {request.requested_team_id
-                              ? ` · ${teamsById.get(request.requested_team_id)?.name ?? 'a squad'}`
-                              : ''}
+                            {/* ⚠️ EVERY SQUAD THEY NAMED, NOT JUST THE FIRST.
+                                requested_team_ids arrived 20 Aug 2026; rows
+                                written before it have none, so this falls back
+                                to the single column rather than showing
+                                nothing. A parent with children in three age
+                                groups is the ordinary case here, not an edge
+                                one. */}
+                            {(() => {
+                              const ids =
+                                request.requested_team_ids?.length
+                                  ? request.requested_team_ids
+                                  : request.requested_team_id
+                                    ? [request.requested_team_id]
+                                    : []
+                              if (!ids.length) return ''
+                              const names = ids.map(
+                                (id) => teamsById.get(id)?.name ?? 'a squad',
+                              )
+                              return ` · ${names.join(', ')}`
+                            })()}
                           </span>
                         )}
 
