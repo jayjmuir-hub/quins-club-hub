@@ -8,6 +8,26 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 20 Aug 2026
+
+- ✏️ **THE INSTALL BANNER NOW SAYS "DOWNLOAD THE APP".** Jay, 20 Aug 2026 —
+  parents look for a download, and the old heading ("Add Quins to your home
+  screen") described the mechanism rather than the thing they wanted.
+  ⚠️ **THE HEADING IS DELIBERATELY THE ONE INACCURATE WORD ON THE CARD.**
+  Nothing is downloaded from a store; this is a PWA. The heading borrows the
+  word people search for and the body then says what actually happens, which is
+  why the two do not match.
+  ⚠️ **THE iOS BODY STILL SAYS "ADD TO HOME SCREEN", AND MUST.** That is the
+  literal wording of the menu item in Safari's share sheet, and a parent has to
+  find those exact words. Renaming it to match the heading would point at a
+  control that does not exist — the dead-affordance defect the Android/iOS
+  split in `src/components/InstallPrompt.jsx` exists to avoid.
+  ✅ **PINNED BY THREE NEW ASSERTIONS, BECAUSE NOTHING PINNED THE COPY BEFORE.**
+  Two hold the heading on each platform, one holds the Safari step apart from
+  it. Proved by reverting the heading and watching them go red — a copy test
+  that has never failed is not a check.
+- `e4f79a5` — the squash that fixed the screenshot harness's first-login gate.
+
 ## 19 Aug 2026
 
 - 🐛 **THE SCREENSHOT HARNESS RENDERED EVERY SCREEN THROUGH THE FIRST-LOGIN

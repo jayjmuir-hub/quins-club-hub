@@ -10,7 +10,18 @@ import {
   subscribeInstall,
 } from '../lib/installPrompt.js'
 
-// "Add it to your home screen" — the banner that tells people this is an app.
+// "Download the App" — the banner that tells people this is an app.
+//
+// ⚠️ THE HEADING SAYS "DOWNLOAD" AND THE BODY DOES NOT, AND THAT IS THE POINT.
+// Jay, 20 Aug 2026: parents look for a download. Nothing is downloaded from a
+// store here, so the heading borrows the word people search for and the body
+// then tells them what actually happens.
+// ⚠️ DO NOT "FIX" THE iOS BODY TO MATCH THE HEADING. It says "Add to Home
+// Screen" because that is the literal wording of the menu item in Safari, and
+// a parent scrolling that share sheet has to find those exact words. Renaming
+// it to "Download" would describe a control that does not exist — the same
+// dead-affordance defect this file's Android/iOS split already exists to
+// avoid. `tests/install-prompt.test.jsx` pins the Safari step for this reason.
 //
 // See src/lib/installPrompt.js for the reasoning. In short: the app has been
 // installable all along and nothing said so, and the two platforms need
@@ -100,7 +111,7 @@ export default function InstallPrompt() {
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-ink">Add Quins to your home screen</p>
+          <p className="text-sm font-bold text-ink">Download the App</p>
 
           {ios ? (
             // ⚠️ NAMES THE BROWSER, and that is not pedantry. Add to Home
