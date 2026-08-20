@@ -10,11 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- ⚠️ **CORRECTION, SAME DAY: `SUPABASE_DB_URL` IS SET, AND THE NIGHTLY IS REAL.**
+  Two handoffs said the secret was *"STILL unset"*, and a session repeated it
+  into `claude/runbooks/db-harnesses.md` and this changelog **without checking**.
+  Measured: `gh secret list` shows it set **19 Aug 2026 12:50 UTC**, and the
+  nightly at **20 Aug 04:01 ran 34 harnesses and reported "All harnesses
+  passed."** The 19 Aug 04:01 run, before the secret, is the one that printed
+  *"the db harnesses did not run"*.
+  ⚠️ **AND THE CORRECTION MAKES THE FINDING WORSE, NOT BETTER.**
+  `notice-push.sql` and `approval-push.sql` had not "never run" — they were
+  **passing every night**, and were **correct only by coincidence**. What broke
+  them during 20 August was the CLUB, not the code: subscribers went from 1 to
+  8, and the two numbers those harnesses conflated stopped being equal. They
+  would have gone red at 04:01 the next morning, for a change nobody made.
+  ⚠️ **So: a green nightly is evidence about the moment it ran and nothing
+  else** — and only two harnesses had genuinely never run, `signup-nudges.sql`
+  and `email-confirmed-sync.sql`, both added after that morning's run.
+  **The rule that keeps being relearned here is the cheap one: measure the
+  claim, do not carry it forward.** `CLAUDE.md` rule 4.
+- `7390a2c` — the squash that ran all nine harnesses and fixed three.
+
 - 🧪 **ALL NINE db/tests HARNESSES RAN FOR THE FIRST TIME, AND THREE OF THEM
-  WERE BROKEN.** `SUPABASE_DB_URL` is still unset, so `npm run db:check` had
-  never executed any of them and the nightly workflow was passing green while
-  checking nothing. Each was run through the Supabase MCP inside its own
+  WERE BROKEN.** Each was run through the Supabase MCP inside its own
   rolled-back transaction, after proving the runner's rollback with a control.
+  ⚠️ **THE "SUPABASE_DB_URL IS STILL UNSET" PART OF THIS ENTRY WAS WRONG AND IS
+  CORRECTED BELOW** — see the 20 Aug correction entry above. The secret has been
+  set since 19 Aug and the nightly is real; two of the three broken harnesses
+  had been PASSING it.
   ⚠️ **`db/tests/notice-push.sql` and `db/tests/approval-push.sql` compared the
   WHOLE AUDIENCE's notified devices against ONE PERSON'S.** Both were written
   when exactly one person had ever subscribed — "the only subscriber is Jay",
@@ -54,8 +76,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   both — Jay: *"they should get the email if info is missing"* — six days apart
   rather than six seconds.
 - 🧪 **`db/tests/signup-nudges.sql` HAD NEVER ONCE BEEN RUN, AND BOTH THINGS
-  WRONG WITH IT WERE INVISIBLE BECAUSE OF THAT.** `SUPABASE_DB_URL` is still
-  unset, so `npm run db:check` has never executed it.
+  WRONG WITH IT WERE INVISIBLE BECAUSE OF THAT.** It was added AFTER that
+  morning's nightly `db:check`, so no run had ever reached it. ⚠️ **Not because
+  the runner is off** — corrected 20 Aug, see above.
   ⚠️ **Its fixture could not execute at all** — it inserted `public.profiles`
   before `auth.users`, violating `profiles_id_fkey` on the first statement of
   its own setup, and the row was a duplicate anyway because inserting into

@@ -87,19 +87,33 @@ editing the harness until you have established which of the two is wrong. On
 
 ## ⚠️ Which of these have ever actually RUN, and what running them found
 
-**On 20 Aug 2026 all nine harnesses added on 19 and 20 August were executed for
-the first time**, through the Supabase MCP, each inside its own rolled-back
-transaction. `SUPABASE_DB_URL` is still unset, so `npm run db:check` had never
-executed any of them and the nightly workflow was passing green while checking
-nothing.
+⚠️ **THE `SUPABASE_DB_URL` SECRET IS SET, AND HAS BEEN SINCE 19 Aug 2026,
+12:50 UTC.** Two handoffs said it was "STILL unset" after that was already
+false, and on 20 Aug a session repeated the claim into this runbook and the
+changelog before checking. **Measure it —** `gh secret list` names it, and
+`gh run list --workflow=db-check.yml` shows what the nightly actually did:
 
-**Three of the nine were broken.** Not subtly:
+| Nightly | What it did |
+|---|---|
+| 19 Aug 04:01, before the secret | `SUPABASE_DB_URL is not set - the db harnesses did not run`, exit 0 |
+| 20 Aug 04:01, after it | **34 harnesses, "All harnesses passed."** |
+
+So the nightly is REAL and has been for a day. Only two harnesses had never
+run — `signup-nudges.sql` and `email-confirmed-sync.sql`, both added later on
+20 August, after that morning's run.
+
+## ⚠️ Two harnesses were passing nightly and were about to go red
+
+On 20 Aug 2026 all nine harnesses added on 19–20 August were run by hand,
+through the Supabase MCP, each inside its own rolled-back transaction.
+**Three were broken** — and the interesting part is that two of them had been
+**passing** every night:
 
 | Harness | What running it found |
 |---|---|
-| `db/tests/signup-nudges.sql` | **could not execute at all** — inserted `public.profiles` before `auth.users`, violating `profiles_id_fkey` on the first statement of its own fixture, and the row was a duplicate anyway because `on_auth_user_created` creates it. Its part 5 also **asserted the bug** that `20260820_signup_nudge_spacing.sql` fixes |
-| `db/tests/notice-push.sql` | compared the **whole audience's** notified devices against **one person's** device count. Red as soon as a second person subscribed |
-| `db/tests/approval-push.sql` | same mistake — reported *"the REQUESTER would be buzzed about their own request"*, which was **false**: a second super admin had subscribed and was correctly told |
+| `db/tests/signup-nudges.sql` | never ran — added after that morning's nightly. **Could not execute at all** — inserted `public.profiles` before `auth.users`, violating `profiles_id_fkey` on the first statement of its own fixture, and the row was a duplicate anyway because `on_auth_user_created` creates it. Its part 5 also **asserted the bug** that `20260820_signup_nudge_spacing.sql` fixes |
+| `db/tests/notice-push.sql` | **passed the 04:01 nightly**, then compared the **whole audience's** notified devices against **one person's** device count. Correct only by coincidence |
+| `db/tests/approval-push.sql` | **passed the same nightly**, same mistake — by evening reported *"the REQUESTER would be buzzed about their own request"*, which was **false**: a second super admin had subscribed and was correctly told |
 
 The other six passed as written, self-tests included:
 `email-confirmed-sync.sql`, `fixture-push.sql`, `feedback-delete.sql`,
@@ -108,7 +122,11 @@ The other six passed as written, self-tests included:
 ### ⚠️ The rule the two push harnesses cost
 
 **A harness that grows red as the club grows is testing the fixture, not the
-feature.** Both were written when exactly one person had ever subscribed, so
+feature.** ⚠️ **AND THE NIGHTLY CANNOT TELL YOU THIS.** Both passed at 04:01
+and were broken by tea time, because what changed was the CLUB, not the code —
+subscribers went from 1 to 8 during the day. A green nightly is evidence about
+the moment it ran and nothing else. Both were written when exactly one person
+had ever subscribed, so
 *"this person's devices"* and *"everybody notified"* were the same number and
 the distinction was invisible. `notice_push_subscriptions` and
 `approval_push_subscriptions` both return `(id, endpoint, p256dh, auth)` and
