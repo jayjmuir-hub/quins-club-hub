@@ -10,6 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🏉 **TRAINING SESSION PLANS REOPENED, AND ONE MEASUREMENT MAKES PART OF THE OLD
+  PLAN WRONG.** Jay, eight days after tabling it: *"i want to create another admin
+  position named Rugby Performance Director… develop training plans, focus points,
+  structure for sessions… to pass down to any of the age groups he selects"*.
+  `claude/plans/2026-08-12-training-session-plans.md` is reopened and corrected;
+  no code yet.
+  ⛔ **CONTACT VERSUS TAG IS NOT IN THE SQUAD NAMES.** The plan asserted it was,
+  citing `U6 Tag` and `U14B Contact` — and `U14B Contact` does not exist, the
+  squad is `U14B`. Measured against live `teams`: three names carry "Tag", two
+  carry "QR", and **five say nothing at all**. So `requires_contact` becomes an
+  explicit column on `teams`, and **inferring it from age is forbidden** — this
+  club runs tag sides above the age contact begins, the exact case that breaks
+  the inference. ✅ The AGE band is fine: all fifteen names parse.
+  ⚠️ **Multi-squad publish overturns the plan's "explicit and per-SQUAD" rule**,
+  on Jay's wording. The original worry was blast radius; the answer is
+  visibility, not prohibition — a per-squad preview of what changes and what is
+  skipped, before anything is written. The two real protections are unchanged: a
+  coach-edited session is never overwritten, and the publish says how many it
+  skipped.
+  ⚠️ **"Rugby Performance Director" is person-shaped and sits awkwardly with the
+  12 Aug jobs-not-people ruling.** Put to Jay; his wording stands, and the other
+  three labels do not move.
+  ✅ **A fourth object, `training_focus`** — a theme spanning weeks for a squad,
+  which is what Jay's "focus points" are. It labels a period and **gates
+  nothing**.
+  ✅ **The tabled list did its job** — nobody offered this for eight days and he
+  brought it back himself. That is the argument for the list, recorded now rather
+  than after somebody prunes it.
+- `7b5356e` — the squash that tabled the live squad_push test.
+
 - 🛑 **The live `squad_push` test is TABLED** (Jay: *"lets table this for now"*).
   Moved onto `claude/state-of-play.md`'s tabled list rather than left in a
   handoff, because it was raised twice in one day and a handoff is exactly where
