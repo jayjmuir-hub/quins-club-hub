@@ -183,7 +183,23 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
         }
 
         const asked = requestResult.status === 'fulfilled' && requestResult.value
-        setStep(asked ? 'helper' : 'ask')
+        // ⚠️ A REQUEST IS NO LONGER PROOF THERE IS NOTHING LEFT TO DO, and
+        // reading it that way turned this screen into a DEAD END the same day
+        // the first screen started writing one. Until 20 Aug only the "I help
+        // another way" tick created a request, so `asked` really did mean
+        // "waiting on an admin, nothing more to ask". Now every first submit
+        // writes one — so a parent who chose their squads and closed the tab
+        // came back to RequestAccess, which is TERMINAL, and could never add
+        // their child.
+        //
+        // ⚠️ 'volunteer' IS THE ONLY JOURNEY THAT ENDS HERE, and the reason is
+        // structural rather than a preference. Registering a child and claiming
+        // a squad BOTH write a membership row, and this whole screen is gated on
+        // `memberships.length === 0` — so anybody still looking at it has
+        // finished no section at all. A volunteer is the one case with nothing
+        // further to do: their request IS the whole ask.
+        const askedAsVolunteer = Boolean(asked) && asked.requested_role === 'volunteer'
+        setStep(askedAsVolunteer ? 'helper' : 'ask')
       },
     )
 
