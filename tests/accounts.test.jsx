@@ -2477,3 +2477,56 @@ describe('Accounts — adding a player who is not on the roster yet', () => {
     expect(sent.full_name).toBe('New Player')
   })
 })
+
+describe('Accounts — a request naming several squads', () => {
+  // ⚠️ MULTI-SELECT, ON JAY'S INSTRUCTION 20 Aug 2026. A parent with children
+  // in three age groups is the ordinary case here, and one squad per request
+  // could not express it. requested_team_ids carries the list;
+  // requested_team_id keeps the first, because the INSERT policy requires it.
+
+  function waiting() {
+    return screen.getByTestId('waiting-for-access')
+  }
+
+  it('lists every squad the person named', async () => {
+    listAccessRequestsMock.mockResolvedValue([
+      {
+        id: 'req-1',
+        profile_id: JANICE_PENDING.id,
+        status: 'open',
+        note: null,
+        requested_role: 'parent',
+        requested_team_id: TEAM_U12.id,
+        requested_team_ids: [TEAM_U12.id, TEAM_U10.id],
+        created_at: '2026-08-20T12:00:00Z',
+      },
+    ])
+    setup()
+    await screen.findByText('Sara Coach')
+
+    const asked = within(waiting()).getByTestId('requested-as')
+    expect(asked).toHaveTextContent(TEAM_U12.name)
+    expect(asked).toHaveTextContent(TEAM_U10.name)
+  })
+
+  it('⚠️ falls back to the single column for rows written before the array existed', async () => {
+    // No backfill was run, deliberately: a one-element array would make "asked
+    // for one squad" indistinguishable from "asked before the column existed".
+    listAccessRequestsMock.mockResolvedValue([
+      {
+        id: 'req-2',
+        profile_id: JANICE_PENDING.id,
+        status: 'open',
+        note: null,
+        requested_role: 'parent',
+        requested_team_id: TEAM_U10.id,
+        requested_team_ids: null,
+        created_at: '2026-08-10T12:00:00Z',
+      },
+    ])
+    setup()
+    await screen.findByText('Sara Coach')
+
+    expect(within(waiting()).getByTestId('requested-as')).toHaveTextContent(TEAM_U10.name)
+  })
+})

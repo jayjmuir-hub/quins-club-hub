@@ -50,10 +50,18 @@ export async function getMyAccessRequest(profileId) {
  * trimmed to null rather than stored as an empty string so the admin screen
  * can tell "said nothing" from "said something blank".
  */
-export async function createAccessRequest({ profileId, note, role, teamId } = {}) {
+export async function createAccessRequest({ profileId, note, role, teamId, teamIds } = {}) {
   if (!profileId) throw new Error('createAccessRequest needs a profileId.')
 
   const trimmed = typeof note === 'string' ? note.trim() : ''
+
+  // ⚠️ THE ARRAY IS THE ANSWER; teamId IS THE FIRST OF IT. The INSERT policy
+  // requires requested_team_id to be non-null, so the single column stays
+  // populated and the policy is satisfied without being weakened — see
+  // db/migrations/20260820_access_request_team_ids.sql. A caller that passes
+  // only `teamId` (RequestAccess still does) keeps working unchanged.
+  const ids = Array.isArray(teamIds) ? teamIds.filter(Boolean) : []
+  const firstTeam = teamId || ids[0] || null
 
   const { data, error } = await supabase
     .from('access_requests')
@@ -67,7 +75,11 @@ export async function createAccessRequest({ profileId, note, role, teamId } = {}
       // `access request insert own`, which is the point: the form is the
       // convenience and the policy is the gate.
       requested_role: role || null,
-      requested_team_id: teamId || null,
+      requested_team_id: firstTeam,
+      // Null rather than an empty array when nobody chose several: a null
+      // reads as "this row predates the column, fall back", which is exactly
+      // what the card does, and an empty array would claim they chose none.
+      requested_team_ids: ids.length ? ids : null,
     })
     .select()
     .maybeSingle()
@@ -119,8 +131,12 @@ export async function listAccessRequests() {
   const { data, error } = await supabase
     .from('access_requests')
     .select(
+      // ⚠️ requested_team_ids ADDED 20 Aug 2026, AND THIS IS A COLUMN LIST.
+      // A column the screen reads but the query omits comes back undefined
+      // rather than failing, so the card would quietly show one squad out of
+      // five and nothing would go red.
       'id, profile_id, note, status, created_at, decided_at, decided_by,' +
-        ' requested_role, requested_team_id',
+        ' requested_role, requested_team_id, requested_team_ids',
     )
     .order('created_at', { ascending: false })
 

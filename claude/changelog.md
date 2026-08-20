@@ -10,6 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🚪 **THE FIRST SCREEN NOW ASKS WHICH SQUADS, AND WRITES THE REQUEST IN THE SAME
+  SUBMIT.** Jay: *"is there a way to force people to choose their requested
+  access in one shot?"* — and, on the shape of it, **"multi select"**.
+  ⚠️ **THE OLD ORDER WAS THE DEFECT.** `RollCall` saved the name on screen one
+  and asked what the person actually wanted on screen two, so anybody who
+  stopped in between left a named profile and nothing else. Measured on
+  production: three people waiting, all confirmed, all signed in, **none with a
+  request row**, two of them named.
+  ⚠️ **AN ARRAY, NOT A ROW PER SQUAD.** `access_requests` carries
+  UNIQUE (profile_id) and the whole approval queue is built on it —
+  `requestByProfile` is a Map keyed by profile, dismissal is per person.
+  `requested_team_ids` holds the list; `requested_team_id` keeps the FIRST,
+  because the INSERT policy requires it and that policy was added 16 Aug for
+  this same complaint. It is not weakened here.
+  ⚠️ **NO BACKFILL, DELIBERATELY.** A one-element array would make "asked for
+  one squad" indistinguishable from "asked before the column existed". The card
+  falls back to the single column, and a test pins that fallback.
+  ⚠️ **THE STAFF ROLE IS ASKED HERE TOO, because "staff" alone cannot be
+  written.** `requested_role` is CHECKed against a fixed list; coach, manager
+  and medic are three different claims and guessing one would put a wrong answer
+  in front of whoever approves it.
+  ⚠️ **A REQUIRED FIELD THAT COULD STRAND SOMEBODY WAS CAUGHT BY A TEST, NOT BY
+  REVIEW.** With no squads loaded the picker demanded a choice that could not be
+  made — the dead-affordance defect this codebase has shipped once already.
+  `tests/parent-self-registration.test.jsx` renders exactly that case. The
+  requirement is now conditional on there being squads, and the picker hides
+  itself when there are none.
+  ⚠️ **55 EXISTING TESTS BROKE, AND ALL OF THEM WERE RIGHT TO.** Every test that
+  walked the first screen now meets a mandatory field. The helpers find the
+  picker by its **legend**, not by a squad name, because the three files that
+  drive it name their squads differently.
+- `4452849` — the squash that unblocked approvals and added the no-request badge.
+
+
 - 🐛 **AN ADMIN COULD NOT ADD A PLAYER WHO WAS NOT ON THE ROSTER YET.** Granting
   Player access with "they're not on the roster yet" answered with the raw
   database refusal — *null value in column "club_id" of relation "players"
