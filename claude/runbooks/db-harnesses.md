@@ -85,6 +85,50 @@ ago, possibly from a migration somebody else applied. Do not "fix" it by
 editing the harness until you have established which of the two is wrong. On
 13 Aug the harness was wrong and the database was right.
 
+## ⚠️ Which of these have ever actually RUN, and what running them found
+
+**On 20 Aug 2026 all nine harnesses added on 19 and 20 August were executed for
+the first time**, through the Supabase MCP, each inside its own rolled-back
+transaction. `SUPABASE_DB_URL` is still unset, so `npm run db:check` had never
+executed any of them and the nightly workflow was passing green while checking
+nothing.
+
+**Three of the nine were broken.** Not subtly:
+
+| Harness | What running it found |
+|---|---|
+| `db/tests/signup-nudges.sql` | **could not execute at all** — inserted `public.profiles` before `auth.users`, violating `profiles_id_fkey` on the first statement of its own fixture, and the row was a duplicate anyway because `on_auth_user_created` creates it. Its part 5 also **asserted the bug** that `20260820_signup_nudge_spacing.sql` fixes |
+| `db/tests/notice-push.sql` | compared the **whole audience's** notified devices against **one person's** device count. Red as soon as a second person subscribed |
+| `db/tests/approval-push.sql` | same mistake — reported *"the REQUESTER would be buzzed about their own request"*, which was **false**: a second super admin had subscribed and was correctly told |
+
+The other six passed as written, self-tests included:
+`email-confirmed-sync.sql`, `fixture-push.sql`, `feedback-delete.sql`,
+`truncate-grants.sql`, `push-notifications.sql`, `availability-nudge.sql`.
+
+### ⚠️ The rule the two push harnesses cost
+
+**A harness that grows red as the club grows is testing the fixture, not the
+feature.** Both were written when exactly one person had ever subscribed, so
+*"this person's devices"* and *"everybody notified"* were the same number and
+the distinction was invisible. `notice_push_subscriptions` and
+`approval_push_subscriptions` both return `(id, endpoint, p256dh, auth)` and
+carry **no `profile_id`**, which is what makes the loose count look reasonable.
+
+**Join the returned `id` back to `push_subscriptions` and filter to the person
+the assertion is about** — and keep an unfiltered control alongside it, so a
+function that returned nothing cannot satisfy the filtered check for free.
+⚠️ **Not every count should be filtered:** `approval-push.sql`'s
+"an already-actioned request notifies nobody" is deliberately about the whole
+audience, and is marked as such in the file.
+
+### ⚠️ Prove the runner's rollback before trusting it with a harness
+
+The MCP was proved on 20 Aug by creating a throwaway table inside
+`begin`/`rollback` and confirming it was gone **with a control that the same
+query can see a table which does exist**. Measured the same day: **an
+unterminated transaction is discarded, not committed** — but do not lean on
+that, write the `rollback;`.
+
 ## The nightly run
 
 `.github/workflows/db-check.yml`, on a schedule and on demand.
