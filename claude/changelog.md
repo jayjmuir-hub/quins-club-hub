@@ -10,6 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🐛 **AN ADMIN COULD NOT ADD A PLAYER WHO WAS NOT ON THE ROSTER YET.** Granting
+  Player access with "they're not on the roster yet" answered with the raw
+  database refusal — *null value in column "club_id" of relation "players"
+  violates not-null constraint* — printed on the live Accounts screen, mid
+  approval. Reported by Jay from production, 20 Aug 2026.
+  ⚠️ **`AccessBuilder` BUILT `{ full_name, team_id }` AND NOTHING ELSE.**
+  `players.club_id` is NOT NULL. `src/screens/PlayerForm.jsx` has always sent
+  it, which is exactly why the same action worked from the roster and failed
+  from here — the two paths had drifted, and only one of them was right.
+  ⚠️ **TAKEN FROM THE CHOSEN SQUAD, not from a club id threaded down as a prop.**
+  The team is the thing the admin actually picked; deriving it from anywhere
+  else would let a new player land in a different club from the squad they were
+  just assigned to.
+  ⚠️ **TWO TESTS EXISTED AND BOTH LET IT THROUGH, WHICH IS THE PART WORTH
+  KEEPING.** `tests/accounts.test.jsx` gave its teams **no `club_id`** — a row
+  that cannot exist, the same defect its own `status` note records for
+  memberships — and never mocked `upsertPlayer` at all, so the path was
+  unreachable. `tests/access-new-player.test.jsx` DID reach it and asserted
+  `toHaveBeenCalledWith({ full_name, team_id })` **exactly**, which pinned the
+  bug in place: it went green precisely because the column was missing. Both are
+  fixed, and the exact match is kept on purpose — an extra column there is a
+  column the database was never asked about.
+  ✅ A friendlier refusal replaces the constraint text if a squad ever arrives
+  without a club, rather than showing an admin Postgres internals again.
+- `2a4049e` — the squash that added the email-confirmed badge.
+
+
 - 🏷️ **"HASN'T SAID WHAT THEY NEED" — THE ABSENCE OF THE "Asked" BADGE WAS
   CARRYING THE USEFUL FACT, AND WAS INVISIBLE.** Jay, 20 Aug 2026: *"I'm still
   getting approval requests with no indicating who they are or what they are
@@ -33,7 +60,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   That is right for the list and wrong for this label: without the guard a
   single dropped connection would tell an admin that every person in the queue
   had said nothing. Pinned by a test that rejects the read.
-- `2a4049e` — the squash that added the email-confirmed badge.
 
 
 - 🏷️ **THE "WAITING FOR ACCESS" LIST NOW SAYS WHETHER THE LOGIN WAS EVER

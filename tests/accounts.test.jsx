@@ -16,6 +16,7 @@ const listPendingProfilesMock = vi.fn()
 const grantMembershipsMock = vi.fn()
 const listPlayersMock = vi.fn()
 const listPlayerPrivateMock = vi.fn()
+const upsertPlayerMock = vi.fn()
 const listParentsForPlayersMock = vi.fn()
 const listVouchesMock = vi.fn()
 const setVouchMock = vi.fn()
@@ -57,6 +58,11 @@ vi.mock('../src/data/players.js', () => ({
   // calling it in an effect throws before the queue renders at all — which
   // shows up as every card in this file disappearing, not as a missing chip.
   listPlayerPrivate: (...args) => listPlayerPrivateMock(...args),
+  // ⚠️ NOT MOCKED UNTIL 20 Aug 2026, WHICH IS WHY THE club_id BUG SHIPPED.
+  // AccessBuilder calls this to create a player who is not on the roster yet.
+  // An unmocked export is undefined, so no test could reach that path — and
+  // none did. The insert it builds was missing a NOT NULL column the whole time.
+  upsertPlayer: (...args) => upsertPlayerMock(...args),
 }))
 
 // The approval gate: who asked for access, and who has been dismissed.
@@ -95,11 +101,18 @@ vi.mock('../src/data/accessRequests.js', () => ({
 // Import after vi.mock so this binds to the mocked modules.
 import Accounts from '../src/screens/Accounts.jsx'
 
-const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
-const TEAM_U12 = { id: 'team-u12', name: 'U12 Boys', sort_order: 6 }
-const TEAMS = [TEAM_U12, TEAM_U10] // deliberately unsorted; the screen sorts
-
 const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
+
+// ⚠️ `club_id` IS LOAD-BEARING, AND ITS ABSENCE SHIPPED A BUG — 20 Aug 2026.
+// teams.club_id is NOT NULL, so a fixture without one was a row that cannot
+// exist — the same defect the `status` note below records for memberships.
+// AccessBuilder derives a new player's club_id from the chosen squad, and with
+// club-less teams here every test passed while the live screen answered an
+// admin mid-approval with: null value in column "club_id" of relation
+// "players" violates not-null constraint.
+const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5, club_id: CLUB_ID }
+const TEAM_U12 = { id: 'team-u12', name: 'U12 Boys', sort_order: 6, club_id: CLUB_ID }
+const TEAMS = [TEAM_U12, TEAM_U10] // deliberately unsorted; the screen sorts
 
 // ⚠️ `status` IS LOAD-BEARING HERE — 17 Aug 2026. memberships.status is NOT
 // NULL in the database, so a fixture without one is a row that cannot exist.
@@ -2427,5 +2440,40 @@ describe('Accounts — the "hasn\'t said what they need" badge', () => {
 
     expect(within(waiting()).getAllByTestId('waiting-person')).toHaveLength(2)
     expect(within(waiting()).queryAllByTestId('no-request-badge')).toHaveLength(0)
+  })
+})
+
+describe('Accounts — adding a player who is not on the roster yet', () => {
+  // ⚠️ THIS PATH HAD NO TEST AT ALL, and it is the one that broke in front of
+  // an admin on 20 Aug 2026: "null value in column club_id of relation players
+  // violates not-null constraint", shown raw on the Accounts screen mid-approval.
+  // src/screens/PlayerForm.jsx has always sent club_id; AccessBuilder built
+  // { full_name, team_id } and nothing else, so the same action worked from the
+  // roster and failed from here.
+
+  it('sends club_id with the new player, taken from the chosen squad', async () => {
+    upsertPlayerMock.mockResolvedValue({ id: 'player-new', full_name: 'New Player' })
+    const { user } = setup()
+
+    await screen.findByText('Sara Coach')
+    await chooseRole(user, 'raw@example.com', 'player')
+    await user.click(
+      within(builderFor('raw@example.com')).getByRole('checkbox', { name: /on the roster yet/i }),
+    )
+
+    const builder = builderFor('raw@example.com')
+    await user.type(within(builder).getByRole('textbox'), 'New Player')
+    await user.selectOptions(
+      within(builder).getAllByRole('combobox').at(-1),
+      TEAM_U12.id,
+    )
+    await user.click(within(builder).getByRole('button', { name: /give access/i }))
+
+    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
+    const sent = upsertPlayerMock.mock.calls[0][0]
+    // The assertion that would have caught it: the column the database demands.
+    expect(sent.club_id).toBe(CLUB_ID)
+    expect(sent.team_id).toBe(TEAM_U12.id)
+    expect(sent.full_name).toBe('New Player')
   })
 })

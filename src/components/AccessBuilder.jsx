@@ -58,6 +58,14 @@ export const NO_PLAYER_CHOSEN =
   "Choose which player this person is — or tick “not on the roster yet” and add them."
 export const NEW_PLAYER_NEEDS_NAME = 'Give the new player a name.'
 export const NEW_PLAYER_NEEDS_TEAM = 'Choose an age group for the new player.'
+// ⚠️ SHOULD BE UNREACHABLE, AND EXISTS BECAUSE THE ALTERNATIVE WAS WORSE.
+// players.club_id is NOT NULL, and every squad in the picker carries a club_id,
+// so a team without one means the team list arrived malformed. Before 20 Aug
+// 2026 this case sent the insert anyway and the admin was shown the raw
+// database refusal — "null value in column \"club_id\" of relation \"players\"
+// violates not-null constraint" — on the live Accounts screen, mid-approval.
+export const NEW_PLAYER_NEEDS_CLUB =
+  "That age group isn't attached to a club, so a new player can't be added to it. Reload the page, and tell an admin if it happens again."
 export const CHILD_WITHOUT_TEAM =
   "That player isn't in an age group yet, so there's nothing to give access to. Put them in a squad on the roster first."
 export const DUPLICATE_ACCESS = 'They already have that access, so there is nothing to add.'
@@ -187,13 +195,29 @@ export default function AccessBuilder({
     if (newPlayerMode) {
       if (!newPlayerName.trim()) return { error: NEW_PLAYER_NEEDS_NAME }
       if (!newPlayerTeam) return { error: NEW_PLAYER_NEEDS_TEAM }
+      // ⚠️ club_id IS MANDATORY ON players AND WAS NOT BEING SENT. This path
+      // built { full_name, team_id } only, so the insert hit a NOT NULL
+      // constraint and the admin saw the raw Postgres message on the Accounts
+      // screen while trying to approve somebody. src/screens/PlayerForm.jsx has
+      // always sent it — `club_id: team.club_id` — which is why the same action
+      // works from the roster and failed from here.
+      // ⚠️ TAKEN FROM THE CHOSEN SQUAD, not from a club id threaded down as a
+      // prop. The team is the thing the admin actually picked, and deriving it
+      // from anything else would let the new player land in a different club
+      // from the squad they were just assigned to.
+      const newTeam = teamsById.get(newPlayerTeam)
+      if (!newTeam?.club_id) return { error: NEW_PLAYER_NEEDS_CLUB }
       return {
         rows: [
           {
             role: 'player',
             teamId: newPlayerTeam,
             playerId: null,
-            newPlayer: { full_name: newPlayerName.trim(), team_id: newPlayerTeam },
+            newPlayer: {
+              full_name: newPlayerName.trim(),
+              team_id: newPlayerTeam,
+              club_id: newTeam.club_id,
+            },
           },
         ],
       }
