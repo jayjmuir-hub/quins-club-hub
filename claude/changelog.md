@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 📓 **20 Aug session record** —
+  `claude/handoffs/2026-08-20-onboarding-and-the-meaning-of-a-row.md`. Nine pull
+  requests, #255 to #263, most of them reacting to something Jay saw on the live
+  Accounts screen while families were signing up around us.
+  ⚠️ **Its one idea: widening WHO WRITES a row silently changes what READING one
+  means.** `access_requests` had a single writer, so "has a request" honestly
+  meant "waiting on an admin". The moment the first screen wrote one for
+  everybody, a mount check three files away turned the sign-up screen into a dead
+  end — and the follow-up nudge would have repeated the same mistake in the
+  opposite direction, chasing nobody.
+- `4424a9a` — the squash that added the unfinished-signup follow-up emails.
+
+
 - 📮 **NOBODY CHASED THE PEOPLE WHO SIGNED UP AND STOPPED. NOW SOMETHING DOES.**
   Jay asked *"will they be nudged again?"* and the honest answer was: only if
   they choose to come back. One email at 24 hours, one at seven days, then
