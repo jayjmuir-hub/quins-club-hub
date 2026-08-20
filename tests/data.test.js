@@ -1691,7 +1691,13 @@ describe('listPendingProfiles', () => {
     const result = await listPendingProfiles()
 
     expect(supabase.from).toHaveBeenCalledWith('profiles')
-    expect(builder.select).toHaveBeenCalledWith('id, full_name, email, created_at')
+    // ⚠️ email_confirmed_at ADDED 20 Aug 2026. This assertion pins the EXACT
+    // column list on purpose: the select is a column list, so a column that is
+    // read by the screen but missing here comes back undefined rather than
+    // failing, and the Waiting-for-access badge would silently render nothing.
+    expect(builder.select).toHaveBeenCalledWith(
+      'id, full_name, email, created_at, email_confirmed_at',
+    )
     expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false })
     expect(result).toEqual(rows)
   })
