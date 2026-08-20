@@ -1,23 +1,25 @@
 # Training session plans — the plan
 
-**STATUS: NOT SHIPPED — TABLED BY JAY, 12 Aug 2026.** Written 12 Aug 2026.
-His words: *"table 1 and 2 for now until i bring them back up again"*.
+**STATUS: NOT SHIPPED — REOPENED BY JAY, 20 Aug 2026.** Written 12 Aug 2026,
+tabled the same day (*"table 1 and 2 for now until i bring them back up again"*),
+reopened eight days later: *"i want to create another admin position named Rugby
+Performance Director, and then i want to create a system where that person can
+develop training plans, focus points, structure for sessions, etc to pass down to
+any of the age groups he selects"*.
 
-⚠️ **TABLED IS NOT REJECTED, AND IT IS NOT A QUEUE EITHER.** Do not start this,
-do not propose starting it, and do not ask again — **Jay reopens it or it stays
-closed.** A plan sitting at plain "NOT SHIPPED" reads as work waiting to be
-picked up, which is how this repo has already spent a session offering to build
-something that was live. The nearest prior instance is the roster import
-(`claude/decisions/2026-08-10-no-roster-import.md`): settled, and re-asking a
-settled question is its own kind of rot.
+✅ **THE TABLING WORKED EXACTLY AS DESIGNED AND IS WORTH NOTING BEFORE IT IS
+FORGOTTEN.** Nobody offered to build this for eight days, and when it came back
+it came back from Jay. The rule that produced that — *he reopens it or it stays
+closed* — is what `claude/state-of-play.md`'s tabled list is for, and this plan
+is the evidence it earns its keep.
+
+⚠️ **Set this line to SHIPPED in the commit that ships it**, not as a promise
+about that commit.
 
 ⚠️ **What survives the tabling is the copyright finding below.** It is a legal
 constraint, not a design preference, so it will still be true whenever this is
 reopened — and it is the reason the feature cannot be built the way it was
 first described.
-
-⚠️ **Set this line to SHIPPED in the commit that ships it**, not as a promise
-about that commit.
 
 **Jay, 12 Aug 2026:** *"integrate training session plans in for all age groups,
 the goal would be for the Club Rugby Performance Officer to distribute brief
@@ -60,6 +62,78 @@ material reusable and distributable, not to replace him with a scraper. A drill
 he writes once and reuses forty times across the season is the actual win here.
 
 ---
+
+## ⚠️ What the 20 August reopening changed
+
+Four things. The first is a measurement that makes part of the plan below wrong.
+
+### 1. ⛔ CONTACT VERSUS TAG IS **NOT** IN THE SQUAD NAMES. The plan below says it is.
+
+Under "Age-appropriateness" this plan states the axis "is in the squad name
+already (`U6 Tag`, `U14B Contact`)". **Measured against the live `teams` table
+on 20 Aug 2026, that is false**, and `U14B Contact` does not exist — the squad is
+called `U14B`:
+
+| Names carrying it | Names that do not |
+|---|---|
+| `U6 Tag`, `U7 Tag`, `U8 Tag` | `U9`–`U13 Mixed`, `U12G QR`, `U14G QR` |
+| | `U14B`, `U16B`, `U16G`, `U18B`, `U18G` |
+
+Five squads say nothing either way. **So `requires_contact` must be an explicit
+column on `teams`**, set once on `/admin/staff`, and NOT parsed from the name.
+⚠️ **Deriving it from the age band is specifically forbidden** — this club runs
+tag sides above the age contact begins, which is the exact case that breaks the
+inference. Same shape as the `ageGroup.js` null lesson: a plausible default is
+worse than no answer.
+✅ **The AGE band is fine** — all fifteen squad names parse under
+`YOUTH_NAME` in `src/lib/ageGroup.js`, checked the same day.
+
+### 2. A fourth object: **focus**
+
+Jay's *"focus points"* are not a note on one session. A focus is a **theme
+spanning a block of weeks for a squad** — "weeks 1–4: tackle technique" — and it
+is what makes a term read as a plan rather than eight unrelated hours.
+
+`public.training_focus`: `id`, `club_id`, `team_id`, `title`, `starts_on`,
+`ends_on`, `notes`, `created_by`. It carries **no drills and no permissions**;
+it labels a period, shows on the coach's session view, and gives the assemble
+step something to aim at.
+
+⚠️ **It must not gate anything.** Same rule as `memberships.title`: a label
+grants nothing. A session outside every focus window is perfectly valid.
+
+### 3. Multi-squad publish — **this overturns a rule below**
+
+The distribution section says publishing is *"EXPLICIT AND PER-SQUAD. Not 'apply
+to all fifteen' behind one button"*. Jay's reopening says **"to any of the age
+groups he selects"**, which is the opposite, and he is right.
+
+⚠️ **The original worry was blast radius, and the answer is visibility, not
+prohibition.** Multi-select is allowed **only** with a preview that shows, per
+squad, how many sessions change and how many are skipped, before anything is
+written. The 20 Aug sign-up screen already established multi-select as the
+club's pattern (`678ee8c`).
+⚠️ **The two protections below are UNCHANGED and are what make this safe:** a
+coach-edited session is never overwritten, and the publish reports how many it
+skipped.
+
+### 4. The job is the **Rugby Performance Director**, and the right is `training`
+
+⚠️ **THIS SITS AWKWARDLY WITH THE 12 Aug "JOBS NOT PEOPLE" RULING AND JAY CHOSE
+IT ANYWAY** — the same way he chose "Social Media Management" over "Social Media
+Manager". That ruling replaced person-shaped titles with function-shaped ones;
+"Director" is person-shaped. It was put to him on 20 Aug and his wording stands.
+`claude/decisions/2026-08-12-jobs-not-people.md` is not overturned — the other
+three labels do not move.
+
+**Answered on 20 Aug, so they are no longer open questions:**
+
+- **Tuesday and Thursday may differ.** Publish assigns per weekday, so a
+  Tue/Thu pair is expressible and identical nights are the easy case.
+- **Nobody holds the job in the app yet**, so the screen is titled by the job —
+  as `YouthDashboard.jsx` already is.
+- **Linking out is accepted.** The library is the club's own summaries plus
+  links; see the copyright section above, which is unchanged and not optional.
 
 ## The shape of it
 
@@ -115,11 +189,15 @@ U14 **Boys**. `private.squad_expects_gender` parses exactly that suffix. Nothing
 here may read a "B" as anything else — the same trap the league-team division
 column exists to avoid.
 
-**Contact vs tag is a separate axis from age**, and it is in the squad name
-already (`U6 Tag`, `U14B Contact`). A tackle drill must not reach a tag squad.
-⚠️ **Derive it from the name and store it on the drill as an explicit
-requirement** — do not infer "if U9+ then contact", because the club runs tag
-sides above that age.
+**Contact vs tag is a separate axis from age.** A tackle drill must not reach a
+tag squad.
+⛔ **THIS PARAGRAPH SAID THE AXIS WAS "IN THE SQUAD NAME ALREADY (`U6 Tag`,
+`U14B Contact`)". IT IS NOT, AND `U14B Contact` DOES NOT EXIST.** Measured
+20 Aug 2026: three squad names carry "Tag", two carry "QR", and five say nothing
+at all. See §What the 20 August reopening changed. **`requires_contact` is an
+explicit column on `teams`.**
+⚠️ **Do not infer "if U9+ then contact"** — the club runs tag sides above that
+age, which is precisely why the name cannot be trusted and the flag is needed.
 
 ## Schema
 
@@ -214,7 +292,8 @@ model for a coaching qualification.
 ⚠️ **`ADMIN_RIGHTS` in `src/lib/scope.js` is the ONLY vocabulary there is** —
 the database deliberately has no check constraint on these values, so an
 unrecognised right matches no dashboard and is silently inert. Adding `training`
-means adding it there, and `adminRightLabel` needs "Rugby Performance Officer".
+is therefore **two lines and no migration**: the array entry, and
+`adminRightLabel` → **"Rugby Performance Director"** (Jay's wording, 20 Aug).
 ⚠️ **A right gates the SCREEN, not the data** — it is a "not your job" message
 and must never be described as a security boundary.
 
@@ -237,6 +316,10 @@ the register and the match sheet live.
   an injected fault, per rule 6.
 
 ## Open questions for Jay
+
+⚠️ **THE THREE BELOW WERE ANSWERED ON 20 Aug 2026** — see §What the 20 August
+reopening changed. They are kept because the reasoning under each is still the
+reasoning, and a question deleted is a question somebody asks again.
 
 1. **Who is the CRPO, and do they have an account?** ⚠️ Measured 12 Aug: the
    only active admins are Jacques Reyneke and Jay's two accounts. Like Candice,

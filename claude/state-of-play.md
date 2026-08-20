@@ -45,9 +45,12 @@ load-bearing and easy to undo by tidying.
 ## Tabled — do not start, do not offer, do not ask again
 
 The photo **restore drill**, the **AI build**
-(`claude/plans/2026-08-12-ai-integration.md`), **training session plans**, and
-the **live `squad_push` test** (Jay, 20 Aug 2026). Jay reopens them or they stay
-closed. ⚠️ `squad_push` is still UNPROVEN; when it is reopened, the safe route is
+(`claude/plans/2026-08-12-ai-integration.md`), and the **live `squad_push` test**
+(Jay, 20 Aug 2026). Jay reopens them or they stay closed.
+✅ **Training session plans came OFF this list on 20 Aug 2026**, reopened by Jay
+after eight days — `claude/plans/2026-08-12-training-session-plans.md`. It is the
+worked example of the list doing its job: nobody offered it, and he brought it
+back himself. ⚠️ `squad_push` is still UNPROVEN; when it is reopened, the safe route is
 a fixture change on **U13 Mixed** made by somebody OTHER than Jay — measured, it
 reaches his devices and nobody else's. Being super admin puts you in no squad's
 audience: `notice_audience` keys purely on `team_id`, and the actor is excluded. ⚠️ The AI *ruling* — children's data may
