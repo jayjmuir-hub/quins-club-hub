@@ -14,7 +14,7 @@ import crest from '../assets/crest.png'
 //   1. SPAM. The mail is FROM send.adhquins-clubhub.com and every link in it
 //      pointed at supabase.co. Sender domain ≠ link domain is a textbook
 //      phishing signature and Gmail, Outlook and Yahoo all weight it heavily.
-//      Janice's confirmation landed in Yahoo's junk folder.
+//      A real member's confirmation landed in Yahoo's junk folder.
 //   2. TRUST. Jay's words: "how do we fix the link saying lush?" — the project
 //      ref reads as `lusmshimxdcxpnrktlgz`, which is exactly the sort of
 //      hostname people are taught not to click.

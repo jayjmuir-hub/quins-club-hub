@@ -1684,7 +1684,7 @@ describe('updateProfileName', () => {
 describe('listPendingProfiles', () => {
   it('selects the profile columns the waiting-for-access list needs, newest first', async () => {
     const rows = [
-      { id: 'pr-new', full_name: '', email: 'janice@example.com', created_at: '2026-08-03T11:37:00Z' },
+      { id: 'pr-new', full_name: '', email: 'marisa@example.com', created_at: '2026-08-03T11:37:00Z' },
     ]
     const { builder } = createQueryBuilder({ data: rows })
     supabase.from.mockReturnValue(builder)
@@ -1723,7 +1723,7 @@ describe('listPendingProfiles', () => {
     // documents.
     const rows = [
       { id: 'pr-jay', full_name: 'Jay Muir', email: 'jay@example.com', created_at: '2026-01-05T09:00:00Z' },
-      { id: 'pr-new', full_name: '', email: 'janice@example.com', created_at: '2026-08-03T11:37:00Z' },
+      { id: 'pr-new', full_name: '', email: 'marisa@example.com', created_at: '2026-08-03T11:37:00Z' },
     ]
     const { builder } = createQueryBuilder({ data: rows })
     supabase.from.mockReturnValue(builder)

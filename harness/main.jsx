@@ -121,7 +121,14 @@ function baseAuth(email) {
 }
 
 const COACH_EMAIL = 'coach.sam@adhq.example'
-const JAY_EMAIL = 'jayjmuir@gmail.com'
+// ⚠️ INVENTED, AND IT MUST STAY INVENTED. This was a real personal inbox until
+// 20 Aug 2026. The harness is not just a dev toy: `scripts/shoot-*.mjs` renders
+// these screens to PNG, and those PNGs became the two parent-facing guides. A
+// real address here is a real address published to the whole club. Every stub
+// address in this repo uses the reserved `adhq.example` / `example.com`
+// domains, and `npm run docs:check` now fails on a consumer-inbox domain
+// anywhere in src/, tests/, harness/, scripts/ or db/schema/.
+const JAY_EMAIL = 'jay.muir@adhq.example'
 
 const COACH_MEMBERSHIPS = [
   { id: 'm1', status: 'active', role: 'coach', team_id: 't1', player_id: null },

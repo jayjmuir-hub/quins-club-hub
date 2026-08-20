@@ -10,6 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🔒 **A REAL CLUB MEMBER'S NAME AND INBOX WERE IN A PUBLIC REPO, AND SO WAS A
+  CHILD'S ADDRESS.** The 20 Aug handoff recorded this as one hard-coded address
+  in `harness/stubs/`. It was that, plus the same person's **first name across
+  three test files**, their **full name in `harness/shoot-pending.mjs`**, a
+  sentence naming them in `src/screens/AuthConfirm.jsx`, their **live signup
+  timestamp identifying their row** in two plan documents, and a separate real
+  Gmail address — a child's, by its spelling — in `tests/access-new-player.test.jsx`.
+  ⚠️ **THE LEAK PATH IS NOT HYPOTHETICAL: `harness/` IS PHOTOGRAPHED.**
+  `scripts/shoot-*.mjs` renders those stubs to PNG and the two parent-facing
+  guides were built from those PNGs, so fixture data in this repo reaches the
+  whole club as pictures. Identities invented, shapes kept exactly — the pending
+  row still has `full_name: ''`, an outside personal address and the same
+  timestamp, because the shape is everything the screen is tested on.
+  ⚠️ **Jay's OWN addresses were left alone deliberately.** He is the repo's
+  public author, and `claude/runbooks/first-admin.md`'s bootstrap SQL does not
+  work without his. **His to decide, not a session's.**
+  ⚠️ **git history still holds every one of these** — this cleans the working
+  tree, not the past.
+- 🧯 **`docs:check` grew an eighth check, and it is one CLAUDE.md said could not
+  exist.** The rules file says a name denylist would put those names into the
+  repo, in the checker — true of NAMES, false of MAILBOXES. `checkRealInboxes`
+  fails on any address at a personal mail provider in `src/`, `tests/`,
+  `harness/`, `scripts/`, `db/` or `supabase/`, from a list of **domains**, which
+  names nobody. ⚠️ **`harness/` and `scripts/` are in scope here and are absent
+  from `trackedCode()`** — the existing retired-names scan has never once looked
+  at the harness, which is precisely where the address was sitting.
+  ⚠️ `claude/` is deliberately exempt: a check that fails an operational runbook
+  is a check that gets switched off.
+- `c8009d5` — the squash that recorded the 20 Aug session.
+
 - 📓 **20 Aug session record** —
   `claude/handoffs/2026-08-20-onboarding-and-the-meaning-of-a-row.md`. Nine pull
   requests, #255 to #263, most of them reacting to something Jay saw on the live
@@ -6032,8 +6062,9 @@ must be the NEXT PR that fills it in. Repointed to `725d0e6` below rather than d
   ⚠️ **Both of Jay's accounts are now super** — `jayjmuir@gmail.com` and the backup
   `jayjmuir@yahoo.com`. A single super account is one lost password away from needing
   SQL to recover; the cost is that two accounts can hand out club-wide authority.
-  `reynekeett@gmail.com` is a **legitimate** third admin, confirmed by Jay, ordinary
-  not super — recorded so it is not raised again as a stray.
+  A **third ordinary admin** (not super) is **legitimate**, confirmed by Jay — recorded
+  so it is not raised again as a stray. ⚠️ **Its login address stood here until 20 Aug
+  2026**; identify the row from the database, not from this line.
   ⚠️ **A fault injection could not be reverted by `git checkout --`** because the
   file was UNTRACKED, so the restore silently did nothing and left the injected fault
   in the working tree. Caught by re-grepping for the line afterwards. **Check the

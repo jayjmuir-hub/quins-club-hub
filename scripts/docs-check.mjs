@@ -391,6 +391,66 @@ function checkGrantCapture() {
   }
 }
 
+// ---------------------------------------------------------------- 8. real inboxes
+
+// ⚠️ WHAT THIS CATCHES, AND WHY A CHECK WAS POSSIBLE AT ALL. CLAUDE.md rule 9
+// forbids a real person's identity in this repo, and says plainly that
+// docs:check CANNOT enforce it — a denylist of real names would put those names
+// into the repo, in the checker. That is true of NAMES. It is not true of
+// MAILBOXES: a consumer mail provider is a domain, not a person, so this list
+// names nobody and never will.
+//
+// The gap it closes was found on 20 Aug 2026. A real club member's inbox sat in
+// `harness/stubs/`, their first name across three test files, and their full
+// name in `harness/shoot-pending.mjs` — the script that renders the PNGs the
+// two parent-facing guides were built from. So the leak path was not
+// hypothetical: fixture data in this repo gets published to the club as
+// pictures. A child's address was in `tests/` on the same day.
+//
+// ⚠️ CODE AND FIXTURES ONLY — `claude/` IS DELIBERATELY OUT OF SCOPE. Jay's own
+// address is load-bearing in `claude/runbooks/first-admin.md`, where the
+// bootstrap SQL will not work without it, and a check that fails an operational
+// runbook is a check that gets switched off. The rule for prose is still rule 9
+// and still enforced by hand.
+//
+// ⚠️ `harness/` AND `scripts/` ARE IN SCOPE HERE AND ARE NOT IN `trackedCode()`
+// above. That is the whole point: the retired-names scan has never looked at the
+// harness, which is exactly where the address was.
+const INBOX_DOMAINS = [
+  'gmail', 'googlemail', 'yahoo', 'ymail', 'hotmail', 'outlook', 'live', 'msn',
+  'icloud', 'me', 'mac', 'aol', 'proton', 'protonmail', 'gmx', 'zoho', 'yandex',
+]
+// Built from parts so this file never contains a literal address and cannot
+// match itself. Verified by running the check over a tree containing it.
+const INBOX_RE = new RegExp(
+  '[A-Za-z0-9._%+-]+' + '@' + `(?:${INBOX_DOMAINS.join('|')})` + '\.[a-z]{2,}(?:\.[a-z]{2,})?',
+  'i',
+)
+
+function trackedFixtures() {
+  return execSync('git ls-files "src/*" "tests/*" "harness/*" "scripts/*" "db/*" "supabase/*"', { encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean)
+}
+
+function checkRealInboxes() {
+  for (const f of trackedFixtures()) {
+    const text = readFileSync(join(ROOT, f), 'utf8')
+    text.split('\n').forEach((line, i) => {
+      // The escape hatch exists so a line ABOUT this rule can name a domain.
+      // It is not for keeping a real address.
+      if (line.includes('mailbox-ok')) return
+      const m = INBOX_RE.exec(line)
+      if (!m) return
+      fail(f, i + 1,
+        `"${m[0]}" is an address at a personal mail provider, in code or fixture data - ` +
+        `CLAUDE.md rule 9. Invent it: every stub in this repo uses the reserved ` +
+        `adhq.example / example.com domains. Mark the line mailbox-ok only if the line ` +
+        `is about this rule rather than carrying an address`)
+    })
+  }
+}
+
 // ---------------------------------------------------------------- run
 
 const files = trackedMarkdown()
@@ -402,6 +462,7 @@ const checks = [
   ['plan status lines', () => checkPlanStatus()],
   ['stale terminology', () => checkStaleTerms(files)],
   ['table and column grants captured', () => checkGrantCapture()],
+  ['real inboxes in code and fixtures', () => checkRealInboxes()],
 ]
 
 console.log(`docs-check: ${files.length} tracked markdown files\n`)

@@ -14,8 +14,10 @@ app grants access only through the invite flow, and the Accounts screen lists
 *memberships*, so a self-signed-up user is completely invisible to admins.
 There has never been an approval or request-access flow.
 
-Confirmed live: `janice.muir@yahoo.com` signed up 2026-08-03 11:37 with 0
-memberships and no invite record.
+Confirmed live: one real self-signed-up account, 2026-08-03 11:37, with 0
+memberships and no invite record. ⚠️ **Its address stood here in a public repo
+until 20 Aug 2026.** Identify the row from the DATABASE, never from a document
+— CLAUDE.md rule 9.
 
 Decision (Jay, 2026-08-03): show them and allow granting. Leave public signup
 open for now — a user with no membership reads zero rows from every table, so

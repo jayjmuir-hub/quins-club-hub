@@ -164,10 +164,20 @@ do not propose buying an M365 licence — same session, same verdict.
    ⚠️ **IT APPLIES TO `db/` AS MUCH AS TO `claude/`** — a migration header, a
    harness comment and a `db/schema/` capture are all published the moment they
    are pushed, and "it's only a comment" is how a name gets past a review.
-   ⚠️ **`docs:check` CANNOT ENFORCE THIS AND MUST NOT BE ASKED TO.** A denylist
-   of real names would put those names into the repo, in the checker. The gate is
-   this rule, plus the same instinct that already stops a volunteer's name or
-   email going in.
+   ⚠️ **`docs:check` CANNOT ENFORCE THE *NAME* HALF AND MUST NOT BE ASKED TO.**
+   A denylist of real names would put those names into the repo, in the checker.
+   The gate for a name is this rule, plus the same instinct that already stops a
+   volunteer's name going in.
+   ✅ **THE *MAILBOX* HALF IS ENFORCED, since 20 Aug 2026** — check 8 below. A
+   consumer mail provider is a DOMAIN, not a person, so that list names nobody
+   and the objection above simply does not apply to it. **The distinction is the
+   point: this paragraph read as "no check is possible here" and that was one
+   word too broad.**
+   ⚠️ **AND THE HARNESS IS THE PLACE TO WORRY ABOUT.** `scripts/shoot-*.mjs`
+   renders `harness/stubs/` to PNG, and the parent-facing guides are built from
+   those PNGs — so a real identity in a fixture is a real identity **published to
+   the club as a picture**. On 20 Aug 2026 a member's name and inbox, and a
+   child's address, were found sitting there.
 
 ## Facts worth having before you touch anything
 
@@ -370,7 +380,7 @@ alone on purpose — a decision record is a record of a moment.
 
 **Run it before committing anything under `claude/`, and after editing this
 file.** `scripts/docs-check.mjs`, no dependencies, also runs in GitHub
-Actions on every push. It enforces six things that were previously enforced
+Actions on every push. It enforces eight things that were previously enforced
 by whoever remembered:
 
 1. **Every `claude/…`, `src/…`, `db/…` path named in a doc resolves.**
@@ -423,6 +433,16 @@ by whoever remembered:
 5. **Every file in `claude/plans/` states whether it shipped.**
 6. **No retired terminology** creeping back. Mark `<!-- stale-ok -->` when a
    line is deliberately retiring the term.
+7. **A migration granting on a TABLE is represented in `db/schema/grants.sql`.**
+   It cannot see the database and does not pretend to; it catches the one
+   failure mode visible from the filesystem.
+8. **No address at a personal mail provider in `src/`, `tests/`, `harness/`,
+   `scripts/`, `db/` or `supabase/`** — rule 9's mailbox half, from a list of
+   domains rather than of people. ⚠️ **`claude/` is out of scope on purpose:**
+   Jay's own address is load-bearing in `claude/runbooks/first-admin.md`, whose
+   bootstrap SQL does not work without it, and a check that fails an operational
+   runbook is a check that gets switched off. Mark a line `mailbox-ok` only when
+   the line is ABOUT this rule.
 
 **Each check was verified by breaking it on purpose and confirming it fails
 (rule 6 — a check that has never failed is not a check).** `claude/handoffs/`,

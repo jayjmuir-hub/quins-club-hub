@@ -187,10 +187,10 @@ const MEMBER_ROWS = [JAY_ADMIN, SARA_COACH, SARA_PARENT, ALI_PARENT]
 // signups — the union of three RLS policies, not a pending list. Only the last
 // two rows here are waiting for access. Any test fixture that returns only the
 // unattached rows would hide the exact bug this screen has to avoid.
-const JANICE_PENDING = {
-  id: 'profile-janice',
+const MARISA_PENDING = {
+  id: 'profile-marisa',
   full_name: '',
-  email: 'janice@example.com',
+  email: 'marisa@example.com',
   created_at: '2026-08-03T11:37:00Z',
 }
 const RAW_PENDING = {
@@ -200,7 +200,7 @@ const RAW_PENDING = {
   created_at: '2026-08-02T08:00:00Z',
 }
 const PROFILE_ROWS = [
-  JANICE_PENDING,
+  MARISA_PENDING,
   RAW_PENDING,
   { id: SELF_ID, full_name: 'Jay Muir', email: 'jay@example.com', created_at: '2026-01-05T09:00:00Z' },
   { id: 'profile-sara', full_name: 'Sara Coach', email: 'sara@example.com', created_at: '2026-02-01T09:00:00Z' },
@@ -872,7 +872,7 @@ describe('Accounts — waiting for access', () => {
     const section = waitingSection()
 
     expect(within(section).getAllByTestId('waiting-person')).toHaveLength(2)
-    expect(within(section).getByText(/janice@example\.com/)).toBeInTheDocument()
+    expect(within(section).getByText(/marisa@example\.com/)).toBeInTheDocument()
     expect(within(section).getByText('Raw Recruit')).toBeInTheDocument()
 
     // Members, and the signed-in admin, are all in the readable profile list
@@ -900,14 +900,14 @@ describe('Accounts — waiting for access', () => {
     // This asserted the placeholder, which is what an admin was left holding
     // when somebody signed up and completed neither onboarding form — a label
     // that identifies nobody, sitting where the only identifying fact should
-    // be. JANICE_PENDING has `full_name: ''` and an address, so her card is
+    // be. MARISA_PENDING has `full_name: ''` and an address, so her card is
     // headed by that address now.
     expect(within(section).queryByText('No name yet')).not.toBeInTheDocument()
-    expect(within(section).getByText('janice@example.com')).toBeInTheDocument()
+    expect(within(section).getByText('marisa@example.com')).toBeInTheDocument()
     // ⚠️ ONCE, not twice — the address used to be repeated on the line below
     // the heading, and promoting it without suppressing that would print it
     // twice, a line apart.
-    expect(within(section).getAllByText('janice@example.com')).toHaveLength(1)
+    expect(within(section).getAllByText('marisa@example.com')).toHaveLength(1)
     expect(within(section).getByText(/signed up 3 Aug 2026/)).toBeInTheDocument()
   })
 
@@ -931,21 +931,21 @@ describe('Accounts — waiting for access', () => {
     await screen.findByText('Sara Coach')
     expect(within(waitingSection()).getAllByTestId('waiting-person')).toHaveLength(2)
 
-    const janice = within(waitingSection())
+    const marisa = within(waitingSection())
       .getAllByTestId('waiting-person')
-      .find((card) => within(card).queryByText(/janice@example\.com/))
-    await user.click(within(janice).getByRole('button', { name: /^dismiss$/i }))
+      .find((card) => within(card).queryByText(/marisa@example\.com/))
+    await user.click(within(marisa).getByRole('button', { name: /^dismiss$/i }))
 
     await waitFor(() =>
       expect(dismissAccessRequestMock).toHaveBeenCalledWith({
-        profileId: 'profile-janice',
+        profileId: 'profile-marisa',
         decidedBy: SELF_ID,
       }),
     )
     await waitFor(() =>
       expect(within(waitingSection()).getAllByTestId('waiting-person')).toHaveLength(1),
     )
-    expect(screen.queryByText(/janice@example\.com/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/marisa@example\.com/)).not.toBeInTheDocument()
   })
 
   it('surfaces a failed dismiss inline and keeps the person on the list', async () => {
@@ -963,8 +963,8 @@ describe('Accounts — waiting for access', () => {
   })
 
   it('shows what someone said about themselves, badges them, and lists them first', async () => {
-    // The raw signup asked; Janice did not. listPendingProfiles hands them
-    // over newest-first, which puts Janice (3 Aug) ahead of Raw (2 Aug), so
+    // The raw signup asked; Marisa did not. listPendingProfiles hands them
+    // over newest-first, which puts Marisa (3 Aug) ahead of Raw (2 Aug), so
     // Raw rendering first can only be because asking outranks merely having
     // signed in.
     listAccessRequestsMock.mockResolvedValue([
@@ -996,8 +996,8 @@ describe('Accounts — waiting for access', () => {
     const user = userEvent.setup()
     listAccessRequestsMock.mockResolvedValue([
       {
-        id: 'req-janice',
-        profile_id: 'profile-janice',
+        id: 'req-marisa',
+        profile_id: 'profile-marisa',
         note: null,
         status: 'dismissed',
         created_at: '2026-08-04T09:00:00Z',
@@ -1007,20 +1007,20 @@ describe('Accounts — waiting for access', () => {
     setup()
 
     await screen.findByText('Sara Coach')
-    expect(screen.queryByText(/janice@example\.com/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/marisa@example\.com/)).not.toBeInTheDocument()
 
     // Collapsed by default — dismissing is meant to clear the list.
     await user.click(screen.getByRole('button', { name: /show dismissed \(1\)/i }))
     const dismissedSection = screen.getByTestId('dismissed-requests')
-    expect(within(dismissedSection).getByText(/janice@example\.com/)).toBeInTheDocument()
+    expect(within(dismissedSection).getByText(/marisa@example\.com/)).toBeInTheDocument()
 
     await user.click(within(dismissedSection).getByRole('button', { name: /^restore$/i }))
 
     await waitFor(() =>
-      expect(restoreAccessRequestMock).toHaveBeenCalledWith({ profileId: 'profile-janice' }),
+      expect(restoreAccessRequestMock).toHaveBeenCalledWith({ profileId: 'profile-marisa' }),
     )
     // Back in the waiting list, and the dismissed section is gone with it.
-    await waitFor(() => expect(screen.getByText(/janice@example\.com/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/marisa@example\.com/)).toBeInTheDocument())
     expect(screen.queryByTestId('dismissed-requests')).toBeNull()
   })
 
@@ -1038,7 +1038,7 @@ describe('Accounts — waiting for access', () => {
 
   it('renders an empty state, not a bare heading, when nobody is waiting', async () => {
     // Only members and the admin readable — the normal steady state.
-    listPendingProfilesMock.mockResolvedValue(PROFILE_ROWS.filter((row) => row.id.startsWith('profile-') && row.id !== 'profile-janice' && row.id !== 'profile-raw'))
+    listPendingProfilesMock.mockResolvedValue(PROFILE_ROWS.filter((row) => row.id.startsWith('profile-') && row.id !== 'profile-marisa' && row.id !== 'profile-raw'))
 
     setup()
 
@@ -1238,7 +1238,7 @@ describe('Accounts — access builder', () => {
     expect(listPlayersMock).toHaveBeenCalledWith()
 
     // A second builder reuses the same list rather than fetching again.
-    await chooseRole(user, 'janice@example.com', 'parent')
+    await chooseRole(user, 'marisa@example.com', 'parent')
     expect(listPlayersMock).toHaveBeenCalledTimes(1)
   })
 
@@ -2362,7 +2362,7 @@ describe('Accounts — the email-confirmed badge', () => {
     // rows stay as they are, so this cannot accidentally test the member list.
     listPendingProfilesMock.mockResolvedValue(
       PROFILE_ROWS.map((row) =>
-        row.id === JANICE_PENDING.id || row.id === RAW_PENDING.id ? { ...row, ...extra } : row,
+        row.id === MARISA_PENDING.id || row.id === RAW_PENDING.id ? { ...row, ...extra } : row,
       ),
     )
   }
@@ -2435,7 +2435,7 @@ describe('Accounts — the "hasn\'t said what they need" badge', () => {
     listAccessRequestsMock.mockResolvedValue([
       {
         id: 'req-1',
-        profile_id: JANICE_PENDING.id,
+        profile_id: MARISA_PENDING.id,
         status: 'open',
         note: 'Parent of a U10 player',
         requested_role: 'parent',
@@ -2514,7 +2514,7 @@ describe('Accounts — a request naming several squads', () => {
     listAccessRequestsMock.mockResolvedValue([
       {
         id: 'req-1',
-        profile_id: JANICE_PENDING.id,
+        profile_id: MARISA_PENDING.id,
         status: 'open',
         note: null,
         requested_role: 'parent',
@@ -2537,7 +2537,7 @@ describe('Accounts — a request naming several squads', () => {
     listAccessRequestsMock.mockResolvedValue([
       {
         id: 'req-2',
-        profile_id: JANICE_PENDING.id,
+        profile_id: MARISA_PENDING.id,
         status: 'open',
         note: null,
         requested_role: 'parent',
