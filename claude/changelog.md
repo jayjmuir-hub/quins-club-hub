@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🛑 **The live `squad_push` test is TABLED** (Jay: *"lets table this for now"*).
+  Moved onto `claude/state-of-play.md`'s tabled list rather than left in a
+  handoff, because it was raised twice in one day and a handoff is exactly where
+  the next session would find it and offer it a third time.
+  ⚠️ **The measurement is kept, so reopening it costs nothing:** a fixture change
+  on **U13 Mixed** made by somebody OTHER than Jay reaches his three devices and
+  **nobody else's** — the only squad where that is true. **Being a super admin
+  puts you in no squad's audience at all**: `private.notice_audience` keys purely
+  on `team_id`, and `squad_push_subscriptions` excludes the actor, so you never
+  receive a change you made yourself. U16B is the one to avoid — 8 devices, 5 of
+  them other people's.
+- `294bdbf` — the squash that corrected the db-check claim.
+
 - ⚠️ **CORRECTION, SAME DAY: `SUPABASE_DB_URL` IS SET, AND THE NIGHTLY IS REAL.**
   Two handoffs said the secret was *"STILL unset"*, and a session repeated it
   into `claude/runbooks/db-harnesses.md` and this changelog **without checking**.
