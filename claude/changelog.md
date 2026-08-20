@@ -10,6 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 20 Aug 2026
 
+- 🏷️ **"HASN'T SAID WHAT THEY NEED" — THE ABSENCE OF THE "Asked" BADGE WAS
+  CARRYING THE USEFUL FACT, AND WAS INVISIBLE.** Jay, 20 Aug 2026: *"I'm still
+  getting approval requests with no indicating who they are or what they are
+  requesting."*
+  ⚠️ **THE LIST IS FED BY SIGNUPS, NOT BY REQUESTS.** Anyone who creates a login
+  lands in "Waiting for access" whether or not they ever told the club anything,
+  so somebody who said nothing looked identical to somebody who asked to coach a
+  named squad. Measured on production: all three people then waiting had
+  confirmed, had signed in, and **none had left a request row**. Two of them had
+  even given their name.
+  ⚠️ **WHY A NAME BUT NO REQUEST IS THE COMMON STATE, AND IT IS NOT A BUG.**
+  `RollCall` asks for the name first and saves it — its own header says "THE
+  NAME IS ASKED BEFORE ANY WRITE", because `request_staff_role` is gated on
+  `name_confirmed_at`. The screen that says what they actually want comes next.
+  Anyone who stops in between leaves a named profile and nothing else.
+  ✅ **RULED OUT: THEY ARE NOT STUCK.** `team read` is
+  `(select auth.uid()) is not null`, so a brand-new account can read the squad
+  list and the next screen works. Measured off `pg_policy`, not assumed.
+  ⚠️ **GATED ON `requestsLoaded`, NOT ON `!request`.** The requests read fails
+  OPEN to an empty array, deliberately, so that nobody waiting is ever hidden.
+  That is right for the list and wrong for this label: without the guard a
+  single dropped connection would tell an admin that every person in the queue
+  had said nothing. Pinned by a test that rejects the read.
+- `2a4049e` — the squash that added the email-confirmed badge.
+
+
 - 🏷️ **THE "WAITING FOR ACCESS" LIST NOW SAYS WHETHER THE LOGIN WAS EVER
   CONFIRMED.** Two very different people land in that list and their cards were
   identical: somebody who confirmed, signed in and is genuinely waiting for an

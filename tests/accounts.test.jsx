@@ -2373,3 +2373,59 @@ describe('Accounts — the email-confirmed badge', () => {
     expect(within(waiting()).queryAllByTestId('email-confirmed-badge')).toHaveLength(0)
   })
 })
+
+describe('Accounts — the "hasn\'t said what they need" badge', () => {
+  // ⚠️ WHY. Everyone who creates a login appears in this list, asked or not,
+  // and the "Asked" badge only shows for those who filled the form in. Its
+  // ABSENCE carried the useful fact and was invisible. Measured on production
+  // 20 Aug 2026: three people waiting, all signed in, none with a request row —
+  // two of them had even given their name, because the sign-up flow saves the
+  // name before it asks what you need.
+
+  function waiting() {
+    return screen.getByTestId('waiting-for-access')
+  }
+
+  it('marks a signup that never left a request', async () => {
+    listAccessRequestsMock.mockResolvedValue([])
+    setup()
+    await screen.findByText('Sara Coach')
+
+    const badges = within(waiting()).getAllByTestId('no-request-badge')
+    expect(badges).toHaveLength(2)
+    expect(badges[0]).toHaveTextContent(/hasn.t said what they need/i)
+  })
+
+  it('does NOT mark somebody who did ask — they get the Asked badge instead', async () => {
+    listAccessRequestsMock.mockResolvedValue([
+      {
+        id: 'req-1',
+        profile_id: JANICE_PENDING.id,
+        status: 'open',
+        note: 'Parent of a U10 player',
+        requested_role: 'parent',
+        requested_team_id: null,
+        created_at: '2026-08-03T12:00:00Z',
+      },
+    ])
+    setup()
+    await screen.findByText('Sara Coach')
+
+    // One asked, one did not: exactly one badge of each.
+    expect(within(waiting()).getAllByTestId('no-request-badge')).toHaveLength(1)
+    expect(within(waiting()).getAllByTestId('asked-badge')).toHaveLength(1)
+  })
+
+  it('⚠️ says NOTHING when the requests read FAILED, rather than blaming everyone', async () => {
+    // The read fails open to an empty array so that nobody waiting is hidden.
+    // That is right for the list and wrong for this label: without the
+    // requestsLoaded guard, one dropped connection would tell an admin that
+    // every person in the queue had said nothing.
+    listAccessRequestsMock.mockRejectedValue(new Error('network'))
+    setup()
+    await screen.findByText('Sara Coach')
+
+    expect(within(waiting()).getAllByTestId('waiting-person')).toHaveLength(2)
+    expect(within(waiting()).queryAllByTestId('no-request-badge')).toHaveLength(0)
+  })
+})
