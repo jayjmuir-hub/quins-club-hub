@@ -141,6 +141,7 @@ commit, not only after `git add`**.
 
 - Building anything behind Social Media Management.
 - Any change to what a right permits. The rights gate screens, never data.
-- `reynekeett@gmail.com` in `claude/state-of-play.md`. It is a login address
-  recorded so a session does not flag it as a stray account, not a person's name
-  standing in for a job.
+- The third admin's login address then recorded in `claude/state-of-play.md`. It
+  is a login address noted so a session does not flag it as a stray account, not
+  a person's name standing in for a job. ⚠️ **The address itself was removed from
+  this repo on 20 Aug 2026** — CLAUDE.md rule 9.

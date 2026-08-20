@@ -530,15 +530,15 @@ describe('More — the You card is editable', () => {
   it('fills itself in from the profile row', async () => {
     getMyProfileMock.mockResolvedValue({
       id: 'user-1',
-      first_name: 'Janice',
+      first_name: 'Marisa',
       last_name: 'Bell',
-      email: 'janice@example.com',
+      email: 'marisa@example.com',
       phone: '+971501234567',
     })
 
     renderMore()
 
-    expect(await screen.findByDisplayValue('Janice')).toBe(screen.getByLabelText('First name'))
+    expect(await screen.findByDisplayValue('Marisa')).toBe(screen.getByLabelText('First name'))
     expect(screen.getByLabelText('Family name')).toHaveValue('Bell')
   })
 
@@ -549,7 +549,7 @@ describe('More — the You card is editable', () => {
     // "501234567" with the country dropped, or "+971+971501234567".
     getMyProfileMock.mockResolvedValue({
       id: 'user-1',
-      first_name: 'Janice',
+      first_name: 'Marisa',
       last_name: 'Bell',
       phone: '+971501234567',
     })
@@ -583,7 +583,7 @@ describe('More — the You card is editable', () => {
     await startEditing(u)
     const first = await screen.findByDisplayValue('Jay')
     await user().clear(first)
-    await user().type(first, 'Janice')
+    await user().type(first, 'Marisa')
     await user().clear(screen.getByLabelText('Family name'))
     await user().type(screen.getByLabelText('Family name'), 'Bell')
     await user().type(screen.getByLabelText('Phone'), '501234567')
@@ -593,7 +593,7 @@ describe('More — the You card is editable', () => {
     expect(updateMyProfileMock).toHaveBeenCalledTimes(1)
     expect(updateMyProfileMock).toHaveBeenCalledWith({
       profileId: 'user-1',
-      firstName: 'Janice',
+      firstName: 'Marisa',
       lastName: 'Bell',
       // Typed as national digits on the default UAE country, stored as E.164.
       phone: '+971501234567',
@@ -607,7 +607,7 @@ describe('More — the You card is editable', () => {
     // "has a phone number" true. Null is the honest absence.
     getMyProfileMock.mockResolvedValue({
       id: 'user-1',
-      first_name: 'Janice',
+      first_name: 'Marisa',
       last_name: 'Bell',
       phone: '+971501234567',
     })

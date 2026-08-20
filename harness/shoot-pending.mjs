@@ -265,7 +265,7 @@ for (const [name, query] of [
     const opened = await page.evaluate(PROMPT_STATE)
     await page.screenshot({ path: path.join(outDir, 'name-prompt-open.png'), fullPage: true })
 
-    await page.fill('#name-prompt-full-name', 'Janice Muir')
+    await page.fill('#name-prompt-full-name', 'Marisa Calderon')
     await page.click('button:has-text("Save name")')
     await page.waitForTimeout(500)
     const saved = await page.evaluate(PROMPT_STATE)

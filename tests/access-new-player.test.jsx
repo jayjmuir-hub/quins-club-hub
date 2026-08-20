@@ -39,7 +39,7 @@ function setup(props = {}) {
   const onSubmit = vi.fn()
   render(
     <AccessBuilder
-      label="tylerjmuir5@gmail.com"
+      label="t.brennan@example.com"
       teams={TEAMS}
       players={[]}
       onSubmit={onSubmit}

@@ -25,7 +25,7 @@
 // path renders a block with two access rows, and `mm8` keeps a null name so
 // the "Unnamed member" fallback stays screenshot-able.
 const MEMBERS = [
-  { id: 'mm1', profile_id: 'pr-jay', role: 'admin', status: 'active', team_id: null, player_id: null, created_at: '2026-01-05T09:00:00Z', profiles: { full_name: 'Jay Muir', email: 'jayjmuir@gmail.com' }, teams: null, players: null },
+  { id: 'mm1', profile_id: 'pr-jay', role: 'admin', status: 'active', team_id: null, player_id: null, created_at: '2026-01-05T09:00:00Z', profiles: { full_name: 'Jay Muir', email: 'jay.muir@adhq.example' }, teams: null, players: null },
   { id: 'mm2', profile_id: 'pr-sam', role: 'coach', team_id: 't1', player_id: null, created_at: '2026-02-01T09:00:00Z', profiles: { full_name: 'Sam Carter', email: 'coach.sam@adhq.example' }, teams: { name: 'U12 Boys' }, players: null },
   { id: 'mm9', profile_id: 'pr-sam', role: 'coach', team_id: 't2', player_id: null, created_at: '2026-02-03T09:00:00Z', profiles: { full_name: 'Sam Carter', email: 'coach.sam@adhq.example' }, teams: { name: 'U14 Boys' }, players: null },
   { id: 'mm3', profile_id: 'pr-aisha', role: 'coach', team_id: 't2', player_id: null, created_at: '2026-02-10T09:00:00Z', profiles: { full_name: 'Aisha Al Marzooqi', email: 'aisha@adhq.example' }, teams: { name: 'U14 Boys' }, players: null },
@@ -187,7 +187,7 @@ export async function getMyProfile(userId) {
     first_name: blank ? '' : 'Jay',
     last_name: blank ? '' : 'Muir',
     name_confirmed_at: unconfirmed ? null : '2026-08-06T09:00:00Z',
-    email: 'jayjmuir@gmail.com',
+    email: 'jay.muir@adhq.example',
     // profiles.phone, added 8 Aug 2026 for the editable You card on /more.
     // ?blankPhone=1 gives the never-recorded case, which is what almost every
     // real row looks like today.
@@ -351,12 +351,19 @@ export async function updateProfileName({ profileId, fullName } = {}) {
 // compares every stub's exports against the real module it is aliased to, so
 // this cannot silently recur — it fails `npx vitest run` instead.
 
-// The unattached signups: profiles rows with NO membership. `pn-janice`
-// mirrors the real account that started this plan (signed up by magic link,
-// no name collected, zero memberships), `pn-omar` has a name, and
-// `pn-stranger` is the nobody-recognises-them case the UI copy is about.
+// The unattached signups: profiles rows with NO membership. `pn-marisa`
+// reproduces the SHAPE of the real account that started this plan — signed up
+// by magic link, no name collected, zero memberships, an outside personal
+// address rather than a club one — `pn-omar` has a name, and `pn-stranger` is
+// the nobody-recognises-them case the UI copy is about.
+//
+// ⚠️ THE NAME AND ADDRESS ARE INVENTED AND MUST STAY INVENTED. Until 20 Aug
+// 2026 this row carried a real club member's real name and real inbox, in a
+// PUBLIC repo, and the timestamp below identified their row in the live
+// database. CLAUDE.md rule 9: invent the data, keep the shape. The shape is
+// everything the screen is tested on; the identity was never part of it.
 const PENDING_PROFILES = [
-  { id: 'pn-janice', full_name: '', email: 'janice.muir@yahoo.com', created_at: '2026-08-03T11:37:00Z' },
+  { id: 'pn-marisa', full_name: '', email: 'marisa@example.com', created_at: '2026-08-03T11:37:00Z' },
   { id: 'pn-omar', full_name: 'Omar Farooq', email: 'omar.farooq@adhq.example', created_at: '2026-07-30T08:12:00Z' },
   { id: 'pn-stranger', full_name: null, email: 'someone@example.com', created_at: '2026-07-21T19:04:00Z' },
 ]

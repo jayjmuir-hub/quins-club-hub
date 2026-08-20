@@ -12,8 +12,9 @@ trigger, a `profiles` row — but **no membership**. Access is written only by
 `accept_invite`. The Accounts screen lists memberships, so a self-signed-up user
 is invisible. There had never been an approval or request-access flow.
 
-Confirmed live: `janice.muir@yahoo.com`, signed up 2026-08-03 11:37, 0 memberships,
-no invite record.
+Confirmed live: one real self-signed-up account, 2026-08-03 11:37, 0 memberships,
+no invite record. ⚠️ **Its address stood here in a public repo until 20 Aug 2026.**
+Identify the row from the DATABASE, never from a document — CLAUDE.md rule 9.
 
 **Related finding, not caused by this work**: public signup is open, so anyone with
 the URL can create a login. They read zero rows from every table (every SELECT

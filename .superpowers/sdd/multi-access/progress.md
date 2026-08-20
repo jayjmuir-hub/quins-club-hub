@@ -2,7 +2,7 @@
 
 Spec: docs/superpowers/specs/2026-08-03-multi-access-design.md
 
-Raised when Jay tried to grant Janice access and could only pick one age group.
+Raised when Jay tried to grant a real member access and could only pick one age group.
 Follow-up mid-build: *"remember there are also parents who have 3, 4, or even 5 kids"*.
 
 ## Not a schema change to `memberships`
