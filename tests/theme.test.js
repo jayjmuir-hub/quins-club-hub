@@ -42,6 +42,13 @@ describe('theme integrity', () => {
         if (usesFillRedAsText && !/bg-white/.test(line)) {
           offenders.push(`${path.relative(projectRoot, f)}: ${line.trim().slice(0, 90)}`)
         }
+        // The inverse-pill trap (Jay's white-blob filter pill, 21 Aug): a
+        // bg-ink fill flips WHITE in dark, so pairing it with text-white is
+        // white-on-white half the time. The inverse pair is text-surface-card
+        // — each side flips with the theme and they always oppose.
+        if (/bg-ink(?![-\w])/.test(line) && /text-white/.test(line)) {
+          offenders.push(`${path.relative(projectRoot, f)}: bg-ink+text-white — ${line.trim().slice(0, 70)}`)
+        }
       }
     }
     expect(offenders).toEqual([])

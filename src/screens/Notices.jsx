@@ -329,7 +329,7 @@ export default function Notices() {
             onClick={() => setFilter(ALL)}
             className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
               filter === ALL
-                ? 'border-ink bg-ink text-white'
+                ? 'border-ink bg-ink text-surface-card'
                 : 'border-line bg-surface-card text-ink-muted'
             }`}
           >
@@ -342,7 +342,7 @@ export default function Notices() {
               onClick={() => setFilter(team.id)}
               className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
                 filter === team.id
-                  ? 'border-ink bg-ink text-white'
+                  ? 'border-ink bg-ink text-surface-card'
                   : 'border-line bg-surface-card text-ink-muted'
               }`}
             >
