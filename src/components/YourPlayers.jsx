@@ -247,7 +247,7 @@ export default function YourPlayers({ memberships = [], teams = [], reload }) {
           <ul className="mt-2 space-y-1">
             {missing.map((item) => (
               <li key={item.id} className="flex items-start gap-2 text-[13px] text-ink">
-                <span aria-hidden="true" className="mt-[2px] text-brand">
+                <span aria-hidden="true" className="mt-[2px] text-brand-ink">
                   •
                 </span>
                 <span>{item.label}</span>

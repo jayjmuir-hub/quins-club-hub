@@ -96,7 +96,7 @@ function Receipts({ notice, onClose }) {
   return (
     <Sheet open={Boolean(notice)} onClose={onClose} title={notice?.title ?? 'Seen by'}>
       {error && (
-        <p role="alert" className="text-[13px] font-semibold text-brand-deep">
+        <p role="alert" className="text-[13px] font-semibold text-danger-ink">
           {error}
         </p>
       )}
@@ -314,7 +314,7 @@ export default function Notices() {
 
       {error && (
         <Card className="mb-3 px-4 py-3">
-          <p role="alert" className="text-[13px] font-semibold text-brand-deep">
+          <p role="alert" className="text-[13px] font-semibold text-danger-ink">
             {error}
           </p>
         </Card>

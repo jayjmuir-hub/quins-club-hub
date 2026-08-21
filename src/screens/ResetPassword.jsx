@@ -113,7 +113,7 @@ export default function ResetPassword() {
             {error && (
               <p
                 role="alert"
-                className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+                className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
               >
                 {error}
               </p>
@@ -151,7 +151,7 @@ export default function ResetPassword() {
                     (rule.met ? 'text-ink-faint' : 'text-ink-muted')
                   }
                 >
-                  <span aria-hidden="true" className={rule.met ? 'text-brand' : 'text-line'}>
+                  <span aria-hidden="true" className={rule.met ? 'text-brand-ink' : 'text-line'}>
                     {rule.met ? '✓' : '•'}
                   </span>
                   <span>{rule.label}</span>
@@ -174,7 +174,7 @@ export default function ResetPassword() {
               className={FIELD}
             />
             {mismatch && (
-              <p className="mt-1.5 text-xs font-semibold text-brand-deep">
+              <p className="mt-1.5 text-xs font-semibold text-danger-ink">
                 The two passwords don’t match.
               </p>
             )}

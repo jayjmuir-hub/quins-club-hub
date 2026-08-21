@@ -710,7 +710,7 @@ export default function Roster() {
                   // higher authority.
                   'block cursor-pointer select-none rounded-tab border-[1.5px] px-3.5 py-1.5 text-[13px] transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2',
                   genderFilter === option.value
-                    ? 'border-brand bg-surface-mute font-bold text-brand-deep'
+                    ? 'border-brand bg-surface-mute font-bold text-danger-ink'
                     : 'border-line bg-surface-card font-semibold text-ink',
                 ].join(' ')}
               >
@@ -733,7 +733,7 @@ export default function Roster() {
         <button
           type="button"
           onClick={() => setGenderFilter('unrecorded')}
-          className="mb-3 block w-full rounded-[12px] border border-line bg-surface-sunk px-3 py-2 text-left text-[13px] font-semibold text-ink-muted transition hover:border-brand hover:text-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="mb-3 block w-full rounded-[12px] border border-line bg-surface-sunk px-3 py-2 text-left text-[13px] font-semibold text-ink-muted transition hover:border-brand hover:text-danger-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           {missingGender === 1
             ? '1 player has no gender recorded.'
@@ -743,7 +743,7 @@ export default function Roster() {
       )}
 
       {genderFilter === 'unrecorded' && (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-[12px] border border-brand bg-surface-mute px-3 py-2 text-[13px] font-semibold text-brand-deep">
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-[12px] border border-brand bg-surface-mute px-3 py-2 text-[13px] font-semibold text-danger-ink">
           <span>Showing players with no gender recorded.</span>
           <Button variant="ghost" size="sm" onClick={() => setGenderFilter('all')}>
             Show all
@@ -800,8 +800,8 @@ export default function Roster() {
 
       {!isFirstLoad && error && (
         <Card role="alert" className="p-6 text-center">
-          <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load the roster</h3>
-          <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+          <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the roster</h3>
+          <p className="mt-2 text-sm leading-relaxed text-danger-ink">
             {error.message || 'Something went wrong. Try again.'}
           </p>
           <Button onClick={() => setReloadToken((token) => token + 1)} className="mt-4">

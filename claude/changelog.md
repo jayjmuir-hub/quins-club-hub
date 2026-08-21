@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🌚 **THE DARK-MODE AUDIT.** Jay's screenshot: a sheet rendering
+  black-on-black. Three real causes, all systemic: **217 call sites** used
+  the FILL reds as TEXT (`text-brand-deep` ~1.8:1, bare `text-brand`
+  ~3.6:1 on dark) — swept to the THEMED `danger-ink` (new token, identical
+  in light) and `brand-ink`, with the two literally-white pills sanctioned;
+  **`color-scheme` was never declared**, so native selects, date fields,
+  checkboxes and button fallbacks rendered light-scheme in dark — now
+  `light`/`dark` per theme, plus an explicit `button { color: inherit }`;
+  and the contrast gate grew the deep-red pairs (all pass ≥6.7:1 dark).
+  `tests/theme.test.js` now REFUSES fill-reds-as-text off a white surface.
+  ⚠️ Audit lesson for the record: a JS contrast probe in a HIDDEN browser
+  tab reads buttons frozen mid-colour-transition (no compositor frames) —
+  it reported phantom 1.1:1s. Trust the arithmetic gate and a VISIBLE
+  screen; both said green.
+- `da54bff` — the squash that gave the tracking grid its phone shape
+  (#293).
+
 - 📲 **THE TRACKING GRID GROWS A PHONE SHAPE.** Jay, first real look on his
   phone: "this isn't going to work" — the matrix's event columns and % sat
   off the right edge behind an undiscoverable sideways scroll. On mobile

@@ -121,8 +121,8 @@ export default function SocialIdeas() {
   if (error) {
     return (
       <Card role="alert" className="p-6 text-center">
-        <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load the ideas</h3>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+        <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the ideas</h3>
+        <p className="mt-2 text-sm leading-relaxed text-danger-ink">
           {error.message || 'Something went wrong. Try again.'}
         </p>
         <Button onClick={() => setReloadToken((token) => token + 1)} className="mx-auto mt-4">
@@ -144,8 +144,8 @@ export default function SocialIdeas() {
             className={[
               'rounded-[8px] border-[1.5px] px-3 py-1.5 text-[12.5px] font-bold transition',
               filter === option.key
-                ? 'border-brand bg-surface-mute text-brand-deep'
-                : 'border-line text-ink hover:border-brand hover:text-brand',
+                ? 'border-brand bg-surface-mute text-danger-ink'
+                : 'border-line text-ink hover:border-brand hover:text-brand-ink',
             ].join(' ')}
           >
             {option.label}
@@ -155,7 +155,7 @@ export default function SocialIdeas() {
 
       {actionError && (
         <Card role="alert" className="mb-3 p-4">
-          <p className="text-sm font-medium text-brand-deep">{actionError}</p>
+          <p className="text-sm font-medium text-danger-ink">{actionError}</p>
         </Card>
       )}
 

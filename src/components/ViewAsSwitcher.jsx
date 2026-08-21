@@ -359,7 +359,7 @@ export function ViewAsBanner() {
         <button
           type="button"
           onClick={() => setViewAs(null)}
-          // text-brand, NOT text-brand-ink: the pill is literally white in BOTH
+          // text-brand-ink, NOT text-brand-ink: the pill is literally white in BOTH
           // themes, and brand-ink brightens to the dark-mode red on dark —
           // which on a white pill is a 3:1 AA fail. brand is the unthemed
           // fill red and is AA on white everywhere.

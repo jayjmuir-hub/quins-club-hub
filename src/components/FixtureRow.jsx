@@ -127,7 +127,7 @@ export function FixtureRow({ event, teamName, onSelect, className = '', style })
         className={`absolute inset-y-px left-0 w-[3px] rounded-r-[3px] ${edgeTone(event, played)}`}
       />
       <span className="w-[52px] shrink-0 rounded-[11px] bg-surface-mute px-1 py-2 text-center">
-        <span className="block text-[10.5px] font-extrabold uppercase tracking-[.5px] text-brand">{month}</span>
+        <span className="block text-[10.5px] font-extrabold uppercase tracking-[.5px] text-brand-ink">{month}</span>
         <span className="block text-[21px] font-extrabold leading-none text-ink">{day}</span>
         <span className="block text-[10px] font-semibold text-ink-faint">{weekday}</span>
       </span>

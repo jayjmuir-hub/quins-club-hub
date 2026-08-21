@@ -308,7 +308,7 @@ export default function RequestAccess({ userId, email, children }) {
         {error && (
           <p
             role="alert"
-            className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+            className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
           >
             {error}
           </p>

@@ -59,7 +59,7 @@ export default function PortalChooser() {
             >
               <h3 className="text-[17px] font-extrabold tracking-[-0.2px] text-ink">{label}</h3>
               <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">{portal.blurb}</p>
-              <span className="mt-3 inline-block text-[13px] font-bold text-brand">Open</span>
+              <span className="mt-3 inline-block text-[13px] font-bold text-brand-ink">Open</span>
             </Card>
           )
         }

@@ -46,11 +46,11 @@ import Register from './Register.jsx'
 const RSVP_MARK = {
   in: { label: 'In', className: 'bg-accent-bg text-accent-ink' },
   maybe: { label: '?', className: 'bg-warn-bg text-warn-ink' },
-  out: { label: 'Out', className: 'bg-danger-bg text-brand-deep' },
+  out: { label: 'Out', className: 'bg-danger-bg text-danger-ink' },
 }
 const ATTEND_MARK = {
   present: { label: 'P', className: 'bg-accent-bg text-accent-ink' },
-  absent: { label: 'A', className: 'bg-danger-bg text-brand-deep' },
+  absent: { label: 'A', className: 'bg-danger-bg text-danger-ink' },
   excused: { label: 'E', className: 'bg-surface-mute text-ink-muted' },
 }
 
@@ -314,7 +314,7 @@ export default function SquadHub() {
                 aria-current={candidate.id === teamId ? 'page' : undefined}
                 className={`rounded-full border-[1.5px] px-2.5 py-1 text-[12.5px] font-bold ${
                   candidate.id === teamId
-                    ? 'border-brand bg-surface-mute text-brand-deep'
+                    ? 'border-brand bg-surface-mute text-danger-ink'
                     : 'border-line text-ink hover:bg-surface-mute'
                 }`}
               >
@@ -326,7 +326,7 @@ export default function SquadHub() {
       </div>
 
       {error && (
-        <p role="alert" className="mb-3 text-[13px] font-semibold text-brand-deep">
+        <p role="alert" className="mb-3 text-[13px] font-semibold text-danger-ink">
           Something went wrong loading this squad. Pull to refresh or try again shortly.
         </p>
       )}
@@ -346,7 +346,7 @@ export default function SquadHub() {
           <Card className="mb-4 p-4 desktop:col-start-1 desktop:row-start-1">
             <div className="mb-2 flex items-center justify-between gap-3">
               <BlockTitle>On the calendar</BlockTitle>
-              <Link to="/schedule" className="shrink-0 text-[13px] font-bold text-brand underline-offset-2 hover:underline">
+              <Link to="/schedule" className="shrink-0 text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
                 Full schedule
               </Link>
             </div>
@@ -396,7 +396,7 @@ export default function SquadHub() {
                     <li key={event.id}>
                       <Link
                         to={`/match-sheet/${event.id}`}
-                        className="text-[13px] font-semibold text-brand underline-offset-2 hover:underline"
+                        className="text-[13px] font-semibold text-brand-ink underline-offset-2 hover:underline"
                       >
                         {eventTitle(event)} — {shortDate(event)}
                       </Link>
@@ -428,7 +428,7 @@ export default function SquadHub() {
                 <p className="mb-2 text-[12.5px] font-semibold text-ink-muted">
                   Squad: {summary.percent ?? '—'}% attendance
                   {summary.noShows > 0 && (
-                    <span className="text-brand-deep"> · {summary.noShows} said-in-but-absent</span>
+                    <span className="text-danger-ink"> · {summary.noShows} said-in-but-absent</span>
                   )}
                 </p>
                 {/* ⚠️ THE MATRIX IS DESKTOP-ONLY — Jay, from his phone,
@@ -453,7 +453,7 @@ export default function SquadHub() {
                         <span className="flex shrink-0 items-center gap-2.5 text-[13px] font-bold">
                           <span className="text-ink">{row.percent ?? '—'}%</span>
                           <span
-                            className={row.noShows > 0 ? 'text-brand-deep' : 'text-ink-muted'}
+                            className={row.noShows > 0 ? 'text-danger-ink' : 'text-ink-muted'}
                             title="Said in, marked absent"
                           >
                             {row.noShows} no-show{row.noShows === 1 ? '' : 's'}
@@ -492,7 +492,7 @@ export default function SquadHub() {
                           <td className="px-1.5 py-1.5 text-right text-[13px] font-bold text-ink">
                             {row.percent ?? '—'}
                           </td>
-                          <td className={`px-1.5 py-1.5 text-right text-[13px] font-bold ${row.noShows > 0 ? 'text-brand-deep' : 'text-ink-muted'}`}>
+                          <td className={`px-1.5 py-1.5 text-right text-[13px] font-bold ${row.noShows > 0 ? 'text-danger-ink' : 'text-ink-muted'}`}>
                             {row.noShows}
                           </td>
                         </tr>
@@ -519,7 +519,7 @@ export default function SquadHub() {
               <p className="mb-2 text-[13px] font-medium text-ink-muted">
                 {players.length} {players.length === 1 ? 'player' : 'players'} in this squad.
               </p>
-              <Link to="/roster" className="text-[13px] font-bold text-brand underline-offset-2 hover:underline">
+              <Link to="/roster" className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
                 Open the roster
               </Link>
             </Card>
@@ -533,7 +533,7 @@ export default function SquadHub() {
                     : 'No training scheduled yet.'
                 })()}
               </p>
-              <Link to="/schedule" className="text-[13px] font-bold text-brand underline-offset-2 hover:underline">
+              <Link to="/schedule" className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
                 See sessions in the schedule
               </Link>
             </Card>
@@ -574,7 +574,7 @@ export default function SquadHub() {
           <Sheet open onClose={() => setTrackingPlayerId(null)} title={row.player.full_name}>
             <p className="mb-3 text-[13px] font-semibold text-ink">
               {row.percent ?? '—'}% attendance
-              <span className={row.noShows > 0 ? 'text-brand-deep' : 'text-ink-muted'}>
+              <span className={row.noShows > 0 ? 'text-danger-ink' : 'text-ink-muted'}>
                 {' '}· {row.noShows} said-in-but-absent
               </span>
             </p>

@@ -99,7 +99,10 @@ describe('Chip', () => {
     const el = screen.getByText('Lost')
     expect(hasClassToken(el, 'bg-danger-bg')).toBe(true)
     // The literal --bad text (#d1483b) on --bad-bg measures 3.84:1.
-    expect(hasClassToken(el, 'text-brand-deep')).toBe(true)
+    // danger-ink since the 21 Aug dark audit: the THEMED deep red — identical
+    // in light, brightened in dark, where brand-deep sat at ~1.8:1 on the
+    // loss tint and vanished.
+    expect(hasClassToken(el, 'text-danger-ink')).toBe(true)
   })
 
   it('renders the draw variant with the design system colours verbatim', () => {

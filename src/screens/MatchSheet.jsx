@@ -672,8 +672,8 @@ export default function MatchSheet() {
   if (error) {
     return (
       <Card role="alert" className="p-6 text-center">
-        <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t open that sheet</h3>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+        <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t open that sheet</h3>
+        <p className="mt-2 text-sm leading-relaxed text-danger-ink">
           {error.message || 'Something went wrong.'}
         </p>
         <Button onClick={() => navigate('/schedule')} className="mx-auto mt-4">
@@ -787,7 +787,7 @@ export default function MatchSheet() {
           <p className="mt-2.5 text-[12.5px] font-semibold text-ink-muted">Saved.</p>
         )}
         {saveError && (
-          <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-brand-deep">
+          <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
             {saveError.message || "That didn't save. Try again."}
           </p>
         )}
@@ -924,7 +924,7 @@ export default function MatchSheet() {
               No team was picked for this fixture, so the 22 below start blank. Pick one on the{' '}
               <button
                 type="button"
-                className="font-bold text-brand underline"
+                className="font-bold text-brand-ink underline"
                 onClick={() => navigate(`/lineup/${eventId}`)}
               >
                 team sheet

@@ -200,7 +200,7 @@ function YouCard({ profile, email, role, squads }) {
         {error && (
           <p
             role="alert"
-            className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+            className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
           >
             {error}
           </p>
@@ -400,7 +400,7 @@ export default function More() {
       <Card className="p-[14px]">
         <Link
           to="/notices"
-          className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand"
+          className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand-ink"
         >
           <span>Club and squad notices</span>
           <span aria-hidden="true">›</span>
@@ -448,7 +448,7 @@ export default function More() {
           <Card className="p-[14px]">
             <Link
               to="/approvals"
-              className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand"
+              className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand-ink"
             >
               <span>Players waiting to be approved</span>
               <span aria-hidden="true">›</span>
@@ -475,7 +475,7 @@ export default function More() {
           <Card className="p-[14px]">
             <Link
               to="/game-time"
-              className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand"
+              className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand-ink"
             >
               <span>Who hasn&apos;t had a game</span>
               <span aria-hidden="true">›</span>

@@ -27,8 +27,8 @@ function NotAuthorised() {
     <section>
       <h2 className="sr-only">Admin</h2>
       <Card role="alert" className="p-6 text-center">
-        <h3 className="text-base font-extrabold text-brand-deep">Not authorised</h3>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+        <h3 className="text-base font-extrabold text-danger-ink">Not authorised</h3>
+        <p className="mt-2 text-sm leading-relaxed text-danger-ink">
           This page is for club admins only. If you think you should have access, ask a
           current admin to check your account.
         </p>
@@ -106,7 +106,7 @@ function PreviewingNotice() {
 // would be 3.57:1, materially worse. White on #c8102e is 5.88:1 and is what
 // ships here. The look is copied; the contrast bug is not.
 //
-// The inactive label is `text-ink` rather than the old `text-brand`: on
+// The inactive label is `text-ink` rather than the old `text-brand-ink`: on
 // adhjrt.com an unselected tab is black-on-white (18.85:1 here), and red text
 // on every tab was part of what made this row read as buttons.
 function tabClassName({ isActive }) {
@@ -176,7 +176,7 @@ export default function AdminDashboard() {
             {portal && (
               <Link
                 to="/admin"
-                className="text-[13px] font-bold text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                className="text-[13px] font-bold text-brand-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
               >
                 ← Admin
               </Link>

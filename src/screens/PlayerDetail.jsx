@@ -68,7 +68,7 @@ function telHref(phone) {
 const ACTION_BASE =
   'flex flex-1 items-center justify-center gap-2 rounded-[11px] px-[15px] py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
 const PRIMARY_ACTION = `${ACTION_BASE} bg-brand text-white hover:bg-brand-deep`
-const GHOST_ACTION = `${ACTION_BASE} border border-line bg-surface-card text-brand hover:bg-surface-mute`
+const GHOST_ACTION = `${ACTION_BASE} border border-line bg-surface-card text-brand-ink hover:bg-surface-mute`
 
 function PhoneIcon(props) {
   return (
@@ -130,7 +130,7 @@ function ParentsBlock({ playerId }) {
 
   if (error) {
     return (
-      <p role="alert" className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
+      <p role="alert" className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
         {error.message || "We couldn't load parent details. Try again."}
       </p>
     )
@@ -329,7 +329,7 @@ function ContactBlock({ playerId }) {
 
   if (error) {
     return (
-      <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
+      <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
         {error.message || "We couldn't load contact details. Try again."}
       </p>
     )
@@ -431,7 +431,7 @@ function FooterActions({ player, canEdit, canEditOwn, onEdit, onEditOwn, onDelet
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
         >
           {error.message || "We couldn't remove that player. Try again."}
         </p>

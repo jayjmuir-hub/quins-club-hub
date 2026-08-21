@@ -57,7 +57,7 @@ function WeekEntry({ event, clash, label }) {
           ? 'border-l-warn bg-warn-bg text-warn-ink'
           : waiting
             ? 'border-l-line bg-surface-mute text-ink-muted'
-            : 'border-l-brand bg-danger-bg text-brand-deep',
+            : 'border-l-brand bg-danger-bg text-danger-ink',
       ].join(' ')}
     >
       <span className="block text-[12px] font-extrabold leading-tight">{label}</span>
@@ -108,7 +108,7 @@ export function PitchWeek({ anchor, today, events, clashing, teamsById, onPickDa
                 <span
                   className={[
                     'text-[15px] font-extrabold',
-                    isToday ? 'text-brand-deep' : 'text-ink',
+                    isToday ? 'text-danger-ink' : 'text-ink',
                   ].join(' ')}
                 >
                   {day.day}
@@ -205,7 +205,7 @@ export function PitchMonth({ anchor, today, events, clashing, onPickDay }) {
 
               {list.length > 0 && (
                 <span className="flex flex-wrap items-center gap-1">
-                  <span className="rounded-pill bg-danger-bg px-1.5 py-0.5 text-[10.5px] font-extrabold text-brand-deep">
+                  <span className="rounded-pill bg-danger-bg px-1.5 py-0.5 text-[10.5px] font-extrabold text-danger-ink">
                     {list.length}
                   </span>
                   {/* ⚠️ A FILLED DOT FOR A CLASH, A HOLLOW RING FOR WAITING —

@@ -183,7 +183,7 @@ export default function AdminNeedsAttention() {
         <p role="alert" className="text-sm text-ink">
           {error}
         </p>
-        <button type="button" onClick={load} className="mt-2 text-sm font-bold text-brand underline">
+        <button type="button" onClick={load} className="mt-2 text-sm font-bold text-brand-ink underline">
           Try again
         </button>
       </Card>

@@ -51,7 +51,7 @@ export default function NoticeRow({ notice, teamsById, unread, stat, expired, on
   const tone = expired
     ? { stripe: 'bg-line-strong', chip: 'bg-surface-mute text-ink-faint' }
     : clubWide
-      ? { stripe: 'bg-brand', chip: 'bg-danger-bg text-brand-deep' }
+      ? { stripe: 'bg-brand', chip: 'bg-danger-bg text-danger-ink' }
       : { stripe: 'bg-accent', chip: 'bg-accent-bg text-accent-ink' }
 
   return (
@@ -169,7 +169,7 @@ export default function NoticeRow({ notice, teamsById, unread, stat, expired, on
                 type="button"
                 data-testid="open-receipts"
                 onClick={() => onOpenReceipts(notice)}
-                className="text-[13px] font-bold text-brand underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 {summary}
               </button>

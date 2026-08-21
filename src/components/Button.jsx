@@ -84,8 +84,8 @@ const VARIANTS = {
   // The bottom edge is thicker than the other three for the same reason the
   // primary has one at all.
   secondary:
-    'border-[1.5px] border-b-[3px] border-line bg-surface-card text-ink hover:border-brand hover:text-brand btn-glow-soft',
-  ghost: 'text-brand hover:bg-surface-mute',
+    'border-[1.5px] border-b-[3px] border-line bg-surface-card text-ink hover:border-brand hover:text-brand-ink btn-glow-soft',
+  ghost: 'text-brand-ink hover:bg-surface-mute',
 
   // ── The destructive pair ────────────────────────────────────────────────
   //
@@ -108,7 +108,7 @@ const VARIANTS = {
   // without inventing a colour.
   danger: 'bg-brand-deep text-white hover:bg-brand border-b-[3px] border-black/20',
   dangerQuiet:
-    'border-[1.5px] border-b-[3px] border-line bg-surface-card text-brand-deep hover:bg-danger-bg',
+    'border-[1.5px] border-b-[3px] border-line bg-surface-card text-danger-ink hover:bg-danger-bg',
 }
 
 // ⚠️ 8px FOR BUTTONS, 11px FOR SURFACES — AND BOTH ARE CORRECT.

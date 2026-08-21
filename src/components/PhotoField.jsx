@@ -126,7 +126,7 @@ export default function PhotoField({
               type="button"
               onClick={() => onRemove?.()}
               disabled={disabled}
-              className="rounded-[11px] px-4 py-2 text-sm font-bold text-brand-deep transition hover:bg-danger-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+              className="rounded-[11px] px-4 py-2 text-sm font-bold text-danger-ink transition hover:bg-danger-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
             >
               Remove photo
             </button>

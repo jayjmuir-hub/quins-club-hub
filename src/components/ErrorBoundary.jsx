@@ -117,10 +117,10 @@ export default class ErrorBoundary extends React.Component {
         role="alert"
         className="mx-auto max-w-md rounded-[11px] border border-line bg-surface-card p-6 text-center"
       >
-        <h2 className="text-base font-extrabold text-brand-deep">
+        <h2 className="text-base font-extrabold text-danger-ink">
           Something went wrong on this screen
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+        <p className="mt-2 text-sm leading-relaxed text-danger-ink">
           The rest of the app still works. Try again, and if it keeps happening use
           &ldquo;Clear saved data&rdquo; — that usually fixes it.
         </p>

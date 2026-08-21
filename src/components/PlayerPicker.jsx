@@ -123,7 +123,7 @@ export default function PlayerPicker({
       )}
 
       {!loading && error && (
-        <p role="alert" className="mt-2 text-[12.5px] font-semibold text-brand-deep">
+        <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
           {error.message || "We couldn't load the player list."}
         </p>
       )}

@@ -49,7 +49,7 @@ const VARIANTS = {
   //           swapped to --plum/brand-deep (#b3141a) for ~7.9:1.
   //   - draw: #5a6470 on #eef0f2 already measures ~5.3:1 — used verbatim.
   win: 'bg-accent-bg text-accent-ink',
-  loss: 'bg-danger-bg text-brand-deep',
+  loss: 'bg-danger-bg text-danger-ink',
   draw: 'bg-surface-mute text-ink-muted',
 }
 

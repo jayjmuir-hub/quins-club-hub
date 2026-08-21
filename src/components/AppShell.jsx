@@ -54,7 +54,7 @@ function SignOutControl({ signOut, className = '' }) {
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
         >
           {error}
         </p>
@@ -91,8 +91,8 @@ function ErrorState({ error, reload, children }) {
       role="alert"
       className="mx-auto mt-6 max-w-[420px] rounded-2xl border border-line bg-surface-card p-6 text-center shadow-card"
     >
-      <h2 className="text-lg font-extrabold text-brand-deep">Couldn&apos;t load your account</h2>
-      <p data-testid="error-message" className="mt-2 text-sm leading-relaxed text-brand-deep">
+      <h2 className="text-lg font-extrabold text-danger-ink">Couldn&apos;t load your account</h2>
+      <p data-testid="error-message" className="mt-2 text-sm leading-relaxed text-danger-ink">
         {error.message || 'Something went wrong. Try again.'}
       </p>
       <Button onClick={reload} className="mt-4">

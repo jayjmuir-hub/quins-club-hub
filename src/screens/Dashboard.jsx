@@ -804,8 +804,8 @@ export default function Dashboard() {
       <section>
         <h2 className="sr-only">Dashboard</h2>
         <Card role="alert" className="p-6 text-center">
-          <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load your dashboard</h3>
-          <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+          <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load your dashboard</h3>
+          <p className="mt-2 text-sm leading-relaxed text-danger-ink">
             {error.message || 'Something went wrong. Try again.'}
           </p>
           <Button
@@ -871,7 +871,7 @@ export default function Dashboard() {
             </div>
             <Link
               to="/squad"
-              className="shrink-0 rounded-[11px] border-[1.5px] border-brand px-3 py-2 text-sm font-bold text-brand-deep hover:bg-surface-mute"
+              className="shrink-0 rounded-[11px] border-[1.5px] border-brand px-3 py-2 text-sm font-bold text-danger-ink hover:bg-surface-mute"
             >
               Open
             </Link>

@@ -17,7 +17,7 @@ export function Spinner({ label = 'Loading…', className = '' }) {
       className={['inline-flex items-center gap-2', className].filter(Boolean).join(' ')}
     >
       <svg
-        className="h-5 w-5 animate-spin text-brand motion-reduce:animate-none"
+        className="h-5 w-5 animate-spin text-brand-ink motion-reduce:animate-none"
         viewBox="0 0 24 24"
         fill="none"
         aria-hidden="true"

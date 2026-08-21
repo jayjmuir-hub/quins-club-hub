@@ -23,6 +23,30 @@ function sourceFiles() {
 // enforce for you — both fail silently in a browser, so only a test catches
 // them. See tailwind.config.js for the full reasoning behind each.
 describe('theme integrity', () => {
+  // Rule 0 (21 Aug 2026, found by Jay in the dark on his phone): the FILL
+  // reds must not be used as TEXT on themed surfaces. brand.deep and
+  // brand.DEFAULT are theme-independent (they are backgrounds under white
+  // text), so as text they sit at ~2.9:1 and ~3.6:1 on black — 149 and 70
+  // call sites did exactly that. Text wants the THEMED reds: brand-ink or
+  // danger-ink, identical in light, brightened in dark. The one sanctioned
+  // exception is a literally-white surface (bg-white on the same class
+  // string), where the fill red is correct in BOTH themes.
+  it('never uses the fill reds as text off a white surface', () => {
+    const offenders = []
+    for (const f of sourceFiles()) {
+      const src = readFileSync(f, 'utf8')
+      const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+      for (const line of code.split('\n')) {
+        const usesFillRedAsText =
+          /text-brand-deep/.test(line) || /text-brand(?![-\w])/.test(line)
+        if (usesFillRedAsText && !/bg-white/.test(line)) {
+          offenders.push(`${path.relative(projectRoot, f)}: ${line.trim().slice(0, 90)}`)
+        }
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
   // Rule 1: no raw colour literals in component class names.
   //
   // The whole point of the token layer is that a future theme change is a

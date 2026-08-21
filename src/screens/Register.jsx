@@ -47,7 +47,7 @@ const STATUSES = [
 
 const STATUS_ON = {
   present: 'border-accent-mid bg-accent-bg text-accent-ink',
-  absent: 'border-danger bg-danger-bg text-brand-deep',
+  absent: 'border-danger bg-danger-bg text-danger-ink',
   excused: 'border-warn bg-warn-bg text-warn-ink',
 }
 const STATUS_OFF = 'border-line bg-surface-card text-ink-muted hover:bg-surface-mute'
@@ -196,7 +196,7 @@ export default function Register({ event, team, onClose }) {
           <Spinner label="Loading the register…" />
         </div>
       ) : error ? (
-        <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
+        <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
           {error.message || "We couldn't load the register. Try again."}
         </p>
       ) : players.length === 0 ? (
@@ -223,7 +223,7 @@ export default function Register({ event, team, onClose }) {
           </div>
 
           {saveError && (
-            <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
+            <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
               {saveError.message || "We couldn't save that. Try again."}
             </p>
           )}

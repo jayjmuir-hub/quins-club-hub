@@ -365,8 +365,8 @@ export default function Allocation() {
         </div>
       ) : error ? (
         <Card role="alert" className="p-6 text-center">
-          <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load the day</h3>
-          <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+          <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the day</h3>
+          <p className="mt-2 text-sm leading-relaxed text-danger-ink">
             {error.message || 'Something went wrong. Try again.'}
           </p>
         </Card>
@@ -455,7 +455,7 @@ export default function Allocation() {
                             data-testid={clash ? 'booking-clash' : 'booking'}
                             className={[
                               'block rounded-[6px] px-2 py-1 text-[12px] font-bold leading-tight',
-                              clash ? 'bg-warn-bg text-warn-ink' : 'bg-danger-bg text-brand-deep',
+                              clash ? 'bg-warn-bg text-warn-ink' : 'bg-danger-bg text-danger-ink',
                             ].join(' ')}
                           >
                             {/* ⚠️ LABELLED BY LEAGUE TEAM WHERE THERE IS ONE,
@@ -603,7 +603,7 @@ export default function Allocation() {
                   )}
 
                   {open && decideError && (
-                    <p role="alert" className="mt-2 text-[12.5px] font-semibold text-brand-deep">
+                    <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
                       {decideError.message || "That didn't save. Try again."}
                     </p>
                   )}

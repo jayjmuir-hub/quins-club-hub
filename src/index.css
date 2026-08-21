@@ -40,6 +40,15 @@
      ⚠️ scripts/contrast-check.mjs still keeps its own copy of BOTH palettes.
      Change a value here, change it there, run the script. */
 
+  /* ⚠️ color-scheme TELLS THE BROWSER, NOT JUST THE CSS — found 21 Aug
+     2026 from Jay's black-on-black screenshot. Without it the UA renders
+     its OWN parts (button text via `buttontext`, select popups, date
+     fields, checkboxes, scrollbars) in LIGHT scheme even when every token
+     is dark: the roster's player-name buttons carried no author color at
+     all and fell back to UA black-on-black. The .dark override below flips
+     the UA to dark natively. */
+  color-scheme: light;
+
   /* Light — the club site's light mode, unchanged values from 6 Aug. */
   --surface-rgb: 243 243 243;
   --surface-card-rgb: 255 255 255;
@@ -66,6 +75,11 @@
 
   --danger-rgb: 194 53 44;
   --danger-bg-rgb: 253 236 235;
+  /* Deep red AS TEXT. Identical to brand-deep in light; in dark it must
+     brighten or vanish — the 21 Aug lesson, found by Jay on his phone:
+     149 call sites wrote text-brand-deep (an unthemed FILL token) for
+     error/warning text, ~2.9:1 on black. */
+  --danger-ink-rgb: 163 13 37;
   --warn-rgb: 201 138 18;
   --warn-ink-rgb: 138 90 18;
   --warn-bg-rgb: 253 243 224;
@@ -100,6 +114,8 @@
    ancestor's value over :root.dark's. */
 
 :root.dark {
+  color-scheme: dark;
+
   --surface-rgb: 0 0 0;
   --surface-card-rgb: 10 10 10;
   --surface-sunk-rgb: 28 28 28;
@@ -119,6 +135,7 @@
   --accent-bg-rgb: 13 61 34;
 
   --danger-bg-rgb: 58 15 12;
+  --danger-ink-rgb: 255 125 117;
   --warn-ink-rgb: 224 166 63;
   --warn-bg-rgb: 51 36 8;
   --info-bg-rgb: 15 30 54;
@@ -205,6 +222,14 @@
      the hover colour fade on every button in the app. The colour properties
      are listed explicitly to keep both.
      --------------------------------------------------------------------- */
+  /* ⚠️ BUTTONS INHERIT, EXPLICITLY. This Tailwind build's preflight does
+     not give <button> an author color, so an unstyled button falls back to
+     UA `buttontext` — which color-scheme now themes, but inherit is the
+     honest intent: a button's text follows its surroundings' tokens. */
+  button {
+    color: inherit;
+  }
+
   button:not(:disabled),
   [role='button']:not([aria-disabled='true']) {
     transition:

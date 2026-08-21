@@ -154,7 +154,7 @@ export default function PushNotificationsToggle() {
       {error && (
         <p
           role="alert"
-          className="mt-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+          className="mt-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
         >
           {error}
         </p>

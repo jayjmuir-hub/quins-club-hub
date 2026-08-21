@@ -125,7 +125,7 @@ export default function AppButton() {
               // they cannot find it.
               <div className="mt-3.5 rounded-[11px] bg-surface-mute p-3.5">
                 <p className="flex items-center gap-2 text-sm font-bold text-ink">
-                  <ShareIcon aria-hidden="true" className="h-4.5 w-4.5 shrink-0 text-brand" />
+                  <ShareIcon aria-hidden="true" className="h-4.5 w-4.5 shrink-0 text-brand-ink" />
                   On iPhone and iPad
                 </p>
                 <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">

@@ -201,8 +201,8 @@ function NotAuthorised() {
     <section>
       <h2 className="sr-only">Accounts</h2>
       <Card role="alert" className="p-6 text-center">
-        <h3 className="text-base font-extrabold text-brand-deep">Not authorised</h3>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+        <h3 className="text-base font-extrabold text-danger-ink">Not authorised</h3>
+        <p className="mt-2 text-sm leading-relaxed text-danger-ink">
           This page is for club admins, coaches and team managers. If you think you
           should have access, ask a current admin to check your account.
         </p>
@@ -450,7 +450,7 @@ function PendingApprovals({
               {state.error && (
                 <span
                   role="alert"
-                  className="basis-full text-[12.5px] font-semibold text-brand-deep"
+                  className="basis-full text-[12.5px] font-semibold text-danger-ink"
                 >
                   {state.error}
                 </span>
@@ -604,7 +604,7 @@ function PendingStaffRequests({
               {state.error && (
                 <span
                   role="alert"
-                  className="basis-full text-[12.5px] font-semibold text-brand-deep"
+                  className="basis-full text-[12.5px] font-semibold text-danger-ink"
                 >
                   {state.error}
                 </span>
@@ -692,7 +692,7 @@ function PersonDetailsForm({ group, state, onChange, onSave }) {
       </div>
 
       {draft.error && (
-        <p role="alert" className="mt-3 text-[12.5px] font-semibold text-brand-deep">
+        <p role="alert" className="mt-3 text-[12.5px] font-semibold text-danger-ink">
           {draft.error}
         </p>
       )}
@@ -1574,7 +1574,7 @@ export default function Accounts() {
         )}
 
         {!isFirstLoad && error && (
-          <Card role="alert" className="p-4 text-[13px] font-semibold text-brand-deep">
+          <Card role="alert" className="p-4 text-[13px] font-semibold text-danger-ink">
             We couldn&apos;t load the approvals. Try again in a moment.
           </Card>
         )}
@@ -1791,7 +1791,7 @@ export default function Accounts() {
                           {request && (
                             <span
                               data-testid="asked-badge"
-                              className="ml-2 rounded-pill bg-brand/10 px-2 py-0.5 align-middle text-[11px] font-bold uppercase tracking-[0.06em] text-brand-deep"
+                              className="ml-2 rounded-pill bg-brand/10 px-2 py-0.5 align-middle text-[11px] font-bold uppercase tracking-[0.06em] text-danger-ink"
                             >
                               Asked
                             </span>
@@ -1927,7 +1927,7 @@ export default function Accounts() {
                         {triage.error && (
                           <span
                             role="alert"
-                            className="text-[12px] font-semibold text-brand-deep"
+                            className="text-[12px] font-semibold text-danger-ink"
                           >
                             {triage.error}
                           </span>
@@ -1969,7 +1969,7 @@ export default function Accounts() {
             type="button"
             onClick={() => setShowDismissed((open) => !open)}
             aria-expanded={showDismissed}
-            className={`text-[12.5px] font-bold underline decoration-line underline-offset-4 transition hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${MUTED_ON_PAPER}`}
+            className={`text-[12.5px] font-bold underline decoration-line underline-offset-4 transition hover:text-brand-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${MUTED_ON_PAPER}`}
           >
             {showDismissed ? 'Hide' : 'Show'} dismissed ({dismissed.length})
           </button>
@@ -2011,7 +2011,7 @@ export default function Accounts() {
 
                     <div className="flex flex-col items-end gap-1">
                       {triage.error && (
-                        <span role="alert" className="text-[12px] font-semibold text-brand-deep">
+                        <span role="alert" className="text-[12px] font-semibold text-danger-ink">
                           {triage.error}
                         </span>
                       )}
@@ -2034,8 +2034,8 @@ export default function Accounts() {
 
       {!isFirstLoad && error && (
         <Card role="alert" className="p-6 text-center">
-          <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load accounts</h3>
-          <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+          <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load accounts</h3>
+          <p className="mt-2 text-sm leading-relaxed text-danger-ink">
             {error.message || 'Something went wrong. Try again.'}
           </p>
           <Button onClick={() => setReloadToken((token) => token + 1)} className="mt-4">
@@ -2360,7 +2360,7 @@ export default function Accounts() {
 
                       {state.confirming ? (
                         <span className="flex flex-wrap items-center gap-2">
-                          <span className="text-[12.5px] font-semibold text-brand-deep">
+                          <span className="text-[12.5px] font-semibold text-danger-ink">
                             Remove this access?
                           </span>
                           <Button
@@ -2395,7 +2395,7 @@ export default function Accounts() {
                       {state.error && (
                         <span
                           role="alert"
-                          className="basis-full text-[12.5px] font-semibold text-brand-deep"
+                          className="basis-full text-[12.5px] font-semibold text-danger-ink"
                         >
                           {state.error}
                         </span>
