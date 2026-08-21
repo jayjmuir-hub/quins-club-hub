@@ -79,8 +79,8 @@ function linkClassName({ isActive }) {
 
 // The Admin pill that used to render here (admin-only, desktop-only) is now
 // the sidebar's Admin item — same isAdmin() gate, same destination. The tab
-// bar never showed it and still does not: managing the club from a phone is
-// phase 4's job, and it will get a mobile entry point there, not a fifth tab.
+// bar never showed it and still does not: since phase 4 the phone's route to
+// /admin is the Manage card on More, not a fifth tab.
 export default function Nav() {
   return (
     // The bar is dark chrome so the app is bookended in near-black — masthead

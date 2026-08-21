@@ -761,13 +761,13 @@ const scenarios = {
   // grey for want of the job (Club Youth Manager) and one grey for want of a
   // screen (Social Media Management).
   //
-  // ⚠️ THE OVERFLOW GATE CANNOT SEE THIS SCREEN, AND LISTING IT HERE MUST NOT
-  // BE READ AS COVERAGE. The whole /admin tree lives inside
-  // `hidden desktop:block`, so at the gate's 320-414px widths what renders is
-  // the "Needs a bigger screen" card and nothing else. The scenario is listed
-  // because a scenario that fails to RENDER is still caught, and because this
-  // is the only way to open the chooser in a real browser at desktop width —
-  // which is the check that actually matters and which no script performs.
+  // ⚠️ THE OVERFLOW GATE SEES THIS SCREEN SINCE 21 Aug 2026. Until retheme
+  // phase 4 the whole /admin tree lived inside `hidden desktop:block`, so at
+  // the gate's 320-414px widths what rendered was a "Needs a bigger screen"
+  // card and nothing else, and this note warned against reading the listing
+  // as coverage. The width gate is gone: the chooser now renders its card
+  // grid at every width and the phone measurement is real. Opening it in a
+  // real browser is still the only check of how it LOOKS.
   'portal-chooser': () => {
     const PITCH_ADMIN = [
       { id: 'm0', role: 'admin', status: 'active', team_id: null, player_id: null, admin_rights: ['pitches'] },

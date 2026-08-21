@@ -10,6 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🔧 **PHASE 4 POLISH: the loose ends the gate left behind.** TrainingPublish's
+  four date fields go `min-w-0` → `min-w-[150px]` so From/To and Starts/Ends
+  wrap to their own rows on a phone instead of clipping `dd/mm/yyyy`; the two
+  harness comments calling the admin overflow scenarios near-meaningless are
+  repointed (the overflow gate now genuinely measures the admin tree — run
+  fresh, 165 scenario/width pairs green at 320-414px); and Nav.jsx's "phase 4
+  will add an entry point" note now names the Manage card that exists.
+- `650c5e1` — the squash that took the width gate off /admin (#287).
+
 - 📱 **PHASE 4: ADMIN ON THE PHONE.** The "Needs a bigger screen" card is
   gone from /admin and the Manage block on /more shows at every width —
   Jay's ruling, same day: "bring admin functions into the app, that is my
