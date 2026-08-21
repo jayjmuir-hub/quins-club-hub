@@ -20,6 +20,40 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### `20260821_publish_training_fit_check` — the squad publish never checked
+
+⛔ **WRITTEN 21 Aug 2026, NOT APPLIED.** The file is
+`db/migrations/20260821_publish_training_fit_check.sql` and Jay decides when it
+goes in. `db/schema/functions.sql` carries the NEW text of the function with a
+line pointing here, so the capture is ahead of the database until then —
+⚠️ **`npm run db:check` will report the difference, and that report is correct.**
+
+**Why.** `publish_training` authorised the CALLER against the club that owns the
+TEMPLATE, then trusted `_teams` entirely. It is `SECURITY DEFINER`, so RLS never
+sees the caller: an admin of one club passing another club's team id would have
+had that squad's training events written. There is one club today, which is
+precisely why this is cheap now and expensive on the day there are two.
+
+It also adds the contact check. `squadFitsTemplate` in `src/lib/trainingPlans.js`
+already refuses a contact template for a tag squad, but the SCREEN was the only
+thing enforcing it — a direct RPC call bypassed it. Defence in depth, not a new
+rule.
+
+**The argument against, kept.** Age-band fitness is deliberately NOT enforced
+here. The band is parsed from the squad NAME in JavaScript because the club has
+no age column and the names are inconsistent; reimplementing that parse in
+plpgsql would give two parsers that drift apart silently. Contact is a COLUMN,
+so contact is the half that can be enforced in the database — and it is the half
+that puts a child in a tackle.
+
+**Proof, when it is applied.** `db/tests/training-plans.sql` steps 7 and 8 —
+a contact template to a tag squad, and a team id that is not in the club, both
+expected to be refused `42501`. ⚠️ **Both are marked NOT YET MEASURED in that
+harness's footer and will read `FAIL — allowed` until the migration is applied.**
+That FAIL is the answer to “has it gone in yet”, not a broken test.
+
+---
+
 ### `20260819_revoke_truncate_from_authenticated` — the privilege RLS cannot filter
 
 ✅ **APPLIED 19 Aug 2026 as `revoke_truncate_from_authenticated`.** Measured

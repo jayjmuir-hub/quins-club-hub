@@ -2983,6 +2983,11 @@ GRANT EXECUTE ON FUNCTION public.scan_photo_orphans(interval) TO service_role;
 -- SECURITY DEFINER, and refuses unless private.is_admin(club). ⛔ Selects on
 -- type = 'training' within a DATE RANGE in club time — no weekday anywhere.
 -- Skips and COUNTS any session with coach_edited_at set.
+--
+-- ⚠️ THE TEXT BELOW IS AS OF 20260821_publish_training_fit_check — written
+-- 21 Aug 2026, apply status: see claude/schema-history.md. It adds the
+-- per-squad check that the team is in the template's club and fits its
+-- contact flag; SECURITY DEFINER bypasses RLS, so nothing else would notice.
 -- ---------------------------------------------------------------------
 create or replace function public.publish_training(
   _template uuid, _teams uuid[], _from date, _to date, _preview boolean default true)
@@ -3008,6 +3013,14 @@ begin
 
   foreach _team in array _teams loop
     team_id := _team; will_write := 0; skipped_coach_edited := 0; no_events := 0;
+
+    perform 1 from teams t, session_templates tpl
+     where t.id = _team and tpl.id = _template
+       and t.club_id = _club
+       and (not tpl.requires_contact or t.requires_contact);
+    if not found then
+      raise exception 'squad % is not in this club or does not fit this template', _team using errcode = '42501';
+    end if;
 
     for _ev in
       select e.id, s.id as session_id, s.coach_edited_at

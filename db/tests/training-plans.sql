@@ -4,13 +4,19 @@
 --  runs inside a transaction that ROLLS BACK.
 -- ══════════════════════════════════════════════════════════════════════════
 --
--- Six things, each proved against an injected fault rather than by running:
+-- Eight things, each proved against an injected fault rather than by running:
 --   1. A drill in use cannot be DELETED (on delete restrict). Retire instead.
 --   2. A second session on one event is refused (UNIQUE event_id).
 --   3. publish_training with _preview = true counts and writes NOTHING.
 --   4. A real publish writes every training in range and never a match.
 --   5. A coach-edited session is SKIPPED and COUNTED, its content untouched.
 --   6. A coach cannot call publish_training at all.
+--   7. A contact template published to a TAG squad is refused 42501.
+--   8. A team id that is not in this club is refused 42501.
+--
+-- ⚠️ 7 AND 8 TEST db/migrations/20260821_publish_training_fit_check.sql, WHICH
+-- IS WRITTEN AND NOT APPLIED. Until Jay applies it they will report FAIL, and
+-- that FAIL is correct — see the EXPECTED footer.
 --
 -- ⚠️ 5 IS THE ONE THAT MATTERS. "Publish never overwrites a coach's edit" is
 -- the rule that lets multi-squad publish be safe at all; this is the line
@@ -108,6 +114,36 @@ exception when insufficient_privilege then insert into _r values ('coach calls p
 
 reset role;
 
+-- ── 7 and 8: the fit check inside publish_training ────────────────────────
+-- ⚠️ SET UP AS `postgres` ON PURPOSE. The squad's contact flag is forced to
+-- false here so the step does not depend on how production happens to have it
+-- set today, and the whole transaction rolls back.
+reset role;
+update teams set requires_contact = false where id = (select id from teams order by sort_order limit 1);
+insert into session_templates (id, club_id, name, total_minutes, requires_contact)
+select 'a0000000-0000-4000-8000-0000000000a2', club_id, 'HARNESS contact hour', 15, true from teams limit 1;
+insert into session_template_blocks (template_id, position, drill_id, minutes)
+values ('a0000000-0000-4000-8000-0000000000a2', 1, 'd0000000-0000-4000-8000-0000000000a1', 15);
+
+-- 7. A contact template cannot reach a tag squad, even by direct RPC.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"df730ef7-dce2-4962-babe-96d9999b0173","role":"authenticated"}';
+do $$ begin
+  perform publish_training('a0000000-0000-4000-8000-0000000000a2',
+    array[(select id from teams order by sort_order limit 1)], current_date, current_date + 10, true);
+  insert into _r values ('contact template to a tag squad','FAIL — allowed');
+exception when insufficient_privilege then insert into _r values ('contact template to a tag squad','PASS — refused 42501'); end $$;
+
+-- 8. A team id that is not in this club at all. SECURITY DEFINER bypasses RLS,
+-- so nothing else in the function would have noticed.
+do $$ begin
+  perform publish_training('a0000000-0000-4000-8000-0000000000a1',
+    array['00000000-0000-4000-8000-000000000000'::uuid], current_date, current_date + 10, true);
+  insert into _r values ('a team id not in this club','FAIL — allowed');
+exception when insufficient_privilege then insert into _r values ('a team id not in this club','PASS — refused 42501'); end $$;
+
+reset role;
+
 select * from _r;
 
 -- ══════════════════════════════════════════════════════════════════════════
@@ -154,4 +190,12 @@ rollback;
 --    publish writes both trainings, not the match  PASS
 --    publish skips the coach edit and reports it   PASS
 --    coach calls publish                           PASS — refused 42501
+--
+--  ⚠️ THE LAST TWO ARE NOT MEASURED, AND MUST NOT BE WRITTEN AS IF THEY WERE.
+--  They test db/migrations/20260821_publish_training_fit_check.sql, which is
+--  WRITTEN AND UNAPPLIED — Jay decides when it goes in. Against the function
+--  as it stands in the database today they will read FAIL — allowed, which is
+--  the correct answer to "has the migration been applied yet".
+--    contact template to a tag squad               NOT YET MEASURED
+--    a team id not in this club                    NOT YET MEASURED
 -- ══════════════════════════════════════════════════════════════════════════
