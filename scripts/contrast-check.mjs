@@ -11,8 +11,10 @@
 // previously written into component comments by hand. Numbers in comments go
 // stale silently; a script that fails the build does not.
 
-// ⚠️ MIRRORS tailwind.config.js. Change one, change both. Re-pointed at the
-// current club redesign (abudhabiquinspreview.xyz) on 6 Aug 2026.
+// ⚠️ MIRRORS src/index.css's token layer (which tailwind.config.js reads
+// since the 2.0 retheme). Change a value there, change it here, run this.
+// Re-pointed at the current club redesign on 6 Aug 2026; dark palette added
+// 21 Aug 2026 from the live site's own dark mode.
 const T = {
   surface: '#f3f3f3',
   surfaceCard: '#ffffff',
@@ -42,7 +44,7 @@ const T = {
   warnInk: '#8a5a12',
   warnBg: '#fdf3e0',
   info: '#2f5fa8',
-  infoBg: '#e9f1fb',
+  infoBg: '#eef5fd', // was #e9f1fb — 4.46:1 under the staff badge's green, an AA fail this gate caught on 21 Aug 2026
   white: '#ffffff',
 }
 
@@ -99,6 +101,58 @@ const PAIRS = [
   [T.accent, T.chrome, 'green App link on flat chrome', 4.5],
   [T.line, T.surfaceCard, 'hairline vs card (non-text)', 1.2],
 ]
+
+// ⚠️ THE DARK PALETTE — :root.dark in src/index.css. Only the tokens that
+// CHANGE are here; fills (brand, danger, warn, info, chrome) keep their light
+// values and their pairs above already cover white-on-fill. What dark mode
+// changes is text and tinted surfaces, so those are what get re-measured.
+const D = {
+  surface: '#000000',
+  surfaceCard: '#0a0a0a',
+  surfaceSunk: '#1c1c1c',
+  surfaceMute: '#141414',
+  ink: '#ffffff',
+  inkMuted: '#a8adb6',
+  inkFaint: '#8b9099',
+  line: '#2a2a2a',
+  brandInk: '#ff2d4a', // the site's own dark-mode red
+  // Derived, not sampled: the light accent.ink brightened until it clears AA
+  // on the darkest card. NOT the retired #3bd070 — see tailwind.config.js's
+  // note on the green that must never come back.
+  accentInk: '#4ac27d',
+  accentBg: '#0d3d22',
+  dangerBg: '#3a0f0c',
+  warnInk: '#e0a63f',
+  warnBg: '#332408',
+  infoBg: '#0f1e36',
+}
+
+const DARK_PAIRS = [
+  [D.ink, D.surface, 'dark: body text on page', 4.5],
+  [D.ink, D.surfaceCard, 'dark: body text on card', 4.5],
+  [D.ink, D.surfaceMute, 'dark: text on muted fill', 4.5],
+  [D.ink, D.surfaceSunk, 'dark: text on hover/inset row', 4.5],
+  [D.inkMuted, D.surface, 'dark: labels on page', 4.5],
+  [D.inkMuted, D.surfaceCard, 'dark: labels on card', 4.5],
+  [D.inkMuted, D.surfaceMute, 'dark: Chip/Badge neutral text', 4.5],
+  [D.inkFaint, D.surfaceCard, 'dark: secondary row text on card', 4.5],
+  [D.inkFaint, D.surface, 'dark: secondary text on page', 4.5],
+  [D.inkFaint, D.surfaceMute, 'dark: tertiary text on muted fill', 4.5],
+  [D.inkFaint, D.surfaceSunk, 'dark: tertiary text on hover row', 4.5],
+  [D.brandInk, D.surfaceCard, 'dark: red text/links on card', 4.5],
+  [D.brandInk, D.surface, 'dark: red text on page', 4.5],
+  [D.brandInk, D.dangerBg, 'dark: loss chip', 4.5],
+  [D.accentInk, D.surfaceCard, 'dark: green text on card', 4.5],
+  [D.accentInk, D.accentBg, 'dark: training / win chip', 4.5],
+  [D.warnInk, D.warnBg, 'dark: social chip / ScopeNote', 4.5],
+  [D.warnInk, D.surfaceCard, 'dark: warning text on card', 4.5],
+  // Badge.jsx draws staff roles as text-accent-ink on bg-info-bg — that
+  // pairing, not text-info, is what the info surface actually carries.
+  [D.accentInk, D.infoBg, 'dark: staff badge (green on info tint)', 4.5],
+  [T.accentInk, T.infoBg, 'light: staff badge (green on info tint)', 4.5],
+  [D.line, D.surfaceCard, 'dark: hairline vs card (non-text)', 1.2],
+]
+PAIRS.push(...DARK_PAIRS)
 
 let failed = 0
 console.log('PAIRS')

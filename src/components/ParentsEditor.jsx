@@ -219,7 +219,7 @@ export default function ParentsEditor({ parents, onChange, disabled = false }) {
               checked={Boolean(parent.is_primary)}
               disabled={disabled}
               onChange={() => setPrimary(index)}
-              className="h-4 w-4 accent-[color:var(--maroon)]"
+              className="h-4 w-4 accent-[color:var(--brand)]"
             />
             Main contact
           </label>

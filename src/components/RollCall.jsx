@@ -621,7 +621,7 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
                 checked={Boolean(answers[answer.key])}
                 disabled={saving}
                 onChange={() => toggle(answer.key)}
-                className="mt-0.5 h-5 w-5 shrink-0 accent-[color:var(--maroon)]"
+                className="mt-0.5 h-5 w-5 shrink-0 accent-[color:var(--brand)]"
               />
               <span>
                 <span className="block text-sm font-bold text-ink">{answer.label}</span>
@@ -692,7 +692,7 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
                     )
                     if (error) setError(null)
                   }}
-                  className="h-5 w-5 shrink-0 accent-[color:var(--maroon)]"
+                  className="h-5 w-5 shrink-0 accent-[color:var(--brand)]"
                 />
                 <span className="text-sm font-semibold text-ink">{team.name}</span>
               </label>

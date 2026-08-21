@@ -9,6 +9,7 @@ import NamePrompt from './NamePrompt.jsx'
 import RollCall from './RollCall.jsx'
 // ViewAsBanner only — the switcher itself moved to the Admin screen on
 // 7 Aug 2026. See the long note at its old call site below.
+import ThemeToggle from './ThemeToggle.jsx'
 import { ViewAsBanner, ViewAsSwitcher } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 import Button from './Button.jsx'
@@ -518,6 +519,11 @@ export default function AppShell({ children }) {
                 occasionally, that screen is already desktop-only, and
                 ViewAsBanner below still gives one-click Exit from anywhere,
                 so nobody can get stranded in a preview. */}
+            {/* Light/dark, same corner as the club site's own toggle. A
+                32px disc like the ViewAs trigger beside it — the row's
+                probe-measured buffer covers two of these, not a text pill. */}
+            <ThemeToggle />
+
             <ViewAsSwitcher />
 
             {/* Admin is admin-only, and gates on the EFFECTIVE membership

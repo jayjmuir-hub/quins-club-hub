@@ -18,37 +18,110 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------------
-   TOKEN LAYER
-   These mirror tailwind.config.js exactly. Tailwind classes cover ~99% of the
-   app; these custom properties exist for the handful of places that need a
-   colour inside a gradient string, a box-shadow, or a raw CSS rule where a
-   utility class can't reach. Change a value here AND in tailwind.config.js —
-   they are deliberately duplicated rather than generated, because wiring
-   Tailwind to read from CSS vars costs more than it saves at this size.
+   TOKEN LAYER — the single source of truth for colour, both themes.
+   (Until the 2.0 retheme this block MIRRORED tailwind.config.js and said
+   duplication was cheaper than wiring; with a second theme that inverted,
+   and now the config reads these vars. Tombstone kept so nobody reintroduces
+   the mirror.)
    ------------------------------------------------------------------------ */
-:root {
-  --surface: #f3f3f3;
-  --surface-card: #ffffff;
-  --surface-sunk: #ebebeb;
-  --surface-mute: #f7f7f7;
+:root,
+.force-light {
+  /* ⚠️ SINCE THE 2.0 RETHEME (claude/plans/2026-08-21-retheme-and-shell.md)
+     THESE ARE THE SINGLE SOURCE OF TRUTH AND TAILWIND READS THEM. The old
+     comment above ("mirror tailwind.config.js exactly ... duplicated rather
+     than generated") described the one-theme world and is retired: with TWO
+     themes, hex literals in the config would mean every value existing four
+     times. tailwind.config.js now maps each token to
+     rgb(var(--x-rgb) / <alpha-value>), so /20-style opacity keeps working.
 
-  --ink: #101116;
-  --ink-muted: #565c67;
-  --ink-faint: #636974;
+     Each token is an RGB TRIPLET (Tailwind's alpha slot needs the components
+     bare) plus a -solid alias for raw CSS that wants a colour value.
 
-  --line: #e5e5e5;
-  --line-strong: #d4d4d4;
+     ⚠️ scripts/contrast-check.mjs still keeps its own copy of BOTH palettes.
+     Change a value here, change it there, run the script. */
 
-  --brand: #c8102e;
-  --brand-deep: #a30d25;
-  --brand-ink: #c8102e;
+  /* Light — the club site's light mode, unchanged values from 6 Aug. */
+  --surface-rgb: 243 243 243;
+  --surface-card-rgb: 255 255 255;
+  --surface-sunk-rgb: 235 235 235;
+  --surface-mute-rgb: 247 247 247;
 
-  --accent: #2a9d55;
-  --accent-mid: #1f9d4d;
-  --accent-ink: #157f3c;
+  --ink-rgb: 16 17 22;
+  --ink-muted-rgb: 86 92 103;
+  --ink-faint-rgb: 99 105 116;
+  --ink-invert-rgb: 255 255 255;
 
-  --chrome: #0a0a0a;
-  --chrome-raised: #121212;
+  --line-rgb: 229 229 229;
+  --line-strong-rgb: 212 212 212;
+
+  --brand-rgb: 200 16 46;
+  --brand-deep-rgb: 163 13 37;
+  --brand-ink-rgb: 200 16 46;
+  --brand-ondark-rgb: 255 45 74;
+
+  --accent-rgb: 42 157 85;
+  --accent-mid-rgb: 31 157 77;
+  --accent-ink-rgb: 21 127 60;
+  --accent-bg-rgb: 230 247 236;
+
+  --danger-rgb: 194 53 44;
+  --danger-bg-rgb: 253 236 235;
+  --warn-rgb: 201 138 18;
+  --warn-ink-rgb: 138 90 18;
+  --warn-bg-rgb: 253 243 224;
+  --info-rgb: 47 95 168;
+  --info-bg-rgb: 238 245 253;
+
+  /* The chrome is dark in BOTH themes — identity lives on it. */
+  --chrome-rgb: 10 10 10;
+  --chrome-raised-rgb: 18 18 18;
+  --chrome-muted-rgb: 139 144 153;
+
+  /* Solid aliases for raw CSS (accent-color, gradients, shadows). */
+  --brand: rgb(var(--brand-rgb));
+  --brand-deep: rgb(var(--brand-deep-rgb));
+  --surface: rgb(var(--surface-rgb));
+  --chrome: rgb(var(--chrome-rgb));
+}
+
+/* Dark — the club site and member portal's dark mode, measured live on
+   21 Aug 2026 (bg #000, panels #0a0a0a, hairlines #2a2a2a, the site's own
+   dark-mode red #ff2d4a for red-as-text). Applied by src/lib/theme.js
+   putting `dark` on <html>; default follows prefers-color-scheme.
+   ⚠️ brand/danger/warn/info FILLS keep their light values — white text on
+   them clears AA on any ground. What changes is text and tinted surfaces:
+   red/green AS TEXT brighten, the state *-bg tints go deep instead of
+   pale. Every changed pair is measured in scripts/contrast-check.mjs. */
+/* Force a subtree light regardless of theme. For the two render-to-image
+   surfaces — Lineup's share card and the RCM match-sheet facsimile — which
+   are photographed/exported and must come out white-on-paper even when the
+   person exporting runs dark. Works because the light tokens above are
+   declared on `.force-light` too, and var() resolution prefers the nearest
+   ancestor's value over :root.dark's. */
+
+:root.dark {
+  --surface-rgb: 0 0 0;
+  --surface-card-rgb: 10 10 10;
+  --surface-sunk-rgb: 28 28 28;
+  --surface-mute-rgb: 20 20 20;
+
+  --ink-rgb: 255 255 255;
+  --ink-muted-rgb: 168 173 182;
+  --ink-faint-rgb: 139 144 153;
+  --ink-invert-rgb: 255 255 255;
+
+  --line-rgb: 42 42 42;
+  --line-strong-rgb: 58 58 58;
+
+  --brand-ink-rgb: 255 45 74;
+
+  --accent-ink-rgb: 74 194 125;
+  --accent-bg-rgb: 13 61 34;
+
+  --danger-bg-rgb: 58 15 12;
+  --warn-ink-rgb: 224 166 63;
+  --warn-bg-rgb: 51 36 8;
+  --info-bg-rgb: 15 30 54;
 }
 
 @layer base {
@@ -86,6 +159,16 @@
      cuts bundled. */
   .font-condensed {
     font-weight: 700;
+  }
+
+  /* The accent word — the retheme's signature, copied from the club site:
+     one Playfair-italic crimson word inside a bold Inter headline. A class
+     rather than call-site utilities so every screen writes it identically,
+     and so brand-ink keeps it AA in BOTH themes (it brightens to the site's
+     own dark-mode red on dark — see the token layer). */
+  .accent-word {
+    @apply font-accent italic text-brand-ink;
+    letter-spacing: -0.01em;
   }
 
   /* ---------------------------------------------------------------------

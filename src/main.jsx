@@ -5,6 +5,14 @@ import { AuthProvider } from './lib/auth.jsx'
 import { installGlobalErrorReporting } from './lib/errorReporting.js'
 import './index.css'
 import './sw-register.js'
+import { applyTheme, watchSystemTheme } from './lib/theme.js'
+
+// Theme before render — index.html's inline script already themed the first
+// paint; this re-asserts from the real module and keeps following the OS for
+// as long as the app lives. Never unsubscribed on purpose: the subscription
+// IS app-lifetime.
+applyTheme()
+watchSystemTheme()
 
 // ⚠️ BEFORE `render`, SO A CRASH DURING THE FIRST RENDER IS STILL CAUGHT. It
 // costs nothing to call early: this only registers two listeners, and the Sentry

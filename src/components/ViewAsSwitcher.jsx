@@ -359,7 +359,11 @@ export function ViewAsBanner() {
         <button
           type="button"
           onClick={() => setViewAs(null)}
-          className="shrink-0 rounded-pill bg-white px-3 py-1 text-[13px] font-bold text-brand-ink outline-none transition hover:bg-surface-mute focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-deep"
+          // text-brand, NOT text-brand-ink: the pill is literally white in BOTH
+          // themes, and brand-ink brightens to the dark-mode red on dark —
+          // which on a white pill is a 3:1 AA fail. brand is the unthemed
+          // fill red and is AA on white everywhere.
+          className="shrink-0 rounded-pill bg-white px-3 py-1 text-[13px] font-bold text-brand outline-none transition hover:bg-surface-mute focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-deep"
         >
           Exit preview
         </button>

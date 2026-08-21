@@ -1,7 +1,7 @@
 # Retheme & shell — Club Hub joins the club's design family
 
-**Status: not shipped** (spec only — phases below land as their own PRs, and
-this line moves to "shipping, phase N" as they do).
+**Status: shipping — phase 1 landed** (tokens/themes/toggle/identity); phases
+2-5 still to come, each its own PR.
 
 ## The decisions, in Jay's words, 21 Aug 2026
 
@@ -21,6 +21,17 @@ this line moves to "shipping, phase N" as they do).
 old look does not survive as a third theme. `claude/specs/design-system.md`
 stays as the record of what was (history, not instruction) until each section
 is superseded; the tokens below are the new contract.
+
+## ⚠️ Correction found while starting phase 1: half the match already shipped
+
+The palette and fonts were ALREADY re-pointed at the club redesign on
+6 Aug 2026 — crimson `#c8102e`, the neutral greys, Inter throughout, dark
+chrome — by a session this spec's author had not read deeply enough.
+`claude/specs/design-system.md` still describes the pre-6-Aug world, which is
+exactly how this spec briefly told Jay the app was "maroon with system
+fonts". The code wins; the doc is history. Phase 1's REAL content was
+therefore: dark mode (tokens → CSS variables), the toggle, the Playfair
+accent voice, and the 2.0 identity.
 
 ## What was measured on abudhabiquins.com (21 Aug 2026, live site + portal)
 

@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!-- Matches the masthead, and vite.config.js's manifest theme_color. -->
     <meta name="theme-color" content="#0a0a0a" />
+    <!-- Theme before first paint (2.0 retheme). This is src/lib/theme.js's
+         applyTheme, inlined so a dark-mode user never sees a white flash:
+         the module graph loads far too late to win that race. The storage
+         key and class name are pinned to the lib by tests/theme-switch.test.js
+         — change one, change all three. -->
+    <script>
+      try {
+        var t = localStorage.getItem('club-hub-theme')
+        if (t !== 'light' && t !== 'dark') {
+          t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
+        document.documentElement.classList.toggle('dark', t === 'dark')
+      } catch (e) {}
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Quins" />

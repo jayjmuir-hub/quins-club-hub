@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🌗 **PHASE 1 OF THE RETHEME: CLUB HUB 2.0.** Dark mode exists — every
+  colour token moved to CSS variables (`src/index.css` is now the single
+  source of truth; `tailwind.config.js` reads it, `darkMode: 'class'`), with
+  the dark palette measured from the club site's own dark mode. Toggle in
+  the masthead, default follows the OS, no-flash inline script in
+  `index.html` pinned to the lib by test. Playfair Display italic is in as
+  the accent voice — "Good afternoon, *Jay.*" — self-hosted like Inter. The
+  install is named **Club Hub** (was "Quins") and the version is **2.0.0**.
+  The contrast gate grew a full dark-palette section and promptly caught a
+  real light-mode AA fail (staff badge green on info tint, 4.46:1 — fixed).
+  Also fixed: four checkboxes pointing at `var(--maroon)`, which stopped
+  existing in the 6 Aug re-point and had been browser-default blue since.
+
 - 📐 **THE RETHEME IS SPECIFIED.** Jay's rulings, same day: Club Hub joins
   abudhabiquins.com's design family (measured live, both themes), light AND
   dark mode, the member portal's sidebar shell on desktop, **admin functions

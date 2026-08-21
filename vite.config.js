@@ -64,8 +64,13 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: null,
       manifest: {
-        name: 'Abu Dhabi Harlequins',
-        short_name: 'Quins',
+        // "Club Hub" since 2.0 — Jay, 21 Aug 2026: "when the app installs
+        // the name should say Club Hub". short_name is what sits under the
+        // icon. ⚠️ Phones that installed under the old name re-read the
+        // manifest on their own schedule and may keep "Quins" until
+        // reinstall; that is PWA behaviour, not a bug to chase.
+        name: 'Club Hub — Abu Dhabi Harlequins',
+        short_name: 'Club Hub',
         description: 'Abu Dhabi Harlequins — Quins Club Hub: schedule, roster & availability.',
         // theme_color tints the mobile browser/OS chrome so it blends into the
         // top of the page. The top of the page is the near-black masthead, so

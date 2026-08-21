@@ -44,6 +44,9 @@
 // when it is type. The red no longer needs that split, but `brand.ink` is
 // kept as a name so the ~40 call sites do not all have to change.
 export default {
+  // 2.0 retheme: themes switch by class on <html> (src/lib/theme.js), never
+  // by media query alone — the toggle must beat the OS setting.
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
@@ -54,61 +57,60 @@ export default {
         // stacks far more cards than a marketing page does, and white-on-white
         // would leave a screen of hairlines. The tint moved from blue-grey to
         // the site's NEUTRAL grey family, which is most of the visual match.
+        // ⚠️ 2.0 RETHEME: every value here is now a CSS VARIABLE read from
+        // src/index.css, where BOTH themes' palettes live. The hexes that
+        // used to sit here (with their measured ratios) moved there whole.
+        // The <alpha-value> slot keeps bg-brand/20-style opacity working.
         surface: {
-          DEFAULT: '#f3f3f3', // page background — the site's --muted
-          card: '#ffffff', // cards, sheets, dialogs
-          // #ebebeb, not #e8e8e8: at #e8e8e8 the tertiary-text pair measured
-          // 4.51:1, which clears AA by 0.01 and would fail on any later nudge.
-          sunk: '#ebebeb', // hover / inset / pressed
-          mute: '#f7f7f7', // very light fills, zebra rows
+          DEFAULT: 'rgb(var(--surface-rgb) / <alpha-value>)', // page background
+          card: 'rgb(var(--surface-card-rgb) / <alpha-value>)', // cards, sheets, dialogs
+          sunk: 'rgb(var(--surface-sunk-rgb) / <alpha-value>)', // hover / inset / pressed
+          mute: 'rgb(var(--surface-mute-rgb) / <alpha-value>)', // very light fills, zebra rows
         },
 
         // --- type ------------------------------------------------------------
         // Unchanged by the re-point — these were measured against the greys
         // and still clear AA on the new ones (re-verified, see below).
         ink: {
-          DEFAULT: '#101116', // 16.99:1 on surface — primary text
-          muted: '#565c67', //  6.06:1 on surface — labels, secondary
-          // 4.98:1 on surface / 5.52:1 on card / 4.63:1 on sunk. The first
-          // pass used #6f7681, which cleared 4.5:1 on white but only managed
-          // 4.01:1 on the page background — caught by scripts/contrast-check.
-          faint: '#636974', // tertiary, placeholders, row subtitles
-          invert: '#ffffff', // type on brand/chrome fills
+          DEFAULT: 'rgb(var(--ink-rgb) / <alpha-value>)', // primary text
+          muted: 'rgb(var(--ink-muted-rgb) / <alpha-value>)', // labels, secondary
+          faint: 'rgb(var(--ink-faint-rgb) / <alpha-value>)', // tertiary, placeholders, row subtitles
+          invert: 'rgb(var(--ink-invert-rgb) / <alpha-value>)', // type on brand/chrome fills — white in BOTH themes
         },
 
         // --- hairlines --------------------------------------------------------
         // The site's border token exactly. Its cards are white with this
         // hairline and a 16px radius — which is already what Card.jsx renders.
         line: {
-          DEFAULT: '#e5e5e5',
-          strong: '#d4d4d4',
+          DEFAULT: 'rgb(var(--line-rgb) / <alpha-value>)',
+          strong: 'rgb(var(--line-strong-rgb) / <alpha-value>)',
         },
 
         // --- brand red --------------------------------------------------------
         brand: {
-          DEFAULT: '#c8102e', // 5.88:1 with white — the site's LIGHT-mode red.
+          DEFAULT: 'rgb(var(--brand-rgb) / <alpha-value>)', // the fill red — same in both themes
           // Hover/pressed on a red fill goes DARKER, at 7.95:1 with white.
           // Darker-on-hover is the conventional affordance; the pre-retheme
           // app went lighter, which was the odd one out.
-          deep: '#a30d25',
+          deep: 'rgb(var(--brand-deep-rgb) / <alpha-value>)',
           // Kept as a name, but no longer a different colour: #c8102e is
           // itself AA as text (5.88:1 on card, 5.30:1 on the page). The old
           // split existed because #e11b22 was not.
-          ink: '#c8102e',
+          ink: 'rgb(var(--brand-ink-rgb) / <alpha-value>)', // red AS TEXT — brightens to the site's #ff2d4a in dark
           // Red as text on the DARK chrome. This is the site's own dark-mode
           // red — 5.40:1 on flat chrome, 4.85:1 on the role pill's composited
           // fill (bg-brand/20 over #0a0a0a = #300b11). The previous value was
           // a washed-out pink (#ff8f8f) invented to clear contrast against the
           // old red; the site supplies a real one, so use it.
-          onDark: '#ff2d4a',
+          onDark: 'rgb(var(--brand-ondark-rgb) / <alpha-value>)',
         },
 
         // --- brand green ------------------------------------------------------
         accent: {
-          DEFAULT: '#2a9d55', // the site's green. Decoration only on light.
-          mid: '#1f9d4d', // icons, borders, medium-weight marks (3.51:1)
-          ink: '#157f3c', //  5.08:1 on card — green AS TEXT.
-          bg: '#e6f7ec', // success surface
+          DEFAULT: 'rgb(var(--accent-rgb) / <alpha-value>)', // the site's green. Decoration only as a fill.
+          mid: 'rgb(var(--accent-mid-rgb) / <alpha-value>)', // icons, borders, medium-weight marks
+          ink: 'rgb(var(--accent-ink-rgb) / <alpha-value>)', // green AS TEXT — brightens in dark, measured in contrast-check
+          bg: 'rgb(var(--accent-bg-rgb) / <alpha-value>)', // success surface — deep tint in dark
           // ⚠️ THERE IS DELIBERATELY NO accent.onDark, AND THE ATTEMPT TO ADD
           // ONE IS WORTH RECORDING. On 12 Aug 2026 the club website's own "App"
           // link was sampled to make one — #3bd070, a lovely 9.84:1 on the
@@ -130,16 +132,16 @@ export default {
         // The A+ move. Identity lives on the chrome so the data surfaces can
         // stay light and readable pitch-side in daylight.
         chrome: {
-          DEFAULT: '#0a0a0a', // the site's --background
-          raised: '#121212', // the site's dark --card
-          ink: '#ffffff',
-          muted: '#8b9099', // 6.17:1 on chrome — idle tab labels
+          DEFAULT: 'rgb(var(--chrome-rgb) / <alpha-value>)', // dark in BOTH themes — identity lives on the chrome
+          raised: 'rgb(var(--chrome-raised-rgb) / <alpha-value>)',
+          ink: 'rgb(255 255 255 / <alpha-value>)',
+          muted: 'rgb(var(--chrome-muted-rgb) / <alpha-value>)', // idle tab labels
         },
 
         // --- states -----------------------------------------------------------
-        danger: { DEFAULT: '#c2352c', bg: '#fdeceb' },
-        warn: { DEFAULT: '#c98a12', ink: '#8a5a12', bg: '#fdf3e0' },
-        info: { DEFAULT: '#2f5fa8', bg: '#e9f1fb' },
+        danger: { DEFAULT: 'rgb(var(--danger-rgb) / <alpha-value>)', bg: 'rgb(var(--danger-bg-rgb) / <alpha-value>)' },
+        warn: { DEFAULT: 'rgb(var(--warn-rgb) / <alpha-value>)', ink: 'rgb(var(--warn-ink-rgb) / <alpha-value>)', bg: 'rgb(var(--warn-bg-rgb) / <alpha-value>)' },
+        info: { DEFAULT: 'rgb(var(--info-rgb) / <alpha-value>)', bg: 'rgb(var(--info-bg-rgb) / <alpha-value>)' },
 
         // ⚠️ NOT PART OF THIS APP'S PALETTE, AND MUST NOT BE USED AS ONE.
         // Rugby Club Management prints its Official Match Result Sheet with red
@@ -179,6 +181,11 @@ export default {
         // the callers' uppercase + letter-spacing still make it read as a
         // label rather than body copy.
         condensed: ['Inter', 'system-ui', 'sans-serif'],
+        // The 2.0 accent voice: ONE italic crimson word inside a bold
+        // headline — "Good afternoon, *Jay.*" — exactly the club site and
+        // portal's signature. Italic Playfair only (public/fonts); use it
+        // through .accent-word in index.css, never as body copy.
+        accent: ['"Playfair Display"', 'Georgia', 'serif'],
       },
 
       backgroundImage: {

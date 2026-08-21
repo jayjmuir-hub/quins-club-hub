@@ -115,7 +115,7 @@ export default class ErrorBoundary extends React.Component {
     return (
       <div
         role="alert"
-        className="mx-auto max-w-md rounded-[11px] border border-black/10 bg-white p-6 text-center"
+        className="mx-auto max-w-md rounded-[11px] border border-line bg-surface-card p-6 text-center"
       >
         <h2 className="text-base font-extrabold text-brand-deep">
           Something went wrong on this screen

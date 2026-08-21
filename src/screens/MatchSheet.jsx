@@ -1060,7 +1060,7 @@ export default function MatchSheet() {
         <div
           ref={printRef}
           data-testid="match-sheet-facsimile"
-          className="mx-auto w-[860px] border border-black bg-white p-3 text-black"
+          className="force-light mx-auto w-[860px] border border-black bg-white p-3 text-black"
         >
           <header className="mb-2 text-center">
             <h1 className="text-[15px] font-bold leading-tight text-rcm">
