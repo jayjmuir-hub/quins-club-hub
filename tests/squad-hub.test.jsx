@@ -151,7 +151,7 @@ describe('the gate', () => {
       membershipsFor([{ role: 'coach', team_id: 't-u12', status: 'active' }]),
     )
     renderAt('/squad')
-    expect(await screen.findByRole('heading', { name: /U12 Mixed hub/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /U12 Mixed/i })).toBeInTheDocument()
   })
 
   it('offers a multi-squad manager the picker', async () => {
@@ -219,7 +219,7 @@ describe('match sheets', () => {
     )
     listEventsMock.mockResolvedValue([{ ...PAST_MATCH, id: 'e-u8', team_id: 't-u8' }])
     renderAt('/squad/t-u8')
-    await screen.findByRole('heading', { name: /U8 Tag hub/i })
+    await screen.findByRole('heading', { name: /U8 Tag/i })
     await vi.waitFor(() => expect(listMatchSheetsForMock).toHaveBeenCalled())
     expect(listMatchSheetsForMock).toHaveBeenCalledWith([])
     expect(screen.queryByText(/match sheets outstanding/i)).not.toBeInTheDocument()

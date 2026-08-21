@@ -49,7 +49,10 @@ export default function Greeting({ now = undefined }) {
   return (
     <p
       data-testid="greeting"
-      className="mb-3 text-[15px] font-semibold text-ink-muted desktop:text-base"
+      // Headline scale since phase 3 — the portal's "Good afternoon, *Jason.*"
+      // is the page title, not a whisper above it. Muted lead, ink-and-accent
+      // name, display sizing.
+      className="mb-3 font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[30px]"
     >
       {greeting}
       {firstName ? (

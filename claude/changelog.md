@@ -10,6 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🗞️ **PHASE 3: THE EDITORIAL VOICE ON THE DASHBOARDS.**
+  `src/components/Editorial.jsx` — Kicker (crimson slash + tiny uppercase
+  label), AccentTitle (bold headline + ONE Playfair-italic crimson word),
+  and BlockTitle (moved out of Dashboard, slash added). Home's greeting is
+  now the page headline; Squad Hub opens "U12 Mixed, *tracked.*" with
+  sections "On the calendar" and "Who said, who showed", and its desktop
+  lays schedule and front doors side by side with the tracking grid
+  spanning beneath — grid PLACEMENT classes, so the phone keeps its order.
+  /admin's chooser opens "The club's jobs, *pick yours.*"
+- `9c9581b` — the squash that shipped the desktop sidebar shell (#285).
+
 - 🧭 **PHASE 2: THE DESKTOP SIDEBAR SHELL.** Desktop stops being a stretched
   phone app: a fixed 256px dark sidebar (`src/components/Sidebar.jsx`,
   modelled on the member portal's, dark in both themes like all chrome)
