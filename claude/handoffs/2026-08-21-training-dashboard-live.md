@@ -1,7 +1,9 @@
-# 21 Aug 2026 — the Rugby Performance Director dashboard went live
+# 21 Aug 2026 — the dashboard went live, and the rest of the day
 
-**History, not instruction.** A record of the session that built, merged and
-verified pieces 1–3 of `claude/plans/2026-08-12-training-session-plans.md`.
+**History, not instruction.** One session, start to finish: the Rugby
+Performance Director dashboard built, merged and verified; a preview bug
+found by Jay and fixed the same afternoon; the contact squads set; four PRs
+(#276–#279), two migrations, one deploy that was correctly skipped.
 
 ## What happened, in order
 
@@ -23,6 +25,23 @@ verified pieces 1–3 of `claude/plans/2026-08-12-training-session-plans.md`.
    template and drill retired. `training_sessions` 0, live templates 0, live
    drills 0 — measured.
 
+## The afternoon
+
+5. **Jay found a preview bug within the hour.** Viewing Home as a U7 parent
+   showed a U18B manager's notice badged "Your squad". ⚠️ **Not a leak** —
+   `can_see_team` never sends a squad notice to another squad's member, checked
+   against the row. "View as" is a browser filter over an admin's session,
+   which the server rightly hands every notice, and notices were the one block
+   on Home and `/notices` that never ran through `visibleTeams()`. Fixed with
+   `scopeNotices()` in `src/lib/notices.js`, applied at render; `f46daf9`
+   (#278); verified in the same preview on the deployed site.
+6. **The contact squads were set** on Jay's ruling — *"qr is quick rip which is
+   basically tag, U9 is tackling"* — ten contact, five tag, written to
+   `teams.requires_contact` and measured back.
+   `claude/decisions/2026-08-21-quick-rip-is-tag.md`, `0dd01a3` (#279).
+7. **That docs-only merge did NOT deploy** — checked by the deploy id, not the
+   log: production stayed on `6a881e74e676a700089d7b08` = `f46daf9`.
+
 ## Traps worth keeping
 
 - ⚠️ **Auto mode's classifier refuses production actions outright** — `gh pr
@@ -38,15 +57,22 @@ verified pieces 1–3 of `claude/plans/2026-08-12-training-session-plans.md`.
   is on `claude/open-items.md`.
 - ⚠️ `docs:check` read the branch name `claude/rugby-…` as a `claude/` path and
   failed CI. A branch name is not a path; don't put one in backticks in a doc.
+- ⚠️ **A fetch effect keyed on `memberships` loops forever in preview** — the
+  synthetic membership list is rebuilt every render. The first cut of the
+  notices fix did exactly that and hung CI's `npm test`; the suite locally
+  crawled for the same reason. Scope at render (`useMemo`), never in the fetch.
+- ⚠️ **Two vitest runs on one machine starve each other.** A timed-out
+  `test:related` left its workers alive; the next full run took over five
+  minutes and looked like a hang. Kill orphaned `vitest`/`tinypool` node
+  processes before believing a slow suite.
 - The **senior squads** have no age band in their names by design. The first
   cut refused them for every template; a template that sets no age now reaches
   them, one that does still refuses with the reason.
 
 ## Still open
 
-- Nobody holds the `training` right yet. Jay named the person; the grant is a
-  click on the Accounts screen, not a migration, and the name stays out of
-  this repo.
-- Every squad is still **Tag** — switch the contact squads on `/admin/club`
-  before the first real publish.
+- The library is empty and nothing real has been published. The Director's
+  first session is the real test of the builder and the publish preview.
 - Pieces 4 (notification email) and 5 (AI assist) are unbuilt and unspecced.
+- Follow-ups from the whole-branch review sit in `claude/open-items.md`,
+  including the `.gitattributes` decision on CRLF test files.

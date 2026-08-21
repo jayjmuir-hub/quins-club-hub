@@ -10,6 +10,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 📓 **Handoff for the whole day**, and `state-of-play.md` no longer says the
+  dashboard PR is open: it is live.
+- `0dd01a3` — the squash that recorded the quick-rip ruling (#279).
 - 📐 **QUICK RIP IS TAG.** Jay: *"qr is quick rip which is basically tag, U9 is
   tackling"*. Ten squads marked contact, five left tag, written straight to
   `teams.requires_contact` and measured back. The two QR sides are the living
