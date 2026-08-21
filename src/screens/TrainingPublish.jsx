@@ -477,7 +477,12 @@ function PublishBody() {
 
           <div className="flex flex-wrap items-end gap-2.5">
             {/* ⛔ A RANGE, NOT A NIGHT. See the header of this file. */}
-            <label className="min-w-0 flex-1">
+            {/* ⚠️ min-w-[150px], NOT min-w-0 — a date input needs ~150px for
+                dd/mm/yyyy, and min-w-0 lets flex-1 shrink it past that instead
+                of letting the wrap engage. On a phone (admin renders at every
+                width since retheme phase 4) the pair stacks; on desktop it
+                still shares the row. Same fix on the focus pair below. */}
+            <label className="min-w-[150px] flex-1">
               <span className={LABEL}>From</span>
               <input
                 type="date"
@@ -488,7 +493,7 @@ function PublishBody() {
                 className={INPUT}
               />
             </label>
-            <label className="min-w-0 flex-1">
+            <label className="min-w-[150px] flex-1">
               <span className={LABEL}>To</span>
               <input
                 type="date"
@@ -648,7 +653,7 @@ function PublishBody() {
             </label>
 
             <div className="flex flex-wrap items-end gap-2.5">
-              <label className="min-w-0 flex-1">
+              <label className="min-w-[150px] flex-1">
                 <span className={LABEL}>Starts</span>
                 <input
                   type="date"
@@ -659,7 +664,7 @@ function PublishBody() {
                   className={INPUT}
                 />
               </label>
-              <label className="min-w-0 flex-1">
+              <label className="min-w-[150px] flex-1">
                 <span className={LABEL}>Ends</span>
                 <input
                   type="date"

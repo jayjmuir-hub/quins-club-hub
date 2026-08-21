@@ -132,13 +132,12 @@ const SCENARIOS = [
   'event-detail',
   'admin',
   'admin-nav',
-  // ⚠️ LISTED, BUT IT PROVES ALMOST NOTHING AND THAT IS WORTH KNOWING. The
-  // whole /admin tree is inside `hidden desktop:block`, so at every width
-  // below it renders the "Needs a bigger screen" card and the chooser's card
-  // grid is display:none. This entry catches the scenario failing to BOOT and
-  // nothing else. The chooser's own layout has to be looked at in a real
-  // browser at desktop width. Same class of blind spot as the sheet scenarios
-  // above.
+  // ⚠️ THIS ENTRY STARTED MEANING SOMETHING ON 21 Aug 2026. Until retheme
+  // phase 4 the whole /admin tree sat inside `hidden desktop:block`, so at
+  // the gate's widths this rendered a "Needs a bigger screen" card and the
+  // chooser's grid was display:none — the entry caught a boot failure and
+  // nothing else. The width gate is gone; the chooser's single-column card
+  // grid is now actually measured here.
   'portal-chooser',
   'full-app',
   'accounts-admin',
