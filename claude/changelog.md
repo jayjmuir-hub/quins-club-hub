@@ -10,6 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 📐 **THE RETHEME IS SPECIFIED.** Jay's rulings, same day: Club Hub joins
+  abudhabiquins.com's design family (measured live, both themes), light AND
+  dark mode, the member portal's sidebar shell on desktop, **admin functions
+  come to the phone** ("that is my decision now"), and the maroon design
+  system is REPLACED, not kept as a third theme.
+  `claude/plans/2026-08-21-retheme-and-shell.md` — five phases, each its own
+  PR. Nothing ships in this commit; the spec is the deliverable.
+- `f9314cf` — the squash that opened the hub's events and capped its
+  sections (#282).
+
 - 🖱️ **THE HUB'S EVENTS NOW OPEN.** Jay, minutes after seeing it live: the
   Coming-up rows "don't do anything". They now open the same EventDetail →
   Availability / Register drill-in Dashboard and Schedule use, and the hub
