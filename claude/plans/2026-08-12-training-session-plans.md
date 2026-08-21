@@ -301,8 +301,8 @@ reopening changed. They are kept because the reasoning under each is still the
 reasoning, and a question deleted is a question somebody asks again.
 
 1. **Who is the CRPO, and do they have an account?** ⚠️ Measured 12 Aug: the
-   only active admins are Jacques Reyneke and Jay's two accounts. Like Candice,
-   this person may not exist in the system yet — in which case the screen is
+   only active admins are one other volunteer and Jay's two accounts. Like the
+   social media lead, this person may not exist in the system yet — in which case the screen is
    titled by the job, as the youth dashboard now is.
 2. **Twice a week — same plan both nights, or a pair?** ⚠️ **ANSWERED 21 Aug
    2026, AND THE WEEKDAY FRAMING IN THE ORIGINAL WORDING WAS THE BUG.** It read
