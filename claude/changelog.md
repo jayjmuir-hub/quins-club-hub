@@ -8,6 +8,30 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 21 Aug 2026
+
+- ✂️ **THE COPYRIGHT GUARD IS GONE FROM THE TRAINING PLAN, AND `drills.body`
+  EXISTS.** Jay: *"its not a problem at all, remove it entirely from the build
+  plan, it a solution looking for a problem"*.
+  ⚠️ **He is right, and the reason is that the requirement it defended against
+  was withdrawn.** The section was a direct answer to the 12 Aug brief's
+  *"scrape the web for the best rugby training sessions"*. The 20 Aug reopening
+  asks for none of that — it asks for the Director's OWN material, which the plan
+  itself called the actual win. By 21 August the guard was defending against
+  nothing while stopping a qualified coach writing a drill out properly in his
+  own tool.
+  ⚠️ **A guardrail whose threat model has been withdrawn is not cautious, it is a
+  broken feature.** That is the general form, and it is why this is a decision
+  record rather than a quiet column addition —
+  `claude/decisions/2026-08-21-drill-body-is-just-a-text-field.md` is a
+  TOMBSTONE. The argument was made at length, including the claim that it was the
+  one thing in the plan that could not be overruled, and it was overruled by the
+  person who owns the club and its risk. **Do not re-add it.**
+  ✅ `source_url` and `source_name` survive — linking to where a drill came from
+  is useful to a coach on a touchline. They are just no longer the only way to
+  record one.
+- `bf81ce3` — the squash that reopened the training plan.
+
 ## 20 Aug 2026
 
 - 🏉 **TRAINING SESSION PLANS REOPENED, AND ONE MEASUREMENT MAKES PART OF THE OLD

@@ -16,50 +16,12 @@ is the evidence it earns its keep.
 ⚠️ **Set this line to SHIPPED in the commit that ships it**, not as a promise
 about that commit.
 
-⚠️ **What survives the tabling is the copyright finding below.** It is a legal
-constraint, not a design preference, so it will still be true whenever this is
-reopened — and it is the reason the feature cannot be built the way it was
-first described.
-
 **Jay, 12 Aug 2026:** *"integrate training session plans in for all age groups,
 the goal would be for the Club Rugby Performance Officer to distribute brief
 training session plans per age group in an automated way, scrape the web for the
 best rugby training sessions per age group, it needs to be fully customizable by
 the CRPO, but easy for him to choose things to include for each session, age
 appropriate of course, sessions are 1 hour twice a week"*.
-
----
-
-## ⚠️ READ THIS FIRST: the scraping requirement, and what to do instead
-
-**"Scrape the web for the best rugby training sessions" cannot be built as
-literally described, and the reason is copyright, not capability.**
-
-Rugby coaching sessions are published by World Rugby, the RFU, Rugby Toolbox,
-Sportplan and others. They are **someone else's copyrighted material.** Copying
-their drills into this app's database and distributing them to fifteen squads'
-coaches is republishing that material — the club would be redistributing
-commercial coaching content it does not own, under its own branding, to its own
-members. That is a real exposure for a real club with a real name on it, and it
-is the kind of thing that surfaces years later.
-
-⚠️ **This is a legal constraint, not caution, and it is the one thing in this
-plan I would not build around quietly.** Everything else below is a design
-choice Jay can overrule; this is not.
-
-**What gets built instead — all three, together, and it reaches the same
-outcome:**
-
-| Instead of | Build |
-|---|---|
-| Copying drills from coaching sites | **Link out.** The library stores a title, a one-line summary the CRPO wrote, and a **URL**. Coaches click through to the source. Attribution intact, nothing republished. |
-| Scraping "the best sessions" | **Web search to DISCOVER, never to COPY.** The AI feature returns *candidates with links* for the CRPO to review and add. He curates; the app never ingests page content. |
-| Hoping the web has age-appropriate drills | **Generate original sessions from PRINCIPLES.** Age-grade law variations (tag at U6-U8, contact from U9, scrum and lineout laws by band) are **facts, not expression** — they can be encoded and reasoned from. A session plan generated from "45 minutes, U10, contact, focus on tackle technique" is the club's own material. |
-
-⚠️ **The CRPO's OWN sessions are the primary source, and that is not a
-consolation prize.** He is the qualified person; the app's job is to make his
-material reusable and distributable, not to replace him with a scraper. A drill
-he writes once and reuses forty times across the season is the actual win here.
 
 ---
 
@@ -132,8 +94,8 @@ three labels do not move.
   Tue/Thu pair is expressible and identical nights are the easy case.
 - **Nobody holds the job in the app yet**, so the screen is titled by the job —
   as `YouthDashboard.jsx` already is.
-- **Linking out is accepted.** The library is the club's own summaries plus
-  links; see the copyright section above, which is unchanged and not optional.
+- **Linking out is accepted**, as one option among several. A drill may be
+  written out in full, linked to its source, or both.
 
 ## The shape of it
 
@@ -203,22 +165,29 @@ age, which is precisely why the name cannot be trusted and the flag is needed.
 
 ### `public.drills` — the CRPO's library
 
-`id`, `club_id`, `title`, `summary` (his words, ≤ a line or two),
-`source_url` (nullable — **the link-out**), `source_name` (e.g. "World Rugby
-Passport"), `minutes` (typical), `category` (`warm_up` | `skill` | `game` |
-`conditioning` | `cool_down`), `min_age` smallint nullable, `max_age` smallint
-nullable, `requires_contact` boolean not null default false,
+`id`, `club_id`, `title`, `summary` (a line or two, for the list view),
+`body` (nullable — **the drill written out in full**), `source_url` (nullable),
+`source_name` (nullable), `minutes` (typical), `category` (`warm_up` | `skill` |
+`game` | `conditioning` | `cool_down`), `min_age` smallint nullable, `max_age`
+smallint nullable, `requires_contact` boolean not null default false,
 `is_active` boolean not null default true, `created_by`, `created_at`.
 
 ⚠️ **`is_active`, NEVER DELETE** — the same reasoning `pitches` and
 `league_teams` record: a template referencing a deleted drill is a session plan
 with a hole in it, discovered on the pitch.
 
-⚠️ **`summary` IS THE CRPO'S OWN TEXT AND `source_url` IS THE LINK.** There is
-deliberately **no `body` / `full_text` column.** Its absence is the design: a
-column to paste a drill's full text into is an invitation to paste somebody
-else's, and once it exists somebody will. **Do not add one** without re-reading
-§the scraping requirement.
+✅ **`body` EXISTS, AND ITS ABSENCE USED TO BE ARGUED FOR AT LENGTH.** This plan
+withheld it as a copyright guard until 21 Aug 2026. Jay removed that: *"its not a
+problem at all … its a solution looking for a problem"*, and he is right — the
+guard was written against the original *"scrape the web"* brief, which is no
+longer being asked for, so it was defending against nothing while stopping the
+Director writing a drill out properly in his own tool.
+`claude/decisions/2026-08-21-drill-body-is-just-a-text-field.md`.
+
+⚠️ **`summary` IS STILL SEPARATE FROM `body`** — for layout, not for policy. The
+list view needs one line; the coach on the touchline wants the whole thing.
+`source_url` stays because linking to where a drill came from is useful, not
+because anything requires it.
 
 ### `public.session_templates` + `public.session_template_blocks`
 
@@ -278,7 +247,7 @@ axis — which is an argument for shipping it early, not for relaxing anything.
 | AI does | AI does not |
 |---|---|
 | **Assemble** a 60-minute template from the CRPO's library, given band, contact/tag and a focus | Invent drills the library does not have |
-| **Discover** candidate sessions via web search and return **titles + links** for review | Copy page content into the database |
+| **Discover** candidate sessions via web search and return **titles + links** for review | Publish anything without him reading it |
 | **Draft** a coach note for a block | Publish anything |
 
 ⚠️ **EVERY AI OUTPUT IS A DRAFT THE CRPO SAVES.** He is the qualified person and
