@@ -10,6 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 📐 **QUICK RIP IS TAG.** Jay: *"qr is quick rip which is basically tag, U9 is
+  tackling"*. Ten squads marked contact, five left tag, written straight to
+  `teams.requires_contact` and measured back. The two QR sides are the living
+  reason the flag is a column: `claude/decisions/2026-08-21-quick-rip-is-tag.md`.
+- `f46daf9` — the squash that made "View as" scope the noticeboard (#278).
 - 🐛 **"VIEW AS" NOW FILTERS NOTICES.** Jay previewed Home as a U7 parent and
   saw a U18B manager's notice badged "Your squad". ⚠️ **Not a leak** — RLS
   (`can_see_team`) never sends a squad notice to another squad's member,
