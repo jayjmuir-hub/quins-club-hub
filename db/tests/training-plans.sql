@@ -14,9 +14,9 @@
 --   7. A contact template published to a TAG squad is refused 42501.
 --   8. A team id that is not in this club is refused 42501.
 --
--- ⚠️ 7 AND 8 TEST db/migrations/20260821_publish_training_fit_check.sql, WHICH
--- IS WRITTEN AND NOT APPLIED. Until Jay applies it they will report FAIL, and
--- that FAIL is correct — see the EXPECTED footer.
+-- ✅ 7 AND 8 TEST db/migrations/20260821_publish_training_fit_check.sql, APPLIED
+-- 21 Aug 2026 on Jay's "apply publish_training_fit_check". Measured 8/8 live
+-- the same minute.
 --
 -- ⚠️ 5 IS THE ONE THAT MATTERS. "Publish never overwrites a coach's edit" is
 -- the rule that lets multi-squad publish be safe at all; this is the line
@@ -191,11 +191,10 @@ rollback;
 --    publish skips the coach edit and reports it   PASS
 --    coach calls publish                           PASS — refused 42501
 --
---  ⚠️ THE LAST TWO ARE NOT MEASURED, AND MUST NOT BE WRITTEN AS IF THEY WERE.
---  They test db/migrations/20260821_publish_training_fit_check.sql, which is
---  WRITTEN AND UNAPPLIED — Jay decides when it goes in. Against the function
---  as it stands in the database today they will read FAIL — allowed, which is
---  the correct answer to "has the migration been applied yet".
---    contact template to a tag squad               NOT YET MEASURED
---    a team id not in this club                    NOT YET MEASURED
+--    contact template to a tag squad               PASS — refused 42501
+--    a team id not in this club                    PASS — refused 42501
+--
+--  7 and 8 measured 21 Aug 2026 immediately after publish_training_fit_check
+--  was applied; before it, both read FAIL — allowed, which was the correct
+--  answer to "has the migration been applied yet".
 -- ══════════════════════════════════════════════════════════════════════════

@@ -22,7 +22,7 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ### `20260821_publish_training_fit_check` — the squad publish never checked
 
-⛔ **WRITTEN 21 Aug 2026, NOT APPLIED.** The file is
+✅ **APPLIED 21 Aug 2026 as `publish_training_fit_check`, on Jay's explicit "apply publish_training_fit_check"; harness 8/8 live the same minute.** This paragraph read "NOT APPLIED" for about an hour. The file is
 `db/migrations/20260821_publish_training_fit_check.sql` and Jay decides when it
 goes in. `db/schema/functions.sql` carries the NEW text of the function with a
 line pointing here, so the capture is ahead of the database until then —

@@ -18,8 +18,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `/admin/club`; the plan on every training event's sheet, adjustable by the
   coach. Migration `training_plans` APPLIED to production on Jay's "apply";
   harness `db/tests/training-plans.sql` 6/6 live. Full suite green, build green.
-  ⚠️ **A second migration, `publish_training_fit_check`, is written and NOT
-  applied** — the function trusted `_teams` with no club or contact check.
+  ✅ **A second migration, `publish_training_fit_check`, APPLIED the same
+  day** — the function had trusted `_teams` with no club or contact check;
+  harness now 8/8 live.
   ⛔ Nothing keys on a weekday; `requires_contact` is a column; the null band
   refuses with a reason — and a template that sets NO age now reaches the senior
   squads, which the first cut wrongly refused forever.

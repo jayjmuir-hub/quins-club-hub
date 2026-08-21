@@ -1,6 +1,6 @@
 # Rugby Performance Director dashboard — implementation plan
 
-**STATUS: SHIPPED — Tasks 1–10 done 21 Aug 2026 on the rugby-performance-dashboard branch (PR #276), awaiting merge; the second migration named in the final review is written and unapplied.** Written 21 Aug 2026 from
+**STATUS: SHIPPED — Tasks 1–10 done 21 Aug 2026 on the rugby-performance-dashboard branch (PR #276), awaiting merge; the second migration named in the final review is applied (8/8 live).** Written 21 Aug 2026 from
 `claude/specs/2026-08-21-training-plans-dashboard-design.md` (approved by Jay
 the same day). Set this line to SHIPPED in the commit that ships it.
 
