@@ -10,6 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- `121574c` — the squash that committed the retheme spec (#283).
 - 🌗 **PHASE 1 OF THE RETHEME: CLUB HUB 2.0.** Dark mode exists — every
   colour token moved to CSS variables (`src/index.css` is now the single
   source of truth; `tailwind.config.js` reads it, `darkMode: 'class'`), with
