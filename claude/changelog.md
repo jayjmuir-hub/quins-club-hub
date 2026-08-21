@@ -10,6 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🏉 **THE RUGBY PERFORMANCE DIRECTOR DASHBOARD IS SPECCED AND PLANNED, pieces
+  1–3 of five.** Jay chose the scope (foundation, Library + Templates, Publish +
+  coach view); notification email, AI assist and a first/second-session pair
+  are out of scope and each gets its own spec later.
+  `claude/specs/2026-08-21-training-plans-dashboard-design.md`,
+  `claude/plans/2026-08-21-training-plans-implementation.md`. No code yet.
+  ✅ **One decision made explicit while writing it: a published session COPIES
+  the template's blocks** rather than pointing at the template, so a coach
+  trimming one night's warm-up cannot edit fifteen squads' plans.
+  ⚠️ Two real names were scrubbed from the 12 Aug training plan while it was
+  open (rule 9). Four other files under `claude/` still carry names and are
+  noted for a separate pass.
+- `ba09917` — the squash that marked the handoff's weekday item closed.
+
 - 📓 **The 21 Aug handoff's weekday item is marked CLOSED**, because it was
   fixed hours after being written and a handoff carrying a false "still open"
   line is how a session redoes finished work.
