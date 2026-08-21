@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   totalMinutes, totalWarning, drillFitsTemplate, squadFitsTemplate, describePublishRow,
+  ageOrNull, textOrNull, bandLabel,
 } from '../src/lib/trainingPlans.js'
 
 const T = { min_age: 9, max_age: 13, requires_contact: true }
@@ -84,5 +85,27 @@ describe('describePublishRow', () => {
     expect(describePublishRow({ will_write: 3, skipped_coach_edited: 1, no_events: 0 })).toBe('3 sessions will get the plan · 1 kept (coach edited)')
     expect(describePublishRow({ will_write: 1, skipped_coach_edited: 0, no_events: 0 })).toBe('1 session will get the plan')
     expect(describePublishRow({ will_write: 0, skipped_coach_edited: 0, no_events: 1 })).toBe('No training in this range')
+  })
+})
+
+// The three coercion helpers the four training screens all import. They were
+// byte-identical copies in each screen until 21 Aug 2026.
+describe('the hoisted helpers', () => {
+  it('ageOrNull sends a blank box as NULL, never 0 — the between 4 and 19 check', () => {
+    expect(ageOrNull('')).toBeNull()
+    expect(ageOrNull('   ')).toBeNull()
+    expect(ageOrNull('12')).toBe(12)
+    expect(ageOrNull('nope')).toBeNull()
+  })
+  it('textOrNull turns "not said" into NULL rather than an empty string', () => {
+    expect(textOrNull('  ')).toBeNull()
+    expect(textOrNull(null)).toBeNull()
+    expect(textOrNull('  a note ')).toBe('a note')
+  })
+  it('bandLabel is the standalone form, capitalised', () => {
+    expect(bandLabel(9, 13)).toBe('U9–U13')
+    expect(bandLabel(13, null)).toBe('U13 and up')
+    expect(bandLabel(null, 13)).toBe('up to U13')
+    expect(bandLabel(null, null)).toBe('Any age')
   })
 })

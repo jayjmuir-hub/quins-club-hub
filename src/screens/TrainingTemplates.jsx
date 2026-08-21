@@ -7,9 +7,12 @@ import Spinner from '../components/Spinner.jsx'
 import { listDrills, listTemplates, saveTemplate, setTemplateActive } from '../data/trainingPlans.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import {
+  ageOrNull,
+  bandLabel,
   CATEGORY_LABELS,
   DEFAULT_MINUTES,
   drillFitsTemplate,
+  textOrNull,
   totalMinutes,
   totalWarning,
 } from '../lib/trainingPlans.js'
@@ -50,40 +53,6 @@ const CHIP =
   'rounded-[8px] border-[1.5px] px-2.5 py-1 text-[12.5px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
 const MOVE =
   'rounded-[8px] border-[1.5px] border-line px-2 py-1 text-[13px] font-bold text-ink transition hover:border-brand hover:text-brand disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink'
-
-/**
- * "U9–U13", "U13 and up", "up to U13", "Any age".
- *
- * ⚠️ NOT THE ONE IN src/lib/trainingPlans.js — that one is private and reads
- * "any age" in lower case because it is only ever spliced into the middle of a
- * refusal sentence. This is the same standalone label TrainingLibrary draws,
- * duplicated for the same reason it is duplicated there.
- */
-function bandLabel(minAge, maxAge) {
-  if (minAge != null && maxAge != null) return `U${minAge}–U${maxAge}`
-  if (minAge != null) return `U${minAge} and up`
-  if (maxAge != null) return `up to U${maxAge}`
-  return 'Any age'
-}
-
-/** A blank box is "not said", which is NULL — never '' and never 0. */
-function textOrNull(value) {
-  const trimmed = (value ?? '').trim()
-  return trimmed === '' ? null : trimmed
-}
-
-/**
- * ⚠️ `min_age`/`max_age` carry `check (… between 4 and 19)`, so a blank box
- * sent as 0 is refused by Postgres and a blank box sent as '' is not a smallint
- * at all. Blank means "no limit at this end" and the only value that says so is
- * NULL. `Number('')` is 0, which is exactly the slip this guards.
- */
-function ageOrNull(value) {
-  const trimmed = (value ?? '').trim()
-  if (trimmed === '') return null
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? parsed : null
-}
 
 const BLANK = { name: '', min_age: '', max_age: '', requires_contact: false, notes: '' }
 

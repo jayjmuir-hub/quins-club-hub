@@ -14,7 +14,7 @@ import {
 } from '../data/trainingPlans.js'
 import { clubToday } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { describePublishRow, squadFitsTemplate } from '../lib/trainingPlans.js'
+import { describePublishRow, squadFitsTemplate, textOrNull } from '../lib/trainingPlans.js'
 import TrainingGate from './TrainingGate.jsx'
 
 // The Publish tab of the Rugby Performance Director portal — one template onto
@@ -82,12 +82,6 @@ function isoDayFromToday(days) {
   const today = clubToday()
   const at = new Date(Date.UTC(today.year, today.month, today.day) + days * 86400000)
   return `${at.getUTCFullYear()}-${pad(at.getUTCMonth() + 1)}-${pad(at.getUTCDate())}`
-}
-
-/** A blank box is "not said", which is NULL — never ''. */
-function textOrNull(value) {
-  const trimmed = (value ?? '').trim()
-  return trimmed === '' ? null : trimmed
 }
 
 const BLANK_FOCUS = { id: null, team_id: '', title: '', starts_on: '', ends_on: '', notes: '' }

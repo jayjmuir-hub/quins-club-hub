@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react'
 import Button from './Button.jsx'
 import Chip from './Chip.jsx'
 import { getSession, listDrills, listFocus, saveSessionBlocks } from '../data/trainingPlans.js'
-import { CATEGORY_LABELS, squadFitsTemplate, totalMinutes } from '../lib/trainingPlans.js'
+import {
+  CATEGORY_LABELS,
+  squadFitsTemplate,
+  textOrNull,
+  totalMinutes,
+} from '../lib/trainingPlans.js'
 import { clubDateTimeInputs, eventDate } from '../lib/eventFormat.js'
 
 // Tonight's session plan, on the event sheet.
@@ -41,12 +46,6 @@ const INPUT =
 const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 const MOVE =
   'rounded-[8px] border-[1.5px] border-line px-2 py-1 text-[13px] font-bold text-ink transition hover:border-brand hover:text-brand disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink'
-
-/** A blank box is "not said", which is NULL — never '' and never 0. */
-function textOrNull(value) {
-  const trimmed = (value ?? '').trim()
-  return trimmed === '' ? null : trimmed
-}
 
 // ⚠️ A DRAFT BLOCK CARRIES THE WHOLE DRILL, NOT JUST ITS id — the row shows the
 // title and the category. `key` is a local counter because the same drill may

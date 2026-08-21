@@ -6,7 +6,13 @@ import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listDrills, setDrillActive, upsertDrill } from '../data/trainingPlans.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { CATEGORIES, CATEGORY_LABELS } from '../lib/trainingPlans.js'
+import {
+  ageOrNull,
+  bandLabel,
+  CATEGORIES,
+  CATEGORY_LABELS,
+  textOrNull,
+} from '../lib/trainingPlans.js'
 import TrainingGate from './TrainingGate.jsx'
 
 // The Library tab of the Rugby Performance Director portal — the club's drills.
@@ -36,43 +42,6 @@ const INPUT =
 const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 const CHIP =
   'rounded-[8px] border-[1.5px] px-2.5 py-1 text-[12.5px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
-
-/**
- * "U9–U13", "U13 and up", "up to U13", "Any age".
- *
- * ⚠️ NOT THE ONE IN src/lib/trainingPlans.js, and deliberately so. That one is
- * private to the module and reads "any age" in lower case because it is only
- * ever spliced into the middle of a refusal sentence ("Drill is for any age;
- * template is …"). This one is a standalone label on a row, where a lower-case
- * start looks like a bug. Exporting the other and capitalising at the call site
- * would put the difference somewhere neither reader would look.
- */
-function bandLabel(minAge, maxAge) {
-  if (minAge != null && maxAge != null) return `U${minAge}–U${maxAge}`
-  if (minAge != null) return `U${minAge} and up`
-  if (maxAge != null) return `up to U${maxAge}`
-  return 'Any age'
-}
-
-/** A blank box is "not said", which is NULL — never '' and never 0. */
-function textOrNull(value) {
-  const trimmed = (value ?? '').trim()
-  return trimmed === '' ? null : trimmed
-}
-
-/**
- * ⚠️ THE FIELD THIS WHOLE FILE'S PAYLOAD TEST EXISTS FOR. `min_age`/`max_age`
- * carry `check (… between 4 and 19)`, so a blank box sent as 0 is refused by
- * Postgres and a blank box sent as '' is not a smallint at all. Blank means
- * "no limit at this end" and the only value that says so is NULL. `Number('')`
- * is 0, which is exactly the slip this guards.
- */
-function ageOrNull(value) {
-  const trimmed = (value ?? '').trim()
-  if (trimmed === '') return null
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? parsed : null
-}
 
 const BLANK = {
   title: '',

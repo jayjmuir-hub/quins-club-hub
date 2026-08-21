@@ -32,11 +32,51 @@ export function totalWarning(blocks) {
   return `This is ${total} minutes, not ${DEFAULT_MINUTES}. Save anyway?`
 }
 
-function bandLabel(min, max) {
+/**
+ * The band as a fragment SPLICED INTO A SENTENCE — "Drill is for any age;
+ * template is …". Lower case, and private, because a capital in the middle of
+ * a sentence reads as a bug. The standalone form a row draws is the exported
+ * `bandLabel` below; the two differ by one letter and by where they appear,
+ * which is why they are two functions and not one with a flag.
+ */
+function bandPhrase(min, max) {
   if (min != null && max != null) return `U${min}–U${max}`
   if (min != null) return `U${min} and up`
   if (max != null) return `up to U${max}`
   return 'any age'
+}
+
+/**
+ * "U9–U13", "U13 and up", "up to U13", "Any age" — the STANDALONE label on a
+ * row, where a lower-case start looks like a bug. The Library and the
+ * Templates screen both draw it, and both had their own byte-identical copy
+ * until 21 Aug 2026. See `bandPhrase` above for the sentence form.
+ */
+export function bandLabel(minAge, maxAge) {
+  if (minAge != null && maxAge != null) return `U${minAge}–U${maxAge}`
+  if (minAge != null) return `U${minAge} and up`
+  if (maxAge != null) return `up to U${maxAge}`
+  return 'Any age'
+}
+
+/** A blank box is "not said", which is NULL — never '' and never 0. */
+export function textOrNull(value) {
+  const trimmed = (value ?? '').trim()
+  return trimmed === '' ? null : trimmed
+}
+
+/**
+ * ⚠️ THE FIELD THE PAYLOAD TESTS EXIST FOR. `min_age`/`max_age` carry
+ * `check (… between 4 and 19)`, so a blank box sent as 0 is refused by
+ * Postgres and a blank box sent as '' is not a smallint at all. Blank means
+ * "no limit at this end" and the only value that says so is NULL. `Number('')`
+ * is 0, which is exactly the slip this guards.
+ */
+export function ageOrNull(value) {
+  const trimmed = (value ?? '').trim()
+  if (trimmed === '') return null
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 /** Whether a drill may be offered inside a template: contact, then age overlap. */
@@ -49,10 +89,10 @@ export function drillFitsTemplate(drill, template) {
   const tMin = template?.min_age ?? null
   const tMax = template?.max_age ?? null
   if (dMin != null && tMax != null && dMin > tMax) {
-    return { ok: false, reason: `Drill is for ${bandLabel(dMin, dMax)}; template is ${bandLabel(tMin, tMax)}` }
+    return { ok: false, reason: `Drill is for ${bandPhrase(dMin, dMax)}; template is ${bandPhrase(tMin, tMax)}` }
   }
   if (dMax != null && tMin != null && dMax < tMin) {
-    return { ok: false, reason: `Drill is for ${bandLabel(dMin, dMax)}; template is ${bandLabel(tMin, tMax)}` }
+    return { ok: false, reason: `Drill is for ${bandPhrase(dMin, dMax)}; template is ${bandPhrase(tMin, tMax)}` }
   }
   return { ok: true, reason: null }
 }
@@ -92,7 +132,7 @@ export function squadFitsTemplate(team, template, subject = 'template') {
     return { ok: false, reason: "Can't tell this squad's age group from its name" }
   }
   if ((tMin != null && band < tMin) || (tMax != null && band > tMax)) {
-    return { ok: false, reason: `U${band} is outside this ${subject}'s ${bandLabel(tMin, tMax)}` }
+    return { ok: false, reason: `U${band} is outside this ${subject}'s ${bandPhrase(tMin, tMax)}` }
   }
   return { ok: true, reason: null }
 }
