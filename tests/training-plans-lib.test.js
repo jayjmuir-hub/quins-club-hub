@@ -53,6 +53,30 @@ describe('squadFitsTemplate', () => {
   it('does not read the B in U14B as anything but a squad', () => {
     expect(squadFitsTemplate({ name: 'U12B', requires_contact: true }, T).ok).toBe(true)
   })
+  // ⚠️ THE SENIOR SQUAD. A template that sets no age has nothing to compare a
+  // band against, so an unparseable name is not a refusal — it is irrelevant.
+  it('lets an age-less template reach a squad whose name carries no band', () => {
+    const anyAge = { min_age: null, max_age: null, requires_contact: true }
+    expect(squadFitsTemplate({ name: 'Senior Men', requires_contact: true }, anyAge).ok).toBe(true)
+  })
+  it('still refuses a tag squad for that same age-less contact template', () => {
+    const anyAge = { min_age: null, max_age: null, requires_contact: true }
+    const r = squadFitsTemplate({ name: 'U12 Mixed', requires_contact: false }, anyAge)
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/tag/i)
+  })
+  // ...and the null band is NOT a default: put an age on the template and the
+  // unparseable name is refused again, with the reason.
+  it('refuses a squad with no band when the template DOES set an age', () => {
+    const r = squadFitsTemplate({ name: 'Senior Men', requires_contact: true }, T)
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/can.t tell/i)
+  })
+  it('calls the thing being fitted whatever the caller calls it', () => {
+    const r = squadFitsTemplate({ name: 'U16B', requires_contact: true }, T, 'session')
+    expect(r.reason).toMatch(/this session's/)
+    expect(r.reason).not.toMatch(/template/)
+  })
 })
 
 describe('describePublishRow', () => {

@@ -452,11 +452,17 @@ export default function SessionPlan({ event, team, canEdit }) {
                 // ⚠️ DISABLED WITH THE REASON, NOT FILTERED OUT. A coach who
                 // cannot find a tackling drill concludes the library is broken;
                 // a coach told "U12 is outside…" understands the squad.
-                const fit = squadFitsTemplate(team, {
-                  requires_contact: drill.requires_contact,
-                  min_age: drill.min_age,
-                  max_age: drill.max_age,
-                })
+                // 'session' is the subject word: this is a drill being fitted
+                // to tonight's session, not a template being published.
+                const fit = squadFitsTemplate(
+                  team,
+                  {
+                    requires_contact: drill.requires_contact,
+                    min_age: drill.min_age,
+                    max_age: drill.max_age,
+                  },
+                  'session',
+                )
                 const label = `${drill.title} · ${drill.minutes} min`
                 return (
                   <option key={drill.id} value={drill.id} disabled={!fit.ok}>

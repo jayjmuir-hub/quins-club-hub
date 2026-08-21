@@ -65,19 +65,34 @@ export function drillFitsTemplate(drill, template) {
  * REASON, never given a default band. That null once offered a twelve-year-old
  * girls' squad an adult contact form; this is the place it would recur.
  * ⚠️ Contact is read from teams.requires_contact, never from the name.
+ *
+ * ⚠️ ORDER MATTERS, AND THE NULL BAND IS NOT CHECKED FIRST. A template that
+ * sets NEITHER min_age NOR max_age is fine for any squad, because there is
+ * nothing a band would be compared against — so it is allowed through before
+ * the band is ever consulted. That is NOT a default band: a template that DOES
+ * set an age still refuses an unparseable name below. Checking the null band
+ * first refused every senior squad ("Senior Men" carries no band by design)
+ * for every template, which left a senior coach's whole drill picker disabled.
+ *
+ * `subject` is the word the refusal calls the thing being fitted. SessionPlan
+ * hands a DRILL in as the template, where "this template is tag" names
+ * something the coach is not looking at — it passes 'session'.
  */
-export function squadFitsTemplate(team, template) {
+export function squadFitsTemplate(team, template, subject = 'template') {
+  if (template?.requires_contact && team?.requires_contact !== true) {
+    return { ok: false, reason: `Contact ${subject}; this squad is tag` }
+  }
+  const tMin = template?.min_age ?? null
+  const tMax = template?.max_age ?? null
+  if (tMin == null && tMax == null) {
+    return { ok: true, reason: null }
+  }
   const band = ageBandFromTeamName(team?.name)
   if (band === null) {
     return { ok: false, reason: "Can't tell this squad's age group from its name" }
   }
-  if (template?.requires_contact && team?.requires_contact !== true) {
-    return { ok: false, reason: 'Contact template; this squad is tag' }
-  }
-  const tMin = template?.min_age ?? null
-  const tMax = template?.max_age ?? null
   if ((tMin != null && band < tMin) || (tMax != null && band > tMax)) {
-    return { ok: false, reason: `U${band} is outside this template's ${bandLabel(tMin, tMax)}` }
+    return { ok: false, reason: `U${band} is outside this ${subject}'s ${bandLabel(tMin, tMax)}` }
   }
   return { ok: true, reason: null }
 }
