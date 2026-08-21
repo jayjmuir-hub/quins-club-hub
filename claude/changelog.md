@@ -16,6 +16,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   event's sheet. Verification objects removed afterwards. Handoff:
   `claude/handoffs/2026-08-21-training-dashboard-live.md`. One placeholder
   said "Tuesday hour"; it no longer names a day.
+- `d92adb7` — the squash that shipped the Rugby Performance Director dashboard (#276).
 - 🏉 **THE RUGBY PERFORMANCE DIRECTOR DASHBOARD IS BUILT — pieces 1–3, one PR,
   23 branch commits, no SHA here because `main` squash-merges.** `training`
   admin right; `/admin/training` with Library, Templates (the hour builder with
