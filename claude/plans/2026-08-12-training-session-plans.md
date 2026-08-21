@@ -1,6 +1,6 @@
 # Training session plans — the plan
 
-**STATUS: NOT SHIPPED — REOPENED BY JAY, 20 Aug 2026.** Written 12 Aug 2026,
+**STATUS: SHIPPED (pieces 1–3, on a branch awaiting merge, 21 Aug 2026) — see `claude/specs/2026-08-21-training-plans-dashboard-design.md`. Notification, AI assist and a session pair are NOT built.** Was: NOT SHIPPED — REOPENED BY JAY, 20 Aug 2026. Written 12 Aug 2026,
 tabled the same day (*"table 1 and 2 for now until i bring them back up again"*),
 reopened eight days later: *"i want to create another admin position named Rugby
 Performance Director, and then i want to create a system where that person can
@@ -301,8 +301,8 @@ reopening changed. They are kept because the reasoning under each is still the
 reasoning, and a question deleted is a question somebody asks again.
 
 1. **Who is the CRPO, and do they have an account?** ⚠️ Measured 12 Aug: the
-   only active admins are Jacques Reyneke and Jay's two accounts. Like Candice,
-   this person may not exist in the system yet — in which case the screen is
+   only active admins are one other volunteer and Jay's two accounts. Like the
+   social media lead, this person may not exist in the system yet — in which case the screen is
    titled by the job, as the youth dashboard now is.
 2. **Twice a week — same plan both nights, or a pair?** ⚠️ **ANSWERED 21 Aug
    2026, AND THE WEEKDAY FRAMING IN THE ORIGINAL WORDING WAS THE BUG.** It read

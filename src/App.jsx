@@ -14,6 +14,9 @@ import AdminDashboard from './screens/AdminDashboard.jsx'
 import PortalChooser from './screens/PortalChooser.jsx'
 import SocialWhatsOn from './screens/SocialWhatsOn.jsx'
 import SocialIdeas from './screens/SocialIdeas.jsx'
+import TrainingLibrary from './screens/TrainingLibrary.jsx'
+import TrainingTemplates from './screens/TrainingTemplates.jsx'
+import TrainingPublish from './screens/TrainingPublish.jsx'
 import AdminClub from './screens/AdminClub.jsx'
 import AdminNeedsAttention from './screens/AdminNeedsAttention.jsx'
 import AdminRightsLog from './screens/AdminRightsLog.jsx'
@@ -229,6 +232,16 @@ export default function App() {
                 parent tab reads as current on the child route. */}
             <Route path="social" element={<SocialWhatsOn />} />
             <Route path="social/ideas" element={<SocialIdeas />} />
+            {/* Rugby Performance Director. ⚠️ NESTED like /admin/social — the
+                second portal in the app that is, and the tab row's `end` on
+                NavLink is what keeps "Library" from lighting up on all three.
+                Each screen wraps itself in TrainingGate rather than the route
+                gating them, because a route is linkable and the `training`
+                right gates the SCREEN, not the data — RLS on the training
+                tables is what refuses a row. */}
+            <Route path="training" element={<TrainingLibrary />} />
+            <Route path="training/templates" element={<TrainingTemplates />} />
+            <Route path="training/publish" element={<TrainingPublish />} />
           </Route>
 
           {/* ⚠️ THE MATCH SHEET EDITOR IS DELIBERATELY OUTSIDE /admin, and the

@@ -131,12 +131,18 @@ describe('the rights vocabulary', () => {
     expect(adminRightLabel('finance')).toBe('finance')
   })
 
-  it('is the three Jay named', () => {
-    expect(ADMIN_RIGHTS).toEqual(['youth', 'media', 'pitches'])
+  // ⚠️ FOUR SINCE 21 Aug 2026, AND THE FOURTH IS SPELLED DIFFERENTLY ON
+  // PURPOSE. "Rugby Performance Director" is person-shaped where the other
+  // three are deliberately job-shaped (claude/decisions/2026-08-12-jobs-not-people.md).
+  // Jay chose the wording knowing that, so this test pins it — a later tidy-up
+  // that "corrects" it to match the others is undoing a decision, not a typo.
+  it('is the four Jay named', () => {
+    expect(ADMIN_RIGHTS).toEqual(['youth', 'media', 'pitches', 'training'])
     expect(ADMIN_RIGHTS.map(adminRightLabel)).toEqual([
       'Club Youth Manager',
       'Social Media Management',
       'Pitch Management',
+      'Rugby Performance Director',
     ])
   })
 })

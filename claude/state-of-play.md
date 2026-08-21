@@ -25,6 +25,14 @@ history was a rotted measurement; the rulings never rotted. Measure it.
 **Live at https://adhquins-clubhub.com with real families on it.** The club went
 live 13 Aug 2026. Assume a real parent is looking at whatever you touch.
 
+🏉 **The Rugby Performance Director dashboard (pieces 1–3) is BUILT on branch
+the `rugby-performance-dashboard` branch — PR #276 — NOT merged.** The first
+migration (`training_plans`) IS applied to production — six empty tables and
+`teams.requires_contact`, all 15 squads false. The second migration
+(`publish_training_fit_check`) is applied too, harness 8/8:
+`claude/schema-history.md`. Notification email, AI assist and a first/second
+session pair are out of scope and unbuilt. Nobody holds the `training` right yet.
+
 **Current phase: onboarding, and the fixes it throws up.** Not new
 infrastructure. The last four features found their bugs within hours of a real
 person using them, and none of those bugs had a failing test.

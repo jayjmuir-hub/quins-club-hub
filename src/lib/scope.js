@@ -186,7 +186,9 @@ export function isAdmin(memberships) {
 // Reasoning in full: claude/decisions/2026-08-10-role-dashboards.md.
 //
 // ⚠️ THE RIGHTS GATE SCREENS, NOT DATA, AND THIS IS THE SENTENCE TO RE-READ
-// BEFORE ADDING A FOURTH. Every admin already sees every child's name, photo
+// BEFORE ADDING ANOTHER — it was "before adding a fourth" until `training`
+// became the fourth on 21 Aug 2026, and it applies unchanged to the fifth.
+// Every admin already sees every child's name, photo
 // and contact details — Jay's ruling, 10 Aug: "trusted volunteers". A right
 // decides which specialist DASHBOARD appears; it withholds nothing. This
 // repo's own rule applies: a screen that hides a row is not security. A future
@@ -198,7 +200,7 @@ export function isAdmin(memberships) {
 // these values (that would mean a migration per job title, for a value that
 // gates a screen and cannot do harm), so this list is the only vocabulary
 // there is. An unrecognised right matches no dashboard and is inert.
-export const ADMIN_RIGHTS = ['youth', 'media', 'pitches']
+export const ADMIN_RIGHTS = ['youth', 'media', 'pitches', 'training']
 
 // Job titles for squad staff — what `memberships.title` is usually set to.
 //
@@ -245,6 +247,15 @@ const ADMIN_RIGHT_LABELS = {
   youth: 'Club Youth Manager',
   media: 'Social Media Management',
   pitches: 'Pitch Management',
+  // ⚠️ PERSON-SHAPED, AND JAY CHOSE IT ANYWAY (20 Aug 2026) — see
+  // claude/plans/2026-08-12-training-session-plans.md. The jobs-not-people
+  // ruling above stands for the other three; this wording is his, put to him
+  // with the mismatch spelled out, exactly as the other three were on 12 Aug.
+  // ⚠️ SO THE PROSE AROUND IT DOES NOT MOVE: the refusal card still reads
+  // "hasn't been added to your account", because that sentence works for a
+  // person-shaped name too and having two shapes of refusal would be worse
+  // than having two shapes of name.
+  training: 'Rugby Performance Director',
 }
 
 /** The human label for a right, or the raw value if it is one we do not know. */

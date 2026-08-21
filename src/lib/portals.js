@@ -16,9 +16,9 @@ import { adminRightLabel, hasAdminRight, isSuperAdmin } from './scope.js'
 // invisible from the other. This is also the only place a tab's URL is written
 // down.
 //
-// ⚠️ THE LABELS COME FROM adminRightLabel, NOT FROM STRINGS HERE. The three job
-// names are Jay's ruling of 12 Aug 2026 and they already have a single home in
-// src/lib/scope.js. Copying them would give the ruling two homes, and two
+// ⚠️ THE LABELS COME FROM adminRightLabel, NOT FROM STRINGS HERE. The job names
+// are Jay's — three of them ruled on 12 Aug 2026, "Rugby Performance Director"
+// on 20 Aug — and they already have a single home in src/lib/scope.js. Copying them would give the ruling two homes, and two
 // copies of a fact are two copies that drift.
 // claude/decisions/2026-08-12-jobs-not-people.md
 
@@ -98,6 +98,25 @@ export const PORTALS = [
     tabs: [
       { to: '/admin/social', label: 'What’s on' },
       { to: '/admin/social/ideas', label: 'Ideas' },
+    ],
+  },
+  {
+    key: 'training',
+    right: 'training',
+    blurb: 'Drills, session templates, and publishing them to squads.',
+    // ⚠️ NESTED LIKE `media`, AND THE SECOND PORTAL IN THE FILE THAT IS.
+    // /admin/training/templates sits UNDER /admin/training, so the tab row's
+    // NavLink must pass `end` or "Library" lights up on all three screens.
+    // AdminDashboard already does; the pair of tests in
+    // tests/admin-portals.test.jsx is what keeps it doing so.
+    //
+    // ⚠️ LIBRARY FIRST BECAUSE ENTERING THE PORTAL LANDS ON tabs[0] — the same
+    // trap the Allocation note above records. Publishing is the end of the job,
+    // not the start of it, so it must never be tabs[0].
+    tabs: [
+      { to: '/admin/training', label: 'Library' },
+      { to: '/admin/training/templates', label: 'Templates' },
+      { to: '/admin/training/publish', label: 'Publish' },
     ],
   },
 ]

@@ -10,6 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🏉 **THE RUGBY PERFORMANCE DIRECTOR DASHBOARD IS BUILT — pieces 1–3, one PR,
+  23 branch commits, no SHA here because `main` squash-merges.** `training`
+  admin right; `/admin/training` with Library, Templates (the hour builder with
+  a running total and the 65-minute question) and Publish (preview per squad,
+  then the same SQL function for real); a Contact/Tag switch per squad on
+  `/admin/club`; the plan on every training event's sheet, adjustable by the
+  coach. Migration `training_plans` APPLIED to production on Jay's "apply";
+  harness `db/tests/training-plans.sql` 6/6 live. Full suite green, build green.
+  ✅ **A second migration, `publish_training_fit_check`, APPLIED the same
+  day** — the function had trusted `_teams` with no club or contact check;
+  harness now 8/8 live.
+  ⛔ Nothing keys on a weekday; `requires_contact` is a column; the null band
+  refuses with a reason — and a template that sets NO age now reaches the senior
+  squads, which the first cut wrongly refused forever.
+- 🏉 **THE RUGBY PERFORMANCE DIRECTOR DASHBOARD IS SPECCED AND PLANNED, pieces
+  1–3 of five.** Jay chose the scope (foundation, Library + Templates, Publish +
+  coach view); notification email, AI assist and a first/second-session pair
+  are out of scope and each gets its own spec later.
+  `claude/specs/2026-08-21-training-plans-dashboard-design.md`,
+  `claude/plans/2026-08-21-training-plans-implementation.md`. No code yet.
+  ✅ **One decision made explicit while writing it: a published session COPIES
+  the template's blocks** rather than pointing at the template, so a coach
+  trimming one night's warm-up cannot edit fifteen squads' plans.
+  ⚠️ Two real names were scrubbed from the 12 Aug training plan while it was
+  open (rule 9). Four other files under `claude/` still carry names and are
+  noted for a separate pass.
+- `ba09917` — the squash that marked the handoff's weekday item closed.
+
 - 📓 **The 21 Aug handoff's weekday item is marked CLOSED**, because it was
   fixed hours after being written and a handoff carrying a false "still open"
   line is how a session redoes finished work.
