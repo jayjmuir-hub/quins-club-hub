@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import NoticeBoard from '../components/NoticeBoard.jsx'
@@ -17,6 +17,9 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { isMinisTeam } from '../lib/minis.js'
 import { canEditTeam } from '../lib/scope.js'
 import { buildTracking, squadSummary } from '../lib/tracking.js'
+import Availability from './Availability.jsx'
+import EventDetail from './EventDetail.jsx'
+import Register from './Register.jsx'
 
 // The Squad Hub — the coach/manager dashboard, one squad at a time.
 // claude/plans/2026-08-21-squad-hub.md.
@@ -59,7 +62,9 @@ const TRACKING_FILTERS = [
  * scanning further back than this is asking a season question the export of
  * which is future work, not a wider table. */
 const GRID_EVENT_LIMIT = 15
-const UPCOMING_LIMIT = 8
+// Jay, 21 Aug 2026: the section "should not be too big vertically and take
+// the entire page" — five rows, then the list scrolls inside itself.
+const UPCOMING_LIMIT = 5
 
 function shortDate(event) {
   const date = eventDate(event)
@@ -107,6 +112,17 @@ export default function SquadHub() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')
+  // The drill-in, borrowed from Dashboard wholesale: tapping a Coming-up row
+  // opens the same EventDetail sheet, which in turn opens the same
+  // Availability and Register sheets. One flow everywhere, on purpose —
+  // Dashboard's comment about availabilityOpen being screen-level state and
+  // silently going stale applies here unchanged, so every open/close path
+  // goes through openEvent/closeEvent below.
+  const [selectedEventId, setSelectedEventId] = useState(null)
+  const [availabilityOpen, setAvailabilityOpen] = useState(false)
+  const [registerOpen, setRegisterOpen] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
+  const navigate = useNavigate()
 
   const team = teams?.find((candidate) => candidate.id === teamId)
   const mayView = canEditTeam(memberships, teamId)
@@ -117,6 +133,21 @@ export default function SquadHub() {
     if (!teams) return []
     return teams.filter((candidate) => canEditTeam(memberships, candidate.id))
   }, [memberships, teams])
+
+  const openEvent = (id) => {
+    setAvailabilityOpen(false)
+    setRegisterOpen(false)
+    setSelectedEventId(id)
+  }
+  const closeEvent = () => {
+    setAvailabilityOpen(false)
+    setRegisterOpen(false)
+    setSelectedEventId(null)
+    // An RSVP set or a register taken in the sheets must show up in the
+    // tracking grid and the chips the moment the sheet closes — re-fetch
+    // rather than trusting a stale in-memory copy.
+    setReloadToken((token) => token + 1)
+  }
 
   useEffect(() => {
     if (!teamId || !mayView) {
@@ -167,7 +198,7 @@ export default function SquadHub() {
     return () => {
       mounted = false
     }
-  }, [teamId, mayView, team?.name])
+  }, [teamId, mayView, team?.name, reloadToken])
 
   // ---- No :teamId — land the single-squad coach, offer everyone else a pick.
   if (!teamId) {
@@ -231,6 +262,7 @@ export default function SquadHub() {
   })
   const shownEvents = gridEvents.slice(0, GRID_EVENT_LIMIT)
   const summary = squadSummary(rows)
+  const selectedEvent = selectedEventId ? events.find((event) => event.id === selectedEventId) : null
 
   // RSVP counts per upcoming event, for the chips.
   const rsvpByEvent = new Map()
@@ -304,12 +336,17 @@ export default function SquadHub() {
             {upcoming.length === 0 ? (
               <p className="text-[13px] font-medium text-ink-muted">Nothing scheduled yet.</p>
             ) : (
-              <ul className="flex flex-col divide-y divide-line/60">
+              <ul className="flex max-h-72 flex-col divide-y divide-line/60 overflow-y-auto">
                 {upcoming.map((event) => {
                   const tally = rsvpByEvent.get(event.id)
                   const replies = tally ? tally.in + tally.maybe + tally.out : 0
                   return (
-                    <li key={event.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <li key={event.id}>
+                      <button
+                        type="button"
+                        onClick={() => openEvent(event.id)}
+                        className="flex w-full flex-wrap items-center justify-between gap-2 rounded-[9px] px-1 py-2 text-left hover:bg-surface-mute"
+                      >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-ink">{eventTitle(event)}</p>
                         <p className="text-[12.5px] font-medium text-ink-muted">
@@ -326,6 +363,7 @@ export default function SquadHub() {
                           </>
                         )}
                       </span>
+                      </button>
                     </li>
                   )
                 })}
@@ -376,10 +414,10 @@ export default function SquadHub() {
                     <span className="text-brand-deep"> · {summary.noShows} said-in-but-absent</span>
                   )}
                 </p>
-                <div className="overflow-x-auto">
+                <div className="max-h-[24rem] overflow-auto">
                   <table className="w-full min-w-[560px] border-collapse text-left">
                     <thead>
-                      <tr className="border-b-[1.5px] border-line text-[11.5px] font-bold uppercase tracking-[.3px] text-ink-muted">
+                      <tr className="sticky top-0 z-10 border-b-[1.5px] border-line bg-surface-card text-[11.5px] font-bold uppercase tracking-[.3px] text-ink-muted">
                         <th scope="col" className="sticky left-0 bg-surface-card py-1.5 pr-2">Player</th>
                         {shownEvents.map((event) => (
                           <th key={event.id} scope="col" className="px-1 py-1.5 text-center" title={eventTitle(event)}>
@@ -448,6 +486,29 @@ export default function SquadHub() {
             </Card>
           </div>
         </>
+      )}
+
+      {/* The same drill-in Dashboard and Schedule use, wired identically —
+          including the "closing availability returns to the detail sheet"
+          flow. Edit/duplicate are deliberately NOT offered here: the hub is a
+          reading room; changing a fixture stays on Schedule, one place. */}
+      {selectedEvent && !availabilityOpen && !registerOpen && (
+        <EventDetail
+          event={selectedEvent}
+          team={team}
+          onClose={closeEvent}
+          canEdit={mayView}
+          onOpenAvailability={() => setAvailabilityOpen(true)}
+          onOpenRegister={() => setRegisterOpen(true)}
+          onOpenMatchSheet={(fixture) => navigate(`/match-sheet/${fixture.id}`)}
+          onOpenLineup={(fixture) => navigate(`/lineup/${fixture.id}`)}
+        />
+      )}
+      {selectedEvent && availabilityOpen && (
+        <Availability event={selectedEvent} team={team} onClose={() => setAvailabilityOpen(false)} />
+      )}
+      {selectedEvent && registerOpen && (
+        <Register event={selectedEvent} team={team} onClose={() => setRegisterOpen(false)} />
       )}
     </div>
   )
