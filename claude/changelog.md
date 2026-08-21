@@ -10,6 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 📓 **Evening handoff: the Squad Hub and the whole 2.0 retheme**
+  (`claude/handoffs/2026-08-21-squad-hub-and-retheme-2point0.md`), and
+  `state-of-play.md` now says 2.0 and the hub are live.
+- `d21b344` — the squash that put squads in club order (#291).
+
 - 🔢 **SQUADS IN CLUB ORDER, EVERYWHERE.** Jay, from the phone: the Squad
   Hub picker listed U10, U12G, U11... — `loadTeams` in the memberships
   context had NO ORDER BY, so every consumer of `teams` got
