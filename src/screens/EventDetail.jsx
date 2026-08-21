@@ -5,6 +5,7 @@ import EventTypeIcon from '../components/EventTypeIcon.jsx'
 import Spinner from '../components/Spinner.jsx'
 import Button from '../components/Button.jsx'
 import PitchRequest from '../components/PitchRequest.jsx'
+import SessionPlan from '../components/SessionPlan.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { countSeriesFrom, deleteEvent, deleteSeriesFrom } from '../data/events.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
@@ -644,6 +645,19 @@ export default function EventDetail({
           already has a real pitch has nothing to ask for, and somebody who
           cannot edit the squad sees it only if a request already exists. */}
       <PitchRequest event={event} canEdit={canEdit} />
+
+      {/* ⚠️ TRAINING ONLY, AND THE GATE IS HERE RATHER THAN INSIDE THE CARD.
+          A match has no session plan to read, and asking the database for one
+          on every fixture is a round trip that can only ever answer "none".
+          Self-contained like PitchRequest above: it loads its own session,
+          takes no handler a screen could forget, and renders NOTHING when the
+          squad has neither a published plan nor a focus covering the night.
+          ⚠️ `canEdit` decides what it OFFERS, never what it shows — a parent
+          sees tonight's plan read-only on purpose (it holds no children's
+          data), and RLS on public.training_sessions is the actual boundary. */}
+      {event.type === 'training' && (
+        <SessionPlan event={event} team={team} canEdit={canEdit} />
+      )}
 
       {canEdit && onOpenRegister && date && date.getTime() <= Date.now() && (
         <div className="mt-4">

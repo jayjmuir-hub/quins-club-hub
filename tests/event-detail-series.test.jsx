@@ -22,6 +22,7 @@ const listAvailabilityMock = vi.fn()
 const deleteEventMock = vi.fn()
 const deleteSeriesFromMock = vi.fn()
 const countSeriesFromMock = vi.fn()
+const getSessionMock = vi.fn()
 
 vi.mock('../src/data/availability.js', () => ({
   listAvailability: (...args) => listAvailabilityMock(...args),
@@ -32,6 +33,17 @@ vi.mock('../src/data/events.js', () => ({
   deleteEvent: (...args) => deleteEventMock(...args),
   deleteSeriesFrom: (...args) => deleteSeriesFromMock(...args),
   countSeriesFrom: (...args) => countSeriesFromMock(...args),
+}))
+
+// ⚠️ MOCKED BECAUSE AN UNMOCKED DATA MODULE MAKES A REAL REQUEST. The sheet
+// mounts SessionPlan on a training event; CI sets placeholder Supabase env
+// vars, so the client constructs happily, the promise never settles, and the
+// card sits in `loading` forever — with an error that names nothing.
+vi.mock('../src/data/trainingPlans.js', () => ({
+  getSession: (...args) => getSessionMock(...args),
+  saveSessionBlocks: async () => {},
+  listFocus: async () => [],
+  listDrills: async () => [],
 }))
 
 import EventDetail from '../src/screens/EventDetail.jsx'
@@ -81,6 +93,7 @@ beforeEach(() => {
   deleteEventMock.mockResolvedValue(undefined)
   // 13 sessions from this one forward: this one plus 12 later.
   countSeriesFromMock.mockResolvedValue(13)
+  getSessionMock.mockResolvedValue(null)
   deleteSeriesFromMock.mockImplementation(async () =>
     Array.from({ length: 13 }, (_, i) => ({ id: `e-${i}` })),
   )
@@ -288,5 +301,26 @@ describe('deleting an occurrence of a series', () => {
     show(IN_SERIES, { canEdit: false })
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
     expect(within(screen.getByRole('dialog')).queryByRole('button', { name: /later session/i })).toBeNull()
+  })
+})
+
+// --- the session plan ------------------------------------------------------
+
+describe('EventDetail — the session plan', () => {
+  it('shows no heading for a training event with no plan', async () => {
+    // Most training sessions have no published plan. An empty "Session plan"
+    // heading on every one of them is noise on the screen members read.
+    show(ONE_OFF)
+    await waitFor(() => expect(getSessionMock).toHaveBeenCalledWith('e-1'))
+    expect(screen.queryByRole('heading', { name: /session plan/i })).not.toBeInTheDocument()
+  })
+
+  it('never asks for a session plan on a match', async () => {
+    // ⚠️ THE GATE IS IN THIS SCREEN, and this is what holds it. A match has
+    // no session plan, so the read must not happen at all — a card that
+    // rendered nothing would still have cost a round trip per fixture.
+    show({ ...ONE_OFF, type: 'match', opponent: 'Dubai Wanderers', home: true })
+    await waitFor(() => expect(listAvailabilityMock).toHaveBeenCalled())
+    expect(getSessionMock).not.toHaveBeenCalled()
   })
 })
