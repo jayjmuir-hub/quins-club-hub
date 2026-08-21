@@ -72,6 +72,21 @@ const CONTACT_HOUR = {
   is_active: true,
 }
 
+// ⚠️ A SECOND TEMPLATE EXISTS SO THAT THE BOX CAN BE *CHANGED*. Every squad in
+// TEAMS with a readable band fits this one, which is what makes the switch to
+// the contact template the thing under test rather than the tick itself.
+const TAG_HOUR = {
+  id: 'tpl-tag',
+  club_id: CLUB,
+  name: 'Tag hour',
+  min_age: 7,
+  max_age: 16,
+  requires_contact: false,
+  notes: null,
+  total_minutes: 60,
+  is_active: true,
+}
+
 const FOCUS_ROWS = [
   {
     id: 'focus-1',
@@ -141,7 +156,7 @@ const ARGS = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  listTemplatesMock.mockImplementation(async () => [CONTACT_HOUR])
+  listTemplatesMock.mockImplementation(async () => [TAG_HOUR, CONTACT_HOUR])
   listFocusMock.mockImplementation(async () => FOCUS_ROWS)
   previewPublishMock.mockImplementation(async () => [
     { team_id: 't-u14b', will_write: 3, skipped_coach_edited: 1, no_events: false },
@@ -233,6 +248,128 @@ describe('TrainingPublish', () => {
     expect(screen.queryByRole('button', { name: /publish to/i })).toBeNull()
     expect(screen.queryByTestId('preview-t-u14b')).toBeNull()
     expect(publishMock).not.toHaveBeenCalled()
+  })
+
+  it('drops a squad that stops fitting when the template is changed', async () => {
+    // ⚠️ THE HOLE THIS PINS. A squad ticked under the tag template and left
+    // ticked when the template becomes a contact one is a squad the user
+    // CANNOT untick — its chip is disabled by then — and publish_training does
+    // no fitness check of its own, so the tag squad would have been handed an
+    // adult contact plan by an argument list nobody could see. Two things have
+    // to hold: the tick is gone, and the argument list is built from the fit.
+    previewPublishMock.mockImplementation(async () => [
+      { team_id: 't-u14b', will_write: 2, skipped_coach_edited: 0, no_events: false },
+    ])
+
+    const { user } = renderPublish()
+    await user.selectOptions(await screen.findByLabelText('Template'), TAG_HOUR.id)
+
+    await user.click(screen.getByRole('checkbox', { name: /U12 Mixed/ }))
+    await user.click(screen.getByRole('checkbox', { name: /U14B/ }))
+    expect(screen.getByRole('checkbox', { name: /U12 Mixed/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+
+    await user.selectOptions(screen.getByLabelText('Template'), CONTACT_HOUR.id)
+
+    const tagSquad = screen.getByRole('checkbox', { name: /U12 Mixed/ })
+    expect(tagSquad).toHaveAttribute('aria-checked', 'false')
+    expect(tagSquad).toBeDisabled()
+    expect(screen.getByText('Contact template; this squad is tag')).toBeInTheDocument()
+
+    setDate('From', '2026-09-01')
+    setDate('To', '2026-09-29')
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+
+    // One squad, and it is the one that still fits.
+    expect(await screen.findByRole('button', { name: /Publish to 1 squad/ })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(previewPublishMock).toHaveBeenCalledWith({
+        templateId: CONTACT_HOUR.id,
+        teamIds: ['t-u14b'],
+        from: '2026-09-01',
+        to: '2026-09-29',
+      }),
+    )
+  })
+
+  it('sends two squads in sort_order, whichever order they were ticked in', async () => {
+    // ⚠️ THE ARRAY GOES STRAIGHT TO THE DATABASE FUNCTION. Ticking U14B first
+    // must not produce a different argument list from ticking U12 Mixed first,
+    // or two identical publishes read as different ones in a log.
+    previewPublishMock.mockImplementation(async () => [
+      { team_id: 't-u12m', will_write: 1, skipped_coach_edited: 0, no_events: false },
+      { team_id: 't-u14b', will_write: 2, skipped_coach_edited: 0, no_events: false },
+    ])
+
+    const { user } = renderPublish()
+    await user.selectOptions(await screen.findByLabelText('Template'), TAG_HOUR.id)
+
+    // Reverse of the drawn order: sort_order 2 first, then sort_order 1.
+    await user.click(screen.getByRole('checkbox', { name: /U14B/ }))
+    await user.click(screen.getByRole('checkbox', { name: /U12 Mixed/ }))
+
+    setDate('From', '2026-09-01')
+    setDate('To', '2026-09-29')
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+
+    await waitFor(() =>
+      expect(previewPublishMock).toHaveBeenCalledWith(
+        expect.objectContaining({ teamIds: ['t-u12m', 't-u14b'] }),
+      ),
+    )
+    expect(await screen.findByRole('button', { name: /Publish to 2 squads/ })).toBeInTheDocument()
+  })
+
+  it('counts the squads that got something, not the rows that came back', async () => {
+    // ⚠️ A SQUAD WITH NO TRAINING IN THE RANGE STILL RETURNS A ROW. Counting
+    // rows told a director the plan had reached a squad whose sessions were
+    // never touched, and that sentence is all they get.
+    previewPublishMock.mockImplementation(async () => [
+      { team_id: 't-u12m', will_write: 0, skipped_coach_edited: 0, no_events: true },
+      { team_id: 't-u14b', will_write: 3, skipped_coach_edited: 1, no_events: false },
+    ])
+    publishMock.mockImplementation(async () => [
+      { team_id: 't-u12m', will_write: 0, skipped_coach_edited: 0, no_events: true },
+      { team_id: 't-u14b', will_write: 3, skipped_coach_edited: 1, no_events: false },
+    ])
+
+    const { user } = renderPublish()
+    await user.selectOptions(await screen.findByLabelText('Template'), TAG_HOUR.id)
+    await user.click(screen.getByRole('checkbox', { name: /U12 Mixed/ }))
+    await user.click(screen.getByRole('checkbox', { name: /U14B/ }))
+    setDate('From', '2026-09-01')
+    setDate('To', '2026-09-29')
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(await screen.findByTestId('preview-t-u12m')).toHaveTextContent(
+      'No training in this range',
+    )
+
+    await user.click(await screen.findByRole('button', { name: /Publish to 2 squads/ }))
+
+    expect(
+      await screen.findByText('Published to 1 squad — 3 sessions updated, 1 kept.'),
+    ).toBeInTheDocument()
+  })
+
+  it('says so when a preview comes back with nothing', async () => {
+    // ⚠️ EMPTY HAS TWO MEANINGS ON THIS SCREEN. Silence is what "not asked
+    // yet" looks like, so an answer of nothing drawn as silence reads as a
+    // button that did not work.
+    previewPublishMock.mockImplementation(async () => [])
+
+    const { user } = renderPublish()
+    await screen.findByLabelText('Template')
+    await pickTheContactHour(user)
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Nothing to preview — pick a template and at least one squad.',
+    )
+    expect(screen.queryByRole('button', { name: /publish to/i })).toBeNull()
   })
 
   it('adds a focus for a squad and a date range', async () => {

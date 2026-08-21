@@ -176,6 +176,10 @@ function PublishBody() {
   // The preview. Empty means "no question has been answered for these boxes",
   // which is the whole of the rule that hides the Publish button.
   const [rows, setRows] = useState([])
+  // ⚠️ SEPARATE FROM `rows` BECAUSE EMPTY HAS TWO MEANINGS. "Nobody has asked
+  // yet" and "the server answered, and the answer was nothing" look identical
+  // in `rows`, and only the second one deserves a sentence on screen.
+  const [previewed, setPreviewed] = useState(false)
   const [running, setRunning] = useState(false)
   const [publishError, setPublishError] = useState(null)
   const [done, setDone] = useState(null)
@@ -226,6 +230,7 @@ function PublishBody() {
   function change(apply) {
     apply()
     setRows([])
+    setPreviewed(false)
     setPublishError(null)
     setDone(null)
   }
@@ -238,11 +243,46 @@ function PublishBody() {
     )
   }
 
+  /** Does this squad suit the template on screen right now? No template, no. */
+  function fitsChosenTemplate(squad) {
+    return template !== null && squadFitsTemplate(squad, template).ok
+  }
+
+  /**
+   * ⚠️ THE TEMPLATE BOX PRUNES THE TICKS, AND IT HAS TO. A squad ticked under
+   * one template can stop fitting under the next one — and the chip that would
+   * let somebody untick it is DISABLED the moment it stops fitting, so the
+   * ticked-but-unfit state is one the user cannot get out of. It would then
+   * ride along into publish_training, which does NOT re-check fitness on the
+   * server: this screen is the only gate there is. Prune on the way in, and
+   * derive `teamIds` from the fit as well (below) so that a future path into
+   * `selected` that forgets to prune still cannot publish an unfit squad.
+   */
+  function chooseTemplate(nextId) {
+    const next = templates.find((row) => row.id === nextId) ?? null
+    change(() => {
+      setTemplateId(nextId)
+      setSelected((current) =>
+        current.filter((id) => {
+          const squad = squads.find((one) => one.id === id)
+          return squad != null && next !== null && squadFitsTemplate(squad, next).ok
+        }),
+      )
+    })
+  }
+
   // ⚠️ IN THE ORDER THE SQUADS ARE DRAWN IN, not in click order. The array goes
   // straight to the database function, and an argument list that reshuffles
   // itself depending on which chip somebody tapped first makes two identical
-  // publishes look like different ones in a log.
-  const teamIds = squads.filter((squad) => selected.includes(squad.id)).map((squad) => squad.id)
+  // publishes look like different ones in a log. `squads` is already sorted by
+  // sort_order, so filtering it is what keeps that order.
+  //
+  // ⚠️ AND FIT IS PART OF THE FILTER, not only of whether the chip is clickable.
+  // See chooseTemplate() above: the server does not check, so an unfit squad
+  // must not be able to reach the argument list by any route.
+  const teamIds = squads
+    .filter((squad) => selected.includes(squad.id) && fitsChosenTemplate(squad))
+    .map((squad) => squad.id)
 
   const args = { templateId, teamIds, from, to }
   const canRun = templateId !== '' && teamIds.length > 0 && from !== '' && to !== ''
@@ -253,9 +293,11 @@ function PublishBody() {
     setDone(null)
     try {
       setRows(await previewPublish(args))
+      setPreviewed(true)
     } catch (failure) {
       setPublishError(failure)
       setRows([])
+      setPreviewed(false)
     } finally {
       setRunning(false)
     }
@@ -271,7 +313,11 @@ function PublishBody() {
     setPublishError(null)
     try {
       const result = await publish(args)
-      const squadCount = result.length
+      // ⚠️ SQUADS THAT ACTUALLY GOT SOMETHING, not rows returned. A squad with
+      // no training in the range comes back as a row too, and counting rows
+      // told a director the plan had reached a squad whose sessions were never
+      // touched — the one sentence they had to go on, and it was wrong.
+      const squadCount = result.filter((row) => (row.will_write ?? 0) > 0).length
       const written = result.reduce((sum, row) => sum + (row.will_write ?? 0), 0)
       const kept = result.reduce((sum, row) => sum + (row.skipped_coach_edited ?? 0), 0)
       setDone(
@@ -282,6 +328,7 @@ function PublishBody() {
       // The preview described what WOULD happen; it has happened. Leaving the
       // button up would invite a second identical publish.
       setRows([])
+      setPreviewed(false)
     } catch (failure) {
       setPublishError(failure)
     } finally {
@@ -375,7 +422,7 @@ function PublishBody() {
               aria-label="Template"
               value={templateId}
               disabled={running}
-              onChange={(domEvent) => change(() => setTemplateId(domEvent.target.value))}
+              onChange={(domEvent) => chooseTemplate(domEvent.target.value)}
               className={INPUT}
             >
               <option value="">Choose a template…</option>
@@ -470,6 +517,16 @@ function PublishBody() {
                 </li>
               ))}
             </ul>
+          )}
+
+          {/* ⚠️ AN ANSWER OF "NOTHING" IS STILL AN ANSWER, AND MUST LOOK LIKE
+              ONE. Preview returning no rows used to draw exactly what "I have
+              not pressed it yet" draws, so the screen appeared to have ignored
+              the button. */}
+          {previewed && rows.length === 0 && (
+            <p role="status" className="text-[12.5px] text-ink-muted">
+              Nothing to preview — pick a template and at least one squad.
+            </p>
           )}
 
           {done && (
