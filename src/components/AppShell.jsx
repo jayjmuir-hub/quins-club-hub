@@ -256,7 +256,18 @@ export default function AppShell({ children }) {
           keeps them stacked in document order at every scroll position, and
           costs nothing when no preview is active (the banner renders null).
           The Sheet's own scrim is z-50, so it still covers this. */}
-      <div className="sticky top-0 z-40">
+      {/* ⚠️ pt-[env(safe-area-inset-top)] + bg-chrome — THE iPHONE STATUS
+          BAR FIX (Jay, 21 Aug 2026: "the top bar is up under the time,
+          battery, etc, so nothing up there can be clicked"). index.html
+          sets viewport-fit=cover, so an INSTALLED app draws underneath the
+          status bar; every safe-area inset in this codebase handled the
+          BOTTOM (tab bar, sheets, FAB) and nothing ever padded the top.
+          The padding lives on this sticky wrapper so the ViewAs banner and
+          the masthead both clear the clock, and the wrapper carries the
+          chrome colour so the padded strip reads as the masthead extending
+          behind the status bar, not a black gap. Desktop and un-installed
+          browsers get env() = 0 and nothing changes. */}
+      <div className="sticky top-0 z-40 bg-chrome pt-[env(safe-area-inset-top)]">
         <ViewAsBanner />
 
         {/* The masthead is DARK CHROME (#151517 -> #0c0c0e), not the red
