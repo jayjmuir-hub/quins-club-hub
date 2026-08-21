@@ -304,7 +304,7 @@ export default function Allocation() {
     <section>
       <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">{heading}</h2>
+          <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">{heading}</h2>
           <p className="text-[13px] font-medium text-ink-muted">
             {events.length} {events.length === 1 ? 'fixture' : 'fixtures'}
             {unallocated.length > 0 ? ` · ${unallocated.length} without a pitch` : ''}

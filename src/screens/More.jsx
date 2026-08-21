@@ -353,7 +353,7 @@ export default function More() {
   return (
     <section>
       <div className="mb-3.5 mt-1">
-        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">More</h2>
+        <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">More</h2>
       </div>
 
       {/* Added 6 Aug 2026 (Jay): the More screen showed a role, a squad list

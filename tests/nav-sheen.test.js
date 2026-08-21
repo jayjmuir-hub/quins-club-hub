@@ -29,87 +29,32 @@ beforeAll(() => {
   css = sheets.map((f) => readFileSync(join(DIST, f), 'utf8')).join('\n')
 })
 
-describe('the top-nav sheen ships', () => {
+describe('the top-nav sheen is retired', () => {
+  // ⚠️ REPOINTED, NOT DELETED — phase 5 of the 2.0 retheme (21 Aug 2026).
+  // This file used to pin that the desktop pill sheen SHIPPED: the
+  // mix-blend-mode, the keyframes, the media-query adjacency, the
+  // reduced-motion switch-off — each assertion built by injecting its fault.
+  // Phase 2 moved desktop nav into the Sidebar, no element carries
+  // `.nav-tab` at any width, and phase 5 removed the block (tombstone in
+  // src/index.css). What this anchor now pins is the ABSENCE: if the sheen
+  // CSS creeps back into the bundle without a consumer, or a consumer
+  // reappears without a decision, this is the alarm. The built-CSS reading
+  // mechanics are unchanged — a source-only check would pass against CSS
+  // that never shipped, in either direction.
+
   it('has a built stylesheet to read at all', () => {
     expect(css.length, 'run `npm run build` first — dist/assets/*.css missing').toBeGreaterThan(1000)
   })
 
-  it('emits the sheen and its keyframes', () => {
-    expect(css).toMatch(/\.nav-tab::?before/)
-    expect(css).toMatch(/@keyframes nav-sheen/)
-    expect(css).toMatch(/animation:\s*nav-sheen/)
+  it('emits NO nav-tab rules and NO nav-sheen keyframes', () => {
+    expect(css).not.toMatch(/\.nav-tab/)
+    expect(css).not.toMatch(/@keyframes nav-sheen/)
   })
 
-  it('⚠️ blends the sheen rather than painting over the active fill', () => {
-    // `mix-blend-mode: screen` is the only reason ONE gradient works over both
-    // the transparent idle item and the solid red active one. Without it the
-    // sheen paints a grey wash across the current page's red fill.
-    expect(css).toMatch(/mix-blend-mode:\s*screen/)
-  })
-
-  it('⚠️ keeps green OUT of the sheen — it means success everywhere else', () => {
-    // Jay's call, 11 Aug 2026: adhjrt.com sweeps red -> white -> green, and
-    // green in this app is a success colour. The underline may be red->green
-    // (it reuses `brand-rule`, which is decorative); the sheen may not.
-    //
-    // ⚠️ BOTH SPELLINGS, AND THE HEX-ONLY VERSION OF THIS TEST WAS WRITTEN
-    // FIRST AND PASSED WITH GREEN INJECTED. src/index.css already carries the
-    // warning that made it obvious in hindsight — the brand green is authored
-    // as decimal `rgb()` in the `.harlequin` diagonal, "which is why the
-    // re-point's hex search for 3bd070 walked straight past it". A hex-only
-    // matcher here is the same mistake in the same file. Caught by injecting
-    // the fault, not by review.
-    const GREEN = /2a9d55|17a34a|42\s*,?\s*157\s*,?\s*85|23\s*,?\s*163\s*,?\s*74/i
-    const sheen = css.match(/\.nav-tab::?before\{[^}]*\}/)?.[0] ?? ''
-    expect(sheen, 'no .nav-tab::before rule found').not.toBe('')
-    expect(sheen).not.toMatch(GREEN)
-    // ...and it IS carrying the brand red, so this cannot pass by emptiness.
-    expect(sheen).toMatch(/200\s*,?\s*16\s*,?\s*46|c8102e/i)
-    // The matcher must be able to SEE a green when one is present. The
-    // underline deliberately has one, so it doubles as the positive control:
-    // if this stops matching, the pattern above has stopped working and the
-    // negative assertion above it is worth nothing.
-    const underline = css.match(/\.nav-tab::?after\{[^}]*\}/)?.[0] ?? ''
-    expect(underline, 'no .nav-tab::after rule found').not.toBe('')
-    expect(underline, 'the GREEN matcher no longer matches a known green').toMatch(GREEN)
-  })
-
-  it('⚠️ never reaches the phone tab bar', () => {
-    // `.nav-tab` is on the element at EVERY width — the same element is a
-    // bottom-tab-bar cell on a phone. The media query is the only thing
-    // keeping a hover sheen off a touch target, so if this ever stops being
-    // nested the effect leaks to mobile, where it cannot even be triggered.
-    // 820px is `screens.desktop` in tailwind.config.js.
-    //
-    // ⚠️ THE ADJACENCY IS THE ASSERTION, and the first version of this test
-    // did not have it. It read `min-width:\s*820px\)\{[\s\S]*?\.nav-tab\{`,
-    // which is unanchored and lazy — Tailwind emits DOZENS of
-    // `@media (min-width: 820px)` blocks for the `desktop:` variants, so the
-    // pattern matched one of those and then scanned forward to `.nav-tab`
-    // anywhere later in the file. It passed with the gate rewritten to
-    // `min-width: 1px`, i.e. it would have passed against the exact bug it
-    // exists to catch. Minified CSS opens a media block immediately before
-    // its first rule, so requiring them to be ADJACENT is what makes this
-    // real. Caught by injecting the fault.
-    expect(css, '.nav-tab escaped its desktop media query').toMatch(
-      /@media\s*\(min-width:\s*820px\)\{\.nav-tab\{position:relative/,
-    )
-  })
-
-  it('⚠️ gives the current page no underline', () => {
-    // It already carries the solid red fill, and a red-to-green rule inside a
-    // red box reads as a rendering fault rather than an accent.
-    expect(css).toMatch(/aria-current=["']?page["']?\]::?after\{display:none\}/)
-  })
-
-  it('⚠️ is switched off for prefers-reduced-motion', () => {
-    // The global reduced-motion block drives durations to ~0, which for an
-    // ANIMATED sheen means it snaps to its end state and sits there lit. Only
-    // removing the element fixes that — the same conclusion `.btn-sweep`
-    // reached, and the reason this assertion is separate from that one.
-    const blocks = css.match(/@media[^{]*prefers-reduced-motion:\s*reduce[^{]*\{[\s\S]*?\}\s*\}/g) ?? []
-    const joined = blocks.join('\n')
-    expect(joined, 'no reduced-motion block found').not.toBe('')
-    expect(joined).toMatch(/\.nav-tab::?before\{display:none\}/)
+  it('control: the matcher can still see rules that DO ship', () => {
+    // A negative search is only evidence if the same probe finds a known
+    // positive — the rule this repo has been burned by twice. brand-rule is
+    // the sheen block's surviving neighbour in the same @layer.
+    expect(css).toMatch(/\.brand-rule/)
   })
 })

@@ -1,3 +1,4 @@
+import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -300,7 +301,10 @@ export default function Notices() {
           pushes the whole DOCUMENT wider than the phone, which shows up as a
           clipped masthead and a cut-off sheet three screens away. */}
       <div className="mb-3.5 mt-1 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Notices</h2>
+        <div>
+          <Kicker>Club notices</Kicker>
+          <AccentTitle lead="From the" accent="committee." />
+        </div>
         {mayPost && (
           <Button data-testid="post-notice" onClick={() => setComposerOpen(true)}>
             Post a notice

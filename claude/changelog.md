@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- `bb4c651` — the squash with the phase-4 polish (#288), from a parallel
+  session working the same day.
+- 🧹 **PHASE 5: THE SWEEP — the retheme is COMPLETE.** Every remaining page
+  heading moved to the editorial system: Schedule opens "Club life,
+  *calendared.*" and Notices "From the *committee.*" (the portal's own
+  lines), Roster "Roster & *members.*", and the admin/working screens took
+  the display scale. The dead `.nav-tab` sheen CSS — orphaned when phase 2
+  retired the desktop pills — is removed with a tombstone in
+  `src/index.css`, and `tests/nav-sheen.test.js` is REPOINTED to pin the
+  absence, with a positive control so the negative means something.
+  `claude/specs/design-system.md` gains §−1: what 2.0 actually ships,
+  superseding §0 where they disagree.
 - 🔧 **PHASE 4 POLISH: the loose ends the gate left behind.** TrainingPublish's
   four date fields go `min-w-0` → `min-w-[150px]` so From/To and Starts/Ends
   wrap to their own rows on a phone instead of clipping `dd/mm/yyyy`; the two

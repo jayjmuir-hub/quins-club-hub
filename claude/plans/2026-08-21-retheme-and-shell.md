@@ -1,8 +1,9 @@
 # Retheme & shell — Club Hub joins the club's design family
 
-**Status: shipping — phases 1-4 landed** (tokens/themes/toggle/identity;
-desktop sidebar shell; editorial dashboards; admin on the phone); phase 5
-(the sweep) still to come.
+**Status: shipped — all five phases, all on 21 Aug 2026** (tokens/themes/
+toggle/identity; desktop sidebar shell; editorial dashboards; admin on the
+phone; the sweep). `claude/specs/design-system.md` §−1 records what now
+ships; the retired sheen has its tombstone in `src/index.css`.
 
 ## The decisions, in Jay's words, 21 Aug 2026
 

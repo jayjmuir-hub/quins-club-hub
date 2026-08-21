@@ -195,7 +195,7 @@ export default function Pitches() {
     <section>
       <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Pitches</h2>
+          <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">Pitches</h2>
           <p className="text-[13px] font-medium text-ink-muted">
             {pitches.length} {pitches.length === 1 ? 'pitch' : 'pitches'}
             {retiredCount > 0 ? ` · ${retiredCount} retired` : ''} · tap one to rename or retire

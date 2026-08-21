@@ -1559,7 +1559,7 @@ export default function Accounts() {
     return (
       <section>
         <div className="mb-3.5 mt-1">
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Approvals</h2>
+          <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">Approvals</h2>
           <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>
             {pendingMembers.length === 0
               ? 'Nobody is waiting for your age groups.'
@@ -1629,7 +1629,7 @@ export default function Accounts() {
   return (
     <section>
       <div className="mb-3.5 mt-1">
-        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Accounts</h2>
+        <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">Accounts</h2>
         {/* ⚠️ SHOWS BOTH NUMBERS ON PURPOSE, and the second one is the point.
             This read "{n} people · {n} access rows", which everybody — including
             Jay, who built the thing — took to mean "there are n accounts". It

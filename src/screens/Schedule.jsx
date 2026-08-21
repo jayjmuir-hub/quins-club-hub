@@ -16,6 +16,7 @@ import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, isSquadStaffRole, roleLabel, visibleTeams } from '../lib/scope.js'
 import { clubDayParts, clubToday, eventDate, hasResult, sortByStart } from '../lib/eventFormat.js'
+import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import { defaultEventWindow, isMonthOutsideWindow, windowCovering } from '../lib/eventWindow.js'
 import ScheduleTable from '../components/ScheduleTable.jsx'
 import { useMediaQuery, WIDE_QUERY } from '../lib/useMediaQuery.js'
@@ -609,7 +610,11 @@ export default function Schedule() {
           same row shape — this is the house pattern, not a new idea. */}
       <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Schedule</h2>
+          <div>
+            <Kicker>Schedule</Kicker>
+            {/* The member portal's own events line, word for word. */}
+            <AccentTitle lead="Club life," accent="calendared." />
+          </div>
           <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
         </div>
         {/* "Add to calendar" sits beside "Add event" and is for EVERYONE — a
