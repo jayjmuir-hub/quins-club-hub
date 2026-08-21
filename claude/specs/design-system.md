@@ -1,5 +1,41 @@
 # Quins Club Hub — Design System Reference
 
+> ## −1. THE 2.0 RETHEME — what ships NOW (21 Aug 2026)
+>
+> **This section supersedes both the §0 notice below and the body where they
+> disagree.** The full decision record is
+> `claude/plans/2026-08-21-retheme-and-shell.md`; the tokens live in code.
+> Five phases, all shipped the same day:
+>
+> 1. **Colour is CSS variables, in TWO themes.** `src/index.css` is the
+>    single source of truth — light and dark palettes as RGB triplets —
+>    and `tailwind.config.js` reads them (`darkMode: 'class'`). The dark
+>    palette is the club site's own dark mode, measured live. The §0 line
+>    "the source of truth is tailwind.config.js" is superseded: the config
+>    is now a mapping, not a palette.
+> 2. **Dark mode + toggle.** Masthead disc; stored choice beats the OS,
+>    otherwise follows it live; no-flash inline script in `index.html`
+>    pinned to `src/lib/theme.js` by `tests/theme-switch.test.js`. Chrome
+>    (masthead, tab bar, sidebar) stays dark in BOTH themes — identity
+>    lives on the chrome. `scripts/contrast-check.mjs` measures BOTH
+>    palettes and fails the build on an AA miss.
+> 3. **The desktop shell is the member portal's**: fixed 256px dark sidebar
+>    (`src/components/Sidebar.jsx`) carrying ALL nav — Home, Schedule,
+>    Roster, Squad Hub, Notices, Admin, More — masthead slimmed to a
+>    utility bar, content full-width. `Nav.jsx` is the mobile tab bar only.
+>    §4.1/§4.3's desktop top-nav pills and §5's 1120px cap are history;
+>    the mobile anatomy below them still ships as written.
+> 4. **The editorial voice** (`src/components/Editorial.jsx`): Kicker
+>    (crimson slash + tiny uppercase label), AccentTitle (bold Inter +
+>    ONE Playfair-italic crimson word — "Club life, *calendared.*"),
+>    BlockTitle (slash + gradient rule). Playfair Display italic is
+>    self-hosted alongside Inter; `.accent-word` in index.css.
+> 5. **No width gate on admin.** The "needs a bigger screen" card is gone;
+>    admin renders at every width and the More screen links it on the
+>    phone. Role gates unchanged.
+>
+> **Identity:** the PWA installs as **"Club Hub"**, version 2.0.0.
+
 > ## 0. RETHEME NOTICE — read before trusting any colour below
 >
 > **The app no longer uses the palette or the type described in §1–§4 of this

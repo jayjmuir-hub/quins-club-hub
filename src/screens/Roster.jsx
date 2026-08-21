@@ -1,3 +1,4 @@
+import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import { useEffect, useMemo, useState } from 'react'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
@@ -610,7 +611,10 @@ export default function Roster() {
           the longest of any screen. */}
       <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Roster &amp; members</h2>
+          <div>
+            <Kicker>The club</Kicker>
+            <AccentTitle lead="Roster &" accent="members." />
+          </div>
           {/* Describes the scope, not the current filter — the per-group counts
               below already report what the search and pills leave. */}
           <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>

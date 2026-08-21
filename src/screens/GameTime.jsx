@@ -89,7 +89,7 @@ export default function GameTime() {
   if (editable.length === 0) {
     return (
       <section>
-        <h2 className="mb-3.5 mt-1 text-[21px] font-extrabold tracking-[-0.2px] text-ink">
+        <h2 className="mb-3.5 mt-1 font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">
           Game time
         </h2>
         <Card className="p-6">
@@ -105,7 +105,7 @@ export default function GameTime() {
   return (
     <section>
       <div className="mb-3.5 mt-1 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Game time</h2>
+        <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">Game time</h2>
       </div>
 
       {/* ⚠️ A PLAIN SELECT, NOT <TeamFilter>. That component always offers an

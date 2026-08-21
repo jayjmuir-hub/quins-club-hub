@@ -359,7 +359,7 @@ export default function Lineup() {
           document wider than the viewport rather than wrapping. It caught this
           screen on its first run. */}
       <div className="mb-3.5 mt-1 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Team sheet</h2>
+        <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">Team sheet</h2>
         <button
           type="button"
           onClick={() => navigate(-1)}

@@ -56,7 +56,8 @@ vi.mock('../src/data/players.js', () => ({
   listPlayers: () => new Promise(() => {}),
   getPlayerContact: () => new Promise(() => {}),
   // /admin/club (AdminClub) and the Accounts tab both read players.js.
-  listContactsForPlayers: () => new Promise(() => {}),
+  listContactsForPlayers: () => new Promise(() => {}),
+
   // The completeness card on YourPlayers reads this (17 Aug 2026).
   listPlayerPrivate: async () => [],
 }))
@@ -163,7 +164,8 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /schedule/i })).toBeInTheDocument()
+    // "Club life, *calendared.*" — the phase-5 editorial heading.
+    expect(screen.getByRole('heading', { name: /club life/i })).toBeInTheDocument()
   })
 
   it('renders the roster screen at /roster when signed in', () => {

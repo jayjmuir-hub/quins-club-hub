@@ -188,7 +188,7 @@ export default function YouthDashboard() {
     <section>
       <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">Match sheets</h2>
+          <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">Match sheets</h2>
           {/* ⚠️ "U11 AND UP" IS SAID OUT LOUD rather than left to be noticed.
               The minis' fixtures are filtered out above, so without this line
               the Youth Manager sees a list that is missing matches they know

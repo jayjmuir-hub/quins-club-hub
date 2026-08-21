@@ -181,7 +181,7 @@ export default function AdminDashboard() {
                 ← Admin
               </Link>
             )}
-            <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">
+            <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">
               {portal ? portalLabel(portal) : 'Admin'}
             </h2>
           </div>
