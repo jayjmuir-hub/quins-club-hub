@@ -198,7 +198,9 @@ describe('the tracking grid', () => {
   it('reports the squad summary with the no-show called out', async () => {
     renderAt('/squad/t-u12')
     expect(await screen.findByText(/50% attendance/)).toBeInTheDocument()
-    expect(screen.getByText(/1 said-in-but-absent/)).toBeInTheDocument()
+    // The squad summary line uses the same phrase, so scope to the sheet's
+    // own summary — the one that pairs it with the player's 0%.
+    expect(screen.getAllByText(/1 said-in-but-absent/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows RSVP counts on the upcoming event', async () => {
@@ -267,5 +269,44 @@ describe('the drill-in', () => {
     // showing pre-sheet data and this count would not move.
     await vi.waitFor(() => expect(listEventsMock.mock.calls.length).toBe(callsBefore + 1))
     expect(screen.queryByTestId('event-detail')).not.toBeInTheDocument()
+  })
+})
+
+describe('the phone tracking list', () => {
+  beforeEach(() => {
+    useMembershipsMock.mockReturnValue(
+      membershipsFor([{ role: 'coach', team_id: 't-u12', status: 'active' }]),
+    )
+  })
+
+  it('lists each player with the two numbers a coach acts on', async () => {
+    renderAt('/squad/t-u12')
+    // The mobile list and the desktop table are BOTH in the DOM (CSS decides,
+    // as with the two navs) — the list is the one holding buttons.
+    const row = await screen.findByRole('button', { name: /Ines Vukovic/ })
+    // Said in, marked absent: 0% and 1 no-show.
+    expect(row).toHaveTextContent('0%')
+    expect(row).toHaveTextContent('1 no-show')
+  })
+
+  it('opens a per-player history sheet with the same marks as the grid', async () => {
+    const user = userEvent.setup()
+    renderAt('/squad/t-u12')
+    await user.click(await screen.findByRole('button', { name: /Ines Vukovic/ }))
+    // Sheet header carries the player, the summary line pairs % and no-shows,
+    // and the event row shows the RSVP-beside-register marks.
+    expect(screen.getByText('0% attendance')).toBeInTheDocument()
+    // The squad summary line uses the same phrase, so scope to the sheet's
+    // own summary — the one that pairs it with the player's 0%.
+    expect(screen.getAllByText(/1 said-in-but-absent/).length).toBeGreaterThanOrEqual(1)
+    // "Quins vs Sharjah" also appears in the match-sheets chaser link, so
+    // pick the sheet's copy: the one inside a list item carrying the marks.
+    const sheetRow = screen
+      .getAllByText(/Quins vs Sharjah/)
+      .map((el) => el.closest('li'))
+      .find((li) => li && /·|In|A/.test(li.textContent))
+    expect(sheetRow).toBeTruthy()
+    expect(sheetRow).toHaveTextContent('In') // said in...
+    expect(sheetRow).toHaveTextContent('A') // ...marked absent
   })
 })
