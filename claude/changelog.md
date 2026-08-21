@@ -10,6 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🖱️ **THE HUB'S EVENTS NOW OPEN.** Jay, minutes after seeing it live: the
+  Coming-up rows "don't do anything". They now open the same EventDetail →
+  Availability / Register drill-in Dashboard and Schedule use, and the hub
+  re-fetches when the sheet closes so an RSVP or a register taken there
+  reaches the grid at once. Coming up capped at five rows and both it and the
+  grid scroll inside themselves rather than taking the page.
+- `9caed53` — the squash that shipped the Squad Hub (#281).
 - 🏉 **THE SQUAD HUB — the coach/manager dashboard.** `/squad` and
   `/squad/:teamId`: a one-squad coach lands straight in it, multi-squad staff
   and admins pick. Upcoming events with RSVP counts, outstanding RCM sheets

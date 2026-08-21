@@ -46,7 +46,29 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+// The drill-in sheets are stubbed, FeedbackTriage-style: every assertion in
+// this file is about the HUB's wiring — which sheet is open, with which event
+// — and none should start depending on what the real sheets render. Their own
+// behaviour is covered by tests/event-detail-series.test.jsx,
+// tests/availability.test.jsx and the register tests.
+vi.mock('../src/screens/EventDetail.jsx', () => ({
+  default: ({ event, onOpenAvailability, onClose }) => (
+    <div data-testid="event-detail">
+      <p>detail: {event.id}</p>
+      <button type="button" onClick={onOpenAvailability}>stub availability</button>
+      <button type="button" onClick={onClose}>stub close</button>
+    </div>
+  ),
+}))
+vi.mock('../src/screens/Availability.jsx', () => ({
+  default: ({ event }) => <div data-testid="availability-sheet">availability: {event.id}</div>,
+}))
+vi.mock('../src/screens/Register.jsx', () => ({
+  default: ({ event }) => <div data-testid="register-sheet">register: {event.id}</div>,
+}))
+
 import SquadHub from '../src/screens/SquadHub.jsx'
+import userEvent from '@testing-library/user-event'
 
 const TEAMS = [
   { id: 't-u12', name: 'U12 Mixed', sort_order: 3 },
@@ -201,5 +223,43 @@ describe('match sheets', () => {
     await vi.waitFor(() => expect(listMatchSheetsForMock).toHaveBeenCalled())
     expect(listMatchSheetsForMock).toHaveBeenCalledWith([])
     expect(screen.queryByText(/match sheets outstanding/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('the drill-in', () => {
+  beforeEach(() => {
+    useMembershipsMock.mockReturnValue(
+      membershipsFor([{ role: 'coach', team_id: 't-u12', status: 'active' }]),
+    )
+  })
+
+  it('opens the event detail sheet from a Coming up row', async () => {
+    const user = userEvent.setup()
+    renderAt('/squad/t-u12')
+    await user.click(await screen.findByRole('button', { name: /Tuesday training/ }))
+    expect(screen.getByTestId('event-detail')).toHaveTextContent('detail: e-next')
+  })
+
+  it('drills from detail into availability, with the same event', async () => {
+    const user = userEvent.setup()
+    renderAt('/squad/t-u12')
+    await user.click(await screen.findByRole('button', { name: /Tuesday training/ }))
+    await user.click(screen.getByRole('button', { name: 'stub availability' }))
+    expect(screen.getByTestId('availability-sheet')).toHaveTextContent('availability: e-next')
+    // Availability REPLACES the detail sheet rather than stacking on it —
+    // the same one-sheet-at-a-time rule Dashboard follows.
+    expect(screen.queryByTestId('event-detail')).not.toBeInTheDocument()
+  })
+
+  it('re-fetches on close, so an RSVP set in the sheet reaches the grid', async () => {
+    const user = userEvent.setup()
+    renderAt('/squad/t-u12')
+    await user.click(await screen.findByRole('button', { name: /Tuesday training/ }))
+    const callsBefore = listEventsMock.mock.calls.length
+    await user.click(screen.getByRole('button', { name: 'stub close' }))
+    // Against the injected fault "just close the sheet": the grid would keep
+    // showing pre-sheet data and this count would not move.
+    await vi.waitFor(() => expect(listEventsMock.mock.calls.length).toBe(callsBefore + 1))
+    expect(screen.queryByTestId('event-detail')).not.toBeInTheDocument()
   })
 })
