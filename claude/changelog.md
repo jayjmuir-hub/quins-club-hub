@@ -10,6 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 📓 **20–21 Aug session record** —
+  `claude/handoffs/2026-08-21-notices-plans-and-harnesses.md`. Eight pull
+  requests, #265 to #272, two migrations applied to production.
+  ⚠️ **Its one idea: a green check can be green by coincidence.** Three separate
+  things were passing while testing nothing — two push harnesses that compared
+  the whole audience against one person's devices and were correct only while a
+  single person had subscribed, a harness whose fixture could not execute at
+  all, and a notice audience picker that nothing covered.
+- `883afd0` — the squash that sent one notice to any number of age groups.
+
 - 📢 **A NOTICE CAN GO TO ANY NUMBER OF AGE GROUPS, OR THE WHOLE CLUB.** Jay:
   *"check boxes for age groups… select whole club and the other options grey out
   so we don't send redundant notices"*. The `<select>` is now a checkbox group;
