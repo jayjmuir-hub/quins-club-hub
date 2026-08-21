@@ -10,6 +10,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- `bb4c651` — the squash with the phase-4 polish (#288), from a parallel
+  session working the same day.
 - 🧹 **PHASE 5: THE SWEEP — the retheme is COMPLETE.** Every remaining page
   heading moved to the editorial system: Schedule opens "Club life,
   *calendared.*" and Notices "From the *committee.*" (the portal's own
