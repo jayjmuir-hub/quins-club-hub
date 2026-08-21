@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import { withCap, unwrapCapped } from './limits.js'
+import { fetchByIds, withCap, unwrapCapped } from './limits.js'
 
 // Data access for the attendance table — who actually turned up.
 //
@@ -75,6 +75,32 @@ export async function listAttendanceForPlayer(playerId) {
     'attendance records',
     'Narrow it to a season before reading a whole career.',
   )
+}
+
+/**
+ * Attendance across many events in one query — the Squad Hub's tracking grid,
+ * which needs the register for a whole season of one squad, not one event at
+ * a time the way listAttendance(eventId) does.
+ *
+ * ⚠️ CHUNKED WITH fetchByIds, exactly like listAvailabilityForEvents and for
+ * the measured reason recorded there: PostgREST takes `.in()` as a query
+ * STRING, ~37 bytes of URL per uuid — 300 ids works, 400 makes the fetch
+ * THROW a connection error. An empty eventIds array returns [] without
+ * querying; empty input must never be read as "no filter, return everything".
+ *
+ * RLS still decides everything: a coach gets their squad's rows, anyone else
+ * gets whatever `attendance read` allows, and fewer rows than expected is a
+ * normal answer, not an error.
+ */
+export async function listAttendanceForEvents(eventIds) {
+  return fetchByIds(eventIds, async (chunk) => {
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('id, event_id, player_id, status, recorded_at')
+      .in('event_id', chunk)
+    if (error) throw error
+    return data ?? []
+  })
 }
 
 // A write the database refused is not an error as far as PostgREST is

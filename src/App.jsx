@@ -24,6 +24,7 @@ import AdminStaff from './screens/AdminStaff.jsx'
 import Accounts from './screens/Accounts.jsx'
 import Pitches from './screens/Pitches.jsx'
 import Allocation from './screens/Allocation.jsx'
+import SquadHub from './screens/SquadHub.jsx'
 import YouthDashboard from './screens/YouthDashboard.jsx'
 import MatchSheet from './screens/MatchSheet.jsx'
 import Lineup from './screens/Lineup.jsx'
@@ -178,6 +179,17 @@ export default function App() {
               RLS, and the composer is offered only where the database would
               accept it. */}
           <Route path="/notices" element={<AppShell><Notices /></AppShell>} />
+
+          {/* THE SQUAD HUB (21 Aug 2026) — the coach/manager dashboard, one
+              squad at a time. ⚠️ NOT under /admin, same reason as /notices:
+              its audience is squad staff, and AdminDashboard's isAdmin() gate
+              would turn every coach away at the door. The screen self-gates
+              with canEditTeam ("not your squad", not security — RLS decides
+              the data). Bare /squad lands a one-squad coach straight in
+              their hub and offers everyone else the picker.
+              claude/plans/2026-08-21-squad-hub.md. */}
+          <Route path="/squad" element={<AppShell><SquadHub /></AppShell>} />
+          <Route path="/squad/:teamId" element={<AppShell><SquadHub /></AppShell>} />
 
           {/* Admin-only, desktop-only. AdminDashboard gates on isAdmin()
               against the EFFECTIVE membership set and renders <Outlet/>,

@@ -31,7 +31,7 @@ import { pinnedNotices,
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canEditTeam, isAdmin, isSquadStaffRole, roleLabel, visibleTeams } from '../lib/scope.js'
 import { recordsScores, squadFormat } from '../lib/minis.js'
 import {
   clubToday,
@@ -862,6 +862,29 @@ export default function Dashboard() {
           for the squad this week outranks a prompt about a feature. */}
       <NotificationsNudge />
 
+      {/* The coach/manager's front door (21 Aug 2026). Squad staff only —
+          admins already have /admin, and parents/players have nothing behind
+          this link, so showing it to them would be a dead end. Costs nothing
+          when it does not apply, same argument as the two blocks above.
+          claude/plans/2026-08-21-squad-hub.md. */}
+      {memberships?.some((m) => isSquadStaffRole(m.role) && m.team_id) && (
+        <Card className="mb-4 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-extrabold text-ink">Squad Hub</h3>
+              <p className="text-[13px] font-medium text-ink-muted">
+                Your squad&apos;s availability, register and season at a glance.
+              </p>
+            </div>
+            <Link
+              to="/squad"
+              className="shrink-0 rounded-[11px] border-[1.5px] border-brand px-3 py-2 text-sm font-bold text-brand-deep hover:bg-surface-mute"
+            >
+              Open
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {nextFixture && (
         <NextFixtureHero
