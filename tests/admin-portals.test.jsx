@@ -68,6 +68,9 @@ function renderAt(path) {
           <Route path="youth" element={<div>Match sheets marker</div>} />
           <Route path="social" element={<div>What&apos;s on marker</div>} />
           <Route path="social/ideas" element={<div>Ideas marker</div>} />
+        <Route path="training" element={<div>Library marker</div>} />
+        <Route path="training/templates" element={<div>Templates marker</div>} />
+        <Route path="training/publish" element={<div>Publish marker</div>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -80,13 +83,14 @@ beforeEach(() => {
 })
 
 describe('portals.js', () => {
-  it('labels the three jobs from scope.js, so the naming ruling has one home', () => {
+  it('labels the four jobs from scope.js, so the naming ruling has one home', () => {
     const byKey = Object.fromEntries(PORTALS.map((p) => [p.key, portalLabel(p)]))
     expect(byKey).toEqual({
       club: 'Club Admin',
       pitches: 'Pitch Management',
       youth: 'Club Youth Manager',
       media: 'Social Media Management',
+      training: 'Rugby Performance Director',
     })
   })
 
@@ -102,6 +106,11 @@ describe('portals.js', () => {
     expect(portalForPath('/admin/allocation').key).toBe('pitches')
     expect(portalForPath('/admin/pitches').key).toBe('pitches')
     expect(portalForPath('/admin/youth').key).toBe('youth')
+    // ⚠️ NESTED, like /admin/social — the child paths must land in the SAME
+    // portal, not fall through to the chooser.
+    expect(portalForPath('/admin/training').key).toBe('training')
+    expect(portalForPath('/admin/training/templates').key).toBe('training')
+    expect(portalForPath('/admin/training/publish').key).toBe('training')
   })
 
   // ⚠️ TESTED AGAINST A SYNTHETIC PORTAL, NOT A REAL ONE, AND ON PURPOSE.
@@ -133,11 +142,11 @@ describe('portals.js', () => {
 })
 
 describe('PortalChooser', () => {
-  it('renders ALL four cards for an admin with no extra rights, only one of them a link', () => {
+  it('renders ALL five cards for an admin with no extra rights, only one of them a link', () => {
     useMembershipsMock.mockReturnValue(memberships(admin([])))
     renderAt('/admin')
 
-    expect(screen.getAllByTestId(/^portal-card-/)).toHaveLength(4)
+    expect(screen.getAllByTestId(/^portal-card-/)).toHaveLength(5)
     const open = screen.getAllByTestId('portal-card-open')
     expect(open).toHaveLength(1)
     expect(open[0]).toHaveAttribute('href', '/admin/accounts')
@@ -164,6 +173,37 @@ describe('PortalChooser', () => {
     expect(open.map((el) => el.getAttribute('href'))).toEqual(['/admin/accounts', '/admin/allocation'])
   })
 
+  // The fourth job (21 Aug 2026). Its card behaves exactly like the other
+  // three — which is the point of there being one PORTALS list.
+  it('offers the Rugby Performance Director card to an admin holding training', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin(['training'])))
+    renderAt('/admin')
+
+    const card = screen.getByRole('link', { name: /Rugby Performance Director/ })
+    // ⚠️ tabs[0] — entering the portal lands on the Library, not on Publish.
+    expect(card).toHaveAttribute('href', '/admin/training')
+  })
+
+  // ⚠️ THE GREY CARD, ASSERTED IN WORDS AND IN MARKUP. Colour alone cannot say
+  // WHY a card is closed (claude/specs/accessibility.md), and a grey <Link>
+  // would pass a screenshot while still being pressable.
+  it('greys the card for an admin without the right, in words', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin(['youth'])))
+    renderAt('/admin')
+
+    expect(screen.queryByRole('link', { name: /Rugby Performance Director/ })).toBeNull()
+
+    const card = screen
+      .getAllByTestId('portal-card-closed')
+      .find((el) => el.textContent.includes('Rugby Performance Director'))
+    expect(card).toBeDefined()
+    // "no right", not "no screen" — the two have different fixes.
+    expect(card).toHaveAttribute('data-reason', 'no-right')
+    expect(card).toHaveTextContent(/hasn’t been added to your account/i)
+    expect(card.querySelector('a')).toBeNull()
+    expect(card.querySelector('button')).toBeNull()
+  })
+
   // ⚠️ THIS TEST USED TO ASSERT THE OPPOSITE. Until Social Media Management
   // shipped its two screens later on 12 Aug 2026, a super admin saw three open
   // cards and one grey. It is rewritten rather than deleted because the claim
@@ -173,7 +213,7 @@ describe('PortalChooser', () => {
     useMembershipsMock.mockReturnValue(memberships(admin([], { is_super: true })))
     renderAt('/admin')
 
-    expect(screen.getAllByTestId('portal-card-open')).toHaveLength(4)
+    expect(screen.getAllByTestId('portal-card-open')).toHaveLength(5)
     expect(screen.queryAllByTestId('portal-card-closed')).toHaveLength(0)
     expect(screen.getByRole('link', { name: /Social Media Management/ }))
       .toHaveAttribute('href', '/admin/social')
@@ -338,6 +378,35 @@ describe('AdminDashboard — inside a portal', () => {
     const tabs = screen.getByRole('navigation', { name: /admin sections/i })
     expect(within(tabs).getByRole('link', { name: /What’s on/ })).toHaveAttribute('aria-current', 'page')
     expect(within(tabs).getByRole('link', { name: 'Ideas' })).not.toHaveAttribute('aria-current')
+  })
+
+  // ⚠️ THE SECOND NESTED PORTAL, AND IT HAS THE TRAP TWICE OVER.
+  // /admin/training/templates and /admin/training/publish both start with
+  // /admin/training, so a NavLink without `end` would light "Library" up on all
+  // three screens. Social Media Management proved the rule; this proves it did
+  // not stop applying when a second portal was nested the same way.
+  it('⚠️ marks only the training tab you are ON, not its parent', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin(['training'])))
+    renderAt('/admin/training/templates')
+
+    const tabs = screen.getByRole('navigation', { name: /admin sections/i })
+    expect(within(tabs).getAllByRole('link').map((el) => el.textContent)).toEqual([
+      'Library',
+      'Templates',
+      'Publish',
+    ])
+    expect(within(tabs).getByRole('link', { name: 'Templates' })).toHaveAttribute('aria-current', 'page')
+    expect(within(tabs).getByRole('link', { name: 'Library' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('heading', { name: 'Rugby Performance Director' })).toBeInTheDocument()
+  })
+
+  it('marks the Library tab when you are actually on it', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin(['training'])))
+    renderAt('/admin/training')
+
+    const tabs = screen.getByRole('navigation', { name: /admin sections/i })
+    expect(within(tabs).getByRole('link', { name: 'Library' })).toHaveAttribute('aria-current', 'page')
+    expect(within(tabs).getByRole('link', { name: 'Templates' })).not.toHaveAttribute('aria-current')
   })
 
   it('⚠️ draws NO tab row for a one-tab portal', () => {

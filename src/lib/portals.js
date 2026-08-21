@@ -100,6 +100,25 @@ export const PORTALS = [
       { to: '/admin/social/ideas', label: 'Ideas' },
     ],
   },
+  {
+    key: 'training',
+    right: 'training',
+    blurb: 'Drills, session templates, and publishing them to squads.',
+    // ⚠️ NESTED LIKE `media`, AND THE SECOND PORTAL IN THE FILE THAT IS.
+    // /admin/training/templates sits UNDER /admin/training, so the tab row's
+    // NavLink must pass `end` or "Library" lights up on all three screens.
+    // AdminDashboard already does; the pair of tests in
+    // tests/admin-portals.test.jsx is what keeps it doing so.
+    //
+    // ⚠️ LIBRARY FIRST BECAUSE ENTERING THE PORTAL LANDS ON tabs[0] — the same
+    // trap the Allocation note above records. Publishing is the end of the job,
+    // not the start of it, so it must never be tabs[0].
+    tabs: [
+      { to: '/admin/training', label: 'Library' },
+      { to: '/admin/training/templates', label: 'Templates' },
+      { to: '/admin/training/publish', label: 'Publish' },
+    ],
+  },
 ]
 
 /**

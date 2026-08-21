@@ -47,7 +47,15 @@ beforeEach(() => {
 describe('assigning admin rights', () => {
   it('shows every right, none ticked for a plain admin', async () => {
     setup()
-    for (const label of ['Club Youth Manager', 'Social Media Management', 'Pitch Management']) {
+    // ⚠️ FOUR SINCE 21 Aug 2026. Listed by hand rather than mapped from
+    // ADMIN_RIGHTS, so that a wrong label cannot agree with itself.
+    const LABELS = [
+      'Club Youth Manager',
+      'Social Media Management',
+      'Pitch Management',
+      'Rugby Performance Director',
+    ]
+    for (const label of LABELS) {
       expect(screen.getByRole('checkbox', { name: label })).not.toBeChecked()
     }
   })
@@ -72,7 +80,15 @@ describe('assigning admin rights', () => {
     // A super admin holds all rights implicitly. Empty boxes would read as
     // "this person has no rights", which is the opposite of the truth.
     setup({ membership: membership({ is_super: true }) })
-    for (const label of ['Club Youth Manager', 'Social Media Management', 'Pitch Management']) {
+    // ⚠️ FOUR SINCE 21 Aug 2026. Listed by hand rather than mapped from
+    // ADMIN_RIGHTS, so that a wrong label cannot agree with itself.
+    const LABELS = [
+      'Club Youth Manager',
+      'Social Media Management',
+      'Pitch Management',
+      'Rugby Performance Director',
+    ]
+    for (const label of LABELS) {
       const box = screen.getByRole('checkbox', { name: label })
       expect(box).toBeChecked()
       expect(box).toBeDisabled()
