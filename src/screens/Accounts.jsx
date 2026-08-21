@@ -2067,7 +2067,7 @@ export default function Accounts() {
             aria-pressed={roleFilter === ALL_ROLES}
             className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
               roleFilter === ALL_ROLES
-                ? 'border-ink bg-ink text-white'
+                ? 'border-ink bg-ink text-surface-card'
                 : 'border-line bg-surface-card text-ink-muted'
             }`}
           >
@@ -2081,7 +2081,7 @@ export default function Accounts() {
               aria-pressed={roleFilter === option.value}
               className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
                 roleFilter === option.value
-                  ? 'border-ink bg-ink text-white'
+                  ? 'border-ink bg-ink text-surface-card'
                   : 'border-line bg-surface-card text-ink-muted'
               }`}
             >
