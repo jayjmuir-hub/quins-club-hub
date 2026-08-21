@@ -1,6 +1,6 @@
 # Training session plans — the plan
 
-**STATUS: NOT SHIPPED — REOPENED BY JAY, 20 Aug 2026.** Written 12 Aug 2026,
+**STATUS: SHIPPED (pieces 1–3, on a branch awaiting merge, 21 Aug 2026) — see `claude/specs/2026-08-21-training-plans-dashboard-design.md`. Notification, AI assist and a session pair are NOT built.** Was: NOT SHIPPED — REOPENED BY JAY, 20 Aug 2026. Written 12 Aug 2026,
 tabled the same day (*"table 1 and 2 for now until i bring them back up again"*),
 reopened eight days later: *"i want to create another admin position named Rugby
 Performance Director, and then i want to create a system where that person can

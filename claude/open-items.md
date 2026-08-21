@@ -73,6 +73,15 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Cheap (under an hour each)
 
+- **Training plans follow-ups from the 21 Aug 2026 whole-branch review** (none
+  blocking): client-side age validation on the drill and template forms (a typo
+  of 99 surfaces a raw `drills_min_age_check`); `saveTemplate`/`saveSessionBlocks`
+  are two round trips (caveat recorded in the spec; an RPC would close it);
+  a `.gitattributes` decision — the system `core.autocrlf=true` flattens CRLF test
+  files on `git add` and cost one review round; no test for the embed sort in
+  `listTemplates`/`getSession`; the three screens are 600–760 lines (seams named
+  in their headers).
+
 - ✅ ~~**`authenticated` holds TRUNCATE on every table it holds anything on**,
   including `memberships`, `player_parents` and (as of 18 Aug 2026)
   `push_subscriptions` — found while capturing that table's grants, measured

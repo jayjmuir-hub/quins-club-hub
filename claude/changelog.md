@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🏉 **THE RUGBY PERFORMANCE DIRECTOR DASHBOARD IS BUILT — pieces 1–3, one PR,
+  23 branch commits, no SHA here because `main` squash-merges.** `training`
+  admin right; `/admin/training` with Library, Templates (the hour builder with
+  a running total and the 65-minute question) and Publish (preview per squad,
+  then the same SQL function for real); a Contact/Tag switch per squad on
+  `/admin/club`; the plan on every training event's sheet, adjustable by the
+  coach. Migration `training_plans` APPLIED to production on Jay's "apply";
+  harness `db/tests/training-plans.sql` 6/6 live. Full suite green, build green.
+  ⚠️ **A second migration, `publish_training_fit_check`, is written and NOT
+  applied** — the function trusted `_teams` with no club or contact check.
+  ⛔ Nothing keys on a weekday; `requires_contact` is a column; the null band
+  refuses with a reason — and a template that sets NO age now reaches the senior
+  squads, which the first cut wrongly refused forever.
 - 🏉 **THE RUGBY PERFORMANCE DIRECTOR DASHBOARD IS SPECCED AND PLANNED, pieces
   1–3 of five.** Jay chose the scope (foundation, Library + Templates, Publish +
   coach view); notification email, AI assist and a first/second-session pair
