@@ -10,6 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 📵 **iPHONE STATUS-BAR FIX.** Jay, from the installed app: "the top bar is
+  up under the time, battery, etc, so nothing up there can be clicked".
+  viewport-fit=cover has always let the installed app draw under the status
+  bar, and every safe-area inset in the codebase handled the BOTTOM — the
+  top was never padded. AppShell's sticky chrome wrapper now carries
+  `pt-[env(safe-area-inset-top)]` + `bg-chrome`, so the banner and masthead
+  clear the clock and the padded strip reads as chrome, not a gap. Desktop
+  and un-installed browsers get env() = 0 and are unchanged.
+- `87f7eca` — the squash that completed the retheme: phase 5, the sweep
+  (#289).
+
 - `bb4c651` — the squash with the phase-4 polish (#288), from a parallel
   session working the same day.
 - 🧹 **PHASE 5: THE SWEEP — the retheme is COMPLETE.** Every remaining page
