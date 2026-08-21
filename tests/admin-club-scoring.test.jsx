@@ -19,6 +19,7 @@ const listPlayersMock = vi.fn()
 const listContactsForPlayersMock = vi.fn()
 const listAllLeagueTeamsMock = vi.fn()
 const setTeamScoringKindsMock = vi.fn()
+const setRequiresContactMock = vi.fn()
 const reloadMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
@@ -29,7 +30,7 @@ vi.mock('../src/lib/auth.jsx', () => ({
 }))
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
-  listContactsForPlayers: (...args) => listContactsForPlayersMock(...args),
+  listContactsForPlayers: (...args) => listContactsForPlayersMock(...args),
   // The completeness card on YourPlayers reads this (17 Aug 2026).
   listPlayerPrivate: async () => [],
 }))
@@ -44,6 +45,7 @@ vi.mock('../src/data/leagueTeams.js', () => ({
 }))
 vi.mock('../src/data/teams.js', () => ({
   setTeamScoringKinds: (...args) => setTeamScoringKindsMock(...args),
+  setTeamRequiresContact: (...args) => setRequiresContactMock(...args),
 }))
 
 import AdminClub from '../src/screens/AdminClub.jsx'
@@ -91,6 +93,7 @@ beforeEach(() => {
   listContactsForPlayersMock.mockResolvedValue([])
   listAllLeagueTeamsMock.mockResolvedValue([])
   setTeamScoringKindsMock.mockResolvedValue({})
+  setRequiresContactMock.mockResolvedValue({})
   reloadMock.mockResolvedValue(undefined)
 })
 
@@ -221,6 +224,79 @@ describe('AdminClub — how a squad scores', () => {
     expect(
       within(screen.getByTestId('scoring-panel')).getByRole('checkbox', { name: 'Conversions' }),
     ).toHaveAttribute('aria-checked', 'true')
+    expect(reloadMock).not.toHaveBeenCalled()
+  })
+})
+
+// The CONTACT/TAG flag, in the same panel and for the same reason: this panel
+// is "what applies to this squad". Task 3 of the training-plans dashboard —
+// claude/specs/2026-08-21-training-plans-dashboard-design.md.
+//
+// ⚠️ THE POINT OF EVERY FIXTURE BELOW IS THAT THE NAME DISAGREES WITH THE
+// COLUMN. 'U10 Mixed Contact' is stored as TAG and 'U8 Tag' is stored as
+// CONTACT, so a screen that read the squad's name — or its age — instead of
+// teams.requires_contact fails every assertion here. That is the whole reason
+// the flag is a column.
+describe('AdminClub — whether a squad plays contact', () => {
+  it('offers a contact/tag switch in the scoring panel and saves the column', async () => {
+    const { user } = renderClub()
+
+    await user.click(await screen.findByTestId('scoring-chip-team-u10'))
+    const panel = within(screen.getByTestId('scoring-panel'))
+
+    // Named "U10 Mixed Contact" and reported as tag, because the column says so.
+    const toggle = panel.getByRole('switch', { name: /contact rugby/i })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+
+    await user.click(toggle)
+
+    await waitFor(() => expect(setRequiresContactMock).toHaveBeenCalled())
+    expect(setRequiresContactMock).toHaveBeenCalledWith('team-u10', true)
+  })
+
+  it('⚠️ turns a contact squad back to tag — the switch is not one-way', async () => {
+    // A squad can stop playing contact (a merged age group, an injury-hit
+    // season). If the switch only ever sent `true` the club could never undo a
+    // mis-tap, and a contact drill would stay publishable to a tag squad.
+    const { user } = renderClub([{ ...OVERRIDDEN, requires_contact: true }, U10, U12G, U16B])
+
+    await user.click(await screen.findByTestId('scoring-chip-team-u8'))
+    const panel = within(screen.getByTestId('scoring-panel'))
+
+    // Named "U8 Tag" and reported as contact, because the column says so.
+    const toggle = panel.getByRole('switch', { name: /contact rugby/i })
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+
+    await user.click(toggle)
+
+    await waitFor(() => expect(setRequiresContactMock).toHaveBeenCalled())
+    expect(setRequiresContactMock).toHaveBeenCalledWith('team-u8', false)
+  })
+
+  it('reloads the squads after the switch, so the flag is not stale', async () => {
+    const { user } = renderClub()
+
+    await user.click(await screen.findByTestId('scoring-chip-team-u10'))
+    await user.click(within(screen.getByTestId('scoring-panel')).getByRole('switch'))
+
+    await waitFor(() => expect(reloadMock).toHaveBeenCalled())
+  })
+
+  it('⚠️ leaves the panel OPEN and the switch unchanged when the write is refused', async () => {
+    // Same rule as the scoring save: closing on a refused write presents it as
+    // a completed one, and the reload must not run on a write that never
+    // landed or the switch redraws as though something had been attempted.
+    setRequiresContactMock.mockRejectedValueOnce(new Error('Only a club admin can do that.'))
+    const { user } = renderClub()
+
+    await user.click(await screen.findByTestId('scoring-chip-team-u10'))
+    await user.click(within(screen.getByTestId('scoring-panel')).getByRole('switch'))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/only a club admin/i))
+    expect(screen.getByTestId('scoring-panel')).toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('scoring-panel')).getByRole('switch', { name: /contact rugby/i }),
+    ).toHaveAttribute('aria-checked', 'false')
     expect(reloadMock).not.toHaveBeenCalled()
   })
 })

@@ -10,7 +10,7 @@ import {
   upsertLeagueTeam,
 } from '../data/leagueTeams.js'
 import { listContactsForPlayers, listPlayers } from '../data/players.js'
-import { setTeamScoringKinds } from '../data/teams.js'
+import { setTeamScoringKinds, setTeamRequiresContact } from '../data/teams.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { SCORE_KINDS, SCORE_LABELS, scoringForBand, scoringForTeam } from '../lib/scoring.js'
 import { ageBandFromTeamName } from '../lib/ageGroup.js'
@@ -359,6 +359,22 @@ export default function AdminClub() {
     })
   }
 
+  /**
+   * Flips the squad between contact and tag.
+   *
+   * ⚠️ SAME SHAPE AS saveScoring, AND FOR THE SAME REASON: `reloadTeams()` is
+   * INSIDE the work, so a refused write leaves the panel open with the switch
+   * still showing what the database actually holds. Reloading after a write
+   * that never landed would redraw the switch as though something had changed.
+   */
+  function saveRequiresContact(next) {
+    const team = scoringTeam
+    return run(async () => {
+      await setTeamRequiresContact(team.id, next)
+      await reloadTeams()
+    })
+  }
+
   function toggleKind(kind) {
     setDraftKinds((current) =>
       current.includes(kind)
@@ -566,7 +582,8 @@ export default function AdminClub() {
           </h3>
 
           <p className="mb-2.5 text-[12.5px] leading-relaxed text-ink-muted">
-            What a coach can record against this squad&rsquo;s fixtures. The points are the laws of
+            What a coach can record against this squad&rsquo;s fixtures, and whether it plays
+            contact. The points are the laws of
             the game and are not editable — what changes by age is which of them apply.
           </p>
 
@@ -593,6 +610,44 @@ export default function AdminClub() {
                 </button>
               )
             })}
+          </div>
+
+          {/* ⚠️ CONTACT OR TAG IS A FACT ABOUT THE SQUAD, and it is set here
+              beside the scoring for the reason the scoring is here: this is the
+              panel for "what applies to this squad". A section of its own would
+              have to repeat the whole squad list to say the same thing.
+
+              ⚠️ IT COMES FROM THE COLUMN, NOT THE NAME AND NOT THE AGE. This
+              club runs tag sides above the age at which contact begins, and
+              several squad names say nothing either way — so the flag decides
+              which drills may be PUBLISHED to this squad, and a tackling drill
+              never reaches a tag squad. The default (false) fails safe: a
+              contact drill can never reach a squad nobody has marked.
+              Reasoning: claude/specs/2026-08-21-training-plans-dashboard-design.md.
+
+              ⚠️ SAVES ON THE CLICK, with no Save button. There is one bit to
+              change, so a draft state would only be a second chance to forget
+              to press Save — and `run` closes the panel on success exactly as
+              it does for the scoring save. */}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-[13px] font-bold text-ink">Contact rugby</span>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Contact rugby"
+              aria-checked={scoringTeam.requires_contact === true}
+              disabled={saving}
+              onClick={() => saveRequiresContact(scoringTeam.requires_contact !== true)}
+              className={[
+                CHIP,
+                scoringTeam.requires_contact === true
+                  ? 'border-brand bg-brand text-white'
+                  : 'border-line text-ink hover:border-brand hover:text-brand',
+                saving ? 'opacity-60' : '',
+              ].join(' ')}
+            >
+              {scoringTeam.requires_contact === true ? 'Contact' : 'Tag'}
+            </button>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2.5">

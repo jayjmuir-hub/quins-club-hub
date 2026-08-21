@@ -46,3 +46,48 @@ export async function setTeamScoringKinds(teamId, kinds) {
   if (!data) throw new Error(REFUSED)
   return data
 }
+
+// ⚠️ ITS OWN MESSAGE, not the scoring one above. Both refusals come from the
+// same `team manage` policy, but a coach told "you can't change how a squad
+// scores" after flipping a contact switch would go looking for the wrong bug.
+const REFUSED_CONTACT =
+  "We couldn't save that. Only a club admin can change whether a squad plays contact."
+
+/**
+ * Marks a squad as contact (true) or tag (false).
+ *
+ * ⚠️ A COLUMN, NEVER THE NAME AND NEVER THE AGE — the same rule
+ * setTeamScoringKinds carries above, and here it is load-bearing rather than
+ * tidy. Several squad names say nothing either way ("U12G QR"), some say the
+ * opposite of what the squad does, and this club runs TAG sides above the age
+ * at which contact normally begins. Deriving the flag from either would be a
+ * guess, and the thing being guessed at is whether a tackling drill may be
+ * published to a group of children.
+ *
+ * ⚠️ THE DEFAULT (false) FAILS SAFE. Every squad is tag until an admin says
+ * otherwise, so a contact drill can never reach a squad nobody has marked. The
+ * cost of the default being wrong is a coach opening this panel; the cost of
+ * the opposite default being wrong is a contact session published to a tag
+ * squad.
+ *
+ * ⚠️ THROWS WHEN RLS FILTERS THE WRITE TO ZERO ROWS — the same trap as
+ * setTeamScoringKinds: a non-admin's update arrives as `data === null` with
+ * `error === null`, a perfectly successful nothing.
+ */
+export async function setTeamRequiresContact(teamId, value) {
+  if (!teamId) throw new Error(REFUSED_CONTACT)
+
+  const { data, error } = await supabase
+    .from('teams')
+    // ⚠️ `=== true`, not the raw argument. The column is NOT NULL, so an
+    // undefined or absent value must land as false rather than as a null the
+    // database would reject.
+    .update({ requires_contact: value === true })
+    .eq('id', teamId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw new Error(error.message || REFUSED_CONTACT)
+  if (!data) throw new Error(REFUSED_CONTACT)
+  return data
+}
