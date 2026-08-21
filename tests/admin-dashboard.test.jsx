@@ -229,16 +229,19 @@ describe('AdminDashboard — tabs', () => {
     expect(screen.getByRole('link', { name: /Admin/ })).toHaveAttribute('href', '/admin')
   })
 
-  // Desktop-only, the way /accounts and /overview always were. jsdom applies
-  // no CSS, so the class token is what is actually testable here — the same
-  // approach tests/app-shell.test.jsx uses for the role label.
-  it('shows a bigger-screen note that is hidden at the desktop breakpoint', () => {
+  // ⚠️ INVERTED IN PHASE 4 (21 Aug 2026, Jay: "bring admin functions into
+  // the app, that is my decision now"). This test used to pin the
+  // "Needs a bigger screen" note and its desktop:hidden class; the note is
+  // gone, and what must now hold is the opposite — the admin shell renders
+  // with NO width gate wrapping it, so a phone gets the real screen.
+  it('renders the admin shell with no width gate — admin works on a phone now', () => {
     renderAdmin()
 
-    const note = screen.getByTestId('admin-small-screen-note')
-    expect(note).toHaveTextContent(/bigger screen/i)
-    expect(hasClassToken(note, 'desktop:hidden')).toBe(true)
-    expect(hasClassToken(note, 'hidden')).toBe(false)
+    expect(screen.queryByTestId('admin-small-screen-note')).not.toBeInTheDocument()
+    expect(screen.queryByText(/bigger screen/i)).not.toBeInTheDocument()
+    // The tab content itself renders — the Outlet is not wrapped in any
+    // width gate, so a phone gets the real screen.
+    expect(screen.getByText('Accounts tab marker')).toBeInTheDocument()
   })
 })
 

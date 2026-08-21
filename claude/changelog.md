@@ -10,6 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 📱 **PHASE 4: ADMIN ON THE PHONE.** The "Needs a bigger screen" card is
+  gone from /admin and the Manage block on /more shows at every width —
+  Jay's ruling, same day: "bring admin functions into the app, that is my
+  decision now". The feared per-screen rework mostly evaporated on
+  measurement: no admin screen renders a `<table>` at all (cards and lists
+  throughout), Allocation already scrolled sideways, and the tab row's
+  flex-wrap was load-bearing since 12 Aug. Role gates untouched — width was
+  never one of them. The inverted gate test now pins "renders ungated".
+- `686044b` — the squash that put the editorial voice on the dashboards
+  (#286).
+
 - 🗞️ **PHASE 3: THE EDITORIAL VOICE ON THE DASHBOARDS.**
   `src/components/Editorial.jsx` — Kicker (crimson slash + tiny uppercase
   label), AccentTitle (bold headline + ONE Playfair-italic crimson word),
