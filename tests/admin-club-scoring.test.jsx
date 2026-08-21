@@ -69,21 +69,30 @@ const TEAMS = [OVERRIDDEN, U10, U12G, U16B]
 
 const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: CLUB }]
 
+// ⚠️ mockImplementation, NOT mockReturnValue, AND THE RETURNED setTeams IS
+// THE REASON. The scoring panel derives the squad it is drawing from `teams`
+// by id rather than from a snapshot taken when it opened, so a test that wants
+// to prove a reload REDRAWS the panel has to be able to hand the next render a
+// different array. A fixed return value would pin the context to whatever it
+// held at render time and the panel could never be seen to change.
 function renderClub(teams = TEAMS) {
   const user = userEvent.setup()
-  useMembershipsMock.mockReturnValue({
+  let current = teams
+  useMembershipsMock.mockImplementation(() => ({
     memberships: ADMIN,
-    teams,
+    teams: current,
     loading: false,
     error: null,
     reload: reloadMock,
-  })
+  }))
   render(
     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AdminClub />
     </MemoryRouter>,
   )
-  return { user }
+  // Swapping `current` does not itself re-render; the component re-reads the
+  // context on the render that the saving flag going false already causes.
+  return { user, setTeams: (next) => { current = next } }
 }
 
 beforeEach(() => {
@@ -280,6 +289,50 @@ describe('AdminClub — whether a squad plays contact', () => {
     await user.click(within(screen.getByTestId('scoring-panel')).getByRole('switch'))
 
     await waitFor(() => expect(reloadMock).toHaveBeenCalled())
+  })
+
+  it('⚠️ FLIPS WHERE IT STANDS: the panel stays open showing the NEW value', async () => {
+    // A switch reports a state and changes it, so the answer to "did that
+    // land?" belongs in the switch itself. Closing the panel on success —
+    // which is right for the Save button, because pressing Save finishes a
+    // task — takes that answer away at the very moment it arrives, and a
+    // second tap then means re-opening the panel to find out what happened.
+    //
+    // ⚠️ THIS TEST FAILS TWO DIFFERENT WAYS, AND IT NEEDS TO. It fails if the
+    // handler closes the panel on success (nothing to query), and it fails if
+    // the panel keeps a snapshot of the squad taken when it opened, because
+    // then aria-checked stays 'false' however many reloads run.
+    const { user, setTeams } = renderClub()
+    reloadMock.mockImplementation(async () => {
+      setTeams([OVERRIDDEN, { ...U10, requires_contact: true }, U12G, U16B])
+    })
+
+    await user.click(await screen.findByTestId('scoring-chip-team-u10'))
+    expect(
+      within(screen.getByTestId('scoring-panel')).getByRole('switch', { name: /contact rugby/i }),
+    ).toHaveAttribute('aria-checked', 'false')
+
+    await user.click(
+      within(screen.getByTestId('scoring-panel')).getByRole('switch', { name: /contact rugby/i }),
+    )
+
+    // Still open …
+    await waitFor(() => expect(reloadMock).toHaveBeenCalled())
+    expect(screen.getByTestId('scoring-panel')).toBeInTheDocument()
+
+    // … and showing what the database holds NOW, not what it held on opening.
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('scoring-panel')).getByRole('switch', { name: /contact rugby/i }),
+      ).toHaveAttribute('aria-checked', 'true'),
+    )
+    expect(
+      within(screen.getByTestId('scoring-panel')).getByRole('switch', { name: /contact rugby/i }),
+    ).toHaveTextContent('Contact')
+
+    // And nothing else about the panel went away with it.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('⚠️ leaves the panel OPEN and the switch unchanged when the write is refused', async () => {

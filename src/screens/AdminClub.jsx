@@ -191,7 +191,15 @@ export default function AdminClub() {
   // The squad whose scoring is being edited, and the ticked kinds. A separate
   // panel from the league-team one above: they answer different questions about
   // the same row, and one panel doing both would have to explain which.
-  const [scoringTeam, setScoringTeam] = useState(null)
+  //
+  // ⚠️ THE ID, NOT THE ROW. Holding the row itself would freeze a SNAPSHOT
+  // taken when the panel opened, so `reloadTeams()` could refresh the context
+  // underneath and this panel would carry on drawing the values it captured.
+  // That is fatal for the contact switch below, whose entire job is to show
+  // the squad's current state and flip it in place. Deriving the row from
+  // `teams` by id costs a find() per render and makes a reload redraw the panel.
+  const [scoringTeamId, setScoringTeamId] = useState(null)
+  const scoringTeam = teams.find((team) => team.id === scoringTeamId) ?? null
   const [draftKinds, setDraftKinds] = useState([])
 
   useEffect(() => {
@@ -287,7 +295,7 @@ export default function AdminClub() {
   }
 
   function openScoring(team) {
-    setScoringTeam(team)
+    setScoringTeamId(team.id)
     setEditing(null)
     setAdding(null)
     // ⚠️ SEEDED FROM scoringForTeam, NOT FROM THE RAW COLUMN. The column is null
@@ -300,7 +308,7 @@ export default function AdminClub() {
   function closePanel() {
     setEditing(null)
     setAdding(null)
-    setScoringTeam(null)
+    setScoringTeamId(null)
     setDraftName('')
     setDraftDivision('')
     setDraftKinds([])
@@ -352,27 +360,44 @@ export default function AdminClub() {
    * would redraw the chip as though nothing had been attempted.
    */
   function saveScoring(kinds) {
-    const team = scoringTeam
+    const id = scoringTeamId
     return run(async () => {
-      await setTeamScoringKinds(team.id, kinds)
+      await setTeamScoringKinds(id, kinds)
       await reloadTeams()
     })
   }
 
   /**
-   * Flips the squad between contact and tag.
+   * Flips the squad between contact and tag, IN PLACE.
    *
-   * ⚠️ SAME SHAPE AS saveScoring, AND FOR THE SAME REASON: `reloadTeams()` is
-   * INSIDE the work, so a refused write leaves the panel open with the switch
-   * still showing what the database actually holds. Reloading after a write
-   * that never landed would redraw the switch as though something had changed.
+   * ⚠️ THIS DELIBERATELY DOES NOT GO THROUGH `run`, AND THE DIFFERENCE IS THE
+   * WHOLE POINT OF A SWITCH. `run` closes the panel on success, which is right
+   * for the Save button below: pressing Save FINISHES a task, and a panel with
+   * nothing left to say should get out of the way. A switch is not a task — it
+   * REPORTS a state and changes it, so it has to still be on screen afterwards
+   * showing the new one. Closing the panel out from under the tap would take
+   * away the only answer to "did that land?" at the moment it arrived.
+   * Everything else `run` does — the saving flag, clearing the last error,
+   * catching a refusal — is reproduced here on purpose rather than shared.
+   *
+   * ⚠️ `reloadTeams()` IS WHAT MOVES THE SWITCH. The panel derives its row
+   * from `teams` by id, so refreshing the memberships context is the only thing
+   * that can change what `aria-checked` reads. On a refused write nothing is
+   * reloaded and nothing moves, which is the honest picture: the switch keeps
+   * showing what the database actually holds, with the error beneath it.
    */
-  function saveRequiresContact(next) {
-    const team = scoringTeam
-    return run(async () => {
-      await setTeamRequiresContact(team.id, next)
+  async function saveRequiresContact(next) {
+    const id = scoringTeamId
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await setTeamRequiresContact(id, next)
       await reloadTeams()
-    })
+    } catch (failure) {
+      setSaveError(failure)
+    } finally {
+      setSaving(false)
+    }
   }
 
   function toggleKind(kind) {
@@ -627,8 +652,13 @@ export default function AdminClub() {
 
               ⚠️ SAVES ON THE CLICK, with no Save button. There is one bit to
               change, so a draft state would only be a second chance to forget
-              to press Save — and `run` closes the panel on success exactly as
-              it does for the scoring save. */}
+              to press Save.
+
+              ⚠️ AND IT FLIPS WHERE IT STANDS. saveRequiresContact does NOT go
+              through `run`, so the panel stays open and this switch redraws
+              itself with the value the reload brought back. That is the
+              opposite of what the Save button does, deliberately — the
+              reasoning is on saveRequiresContact. */}
           <div className="mt-3 flex items-center justify-between gap-3">
             <span className="text-[13px] font-bold text-ink">Contact rugby</span>
             <button
