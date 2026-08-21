@@ -85,12 +85,15 @@ know that the acknowledgements are not yours.
 - ⏰ **The signup nudge has still never sent.** The cron is active on `10 7 * * *`
   and had never fired as of 20 Aug — it was scheduled after that day's slot. At
   the time of writing nobody qualified, so its first real fire sends nothing.
-- ⚠️ **The training plan still assumes a fixed Tuesday/Thursday pair.** Jay,
-  21 Aug: fifteen age groups train **twice a week each, on nights that differ by
-  squad** — 30+ sessions a week club-wide. The publish step must work off each
-  squad's own training nights, not a fixed pair.
-  `claude/plans/2026-08-12-training-session-plans.md` has not been corrected for
-  this yet.
+- ✅ **CLOSED THE SAME DAY — `fd05b95`.** This read "the training plan still
+  assumes a fixed Tuesday/Thursday pair". Jay then said *"some age groups train
+  on mon and friday"*, and the plan was corrected: **nothing may key on a
+  weekday.** Publish targets the squad's own training EVENTS in a date range,
+  whatever nights they land on, so a Tue/Thu pair, a Mon/Fri pair and a squad
+  that moves to a Wednesday are one code path.
+  ⚠️ **Built as originally written it would have SILENTLY SKIPPED every
+  Monday-and-Friday squad**, and the failure would have looked like "nobody has
+  any training that week".
 - **`squad_push` is unproven and TABLED** — `claude/state-of-play.md`. The safe
   route is recorded there if it is reopened.
 - **Duplicate-content detection was raised and not answered.** "So we don't send
