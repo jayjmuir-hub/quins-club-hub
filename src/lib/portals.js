@@ -16,9 +16,9 @@ import { adminRightLabel, hasAdminRight, isSuperAdmin } from './scope.js'
 // invisible from the other. This is also the only place a tab's URL is written
 // down.
 //
-// ⚠️ THE LABELS COME FROM adminRightLabel, NOT FROM STRINGS HERE. The three job
-// names are Jay's ruling of 12 Aug 2026 and they already have a single home in
-// src/lib/scope.js. Copying them would give the ruling two homes, and two
+// ⚠️ THE LABELS COME FROM adminRightLabel, NOT FROM STRINGS HERE. The job names
+// are Jay's — three of them ruled on 12 Aug 2026, "Rugby Performance Director"
+// on 20 Aug — and they already have a single home in src/lib/scope.js. Copying them would give the ruling two homes, and two
 // copies of a fact are two copies that drift.
 // claude/decisions/2026-08-12-jobs-not-people.md
 
