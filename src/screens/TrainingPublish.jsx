@@ -375,8 +375,25 @@ function PublishBody() {
     return run(() => upsertFocus(payload))
   }
 
+  // ⚠️ BOTH DATES ARE REQUIRED, AND THEY MUST BE THE RIGHT WAY ROUND. The
+  // columns are `starts_on`/`ends_on NOT NULL` with `check (ends_on >=
+  // starts_on)`, so a blank or reversed pair reaches the user as a raw
+  // Postgres message about a constraint nobody has heard of. ISO date strings
+  // (yyyy-mm-dd, which is what a date input gives us) compare correctly as
+  // strings, so no Date object is needed to order them.
+  const datesReversed =
+    editingFocus !== null &&
+    editingFocus.starts_on !== '' &&
+    editingFocus.ends_on !== '' &&
+    editingFocus.ends_on < editingFocus.starts_on
+
   const canSaveFocus =
-    editingFocus !== null && editingFocus.title.trim() !== '' && editingFocus.team_id !== ''
+    editingFocus !== null &&
+    editingFocus.title.trim() !== '' &&
+    editingFocus.team_id !== '' &&
+    editingFocus.starts_on !== '' &&
+    editingFocus.ends_on !== '' &&
+    !datesReversed
 
   function squadName(id) {
     return squads.find((one) => one.id === id)?.name ?? 'Unknown squad'
@@ -673,6 +690,11 @@ function PublishBody() {
               />
             </label>
 
+            {datesReversed && (
+              <p className="text-[12.5px] font-semibold text-brand-deep">
+                Ends can&apos;t be before it starts
+              </p>
+            )}
             <div className="flex flex-wrap gap-2.5">
               <Button disabled={focusSaving || !canSaveFocus} onClick={saveFocus}>
                 {focusSaving ? 'Saving…' : 'Save focus'}

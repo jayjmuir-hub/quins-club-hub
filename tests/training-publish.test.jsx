@@ -397,6 +397,37 @@ describe('TrainingPublish', () => {
     )
   })
 
+  // ⚠️ THE DATES ARE NOT OPTIONAL AND THEY HAVE AN ORDER. `training_focus`
+  // has both columns NOT NULL under `check (ends_on >= starts_on)`, so a
+  // Save allowed through here comes back as a raw Postgres constraint name.
+  it('will not save a focus with a blank Ends', async () => {
+    const { user } = renderPublish()
+    await screen.findByText('Breakdown block')
+
+    await user.click(screen.getByRole('button', { name: 'Add a focus' }))
+    await user.selectOptions(screen.getByLabelText('Focus squad'), 't-u14b')
+    await user.type(screen.getByLabelText('Focus title'), 'Scrum block')
+    setDate('Focus starts', '2026-09-01')
+
+    expect(screen.getByRole('button', { name: 'Save focus' })).toBeDisabled()
+    expect(upsertFocusMock).not.toHaveBeenCalled()
+  })
+
+  it('says so, and will not save, when Ends is before Starts', async () => {
+    const { user } = renderPublish()
+    await screen.findByText('Breakdown block')
+
+    await user.click(screen.getByRole('button', { name: 'Add a focus' }))
+    await user.selectOptions(screen.getByLabelText('Focus squad'), 't-u14b')
+    await user.type(screen.getByLabelText('Focus title'), 'Scrum block')
+    setDate('Focus starts', '2026-09-28')
+    setDate('Focus ends', '2026-09-01')
+
+    expect(await screen.findByText("Ends can't be before it starts")).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save focus' })).toBeDisabled()
+    expect(upsertFocusMock).not.toHaveBeenCalled()
+  })
+
   it('shows the error when a focus refuses to delete', async () => {
     // ⚠️ THE DATA LAYER TURNS AN RLS ZERO-ROW DELETE INTO A THROW. If Remove
     // did not go through the same `run()` as every other write, a refused
