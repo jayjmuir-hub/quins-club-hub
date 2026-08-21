@@ -1,0 +1,276 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+
+// The Publish tab of the Rugby Performance Director portal.
+// Plan: claude/plans/2026-08-21-training-plans-implementation.md (Task 8).
+// Spec: claude/specs/2026-08-21-training-plans-dashboard-design.md
+//
+// ⛔ NOTHING ON THIS SCREEN MAY KEY ON A WEEKDAY, and no test here supplies
+// one. Publish is a template, some squads and a DATE RANGE; the database
+// function finds those squads' own training events inside the range. A screen
+// that knew "Tuesday" would be wrong for every squad that trains on another
+// day, and there is no day name, no getDay() and no weekday fixture anywhere.
+//
+// ⚠️ WHAT IS PINNED, i.e. the things a plausible tidy-up would break:
+//   - a squad that does not fit the template is OFFERED DISABLED WITH ITS
+//     REASON, never silently filtered out of the list;
+//   - preview WRITES NOTHING, and the Publish button does not exist until a
+//     preview for the CURRENT inputs exists — change a date and it is gone
+//     again, because the rows on screen no longer describe what would happen;
+//   - publish is called with exactly the arguments the preview was called with.
+//
+// ⚠️ EVERY NAME IN THIS FILE IS INVENTED. CLAUDE.md rule 9 — the repo is public
+// and the club's members are mostly children.
+
+const useMembershipsMock = vi.fn()
+const listTemplatesMock = vi.fn()
+const previewPublishMock = vi.fn()
+const publishMock = vi.fn()
+const listFocusMock = vi.fn()
+const upsertFocusMock = vi.fn()
+const deleteFocusMock = vi.fn()
+
+vi.mock('../src/lib/memberships.jsx', () => ({
+  useMemberships: () => useMembershipsMock(),
+}))
+
+// ⚠️ MOCKED BECAUSE AN UNMOCKED DATA MODULE MAKES A REAL REQUEST. CI sets
+// placeholder Supabase env vars, so the client constructs happily, the promise
+// never settles, and the screen sits in `loading` forever. See src/test/setup.js.
+vi.mock('../src/data/trainingPlans.js', () => ({
+  listTemplates: (...args) => listTemplatesMock(...args),
+  previewPublish: (...args) => previewPublishMock(...args),
+  publish: (...args) => publishMock(...args),
+  listFocus: (...args) => listFocusMock(...args),
+  upsertFocus: (...args) => upsertFocusMock(...args),
+  deleteFocus: (...args) => deleteFocusMock(...args),
+}))
+
+import TrainingPublish from '../src/screens/TrainingPublish.jsx'
+
+const CLUB = '00000000-0000-0000-0000-0000000000ad'
+
+// Invented squads whose SHAPES are the real ones. The three cases the fit rule
+// has to separate: a tag squad, a contact squad, and a name with no band in it.
+const TEAMS = [
+  { id: 't-u12m', club_id: CLUB, name: 'U12 Mixed', sort_order: 1, requires_contact: false },
+  { id: 't-u14b', club_id: CLUB, name: 'U14B', sort_order: 2, requires_contact: true },
+  { id: 't-senior', club_id: CLUB, name: 'Senior Men', sort_order: 3, requires_contact: true },
+]
+
+const CONTACT_HOUR = {
+  id: 'tpl-contact',
+  club_id: CLUB,
+  name: 'Contact hour',
+  min_age: 9,
+  max_age: 16,
+  requires_contact: true,
+  notes: null,
+  total_minutes: 60,
+  is_active: true,
+}
+
+const FOCUS_ROWS = [
+  {
+    id: 'focus-1',
+    club_id: CLUB,
+    team_id: 't-u14b',
+    title: 'Breakdown block',
+    starts_on: '2026-08-01',
+    ends_on: '2026-08-28',
+    notes: null,
+  },
+]
+
+/** ⚠️ `status: 'active'` is load-bearing — adminRights() skips anything else. */
+function admin(rights = ['training']) {
+  return [
+    { id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: CLUB, admin_rights: rights },
+  ]
+}
+
+function memberships(rows) {
+  return {
+    memberships: rows,
+    realMemberships: rows,
+    teams: TEAMS,
+    viewAs: null,
+    setViewAs: vi.fn(),
+    loading: false,
+    error: null,
+    reload: vi.fn(),
+  }
+}
+
+function renderPublish(rows = admin()) {
+  const user = userEvent.setup()
+  useMembershipsMock.mockReturnValue(memberships(rows))
+  render(
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <TrainingPublish />
+    </MemoryRouter>,
+  )
+  return { user }
+}
+
+/**
+ * ⚠️ `fireEvent.change` FOR A DATE BOX, NOT `user.type`. jsdom's date input
+ * takes a whole ISO value; typing into it character by character produces
+ * intermediate values that are not dates and the box discards them.
+ */
+function setDate(label, value) {
+  fireEvent.change(screen.getByLabelText(label), { target: { value } })
+}
+
+/** Choose the template, tick U14B, and pin both ends of the range. */
+async function pickTheContactHour(user) {
+  await user.selectOptions(await screen.findByLabelText('Template'), CONTACT_HOUR.id)
+  await user.click(screen.getByRole('checkbox', { name: /U14B/ }))
+  setDate('From', '2026-09-01')
+  setDate('To', '2026-09-29')
+}
+
+const ARGS = {
+  templateId: CONTACT_HOUR.id,
+  teamIds: ['t-u14b'],
+  from: '2026-09-01',
+  to: '2026-09-29',
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  listTemplatesMock.mockImplementation(async () => [CONTACT_HOUR])
+  listFocusMock.mockImplementation(async () => FOCUS_ROWS)
+  previewPublishMock.mockImplementation(async () => [
+    { team_id: 't-u14b', will_write: 3, skipped_coach_edited: 1, no_events: false },
+  ])
+  publishMock.mockImplementation(async () => [
+    { team_id: 't-u14b', will_write: 3, skipped_coach_edited: 1, no_events: false },
+  ])
+  upsertFocusMock.mockImplementation(async (focus) => ({ id: 'focus-new', ...focus }))
+  deleteFocusMock.mockImplementation(async (id) => ({ id }))
+})
+
+describe('TrainingPublish', () => {
+  it('shows the not-your-job card without the training right, and asks for nothing', async () => {
+    renderPublish(admin([]))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /Rugby Performance Director hasn.t been added/,
+    )
+    // ⚠️ THE STRONGER HALF. Rendering the screen and hiding it would satisfy
+    // the card check above and still fetch the club's templates and focus rows
+    // for somebody without the job. The gate must not even ask.
+    expect(listTemplatesMock).not.toHaveBeenCalled()
+    expect(listFocusMock).not.toHaveBeenCalled()
+  })
+
+  it('disables an unparseable squad and a tag squad for a contact template, with reasons', async () => {
+    const { user } = renderPublish()
+    await user.selectOptions(await screen.findByLabelText('Template'), CONTACT_HOUR.id)
+
+    // A tag squad under a contact template: offered, refused, and told why.
+    const tagSquad = screen.getByRole('checkbox', { name: /U12 Mixed/ })
+    expect(tagSquad).toBeDisabled()
+    expect(screen.getByText('Contact template; this squad is tag')).toBeInTheDocument()
+
+    // ⚠️ THE NULL-BAND CASE. "Senior Men" has no band in its name, and null
+    // must mean "no guidance, so refuse" — never a default band. That null
+    // once offered a twelve-year-old squad an adult contact form.
+    const seniors = screen.getByRole('checkbox', { name: /Senior Men/ })
+    expect(seniors).toBeDisabled()
+    expect(
+      screen.getByText("Can't tell this squad's age group from its name"),
+    ).toBeInTheDocument()
+
+    expect(screen.getByRole('checkbox', { name: /U14B/ })).toBeEnabled()
+  })
+
+  it('previews before it publishes, and the confirm button carries the counts', async () => {
+    const { user } = renderPublish()
+    await screen.findByLabelText('Template')
+    await pickTheContactHour(user)
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+
+    // ⚠️ PREVIEW WRITES NOTHING. Same server function, `_preview` true — the
+    // only thing that proves the screen asked the harmless question is that
+    // publish() was not the one called.
+    await waitFor(() => expect(previewPublishMock).toHaveBeenCalledWith(ARGS))
+    expect(publishMock).not.toHaveBeenCalled()
+
+    const row = await screen.findByTestId('preview-t-u14b')
+    expect(within(row).getByText('U14B')).toBeInTheDocument()
+    expect(row).toHaveTextContent('3 sessions will get the plan · 1 kept (coach edited)')
+
+    await user.click(await screen.findByRole('button', { name: /Publish to 1 squad/ }))
+
+    // The SAME arguments. A publish that quietly re-read the boxes could send
+    // something the preview never described.
+    await waitFor(() => expect(publishMock).toHaveBeenCalledWith(ARGS))
+    expect(
+      await screen.findByText('Published to 1 squad — 3 sessions updated, 1 kept.'),
+    ).toBeInTheDocument()
+  })
+
+  it('never calls publish without a preview first', async () => {
+    const { user } = renderPublish()
+    await screen.findByLabelText('Template')
+    await pickTheContactHour(user)
+
+    // Everything is chosen and the button still does not exist.
+    expect(screen.queryByRole('button', { name: /publish to/i })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(await screen.findByRole('button', { name: /Publish to 1 squad/ })).toBeInTheDocument()
+
+    // ⚠️ AND IT GOES AWAY AGAIN. The rows on screen describe the OLD range, so
+    // a Publish button surviving a date change would be offering to do
+    // something nobody has been shown.
+    setDate('To', '2026-10-31')
+    expect(screen.queryByRole('button', { name: /publish to/i })).toBeNull()
+    expect(screen.queryByTestId('preview-t-u14b')).toBeNull()
+    expect(publishMock).not.toHaveBeenCalled()
+  })
+
+  it('adds a focus for a squad and a date range', async () => {
+    const { user } = renderPublish()
+    await screen.findByText('Breakdown block')
+
+    await user.click(screen.getByRole('button', { name: 'Add a focus' }))
+    await user.selectOptions(screen.getByLabelText('Focus squad'), 't-u14b')
+    await user.type(screen.getByLabelText('Focus title'), 'Scrum block')
+    setDate('Focus starts', '2026-09-01')
+    setDate('Focus ends', '2026-09-28')
+
+    await user.click(screen.getByRole('button', { name: 'Save focus' }))
+
+    await waitFor(() =>
+      expect(upsertFocusMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          club_id: CLUB,
+          team_id: 't-u14b',
+          title: 'Scrum block',
+          starts_on: '2026-09-01',
+          ends_on: '2026-09-28',
+        }),
+      ),
+    )
+  })
+
+  it('shows the error when a focus refuses to delete', async () => {
+    // ⚠️ THE DATA LAYER TURNS AN RLS ZERO-ROW DELETE INTO A THROW. If Remove
+    // did not go through the same `run()` as every other write, a refused
+    // delete would be drawn as a done one and the label would come back on
+    // reload with no explanation.
+    deleteFocusMock.mockRejectedValue(new Error('That change was refused.'))
+    const { user } = renderPublish()
+    await screen.findByText('Breakdown block')
+
+    await user.click(screen.getByRole('button', { name: 'Remove Breakdown block' }))
+
+    expect(await screen.findByText('That change was refused.')).toBeInTheDocument()
+  })
+})
