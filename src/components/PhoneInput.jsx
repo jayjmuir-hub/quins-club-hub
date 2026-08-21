@@ -129,7 +129,7 @@ export default function PhoneInput({
         // Not role="alert": this fires while the user is still typing, and an
         // assertive live region would interrupt a screen reader on every
         // keystroke of a number that is merely incomplete.
-        <p className="mt-1.5 text-[13px] font-semibold text-brand-deep">
+        <p className="mt-1.5 text-[13px] font-semibold text-danger-ink">
           That doesn&apos;t look like a valid number for this country. You can still save it.
         </p>
       )}

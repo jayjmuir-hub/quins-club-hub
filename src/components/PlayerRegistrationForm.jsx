@@ -352,7 +352,7 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
           squad and gives the correct action — so this is just the way past it
           for the case where the person really does know better. */}
       {row.needsConfirm && (
-        <label className="mt-2 flex items-start gap-2 rounded-[11px] bg-danger-bg px-3 py-2.5 text-[12.5px] font-semibold leading-relaxed text-brand-deep">
+        <label className="mt-2 flex items-start gap-2 rounded-[11px] bg-danger-bg px-3 py-2.5 text-[12.5px] font-semibold leading-relaxed text-danger-ink">
           <input
             type="checkbox"
             className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
@@ -853,7 +853,7 @@ export default function PlayerRegistrationForm({
       {error && (
         <p
           role="alert"
-          className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+          className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
         >
           {error}
         </p>

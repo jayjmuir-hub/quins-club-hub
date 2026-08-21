@@ -52,7 +52,7 @@ const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] te
 const CHIP =
   'rounded-[8px] border-[1.5px] px-2.5 py-1 text-[12.5px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
 const MOVE =
-  'rounded-[8px] border-[1.5px] border-line px-2 py-1 text-[13px] font-bold text-ink transition hover:border-brand hover:text-brand disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink'
+  'rounded-[8px] border-[1.5px] border-line px-2 py-1 text-[13px] font-bold text-ink transition hover:border-brand hover:text-brand-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink'
 
 const BLANK = { name: '', min_age: '', max_age: '', requires_contact: false, notes: '' }
 
@@ -213,7 +213,7 @@ function BlockRow({ block, index, count, unfit, onChange, onMove, onRemove, busy
           purpose, and losing it without a word is worse than saying why it no
           longer fits and letting them decide. */}
       {unfit && (
-        <p className="text-[12.5px] font-semibold text-brand-deep">{unfit}</p>
+        <p className="text-[12.5px] font-semibold text-danger-ink">{unfit}</p>
       )}
     </li>
   )
@@ -443,10 +443,10 @@ function TemplatesBody() {
   if (error) {
     return (
       <Card role="alert" className="p-6 text-center">
-        <h3 className="text-base font-extrabold text-brand-deep">
+        <h3 className="text-base font-extrabold text-danger-ink">
           We couldn&apos;t load the templates
         </h3>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+        <p className="mt-2 text-sm leading-relaxed text-danger-ink">
           {error.message || 'Something went wrong. Try again.'}
         </p>
         <Button onClick={() => setReloadToken((token) => token + 1)} className="mx-auto mt-4">
@@ -473,7 +473,7 @@ function TemplatesBody() {
               CHIP,
               includeRetired
                 ? 'border-brand bg-brand text-white'
-                : 'border-line text-ink hover:border-brand hover:text-brand',
+                : 'border-line text-ink hover:border-brand hover:text-brand-ink',
             ].join(' ')}
           >
             Show retired
@@ -570,7 +570,7 @@ function TemplatesBody() {
                     CHIP,
                     draft.requires_contact
                       ? 'border-brand bg-brand text-white'
-                      : 'border-line text-ink hover:border-brand hover:text-brand',
+                      : 'border-line text-ink hover:border-brand hover:text-brand-ink',
                   ].join(' ')}
                 >
                   {draft.requires_contact ? 'Contact' : 'Tag'}
@@ -649,7 +649,7 @@ function TemplatesBody() {
                 aria-live="polite"
                 className={[
                   'py-2 text-sm font-extrabold',
-                  total === DEFAULT_MINUTES ? 'text-ink' : 'text-brand',
+                  total === DEFAULT_MINUTES ? 'text-ink' : 'text-brand-ink',
                 ].join(' ')}
               >
                 {total} / {DEFAULT_MINUTES} min
@@ -709,7 +709,7 @@ function TemplatesBody() {
           )}
 
           {saveError && (
-            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-brand-deep">
+            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
               {saveError.message || "That didn't save. Try again."}
             </p>
           )}

@@ -229,7 +229,7 @@ function StaffPhoto({ member, onPhoto }) {
         onClick={() => setOpen(true)}
         className="flex items-center gap-2 rounded-[10px] border border-line px-2 py-1 text-[12.5px] font-bold text-ink-muted hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
-        <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-[9px] bg-brand/10 text-[11px] font-extrabold text-brand-deep">
+        <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-[9px] bg-brand/10 text-[11px] font-extrabold text-danger-ink">
           {member.photoUrl ? (
             <img
               src={member.photoUrl}
@@ -255,7 +255,7 @@ function StaffPhoto({ member, onPhoto }) {
       )}
 
       {error && (
-        <p role="alert" className="mt-2 text-[12.5px] font-bold text-brand">
+        <p role="alert" className="mt-2 text-[12.5px] font-bold text-brand-ink">
           {error}
         </p>
       )}
@@ -284,7 +284,7 @@ function StaffPhoto({ member, onPhoto }) {
                 return null
               })
             }}
-            className="text-[12.5px] font-semibold text-brand underline"
+            className="text-[12.5px] font-semibold text-brand-ink underline"
           >
             Choose a different photo
           </button>
@@ -383,7 +383,7 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto }) {
         />
         {busy && <span className="text-[12.5px] text-ink-faint">Saving…</span>}
         {error && (
-          <span role="alert" className="text-[12.5px] font-bold text-brand">
+          <span role="alert" className="text-[12.5px] font-bold text-brand-ink">
             {error}
           </span>
         )}
@@ -413,13 +413,13 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto }) {
               checked={headCoach}
               disabled={headBusy}
               onChange={(event) => saveHeadCoach(event.target.checked)}
-              className="h-4 w-4 rounded-[4px] border-line text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="h-4 w-4 rounded-[4px] border-line text-brand-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             />
             Head coach — gets the approval emails for this squad
           </label>
           {headBusy && <span className="text-[12.5px] text-ink-faint">Saving…</span>}
           {headError && (
-            <span role="alert" className="text-[12.5px] font-bold text-brand">
+            <span role="alert" className="text-[12.5px] font-bold text-brand-ink">
               {headError}
             </span>
           )}
@@ -485,14 +485,14 @@ function SquadRow({ squad, open, onToggle, onSaved, onHeadCoachSaved, onPhoto })
           {/* ⚠️ THE GAP IS SAID IN WORDS AND IN COLOUR, never colour alone —
               claude/specs/accessibility.md. */}
           <span
-            className={`block text-[12px] font-semibold ${missing ? 'text-brand' : 'text-ink-muted'}`}
+            className={`block text-[12px] font-semibold ${missing ? 'text-brand-ink' : 'text-ink-muted'}`}
           >
             {missing ? 'No coach, manager or medic' : roleSummary}
           </span>
         </span>
 
         {missing ? (
-          <span className="shrink-0 rounded-[8px] bg-danger-bg px-2 py-1 text-[11px] font-extrabold uppercase tracking-[.4px] text-brand-deep">
+          <span className="shrink-0 rounded-[8px] bg-danger-bg px-2 py-1 text-[11px] font-extrabold uppercase tracking-[.4px] text-danger-ink">
             Gap
           </span>
         ) : (
@@ -651,7 +651,7 @@ export default function AdminStaff() {
         <button
           type="button"
           onClick={load}
-          className="mt-2 text-sm font-bold text-brand underline"
+          className="mt-2 text-sm font-bold text-brand-ink underline"
         >
           Try again
         </button>

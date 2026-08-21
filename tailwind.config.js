@@ -139,7 +139,14 @@ export default {
         },
 
         // --- states -----------------------------------------------------------
-        danger: { DEFAULT: 'rgb(var(--danger-rgb) / <alpha-value>)', bg: 'rgb(var(--danger-bg-rgb) / <alpha-value>)' },
+        danger: {
+          DEFAULT: 'rgb(var(--danger-rgb) / <alpha-value>)',
+          bg: 'rgb(var(--danger-bg-rgb) / <alpha-value>)',
+          // Deep red AS TEXT — themed, unlike brand.deep which is a fill.
+          // The only sanctioned red for text on themed surfaces besides
+          // brand.ink; tests/theme.test.js polices text-brand-deep.
+          ink: 'rgb(var(--danger-ink-rgb) / <alpha-value>)',
+        },
         warn: { DEFAULT: 'rgb(var(--warn-rgb) / <alpha-value>)', ink: 'rgb(var(--warn-ink-rgb) / <alpha-value>)', bg: 'rgb(var(--warn-bg-rgb) / <alpha-value>)' },
         info: { DEFAULT: 'rgb(var(--info-rgb) / <alpha-value>)', bg: 'rgb(var(--info-bg-rgb) / <alpha-value>)' },
 

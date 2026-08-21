@@ -69,7 +69,7 @@ function PitchChip({ pitch, onSelect, busy }) {
         CHIP,
         retired
           ? 'border-dashed border-line text-ink-faint'
-          : 'border-line text-ink hover:border-brand hover:text-brand',
+          : 'border-line text-ink hover:border-brand hover:text-brand-ink',
         busy ? 'opacity-60' : '',
       ].join(' ')}
     >
@@ -178,8 +178,8 @@ export default function Pitches() {
   if (error) {
     return (
       <Card role="alert" className="p-6 text-center">
-        <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load the pitches</h3>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+        <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the pitches</h3>
+        <p className="mt-2 text-sm leading-relaxed text-danger-ink">
           {error.message || 'Something went wrong. Try again.'}
         </p>
         <Button onClick={refresh} className="mx-auto mt-4">
@@ -232,7 +232,7 @@ export default function Pitches() {
                     aria-label={`Add a pitch to ${block === OTHER_BLOCK ? 'the club' : `${block} block`}`}
                     disabled={saving}
                     onClick={() => openAdd(block === OTHER_BLOCK ? '' : block)}
-                    className={`${CHIP} border-dashed border-line text-ink-muted hover:border-brand hover:text-brand`}
+                    className={`${CHIP} border-dashed border-line text-ink-muted hover:border-brand hover:text-brand-ink`}
                   >
                     +
                   </button>
@@ -322,7 +322,7 @@ export default function Pitches() {
           )}
 
           {saveError && (
-            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-brand-deep">
+            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
               {saveError.message || "That didn't save. Try again."}
             </p>
           )}

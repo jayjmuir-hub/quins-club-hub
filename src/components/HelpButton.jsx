@@ -224,7 +224,7 @@ export default function HelpButton() {
             <button
               type="button"
               onClick={showMine}
-              className="mb-3 min-h-[44px] w-full border-t border-line pt-3 text-left text-[13px] font-semibold text-brand underline"
+              className="mb-3 min-h-[44px] w-full border-t border-line pt-3 text-left text-[13px] font-semibold text-brand-ink underline"
             >
               See what you&rsquo;ve already reported
             </button>
@@ -261,7 +261,7 @@ export default function HelpButton() {
             </div>
 
             {error && (
-              <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-[13px] font-semibold text-brand-deep">
+              <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-[13px] font-semibold text-danger-ink">
                 {error}
               </p>
             )}

@@ -105,7 +105,7 @@ export default function InstallPrompt() {
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-surface-mute text-brand"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-surface-mute text-brand-ink"
         >
           {ios ? <ShareIcon className="h-5 w-5" /> : <PlusSquareIcon className="h-5 w-5" />}
         </span>

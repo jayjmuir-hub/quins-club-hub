@@ -46,14 +46,14 @@ const AVAILABILITY_GROUPS = [
   { key: 'in', label: 'Available', tone: 'text-accent-ink' },
   { key: 'maybe', label: 'Maybe', tone: 'text-warn-ink' },
   { key: 'none', label: 'No response', tone: 'text-ink-muted' },
-  { key: 'out', label: 'Not available', tone: 'text-brand-deep' },
+  { key: 'out', label: 'Not available', tone: 'text-danger-ink' },
 ]
 
 const STATUS_CHIP = {
   in: null, // the expected case says nothing
   maybe: { label: 'Maybe', className: 'bg-warn-bg text-warn-ink' },
   none: { label: 'No response', className: 'bg-surface-mute text-ink-muted' },
-  out: { label: 'Said no', className: 'bg-danger-bg text-brand-deep' },
+  out: { label: 'Said no', className: 'bg-danger-bg text-danger-ink' },
 }
 
 // ⚠️ A GUIDE, NOT A GATE. See the migration's comment on players_per_side: the
@@ -116,7 +116,7 @@ function PickedRow({ player, status, fixtureTier, grade, onRemove, onToggleRole 
         <button
           type="button"
           onClick={onToggleRole}
-          className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-brand hover:bg-surface-mute"
+          className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-brand-ink hover:bg-surface-mute"
         >
           {player.role === ROLE_STARTER ? '→ Bench' : '→ Start'}
         </button>
@@ -363,7 +363,7 @@ export default function Lineup() {
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="text-[13px] font-bold text-brand"
+          className="text-[13px] font-bold text-brand-ink"
         >
           Back
         </button>
@@ -372,7 +372,7 @@ export default function Lineup() {
       {error && (
         <p
           role="alert"
-          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
         >
           {error.message || "That didn't save. Try again."}
         </p>
@@ -545,7 +545,7 @@ export default function Lineup() {
                 key={group.key}
                 type="button"
                 onClick={() => setShowOut(true)}
-                className="my-2 text-[13px] font-bold text-brand"
+                className="my-2 text-[13px] font-bold text-brand-ink"
               >
                 Show {list.length} who said no
               </button>
@@ -665,7 +665,7 @@ export default function Lineup() {
 
           <div className="mt-5 grid grid-cols-2 gap-8">
             <div>
-              <p className="mb-2 text-[13px] font-extrabold uppercase tracking-[1px] text-brand">
+              <p className="mb-2 text-[13px] font-extrabold uppercase tracking-[1px] text-brand-ink">
                 Starting
               </p>
               <ol className="text-[16px] leading-[1.9] text-ink">
@@ -678,7 +678,7 @@ export default function Lineup() {
               </ol>
             </div>
             <div>
-              <p className="mb-2 text-[13px] font-extrabold uppercase tracking-[1px] text-brand">
+              <p className="mb-2 text-[13px] font-extrabold uppercase tracking-[1px] text-brand-ink">
                 Replacements
               </p>
               <ol className="text-[16px] leading-[1.9] text-ink">

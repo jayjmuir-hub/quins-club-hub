@@ -44,7 +44,7 @@ const STATUS_LABELS = { in: 'In', maybe: 'Maybe', out: 'Out' }
 const STATUS_ON = {
   in: 'border-accent-mid bg-accent-bg text-accent-ink',
   maybe: 'border-warn bg-warn-bg text-warn-ink',
-  out: 'border-danger bg-danger-bg text-brand-deep',
+  out: 'border-danger bg-danger-bg text-danger-ink',
 }
 const STATUS_OFF = 'border-line bg-surface-card text-ink-muted hover:bg-surface-mute'
 
@@ -209,7 +209,7 @@ export default function Availability({ event, team, onClose }) {
       {saveError && (
         <p
           role="alert"
-          className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+          className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
         >
           {saveError.message || "We couldn't save that RSVP. Try again."}
         </p>
@@ -224,7 +224,7 @@ export default function Availability({ event, team, onClose }) {
       {!isFirstLoad && error && (
         <p
           role="alert"
-          className="rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+          className="rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
         >
           {error.message || "We couldn't load availability. Try again."}
         </p>

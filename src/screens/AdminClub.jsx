@@ -91,7 +91,7 @@ function LeagueTeamChip({ leagueTeam, onSelect, busy }) {
         'inline-flex items-center gap-1.5',
         retired
           ? 'border-dashed border-line text-ink-faint'
-          : 'border-line text-ink hover:border-brand hover:text-brand',
+          : 'border-line text-ink hover:border-brand hover:text-brand-ink',
         busy ? 'opacity-60' : '',
       ].join(' ')}
     >
@@ -145,8 +145,8 @@ function ScoringChip({ team, onSelect, busy }) {
         CHIP,
         'inline-flex items-center gap-1.5',
         overridden
-          ? 'border-brand text-brand hover:border-brand-deep'
-          : 'border-dashed border-line text-ink-faint hover:border-brand hover:text-brand',
+          ? 'border-brand text-brand-ink hover:border-brand-deep'
+          : 'border-dashed border-line text-ink-faint hover:border-brand hover:text-brand-ink',
         busy ? 'opacity-60' : '',
       ].join(' ')}
     >
@@ -423,8 +423,8 @@ export default function AdminClub() {
   if (error) {
     return (
       <Card role="alert" className="p-6 text-center">
-        <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load the club overview</h3>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+        <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the club overview</h3>
+        <p className="mt-2 text-sm leading-relaxed text-danger-ink">
           {error.message || 'Something went wrong. Try again.'}
         </p>
         <Button
@@ -496,7 +496,7 @@ export default function AdminClub() {
                     aria-label={`Add league team to ${team.name}`}
                     disabled={saving}
                     onClick={() => openAdd(team)}
-                    className={`${CHIP} border-dashed border-line text-ink-muted hover:border-brand hover:text-brand`}
+                    className={`${CHIP} border-dashed border-line text-ink-muted hover:border-brand hover:text-brand-ink`}
                   >
                     +
                   </button>
@@ -593,7 +593,7 @@ export default function AdminClub() {
           )}
 
           {saveError && (
-            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-brand-deep">
+            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
               {saveError.message || "That didn't save. Try again."}
             </p>
           )}
@@ -627,7 +627,7 @@ export default function AdminClub() {
                     CHIP,
                     on
                       ? 'border-brand bg-brand text-white'
-                      : 'border-line text-ink hover:border-brand hover:text-brand',
+                      : 'border-line text-ink hover:border-brand hover:text-brand-ink',
                     saving ? 'opacity-60' : '',
                   ].join(' ')}
                 >
@@ -672,7 +672,7 @@ export default function AdminClub() {
                 CHIP,
                 scoringTeam.requires_contact === true
                   ? 'border-brand bg-brand text-white'
-                  : 'border-line text-ink hover:border-brand hover:text-brand',
+                  : 'border-line text-ink hover:border-brand hover:text-brand-ink',
                 saving ? 'opacity-60' : '',
               ].join(' ')}
             >
@@ -719,7 +719,7 @@ export default function AdminClub() {
           </p>
 
           {saveError && (
-            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-brand-deep">
+            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
               {saveError.message || "That didn't save. Try again."}
             </p>
           )}

@@ -153,7 +153,7 @@ const FIELD_ROW = 'mb-3.5 grid grid-cols-2 gap-3'
 // it keeps keyboard access and an accessible name).
 const SEG_OPTION_BASE =
   'block cursor-pointer select-none rounded-[11px] border-[1.5px] px-2 py-2.5 text-center text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2'
-const SEG_OPTION_ON = 'border-brand bg-surface-mute font-bold text-brand-deep'
+const SEG_OPTION_ON = 'border-brand bg-surface-mute font-bold text-danger-ink'
 const SEG_OPTION_OFF = 'border-line font-semibold text-ink'
 
 const TYPES = [
@@ -1379,7 +1379,7 @@ export default function EventForm({
             ) : previewError ? (
               <p
                 role="alert"
-                className="mt-2 rounded-[9px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+                className="mt-2 rounded-[9px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
               >
                 {previewError.message}
               </p>
@@ -1911,7 +1911,7 @@ export default function EventForm({
         {error && (
           <p
             role="alert"
-            className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+            className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
           >
             {error.message || "We couldn't save that. Try again."}
           </p>

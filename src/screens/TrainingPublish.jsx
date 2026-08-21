@@ -130,13 +130,13 @@ function SquadChip({ team, checked, fit, ready, busy, onToggle }) {
           CHIP,
           checked
             ? 'border-brand bg-brand text-white'
-            : 'border-line text-ink hover:border-brand hover:text-brand',
+            : 'border-line text-ink hover:border-brand hover:text-brand-ink',
         ].join(' ')}
       >
         {team.name}
       </button>
       {refused && (
-        <span className="text-[12px] font-semibold leading-snug text-brand-deep">{fit.reason}</span>
+        <span className="text-[12px] font-semibold leading-snug text-danger-ink">{fit.reason}</span>
       )}
     </span>
   )
@@ -404,10 +404,10 @@ function PublishBody() {
   if (error) {
     return (
       <Card role="alert" className="p-6 text-center">
-        <h3 className="text-base font-extrabold text-brand-deep">
+        <h3 className="text-base font-extrabold text-danger-ink">
           We couldn&apos;t load this screen
         </h3>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+        <p className="mt-2 text-sm leading-relaxed text-danger-ink">
           {error.message || 'Something went wrong. Try again.'}
         </p>
         <Button onClick={() => setReloadToken((token) => token + 1)} className="mx-auto mt-4">
@@ -552,7 +552,7 @@ function PublishBody() {
           )}
 
           {publishError && (
-            <p role="alert" className="text-[12.5px] font-semibold text-brand-deep">
+            <p role="alert" className="text-[12.5px] font-semibold text-danger-ink">
               {publishError.message || "That didn't run. Try again."}
             </p>
           )}
@@ -690,7 +690,7 @@ function PublishBody() {
             </label>
 
             {datesReversed && (
-              <p className="text-[12.5px] font-semibold text-brand-deep">
+              <p className="text-[12.5px] font-semibold text-danger-ink">
                 Ends can&apos;t be before it starts
               </p>
             )}
@@ -706,7 +706,7 @@ function PublishBody() {
         )}
 
         {focusError && (
-          <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-brand-deep">
+          <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
             {focusError.message || "That didn't save. Try again."}
           </p>
         )}

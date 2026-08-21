@@ -45,7 +45,7 @@ const INPUT =
   'w-full rounded-[8px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-[16px] text-ink outline-none transition focus:border-brand'
 const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 const MOVE =
-  'rounded-[8px] border-[1.5px] border-line px-2 py-1 text-[13px] font-bold text-ink transition hover:border-brand hover:text-brand disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink'
+  'rounded-[8px] border-[1.5px] border-line px-2 py-1 text-[13px] font-bold text-ink transition hover:border-brand hover:text-brand-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink'
 
 // ⚠️ A DRAFT BLOCK CARRIES THE WHOLE DRILL, NOT JUST ITS id — the row shows the
 // title and the category. `key` is a local counter because the same drill may
@@ -99,7 +99,7 @@ function BlockRow({ block }) {
 
       {hasDetail && (
         <details className="mt-1">
-          <summary className="cursor-pointer text-[12.5px] font-bold text-brand">
+          <summary className="cursor-pointer text-[12.5px] font-bold text-brand-ink">
             How it runs
           </summary>
           {drill.summary && (
@@ -119,7 +119,7 @@ function BlockRow({ block }) {
                 href={drill.source_url}
                 target="_blank"
                 rel="noreferrer"
-                className="font-bold text-brand underline"
+                className="font-bold text-brand-ink underline"
               >
                 {drill.source_name || 'Source'}
               </a>
@@ -515,7 +515,7 @@ export default function SessionPlan({ event, team, canEdit }) {
           </div>
 
           {!minutesOk && (
-            <p className="mt-2 text-[12.5px] font-semibold text-brand-deep">
+            <p className="mt-2 text-[12.5px] font-semibold text-danger-ink">
               Every block needs a whole number of minutes, from 1 to 120.
             </p>
           )}
@@ -523,7 +523,7 @@ export default function SessionPlan({ event, team, canEdit }) {
       )}
 
       {error && (
-        <p role="alert" className="mt-2 text-[12.5px] font-semibold text-brand-deep">
+        <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
           {error.message || "That didn't save. Try again."}
         </p>
       )}

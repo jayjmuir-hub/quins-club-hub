@@ -110,7 +110,7 @@ export default function ParentsEditor({ parents, onChange, disabled = false }) {
               type="button"
               onClick={() => remove(index)}
               disabled={disabled}
-              className="rounded-[9px] px-2 py-1 text-[13px] font-bold text-brand-deep transition hover:bg-danger-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+              className="rounded-[9px] px-2 py-1 text-[13px] font-bold text-danger-ink transition hover:bg-danger-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
             >
               Remove
             </button>

@@ -497,7 +497,7 @@ export default function AccessBuilder({
       )}
 
       {shownError && (
-        <span role="alert" className="basis-full text-[12.5px] font-semibold text-brand-deep">
+        <span role="alert" className="basis-full text-[12.5px] font-semibold text-danger-ink">
           {shownError.message || shownError}
         </span>
       )}

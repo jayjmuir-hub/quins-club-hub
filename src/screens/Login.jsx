@@ -208,7 +208,7 @@ function PasswordChecklist({ password }) {
           {/* The tick/dot is decorative — the met/not-met state is carried in
               the visually-hidden text below, because colour and glyph alone
               are not accessible. */}
-          <span aria-hidden="true" className={rule.met ? 'text-brand' : 'text-line'}>
+          <span aria-hidden="true" className={rule.met ? 'text-brand-ink' : 'text-line'}>
             {rule.met ? '✓' : '•'}
           </span>
           <span>{rule.label}</span>
@@ -547,7 +547,7 @@ export default function Login({ authError = null, embedded = false }) {
             {displayedError && (
               <p
                 role="alert"
-                className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+                className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
               >
                 {displayedError}
               </p>
@@ -643,7 +643,7 @@ export default function Login({ authError = null, embedded = false }) {
               Can&rsquo;t get in?{' '}
               <a
                 href="mailto:help@adhquins-clubhub.com?subject=Can%27t%20sign%20in"
-                className="font-semibold text-brand underline"
+                className="font-semibold text-brand-ink underline"
               >
                 Email us
               </a>

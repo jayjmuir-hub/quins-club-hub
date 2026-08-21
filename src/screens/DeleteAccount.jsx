@@ -76,7 +76,7 @@ function WhatHappens() {
         Because the club keeps your contact details on its roster, signing in
         again later will set your account up again automatically. If you want
         the club to remove your details from the roster too, email{' '}
-        <a className="text-brand underline" href="mailto:admin@adhquins-clubhub.com">
+        <a className="text-brand-ink underline" href="mailto:admin@adhquins-clubhub.com">
           admin@adhquins-clubhub.com
         </a>
         .
@@ -166,7 +166,7 @@ export default function DeleteAccount() {
               {error && (
                 <p
                   role="alert"
-                  className="mt-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+                  className="mt-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
                 >
                   {error.message || "We couldn't delete your account. Try again."}
                 </p>

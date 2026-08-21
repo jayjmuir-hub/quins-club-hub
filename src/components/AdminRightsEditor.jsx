@@ -111,7 +111,7 @@ export default function AdminRightsEditor({ membership, label, onChanged }) {
       </p>
 
       {error && (
-        <p role="alert" className="mt-2 text-[12.5px] font-semibold text-brand-deep">
+        <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
           {error.message || "That didn't save. You may not be a super admin."}
         </p>
       )}

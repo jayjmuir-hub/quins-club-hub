@@ -24,7 +24,7 @@
 
 const BASE =
   'block cursor-pointer select-none rounded-[11px] border-[1.5px] px-2 py-2.5 text-center text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2'
-const ON = 'border-brand bg-surface-mute font-bold text-brand-deep'
+const ON = 'border-brand bg-surface-mute font-bold text-danger-ink'
 const OFF = 'border-line font-semibold text-ink'
 
 export default function Segmented({ legend, name, options, value, onChange, disabled = false, className = 'mb-3.5' }) {

@@ -26,7 +26,7 @@ const STATUS_TEXT = {
 
 const STATUS_TONE = {
   submitted: 'bg-surface-mute text-ink-muted',
-  allocated: 'bg-danger-bg text-brand-deep',
+  allocated: 'bg-danger-bg text-danger-ink',
   declined: 'bg-warn-bg text-warn-ink',
 }
 
@@ -204,7 +204,7 @@ export default function PitchRequest({ event, canEdit }) {
       )}
 
       {error && (
-        <p role="alert" className="mt-2 text-[12.5px] font-semibold text-brand-deep">
+        <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
           {error.message || "That didn't send. Try again."}
         </p>
       )}

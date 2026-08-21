@@ -194,7 +194,7 @@ export default function MyPhotoField({ profile, userId }) {
           />
         ) : (
           <div
-            className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-[16px] bg-brand/10 text-[20px] font-extrabold tracking-[.5px] text-brand-deep"
+            className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-[16px] bg-brand/10 text-[20px] font-extrabold tracking-[.5px] text-danger-ink"
             aria-hidden="true"
           >
             {initials(profile?.full_name)}
@@ -281,7 +281,7 @@ export default function MyPhotoField({ profile, userId }) {
 
       {busy && <p className="mt-2 text-[12.5px] text-ink-faint">Saving…</p>}
       {error && (
-        <p role="alert" className="mt-2 text-[12.5px] font-bold text-brand">
+        <p role="alert" className="mt-2 text-[12.5px] font-bold text-brand-ink">
           {error}
         </p>
       )}

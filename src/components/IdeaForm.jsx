@@ -115,7 +115,7 @@ export default function IdeaForm({ open, onClose, event = null, onSubmitted }) {
           </p>
 
           {error && (
-            <p role="alert" className="mt-3 text-[13px] font-medium text-brand-deep">{error}</p>
+            <p role="alert" className="mt-3 text-[13px] font-medium text-danger-ink">{error}</p>
           )}
 
           <div className="mt-4 flex gap-2">

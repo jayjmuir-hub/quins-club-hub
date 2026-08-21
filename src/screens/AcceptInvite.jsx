@@ -112,8 +112,8 @@ export default function AcceptInvite() {
 
         {status === 'error' && (
           <>
-            <h2 className="text-lg font-extrabold text-brand-deep">We couldn&apos;t accept that invite</h2>
-            <p role="alert" className="mt-2 text-sm leading-relaxed text-brand-deep">
+            <h2 className="text-lg font-extrabold text-danger-ink">We couldn&apos;t accept that invite</h2>
+            <p role="alert" className="mt-2 text-sm leading-relaxed text-danger-ink">
               {error?.message || "We couldn't accept that invite. Try again."}
             </p>
           </>

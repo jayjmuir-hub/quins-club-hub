@@ -294,7 +294,7 @@ describe('AppShell', () => {
 
     // Regression: error text must use the brand-deep token (binding
     // global constraint), not a muted grey — see Task 8 review finding.
-    expect(hasClassToken(screen.getByTestId('error-message'), 'text-brand-deep')).toBe(true)
+    expect(hasClassToken(screen.getByTestId('error-message'), 'text-danger-ink')).toBe(true)
   })
 
   // ⚠️ THE WAY OUT. The app's only sign-out control renders on /more behind the

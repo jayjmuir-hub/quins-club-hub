@@ -64,7 +64,7 @@ export default function Privacy() {
       </P>
       <P>
         Questions, corrections, or anything you are unhappy with:{' '}
-        <a className="font-bold text-brand underline" href="mailto:admin@adhquins-clubhub.com">
+        <a className="font-bold text-brand-ink underline" href="mailto:admin@adhquins-clubhub.com">
           admin@adhquins-clubhub.com
         </a>
         .
@@ -186,7 +186,7 @@ export default function Privacy() {
         </Bullet>
         <Bullet>
           <span className="font-bold text-ink">Delete your account.</span>{' '}
-          <Link to="/delete-account" className="font-bold text-brand underline">
+          <Link to="/delete-account" className="font-bold text-brand-ink underline">
             Delete it here
           </Link>
           , at any time, without asking anyone.

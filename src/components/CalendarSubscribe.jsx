@@ -100,7 +100,7 @@ export default function CalendarSubscribe() {
           {error && (
             <p
               role="alert"
-              className="mt-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+              className="mt-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
             >
               {error}
             </p>
@@ -190,7 +190,7 @@ export default function CalendarSubscribe() {
                   <button
                     type="button"
                     onClick={() => setConfirmingReset(true)}
-                    className="mt-3 text-[13px] font-bold text-brand underline decoration-line underline-offset-4 hover:decoration-brand"
+                    className="mt-3 text-[13px] font-bold text-brand-ink underline decoration-line underline-offset-4 hover:decoration-brand"
                   >
                     Reset my link
                   </button>

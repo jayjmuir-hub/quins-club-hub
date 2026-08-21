@@ -68,7 +68,7 @@ export default function NoticeBoard({ notices, readIds, teamsById, now = Date.no
           condition nobody could discover. */}
       <Link
         to="/notices"
-        className="inline-block px-1 text-[13px] font-bold text-brand underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        className="inline-block px-1 text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         All notices
       </Link>

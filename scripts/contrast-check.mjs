@@ -66,6 +66,8 @@ const mix = (a, b, t) => {
 
 // [foreground, background, where it's used, minimum required]
 const PAIRS = [
+  ['#a30d25', T.surfaceCard, 'light: deep-red text on card (danger.ink)', 4.5],
+  ['#a30d25', T.dangerBg, 'light: deep-red text on error tint', 4.5],
   [T.ink, T.surface, 'body text on page', 4.5],
   [T.ink, T.surfaceCard, 'body text on card', 4.5],
   [T.ink, T.surfaceMute, 'text on muted fill', 4.5],
@@ -123,11 +125,15 @@ const D = {
   accentBg: '#0d3d22',
   dangerBg: '#3a0f0c',
   warnInk: '#e0a63f',
+  dangerInk: '#ff7d75',
   warnBg: '#332408',
   infoBg: '#0f1e36',
 }
 
 const DARK_PAIRS = [
+  [D.dangerInk, D.surface, 'dark: deep-red text on page', 4.5],
+  [D.dangerInk, D.surfaceCard, 'dark: deep-red text on card', 4.5],
+  [D.dangerInk, D.dangerBg, 'dark: deep-red text on loss/error tint', 4.5],
   [D.ink, D.surface, 'dark: body text on page', 4.5],
   [D.ink, D.surfaceCard, 'dark: body text on card', 4.5],
   [D.ink, D.surfaceMute, 'dark: text on muted fill', 4.5],

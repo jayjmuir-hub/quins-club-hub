@@ -902,7 +902,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
                     className={[
                       'block cursor-pointer select-none rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2',
                       on
-                        ? 'border-brand bg-surface-mute font-bold text-brand-deep'
+                        ? 'border-brand bg-surface-mute font-bold text-danger-ink'
                         : 'border-line font-semibold text-ink',
                     ].join(' ')}
                   >
@@ -1129,7 +1129,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         {error && (
           <p
             role="alert"
-            className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+            className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
           >
             {errorStage === 'contact' && (
               <span className="block">

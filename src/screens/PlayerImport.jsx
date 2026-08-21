@@ -105,7 +105,7 @@ export default function PlayerImport({ onClose, onImported }) {
                   {parsed.validCount} ready to add
                 </span>
                 {parsed.invalidCount > 0 && (
-                  <span data-testid="import-invalid" className="font-bold text-brand-deep">
+                  <span data-testid="import-invalid" className="font-bold text-danger-ink">
                     {parsed.invalidCount} need fixing
                   </span>
                 )}
@@ -142,7 +142,7 @@ export default function PlayerImport({ onClose, onImported }) {
                         <td className={`${CELL} font-semibold text-ink`}>
                           {row.full_name || <span className="text-ink-faint">—</span>}
                           {!row.ok && (
-                            <span className="mt-0.5 block text-[12px] font-semibold text-brand-deep">
+                            <span className="mt-0.5 block text-[12px] font-semibold text-danger-ink">
                               {row.errors.join('. ')}
                             </span>
                           )}
@@ -163,7 +163,7 @@ export default function PlayerImport({ onClose, onImported }) {
           )}
 
           {failure && (
-            <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
+            <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
               {failure}
             </p>
           )}

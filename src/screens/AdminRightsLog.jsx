@@ -39,7 +39,7 @@ import {
 function NotForYou() {
   return (
     <Card role="alert" className="p-6 text-center">
-      <h3 className="text-base font-extrabold text-brand-deep">Not authorised</h3>
+      <h3 className="text-base font-extrabold text-danger-ink">Not authorised</h3>
       <p className="mx-auto mt-2 max-w-[52ch] text-sm leading-relaxed text-ink-muted">
         The rights log is for super admins only. It records what admins do, so the people
         it records are not the people who read it.
@@ -156,7 +156,7 @@ export default function AdminRightsLog() {
         <p role="alert" className="text-sm text-ink">
           {error}
         </p>
-        <button type="button" onClick={load} className="mt-2 text-sm font-bold text-brand underline">
+        <button type="button" onClick={load} className="mt-2 text-sm font-bold text-brand-ink underline">
           Try again
         </button>
       </Card>

@@ -263,8 +263,8 @@ function LibraryBody() {
   if (error) {
     return (
       <Card role="alert" className="p-6 text-center">
-        <h3 className="text-base font-extrabold text-brand-deep">We couldn&apos;t load the drills</h3>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
+        <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the drills</h3>
+        <p className="mt-2 text-sm leading-relaxed text-danger-ink">
           {error.message || 'Something went wrong. Try again.'}
         </p>
         <Button onClick={() => setReloadToken((token) => token + 1)} className="mx-auto mt-4">
@@ -318,7 +318,7 @@ function LibraryBody() {
                   CHIP,
                   contactFilter === value
                     ? 'border-brand bg-brand text-white'
-                    : 'border-line text-ink hover:border-brand hover:text-brand',
+                    : 'border-line text-ink hover:border-brand hover:text-brand-ink',
                 ].join(' ')}
               >
                 {label}
@@ -339,7 +339,7 @@ function LibraryBody() {
               CHIP,
               includeRetired
                 ? 'border-brand bg-brand text-white'
-                : 'border-line text-ink hover:border-brand hover:text-brand',
+                : 'border-line text-ink hover:border-brand hover:text-brand-ink',
             ].join(' ')}
           >
             Show retired
@@ -522,7 +522,7 @@ function LibraryBody() {
                   CHIP,
                   draft.requires_contact
                     ? 'border-brand bg-brand text-white'
-                    : 'border-line text-ink hover:border-brand hover:text-brand',
+                    : 'border-line text-ink hover:border-brand hover:text-brand-ink',
                 ].join(' ')}
               >
                 {draft.requires_contact ? 'Contact' : 'Tag'}
@@ -559,7 +559,7 @@ function LibraryBody() {
           )}
 
           {saveError && (
-            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-brand-deep">
+            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
               {saveError.message || "That didn't save. Try again."}
             </p>
           )}

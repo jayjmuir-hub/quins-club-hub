@@ -462,7 +462,7 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
           {error && (
             <p
               role="alert"
-              className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+              className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
             >
               {error.message || "We couldn't send that. Try again."}
             </p>
@@ -557,7 +557,7 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
         {error && (
           <p
             role="alert"
-            className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-brand-deep"
+            className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
           >
             {error.message || "We couldn't save that. Try again."}
           </p>

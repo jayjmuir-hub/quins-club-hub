@@ -311,7 +311,7 @@ export default function FeedbackTriage() {
     return (
       <Card className="p-3">
         <p className="text-sm text-ink">{error}</p>
-        <button type="button" onClick={load} className="mt-2 text-sm font-bold text-brand underline">
+        <button type="button" onClick={load} className="mt-2 text-sm font-bold text-brand-ink underline">
           Try again
         </button>
       </Card>
@@ -343,14 +343,14 @@ export default function FeedbackTriage() {
           type="button"
           onClick={() => setShowResolved((v) => !v)}
           data-testid="toggle-resolved"
-          className="mb-3 min-h-[44px] text-sm font-bold text-brand underline"
+          className="mb-3 min-h-[44px] text-sm font-bold text-brand-ink underline"
         >
           {showResolved ? 'Hide resolved' : `Show resolved (${resolved})`}
         </button>
       )}
 
       {error && rows && (
-        <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep">
+        <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
           {error}
         </p>
       )}

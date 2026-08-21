@@ -312,7 +312,7 @@ export default function RosterTable({
                     {/* The refusal lands in the row that caused it, not in a
                         toast that scrolls away from a long table. */}
                     {error && (
-                      <span role="alert" className="mt-0.5 block text-[12px] font-semibold text-brand-deep">
+                      <span role="alert" className="mt-0.5 block text-[12px] font-semibold text-danger-ink">
                         {error}
                       </span>
                     )}

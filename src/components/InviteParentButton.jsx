@@ -184,7 +184,7 @@ export default function InviteParentButton({ parent, disabled = false }) {
       {error && (
         <p
           role="alert"
-          className="mt-2 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-brand-deep"
+          className="mt-2 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
         >
           {error.message}
         </p>
