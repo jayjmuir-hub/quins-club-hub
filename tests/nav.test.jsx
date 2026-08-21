@@ -84,14 +84,14 @@ describe('Nav — Admin pill', () => {
     expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument()
   })
 
-  it('renders an Admin link, hidden on mobile, when canManageClub is true', () => {
+  it('never renders an Admin link — the pill moved to the Sidebar in phase 2', () => {
+    // The prop is gone; passing the old one must change nothing. The admin
+    // gate now lives in AppShell -> Sidebar and tests/app-shell.test.jsx
+    // still proves it role by role.
     renderNav('/', { canManageClub: true })
 
-    const link = screen.getByRole('link', { name: 'Admin' })
-    expect(link).toBeInTheDocument()
-    expect(link).toHaveAttribute('href', '/admin')
-    expect(link.className).toMatch(/\bhidden\b/)
-    expect(link.className).toMatch(/desktop:flex/)
+    const link = screen.queryByRole('link', { name: 'Admin' })
+    expect(link).not.toBeInTheDocument()
   })
 
   // The two retired pills. Nothing should be able to bring them back by

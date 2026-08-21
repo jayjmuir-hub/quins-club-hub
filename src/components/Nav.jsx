@@ -1,13 +1,15 @@
 import { NavLink } from 'react-router-dom'
 
-// Primary navigation: one component rendered once, styled entirely by CSS
-// to be the fixed bottom tab bar below the 820px breakpoint and the
-// in-header top nav at/above it (design-system.md §4.3, §5). It is meant to
-// be rendered as a child of AppShell's header: below 820px it detaches to
-// the viewport bottom via `fixed`, at/above 820px it sits inline in the
-// header's flex row via `desktop:static`. There is deliberately only one
-// list of items and one <nav> in the DOM — no duplicated mobile/desktop
-// trees and no JS width check.
+// Primary navigation — THE MOBILE TAB BAR, and since phase 2 of the 2.0
+// retheme (claude/plans/2026-08-21-retheme-and-shell.md) nothing else.
+// Desktop nav lives in src/components/Sidebar.jsx, which imports NAV_ITEMS
+// from here so there is still exactly one list of destinations.
+//
+// ⚠️ Until 21 Aug 2026 this one component was ALSO the in-header desktop
+// pill row, switched by CSS. Those pills — and their measured-off-adhjrt
+// styling, the sheen, the Admin pill — retired with the sidebar's arrival.
+// The `.nav-tab` sheen CSS in src/index.css survives them for now; it is
+// inert without a desktop nav-tab and phase 5's sweep decides its fate.
 
 // icon components: inline SVG, stroke="currentColor" so they inherit the
 // surrounding text colour (muted/maroon on the mobile tab bar), matching
@@ -70,67 +72,16 @@ function linkClassName({ isActive }) {
     'flex flex-col items-center justify-center gap-1 rounded-lg py-2 font-condensed text-[11px] font-bold uppercase tracking-[0.06em] outline-none transition',
     'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
     isActive ? 'text-white' : 'text-chrome-muted hover:text-white',
-    // Desktop (in-header top nav): a tab on the flat near-black masthead.
-    // The old code needed two different black overlays here, one for active
-    // and one for idle, because the underlying gradient's colour varied with
-    // viewport width and idle text at 82% opacity fell under 4.5:1 without
-    // help. The masthead is flat #0c0c0e now, so idle text can simply be
-    // full-strength white and the active state can be a solid red fill
-    // instead of a darker patch. No opacity tricks, no width-dependent
-    // measurements.
-    //
-    // ⚠️ EVERY DESKTOP VALUE BELOW WAS MEASURED OFF adhjrt.com's `.hdr-nav a`
-    // on 11 Aug 2026 — Jay: "not all capital letters, seems like the font is
-    // smaller on the tournament site, tournament site tabs have nice
-    // animation and a shimmer when you scroll over them". Read with
-    // getComputedStyle, and the hover state read by actually hovering the
-    // element, because three of its :hover rules were unreadable from the
-    // stylesheet.
-    //
-    //   15px / 600 / normal-case / letter-spacing normal / padding 7px 11px 9px
-    //   radius 8px   ← NOT 12px
-    //   hover: white text, bg rgba(255,255,255,.07), translateY(-1px)
-    //
-    // ⚠️ 8px, AND THIS CORRECTS THE COMMIT BEFORE IT. That commit put 12px
-    // here on the strength of adhjrt.com's AGE-GROUP tabs. Its header nav is
-    // a different control and is 8px — which happens to be `rounded-btn`, the
-    // app's own button radius, so the top menu now agrees with the site-wide
-    // rule Jay invoked in the first place.
-    //
-    // ⚠️ THE SHEEN AND THE UNDERLINE ARE IN src/index.css, not here: they are
-    // `::before`/`::after` with a gradient, a blend mode and a keyframe, none
-    // of which a utility class expresses. `.nav-tab` is the hook, and that CSS
-    // is inside its own `@media (min-width: 820px)` — the class is on the
-    // element at every width, so the media query is the ONLY thing keeping a
-    // hover sheen off the phone tab bar.
-    //
-    // ⚠️ SMALLER TYPE HERE BUYS MASTHEAD WIDTH. 16px→15px and px-4→px-[11px]
-    // across five items gives the row back roughly 50px, and the wordmark is
-    // the only thing in it that can take the space (everything else is
-    // shrink-0). That is a side effect, not the fix, and the `sr-only` cutoff
-    // at `wide` is unchanged.
-    //
-    // ⚠️ The active pair measures 5.88:1 (white on brand #c8102e), MEASURED
-    // live on 11 Aug 2026. This comment claimed 4.79:1 until then — that is
-    // the ratio for #e11b22, the OTHER red, which is what adhjrt.com uses and
-    // what this app's brand colour is not. Wrong figure, right conclusion.
-    'nav-tab desktop:flex-row desktop:gap-0 desktop:rounded-btn desktop:px-[11px] desktop:pb-[9px] desktop:pt-[7px] desktop:text-[15px] desktop:font-semibold desktop:normal-case desktop:tracking-normal',
-    'desktop:hover:-translate-y-px',
-    isActive
-      ? 'desktop:bg-brand desktop:text-white'
-      : 'desktop:text-white/80 desktop:hover:bg-white/[0.07] desktop:hover:text-white',
+    // (The desktop pill styling that lived here 6-21 Aug, with its measured
+    // adhjrt values, is retired — see the header note.)
   ].join(' ')
 }
 
-// `canManageClub` (admin ONLY) gates the single Admin pill.
-//
-// This replaced two props (admin-dashboard plan, 2026-08-05): `canManage`
-// (admin OR coach) for an Overview pill, and `canManageAccounts` (admin
-// only) for an Accounts pill. /overview is deleted and /accounts now lives
-// as a tab inside /admin, so there is one destination and one gate. There is
-// deliberately no coach-visible pill here: everything behind /admin edits
-// roles and revokes access, which coaches must not reach.
-export default function Nav({ canManageClub = false }) {
+// The Admin pill that used to render here (admin-only, desktop-only) is now
+// the sidebar's Admin item — same isAdmin() gate, same destination. The tab
+// bar never showed it and still does not: managing the club from a phone is
+// phase 4's job, and it will get a mobile entry point there, not a fifth tab.
+export default function Nav() {
   return (
     // The bar is dark chrome so the app is bookended in near-black — masthead
     // at the top, tab bar at the bottom, light content well between. The
@@ -143,33 +94,15 @@ export default function Nav({ canManageClub = false }) {
       /* `desktop:gap-[2px]` matches adhjrt.com's `.hdr-nav { gap: 2px }`. The
          items now carry their own hover fill, so a wider gap would read as
          five separate buttons rather than one row of tabs. */
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 bg-chrome pb-[env(safe-area-inset-bottom)] shadow-tabbar desktop:static desktop:z-auto desktop:flex desktop:w-auto desktop:grid-cols-none desktop:gap-[2px] desktop:bg-transparent desktop:p-0 desktop:shadow-none"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 bg-chrome pb-[env(safe-area-inset-bottom)] shadow-tabbar desktop:hidden"
     >
-      <div className="brand-rule absolute inset-x-0 top-0 desktop:hidden" />
+      <div className="brand-rule absolute inset-x-0 top-0" />
       {NAV_ITEMS.map(({ to, label, end, icon: Icon }) => (
         <NavLink key={to} to={to} end={end} className={linkClassName}>
-          <Icon
-            className={'h-[23px] w-[23px] desktop:hidden'}
-            aria-hidden="true"
-          />
+          <Icon className={'h-[23px] w-[23px]'} aria-hidden="true" />
           <span>{label}</span>
         </NavLink>
       ))}
-      {canManageClub && (
-        <NavLink
-          to="/admin"
-          // Desktop-only regardless of canManageClub: `hidden` keeps it out
-          // of the mobile tab bar's grid-cols-4 layout entirely (display:none
-          // removes it from grid flow, so the bar still shows exactly 4
-          // visible cells on phone), `desktop:flex` brings it back as a
-          // fifth pill in the desktop row, matching every other item's
-          // `desktop:flex-row` shape from linkClassName. Managing the club is
-          // a sit-down-at-a-laptop task, not a pitch-side one.
-          className={(state) => `${linkClassName(state)} hidden desktop:flex`}
-        >
-          <span>Admin</span>
-        </NavLink>
-      )}
     </nav>
   )
 }

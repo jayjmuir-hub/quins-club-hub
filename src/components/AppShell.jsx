@@ -3,12 +3,13 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin, isPendingOnly, roleLabel } from '../lib/scope.js'
+import { isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
 import Nav from './Nav.jsx'
 import NamePrompt from './NamePrompt.jsx'
 import RollCall from './RollCall.jsx'
 // ViewAsBanner only — the switcher itself moved to the Admin screen on
 // 7 Aug 2026. See the long note at its old call site below.
+import Sidebar from './Sidebar.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
 import { ViewAsBanner, ViewAsSwitcher } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
@@ -209,8 +210,17 @@ export default function AppShell({ children }) {
   // (admin-dashboard plan, 2026-08-05). There is one management destination
   // now — /admin — and it is admin-only, so the nav gate is just isAdmin().
 
+  // Squad staff (and admins, who can open every squad) get the Squad Hub
+  // entry in the desktop sidebar; parents and players have nothing behind it.
+  const showSquadHub =
+    isAdmin(memberships) ||
+    (memberships ?? []).some((m) => isSquadStaffRole(m.role) && m.team_id)
+
   return (
-    <div className="flex min-h-screen flex-col bg-surface text-ink">
+    // desktop:pl-64 clears the fixed 256px sidebar (phase 2 of the 2.0
+    // retheme). Padding on this root moves header, main and tab bar together;
+    // the sidebar itself is `fixed`, so the padding cannot double-shift it.
+    <div className="flex min-h-screen flex-col bg-surface text-ink desktop:pl-64">
       {/* Task 22: skip-to-content link — design-system.md §8's last
           remaining open gap. Must be the very first focusable element in
           the DOM (it is: nothing above this in AppShell, and AppShell wraps
@@ -231,6 +241,12 @@ export default function AppShell({ children }) {
       >
         Skip to content
       </a>
+
+      {/* AFTER the skip link on purpose — the skip link must stay the first
+          focusable element on every screen (the a11y test enforces it), and
+          the sidebar is a fixed element whose DOM position does not affect
+          its paint. */}
+      <Sidebar showSquadHub={showSquadHub} showAdmin={isAdmin(memberships)} />
 
       {/* Banner + masthead stick together as ONE unit. The banner has to sit
           above the header and stay visible (spec §1: persistent, unmissable),
@@ -265,16 +281,19 @@ export default function AppShell({ children }) {
             shapes bleeding off the right edge. */}
         <header className="bg-chrome-grad text-white shadow-masthead">
           <div className="brand-rule" />
-          <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3 wide:max-w-[1360px]">
+          <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3 desktop:mx-0 desktop:max-w-none wide:max-w-none">
             {/* crest.png is 370x400 (portrait) — object-contain keeps its native
                 aspect ratio inside the 46x46 badge box (matching the
                 prototype's background:contain treatment) instead of the
                 default object-fit:fill, which stretched it to fill the square
                 and visually flattened the shield's pointed base. */}
+            {/* Phase 2: on desktop the SIDEBAR carries the crest and the
+                app's name, so the masthead becomes a utility bar and hides
+                both. Mobile is untouched. */}
             <img
               src={crest}
               alt="Abu Dhabi Harlequins crest"
-              className="h-[46px] w-[46px] shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
+              className="h-[46px] w-[46px] shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)] desktop:hidden"
             />
             {/* The club name is one of the few places Anton is allowed (see
                 tailwind.config.js fontFamily): it is a masthead wordmark, not
@@ -305,7 +324,7 @@ export default function AppShell({ children }) {
                 something that holds only while both children happen to carry
                 `truncate`. That is the class of bug jsdom cannot see, so it is
                 worth making structural. */}
-            <div className="relative min-w-0 overflow-hidden">
+            <div className="relative min-w-0 overflow-hidden desktop:hidden">
               {/* ⚠️ PAINTED ONLY WHERE IT FITS — `sr-only` until `wide`.
                   FIXED 10 Aug 2026. The note below records that this
                   truncated to "ABU DHABI HARLE…" at ~1114px. It was worse
@@ -526,10 +545,11 @@ export default function AppShell({ children }) {
 
             <ViewAsSwitcher />
 
-            {/* Admin is admin-only, and gates on the EFFECTIVE membership
-                set (the same one AdminDashboard itself reads), so an admin
-                previewing as a coach loses the pill along with the screen. */}
-            <Nav canManageClub={isAdmin(memberships)} />
+            {/* The mobile tab bar (desktop nav is the Sidebar since phase 2;
+                the old Admin pill gate rode there with it, still reading the
+                EFFECTIVE membership set so an admin previewing as a coach
+                loses the item along with the screen). */}
+            <Nav />
           </div>
         </header>
       </div>
@@ -537,7 +557,7 @@ export default function AppShell({ children }) {
       <main
         id="main-content"
         tabIndex={-1}
-        className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:pb-16 wide:max-w-[1360px] focus:outline-none"
+        className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:mx-0 desktop:max-w-none desktop:px-6 desktop:pb-16 wide:max-w-none focus:outline-none"
       >
         {/* ⚠️ ABOVE THE loading/error/ready SPLIT, DELIBERATELY. Installing is
             not gated on having a membership: a parent who has just signed up
