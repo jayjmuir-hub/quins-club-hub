@@ -104,10 +104,21 @@ screen keeps its existing right/role gate; only the width gate goes.
 
 ## Phases — each its own PR, each deployable alone
 
-1. **Tokens, type, themes.** Fonts in, palette swapped, dark mode working,
-   toggle in the existing header. The app looks re-dressed but keeps its
-   current layout. Biggest testable chunk with zero information-architecture
-   risk.
+1. **Tokens, type, themes — and the app becomes Club Hub 2.0.** Fonts in,
+   palette swapped, dark mode working, toggle in the existing header. The app
+   looks re-dressed but keeps its current layout. Biggest testable chunk with
+   zero information-architecture risk.
+   Also in this phase, per Jay (21 Aug, same conversation):
+   - **The installed app is named "Club Hub"** — the PWA manifest in
+     `vite.config.js` currently says name "Abu Dhabi Harlequins",
+     short_name "Quins". Becomes name "Club Hub — Abu Dhabi Harlequins",
+     short_name "Club Hub" (the short name is what sits under the icon).
+     ⚠️ Already-installed apps re-read the manifest on their own schedule;
+     phones that installed under the old name may keep it until reinstall —
+     say so rather than chase it.
+   - **Version 2.0.0** in `package.json` — the retheme is the 2.0. The 1.x
+     line was never used; 0.1.0 jumps straight to 2.0.0 because the version
+     is a statement to people, not to npm.
 2. **Desktop shell.** Sidebar + utility bar + full-width content on
    `desktop:`; mobile untouched. Nav IA consolidates the scattered
    dashboards.
