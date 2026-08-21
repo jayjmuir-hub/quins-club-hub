@@ -27,7 +27,7 @@ import { supabase } from '../lib/supabase'
 // Home card comes from `my_squad_staff`, which is SECURITY DEFINER and already
 // loaded for the squad-contacts block.
 const SELECT = `
-  id, club_id, team_id, author_id, title, body, pinned,
+  id, club_id, team_id, group_id, author_id, title, body, pinned,
   expires_at, created_at, updated_at,
   author:profiles!announcements_author_id_fkey(full_name)
 `
@@ -106,7 +106,7 @@ export async function markNoticesRead(profileId, announcementIds) {
 }
 
 /**
- * Posts a notice.
+ * Posts a notice to one squad, several squads, or the whole club.
  *
  * ⚠️ `club_id` AND `author_id` ARE DELIBERATELY ABSENT FROM THE PAYLOAD. A
  * BEFORE INSERT trigger stamps both from the caller's own session. Adding them
@@ -114,29 +114,60 @@ export async function markNoticesRead(profileId, announcementIds) {
  * make this file look like they are, which is how the next person reintroduces
  * the hole.
  *
- * `teamId` null posts to the whole club, which the policy allows only to an
- * admin.
+ * ⚠️ SEVERAL SQUADS IS A FAN-OUT: ONE ROW EACH, SHARING A `group_id`.
+ * `team_id` is the security boundary — `announcement read` keys on it and so
+ * does `private.notice_audience` — so a junction table would be a rewrite of
+ * the read path AND the boundary. Same answer, same reasoning, as
+ * `claude/decisions/2026-08-05-multi-squad-events-and-pitch.md` gave for events.
+ *
+ * ⚠️ AND IT MUST BE **ONE** `.insert([...])` CALL, NOT A LOOP. The push trigger
+ * is STATEMENT-level with a transition table: it sends one notification per
+ * group per statement. A loop would be N statements, which is N notifications,
+ * which is the duplicate-buzz this whole arrangement exists to prevent —
+ * measured 21 Aug 2026, seven people sit in two squads.
+ *
+ * `teamIds` empty (or a single null) posts to the whole club, which the policy
+ * allows only to an admin. `teamId` is still accepted for the single-squad
+ * callers that predate this.
  */
-export async function createNotice({ title, body, teamId = null, pinned = false, expiresAt = null }) {
+export async function createNotice({
+  title,
+  body,
+  teamId = null,
+  teamIds = null,
+  pinned = false,
+  expiresAt = null,
+}) {
   const cleanTitle = (title ?? '').trim()
   const cleanBody = (body ?? '').trim()
   if (!cleanTitle) throw new Error('Give the notice a title.')
   if (!cleanBody) throw new Error('Write something in the notice.')
 
-  const { data, error } = await supabase
-    .from('announcements')
-    .insert({
-      title: cleanTitle,
-      body: cleanBody,
-      team_id: teamId || null,
-      pinned: Boolean(pinned),
-      expires_at: expiresAt || null,
-    })
-    .select(SELECT)
-    .single()
+  // One list, however the caller expressed it. Falsy entries mean "whole club",
+  // and a whole-club notice is a single row with no team — never a fan-out.
+  const chosen = (Array.isArray(teamIds) ? teamIds : [teamId]).filter(Boolean)
+  const clubWide = chosen.length === 0
+  const unique = [...new Set(chosen)]
+
+  const shared = {
+    title: cleanTitle,
+    body: cleanBody,
+    pinned: Boolean(pinned),
+    expires_at: expiresAt || null,
+  }
+
+  // ⚠️ `group_id` ONLY WHEN THERE IS ACTUALLY A GROUP. Stamping one on a
+  // single-squad notice would be harmless today and a lie in every query that
+  // later asks "was this sent to several squads".
+  const groupId = unique.length > 1 ? crypto.randomUUID() : null
+  const rows = clubWide
+    ? [{ ...shared, team_id: null }]
+    : unique.map((id) => ({ ...shared, team_id: id, group_id: groupId }))
+
+  const { data, error } = await supabase.from('announcements').insert(rows).select(SELECT)
 
   if (error) throw error
-  return data
+  return rows.length === 1 ? data[0] : data
 }
 
 /**

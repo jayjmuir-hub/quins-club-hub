@@ -58,26 +58,60 @@ export default function NoticeComposer({ open, onClose, teams, clubWide, onPoste
   // club-wide could have this default to "Whole club", and the cost of a
   // mis-tap there is every family in the club. A coach's only option is their
   // squad anyway, so defaulting to teams[0] is right for both and safe for one.
-  const [scope, setScope] = useState(() => teams[0]?.id ?? (clubWide ? '' : ''))
+  //
+  // ⚠️ A SET OF SQUAD IDS SINCE 21 Aug 2026, AND `wholeClub` IS A SEPARATE FLAG
+  // RATHER THAN A MEMBER OF IT. Jay: "select whole club and the other options
+  // grey out so we don't send redundant notices". Modelling club-wide as one
+  // more checkbox would make "whole club AND U12" expressible, which is the
+  // redundant notice he is asking us to prevent — so it cannot be a member of
+  // the same set as the squads.
+  const [picked, setPicked] = useState(() => new Set(teams[0] ? [teams[0].id] : []))
+  const [wholeClub, setWholeClub] = useState(false)
   const [pinned, setPinned] = useState(false)
   const [expiry, setExpiry] = useState('none')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  const clubWideChosen = scope === ''
-  const recipientsHint = clubWideChosen
-    ? 'Everyone in the club will see this.'
-    : 'Everyone attached to that squad will see this.'
+  const clubWideChosen = wholeClub
+  const chosenTeams = teams.filter((team) => picked.has(team.id))
+  // ⚠️ NOTHING CHOSEN IS NOT THE SAME AS THE WHOLE CLUB. An empty set must
+  // block the post, not quietly widen it to every family in the club — the
+  // failure this component is most able to cause.
+  const nothingChosen = !wholeClub && chosenTeams.length === 0
+
+  const recipientsHint = wholeClub
+    ? 'Everyone in the club will see this, once.'
+    : nothingChosen
+      ? 'Choose at least one age group.'
+      : chosenTeams.length === 1
+        ? `Everyone attached to ${chosenTeams[0].name} will see this.`
+        : `${chosenTeams.length} age groups will see this. Anyone in more than one of ` +
+          'them is notified once, not twice.'
+
+  function toggleTeam(id) {
+    setPicked((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
+    // ⚠️ CHECKED HERE AS WELL AS ON THE BUTTON. A disabled button is a hint;
+    // a form can still be submitted by Enter in a text field.
+    if (nothingChosen) {
+      setError('Choose at least one age group, or the whole club.')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
       await createNotice({
         title,
         body,
-        teamId: clubWideChosen ? null : scope,
+        teamIds: wholeClub ? [] : [...picked],
         pinned,
         expiresAt: expiryFromChoice(expiry),
       })
@@ -106,26 +140,51 @@ export default function NoticeComposer({ open, onClose, teams, clubWide, onPoste
           </p>
         )}
 
-        <label className={LABEL} htmlFor="notice-scope">
-          Who sees it
-        </label>
-        <select
-          id="notice-scope"
-          className={FIELD}
-          value={scope}
-          disabled={saving}
-          onChange={(event) => setScope(event.target.value)}
-        >
-          {/* ⚠️ CLUB-WIDE IS LAST, NOT FIRST. A select opens on its current
-              value, but a person scanning the list should meet their squads
-              before the option that reaches every family in the club. */}
-          {teams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {team.name}
-            </option>
-          ))}
-          {clubWide && <option value="">Whole club</option>}
-        </select>
+        {/* ⚠️ A FIELDSET WITH A LEGEND, NOT A LABELLED DIV. Every helper in
+            tests/ finds this group by its legend rather than by a squad name,
+            because the three files that drive this component name their squads
+            differently — the lesson 55 broken tests taught on 20 Aug 2026. */}
+        <fieldset className="mb-1.5 border-0 p-0" disabled={saving}>
+          <legend className={LABEL}>Who sees it</legend>
+
+          {/* ⚠️ CLUB-WIDE IS LAST, NOT FIRST — a person scanning should meet
+              their own squads before the option that reaches every family. */}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+            {teams.map((team) => (
+              <label
+                key={team.id}
+                className={`flex items-center gap-2 text-[15px] ${
+                  wholeClub ? 'cursor-not-allowed opacity-45' : 'cursor-pointer text-ink'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-brand"
+                  checked={!wholeClub && picked.has(team.id)}
+                  /* ⚠️ DISABLED, NOT UNCHECKED, WHILE CLUB-WIDE IS ON. The
+                     squad ticks are kept in state so that turning club-wide
+                     back off restores what they had chosen rather than
+                     silently emptying it. */
+                  disabled={wholeClub}
+                  onChange={() => toggleTeam(team.id)}
+                />
+                <span>{team.name}</span>
+              </label>
+            ))}
+          </div>
+
+          {clubWide && (
+            <label className="mt-2.5 flex cursor-pointer items-center gap-2 border-t border-line pt-2.5 text-[15px] font-bold text-ink">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-brand"
+                checked={wholeClub}
+                onChange={(event) => setWholeClub(event.target.checked)}
+              />
+              <span>Whole club</span>
+            </label>
+          )}
+        </fieldset>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted" data-testid="scope-hint">
           {recipientsHint}
         </p>
@@ -190,7 +249,7 @@ export default function NoticeComposer({ open, onClose, teams, clubWide, onPoste
         </label>
 
         <div className="mt-4 flex items-center gap-3">
-          <Button type="submit" disabled={saving || !title.trim() || !body.trim()}>
+          <Button type="submit" disabled={saving || nothingChosen || !title.trim() || !body.trim()}>
             {saving ? 'Posting…' : 'Post'}
           </Button>
           {!saving && (

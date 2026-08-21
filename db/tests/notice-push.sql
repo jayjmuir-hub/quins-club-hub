@@ -68,6 +68,12 @@ declare
   -- The rule this keeps relearning: **a harness that grows red as the club
   -- grows is testing the fixture, not the feature.**
   n_devices int;
+  n_devices2 int;
+  n_before  int;
+  v_two     uuid;
+  v_teams   uuid[];
+  v_lead    uuid;
+  v_group   uuid := gen_random_uuid();
   -- ⚠️ AND HOW MANY DEVICES THE WHOLE AUDIENCE HAS, which is the control for
   -- the join below: if it were filtering nothing, this and n would be equal.
   n_all     int;
@@ -235,6 +241,74 @@ begin
       'NOTICE PUSH: the target did not come back once the conditions were '
       'cleared (% rows, expected % device(s)). The zeros above therefore '
       'prove nothing.', n, n_devices;
+  end if;
+
+  -- ── 7. ⚠️ A MESSAGE SENT TO SEVERAL SQUADS IS PUSHED ONCE ──────────────
+  --
+  -- 20260821_notice_multi_squad.sql fans a multi-squad notice out into one row
+  -- per squad sharing a `group_id`, because `team_id` is the security boundary
+  -- and the squads cannot share a row. The danger that creates is the reason
+  -- the trigger is STATEMENT-level: anybody attached to two of the chosen
+  -- squads would otherwise get the same words on their phone twice.
+  --
+  -- ⚠️ MEASURED 21 Aug 2026 BEFORE THE FEATURE WAS BUILT: seven people hold
+  -- active memberships in two squads, two of them subscribed. Not hypothetical.
+  --
+  -- Skipped rather than faked when nobody sits in two squads — a fabricated
+  -- membership would test the fixture, not the rule.
+  select m.profile_id into v_two
+    from public.memberships m
+    join public.push_subscriptions s on s.profile_id = m.profile_id
+   where m.status = 'active' and m.team_id is not null
+   group by m.profile_id having count(distinct m.team_id) > 1
+   limit 1;
+
+  if v_two is not null then
+    select array_agg(distinct team_id) into v_teams
+      from public.memberships
+     where profile_id = v_two and status = 'active' and team_id is not null;
+
+    select count(*) into n_before from net.http_request_queue;
+
+    set local role authenticated;
+    perform set_config('request.jwt.claims',
+                       json_build_object('sub', v_poster, 'role', 'authenticated')::text, true);
+    insert into public.announcements (title, body, team_id, group_id)
+    select 'db:check group — rolled back', 'body', t, v_group
+      from (values (v_teams[1]), (v_teams[2])) g(t);
+    reset role;
+
+    select count(*) - n_before into n from net.http_request_queue;
+    if n <> 1 then
+      raise exception
+        'NOTICE PUSH: a notice sent to TWO squads queued % pushes, expected 1. '
+        'Everyone in both squads is about to be buzzed twice with the same '
+        'words. The trigger must be STATEMENT-level over the transition table.', n;
+    end if;
+
+    select (array_agg(id order by id))[1] into v_lead
+      from public.announcements where group_id = v_group;
+
+    select count(*) into n
+      from public.notice_push_subscriptions(v_lead) f
+      join public.push_subscriptions ps on ps.id = f.id
+     where ps.profile_id = v_two;
+    select count(*) into n_devices2 from public.push_subscriptions where profile_id = v_two;
+    if n <> n_devices2 then
+      raise exception
+        'NOTICE PUSH: somebody in BOTH chosen squads resolved to % rows for % '
+        'device(s). The `distinct` in notice_push_subscriptions is what makes '
+        'this one, and it is easy to drop by accident.', n, n_devices2;
+    end if;
+
+    -- ⚠️ THE CONTROL. If the audience were empty the assertion above would pass
+    -- for the wrong reason.
+    select count(*) into n from public.notice_push_subscriptions(v_lead);
+    if n < n_devices2 then
+      raise exception
+        'NOTICE PUSH: the whole group audience (%) is smaller than one person''s '
+        'devices (%), so the count above proves nothing.', n, n_devices2;
+    end if;
   end if;
 
   raise notice 'NOTICE PUSH: all checks passed.';

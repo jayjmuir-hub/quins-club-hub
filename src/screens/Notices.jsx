@@ -18,7 +18,14 @@ import {
 import { useAuth } from '../lib/auth.jsx'
 import { formatTableDate, formatTime } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canPostNotice, currentNotices, isExpired, postableTeams } from '../lib/notices.js'
+import {
+  canPostNotice,
+  collapseGroups,
+  currentNotices,
+  isExpired,
+  noticeRowIds,
+  postableTeams,
+} from '../lib/notices.js'
 import { visibleTeams } from '../lib/scope.js'
 
 // The noticeboard — /notices. Phase 1 of claude/plans/2026-08-14-notices.md.
@@ -196,7 +203,10 @@ export default function Notices() {
     setError(null)
     try {
       const [rows, reads] = await Promise.all([listNotices(), listMyReads()])
-      setNotices(rows)
+      // ⚠️ COLLAPSED HERE AND NOT IN listNotices(). That function also feeds
+      // the receipts sheet, which counts reads per ROW and would be wrong if it
+      // were handed one entry standing for three.
+      setNotices(collapseGroups(rows))
       setReadIds(reads)
 
       // ⚠️ THE STATS CALL IS ALLOWED TO FAIL WITHOUT BREAKING THE BOARD. It is
@@ -231,9 +241,12 @@ export default function Notices() {
   // recording them as seen would be a lie told to a coach's counter.
   useEffect(() => {
     if (!notices || !user?.id) return
+    // ⚠️ EVERY ROW BEHIND THE CARD, NOT JUST THE ONE IT IS KEYED ON. A notice
+    // sent to three squads is three rows; marking only the first read leaves
+    // the unread dot coming back on the next load.
     const unseen = currentNotices(notices)
       .filter((notice) => !readIds.has(notice.id))
-      .map((notice) => notice.id)
+      .flatMap((notice) => noticeRowIds(notice))
     if (unseen.length === 0) return
 
     markNoticesRead(user.id, unseen)

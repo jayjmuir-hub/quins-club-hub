@@ -24,7 +24,9 @@ import {
   markNoticesRead,
   subscribeNotices,
 } from '../data/announcements.js'
-import { pinnedNotices } from '../lib/notices.js'
+import { pinnedNotices,
+  collapseGroups,
+} from '../lib/notices.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -618,7 +620,7 @@ export default function Dashboard() {
     Promise.all([listNotices(), listMyReads()])
       .then(([rows, reads]) => {
         if (!mounted) return
-        setNotices(rows)
+        setNotices(collapseGroups(rows))
         setNoticeReads(reads)
       })
       .catch(() => {
