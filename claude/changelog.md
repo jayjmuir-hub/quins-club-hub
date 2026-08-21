@@ -10,6 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 📲 **THE TRACKING GRID GROWS A PHONE SHAPE.** Jay, first real look on his
+  phone: "this isn't going to work" — the matrix's event columns and % sat
+  off the right edge behind an undiscoverable sideways scroll. On mobile
+  the section is now a tappable summary list (player, %, no-shows — the
+  numbers a coach acts on) and each player opens a Sheet with their
+  event-by-event history, vertical, same marks and same rules as the grid.
+  The matrix itself is desktop-only. First coach feedback, answered within
+  the hour — exactly what the handoff said to watch for.
+- `16f8bf7` — the squash with the evening handoff (#292).
+
 - 📓 **Evening handoff: the Squad Hub and the whole 2.0 retheme**
   (`claude/handoffs/2026-08-21-squad-hub-and-retheme-2point0.md`), and
   `state-of-play.md` now says 2.0 and the hub are live.

@@ -5,6 +5,7 @@ import { AccentTitle, BlockTitle, Kicker } from '../components/Editorial.jsx'
 import Empty from '../components/Empty.jsx'
 import NoticeBoard from '../components/NoticeBoard.jsx'
 import Segmented from '../components/Segmented.jsx'
+import { Sheet } from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listMyReads, listNotices } from '../data/announcements.js'
 import { listAttendanceForEvents } from '../data/attendance.js'
@@ -113,6 +114,8 @@ export default function SquadHub() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')
+  // The phone's tracking drill-in: which player's history sheet is open.
+  const [trackingPlayerId, setTrackingPlayerId] = useState(null)
   // The drill-in, borrowed from Dashboard wholesale: tapping a Coming-up row
   // opens the same EventDetail sheet, which in turn opens the same
   // Availability and Register sheets. One flow everywhere, on purpose —
@@ -428,7 +431,40 @@ export default function SquadHub() {
                     <span className="text-brand-deep"> · {summary.noShows} said-in-but-absent</span>
                   )}
                 </p>
-                <div className="max-h-[24rem] overflow-auto">
+                {/* ⚠️ THE MATRIX IS DESKTOP-ONLY — Jay, from his phone,
+                    21 Aug 2026: "this isn't going to work". On a 375px
+                    screen the event columns and the % lived off the right
+                    edge behind an undiscoverable sideways scroll. The phone
+                    gets the two numbers a coach acts on — % and no-shows —
+                    as a tappable list, and the per-event marks move into a
+                    sheet per player, vertical like everything else on a
+                    phone. */}
+                <ul className="desktop:hidden">
+                  {rows.map((row) => (
+                    <li key={row.player.id} className="border-b border-line/50 last:border-b-0">
+                      <button
+                        type="button"
+                        onClick={() => setTrackingPlayerId(row.player.id)}
+                        className="flex w-full items-center justify-between gap-2 rounded-[9px] px-1 py-2.5 text-left hover:bg-surface-mute"
+                      >
+                        <span className="min-w-0 truncate text-sm font-semibold text-ink">
+                          {row.player.full_name}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2.5 text-[13px] font-bold">
+                          <span className="text-ink">{row.percent ?? '—'}%</span>
+                          <span
+                            className={row.noShows > 0 ? 'text-brand-deep' : 'text-ink-muted'}
+                            title="Said in, marked absent"
+                          >
+                            {row.noShows} no-show{row.noShows === 1 ? '' : 's'}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="hidden max-h-[24rem] overflow-auto desktop:block">
                   <table className="w-full min-w-[560px] border-collapse text-left">
                     <thead>
                       <tr className="sticky top-0 z-10 border-b-[1.5px] border-line bg-surface-card text-[11.5px] font-bold uppercase tracking-[.3px] text-ink-muted">
@@ -464,10 +500,13 @@ export default function SquadHub() {
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-2 text-[11.5px] font-medium text-ink-muted">
+                <p className="mt-2 hidden text-[11.5px] font-medium text-ink-muted desktop:block">
                   Left mark: RSVP (In / ? / Out, · no reply). Right mark: register (P present, A absent,
                   E excused, · not taken). Shaded cell = said in, didn&apos;t show. Newest first, last{' '}
                   {shownEvents.length} events.
+                </p>
+                <p className="mt-2 text-[11.5px] font-medium text-ink-muted desktop:hidden">
+                  Tap a player for their event-by-event history.
                 </p>
               </>
             )}
@@ -525,6 +564,54 @@ export default function SquadHub() {
       {selectedEvent && registerOpen && (
         <Register event={selectedEvent} team={team} onClose={() => setRegisterOpen(false)} />
       )}
+
+      {/* The phone's per-player tracking history — the grid's row, turned
+          vertical. Same marks, same rules, one player at a time. */}
+      {(() => {
+        const row = trackingPlayerId ? rows.find((r) => r.player.id === trackingPlayerId) : null
+        if (!row) return null
+        return (
+          <Sheet open onClose={() => setTrackingPlayerId(null)} title={row.player.full_name}>
+            <p className="mb-3 text-[13px] font-semibold text-ink">
+              {row.percent ?? '—'}% attendance
+              <span className={row.noShows > 0 ? 'text-brand-deep' : 'text-ink-muted'}>
+                {' '}· {row.noShows} said-in-but-absent
+              </span>
+            </p>
+            <ul className="flex flex-col divide-y divide-line/50">
+              {shownEvents.map((event) => {
+                const cell = row.cells.get(event.id)
+                const rsvp = RSVP_MARK[cell?.availability]
+                const attend = ATTEND_MARK[cell?.attendance]
+                const noShow = cell?.availability === 'in' && cell?.attendance === 'absent'
+                return (
+                  <li
+                    key={event.id}
+                    className={`flex items-center justify-between gap-2 px-1 py-2 ${noShow ? 'bg-danger-bg/60' : ''}`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13px] font-semibold text-ink">{eventTitle(event)}</span>
+                      <span className="text-[12px] font-medium text-ink-muted">{shortDate(event)}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1 text-[11px] font-bold">
+                      <span className={`inline-block min-w-[26px] rounded px-1.5 py-0.5 text-center ${rsvp ? rsvp.className : 'text-ink-muted/60'}`}>
+                        {rsvp ? rsvp.label : '·'}
+                      </span>
+                      <span className={`inline-block min-w-[22px] rounded px-1.5 py-0.5 text-center ${attend ? attend.className : 'text-ink-muted/60'}`}>
+                        {attend ? attend.label : '·'}
+                      </span>
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+            <p className="mt-3 text-[11.5px] font-medium text-ink-muted">
+              Left: RSVP (In / ? / Out, · no reply). Right: register (P / A / E, · not taken).
+              Shaded = said in, didn&apos;t show. Newest first.
+            </p>
+          </Sheet>
+        )
+      })()}
     </div>
   )
 }
