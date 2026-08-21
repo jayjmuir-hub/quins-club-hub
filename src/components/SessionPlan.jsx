@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Button from './Button.jsx'
 import Chip from './Chip.jsx'
 import { getSession, listDrills, listFocus, saveSessionBlocks } from '../data/trainingPlans.js'
@@ -220,12 +220,22 @@ export default function SessionPlan({ event, team, canEdit }) {
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
 
+  // ⚠️ A REF, NOT THE STATE, BECAUSE THE READER BELOW IS ASYNCHRONOUS. The
+  // effect's `.then` runs long after the effect body captured its variables,
+  // so a coach who opened the form mid-load would be judged by whatever
+  // `editing` was when the fetch started. The ref always reads what is true
+  // now.
+  const editingRef = useRef(false)
+  editingRef.current = editing
+
   // ⚠️ THE EVENT'S DATE IN CLUB TIME, never a bare `new Date()` and never
   // date.getDate(). A 20:00 Abu Dhabi session is 16:00 UTC the same day but
   // 18:00 the previous evening in some readers' zones, and a focus window is
-  // stored as plain dates — reading the wrong day is how a fortnight's theme
-  // shows on the wrong Tuesday. ISO date strings compare correctly as strings,
-  // which is why the window test below needs no Date arithmetic at all.
+  // stored as plain dates — reading the wrong date is how a fortnight's theme
+  // shows on the wrong day. (It said "the wrong Tuesday" until 21 Aug 2026;
+  // nothing in this feature keys on a weekday and the wording invited it to.)
+  // ISO date strings compare correctly as strings, which is why the window
+  // test below needs no Date arithmetic at all.
   const clubDate = clubDateTimeInputs(eventDate(event)).date
 
   useEffect(() => {
@@ -249,8 +259,16 @@ export default function SessionPlan({ event, team, canEdit }) {
 
         const loaded = sessionResult.status === 'fulfilled' ? sessionResult.value : null
         setSession(loaded)
-        setNotes(loaded?.notes ?? '')
-        setBlocks(draftFrom(loaded))
+        // ⚠️ NEVER RE-SEED THE FORM UNDER A COACH WHO IS TYPING IN IT. This
+        // effect reruns on canEdit and on the event's club date as well as on
+        // reloadToken, and each rerun used to overwrite `blocks` and `notes`
+        // with the saved session — throwing away an unsaved running order with
+        // no warning and no way back. After a save, `editing` is already false
+        // and the reload seeds the form as before.
+        if (!editingRef.current) {
+          setNotes(loaded?.notes ?? '')
+          setBlocks(draftFrom(loaded))
+        }
 
         const focusRows = focusResult.status === 'fulfilled' ? focusResult.value ?? [] : []
         setFocus(

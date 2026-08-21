@@ -23,7 +23,8 @@ view. **Out of scope, each to get its own spec later:**
 `db/migrations/20260821_training_plans.sql`, represented in `db/schema/`.
 
 - **`teams.requires_contact boolean not null default false`**, set on
-  `/admin/staff` beside `is_senior` and `allows_self_registration`. Default
+  `/admin/club` — the squad list with the scoring panel, NOT `/admin/staff`,
+  which this line said until 21 Aug 2026. Default
   false means every squad starts as TAG until somebody says otherwise — the safe
   direction, because a tackle drill cannot reach a squad by accident. ⛔ Never
   parsed from `teams.name`, never inferred from age (plan §1).
@@ -118,3 +119,14 @@ when that is set, so the Director knows why a publish skipped it.
   it on 20 Aug; the preview is what makes multi-squad safe.
 - *"Default `requires_contact` to true for U9+."* Forbidden — the club runs tag
   sides above that age. False is the direction that fails safe.
+- *"Saving a template is not atomic."* Correct, and accepted. `saveTemplate`
+  then `saveSessionBlocks` is a delete-then-insert across two round trips, so
+  an insert that fails after the delete leaves the template with ZERO blocks
+  rather than its old ones. The blast radius is one template, or one night's
+  session for the same shape in `SessionPlan` — and the screen that just did
+  it is still open with every block on it, so a rebuild is retyping nothing.
+  An RPC that did both inside one transaction would close it properly; it is
+  a third function to write, grant, revoke and harness against a failure mode
+  nobody has hit, and it is not worth it yet. ⚠️ **The moment blocks are ever
+  written by anything OTHER than a person watching the screen, this stops
+  being true and the RPC becomes the answer.**

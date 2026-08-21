@@ -423,9 +423,11 @@ function TemplatesBody() {
     doSave()
   }
 
+  // ⚠️ Number.isInteger, NOT Number.isFinite — `minutes` is a smallint with a
+  // 1..120 check, and 12.5 is finite. Same test SessionPlan makes.
   const minutesOk = blocks.every((block) => {
     const value = Number(block.minutes)
-    return Number.isFinite(value) && value >= 1 && value <= 120
+    return Number.isInteger(value) && value >= 1 && value <= 120
   })
   const canSave =
     draft.name.trim() !== '' && minutesOk && (editing !== 'new' || clubId != null)
