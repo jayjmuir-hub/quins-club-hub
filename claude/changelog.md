@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- ⬜ **THE WHITE-BLOB PILL, AND THE SWEEP THAT SAYS IT WAS THE LAST.** Jay's
+  screenshot after the dark audit: the ACTIVE role-filter pill a solid white
+  lozenge. Cause: the inverse fill — `bg-ink text-white` flips its
+  background white in dark while the text stays white. The inverse pair is
+  `text-surface-card` (each side flips, always opposing); four call sites
+  fixed (Accounts + Notices pills), and the theme guard now refuses
+  `bg-ink`+`text-white`. Then the audit Jay asked for: a Playwright rig
+  (real renderer, real frames — no frozen-transition phantoms) swept every
+  harness scenario in BOTH themes. **Dark: clean across the board.** Light:
+  only gradient-background false positives the probe cannot see. The rig
+  rides in the harness: a `squadhub` scenario plus attendance/announcements
+  stubs, so the player-history sheet is screenshotable forever.
+  ⚠️ His earlier still-black sheet predated #294's deploy by minutes —
+  `color-scheme` is what disarms Android's force-dark, and the flag test
+  proved the current page survives `--force-dark-mode` intact.
+- `a84b096` — the squash with the dark-mode audit (#294).
+
 - 🌚 **THE DARK-MODE AUDIT.** Jay's screenshot: a sheet rendering
   black-on-black. Three real causes, all systemic: **217 call sites** used
   the FILL reds as TEXT (`text-brand-deep` ~1.8:1, bare `text-brand`

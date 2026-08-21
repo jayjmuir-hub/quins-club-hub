@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { MemoryRouter, BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '../src/components/AppShell.jsx'
+import SquadHub from '../src/screens/SquadHub.jsx'
+import { Routes as RRoutes, Route as RRoute } from 'react-router-dom'
 import NoticeBoard from '../src/components/NoticeBoard.jsx'
 import { applyTheme, watchSystemTheme } from '../src/lib/theme.js'
 import Login from '../src/screens/Login.jsx'
@@ -1105,6 +1107,20 @@ const scenarios = {
 
 const params = new URLSearchParams(window.location.search)
 const scenario = params.get('scenario') || 'login'
+// The Squad Hub, at its real route so useParams resolves — added 21 Aug
+// 2026 to reproduce the dark-mode player-history sheet on a REAL renderer.
+scenarios.squadhub = () => (
+  <Shell
+    route="/squad/t1"
+    authValue={baseAuth(COACH_EMAIL)}
+    membershipValue={{ memberships: COACH_MEMBERSHIPS, teams: TEAMS, loading: false, error: null, reload: noop }}
+  >
+    <RRoutes>
+      <RRoute path="/squad/:teamId" element={<SquadHub />} />
+    </RRoutes>
+  </Shell>
+)
+
 const render = scenarios[scenario] || scenarios.login
 
 // Theme parity with the real app: index.html's inline no-flash script does

@@ -34,6 +34,8 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^\.\.\/lib\/auth\.jsx$/, replacement: path.resolve(__dirname, 'stubs/auth.jsx') },
+      { find: /^\.\.\/data\/attendance\.js$/, replacement: path.resolve(__dirname, 'stubs/attendance.js') },
+      { find: /^\.\.\/data\/announcements\.js$/, replacement: path.resolve(__dirname, 'stubs/announcements.js') },
       // ⚠️ './auth.jsx' as well as '../lib/auth.jsx', and the difference is
       // not cosmetic. These aliases match SPECIFIER TEXT, so they only catch
       // importers sitting one directory below src/. src/lib/useMyProfile.js
