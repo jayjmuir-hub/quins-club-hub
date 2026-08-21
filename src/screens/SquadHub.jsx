@@ -132,7 +132,12 @@ export default function SquadHub() {
   // redirect/picker and the switcher shown to multi-squad staff and admins.
   const myHubTeams = useMemo(() => {
     if (!teams) return []
-    return teams.filter((candidate) => canEditTeam(memberships, candidate.id))
+    return teams
+      .filter((candidate) => canEditTeam(memberships, candidate.id))
+      // Belt to the context's braces: loadTeams orders by sort_order, but
+      // this screen re-asserts it so the picker and the switcher chips can
+      // never regress to insertion order if the context changes hands.
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name))
   }, [memberships, teams])
 
   const openEvent = (id) => {

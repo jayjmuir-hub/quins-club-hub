@@ -70,9 +70,13 @@ vi.mock('../src/screens/Register.jsx', () => ({
 import SquadHub from '../src/screens/SquadHub.jsx'
 import userEvent from '@testing-library/user-event'
 
+// ⚠️ DELIBERATELY SHUFFLED — U14 before U12 despite sort_order 5 > 3. The
+// picker-order test below only discriminates because array order and
+// sort_order disagree; a fixture already in order would pass against the
+// exact bug it exists to catch (the 21 Aug picker showing insertion order).
 const TEAMS = [
-  { id: 't-u12', name: 'U12 Mixed', sort_order: 3 },
   { id: 't-u14', name: 'U14B', sort_order: 5 },
+  { id: 't-u12', name: 'U12 Mixed', sort_order: 3 },
   { id: 't-u8', name: 'U8 Tag', sort_order: 1 },
 ]
 
@@ -163,8 +167,10 @@ describe('the gate', () => {
     )
     renderAt('/squad')
     expect(await screen.findByText(/which squad/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'U12 Mixed' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'U14B' })).toBeInTheDocument()
+    // In CLUB order (sort_order), not the shuffled fixture order — Jay's
+    // 21 Aug report: the picker listed squads as the database inserted them.
+    const links = screen.getAllByRole('link', { name: /U1[24]/ })
+    expect(links.map((link) => link.textContent)).toEqual(['U12 Mixed', 'U14B'])
   })
 })
 
