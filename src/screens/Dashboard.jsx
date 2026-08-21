@@ -26,6 +26,7 @@ import {
 } from '../data/announcements.js'
 import { pinnedNotices,
   collapseGroups,
+  scopeNotices,
 } from '../lib/notices.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -620,7 +621,12 @@ export default function Dashboard() {
     Promise.all([listNotices(), listMyReads()])
       .then(([rows, reads]) => {
         if (!mounted) return
-        setNotices(collapseGroups(rows))
+        // ⚠️ SCOPED TO THE EFFECTIVE MEMBERSHIPS, for "View as". RLS already
+        // decided what the SERVER returned; this narrows an admin's everything
+        // to the squad being previewed, as every other block here does through
+        // visibleTeams(). Without it a preview as a U7 parent showed a U18B
+        // notice (21 Aug 2026).
+        setNotices(scopeNotices(collapseGroups(rows), memberships, teams))
         setNoticeReads(reads)
       })
       .catch(() => {
@@ -629,7 +635,7 @@ export default function Dashboard() {
     return () => {
       mounted = false
     }
-  }, [memberships])
+  }, [memberships, teams])
 
   // ⚠️ MARKS READ ONLY WHAT IS ACTUALLY DRAWN — the pinned ones, and only the
   // unexpired pinned ones, because `pinnedNotices` filters expiry. The count a

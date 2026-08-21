@@ -10,6 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🐛 **"VIEW AS" NOW FILTERS NOTICES.** Jay previewed Home as a U7 parent and
+  saw a U18B manager's notice badged "Your squad". ⚠️ **Not a leak** — RLS
+  (`can_see_team`) never sends a squad notice to another squad's member,
+  measured against the row. The preview is a browser filter over an admin's
+  session, which the server rightly hands every notice, and notices were the
+  one block on Home and /notices that never ran through `visibleTeams()`.
+  `scopeNotices()` in `src/lib/notices.js`, applied on both screens; a real
+  member's rows are unchanged by it.
+- `ec942ba` — the squash that recorded the dashboard verification (#277).
 - ✅ **THE DASHBOARD IS LIVE AND VERIFIED END TO END** — merged as `d92adb7`
   (#276), deployed, and driven in Chrome as a super admin: drill → template
   (the 15-not-60 question fired) → publish to one squad → the plan on that

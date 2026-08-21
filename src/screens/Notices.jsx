@@ -22,6 +22,7 @@ import {
   canPostNotice,
   collapseGroups,
   currentNotices,
+  scopeNotices,
   isExpired,
   noticeRowIds,
   postableTeams,
@@ -206,7 +207,9 @@ export default function Notices() {
       // ⚠️ COLLAPSED HERE AND NOT IN listNotices(). That function also feeds
       // the receipts sheet, which counts reads per ROW and would be wrong if it
       // were handed one entry standing for three.
-      setNotices(collapseGroups(rows))
+      // ⚠️ SCOPED FOR "VIEW AS" — see scopeNotices. A real member's rows are
+      // unchanged by this; an admin previewing a squad sees only its notices.
+      setNotices(scopeNotices(collapseGroups(rows), memberships, teams))
       setReadIds(reads)
 
       // ⚠️ THE STATS CALL IS ALLOWED TO FAIL WITHOUT BREAKING THE BOARD. It is
@@ -221,7 +224,7 @@ export default function Notices() {
     } catch (err) {
       setError(err.message || 'We could not load the notices just now.')
     }
-  }, [])
+  }, [memberships, teams])
 
   useEffect(() => {
     load()

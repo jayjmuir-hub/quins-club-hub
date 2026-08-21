@@ -1,4 +1,4 @@
-import { isSquadStaffRole } from './scope.js'
+import { isSquadStaffRole, visibleTeams } from './scope.js'
 
 // Pure helpers for the noticeboard. The only import is scope.js, which is
 // itself import-free — no data module and no React, so this stays mountable in
@@ -37,6 +37,31 @@ export function isExpired(notice, now = Date.now()) {
   // noticeboard is showing something too long, not silently hiding it.
   if (Number.isNaN(at)) return false
   return at <= now
+}
+
+/**
+ * The notices this person's EFFECTIVE memberships should see.
+ *
+ * ⚠️ NOT SECURITY — RLS has already decided what came back from the server,
+ * and for a real member this filter changes nothing. It exists for "View as":
+ * that preview is a browser-side filter over an ADMIN's session, which the
+ * server rightly hands every notice, and until 21 Aug 2026 nothing narrowed
+ * them to the squad being previewed. Jay viewed as a U7 parent and saw a U18B
+ * manager's notice, badged "Your squad" because the preview's team list could
+ * not name U18B. Every other block on Home already ran through visibleTeams();
+ * this is the same filter, applied to the noticeboard.
+ *
+ * A club-wide notice (no team) passes. A squad notice passes if ANY squad it
+ * reached — `teamIds` on a collapsed group, else `team_id` — is visible.
+ */
+export function scopeNotices(notices, memberships, allTeams) {
+  if (!notices) return []
+  const visible = new Set(visibleTeams(memberships, allTeams).map((team) => team.id))
+  return notices.filter((notice) => {
+    if (!notice.team_id) return true
+    const ids = notice.teamIds ?? [notice.team_id]
+    return ids.some((id) => visible.has(id))
+  })
 }
 
 /** Everything a member should currently be shown, newest first. */
