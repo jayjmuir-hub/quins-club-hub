@@ -495,16 +495,12 @@ export default function More() {
         <CalendarSubscribe />
       </Card>
 
-      {/* Admins only, and desktop only. /admin is a wide, table-heavy screen
-          (the plan calls it desktop-only, like /accounts was), so the whole
-          block is hidden below the 820px breakpoint rather than just the
-          link — a lone "Manage" heading over an empty card is worse than no
-          heading at all. CSS-only (`hidden desktop:block`), not
-          useMediaQuery: that hook exists for the case where both branches
-          would emit the SAME content into the DOM (see its header comment),
-          which is not the case here. */}
+      {/* Admins only — and since phase 4, at EVERY width: this is the
+          phone's front door to /admin now that the width gate is gone
+          (Jay's 21 Aug ruling). On desktop the sidebar also carries Admin,
+          so this block is mostly a phone affordance, and that is the point. */}
       {admin && (
-        <div className="hidden desktop:block">
+        <div>
           <SectionTitle>Manage</SectionTitle>
           <Card className="p-[14px]">
             <Button as={Link} variant="secondary" full to="/admin">

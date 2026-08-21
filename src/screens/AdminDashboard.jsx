@@ -144,26 +144,16 @@ export default function AdminDashboard() {
 
   return (
     <section>
-      {/* Desktop-only, the same way /accounts and /overview always were:
-          these are wide tables and multi-column forms, not a pitch-side
-          screen. Someone who bookmarked /admin and opens it on a phone gets
-          this note instead of a broken layout.
-
-          CSS-only (`desktop:hidden` / `hidden desktop:block`) rather than
-          useMediaQuery — see that hook's header comment: it exists for when
-          both branches would emit the SAME content into the DOM, which is
-          not the case here. A consequence worth knowing: on a phone the
-          dashboard is still mounted behind the hidden wrapper and still
-          issues its queries. That is the same behaviour /accounts had, and
-          it keeps the width decision entirely in CSS with no JS listener. */}
-      <Card data-testid="admin-small-screen-note" className="p-6 text-center desktop:hidden">
-        <h3 className="text-base font-extrabold text-brand-deep">Needs a bigger screen</h3>
-        <p className="mt-2 text-sm leading-relaxed text-brand-deep">
-          Managing the club needs a wider screen. Open this page on a laptop or desktop.
-        </p>
-      </Card>
-
-      <div className="hidden desktop:block">
+      {/* ⚠️ THE WIDTH GATE IS GONE — phase 4 of the 2.0 retheme, and it was
+          Jay's own ruling: "we need to figure out how to bring admin
+          functions into the app, that is my decision now" (21 Aug 2026).
+          The "Needs a bigger screen" card sat here from the first admin
+          screen to that day. It guarded against "wide tables and
+          multi-column forms" that a survey found the admin screens do not
+          actually contain — they are card- and list-based, and the one true
+          grid (Allocation) carries its own overflow-x-auto. The ROLE gates
+          above are untouched: width was never one of them. */}
+      <div>
         {/* ⚠️ ViewAsSwitcher NO LONGER LIVES HERE — 14 Aug 2026, Jay: "i want
             to be able to select view as with a drop down from any screen, as an
             admin". It is in the masthead, which AppShell renders around every

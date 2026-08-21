@@ -1,7 +1,8 @@
 # Retheme & shell — Club Hub joins the club's design family
 
-**Status: shipping — phases 1-3 landed** (tokens/themes/toggle/identity;
-desktop sidebar shell; editorial dashboards); phases 4-5 still to come.
+**Status: shipping — phases 1-4 landed** (tokens/themes/toggle/identity;
+desktop sidebar shell; editorial dashboards; admin on the phone); phase 5
+(the sweep) still to come.
 
 ## The decisions, in Jay's words, 21 Aug 2026
 
@@ -100,6 +101,13 @@ it behind a CSS-only `desktop:hidden` "needs a wider screen" card. Bringing
 admin into the app is a per-screen mobile layout job, hardest for the dense
 tables (Accounts, Allocation), trivial for the card-based screens. Each
 screen keeps its existing right/role gate; only the width gate goes.
+
+⚠️ MEASURED IN PHASE 4: the "dense tables" this paragraph feared do not
+exist. A survey found NO `<table>` element in any admin screen — they are
+card- and list-based throughout, and the one real grid (Allocation) already
+carried its own `overflow-x-auto`. The gate came off whole, the tab row's
+load-bearing `flex-wrap` handles the narrow widths, and the per-screen
+layout job this spec budgeted shrank to a verification pass.
 
 ### Theming mechanics
 
