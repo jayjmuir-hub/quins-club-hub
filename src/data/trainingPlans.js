@@ -88,9 +88,21 @@ export async function upsertFocus(focus) {
   return must(data, error)
 }
 
+/**
+ * Removes a focus. A focus is a label, so deleting one loses nothing — but
+ * the delete still goes through `must()`: a bare `.delete()` answers
+ * `{ error: null }` whether it removed a row or RLS filtered it to nothing,
+ * and the screen would then report a removal that never happened and watch
+ * the label reappear on reload. `.select()` makes the zero-row case visible.
+ */
 export async function deleteFocus(id) {
-  const { error } = await supabase.from('training_focus').delete().eq('id', id)
-  if (error) throw error
+  const { data, error } = await supabase
+    .from('training_focus')
+    .delete()
+    .eq('id', id)
+    .select()
+    .maybeSingle()
+  return must(data, error)
 }
 
 async function callPublish({ templateId, teamIds, from, to }, preview) {

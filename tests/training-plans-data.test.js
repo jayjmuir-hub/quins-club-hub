@@ -67,6 +67,7 @@ import {
   publish,
   saveTemplate,
   saveSessionBlocks,
+  deleteFocus,
   setDrillActive,
 } from '../src/data/trainingPlans.js'
 
@@ -256,5 +257,22 @@ describe('setDrillActive', () => {
       error: { message: 'column is_active does not exist' },
     }))
     await expect(setDrillActive('d1', false)).rejects.toThrow(/column is_active/)
+  })
+})
+
+// ⚠️ A bare `.delete()` cannot see a refusal: it returns `{ error: null }` for
+// zero rows exactly as it does for one. deleteFocus therefore selects the
+// deleted row back and runs it through the same guard as every other write.
+describe('deleteFocus', () => {
+  it('throws REFUSED when RLS filters the delete to zero rows', async () => {
+    resultFor.mockImplementation(() => ({ data: null, error: null }))
+    await expect(deleteFocus('f1')).rejects.toThrow(/Rugby Performance Director/)
+  })
+
+  it('returns the removed row when the delete landed', async () => {
+    resultFor.mockImplementation(() => ({ data: { id: 'f1' }, error: null }))
+    await expect(deleteFocus('f1')).resolves.toEqual({ id: 'f1' })
+    const chain = calls.find((c) => c.table === 'training_focus')
+    expect(chain.ops.map((o) => o.name)).toEqual(['delete', 'eq', 'select', 'settle'])
   })
 })
