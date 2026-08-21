@@ -518,7 +518,7 @@ function TemplatesBody() {
                 disabled={saving}
                 autoFocus
                 onChange={(domEvent) => set('name', domEvent.target.value)}
-                placeholder="Tuesday hour"
+                placeholder="Autumn hour"
                 className={INPUT}
               />
             </label>
