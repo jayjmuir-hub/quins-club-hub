@@ -10,6 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- ⛔ **NOTHING IN THE TRAINING PLAN MAY KEY ON A WEEKDAY.** Jay: *"some age
+  groups train on mon and friday"*. The plan said publish *"assigns per
+  weekday"* and offered a *"Tuesday/Thursday pair"* as the likely answer — which
+  would have shipped a feature that silently skipped every Monday-and-Friday
+  squad.
+  ✅ **Publish targets the squad's own training EVENTS in a date range**,
+  whatever nights they fall on. Those events already exist with real dates, so a
+  Tue/Thu pair, a Mon/Fri pair and a squad that moves to a Wednesday for one
+  week become the same code path and none is special.
+  ⚠️ **"First and second session of the week" is the ordering that survives**, if
+  a pair ever needs to differ — never named days.
+  ⚠️ **The two illustrative mentions were neutralised too** ("a wet Tuesday", 
+  "Thursday's session"), because a plan that says Tuesday four times teaches
+  Tuesday whatever its design section claims.
+- `26d56c2` — the squash that recorded the 20–21 Aug session.
+
 - 📓 **20–21 Aug session record** —
   `claude/handoffs/2026-08-21-notices-plans-and-harnesses.md`. Eight pull
   requests, #265 to #272, two migrations applied to production.
