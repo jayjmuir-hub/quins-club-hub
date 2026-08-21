@@ -1,7 +1,7 @@
 # Retheme & shell — Club Hub joins the club's design family
 
-**Status: shipping — phase 1 landed** (tokens/themes/toggle/identity); phases
-2-5 still to come, each its own PR.
+**Status: shipping — phases 1 and 2 landed** (tokens/themes/toggle/identity;
+desktop sidebar shell); phases 3-5 still to come, each its own PR.
 
 ## The decisions, in Jay's words, 21 Aug 2026
 

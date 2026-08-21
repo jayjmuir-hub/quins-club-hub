@@ -152,17 +152,22 @@ beforeEach(() => {
 })
 
 describe('AppShell', () => {
-  it('renders the brand name, tagline, and all four nav items', () => {
+  it('renders the brand name, tagline, and the four nav items in BOTH navs', () => {
     useMembershipsMock.mockReturnValue(loaded())
 
     renderShell()
 
     expect(screen.getByText('Abu Dhabi Harlequins')).toBeInTheDocument()
     expect(screen.getByText('Quins Club Hub')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Schedule' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Roster' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'More' })).toBeInTheDocument()
+    // Since phase 2 there are exactly TWO primary navs in the DOM — the
+    // mobile tab bar and the desktop Sidebar — and CSS (not JS) decides
+    // which paints. jsdom sees both, so each shared destination appears
+    // exactly twice; one or three would both be bugs.
+    for (const name of ['Home', 'Schedule', 'Roster', 'More']) {
+      expect(screen.getAllByRole('link', { name })).toHaveLength(2)
+    }
+    // Sidebar-only destinations appear once.
+    expect(screen.getAllByRole('link', { name: 'Notices' })).toHaveLength(1)
   })
 
   it('renders the crest with a meaningful alt and without a cropping object-fit class', () => {

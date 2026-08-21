@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🧭 **PHASE 2: THE DESKTOP SIDEBAR SHELL.** Desktop stops being a stretched
+  phone app: a fixed 256px dark sidebar (`src/components/Sidebar.jsx`,
+  modelled on the member portal's, dark in both themes like all chrome)
+  carries the nav — Home, Schedule, Roster, **Squad Hub** (staff and
+  admins), **Notices**, **Admin** (admins), More — one nav for every
+  dashboard. The masthead slims to a utility bar (role pill, App link,
+  account, theme toggle), content goes full-width, and `Nav.jsx` is now the
+  mobile tab bar alone; the old desktop pills and their Admin gate retired
+  into the sidebar. Mobile untouched, and the skip link is still the first
+  focusable element on every screen.
+- `a91c4b4` — the squash that shipped Club Hub 2.0's phase 1 (#284).
+
 - `121574c` — the squash that committed the retheme spec (#283).
 - 🌗 **PHASE 1 OF THE RETHEME: CLUB HUB 2.0.** Dark mode exists — every
   colour token moved to CSS variables (`src/index.css` is now the single
