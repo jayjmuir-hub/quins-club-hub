@@ -26,7 +26,7 @@ history was a rotted measurement; the rulings never rotted. Measure it.
 live 13 Aug 2026. Assume a real parent is looking at whatever you touch.
 
 🏉 **The Rugby Performance Director dashboard (pieces 1–3) is BUILT on branch
-`claude/rugby-performance-dashboard-001473`, PR open, NOT merged.** The first
+the `rugby-performance-dashboard` branch — PR #276 — NOT merged.** The first
 migration (`training_plans`) IS applied to production — six empty tables and
 `teams.requires_contact`, all 15 squads false. A second, ten-line migration
 (`publish_training_fit_check`) is written and waits for Jay's "apply":
