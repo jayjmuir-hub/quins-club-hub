@@ -10,6 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🏉 **THE SQUAD HUB — the coach/manager dashboard.** `/squad` and
+  `/squad/:teamId`: a one-squad coach lands straight in it, multi-squad staff
+  and admins pick. Upcoming events with RSVP counts, outstanding RCM sheets
+  (non-minis only), roster and training front doors, the squad noticeboard —
+  and the new tracking grid: availability beside attendance per event, per
+  player, with attendance % (present/(present+absent), excused excluded per
+  the ruling in `src/data/attendance.js`) and a said-in-but-absent count.
+  New `listAttendanceForEvents()` (chunked like its availability twin),
+  pure maths in `src/lib/tracking.js`. No schema changes — the tables
+  existed; the aggregate view did not. `claude/plans/2026-08-21-squad-hub.md`.
+
 - 📓 **Handoff for the whole day**, and `state-of-play.md` no longer says the
   dashboard PR is open: it is live.
 - `0dd01a3` — the squash that recorded the quick-rip ruling (#279).
