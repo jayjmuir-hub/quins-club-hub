@@ -23,6 +23,8 @@ import {
   audienceLabel,
   authorLine,
   canPostNotice,
+  collapseGroups,
+  noticeRowIds,
   postedLabel,
   currentNotices,
   isExpired,
@@ -287,5 +289,69 @@ describe('postedLabel', () => {
     expect(postedLabel(null, NOW)).toBe('')
     expect(postedLabel(undefined, NOW)).toBe('')
     expect(postedLabel('not a date', NOW)).toBe('')
+  })
+})
+
+// ⚠️ THE FAN-OUT COLLAPSE, ADDED 21 Aug 2026 WITH MULTI-SQUAD NOTICES.
+// A notice sent to three squads is three ROWS and one MESSAGE, because
+// `team_id` is the security boundary and the squads cannot share a row. Anybody
+// who can read more than one of them — an admin, a coach of two squads — sees
+// the board, so this is what stops the same words appearing three times.
+describe('collapseGroups', () => {
+  const row = (id, team, group) => ({ id, team_id: team, group_id: group ?? null, title: 't' })
+
+  it('leaves ordinary notices completely alone', () => {
+    const rows = [row('a', 't1'), row('b', null), row('c', 't2')]
+    expect(collapseGroups(rows)).toEqual(rows)
+  })
+
+  it('folds a fan-out into one entry carrying every squad', () => {
+    const out = collapseGroups([row('a', 't1', 'g'), row('b', 't2', 'g'), row('c', 't3', 'g')])
+    expect(out).toHaveLength(1)
+    expect(out[0].teamIds).toEqual(['t1', 't2', 't3'])
+    expect(out[0].groupIds).toEqual(['a', 'b', 'c'])
+  })
+
+  // ⚠️ ORDER IS THE POINT. The board is sorted newest-first by the caller, and
+  // keeping the FIRST row of a group means the collapse cannot reorder it.
+  it('keeps the first row of the group, so ordering survives', () => {
+    const out = collapseGroups([row('new', 't1'), row('a', 't2', 'g'), row('b', 't3', 'g')])
+    expect(out.map((n) => n.id)).toEqual(['new', 'a'])
+  })
+
+  it('never groups two different messages together', () => {
+    const out = collapseGroups([row('a', 't1', 'g1'), row('b', 't2', 'g2')])
+    expect(out).toHaveLength(2)
+  })
+
+  it('survives an empty or missing list', () => {
+    expect(collapseGroups([])).toEqual([])
+    expect(collapseGroups(undefined)).toEqual([])
+  })
+
+  // ⚠️ WHAT MARKING A CARD READ HAS TO COVER. Marking only the row the card is
+  // keyed on leaves the unread dot coming back on the next load.
+  it('hands back every row id behind a card', () => {
+    const [folded] = collapseGroups([row('a', 't1', 'g'), row('b', 't2', 'g')])
+    expect(noticeRowIds(folded)).toEqual(['a', 'b'])
+    expect(noticeRowIds(row('solo', 't1'))).toEqual(['solo'])
+  })
+})
+
+describe('audienceLabel across a group', () => {
+  const teamsById = new Map([
+    ['t1', { id: 't1', name: 'U10 Reds' }],
+    ['t2', { id: 't2', name: 'U12 Blues' }],
+  ])
+
+  it('names every squad the message reached', () => {
+    const folded = { team_id: 't1', teamIds: ['t1', 't2'] }
+    expect(audienceLabel(folded, teamsById)).toBe('U10 Reds, U12 Blues')
+  })
+
+  // A squad the reader cannot see is dropped rather than rendered blank.
+  it('skips a squad this reader cannot resolve', () => {
+    const folded = { team_id: 't1', teamIds: ['t1', 'unknown'] }
+    expect(audienceLabel(folded, teamsById)).toBe('U10 Reds')
   })
 })

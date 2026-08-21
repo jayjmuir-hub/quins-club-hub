@@ -85,7 +85,63 @@ export function unreadCount(notices, readIds, now = Date.now()) {
  */
 export function audienceLabel(notice, teamsById) {
   if (!notice?.team_id) return 'Whole club'
-  return teamsById?.get?.(notice.team_id)?.name ?? 'Your squad'
+
+  // ⚠️ A COLLAPSED GROUP NAMES EVERY SQUAD IT REACHED, in the order they came
+  // back. "U10 Reds and 2 more" would hide the thing the reader most wants to
+  // know — whether their own squad is in it.
+  const ids = notice.teamIds ?? [notice.team_id]
+  const names = ids.map((id) => teamsById?.get?.(id)?.name).filter(Boolean)
+  if (names.length > 1) return names.join(', ')
+  return names[0] ?? 'Your squad'
+}
+
+/**
+ * Collapses a fan-out back into one entry per message.
+ *
+ * ⚠️ A NOTICE SENT TO THREE SQUADS IS THREE ROWS AND ONE MESSAGE. That is the
+ * shape `announcements.group_id` records (21 Aug 2026) and the reason is in
+ * `db/migrations/20260821_notice_multi_squad.sql`: `team_id` is the security
+ * boundary, so the squads have to be separate rows. Anybody who can read more
+ * than one of them — an admin, a coach of two squads — would otherwise see the
+ * same words three times on the board.
+ *
+ * The kept entry is the FIRST of the group, so `created_at` ordering is
+ * untouched. It gains:
+ *
+ *   `teamIds`  — every squad the message reached, for `audienceLabel`
+ *   `groupIds` — every row id, because marking the card read has to mark all
+ *                of them or the dot comes back on the next load
+ *
+ * ⚠️ ROWS WITHOUT A `group_id` PASS THROUGH UNCHANGED, which is nearly all of
+ * them. Never key this on "does the row have a team" — a club-wide notice is a
+ * single row and must not be grouped with anything.
+ */
+export function collapseGroups(notices) {
+  const out = []
+  const byGroup = new Map()
+
+  for (const notice of notices ?? []) {
+    if (!notice?.group_id) {
+      out.push(notice)
+      continue
+    }
+    const seen = byGroup.get(notice.group_id)
+    if (!seen) {
+      const entry = { ...notice, teamIds: [notice.team_id], groupIds: [notice.id] }
+      byGroup.set(notice.group_id, entry)
+      out.push(entry)
+      continue
+    }
+    seen.teamIds.push(notice.team_id)
+    seen.groupIds.push(notice.id)
+  }
+
+  return out
+}
+
+/** Every underlying row id a card stands for — one, or a whole group. */
+export function noticeRowIds(notice) {
+  return notice?.groupIds ?? [notice.id]
 }
 
 /**

@@ -10,6 +10,42 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 📢 **A NOTICE CAN GO TO ANY NUMBER OF AGE GROUPS, OR THE WHOLE CLUB.** Jay:
+  *"check boxes for age groups… select whole club and the other options grey out
+  so we don't send redundant notices"*. The `<select>` is now a checkbox group;
+  ticking **Whole club** disables the squads rather than clearing them, so
+  turning it off gives the ticks back.
+  ⚠️ **FAN-OUT, NOT A JUNCTION TABLE — one row per squad sharing a `group_id`.**
+  `team_id` is the SECURITY boundary (`announcement read`,
+  `private.notice_audience`), so a junction table is a rewrite of the read path
+  and of the boundary. Same question, same answer as
+  `claude/decisions/2026-08-05-multi-squad-events-and-pitch.md` gave for events.
+  ⚠️ **BUT A NOTICE TO THREE SQUADS IS ONE MESSAGE, WHICH EVENTS NEVER WERE.**
+  A naive fan-out pushes it once per row. **Measured before building: seven
+  people hold active memberships in two squads, two of them subscribed.** So
+  `notice_push` is now STATEMENT-level over a transition table and sends once
+  per group, and `notice_push_subscriptions` resolves the whole group
+  `distinct`. `push-send` is untouched and needed no redeploy.
+  ⚠️ **`min(uuid)` DOES NOT EXIST IN POSTGRES.** The first trigger draft used it
+  and failed — caught only because the migration was run inside a rolled-back
+  transaction before being applied. `(array_agg(id order by id))[1]` instead.
+  ⚠️ **NOTHING COVERED WHO A NOTICE REACHES.** Swapping the `<select>` for
+  checkboxes broke **zero** of 2,972 tests, because not one asserted the
+  audience — the control deciding which families get a message on their phone.
+  `tests/notice-composer.test.jsx` is new and its faults were injected: no
+  greying, empty-means-club-wide, and a per-squad loop were each caught.
+- 🧹 **The board collapses a fan-out back into one card**, `collapseGroups` in
+  `src/lib/notices.js`, applied at the two render sites and **not** in
+  `listNotices()` — which also feeds the receipts sheet, where a per-ROW count
+  is the right one. Marking a card read marks every row behind it.
+- ⚠️ **AND `git checkout --` WIPED `collapseGroups` MID-SESSION, EXACTLY AS
+  `CLAUDE.md` WARNS.** The file was edited AFTER the checkpoint commit, so the
+  fault-injection restore reverted it to a version that never had the function.
+  `git status` then read clean, which looked like proof and was the opposite.
+  **The rule needs the clause it already has read twice: commit before injecting
+  a fault, and the file you restore must be IN that commit.**
+- `0e883e8` — the squash that dropped the copyright guard.
+
 - ✂️ **THE COPYRIGHT GUARD IS GONE FROM THE TRAINING PLAN, AND `drills.body`
   EXISTS.** Jay: *"its not a problem at all, remove it entirely from the build
   plan, it a solution looking for a problem"*.
