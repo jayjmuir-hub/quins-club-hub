@@ -21,6 +21,7 @@ afterAll(() => {
 })
 import {
   audienceLabel,
+  scopeNotices,
   authorLine,
   canPostNotice,
   collapseGroups,
@@ -355,3 +356,37 @@ describe('audienceLabel across a group', () => {
     expect(audienceLabel(folded, teamsById)).toBe('U10 Reds')
   })
 })
+
+// ⚠️ "VIEW AS" IS A BROWSER FILTER, AND UNTIL 21 Aug 2026 IT DID NOT COVER
+// NOTICES. Jay previewed as a U7 parent and saw a U18B manager's notice with a
+// "Your squad" badge. RLS was never wrong — a real U7 parent is not sent it —
+// but the admin's own session fetches every notice and nothing narrowed them
+// to the squad being previewed. This is the filter every other Home block
+// already had through visibleTeams().
+describe('scopeNotices', () => {
+  const teams = [
+    { id: 'u7', name: 'U7 Tag', sort_order: 1 },
+    { id: 'u18', name: 'U18B', sort_order: 9 },
+  ]
+  const rows = [
+    notice({ id: 'club', team_id: null }),
+    notice({ id: 'seven', team_id: 'u7' }),
+    notice({ id: 'eighteen', team_id: 'u18' }),
+  ]
+  const parentOfU7 = [{ role: 'parent', status: 'active', team_id: 'u7' }]
+  const admin = [{ role: 'admin', status: 'active', team_id: null }]
+
+  it('shows a U7 parent the club notice and the U7 one, never the U18B one', () => {
+    expect(scopeNotices(rows, parentOfU7, teams).map((n) => n.id)).toEqual(['club', 'seven'])
+  })
+
+  it('shows an admin everything', () => {
+    expect(scopeNotices(rows, admin, teams).map((n) => n.id)).toEqual(['club', 'seven', 'eighteen'])
+  })
+
+  it('keeps a collapsed multi-squad notice if ANY of its squads is yours', () => {
+    const multi = notice({ id: 'multi', team_id: 'u18', teamIds: ['u18', 'u7'] })
+    expect(scopeNotices([multi], parentOfU7, teams).map((n) => n.id)).toEqual(['multi'])
+  })
+})
+

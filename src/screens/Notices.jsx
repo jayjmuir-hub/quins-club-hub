@@ -22,6 +22,7 @@ import {
   canPostNotice,
   collapseGroups,
   currentNotices,
+  scopeNotices,
   isExpired,
   noticeRowIds,
   postableTeams,
@@ -183,7 +184,17 @@ export default function Notices() {
   const { memberships, teams } = useMemberships()
   const { user } = useAuth()
 
-  const [notices, setNotices] = useState(null)
+  const [allNotices, setNotices] = useState(null)
+  // ⚠️ SCOPED AT RENDER, NOT IN THE FETCH. "View as" is a browser filter over
+  // an admin's session, which the server rightly hands every notice; this
+  // narrows them to the effective memberships, as every other block does
+  // through visibleTeams(). A real member's rows are unchanged. It is NOT in
+  // the fetch effect's deps — memberships is rebuilt per render in preview,
+  // and a first cut that refetched on it looped forever (21 Aug 2026).
+  const notices = useMemo(
+    () => (allNotices ? scopeNotices(allNotices, memberships, teams) : allNotices),
+    [allNotices, memberships, teams],
+  )
   const [readIds, setReadIds] = useState(() => new Set())
   const [stats, setStats] = useState(() => new Map())
   const [error, setError] = useState(null)

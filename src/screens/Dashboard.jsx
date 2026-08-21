@@ -26,6 +26,7 @@ import {
 } from '../data/announcements.js'
 import { pinnedNotices,
   collapseGroups,
+  scopeNotices,
 } from '../lib/notices.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -467,7 +468,17 @@ export default function Dashboard() {
   const [players, setPlayers] = useState([])
   // null until the first read settles, so the board can stay absent rather than
   // flashing an empty card under the greeting on every load.
-  const [notices, setNotices] = useState(null)
+  const [allNotices, setNotices] = useState(null)
+  // ⚠️ SCOPED AT RENDER, NOT IN THE FETCH. "View as" is a browser filter over
+  // an admin's session, which the server rightly hands every notice; this
+  // narrows them to the effective memberships, as every other block does
+  // through visibleTeams(). A real member's rows are unchanged. It is NOT in
+  // the fetch effect's deps — memberships is rebuilt per render in preview,
+  // and a first cut that refetched on it looped forever (21 Aug 2026).
+  const notices = useMemo(
+    () => (allNotices ? scopeNotices(allNotices, memberships, teams) : allNotices),
+    [allNotices, memberships, teams],
+  )
   // Bumped when this person posts one, so the card they just wrote appears
   // without a reload. Deliberately separate from `reloadToken`, which realtime
   // bumps on `events` — see the note on the effect below.
