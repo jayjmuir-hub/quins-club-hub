@@ -468,7 +468,17 @@ export default function Dashboard() {
   const [players, setPlayers] = useState([])
   // null until the first read settles, so the board can stay absent rather than
   // flashing an empty card under the greeting on every load.
-  const [notices, setNotices] = useState(null)
+  const [allNotices, setNotices] = useState(null)
+  // ⚠️ SCOPED AT RENDER, NOT IN THE FETCH. "View as" is a browser filter over
+  // an admin's session, which the server rightly hands every notice; this
+  // narrows them to the effective memberships, as every other block does
+  // through visibleTeams(). A real member's rows are unchanged. It is NOT in
+  // the fetch effect's deps — memberships is rebuilt per render in preview,
+  // and a first cut that refetched on it looped forever (21 Aug 2026).
+  const notices = useMemo(
+    () => (allNotices ? scopeNotices(allNotices, memberships, teams) : allNotices),
+    [allNotices, memberships, teams],
+  )
   // Bumped when this person posts one, so the card they just wrote appears
   // without a reload. Deliberately separate from `reloadToken`, which realtime
   // bumps on `events` — see the note on the effect below.
@@ -621,12 +631,7 @@ export default function Dashboard() {
     Promise.all([listNotices(), listMyReads()])
       .then(([rows, reads]) => {
         if (!mounted) return
-        // ⚠️ SCOPED TO THE EFFECTIVE MEMBERSHIPS, for "View as". RLS already
-        // decided what the SERVER returned; this narrows an admin's everything
-        // to the squad being previewed, as every other block here does through
-        // visibleTeams(). Without it a preview as a U7 parent showed a U18B
-        // notice (21 Aug 2026).
-        setNotices(scopeNotices(collapseGroups(rows), memberships, teams))
+        setNotices(collapseGroups(rows))
         setNoticeReads(reads)
       })
       .catch(() => {
@@ -635,7 +640,7 @@ export default function Dashboard() {
     return () => {
       mounted = false
     }
-  }, [memberships, teams])
+  }, [memberships])
 
   // ⚠️ MARKS READ ONLY WHAT IS ACTUALLY DRAWN — the pinned ones, and only the
   // unexpired pinned ones, because `pinnedNotices` filters expiry. The count a
