@@ -34,6 +34,20 @@ Rugby Performance Director. Ten squads are marked contact and five tag —
 for real yet; the library is empty. Notification email, AI assist and a
 first/second-session pair are out of scope and unbuilt.
 
+🎨 **CLUB HUB 2.0 IS LIVE — the whole retheme, one day (21 Aug 2026).**
+Dark mode + toggle, the member portal's sidebar shell on desktop, the
+editorial voice, admin at every width, installs as "Club Hub" v2.0.0. The
+spec is CLOSED: `claude/plans/2026-08-21-retheme-and-shell.md`, all five
+phases shipped and verified from deployed bundles. design-system.md §−1
+is the record of what ships; §0 and the body are history where they
+disagree.
+
+🏉 **THE SQUAD HUB IS LIVE** — `/squad`, the coach/manager dashboard:
+availability-vs-attendance tracking, RSVP chips, match-sheet chasers,
+squad notices, event drill-in. `claude/plans/2026-08-21-squad-hub.md`.
+No real coach has used the tracking grid yet; the first one's reaction is
+the thing to watch.
+
 **Current phase: onboarding, and the fixes it throws up.** Not new
 infrastructure. The last four features found their bugs within hours of a real
 person using them, and none of those bugs had a failing test.
