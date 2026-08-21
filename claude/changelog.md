@@ -21,6 +21,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   pure maths in `src/lib/tracking.js`. No schema changes — the tables
   existed; the aggregate view did not. `claude/plans/2026-08-21-squad-hub.md`.
 
+- `2d36b76` — the squash that recorded the day's handoff (#280).
 - 📓 **Handoff for the whole day**, and `state-of-play.md` no longer says the
   dashboard PR is open: it is live.
 - `0dd01a3` — the squash that recorded the quick-rip ruling (#279).
