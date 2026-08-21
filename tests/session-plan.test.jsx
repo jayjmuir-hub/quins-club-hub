@@ -153,6 +153,19 @@ describe('SessionPlan — when it renders at all', () => {
     expect(screen.queryByRole('heading', { name: /session plan/i })).not.toBeInTheDocument()
   })
 
+  it('uses the CLUB date, not UTC, at the edge of a focus window', async () => {
+    // ⚠️ THE ONE FIXTURE THAT CAN TELL THE TWO APART. 20:30Z on 25 Aug is
+    // 00:30 on 26 Aug in Abu Dhabi. A focus ending on the 25th therefore does
+    // NOT cover this session — but a UTC implementation would say it does.
+    // Every other fixture in this file is at 14:00Z, where both answers agree,
+    // so without this test `new Date(starts_at).toISOString().slice(0, 10)`
+    // would pass the suite. design-system.md §7: the club's day, never UTC.
+    listFocusMock.mockResolvedValue([{ ...FOCUS, starts_on: '2026-08-10', ends_on: '2026-08-25' }])
+    show({ event: { ...EVENT, starts_at: '2026-08-25T20:30:00.000Z' } })
+    await waitFor(() => expect(listFocusMock).toHaveBeenCalled())
+    expect(screen.queryByRole('heading', { name: /session plan/i })).not.toBeInTheDocument()
+  })
+
   it('shows the focus on its own, with no session', async () => {
     // A focus is a LABEL and gates nothing — a squad can have a theme for the
     // fortnight with no published plan for tonight, and that is worth saying.
