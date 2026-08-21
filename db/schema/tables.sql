@@ -166,6 +166,15 @@ CREATE TABLE public.teams (
   -- guard asserts the count at apply time and `select name,
   -- self_registration_allowed from teams` answers it now.
   self_registration_allowed boolean NOT NULL DEFAULT false,
+
+  -- Added 2026-08-21 (training_plans). Column comment as stored:
+  --   "Whether this squad plays contact rugby. Set per squad on /admin/club,
+  --   NEVER parsed from teams.name and NEVER inferred from age — the club runs
+  --   tag sides above the age contact begins. Default false fails safe."
+  -- ⚠️ THE THIRD COLUMN ON THIS TABLE THAT EXISTS SO A SQUAD RENAME CANNOT
+  -- CHANGE BEHAVIOUR. Measured at apply: 15 squads, 0 flagged — every squad is
+  -- TAG until somebody says otherwise, which is the safe direction.
+  requires_contact boolean NOT NULL DEFAULT false,
   CONSTRAINT teams_pkey    PRIMARY KEY (id),
   CONSTRAINT teams_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
 );
@@ -1752,3 +1761,98 @@ CREATE TABLE public.player_private (
     CHECK ((date_of_birth IS NULL)
            OR ((date_of_birth > '1900-01-01'::date) AND (date_of_birth <= CURRENT_DATE)))
 );
+
+-- ---------------------------------------------------------------------
+-- Training plans (21 Aug 2026, 20260821_training_plans.sql)
+--
+-- drill → session_template (+blocks) → training_session (+blocks, COPIED from
+-- the template at publish so a coach's edit touches one night, not fifteen
+-- squads). training_focus is a label over a date range and gates nothing.
+-- Reasoning: claude/specs/2026-08-21-training-plans-dashboard-design.md.
+-- ⚠️ drill_id is ON DELETE RESTRICT in BOTH block tables: retire via is_active.
+-- ⚠️ training_sessions.event_id is UNIQUE; coach_edited_at is what
+-- publish_training reads to leave a session alone.
+-- Captured from the migration text; constraint names are Postgres defaults.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.drills (
+  id               uuid primary key default gen_random_uuid(),
+  club_id          uuid not null references public.clubs(id) on delete cascade,
+  title            text not null,
+  summary          text,
+  body             text,
+  source_name      text,
+  source_url       text,
+  minutes          smallint not null default 10 check (minutes between 1 and 120),
+  category         text not null check (category in ('warm_up','skill','game','conditioning','cool_down')),
+  min_age          smallint check (min_age between 4 and 19),
+  max_age          smallint check (max_age between 4 and 19),
+  requires_contact boolean not null default false,
+  is_active        boolean not null default true,
+  created_by       uuid references public.profiles(id),
+  created_at       timestamptz not null default now(),
+  constraint drills_age_order check (min_age is null or max_age is null or min_age <= max_age)
+);
+ALTER TABLE public.drills ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE public.session_templates (
+  id               uuid primary key default gen_random_uuid(),
+  club_id          uuid not null references public.clubs(id) on delete cascade,
+  name             text not null,
+  min_age          smallint check (min_age between 4 and 19),
+  max_age          smallint check (max_age between 4 and 19),
+  requires_contact boolean not null default false,
+  total_minutes    smallint not null default 0,
+  notes            text,
+  is_active        boolean not null default true,
+  created_by       uuid references public.profiles(id),
+  created_at       timestamptz not null default now(),
+  constraint session_templates_age_order check (min_age is null or max_age is null or min_age <= max_age)
+);
+ALTER TABLE public.session_templates ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE public.session_template_blocks (
+  id          uuid primary key default gen_random_uuid(),
+  template_id uuid not null references public.session_templates(id) on delete cascade,
+  position    smallint not null,
+  drill_id    uuid not null references public.drills(id) on delete restrict,
+  minutes     smallint not null check (minutes between 1 and 120),
+  coach_note  text,
+  unique (template_id, position)
+);
+ALTER TABLE public.session_template_blocks ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE public.training_focus (
+  id         uuid primary key default gen_random_uuid(),
+  club_id    uuid not null references public.clubs(id) on delete cascade,
+  team_id    uuid not null references public.teams(id) on delete cascade,
+  title      text not null,
+  starts_on  date not null,
+  ends_on    date not null,
+  notes      text,
+  created_by uuid references public.profiles(id),
+  created_at timestamptz not null default now(),
+  constraint training_focus_dates check (ends_on >= starts_on)
+);
+ALTER TABLE public.training_focus ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE public.training_sessions (
+  id              uuid primary key default gen_random_uuid(),
+  event_id        uuid not null unique references public.events(id) on delete cascade,
+  template_id     uuid references public.session_templates(id) on delete set null,
+  published_at    timestamptz not null default now(),
+  coach_edited_at timestamptz,
+  notes           text
+);
+ALTER TABLE public.training_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE public.training_session_blocks (
+  id         uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.training_sessions(id) on delete cascade,
+  position   smallint not null,
+  drill_id   uuid not null references public.drills(id) on delete restrict,
+  minutes    smallint not null check (minutes between 1 and 120),
+  coach_note text,
+  unique (session_id, position)
+);
+ALTER TABLE public.training_session_blocks ENABLE ROW LEVEL SECURITY;
+

@@ -44,9 +44,9 @@ select 'eee00000-0000-4000-8000-0000000000d3', club_id, id, 'match','HARNESS mat
 insert into drills (id, club_id, title, category, minutes)
 select 'd0000000-0000-4000-8000-0000000000a1', club_id, 'HARNESS passing lines', 'skill', 15 from teams limit 1;
 insert into session_templates (id, club_id, name, total_minutes)
-select 't0000000-0000-4000-8000-0000000000a1', club_id, 'HARNESS hour', 15 from teams limit 1;
+select 'a0000000-0000-4000-8000-0000000000a1', club_id, 'HARNESS hour', 15 from teams limit 1;
 insert into session_template_blocks (template_id, position, drill_id, minutes)
-values ('t0000000-0000-4000-8000-0000000000a1', 1, 'd0000000-0000-4000-8000-0000000000a1', 15);
+values ('a0000000-0000-4000-8000-0000000000a1', 1, 'd0000000-0000-4000-8000-0000000000a1', 15);
 
 -- 1. The restrict FK. A drill in use cannot be deleted.
 do $$ begin
@@ -66,7 +66,7 @@ delete from training_sessions where event_id = 'eee00000-0000-4000-8000-00000000
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"df730ef7-dce2-4962-babe-96d9999b0173","role":"authenticated"}';
 do $$ declare w int; n int; begin
-  select will_write into w from publish_training('t0000000-0000-4000-8000-0000000000a1',
+  select will_write into w from publish_training('a0000000-0000-4000-8000-0000000000a1',
     array[(select id from teams order by sort_order limit 1)], current_date, current_date + 10, true);
   select count(*) into n from training_sessions where event_id in ('eee00000-0000-4000-8000-0000000000d1','eee00000-0000-4000-8000-0000000000d2');
   insert into _r values ('preview counts 2 and writes 0', case when w = 2 and n = 0 then 'PASS' else 'FAIL w='||w||' n='||n end);
@@ -74,7 +74,7 @@ end $$;
 
 -- 4. Real publish writes 2 sessions, 2 blocks, and not the match.
 do $$ declare n int; m int; begin
-  perform publish_training('t0000000-0000-4000-8000-0000000000a1',
+  perform publish_training('a0000000-0000-4000-8000-0000000000a1',
     array[(select id from teams order by sort_order limit 1)], current_date, current_date + 10, false);
   select count(*) into n from training_sessions where event_id in ('eee00000-0000-4000-8000-0000000000d1','eee00000-0000-4000-8000-0000000000d2');
   select count(*) into m from training_sessions where event_id = 'eee00000-0000-4000-8000-0000000000d3';
@@ -90,7 +90,7 @@ update training_sessions set coach_edited_at = now(), notes = 'coach changed it'
 reset role; set local role authenticated;
 set local request.jwt.claims = '{"sub":"df730ef7-dce2-4962-babe-96d9999b0173","role":"authenticated"}';
 do $$ declare s int; w int; kept text; begin
-  select skipped_coach_edited, will_write into s, w from publish_training('t0000000-0000-4000-8000-0000000000a1',
+  select skipped_coach_edited, will_write into s, w from publish_training('a0000000-0000-4000-8000-0000000000a1',
     array[(select id from teams order by sort_order limit 1)], current_date, current_date + 10, false);
   select notes into kept from training_sessions where event_id = 'eee00000-0000-4000-8000-0000000000d1';
   insert into _r values ('publish skips the coach edit and reports it',
@@ -101,7 +101,7 @@ end $$;
 reset role; set local role authenticated;
 set local request.jwt.claims = '{"sub":"c0000000-0000-4000-8000-00000000d001","role":"authenticated"}';
 do $$ begin
-  perform publish_training('t0000000-0000-4000-8000-0000000000a1',
+  perform publish_training('a0000000-0000-4000-8000-0000000000a1',
     array[(select id from teams order by sort_order limit 1)], current_date, current_date + 10, true);
   insert into _r values ('coach calls publish','FAIL — allowed');
 exception when insufficient_privilege then insert into _r values ('coach calls publish','PASS — refused 42501'); end $$;
@@ -146,7 +146,8 @@ end $$;
 rollback;
 
 -- ══════════════════════════════════════════════════════════════════════════
---  EXPECTED — not yet measured live; fill in from the first green run.
+--  EXPECTED — measured live 21 Aug 2026, through the Supabase MCP (the
+--  whole transaction rolled back; the six tables were empty before and after).
 --    delete a drill in use                         PASS — refused 23503
 --    second session on one event                   PASS — refused 23505
 --    preview counts 2 and writes 0                 PASS

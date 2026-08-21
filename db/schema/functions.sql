@@ -2973,3 +2973,76 @@ REVOKE ALL ON FUNCTION public.scan_photo_orphans(interval) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.scan_photo_orphans(interval) FROM anon;
 REVOKE ALL ON FUNCTION public.scan_photo_orphans(interval) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.scan_photo_orphans(interval) TO service_role;
+
+-- ---------------------------------------------------------------------
+-- public.publish_training(uuid, uuid[], date, date, boolean)  (21 Aug 2026)
+-- proacl: authenticated, service_role (PUBLIC and anon revoked in the migration)
+--
+-- ONE function for preview and for real, switched by _preview, so the table
+-- the Director confirms is computed by the code that then acts on it.
+-- SECURITY DEFINER, and refuses unless private.is_admin(club). ⛔ Selects on
+-- type = 'training' within a DATE RANGE in club time — no weekday anywhere.
+-- Skips and COUNTS any session with coach_edited_at set.
+-- ---------------------------------------------------------------------
+create or replace function public.publish_training(
+  _template uuid, _teams uuid[], _from date, _to date, _preview boolean default true)
+returns table (team_id uuid, will_write int, skipped_coach_edited int, no_events int)
+language plpgsql security definer set search_path to 'public'
+as $$
+declare
+  _club uuid;
+  _team uuid;
+  _ev record;
+  _session uuid;
+begin
+  select club_id into _club from session_templates where id = _template and is_active;
+  if _club is null then
+    raise exception 'template not found or retired' using errcode = 'P0002';
+  end if;
+  if not private.is_admin(_club) then
+    raise exception 'not an active admin of this club' using errcode = '42501';
+  end if;
+  if _to < _from then
+    raise exception 'date range is backwards' using errcode = '22007';
+  end if;
+
+  foreach _team in array _teams loop
+    team_id := _team; will_write := 0; skipped_coach_edited := 0; no_events := 0;
+
+    for _ev in
+      select e.id, s.id as session_id, s.coach_edited_at
+        from events e
+        left join training_sessions s on s.event_id = e.id
+       where e.team_id = _team
+         and e.type = 'training'
+         and (e.starts_at at time zone 'Asia/Dubai')::date between _from and _to
+    loop
+      if _ev.coach_edited_at is not null then
+        skipped_coach_edited := skipped_coach_edited + 1;
+        continue;
+      end if;
+      will_write := will_write + 1;
+      if _preview then continue; end if;
+
+      if _ev.session_id is null then
+        insert into training_sessions (event_id, template_id)
+        values (_ev.id, _template) returning id into _session;
+      else
+        _session := _ev.session_id;
+        update training_sessions set template_id = _template, published_at = now()
+         where id = _session;
+        delete from training_session_blocks where session_id = _session;
+      end if;
+
+      insert into training_session_blocks (session_id, position, drill_id, minutes, coach_note)
+      select _session, b.position, b.drill_id, b.minutes, b.coach_note
+        from session_template_blocks b where b.template_id = _template;
+    end loop;
+
+    if will_write = 0 and skipped_coach_edited = 0 then no_events := 1; end if;
+    return next;
+  end loop;
+end $$;
+
+revoke execute on function public.publish_training(uuid, uuid[], date, date, boolean) from public, anon;
+grant  execute on function public.publish_training(uuid, uuid[], date, date, boolean) to authenticated, service_role;

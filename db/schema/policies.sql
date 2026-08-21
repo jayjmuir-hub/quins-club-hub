@@ -1312,3 +1312,52 @@ CREATE POLICY "opt out is mine" ON public.notification_opt_outs
   FOR ALL
   USING ((profile_id = auth.uid()))
   WITH CHECK ((profile_id = auth.uid()));
+
+-- ---------------------------------------------------------------------
+-- Training plans (21 Aug 2026)
+--
+-- Library objects (drills, templates, blocks, focus): any signed-in person
+-- reads, an ACTIVE club admin manages — private.is_admin checks status.
+-- Sessions follow the EVENT: read is is_attached_to_team (a parent may see
+-- tonight's plan; it holds no children's data), write is can_edit_team, the
+-- match-sheet pattern. Harness: db/tests/training-plans.sql.
+-- ---------------------------------------------------------------------
+create policy "drill read"   on public.drills for select using (auth.uid() is not null);
+create policy "drill manage" on public.drills for all
+  using (private.is_admin(club_id)) with check (private.is_admin(club_id));
+
+create policy "template read"   on public.session_templates for select using (auth.uid() is not null);
+create policy "template manage" on public.session_templates for all
+  using (private.is_admin(club_id)) with check (private.is_admin(club_id));
+
+create policy "template block read" on public.session_template_blocks for select using (auth.uid() is not null);
+create policy "template block manage" on public.session_template_blocks for all
+  using (exists (select 1 from public.session_templates t where t.id = template_id and private.is_admin(t.club_id)))
+  with check (exists (select 1 from public.session_templates t where t.id = template_id and private.is_admin(t.club_id)));
+
+create policy "focus read"   on public.training_focus for select using (auth.uid() is not null);
+create policy "focus manage" on public.training_focus for all
+  using (private.is_admin(club_id)) with check (private.is_admin(club_id));
+
+-- Sessions: read follows the EVENT (a parent may see tonight's plan — it holds
+-- no children's data); write is can_edit_team via the event, the match-sheet
+-- pattern. can_edit_team already carries a status-aware admin arm.
+create policy "session read" on public.training_sessions for select
+  using (exists (select 1 from public.events e where e.id = event_id and private.is_attached_to_team(e.team_id)));
+create policy "session manage" on public.training_sessions for all
+  using (exists (select 1 from public.events e where e.id = event_id and private.can_edit_team(e.team_id)))
+  with check (exists (select 1 from public.events e where e.id = event_id and private.can_edit_team(e.team_id)));
+
+create policy "session block read" on public.training_session_blocks for select
+  using (exists (select 1 from public.training_sessions s join public.events e on e.id = s.event_id
+                 where s.id = session_id and private.is_attached_to_team(e.team_id)));
+create policy "session block manage" on public.training_session_blocks for all
+  using (exists (select 1 from public.training_sessions s join public.events e on e.id = s.event_id
+                 where s.id = session_id and private.can_edit_team(e.team_id)))
+  with check (exists (select 1 from public.training_sessions s join public.events e on e.id = s.event_id
+                      where s.id = session_id and private.can_edit_team(e.team_id)));
+
+-- ── publish_training ──────────────────────────────────────────────────────
+-- ONE function for preview and for real, switched by _preview, so the table
+-- the Director confirms is computed by the code that then acts on it.
+-- ⛔ DATE RANGE ON type = 'training'. No weekday anywhere.

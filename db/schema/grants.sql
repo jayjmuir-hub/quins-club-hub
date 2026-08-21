@@ -177,6 +177,17 @@
 --                     what keeps anon out: all three policies resolve through
 --                     private.can_edit_team, which tests auth.uid() against
 --                     memberships and cannot match a null uid.
+--   drills            anon, authenticated, postgres, service_role   ALL 8
+--   session_templates anon, authenticated, postgres, service_role   ALL 8
+--   session_template_blocks  anon, authenticated, postgres, service_role   ALL 8
+--   training_focus    anon, authenticated, postgres, service_role   ALL 8
+--   training_sessions anon, authenticated, postgres, service_role   ALL 8
+--   training_session_blocks  anon, authenticated, postgres, service_role   ALL 8
+--                     ⚠️ ADDED 21 Aug 2026. As with league_teams, the `anon`
+--                     row is Supabase's DEFAULT PRIVILEGES and not intent —
+--                     the migration grants nothing on these tables. RLS keeps
+--                     anon out: every read policy requires a non-null
+--                     auth.uid() or resolves through is_attached_to_team.
 --   photo_backup_runs postgres, service_role                        ALL 8
 --   photo_backup_runs authenticated    ← SELECT ONLY
 --   photo_backup_runs anon             ← NOTHING AT ALL
