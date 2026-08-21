@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🩺 **PAINT-DEBUG OVERLAY (temporary).** Jay's phone renders the Squad Hub's
+  text invisible in BOTH themes, browser and reinstalled app alike, while
+  every emulation this session could build (dark, reduced-motion, forced
+  dark, Chromium) renders it perfectly. `src/components/PaintDebug.jsx`
+  renders — only under `#paint-debug` — a raw inline-styled box reporting
+  the device's UA, theme state, font-load counts and the computed styles of
+  the exact elements that vanish. Styled with system-ui inline styles on
+  purpose: if the styling pipeline is the casualty, the instrument must
+  survive it. DELETE once the phone mystery is solved.
+- `3edd2d7` — the squash with the inverse-pill fix and the sweep (#296),
+  admin-merged while GitHub Actions was down repo-wide.
+
 - ⬜ **THE WHITE-BLOB PILL, AND THE SWEEP THAT SAYS IT WAS THE LAST.** Jay's
   screenshot after the dark audit: the ACTIVE role-filter pill a solid white
   lozenge. Cause: the inverse fill — `bg-ink text-white` flips its
