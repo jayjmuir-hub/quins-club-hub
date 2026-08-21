@@ -90,8 +90,16 @@ three labels do not move.
 
 **Answered on 20 Aug, so they are no longer open questions:**
 
-- **Tuesday and Thursday may differ.** Publish assigns per weekday, so a
-  Tue/Thu pair is expressible and identical nights are the easy case.
+- ⛔ **NOTHING MAY KEY ON A WEEKDAY. THIS BULLET SAID "PUBLISH ASSIGNS PER
+  WEEKDAY" AND THAT IS NOW WRONG.** Jay, 21 Aug 2026: *"some age groups train on
+  mon and friday"*, and separately that all fifteen squads train **twice a week
+  on nights that differ by squad** — 30+ sessions a week club-wide.
+  ✅ **Publish targets the squad's own training EVENTS in a date range**,
+  whatever days they land on. The events already exist, with real dates, in
+  `events`. A Tue/Thu pair, a Mon/Fri pair and a squad that moves to a Wednesday
+  for one week are then all the same code path and none of them is special.
+  ⚠️ **"First and second session of the week" is the ordering that survives**, if
+  a pair ever needs to differ — not "Tuesday's plan" and "Thursday's plan".
 - **Nobody holds the job in the app yet**, so the screen is titled by the job —
   as `YouthDashboard.jsx` already is.
 - **Linking out is accepted**, as one option among several. A drill may be
@@ -112,15 +120,17 @@ three labels do not move.
 ```
 
 ⚠️ **A SESSION IS ATTACHED TO AN EXISTING `events` ROW, NOT A NEW CALENDAR.**
-The club's training already lives in `events` — Tuesday/Thursday repeating
-series, with RLS, a calendar feed and a schedule screen already built. A parallel
+The club's training already lives in `events` — repeating series on whichever
+nights each squad uses, with RLS, a calendar feed and a schedule screen already
+built. ⚠️ **Do not read "Tuesday and Thursday" into this**: some age groups
+train Monday and Friday (Jay, 21 Aug 2026). A parallel
 training calendar would be a second place for "when is training" to be wrong,
 and the fortnight strip would disagree with it. **Reuse the fixture.**
 
 ## The hour, and why it is the unit
 
-Jay: **1 hour, twice a week.** So a template is **60 minutes** and its blocks
-must sum to it.
+Jay: **1 hour, twice a week** — per squad, on that squad's own nights. So a
+template is **60 minutes** and its blocks must sum to it.
 
 ⚠️ **THE APP SHOULD REFUSE TO SAVE A TEMPLATE THAT DOES NOT ADD UP, AND SAY WHAT
 IS WRONG.** "Warm-up 15 + skill 20 + game 30 = 65" is the single most likely
@@ -128,7 +138,7 @@ mistake in the whole feature, it is invisible on the page, and a coach discovers
 it on a pitch with twenty children waiting. **Show the running total as he
 builds** — not a validation error at the end.
 
-⚠️ **60 IS A DEFAULT, NOT A CONSTRAINT.** A festival week or a wet Tuesday is a
+⚠️ **60 IS A DEFAULT, NOT A CONSTRAINT.** A festival week or a wet evening is a
 40-minute session. Refuse silently-wrong arithmetic; do not refuse a deliberate
 50.
 
@@ -222,7 +232,7 @@ one button — the blast radius is every coach's plan for a term. The multi-squa
 `group_id` fan-out is already deferred in this app for exactly this reason.
 
 ⚠️ **PUBLISHING NEVER OVERWRITES A COACH'S EDIT.** A coach who has adjusted
-Thursday's session keeps it; the publish skips that one and **says how many it
+one session keeps it; the publish skips that one and **says how many it
 skipped**. Silently replacing a coach's own plan is how a tool stops being
 trusted after one incident.
 
@@ -294,9 +304,11 @@ reasoning, and a question deleted is a question somebody asks again.
    only active admins are Jacques Reyneke and Jay's two accounts. Like Candice,
    this person may not exist in the system yet — in which case the screen is
    titled by the job, as the youth dashboard now is.
-2. **Twice a week — same plan both nights, or a pair?** The schema supports
-   either; the publish screen differs. A Tuesday/Thursday *pair* is the more
-   likely real answer and is slightly more work.
+2. **Twice a week — same plan both nights, or a pair?** ⚠️ **ANSWERED 21 Aug
+   2026, AND THE WEEKDAY FRAMING IN THE ORIGINAL WORDING WAS THE BUG.** It read
+   "a Tuesday/Thursday *pair*"; some age groups train Monday and Friday, so the
+   pair is **first and second session of the week**, never named days. The
+   schema supports either; publish works off the squad's own events.
 3. **Is linking out actually acceptable to him**, or does he want the club to
    build its own library from scratch over a season? Both are supported; the
    second is slower to start and owns its material outright.
