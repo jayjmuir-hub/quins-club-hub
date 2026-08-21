@@ -643,7 +643,9 @@ export default function Lineup() {
           a display:none element — it has zero size. It is positioned off-screen
           instead, which is the same trick MatchSheet's facsimile relies on. */}
       <div className="pointer-events-none fixed -left-[9999px] top-0" aria-hidden="true">
-        <div ref={shareRef} className="w-[720px] bg-white p-8 font-sans">
+        {/* force-light: this subtree renders to a shared IMAGE and must come
+            out white-on-paper even when the exporter runs dark. */}
+        <div ref={shareRef} className="force-light w-[720px] bg-white p-8 font-sans">
           <div className="flex items-center gap-4 border-b-4 border-brand pb-4">
             <img src={crest} alt="" className="h-[64px] w-[59px] object-contain" />
             <div>

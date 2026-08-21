@@ -41,13 +41,24 @@ export default function Greeting({ now = undefined }) {
   const date = now ? new Date(now) : new Date()
   const greeting = greetingFor(date.getHours())
 
+  // The name takes the 2.0 accent voice — the club site's signature, one
+  // Playfair-italic crimson word: "Good afternoon, *Jay.*" The full stop is
+  // part of the accent, exactly as the portal writes it. The nameless case
+  // keeps its plain form (no accent, no stop) — an italic crimson period
+  // hanging alone would read as a typo.
   return (
     <p
       data-testid="greeting"
       className="mb-3 text-[15px] font-semibold text-ink-muted desktop:text-base"
     >
       {greeting}
-      {firstName ? <span className="text-ink">, {firstName}</span> : ''}
+      {firstName ? (
+        <>
+          , <span className="accent-word text-[1.12em] font-semibold">{firstName}.</span>
+        </>
+      ) : (
+        ''
+      )}
     </p>
   )
 }

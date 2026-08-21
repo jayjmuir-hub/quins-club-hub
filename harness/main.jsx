@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { MemoryRouter, BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '../src/components/AppShell.jsx'
 import NoticeBoard from '../src/components/NoticeBoard.jsx'
+import { applyTheme, watchSystemTheme } from '../src/lib/theme.js'
 import Login from '../src/screens/Login.jsx'
 import Schedule from '../src/screens/Schedule.jsx'
 import Roster from '../src/screens/Roster.jsx'
@@ -1105,6 +1106,13 @@ const scenarios = {
 const params = new URLSearchParams(window.location.search)
 const scenario = params.get('scenario') || 'login'
 const render = scenarios[scenario] || scenarios.login
+
+// Theme parity with the real app: index.html's inline no-flash script does
+// this in production, and the shoot scripts flip the class to photograph
+// dark mode. Without it the harness is stuck light and every dark-mode
+// screenshot lies.
+applyTheme()
+watchSystemTheme()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>{render()}</React.StrictMode>,

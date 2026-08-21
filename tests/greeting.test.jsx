@@ -54,8 +54,12 @@ describe('greetingFor', () => {
 describe('Greeting', () => {
   it('uses the first name once the profile arrives', async () => {
     render(<Greeting now={Date.parse('2026-08-06T09:00:00')} />)
-    expect(await screen.findByText(/, Jay/)).toBeInTheDocument()
-    expect(screen.getByTestId('greeting')).toHaveTextContent('Good morning, Jay')
+    // The name is the 2.0 accent word — Playfair italic crimson, with the
+    // full stop inside the accent — so it lives in its own span and the
+    // matcher reads the paragraph whole rather than hunting one text node.
+    const name = await screen.findByText('Jay.')
+    expect(name).toHaveClass('accent-word')
+    expect(screen.getByTestId('greeting')).toHaveTextContent('Good morning, Jay.')
   })
 
   it('reads correctly with NO name at all', async () => {
@@ -95,7 +99,7 @@ describe('Greeting', () => {
         <Greeting now={Date.parse('2026-08-06T09:00:00')} />
       </>,
     )
-    await screen.findAllByText(/, Jay/)
+    await screen.findAllByText('Jay.')
     expect(getMyProfileMock).toHaveBeenCalledTimes(1)
   })
 })

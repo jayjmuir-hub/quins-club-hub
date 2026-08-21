@@ -460,7 +460,7 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
               checked={row.playUpConsent === true}
               disabled={disabled}
               onChange={(event) => onChange({ playUpConsent: event.target.checked })}
-              className="mt-0.5 h-5 w-5 shrink-0 accent-[color:var(--maroon)]"
+              className="mt-0.5 h-5 w-5 shrink-0 accent-[color:var(--brand)]"
             />
             Yes, I&apos;m happy for them to play up an age group.
           </label>

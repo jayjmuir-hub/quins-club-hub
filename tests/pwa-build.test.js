@@ -129,8 +129,10 @@ describe('PWA production build output', () => {
   })
 
   it('manifest declares the exact app name and short_name', () => {
-    expect(manifest.name).toBe('Abu Dhabi Harlequins')
-    expect(manifest.short_name).toBe('Quins')
+    // "Club Hub" since 2.0 — Jay, 21 Aug 2026. short_name is what sits
+    // under the installed icon.
+    expect(manifest.name).toBe('Club Hub — Abu Dhabi Harlequins')
+    expect(manifest.short_name).toBe('Club Hub')
   })
 
   it('manifest declares standalone display and the club theme colour', () => {
