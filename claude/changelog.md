@@ -10,6 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 📓 **The 21 Aug handoff's weekday item is marked CLOSED**, because it was
+  fixed hours after being written and a handoff carrying a false "still open"
+  line is how a session redoes finished work.
+- `fd05b95` — the squash that stopped anything keying on a weekday.
+
 - ⛔ **NOTHING IN THE TRAINING PLAN MAY KEY ON A WEEKDAY.** Jay: *"some age
   groups train on mon and friday"*. The plan said publish *"assigns per
   weekday"* and offered a *"Tuesday/Thursday pair"* as the likely answer — which
