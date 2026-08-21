@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import Card from '../components/Card.jsx'
+import { AccentTitle, BlockTitle, Kicker } from '../components/Editorial.jsx'
 import Empty from '../components/Empty.jsx'
 import NoticeBoard from '../components/NoticeBoard.jsx'
 import Segmented from '../components/Segmented.jsx'
@@ -211,9 +212,10 @@ export default function SquadHub() {
     }
     return (
       <div>
-        <h2 className="mb-3.5 mt-1 text-[21px] font-extrabold tracking-[-0.2px] text-ink">
-          Squad Hub
-        </h2>
+        <div className="mb-3.5 mt-1">
+          <Kicker>Squad Hub</Kicker>
+          <AccentTitle lead="Your squads," accent="pick one." />
+        </div>
         <Card className="p-4">
           <p className="mb-3 text-[13px] font-medium text-ink-muted">Which squad?</p>
           <ul className="flex flex-col gap-2">
@@ -287,10 +289,11 @@ export default function SquadHub() {
     <div>
       <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[21px] font-extrabold tracking-[-0.2px] text-ink">
-            {team?.name ?? 'Squad'} hub
-          </h2>
-          <p className="text-[13px] font-medium text-ink-muted">
+          {/* The portal's headline formula — "The Muirs, *on paper.*" — worn
+              by a squad: "U12 Mixed, *tracked.*" */}
+          <Kicker>Squad Hub</Kicker>
+          <AccentTitle lead={`${team?.name ?? 'Squad'},`} accent="tracked." />
+          <p className="mt-0.5 text-[13px] font-medium text-ink-muted">
             {players.length} {players.length === 1 ? 'player' : 'players'} · availability, register and the season at a glance
           </p>
         </div>
@@ -325,11 +328,17 @@ export default function SquadHub() {
         <>
           <NoticeBoard notices={squadNotices} readIds={noticeReads} teamsById={new Map(teams.map((t) => [t.id, t]))} />
 
+          {/* Phase 3 desktop density: schedule and the front doors sit side
+              by side, the tracking grid takes the full width beneath them.
+              Grid PLACEMENT classes, not DOM order, so the phone keeps
+              tracking directly under the calendar — its headline position. */}
+          <div className="desktop:grid desktop:grid-cols-[1.15fr_.85fr] desktop:gap-x-4">
+
           {/* ---- Upcoming -------------------------------------------------- */}
-          <Card className="mb-4 p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-[15px] font-extrabold text-ink">Coming up</h3>
-              <Link to="/schedule" className="text-[13px] font-bold text-brand underline-offset-2 hover:underline">
+          <Card className="mb-4 p-4 desktop:col-start-1 desktop:row-start-1">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <BlockTitle>On the calendar</BlockTitle>
+              <Link to="/schedule" className="shrink-0 text-[13px] font-bold text-brand underline-offset-2 hover:underline">
                 Full schedule
               </Link>
             </div>
@@ -391,8 +400,8 @@ export default function SquadHub() {
           </Card>
 
           {/* ---- Tracking -------------------------------------------------- */}
-          <Card className="mb-4 p-4">
-            <h3 className="mb-1 text-[15px] font-extrabold text-ink">Availability &amp; attendance</h3>
+          <Card className="mb-4 p-4 desktop:col-span-2 desktop:row-start-2">
+            <BlockTitle>Who said, who showed</BlockTitle>
             <p className="mb-3 text-[12.5px] font-medium text-ink-muted">
               What they said, then what the register says — side by side per event.
               % is present / (present + absent); excused doesn&apos;t count either way.
@@ -460,7 +469,7 @@ export default function SquadHub() {
           </Card>
 
           {/* ---- Front doors ---------------------------------------------- */}
-          <div className="grid grid-cols-1 gap-3 desktop:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 desktop:col-start-2 desktop:row-start-1 desktop:content-start desktop:grid-cols-1">
             <Card className="p-4">
               <h3 className="text-[15px] font-extrabold text-ink">Roster</h3>
               <p className="mb-2 text-[13px] font-medium text-ink-muted">
@@ -484,6 +493,7 @@ export default function SquadHub() {
                 See sessions in the schedule
               </Link>
             </Card>
+          </div>
           </div>
         </>
       )}

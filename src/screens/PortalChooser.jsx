@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import Card from '../components/Card.jsx'
+import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { PORTALS, closedReason, portalHome, portalLabel } from '../lib/portals.js'
 
@@ -35,7 +36,14 @@ export default function PortalChooser() {
   const { memberships } = useMemberships()
 
   return (
-    <div data-testid="portal-chooser" className="grid gap-3 desktop:grid-cols-2">
+    <div>
+      {/* Phase 3: the chooser opens in the editorial voice like every other
+          landing surface. The cards below are unchanged. */}
+      <div className="mb-4">
+        <Kicker>Club admin</Kicker>
+        <AccentTitle lead="The club's jobs," accent="pick yours." />
+      </div>
+      <div data-testid="portal-chooser" className="grid gap-3 desktop:grid-cols-2">
       {PORTALS.map((portal) => {
         const reason = closedReason(portal, memberships)
         const label = portalLabel(portal)
@@ -68,6 +76,7 @@ export default function PortalChooser() {
           </Card>
         )
       })}
+      </div>
     </div>
   )
 }

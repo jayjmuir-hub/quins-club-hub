@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
+import { BlockTitle, Kicker } from '../components/Editorial.jsx'
 import Greeting from '../components/Greeting.jsx'
 import UpcomingStrip from '../components/UpcomingStrip.jsx'
 import Empty from '../components/Empty.jsx'
@@ -137,17 +138,8 @@ function PinIcon(props) {
 // Section headers get Anton plus the website's red rule fading out across the
 // remaining width. Anton is legitimate here — these are two-word signposts, not
 // running text. The rule is a flex child rather than a border so it can taper.
-function BlockTitle({ children }) {
-  return (
-    <h3 className="mb-2.5 ml-0.5 mt-[18px] flex items-center gap-2.5 font-display text-[17px] uppercase tracking-[0.03em] text-ink first:mt-0">
-      <span>{children}</span>
-      <span
-        aria-hidden="true"
-        className="h-[2px] flex-1 rounded-sm bg-[image:linear-gradient(90deg,theme(colors.brand.DEFAULT),transparent)]"
-      />
-    </h3>
-  )
-}
+// BlockTitle moved to src/components/Editorial.jsx in phase 3, so Squad Hub
+// and the admin screens write the identical section anatomy. Imported above.
 
 // StatTile is no longer a Card. The three tiles now render as cells of one
 // continuous red->green band — the club website's single strongest signature
@@ -837,6 +829,7 @@ export default function Dashboard() {
 
       {/* Sits above the fixture hero so the first thing on the screen is
           addressed to the person, not to the club. */}
+      <Kicker>Member home</Kicker>
       <Greeting />
 
       {/* ⚠️ ABOVE THE FIXTURE HERO, AND THAT IS A KNOWING DEPARTURE FROM
