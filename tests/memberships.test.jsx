@@ -78,12 +78,17 @@ function mockFrom({ memberships, membershipsError, teams, teamsError } = {}) {
       return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue(result) }) }
     }
     if (table === 'teams') {
-      return {
-        select: vi.fn().mockResolvedValue({
-          data: teamsError ? null : (teams ?? [TEAM_ROW]),
-          error: teamsError ?? null,
-        }),
+      // loadTeams chains .order().order() since 21 Aug 2026 (club order at
+      // the source). The builder is awaitable at every link, like PostgREST's.
+      const result = {
+        data: teamsError ? null : (teams ?? [TEAM_ROW]),
+        error: teamsError ?? null,
       }
+      const builder = {
+        order: vi.fn(() => builder),
+        then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
+      }
+      return { select: vi.fn().mockReturnValue(builder) }
     }
     throw new Error(`Unexpected table in test: ${table}`)
   })
@@ -270,14 +275,17 @@ describe('MembershipProvider / useMemberships', () => {
   it('does not update state after unmount', async () => {
     useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
     let resolveSelect
-    supabase.from.mockImplementation(() => ({
-      select: vi.fn(
-        () =>
-          new Promise((resolve) => {
-            resolveSelect = resolve
-          }),
-      ),
-    }))
+    supabase.from.mockImplementation(() => {
+      const pending = new Promise((resolve) => {
+        resolveSelect = resolve
+      })
+      const builder = {
+        order: vi.fn(() => builder),
+        eq: vi.fn(() => builder),
+        then: (resolve, reject) => pending.then(resolve, reject),
+      }
+      return { select: vi.fn(() => builder) }
+    })
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const { unmount } = render(
@@ -540,12 +548,13 @@ describe('MembershipProvider — roster auto-onboarding', () => {
           }),
         }
       }
-      return {
-        select: vi.fn().mockImplementation(async () => ({
-          data: call > 0 ? [TEAM_ROW] : [],
-          error: null,
-        })),
+      // teams goes through .select().order().order() since 21 Aug 2026.
+      const builder = {
+        order: vi.fn(() => builder),
+        then: (resolve, reject) =>
+          Promise.resolve({ data: call > 0 ? [TEAM_ROW] : [], error: null }).then(resolve, reject),
       }
+      return { select: vi.fn(() => builder) }
     })
     supabase.rpc.mockImplementation(async () => {
       call = 1

@@ -103,7 +103,17 @@ function syntheticMemberships(viewAs, realMemberships) {
 const MembershipContext = createContext(undefined)
 
 async function loadTeams() {
-  const { data, error } = await supabase.from('teams').select('*')
+  // ⚠️ ORDERED AT THE SOURCE — sort_order then name, the same pair
+  // listSquadStaff uses. This had no ORDER BY until 21 Aug 2026, so every
+  // consumer of the context's `teams` got database-insertion order; screens
+  // that re-sorted locally (Roster) hid it, and the Squad Hub picker showed
+  // it to Jay as U10, U12G, U11... Sorting here fixes every consumer at
+  // once; anything wanting a different order must sort a COPY.
+  const { data, error } = await supabase
+    .from('teams')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true })
   if (error) throw error
   return data ?? []
 }

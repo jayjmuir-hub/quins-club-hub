@@ -10,6 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 21 Aug 2026
 
+- 🔢 **SQUADS IN CLUB ORDER, EVERYWHERE.** Jay, from the phone: the Squad
+  Hub picker listed U10, U12G, U11... — `loadTeams` in the memberships
+  context had NO ORDER BY, so every consumer of `teams` got
+  database-insertion order, hidden wherever screens re-sorted locally.
+  Now ordered at the source (sort_order, then name — listSquadStaff's
+  pair) and re-asserted in the hub's picker; the test fixture is
+  deliberately shuffled so insertion order fails the build.
+- `95050ca` — the squash with the iPhone status-bar fix (#290).
+
 - 📵 **iPHONE STATUS-BAR FIX.** Jay, from the installed app: "the top bar is
   up under the time, battery, etc, so nothing up there can be clicked".
   viewport-fit=cover has always let the installed app draw under the status
