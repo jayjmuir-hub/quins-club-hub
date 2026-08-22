@@ -10,11 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- The tracking numbers count the WHOLE season: the `.slice(-30)` pre-trim
+- Game time moved from More to the Squad Hub's front doors — its audience
+  is the hub's, the hub is on the phone's tab bar, and the More card had
+  become a third entry point. The link stays squad-less: the screen is
+  cross-squad by design.
+- `fc040ec` — The tracking numbers count the WHOLE season: the `.slice(-30)` pre-trim
   is gone from Squad Hub's "Who said, who showed", so %, no-shows, the
   squad summary ("across N events this season") and the phone drill-in
   read every past event in the window; only the desktop matrix's 15
-  columns stay capped, and the footnote names both numbers.
+  columns stay capped, and the footnote names both numbers (#312).
 - `1e4c063` — The sidebar's Admin item wears a count badge: pending memberships plus
   undecided access requests (`countAdminWaiting`, two head-only count
   queries), fetched once per shell mount for admins only. Zero renders

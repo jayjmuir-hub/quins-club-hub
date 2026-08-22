@@ -553,6 +553,20 @@ export default function SquadHub() {
                 Build a match roster
               </Link>
             </Card>
+            {/* Moved here from More (22 Aug 2026): its audience is exactly
+                this page's, and the hub is on the phone's tab bar. ⚠️ The
+                SCREEN is cross-squad — appearances across every squad the
+                viewer can pick teams for — which is why the link does not
+                carry this hub's teamId. */}
+            <Card className="p-4">
+              <h3 className="text-[15px] font-extrabold text-ink">Game time</h3>
+              <p className="mb-2 text-[13px] font-medium text-ink-muted">
+                Who hasn&apos;t had a game — appearances from your team sheets, fewest first.
+              </p>
+              <Link to="/game-time" className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
+                Open game time
+              </Link>
+            </Card>
             <Card className="p-4">
               <h3 className="text-[15px] font-extrabold text-ink">Training</h3>
               <p className="mb-2 text-[13px] font-medium text-ink-muted">
