@@ -10,6 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
+- 📓 **Handoff: the invisible text that wasn't**
+  (`claude/handoffs/2026-08-22-the-invisible-text-that-wasnt.md`) — the
+  full arc and its five ranked lessons. PaintDebug is KEPT as a permanent
+  flag-gated diagnostic; its header still says TEMPORARY — repoint on the
+  next src-touching change.
+- `8d59c93` — the squash with the switcher fix, gate coverage and the
+  changelog repair (#303).
+
 - 📱 **THE PHONE MYSTERY, SOLVED BY THE BOX: the Squad Hub switcher's
   `shrink-0`.** Four hours of "invisible text" on Jay's phone — both
   themes, browser and app, surviving reinstall and a site-data wipe — was
