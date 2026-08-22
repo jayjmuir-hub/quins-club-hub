@@ -63,6 +63,13 @@ jobs:
       # now and finding out after merge.
       - run: npm run build
 
+      # Static analysis, before the suite. Added 22 Aug 2026 after a dry run
+      # found a conditional hook in Accounts.jsx that crashed the screen on a
+      # "View as" switch and that 107 test files could not see. Errors fail the
+      # build; warnings (unused vars, stale disable comments) do not — see the
+      # header of eslint.config.js for what is off and why.
+      - run: npm run lint
+
       - run: npm test
 
       # ── Dependency advisories ────────────────────────────────────────────

@@ -139,7 +139,7 @@ describe('the eligibility warning', () => {
 
     // Ewan is graded B at a B-tier fixture; Tomas has no grade at all.
     expect(screen.queryByText(/Graded B/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Graded undefined|Graded null|Graded  /)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Graded undefined|Graded null|Graded {2}/)).not.toBeInTheDocument()
 
     // The control: this render DID produce warnings, so the two absences above
     // mean "correctly silent" rather than "the feature never ran".

@@ -22,9 +22,11 @@ import { canonicalGender, squadRequiresGender } from './gender.js'
 // Word insert these silently and they are invisible in the preview, so a name
 // that looks identical to the eye fails an equality check against the team
 // list. Normalised before anything else looks at the text.
-const INVISIBLES = /[​-‍﻿]/g
-const NBSP = / /g
-const SMART_SINGLE = /[‘’‚‛]/g
+// Written as escapes so the characters are visible in the source, and so a
+// linter does not read them as stray whitespace (no-irregular-whitespace).
+const INVISIBLES = /[\u200B-\u200D\uFEFF]/g
+const NBSP = /\u00A0/g
+const SMART_SINGLE = /[\u2018\u2019\u201A\u201B]/g
 const SMART_DOUBLE = /[“”„‟]/g
 
 function normaliseText(text) {

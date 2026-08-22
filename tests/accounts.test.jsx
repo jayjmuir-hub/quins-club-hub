@@ -423,6 +423,24 @@ describe('Accounts — authorisation gate', () => {
   // ⚠️ CHANGED 9 Aug 2026 (Jay: coaches and managers approve for their own age
   // groups). A coach used to be refused this screen outright. They now get the
   // approvals view — and NOTHING else on it.
+  // ⚠️ THIS TEST CRASHED BEFORE THE FIX, AND THAT IS WHAT MAKES IT A TEST.
+  // `memberships` is the EFFECTIVE set, and "View as" swaps it in place without
+  // navigating — so a super admin on this screen previewing a parent went from
+  // admin to not-authorised while mounted. The gate sat above nine hooks, React
+  // threw "Rendered fewer hooks than expected", and the screen fell into the
+  // error boundary. 22 Aug 2026. The gate now sits below the last hook.
+  it('survives admin -> parent while mounted (a View-as switch)', async () => {
+    const { rerender } = setup()
+    expect(await screen.findByRole('heading', { name: /accounts/i })).toBeInTheDocument()
+
+    useMembershipsMock.mockReturnValue(memberships(PARENT))
+    rerender(<Accounts />)
+
+    const alert = await screen.findByRole('alert')
+    expect(within(alert).getByText('Not authorised')).toBeInTheDocument()
+    expect(screen.queryByTestId('account-person')).toBeNull()
+  })
+
   it('gives a coach the approvals view, not the accounts screen', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH))
 
