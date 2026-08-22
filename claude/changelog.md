@@ -10,10 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- Desktop roster table shows the whole squad: the `max-h-[70vh]` inner
+- Schedule table gets the RosterTable treatment — inner scroller and sticky
+  header gone, the page scrolls. And the Dashboard's Squad Hub card is
+  `desktop:hidden`, not removed: the sidebar duplicates it on desktop, but
+  the mobile tab bar has no Squad Hub entry, so on a phone the card is squad
+  staff's only way in.
+- `514bcbc` — Desktop roster table shows the whole squad: the `max-h-[70vh]` inner
   scroller and the sticky header row are gone from `RosterTable` — the page
   scrolls instead, `overflow-x-auto` kept for windows too narrow for the
-  columns.
+  columns (#305).
 - `ab9d888` — 📓 **Handoff: the invisible text that wasn't**
   (`claude/handoffs/2026-08-22-the-invisible-text-that-wasnt.md`) — the
   full arc and its five ranked lessons. PaintDebug is KEPT as a permanent

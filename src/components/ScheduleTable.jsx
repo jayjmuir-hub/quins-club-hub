@@ -28,8 +28,11 @@ import {
 // or an aggregate view — a data change, not a layout one. Deferred rather
 // than faked, and called out in the phase 2 notes.
 
+// Not sticky: the table renders full-height and the PAGE scrolls (the 70vh
+// inner scroller went 22 Aug 2026, same change as RosterTable), so
+// `sticky top-0` would pin against the viewport under AppShell's masthead.
 const HEAD =
-  'sticky top-0 z-10 bg-surface-sunk px-3 py-2.5 text-left text-[11.5px] font-extrabold uppercase tracking-[.5px] text-ink-muted'
+  'bg-surface-sunk px-3 py-2.5 text-left text-[11.5px] font-extrabold uppercase tracking-[.5px] text-ink-muted'
 const CELL = 'border-t border-line px-3 py-2 text-[14px] text-ink align-middle'
 
 const TYPE_TONE = { match: 'match', training: 'training', social: 'social' }
@@ -99,7 +102,10 @@ export default function ScheduleTable({ events, teamsById, onSelect, emptyMessag
 
   return (
     <Card className="overflow-hidden">
-      <div className="max-h-[70vh] overflow-auto">
+      {/* No max-height: every event renders and the page scrolls, matching
+          RosterTable (22 Aug 2026). overflow-x-auto stays for windows too
+          narrow for the columns. */}
+      <div className="overflow-x-auto">
         <table className="w-full border-collapse" data-testid="schedule-table">
           <caption className="sr-only">
             Fixtures and training across every age group you can see.
