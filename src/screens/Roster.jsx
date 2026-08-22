@@ -1,5 +1,6 @@
 import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -195,7 +196,7 @@ function RosterGroup({ label, players, teamsById, photoUrls, ageByPlayer, onSele
 }
 
 export default function Roster() {
-  const { memberships, teams } = useMemberships()
+  const { memberships, teams, loading: membershipsLoading } = useMemberships()
 
   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
@@ -301,6 +302,26 @@ export default function Roster() {
   // private.can_edit_team). Asking the helper rather than testing the string
   // is what stops the next role needing an edit here.
   const canEditAnything = admin || memberships.some((membership) => isSquadStaffRole(membership.role))
+
+  // The sidebar's Roster sub-menu deep-links: /roster?open=add-player and
+  // /roster?open=import (22 Aug 2026). Same consume-and-clear contract as
+  // Schedule's ?open= — an effect because clicking a sub-item while already
+  // on /roster changes only the search string, cleared so refresh/share
+  // cannot reopen a closed sheet, and not judged until memberships load.
+  // Import additionally waits for isDesktop: the importer is a paste target
+  // and Roster hides its button on mobile for the same reason.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const openParam = searchParams.get('open')
+  useEffect(() => {
+    if (!openParam) return
+    if (membershipsLoading) return
+    if (openParam === 'add-player' && canEditAnything) {
+      setFormState({ player: null })
+    } else if (openParam === 'import' && canEditAnything && isDesktop) {
+      setImporting(true)
+    }
+    setSearchParams({}, { replace: true })
+  }, [openParam, canEditAnything, membershipsLoading, isDesktop, setSearchParams])
 
   // ⚠️ STAFF ONLY, AND THE READ IS NOT ISSUED AT ALL OTHERWISE — the same rule
   // the Tier column follows below, for the same reason. RLS on `player_private`

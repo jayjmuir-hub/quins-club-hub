@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -100,7 +101,7 @@ function mountRoster(team, memberships = coachOf(team)) {
     reload: vi.fn(),
   })
   listPlayersMock.mockResolvedValue(squadOf(team))
-  render(<Roster />)
+  render(<MemoryRouter><Roster /></MemoryRouter>)
   return userEvent.setup()
 }
 

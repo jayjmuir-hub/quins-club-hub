@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -83,26 +84,26 @@ const names = () => screen.getAllByTestId('table-player-name').map((n) => n.text
 
 describe('RosterTable — rendering', () => {
   it('renders the table on desktop instead of the mobile card list', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     expect(await screen.findByTestId('roster-table')).toBeInTheDocument()
     expect(screen.queryByTestId('player-row')).not.toBeInTheDocument()
   })
 
   it('renders the mobile card list and no table below the breakpoint', async () => {
     setDesktop(false)
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     expect(await screen.findAllByTestId('player-row')).toHaveLength(3)
     expect(screen.queryByTestId('roster-table')).not.toBeInTheDocument()
   })
 
   it('shows every visible player as one row', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(rows()).toHaveLength(3)
   })
 
   it('has no jersey column — the club does not use squad numbers', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(screen.queryByRole('columnheader', { name: /jersey|number|#/i })).not.toBeInTheDocument()
   })
@@ -121,7 +122,7 @@ describe('RosterTable — sorting', () => {
 
   it('sorts by name ascending by default', async () => {
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     await ungroup(user)
     expect(names()).toEqual(['Amy Rose', 'Tom Fletcher', 'Zac Bell'])
@@ -129,7 +130,7 @@ describe('RosterTable — sorting', () => {
 
   it('reverses the sort when the same header is clicked twice', async () => {
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     await ungroup(user)
     await user.click(screen.getByRole('button', { name: /^Name/ }))
@@ -148,7 +149,7 @@ describe('RosterTable — sorting', () => {
       { ...ZAC, position: 'Lock' },
       { id: 'p4', team_id: 'team-u10', full_name: 'Alfie Denning', position: 'Prop', is_captain: false },
     ])
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     // All three are forwards, so they sit in one section and the sort is
@@ -160,7 +161,7 @@ describe('RosterTable — sorting', () => {
 
   it('sorts players with no position last, not first', async () => {
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     await ungroup(user)
     await user.click(screen.getByRole('button', { name: /^Position/ }))
@@ -168,7 +169,7 @@ describe('RosterTable — sorting', () => {
   })
 
   it('exposes the sort direction to assistive tech via aria-sort', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     const header = screen.getByRole('columnheader', { name: /Name/ })
     expect(header).toHaveAttribute('aria-sort', 'ascending')
@@ -178,7 +179,7 @@ describe('RosterTable — sorting', () => {
 describe('RosterTable — inline editing', () => {
   it('writes only the changed field, keyed by id', async () => {
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
@@ -187,7 +188,7 @@ describe('RosterTable — inline editing', () => {
 
   it('does not write when the value is unchanged', async () => {
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     await user.selectOptions(screen.getByLabelText('Position for Tom Fletcher'), 'Flanker')
@@ -196,7 +197,7 @@ describe('RosterTable — inline editing', () => {
 
   it('writes null rather than an empty string when a position is cleared', async () => {
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     await user.selectOptions(screen.getByLabelText('Position for Tom Fletcher'), '')
@@ -205,7 +206,7 @@ describe('RosterTable — inline editing', () => {
 
   it('moves a player to another age group', async () => {
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     await user.selectOptions(screen.getByLabelText('Age group for Zac Bell'), 'team-u12')
@@ -214,7 +215,7 @@ describe('RosterTable — inline editing', () => {
 
   it('toggles captain and reports the state through aria-pressed', async () => {
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     const toggle = screen.getByRole('button', { name: 'Captain: Zac Bell' })
@@ -232,7 +233,7 @@ describe('RosterTable — inline editing', () => {
     let release
     upsertPlayerMock.mockImplementation(() => new Promise((r) => { release = r }))
 
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
 
@@ -249,7 +250,7 @@ describe('RosterTable — refusals', () => {
       new Error("We couldn't save that player. You may not have permission to change this squad."),
     )
 
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
 
@@ -263,7 +264,7 @@ describe('RosterTable — refusals', () => {
     const user = userEvent.setup()
     upsertPlayerMock.mockRejectedValue(new Error('Refused'))
 
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
 
@@ -276,7 +277,7 @@ describe('RosterTable — refusals', () => {
     const user = userEvent.setup()
     upsertPlayerMock.mockRejectedValueOnce(new Error('Refused'))
 
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
     await screen.findByRole('alert')
@@ -295,7 +296,7 @@ describe('RosterTable — permissions', () => {
     // read-only path with a membership that resolves to no editable team.
     listPlayersMock.mockResolvedValue([TOM, ZAC])
 
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(screen.getByLabelText('Position for Tom Fletcher')).toBeInTheDocument()
   })
@@ -310,7 +311,7 @@ describe('RosterTable — permissions', () => {
     })
     listPlayersMock.mockResolvedValue([TOM, ZAC])
 
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(screen.queryByLabelText(/^Position for/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Captain:/ })).not.toBeInTheDocument()
@@ -324,7 +325,7 @@ describe('RosterTable — permissions', () => {
 describe('RosterTable — opening a player from the name', () => {
   it('opens the player when the name is clicked', async () => {
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
@@ -344,7 +345,7 @@ describe('RosterTable — opening a player from the name', () => {
     // above and then fires on every inline edit — opening a detail sheet on
     // top of the age group somebody just changed.
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     await user.selectOptions(screen.getByLabelText('Age group for Tom Fletcher'), 'team-u12')
@@ -356,7 +357,7 @@ describe('RosterTable — opening a player from the name', () => {
   it('still opens from the Open button', async () => {
     // The old route stays. Removing it would be a second, unasked-for change.
     const user = userEvent.setup()
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     const tomRow = rows().find((r) => within(r).queryByText('Tom Fletcher'))
@@ -370,7 +371,7 @@ describe('RosterTable — the face beside the name', () => {
   it('shows the monogram when a player has no photo', async () => {
     // 314 of the club's 315 players are in exactly this state today, so this
     // is the normal rendering, not the fallback-nobody-sees.
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     const tomRow = rows().find((r) => within(r).queryByText('Tom Fletcher'))
@@ -388,7 +389,7 @@ describe('RosterTable — the face beside the name', () => {
     // above still renders, so only this test fails.
     listPlayersMock.mockResolvedValue([{ ...TOM, photo_path: 'players/p1.jpg' }, AMY])
 
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     const tomRow = await waitFor(() => {
@@ -411,7 +412,7 @@ describe('RosterTable — the face beside the name', () => {
       AMY,
     ])
 
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     const tomImg = await waitFor(() => {
@@ -432,7 +433,7 @@ describe('RosterTable — the face beside the name', () => {
   it('centres a player photo nobody has positioned', async () => {
     listPlayersMock.mockResolvedValue([{ ...TOM, photo_path: 'players/p1.jpg' }, AMY])
 
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     const tomImg = await waitFor(() => {

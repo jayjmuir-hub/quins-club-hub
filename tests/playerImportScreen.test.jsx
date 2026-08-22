@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -53,7 +54,7 @@ beforeEach(() => {
 })
 
 async function openImport(user) {
-  render(<Roster />)
+  render(<MemoryRouter><Roster /></MemoryRouter>)
   await user.click(await screen.findByRole('button', { name: 'Import' }))
   return screen.findByTestId('import-paste')
 }
@@ -62,13 +63,13 @@ const paste = (user, text) => user.type(screen.getByTestId('import-paste'), text
 
 describe('Import — availability', () => {
   it('offers Import on desktop', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     expect(await screen.findByRole('button', { name: 'Import' })).toBeInTheDocument()
   })
 
   it('does not offer Import on mobile — pasting a spreadsheet into a phone is not a thing', async () => {
     setDesktop(false)
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByRole('button', { name: 'Add player' })
     expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument()
   })
@@ -78,7 +79,7 @@ describe('Import — availability', () => {
       memberships: [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1', club_id: 'club-1' }],
       teams: TEAMS,
     })
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument())
   })
 })

@@ -10,12 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- **Training Plans, squad-level** (`/squad/:teamId/training`): the
+- Roster gets its sidebar section, staff-only: Add a player and Import
+  players as `?open=` deep-links, and Game time — which keeps the section
+  open, so its screen does not orphan the menu. Parents see no children.
+- `a40464d` — **Training Plans, squad-level** (`/squad/:teamId/training`): the
   coach-facing read of published sessions — upcoming training with a
   "Planned · N blocks · M min" badge per row, each opening the same
   SessionPlan sheet EventDetail uses (read and coach-adjust). Third item
   in the sidebar's Squad Hub section; the hub's Training card repoints
-  here from /schedule.
+  here from /schedule (#309).
 - `01a8ae1` — Sidebar sub-menus, only the active section expanded: Squad Hub gets
   Overview and **Build a Match Roster** — a new picker at
   `/squad/:teamId/match-roster` listing upcoming matches with RSVP tallies

@@ -50,6 +50,32 @@ describe('Squad Hub sub-menu', () => {
   })
 })
 
+describe('Roster sub-menu', () => {
+  it('expands for squad staff with the two deep-links and Game time', () => {
+    renderAt('/roster')
+    const submenu = screen.getByTestId('submenu-roster')
+    expect(within(submenu).getByRole('link', { name: 'Add a player' })).toHaveAttribute(
+      'href',
+      '/roster?open=add-player',
+    )
+    expect(within(submenu).getByRole('link', { name: 'Import players' })).toHaveAttribute(
+      'href',
+      '/roster?open=import',
+    )
+    expect(within(submenu).getByRole('link', { name: 'Game time' })).toHaveAttribute('href', '/game-time')
+  })
+
+  it('stays expanded on /game-time — the section must not collapse under its own child', () => {
+    renderAt('/game-time')
+    expect(screen.getByTestId('submenu-roster')).toBeInTheDocument()
+  })
+
+  it('has no children at all for people without the staff gate', () => {
+    renderAt('/roster', { showSquadHub: false })
+    expect(screen.queryByTestId('submenu-roster')).not.toBeInTheDocument()
+  })
+})
+
 describe('Schedule sub-menu', () => {
   it('expands on /schedule with the two deep-links for squad staff', () => {
     renderAt('/schedule')

@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -90,13 +91,13 @@ const header = (name) => screen.queryByRole('columnheader', { name })
 
 describe('columns that repeat themselves are dropped', () => {
   it('hides Gender when every player on screen has the same one', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(header(/gender/i)).not.toBeInTheDocument()
   })
 
   it('hides Age group when the roster is showing one squad', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(header(/age group/i)).not.toBeInTheDocument()
   })
@@ -106,7 +107,7 @@ describe('columns that repeat themselves are dropped', () => {
     // player whose gender nobody has answered for — has to keep the column, and
     // that is the case the coach most needs to see.
     listPlayersMock.mockResolvedValue([...SQUAD.slice(0, 3), { ...SQUAD[3], gender: null }])
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(header(/gender/i)).toBeInTheDocument()
   })
@@ -120,7 +121,7 @@ describe('columns that repeat themselves are dropped', () => {
       ...SQUAD,
       { id: 'p9', team_id: 'team-u14a', full_name: 'Ozzy Marchetti', position: 'Centre', unit: 'back', gender: 'male', is_captain: false },
     ])
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(header(/age group/i)).toBeInTheDocument()
   })
@@ -128,7 +129,7 @@ describe('columns that repeat themselves are dropped', () => {
 
 describe('tier and the other positions become visible', () => {
   it('shows a Tier column with each graded player’s letter', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(header('Tier')).toBeInTheDocument()
 
@@ -139,7 +140,7 @@ describe('tier and the other positions become visible', () => {
   it('⚠️ shows a player’s OTHER positions, not a duplicate of the primary', async () => {
     // p1 is Prop (the primary, in the inline select) and also Hooker. Repeating
     // "Prop" as a chip directly under a select already reading Prop is noise.
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     // ⚠️ BY TESTID, NOT BY TEXT. The inline position editor is a <select> whose
@@ -156,7 +157,7 @@ describe('tier and the other positions become visible', () => {
     // request. The screen does not make it, and the column does not exist in
     // their DOM to be inspected.
     useMembershipsMock.mockReturnValue({ memberships: PARENT, teams: [U16B] })
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     expect(listPlayerGradesMock).not.toHaveBeenCalled()
@@ -169,7 +170,7 @@ describe('grouping by tier, then forwards and backs', () => {
     // "i want it to land default on Tier, then forwards and backs view instead
     // of nothing view". It shipped defaulting to 'none' and that was reversed on
     // his instruction; this test is the thing that stops it drifting back.
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(screen.getByLabelText('Group by')).toHaveValue('tier')
     await waitFor(() =>
@@ -177,7 +178,7 @@ describe('grouping by tier, then forwards and backs', () => {
   })
 
   it('can still be turned off', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     await waitFor(() =>
       expect(screen.getByRole('columnheader', { name: /tier a/i })).toBeInTheDocument())
@@ -187,7 +188,7 @@ describe('grouping by tier, then forwards and backs', () => {
   })
 
   it('nests forwards and backs under each tier heading', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     // ⚠️ Wait for the grades to land first: grouping by tier before they arrive
@@ -210,7 +211,7 @@ describe('grouping by tier, then forwards and backs', () => {
   })
 
   it('⚠️ shows the ungraded player rather than dropping them', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     await userEvent.selectOptions(screen.getByLabelText('Group by'), 'tier')
 
@@ -221,7 +222,7 @@ describe('grouping by tier, then forwards and backs', () => {
 
   it('offers no grouping control to a parent', async () => {
     useMembershipsMock.mockReturnValue({ memberships: PARENT, teams: [U16B] })
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(screen.queryByLabelText('Group by')).not.toBeInTheDocument()
   })
@@ -232,7 +233,7 @@ describe('grouping by tier, then forwards and backs', () => {
     // graded" over every child on the roster — a statement about the club's
     // record-keeping, made to the one audience who cannot act on it.
     useMembershipsMock.mockReturnValue({ memberships: PARENT, teams: [U16B] })
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     const headings = screen.getAllByRole('columnheader').map((cell) => cell.textContent)
@@ -248,13 +249,13 @@ describe('the gender gap nudges, and the nudge is clickable', () => {
   })
 
   it('says how many players have no gender recorded', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     expect(await screen.findByRole('button', { name: /1 player has no gender recorded/i }))
       .toBeInTheDocument()
   })
 
   it('⚠️ CLICKING IT SHOWS EXACTLY THOSE PLAYERS — Jay’s explicit ask', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     const nudge = await screen.findByRole('button', { name: /no gender recorded/i })
     await userEvent.click(nudge)
 
@@ -263,7 +264,7 @@ describe('the gender gap nudges, and the nudge is clickable', () => {
   })
 
   it('can be cleared again', async () => {
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await userEvent.click(await screen.findByRole('button', { name: /no gender recorded/i }))
     await userEvent.click(screen.getByRole('button', { name: 'Show all' }))
     expect(screen.getAllByTestId('table-player-name')).toHaveLength(4)
@@ -271,7 +272,7 @@ describe('the gender gap nudges, and the nudge is clickable', () => {
 
   it('stays quiet when every player has a gender', async () => {
     listPlayersMock.mockResolvedValue(SQUAD)
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(screen.queryByRole('button', { name: /no gender recorded/i })).not.toBeInTheDocument()
   })

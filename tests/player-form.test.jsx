@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -848,13 +849,13 @@ describe('PlayerForm — failures', () => {
 describe('Roster wiring', () => {
   it('offers an Add player button to a coach', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(COACH_U14))
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     expect(await screen.findByRole('button', { name: /add player/i })).toBeInTheDocument()
   })
 
   it('does not offer it to a parent', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByText(/no players yet/i)
     expect(screen.queryByRole('button', { name: /add player/i })).not.toBeInTheDocument()
   })
@@ -862,7 +863,7 @@ describe('Roster wiring', () => {
   it('opens the empty form from the Add button', async () => {
     const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(membershipValue(COACH_U14))
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
 
     await user.click(await screen.findByRole('button', { name: /add player/i }))
 
@@ -873,7 +874,7 @@ describe('Roster wiring', () => {
   it('reloads the roster after a save', async () => {
     const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(membershipValue(COACH_U14))
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
 
     await user.click(await screen.findByRole('button', { name: /add player/i }))
     const callsBefore = listPlayersMock.mock.calls.length
@@ -896,7 +897,7 @@ describe('PlayerDetail wiring', () => {
   async function openDetail(memberships) {
     const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(membershipValue(memberships))
-    render(<Roster />)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
     await user.click(await screen.findByRole('button', { name: /Dhruv Ramachandran/i }))
     await screen.findByRole('dialog')
     return user

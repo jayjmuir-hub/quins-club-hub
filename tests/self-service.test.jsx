@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -32,7 +33,7 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
-  listContactsForPlayers: (...a) => listContactsForPlayersMock(...a),
+  listContactsForPlayers: (...a) => listContactsForPlayersMock(...a),
   // The completeness card on YourPlayers reads this (17 Aug 2026).
   listPlayerPrivate: async () => [],
   getPlayerDob: vi.fn(() => Promise.resolve(null)),
@@ -105,7 +106,7 @@ async function openSheet(memberships, playerName, players) {
   listPlayersMock.mockResolvedValue(players)
   useMembershipsMock.mockReturnValue(membershipValue(memberships))
   const user = userEvent.setup()
-  render(<Roster />)
+  render(<MemoryRouter><Roster /></MemoryRouter>)
   await user.click(await screen.findByRole('button', { name: new RegExp(playerName, 'i') }))
   await screen.findByRole('dialog')
   return user

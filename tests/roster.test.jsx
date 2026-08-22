@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -164,7 +165,7 @@ beforeEach(() => {
 
 function setup() {
   const user = userEvent.setup()
-  const utils = render(<Roster />)
+  const utils = render(<MemoryRouter><Roster /></MemoryRouter>)
   return { user, ...utils }
 }
 
@@ -361,7 +362,7 @@ describe('Roster — a team filter that outlives its team', () => {
 
     useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', team_id: 'team-1xv' }]))
     listPlayersMock.mockResolvedValue([SENIOR])
-    rerender(<Roster />)
+    rerender(<MemoryRouter><Roster /></MemoryRouter>)
 
     expect(await screen.findByText('Craig Muir')).toBeInTheDocument()
     expect(screen.queryByText(/no players/i)).not.toBeInTheDocument()

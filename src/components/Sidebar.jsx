@@ -76,6 +76,20 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
         { to: `/squad/${squadMatch[1]}/training`, label: 'Training Plans' },
       ]
     }
+    // /game-time keeps the Roster section open: it is this section's only
+    // routed child, and collapsing the menu the moment somebody enters it
+    // would leave no sidebar item lit at all.
+    if (to === '/roster' && (location.pathname.startsWith('/roster') || location.pathname.startsWith('/game-time'))) {
+      // Staff-only section: parents have no add/import rights and Game time
+      // is a coach's question, so for them Roster simply has no children.
+      return showSquadHub
+        ? [
+            { to: '/roster?open=add-player', label: 'Add a player', action: true },
+            { to: '/roster?open=import', label: 'Import players', action: true },
+            { to: '/game-time', label: 'Game time' },
+          ]
+        : []
+    }
     if (to === '/schedule' && location.pathname.startsWith('/schedule')) {
       return [
         // `action: true` = a deep-link that opens a sheet on the screen, not a
