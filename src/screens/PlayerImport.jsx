@@ -34,16 +34,28 @@ export default function PlayerImport({ onClose, onImported }) {
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [failure, setFailure] = useState(null)
+  // The picker's squad — the fallback for lines that name none, which makes
+  // a plain list of names a valid import (22 Aug 2026 rethink). '' = no
+  // fallback, every line must name its own squad.
+  const [defaultTeamId, setDefaultTeamId] = useState('')
   // Guards the double-click case the same way PlayerForm does: state updates
   // are async, so a ref is what actually stops a second submit landing.
   const inFlight = useRef(false)
+
+  // Only squads the user can WRITE belong in the picker — offering U18B to a
+  // U12 coach would parse 40 rows green and refuse them all at insert.
+  const editableTeams = useMemo(
+    () => scopedTeams.filter((team) => canEditTeam(memberships, team.id)),
+    [scopedTeams, memberships],
+  )
 
   const parsed = useMemo(
     () => parsePlayerPaste(text, {
       teams: scopedTeams,
       canEditTeam: (teamId) => canEditTeam(memberships, teamId),
+      defaultTeamId: defaultTeamId || null,
     }),
-    [text, scopedTeams, memberships],
+    [text, scopedTeams, memberships, defaultTeamId],
   )
 
   const hasInput = text.trim() !== ''
@@ -81,11 +93,34 @@ export default function PlayerImport({ onClose, onImported }) {
               Paste from a spreadsheet
             </label>
             <p className="mb-2 text-[13px] leading-relaxed text-ink-muted">
-              One player per line: <b>name, position, age group, gender</b>. Copy the columns
-              straight out of Excel or Sheets — a header row is ignored, and blank lines are
-              skipped. Position and gender can be left empty, and gender can be left off
-              altogether. Gender accepts Male/Female, M/F or Boy/Girl.
+              One player per line, <b>columns in any order</b> — the age group, position and
+              gender are recognised wherever they sit, and whatever is left is the name (a
+              First and Last column pair works too). Copy straight out of Excel or Sheets; a
+              header row is ignored and blank lines are skipped. Only the name is required
+              when a squad is picked below. Gender accepts Male/Female, M/F or Boy/Girl.
             </p>
+            {/* The commonest import is one coach, one squad, a plain list of
+                names — this picker is what makes that paste valid without a
+                squad column. A line naming its own squad still wins. */}
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <label htmlFor="import-default-team" className="text-[13px] font-semibold text-ink-muted">
+                Squad for lines without one:
+              </label>
+              <select
+                id="import-default-team"
+                data-testid="import-default-team"
+                value={defaultTeamId}
+                onChange={(event) => setDefaultTeamId(event.target.value)}
+                className="rounded-[9px] border-[1.5px] border-line bg-surface-card px-2 py-1.5 text-[13px] font-semibold text-ink outline-none focus:border-brand"
+              >
+                <option value="">— each line names its own —</option>
+                {editableTeams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <textarea
               id="import-paste"
               data-testid="import-paste"
