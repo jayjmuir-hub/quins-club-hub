@@ -40,9 +40,13 @@ export default function PaintDebug() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
+  // v3: LIVE — recollect every 2s so the box always reports the CURRENT
+  // screen (v2 snapshotted once at arm time and froze on Home's numbers),
+  // and sample only elements that actually paint (>2px), so sr-only and
+  // the hidden desktop sidebar stop muddying the report.
   useEffect(() => {
     if (!active) return
-    const timer = setTimeout(() => {
+    const collect = () => {
       const pick = (label, el) => {
         if (!el) return `${label}: NOT FOUND`
         const cs = getComputedStyle(el)
@@ -55,10 +59,17 @@ export default function PaintDebug() {
           `  rect=${Math.round(r.width)}x${Math.round(r.height)}@${Math.round(r.top)}`
         )
       }
-      const h2 = document.querySelector('h2')
-      const kicker = document.querySelector('p')
+      const painted = (sel) =>
+        [...document.querySelectorAll(sel)].find((el) => {
+          const r = el.getBoundingClientRect()
+          return r.width > 2 && r.height > 2
+        })
+      const h2 = painted('h2')
+      const kicker = painted('main p')
       const rowBtn = [...document.querySelectorAll('button')].find((b) => /%/.test(b.textContent))
-      const sheetTitle = [...document.querySelectorAll('h3')].pop()
+      const dialog = document.querySelector('[role="dialog"]')
+      const sheetTitle = dialog ? dialog.querySelector('h3') : painted('h3')
+      const sheetRow = dialog ? dialog.querySelector('li span') : null
       const lines = [
         `UA: ${navigator.userAgent}`,
         `htmlClass: ${document.documentElement.className}`,
