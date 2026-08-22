@@ -2,6 +2,17 @@
 -- db/schema/functions.sql
 -- CAPTURE of every function in the `public` and `private` schemas of
 -- Supabase project lusmshimxdcxpnrktlgz (quins-club-hub).
+-- ⚠️ RE-CAPTURED 2026-08-22 — A NAME-LEVEL AUDIT AGAINST pg_proc FOUND
+--   29 LIVE FUNCTIONS WITH NO ENTRY IN THIS FILE AT ALL. The mechanism:
+--   every re-capture since 11 Aug was SELECTIVE ("re-capture what my
+--   migration touched"), so functions added by OTHER work — the push
+--   pipeline, the nudges, feedback, photo focus — accumulated silently.
+--   All 29 are now captured verbatim from pg_get_functiondef at the
+--   section marked "2026-08-22" below, with proacl noted per entry.
+--   public.pitch_occupancy (20260822) is also captured from live rather
+--   than transcribed from its migration.
+--   ⚠️ WHAT THIS RE-CAPTURE DID NOT DO: re-verify the BODIES of entries
+--   captured earlier. Each entry's own capture date still governs it.
 -- First captured 2026-08-03; re-captured 2026-08-07;
 -- ⚠️ RE-CAPTURED 2026-08-09 — 29 functions (was 22).
 -- ⚠️ RE-CAPTURED 2026-08-11 — see the block below.
@@ -3061,28 +3072,1013 @@ revoke execute on function public.publish_training(uuid, uuid[], date, date, boo
 grant  execute on function public.publish_training(uuid, uuid[], date, date, boolean) to authenticated, service_role;
 
 
+-- (public.pitch_occupancy: captured from live in the 2026-08-22 re-capture
+-- section below — the hand-transcribed pre-application block that sat here
+-- for a few hours is gone, as its own header demanded.)
+
+
+-- =====================================================================
+-- ⚠️ 2026-08-22 RE-CAPTURE — the 29 functions that were live with no
+-- entry in this file (see the header). Captured verbatim from
+-- pg_get_functiondef; proacl noted above each. A null proacl means
+-- default privileges only (owner + PUBLIC per default ACL behaviour for
+-- functions — note `private` is sealed at the SCHEMA level: anon and
+-- authenticated hold no USAGE on it, so PUBLIC execute on a private.*
+-- function is inert, the same argument can_edit_team's grant records).
+-- =====================================================================
+
 -- ---------------------------------------------------------------------
--- public.pitch_occupancy(timestamptz, timestamptz)
--- ⚠️ WRITTEN FROM db/migrations/20260822_pitch_occupancy.sql, not captured
--- from live — re-capture after the migration is applied. The redacted
--- club-wide booking read for squad staff; see the migration header for why
--- this is a SECURITY DEFINER function and not a wider `event read` policy.
+-- private.approval_audience(uuid, uuid, uuid)
+-- proacl: null
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.pitch_occupancy(_from timestamptz, _to timestamptz)
- RETURNS TABLE(id uuid, team_id uuid, team_name text, type text, starts_at timestamptz, ends_at timestamptz, pitch text, group_id uuid)
+CREATE OR REPLACE FUNCTION private.approval_audience(_club uuid, _team uuid, _requester uuid)
+ RETURNS SETOF uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select distinct m.profile_id
+    from memberships m
+   where m.status = 'active'
+     and m.profile_id is distinct from _requester
+     and (
+       (m.club_id = _club and m.is_super)
+       or (_team is not null and m.team_id = _team
+           and (m.is_head_coach or m.role = 'manager'))
+     );
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.audit_membership()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.audit_membership()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  actor uuid := auth.uid();
+  row_now public.memberships;
+begin
+  row_now := coalesce(new, old);
+
+  if tg_op = 'UPDATE' then
+    if new.role = old.role
+       and new.status = old.status
+       and new.is_super = old.is_super
+       and new.admin_rights = old.admin_rights then
+      return new;
+    end if;
+  end if;
+
+  insert into public.membership_audit (
+    membership_id, profile_id, club_id, team_id, player_id,
+    action, actor_id, actor_kind,
+    old_role, new_role, old_status, new_status,
+    old_is_super, new_is_super, old_rights, new_rights
+  )
+  values (
+    row_now.id, row_now.profile_id, row_now.club_id, row_now.team_id, row_now.player_id,
+    case tg_op when 'INSERT' then 'granted' when 'DELETE' then 'revoked' else 'changed' end,
+    actor,
+    case when actor is null then 'system' else 'member' end,
+    case when tg_op = 'INSERT' then null else old.role end,
+    case when tg_op = 'DELETE' then null else new.role end,
+    case when tg_op = 'INSERT' then null else old.status end,
+    case when tg_op = 'DELETE' then null else new.status end,
+    case when tg_op = 'INSERT' then null else old.is_super end,
+    case when tg_op = 'DELETE' then null else new.is_super end,
+    case when tg_op = 'INSERT' then null else old.admin_rights end,
+    case when tg_op = 'DELETE' then null else new.admin_rights end
+  );
+
+  return coalesce(new, old);
+exception when others then
+  raise warning 'audit_membership: % (membership %)', sqlerrm, row_now.id;
+  return coalesce(new, old);
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.availability_nudge_candidates(uuid)
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.availability_nudge_candidates(_event uuid)
+ RETURNS SETOF uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select distinct m.profile_id
+    from events e
+    join memberships m
+      on m.team_id = e.team_id and m.status = 'active'
+     and m.role in ('parent', 'player') and m.player_id is not null
+   where e.id = _event
+     and not exists (select 1 from availability a
+                      where a.event_id = e.id and a.player_id = m.player_id)
+     and not exists (select 1 from availability_nudges n
+                      where n.event_id = e.id and n.profile_id = m.profile_id)
+     and not exists (select 1 from notification_opt_outs o
+                      where o.profile_id = m.profile_id and o.category = 'availability');
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.handle_user_email_confirmed()
+-- proacl: {postgres=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.handle_user_email_confirmed()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  update public.profiles
+     set email_confirmed_at = new.email_confirmed_at
+   where id = new.id;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.may_set_staff_photo(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.may_set_staff_photo(_profile uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select coalesce(
+    _profile is not null
+    and (
+      _profile = auth.uid()
+      or exists (
+        select 1 from public.memberships m
+        where m.profile_id = _profile
+          and (
+            (m.club_id is not null and private.is_admin(m.club_id))
+            or (m.team_id is not null and private.can_edit_team(m.team_id))
+          )
+      )
+    ),
+    false
+  );
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notice_audience(uuid, uuid)
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notice_audience(_club uuid, _team uuid)
+ RETURNS SETOF uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select distinct m.profile_id
+    from memberships m
+   where m.status = 'active'
+     and m.club_id = _club
+     and (_team is null or m.team_id = _team);
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notify_feedback()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_feedback()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+begin
+  select decrypted_secret into endpoint
+    from vault.decrypted_secrets where name = 'feedback_notify_url';
+  select decrypted_secret into secret
+    from vault.decrypted_secrets where name = 'approval_notify_secret';
+
+  if endpoint is null or secret is null then
+    raise warning 'notify_feedback: vault secrets missing, no email sent for feedback %', new.id;
+    return new;
+  end if;
+
+  perform net.http_post(
+    url     := endpoint,
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'x-approval-secret', secret),
+    body    := jsonb_build_object('feedback_id', new.id)
+  );
+
+  return new;
+exception when others then
+  raise warning 'notify_feedback: % (feedback %)', sqlerrm, new.id;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notify_feedback_reply_push()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_feedback_reply_push()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+begin
+  select decrypted_secret into endpoint
+    from vault.decrypted_secrets where name = 'push_notify_url';
+  select decrypted_secret into secret
+    from vault.decrypted_secrets where name = 'approval_notify_secret';
+
+  if endpoint is null or secret is null then
+    raise warning 'notify_feedback_reply_push: vault secrets missing, no push sent for feedback %', new.id;
+    return new;
+  end if;
+
+  perform net.http_post(
+    url     := endpoint,
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'x-approval-secret', secret),
+    body    := jsonb_build_object('feedback_id', new.id)
+  );
+
+  return new;
+exception when others then
+  raise warning 'notify_feedback_reply_push: % (feedback %)', sqlerrm, new.id;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notify_fixture_added()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_fixture_added()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare e public.events;
+begin
+  if (select count(*) from inserted) <> 1 then return null; end if;
+  select * into e from inserted;
+  if e.series_id is not null then return null; end if;
+  perform private.send_fixture_push(e.club_id, e.team_id, auth.uid(), 'New fixture', e);
+  return null;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notify_fixture_cancelled()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_fixture_cancelled()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare e public.events;
+begin
+  if (select count(*) from deleted) <> 1 then return null; end if;
+  select * into e from deleted;
+  perform private.send_fixture_push(e.club_id, e.team_id, auth.uid(), 'Fixture cancelled', e);
+  return null;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notify_fixture_changed()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_fixture_changed()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare o public.events; n public.events;
+begin
+  if (select count(*) from updated_new) <> 1 then return null; end if;
+  select * into n from updated_new;
+  select * into o from updated_old;
+  if o.starts_at is distinct from n.starts_at
+     or o.time_tbd is distinct from n.time_tbd
+     or o.venue    is distinct from n.venue
+     or o.pitch    is distinct from n.pitch
+     or o.opponent is distinct from n.opponent
+     or o.home     is distinct from n.home
+     or o.team_id  is distinct from n.team_id
+  then
+    perform private.send_fixture_push(n.club_id, n.team_id, auth.uid(), 'Fixture changed', n);
+  end if;
+  return null;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notify_invite()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_invite()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+begin
+  select decrypted_secret into endpoint
+    from vault.decrypted_secrets where name = 'invite_notify_url';
+  select decrypted_secret into secret
+    from vault.decrypted_secrets where name = 'approval_notify_secret';
+
+  if endpoint is null or secret is null then
+    raise warning 'notify_invite: vault secrets missing, no email sent for invite %', new.id;
+    return new;
+  end if;
+
+  perform net.http_post(
+    url     := endpoint,
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'x-approval-secret', secret),
+    body    := jsonb_build_object('invite_id', new.id)
+  );
+
+  return new;
+exception when others then
+  raise warning 'notify_invite: % (invite %)', sqlerrm, new.id;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notify_notice_push()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_notice_push()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+  lead     record;
+begin
+  select decrypted_secret into endpoint
+    from vault.decrypted_secrets where name = 'push_notify_url';
+  select decrypted_secret into secret
+    from vault.decrypted_secrets where name = 'approval_notify_secret';
+
+  if endpoint is null or secret is null then
+    raise warning 'notify_notice_push: vault secrets missing, no push sent';
+    return null;
+  end if;
+
+  -- ⚠️ array_agg(order by) AND NOT min(id): THERE IS NO min(uuid) IN POSTGRES.
+  -- The first draft used min() and failed with "function min(uuid) does not
+  -- exist", caught by running this inside a rolled-back transaction first.
+  for lead in
+    select (array_agg(a.id order by a.id))[1] as id
+      from inserted a
+     where a.expires_at is null or a.expires_at > now()
+     group by coalesce(a.group_id, a.id)
+  loop
+    begin
+      perform net.http_post(
+        url     := endpoint,
+        headers := jsonb_build_object('Content-Type', 'application/json',
+                                      'x-approval-secret', secret),
+        body    := jsonb_build_object('announcement_id', lead.id));
+    exception when others then
+      raise warning 'notify_notice_push: % (notice %)', sqlerrm, lead.id;
+    end;
+  end loop;
+
+  return null;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notify_pending_membership_push()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_pending_membership_push()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+begin
+  select decrypted_secret into endpoint
+    from vault.decrypted_secrets where name = 'push_notify_url';
+  select decrypted_secret into secret
+    from vault.decrypted_secrets where name = 'approval_notify_secret';
+
+  if endpoint is null or secret is null then
+    raise warning 'notify_pending_membership_push: vault secrets missing, no push sent for membership %', new.id;
+    return new;
+  end if;
+
+  perform net.http_post(
+    url     := endpoint,
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'x-approval-secret', secret),
+    body    := jsonb_build_object('approval_membership_id', new.id)
+  );
+
+  return new;
+exception when others then
+  raise warning 'notify_pending_membership_push: % (membership %)', sqlerrm, new.id;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.send_availability_nudges()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.send_availability_nudges()
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text; secret text; ev record; v_batch uuid;
+  n_people int; n_sent int := 0; squad text; detail text; whenish text;
+begin
+  select decrypted_secret into endpoint
+    from vault.decrypted_secrets where name = 'push_notify_url';
+  select decrypted_secret into secret
+    from vault.decrypted_secrets where name = 'approval_notify_secret';
+  if endpoint is null or secret is null then
+    raise warning 'send_availability_nudges: vault secrets missing, nothing sent';
+    return 0;
+  end if;
+
+  for ev in
+    select e.*, t.name as team_name
+      from events e join teams t on t.id = e.team_id
+     where e.type = 'match'
+       and e.starts_at > now()
+       and e.starts_at <= now() + interval '48 hours'
+  loop
+    v_batch := gen_random_uuid();
+
+    insert into availability_nudges (event_id, profile_id, batch_id)
+    select ev.id, c.profile_id, v_batch
+      from private.availability_nudge_candidates(ev.id) as c(profile_id)
+    on conflict (event_id, profile_id) do nothing;
+
+    get diagnostics n_people = row_count;
+    if n_people = 0 then continue; end if;
+
+    squad   := ev.team_name;
+    whenish := to_char(ev.starts_at at time zone 'Asia/Dubai', 'Dy DD Mon')
+               || case when ev.time_tbd then ', time TBC'
+                       else ', ' || to_char(ev.starts_at at time zone 'Asia/Dubai', 'HH24:MI') end;
+    detail  := coalesce(
+      case when ev.opponent is not null then 'v ' || ev.opponent end,
+      nullif(ev.title, ''), 'Match');
+
+    perform net.http_post(
+      url     := endpoint,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                                    'x-approval-secret', secret),
+      body    := jsonb_build_object('availability_nudge', jsonb_build_object(
+                   'event_id', ev.id,
+                   'batch_id', v_batch,
+                   'title', 'Availability needed' || coalesce(' — ' || squad, ''),
+                   'body',  detail || ' · ' || whenish,
+                   'path',  '/schedule',
+                   'tag',   'availability-' || ev.id)));
+
+    n_sent := n_sent + n_people;
+  end loop;
+
+  return n_sent;
+exception when others then
+  raise warning 'send_availability_nudges: %', sqlerrm;
+  return n_sent;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.send_fixture_push(uuid, uuid, uuid, text, events)
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.send_fixture_push(_club uuid, _team uuid, _actor uuid, _headline text, _event events)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare endpoint text; secret text; squad text; detail text; whenish text;
+begin
+  select decrypted_secret into endpoint from vault.decrypted_secrets where name = 'push_notify_url';
+  select decrypted_secret into secret   from vault.decrypted_secrets where name = 'approval_notify_secret';
+  if endpoint is null or secret is null then
+    raise warning 'send_fixture_push: vault secrets missing, no push sent';
+    return;
+  end if;
+
+  select t.name into squad from teams t where t.id = _team;
+
+  whenish := to_char(_event.starts_at at time zone 'Asia/Dubai', 'Dy DD Mon')
+             || case when _event.time_tbd then ', time TBC'
+                     else ', ' || to_char(_event.starts_at at time zone 'Asia/Dubai', 'HH24:MI') end;
+
+  detail := coalesce(
+    case when _event.type = 'match' and _event.opponent is not null then 'v ' || _event.opponent end,
+    nullif(_event.title, ''), initcap(_event.type));
+
+  perform net.http_post(
+    url     := endpoint,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-approval-secret', secret),
+    body    := jsonb_build_object('squad_push', jsonb_build_object(
+                 'club_id', _club, 'team_id', _team, 'actor_id', _actor,
+                 'category', 'fixture',
+                 'title', _headline || coalesce(' — ' || squad, ''),
+                 'body',  detail || ' · ' || whenish,
+                 'path',  '/schedule',
+                 'tag',   'fixture-' || _event.id)));
+exception when others then
+  raise warning 'send_fixture_push: %', sqlerrm;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.send_signup_nudges(boolean)
+-- proacl: {postgres=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.send_signup_nudges(_dry boolean DEFAULT false)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+  people   jsonb;
+  n        int := 0;
+  total    int := 0;
+  step     int;
+begin
+  select decrypted_secret into endpoint
+    from vault.decrypted_secrets where name = 'signup_nudge_url';
+  select decrypted_secret into secret
+    from vault.decrypted_secrets where name = 'approval_notify_secret';
+
+  if not _dry and (endpoint is null or secret is null) then
+    raise warning 'send_signup_nudges: vault secrets missing, nothing sent';
+    return 0;
+  end if;
+
+  foreach step in array array[1, 2] loop
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'email', c.email, 'first_name', c.first_name, 'nudge_no', step)), '[]'::jsonb),
+           count(*)
+      into people, n
+      from private.unfinished_signup_candidates(step) as c;
+
+    if n = 0 then
+      continue;
+    end if;
+
+    total := total + n;
+    if _dry then
+      continue;
+    end if;
+
+    insert into public.signup_nudges (profile_id, nudge_no)
+    select c.profile_id, step
+      from private.unfinished_signup_candidates(step) as c
+    on conflict (profile_id, nudge_no) do nothing;
+
+    perform net.http_post(
+      url     := endpoint,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                                    'x-approval-secret', secret),
+      body    := jsonb_build_object('people', people));
+  end loop;
+
+  return total;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.stamp_feedback()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.stamp_feedback()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  _club uuid;
+begin
+  select m.club_id into _club
+    from public.memberships m
+   where m.profile_id = auth.uid()
+     and m.status = 'active'
+   order by m.created_at
+   limit 1;
+
+  if _club is null then
+    raise exception 'no active membership: cannot file feedback'
+      using errcode = '42501';
+  end if;
+
+  new.club_id      := _club;
+  new.submitted_by := auth.uid();
+  new.status       := 'new';
+  new.handled_by   := null;
+  new.handled_at   := null;
+  new.created_at   := now();
+
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.touch_lineup()
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.touch_lineup()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.unfinished_signup_candidates(integer)
+-- proacl: {postgres=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.unfinished_signup_candidates(_nudge_no integer)
+ RETURNS TABLE(profile_id uuid, email text, first_name text)
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select u.id,
+         u.email::text,
+         coalesce(nullif(trim(p.first_name), ''), '')::text
+    from auth.users u
+    join public.profiles p on p.id = u.id
+   where u.email_confirmed_at is not null
+     and u.email is not null
+     and u.created_at < now() - case when _nudge_no = 1
+                                     then interval '24 hours'
+                                     else interval '7 days' end
+     and not exists (select 1 from public.memberships m where m.profile_id = u.id)
+     and not exists (
+       select 1 from public.access_requests ar
+        where ar.profile_id = u.id
+          and (ar.requested_role = 'volunteer' or ar.status = 'dismissed'))
+     and not exists (
+       select 1 from public.signup_nudges sn
+        where sn.profile_id = u.id and sn.nudge_no = _nudge_no)
+     -- ⚠️ THE SECOND NEVER ARRIVES WITHOUT THE FIRST, *AND NOT IN THE SAME RUN
+     -- AS IT*. The sent_at test is the whole of this migration.
+     and (_nudge_no = 1
+          or exists (select 1 from public.signup_nudges sn
+                      where sn.profile_id = u.id
+                        and sn.nudge_no = 1
+                        and sn.sent_at < now() - interval '6 days'));
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.approval_push_subscriptions(uuid)
+-- proacl: {postgres=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.approval_push_subscriptions(_membership uuid)
+ RETURNS TABLE(id uuid, endpoint text, p256dh text, auth text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select s.id, s.endpoint, s.p256dh, s.auth
+    from memberships req
+    cross join lateral
+      private.approval_audience(req.club_id, req.team_id, req.profile_id) as aud(profile_id)
+    join push_subscriptions s on s.profile_id = aud.profile_id
+   where req.id = _membership
+     and req.status = 'pending'
+     and not exists (
+       select 1 from notification_opt_outs o
+        where o.profile_id = aud.profile_id
+          and o.category = 'approval');
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.availability_push_subscriptions(uuid, uuid)
+-- proacl: {postgres=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.availability_push_subscriptions(_event uuid, _batch uuid)
+ RETURNS TABLE(id uuid, endpoint text, p256dh text, auth text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select s.id, s.endpoint, s.p256dh, s.auth
+    from availability_nudges n
+    join push_subscriptions s on s.profile_id = n.profile_id
+   where n.event_id = _event and n.batch_id = _batch;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.get_push_vapid_private_key()
+-- proacl: {postgres=X/postgres,service_role=X/postgres}
+-- ⚠️ A VAULT READ BEHIND A FUNCTION: service_role only. If this ever
+-- gains an authenticated grant, every member can mint club push traffic.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_push_vapid_private_key()
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select decrypted_secret from vault.decrypted_secrets where name = 'push_vapid_private_key';
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.link_my_parent_rows()
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.link_my_parent_rows()
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  caller_email text;
+  confirmed_at timestamptz;
+  linked       integer;
+begin
+  if auth.uid() is null then
+    raise exception 'You must be signed in.' using errcode = '42501';
+  end if;
+
+  select email, email_confirmed_at into caller_email, confirmed_at
+    from auth.users where id = auth.uid();
+
+  if nullif(btrim(caller_email), '') is null or confirmed_at is null then
+    return 0;
+  end if;
+
+  update public.player_parents pp
+     set profile_id = auth.uid()
+   where pp.profile_id is null
+     and lower(btrim(pp.email)) = lower(btrim(caller_email));
+
+  get diagnostics linked = row_count;
+  return linked;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.notice_push_subscriptions(uuid)
+-- proacl: {postgres=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.notice_push_subscriptions(_announcement uuid)
+ RETURNS TABLE(id uuid, endpoint text, p256dh text, auth text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with asked as (
+    select * from announcements where id = _announcement
+  ),
+  siblings as (
+    select an.*
+      from announcements an
+      join asked a
+        on (a.group_id is not null and an.group_id = a.group_id)
+        or (a.group_id is null and an.id = a.id)
+  ),
+  people as (
+    select distinct aud.profile_id
+      from siblings s
+      cross join lateral private.notice_audience(s.club_id, s.team_id) as aud(profile_id)
+  )
+  select s.id, s.endpoint, s.p256dh, s.auth
+    from people p
+    join push_subscriptions s on s.profile_id = p.profile_id
+    cross join asked a
+   where p.profile_id <> a.author_id
+     and (a.expires_at is null or a.expires_at > now())
+     and not exists (
+       select 1 from notification_opt_outs o
+        where o.profile_id = p.profile_id and o.category = 'notice');
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.set_my_photo_focus(smallint, smallint)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_my_photo_focus(_focus_x smallint, _focus_y smallint)
+ RETURNS profiles
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  updated public.profiles;
+begin
+  if auth.uid() is null then
+    raise exception 'You must be signed in.' using errcode = '42501';
+  end if;
+
+  update public.profiles
+     set photo_focus_x = _focus_x,
+         photo_focus_y = _focus_y
+   where id = auth.uid()
+  returning * into updated;
+
+  if not found then
+    raise exception 'No profile for the signed-in user.' using errcode = 'P0002';
+  end if;
+
+  return updated;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.set_own_player_photo_focus(uuid, smallint, smallint)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_own_player_photo_focus(_player uuid, _focus_x smallint, _focus_y smallint)
+ RETURNS players
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  updated public.players;
+begin
+  if not private.is_own_player(_player) then
+    raise exception 'You can only change a photo for your own player.'
+      using errcode = '42501';
+  end if;
+
+  update public.players
+     set photo_focus_x = _focus_x,
+         photo_focus_y = _focus_y
+   where id = _player
+  returning * into updated;
+
+  return updated;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.set_staff_photo(uuid, text, smallint, smallint)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_staff_photo(_profile uuid, _photo_path text, _focus_x smallint DEFAULT NULL::smallint, _focus_y smallint DEFAULT NULL::smallint)
+ RETURNS profiles
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  updated public.profiles;
+begin
+  if not private.may_set_staff_photo(_profile) then
+    raise exception 'Only a club admin can set that person''s photo.'
+      using errcode = '42501';
+  end if;
+
+  if _photo_path is not null
+     and private.staff_photo_owner(_photo_path) is distinct from _profile then
+    raise exception 'A photo key must live under that person''s id.'
+      using errcode = '42501';
+  end if;
+
+  update public.profiles
+     set photo_path = _photo_path,
+         photo_focus_x = _focus_x,
+         photo_focus_y = _focus_y
+   where id = _profile
+  returning * into updated;
+
+  if not found then
+    raise exception 'No such profile.' using errcode = 'P0002';
+  end if;
+
+  return updated;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.squad_push_subscriptions(uuid, uuid, uuid, text)
+-- proacl: {postgres=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.squad_push_subscriptions(_club uuid, _team uuid, _actor uuid, _category text)
+ RETURNS TABLE(id uuid, endpoint text, p256dh text, auth text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select s.id, s.endpoint, s.p256dh, s.auth
+    from private.notice_audience(_club, _team) as aud(profile_id)
+    join push_subscriptions s on s.profile_id = aud.profile_id
+   where (_actor is null or aud.profile_id <> _actor)
+     and not exists (select 1 from notification_opt_outs o
+                      where o.profile_id = aud.profile_id and o.category = _category);
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.pitch_occupancy(timestamptz, timestamptz)   (22 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- Captured from live AFTER 20260822_pitch_occupancy was applied — the
+-- service_role execute arrived via default privileges, not the migration.
+-- The redacted club-wide booking read for squad staff; see the migration
+-- header for why this is a function and not a wider `event read` policy.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.pitch_occupancy(_from timestamp with time zone, _to timestamp with time zone)
+ RETURNS TABLE(id uuid, team_id uuid, team_name text, type text, starts_at timestamp with time zone, ends_at timestamp with time zone, pitch text, group_id uuid)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
   select e.id, e.team_id, t.name, e.type, e.starts_at, e.ends_at, e.pitch, e.group_id
-  from events e join teams t on t.id = e.team_id
-  where e.starts_at >= _from and e.starts_at < _to
-    and exists (select 1 from memberships m
-      where m.profile_id = auth.uid() and m.status = 'active'
-        and (m.role = 'admin' or (m.role in ('coach','manager','medic') and m.team_id is not null)));
+  from events e
+  join teams t on t.id = e.team_id
+  where e.starts_at >= _from
+    and e.starts_at < _to
+    and exists (
+      select 1 from memberships m
+      where m.profile_id = auth.uid()
+        and m.status = 'active'
+        and (m.role = 'admin'
+             or (m.role in ('coach','manager','medic') and m.team_id is not null))
+    );
 $function$
 ;
-
-REVOKE EXECUTE ON FUNCTION public.pitch_occupancy(timestamptz, timestamptz) FROM public;
-REVOKE EXECUTE ON FUNCTION public.pitch_occupancy(timestamptz, timestamptz) FROM anon;
-GRANT EXECUTE ON FUNCTION public.pitch_occupancy(timestamptz, timestamptz) TO authenticated;

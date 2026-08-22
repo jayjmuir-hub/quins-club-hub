@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- **The pitch calendar for coaches** (`/pitch-calendar`): read-only
+- **Schema re-capture: 29 live functions had NO entry in
+  `db/schema/functions.sql`.** Every re-capture since 11 Aug was selective,
+  so functions added by other work — the push pipeline, the nudges,
+  feedback, photo focus — accumulated silently. All 29 captured verbatim
+  from `pg_get_functiondef`, md5-verified against live per block, proacl
+  noted per entry; `pitch_occupancy` normalized from live at the same
+  time. Bodies of earlier entries were deliberately NOT re-verified — each
+  entry's own capture date still governs it.
+- `fb0135a` — **The pitch calendar for coaches** (`/pitch-calendar`): read-only
   week/month view of every squad's bookings, fed by the new
   `pitch_occupancy` SECURITY DEFINER function
   (`db/migrations/20260822_pitch_occupancy.sql`) — redacted rows (squad
