@@ -859,9 +859,15 @@ export default function Dashboard() {
           admins already have /admin, and parents/players have nothing behind
           this link, so showing it to them would be a dead end. Costs nothing
           when it does not apply, same argument as the two blocks above.
-          claude/plans/2026-08-21-squad-hub.md. */}
+          claude/plans/2026-08-21-squad-hub.md.
+          ⚠️ desktop:hidden, NOT removed (22 Aug 2026, Jay): the desktop
+          sidebar already carries Squad Hub, so there this card is a
+          duplicate — but the mobile tab bar (Nav.jsx: Home / Schedule /
+          Roster / More) has no Squad Hub entry, so on a phone this card is
+          a squad staff member's ONLY way in. Delete it outright and mobile
+          coaches are stranded. */}
       {memberships?.some((m) => isSquadStaffRole(m.role) && m.team_id) && (
-        <Card className="mb-4 p-4">
+        <Card className="mb-4 p-4 desktop:hidden">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <h3 className="text-[15px] font-extrabold text-ink">Squad Hub</h3>
