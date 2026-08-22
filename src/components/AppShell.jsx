@@ -9,6 +9,7 @@ import NamePrompt from './NamePrompt.jsx'
 import RollCall from './RollCall.jsx'
 // ViewAsBanner only — the switcher itself moved to the Admin screen on
 // 7 Aug 2026. See the long note at its old call site below.
+import PaintDebug from './PaintDebug.jsx'
 import Sidebar from './Sidebar.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
 import { ViewAsBanner, ViewAsSwitcher } from './ViewAsSwitcher.jsx'
@@ -247,6 +248,9 @@ export default function AppShell({ children }) {
           the sidebar is a fixed element whose DOM position does not affect
           its paint. */}
       <Sidebar showSquadHub={showSquadHub} showAdmin={isAdmin(memberships)} />
+      {/* Diagnostic overlay, flag-gated — see its header. Mounted in the
+          shell so it renders on EVERY screen once armed. */}
+      <PaintDebug />
 
       {/* Banner + masthead stick together as ONE unit. The banner has to sit
           above the header and stay visible (spec §1: persistent, unmissable),
