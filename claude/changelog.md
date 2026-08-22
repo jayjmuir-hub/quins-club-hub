@@ -10,10 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- Import skips players already on the roster — a third state beside
+- 📓 **Handoff: the sidebar day, and the import rethink**
+  (`claude/handoffs/2026-08-22-sidebar-day-and-the-import-rethink.md`) —
+  #305–#317 in order, six ranked lessons (the selective-re-capture rot and
+  its audit query; the 16-event fixture that passed against the
+  re-injected bug), and the closing cleanup.
+- `50d1458` — Import skips players already on the roster — a third state beside
   ready and needs-fixing ("N already there", muted, never inserted),
   matched per squad, case- and whitespace-insensitively. Until now a
-  re-pasted sheet doubled the squad with a green tick on every row.
+  re-pasted sheet doubled the squad with a green tick on every row (#317).
 - `415960b` — **Player import rethink** (Jay: "complicated and not user friendly",
   after a 38-row paste failed whole): columns are now classified by
   CONTENT, not position — squad names, positions (with a real-world

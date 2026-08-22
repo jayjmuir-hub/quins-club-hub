@@ -43,10 +43,21 @@ is the record of what ships; §0 and the body are history where they
 disagree.
 
 🏉 **THE SQUAD HUB IS LIVE** — `/squad`, the coach/manager dashboard:
-availability-vs-attendance tracking, RSVP chips, match-sheet chasers,
-squad notices, event drill-in. `claude/plans/2026-08-21-squad-hub.md`.
-No real coach has used the tracking grid yet; the first one's reaction is
-the thing to watch.
+availability-vs-attendance tracking across the WHOLE season, RSVP chips,
+match-sheet chasers, event drill-in, and its own section in the desktop
+sidebar (Overview / Build a Match Roster / Training Plans) with the same
+doors as hub cards on the phone, where it is also on the tab bar.
+`claude/plans/2026-08-21-squad-hub.md`. No real coach has used the
+tracking grid yet; the first one's reaction is the thing to watch.
+
+🗓️ **Coaches can see every squad's pitch bookings** at `/pitch-calendar`
+(read-only, redacted — `public.pitch_occupancy`, applied and harnessed).
+Requests still go through the fixture; allocation stays admin-only.
+
+📋 **The importer reads columns by content, any order**, has a squad
+picker for name-only pastes, and skips players already on the roster.
+The first real bulk import since the rethink is the thing to watch — the
+accepted residue is that an unknown word next to a name joins it, visibly.
 
 **Current phase: onboarding, and the fixes it throws up.** Not new
 infrastructure. The last four features found their bugs within hours of a real
