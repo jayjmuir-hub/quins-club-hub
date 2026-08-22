@@ -17,6 +17,7 @@ import userEvent from '@testing-library/user-event'
 const setAdminRightsMock = vi.fn()
 
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   setAdminRights: (...args) => setAdminRightsMock(...args),
 }))
 

@@ -25,6 +25,7 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 }))
 
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   createInvite: (...args) => createInviteMock(...args),
 }))
 

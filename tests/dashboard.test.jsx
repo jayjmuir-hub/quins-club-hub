@@ -38,6 +38,7 @@ vi.mock('../src/lib/auth.jsx', () => ({
 }))
 
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   getMyProfile: vi.fn().mockResolvedValue({
     id: 'profile-1',
     first_name: 'Jay',

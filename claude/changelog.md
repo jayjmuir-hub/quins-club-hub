@@ -10,9 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- Roster gets its sidebar section, staff-only: Add a player and Import
+- The sidebar's Admin item wears a count badge: pending memberships plus
+  undecided access requests (`countAdminWaiting`, two head-only count
+  queries), fetched once per shell mount for admins only. Zero renders
+  nothing; a failed count costs only the badge.
+- `e0db33a` — Roster gets its sidebar section, staff-only: Add a player and Import
   players as `?open=` deep-links, and Game time — which keeps the section
-  open, so its screen does not orphan the menu. Parents see no children.
+  open, so its screen does not orphan the menu. Parents see no children (#310).
 - `a40464d` — **Training Plans, squad-level** (`/squad/:teamId/training`): the
   coach-facing read of published sessions — upcoming training with a
   "Planned · N blocks · M min" badge per row, each opening the same

@@ -69,6 +69,7 @@ vi.mock('../src/data/players.js', () => ({
 // tests/admin-dashboard.test.jsx and tests/accounts.test.jsx; here they only
 // have to be the thing each route renders.
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   listClubMembers: () => new Promise(() => {}),
   listPendingProfiles: () => new Promise(() => {}),
   grantMemberships: () => new Promise(() => {}),

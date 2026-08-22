@@ -40,6 +40,7 @@ vi.mock('../src/lib/auth.jsx', () => ({
 }))
 
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   listClubMembers: (...args) => listClubMembersMock(...args),
   listPendingProfiles: (...args) => listPendingProfilesMock(...args),
   grantMemberships: (...args) => grantMembershipsMock(...args),

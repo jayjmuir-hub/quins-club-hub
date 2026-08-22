@@ -38,6 +38,7 @@ vi.mock('../src/lib/auth.jsx', () => ({
 }))
 
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   getMyProfile: (...a) => getMyProfileMock(...a),
   // The You card's writer (8 Aug 2026). Mocked, like every other data
   // function in this file — nothing here reaches a Supabase client.

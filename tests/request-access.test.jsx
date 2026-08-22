@@ -27,6 +27,7 @@ const createAccessRequestMock = vi.fn()
 const listSquadsMock = vi.fn()
 
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   getMyProfile: (...args) => getMyProfileMock(...args),
   updateProfileNames: (...args) => updateProfileNamesMock(...args),
 }))

@@ -624,6 +624,12 @@ export async function confirmNoRole({ profileId } = {}) {
   return { id: profileId, no_role_confirmed_at: '2026-08-16T12:00:00.000Z' }
 }
 
+// The sidebar's Admin badge count — a fixed 3, so any admin scenario shows
+// the badge in its non-empty state without a scenario knob for it.
+export async function countAdminWaiting() {
+  return 3
+}
+
 // The fourth gate step's write. ⚠️ Echoes a PENDING row, because that is what
 // the real RPC creates and the distinction is the whole safety property — a
 // stub returning 'active' would make a harness scenario show squad data the

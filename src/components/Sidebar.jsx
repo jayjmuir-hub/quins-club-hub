@@ -1,5 +1,6 @@
-import { Fragment } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
+import { countAdminWaiting } from '../data/members.js'
 import { NAV_ITEMS, SquadIcon } from './Nav.jsx'
 import crest from '../assets/crest.png'
 
@@ -61,6 +62,24 @@ function itemClassName({ isActive }) {
 
 export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
   const location = useLocation()
+
+  // The Admin item's badge: how many approvals and access requests are
+  // waiting (22 Aug 2026, Jay — "the number an admin opens the app for").
+  // Fetched once per shell mount, admins only; a failed count costs the
+  // badge and nothing else, and 0 renders nothing rather than a zero.
+  const [adminWaiting, setAdminWaiting] = useState(0)
+  useEffect(() => {
+    if (!showAdmin) return undefined
+    let mounted = true
+    countAdminWaiting()
+      .then((count) => {
+        if (mounted) setAdminWaiting(count)
+      })
+      .catch(() => {})
+    return () => {
+      mounted = false
+    }
+  }, [showAdmin])
 
   // Sub-menus (22 Aug 2026, Jay). Only the ACTIVE section expands — a
   // coach-admin's sidebar with every section open would be a wall — and every
@@ -138,6 +157,18 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
               <NavLink to={to} end={end} className={itemClassName}>
                 <Icon className="h-[19px] w-[19px] shrink-0" aria-hidden="true" />
                 <span>{label}</span>
+                {/* White pill so it reads on BOTH row states — dark chrome
+                    idle and brand-red active. aria-label carries the meaning
+                    a bare number does not. */}
+                {to === '/admin' && adminWaiting > 0 && (
+                  <span
+                    data-testid="admin-waiting-badge"
+                    aria-label={`${adminWaiting} waiting for review`}
+                    className="ml-auto rounded-full bg-white px-2 py-0.5 text-[11px] font-bold leading-4 text-brand-ink"
+                  >
+                    {adminWaiting}
+                  </span>
+                )}
               </NavLink>
               {children.length > 0 && (
                 <div className="ml-[22px] flex flex-col gap-0.5 border-l border-white/10 pl-2" data-testid={`submenu${to.replaceAll('/', '-')}`}>
