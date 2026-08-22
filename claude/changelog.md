@@ -10,7 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- **Player import rethink** (Jay: "complicated and not user friendly",
+- Import skips players already on the roster — a third state beside
+  ready and needs-fixing ("N already there", muted, never inserted),
+  matched per squad, case- and whitespace-insensitively. Until now a
+  re-pasted sheet doubled the squad with a green tick on every row.
+- `415960b` — **Player import rethink** (Jay: "complicated and not user friendly",
   after a 38-row paste failed whole): columns are now classified by
   CONTENT, not position — squad names, positions (with a real-world
   synonym map: winger, scrum half, loosehead…) and gender tokens are
@@ -19,7 +23,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   works. A squad picker above the box makes a plain list of names a
   valid import. Unknown values away from the name error loudly; the
   accepted trade-off (an unknown word NEXT to the name joins it,
-  visibly) is stated as a test.
+  visibly) is stated as a test (#316).
 - `559c8d8` — **Schema re-capture: 29 live functions had NO entry in
   `db/schema/functions.sql`.** Every re-capture since 11 Aug was selective,
   so functions added by other work — the push pipeline, the nudges,

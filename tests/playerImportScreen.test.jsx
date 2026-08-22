@@ -84,6 +84,27 @@ describe('Import — availability', () => {
   })
 })
 
+describe('Import — players already on the roster (22 Aug 2026)', () => {
+  it('skips a re-pasted player, muted and counted separately, and never sends them', async () => {
+    // The roster the screen opened with already holds Tom.
+    listPlayersMock.mockResolvedValue([
+      { id: 'p-tom', club_id: 'club-1', team_id: 'team-u10', full_name: 'Tom Fletcher', position: 'Flanker' },
+    ])
+    const user = userEvent.setup()
+    await openImport(user)
+    await paste(user, 'Tom Fletcher,Flanker,U10{enter}Amy Rose,Wing,U12')
+
+    expect(await screen.findByTestId('import-valid')).toHaveTextContent('1 ready to add')
+    expect(screen.getByTestId('import-skipped')).toHaveTextContent('1 already there')
+    expect(screen.queryByTestId('import-invalid')).not.toBeInTheDocument()
+    expect(screen.getByTestId('import-row-existing')).toHaveTextContent('Already on the roster — skipped')
+
+    await user.click(screen.getByTestId('import-submit'))
+    await waitFor(() => expect(insertPlayersMock).toHaveBeenCalledTimes(1))
+    expect(insertPlayersMock.mock.calls[0][0].map((row) => row.full_name)).toEqual(['Amy Rose'])
+  })
+})
+
 describe('Import — the squad picker (22 Aug 2026 rethink)', () => {
   it('a plain list of names imports once a squad is picked', async () => {
     const user = userEvent.setup()

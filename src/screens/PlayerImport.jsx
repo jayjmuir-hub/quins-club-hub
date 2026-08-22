@@ -26,7 +26,10 @@ const CELL = 'border-t border-line px-2.5 py-1.5 text-[13px] align-top'
 // long form would suggest the short one is not accepted.
 const EXAMPLE = 'Tom Fletcher\tFlanker\tU10\tM\nAmy Rose\tWing\tU12\tF'
 
-export default function PlayerImport({ onClose, onImported }) {
+// `existingPlayers` is the roster the opening screen already holds — no
+// second query — and it is what stops a re-pasted sheet doubling a squad
+// (Jay, 22 Aug 2026: "if I import players who already exist, then what?").
+export default function PlayerImport({ onClose, onImported, existingPlayers = [] }) {
   const { memberships, teams } = useMemberships()
   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
   const clubId = memberships.find((m) => m.club_id)?.club_id ?? null
@@ -54,8 +57,9 @@ export default function PlayerImport({ onClose, onImported }) {
       teams: scopedTeams,
       canEditTeam: (teamId) => canEditTeam(memberships, teamId),
       defaultTeamId: defaultTeamId || null,
+      existingPlayers,
     }),
-    [text, scopedTeams, memberships, defaultTeamId],
+    [text, scopedTeams, memberships, defaultTeamId, existingPlayers],
   )
 
   const hasInput = text.trim() !== ''
@@ -144,6 +148,11 @@ export default function PlayerImport({ onClose, onImported }) {
                     {parsed.invalidCount} need fixing
                   </span>
                 )}
+                {parsed.skippedCount > 0 && (
+                  <span data-testid="import-skipped" className="font-bold text-ink-muted">
+                    {parsed.skippedCount} already there
+                  </span>
+                )}
                 {parsed.headerSkipped && (
                   <span className="text-ink-faint">Header row ignored</span>
                 )}
@@ -170,13 +179,20 @@ export default function PlayerImport({ onClose, onImported }) {
                     {parsed.rows.map((row) => (
                       <tr
                         key={row.lineNo}
-                        data-testid={row.ok ? 'import-row-ok' : 'import-row-bad'}
-                        className={row.ok ? '' : 'bg-danger-bg'}
+                        data-testid={row.ok ? 'import-row-ok' : row.existing ? 'import-row-existing' : 'import-row-bad'}
+                        // Already-there rows are muted, not red: nothing is
+                        // wrong with them, they are simply done.
+                        className={row.ok ? '' : row.existing ? 'bg-surface-mute text-ink-muted' : 'bg-danger-bg'}
                       >
                         <td className={`${CELL} tabular-nums text-ink-faint`}>{row.lineNo}</td>
-                        <td className={`${CELL} font-semibold text-ink`}>
+                        <td className={`${CELL} font-semibold ${row.existing ? 'text-ink-muted' : 'text-ink'}`}>
                           {row.full_name || <span className="text-ink-faint">—</span>}
-                          {!row.ok && (
+                          {row.existing && (
+                            <span className="mt-0.5 block text-[12px] font-semibold text-ink-muted">
+                              Already on the roster — skipped
+                            </span>
+                          )}
+                          {!row.ok && !row.existing && (
                             <span className="mt-0.5 block text-[12px] font-semibold text-danger-ink">
                               {row.errors.join('. ')}
                             </span>

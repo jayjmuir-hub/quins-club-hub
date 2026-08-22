@@ -91,6 +91,11 @@ function looksLikeHeader(cells) {
   return filled.every((c) => HEADER_WORDS.has(c.toLowerCase()))
 }
 
+// The roster-identity key: case- and whitespace-insensitive name, per squad.
+// Shared by the already-on-the-roster check and the within-paste duplicate
+// check, so "TOM  FLETCHER" and "Tom Fletcher" are the same child in both.
+const nameKey = (name) => String(name ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+
 /**
  * Parses pasted roster text into rows ready for preview.
  *
@@ -119,6 +124,15 @@ function looksLikeHeader(cells) {
  * @param {string} [options.defaultTeamId]  the squad the screen's picker has
  *   selected: rows naming NO squad fall back to it, so a plain list of names
  *   is a valid import. A row naming its own squad still wins.
+ * @param {Array}  [options.existingPlayers]  [{ full_name, team_id }] already
+ *   on the roster. A pasted row matching one (same squad, name compared
+ *   case- and whitespace-insensitively) is SKIPPED — a third state beside
+ *   ready and needs-fixing, counted as `skippedCount`, never inserted, and
+ *   not red: re-pasting an updated sheet is ordinary, not an error. Until
+ *   22 Aug 2026 nothing checked this and a second paste doubled the squad
+ *   with a green tick on every row. A genuine namesake in the same squad is a
+ *   deliberate act for the single-player form, where the existing child is
+ *   visible first.
  *
  * @returns {{rows: Array, delimiter: string, headerSkipped: boolean,
  *           validCount: number, invalidCount: number}}
@@ -126,7 +140,10 @@ function looksLikeHeader(cells) {
  *   `lineNo` is 1-based against the ORIGINAL paste including blanks and the
  *   header, so an error message can point the user at the line they can see.
  */
-export function parsePlayerPaste(text, { teams = [], canEditTeam, defaultTeamId = null } = {}) {
+export function parsePlayerPaste(
+  text,
+  { teams = [], canEditTeam, defaultTeamId = null, existingPlayers = [] } = {},
+) {
   const normalised = normaliseText(text)
   const delimiter = detectDelimiter(normalised)
 
@@ -137,6 +154,9 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam, defaultTeamId 
     teams.map((t) => [String(t.name ?? '').trim().toLowerCase(), t]),
   )
   const defaultTeam = teams.find((t) => t.id === defaultTeamId) ?? null
+  const existingKeys = new Set(
+    existingPlayers.map((player) => `${nameKey(player.full_name)}::${player.team_id}`),
+  )
 
   const rawLines = normalised.split(/\r\n|\n|\r/)
   const rows = []
@@ -257,7 +277,19 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam, defaultTeamId 
       teamName: team?.name ?? teamCellText,
       errors,
       ok: errors.length === 0,
+      existing: false,
     })
+  })
+
+  // Already on the roster: checked before the within-paste duplicate pass so
+  // that a re-pasted sheet reads "35 ready · 3 already there", not as 3
+  // duplicates of lines that are not in the paste at all.
+  rows.forEach((row) => {
+    if (!row.ok) return
+    if (existingKeys.has(`${nameKey(row.full_name)}::${row.team_id}`)) {
+      row.existing = true
+      row.ok = false
+    }
   })
 
   // Duplicate detection runs across the whole paste, after per-row parsing,
@@ -266,7 +298,7 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam, defaultTeamId 
   const seen = new Map()
   rows.forEach((row) => {
     if (!row.ok) return
-    const key = `${row.full_name.toLowerCase()}::${row.team_id}`
+    const key = `${nameKey(row.full_name)}::${row.team_id}`
     if (seen.has(key)) {
       row.errors.push(`Duplicate of line ${seen.get(key)}`)
       row.ok = false
@@ -280,7 +312,9 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam, defaultTeamId 
     delimiter,
     headerSkipped,
     validCount: rows.filter((r) => r.ok).length,
-    invalidCount: rows.filter((r) => !r.ok).length,
+    // Skipped rows are neither: they are fine, and already done.
+    invalidCount: rows.filter((r) => !r.ok && !r.existing).length,
+    skippedCount: rows.filter((r) => r.existing).length,
   }
 }
 
