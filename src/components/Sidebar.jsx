@@ -109,11 +109,15 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
           ]
         : []
     }
-    if (to === '/schedule' && location.pathname.startsWith('/schedule')) {
+    // /pitch-calendar keeps the Schedule section open — same rule as
+    // /game-time under Roster: a section must not collapse under its own
+    // routed child and leave nothing lit.
+    if (to === '/schedule' && (location.pathname.startsWith('/schedule') || location.pathname.startsWith('/pitch-calendar'))) {
       return [
         // `action: true` = a deep-link that opens a sheet on the screen, not a
         // place you can BE — so it never renders as the active item.
         ...(showSquadHub ? [{ to: '/schedule?open=add-event', label: 'Add an event', action: true }] : []),
+        ...(showSquadHub ? [{ to: '/pitch-calendar', label: 'Pitch calendar' }] : []),
         { to: '/schedule?open=subscribe', label: 'Add to calendar', action: true },
       ]
     }

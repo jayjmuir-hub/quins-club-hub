@@ -10,10 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- Game time moved from More to the Squad Hub's front doors — its audience
+- **The pitch calendar for coaches** (`/pitch-calendar`): read-only
+  week/month view of every squad's bookings, fed by the new
+  `pitch_occupancy` SECURITY DEFINER function
+  (`db/migrations/20260822_pitch_occupancy.sql`) — redacted rows (squad
+  name, type, times, pitch, group_id; no titles or opponents) because
+  `event read` RLS deliberately scopes the events table to the reader's
+  own squads. Squad staff and admins only, refuse-by-empty. Sidebar
+  Schedule section + a hub Pitches card for phones. Harness:
+  `db/tests/pitch-occupancy.sql`, proven green in a rolled-back
+  transaction against production before application.
+- `5f3ffe6` — Game time moved from More to the Squad Hub's front doors — its audience
   is the hub's, the hub is on the phone's tab bar, and the More card had
   become a third entry point. The link stays squad-less: the screen is
-  cross-squad by design.
+  cross-squad by design (#313).
 - `fc040ec` — The tracking numbers count the WHOLE season: the `.slice(-30)` pre-trim
   is gone from Squad Hub's "Who said, who showed", so %, no-shows, the
   squad summary ("across N events this season") and the phone drill-in

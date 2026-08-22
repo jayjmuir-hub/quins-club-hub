@@ -129,12 +129,22 @@ describe('Schedule sub-menu', () => {
       'href',
       '/schedule?open=subscribe',
     )
+    expect(within(submenu).getByRole('link', { name: 'Pitch calendar' })).toHaveAttribute(
+      'href',
+      '/pitch-calendar',
+    )
   })
 
-  it('hides Add an event from people without the Squad Hub gate', () => {
+  it('stays expanded on /pitch-calendar — same rule as /game-time under Roster', () => {
+    renderAt('/pitch-calendar')
+    expect(screen.getByTestId('submenu-schedule')).toBeInTheDocument()
+  })
+
+  it('hides Add an event and Pitch calendar from people without the Squad Hub gate', () => {
     renderAt('/schedule', { showSquadHub: false })
     const submenu = screen.getByTestId('submenu-schedule')
     expect(within(submenu).queryByRole('link', { name: 'Add an event' })).not.toBeInTheDocument()
+    expect(within(submenu).queryByRole('link', { name: 'Pitch calendar' })).not.toBeInTheDocument()
     expect(within(submenu).getByRole('link', { name: 'Add to calendar' })).toBeInTheDocument()
   })
 })

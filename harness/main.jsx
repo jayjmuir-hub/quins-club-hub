@@ -5,6 +5,7 @@ import AppShell from '../src/components/AppShell.jsx'
 import SquadHub from '../src/screens/SquadHub.jsx'
 import MatchRosterPicker from '../src/screens/MatchRosterPicker.jsx'
 import SquadTraining from '../src/screens/SquadTraining.jsx'
+import PitchGlance from '../src/screens/PitchGlance.jsx'
 import { Routes as RRoutes, Route as RRoute } from 'react-router-dom'
 import NoticeBoard from '../src/components/NoticeBoard.jsx'
 import { applyTheme, watchSystemTheme } from '../src/lib/theme.js'
@@ -1111,6 +1112,19 @@ const params = new URLSearchParams(window.location.search)
 const scenario = params.get('scenario') || 'login'
 // The Squad Hub, at its real route so useParams resolves — added 21 Aug
 // 2026 to reproduce the dark-mode player-history sheet on a REAL renderer.
+// The coach's read-only pitch calendar (22 Aug 2026). The stub occupancy
+// carries one genuine D2 clash and one group-shared A1 fan-out, so both
+// marking states render.
+scenarios['pitch-glance'] = () => (
+  <Shell
+    route="/pitch-calendar"
+    authValue={baseAuth(COACH_EMAIL)}
+    membershipValue={{ memberships: COACH_MEMBERSHIPS, teams: TEAMS, loading: false, error: null, reload: noop }}
+  >
+    <PitchGlance />
+  </Shell>
+)
+
 scenarios.squadhub = () => (
   <Shell
     route="/squad/t1"
