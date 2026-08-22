@@ -106,6 +106,12 @@ const SCENARIOS = [
   'dashboard',
   'dashboard-admin',
   'dashboard-parent',
+  // The Squad Hub, coach and ADMIN. The admin variant carries all fifteen
+  // squads, which is what makes the header's switcher row an overflow risk
+  // at all — shrink-0 on it held ~1127px and blew a 360px phone's document
+  // out to 1142 (Jay's device, 22 Aug 2026, named by the paint-debug box).
+  'squadhub',
+  'squadhub-admin',
   'overview-admin',
   'overview-coach',
   'playerform',
