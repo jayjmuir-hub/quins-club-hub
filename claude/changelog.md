@@ -10,6 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
+- 📱 **THE PHONE MYSTERY, SOLVED BY THE BOX: the Squad Hub switcher's
+  `shrink-0`.** Four hours of "invisible text" on Jay's phone — both
+  themes, browser and app, surviving reinstall and a site-data wipe — was
+  never colours: with an ADMIN's fifteen squads the header chip row's
+  max-content width is ~1127px, `shrink-0` forbade it from ever being
+  narrower, the DOCUMENT blew out to 1142px on a 360px phone, and opening
+  a sheet re-fit the visual viewport to 32% — text wasn't invisible, it
+  was OUTSIDE THE ZOOMED VIEW. The repo's own bolded lesson ("a row that
+  overruns does not clip"), reintroduced and re-learned. Fix: `min-w-0`,
+  wrap. Proof: `squadhub` + `squadhub-admin` joined the harness overflow
+  gate — green at 175 pairs on the fix, and the injected `shrink-0` fails
+  5 pairs including Jay's exact 360px. Why no emulation caught it: the
+  rig's coach fixture had too few squads; the ADMIN fixture is now the
+  gate's.
+- 🧰 Paint-debug v3 grew viewport truth (`vw`, `visualViewport`, viewport
+  meta) and a widest-element reporter — the two lines that named the
+  culprit from Jay's screenshot. Citations for the debug train:
+  `9a31dba` (#300, repairing #299 which shipped half-patched and was
+  refused by the build), `65f38d0` (#301), `2e7ecbb` (#302).
+
 - 🩺 **Paint-debug v2.** The hash gate was naive: signing in redirects and
   strips `#paint-debug` before any screen renders, so the box could never
   trigger for someone who had to log in — which was exactly Jay after a
