@@ -8,6 +8,17 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 22 Aug 2026
+
+- 🩺 **Paint-debug v2.** The hash gate was naive: signing in redirects and
+  strips `#paint-debug` before any screen renders, so the box could never
+  trigger for someone who had to log in — which was exactly Jay after a
+  clean-slate site wipe. Now `?paintdebug=1` or the hash ARMS a
+  localStorage flag at any moment, the box follows the flag on EVERY screen
+  (mounted in AppShell), reacts to hashchange, and carries its own [hide].
+- `30b188c` — the squash with paint-debug v1 (#297), admin-merged during
+  the Actions outage.
+
 ## 21 Aug 2026
 
 - 🩺 **PAINT-DEBUG OVERLAY (temporary).** Jay's phone renders the Squad Hub's

@@ -13,11 +13,35 @@ import { useEffect, useState } from 'react'
 //
 // ⚠️ TEMPORARY. Delete when the phone mystery is solved; nothing imports it
 // except SquadHub, and the hash gate keeps it out of everyone's way.
+// v2 (22 Aug): the hash gate was naive — signing in REDIRECTS and strips
+// the hash before any screen renders, so the box could never trigger for
+// someone who had to log in first. Now: seeing ?paintdebug=1 OR the hash at
+// ANY point persists a localStorage flag, the box follows the flag, and a
+// hashchange listener catches the type-it-in-later route. The box's own
+// [hide] clears the flag.
+function wantsDebug() {
+  try {
+    if (window.location.hash === '#paint-debug' || /[?&]paintdebug=1/.test(window.location.search)) {
+      localStorage.setItem('paint-debug', '1')
+    }
+    return localStorage.getItem('paint-debug') === '1'
+  } catch {
+    return window.location.hash === '#paint-debug'
+  }
+}
+
 export default function PaintDebug() {
   const [report, setReport] = useState('collecting…')
+  const [active, setActive] = useState(() => wantsDebug())
 
   useEffect(() => {
-    if (window.location.hash !== '#paint-debug') return
+    const onHash = () => setActive(wantsDebug())
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  useEffect(() => {
+    if (!active) return
     const timer = setTimeout(() => {
       const pick = (label, el) => {
         if (!el) return `${label}: NOT FOUND`
@@ -53,7 +77,7 @@ export default function PaintDebug() {
     return () => clearTimeout(timer)
   }, [])
 
-  if (typeof window === 'undefined' || window.location.hash !== '#paint-debug') return null
+  if (!active) return null
   return (
     <pre
       style={{
@@ -74,6 +98,17 @@ export default function PaintDebug() {
       }}
     >
       {report}
+      {'\n\n'}
+      <button
+        type="button"
+        style={{ background: '#c00', color: '#fff', padding: '4px 10px', fontFamily: 'monospace' }}
+        onClick={() => {
+          try { localStorage.removeItem('paint-debug') } catch {}
+          setActive(false)
+        }}
+      >
+        hide
+      </button>
     </pre>
   )
 }
