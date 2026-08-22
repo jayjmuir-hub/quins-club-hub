@@ -912,6 +912,9 @@ export default function Roster() {
         <PlayerImport
           onClose={() => setImporting(false)}
           onImported={refresh}
+          // The loaded roster, so a re-pasted sheet skips the players it
+          // already holds instead of doubling the squad.
+          existingPlayers={players}
         />
       )}
 

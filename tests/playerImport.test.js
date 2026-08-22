@@ -252,6 +252,48 @@ describe('parsePlayerPaste — columns in any order, any subset', () => {
   })
 })
 
+// ── Already on the roster (22 Aug 2026) ─────────────────────────────────
+// Jay: "if I import players who already exist, then what?" — until this,
+// duplicates, silently, with a green tick on every row.
+describe('parsePlayerPaste — players already on the roster', () => {
+  const EXISTING = [
+    { full_name: 'Tom Fletcher', team_id: 'team-u10' },
+    { full_name: 'Amy Rose', team_id: 'team-u12' },
+  ]
+
+  it('skips a row that is already on the squad — a third state, not an error', () => {
+    const r = parse('Tom Fletcher\tProp\tU10\nNew Kid\tProp\tU10', { existingPlayers: EXISTING })
+    expect(r.rows[0].existing).toBe(true)
+    expect(r.rows[0].ok).toBe(false)
+    expect(r.rows[0].errors).toEqual([])
+    expect(r.validCount).toBe(1)
+    expect(r.invalidCount).toBe(0)
+    expect(r.skippedCount).toBe(1)
+  })
+
+  it('matches case- and whitespace-insensitively, so a re-pasted sheet cannot sneak a twin in', () => {
+    const r = parse('TOM   fletcher\tProp\tU10', { existingPlayers: EXISTING })
+    expect(r.rows[0].existing).toBe(true)
+  })
+
+  it('is per squad — the same name in ANOTHER squad is a new player', () => {
+    const r = parse('Tom Fletcher\tProp\tU12', { existingPlayers: EXISTING })
+    expect(r.rows[0].existing).toBe(false)
+    expect(r.rows[0].ok).toBe(true)
+  })
+
+  it('never reaches the insert', () => {
+    const r = parse('Tom Fletcher\tProp\tU10\nNew Kid\tProp\tU10', { existingPlayers: EXISTING })
+    expect(toInsertRows(r, { clubId: 'club-1' }).map((row) => row.full_name)).toEqual(['New Kid'])
+  })
+
+  it('reads "already there", not "duplicate of line N", for a re-pasted sheet', () => {
+    const r = parse('Tom Fletcher\tProp\tU10\nAmy Rose\tWing\tU12', { existingPlayers: EXISTING })
+    expect(r.skippedCount).toBe(2)
+    expect(r.rows.every((row) => row.errors.length === 0)).toBe(true)
+  })
+})
+
 describe('toInsertRows', () => {
   it('emits only valid rows, shaped for the players table', () => {
     const r = parse('Tom Fletcher\tProp\tU10\nBad\tProp')
