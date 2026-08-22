@@ -73,6 +73,7 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
       return [
         { to: `/squad/${squadMatch[1]}`, label: 'Overview', end: true },
         { to: `/squad/${squadMatch[1]}/match-roster`, label: 'Build a Match Roster' },
+        { to: `/squad/${squadMatch[1]}/training`, label: 'Training Plans' },
       ]
     }
     if (to === '/schedule' && location.pathname.startsWith('/schedule')) {

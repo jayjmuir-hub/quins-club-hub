@@ -26,6 +26,7 @@ import Pitches from './screens/Pitches.jsx'
 import Allocation from './screens/Allocation.jsx'
 import SquadHub from './screens/SquadHub.jsx'
 import MatchRosterPicker from './screens/MatchRosterPicker.jsx'
+import SquadTraining from './screens/SquadTraining.jsx'
 import YouthDashboard from './screens/YouthDashboard.jsx'
 import MatchSheet from './screens/MatchSheet.jsx'
 import Lineup from './screens/Lineup.jsx'
@@ -195,6 +196,10 @@ export default function App() {
               A child of the hub so the sidebar's Squad Hub section carries it and
               the squad context rides in the path (22 Aug 2026). */}
           <Route path="/squad/:teamId/match-roster" element={<AppShell><MatchRosterPicker /></AppShell>} />
+          {/* Training plans, squad-level — the coach-facing read of what the
+              performance director published. The per-event view stays inside
+              EventDetail; this is the season-at-a-glance list (22 Aug 2026). */}
+          <Route path="/squad/:teamId/training" element={<AppShell><SquadTraining /></AppShell>} />
 
           {/* Admin-only, desktop-only. AdminDashboard gates on isAdmin()
               against the EFFECTIVE membership set and renders <Outlet/>,

@@ -27,6 +27,10 @@ describe('Squad Hub sub-menu', () => {
       'href',
       '/squad/t-u12/match-roster',
     )
+    expect(within(submenu).getByRole('link', { name: 'Training Plans' })).toHaveAttribute(
+      'href',
+      '/squad/t-u12/training',
+    )
   })
 
   it('stays expanded on the match-roster child route', () => {
