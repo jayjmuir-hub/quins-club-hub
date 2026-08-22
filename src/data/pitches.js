@@ -31,6 +31,21 @@ export async function listPitches({ includeRetired = false } = {}) {
   return data ?? []
 }
 
+/**
+ * The club-wide booking picture, REDACTED — id, squad name, type, times,
+ * pitch, group_id and nothing else. Comes from the pitch_occupancy SECURITY
+ * DEFINER function (db/migrations/20260822_pitch_occupancy.sql) because
+ * `event read` RLS deliberately scopes the events table to the reader's own
+ * squads: a coach checking "is D2 free on Saturday?" needs to know WHO is
+ * WHERE and WHEN across the club, and nothing more. Squad staff and admins
+ * get rows; everyone else gets an empty list, refuse-by-empty as usual.
+ */
+export async function listPitchOccupancy({ from, to }) {
+  const { data, error } = await supabase.rpc('pitch_occupancy', { _from: from, _to: to })
+  if (error) throw error
+  return data ?? []
+}
+
 const REFUSED =
   "We couldn't save that pitch. You may not have permission, or the name may already be in use."
 

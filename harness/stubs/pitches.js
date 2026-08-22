@@ -41,6 +41,29 @@ export async function listPitches({ includeRetired = false } = {}) {
   return includeRetired ? HARNESS_PITCHES : HARNESS_PITCHES.filter((pitch) => pitch.is_active)
 }
 
+// The redacted occupancy read (real one is the pitch_occupancy RPC). Two
+// squads on D2 within the window — one genuine clash pair for the calendar to
+// mark — plus an untroubled booking and a fanned-out multi-squad session
+// sharing a group_id, which must NOT read as a clash.
+export async function listPitchOccupancy({ from } = {}) {
+  const base = new Date(from ?? Date.now())
+  const at = (dayOffset, hour, minutes = 90) => {
+    const start = new Date(base.getTime() + dayOffset * 86400000)
+    start.setUTCHours(hour, 0, 0, 0)
+    return {
+      starts_at: start.toISOString(),
+      ends_at: new Date(start.getTime() + minutes * 60000).toISOString(),
+    }
+  }
+  return [
+    { id: 'po-1', team_id: 't1', team_name: 'U12 Mixed', type: 'match', pitch: 'D2', group_id: null, ...at(1, 8) },
+    { id: 'po-2', team_id: 't2', team_name: 'U14 Boys', type: 'match', pitch: 'D2', group_id: null, ...at(1, 8) },
+    { id: 'po-3', team_id: 't1', team_name: 'U12 Mixed', type: 'training', pitch: 'C1', group_id: null, ...at(3, 16) },
+    { id: 'po-4', team_id: 't1', team_name: 'U12 Mixed', type: 'training', pitch: 'A1', group_id: 'g-1', ...at(4, 16) },
+    { id: 'po-5', team_id: 't2', team_name: 'U14 Boys', type: 'training', pitch: 'A1', group_id: 'g-1', ...at(4, 16) },
+  ]
+}
+
 export async function upsertPitch(pitch) {
   window.__writes = window.__writes || []
   window.__writes.push({ op: 'upsert-pitch', payload: pitch })

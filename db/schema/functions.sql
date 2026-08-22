@@ -3059,3 +3059,30 @@ end $$;
 
 revoke execute on function public.publish_training(uuid, uuid[], date, date, boolean) from public, anon;
 grant  execute on function public.publish_training(uuid, uuid[], date, date, boolean) to authenticated, service_role;
+
+
+-- ---------------------------------------------------------------------
+-- public.pitch_occupancy(timestamptz, timestamptz)
+-- ⚠️ WRITTEN FROM db/migrations/20260822_pitch_occupancy.sql, not captured
+-- from live — re-capture after the migration is applied. The redacted
+-- club-wide booking read for squad staff; see the migration header for why
+-- this is a SECURITY DEFINER function and not a wider `event read` policy.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.pitch_occupancy(_from timestamptz, _to timestamptz)
+ RETURNS TABLE(id uuid, team_id uuid, team_name text, type text, starts_at timestamptz, ends_at timestamptz, pitch text, group_id uuid)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select e.id, e.team_id, t.name, e.type, e.starts_at, e.ends_at, e.pitch, e.group_id
+  from events e join teams t on t.id = e.team_id
+  where e.starts_at >= _from and e.starts_at < _to
+    and exists (select 1 from memberships m
+      where m.profile_id = auth.uid() and m.status = 'active'
+        and (m.role = 'admin' or (m.role in ('coach','manager','medic') and m.team_id is not null)));
+$function$
+;
+
+REVOKE EXECUTE ON FUNCTION public.pitch_occupancy(timestamptz, timestamptz) FROM public;
+REVOKE EXECUTE ON FUNCTION public.pitch_occupancy(timestamptz, timestamptz) FROM anon;
+GRANT EXECUTE ON FUNCTION public.pitch_occupancy(timestamptz, timestamptz) TO authenticated;

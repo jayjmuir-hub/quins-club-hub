@@ -553,6 +553,18 @@ export default function SquadHub() {
                 Build a match roster
               </Link>
             </Card>
+            {/* Cross-squad like Game time below, so the link carries no
+                teamId. The sidebar's Schedule section holds this on desktop;
+                this card is the phone's only route in. */}
+            <Card className="p-4">
+              <h3 className="text-[15px] font-extrabold text-ink">Pitches</h3>
+              <p className="mb-2 text-[13px] font-medium text-ink-muted">
+                Every squad&apos;s bookings — see what&apos;s free before you ask.
+              </p>
+              <Link to="/pitch-calendar" className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
+                Open the pitch calendar
+              </Link>
+            </Card>
             {/* Moved here from More (22 Aug 2026): its audience is exactly
                 this page's, and the hub is on the phone's tab bar. ⚠️ The
                 SCREEN is cross-squad — appearances across every squad the
