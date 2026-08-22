@@ -10,10 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- The sidebar's Admin item wears a count badge: pending memberships plus
+- The tracking numbers count the WHOLE season: the `.slice(-30)` pre-trim
+  is gone from Squad Hub's "Who said, who showed", so %, no-shows, the
+  squad summary ("across N events this season") and the phone drill-in
+  read every past event in the window; only the desktop matrix's 15
+  columns stay capped, and the footnote names both numbers.
+- `1e4c063` — The sidebar's Admin item wears a count badge: pending memberships plus
   undecided access requests (`countAdminWaiting`, two head-only count
   queries), fetched once per shell mount for admins only. Zero renders
-  nothing; a failed count costs only the badge.
+  nothing; a failed count costs only the badge (#311).
 - `e0db33a` — Roster gets its sidebar section, staff-only: Add a player and Import
   players as `?open=` deep-links, and Game time — which keeps the section
   open, so its screen does not orphan the menu. Parents see no children (#310).

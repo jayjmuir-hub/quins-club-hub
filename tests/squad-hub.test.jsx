@@ -208,6 +208,37 @@ describe('the tracking grid', () => {
     expect(await screen.findByText(/1 in/)).toBeInTheDocument()
     expect(screen.getByText(/1 out/)).toBeInTheDocument()
   })
+
+  // Season-wide numbers (22 Aug 2026, Jay: "track all training the entire
+  // season"). FORTY past sessions and the ONLY register mark sits on the
+  // OLDEST — the old `.slice(-GRID_EVENT_LIMIT * 2)` pre-trim kept the newest
+  // 30, so that mark fell off the maths entirely and every % read "—".
+  // (Verified by re-injecting the slice: a 16-event fixture did NOT fail,
+  // because 16 < 30 — the count has to clear the pre-trim, not the columns.)
+  // Season-wide, p1 reads 100% while the columns still cap at 15.
+  it('counts the whole season, not just the newest 15 columns', async () => {
+    const seasonTraining = Array.from({ length: 40 }, (_, i) => ({
+      id: `e-s${i}`,
+      team_id: 't-u12',
+      type: 'training',
+      title: `Session ${i}`,
+      starts_at: `2026-06-01T15:00:00Z`.replace('06-01', `0${4 + Math.floor(i / 28)}-${String((i % 28) + 1).padStart(2, '0')}`),
+    }))
+    listEventsMock.mockResolvedValue(seasonTraining)
+    listAvailabilityForEventsMock.mockResolvedValue([])
+    // e-s0 is the OLDEST (July 1st) — newest-first sorting puts it 16th.
+    listAttendanceForEventsMock.mockResolvedValue([
+      { event_id: 'e-s0', player_id: 'p1', status: 'present' },
+    ])
+    renderAt('/squad/t-u12')
+
+    expect(await screen.findByText(/100% attendance across 40 events this season/)).toBeInTheDocument()
+    // The matrix still caps its columns: the footnote names both numbers.
+    expect(screen.getByText(/newest 15 of 40 events/)).toBeInTheDocument()
+    const table = screen.getByRole('table')
+    // Player + 15 event columns + % + No-shows = 18 column headers.
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(18)
+  })
 })
 
 describe('match sheets', () => {
