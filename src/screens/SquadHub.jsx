@@ -305,8 +305,17 @@ export default function SquadHub() {
             {players.length} {players.length === 1 ? 'player' : 'players'} · availability, register and the season at a glance
           </p>
         </div>
+        {/* ⚠️ min-w-0, NEVER shrink-0 — found live on Jay's phone, 22 Aug
+            2026, named by the paint-debug box: with fifteen squads this
+            row's max-content width is ~1127px, and shrink-0 forbade it
+            from ever being narrower, so the DOCUMENT blew out to 1142px on
+            a 360px phone and opening the sheet re-fit the view to 32%.
+            The repo's own bolded lesson ("a row that overruns does not
+            clip") reintroduced by the hand that had just read it. The
+            harness overflow gate now runs the admin squad hub so this
+            class of regression fails a build instead of a coach. */}
         {myHubTeams.length > 1 && (
-          <div className="flex shrink-0 flex-wrap gap-1.5">
+          <div className="flex min-w-0 flex-wrap justify-end gap-1.5">
             {myHubTeams.map((candidate) => (
               <Link
                 key={candidate.id}

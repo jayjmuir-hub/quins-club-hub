@@ -1121,6 +1121,22 @@ scenarios.squadhub = () => (
   </Shell>
 )
 
+// The ADMIN squad hub — fifteen squads, which is what makes the header's
+// switcher row an overflow risk at all (found on Jay's phone, 22 Aug 2026:
+// shrink-0 held it at ~1127px and the document blew out). This scenario is
+// in the overflow gate's list; a one-squad coach cannot reproduce it.
+scenarios['squadhub-admin'] = () => (
+  <Shell
+    route="/squad/t1"
+    authValue={baseAuth(COACH_EMAIL)}
+    membershipValue={{ memberships: ADMIN_MEMBERSHIPS, teams: TEAMS_15, loading: false, error: null, reload: noop }}
+  >
+    <RRoutes>
+      <RRoute path="/squad/:teamId" element={<SquadHub />} />
+    </RRoutes>
+  </Shell>
+)
+
 const render = scenarios[scenario] || scenarios.login
 
 // Theme parity with the real app: index.html's inline no-flash script does

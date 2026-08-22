@@ -10,6 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
+- 📱 **THE PHONE MYSTERY, SOLVED BY THE BOX: the Squad Hub switcher's
+  `shrink-0`.** Four hours of "invisible text" on Jay's phone — both
+  themes, browser and app, surviving reinstall and a site-data wipe — was
+  never colours: with an ADMIN's fifteen squads the header chip row's
+  max-content width is ~1127px, `shrink-0` forbade it from ever being
+  narrower, the DOCUMENT blew out to 1142px on a 360px phone, and opening
+  a sheet re-fit the visual viewport to 32% — text wasn't invisible, it
+  was OUTSIDE THE ZOOMED VIEW. The repo's own bolded lesson ("a row that
+  overruns does not clip"), reintroduced and re-learned. Fix: `min-w-0`,
+  wrap. Proof: `squadhub` + `squadhub-admin` joined the harness overflow
+  gate — green at 175 pairs on the fix, and the injected `shrink-0` fails
+  5 pairs including Jay's exact 360px. Why no emulation caught it: the
+  rig's coach fixture had too few squads; the ADMIN fixture is now the
+  gate's.
+- 🧰 Paint-debug v3 grew viewport truth (`vw`, `visualViewport`, viewport
+  meta) and a widest-element reporter — the two lines that named the
+  culprit from Jay's screenshot. The debug train, admin-merged during and
+  after the Actions outage:
+- `2e7ecbb` — the widest-element reporter (#302).
+- `65f38d0` — the viewport-truth lines (#301).
+- `9a31dba` — the repair of #299 (#300).
+- `a9ac781` — paint-debug v3, which shipped HALF-PATCHED and unparseable
+  (#299): a grep-piped test run masked six transform-failed files, and
+  Netlify's build refused it, so production stayed on #298. The lesson is
+  the pipe, not the patch: exit codes, never grep, decide green.
+- `8754c9e` — paint-debug v2, flag-armed through the login redirect (#298).
+
 - 🩺 **Paint-debug v2.** The hash gate was naive: signing in redirects and
   strips `#paint-debug` before any screen renders, so the box could never
   trigger for someone who had to log in — which was exactly Jay after a
