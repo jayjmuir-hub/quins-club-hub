@@ -14,7 +14,7 @@ import { useAuth } from '../lib/auth.jsx'
 import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { joinPhone, splitPhone } from '../lib/phone.js'
-import { canApproveAnything, canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canApproveAnything, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 
 // The "More" tab, for EVERYONE (admin-dashboard plan, 2026-08-05).
 //
@@ -330,14 +330,6 @@ function SendAnIdea() {
   )
 }
 
-// ⚠️ NOT ADDED TO src/lib/scope.js. There is one call site, and that module is
-// the shared vocabulary for permission questions asked all over the app —
-// widening it for a single screen would make it look like a general rule.
-// canEditTeam IS the shared helper; this only folds it over the visible squads.
-function canEditAnyTeam(memberships, teams) {
-  return visibleTeams(memberships, teams).some((team) => canEditTeam(memberships, team.id))
-}
-
 export default function More() {
   // `reload` is passed to YourPlayers so that a child added there lands in the
   // provider — the new membership is created server-side and nothing pushes it
@@ -461,31 +453,11 @@ export default function More() {
         </>
       )}
 
-      {/* ⚠️ GAME TIME — for anyone who can pick a team, coach or admin (Jay,
-          14 Aug 2026: "tracking which players haven't had a chance to play").
-          Shown to admins TOO, unlike the approvals entry above: that one is
-          hidden from admins because they already have the Admin pill, and this
-          screen is not behind /admin at all. Without this entry a coach on a
-          phone has no route to it whatsoever.
-          The screen and `lineup_players` RLS both gate independently; this only
-          decides who is offered it. */}
-      {canEditAnyTeam(memberships, teams) && (
-        <>
-          <SectionTitle>Game time</SectionTitle>
-          <Card className="p-[14px]">
-            <Link
-              to="/game-time"
-              className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand-ink"
-            >
-              <span>Who hasn&apos;t had a game</span>
-              <span aria-hidden="true">›</span>
-            </Link>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
-              Appearances per player from the team sheets you have picked, fewest first.
-            </p>
-          </Card>
-        </>
-      )}
+      {/* The Game time entry that lived here 14-22 Aug 2026 moved to the
+          Squad Hub's front doors: its audience is exactly the hub's (people
+          who pick teams), the hub is on the phone's tab bar now, and the
+          desktop sidebar carries it under Roster — so the More card had
+          become the third entry point, not the only one. */}
 
       {/* The .ics feed already existed but lived only on Schedule. This is
           where someone comes looking for "my stuff", so it belongs here too;

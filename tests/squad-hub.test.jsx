@@ -241,6 +241,17 @@ describe('the tracking grid', () => {
   })
 })
 
+describe('the front doors', () => {
+  it('offers Game time, without a squad in the link — the screen is cross-squad', async () => {
+    useMembershipsMock.mockReturnValue(
+      membershipsFor([{ role: 'coach', team_id: 't-u12', status: 'active' }]),
+    )
+    renderAt('/squad/t-u12')
+    const link = await screen.findByRole('link', { name: /Open game time/i })
+    expect(link).toHaveAttribute('href', '/game-time')
+  })
+})
+
 describe('match sheets', () => {
   it('asks for sheets on a non-minis squad and lists the missing one', async () => {
     useMembershipsMock.mockReturnValue(
