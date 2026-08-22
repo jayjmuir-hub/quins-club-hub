@@ -10,7 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- 📓 **Handoff: the invisible text that wasn't**
+- Desktop roster table shows the whole squad: the `max-h-[70vh]` inner
+  scroller and the sticky header row are gone from `RosterTable` — the page
+  scrolls instead, `overflow-x-auto` kept for windows too narrow for the
+  columns.
+- `ab9d888` — 📓 **Handoff: the invisible text that wasn't**
   (`claude/handoffs/2026-08-22-the-invisible-text-that-wasnt.md`) — the
   full arc and its five ranked lessons. PaintDebug is KEPT as a permanent
   flag-gated diagnostic; its header still says TEMPORARY — repoint on the
