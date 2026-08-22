@@ -58,6 +58,7 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 }))
 
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   getMyProfile: (...args) => getMyProfileMock(...args),
   confirmMyDetails: (...args) => confirmMyDetailsMock(...args),
   confirmNoPlayer: (...args) => confirmNoPlayerMock(...args),

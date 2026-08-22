@@ -48,6 +48,7 @@ vi.mock('../src/data/players.js', () => ({
 // listClubMembers is mocked purely so the "Club tab does not list club
 // members" assertion below can be made against the QUERY, not just the DOM.
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   listClubMembers: (...args) => listClubMembersMock(...args),
   createInvite: (...args) => createInviteMock(...args),
 }))

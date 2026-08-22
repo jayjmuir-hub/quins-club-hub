@@ -35,6 +35,7 @@ vi.mock('../src/data/players.js', () => ({
   listPlayerPrivate: async () => [],
 }))
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   listClubMembers: vi.fn(),
   createInvite: vi.fn(),
 }))

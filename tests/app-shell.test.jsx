@@ -23,6 +23,7 @@ vi.mock('../src/lib/auth.jsx', () => ({
 // whatever a failed network call happens to render. The request-access
 // behaviour itself is covered by tests/request-access.test.jsx.
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   getMyProfile: (...args) => getMyProfileMock(...args),
   updateProfileName: (...args) => updateProfileNameMock(...args),
   // AddYourPlayer (a section of the roll-call since 17 Aug 2026) calls this.

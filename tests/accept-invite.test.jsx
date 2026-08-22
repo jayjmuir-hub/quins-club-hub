@@ -13,6 +13,7 @@ const acceptInviteMock = vi.fn()
 const useMembershipsMock = vi.fn()
 
 vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: () => Promise.resolve(0),
   acceptInvite: (...args) => acceptInviteMock(...args),
 }))
 

@@ -1,7 +1,18 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+
+const countAdminWaitingMock = vi.fn()
+vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: (...args) => countAdminWaitingMock(...args),
+}))
+
 import Sidebar from '../src/components/Sidebar.jsx'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  countAdminWaitingMock.mockResolvedValue(0)
+})
 
 // The sidebar's expanding sub-menus (22 Aug 2026). The contract:
 //   - only the ACTIVE section expands — elsewhere, no sub-items at all;
@@ -47,6 +58,36 @@ describe('Squad Hub sub-menu', () => {
     renderAt('/roster')
     expect(screen.queryByTestId('submenu-squad')).not.toBeInTheDocument()
     expect(screen.queryByTestId('submenu-schedule')).not.toBeInTheDocument()
+  })
+})
+
+describe('the Admin badge', () => {
+  it('shows the waiting count on the Admin item for admins', async () => {
+    countAdminWaitingMock.mockResolvedValue(3)
+    renderAt('/', { showAdmin: true })
+    const badge = await screen.findByTestId('admin-waiting-badge')
+    expect(badge).toHaveTextContent('3')
+    expect(badge).toHaveAttribute('aria-label', '3 waiting for review')
+  })
+
+  it('renders nothing at zero — a "0" pill is noise', async () => {
+    countAdminWaitingMock.mockResolvedValue(0)
+    renderAt('/', { showAdmin: true })
+    await vi.waitFor(() => expect(countAdminWaitingMock).toHaveBeenCalled())
+    expect(screen.queryByTestId('admin-waiting-badge')).not.toBeInTheDocument()
+  })
+
+  it('a failed count costs the badge, nothing else', async () => {
+    countAdminWaitingMock.mockRejectedValue(new Error('nope'))
+    renderAt('/', { showAdmin: true })
+    await vi.waitFor(() => expect(countAdminWaitingMock).toHaveBeenCalled())
+    expect(screen.queryByTestId('admin-waiting-badge')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Admin/ })).toBeInTheDocument()
+  })
+
+  it('never even asks for non-admins', () => {
+    renderAt('/', { showAdmin: false })
+    expect(countAdminWaitingMock).not.toHaveBeenCalled()
   })
 })
 

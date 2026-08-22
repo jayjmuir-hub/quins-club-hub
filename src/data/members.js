@@ -156,6 +156,24 @@ export async function listClubMembers() {
  * Ordered newest-first: for the "Waiting for access" list, the person who
  * just signed up and is standing there waiting is the one being looked for.
  */
+
+/**
+ * How many things on Accounts are waiting for an admin — pending memberships
+ * plus undecided access requests, the two queues an admin opens the app to
+ * clear. Head-only count queries: the sidebar badge needs a number, never
+ * the rows. RLS does the scoping, as everywhere; for a non-admin both counts
+ * come back small or zero and the badge is not rendered anyway.
+ */
+export async function countAdminWaiting() {
+  const [memb, reqs] = await Promise.all([
+    supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('access_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+  ])
+  if (memb.error) throw memb.error
+  if (reqs.error) throw reqs.error
+  return (memb.count ?? 0) + (reqs.count ?? 0)
+}
+
 export async function listPendingProfiles() {
   const { data, error } = await supabase
     .from('profiles')
