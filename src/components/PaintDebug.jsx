@@ -77,6 +77,32 @@ export default function PaintDebug() {
         `vw: ${window.innerWidth}x${window.innerHeight} dpr:${window.devicePixelRatio} vvScale:${window.visualViewport ? window.visualViewport.scale.toFixed(2) : '?'} vvW:${window.visualViewport ? Math.round(window.visualViewport.width) : '?'}`,
         `viewportMeta: ${document.querySelector('meta[name="viewport"]')?.getAttribute('content') ?? 'MISSING'}`,
         `url: ${window.location.pathname} sheetOpen: ${Boolean(dialog)}`,
+        // "Fine until I tap a player" (22 Aug): the sheet mounts something
+        // WIDER than the screen and the layout viewport blows out to fit it
+        // — the overflow failure class this repo already gates in the
+        // harness. This line names the widest element so the culprit stops
+        // being a guess.
+        (() => {
+          let worst = null
+          let worstRight = 0
+          for (const el of document.querySelectorAll('body *')) {
+            const r = el.getBoundingClientRect()
+            if (r.right > worstRight && r.width > 10) {
+              worstRight = r.right
+              worst = el
+            }
+          }
+          const doc = document.documentElement
+          return (
+            `docWidth: scroll=${doc.scrollWidth} client=${doc.clientWidth}
+` +
+            `widest: <${worst?.tagName.toLowerCase()}> right=${Math.round(worstRight)} w=${Math.round(worst?.getBoundingClientRect().width ?? 0)}
+` +
+            `  class=${(worst?.className ?? '').toString().slice(0, 110)}
+` +
+            `  text="${(worst?.textContent ?? '').trim().slice(0, 30)}"`
+          )
+        })(),
         pick('h2', painted('h2')),
         pick('firstP', painted('main p')),
         pick(
