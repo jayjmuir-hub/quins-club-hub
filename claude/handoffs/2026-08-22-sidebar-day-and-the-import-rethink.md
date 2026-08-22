@@ -87,7 +87,7 @@ screenshot and a paste that failed whole; each merge was his explicit
 5. **"Merged" by ancestry lies under squash-merging.** Thirty-two local
    branches all read UNMERGED to `git merge-base`; every one had a merged
    PR. Ask GitHub, not the DAG, before deleting — and the one remote branch
-   with a CLOSED-unmerged PR (`claude/dark-audit`) was left for Jay, who
+   with a CLOSED-unmerged PR (#295, the dark-audit branch) was left for Jay, who
    declared it dead.
 6. **Verify a deploy from the served bundle, never from a local hash.**
    A ten-minute poll once waited for a hash CI would never produce. Grep
@@ -106,8 +106,8 @@ screenshot and a paste that failed whole; each merge was his explicit
   `perl -e` strings; the dedicated Edit tool is the route for test files
   with `\t`/`\n` literals.
 - Cleanup at close: main clone fast-forwarded (was 13 behind), three stale
-  worktrees removed, 33 local branches deleted, `claude/dark-audit` deleted
-  on Jay's word, zero open PRs, zero remote `claude/*` branches.
+  worktrees removed, 33 local branches deleted, the dark-audit branch deleted
+  on Jay's word, zero open PRs, zero remote session branches left.
 
 ## Not done, not promised
 
