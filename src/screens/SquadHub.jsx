@@ -58,9 +58,11 @@ const TRACKING_FILTERS = [
   { value: 'match', label: 'Matches' },
 ]
 
-/** How many past events the grid renders. The data window is wider; a coach
- * scanning further back than this is asking a season question the export of
- * which is future work, not a wider table. */
+/** How many event COLUMNS the desktop matrix draws — a legibility cap on the
+ * marks, and nothing else. Since 22 Aug 2026 (Jay: "track all training the
+ * entire season") every NUMBER on this section — the %, the no-shows, the
+ * squad summary, the phone drill-in — counts the whole season's past events,
+ * however many the columns show. */
 const GRID_EVENT_LIMIT = 15
 // Jay, 21 Aug 2026: the section "should not be too big vertically and take
 // the entire page" — five rows, then the list scrolls inside itself.
@@ -256,9 +258,15 @@ export default function SquadHub() {
   })
 
   const filteredPast = past.filter((event) => (filter === 'all' ? true : event.type === filter))
+  // The WHOLE season's past events — the fetch window (12 months back, see
+  // src/lib/eventWindow.js) always covers the season, and the availability
+  // and attendance rows were fetched for every one of them all along. The
+  // old `.slice(-GRID_EVENT_LIMIT * 2)` pre-trim made the percentages
+  // silently mean "the last month or so"; only the matrix COLUMNS are capped
+  // now, below.
   const { events: gridEvents, rows } = buildTracking({
     players,
-    events: filteredPast.slice(-GRID_EVENT_LIMIT * 2), // pre-trim before sort; buildTracking sorts newest-first
+    events: filteredPast,
     availabilityRows: availability,
     attendanceRows: attendance,
   })
@@ -409,8 +417,9 @@ export default function SquadHub() {
           <Card className="mb-4 p-4 desktop:col-span-2 desktop:row-start-2">
             <BlockTitle>Who said, who showed</BlockTitle>
             <p className="mb-3 text-[12.5px] font-medium text-ink-muted">
-              What they said, then what the register says — side by side per event.
-              % is present / (present + absent); excused doesn&apos;t count either way.
+              What they said, then what the register says — side by side per event,
+              across the whole season. % is present / (present + absent); excused
+              doesn&apos;t count either way.
             </p>
             <Segmented
               legend="Show"
@@ -424,7 +433,8 @@ export default function SquadHub() {
             ) : (
               <>
                 <p className="mb-2 text-[12.5px] font-semibold text-ink-muted">
-                  Squad: {summary.percent ?? '—'}% attendance
+                  Squad: {summary.percent ?? '—'}% attendance across {gridEvents.length}{' '}
+                  {filter === 'all' ? 'events' : filter === 'match' ? 'matches' : 'training sessions'} this season
                   {summary.noShows > 0 && (
                     <span className="text-danger-ink"> · {summary.noShows} said-in-but-absent</span>
                   )}
@@ -509,8 +519,10 @@ export default function SquadHub() {
                 </div>
                 <p className="mt-2 hidden text-[11.5px] font-medium text-ink-muted desktop:block">
                   Left mark: RSVP (In / ? / Out, · no reply). Right mark: register (P present, A absent,
-                  E excused, · not taken). Shaded cell = said in, didn&apos;t show. Newest first, last{' '}
-                  {shownEvents.length} events.
+                  E excused, · not taken). Shaded cell = said in, didn&apos;t show.
+                  {gridEvents.length > shownEvents.length
+                    ? ` Columns show the newest ${shownEvents.length} of ${gridEvents.length} events; % and no-shows count all ${gridEvents.length}.`
+                    : ' Newest first.'}
                 </p>
                 <p className="mt-2 text-[11.5px] font-medium text-ink-muted desktop:hidden">
                   Tap a player for their event-by-event history.
@@ -599,8 +611,11 @@ export default function SquadHub() {
                 {' '}· {row.noShows} said-in-but-absent
               </span>
             </p>
+            {/* The whole season, not the matrix's column cap — this sheet is
+                one player deep and vertical, so length costs nothing but
+                scroll, and the % above is computed over exactly this list. */}
             <ul className="flex flex-col divide-y divide-line/50">
-              {shownEvents.map((event) => {
+              {gridEvents.map((event) => {
                 const cell = row.cells.get(event.id)
                 const rsvp = RSVP_MARK[cell?.availability]
                 const attend = ATTEND_MARK[cell?.attendance]
