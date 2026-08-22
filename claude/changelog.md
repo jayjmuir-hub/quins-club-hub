@@ -26,9 +26,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   gate's.
 - 🧰 Paint-debug v3 grew viewport truth (`vw`, `visualViewport`, viewport
   meta) and a widest-element reporter — the two lines that named the
-  culprit from Jay's screenshot. Citations for the debug train:
-  `9a31dba` (#300, repairing #299 which shipped half-patched and was
-  refused by the build), `65f38d0` (#301), `2e7ecbb` (#302).
+  culprit from Jay's screenshot. The debug train, admin-merged during and
+  after the Actions outage:
+- `2e7ecbb` — the widest-element reporter (#302).
+- `65f38d0` — the viewport-truth lines (#301).
+- `9a31dba` — the repair of #299 (#300).
+- `a9ac781` — paint-debug v3, which shipped HALF-PATCHED and unparseable
+  (#299): a grep-piped test run masked six transform-failed files, and
+  Netlify's build refused it, so production stayed on #298. The lesson is
+  the pipe, not the patch: exit codes, never grep, decide green.
+- `8754c9e` — paint-debug v2, flag-armed through the login redirect (#298).
 
 - 🩺 **Paint-debug v2.** The hash gate was naive: signing in redirects and
   strips `#paint-debug` before any screen renders, so the box could never
