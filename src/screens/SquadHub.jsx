@@ -551,8 +551,11 @@ export default function SquadHub() {
                     : 'No training scheduled yet.'
                 })()}
               </p>
-              <Link to="/schedule" className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
-                See sessions in the schedule
+              {/* Repointed from /schedule to the squad's own training-plans
+                  page (22 Aug 2026) — the page shows the same sessions PLUS
+                  what each one runs, and it is the phone's only route there. */}
+              <Link to={`/squad/${teamId}/training`} className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
+                Open training plans
               </Link>
             </Card>
           </div>
