@@ -31,8 +31,11 @@ import { upsertPlayer } from '../data/players.js'
 // upsertPlayer turns "zero rows affected" into a thrown refusal, which is
 // what the row error below reports.
 
+// Not sticky: the table grows to its full height and the PAGE scrolls (no
+// inner scroll container since 22 Aug 2026), so `sticky top-0` here would pin
+// against the viewport and slide under AppShell's sticky masthead.
 const HEAD_CELL =
-  'sticky top-0 z-10 bg-surface-sunk px-3 py-2.5 text-left text-[11.5px] font-extrabold uppercase tracking-[.5px] text-ink-muted'
+  'bg-surface-sunk px-3 py-2.5 text-left text-[11.5px] font-extrabold uppercase tracking-[.5px] text-ink-muted'
 const BODY_CELL = 'border-t border-line px-3 py-2 text-[14px] text-ink align-middle'
 // Inline controls are borderless until hovered/focused so a dense table does
 // not read as a wall of form fields — the affordance appears when the cursor
@@ -197,7 +200,11 @@ export default function RosterTable({
 
   return (
     <Card className="overflow-hidden">
-      <div className="max-h-[70vh] overflow-auto">
+      {/* No max-height: the full roster renders and the page scrolls. The
+          70vh inner scroller was removed 22 Aug 2026 — a scrollbar inside a
+          scrollbar on desktop, and it hid most of the squad. overflow-x-auto
+          stays as the escape hatch for a window too narrow for the columns. */}
+      <div className="overflow-x-auto">
         <table className="w-full border-collapse" data-testid="roster-table">
           <caption className="sr-only">
             Club roster. Position, gender, age group and captain can be changed in place.
