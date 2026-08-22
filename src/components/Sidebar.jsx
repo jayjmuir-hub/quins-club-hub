@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { NAV_ITEMS } from './Nav.jsx'
+import { NAV_ITEMS, SquadIcon } from './Nav.jsx'
 import crest from '../assets/crest.png'
 
 // The desktop sidebar — phase 2 of the 2.0 retheme
@@ -19,15 +19,6 @@ import crest from '../assets/crest.png'
 // The nav consolidates what used to be scattered: the four tab-bar items,
 // plus Squad Hub (squad staff and admins), Notices, and the Admin portals.
 // One nav, every dashboard — the information-architecture half of phase 2.
-
-function SquadIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M12 3l8 3v5c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3z" />
-      <path d="M8.5 12.5l2.3 2.3 4.7-4.6" />
-    </svg>
-  )
-}
 
 function NoticesIcon(props) {
   return (

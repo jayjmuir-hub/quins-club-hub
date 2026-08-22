@@ -10,11 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- Schedule table gets the RosterTable treatment — inner scroller and sticky
+- Squad Hub joins the mobile tab bar (same `showSquadHub` gate as the
+  sidebar; five columns for staff, four for everyone else), which retires
+  the Dashboard's Squad Hub card entirely. The Squad Hub loses its
+  NoticeBoard — notices live on Home — and its tracking grid gets the
+  whole-page-scroll treatment.
+- `158a44a` — Schedule table gets the RosterTable treatment — inner scroller and sticky
   header gone, the page scrolls. And the Dashboard's Squad Hub card is
   `desktop:hidden`, not removed: the sidebar duplicates it on desktop, but
   the mobile tab bar has no Squad Hub entry, so on a phone the card is squad
-  staff's only way in.
+  staff's only way in (#306).
 - `514bcbc` — Desktop roster table shows the whole squad: the `max-h-[70vh]` inner
   scroller and the sticky header row are gone from `RosterTable` — the page
   scrolls instead, `overflow-x-auto` kept for windows too narrow for the

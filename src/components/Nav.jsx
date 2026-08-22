@@ -44,6 +44,17 @@ function RosterIcon(props) {
   )
 }
 
+// Exported for Sidebar, which shows the same destination to the same people —
+// one icon, one home, like NAV_ITEMS itself.
+export function SquadIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 3l8 3v5c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3z" />
+      <path d="M8.5 12.5l2.3 2.3 4.7-4.6" />
+    </svg>
+  )
+}
+
 function MoreIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -81,7 +92,17 @@ function linkClassName({ isActive }) {
 // the sidebar's Admin item — same isAdmin() gate, same destination. The tab
 // bar never showed it and still does not: since phase 4 the phone's route to
 // /admin is the Manage card on More, not a fifth tab.
-export default function Nav() {
+export default function Nav({ showSquadHub = false }) {
+  // Squad Hub joins the bar for the same people the sidebar shows it to
+  // (22 Aug 2026, Jay) — until now the Dashboard card was the phone's only
+  // way in. Between Roster and More, matching the sidebar's order.
+  const items = showSquadHub
+    ? [
+        ...NAV_ITEMS.filter((item) => item.to !== '/more'),
+        { to: '/squad', label: 'Squad Hub', icon: SquadIcon },
+        ...NAV_ITEMS.filter((item) => item.to === '/more'),
+      ]
+    : NAV_ITEMS
   return (
     // The bar is dark chrome so the app is bookended in near-black — masthead
     // at the top, tab bar at the bottom, light content well between. The
@@ -94,10 +115,10 @@ export default function Nav() {
       /* `desktop:gap-[2px]` matches adhjrt.com's `.hdr-nav { gap: 2px }`. The
          items now carry their own hover fill, so a wider gap would read as
          five separate buttons rather than one row of tabs. */
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 bg-chrome pb-[env(safe-area-inset-bottom)] shadow-tabbar desktop:hidden"
+      className={`fixed inset-x-0 bottom-0 z-40 grid ${items.length === 5 ? 'grid-cols-5' : 'grid-cols-4'} bg-chrome pb-[env(safe-area-inset-bottom)] shadow-tabbar desktop:hidden`}
     >
       <div className="brand-rule absolute inset-x-0 top-0" />
-      {NAV_ITEMS.map(({ to, label, end, icon: Icon }) => (
+      {items.map(({ to, label, end, icon: Icon }) => (
         <NavLink key={to} to={to} end={end} className={linkClassName}>
           <Icon className={'h-[23px] w-[23px]'} aria-hidden="true" />
           <span>{label}</span>

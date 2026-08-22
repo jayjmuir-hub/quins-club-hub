@@ -564,7 +564,7 @@ export default function AppShell({ children }) {
                 the old Admin pill gate rode there with it, still reading the
                 EFFECTIVE membership set so an admin previewing as a coach
                 loses the item along with the screen). */}
-            <Nav />
+            <Nav showSquadHub={showSquadHub} />
           </div>
         </header>
       </div>
