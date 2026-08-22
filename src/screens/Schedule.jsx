@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import Button from '../components/Button.jsx'
 import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
@@ -403,7 +403,7 @@ function DaySheet({ day, events, teamsById, canManage, onClose, onSelectEvent, o
 export default function Schedule() {
   // Routing out to the full-page match sheet. See onOpenMatchSheet below.
   const navigate = useNavigate()
-  const { memberships, teams } = useMemberships()
+  const { memberships, teams, loading: membershipsLoading } = useMemberships()
 
   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
@@ -532,6 +532,34 @@ export default function Schedule() {
   const canEditAnything = admin || memberships.some((membership) => isSquadStaffRole(membership.role))
   const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
+  // The sidebar's Schedule sub-menu deep-links: /schedule?open=subscribe and
+  // /schedule?open=add-event (22 Aug 2026). Consumed here and CLEARED, so the
+  // sheet does not reopen on refresh or ride along when the URL is shared.
+  // An effect rather than a mount-time read because clicking the sub-item
+  // while already ON /schedule changes only the search string — the screen
+  // does not remount. subscribeRequest is a counter, not a boolean, so a
+  // second click after closing the sheet opens it again.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [subscribeRequest, setSubscribeRequest] = useState(0)
+  const openParam = searchParams.get('open')
+  useEffect(() => {
+    if (!openParam) return
+    // Not consumed until memberships have loaded: on a full-page load of
+    // /schedule?open=add-event, canEditAnything is false for a moment simply
+    // because the rows have not arrived, and clearing the param then would
+    // swallow a legitimate click.
+    if (membershipsLoading) return
+    if (openParam === 'subscribe') {
+      setSubscribeRequest((n) => n + 1)
+    } else if (openParam === 'add-event' && canEditAnything) {
+      setFormState({ event: null })
+    }
+    // Unknown values (and add-event for people who cannot add) just clear:
+    // the gate is the UI's, RLS is the real one, and a stale param must not
+    // sit in the address bar waiting to fire.
+    setSearchParams({}, { replace: true })
+  }, [openParam, canEditAnything, membershipsLoading, setSearchParams])
+
   // A stored team filter can outlive the team it names: memberships reload,
   // the user's scope shrinks, and `teamFilter` still points at a squad that is
   // no longer in it — leaving an empty list with no pill selected. Worse, if
@@ -621,7 +649,7 @@ export default function Schedule() {
             parent subscribing to their child's fixtures is the main case, not
             an organiser one. */}
         <div className="flex shrink-0 items-center gap-2">
-          <CalendarSubscribe />
+          <CalendarSubscribe openRequest={subscribeRequest} />
           {canEditAnything && (
             <Button onClick={() => setFormState({ event: null })} className="shrink-0">
               Add event

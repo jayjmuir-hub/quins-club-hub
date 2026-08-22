@@ -52,6 +52,16 @@ export async function listLineups(eventId) {
   ]
 }
 
+// Every OTHER fixture has a lineup started, so the match-roster picker
+// scenario shows both states of the badge at once.
+export async function listLineupCounts(eventIds) {
+  const counts = new Map()
+  ;(eventIds ?? []).forEach((id, index) => {
+    if (index % 2 === 0) counts.set(id, 1)
+  })
+  return counts
+}
+
 export async function createLineup() {
   throw new Error('The harness does not write.')
 }

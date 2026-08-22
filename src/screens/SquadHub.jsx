@@ -530,6 +530,17 @@ export default function SquadHub() {
                 Open the roster
               </Link>
             </Card>
+            {/* The picker's mobile front door — the sidebar sub-menu that
+                carries it on desktop does not exist on a phone. */}
+            <Card className="p-4">
+              <h3 className="text-[15px] font-extrabold text-ink">Match rosters</h3>
+              <p className="mb-2 text-[13px] font-medium text-ink-muted">
+                Pick an upcoming match and build the team for it.
+              </p>
+              <Link to={`/squad/${teamId}/match-roster`} className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
+                Build a match roster
+              </Link>
+            </Card>
             <Card className="p-4">
               <h3 className="text-[15px] font-extrabold text-ink">Training</h3>
               <p className="mb-2 text-[13px] font-medium text-ink-muted">

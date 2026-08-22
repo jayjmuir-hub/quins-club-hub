@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Sheet from './Sheet.jsx'
 import Button from './Button.jsx'
 import {
@@ -29,13 +29,24 @@ function CalendarIcon(props) {
   )
 }
 
-export default function CalendarSubscribe() {
+// `openRequest` — a counter, not a boolean: each increment opens the sheet,
+// exactly as if the button were pressed (token minting included). The
+// sidebar's "Add to calendar" deep-link is the caller; 0 means "never asked",
+// which is why the effect ignores it and the token stays lazy.
+export default function CalendarSubscribe({ openRequest = 0 }) {
   const [open, setOpen] = useState(false)
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
   const [confirmingReset, setConfirmingReset] = useState(false)
+
+  useEffect(() => {
+    if (openRequest > 0) handleOpen()
+    // handleOpen is stable in behaviour (guards on `token` itself); listing it
+    // would demand useCallback ceremony for no change in when this runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest])
 
   async function handleOpen() {
     setOpen(true)

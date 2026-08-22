@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { MemoryRouter, BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '../src/components/AppShell.jsx'
 import SquadHub from '../src/screens/SquadHub.jsx'
+import MatchRosterPicker from '../src/screens/MatchRosterPicker.jsx'
 import { Routes as RRoutes, Route as RRoute } from 'react-router-dom'
 import NoticeBoard from '../src/components/NoticeBoard.jsx'
 import { applyTheme, watchSystemTheme } from '../src/lib/theme.js'
@@ -1117,6 +1118,9 @@ scenarios.squadhub = () => (
   >
     <RRoutes>
       <RRoute path="/squad/:teamId" element={<SquadHub />} />
+      {/* The picker rides along so the sidebar's Build a Match Roster
+          sub-item goes somewhere real in the harness too (22 Aug 2026). */}
+      <RRoute path="/squad/:teamId/match-roster" element={<MatchRosterPicker />} />
     </RRoutes>
   </Shell>
 )

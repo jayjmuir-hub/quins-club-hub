@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { Fragment } from 'react'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { NAV_ITEMS, SquadIcon } from './Nav.jsx'
 import crest from '../assets/crest.png'
 
@@ -38,6 +39,16 @@ function AdminIcon(props) {
   )
 }
 
+function subItemClassName({ isActive }) {
+  return [
+    'block rounded-btn px-3 py-1.5 text-[13px] font-semibold outline-none transition',
+    'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
+    isActive
+      ? 'bg-white/[0.1] text-white'
+      : 'text-chrome-muted hover:bg-white/[0.07] hover:text-white',
+  ].join(' ')
+}
+
 function itemClassName({ isActive }) {
   return [
     'flex items-center gap-3 rounded-btn px-3 py-2.5 text-[14px] font-semibold outline-none transition',
@@ -49,6 +60,32 @@ function itemClassName({ isActive }) {
 }
 
 export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
+  const location = useLocation()
+
+  // Sub-menus (22 Aug 2026, Jay). Only the ACTIVE section expands — a
+  // coach-admin's sidebar with every section open would be a wall — and every
+  // child is a real, linkable route or a ?open= deep-link a screen consumes.
+  // The Squad Hub section needs the squad from the URL: on bare /squad
+  // (the multi-squad picker) there is no squad yet, so no children show.
+  const squadMatch = location.pathname.match(/^\/squad\/([^/]+)/)
+  const childrenFor = (to) => {
+    if (to === '/squad' && squadMatch) {
+      return [
+        { to: `/squad/${squadMatch[1]}`, label: 'Overview', end: true },
+        { to: `/squad/${squadMatch[1]}/match-roster`, label: 'Build a Match Roster' },
+      ]
+    }
+    if (to === '/schedule' && location.pathname.startsWith('/schedule')) {
+      return [
+        // `action: true` = a deep-link that opens a sheet on the screen, not a
+        // place you can BE — so it never renders as the active item.
+        ...(showSquadHub ? [{ to: '/schedule?open=add-event', label: 'Add an event', action: true }] : []),
+        { to: '/schedule?open=subscribe', label: 'Add to calendar', action: true },
+      ]
+    }
+    return []
+  }
+
   const items = [
     ...NAV_ITEMS.filter((item) => item.to !== '/more'),
     ...(showSquadHub ? [{ to: '/squad', label: 'Squad Hub', icon: SquadIcon }] : []),
@@ -79,12 +116,32 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 pb-4" aria-label="Sections">
-        {items.map(({ to, label, end, icon: Icon }) => (
-          <NavLink key={to} to={to} end={end} className={itemClassName}>
-            <Icon className="h-[19px] w-[19px] shrink-0" aria-hidden="true" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
+        {items.map(({ to, label, end, icon: Icon }) => {
+          const children = childrenFor(to)
+          return (
+            <Fragment key={to}>
+              <NavLink to={to} end={end} className={itemClassName}>
+                <Icon className="h-[19px] w-[19px] shrink-0" aria-hidden="true" />
+                <span>{label}</span>
+              </NavLink>
+              {children.length > 0 && (
+                <div className="ml-[22px] flex flex-col gap-0.5 border-l border-white/10 pl-2" data-testid={`submenu${to.replaceAll('/', '-')}`}>
+                  {children.map((child) =>
+                    child.action ? (
+                      <Link key={child.to} to={child.to} className={subItemClassName({ isActive: false })}>
+                        {child.label}
+                      </Link>
+                    ) : (
+                      <NavLink key={child.to} to={child.to} end={child.end} className={subItemClassName}>
+                        {child.label}
+                      </NavLink>
+                    ),
+                  )}
+                </div>
+              )}
+            </Fragment>
+          )
+        })}
       </nav>
 
       <p className="shrink-0 px-4 pb-4 font-condensed text-[10px] font-bold uppercase tracking-[0.14em] text-chrome-muted">

@@ -36,6 +36,26 @@ export async function listLineups(eventId) {
 }
 
 /**
+ * Which of these fixtures already have a lineup started — a Map of
+ * event_id → lineup count. For the match-roster picker's "already started"
+ * badge, so it is one query for the page rather than one per fixture
+ * (a season window is dozens of matches; see listAvailabilityForEvents,
+ * which exists for the same reason).
+ */
+export async function listLineupCounts(eventIds) {
+  const ids = (eventIds ?? []).filter(Boolean)
+  if (ids.length === 0) return new Map()
+  const { data, error } = await supabase.from('lineups').select('id, event_id').in('event_id', ids)
+
+  if (error) throw error
+  const counts = new Map()
+  for (const row of data ?? []) {
+    counts.set(row.event_id, (counts.get(row.event_id) ?? 0) + 1)
+  }
+  return counts
+}
+
+/**
  * Creates a lineup for a fixture and returns it.
  *
  * ⚠️ THERE IS NO "get or create". Deliberately: `lineups.event_id` carries NO

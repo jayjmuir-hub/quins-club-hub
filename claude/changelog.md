@@ -10,11 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- Squad Hub joins the mobile tab bar (same `showSquadHub` gate as the
+- Sidebar sub-menus, only the active section expanded: Squad Hub gets
+  Overview and **Build a Match Roster** — a new picker at
+  `/squad/:teamId/match-roster` listing upcoming matches with RSVP tallies
+  and a "lineup started" badge, each row landing in the existing Lineup
+  screen — and Schedule gets Add an event / Add to calendar as
+  `?open=` deep-links the screen consumes and clears. The hub grows a
+  Match rosters front-door card so phones reach the picker too.
+- `2bac9bb` — Squad Hub joins the mobile tab bar (same `showSquadHub` gate as the
   sidebar; five columns for staff, four for everyone else), which retires
   the Dashboard's Squad Hub card entirely. The Squad Hub loses its
   NoticeBoard — notices live on Home — and its tracking grid gets the
-  whole-page-scroll treatment.
+  whole-page-scroll treatment (#307).
 - `158a44a` — Schedule table gets the RosterTable treatment — inner scroller and sticky
   header gone, the page scrolls. And the Dashboard's Squad Hub card is
   `desktop:hidden`, not removed: the sidebar duplicates it on desktop, but
