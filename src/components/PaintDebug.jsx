@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 
 // A disposable diagnostic overlay — 21 Aug 2026, the night the Squad Hub
-// rendered invisible text on Jay's phone (both themes, browser AND installed
-// app) while every emulation this session could build rendered it perfectly.
-// Rendered ONLY when the URL hash is #paint-debug; costs nothing otherwise.
+// rendered invisible text on Jay's phone while every emulation this session
+// could build rendered it perfectly.
 //
 // It answers, on the ACTUAL device, the questions remote debugging could
 // not: which engine, which theme state, and what the browser COMPUTES for
@@ -11,14 +10,17 @@ import { useEffect, useState } from 'react'
 // inline styles and system-ui — if the app's own styling pipeline is the
 // casualty, this box must not die with it.
 //
-// ⚠️ TEMPORARY. Delete when the phone mystery is solved; nothing imports it
-// except SquadHub, and the hash gate keeps it out of everyone's way.
 // v2 (22 Aug): the hash gate was naive — signing in REDIRECTS and strips
-// the hash before any screen renders, so the box could never trigger for
-// someone who had to log in first. Now: seeing ?paintdebug=1 OR the hash at
-// ANY point persists a localStorage flag, the box follows the flag, and a
-// hashchange listener catches the type-it-in-later route. The box's own
-// [hide] clears the flag.
+// the hash before any screen renders. Now ?paintdebug=1 or the hash ARMS a
+// localStorage flag at any moment; the box follows the flag on every screen
+// and carries its own [hide].
+//
+// v3 (22 Aug): LIVE — recollects every 2s so the box reports the CURRENT
+// screen (v2 snapshotted once and froze on Home's numbers), samples only
+// elements that actually paint (>2px, so sr-only and the hidden desktop
+// sidebar stop muddying the report), and targets the open sheet directly.
+//
+// ⚠️ TEMPORARY. Delete when the phone mystery is solved.
 function wantsDebug() {
   try {
     if (window.location.hash === '#paint-debug' || /[?&]paintdebug=1/.test(window.location.search)) {
@@ -40,12 +42,8 @@ export default function PaintDebug() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  // v3: LIVE — recollect every 2s so the box always reports the CURRENT
-  // screen (v2 snapshotted once at arm time and froze on Home's numbers),
-  // and sample only elements that actually paint (>2px), so sr-only and
-  // the hidden desktop sidebar stop muddying the report.
   useEffect(() => {
-    if (!active) return
+    if (!active) return undefined
     const collect = () => {
       const pick = (label, el) => {
         if (!el) return `${label}: NOT FOUND`
@@ -64,12 +62,7 @@ export default function PaintDebug() {
           const r = el.getBoundingClientRect()
           return r.width > 2 && r.height > 2
         })
-      const h2 = painted('h2')
-      const kicker = painted('main p')
-      const rowBtn = [...document.querySelectorAll('button')].find((b) => /%/.test(b.textContent))
       const dialog = document.querySelector('[role="dialog"]')
-      const sheetTitle = dialog ? dialog.querySelector('h3') : painted('h3')
-      const sheetRow = dialog ? dialog.querySelector('li span') : null
       const lines = [
         `UA: ${navigator.userAgent}`,
         `htmlClass: ${document.documentElement.className}`,
@@ -78,15 +71,22 @@ export default function PaintDebug() {
         `bodyBg: ${getComputedStyle(document.body).backgroundColor}`,
         `inkVar: ${getComputedStyle(document.documentElement).getPropertyValue('--ink-rgb')}`,
         `fonts: ${[...document.fonts].filter((f) => f.status === 'loaded').length} loaded / ${document.fonts.size} total`,
-        pick('h2', h2),
-        pick('firstP', kicker),
-        pick('trackRow', rowBtn),
-        pick('lastH3', sheetTitle),
+        `url: ${window.location.pathname} sheetOpen: ${Boolean(dialog)}`,
+        pick('h2', painted('h2')),
+        pick('firstP', painted('main p')),
+        pick(
+          'trackRow',
+          [...document.querySelectorAll('button')].find((b) => /%/.test(b.textContent)),
+        ),
+        pick('sheetTitle', dialog ? dialog.querySelector('h3') : painted('h3')),
+        pick('sheetRow', dialog ? dialog.querySelector('li span') : null),
       ]
       setReport(lines.join('\n'))
-    }, 1500)
-    return () => clearTimeout(timer)
-  }, [])
+    }
+    const timer = setInterval(collect, 2000)
+    collect()
+    return () => clearInterval(timer)
+  }, [active])
 
   if (!active) return null
   return (
@@ -114,7 +114,11 @@ export default function PaintDebug() {
         type="button"
         style={{ background: '#c00', color: '#fff', padding: '4px 10px', fontFamily: 'monospace' }}
         onClick={() => {
-          try { localStorage.removeItem('paint-debug') } catch {}
+          try {
+            localStorage.removeItem('paint-debug')
+          } catch {
+            /* fine */
+          }
           setActive(false)
         }}
       >
