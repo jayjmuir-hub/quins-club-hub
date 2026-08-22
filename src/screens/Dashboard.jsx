@@ -32,7 +32,7 @@ import { pinnedNotices,
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, isAdmin, isSquadStaffRole, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import { recordsScores, squadFormat } from '../lib/minis.js'
 import {
   clubToday,
@@ -855,35 +855,10 @@ export default function Dashboard() {
           for the squad this week outranks a prompt about a feature. */}
       <NotificationsNudge />
 
-      {/* The coach/manager's front door (21 Aug 2026). Squad staff only —
-          admins already have /admin, and parents/players have nothing behind
-          this link, so showing it to them would be a dead end. Costs nothing
-          when it does not apply, same argument as the two blocks above.
-          claude/plans/2026-08-21-squad-hub.md.
-          ⚠️ desktop:hidden, NOT removed (22 Aug 2026, Jay): the desktop
-          sidebar already carries Squad Hub, so there this card is a
-          duplicate — but the mobile tab bar (Nav.jsx: Home / Schedule /
-          Roster / More) has no Squad Hub entry, so on a phone this card is
-          a squad staff member's ONLY way in. Delete it outright and mobile
-          coaches are stranded. */}
-      {memberships?.some((m) => isSquadStaffRole(m.role) && m.team_id) && (
-        <Card className="mb-4 p-4 desktop:hidden">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="text-[15px] font-extrabold text-ink">Squad Hub</h3>
-              <p className="text-[13px] font-medium text-ink-muted">
-                Your squad&apos;s availability, register and season at a glance.
-              </p>
-            </div>
-            <Link
-              to="/squad"
-              className="shrink-0 rounded-[11px] border-[1.5px] border-brand px-3 py-2 text-sm font-bold text-danger-ink hover:bg-surface-mute"
-            >
-              Open
-            </Link>
-          </div>
-        </Card>
-      )}
+      {/* The Squad Hub card that sat here (21-22 Aug 2026) is gone entirely:
+          it became desktop:hidden when the sidebar took the desktop entry,
+          and the mobile tab bar carrying Squad Hub (Nav.jsx, same
+          showSquadHub gate) removed its last job — the phone's only way in. */}
 
       {nextFixture && (
         <NextFixtureHero

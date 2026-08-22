@@ -3,11 +3,9 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import { AccentTitle, BlockTitle, Kicker } from '../components/Editorial.jsx'
 import Empty from '../components/Empty.jsx'
-import NoticeBoard from '../components/NoticeBoard.jsx'
 import Segmented from '../components/Segmented.jsx'
 import { Sheet } from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { listMyReads, listNotices } from '../data/announcements.js'
 import { listAttendanceForEvents } from '../data/attendance.js'
 import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
@@ -109,8 +107,6 @@ export default function SquadHub() {
   const [availability, setAvailability] = useState([])
   const [attendance, setAttendance] = useState([])
   const [sheets, setSheets] = useState(new Map())
-  const [notices, setNotices] = useState([])
-  const [noticeReads, setNoticeReads] = useState(() => new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')
@@ -171,11 +167,9 @@ export default function SquadHub() {
       // half, the tracking grid from its past half. Same window the Dashboard
       // and calendar already use, so nothing here invents a second calendar.
       const { from, to } = defaultEventWindow(clubToday())
-      const [eventRows, playerRows, noticeRows, readRows] = await Promise.all([
+      const [eventRows, playerRows] = await Promise.all([
         listEvents({ teamIds: [teamId], from, to }),
         listPlayers({ teamIds: [teamId] }),
-        listNotices(),
-        listMyReads(),
       ])
       if (!mounted) return
       const eventIds = eventRows.map((event) => event.id)
@@ -197,8 +191,6 @@ export default function SquadHub() {
       setAvailability(availabilityRows)
       setAttendance(attendanceRows)
       setSheets(sheetMap)
-      setNotices(noticeRows)
-      setNoticeReads(new Set(readRows))
     })().catch((cause) => {
       if (mounted) setError(cause)
     }).finally(() => {
@@ -289,10 +281,6 @@ export default function SquadHub() {
     .sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at))
     .slice(0, isMinisTeam(team?.name) ? 0 : 3)
 
-  const squadNotices = notices.filter(
-    (notice) => !notice.team_id || (notice.teamIds ?? [notice.team_id]).includes(teamId),
-  )
-
   return (
     <div>
       <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
@@ -343,8 +331,9 @@ export default function SquadHub() {
 
       {!loading && !error && (
         <>
-          <NoticeBoard notices={squadNotices} readIds={noticeReads} teamsById={new Map(teams.map((t) => [t.id, t]))} />
-
+          {/* The NoticeBoard that opened this screen went 22 Aug 2026 (Jay):
+              notices live on Home, and the same pinned notice appearing on
+              both screens read as a bug, not reinforcement. */}
           {/* Phase 3 desktop density: schedule and the front doors sit side
               by side, the tracking grid takes the full width beneath them.
               Grid PLACEMENT classes, not DOM order, so the phone keeps
@@ -473,10 +462,19 @@ export default function SquadHub() {
                   ))}
                 </ul>
 
-                <div className="hidden max-h-[24rem] overflow-auto desktop:block">
+                {/* No max-height: the whole squad's grid renders and the page
+                    scrolls (22 Aug 2026, same treatment as RosterTable and
+                    ScheduleTable). overflow-x-auto stays — the table has a
+                    real min-width and the sticky Player column exists for
+                    exactly that sideways case. */}
+                <div className="hidden overflow-x-auto desktop:block">
                   <table className="w-full min-w-[560px] border-collapse text-left">
                     <thead>
-                      <tr className="sticky top-0 z-10 border-b-[1.5px] border-line bg-surface-card text-[11.5px] font-bold uppercase tracking-[.3px] text-ink-muted">
+                      {/* Not sticky top — with no inner vertical scroller it
+                          would pin under the masthead. left-0 stickiness on
+                          the Player column below survives; that one is for
+                          the horizontal escape hatch. */}
+                      <tr className="border-b-[1.5px] border-line bg-surface-card text-[11.5px] font-bold uppercase tracking-[.3px] text-ink-muted">
                         <th scope="col" className="sticky left-0 bg-surface-card py-1.5 pr-2">Player</th>
                         {shownEvents.map((event) => (
                           <th key={event.id} scope="col" className="px-1 py-1.5 text-center" title={eventTitle(event)}>

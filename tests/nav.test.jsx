@@ -36,6 +36,25 @@ describe('Nav', () => {
     expect(screen.getByRole('link', { name: 'More' })).toBeInTheDocument()
   })
 
+  // The tab bar's Squad Hub entry (22 Aug 2026) — same showSquadHub gate the
+  // sidebar uses, so a coach gets five tabs and a parent still gets four.
+  it('has no Squad Hub tab by default', () => {
+    renderNav()
+
+    expect(screen.queryByRole('link', { name: 'Squad Hub' })).not.toBeInTheDocument()
+    expect(document.querySelector('nav')).toHaveClass('grid-cols-4')
+  })
+
+  it('shows Squad Hub between Roster and More when showSquadHub is set, in a 5-column grid', () => {
+    renderNav('/', { showSquadHub: true })
+
+    const squadHub = screen.getByRole('link', { name: 'Squad Hub' })
+    expect(squadHub).toHaveAttribute('href', '/squad')
+    const labels = [...document.querySelectorAll('nav a span')].map((el) => el.textContent)
+    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Squad Hub', 'More'])
+    expect(document.querySelector('nav')).toHaveClass('grid-cols-5')
+  })
+
   it('marks Home active with aria-current="page" at the root route', () => {
     renderNav('/')
 
