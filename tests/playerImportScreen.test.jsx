@@ -84,6 +84,22 @@ describe('Import — availability', () => {
   })
 })
 
+describe('Import — the squad picker (22 Aug 2026 rethink)', () => {
+  it('a plain list of names imports once a squad is picked', async () => {
+    const user = userEvent.setup()
+    await openImport(user)
+    await paste(user, 'Tom Fletcher{enter}Amy Rose')
+
+    // Without a picked squad, every line is missing its age group…
+    expect(await screen.findByTestId('import-invalid')).toHaveTextContent('2 need fixing')
+
+    // …and picking one turns the same paste fully green.
+    await user.selectOptions(screen.getByTestId('import-default-team'), 'team-u10')
+    expect(await screen.findByTestId('import-valid')).toHaveTextContent('2 ready to add')
+    expect(screen.queryByTestId('import-invalid')).not.toBeInTheDocument()
+  })
+})
+
 describe('Import — preview', () => {
   it('shows nothing to preview until something is pasted', async () => {
     const user = userEvent.setup()
@@ -103,10 +119,10 @@ describe('Import — preview', () => {
   it('flags a bad row with its reason instead of dropping it silently', async () => {
     const user = userEvent.setup()
     await openImport(user)
-    await paste(user, 'Tom Fletcher,Flanker,U10{enter}Bad Row,Winger,U10')
+    await paste(user, 'Tom Fletcher,Flanker,U10{enter}Bad Row,Flanker')
 
     expect(await screen.findByTestId('import-invalid')).toHaveTextContent('1 need fixing')
-    expect(screen.getByTestId('import-row-bad')).toHaveTextContent('is not a position')
+    expect(screen.getByTestId('import-row-bad')).toHaveTextContent('No age group on this line')
   })
 
   it('names an age group the user does not have', async () => {
@@ -135,7 +151,7 @@ describe('Import — preview', () => {
   it('warns that only the valid rows will be added when the paste is mixed', async () => {
     const user = userEvent.setup()
     await openImport(user)
-    await paste(user, 'Tom Fletcher,Flanker,U10{enter}Bad,Winger,U10')
+    await paste(user, 'Tom Fletcher,Flanker,U10{enter}Bad,Flanker')
     expect(await screen.findByText(/Only the 1 valid row will be added/)).toBeInTheDocument()
   })
 })
@@ -144,7 +160,7 @@ describe('Import — writing', () => {
   it('sends only the valid rows, shaped for the players table', async () => {
     const user = userEvent.setup()
     await openImport(user)
-    await paste(user, 'Tom Fletcher,Flanker,U10{enter}Bad,Winger,U10')
+    await paste(user, 'Tom Fletcher,Flanker,U10{enter}Bad,Flanker')
     await user.click(screen.getByTestId('import-submit'))
 
     await waitFor(() => expect(insertPlayersMock).toHaveBeenCalledWith([

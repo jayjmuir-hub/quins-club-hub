@@ -78,10 +78,11 @@ function splitLine(line, delimiter) {
 // reading "Name, Position, Team" would otherwise be imported as a player
 // called Name — the single most likely way this feature embarrasses someone.
 const HEADER_WORDS = new Set([
-  'name', 'full name', 'fullname', 'player', 'player name',
-  'position', 'pos',
-  'team', 'age group', 'agegroup', 'squad', 'group',
-  'gender', 'sex', 'm/f',
+  'name', 'names', 'full name', 'fullname', 'player', 'players', 'player name',
+  'first', 'last', 'first name', 'last name', 'firstname', 'lastname', 'surname', 'forename',
+  'position', 'positions', 'pos',
+  'team', 'teams', 'age group', 'age groups', 'agegroup', 'age', 'squad', 'squads', 'group',
+  'gender', 'genders', 'sex', 'm/f', 'boy/girl',
 ])
 
 function looksLikeHeader(cells) {
@@ -93,12 +94,31 @@ function looksLikeHeader(cells) {
 /**
  * Parses pasted roster text into rows ready for preview.
  *
+ * ⚠️ COLUMNS ARE CLASSIFIED BY CONTENT, NOT BY POSITION — 22 Aug 2026, after
+ * Jay pasted the spreadsheet a club actually has (name, age group, gender —
+ * no position column) and all 38 rows failed with ""U16B" is not a position".
+ * Squad names, positions and gender tokens are three closed vocabularies that
+ * do not overlap, so every cell can say what it is: a cell matching a squad
+ * is the age group, a position word is the position, a gender token is the
+ * gender, and the name is what remains. Any column order works, any subset
+ * works, and the old fixed order still parses identically.
+ *
+ * The NAME is the first CONTIGUOUS run of unclassified cells, which is what
+ * lets a sheet with separate First and Last columns import ("Harry" "Nunn" →
+ * "Harry Nunn"). An unclassified cell OUTSIDE that run — a "Y" in a gender
+ * column, a "1" — is an error naming the value, never silently dropped and
+ * never silently glued onto a name: both failure modes put garbage in the
+ * database with a green tick next to it.
+ *
  * @param {string} text        raw clipboard content
  * @param {object} options
  * @param {Array}  options.teams      [{ id, name }] the user may see
  * @param {Function} [options.canEditTeam]  (teamId) => boolean; rows for teams
  *   the user cannot write are marked invalid so the preview can say why,
  *   rather than letting the insert fail opaquely.
+ * @param {string} [options.defaultTeamId]  the squad the screen's picker has
+ *   selected: rows naming NO squad fall back to it, so a plain list of names
+ *   is a valid import. A row naming its own squad still wins.
  *
  * @returns {{rows: Array, delimiter: string, headerSkipped: boolean,
  *           validCount: number, invalidCount: number}}
@@ -106,7 +126,7 @@ function looksLikeHeader(cells) {
  *   `lineNo` is 1-based against the ORIGINAL paste including blanks and the
  *   header, so an error message can point the user at the line they can see.
  */
-export function parsePlayerPaste(text, { teams = [], canEditTeam } = {}) {
+export function parsePlayerPaste(text, { teams = [], canEditTeam, defaultTeamId = null } = {}) {
   const normalised = normaliseText(text)
   const delimiter = detectDelimiter(normalised)
 
@@ -116,6 +136,7 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam } = {}) {
   const teamsByName = new Map(
     teams.map((t) => [String(t.name ?? '').trim().toLowerCase(), t]),
   )
+  const defaultTeam = teams.find((t) => t.id === defaultTeamId) ?? null
 
   const rawLines = normalised.split(/\r\n|\n|\r/)
   const rows = []
@@ -133,48 +154,77 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam } = {}) {
       return
     }
 
-    // Gender is the FOURTH column and is optional, so an existing three-column
-    // paste keeps working unchanged — destructuring a missing cell gives ''.
-    const [nameCell = '', positionCell = '', teamCell = '', genderCell = ''] = cells
     const errors = []
 
-    const fullName = nameCell.trim()
+    // ── Classify every cell by what it contains ──────────────────────────
+    // First match of each kind wins; a second squad name (or position, or
+    // gender) on one line falls through to the unclassified pile and is
+    // reported below rather than silently overwriting the first.
+    let team = null
+    let teamCellText = ''
+    let position = null
+    let gender = null
+    const unclassified = [] // { index, value }
+
+    cells.forEach((cell, cellIndex) => {
+      if (cell === '') return
+      if (!team) {
+        const matched = teamsByName.get(cell.toLowerCase())
+        if (matched) {
+          team = matched
+          teamCellText = cell
+          return
+        }
+      }
+      if (position === null) {
+        const matchedPosition = canonicalPosition(cell)
+        if (matchedPosition !== null) {
+          position = matchedPosition
+          return
+        }
+      }
+      if (gender === null) {
+        const matchedGender = canonicalGender(cell)
+        if (matchedGender !== null) {
+          gender = matchedGender
+          return
+        }
+      }
+      unclassified.push({ index: cellIndex, value: cell })
+    })
+
+    // The name: the first contiguous run of unclassified cells, joined.
+    // Anything unclassified OUTSIDE that run is a value we could not read —
+    // say so per value, because gluing it onto the name or dropping it are
+    // both ways of importing garbage with a green tick.
+    const nameParts = []
+    let runEnd = null
+    for (const entry of unclassified) {
+      if (runEnd === null || entry.index === runEnd + 1) {
+        nameParts.push(entry.value)
+        runEnd = entry.index
+      } else {
+        errors.push(
+          `Couldn't tell what "${entry.value}" is — not a position, one of your age groups, or Male/Female`,
+        )
+      }
+    }
+    const fullName = nameParts.join(' ')
+
     if (fullName === '') errors.push('Name is required')
     else if (fullName.length > 120) errors.push('Name is too long')
 
-    // Position is optional — the roster renders "Position not set" — but a
-    // value that is present and unrecognised is a mistake worth surfacing,
-    // not something to silently discard.
-    let position = null
-    if (positionCell.trim() !== '') {
-      position = canonicalPosition(positionCell)
-      if (position === null) errors.push(`"${positionCell.trim()}" is not a position`)
+    // Squad: a row that names one keeps it; a row that names none takes the
+    // screen's picker. players.team_id is NOT NULL, so no squad from either
+    // source is an error.
+    if (!team && defaultTeam) {
+      team = defaultTeam
+      teamCellText = defaultTeam.name
     }
-
-    // Gender is optional and follows position's rule exactly: a blank cell is
-    // fine and stores null, but a value that is PRESENT and unrecognised is a
-    // mistake worth reporting rather than silently dropping.
-    //
-    // ⚠️ Silently dropping it would be the worst outcome available here. A
-    // spreadsheet column of "Y"/"N", or one where the club used "1"/"2",
-    // would import several hundred players with gender null and report total
-    // success — and nobody would notice until someone tried to filter by it.
-    let gender = null
-    if (genderCell.trim() !== '') {
-      gender = canonicalGender(genderCell)
-      if (gender === null) errors.push(`"${genderCell.trim()}" is not male or female`)
-    }
-
-    // Team is required: players.team_id is NOT NULL.
-    let team = null
-    if (teamCell.trim() === '') {
-      errors.push('Age group is required')
-    } else {
-      team = teamsByName.get(teamCell.trim().toLowerCase()) ?? null
-      if (!team) errors.push(`"${teamCell.trim()}" is not one of your age groups`)
-      else if (typeof canEditTeam === 'function' && !canEditTeam(team.id)) {
-        errors.push(`You can't add players to ${team.name}`)
-      }
+    if (!team) {
+      errors.push('No age group on this line — add one, or pick a squad above the box')
+    } else if (typeof canEditTeam === 'function' && !canEditTeam(team.id)) {
+      errors.push(`You can't add players to ${team.name}`)
     }
 
     // ⚠️ GENDER IS REQUIRED WHEN THE SQUAD IS SINGLE-GENDER (Jay, 9 Aug 2026).
@@ -191,8 +241,10 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam } = {}) {
     //
     // As everywhere else: only ABSENCE is an error. A row saying "male" in a
     // girls' squad imports, because a contradiction is a real arrangement to
-    // be looked at rather than a parse failure.
-    if (team && gender === null && genderCell.trim() === '' && squadRequiresGender(team.name)) {
+    // be looked at rather than a parse failure. (Under content classification
+    // "no gender cell" and "blank gender cell" are the same thing: gender is
+    // null exactly when no cell read as one.)
+    if (team && gender === null && squadRequiresGender(team.name)) {
       errors.push(`${team.name} is single-gender, so gender is required`)
     }
 
@@ -202,7 +254,7 @@ export function parsePlayerPaste(text, { teams = [], canEditTeam } = {}) {
       position,
       gender,
       team_id: team?.id ?? null,
-      teamName: team?.name ?? teamCell.trim(),
+      teamName: team?.name ?? teamCellText,
       errors,
       ok: errors.length === 0,
     })

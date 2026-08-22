@@ -10,14 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- **Schema re-capture: 29 live functions had NO entry in
+- **Player import rethink** (Jay: "complicated and not user friendly",
+  after a 38-row paste failed whole): columns are now classified by
+  CONTENT, not position — squad names, positions (with a real-world
+  synonym map: winger, scrum half, loosehead…) and gender tokens are
+  closed vocabularies, and the name is the first contiguous run of
+  whatever's left, so a First/Last split works and any column order
+  works. A squad picker above the box makes a plain list of names a
+  valid import. Unknown values away from the name error loudly; the
+  accepted trade-off (an unknown word NEXT to the name joins it,
+  visibly) is stated as a test.
+- `559c8d8` — **Schema re-capture: 29 live functions had NO entry in
   `db/schema/functions.sql`.** Every re-capture since 11 Aug was selective,
   so functions added by other work — the push pipeline, the nudges,
   feedback, photo focus — accumulated silently. All 29 captured verbatim
   from `pg_get_functiondef`, md5-verified against live per block, proacl
   noted per entry; `pitch_occupancy` normalized from live at the same
   time. Bodies of earlier entries were deliberately NOT re-verified — each
-  entry's own capture date still governs it.
+  entry's own capture date still governs it (#315).
 - `fb0135a` — **The pitch calendar for coaches** (`/pitch-calendar`): read-only
   week/month view of every squad's bookings, fed by the new
   `pitch_occupancy` SECURITY DEFINER function

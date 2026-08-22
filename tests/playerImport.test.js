@@ -28,10 +28,21 @@ describe('positions enum', () => {
     expect(canonicalPosition('number 8')).toBe('Number 8')
   })
 
-  it('rejects anything not on the list rather than guessing', () => {
-    expect(canonicalPosition('Winger')).toBeNull()
+  it('rejects anything not on the list or the synonym map rather than guessing', () => {
+    expect(canonicalPosition('Goalkeeper')).toBeNull()
     expect(canonicalPosition('')).toBeNull()
     expect(canonicalPosition(null)).toBeNull()
+  })
+
+  // The spellings clubs actually type (22 Aug 2026). The map matters doubly
+  // under content classification: a spelling it knows is a position, one it
+  // does not becomes part of a name in the preview.
+  it('maps the common real-world spellings onto the enum', () => {
+    expect(canonicalPosition('Winger')).toBe('Wing')
+    expect(canonicalPosition('scrum half')).toBe('Scrum-half')
+    expect(canonicalPosition('LOOSEHEAD')).toBe('Prop')
+    expect(canonicalPosition('second row')).toBe('Lock')
+    expect(canonicalPosition('no. 8')).toBe('Number 8')
   })
 
   it('offers exactly the 11 positions the design system defines', () => {
@@ -114,7 +125,19 @@ describe('parsePlayerPaste — validation', () => {
 
   it('requires an age group, because players.team_id is NOT NULL', () => {
     const r = parse('Tom Fletcher\tProp\t')
-    expect(r.rows[0].errors).toContain('Age group is required')
+    expect(r.rows[0].ok).toBe(false)
+    expect(r.rows[0].errors[0]).toContain('No age group on this line')
+  })
+
+  it('falls back to the picked squad when a line names none', () => {
+    const r = parse('Tom Fletcher\tProp', { defaultTeamId: 'team-u10' })
+    expect(r.rows[0].ok).toBe(true)
+    expect(r.rows[0].team_id).toBe('team-u10')
+  })
+
+  it('a line naming its own squad beats the picked one', () => {
+    const r = parse('Tom Fletcher\tU12', { defaultTeamId: 'team-u10' })
+    expect(r.rows[0].team_id).toBe('team-u12')
   })
 
   it('allows an empty position, which the roster renders as "Position not set"', () => {
@@ -123,10 +146,27 @@ describe('parsePlayerPaste — validation', () => {
     expect(r.rows[0].position).toBeNull()
   })
 
-  it('rejects a present-but-unrecognised position rather than discarding it silently', () => {
+  it('reads a synonym-spelled position instead of failing the row', () => {
     const r = parse('Tom Fletcher\tWinger\tU10')
+    expect(r.rows[0].ok).toBe(true)
+    expect(r.rows[0].position).toBe('Wing')
+  })
+
+  // ⚠️ THE ACCEPTED TRADE-OFF of content classification, stated as a test so
+  // it is a decision and not an accident: an unknown word ADJACENT to the
+  // name joins the name — visibly, in the preview's name column — because it
+  // is structurally identical to a Last-name cell. An unknown value that is
+  // NOT adjacent (a "Y" after the squad) errors loudly instead.
+  it('an unknown word next to the name joins the name, visibly', () => {
+    const r = parse('Tom Fletcher\tXyzzy\tU10')
+    expect(r.rows[0].ok).toBe(true)
+    expect(r.rows[0].full_name).toBe('Tom Fletcher Xyzzy')
+  })
+
+  it('an unknown value separated from the name errors loudly, never silently dropped', () => {
+    const r = parse('Tom Fletcher\tU10\tY')
     expect(r.rows[0].ok).toBe(false)
-    expect(r.rows[0].errors[0]).toContain('is not a position')
+    expect(r.rows[0].errors[0]).toContain(`Couldn't tell what "Y" is`)
   })
 
   it('rejects a team the user does not have, naming it', () => {
@@ -164,15 +204,57 @@ describe('parsePlayerPaste — validation', () => {
   })
 
   it('counts valid and invalid rows separately for the preview summary', () => {
-    const r = parse('Tom Fletcher\tProp\tU10\nBad Row\tWinger\tU10\n\nAmy Rose\tWing\tU12')
+    const r = parse('Tom Fletcher\tProp\tU10\nNo Squad Kid\tProp\n\nAmy Rose\tWing\tU12')
     expect(r.validCount).toBe(2)
     expect(r.invalidCount).toBe(1)
   })
 })
 
+// ── Content classification (22 Aug 2026) ────────────────────────────────
+// The redesign after Jay's 38-row paste failed whole: columns are read by
+// WHAT THEY CONTAIN, not where they sit. These fixtures are the pastes clubs
+// actually produce.
+describe('parsePlayerPaste — columns in any order, any subset', () => {
+  it("imports Jay's exact paste shape: name, age group, gender — no position column", () => {
+    const r = parse('Maxi Petitt\tU10\tMale\nAmy Rose\tU12\tFemale')
+    expect(r.validCount).toBe(2)
+    expect(r.rows[0]).toMatchObject({ full_name: 'Maxi Petitt', team_id: 'team-u10', gender: 'male', position: null })
+    expect(r.rows[1]).toMatchObject({ full_name: 'Amy Rose', team_id: 'team-u12', gender: 'female' })
+  })
+
+  it('accepts the squad in the FIRST column', () => {
+    const r = parse('U10\tTom Fletcher\tProp')
+    expect(r.rows[0]).toMatchObject({ full_name: 'Tom Fletcher', team_id: 'team-u10', position: 'Prop' })
+  })
+
+  it('joins separate First and Last columns into one name', () => {
+    const r = parse('Harry\tNunn\tU10\tM')
+    expect(r.rows[0]).toMatchObject({ full_name: 'Harry Nunn', team_id: 'team-u10', gender: 'male' })
+  })
+
+  it('a plain list of names imports against the picked squad', () => {
+    const r = parse('Tom Fletcher\nAmy Rose', { defaultTeamId: 'team-u10' })
+    expect(r.validCount).toBe(2)
+    expect(r.rows.map((row) => row.team_id)).toEqual(['team-u10', 'team-u10'])
+  })
+
+  it('skips the header row Jay actually had — "Names, Position, Age Group, Gender"', () => {
+    const r = parse('Names\tPosition\tAge Group\tGender\nTom Fletcher\tProp\tU10\tM')
+    expect(r.headerSkipped).toBe(true)
+    expect(r.validCount).toBe(1)
+  })
+
+  it('a second squad name on one line does not silently overwrite the first', () => {
+    const r = parse('Tom Fletcher\tU10\tU12')
+    expect(r.rows[0].ok).toBe(false)
+    expect(r.rows[0].team_id).toBe('team-u10')
+    expect(r.rows[0].errors[0]).toContain('"U12"')
+  })
+})
+
 describe('toInsertRows', () => {
   it('emits only valid rows, shaped for the players table', () => {
-    const r = parse('Tom Fletcher\tProp\tU10\nBad\tWinger\tU10')
+    const r = parse('Tom Fletcher\tProp\tU10\nBad\tProp')
     expect(toInsertRows(r, { clubId: 'club-1' })).toEqual([
       { club_id: 'club-1', gender: null, team_id: 'team-u10', full_name: 'Tom Fletcher', position: 'Prop' },
     ])
