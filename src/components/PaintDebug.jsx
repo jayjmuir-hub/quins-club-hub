@@ -71,6 +71,11 @@ export default function PaintDebug() {
         `bodyBg: ${getComputedStyle(document.body).backgroundColor}`,
         `inkVar: ${getComputedStyle(document.documentElement).getPropertyValue('--ink-rgb')}`,
         `fonts: ${[...document.fonts].filter((f) => f.status === 'loaded').length} loaded / ${document.fonts.size} total`,
+        // The 22 Aug "zoom out to see the box" clue: if layout width is
+        // ~980 on a phone, the viewport meta is not taking effect and every
+        // "invisible" element is simply outside the zoomed visual viewport.
+        `vw: ${window.innerWidth}x${window.innerHeight} dpr:${window.devicePixelRatio} vvScale:${window.visualViewport ? window.visualViewport.scale.toFixed(2) : '?'} vvW:${window.visualViewport ? Math.round(window.visualViewport.width) : '?'}`,
+        `viewportMeta: ${document.querySelector('meta[name="viewport"]')?.getAttribute('content') ?? 'MISSING'}`,
         `url: ${window.location.pathname} sheetOpen: ${Boolean(dialog)}`,
         pick('h2', painted('h2')),
         pick('firstP', painted('main p')),
