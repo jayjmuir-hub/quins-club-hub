@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import Card from '../components/Card.jsx'
+import PaintDebug from '../components/PaintDebug.jsx'
 import { AccentTitle, BlockTitle, Kicker } from '../components/Editorial.jsx'
 import Empty from '../components/Empty.jsx'
 import NoticeBoard from '../components/NoticeBoard.jsx'
@@ -295,6 +296,7 @@ export default function SquadHub() {
 
   return (
     <div>
+      <PaintDebug />
       <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           {/* The portal's headline formula — "The Muirs, *on paper.*" — worn
