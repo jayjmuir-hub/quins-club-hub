@@ -776,7 +776,7 @@ describe('canApproveAnything — a request is not access', () => {
   })
 
   it('refuses a pending admin row', () => {
-    expect(canApproveAnything([{ role: 'admin', status: 'active', team_id: null, status: 'pending' }])).toBe(false)
+    expect(canApproveAnything([{ role: 'admin', team_id: null, status: 'pending' }])).toBe(false)
     expect(canApproveAnything([{ role: 'admin', status: 'active', team_id: null }])).toBe(true)
   })
 

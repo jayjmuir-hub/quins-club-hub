@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 22 Aug 2026
 
-- 📓 **Handoff: the sidebar day, and the import rethink**
+- **ESLint, and the crash it found first** — `eslint.config.js`,
+  `npm run lint`, a CI step before `npm test` in `.github/workflows/test.yml`.
+  The dry run over `src/` found a conditional hook in `src/screens/Accounts.jsx`:
+  the authorisation gate sat above nine hooks, and because `memberships` is the
+  EFFECTIVE set, a super admin switching "View as" to a parent on that screen
+  went from admin to not-authorised while mounted and the screen fell into the
+  error boundary ("Rendered fewer hooks than expected"). Proven by a test before
+  the fix, gate moved below the last hook, test kept. Also: `docs-check`'s
+  inbox regex wrote a single-backslash dot in a plain string, so its dot matched
+  any character (harmless, broader); three invisible characters in
+  `src/lib/playerImport.js` are now unicode escapes; one duplicate key in a
+  `scope.test.js` fixture. Zero lint errors; 50 warnings left as a burn-down,
+  deliberately not blocking.
+- `a33b77e` — 📓 **Handoff: the sidebar day, and the import rethink**
   (`claude/handoffs/2026-08-22-sidebar-day-and-the-import-rethink.md`) —
   #305–#317 in order, six ranked lessons (the selective-re-capture rot and
   its audit query; the 16-event fixture that passed against the

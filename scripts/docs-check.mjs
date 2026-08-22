@@ -423,7 +423,7 @@ const INBOX_DOMAINS = [
 // Built from parts so this file never contains a literal address and cannot
 // match itself. Verified by running the check over a tree containing it.
 const INBOX_RE = new RegExp(
-  '[A-Za-z0-9._%+-]+' + '@' + `(?:${INBOX_DOMAINS.join('|')})` + '\.[a-z]{2,}(?:\.[a-z]{2,})?',
+  '[A-Za-z0-9._%+-]+' + '@' + `(?:${INBOX_DOMAINS.join('|')})` + '\\.[a-z]{2,}(?:\\.[a-z]{2,})?',
   'i',
 )
 

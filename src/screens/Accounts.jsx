@@ -902,7 +902,14 @@ export default function Accounts() {
     [memberships, teams],
   )
 
-  if (!admin && !approver) return <NotAuthorised />
+  // ⚠️ THE AUTHORISATION GATE USED TO SIT HERE, ABOVE NINE HOOKS — AND THAT
+  // WAS A CRASH, NOT A STYLE POINT. `memberships` is the EFFECTIVE set, so a
+  // super admin on this screen who switched "View as" to a parent persona went
+  // from admin to not-authorised WHILE MOUNTED, React counted fewer hooks than
+  // the previous render, and the whole screen fell into the error boundary
+  // ("Rendered fewer hooks than expected"). Proven by a test on 22 Aug 2026
+  // before it was moved; the gate is now below the last hook, next to the
+  // render. tests/accounts.test.jsx — "hook order across a View-as switch".
 
   // Split by ROW, not by person — see THE THIRD CATEGORY above. `status` is
   // compared against 'pending' rather than 'active' so a row from before the
@@ -1098,6 +1105,9 @@ export default function Accounts() {
   // people the row is decorative. ROLE_OPTIONS still decides the ORDER, so the
   // row cannot reshuffle itself as memberships change.
   const availableRoles = ROLE_OPTIONS.filter((option) => roleCounts.has(option.value))
+
+  // The gate. Below every hook — see the note where it used to live.
+  if (!admin && !approver) return <NotAuthorised />
 
   // ⚠️ `groups` STAYS THE WHOLE SET AND THE HEADER KEEPS COUNTING IT. "12 with
   // access" is a fact about the club, not about the filter — recomputing it
