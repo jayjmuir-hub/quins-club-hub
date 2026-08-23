@@ -370,13 +370,21 @@ export async function listMyConversations() {
 
 /** One conversation row (participants), for the thread header. RLS scopes it. */
 export async function getConversation(conversationId) {
-  const { data, error } = await supabase
-    .from('conversations')
-    .select('id, club_id, profile_a, profile_b, created_at, last_at')
-    .eq('id', conversationId)
-    .maybeSingle()
+  const [{ data, error }, minor] = await Promise.all([
+    supabase
+      .from('conversations')
+      .select('id, club_id, profile_a, profile_b, created_at, last_at')
+      .eq('id', conversationId)
+      .maybeSingle(),
+    // Whether a minor is in it decides the notice: a minor's conversation is
+    // reviewable by admins from the first message; an adults-only one only
+    // once a message in it is reported (Jay, 23 Aug 2026). null for anyone
+    // who may not see it. db/migrations/20260823_adult_dms_private.sql.
+    supabase.rpc('conversation_involves_minor', { _conversation: conversationId }),
+  ])
   if (error) throw error
-  return data
+  if (minor.error) throw minor.error
+  return data ? { ...data, involves_minor: minor.data === true } : data
 }
 
 /** A DM thread, oldest first. */

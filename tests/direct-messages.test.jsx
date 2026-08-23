@@ -107,8 +107,19 @@ describe('DirectMessages — inbox', () => {
 })
 
 describe('DirectMessages — a thread', () => {
-  it('shows the permanent notice naming club admins, the bubbles, and sends', async () => {
+  // ⚠️ TWO NOTICES SINCE 23 Aug 2026 (evening). Jay: "I don't think dm between
+  // adults should be visible to anyone except those people, unless a message
+  // is reported." The database decides which (conversation_involves_minor);
+  // the screen only words it.
+  it('an adults-only conversation says admins can review it only if a message is reported', async () => {
+    renderAt('/chat/dm/c1')
+    const notice = await screen.findByTestId('dm-notice')
+    expect(notice).toHaveTextContent('Private between you and Zz Manager Probe. If a message is reported, club admins can review it.')
+  })
+
+  it('shows the permanent notice naming club admins when a minor is in it, the bubbles, and sends', async () => {
     const user = userEvent.setup()
+    m.getConversation.mockResolvedValue({ ...CONV, involves_minor: true })
     renderAt('/chat/dm/c1')
     const notice = await screen.findByTestId('dm-notice')
     expect(notice).toHaveTextContent('Private between you and Zz Manager Probe. Club admins can review this conversation.')
@@ -144,12 +155,27 @@ describe('DirectMessages — a thread', () => {
     expect(m.reportMessage).toHaveBeenCalledWith('d1', 'Rude')
   })
 
-  // ⚠️ THE RULING MADE VISIBLE. An admin who is not a participant sees the
+  it('an admin opening an adults-only conversation that is not reported gets the not-available card and nothing is logged', async () => {
+    useAuthMock.mockReturnValue({ user: { id: 'admin-9' } })
+    useMembershipsMock.mockReturnValue({ memberships: ADMIN, teams: [] })
+    m.listMyConversations.mockResolvedValue([])
+    m.getConversation.mockResolvedValue(null)   // RLS: no row for this reader
+    m.listDirectMessages.mockResolvedValue([])
+    renderAt('/chat/dm/c1')
+    expect(await screen.findByTestId('dm-missing')).toHaveTextContent(/private to them unless a message in it is reported/)
+    expect(screen.queryByTestId('dm-notice')).toBeNull()
+    expect(m.logWelfareAccess).not.toHaveBeenCalled()
+  })
+
+  // ⚠️ THE RULING MADE VISIBLE — AND NARROWED THE SAME EVENING. This path now
+  // only exists for a conversation the database lets the admin read: one that
+  // involves a minor, or one with a reported message. An admin who is not a participant sees the
   // thread read-only, the notice says the open was recorded, and it WAS.
   it('an admin who is not in it reads only, sees the review notice, and the open is logged', async () => {
     useAuthMock.mockReturnValue({ user: { id: 'admin-9' } })
     useMembershipsMock.mockReturnValue({ memberships: ADMIN, teams: [] })
     m.listMyConversations.mockResolvedValue([])
+    m.getConversation.mockResolvedValue({ ...CONV, involves_minor: true })
     renderAt('/chat/dm/c1')
     const notice = await screen.findByTestId('dm-notice')
     expect(notice).toHaveTextContent(/reviewing a private conversation as a club admin/)

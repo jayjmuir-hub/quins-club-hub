@@ -54,6 +54,7 @@ tracking grid yet; the first one's reaction is the thing to watch.
 (read-only, redacted — `public.pitch_occupancy`, applied and harnessed).
 Requests still go through the fixture; allocation stays admin-only.
 
+<<<<<<< HEAD
 💬 **SQUAD CHAT PHASES 1–3 ARE LIVE** (23 Aug 2026) — a channel per squad
 and one for the club (announce-only by default), a thread per fixture with
 RSVP chips, @mentions that push, a staff channel per squad, direct messages,
@@ -66,6 +67,17 @@ Android. `claude/plans/2026-08-23-squad-chat.md`; the day's record is
 retention, email digests) is not started and email was ruled low priority.
 ⚠️ **Nobody has the Welfare right yet and no real DM has been sent** — the
 first one is the first proof.
+=======
+💬 **SQUAD CHAT PHASE 1 IS LIVE** (23 Aug 2026) — a channel per squad and
+one for the club, announce-only by default, `Chat` on everyone's tab bar.
+Push on a staff post proven end to end the same afternoon: Jay posted in
+U13 Mixed and it arrived on a parent's phone; read receipts counted it.
+`claude/plans/2026-08-23-squad-chat.md` — phases 2–4 (fixture threads,
+@mentions, staff channel, welfare view, DMs) shipped the same day — see the
+plan. ⚠️ **An admin may read a DM only if it involves a minor or a message in
+it was reported** (`claude/decisions/2026-08-23-adult-dms-private-unless-reported.md`). The thing to
+watch is the first coach who uses it for real.
+>>>>>>> a155120 (feat(chat): adult-to-adult DMs are private unless a message is reported)
 
 📋 **The importer reads columns by content, any order**, has a squad
 picker for name-only pastes, and skips players already on the roster.

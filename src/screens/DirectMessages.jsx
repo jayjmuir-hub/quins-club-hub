@@ -219,6 +219,9 @@ function Thread({ conversationId }) {
   const admin = isAdmin(memberships)
 
   const [conversation, setConversation] = useState(null)
+  // The database answered and there is no such conversation FOR THIS READER —
+  // a typo in the URL, or an adults-only DM an admin may not review.
+  const [missing, setMissing] = useState(false)
   const [messages, setMessages] = useState(null)
   const [other, setOther] = useState(null)
   const [blocked, setBlocked] = useState(false)
@@ -241,6 +244,7 @@ function Thread({ conversationId }) {
       ])
       setConversation(conv)
       setMessages(rows)
+      setMissing(!conv)
       const mine = inbox.find((c) => c.conversation_id === conversationId)
       const otherId = conv ? (conv.profile_a === selfId ? conv.profile_b : conv.profile_a) : null
       setOther(
@@ -317,6 +321,24 @@ function Thread({ conversationId }) {
     }
   }
 
+  if (missing) {
+    return (
+      <section className="px-1">
+        <div className="mb-3 mt-1 flex items-center gap-3">
+          <Link to="/chat/dm" className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
+            ← Messages
+          </Link>
+        </div>
+        <Card className="p-6 text-center" data-testid="dm-missing">
+          <p className="text-[14px] font-semibold text-ink">This conversation isn’t available to you.</p>
+          <p className="mt-1.5 text-[12.5px] text-ink-muted">
+            A conversation between two adults is private to them unless a message in it is reported.
+          </p>
+        </Card>
+      </section>
+    )
+  }
+
   return (
     <section className="px-1">
       <div className="mb-3 mt-1 flex items-center gap-3">
@@ -348,7 +370,9 @@ function Thread({ conversationId }) {
         <p>
           {reviewing
             ? 'You are reviewing a private conversation as a club admin. This open has been recorded.'
-            : `Private between you and ${other?.name ?? 'them'}. Club admins can review this conversation.`}
+            : conversation?.involves_minor
+              ? `Private between you and ${other?.name ?? 'them'}. Club admins can review this conversation.`
+              : `Private between you and ${other?.name ?? 'them'}. If a message is reported, club admins can review it.`}
         </p>
       </div>
 
