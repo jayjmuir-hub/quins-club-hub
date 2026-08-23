@@ -807,7 +807,11 @@ REVOKE ALL ON public.messages, public.channel_settings, public.message_reads FRO
 -- column-level on (resolved_at, resolved_by). player_private: UPDATE on
 -- staff_dm_opt_in is granted on top of the existing column grants; the
 -- trigger decides who may flip it. anon holds nothing on any of them.
--- To be re-verified from information_schema after the apply.
+-- VERIFIED from information_schema after the apply (23 Aug 2026): exactly the
+-- lines below, anon absent. ⚠️ player_private ALREADY carried table-level
+-- UPDATE for authenticated from before, so staff_dm_opt_in_by / _at are
+-- writable too — harmless: player_private_staff_dm_opt_in overwrites both on
+-- every update (stamps on a flip, restores old otherwise).
 -- ---------------------------------------------------------------------
 GRANT SELECT ON public.conversations TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.dm_blocks TO authenticated;
