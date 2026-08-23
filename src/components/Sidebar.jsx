@@ -55,8 +55,12 @@ function itemClassName({ isActive }) {
   return [
     'flex items-center gap-3 rounded-btn px-3 py-2.5 text-[14px] font-semibold outline-none transition',
     'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
+    // The same pill the phone's dock gives its active tab (Nav.jsx, design
+    // "A", 23 Aug 2026): brand gradient and a soft red glow, so the two
+    // navs read as one system rather than a flat fill here and a lit one
+    // there.
     isActive
-      ? 'bg-brand text-white'
+      ? 'bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-white shadow-[0_4px_14px_rgba(194,31,50,0.35)]'
       : 'text-chrome-muted hover:bg-white/[0.07] hover:text-white',
   ].join(' ')
 }
