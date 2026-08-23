@@ -35,6 +35,11 @@ export async function listMessages(teamId, { limit = 50 } = {}) {
     .from('messages')
     .select(SELECT)
     .is('parent_id', null)
+    // ⚠️ THE CHANNEL FILTER IS LOAD-BEARING — 23 Aug 2026. Without it the club
+    // channel (team_id null) also matched every DM (team_id null, channel dm),
+    // so a member's own private messages appeared in Whole-club chat with no
+    // recipient shown. Jay saw it on the live site the evening DMs shipped.
+    .eq('channel', 'squad')
     .order('created_at', { ascending: false })
     .limit(limit)
   posts = teamId ? posts.eq('team_id', teamId) : posts.is('team_id', null)
