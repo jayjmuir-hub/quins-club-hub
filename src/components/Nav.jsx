@@ -55,6 +55,16 @@ export function SquadIcon(props) {
   )
 }
 
+// Exported for Sidebar, same reason as SquadIcon.
+export function ChatIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.4A.5.5 0 0 1 4 19z" />
+      <path d="M8 8.5h8M8 12h5" />
+    </svg>
+  )
+}
+
 function MoreIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -71,8 +81,14 @@ export const NAV_ITEMS = [
   { to: '/', label: 'Home', end: true, icon: HomeIcon },
   { to: '/schedule', label: 'Schedule', icon: ScheduleIcon },
   { to: '/roster', label: 'Roster', icon: RosterIcon },
+  // Chat (23 Aug 2026) — the squad channel. On the bar for EVERYONE: the
+  // phone's only entry point is the thing you cannot delete (the 22 Aug
+  // handoff's lesson), and a chat nobody can find is a chat nobody uses.
+  { to: '/chat', label: 'Chat', icon: ChatIcon },
   { to: '/more', label: 'More', icon: MoreIcon },
 ]
+
+const GRID_COLS = { 4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6' }
 
 function linkClassName({ isActive }) {
   return [
@@ -115,7 +131,10 @@ export default function Nav({ showSquadHub = false }) {
       /* `desktop:gap-[2px]` matches adhjrt.com's `.hdr-nav { gap: 2px }`. The
          items now carry their own hover fill, so a wider gap would read as
          five separate buttons rather than one row of tabs. */
-      className={`fixed inset-x-0 bottom-0 z-40 grid ${items.length === 5 ? 'grid-cols-5' : 'grid-cols-4'} bg-chrome pb-[env(safe-area-inset-bottom)] shadow-tabbar desktop:hidden`}
+      // ⚠️ FULL CLASS NAMES, NEVER `grid-cols-${n}` — Tailwind only emits the
+      // classes it can see in the source. Five for everyone since Chat joined
+      // (23 Aug 2026), six for squad staff.
+      className={`fixed inset-x-0 bottom-0 z-40 grid ${GRID_COLS[items.length] ?? 'grid-cols-5'} bg-chrome pb-[env(safe-area-inset-bottom)] shadow-tabbar desktop:hidden`}
     >
       <div className="brand-rule absolute inset-x-0 top-0" />
       {items.map(({ to, label, end, icon: Icon }) => (

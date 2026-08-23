@@ -9,6 +9,7 @@ import Schedule from './screens/Schedule.jsx'
 import Roster from './screens/Roster.jsx'
 import More from './screens/More.jsx'
 import Notices from './screens/Notices.jsx'
+import Chat from './screens/Chat.jsx'
 import MyReports from './screens/MyReports.jsx'
 import AdminDashboard from './screens/AdminDashboard.jsx'
 import PortalChooser from './screens/PortalChooser.jsx'
@@ -182,6 +183,15 @@ export default function App() {
               RLS, and the composer is offered only where the database would
               accept it. */}
           <Route path="/notices" element={<AppShell><Notices /></AppShell>} />
+
+          {/* SQUAD CHAT (23 Aug 2026, phase 1) — a channel per squad.
+              /chat picks (or redirects to the only squad); /chat/club is the
+              club-wide channel; /squad/:teamId/chat is the SAME screen under
+              the Squad Hub's sidebar section, so a coach's Chat item stays in
+              the section that is lit. claude/plans/2026-08-23-squad-chat.md. */}
+          <Route path="/chat" element={<AppShell><Chat /></AppShell>} />
+          <Route path="/chat/:teamId" element={<AppShell><Chat /></AppShell>} />
+          <Route path="/squad/:teamId/chat" element={<AppShell><Chat /></AppShell>} />
 
           {/* THE SQUAD HUB (21 Aug 2026) — the coach/manager dashboard, one
               squad at a time. ⚠️ NOT under /admin, same reason as /notices:

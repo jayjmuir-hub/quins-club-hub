@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **The account menu — one trigger in the masthead, at every width** — Jay's
+- 💬 **Squad chat, phase 1** — a channel per squad (and one for the club):
+  `/chat` on the phone's tab bar for everyone, `Chat` under the Squad Hub's
+  sidebar section for staff. Announce-only by DEFAULT (staff post, families
+  reply in threads; staff can switch it off, recorded who and when), pinned
+  posts, one-level replies, soft delete, 15-minute edits, "Read by N of M"
+  for staff, realtime, and push on a staff post through `push-send`'s sixth
+  trigger shape `{ message_id }` (category `squad_chat`, opt-outable).
+  `db/migrations/20260823_squad_chat.sql` (+ harness 11/11 rolled back
+  against production), `src/data/messages.js`, `src/screens/Chat.jsx`,
+  `src/components/MessageRow.jsx`, a `message-row` harness scenario.
+  Two things found on the way: a policy on `messages` cannot select from
+  `messages` (recursion — now `private.can_reply_to`), and Supabase's default
+  privileges would have handed `authenticated` table-level UPDATE under the
+  column grant (now revoked first, and the capture proves it).
+  `claude/plans/2026-08-23-squad-chat.md` phase 1.
+- `acd9475` — **The account menu — one trigger in the masthead, at every width** — Jay's
   phone showed "QUINS CLUB HUB · …" with the role eaten by the ellipsis, the
   fifth masthead-overflow fix in sixteen days. Every control beside the
   initial was `shrink-0` and the wordmark paid for all of them. Now the

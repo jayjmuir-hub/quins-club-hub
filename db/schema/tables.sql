@@ -1856,3 +1856,72 @@ CREATE TABLE public.training_session_blocks (
 );
 ALTER TABLE public.training_session_blocks ENABLE ROW LEVEL SECURITY;
 
+
+
+-- ---------------------------------------------------------------------
+-- public.messages / public.channel_settings / public.message_reads
+--   (captured 23 Aug 2026, from a rolled-back apply of
+--    db/migrations/20260823_squad_chat.sql — re-verify after the real apply)
+--
+-- Squad chat, phase 1. team_id is the boundary (NULL = whole club), exactly
+-- as for announcements. club_id, author_id, author_role and author_title are
+-- stamped by messages_provenance and are not client-settable. A reply
+-- (parent_id set) inherits its parent's team_id from the same trigger.
+-- Soft delete only: deleted_at is set and messages_touch blanks the body.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.messages (
+  id            uuid        NOT NULL DEFAULT gen_random_uuid(),
+  club_id       uuid        NOT NULL,
+  team_id       uuid,
+  channel       text        NOT NULL DEFAULT 'squad',
+  parent_id     uuid,
+  event_id      uuid,
+  author_id     uuid        NOT NULL,
+  author_role   text,
+  author_title  text,
+  body          text        NOT NULL,
+  pinned        boolean     NOT NULL DEFAULT false,
+  edited_at     timestamptz,
+  deleted_at    timestamptz,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.messages ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
+ALTER TABLE public.messages ADD CONSTRAINT messages_channel_check CHECK (channel IN ('squad', 'staff', 'dm'));
+ALTER TABLE public.messages ADD CONSTRAINT messages_body_check CHECK (length(btrim(body)) BETWEEN 1 AND 2000);
+ALTER TABLE public.messages ADD CONSTRAINT messages_staff_needs_team CHECK (channel <> 'staff' OR team_id IS NOT NULL);
+ALTER TABLE public.messages ADD CONSTRAINT messages_club_id_fkey   FOREIGN KEY (club_id)   REFERENCES clubs(id)    ON DELETE CASCADE;
+ALTER TABLE public.messages ADD CONSTRAINT messages_team_id_fkey   FOREIGN KEY (team_id)   REFERENCES teams(id)    ON DELETE CASCADE;
+ALTER TABLE public.messages ADD CONSTRAINT messages_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES messages(id) ON DELETE CASCADE;
+ALTER TABLE public.messages ADD CONSTRAINT messages_event_id_fkey  FOREIGN KEY (event_id)  REFERENCES events(id)   ON DELETE SET NULL;
+ALTER TABLE public.messages ADD CONSTRAINT messages_author_id_fkey FOREIGN KEY (author_id) REFERENCES profiles(id) ON DELETE CASCADE;
+CREATE INDEX messages_stream_idx ON public.messages USING btree (team_id, channel, created_at DESC);
+CREATE INDEX messages_parent_idx ON public.messages USING btree (parent_id) WHERE (parent_id IS NOT NULL);
+CREATE INDEX messages_event_idx  ON public.messages USING btree (event_id)  WHERE (event_id IS NOT NULL);
+CREATE INDEX messages_author_idx ON public.messages USING btree (author_id);
+
+-- announce_only DEFAULTS TRUE, and an ABSENT row means true — most squads
+-- will never have one. private.channel_announce_only() reads it that way.
+CREATE TABLE public.channel_settings (
+  team_id        uuid        NOT NULL,
+  club_id        uuid        NOT NULL,
+  announce_only  boolean     NOT NULL DEFAULT true,
+  updated_by     uuid,
+  updated_at     timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.channel_settings ADD CONSTRAINT channel_settings_pkey PRIMARY KEY (team_id);
+ALTER TABLE public.channel_settings ADD CONSTRAINT channel_settings_team_id_fkey    FOREIGN KEY (team_id)    REFERENCES teams(id)    ON DELETE CASCADE;
+ALTER TABLE public.channel_settings ADD CONSTRAINT channel_settings_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE;
+ALTER TABLE public.channel_settings ADD CONSTRAINT channel_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES profiles(id) ON DELETE SET NULL;
+
+-- Same shape as announcement_reads: the primary key is the deduplication.
+CREATE TABLE public.message_reads (
+  message_id uuid        NOT NULL,
+  profile_id uuid        NOT NULL,
+  read_at    timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.message_reads ADD CONSTRAINT message_reads_pkey PRIMARY KEY (message_id, profile_id);
+ALTER TABLE public.message_reads ADD CONSTRAINT message_reads_message_id_fkey FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE;
+ALTER TABLE public.message_reads ADD CONSTRAINT message_reads_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE;
+CREATE INDEX message_reads_profile_idx ON public.message_reads USING btree (profile_id);
+
+-- notification_opt_outs.category gained 'squad_chat' in the same migration.

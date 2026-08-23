@@ -307,3 +307,18 @@ CREATE TRIGGER player_parents_sync_name
   BEFORE INSERT OR UPDATE ON public.player_parents
   FOR EACH ROW
   EXECUTE FUNCTION private.sync_person_name();
+
+
+-- ---------------------------------------------------------------------
+-- public.messages  (captured 23 Aug 2026, pg_get_triggerdef, rolled-back apply)
+-- Migration: db/migrations/20260823_squad_chat.sql
+--
+-- messages_provenance OVERWRITES author_id/club_id/author_role/author_title
+-- and, for a reply, team_id/channel/event_id from the parent — the
+-- announcements reasoning. messages_touch freezes everything but body,
+-- pinned and deleted_at, and blanks the body on soft delete.
+-- messages_push fires per row; the FUNCTION decides (staff top-level only).
+-- ---------------------------------------------------------------------
+CREATE TRIGGER messages_provenance BEFORE INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION private.set_message_provenance();
+CREATE TRIGGER messages_touch BEFORE UPDATE ON public.messages FOR EACH ROW EXECUTE FUNCTION private.touch_message();
+CREATE TRIGGER messages_push AFTER INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION private.notify_message_push();

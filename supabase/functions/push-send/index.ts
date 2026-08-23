@@ -1,6 +1,6 @@
 // Sends a real browser/OS push notification — not an email.
 //
-// FIVE triggers, ONE function:
+// SIX triggers, ONE function:
 //   { feedback_id }     an admin replied to somebody's report
 //                       (AFTER UPDATE on public.feedback, when status or
 //                        admin_note changes)
@@ -17,6 +17,9 @@
 //                       somebody is waiting to be approved
 //                       (AFTER INSERT on public.memberships when pending,
 //                        19 Aug 2026)
+//   { message_id }      squad staff posted in the squad chat
+//                       (AFTER INSERT on public.messages, staff top-level
+//                        posts only — the trigger decides, 23 Aug 2026)
 //
 // ⚠️ `squad_push` AND `availability_nudge` ARRIVE FULLY FORMED — title, body,
 // tag and all — WHICH THE OTHER THREE DO NOT, AND A CANCELLATION IS WHY. By the
@@ -25,8 +28,9 @@
 // resolves the audience and encrypts.
 //
 // ⚠️ THE COUNT IN THE LINE ABOVE SAID "TWO" WHILE THREE WERE LISTED, from
-// 19 Aug 2026 until the fifth was added the same day. If you add a sixth,
-// change the number — a header nobody maintains is worse than no header.
+// 19 Aug 2026 until the fifth was added the same day. The sixth (23 Aug)
+// changed the number. If you add a seventh, change it again — a header
+// nobody maintains is worse than no header.
 //
 // ⚠️ ONE FUNCTION RATHER THAN TWO, AND THE REASON IS THE CRYPTO. A second
 // function would mean a SECOND COPY of hand-rolled ECDH, HKDF, AES-128-GCM and
@@ -439,6 +443,22 @@ async function approvalTargets(membershipId: string): Promise<Subscription[]> {
   return await response.json()
 }
 
+async function messageTargets(messageId: string): Promise<Subscription[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/message_push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ _message: messageId }),
+  })
+  if (!response.ok) {
+    throw new Error(`message_push_subscriptions failed (${response.status}): ${await response.text()}`)
+  }
+  return await response.json()
+}
+
 async function noticeTargets(announcementId: string): Promise<Subscription[]> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/notice_push_subscriptions`, {
     method: 'POST',
@@ -507,6 +527,7 @@ Deno.serve(async (request) => {
 
   let feedbackId = ''
   let announcementId = ''
+  let messageId = ''
   let approvalMembershipId = ''
   let squad: Record<string, string> | null = null
   let nudge: Record<string, string> | null = null
@@ -514,6 +535,7 @@ Deno.serve(async (request) => {
     const payload = await request.json()
     feedbackId = String(payload?.feedback_id ?? '')
     announcementId = String(payload?.announcement_id ?? '')
+    messageId = String(payload?.message_id ?? '')
     approvalMembershipId = String(payload?.approval_membership_id ?? '')
     squad = payload?.squad_push ?? null
     nudge = payload?.availability_nudge ?? null
@@ -524,7 +546,7 @@ Deno.serve(async (request) => {
   // asking for, and guessing which it meant is how the wrong people get
   // notified.
   if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0)
-      + (approvalMembershipId ? 1 : 0) + (nudge ? 1 : 0) !== 1) {
+      + (approvalMembershipId ? 1 : 0) + (nudge ? 1 : 0) + (messageId ? 1 : 0) !== 1) {
     return new Response('bad request', { status: 400 })
   }
 
@@ -639,6 +661,29 @@ Deno.serve(async (request) => {
         // about the same thing.
         tag: `approval-${approvalMembershipId}`,
         subscriptions: await approvalTargets(approvalMembershipId),
+      }
+    } else if (messageId) {
+      // ⚠️ THE SQUAD NAME AND THE FIRST LINE — NEVER A CHILD'S NAME BY
+      // CONSTRUCTION. The body is the coach's responsibility; the shape is
+      // ours. A club-wide post has no squad and says so.
+      const rows = await db(
+        `messages?id=eq.${encodeURIComponent(messageId)}&select=body,team_id,deleted_at,teams(name)`,
+      )
+      const message = rows?.[0]
+      if (!message || message.deleted_at) return new Response('not found', { status: 404 })
+
+      const squadName = message.teams?.name ?? 'Whole club'
+      job = {
+        title: `${escapeHtmlFree(squadName)} chat`,
+        body: escapeHtmlFree(message.body).slice(0, 200),
+        url: message.team_id
+          ? `${APP_URL}/chat/${encodeURIComponent(message.team_id)}`
+          : `${APP_URL}/chat/club`,
+        // Per SQUAD, not per message: three posts in a minute collapse into
+        // the latest one rather than stacking. A chat is the one place where
+        // "newest replaces previous" is what the tray should do.
+        tag: `chat-${message.team_id ?? 'club'}`,
+        subscriptions: await messageTargets(messageId),
       }
     } else {
       const rows = await db(

@@ -4055,6 +4055,245 @@ $function$
 ;
 
 -- ---------------------------------------------------------------------
+-- private.channel_announce_only(_team uuid)   (23 Aug 2026 — squad chat)
+-- proacl: {postgres=X/postgres}
+-- Absent channel_settings row = announce-only ON.
+-- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
+-- re-verify after the real apply.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.channel_announce_only(_team uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select coalesce((select announce_only from channel_settings where team_id = _team), true);
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.can_reply_to(_parent uuid)   (23 Aug 2026 — squad chat)
+-- proacl: {postgres=X/postgres}
+-- SECURITY DEFINER so "message create" can look at the parent without the policy recursing into its own table.
+-- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
+-- re-verify after the real apply.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_reply_to(_parent uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from messages p
+     where p.id = _parent
+       and p.parent_id is null
+       and p.deleted_at is null
+       and p.channel = 'squad'
+       and case
+         when p.team_id is null then exists (
+           select 1 from memberships m
+            where m.profile_id = (select auth.uid())
+              and m.club_id = p.club_id and m.status = 'active')
+         else private.can_see_team(p.team_id)
+       end);
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.set_message_provenance()   (23 Aug 2026 — squad chat)
+-- proacl: null
+-- Stamps club/author/role/title; a reply inherits team/channel/event from its parent; replies are one level deep.
+-- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
+-- re-verify after the real apply.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.set_message_provenance()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  parent public.messages;
+begin
+  new.author_id := auth.uid();
+  if new.author_id is null then
+    raise exception 'not signed in' using errcode = '42501';
+  end if;
+
+  if new.parent_id is not null then
+    select * into parent from messages where id = new.parent_id;
+    if parent.id is null then
+      raise exception 'no such message to reply to' using errcode = 'P0002';
+    end if;
+    if parent.parent_id is not null then
+      raise exception 'replies are one level deep' using errcode = '23514';
+    end if;
+    if parent.deleted_at is not null then
+      raise exception 'that message was removed' using errcode = '23514';
+    end if;
+    new.team_id  := parent.team_id;
+    new.channel  := parent.channel;
+    new.event_id := parent.event_id;
+    new.pinned   := false;
+  end if;
+
+  -- The author's standing on this squad, best role first. A club admin with
+  -- no squad row is 'admin'; a parent is 'parent'.
+  select m.role, m.title into new.author_role, new.author_title
+    from memberships m
+   where m.profile_id = new.author_id and m.status = 'active'
+     and (m.team_id = new.team_id or m.team_id is null)
+   order by case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2
+                        when 'medic' then 3 else 9 end,
+            m.team_id nulls last
+   limit 1;
+
+  new.club_id := coalesce(
+    (select club_id from teams where id = new.team_id),
+    (select m.club_id from memberships m
+      where m.profile_id = new.author_id and m.status = 'active'
+      order by m.created_at limit 1));
+  if new.club_id is null then
+    raise exception 'no club for this message' using errcode = '23502';
+  end if;
+
+  new.edited_at  := null;
+  new.deleted_at := null;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.touch_message()   (23 Aug 2026 — squad chat)
+-- proacl: null
+-- Freezes every column but body/pinned/deleted_at; soft delete blanks the body to "(removed)".
+-- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
+-- re-verify after the real apply.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.touch_message()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  new.club_id    := old.club_id;
+  new.team_id    := old.team_id;
+  new.channel    := old.channel;
+  new.parent_id  := old.parent_id;
+  new.event_id   := old.event_id;
+  new.author_id  := old.author_id;
+  new.author_role  := old.author_role;
+  new.author_title := old.author_title;
+  new.created_at := old.created_at;
+
+  if new.deleted_at is not null and old.deleted_at is null then
+    new.body := '(removed)';
+    new.pinned := false;
+  elsif old.deleted_at is not null then
+    -- Nothing about a removed message changes again.
+    new.body := old.body;
+    new.deleted_at := old.deleted_at;
+    new.pinned := false;
+  elsif new.body is distinct from old.body then
+    new.edited_at := now();
+  end if;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notify_message_push()   (23 Aug 2026 — squad chat)
+-- proacl: null
+-- Fires on a STAFF top-level post only; queues {message_id} to push-send via net.http_post.
+-- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
+-- re-verify after the real apply.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_message_push()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+begin
+  if new.parent_id is not null then return null; end if;
+  if new.team_id is not null and not private.can_edit_team(new.team_id) then return null; end if;
+  if new.team_id is null and not private.is_admin(new.club_id) then return null; end if;
+
+  select decrypted_secret into endpoint from vault.decrypted_secrets where name = 'push_notify_url';
+  select decrypted_secret into secret   from vault.decrypted_secrets where name = 'approval_notify_secret';
+  if endpoint is null or secret is null then
+    raise warning 'notify_message_push: vault secrets missing, no push sent';
+    return null;
+  end if;
+
+  begin
+    perform net.http_post(
+      url     := endpoint,
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-approval-secret', secret),
+      body    := jsonb_build_object('message_id', new.id));
+  exception when others then
+    raise warning 'notify_message_push: % (message %)', sqlerrm, new.id;
+  end;
+  return null;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.message_read_stats(_team uuid)   (23 Aug 2026 — squad chat)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- Staff only — returns no rows to anybody else. Reads per post and the audience size.
+-- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
+-- re-verify after the real apply.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.message_read_stats(_team uuid)
+ RETURNS TABLE(message_id uuid, reads bigint, audience bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select m.id,
+         (select count(*) from message_reads r where r.message_id = m.id),
+         (select count(*) from private.notice_audience(m.club_id, m.team_id))
+    from messages m
+   where m.team_id = _team and m.parent_id is null and m.deleted_at is null
+     and private.can_edit_team(_team);
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.message_push_subscriptions(_message uuid)   (23 Aug 2026 — squad chat)
+-- proacl: {postgres=X/postgres,service_role=X/postgres}
+-- The audience for one message: squad (or club) minus the author minus squad_chat opt-outs. service_role only — push-send calls it.
+-- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
+-- re-verify after the real apply.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.message_push_subscriptions(_message uuid)
+ RETURNS TABLE(id uuid, endpoint text, p256dh text, auth text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with asked as (select * from messages where id = _message)
+  select s.id, s.endpoint, s.p256dh, s.auth
+    from asked a
+    cross join lateral private.notice_audience(a.club_id, a.team_id) as aud(profile_id)
+    join push_subscriptions s on s.profile_id = aud.profile_id
+   where aud.profile_id <> a.author_id
+     and a.deleted_at is null
+     and not exists (select 1 from notification_opt_outs o
+                      where o.profile_id = aud.profile_id and o.category = 'squad_chat');
+$function$
+;
+
+-- ---------------------------------------------------------------------
 -- public.register_push_subscription(text, text, text)   (23 Aug 2026)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
 -- Captured from pg_get_functiondef inside a rolled-back transaction BEFORE
