@@ -165,8 +165,8 @@ describe('App', () => {
 
     render(<App />)
 
-    // "Club life, *calendared.*" — the phase-5 editorial heading.
-    expect(screen.getByRole('heading', { name: /club life/i })).toBeInTheDocument()
+    // "What's on, *when.*" — the editorial heading (was "Club life, calendared.").
+    expect(screen.getByRole('heading', { name: /what's on/i })).toBeInTheDocument()
   })
 
   it('renders the roster screen at /roster when signed in', () => {

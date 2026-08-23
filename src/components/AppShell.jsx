@@ -303,7 +303,12 @@ export default function AppShell({ children }) {
         aria-hidden="true"
         className="glass-chrome pointer-events-none fixed inset-x-0 top-0 z-40 h-[env(safe-area-inset-top)]"
       />
-      <div className="sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:px-4">
+      {/* ⚠️ ON DESKTOP THE ISLAND SHRINK-WRAPS TO THE TOP-RIGHT. The sidebar
+          carries the crest and the name there, so a full-width island held
+          only a badge, the App link and an initial on the right — "something
+          is missing from that top menu bar" (Jay, 23 Aug 2026). Nothing was
+          missing; the bar was too big for what it holds. */}
+      <div className="sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:flex desktop:flex-col desktop:items-end desktop:px-4">
         <ViewAsBanner />
 
         {/* The masthead is DARK CHROME (#151517 -> #0c0c0e), not the red
@@ -326,7 +331,7 @@ export default function AppShell({ children }) {
             across the top edge, where it is decoration and carries no text, so
             full saturation is free there. `harlequin` adds the site's diagonal
             shapes bleeding off the right edge. */}
-        <header className="glass-island overflow-hidden rounded-[22px] text-white">
+        <header className="glass-island overflow-hidden rounded-[22px] text-white desktop:w-auto">
           <div className="brand-rule" />
           <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-2.5 overflow-hidden px-3 py-2.5 desktop:mx-0 desktop:max-w-none wide:max-w-none">
             {/* crest.png is 370x400 (portrait) — object-contain keeps its native

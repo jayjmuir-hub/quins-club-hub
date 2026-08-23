@@ -302,8 +302,11 @@ export default function Notices() {
           clipped masthead and a cut-off sheet three screens away. */}
       <div className="mb-3.5 mt-1 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Kicker>Club notices</Kicker>
-          <AccentTitle lead="From the" accent="committee." />
+          <Kicker>Notices</Kicker>
+          {/* "From the committee." until 23 Aug 2026 — Jay: "not all notices
+              are posted by the committee, in fact very few probably will be".
+              Coaches and managers post most of them. */}
+          <AccentTitle lead="Club" accent="notices." />
         </div>
         {mayPost && (
           <Button data-testid="post-notice" onClick={() => setComposerOpen(true)}>

@@ -1270,13 +1270,14 @@ describe('Schedule — the event-type filter row', () => {
 describe('Schedule — the section heading', () => {
   // Jay, 9 Aug 2026: "that area should say schedule, not schedule and
   // fixtures". The old wording said the same thing twice. Since phase 5 of
-  // the 2.0 retheme the heading is the portal's own line — "Club life,
-  // *calendared.*" over a "/ SCHEDULE" kicker — and the original claim
+  // the 2.0 retheme the heading is the portal's own line — "What's on,
+  // *when.*" (was "Club life, calendared." until 23 Aug 2026) over a
+  // "/ SCHEDULE" kicker — and the original claim
   // still binds: the doubled-up wording must never come back.
   it('reads the editorial heading, never "Schedule & fixtures"', async () => {
     setup()
 
-    const heading = await screen.findByRole('heading', { name: /Club life/i })
+    const heading = await screen.findByRole('heading', { name: /What's on/i })
     expect(heading).toBeInTheDocument()
     expect(screen.getByText('Schedule')).toBeInTheDocument() // the kicker
     expect(screen.queryByText(/schedule\s*&\s*fixtures/i)).not.toBeInTheDocument()

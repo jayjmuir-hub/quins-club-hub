@@ -176,7 +176,7 @@ describe('/privacy', () => {
     // what the app does without changing the policy, this fails.
     expect(screen.getByText(/tokyo, japan/i)).toBeInTheDocument()
     expect(
-      screen.getByText(/do not use advertising, analytics or tracking/i),
+      screen.getByText(/do not sell it, share it outside the club, advertise, or track you/i),
     ).toBeInTheDocument()
     expect(screen.getByText(/a child does not sign in/i)).toBeInTheDocument()
   })
@@ -198,7 +198,7 @@ describe('/privacy', () => {
     expect(screen.getByText(/names, photographs and availability of the rest/i)).toBeInTheDocument()
     // The half that IS restricted must still be stated plainly.
     expect(
-      screen.getByText(/nobody can see another family's phone number, email address or account/i),
+      screen.getByText(/contact details for a child are visible to that child.s family and to the squad.s coaches and managers/i),
     ).toBeInTheDocument()
   })
 

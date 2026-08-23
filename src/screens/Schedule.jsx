@@ -650,7 +650,9 @@ export default function Schedule() {
           <div>
             <Kicker>Schedule</Kicker>
             {/* The member portal's own events line, word for word. */}
-            <AccentTitle lead="Club life," accent="calendared." />
+            {/* "Club life, calendared." until 23 Aug 2026 — Jay: "not sure
+                calendared makes any sense". It is a word, but a lawyer's one. */}
+            <AccentTitle lead="What's on," accent="when." />
           </div>
           <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
         </div>
