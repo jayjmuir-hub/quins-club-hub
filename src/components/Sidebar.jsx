@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { countAdminWaiting } from '../data/members.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -61,15 +61,32 @@ function itemClassName({ isActive }) {
   ].join(' ')
 }
 
+// Where the waiting queues are cleared — see the badge below. `/approvals` is
+// the same screen mounted for squad staff (src/App.jsx).
+const ACCOUNTS_PATHS = ['/admin/accounts', '/approvals']
+
 export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
   const location = useLocation()
   const { user } = useAuth()
 
   // The Admin item's badge: how many approvals and access requests are
   // waiting (22 Aug 2026, Jay — "the number an admin opens the app for").
-  // Fetched once per shell mount, admins only; a failed count costs the
-  // badge and nothing else, and 0 renders nothing rather than a zero.
+  // Admins only; a failed count costs the badge and nothing else, and 0
+  // renders nothing rather than a zero.
+  //
+  // Counted on mount, and AGAIN EACH TIME THE ADMIN LEAVES THE ACCOUNTS SCREEN
+  // (23 Aug 2026, Jay). That screen is where the queue gets cleared, so a
+  // count taken before the visit is exactly the number that is now wrong —
+  // and re-counting on every route change would be a query per click to
+  // answer a question whose answer only changes there.
   const [adminWaiting, setAdminWaiting] = useState(0)
+  const [recount, setRecount] = useState(0)
+  const onAccounts = ACCOUNTS_PATHS.some((path) => location.pathname.startsWith(path))
+  const wasOnAccounts = useRef(onAccounts)
+  useEffect(() => {
+    if (wasOnAccounts.current && !onAccounts) setRecount((n) => n + 1)
+    wasOnAccounts.current = onAccounts
+  }, [onAccounts])
   useEffect(() => {
     if (!showAdmin) return undefined
     let mounted = true
@@ -81,7 +98,7 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
     return () => {
       mounted = false
     }
-  }, [showAdmin, user?.id])
+  }, [showAdmin, user?.id, recount])
 
   // Sub-menus (22 Aug 2026, Jay). Only the ACTIVE section expands — a
   // coach-admin's sidebar with every section open would be a wall — and every
