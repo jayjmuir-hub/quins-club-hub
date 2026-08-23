@@ -16,7 +16,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
      wrote them, kept because two of the migrations are already applied under
      those names. -->
 
-- 🗑️ **Delete for good.** Jay, with the list live: "i still can't completely
+- 📧 **Admins choose who is emailed about people waiting to be approved.**
+  Jay: "right now the only option related to that is selecting who's the
+  head coach." The recipient list was a rule inside `notify-approval`
+  (super admins + the squad's head coach + its managers); it is now a switch
+  per membership, `memberships.notify_approvals` — admins for the whole club,
+  a coach or manager for their squad — set from a new panel on the Club admin
+  tab. Backfilled to exactly the people the old rule emailed, so day one
+  changed nothing; if nobody in scope is switched on, the super admins are
+  still told. `db/migrations/20260823_notify_approvals.sql`, harness
+  `db/tests/notify-approvals.sql` 4/4, `src/components/ApprovalRecipients.jsx`,
+  `notify-approval` redeployed.
+- `6aca3f9` — 🗑️ **Delete for good.** Jay, with the list live: "i still can't completely
   delete messages or chats." Delete is now a real delete — the author any
   time, staff in their channels, admins where they may review; a DM deletes
   for both; "Clear chat" empties a channel. ⚠️ A reported message (or a post

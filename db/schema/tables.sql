@@ -598,6 +598,7 @@ CREATE TABLE public.memberships (
   --
   -- ⚠️ ITS COLUMN GRANT IS LOAD-BEARING, same trap as `title` — see grants.sql.
   is_head_coach boolean NOT NULL DEFAULT false,
+  notify_approvals boolean NOT NULL DEFAULT false,  -- 23 Aug 2026: who is EMAILED about pending approvals (admin: club-wide; coach/manager: their squad). Confers nothing.
   CONSTRAINT memberships_pkey            PRIMARY KEY (id),
   CONSTRAINT memberships_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
   CONSTRAINT memberships_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
@@ -612,6 +613,7 @@ CREATE TABLE public.memberships (
   -- sense. Written as `NOT is_head_coach OR ...` so it is silent for every row
   -- where the flag is false.
   CONSTRAINT memberships_head_coach_is_a_squad_coach CHECK ((NOT is_head_coach OR (role = 'coach'::text AND team_id IS NOT NULL))),
+  CONSTRAINT memberships_notify_approvals_role CHECK ((NOT notify_approvals OR (role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text])))),
   -- Added 2026-08-08 (membership_pending_status). Two values only, as found;
   -- there is no 'rejected'/'dismissed' value on this column.
   CONSTRAINT memberships_status_check     CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text]))),

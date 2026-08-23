@@ -190,6 +190,10 @@ begin
       -- receive more email and gain nothing. The unique index
       -- memberships_one_head_coach_per_team is what stops it fanning out.
       'memberships.is_head_coach',
+      -- notify_approvals ADDED 23 Aug 2026 (20260823_notify_approvals). The
+      -- same kind of thing as is_head_coach: who is TOLD, never who may act.
+      -- Constrained to admin / coach / manager rows by a CHECK.
+      'memberships.notify_approvals',
       -- announcements — an author may edit their own notice. ⚠️ `team_id` is
       -- DELIBERATELY ABSENT and that absence is load-bearing: step 10 of
       -- db/tests/announcements.sql exists to prove an author cannot re-scope a

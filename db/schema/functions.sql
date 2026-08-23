@@ -4881,6 +4881,34 @@ $function$
 ;
 
 -- ---------------------------------------------------------------------
+-- public.approval_recipients()   (23 Aug 2026 — db/migrations/20260823_notify_approvals.sql)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}   md5 99dfe405d827ea81c00822556360131a
+-- The list an admin edits on the Club tab: every active admin, coach and manager with the switch.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.approval_recipients()
+ RETURNS TABLE(membership_id uuid, profile_id uuid, full_name text, role text, team_id uuid, team_name text, notify boolean)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with me as (select auth.uid() as id),
+  club as (select m.club_id as id from memberships m cross join me
+            where m.profile_id = me.id and m.status = 'active' order by m.created_at limit 1)
+  select m.id, m.profile_id, p.full_name, m.role, m.team_id, t.name, m.notify_approvals
+    from memberships m
+    cross join club
+    join profiles p on p.id = m.profile_id
+    left join teams t on t.id = m.team_id
+   where m.club_id = club.id
+     and m.status = 'active'
+     and m.role in ('admin', 'coach', 'manager')
+     and (m.role = 'admin' or m.team_id is not null)
+     and private.is_admin(club.id)
+   order by case m.role when 'admin' then 0 else 1 end, t.sort_order nulls first, t.name, p.full_name;
+$function$
+;
+
+-- ---------------------------------------------------------------------
 -- DELETE FOR GOOD (24 Aug 2026, evening) — db/migrations/20260824_delete_for_good.sql.
 -- Jay: "i still can't completely delete messages or chats". Hard deletes; a
 -- reported message/conversation only by an admin. Captured from a rolled-back

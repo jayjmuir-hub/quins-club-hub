@@ -332,47 +332,43 @@ Deno.serve(async (request: Request): Promise<Response> => {
       return new Response(JSON.stringify({ skipped: 'no longer pending' }), { status: 200 })
     }
 
-    // -- Who to tell: SUPER admins, plus the head coach and team manager(s) of
-    //    THIS squad. Jay, 18 Aug 2026: "we don't need to email every single
-    //    admin every time or all the coaches in an age group".
+    // -- Who to tell: WHOEVER AN ADMIN SWITCHED ON. 23 Aug 2026, Jay: "admin
+    //    needs a way to select who receives emails about people waiting to be
+    //    approved, right now the only option related to that is selecting
+    //    who's the head coach." memberships.notify_approvals is that switch:
+    //    an admin (team_id null) hears about every registration in the club;
+    //    a coach or manager about THEIR squad's. The Club admin tab sets it.
+    //    db/migrations/20260823_notify_approvals.sql.
     //
-    // !! THIS IS DELIBERATELY NARROWER THAN private.can_approve_team, AND THAT
-    //    IS THE CHANGE. It used to be the same list - every admin in the club
-    //    plus every coach and manager on the squad - on the reasoning that the
-    //    people who CAN act should be told. In practice that meant an assistant
-    //    coach got an email for every registration in their age group, and all
-    //    five admins got one whether or not they run registrations.
-    //    Everyone who could approve before still can; they are simply not all
-    //    told. Authority is private.can_approve_team's business, not this
-    //    function's.
+    // !! THE OLD RULE LIVES ON AS THE BACKFILL, NOT IN THIS CODE. It used to be
+    //    "super admins + the squad's head coach + its managers" (18 Aug 2026,
+    //    Jay: "we don't need to email every single admin every time or all
+    //    the coaches in an age group"); the migration switched exactly those
+    //    people on, so day one sent the same emails to the same inboxes. From
+    //    here on the list is whatever the switches say.
     //
-    // !! NOT medic, unchanged. A medic cannot approve, so an email asking them
-    //    to would be an instruction they cannot follow.
+    // !! STILL DELIBERATELY NARROWER THAN private.can_approve_team. Everyone
+    //    who could approve before still can; the switch decides who is TOLD.
+    //    Authority is the database's business, not this function's.
     //
-    // !! THE HEAD COACH IS A COLUMN, NOT A TITLE MATCH. `memberships.title` is
-    //    free text with no constraints and already holds 'Assistant
-    //    Coach/Medic' on production; matching '%head coach%' would drop a
-    //    recipient silently the first time somebody typed 'HC'. The database
-    //    guarantees at most one per squad
-    //    (memberships_one_head_coach_per_team), so this cannot fan out.
-    //
-    // !! MANAGERS BY ROLE, NOT BY TITLE, and there may be more than one - Jay
-    //    asked for "the team manager or team managers if there is more than
-    //    one". role='manager' and the title 'Team Manager' cover the same
-    //    squads today, and a role cannot break on a typo.
-    const [supers, squadStaff] = await Promise.all([
-      db(
-        `memberships?club_id=eq.${encodeURIComponent(membership.club_id)}` +
-          '&is_super=is.true&status=eq.active&select=profiles(email)',
-      ),
-      db(
-        `memberships?team_id=eq.${encodeURIComponent(membership.team_id)}` +
-          '&status=eq.active&or=(is_head_coach.is.true,role.eq.manager)&select=profiles(email)',
-      ),
-    ])
-
+    // !! THE FLOOR: if NOBODY in scope is switched on - a new squad, or an
+    //    admin who switched everyone off - the super admins are told anyway.
+    //    A registration is never left unseen; that was the old rule's floor
+    //    and it is kept. The Club tab says so under the list.
+    const switched = await db(
+      `memberships?club_id=eq.${encodeURIComponent(membership.club_id)}` +
+        '&status=eq.active&notify_approvals=is.true' +
+        `&or=(team_id.is.null,team_id.eq.${encodeURIComponent(membership.team_id)})` +
+        '&select=profiles(email)',
+    )
+    const supers = switched.length > 0
+      ? []
+      : await db(
+          `memberships?club_id=eq.${encodeURIComponent(membership.club_id)}` +
+            '&is_super=is.true&status=eq.active&select=profiles(email)',
+        )
     const recipients = [...new Set(
-      [...supers, ...squadStaff]
+      [...switched, ...supers]
         .map((row: any) => row?.profiles?.email)
         .filter((email: unknown): email is string => typeof email === 'string' && email.includes('@')),
     )]
