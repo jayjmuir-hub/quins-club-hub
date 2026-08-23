@@ -131,6 +131,7 @@ ALTER TABLE public.messages          ENABLE ROW LEVEL SECURITY;  -- added 23 Aug
 ALTER TABLE public.channel_settings  ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026
 ALTER TABLE public.message_reads     ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026
 ALTER TABLE public.conversations      ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026 (phase 3)
+ALTER TABLE public.conversation_clears ENABLE ROW LEVEL SECURITY;  -- added 24 Aug 2026 (the Chats list)
 ALTER TABLE public.dm_blocks          ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026 (phase 3)
 ALTER TABLE public.message_reports    ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026 (phase 3)
 ALTER TABLE public.welfare_access_log ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026 (phase 3)
@@ -1390,6 +1391,7 @@ create policy "session block manage" on public.training_session_blocks for all
 -- ---------------------------------------------------------------------
 -- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
 -- private.admin_may_review — a minor in it, or a reported message. Captured from live.
+-- ⚠️ REPLACED by 20260824_chat_list (the Chats list; delete a message / a chat).
 CREATE POLICY "message read" ON public.messages
   FOR SELECT USING (
 CASE channel
@@ -1401,7 +1403,7 @@ CASE channel
         ELSE private.can_see_team(team_id)
     END
     WHEN 'staff'::text THEN private.can_edit_team(team_id)
-    WHEN 'dm'::text THEN (private.in_conversation(conversation_id) OR private.admin_may_review(conversation_id))
+    WHEN 'dm'::text THEN ((private.in_conversation(conversation_id) AND (created_at > COALESCE(private.cleared_before(conversation_id), '-infinity'::timestamp with time zone))) OR private.admin_may_review(conversation_id))
     ELSE false
 END);
 -- ⚠️ REPLACED by 20260823_squad_chat_phase3: three channels. 'staff' is the
@@ -1430,8 +1432,10 @@ END);
 
 -- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
 -- private.admin_may_review — a minor in it, or a reported message. Captured from live.
+-- ⚠️ REPLACED by 20260824_chat_list (the Chats list; delete a message / a chat).
+-- The author may REMOVE at any time; the 15-minute limit on EDITING words moved into private.touch_message.
 CREATE POLICY "message edit" ON public.messages
-  FOR UPDATE USING ((((author_id = ( SELECT auth.uid() AS uid)) AND (created_at > (now() - '00:15:00'::interval))) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.admin_may_review(conversation_id))))
+  FOR UPDATE USING (((author_id = ( SELECT auth.uid() AS uid)) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.admin_may_review(conversation_id))))
   WITH CHECK ((channel = ANY (ARRAY['squad'::text, 'staff'::text, 'dm'::text])));
 -- ⚠️ REPLACED by 20260823_squad_chat_phase3. An admin may UPDATE a DM row — to
 -- REMOVE it (deleted_at; the trigger blanks the body). touch_message refuses a
@@ -1461,6 +1465,14 @@ CREATE POLICY "message mark read" ON public.message_reads
 -- ⚠️ NO INSERT POLICY ON conversations. The only way in is
 -- public.open_conversation(), SECURITY DEFINER, which applies private.can_dm.
 -- ⚠️ NO INSERT POLICY ON welfare_access_log either: public.log_welfare_access().
+-- ---------------------------------------------------------------------
+-- public.conversation_clears   (24 Aug 2026 — db/migrations/20260824_chat_list.sql)
+-- ⚠️ SELECT ONLY. The only way in is public.clear_conversation(), SECURITY DEFINER,
+-- which checks private.in_conversation. A clear hides the past from ONE person.
+-- ---------------------------------------------------------------------
+CREATE POLICY "clear own" ON public.conversation_clears
+  FOR SELECT USING ((profile_id = ( SELECT auth.uid() AS uid)));
+
 -- ---------------------------------------------------------------------
 -- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
 -- private.admin_may_review — a minor in it, or a reported message. Captured from live.

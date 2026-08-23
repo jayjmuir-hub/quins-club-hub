@@ -95,3 +95,29 @@ export async function listWelfareAccessLog() {
   return []
 }
 export async function setStaffDmOptIn() {}
+
+// ── The Chats list (24 Aug 2026) ───────────────────────────────────────────
+// Invented people and squads only — CLAUDE.md rule 9. The shape mirrors
+// public.my_chats(); the harness's chat-list scenario renders exactly this.
+export async function listChats() {
+  return [
+    { kind: 'squad', team_id: 'hz-team-1', conversation_id: null, label: 'U13 Mixed', detail: 'Squad · announce-only', last_at: new Date(Date.now() - 12 * 60000).toISOString(), last_body: 'Kick-off moved to 10:30 Saturday. Pitch 2.', last_author_id: 'hz-coach', last_author_name: 'Harriet Zephyr', unread: 3 },
+    { kind: 'dm', team_id: null, conversation_id: 'hz-conv-1', label: 'Sam Quillon', detail: 'Team Manager', last_at: new Date(Date.now() - 95 * 60000).toISOString(), last_body: 'Two seats held, thanks', last_author_id: 'hz-self', last_author_name: 'You', unread: 0 },
+    { kind: 'staff', team_id: 'hz-team-1', conversation_id: null, label: 'U13 Mixed · staff', detail: 'Staff only', last_at: new Date(Date.now() - 26 * 3600000).toISOString(), last_body: 'Selection for Saturday — thoughts?', last_author_id: 'hz-coach', last_author_name: 'Harriet Zephyr', unread: 1 },
+    { kind: 'club', team_id: null, conversation_id: null, label: 'Whole club', detail: 'Club-wide · admins post', last_at: new Date(Date.now() - 3 * 86400000).toISOString(), last_body: 'Registration closes Friday', last_author_id: 'hz-admin', last_author_name: 'Ora Vantage', unread: 0 },
+    { kind: 'squad', team_id: 'hz-team-2', conversation_id: null, label: 'U16 Boys', detail: 'Squad · open chat', last_at: new Date(Date.now() - 5 * 86400000).toISOString(), last_body: 'Fixture thread · v Probe Exiles', last_author_id: 'hz-parent', last_author_name: 'Dov Lantern', unread: 0 },
+  ]
+}
+export function chatPath(row) {
+  switch (row.kind) {
+    case 'dm':
+      return `/chat/dm/${row.conversation_id}`
+    case 'club':
+      return '/chat/club'
+    case 'staff':
+      return `/chat/${row.team_id}?channel=staff`
+    default:
+      return `/chat/${row.team_id}`
+  }
+}
+export async function clearConversation() {}

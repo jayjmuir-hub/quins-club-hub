@@ -1935,6 +1935,21 @@ CREATE INDEX message_reads_profile_idx ON public.message_reads USING btree (prof
 
 
 -- ---------------------------------------------------------------------
+-- public.conversation_clears   (24 Aug 2026 — db/migrations/20260824_chat_list.sql)
+--
+-- "Delete chat" on a DM, WhatsApp's meaning: one row per (conversation,
+-- person) holding when THEY last cleared it. The read policy on messages
+-- hides rows before cleared_at from that person; my_chats() drops the row
+-- until the other side writes again. The other participant is untouched.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.conversation_clears (
+  conversation_id uuid        NOT NULL REFERENCES public.conversations(id) ON DELETE CASCADE,
+  profile_id      uuid        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  cleared_at      timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (conversation_id, profile_id)
+);
+
+-- ---------------------------------------------------------------------
 -- public.conversations / public.dm_blocks / public.message_reports /
 -- public.welfare_access_log, plus messages.conversation_id and
 -- player_private.staff_dm_opt_in*  (squad chat phase 3, 23 Aug 2026)

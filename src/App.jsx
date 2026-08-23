@@ -10,6 +10,7 @@ import Roster from './screens/Roster.jsx'
 import More from './screens/More.jsx'
 import Notices from './screens/Notices.jsx'
 import Chat from './screens/Chat.jsx'
+import ChatList from './screens/ChatList.jsx'
 import DirectMessages from './screens/DirectMessages.jsx'
 import Welfare from './screens/Welfare.jsx'
 import WelfareReports from './screens/WelfareReports.jsx'
@@ -192,7 +193,7 @@ export default function App() {
               club-wide channel; /squad/:teamId/chat is the SAME screen under
               the Squad Hub's sidebar section, so a coach's Chat item stays in
               the section that is lit. claude/plans/2026-08-23-squad-chat.md. */}
-          <Route path="/chat" element={<AppShell><Chat /></AppShell>} />
+          <Route path="/chat" element={<AppShell><ChatList /></AppShell>} />
           {/* Direct messages (phase 3): the inbox and one thread. Before
               /chat/:teamId so "dm" is never read as a squad id. */}
           <Route path="/chat/dm" element={<AppShell><DirectMessages /></AppShell>} />

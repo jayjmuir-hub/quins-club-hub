@@ -54,7 +54,11 @@ tracking grid yet; the first one's reaction is the thing to watch.
 (read-only, redacted — `public.pitch_occupancy`, applied and harnessed).
 Requests still go through the fixture; allocation stays admin-only.
 
-💬 **SQUAD CHAT PHASES 1–3 ARE LIVE** (23 Aug 2026) — a channel per squad
+💬 **CHAT IS WHATSAPP-SHAPED SINCE 24 Aug 2026** — one Chats list, a pencil to
+start a DM, a header on every thread saying who reads it, bubbles; the author
+may delete a message any time and a DM can be deleted for yourself
+(`claude/plans/2026-08-24-chat-list.md`). Underneath, unchanged:
+**SQUAD CHAT PHASES 1–3** (23 Aug 2026) — a channel per squad
 and one for the club (announce-only by default), a thread per fixture with
 RSVP chips, @mentions that push, a staff channel per squad, direct messages,
 reports, and a Welfare dashboard behind a fifth admin right. **Who may DM whom

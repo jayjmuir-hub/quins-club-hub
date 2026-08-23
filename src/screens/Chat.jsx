@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
-import { AccentTitle, Kicker } from '../components/Editorial.jsx'
+import ChatHeader from '../components/ChatHeader.jsx'
 import { Empty } from '../components/Empty.jsx'
 import FixtureCard from '../components/FixtureCard.jsx'
 import MentionPicker, { appendMention } from '../components/MentionPicker.jsx'
@@ -31,12 +31,18 @@ import { useAuth } from '../lib/auth.jsx'
 import { eventTitle } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, visibleTeams } from '../lib/scope.js'
+import { shortBand } from './ChatList.jsx'
 
-// Squad chat, phase 1 — claude/plans/2026-08-23-squad-chat.md.
+// One channel's thread — claude/plans/2026-08-23-squad-chat.md, reshaped
+// 24 Aug 2026 (claude/plans/2026-08-24-chat-list.md): bubbles, a header bar
+// that says who reads this, and NO picker or tabs — the Chats list
+// (src/screens/ChatList.jsx) is the only way in, and `Chat` in the nav
+// always lands on the list.
 //
-// /chat            → the only squad, or a picker when there is more than one
-// /chat/club       → the club-wide channel
-// /chat/:teamId    → one squad's channel
+// /chat                    → ChatList, not this screen
+// /chat/club               → the club-wide channel
+// /chat/:teamId            → one squad's channel
+// /chat/:teamId?channel=staff → its staff channel (its own row in the list)
 //
 // ⚠️ ANNOUNCE-ONLY IS THE DEFAULT, AND THE COMPOSER SAYS SO. Staff post;
 // families reply inside threads. A squad's staff can switch it off from the
@@ -53,29 +59,6 @@ import { canEditTeam, isAdmin, visibleTeams } from '../lib/scope.js'
 //                  start one — the event screen's "Squad chat" block
 
 export const CLUB = 'club'
-
-function Picker({ teams, showClub }) {
-  return (
-    <section className="px-1">
-      <div className="mb-3.5 mt-1">
-        <Kicker>Squad chat</Kicker>
-        <AccentTitle lead="Pick a" accent="channel." />
-      </div>
-      <div className="grid gap-2.5">
-        {showClub && (
-          <Card as={Link} to={`/chat/${CLUB}`} className="px-4 py-3.5 font-extrabold text-ink">
-            Whole club
-          </Card>
-        )}
-        {teams.map((team) => (
-          <Card key={team.id} as={Link} to={`/chat/${team.id}`} className="px-4 py-3.5 font-extrabold text-ink">
-            {team.name}
-          </Card>
-        ))}
-      </div>
-    </section>
-  )
-}
 
 /** { in, maybe, out } per event id, from raw availability rows. */
 export function tallyByEvent(rows) {
@@ -123,8 +106,11 @@ export default function Chat() {
   // people who can edit the squad; the policy refuses everybody else anyway.
   const staffChannel = searchParams.get('channel') === 'staff' && !isClub && canModerate
 
+  // A squad the reader is not on redirects below; do not fetch for it first.
+  const unknownTeam = !isClub && myTeams.length > 0 && !team
+
   const load = useCallback(async () => {
-    if (!param) return
+    if (!param || unknownTeam) return
     setError(null)
     try {
       const [rows, mine, channel] = await Promise.all([
@@ -156,7 +142,7 @@ export default function Chat() {
     } catch (err) {
       setError(err.message || 'We could not load the chat just now.')
     }
-  }, [param, teamId, canModerate, staffChannel])
+  }, [param, teamId, canModerate, staffChannel, unknownTeam])
 
   useEffect(() => {
     load()
@@ -188,10 +174,14 @@ export default function Chat() {
     }
   }, [eventParam, messages, setSearchParams])
 
-  // Mark posts read on arrival — top-level only.
+  // Mark what is on screen read on arrival — posts AND their replies, since
+  // 24 Aug 2026: the list's unread badge counts both.
   useEffect(() => {
     if (!messages || !selfId) return
-    const unseen = messages.filter((m) => !m.deleted_at && !reads.has(m.id)).map((m) => m.id)
+    const unseen = messages
+      .flatMap((m) => [m, ...(m.replies ?? [])])
+      .filter((m) => !m.deleted_at && !reads.has(m.id) && m.author_id !== selfId)
+      .map((m) => m.id)
     if (unseen.length === 0) return
     markMessagesRead(selfId, unseen)
     setReads((prev) => new Set([...prev, ...unseen]))
@@ -204,11 +194,7 @@ export default function Chat() {
   }, [messages?.length])
 
   // ── Routing ─────────────────────────────────────────────────────────────
-  if (!param) {
-    if (myTeams.length === 1 && !admin) return <Navigate to={`/chat/${myTeams[0].id}`} replace />
-    return <Picker teams={myTeams} showClub />
-  }
-  if (!isClub && myTeams.length > 0 && !team) {
+  if (!param || unknownTeam) {
     return <Navigate to="/chat" replace />
   }
 
@@ -275,51 +261,32 @@ export default function Chat() {
     }
   }
 
+  const subtitle = isClub
+    ? 'Club-wide · admins post'
+    : staffChannel
+      ? 'Staff only · coaches, managers and medics'
+      : `${mentionables.length > 0 ? `${mentionables.length} members · ` : ''}${announceOnly ? 'announce-only' : 'open chat'}`
+  const headerActions = canModerate && !isClub && !staffChannel && settings
+    ? [{ label: announceOnly ? 'Turn announce-only off' : 'Turn announce-only on', onClick: toggleAnnounceOnly }]
+    : []
+
   return (
     <section className="px-1">
-      <div className="mb-3.5 mt-1 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Kicker>{staffChannel ? 'Staff channel' : 'Squad chat'}</Kicker>
-          <AccentTitle lead={title} accent={staffChannel ? 'staff.' : 'chat.'} />
-        </div>
-        <div className="flex items-center gap-3 text-[13px] font-bold">
-          <Link to="/chat/dm" className="text-brand-ink underline-offset-2 hover:underline">
-            Messages
-          </Link>
-          {myTeams.length > 1 || admin ? (
-            <Link to="/chat" className="text-brand-ink underline-offset-2 hover:underline">
-              Other channels
-            </Link>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Phase 3: the squad's two streams, for staff only. A parent never
-          sees this row — for them there is one channel. */}
-      {!isClub && canModerate && (
-        <div className="mb-3 flex gap-2" role="tablist" aria-label="Channel">
-          <Link
-            role="tab"
-            aria-selected={!staffChannel}
-            to={`/chat/${teamId}`}
-            className={`rounded-full border px-3 py-1.5 text-[13px] font-bold ${
-              !staffChannel ? 'border-ink bg-ink text-surface-card' : 'border-line bg-surface-card text-ink-muted'
+      <ChatHeader
+        avatar={
+          <span
+            aria-hidden="true"
+            className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[11px] font-extrabold ${
+              isClub ? 'bg-surface-mute text-ink' : 'bg-brand text-ink-invert'
             }`}
           >
-            Squad
-          </Link>
-          <Link
-            role="tab"
-            aria-selected={staffChannel}
-            to={`/chat/${teamId}?channel=staff`}
-            className={`rounded-full border px-3 py-1.5 text-[13px] font-bold ${
-              staffChannel ? 'border-ink bg-ink text-surface-card' : 'border-line bg-surface-card text-ink-muted'
-            }`}
-          >
-            Staff only
-          </Link>
-        </div>
-      )}
+            {isClub ? '🏉' : staffChannel ? '🛡' : shortBand(title)}
+          </span>
+        }
+        title={staffChannel ? `${title} · staff` : title}
+        subtitle={subtitle}
+        actions={headerActions}
+      />
 
       {error && (
         <Card className="mb-3 px-4 py-3">
@@ -329,21 +296,15 @@ export default function Chat() {
         </Card>
       )}
 
-      {/* ── Staff panel: announce-only ───────────────────────────────── */}
+      {/* Announce-only lives in the header's ⋯ menu since 24 Aug 2026; this
+          line keeps the state visible to staff (data-testid kept for the tests). */}
       {canModerate && !isClub && !staffChannel && settings && (
-        <Card className="mb-3 flex flex-wrap items-center justify-between gap-3 px-4 py-3" data-testid="channel-settings">
-          <div>
-            <p className="text-[13.5px] font-extrabold text-ink">Announce-only</p>
-            <p className="text-[12px] text-ink-muted">
-              {announceOnly
-                ? 'Staff post; families reply inside threads.'
-                : 'Anyone in the squad can post.'}
-            </p>
-          </div>
-          <Button size="sm" variant="ghost" onClick={toggleAnnounceOnly} aria-pressed={announceOnly}>
+        <p className="mb-2 px-1 text-[12px] text-ink-muted" data-testid="channel-settings">
+          {announceOnly ? 'Announce-only: staff post; families reply inside threads.' : 'Open chat: anyone in the squad can post.'}
+          <Button size="sm" variant="ghost" onClick={toggleAnnounceOnly} aria-pressed={announceOnly} className="ml-2">
             {announceOnly ? 'Turn off' : 'Turn on'}
           </Button>
-        </Card>
+        </p>
       )}
 
       {/* ── Pinned ──────────────────────────────────────────────────── */}
@@ -441,13 +402,11 @@ export default function Chat() {
               onChange={(e) => setDraft(e.target.value)}
               rows={1}
               maxLength={2000}
-              placeholder={
-                attachedEvent ? `Start the thread for ${eventTitle(attachedEvent)}` : staffChannel ? `Post to ${title} staff` : `Post to ${title}`
-              }
+              placeholder={attachedEvent ? `Start the thread for ${eventTitle(attachedEvent)}` : 'Message'}
               className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
             />
             <Button type="submit" disabled={sending || !draft.trim()}>
-              {attachedEvent ? 'Start thread' : 'Post'}
+              {attachedEvent ? 'Start thread' : 'Send'}
             </Button>
           </form>
         ) : (

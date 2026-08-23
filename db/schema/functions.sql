@@ -4233,6 +4233,8 @@ $function$
 -- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
 -- re-verify after the real apply.
 -- ---------------------------------------------------------------------
+-- ⚠️ REPLACED by 20260824_chat_list (the Chats list; delete a message / a chat).
+-- md5 85583086af08f80c49622213bc5baf0c from a rolled-back apply; re-verify after the real one.
 CREATE OR REPLACE FUNCTION private.touch_message()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -4260,10 +4262,14 @@ begin
     new.deleted_at := old.deleted_at;
     new.pinned := false;
   elsif new.body is distinct from old.body then
-    -- Only the author edits words. An admin reviewing a DM may remove a
-    -- message (above); rewriting somebody's words is not a review.
+    -- Only the author edits words, and only for 15 minutes (24 Aug 2026:
+    -- the limit used to sit in the policy, which also blocked a late
+    -- delete). An admin reviewing a DM may remove; rewriting is not a review.
     if auth.uid() <> old.author_id then
       raise exception 'only the author can edit a message' using errcode = '42501';
+    end if;
+    if old.created_at < now() - interval '15 minutes' then
+      raise exception 'a message can be edited for 15 minutes' using errcode = '42501';
     end if;
     new.edited_at := now();
   end if;
@@ -4871,6 +4877,137 @@ AS $function$
   ) rows, ok
   where ok.yes
   order by last_at desc nulls last;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- THE CHATS LIST, DELETE A MESSAGE, DELETE A CHAT (24 Aug 2026) —
+-- db/migrations/20260824_chat_list.sql, claude/plans/2026-08-24-chat-list.md.
+-- Jay: "make it more like whatsapp" and "need to be able to delete messages
+-- and entire chats too". Captured from a rolled-back apply; md5s below.
+-- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- public.my_chats()   (24 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}   md5 801095c17a8d8df940f146bf02404c2d
+-- One row per chat the caller may read, newest first, with unread counts.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.my_chats()
+ RETURNS TABLE(kind text, team_id uuid, conversation_id uuid, label text, detail text, last_at timestamp with time zone, last_body text, last_author_id uuid, last_author_name text, unread bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with me as (select auth.uid() as id),
+  club as (select m.club_id as id from memberships m cross join me
+            where m.profile_id = me.id and m.status = 'active' order by m.created_at limit 1),
+  rows as (
+    -- squad channels
+    select 'squad'::text as kind, t.id as team_id, null::uuid as conversation_id, t.name as label,
+           case when private.channel_announce_only(t.id) then 'Squad · announce-only' else 'Squad · open chat' end as detail,
+           lm.created_at as last_at, lm.body as last_body, lm.author_id as last_author_id,
+           (select count(*) from messages x cross join me
+             where x.team_id = t.id and x.channel = 'squad' and x.deleted_at is null
+               and x.author_id <> me.id and x.created_at > now() - interval '14 days'
+               and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id)) as unread
+      from teams t cross join club
+      left join lateral (select created_at, body, author_id from messages x
+                          where x.team_id = t.id and x.channel = 'squad' and x.deleted_at is null
+                          order by x.created_at desc limit 1) lm on true
+     where t.club_id = club.id and private.can_see_team(t.id)
+    union all
+    -- staff channels, for the squad's staff
+    select 'staff', t.id, null, t.name || ' · staff', 'Staff only',
+           lm.created_at, lm.body, lm.author_id,
+           (select count(*) from messages x cross join me
+             where x.team_id = t.id and x.channel = 'staff' and x.deleted_at is null
+               and x.author_id <> me.id and x.created_at > now() - interval '14 days'
+               and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id))
+      from teams t cross join club
+      left join lateral (select created_at, body, author_id from messages x
+                          where x.team_id = t.id and x.channel = 'staff' and x.deleted_at is null
+                          order by x.created_at desc limit 1) lm on true
+     where t.club_id = club.id and private.can_edit_team(t.id)
+    union all
+    -- the club channel
+    select 'club', null, null, 'Whole club', 'Club-wide · admins post',
+           lm.created_at, lm.body, lm.author_id,
+           (select count(*) from messages x cross join me
+             where x.club_id = club.id and x.channel = 'squad' and x.team_id is null and x.deleted_at is null
+               and x.author_id <> me.id and x.created_at > now() - interval '14 days'
+               and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id))
+      from club
+      left join lateral (select created_at, body, author_id from messages x
+                          where x.club_id = club.id and x.channel = 'squad' and x.team_id is null and x.deleted_at is null
+                          order by x.created_at desc limit 1) lm on true
+    union all
+    -- direct messages I am in
+    select 'dm', null, c.id, pr.full_name,
+           coalesce((select labelled.l from (
+               select case m.role when 'admin' then 'Club admin' when 'coach' then 'Coach'
+                                  when 'manager' then 'Team Manager' when 'medic' then 'Medic' else null end as l,
+                      case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2 when 'medic' then 3 else 9 end as o
+                 from memberships m where m.profile_id = pr.id and m.status = 'active') labelled
+               where labelled.l is not null order by labelled.o limit 1), 'Direct message'),
+           c.last_at, lm.body, lm.author_id,
+           (select count(*) from messages x cross join me
+             where x.conversation_id = c.id and x.deleted_at is null
+               and x.author_id <> me.id
+               and x.created_at > coalesce(cl.cleared_at, '-infinity'::timestamptz)
+               and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id))
+      from conversations c cross join me
+      join profiles pr on pr.id = (case when c.profile_a = me.id then c.profile_b else c.profile_a end)
+      left join conversation_clears cl on cl.conversation_id = c.id and cl.profile_id = me.id
+      left join lateral (select body, author_id from messages x
+                          where x.conversation_id = c.id and x.deleted_at is null
+                            and x.created_at > coalesce(cl.cleared_at, '-infinity'::timestamptz)
+                          order by x.created_at desc limit 1) lm on true
+     where me.id in (c.profile_a, c.profile_b)
+       -- cleared, and nothing since: not listed (WhatsApp's "delete chat")
+       and (cl.cleared_at is null or c.last_at > cl.cleared_at)
+  )
+  select r.kind, r.team_id, r.conversation_id, r.label, r.detail,
+         r.last_at, r.last_body, r.last_author_id, p.full_name, r.unread
+    from rows r
+    left join profiles p on p.id = r.last_author_id
+   order by r.last_at desc nulls last, r.label;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.clear_conversation(_conversation uuid)   (24 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}   md5 173fde09c8d92e99053bf5a5fa4340a0
+-- "Delete chat" for ME: records cleared_at; the read policy hides the past from me.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.clear_conversation(_conversation uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not private.in_conversation(_conversation) then
+    raise exception 'not your conversation' using errcode = '42501';
+  end if;
+  insert into conversation_clears (conversation_id, profile_id, cleared_at)
+  values (_conversation, auth.uid(), now())
+  on conflict (conversation_id, profile_id) do update set cleared_at = excluded.cleared_at;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.cleared_before(_conversation uuid)   (24 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}   md5 189b5c7d82cc202c29ef949ad8663744
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.cleared_before(_conversation uuid)
+ RETURNS timestamp with time zone
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select cleared_at from conversation_clears
+   where conversation_id = _conversation and profile_id = auth.uid()
 $function$
 ;
 
