@@ -8,9 +8,22 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
-## 23 Aug 2026
+## 24 Aug 2026
 
-- **Privacy: "secure providers", not a city** — Jay: "we don't need to
+- 💬 **Chat, reshaped like WhatsApp — and delete a message, delete a chat.**
+  Jay: "there is no logical way to send someone a DM ... make it more like
+  whatsapp", then "need to be able to delete messages and entire chats too".
+  One Chats list at `/chat` (squads, staff channels, the club, DMs — newest
+  first, unread badges, who-said-what previews, search); the pencil starts a
+  DM from a grouped people picker; a header bar on every thread says exactly
+  who reads it; bubbles, mine on the right. The author may remove a message
+  at any time (edits still close at 15 minutes, now in the trigger); "Delete
+  chat" clears a DM for YOU — WhatsApp's meaning — and it returns when the
+  other side writes. `public.my_chats()`, `conversation_clears`,
+  `clear_conversation()`; harness `db/tests/chat-list.sql` 9/9;
+  `claude/plans/2026-08-24-chat-list.md`. The message-row harness scenario
+  had rendered blank since phase 2 (no router) — fixed.
+- `94ffd81` — **Privacy: "secure providers", not a city** — Jay: "we don't need to
   mention Tokyo". The where-it-is-kept paragraph now says the data is held
   by secure, reputable providers acting on the club's instructions; the
   test that pinned the region now pins its absence.

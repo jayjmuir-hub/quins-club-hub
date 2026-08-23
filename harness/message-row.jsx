@@ -8,6 +8,7 @@
 // with replies (red rule, role pill, read stat), a family's post in an open
 // channel (plain), a removed message, and a pinned staff post. Everything
 // invented — CLAUDE.md rule 9.
+import { MemoryRouter } from 'react-router-dom'
 import MessageRow from '../src/components/MessageRow.jsx'
 
 const MIN = 60 * 1000
@@ -113,7 +114,10 @@ const STATS = new Map([
 
 export default function MessageRowScenario() {
   const noop = async () => {}
+  // ⚠️ A ROUTER IS REQUIRED since phase 2: FixtureCard links to the fixture.
+  // Without it the scenario rendered BLANK (found 24 Aug 2026).
   return (
+    <MemoryRouter>
     <div className="mx-auto max-w-[640px] px-3 py-4">
       {ROWS.map((m) => (
         <MessageRow
@@ -132,5 +136,6 @@ export default function MessageRowScenario() {
         />
       ))}
     </div>
+    </MemoryRouter>
   )
 }

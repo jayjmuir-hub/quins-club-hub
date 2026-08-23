@@ -3,8 +3,9 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
-// src/screens/DirectMessages.jsx — squad chat phase 3. The inbox, the
-// picker, one thread, the permanent notice, the block, the report. Who may
+// src/screens/DirectMessages.jsx — squad chat phase 3, reshaped 24 Aug 2026.
+// One thread: the header bar, the permanent notice, block, report, remove,
+// delete chat. (The inbox and the picker live in ChatList since the reshape.) Who may
 // message whom is the database's (db/tests/squad-chat-phase3.sql); this
 // proves the screen shows what the database hands it and nothing else.
 
@@ -24,6 +25,8 @@ const m = {
   logWelfareAccess: vi.fn(),
   markMessagesRead: vi.fn(),
   subscribeMessages: vi.fn(),
+  removeMessage: vi.fn(),
+  clearConversation: vi.fn(),
 }
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
@@ -41,6 +44,8 @@ vi.mock('../src/data/messages.js', () => ({
   logWelfareAccess: (...a) => m.logWelfareAccess(...a),
   markMessagesRead: (...a) => m.markMessagesRead(...a),
   subscribeMessages: (...a) => m.subscribeMessages(...a),
+  removeMessage: (...a) => m.removeMessage(...a),
+  clearConversation: (...a) => m.clearConversation(...a),
 }))
 
 import DirectMessages from '../src/screens/DirectMessages.jsx'
@@ -56,7 +61,7 @@ function renderAt(path) {
       <Routes>
         <Route path="/chat/dm" element={<DirectMessages />} />
         <Route path="/chat/dm/:conversationId" element={<DirectMessages />} />
-        <Route path="/chat" element={<div>squads</div>} />
+        <Route path="/chat" element={<div>the list</div>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -79,30 +84,14 @@ beforeEach(() => {
   m.listMyBlocks.mockResolvedValue(new Set())
   m.markMessagesRead.mockResolvedValue(undefined)
   m.subscribeMessages.mockReturnValue(() => {})
+  m.removeMessage.mockResolvedValue(undefined)
+  m.clearConversation.mockResolvedValue(undefined)
 })
 
-describe('DirectMessages — inbox', () => {
-  it('lists conversations with the role pill, last line and unread dot', async () => {
+describe('DirectMessages — /chat/dm', () => {
+  it('the old inbox URL goes to the Chats list', async () => {
     renderAt('/chat/dm')
-    const row = await screen.findByTestId('conversation-row')
-    expect(row).toHaveAttribute('href', '/chat/dm/c1')
-    expect(within(row).getByText('Zz Manager Probe')).toBeInTheDocument()
-    expect(within(row).getByText('Team Manager')).toBeInTheDocument()
-    expect(within(row).getByText('Two seats held')).toBeInTheDocument()
-    expect(within(row).getByLabelText('Unread')).toBeInTheDocument()
-  })
-
-  it('New message shows only the people the database allows, and opens the conversation on pick', async () => {
-    const user = userEvent.setup()
-    renderAt('/chat/dm')
-    await screen.findByTestId('conversation-row')
-    await user.click(screen.getByTestId('new-message'))
-    const picker = await screen.findByTestId('dm-picker')
-    expect(m.listDmCandidates).toHaveBeenCalled()
-    expect(within(picker).getByText(/Only people you share a squad with/)).toBeInTheDocument()
-    await user.click(within(picker).getByRole('button', { name: /Zz Manager Probe/ }))
-    expect(m.openConversation).toHaveBeenCalledWith(OTHER)
-    expect(await screen.findByTestId('dm-notice')).toBeInTheDocument()
+    expect(await screen.findByText('the list')).toBeInTheDocument()
   })
 })
 
@@ -139,7 +128,8 @@ describe('DirectMessages — a thread', () => {
     renderAt('/chat/dm/c1')
     await screen.findByTestId('dm-composer')
     m.listMyBlocks.mockResolvedValue(new Set([OTHER]))
-    await user.click(screen.getByRole('button', { name: 'Block' }))
+    await user.click(screen.getByRole('button', { name: 'Chat options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Block Zz Manager Probe' }))
     expect(m.blockDm).toHaveBeenCalledWith(OTHER)
     expect(await screen.findByTestId('dm-blocked')).toBeInTheDocument()
     expect(screen.queryByTestId('dm-composer')).toBeNull()
@@ -153,6 +143,37 @@ describe('DirectMessages — a thread', () => {
     await user.type(screen.getByLabelText('Report this message to the club'), 'Rude')
     await user.click(screen.getByRole('button', { name: 'Send report' }))
     expect(m.reportMessage).toHaveBeenCalledWith('d1', 'Rude')
+  })
+
+  it('the header says who this is private to', async () => {
+    renderAt('/chat/dm/c1')
+    expect(await screen.findByRole('heading', { name: 'Zz Manager Probe' })).toBeInTheDocument()
+    expect(screen.getByTestId('chat-subtitle')).toHaveTextContent('Private · you and Zz Manager Probe')
+    expect(screen.getByRole('link', { name: 'Back to chats' })).toHaveAttribute('href', '/chat')
+  })
+
+  it('Remove on my own bubble removes it', async () => {
+    const user = userEvent.setup()
+    renderAt('/chat/dm/c1')
+    const bubbles = await screen.findAllByTestId('dm-bubble')
+    expect(within(bubbles[0]).queryByRole('button', { name: 'Remove' })).toBeNull()
+    await user.click(within(bubbles[1]).getByRole('button', { name: 'Remove' }))
+    expect(m.removeMessage).toHaveBeenCalledWith('d2')
+  })
+
+  // ⚠️ WHATSAPP'S MEANING: deleted for me. The copy says so before the tap.
+  it('Delete chat asks, says it is for you only, clears, and returns to the list', async () => {
+    const user = userEvent.setup()
+    renderAt('/chat/dm/c1')
+    await screen.findByTestId('dm-composer')
+    await user.click(screen.getByRole('button', { name: 'Chat options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete chat' }))
+    const confirm = await screen.findByTestId('delete-chat-confirm')
+    expect(confirm).toHaveTextContent(/removed for you only/)
+    expect(m.clearConversation).not.toHaveBeenCalled()
+    await user.click(within(confirm).getByRole('button', { name: 'Delete chat' }))
+    expect(m.clearConversation).toHaveBeenCalledWith('c1')
+    expect(await screen.findByText('the list')).toBeInTheDocument()
   })
 
   it('an admin opening an adults-only conversation that is not reported gets the not-available card and nothing is logged', async () => {

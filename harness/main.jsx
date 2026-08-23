@@ -40,6 +40,7 @@ import PhotoPositioner, {
 } from '../src/components/PhotoPositioner.jsx'
 import NoticeRowScenario from './notice-row.jsx'
 import MessageRowScenario from './message-row.jsx'
+import ChatList from '../src/screens/ChatList.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
@@ -1109,6 +1110,16 @@ const scenarios = {
   'notice-row': () => <NoticeRowScenario />,
   // The squad chat's rows (23 Aug 2026) — same reasoning as notice-row.
   'message-row': () => <MessageRowScenario />,
+  // 24 Aug 2026 — the WhatsApp-shaped list. Rows come from harness/stubs/messages.js.
+  'chat-list': () => (
+    <Shell
+      route="/chat"
+      authValue={baseAuth(COACH_EMAIL)}
+      membershipValue={{ memberships: COACH_MEMBERSHIPS, teams: TEAMS, loading: false, error: null, reload: noop }}
+    >
+      <ChatList />
+    </Shell>
+  ),
 }
 
 const params = new URLSearchParams(window.location.search)

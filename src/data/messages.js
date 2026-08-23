@@ -503,3 +503,44 @@ export async function setStaffDmOptIn(playerId, optIn) {
     .eq('player_id', playerId)
   if (error) throw error
 }
+
+// ── The Chats list (24 Aug 2026) ────────────────────────────────────────────
+//
+// Jay: "make it more like whatsapp". One list of everything I am in — squad
+// channels, staff channels, the club, DMs — newest first, with unread counts.
+// Scope is the database's (public.my_chats uses the same helpers as the
+// policies), so nothing here can list a chat the reader could not open.
+
+/**
+ * @returns rows of { kind: 'squad'|'staff'|'club'|'dm', team_id, conversation_id,
+ *   label, detail, last_at, last_body, last_author_id, last_author_name, unread }
+ */
+export async function listChats() {
+  const { data, error } = await supabase.rpc('my_chats')
+  if (error) throw error
+  return data ?? []
+}
+
+/** The route a list row opens. */
+export function chatPath(row) {
+  switch (row.kind) {
+    case 'dm':
+      return `/chat/dm/${row.conversation_id}`
+    case 'club':
+      return '/chat/club'
+    case 'staff':
+      return `/chat/${row.team_id}?channel=staff`
+    default:
+      return `/chat/${row.team_id}`
+  }
+}
+
+/**
+ * "Delete chat" on a DM — WhatsApp's meaning: cleared for ME. Everything
+ * before now is hidden from me and the row leaves my list until the other
+ * side writes again. Their copy is untouched. Participants only.
+ */
+export async function clearConversation(conversationId) {
+  const { error } = await supabase.rpc('clear_conversation', { _conversation: conversationId })
+  if (error) throw error
+}

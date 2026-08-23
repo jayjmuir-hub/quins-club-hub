@@ -97,7 +97,7 @@ function renderAt(path) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/chat" element={<Chat />} />
+        <Route path="/chat" element={<div>the list</div>} />
         <Route path="/chat/:teamId" element={<Chat />} />
         <Route path="/squad/:teamId/chat" element={<Chat />} />
       </Routes>
@@ -126,18 +126,19 @@ beforeEach(() => {
 })
 
 describe('Chat — routing', () => {
-  it('sends a one-squad parent straight to their squad', async () => {
-    renderAt('/chat')
-    expect(await screen.findByRole('heading', { name: /ZZ Probe U12/ })).toBeInTheDocument()
-    expect(listMessagesMock).toHaveBeenCalledWith('team-a')
+  // ⚠️ "THE LIST ALWAYS" — Jay, 23 Aug 2026. /chat is ChatList; this screen
+  // never picks a squad for you and never shows a picker.
+  it('a squad the reader is not on sends them back to the list', async () => {
+    renderAt('/chat/team-zzz')
+    expect(await screen.findByText('the list')).toBeInTheDocument()
+    expect(listMessagesMock).not.toHaveBeenCalled()
   })
 
-  it('shows a picker to a two-squad parent', async () => {
-    useMembershipsMock.mockReturnValue(memberships(PARENT_TWO))
-    renderAt('/chat')
-    expect(await screen.findByRole('link', { name: 'ZZ Probe U12' })).toHaveAttribute('href', '/chat/team-a')
-    expect(screen.getByRole('link', { name: 'ZZ Probe U14' })).toHaveAttribute('href', '/chat/team-b')
-    expect(listMessagesMock).not.toHaveBeenCalled()
+  it('names the squad and who reads it in the header bar', async () => {
+    renderAt('/chat/team-a')
+    expect(await screen.findByRole('heading', { name: /ZZ Probe U12/ })).toBeInTheDocument()
+    expect(screen.getByTestId('chat-subtitle')).toHaveTextContent('announce-only')
+    expect(screen.getByRole('link', { name: 'Back to chats' })).toHaveAttribute('href', '/chat')
   })
 
   it('renders the same screen under /squad/:teamId/chat', async () => {
@@ -176,7 +177,7 @@ describe('Chat — announce-only', () => {
     await screen.findByTestId('message-row')
 
     await user.type(await screen.findByLabelText('Message'), 'Anyone need a lift?')
-    await user.click(screen.getByRole('button', { name: 'Post' }))
+    await user.click(screen.getByRole('button', { name: 'Send' }))
 
     expect(postMessageMock).toHaveBeenCalledWith('team-a', 'Anyone need a lift?', { eventId: null, mentions: [] })
   })
@@ -376,7 +377,7 @@ describe('Chat — @mentions', () => {
     await user.click(screen.getByRole('option', { name: /Zz Other Parent/ }))
     await user.clear(screen.getByLabelText('Message'))
     await user.type(screen.getByLabelText('Message'), 'changed my mind')
-    await user.click(screen.getByRole('button', { name: 'Post' }))
+    await user.click(screen.getByRole('button', { name: 'Send' }))
 
     expect(postMessageMock).toHaveBeenCalledWith('team-a', 'changed my mind', { eventId: null, mentions: [] })
   })
@@ -393,18 +394,16 @@ describe('Chat — @mentions', () => {
 // ── Phase 3: the staff channel and reporting ───────────────────────────────
 
 describe('Chat — staff channel', () => {
-  it('shows Squad / Staff only tabs to a coach', async () => {
+  // The staff channel is its own row in the Chats list since 24 Aug 2026 —
+  // no tabs on the thread. The header names it so nobody posts to the wrong one.
+  it('?channel=staff is titled as the staff channel, and a parent never gets it', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH))
     useAuthMock.mockReturnValue({ user: { id: 'coach-1' } })
-    renderAt('/chat/team-a')
-    await screen.findByTestId('message-row')
-    expect(screen.getByRole('tab', { name: 'Staff only' })).toHaveAttribute('href', '/chat/team-a?channel=staff')
-  })
-
-  it('shows no channel tabs to a parent — for them there is one channel', async () => {
-    renderAt('/chat/team-a')
-    await screen.findByTestId('message-row')
-    expect(screen.queryByRole('tab', { name: 'Staff only' })).toBeNull()
+    listStaffMessagesMock.mockResolvedValue([])
+    renderAt('/chat/team-a?channel=staff')
+    expect(await screen.findByRole('heading', { name: /ZZ Probe U12 · staff/ })).toBeInTheDocument()
+    expect(screen.getByTestId('chat-subtitle')).toHaveTextContent(/staff only/i)
+    expect(screen.queryByRole('tab')).toBeNull()
   })
 
   it('?channel=staff reads the staff stream and posts to it, with staff mentionables', async () => {
@@ -421,7 +420,7 @@ describe('Chat — staff channel', () => {
     expect(screen.queryByTestId('channel-settings')).toBeNull()
 
     await user.type(screen.getByLabelText('Message'), 'Go with the big pack')
-    await user.click(screen.getByRole('button', { name: 'Post' }))
+    await user.click(screen.getByRole('button', { name: 'Send' }))
     expect(postStaffMessageMock).toHaveBeenCalledWith('team-a', 'Go with the big pack', { mentions: [] })
     expect(postMessageMock).not.toHaveBeenCalled()
   })
