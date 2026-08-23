@@ -202,6 +202,36 @@ export async function markMessagesRead(profileId, messageIds) {
   if (error) console.warn('Could not record messages as read:', error.message)
 }
 
+/**
+ * How many recent posts this person has not read — the dock's Chat dot
+ * (23 Aug 2026). Head posts only (replies ride under their head), from the
+ * last 14 days, not deleted, not their own, minus their own `message_reads`.
+ *
+ * ⚠️ BOUNDED ON PURPOSE. At a full club this is fifteen squads' worth of
+ * posts, and "everything you have ever not read" is both unbounded and
+ * meaningless as a dot — a parent who joined today has not read any of it.
+ * Two weeks is the window a dot can honestly mean "new". Ids only; RLS
+ * scopes which squads' posts come back, exactly as it does for the screen.
+ */
+export async function countUnreadMessages(profileId) {
+  if (!profileId) return 0
+  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+  const [posts, reads] = await Promise.all([
+    supabase
+      .from('messages')
+      .select('id')
+      .is('parent_id', null)
+      .is('deleted_at', null)
+      .neq('author_id', profileId)
+      .gte('created_at', since),
+    supabase.from('message_reads').select('message_id'),
+  ])
+  if (posts.error) throw posts.error
+  if (reads.error) throw reads.error
+  const read = new Set((reads.data ?? []).map((r) => r.message_id))
+  return (posts.data ?? []).filter((m) => !read.has(m.id)).length
+}
+
 /** Which posts this person has read. RLS returns only their own rows. */
 export async function listMyMessageReads() {
   const { data, error } = await supabase.from('message_reads').select('message_id')

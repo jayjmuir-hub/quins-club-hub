@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **The motion pass** — Jay: "animate like iOS does when you press a
+- **Dock extras** — the rest of the motion ideas, on Jay's "do it". The dock
+  slides away on a downward scroll and returns on an upward one or at either
+  end of the page (re-shown on every route change). The red pill's glow now
+  BLEEDS into the glass — a blurred halo behind it that travels with it.
+  Status dots: Chat when there are unread posts in the last fortnight
+  (`countUnreadMessages` in `src/data/messages.js`, realtime-refreshed and
+  recounted on leaving Chat), More for an admin with reviews waiting; a dot
+  not a count, never on the active tab, "new" in the accessible name, and
+  any failed count means no dot (`src/lib/useDockBadges.js`). ⚠️ The harness
+  gained `harness/stubs/messages.js`: the alias catches every importer of
+  the real module, so the stub carries ALL its exports — a missing one is a
+  blank page with nothing in the server log.
+- `7254ead` — **The motion pass** — Jay: "animate like iOS does when you press a
   different menu option, maybe some red glow, more glass". The dock's red
   pill is now ONE element (`Glider` in `src/components/Nav.jsx`) that
   slides to the tapped tab on a spring curve, its glow blooming as it lands

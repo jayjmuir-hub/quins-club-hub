@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
+import useDockBadges from '../lib/useDockBadges.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { highestRole, isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
 import Nav from './Nav.jsx'
@@ -201,6 +202,10 @@ export default function AppShell({ children }) {
   // preview deletes the only observable that distinguishes those two.
   // The truncation it was meant to fix is handled in ViewAsSwitcher instead.
   const showRole = !loading && !error
+  // The dock's status dots — see src/lib/useDockBadges.js. Off until the
+  // membership set is known, so a pending parent is never shown a dot for a
+  // chat they cannot open.
+  const dockBadges = useDockBadges({ userId: user?.id ?? null, admin: isAdmin(memberships), enabled: ready })
   const currentRoleLabel = roleLabel(memberships)
   // The KEY, for the Badge tone — the same design-system role tag the
   // Accounts screen uses (claude/specs/design-system.md §4.20). Until 23 Aug
@@ -626,7 +631,7 @@ export default function AppShell({ children }) {
 
           Anything `fixed` must live OUTSIDE `.glass-chrome`. The help button
           and the sheets already do; the account menu is portalled to <body>. */}
-      <Nav showSquadHub={showSquadHub} />
+      <Nav showSquadHub={showSquadHub} badges={dockBadges} />
 
       {/* ⚠️ OUTSIDE <main>, AND OUTSIDE THE loading/error/ready SPLIT — for the
           same reason InstallPrompt sits above that split. The moments this is

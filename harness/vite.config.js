@@ -36,6 +36,8 @@ export default defineConfig({
       { find: /^\.\.\/lib\/auth\.jsx$/, replacement: path.resolve(__dirname, 'stubs/auth.jsx') },
       { find: /^\.\.\/data\/attendance\.js$/, replacement: path.resolve(__dirname, 'stubs/attendance.js') },
       { find: /^\.\.\/data\/announcements\.js$/, replacement: path.resolve(__dirname, 'stubs/announcements.js') },
+      // The dock's Chat dot (src/lib/useDockBadges.js) — see stubs/messages.js.
+      { find: /^\.\.\/data\/messages\.js$/, replacement: path.resolve(__dirname, 'stubs/messages.js') },
       // ⚠️ './auth.jsx' as well as '../lib/auth.jsx', and the difference is
       // not cosmetic. These aliases match SPECIFIER TEXT, so they only catch
       // importers sitting one directory below src/. src/lib/useMyProfile.js

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 
 // Primary navigation — THE MOBILE TAB BAR, and since phase 2 of the 2.0
@@ -153,8 +153,27 @@ function Glider({ box, routeKey }) {
       key={routeKey}
       aria-hidden="true"
       data-testid="dock-glider"
-      className="pointer-events-none absolute left-0 top-[7px] h-[46px] rounded-pill bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] shadow-[0_4px_14px_rgba(194,31,50,0.45)] transition-[transform,width] duration-300 ease-[cubic-bezier(.34,1.4,.64,1)] animate-dock-bloom motion-reduce:transition-none motion-reduce:animate-none"
+      className="pointer-events-none absolute left-0 top-[7px] h-[46px] rounded-pill transition-[transform,width] duration-300 ease-[cubic-bezier(.34,1.4,.64,1)] motion-reduce:transition-none"
       style={{ transform: `translateX(${box.left}px)`, width: box.width }}
+    >
+      {/* The glow BLEED — a blurred red blob behind the pill, wider than it,
+          so the red reads as light inside the glass rather than a sticker on
+          top of it. Sits below the pill in paint order; the dock's
+          overflow-hidden clips it to the dock's own curve. */}
+      <span className="absolute -inset-x-4 -inset-y-3 rounded-pill bg-brand/55 blur-xl" />
+      <span className="absolute inset-0 rounded-pill bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] shadow-[0_4px_14px_rgba(194,31,50,0.45)] animate-dock-bloom motion-reduce:animate-none" />
+    </span>
+  )
+}
+
+// The status dot: the same red as the pill, with a halo, at the icon's
+// top-right. Decorative here — the link's accessible name says "new".
+function Dot() {
+  return (
+    <span
+      aria-hidden="true"
+      data-testid="dock-dot"
+      className="absolute right-1.5 top-2 h-2 w-2 rounded-full bg-brand-onDark shadow-[0_0_0_2px_rgba(10,10,10,0.85),0_0_10px_2px_rgba(255,143,143,0.7)]"
     />
   )
 }
@@ -163,7 +182,7 @@ function Glider({ box, routeKey }) {
 // the sidebar's Admin item — same isAdmin() gate, same destination. The tab
 // bar never showed it and still does not: since phase 4 the phone's route to
 // /admin is the Manage card on More, not a fifth tab.
-export default function Nav({ showSquadHub = false }) {
+export default function Nav({ showSquadHub = false, badges = {} }) {
   // Squad Hub joins the bar for the same people the sidebar shows it to
   // (22 Aug 2026, Jay) — until now the Dashboard card was the phone's only
   // way in. Between Roster and More, matching the sidebar's order.
@@ -178,6 +197,37 @@ export default function Nav({ showSquadHub = false }) {
   const { pathname } = useLocation()
   const navRef = useRef(null)
   const [box, setBox] = useState(null)
+
+  // ══ AUTO-HIDE ON SCROLL — Safari's bar, and iOS apps that read ══════════
+  // Scrolling DOWN past the first 80px slides the dock away (more room for
+  // the content you are reading); any scroll UP, or reaching the top or the
+  // bottom of the page, brings it back. Thresholded at 6px so a thumb
+  // resting on the glass does not flicker it. Re-shown on every route
+  // change, so a fresh screen never opens with its nav hidden.
+  const [hidden, setHidden] = useState(false)
+  useEffect(() => {
+    let last = window.scrollY
+    let ticking = false
+    function onScroll() {
+      if (ticking) return
+      ticking = true
+      window.requestAnimationFrame(() => {
+        const y = window.scrollY
+        const max = document.documentElement.scrollHeight - window.innerHeight
+        const delta = y - last
+        if (y <= 80 || y >= max - 8) setHidden(false)
+        else if (delta > 6) setHidden(true)
+        else if (delta < -6) setHidden(false)
+        last = y
+        ticking = false
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+  useEffect(() => {
+    setHidden(false)
+  }, [pathname])
 
   // Where is the active link? Re-measured on route change and on resize, and
   // once more after the label's 300ms unfurl so the pill's final width is the
@@ -254,13 +304,25 @@ export default function Nav({ showSquadHub = false }) {
       // offset in HelpButton.jsx are sized to clear THIS. Change the height or
       // the inset here and re-measure both.
       ref={navRef}
-      className="glass-dock fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-pill px-2 py-[7px] desktop:hidden"
+      data-hidden={hidden ? 'true' : undefined}
+      className={[
+        'glass-dock fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-pill px-2 py-[7px] desktop:hidden',
+        'transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none',
+        hidden ? 'translate-y-[calc(100%+24px)] opacity-0' : 'translate-y-0 opacity-100',
+      ].join(' ')}
     >
       <Glider box={box} routeKey={pathname} />
       {items.map(({ to, label, end, icon: Icon }) => (
-        <NavLink key={to} to={to} end={end} className={linkClassName} aria-label={label}>
+        <NavLink
+          key={to}
+          to={to}
+          end={end}
+          className={linkClassName}
+          aria-label={badges[to] ? `${label}, new` : label}
+        >
           {({ isActive }) => (
             <>
+              {badges[to] && !isActive && <Dot />}
               <Icon className="h-[22px] w-[22px] shrink-0" aria-hidden="true" />
               <span className={labelClassName({ isActive })}>{label}</span>
             </>
