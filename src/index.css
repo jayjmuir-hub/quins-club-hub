@@ -382,6 +382,30 @@
     }
   }
 
+  /* The LIGHT glass — sheets and the account menu (23 Aug 2026, the motion
+     pass: "more glass"). These float OVER content, so unlike the bars they
+     take the card colour, not the chrome: 86% of surface-card over a 24px
+     blur. Contrast floor: the darkest thing a sheet can open over is the
+     near-black masthead or a dark-red fixture card; 86% white over black
+     composites to rgb(219,219,219), on which ink is 13:1 and ink-muted is
+     still above 4.5:1. Dark mode flips the token and the same arithmetic
+     holds the other way up. Opaque fallback without backdrop-filter.
+
+     ⚠️ SAME CONTAINING-BLOCK RULE AS .glass-chrome: nothing `position:
+     fixed` may live inside an element wearing this. The Sheet's scrim is
+     the fixed element and the PANEL is its child, which is the right way
+     round. */
+  .glass-panel {
+    background: rgb(var(--surface-card-rgb) / 0.86);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-panel {
+      background: rgb(var(--surface-card-rgb));
+    }
+  }
+
   /* The dock's material — design "A", 23 Aug 2026. Darker than the masthead
      (the chrome should read BLACK again, Jay: "very bland"), with the three
      things that make glass read as glass rather than grey: a 1px light

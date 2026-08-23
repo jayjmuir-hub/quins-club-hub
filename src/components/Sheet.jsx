@@ -147,7 +147,7 @@ export function Sheet({ open, onClose, title, children, dismissible = true }) {
         aria-labelledby={titleId}
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] bg-surface-card shadow-card animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] desktop:w-[min(520px,94vw)] desktop:animate-sheet-scale-in desktop:rounded-[20px]"
+        className="glass-panel max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] shadow-card animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] desktop:w-[min(520px,94vw)] desktop:animate-sheet-scale-in desktop:rounded-[20px]"
       >
         {/* Drag-handle bar (design-system.md §4.16 .sheet-grip): mobile
             only, visual affordance only — there is no swipe-to-dismiss
@@ -157,7 +157,7 @@ export function Sheet({ open, onClose, title, children, dismissible = true }) {
         <div className="flex justify-center pb-1 pt-2.5 desktop:hidden" aria-hidden="true">
           <span className="h-1 w-[38px] rounded-full bg-surface-sunk" />
         </div>
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface-card px-[18px] py-4">
+        <div className="glass-panel sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line px-[18px] py-4">
           <h3 id={titleId} className="text-[18px] font-extrabold text-ink">
             {title}
           </h3>

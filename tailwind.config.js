@@ -319,6 +319,11 @@ export default {
       // automatically because the newly-active section re-triggers its CSS
       // animation").
       keyframes: {
+        dockBloom: {
+          '0%': { boxShadow: '0 4px 14px rgba(194,31,50,0.45)' },
+          '45%': { boxShadow: '0 6px 26px rgba(194,31,50,0.8), 0 0 0 1px rgba(255,255,255,0.18)' },
+          '100%': { boxShadow: '0 4px 14px rgba(194,31,50,0.45)' },
+        },
         sheetSlideUp: {
           from: { transform: 'translateY(100%)' },
           to: { transform: 'translateY(0)' },
@@ -379,6 +384,8 @@ export default {
         'rise-in': 'riseIn .4s cubic-bezier(.22,.61,.36,1) both',
         shimmer: 'shimmer 1.4s ease-in-out infinite',
         'live-pulse': 'livePulse 2.2s cubic-bezier(.22,.61,.36,1) infinite',
+        // The dock's pill glow blooms as it lands, then settles (Nav.jsx).
+        'dock-bloom': 'dockBloom .7s cubic-bezier(.22,.61,.36,1) both',
       },
       transitionTimingFunction: {
         // The house curve: decelerating, so things arrive softly and leave

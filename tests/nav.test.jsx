@@ -75,6 +75,23 @@ describe('Nav', () => {
     expect(screen.getByRole('link', { name: 'Schedule' })).toBeInTheDocument()
   })
 
+  // The motion pass (23 Aug 2026): the red pill is ONE element that slides to
+  // the active tab. jsdom has no layout, so this pins the structure — a single
+  // glider, keyed to the route so its bloom re-runs — not the geometry.
+  it('renders exactly one glider, behind the links, re-keyed per route', () => {
+    renderNav('/roster')
+
+    const gliders = document.querySelectorAll('[data-testid="dock-glider"]')
+    expect(gliders).toHaveLength(1)
+    expect(gliders[0]).toHaveAttribute('aria-hidden', 'true')
+    expect(gliders[0].className).toMatch(/animate-dock-bloom/)
+    expect(gliders[0].className).toMatch(/motion-reduce:animate-none/)
+    // Decorative: no link carries the gradient any more.
+    for (const link of document.querySelectorAll('nav a')) {
+      expect(link.className).not.toMatch(/linear-gradient/)
+    }
+  })
+
   it('marks Home active with aria-current="page" at the root route', () => {
     renderNav('/')
 
