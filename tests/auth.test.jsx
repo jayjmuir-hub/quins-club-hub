@@ -20,6 +20,13 @@ vi.mock('../src/lib/supabase.js', () => ({
   },
 }))
 
+// signOut drops this device's push row BEFORE the session ends (23 Aug 2026,
+// the shared-phone finding). Mocked here; the real thing is in push.test.js.
+const unsubscribeFromPushMock = vi.fn()
+vi.mock('../src/lib/push.js', () => ({
+  unsubscribeFromPush: (...args) => unsubscribeFromPushMock(...args),
+}))
+
 // Import after vi.mock so this binds to the mocked module.
 import { supabase } from '../src/lib/supabase.js'
 
@@ -75,6 +82,7 @@ beforeEach(() => {
   supabase.auth.signInWithOtp.mockResolvedValue({ data: {}, error: null })
   supabase.auth.signInWithOAuth.mockResolvedValue({ data: {}, error: null })
   supabase.auth.signOut.mockResolvedValue({ error: null })
+  unsubscribeFromPushMock.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -261,6 +269,32 @@ describe('AuthProvider / useAuth', () => {
     await user.click(screen.getByRole('button', { name: /sign out/i }))
 
     expect(supabase.auth.signOut).toHaveBeenCalledTimes(1)
+  })
+
+  // ⚠️ ORDER IS THE ASSERTION. The delete needs the session that signOut ends,
+  // so it must run first. A test that only checked "both were called" would
+  // pass with the order reversed — and then the delete would 401 every time.
+  it('drops the push subscription for this device BEFORE ending the session', async () => {
+    const order = []
+    unsubscribeFromPushMock.mockImplementation(async () => { order.push('unsubscribe') })
+    supabase.auth.signOut.mockImplementation(async () => { order.push('signOut'); return { error: null } })
+    const user = userEvent.setup()
+    await renderHarness()
+
+    await user.click(screen.getByRole('button', { name: /sign out/i }))
+
+    expect(order).toEqual(['unsubscribe', 'signOut'])
+  })
+
+  it('still signs out when the push unsubscribe fails', async () => {
+    unsubscribeFromPushMock.mockRejectedValue(new Error('no service worker'))
+    const user = userEvent.setup()
+    await renderHarness()
+
+    await user.click(screen.getByRole('button', { name: /sign out/i }))
+
+    expect(supabase.auth.signOut).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('error')).toHaveTextContent('none')
   })
 
   it('surfaces a signOut error to the caller instead of swallowing it', async () => {

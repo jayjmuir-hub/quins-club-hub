@@ -4055,6 +4055,42 @@ $function$
 ;
 
 -- ---------------------------------------------------------------------
+-- public.register_push_subscription(text, text, text)   (23 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- Captured from pg_get_functiondef inside a rolled-back transaction BEFORE
+-- 20260823_push_subscription_takeover was applied; re-verify the md5 after.
+-- A device endpoint belongs to whoever is signed in on it now: delete any
+-- row for this endpoint, insert one for auth.uid(). Replaces the client's
+-- upsert, which RLS refused the first time a phone changed hands. The
+-- service_role execute arrives via default privileges, as with
+-- pitch_occupancy below. Harness: db/tests/push-subscription-takeover.sql.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.register_push_subscription(_endpoint text, _p256dh text, _auth text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  _me uuid := auth.uid();
+begin
+  if _me is null then
+    raise exception 'not signed in' using errcode = '42501';
+  end if;
+  if _endpoint is null or btrim(_endpoint) = '' then
+    raise exception 'endpoint required' using errcode = '22023';
+  end if;
+
+  -- The takeover. Whoever held this device before no longer does.
+  delete from public.push_subscriptions where endpoint = _endpoint;
+
+  insert into public.push_subscriptions (profile_id, endpoint, p256dh, auth)
+  values (_me, _endpoint, _p256dh, _auth);
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
 -- public.pitch_occupancy(timestamptz, timestamptz)   (22 Aug 2026)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
 -- Captured from live AFTER 20260822_pitch_occupancy was applied — the
