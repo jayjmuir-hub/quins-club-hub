@@ -4875,6 +4875,7 @@ $function$
 ;
 
 -- ---------------------------------------------------------------------
+<<<<<<< HEAD
 -- ADULT DMs PRIVATE UNLESS REPORTED (23 Aug 2026, evening) —
 -- db/migrations/20260823_adult_dms_private.sql. Jay: "I don't think dm between
 -- adults should be visible to anyone except those people, unless a message is
@@ -4887,10 +4888,21 @@ $function$
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.conversation_reviewable(_conversation uuid)
  RETURNS boolean
+=======
+-- public.storage_usage()   (23 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- Captured from pg_get_functiondef inside a rolled-back transaction; md5
+-- c778fa39b0708d995e65a2a4fc6653f2. db/migrations/20260823_storage_usage.sql.
+-- Admin-only readout of database size and bytes per bucket, for the Club tab.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.storage_usage()
+ RETURNS TABLE(kind text, label text, bytes bigint, objects bigint)
+>>>>>>> d18ed3e (feat(admin): storage readout on the Club tab — the measured answer to 'won't we run out?')
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
+<<<<<<< HEAD
   select exists (
     select 1 from conversations c
      where c.id = _conversation
@@ -4934,6 +4946,18 @@ AS $function$
     from conversations c
    where c.id = _conversation
      and (private.in_conversation(c.id) or private.admin_may_review(c.id))
+=======
+  select 'database'::text, current_database()::text,
+         pg_database_size(current_database()), null::bigint
+  where private.is_admin_anywhere()
+  union all
+  select 'bucket'::text, o.bucket_id::text,
+         coalesce(sum((o.metadata->>'size')::bigint), 0), count(*)
+    from storage.objects o
+   where private.is_admin_anywhere()
+   group by o.bucket_id
+   order by 1, 2
+>>>>>>> d18ed3e (feat(admin): storage readout on the Club tab — the measured answer to 'won't we run out?')
 $function$
 ;
 

@@ -15,6 +15,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { SCORE_KINDS, SCORE_LABELS, scoringForBand, scoringForTeam } from '../lib/scoring.js'
 import { ageBandFromTeamName } from '../lib/ageGroup.js'
 import InviteForm from './InviteForm.jsx'
+import StorageCard from '../components/StorageCard.jsx'
 
 // The Club tab of /admin (admin-dashboard plan, 2026-08-05). Assembled from
 // the parts of the old Admin.jsx worth keeping — age groups with player
@@ -725,6 +726,8 @@ export default function AdminClub() {
           )}
         </Card>
       )}
+
+      <StorageCard />
 
       {inviteOpen && <InviteForm onClose={() => setInviteOpen(false)} />}
     </div>

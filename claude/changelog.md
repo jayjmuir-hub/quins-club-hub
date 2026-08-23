@@ -10,7 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- 🔒 **Adult-to-adult DMs are private unless a message is reported** — Jay's
+- 📊 **Storage readout on the Club admin tab** — database size and bytes per
+  photo bucket against the Pro plan's allowances, measured on open. The
+  answer to "won't we run out of storage?" is now on a screen.
+  `public.storage_usage()` (admin-only by the function), `src/components/StorageCard.jsx`,
+  harness `db/tests/storage-usage.sql`.
+- `30e2cef` — 🔒 **Adult-to-adult DMs are private unless a message is reported** — Jay's
   evening ruling narrowing the morning one. An admin reaches a DM only when it
   involves a minor or a message in it has been reported
   (`private.admin_may_review`); the Welfare overview lists only those; the
