@@ -250,8 +250,8 @@ function plainText(ask: Ask): string {
     'Review it in the Club Hub:',
     `${APP_URL}/approvals`,
     '',
-    "You're getting this because you're a coach, team manager or admin for this",
-    'age group.',
+    "You're getting this because a club admin switched on approval emails for",
+    'you. Ask them to switch it off if you would rather not.',
   ].join('\n')
 }
 
@@ -276,8 +276,8 @@ function template(ask: Ask): string {
         Review it in the Club Hub
       </a>
       <p style="margin:20px 0 0;font-size:12.5px;line-height:1.5;color:#8a8582;">
-        You're getting this because you're a coach, team manager or admin for
-        this age group.
+        You're getting this because a club admin switched on approval emails
+        for you. Ask them to switch it off if you would rather not.
       </p>
     </div>
   </body>
@@ -355,10 +355,15 @@ Deno.serve(async (request: Request): Promise<Response> => {
     //    admin who switched everyone off - the super admins are told anyway.
     //    A registration is never left unseen; that was the old rule's floor
     //    and it is kept. The Club tab says so under the list.
+    // !! A pending row without a squad (none exist today; guarded anyway)
+    //    reaches the club-wide admins only - `team_id.eq.null` is not a filter.
+    const scope = membership.team_id
+      ? `&or=(team_id.is.null,team_id.eq.${encodeURIComponent(membership.team_id)})`
+      : '&team_id=is.null'
     const switched = await db(
       `memberships?club_id=eq.${encodeURIComponent(membership.club_id)}` +
         '&status=eq.active&notify_approvals=is.true' +
-        `&or=(team_id.is.null,team_id.eq.${encodeURIComponent(membership.team_id)})` +
+        scope +
         '&select=profiles(email)',
     )
     const supers = switched.length > 0
