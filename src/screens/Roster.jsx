@@ -750,7 +750,13 @@ export default function Roster() {
 
           Only while the filter is off: with Male or Female selected the
           hiddenUnrecorded line below is already saying the more precise thing. */}
-      {genderFilter === 'all' && missingGender > 0 && (
+      {/* ⚠️ STAFF ONLY — 23 Aug 2026. A parent on the U16B squad saw "2
+          players have no gender recorded — Show them" in red on her phone.
+          This is a data-quality nudge for the people who can FIX the record;
+          a parent cannot, and should not be prompted to go looking at other
+          families' gaps. Same gate as the grouping control below: anyone who
+          can edit anything on this screen. */}
+      {canEditAnything && genderFilter === 'all' && missingGender > 0 && (
         <button
           type="button"
           onClick={() => setGenderFilter('unrecorded')}
