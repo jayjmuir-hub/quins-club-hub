@@ -10,7 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- 🐛 **The "no gender recorded" nudge is staff-only** — a parent saw "2
+- 📝 **Handoff: chat phases 2 and 3** — the afternoon's record, the ruling
+  that any admin may read a DM, and the lessons (harness the file verbatim;
+  never stash across a moved `main`; explicit column lists in `returns table`).
+  `claude/handoffs/2026-08-23-chat-phases-2-and-3.md`; `state-of-play.md`
+  now says phases 1–3 are live.
+- `c593795` — 🐛 **The "no gender recorded" nudge is staff-only** — a parent saw "2
   players have no gender recorded — Show them" in red on her squad's roster.
   It is a data-quality tool for the people who can fix the record; now
   behind the same can-edit gate as grouping (`src/screens/Roster.jsx`).
