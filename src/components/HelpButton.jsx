@@ -182,7 +182,13 @@ export default function HelpButton() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Help, report a problem or suggest a change"
-        className="fixed bottom-[calc(96px+env(safe-area-inset-bottom))] right-[18px] z-30 grid h-11 w-11 place-items-center rounded-full bg-brand text-[20px] font-bold leading-none text-white shadow-card transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 desktop:bottom-6"
+        // ⚠️ DARK GLASS, NOT BRAND RED, since 23 Aug 2026. It was a solid red
+        // 44px disc, and once the dock's active tab became a red pill the two
+        // sat 40px apart as a pair of red blobs competing for the eye. Help
+        // is a utility, not the brand moment: it wears the dock's material
+        // (.glass-dock) so it belongs to the same layer, and the only red at
+        // the foot of the screen is the tab you are on.
+        className="glass-dock fixed bottom-[calc(96px+env(safe-area-inset-bottom))] right-[18px] z-30 grid h-11 w-11 place-items-center rounded-full text-[19px] font-bold leading-none text-white transition hover:bg-chrome-raised active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 desktop:bottom-6"
       >
         {/* aria-hidden: the accessible name is on the button. Without this a
             screen reader reads "question mark" after the real label. */}

@@ -10,7 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **The dock, design "A"** — Jay: "very bland" → "go with A, but flashier
+- **Shell polish to match the dock** — the desktop sidebar's active item is
+  the same gradient pill with the same glow (`src/components/Sidebar.jsx`),
+  and the help button is dark glass instead of a second red disc 40px from
+  the red active tab (`src/components/HelpButton.jsx`; still 44px — the
+  test for the touch-target floor caught a 40px first draft).
+- `e2ca0a7` — **The dock, design "A"** — Jay: "very bland" → "go with A, but flashier
   and more modern". Icons only; the active tab expands into a brand-gradient
   pill with its label sliding open (300ms, reduced-motion aware) and a soft
   red glow. `.glass-dock` in `src/index.css`: chrome at 84% with a light
