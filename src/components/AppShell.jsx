@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
+import { highestRole, isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
 import Nav from './Nav.jsx'
 import NamePrompt from './NamePrompt.jsx'
 import RollCall from './RollCall.jsx'
@@ -12,6 +12,7 @@ import RollCall from './RollCall.jsx'
 import PaintDebug from './PaintDebug.jsx'
 import Sidebar from './Sidebar.jsx'
 import AccountMenu from './AccountMenu.jsx'
+import { Badge } from './Badge.jsx'
 import { ViewAsBanner } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 import Button from './Button.jsx'
@@ -201,6 +202,11 @@ export default function AppShell({ children }) {
   // The truncation it was meant to fix is handled in ViewAsSwitcher instead.
   const showRole = !loading && !error
   const currentRoleLabel = roleLabel(memberships)
+  // The KEY, for the Badge tone — the same design-system role tag the
+  // Accounts screen uses (claude/specs/design-system.md §4.20). Until 23 Aug
+  // 2026 the masthead drew its own translucent red ring for every role, which
+  // matched nothing else in the app.
+  const currentRole = highestRole(memberships)
   // Reads the EFFECTIVE membership set, like every other gate in this file, so
   // an admin previewing a squad is never told they are waiting for approval.
   // (isPendingOnly returns false for a synthetic preview row anyway — see its
@@ -305,11 +311,26 @@ export default function AppShell({ children }) {
             {/* Phase 2: on desktop the SIDEBAR carries the crest and the
                 app's name, so the masthead becomes a utility bar and hides
                 both. Mobile is untouched. */}
-            <img
-              src={crest}
-              alt="Abu Dhabi Harlequins crest"
-              className="h-[40px] w-[40px] shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)] desktop:hidden"
-            />
+            {/* ⚠️ A LINK HOME, AND A SCROLL TO THE TOP — Jay, 23 Aug 2026:
+                "shouldn't clicking on the quins logo always take you to the
+                top of the screen?". Two cases: from another screen it is a
+                plain link to /; from Home itself a Link to the current route
+                does nothing visible, so it scrolls the window to the top
+                instead. One handler does both — the scroll is harmless on the
+                navigation case. */}
+            <Link
+              to="/"
+              aria-label="Abu Dhabi Harlequins — back to the top"
+              data-testid="crest-home"
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="shrink-0 rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-white/70 desktop:hidden"
+            >
+              <img
+                src={crest}
+                alt="Abu Dhabi Harlequins crest"
+                className="h-[40px] w-[40px] object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
+              />
+            </Link>
             {/* The club name is one of the few places Anton is allowed (see
                 tailwind.config.js fontFamily): it is a masthead wordmark, not
                 something anyone reads at speed. `truncate` because Anton is
@@ -415,12 +436,13 @@ export default function AppShell({ children }) {
                   block — the worst case is an ellipsised ROLE, never an
                   ellipsised wordmark. */}
               {showRole && (
-                <span
+                <Badge
+                  tone={currentRole}
                   data-testid="role-label-mobile"
-                  className="mt-1 inline-block max-w-full truncate rounded-pill bg-brand/20 px-2 py-[2px] font-condensed text-[11px] font-bold uppercase tracking-[0.08em] text-brand-onDark ring-1 ring-inset ring-brand/45 desktop:hidden"
+                  className="mt-1 max-w-full truncate desktop:hidden"
                 >
                   {currentRoleLabel}
-                </span>
+                </Badge>
               )}
             </div>
 
@@ -435,12 +457,13 @@ export default function AppShell({ children }) {
                 20% red fill measures >8:1; the fill is opaque-over-flat, so it
                 does not move with viewport width. */}
             {showRole && (
-              <span
+              <Badge
+                tone={currentRole}
                 data-testid="role-label-desktop"
-                className="hidden shrink-0 rounded-pill bg-brand/20 px-3 py-1 font-condensed text-[13px] font-bold uppercase tracking-[0.08em] text-brand-onDark ring-1 ring-inset ring-brand/45 desktop:inline-block"
+                className="hidden shrink-0 desktop:inline-flex"
               >
                 {currentRoleLabel}
-              </span>
+              </Badge>
             )}
 
             {/* ⚠️ BEFORE THE ACCOUNT MENU, AND IT RENDERS NOTHING ONCE THE APP

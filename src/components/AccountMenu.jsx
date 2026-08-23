@@ -215,18 +215,49 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={triggerName}
+        // ⚠️ THE AVATAR LANGUAGE THE APP ALREADY HAS, not a new one. The
+        // Accounts list draws a person as their initials on the brand-deep →
+        // brand gradient (design-system §4.19's `.pa`); the first version of
+        // this button was a flat 15%-white disc and Jay called it bland. The
+        // hairline ring is what says "control" against the near-black chrome,
+        // and the chevron is what says "menu" — a bare initial looked like a
+        // label.
         className={[
-          'relative ml-1 grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-extrabold text-white outline-none transition',
-          'focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
-          // A preview in progress is shown on the trigger too — ring and dot,
-          // not colour alone (claude/specs/accessibility.md) — because the
-          // View-as control now lives behind this button.
-          viewAs ? 'bg-brand/30 ring-1 ring-inset ring-brand-onDark' : 'bg-white/15 hover:bg-white/25',
+          // ⚠️ z-[1]: the masthead's `harlequin::after` diagonal is an absolutely
+          // positioned pseudo-element drawn LAST, so it paints over any
+          // positioned sibling with no z-index. On desktop this button sits
+          // exactly where the diagonal lands, and without this the avatar
+          // dimmed and the chevron half-vanished — measured, not guessed:
+          // the rects were inside the row, the paint order was the bug.
+          'group relative z-[1] ml-1 flex h-9 shrink-0 items-center gap-1 rounded-pill pl-[3px] pr-1.5 text-white outline-none transition',
+          'hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
         ].join(' ')}
       >
-        {initial}
+        <span
+          aria-hidden="true"
+          className={[
+            'grid h-[30px] w-[30px] place-items-center rounded-full bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[13px] font-extrabold tracking-[.5px] shadow-[0_1px_3px_rgba(0,0,0,0.4)] ring-1 ring-inset',
+            // A preview in progress: ring and dot, not colour alone
+            // (claude/specs/accessibility.md). The words are on the View as row.
+            viewAs ? 'ring-brand-onDark' : 'ring-white/30',
+          ].join(' ')}
+        >
+          {initial}
+        </span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={['h-3 w-3 text-white/60 transition group-hover:text-white', open ? 'rotate-180' : ''].join(' ')}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
         {viewAs && (
-          <span aria-hidden="true" className="absolute right-0 top-0 h-2 w-2 rounded-full bg-brand-onDark" />
+          <span aria-hidden="true" className="absolute left-[24px] top-0 h-2 w-2 rounded-full bg-brand-onDark" />
         )}
       </button>
 

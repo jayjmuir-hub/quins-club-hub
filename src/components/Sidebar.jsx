@@ -162,7 +162,17 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
       {/* The portal's sidebar header: crest, then the app's name over the
           club's, in the kicker voice. */}
       <div className="flex items-center gap-3 px-4 py-4">
-        <img src={crest} alt="" className="h-10 w-10 shrink-0 object-contain" />
+        {/* Home, and back to the top — the same promise the mobile masthead's
+            crest makes (AppShell.jsx, 23 Aug 2026). */}
+        <Link
+          to="/"
+          aria-label="Abu Dhabi Harlequins — back to the top"
+          data-testid="crest-home"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="shrink-0 rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        >
+          <img src={crest} alt="" className="h-10 w-10 object-contain" />
+        </Link>
         <div className="min-w-0 leading-tight">
           <p className="font-condensed text-[10px] font-bold uppercase tracking-[0.14em] text-chrome-muted">
             Members
