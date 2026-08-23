@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { clearPhotoUrlCache } from '../data/photos.js'
 import { syncApiCacheOwner } from './apiCache.js'
-import { unsubscribeFromPush } from './push.js'
+import { forgetDeviceRegistration, reattachOnSignIn } from './push.js'
 
 // Auth context for the app: current session/user, loading state, and the
 // three sign-in/sign-out actions. No sign-up, password auth, profile
@@ -48,6 +48,11 @@ export function AuthProvider({ children }) {
       // signOut wrapper in src/lib/supabase.js. A token refresh carries the
       // same uid, so this costs one localStorage read and returns.
       syncApiCacheOwner(newSession?.user?.id ?? null)
+      // A phone that already has a push subscription is re-attached to the
+      // person who just signed in — the other half of forgetDeviceRegistration
+      // in signOut. Fire-and-forget; it never throws. Only on a real sign-in:
+      // a token refresh (same person) would re-run an upsert for nothing.
+      if (_event === 'SIGNED_IN' && newSession?.user) reattachOnSignIn()
       if (!mounted) return
       setSession(newSession)
     })
@@ -181,8 +186,14 @@ export function AuthProvider({ children }) {
     // their notifications. Found 23 Aug 2026 on the first shared phone. A
     // failure here must not block signing out — the server-side takeover in
     // register_push_subscription covers the case where this did not run.
+    //
+    // ⚠️ forgetDeviceRegistration, NOT unsubscribeFromPush, since later the
+    // same day: the row goes, the browser subscription stays, and the
+    // reattach in onAuthStateChange below puts the row back for whoever
+    // signs in next. Jay: "I don't want it to change if I sign out and sign
+    // back in."
     try {
-      await unsubscribeFromPush()
+      await forgetDeviceRegistration()
     } catch {
       // deliberately swallowed — see above
     }
