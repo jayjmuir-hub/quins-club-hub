@@ -248,6 +248,18 @@ describe('the gender gap nudges, and the nudge is clickable', () => {
     listPlayersMock.mockResolvedValue([...SQUAD.slice(0, 3), { ...SQUAD[3], gender: null }])
   })
 
+  // ⚠️ A PARENT NEVER SEES THE NUDGE — 23 Aug 2026, from a parent's iPhone:
+  // "2 players have no gender recorded — Show them", in red, on a squad she
+  // cannot edit. It is a tool for the people who can fix the record.
+  it('never shows the nudge to a parent, even with gaps in her squad', async () => {
+    useMembershipsMock.mockReturnValue({ memberships: PARENT, teams: [U16B] })
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+
+    // The roster itself still loads — this is about the nudge, not the data.
+    expect(await screen.findAllByTestId('table-player-name')).toHaveLength(4)
+    expect(screen.queryByRole('button', { name: /no gender recorded/i })).not.toBeInTheDocument()
+  })
+
   it('says how many players have no gender recorded', async () => {
     render(<MemoryRouter><Roster /></MemoryRouter>)
     expect(await screen.findByRole('button', { name: /1 player has no gender recorded/i }))
