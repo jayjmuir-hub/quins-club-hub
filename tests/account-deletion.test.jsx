@@ -174,7 +174,9 @@ describe('/privacy', () => {
     expect(screen.getByRole('heading', { name: /privacy policy/i })).toBeInTheDocument()
     // Each of these was checked against the live system. If someone changes
     // what the app does without changing the policy, this fails.
-    expect(screen.getByText(/tokyo, japan/i)).toBeInTheDocument()
+    // The region was named until 23 Aug 2026; Jay asked for "secure providers".
+    expect(screen.queryByText(/tokyo/i)).toBeNull()
+    expect(screen.getByText(/secure, reputable hosting and email providers/i)).toBeInTheDocument()
     expect(
       screen.getByText(/do not sell it, share it outside the club, advertise, or track you/i),
     ).toBeInTheDocument()
