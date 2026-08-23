@@ -182,7 +182,7 @@ export default function HelpButton() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Help, report a problem or suggest a change"
-        className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] right-[18px] z-30 grid h-11 w-11 place-items-center rounded-full bg-brand text-[20px] font-bold leading-none text-white shadow-card transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 desktop:bottom-6"
+        className="fixed bottom-[calc(96px+env(safe-area-inset-bottom))] right-[18px] z-30 grid h-11 w-11 place-items-center rounded-full bg-brand text-[20px] font-bold leading-none text-white shadow-card transition hover:bg-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 desktop:bottom-6"
       >
         {/* aria-hidden: the accessible name is on the button. Without this a
             screen reader reads "question mark" after the real label. */}

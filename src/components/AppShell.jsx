@@ -518,7 +518,7 @@ export default function AppShell({ children }) {
       <main
         id="main-content"
         tabIndex={-1}
-        className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(100px+env(safe-area-inset-bottom))] pt-4 desktop:mx-0 desktop:max-w-none desktop:px-6 desktop:pb-16 wide:max-w-none focus:outline-none"
+        className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(108px+env(safe-area-inset-bottom))] pt-4 desktop:mx-0 desktop:max-w-none desktop:px-6 desktop:pb-16 wide:max-w-none focus:outline-none"
       >
         {/* ⚠️ ABOVE THE loading/error/ready SPLIT, DELIBERATELY. Installing is
             not gated on having a membership: a parent who has just signed up

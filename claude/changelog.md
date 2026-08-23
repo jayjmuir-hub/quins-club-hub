@@ -10,7 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **iOS-style bars** — Jay: "transparent and sort of above the screen instead
+- **The dock** — Jay, with a photo of his iPhone home screen: the tab bar is
+  now a floating rounded pill, inset 12px from the edges and lifted clear of
+  the home indicator, in the same glass as the masthead. Six tabs on a 360px
+  Android had "SQUAD HUB" wrapping and "SCHEDULE ROSTER" running together:
+  labels are 10px condensed caps, single-line, and the Squad Hub tab prints
+  "Squad" (accessible name unchanged). Content padding and the help button
+  re-measured to clear it. `src/components/Nav.jsx`.
+- `6cde742` — **iOS-style bars** — Jay: "transparent and sort of above the screen instead
   of sitting as a bar". Masthead and tab bar wear `.glass-chrome`
   (`src/index.css`): chrome at 82% over a 20px backdrop blur, hairline edges
   instead of shadows, opaque fallback where backdrop-filter is unsupported.

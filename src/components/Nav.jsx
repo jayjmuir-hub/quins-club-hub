@@ -96,7 +96,13 @@ function linkClassName({ isActive }) {
     // chrome, so idle items are chrome-muted (#8b9099, 6.09:1 on #0c0c0e)
     // and the active item goes pure white plus a red icon — brighter, not
     // just a different hue, so it reads at a glance in sunlight.
-    'flex flex-col items-center justify-center gap-1 rounded-lg py-2 font-condensed text-[11px] font-bold uppercase tracking-[0.06em] outline-none transition',
+    // ⚠️ `whitespace-nowrap` + 10px + tight tracking: six items on a 360px
+    // Android (squad staff get Squad Hub) gave each ~58px, and "SQUAD HUB"
+    // wrapped onto two lines while "SCHEDULE" and "ROSTER" ran together —
+    // Jay's screenshots, 23 Aug 2026. Condensed caps at 10px keep the
+    // longest label inside that, and nowrap makes a tight fit clip at the
+    // item edge rather than grow the bar.
+    'flex min-w-0 flex-col items-center justify-center gap-[3px] px-0.5 pb-2 pt-[11px] font-condensed text-[10px] font-bold uppercase tracking-[0.03em] whitespace-nowrap outline-none transition',
     'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
     isActive ? 'text-white' : 'text-chrome-muted hover:text-white',
     // (The desktop pill styling that lived here 6-21 Aug, with its measured
@@ -115,7 +121,11 @@ export default function Nav({ showSquadHub = false }) {
   const items = showSquadHub
     ? [
         ...NAV_ITEMS.filter((item) => item.to !== '/more'),
-        { to: '/squad', label: 'Squad Hub', icon: SquadIcon },
+        // `short` is what the tab PRINTS; `label` stays the accessible name.
+        // Measured at 360px with six tabs: "SQUAD HUB" is 61px of condensed
+        // caps in a 56px cell and clipped — "SQUAD" is 33. The sidebar still
+        // says Squad Hub in full; the tab bar is the only place this is short.
+        { to: '/squad', label: 'Squad Hub', short: 'Squad', icon: SquadIcon },
         ...NAV_ITEMS.filter((item) => item.to === '/more'),
       ]
     : NAV_ITEMS
@@ -138,13 +148,23 @@ export default function Nav({ showSquadHub = false }) {
       // ⚠️ FULL CLASS NAMES, NEVER `grid-cols-${n}` — Tailwind only emits the
       // classes it can see in the source. Five for everyone since Chat joined
       // (23 Aug 2026), six for squad staff.
-      className={`fixed inset-x-0 bottom-0 z-40 grid ${GRID_COLS[items.length] ?? 'grid-cols-5'} glass-chrome border-t border-white/10 pb-[env(safe-area-inset-bottom)] desktop:hidden`}
+      // ══ THE DOCK — Jay, 23 Aug 2026, with a photo of his iPhone's home
+      // screen: a floating, rounded, frosted pill inset from the edges and
+      // lifted clear of the home indicator, not a slab welded to the bottom.
+      // `inset-x-3 bottom-[calc(12px+safe-area)]` is the inset; `rounded-[26px]`
+      // and `glass-chrome` are the material; `overflow-hidden` clips the
+      // brand-rule and item hover fills to the pill's corners.
+      //
+      // ⚠️ The content's bottom padding in AppShell and the help button's
+      // offset in HelpButton.jsx are sized to clear THIS. Change the height or
+      // the inset here and re-measure both.
+      className={`fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 grid ${GRID_COLS[items.length] ?? 'grid-cols-5'} glass-chrome overflow-hidden rounded-[26px] border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.35)] desktop:hidden`}
     >
       <div className="brand-rule absolute inset-x-0 top-0" />
-      {items.map(({ to, label, end, icon: Icon }) => (
-        <NavLink key={to} to={to} end={end} className={linkClassName}>
+      {items.map(({ to, label, short, end, icon: Icon }) => (
+        <NavLink key={to} to={to} end={end} className={linkClassName} aria-label={short ? label : undefined}>
           <Icon className={'h-[23px] w-[23px]'} aria-hidden="true" />
-          <span>{label}</span>
+          <span>{short ?? label}</span>
         </NavLink>
       ))}
     </nav>
