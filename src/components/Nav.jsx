@@ -109,7 +109,9 @@ function linkClassName({ isActive }) {
     // Press squash — the iOS tab feel. 90% on the way down, and the spring
     // curve on the transition above gives it the bounce back.
     'active:scale-90 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
-    isActive ? 'px-3 text-white' : 'px-2 text-white/80 hover:text-white',
+    // white/90 for idle icons — the dock is 62% glass now; src/index.css
+    // carries the arithmetic (icons are components, 3:1, and this is 4.4).
+    isActive ? 'px-3 text-white' : 'px-2 text-white/90 hover:text-white',
   ].join(' ')
 }
 

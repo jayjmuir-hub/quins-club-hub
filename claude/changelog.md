@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **Dock extras** — the rest of the motion ideas, on Jay's "do it". The dock
+- **Glass islands** — Jay: "make the bottom more transparent or glass? a
+  similar style for the top?" The masthead is now a floating island like
+  the dock — inset, rounded, highlight edge, shadow (`.glass-island`, 70%
+  because it carries text) — with the iPhone status-bar strip as its own
+  thin fixed glass, and the View-as banner rounded to match. The dock goes
+  to 62%, which design A makes safe: its idle items are icons (3:1
+  components) and its only text sits on the red pill, not the glass.
+  ⚠️ The island's 24px of inset re-opened the morning's bug — "QUINS CLUB
+  H…" at 375px — and was paid for inside the island (row padding, crest
+  40→36, tracking 1.6→1.2px): measured intact at 360 and 375 with the
+  install button present; 320px phones still clip, as they did before.
+- `ad904c2` — **Dock extras** — the rest of the motion ideas, on Jay's "do it". The dock
   slides away on a downward scroll and returns on an upward one or at either
   end of the page (re-shown on every route change). The red pill's glow now
   BLEEDS into the glass — a blurred halo behind it that travels with it.
