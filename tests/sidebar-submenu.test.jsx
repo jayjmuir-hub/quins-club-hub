@@ -3,6 +3,9 @@ import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const countAdminWaitingMock = vi.fn()
+vi.mock('../src/lib/auth.jsx', () => ({
+  useAuth: () => ({ user: { id: 'me' } }),
+}))
 vi.mock('../src/data/members.js', () => ({
   countAdminWaiting: (...args) => countAdminWaitingMock(...args),
 }))

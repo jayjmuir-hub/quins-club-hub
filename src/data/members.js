@@ -158,20 +158,45 @@ export async function listClubMembers() {
  */
 
 /**
- * How many things on Accounts are waiting for an admin — pending memberships
- * plus undecided access requests, the two queues an admin opens the app to
- * clear. Head-only count queries: the sidebar badge needs a number, never
- * the rows. RLS does the scoping, as everywhere; for a non-admin both counts
- * come back small or zero and the badge is not rendered anyway.
+ * How many things on Accounts are waiting for an admin — the "Players waiting
+ * to be approved" rows plus the "Waiting for access" people — so the sidebar
+ * badge says the same number the screen shows.
+ *
+ * ⚠️ THIS USED TO COUNT `access_requests` WITH status = 'pending', AND THAT IS
+ * NOT A QUEUE. There is deliberately no 'granted' status on that table
+ * (20260804_access_requests.sql): granted access IS the existence of a
+ * memberships row, and a request stays 'pending' forever after. So on 23 Aug
+ * 2026 the badge said 23 while the list showed 2 — every one of the 23 had
+ * been given access days earlier. The list's rule is the one below, and it is
+ * copied here on purpose rather than approximated:
+ *
+ *   waiting  = a readable profile that is not me, holds NO membership row
+ *              (pending included), and has not been dismissed
+ *   pending  = every membership row with status 'pending'
+ *
+ * Ids only, under the same RLS the screen reads with — an admin sees the club,
+ * a coach sees their squads' pending rows, a parent sees nothing and the
+ * badge is not rendered anyway.
  */
-export async function countAdminWaiting() {
-  const [memb, reqs] = await Promise.all([
-    supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('access_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+export async function countAdminWaiting(userId) {
+  const [profiles, memberships, dismissed] = await Promise.all([
+    supabase.from('profiles').select('id'),
+    supabase.from('memberships').select('profile_id, status'),
+    supabase.from('access_requests').select('profile_id').eq('status', 'dismissed'),
   ])
-  if (memb.error) throw memb.error
-  if (reqs.error) throw reqs.error
-  return (memb.count ?? 0) + (reqs.count ?? 0)
+  if (profiles.error) throw profiles.error
+  if (memberships.error) throw memberships.error
+  if (dismissed.error) throw dismissed.error
+
+  const memberRows = memberships.data ?? []
+  const withMembership = new Set(memberRows.map((row) => row.profile_id).filter(Boolean))
+  const dismissedIds = new Set((dismissed.data ?? []).map((row) => row.profile_id))
+  const waiting = (profiles.data ?? []).filter(
+    (profile) =>
+      profile.id !== userId && !withMembership.has(profile.id) && !dismissedIds.has(profile.id),
+  ).length
+  const pending = memberRows.filter((row) => row.status === 'pending').length
+  return waiting + pending
 }
 
 export async function listPendingProfiles() {
