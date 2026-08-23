@@ -420,7 +420,7 @@ export default function AppShell({ children }) {
                   this repo could have caught the original — same blind spot as
                   the `wide:` vs `desktop:` note at the account link below. The
                   test that exists pins the class tokens instead. */}
-              <p className="truncate font-condensed text-[13px] font-semibold uppercase tracking-[1.6px] text-white/70">
+              <p className="truncate font-condensed text-[13px] font-semibold uppercase tracking-[1.6px] text-white/80">
                 Quins Club Hub
               </p>
               {/* ⚠️ THE ROLE IS ON ITS OWN LINE NOW, 23 Aug 2026. It used to
@@ -506,11 +506,6 @@ export default function AppShell({ children }) {
               signOut={signOut}
             />
 
-            {/* The mobile tab bar (desktop nav is the Sidebar since phase 2;
-                the old Admin pill gate rode there with it, still reading the
-                EFFECTIVE membership set so an admin previewing as a coach
-                loses the item along with the screen). */}
-            <Nav showSquadHub={showSquadHub} />
           </div>
         </header>
       </div>
@@ -605,6 +600,33 @@ export default function AppShell({ children }) {
           </>
         )}
       </main>
+
+      {/* The mobile tab bar (desktop nav is the Sidebar since phase 2; the old
+          Admin pill gate rode there with it, still reading the EFFECTIVE
+          membership set so an admin previewing as a coach loses the item along
+          with the screen).
+
+          ══ ⚠️ OUTSIDE THE MASTHEAD, AND THAT IS NOT TIDINESS ═══════════════
+          It rendered INSIDE the masthead row until 23 Aug 2026, and that was
+          fine while the masthead was opaque. The moment the sticky wrapper
+          took `backdrop-filter` (#330, the glass), the tab bar — `position:
+          fixed; bottom: 12px` — appeared AT THE TOP of every phone, iOS and
+          Android, sitting on the masthead. `backdrop-filter` on an ancestor
+          makes that ancestor the CONTAINING BLOCK for fixed descendants, the
+          same way `transform`, `filter` and `perspective` do (the caveat
+          ViewAsSwitcher and Sheet already carry names three of the four).
+          So "12px from the bottom" meant 12px from the bottom of the
+          masthead.
+
+          ⚠️ AND THE HARNESS SHOWED IT FIRST, AND WAS DISBELIEVED. The dock
+          screenshot had the bar at the top and it was written off as a
+          harness quirk; Jay's phones said otherwise an hour later. A fixed
+          element drawn somewhere surprising is a containing-block question
+          before it is a renderer question.
+
+          Anything `fixed` must live OUTSIDE `.glass-chrome`. The help button
+          and the sheets already do; the account menu is portalled to <body>. */}
+      <Nav showSquadHub={showSquadHub} />
 
       {/* ⚠️ OUTSIDE <main>, AND OUTSIDE THE loading/error/ready SPLIT — for the
           same reason InstallPrompt sits above that split. The moments this is
