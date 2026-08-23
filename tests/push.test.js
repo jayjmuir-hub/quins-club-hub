@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // duration and must not leak them into other test files.
 
 vi.mock('../src/lib/supabase.js', () => ({
-  supabase: { from: vi.fn() },
+  supabase: { from: vi.fn(), rpc: vi.fn() },
 }))
 
 vi.mock('../src/lib/installPrompt.js', () => ({
@@ -190,27 +190,29 @@ describe('subscribeToPush', () => {
     await expect(subscribeToPush('profile-1')).rejects.toThrow(/blocked/)
   })
 
-  it('subscribes and upserts endpoint/keys/profile_id, keyed on endpoint', async () => {
-    const { builder, calls } = createQueryBuilder({ data: [{}], error: null })
-    supabase.from.mockReturnValue(builder)
+  // ⚠️ AN RPC, NOT AN UPSERT, SINCE 23 Aug 2026 — and profile_id is NOT sent.
+  // The function takes auth.uid() from the session. The upsert this replaced
+  // failed the first time a phone changed hands (RLS refused to update the
+  // previous person's row); db/tests/push-subscription-takeover.sql proves
+  // the server half, this proves the client calls it with the right shape.
+  it('registers endpoint and keys through register_push_subscription, without a profile id', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: null })
     const subscription = makeSubscription({ endpoint: 'https://push.example.invalid/real', p256dh: 'PK', auth: 'AK' })
     installFakePushApis({ subscription: null, subscribeResult: subscription })
 
     await subscribeToPush('profile-1')
 
-    expect(supabase.from).toHaveBeenCalledWith('push_subscriptions')
-    expect(calls.upsert[0][0]).toEqual({
-      profile_id: 'profile-1',
-      endpoint: 'https://push.example.invalid/real',
-      p256dh: 'PK',
-      auth: 'AK',
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    expect(supabase.rpc).toHaveBeenCalledWith('register_push_subscription', {
+      _endpoint: 'https://push.example.invalid/real',
+      _p256dh: 'PK',
+      _auth: 'AK',
     })
-    expect(calls.upsert[0][1]).toEqual({ onConflict: 'endpoint' })
+    expect(supabase.from).not.toHaveBeenCalledWith('push_subscriptions')
   })
 
   it('reuses an existing browser subscription rather than creating a second one', async () => {
-    const { builder } = createQueryBuilder({ data: [{}], error: null })
-    supabase.from.mockReturnValue(builder)
+    supabase.rpc.mockResolvedValue({ data: null, error: null })
     const existing = makeSubscription()
     const pushManager = installFakePushApis({ subscription: existing })
 
@@ -219,12 +221,11 @@ describe('subscribeToPush', () => {
     expect(pushManager.subscribe).not.toHaveBeenCalled()
   })
 
-  it('surfaces a database error from the upsert', async () => {
-    const { builder } = createQueryBuilder({ data: null, error: { message: 'duplicate key' } })
-    supabase.from.mockReturnValue(builder)
+  it('surfaces a database error from the registration', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: { message: 'not signed in' } })
     installFakePushApis({ subscription: null })
 
-    await expect(subscribeToPush('profile-1')).rejects.toThrow(/duplicate key/)
+    await expect(subscribeToPush('profile-1')).rejects.toThrow(/not signed in/)
   })
 })
 

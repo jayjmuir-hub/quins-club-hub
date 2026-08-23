@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **Admin badge re-counts when you leave Accounts** — it was fetched once per
+- **A phone that changes hands can turn notifications on** — found live
+  during the first real push test: Jay signed out of the club iPhone, his wife
+  signed in, and "Turn on notifications" failed with an RLS error, because the
+  device's endpoint row still belonged to him and the client's upsert became
+  an UPDATE of somebody else's row. `20260823_push_subscription_takeover.sql`
+  adds `register_push_subscription` — the endpoint moves to whoever is signed
+  in now — and sign-out drops the device's row first. Harness reproduces the
+  error, proves the move, and proves the previous owner's other devices are
+  untouched. `src/lib/push.js`, `src/lib/auth.jsx`, `db/schema/functions.sql`,
+  `claude/schema-history.md`.
+- `682d1ec` — **Admin badge re-counts when you leave Accounts** — it was fetched once per
   page load, so after approving people it kept the old number until a refresh.
   Accounts (and `/approvals`) is where the queue is cleared, so leaving it is
   the one moment the count is known to be stale. `src/components/Sidebar.jsx`.

@@ -84,20 +84,22 @@ export async function isSubscribed() {
  * Turns notifications on for this device: asks permission if needed,
  * subscribes with the browser's Push API, and records the subscription.
  *
- * ⚠️ RECORDING IS A PLAIN INSERT, NOT AN RPC. `push_subscriptions` is
- * owner-only under RLS (profile_id = auth.uid()), so an ordinary insert as
- * the signed-in user is already exactly as safe as a written-for-purpose
- * function would be — see the migration for the policy.
+ * ⚠️ RECORDING GOES THROUGH `register_push_subscription`, AN RPC, SINCE
+ * 23 Aug 2026 — AND THIS COMMENT USED TO SAY THE OPPOSITE. It argued a plain
+ * upsert was "exactly as safe as a written-for-purpose function", and named
+ * the shared-device case as "known and not solved here". It was found live
+ * the first time a phone changed hands: the browser hands the SECOND person
+ * the SAME endpoint, the upsert on `endpoint` becomes an UPDATE of the FIRST
+ * person's row, and the owner-only policy refuses it —
  *
- * ⚠️ A SHARED-DEVICE EDGE CASE, KNOWN AND NOT SOLVED HERE. If a different
- * person already subscribed THIS device (a family tablet, say), the browser
- * hands back the SAME endpoint, and inserting it under a different
- * `profile_id` collides with the existing row's UNIQUE constraint — RLS will
- * not let this insert see or replace a row it does not own, so it fails with
- * an ordinary duplicate-key error. Surfaced as a plain "couldn't turn that
- * on" rather than something more specific: this is rare enough that a
- * confusing but honest failure beats guessing at what the other person
- * should do about it.
+ *     new row violates row-level security policy (USING expression)
+ *     for table "push_subscriptions"
+ *
+ * The RPC moves the endpoint to the caller: delete any row for it, insert
+ * one for auth.uid(). That is also the privacy-correct rule — a device
+ * belongs to whoever is signed in on it NOW, and the previous person's
+ * pushes must stop landing on it. db/migrations/20260823_push_subscription_takeover.sql,
+ * harness db/tests/push-subscription-takeover.sql.
  *
  * Throws on refusal (permission denied, browser unsupported, or the insert
  * failing) so the caller can show why. Returns nothing on success.
@@ -137,12 +139,13 @@ export async function subscribeToPush(profileId) {
   // conversion is needed on this side.
   const { endpoint, keys } = subscription.toJSON()
 
-  const { error } = await supabase
-    .from('push_subscriptions')
-    .upsert(
-      { profile_id: profileId, endpoint, p256dh: keys.p256dh, auth: keys.auth },
-      { onConflict: 'endpoint' },
-    )
+  // `profileId` is not sent: the function takes auth.uid() from the session,
+  // so a caller cannot register a device against somebody else's profile.
+  const { error } = await supabase.rpc('register_push_subscription', {
+    _endpoint: endpoint,
+    _p256dh: keys.p256dh,
+    _auth: keys.auth,
+  })
   if (error) throw error
 }
 

@@ -20,6 +20,41 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### `20260823_push_subscription_takeover` — a phone that changes hands
+
+**Found live, not in a review.** Jay signed out of the club's iPhone, his wife
+signed in, tapped "Turn on notifications", and got *new row violates row-level
+security policy (USING expression) for table "push_subscriptions"*. The
+`20260818_push_notifications` header had predicted the case ("a family tablet,
+say") and called it future work; it guessed a duplicate-key error, and reality
+was the RLS one, because the client upserts `on conflict (endpoint)` and the
+UPDATE arm is what the owner-only policy refuses.
+
+**Why a SECURITY DEFINER RPC and not a policy change.** The endpoint string is a
+capability — it is the thing the owner-only policy exists to keep private. A
+policy letting anyone UPDATE a row "whose endpoint they know" would let anyone
+who learned an endpoint hijack that device's notifications. So the takeover
+happens inside `register_push_subscription(endpoint, p256dh, auth)`: delete any
+row for that endpoint (whoever owns it), insert one for `auth.uid()`. The
+caller's only input is the endpoint their own browser issued; `profile_id` is
+never sent.
+
+**Why "takeover" is the right rule, not "refuse".** Refusing (the old
+behaviour) left the phone's row naming the *previous* person — so had the
+second person got past the error any other way, the first person's pushes
+would keep landing on a phone they were no longer signed into. The device
+belongs to whoever is signed in on it now. The client also drops its own row
+on sign-out (`src/lib/auth.jsx`, BEFORE `supabase.auth.signOut()` — after, there
+is no session to delete with), so the server-side takeover is the backstop,
+not the normal path.
+
+**Proven** by `db/tests/push-subscription-takeover.sql`: assertion 1 reproduces
+the live error with the old upsert; 2 proves the move; 3 is the control — the
+previous owner's *other* device is untouched — and the self-test re-injects a
+takeover keyed on owner instead of endpoint and confirms 3 catches it.
+
+---
+
 ### `20260821_publish_training_fit_check` — the squad publish never checked
 
 ✅ **APPLIED 21 Aug 2026 as `publish_training_fit_check`, on Jay's explicit "apply publish_training_fit_check"; harness 8/8 live the same minute.** This paragraph read "NOT APPLIED" for about an hour. The file is

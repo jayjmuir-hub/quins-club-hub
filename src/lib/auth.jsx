@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { clearPhotoUrlCache } from '../data/photos.js'
 import { syncApiCacheOwner } from './apiCache.js'
+import { unsubscribeFromPush } from './push.js'
 
 // Auth context for the app: current session/user, loading state, and the
 // three sign-in/sign-out actions. No sign-up, password auth, profile
@@ -174,6 +175,17 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
+    // ⚠️ BEFORE supabase.auth.signOut(), NOT AFTER — the delete needs the
+    // session that is about to end. This device's push row is THIS person's
+    // claim on the phone; the next person to sign in here must not inherit
+    // their notifications. Found 23 Aug 2026 on the first shared phone. A
+    // failure here must not block signing out — the server-side takeover in
+    // register_push_subscription covers the case where this did not run.
+    try {
+      await unsubscribeFromPush()
+    } catch {
+      // deliberately swallowed — see above
+    }
     const { error } = await supabase.auth.signOut()
     if (error) throw error
     // Drop any signed photo URLs held in memory. They expire within the hour
