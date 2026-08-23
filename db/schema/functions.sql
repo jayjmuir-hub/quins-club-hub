@@ -4056,7 +4056,10 @@ $function$
 
 -- ---------------------------------------------------------------------
 -- private.channel_announce_only(_team uuid)   (23 Aug 2026 — squad chat)
--- proacl: {postgres=X/postgres}
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ⚠️ authenticated's EXECUTE arrived in a SECOND apply (squad_chat_helper_execute):
+-- the first revoked it and every insert failed 42501. A policy calls its
+-- helpers as the calling role.
 -- Absent channel_settings row = announce-only ON.
 -- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
 -- re-verify after the real apply.
@@ -4073,7 +4076,8 @@ $function$
 
 -- ---------------------------------------------------------------------
 -- private.can_reply_to(_parent uuid)   (23 Aug 2026 — squad chat)
--- proacl: {postgres=X/postgres}
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ⚠️ Same second-apply note as channel_announce_only above.
 -- SECURITY DEFINER so "message create" can look at the parent without the policy recursing into its own table.
 -- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
 -- re-verify after the real apply.

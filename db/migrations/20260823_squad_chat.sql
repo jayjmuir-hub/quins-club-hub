@@ -112,7 +112,13 @@ as $function$
   select coalesce((select announce_only from channel_settings where team_id = _team), true);
 $function$;
 
+-- ⚠️ authenticated NEEDS EXECUTE: a policy calls its helpers AS THE CALLING
+-- ROLE. The first apply revoked from public without re-granting, and every
+-- insert failed with 42501 — caught by running the harness against the LIVE
+-- objects (the rolled-back runs were on a transcription without the revoke).
+-- Same shape as can_see_team / can_edit_team, minus anon.
 revoke all on function private.channel_announce_only(uuid) from public, anon;
+grant execute on function private.channel_announce_only(uuid) to authenticated;
 
 -- May the caller reply to this post? SECURITY DEFINER because a policy on
 -- `messages` cannot itself select from `messages` — Postgres reports
@@ -142,6 +148,7 @@ as $function$
 $function$;
 
 revoke all on function private.can_reply_to(uuid) from public, anon;
+grant execute on function private.can_reply_to(uuid) to authenticated;
 
 -- ── Triggers ──────────────────────────────────────────────────────────────
 

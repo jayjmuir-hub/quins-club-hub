@@ -19,6 +19,7 @@
 --   7. the coach's post queued ONE push; the parent's reply queued NONE <- who buzzes
 --   8. the push audience excludes the author and an opted-out parent   <- the audience RPC
 --   9. soft delete blanks the body and survives as a row               <- no hard delete
+--  9b. a parent cannot UPDATE team_id — the column grant, not the policy <- the Supabase-defaults trap
 --  10. message_read_stats: staff see reads/audience; a parent gets 0 rows <- receipts are staff-only
 --  11. anon holds nothing on any of the three tables                    <- control
 --
@@ -87,9 +88,10 @@ begin
   perform pg_temp.as_user(coach);
   insert into messages (team_id, body) values (squad_a, 'Training moves to pitch 3.') returning id into post_id;
   reset role;
-  select count(*) into n from messages where id = post_id and author_id = coach::uuid and club_id = 'f0000000-0000-4000-8000-0000000000c3';
+  select count(*) into n from messages where id = post_id and author_id = coach::uuid
+     and club_id = 'f0000000-0000-4000-8000-0000000000c3' and author_role = 'coach';
   if n <> 1 then raise exception 'ASSERT 1 FAILED: provenance not stamped'; end if;
-  insert into _log(line) values ('1 coach posts; club_id and author_id stamped by trigger');
+  insert into _log(line) values ('1 coach posts; club_id, author_id and author_role=coach stamped by trigger');
 
   -- 2. parent cannot post top-level (announce-only default)
   perform pg_temp.as_user(parent);
@@ -151,6 +153,18 @@ begin
   select body into body_now from messages where id = reply_id;
   if body_now <> '(removed)' then raise exception 'ASSERT 9 FAILED: body after soft delete is %', body_now; end if;
   insert into _log(line) values ('9 soft delete: row survives, body blanked');
+
+  -- 9b. the column grant. Supabase's default privileges would have handed
+  -- authenticated table-level UPDATE; the migration revokes first. Without
+  -- that, this UPDATE would SUCCEED — "message edit"'s WITH CHECK pins only
+  -- channel — and an author could move their post to another squad.
+  perform pg_temp.as_user(parent);
+  begin
+    update messages set team_id = 'f0000000-0000-4000-8000-0000000000fb' where id = reply_id; caught := null;
+  exception when others then caught := sqlerrm; end;
+  reset role;
+  if caught is null then raise exception 'ASSERT 9b FAILED: a parent could UPDATE team_id'; end if;
+  insert into _log(line) values ('9b column grant holds: UPDATE team_id refused (' || caught || ')');
 
   -- 10. read stats staff-only
   perform pg_temp.as_user(parent);
