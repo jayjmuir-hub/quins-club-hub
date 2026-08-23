@@ -406,16 +406,47 @@
     }
   }
 
+  /* The masthead island — 23 Aug 2026, "a similar style for the top". The
+     dock's depth recipe at the masthead's opacity: it carries TEXT (the
+     wordmark at white/80, 13px), so it stays at 70% where the dock can go
+     lower. 70% over white composites to rgb(84,84,84): white/80 is 5.4:1,
+     white 8.1:1. The top highlight and the shadow are what make it an
+     object floating over the page rather than a bar stuck to its edge. */
+  .glass-island {
+    background: rgb(var(--chrome-rgb) / 0.7);
+    -webkit-backdrop-filter: saturate(180%) blur(28px);
+    backdrop-filter: saturate(180%) blur(28px);
+    border: 1px solid rgb(255 255 255 / 0.14);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.16),
+      0 10px 30px rgb(0 0 0 / 0.3),
+      0 2px 6px rgb(0 0 0 / 0.2);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-island {
+      background: rgb(var(--chrome-rgb));
+    }
+  }
+
   /* The dock's material — design "A", 23 Aug 2026. Darker than the masthead
      (the chrome should read BLACK again, Jay: "very bland"), with the three
      things that make glass read as glass rather than grey: a 1px light
      highlight along the inside top edge, a faint light border, and a real
-     drop shadow lifting it off the page. The blur is the same. Contrast: the
-     worst composite over white is rgb(41,41,41); white/80 icons are 9.5:1. */
+     drop shadow lifting it off the page.
+
+     ⚠️ 62%, DOWN FROM 84% (Jay, 23 Aug 2026: "more transparent or glass").
+     This is only safe BECAUSE of design A: the dock's idle items are ICONS,
+     which are UI components with a 3:1 floor, not text at 4.5:1 — and the
+     only text on it is the white label on the red pill, which does not sit
+     on the glass at all. Worst composite over white is rgb(108,108,108);
+     white/90 idle icons (Nav.jsx) are 4.4:1 on it, well past 3:1. The help
+     button shares this class and its "?" IS text: 19px bold, which WCAG
+     treats as large (3:1), and white is 5.2:1. Do not put small text on
+     this material. */
   .glass-dock {
-    background: rgb(var(--chrome-rgb) / 0.84);
-    -webkit-backdrop-filter: saturate(180%) blur(24px);
-    backdrop-filter: saturate(180%) blur(24px);
+    background: rgb(var(--chrome-rgb) / 0.62);
+    -webkit-backdrop-filter: saturate(180%) blur(28px);
+    backdrop-filter: saturate(180%) blur(28px);
     border: 1px solid rgb(255 255 255 / 0.14);
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.16),

@@ -286,7 +286,24 @@ export default function AppShell({ children }) {
           material, see src/index.css. The wrapper carries it (not the
           <header>) so the status-bar strip above and the View-as banner are
           the same sheet of glass as the masthead. */}
-      <div className="glass-chrome sticky top-0 z-40 pt-[env(safe-area-inset-top)]">
+      {/* ══ THE TOP IS AN ISLAND NOW, LIKE THE DOCK — Jay, 23 Aug 2026: "can we
+          do a similar style for the top?" The sticky wrapper is TRANSPARENT
+          and only positions; the masthead <header> inside it is the glass
+          island, inset from the edges with rounded corners, a highlight edge
+          and a shadow (`.glass-island` in src/index.css), so content scrolls
+          visibly beneath AND around it.
+
+          ⚠️ THE STATUS-BAR STRIP IS ITS OWN ELEMENT. The iPhone fix of 21 Aug
+          padded this wrapper by env(safe-area-inset-top) and painted it chrome
+          so the clock sat on something dark. With a transparent wrapper that
+          paint is gone, so the strip below — fixed, exactly the inset tall,
+          dark glass — does the job instead; on desktop and un-installed
+          browsers the inset is 0 and it renders as nothing. */}
+      <div
+        aria-hidden="true"
+        className="glass-chrome pointer-events-none fixed inset-x-0 top-0 z-40 h-[env(safe-area-inset-top)]"
+      />
+      <div className="sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:px-4">
         <ViewAsBanner />
 
         {/* The masthead is DARK CHROME (#151517 -> #0c0c0e), not the red
@@ -309,9 +326,9 @@ export default function AppShell({ children }) {
             across the top edge, where it is decoration and carries no text, so
             full saturation is free there. `harlequin` adds the site's diagonal
             shapes bleeding off the right edge. */}
-        <header className="border-b border-white/10 text-white">
+        <header className="glass-island overflow-hidden rounded-[22px] text-white">
           <div className="brand-rule" />
-          <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3 desktop:mx-0 desktop:max-w-none wide:max-w-none">
+          <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-2.5 overflow-hidden px-3 py-2.5 desktop:mx-0 desktop:max-w-none wide:max-w-none">
             {/* crest.png is 370x400 (portrait) — object-contain keeps its native
                 aspect ratio inside the 46x46 badge box (matching the
                 prototype's background:contain treatment) instead of the
@@ -337,7 +354,7 @@ export default function AppShell({ children }) {
               <img
                 src={crest}
                 alt="Abu Dhabi Harlequins crest"
-                className="h-[40px] w-[40px] object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
+                className="h-[36px] w-[36px] object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
               />
             </Link>
             {/* The club name is one of the few places Anton is allowed (see
@@ -425,7 +442,7 @@ export default function AppShell({ children }) {
                   this repo could have caught the original — same blind spot as
                   the `wide:` vs `desktop:` note at the account link below. The
                   test that exists pins the class tokens instead. */}
-              <p className="truncate font-condensed text-[13px] font-semibold uppercase tracking-[1.6px] text-white/80">
+              <p className="truncate font-condensed text-[13px] font-semibold uppercase tracking-[1.2px] text-white/80">
                 Quins Club Hub
               </p>
               {/* ⚠️ THE ROLE IS ON ITS OWN LINE NOW, 23 Aug 2026. It used to

@@ -172,7 +172,7 @@ export function ViewAsBanner() {
       // retheme mapped the old #8E1526 "plum" onto (claude/specs/design-system.md
       // §2's mapping table). White on it measures 6.93:1. A raw hex here would
       // fail tests/theme.test.js's no-literals rule.
-      className="bg-brand-deep text-white"
+      className="mb-2 overflow-hidden rounded-[16px] bg-brand-deep text-white shadow-[0_6px_20px_rgba(0,0,0,0.25)]"
     >
       <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2 wide:max-w-[1360px]">
         <p className="text-[13px] font-semibold leading-snug">
