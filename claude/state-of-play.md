@@ -78,16 +78,18 @@ load-bearing and easy to undo by tidying.
 
 ## Tabled — do not start, do not offer, do not ask again
 
-The photo **restore drill**, the **AI build**
-(`claude/plans/2026-08-12-ai-integration.md`), and the **live `squad_push` test**
-(Jay, 20 Aug 2026). Jay reopens them or they stay closed.
+The photo **restore drill** and the **AI build**
+(`claude/plans/2026-08-12-ai-integration.md`) (Jay, 20 Aug 2026). Jay reopens
+them or they stay closed.
 ✅ **Training session plans came OFF this list on 20 Aug 2026**, reopened by Jay
 after eight days — `claude/plans/2026-08-12-training-session-plans.md`. It is the
 worked example of the list doing its job: nobody offered it, and he brought it
-back himself. ⚠️ `squad_push` is still UNPROVEN; when it is reopened, the safe route is
-a fixture change on **U13 Mixed** made by somebody OTHER than Jay — measured, it
-reaches his devices and nobody else's. Being super admin puts you in no squad's
-audience: `notice_audience` keys purely on `team_id`, and the actor is excluded. ⚠️ The AI *ruling* — children's data may
+back himself. ✅ **The live `squad_push` test came OFF on 23 Aug 2026 — PROVEN**, a
+notice and a fixture change both arriving on a real iPhone that was not the
+actor's, and a fixture change arriving on a real Android the same morning. Reopened by Jay as step zero of `claude/plans/2026-08-23-squad-chat.md`.
+The trap for next time is unchanged: **the actor never receives their own push**
+(`squad_push_subscriptions` excludes `_actor`), so the receiver must be a
+different person on a different account. ⚠️ The AI *ruling* — children's data may
 leave the club, minimised — still stands and still governs;
 `claude/decisions/2026-08-12-childrens-data-may-leave-the-club.md`.
 
