@@ -47,8 +47,10 @@ function Queue() {
 
   async function act(report, remove) {
     try {
-      if (remove && report.message && !report.message.deleted_at) await removeMessage(report.message.id)
+      // Resolve FIRST: a delete is real since 24 Aug 2026 and cascades the
+      // report row, so resolving afterwards would have nothing to resolve.
       await resolveReport(report.id)
+      if (remove && report.message) await removeMessage(report.message.id)
       await load()
     } catch (err) {
       setError(err.message || 'Could not do that.')

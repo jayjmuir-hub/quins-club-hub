@@ -26,7 +26,7 @@ const m = {
   markMessagesRead: vi.fn(),
   subscribeMessages: vi.fn(),
   removeMessage: vi.fn(),
-  clearConversation: vi.fn(),
+  deleteConversation: vi.fn(),
 }
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
@@ -45,7 +45,7 @@ vi.mock('../src/data/messages.js', () => ({
   markMessagesRead: (...a) => m.markMessagesRead(...a),
   subscribeMessages: (...a) => m.subscribeMessages(...a),
   removeMessage: (...a) => m.removeMessage(...a),
-  clearConversation: (...a) => m.clearConversation(...a),
+  deleteConversation: (...a) => m.deleteConversation(...a),
 }))
 
 import DirectMessages from '../src/screens/DirectMessages.jsx'
@@ -85,7 +85,7 @@ beforeEach(() => {
   m.markMessagesRead.mockResolvedValue(undefined)
   m.subscribeMessages.mockReturnValue(() => {})
   m.removeMessage.mockResolvedValue(undefined)
-  m.clearConversation.mockResolvedValue(undefined)
+  m.deleteConversation.mockResolvedValue(undefined)
 })
 
 describe('DirectMessages — /chat/dm', () => {
@@ -152,27 +152,28 @@ describe('DirectMessages — a thread', () => {
     expect(screen.getByRole('link', { name: 'Back to chats' })).toHaveAttribute('href', '/chat')
   })
 
-  it('Remove on my own bubble removes it', async () => {
+  it('Delete on my own bubble deletes it for good', async () => {
     const user = userEvent.setup()
     renderAt('/chat/dm/c1')
     const bubbles = await screen.findAllByTestId('dm-bubble')
-    expect(within(bubbles[0]).queryByRole('button', { name: 'Remove' })).toBeNull()
-    await user.click(within(bubbles[1]).getByRole('button', { name: 'Remove' }))
+    expect(within(bubbles[0]).queryByRole('button', { name: 'Delete' })).toBeNull()
+    await user.click(within(bubbles[1]).getByRole('button', { name: 'Delete' }))
     expect(m.removeMessage).toHaveBeenCalledWith('d2')
   })
 
-  // ⚠️ WHATSAPP'S MEANING: deleted for me. The copy says so before the tap.
-  it('Delete chat asks, says it is for you only, clears, and returns to the list', async () => {
+  // ⚠️ "COMPLETELY" — Jay, 24 Aug 2026. Deleted for BOTH, and the copy says
+  // so before the tap. (The for-me clear built earlier that day is gone.)
+  it('Delete chat asks, says it is for both of you, deletes, and returns to the list', async () => {
     const user = userEvent.setup()
     renderAt('/chat/dm/c1')
     await screen.findByTestId('dm-composer')
     await user.click(screen.getByRole('button', { name: 'Chat options' }))
     await user.click(screen.getByRole('menuitem', { name: 'Delete chat' }))
     const confirm = await screen.findByTestId('delete-chat-confirm')
-    expect(confirm).toHaveTextContent(/removed for you only/)
-    expect(m.clearConversation).not.toHaveBeenCalled()
+    expect(confirm).toHaveTextContent(/deleted for both of you/)
+    expect(m.deleteConversation).not.toHaveBeenCalled()
     await user.click(within(confirm).getByRole('button', { name: 'Delete chat' }))
-    expect(m.clearConversation).toHaveBeenCalledWith('c1')
+    expect(m.deleteConversation).toHaveBeenCalledWith('c1')
     expect(await screen.findByText('the list')).toBeInTheDocument()
   })
 

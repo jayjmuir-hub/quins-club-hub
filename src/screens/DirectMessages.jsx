@@ -8,7 +8,7 @@ import { Avatar, RolePill } from '../components/NewChatPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import {
   blockDm,
-  clearConversation,
+  deleteConversation,
   getConversation,
   listDirectMessages,
   listMyBlocks,
@@ -33,9 +33,9 @@ import { isAdmin } from '../lib/scope.js'
 // pencil on it is "New message".)
 //
 // 24 Aug 2026, Jay: "need to be able to delete messages and entire chats".
-// Remove on my own bubble (any time — the author's right); "Delete chat" in
-// the header menu clears the conversation FOR ME (WhatsApp's meaning, see
-// db/migrations/20260824_chat_list.sql). The other side keeps their copy.
+// Delete on my own bubble (any time — the author's right) deletes it for
+// good; "Delete chat" in the header menu deletes the conversation for BOTH
+// (db/migrations/20260824_delete_for_good.sql). Jay: "completely".
 //
 // ⚠️ THE NOTICE AT THE TOP OF EVERY THREAD IS NOT SMALL PRINT. "Club admins
 // can review this conversation" is the thing that makes a club DM different
@@ -165,7 +165,7 @@ function Thread({ conversationId }) {
 
   async function deleteChat() {
     try {
-      await clearConversation(conversationId)
+      await deleteConversation(conversationId)
       navigate('/chat')
     } catch (err) {
       setError(err.message || 'Could not delete this chat.')
@@ -227,7 +227,7 @@ function Thread({ conversationId }) {
         <Card className="mb-3 px-4 py-3" data-testid="delete-chat-confirm">
           <p className="text-[13.5px] font-extrabold text-ink">Delete this chat?</p>
           <p className="mt-1 text-[12.5px] text-ink-muted">
-            It is removed for you only. {other?.name ?? 'They'} keeps their copy, and if they write again the chat comes back from there.
+            Every message in it is deleted for both of you. This cannot be undone.
           </p>
           <div className="mt-2 flex justify-end gap-2">
             <Button size="sm" variant="ghost" onClick={() => setDeleting(false)}>
@@ -284,7 +284,7 @@ function Thread({ conversationId }) {
                   <span>{postedLabel(m.created_at)}</span>
                   {mine && !m.deleted_at && (
                     <button type="button" onClick={() => onRemove(m.id)} className="underline-offset-2 hover:underline">
-                      Remove
+                      Delete
                     </button>
                   )}
                   {!mine && !m.deleted_at && (

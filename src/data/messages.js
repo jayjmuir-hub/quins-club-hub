@@ -149,11 +149,34 @@ export async function editMessage(id, body) {
  * body to "(removed)". Own row within 15 minutes, or squad staff.
  */
 export async function removeMessage(id) {
-  const { error } = await supabase
-    .from('messages')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', id)
+  // ⚠️ A REAL DELETE SINCE 24 Aug 2026 — Jay: "i still can't completely delete
+  // messages". Replies, read receipts and reports cascade. Who may is the
+  // "message delete" policy: the author any time, staff in their channels,
+  // admins where they may review; a REPORTED message only by an admin.
+  // db/migrations/20260824_delete_for_good.sql.
+  const { error } = await supabase.from('messages').delete().eq('id', id)
   if (error) throw error
+}
+
+/**
+ * Delete a DM for good — for BOTH participants (24 Aug 2026). The policy
+ * allows either participant unless a message in it has been reported, in
+ * which case an admin. Messages cascade; the welfare access log survives.
+ */
+export async function deleteConversation(conversationId) {
+  const { error } = await supabase.from('conversations').delete().eq('id', conversationId)
+  if (error) throw error
+}
+
+/**
+ * Clear a squad, staff or club channel — every post and its replies, gone.
+ * Staff of the squad (admins for the club); reported posts stay. Returns the
+ * number of posts deleted. `teamId` null = the club channel.
+ */
+export async function clearChannel(teamId, channel = 'squad') {
+  const { data, error } = await supabase.rpc('clear_channel', { _team: teamId, _channel: channel })
+  if (error) throw error
+  return data ?? 0
 }
 
 /** Pins or unpins a post. Squad staff only — the policy decides. */
@@ -536,9 +559,9 @@ export function chatPath(row) {
 }
 
 /**
- * "Delete chat" on a DM — WhatsApp's meaning: cleared for ME. Everything
- * before now is hidden from me and the row leaves my list until the other
- * side writes again. Their copy is untouched. Participants only.
+ * Clear a DM for ME only (hide the past; the other side keeps theirs). Built
+ * 24 Aug 2026 and superseded the same evening by deleteConversation — Jay:
+ * "completely". Kept because the function is live; nothing in the app calls it.
  */
 export async function clearConversation(conversationId) {
   const { error } = await supabase.rpc('clear_conversation', { _conversation: conversationId })

@@ -4881,6 +4881,86 @@ $function$
 ;
 
 -- ---------------------------------------------------------------------
+-- DELETE FOR GOOD (24 Aug 2026, evening) — db/migrations/20260824_delete_for_good.sql.
+-- Jay: "i still can't completely delete messages or chats". Hard deletes; a
+-- reported message/conversation only by an admin. Captured from a rolled-back
+-- apply; md5s below.
+-- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- private.message_reported(_message uuid)   (24 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}   md5 af6706827564f55cf28ba4568f67ee77
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.message_reported(_message uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  -- the message itself, OR any reply under it: deleting a post cascades its
+  -- replies, and a reported reply must not vanish with an innocent parent
+  select exists (select 1 from message_reports r
+                   join messages x on x.id = r.message_id
+                  where x.id = _message or x.parent_id = _message)
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.conversation_reported(_conversation uuid)   (24 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}   md5 094ac9666704fea3f3294b2f15cb9c32
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.conversation_reported(_conversation uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from message_reports r join messages x on x.id = r.message_id
+                  where x.conversation_id = _conversation)
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.clear_channel(_team uuid, _channel text DEFAULT 'squad'::text)   (24 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}   md5 76dafd9a8e1de6609d1f0ea58b8bf685
+-- Every post (and by cascade reply) in a channel, gone; reported posts stay. Staff / admins.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.clear_channel(_team uuid, _channel text DEFAULT 'squad'::text)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  n integer;
+  my_club uuid;
+begin
+  if _channel not in ('squad', 'staff') then
+    raise exception 'no such channel' using errcode = '22023';
+  end if;
+  if _team is null then
+    -- the club channel: admins only
+    select m.club_id into my_club from memberships m
+     where m.profile_id = auth.uid() and m.status = 'active' order by m.created_at limit 1;
+    if my_club is null or not private.is_admin(my_club) then
+      raise exception 'not an admin' using errcode = '42501';
+    end if;
+    delete from messages where club_id = my_club and channel = 'squad' and team_id is null
+       and parent_id is null and not private.message_reported(id);
+  else
+    if not private.can_edit_team(_team) then
+      raise exception 'not this squad''s staff' using errcode = '42501';
+    end if;
+    delete from messages where team_id = _team and channel = _channel
+       and parent_id is null and not private.message_reported(id);
+  end if;
+  get diagnostics n = row_count;
+  return n;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
 -- THE CHATS LIST, DELETE A MESSAGE, DELETE A CHAT (24 Aug 2026) —
 -- db/migrations/20260824_chat_list.sql, claude/plans/2026-08-24-chat-list.md.
 -- Jay: "make it more like whatsapp" and "need to be able to delete messages

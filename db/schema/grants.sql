@@ -814,6 +814,9 @@ REVOKE ALL ON public.messages, public.channel_settings, public.message_reads FRO
 -- every update (stamps on a flip, restores old otherwise).
 -- ---------------------------------------------------------------------
 GRANT SELECT ON public.conversations TO authenticated;
+-- 24 Aug 2026 (delete for good): DELETE on both, gated by the delete policies.
+GRANT DELETE ON public.conversations TO authenticated;
+GRANT DELETE ON public.messages TO authenticated;
 -- conversation_clears (24 Aug 2026): SELECT only; clear_conversation() writes.
 REVOKE ALL ON public.conversation_clears FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.conversation_clears TO authenticated;

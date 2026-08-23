@@ -8,9 +8,24 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
-## 24 Aug 2026
+## 23 Aug 2026
 
-- **Push survives signing out and back in** — Jay: "why are notification
+<!-- ⚠️ The chat-list, delete-for-good and the peer session's entries below were
+     written on the EVENING of 23 Aug. The migration and plan files carry
+     "20260824" / "2026-08-24" in their names — a date slip by the session that
+     wrote them, kept because two of the migrations are already applied under
+     those names. -->
+
+- 🗑️ **Delete for good.** Jay, with the list live: "i still can't completely
+  delete messages or chats." Delete is now a real delete — the author any
+  time, staff in their channels, admins where they may review; a DM deletes
+  for both; "Clear chat" empties a channel. ⚠️ A reported message (or a post
+  with a reported reply, or a DM with one) only by an admin — a report is
+  evidence (`claude/decisions/2026-08-24-delete-for-good-except-reported.md`).
+  The welfare access log now outlives the conversation it recorded.
+  `db/migrations/20260824_delete_for_good.sql`, harness
+  `db/tests/delete-for-good.sql` 8/8.
+- `7225e5f` — **Push survives signing out and back in** — Jay: "why are notification
   settings being reset… I don't want it to change if I sign out and sign
   back in." The database showed deploys never touched a subscription (his
   Android row from 19 Aug outlived fifteen of them); the reset was #324's

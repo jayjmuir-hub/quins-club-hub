@@ -20,6 +20,7 @@ const getChannelSettingsMock = vi.fn()
 const postMessageMock = vi.fn()
 const replyToMessageMock = vi.fn()
 const removeMessageMock = vi.fn()
+const clearChannelMock = vi.fn()
 const setPinnedMock = vi.fn()
 const setAnnounceOnlyMock = vi.fn()
 const subscribeMessagesMock = vi.fn()
@@ -41,6 +42,7 @@ vi.mock('../src/data/messages.js', () => ({
   postMessage: (...a) => postMessageMock(...a),
   replyToMessage: (...a) => replyToMessageMock(...a),
   removeMessage: (...a) => removeMessageMock(...a),
+  clearChannel: (...a) => clearChannelMock(...a),
   setPinned: (...a) => setPinnedMock(...a),
   setAnnounceOnly: (...a) => setAnnounceOnlyMock(...a),
   subscribeMessages: (...a) => subscribeMessagesMock(...a),
@@ -396,6 +398,29 @@ describe('Chat — @mentions', () => {
 describe('Chat — staff channel', () => {
   // The staff channel is its own row in the Chats list since 24 Aug 2026 —
   // no tabs on the thread. The header names it so nobody posts to the wrong one.
+  // "need to be able to delete ... entire chats" — for a channel that means
+  // every message, not the channel: it IS the squad.
+  it('Clear chat in the header menu asks, then empties the channel — staff only', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    useAuthMock.mockReturnValue({ user: { id: 'coach-1' } })
+    clearChannelMock.mockResolvedValue(3)
+    const user = userEvent.setup()
+    renderAt('/chat/team-a')
+    await screen.findByTestId('message-row')
+    await user.click(screen.getByRole('button', { name: 'Chat options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Clear chat' }))
+    const confirm = await screen.findByTestId('clear-chat-confirm')
+    expect(confirm).toHaveTextContent(/Reported messages stay/)
+    await user.click(within(confirm).getByRole('button', { name: 'Clear chat' }))
+    expect(clearChannelMock).toHaveBeenCalledWith('team-a', 'squad')
+  })
+
+  it('a parent has no Chat options at all', async () => {
+    renderAt('/chat/team-a')
+    await screen.findByTestId('message-row')
+    expect(screen.queryByRole('button', { name: 'Chat options' })).toBeNull()
+  })
+
   it('?channel=staff is titled as the staff channel, and a parent never gets it', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH))
     useAuthMock.mockReturnValue({ user: { id: 'coach-1' } })

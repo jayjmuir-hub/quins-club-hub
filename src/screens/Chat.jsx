@@ -11,6 +11,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
 import {
+  clearChannel,
   getChannelSettings,
   listMentionablesFor,
   listMessages,
@@ -96,6 +97,7 @@ export default function Chat() {
   const [attachEventId, setAttachEventId] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState(null)
+  const [clearing, setClearing] = useState(false)
   const [tallies, setTallies] = useState(() => new Map())
   const [mentionables, setMentionables] = useState([])
   const [upcoming, setUpcoming] = useState([])
@@ -266,9 +268,25 @@ export default function Chat() {
     : staffChannel
       ? 'Staff only · coaches, managers and medics'
       : `${mentionables.length > 0 ? `${mentionables.length} members · ` : ''}${announceOnly ? 'announce-only' : 'open chat'}`
-  const headerActions = canModerate && !isClub && !staffChannel && settings
-    ? [{ label: announceOnly ? 'Turn announce-only off' : 'Turn announce-only on', onClick: toggleAnnounceOnly }]
-    : []
+  const headerActions = [
+    ...(canModerate && !isClub && !staffChannel && settings
+      ? [{ label: announceOnly ? 'Turn announce-only off' : 'Turn announce-only on', onClick: toggleAnnounceOnly }]
+      : []),
+    // Staff only. Deletes every post in THIS channel for good; the channel
+    // stays — it is the squad. Reported posts stay (evidence).
+    ...(canModerate ? [{ label: 'Clear chat', onClick: () => setClearing(true), danger: true }] : []),
+  ]
+
+  async function clearChat() {
+    try {
+      await clearChannel(isClub ? null : teamId, staffChannel ? 'staff' : 'squad')
+      setClearing(false)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Could not clear this chat.')
+      setClearing(false)
+    }
+  }
 
   return (
     <section className="px-1">
@@ -287,6 +305,23 @@ export default function Chat() {
         subtitle={subtitle}
         actions={headerActions}
       />
+
+      {clearing && (
+        <Card className="mb-3 px-4 py-3" data-testid="clear-chat-confirm">
+          <p className="text-[13.5px] font-extrabold text-ink">Clear this chat?</p>
+          <p className="mt-1 text-[12.5px] text-ink-muted">
+            Every message here is deleted for everyone. Reported messages stay until the club resolves them. This cannot be undone.
+          </p>
+          <div className="mt-2 flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setClearing(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={clearChat}>
+              Clear chat
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {error && (
         <Card className="mb-3 px-4 py-3">
