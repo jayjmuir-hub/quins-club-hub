@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
+- **Admin badge re-counts when you leave Accounts** — it was fetched once per
+  page load, so after approving people it kept the old number until a refresh.
+  Accounts (and `/approvals`) is where the queue is cleared, so leaving it is
+  the one moment the count is known to be stale. `src/components/Sidebar.jsx`.
+- `2f0435d` — **Admin badge now says what the Accounts screen shows** — it read
+  23 while the "Waiting for access" list showed 2. It counted `access_requests`
+  rows still `pending`, a status nothing ever leaves: granted access is the
+  existence of a memberships row, by design (20260804). `countAdminWaiting` in
+  `src/data/members.js` now applies the list's own rule — readable profiles
+  with no membership row and not dismissed, plus pending membership rows —
+  under the same RLS the screen reads with. `tests/count-admin-waiting.test.js`.
+  ⚠️ This entry was written in #322 and lost in a concurrent merge; restored here.
 - `b9b4974` — 📐 **Plan: squad chat** (`claude/plans/2026-08-23-squad-chat.md`, NOT
   SHIPPED) — a channel per squad that a WhatsApp group could move into:
   announce-only by default, fixture threads with RSVP chips, a staff channel,

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useNavigate } from 'react-router-dom'
+import userEvent from '@testing-library/user-event'
 
 const countAdminWaitingMock = vi.fn()
 vi.mock('../src/lib/auth.jsx', () => ({
@@ -86,6 +87,25 @@ describe('the Admin badge', () => {
     await vi.waitFor(() => expect(countAdminWaitingMock).toHaveBeenCalled())
     expect(screen.queryByTestId('admin-waiting-badge')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Admin/ })).toBeInTheDocument()
+  })
+
+  it('re-counts when the admin leaves Accounts, where the queue gets cleared', async () => {
+    countAdminWaitingMock.mockResolvedValueOnce(3).mockResolvedValueOnce(1)
+    // A real in-router navigation — the only thing that is a "leave".
+    function Leave() {
+      const navigate = useNavigate()
+      return <button onClick={() => navigate('/')}>go</button>
+    }
+    render(
+      <MemoryRouter initialEntries={['/admin/accounts']}>
+        <Sidebar showSquadHub showAdmin />
+        <Leave />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByTestId('admin-waiting-badge')).toHaveTextContent('3')
+    await userEvent.click(screen.getByRole('button', { name: 'go' }))
+    await vi.waitFor(() => expect(countAdminWaitingMock).toHaveBeenCalledTimes(2))
+    expect(await screen.findByTestId('admin-waiting-badge')).toHaveTextContent('1')
   })
 
   it('never even asks for non-admins', () => {
