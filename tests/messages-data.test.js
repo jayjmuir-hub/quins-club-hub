@@ -65,7 +65,7 @@ describe('listMessages', () => {
     const rows = await listMessages('team-a', { limit: 20 })
 
     expect(heads.calls.is[0]).toEqual(['parent_id', null])
-    expect(heads.calls.eq[0]).toEqual(['team_id', 'team-a'])
+    expect(heads.calls.eq).toEqual([['channel', 'squad'], ['team_id', 'team-a']])
     expect(heads.calls.order[0]).toEqual(['created_at', { ascending: false }])
     expect(heads.calls.limit[0]).toEqual([20])
     expect(replies.calls.in[0]).toEqual(['parent_id', ['p2', 'p1']])
@@ -82,7 +82,9 @@ describe('listMessages', () => {
     await listMessages(null)
 
     expect(heads.calls.is).toEqual([['parent_id', null], ['team_id', null]])
-    expect(heads.calls.eq).toBeUndefined()
+    // ⚠️ AND ONLY THE SQUAD CHANNEL. A DM also has team_id null; without this
+    // filter a member's own DMs appeared in Whole-club chat (23 Aug 2026).
+    expect(heads.calls.eq).toEqual([['channel', 'squad']])
   })
 
   it('skips the reply query when there are no posts', async () => {

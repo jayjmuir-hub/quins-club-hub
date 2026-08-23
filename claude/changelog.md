@@ -10,7 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- 📊 **Storage readout on the Club admin tab** — database size and bytes per
+- 🐛 **DMs no longer leak into Whole-club chat.** The club channel listed
+  every message with no squad — and a DM has no squad either — so a member's
+  own private messages appeared in the club feed with no recipient shown.
+  Jay saw it on the live site. One filter (`channel = 'squad'`) in
+  `src/data/messages.js`; the data test now asserts it.
+- `ed0becd` — 📊 **Storage readout on the Club admin tab** — database size and bytes per
   photo bucket against the Pro plan's allowances, measured on open. The
   answer to "won't we run out of storage?" is now on a screen.
   `public.storage_usage()` (admin-only by the function), `src/components/StorageCard.jsx`,
