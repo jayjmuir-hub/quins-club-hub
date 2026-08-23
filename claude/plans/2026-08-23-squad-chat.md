@@ -8,8 +8,14 @@ any club admin can read a DM** (Jay, 23 Aug 2026), not only a `welfare` holder �
 the existing rights gate screens, not data (`claude/decisions/2026-08-10-role-dashboards.md`),
 and making `welfare` the first RLS-enforced right was a different decision. The
 DM notice therefore reads "Club admins can review this conversation", and the
-plan's "⚠️ Not admins" paragraph below is superseded. Everything else in the DM
-section shipped as written.
+plan's "⚠️ Not admins" paragraph below is superseded. ⚠️ **AND NARROWED THE SAME
+EVENING** (Jay: "I don't think dm between adults should be visible to anyone
+except those people, unless a message is reported"): an admin reaches a DM only
+when it **involves a minor** or **a message in it has been reported** —
+`private.admin_may_review`, `db/migrations/20260823_adult_dms_private.sql`,
+`claude/decisions/2026-08-23-adult-dms-private-unless-reported.md`. The notice
+in an adults-only thread reads "If a message is reported, club admins can review
+it." Everything else in the DM section shipped as written.
 Phase 1 is `db/migrations/20260823_squad_chat.sql`, `src/screens/Chat.jsx`,
 `src/data/messages.js`, `src/components/MessageRow.jsx`, and the sixth
 trigger shape in `supabase/functions/push-send/index.ts`. Phase 2 is

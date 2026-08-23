@@ -1388,6 +1388,8 @@ create policy "session block manage" on public.training_session_blocks for all
 -- column-level on (body, pinned, deleted_at), see grants.sql — and that
 -- messages_touch freezes every other column regardless.
 -- ---------------------------------------------------------------------
+-- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
+-- private.admin_may_review — a minor in it, or a reported message. Captured from live.
 CREATE POLICY "message read" ON public.messages
   FOR SELECT USING (
 CASE channel
@@ -1399,7 +1401,7 @@ CASE channel
         ELSE private.can_see_team(team_id)
     END
     WHEN 'staff'::text THEN private.can_edit_team(team_id)
-    WHEN 'dm'::text THEN (private.in_conversation(conversation_id) OR private.is_admin(club_id))
+    WHEN 'dm'::text THEN (private.in_conversation(conversation_id) OR private.admin_may_review(conversation_id))
     ELSE false
 END);
 -- ⚠️ REPLACED by 20260823_squad_chat_phase3: three channels. 'staff' is the
@@ -1426,8 +1428,10 @@ END);
 -- trigger, which has already refused a non-participant and any pair can_dm
 -- forbids — re-checked on EVERY message, so a DM stops the day it is not allowed.
 
+-- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
+-- private.admin_may_review — a minor in it, or a reported message. Captured from live.
 CREATE POLICY "message edit" ON public.messages
-  FOR UPDATE USING ((((author_id = ( SELECT auth.uid() AS uid)) AND (created_at > (now() - '00:15:00'::interval))) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.is_admin(club_id))))
+  FOR UPDATE USING ((((author_id = ( SELECT auth.uid() AS uid)) AND (created_at > (now() - '00:15:00'::interval))) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.admin_may_review(conversation_id))))
   WITH CHECK ((channel = ANY (ARRAY['squad'::text, 'staff'::text, 'dm'::text])));
 -- ⚠️ REPLACED by 20260823_squad_chat_phase3. An admin may UPDATE a DM row — to
 -- REMOVE it (deleted_at; the trigger blanks the body). touch_message refuses a
@@ -1458,8 +1462,10 @@ CREATE POLICY "message mark read" ON public.message_reads
 -- public.open_conversation(), SECURITY DEFINER, which applies private.can_dm.
 -- ⚠️ NO INSERT POLICY ON welfare_access_log either: public.log_welfare_access().
 -- ---------------------------------------------------------------------
+-- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
+-- private.admin_may_review — a minor in it, or a reported message. Captured from live.
 CREATE POLICY "conversation read" ON public.conversations
-  FOR SELECT USING ((( SELECT auth.uid() AS uid) IN (profile_a, profile_b)) OR private.is_admin(club_id));
+  FOR SELECT USING ((((( SELECT auth.uid() AS uid) = profile_a) OR (( SELECT auth.uid() AS uid) = profile_b)) OR private.admin_may_review(id)));
 
 CREATE POLICY "dm block own" ON public.dm_blocks
   FOR ALL USING ((blocker_id = ( SELECT auth.uid() AS uid)))

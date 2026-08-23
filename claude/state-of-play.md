@@ -59,8 +59,11 @@ and one for the club (announce-only by default), a thread per fixture with
 RSVP chips, @mentions that push, a staff channel per squad, direct messages,
 reports, and a Welfare dashboard behind a fifth admin right. **Who may DM whom
 is the database's rule** (`private.can_dm`): a minor only by their guardian, or
-by U16+ staff once a guardian opts in. **Any club admin may read a DM** — Jay's
-ruling, and every thread says so. Push proven on a real iPhone and a real
+by U16+ staff once a guardian opts in. ⚠️ **An admin may read a DM only if it
+involves a minor or a message in it was reported** — Jay's evening ruling,
+narrowing his morning one that any admin may
+(`claude/decisions/2026-08-23-adult-dms-private-unless-reported.md`); every
+thread's notice says which applies. Push proven on a real iPhone and a real
 Android. `claude/plans/2026-08-23-squad-chat.md`; the day's record is
 `claude/handoffs/2026-08-23-chat-phases-2-and-3.md`. Phase 4 (photos,
 retention, email digests) is not started and email was ruled low priority.

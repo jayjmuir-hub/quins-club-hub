@@ -4763,6 +4763,8 @@ $function$
 -- public.log_welfare_access(_conversation uuid)   (23 Aug 2026 — squad chat phase 3)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
 -- ---------------------------------------------------------------------
+-- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
+-- private.admin_may_review — a minor in it, or a reported message. md5 55728a7d25512cd4cecef9df23ba9ffa.
 CREATE OR REPLACE FUNCTION public.log_welfare_access(_conversation uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -4776,7 +4778,7 @@ begin
   select * into conv from conversations where id = _conversation;
   if conv.id is null then raise exception 'no such conversation' using errcode = 'P0002'; end if;
   if me in (conv.profile_a, conv.profile_b) then return; end if;
-  if not private.is_admin(conv.club_id) then raise exception 'not an admin' using errcode = '42501'; end if;
+  if not private.admin_may_review(_conversation) then raise exception 'not reviewable' using errcode = '42501'; end if;
   insert into welfare_access_log (club_id, admin_id, conversation_id) values (conv.club_id, me, _conversation);
 end;
 $function$
@@ -4819,6 +4821,8 @@ $function$
 -- public.welfare_overview()   (23 Aug 2026 — squad chat phase 3)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
 -- ---------------------------------------------------------------------
+-- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
+-- private.admin_may_review — a minor in it, or a reported message. md5 4c2b0b533f8d37aaead7213105d43720.
 CREATE OR REPLACE FUNCTION public.welfare_overview()
  RETURNS TABLE(kind text, id uuid, label text, detail text, members bigint, last_at timestamp with time zone, open_reports bigint)
  LANGUAGE sql
@@ -4830,7 +4834,6 @@ AS $function$
             where m.profile_id = me.id and m.status = 'active' order by m.created_at limit 1),
   ok as (select private.is_admin(club.id) as yes from club)
   select rows.kind, rows.id, rows.label, rows.detail, rows.members, rows.last_at, rows.open_reports from (
-    -- squad channels
     select 'squad'::text as kind, t.id as id, t.name as label,
            case when private.channel_announce_only(t.id) then 'Squad · announce-only' else 'Squad · open chat' end as detail,
            (select count(*) from private.notice_audience(t.club_id, t.id)) as members,
@@ -4839,7 +4842,6 @@ AS $function$
              where x.team_id = t.id and x.channel = 'squad' and r.resolved_at is null) as open_reports
       from teams t, club where t.club_id = club.id
     union all
-    -- staff channels
     select 'staff', t.id, t.name, 'Staff',
            (select count(*) from private.staff_audience(t.id)),
            (select max(created_at) from messages x where x.team_id = t.id and x.channel = 'staff'),
@@ -4847,7 +4849,6 @@ AS $function$
              where x.team_id = t.id and x.channel = 'staff' and r.resolved_at is null)
       from teams t, club where t.club_id = club.id
     union all
-    -- the club channel
     select 'club', club.id, 'Whole club', 'Club-wide · admins post',
            (select count(distinct profile_id) from memberships m where m.club_id = club.id and m.status = 'active'),
            (select max(created_at) from messages x where x.club_id = club.id and x.channel = 'squad' and x.team_id is null),
@@ -4855,10 +4856,9 @@ AS $function$
              where x.club_id = club.id and x.channel = 'squad' and x.team_id is null and r.resolved_at is null)
       from club
     union all
-    -- direct messages
     select 'dm', c.id, pa.full_name || ' · ' || pb.full_name,
            case when private.is_minor_profile(c.profile_a) or private.is_minor_profile(c.profile_b)
-                then 'Direct message · involves a minor' else 'Direct message' end,
+                then 'Direct message · involves a minor' else 'Direct message · reported' end,
            2::bigint, c.last_at,
            (select count(*) from message_reports r join messages x on x.id = r.message_id
              where x.conversation_id = c.id and r.resolved_at is null)
@@ -4867,9 +4867,73 @@ AS $function$
       join profiles pa on pa.id = c.profile_a
       join profiles pb on pb.id = c.profile_b
      where c.club_id = club.id
+       and private.conversation_reviewable(c.id)
   ) rows, ok
   where ok.yes
   order by last_at desc nulls last;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- ADULT DMs PRIVATE UNLESS REPORTED (23 Aug 2026, evening) —
+-- db/migrations/20260823_adult_dms_private.sql. Jay: "I don't think dm between
+-- adults should be visible to anyone except those people, unless a message is
+-- reported." Captured from pg_get_functiondef in a rolled-back apply; md5s below.
+-- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- private.conversation_reviewable(_conversation uuid)   (23 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}   md5 4af1471901d8c7fa27cfa05a11a28a38
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.conversation_reviewable(_conversation uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from conversations c
+     where c.id = _conversation
+       and (private.is_minor_profile(c.profile_a)
+         or private.is_minor_profile(c.profile_b)
+         or exists (select 1 from message_reports r
+                      join messages x on x.id = r.message_id
+                     where x.conversation_id = c.id)))
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.admin_may_review(_conversation uuid)   (23 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}   md5 d3b073c66a040fa2bebd563570579d1a
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.admin_may_review(_conversation uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from conversations c
+     where c.id = _conversation
+       and private.is_admin(c.club_id)
+       and private.conversation_reviewable(c.id))
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.conversation_involves_minor(_conversation uuid)   (23 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}   md5 c0555557733091086163d94b1f39151b
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.conversation_involves_minor(_conversation uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select private.is_minor_profile(c.profile_a) or private.is_minor_profile(c.profile_b)
+    from conversations c
+   where c.id = _conversation
+     and (private.in_conversation(c.id) or private.admin_may_review(c.id))
 $function$
 ;
 
