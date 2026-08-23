@@ -2018,13 +2018,13 @@ CREATE TABLE public.welfare_access_log (
   id               uuid        NOT NULL DEFAULT gen_random_uuid(),
   club_id          uuid        NOT NULL,
   admin_id         uuid        NOT NULL,
-  conversation_id  uuid        NOT NULL,
+  conversation_id  uuid,                              -- nullable since 24 Aug 2026: the log OUTLIVES the conversation (delete for good)
   opened_at        timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_pkey PRIMARY KEY (id);
 ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_club_id_fkey         FOREIGN KEY (club_id)         REFERENCES clubs(id)         ON DELETE CASCADE;
 ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_admin_id_fkey        FOREIGN KEY (admin_id)        REFERENCES profiles(id)      ON DELETE CASCADE;
-ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE;
+ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL;  -- was CASCADE until 24 Aug 2026
 CREATE INDEX welfare_access_log_idx ON public.welfare_access_log USING btree (club_id, opened_at DESC);
 
 -- player_private gained (phase 3):

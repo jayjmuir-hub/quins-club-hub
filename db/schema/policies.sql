@@ -1466,6 +1466,32 @@ CREATE POLICY "message mark read" ON public.message_reads
 -- public.open_conversation(), SECURITY DEFINER, which applies private.can_dm.
 -- ⚠️ NO INSERT POLICY ON welfare_access_log either: public.log_welfare_access().
 -- ---------------------------------------------------------------------
+-- DELETE FOR GOOD (24 Aug 2026 — db/migrations/20260824_delete_for_good.sql)
+-- Hard deletes. The author any time; staff in their channels; admins in the club
+-- channel and in a DM they may review. ⚠️ A REPORTED message (or a post with a
+-- reported reply, or a DM with any reported message) only by an admin — a
+-- report is evidence until resolved. Either participant may delete a DM: gone
+-- for BOTH. Channels are cleared through public.clear_channel(), not deleted.
+-- ---------------------------------------------------------------------
+CREATE POLICY "message delete" ON public.messages
+  FOR DELETE USING (
+CASE
+    WHEN private.message_reported(id) THEN
+    CASE channel
+        WHEN 'dm'::text THEN private.admin_may_review(conversation_id)
+        ELSE private.is_admin(club_id)
+    END
+    ELSE ((author_id = ( SELECT auth.uid() AS uid)) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.admin_may_review(conversation_id)))
+END);
+
+CREATE POLICY "conversation delete" ON public.conversations
+  FOR DELETE USING (
+CASE
+    WHEN private.conversation_reported(id) THEN private.admin_may_review(id)
+    ELSE (((( SELECT auth.uid() AS uid) = profile_a) OR (( SELECT auth.uid() AS uid) = profile_b)) OR private.admin_may_review(id))
+END);
+
+-- ---------------------------------------------------------------------
 -- public.conversation_clears   (24 Aug 2026 — db/migrations/20260824_chat_list.sql)
 -- ⚠️ SELECT ONLY. The only way in is public.clear_conversation(), SECURITY DEFINER,
 -- which checks private.in_conversation. A clear hides the past from ONE person.

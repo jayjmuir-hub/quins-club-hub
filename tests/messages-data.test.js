@@ -28,7 +28,7 @@ import {
 function builder(result) {
   const calls = {}
   const b = {}
-  for (const name of ['select', 'is', 'eq', 'neq', 'gte', 'in', 'order', 'limit', 'insert', 'update', 'upsert', 'single', 'maybeSingle']) {
+  for (const name of ['select', 'is', 'eq', 'neq', 'gte', 'in', 'order', 'limit', 'insert', 'update', 'upsert', 'delete', 'single', 'maybeSingle']) {
     b[name] = vi.fn((...args) => {
       ;(calls[name] ??= []).push(args)
       return b
@@ -158,13 +158,16 @@ describe('writes', () => {
     expect(supabase.from).not.toHaveBeenCalled()
   })
 
-  it('removeMessage is a soft delete: an UPDATE setting deleted_at, never a DELETE', async () => {
+  // ⚠️ REVERSED 24 Aug 2026. This test used to pin the SOFT delete ("never a
+  // DELETE"); Jay: "i still can't completely delete messages". It is a real
+  // DELETE now, and the policy decides who may.
+  it('removeMessage is a real DELETE by id', async () => {
     const { b, calls } = builder({ data: null, error: null })
     supabase.from.mockReturnValue(b)
     await removeMessage('p1')
-    expect(calls.update[0][0]).toEqual({ deleted_at: expect.any(String) })
+    expect(calls.delete).toHaveLength(1)
     expect(calls.eq[0]).toEqual(['id', 'p1'])
-    expect(b.delete).toBeUndefined()
+    expect(calls.update).toBeUndefined()
   })
 
   it('surfaces the database error', async () => {

@@ -77,7 +77,7 @@ function Reply({ reply, selfId, canModerate, onRemove }) {
               onClick={() => onRemove(reply.id)}
               className="text-[11px] font-semibold text-ink-faint underline-offset-2 hover:text-danger-ink hover:underline"
             >
-              Remove
+              Delete
             </button>
           )}
         </div>
@@ -211,7 +211,7 @@ export default function MessageRow({
         )}
         {!message.deleted_at && (mine || canModerate) && (
           <button type="button" onClick={() => onRemove(message.id)} className="hover:text-danger-ink">
-            Remove
+            Delete
           </button>
         )}
         {!message.deleted_at && !mine && onReport && (

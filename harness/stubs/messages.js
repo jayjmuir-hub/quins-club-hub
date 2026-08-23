@@ -121,3 +121,7 @@ export function chatPath(row) {
   }
 }
 export async function clearConversation() {}
+export async function deleteConversation() {}
+export async function clearChannel() {
+  return 0
+}
