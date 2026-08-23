@@ -130,6 +130,10 @@ ALTER TABLE public.announcement_reads ENABLE ROW LEVEL SECURITY;  -- added 14 Au
 ALTER TABLE public.messages          ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026
 ALTER TABLE public.channel_settings  ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026
 ALTER TABLE public.message_reads     ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026
+ALTER TABLE public.conversations      ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026 (phase 3)
+ALTER TABLE public.dm_blocks          ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026 (phase 3)
+ALTER TABLE public.message_reports    ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026 (phase 3)
+ALTER TABLE public.welfare_access_log ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026 (phase 3)
 ALTER TABLE public.match_sheets      ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
 ALTER TABLE public.match_sheet_slots ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
 ALTER TABLE public.match_sheet_cards ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
@@ -1385,31 +1389,49 @@ create policy "session block manage" on public.training_session_blocks for all
 -- messages_touch freezes every other column regardless.
 -- ---------------------------------------------------------------------
 CREATE POLICY "message read" ON public.messages
-  FOR SELECT USING (((channel = 'squad'::text) AND
-CASE
-    WHEN (team_id IS NULL) THEN (EXISTS ( SELECT 1
-       FROM memberships m
-      WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = messages.club_id) AND (m.status = 'active'::text))))
-    ELSE private.can_see_team(team_id)
-END));
+  FOR SELECT USING (
+CASE channel
+    WHEN 'squad'::text THEN
+    CASE
+        WHEN (team_id IS NULL) THEN (EXISTS ( SELECT 1
+           FROM memberships m
+          WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = messages.club_id) AND (m.status = 'active'::text))))
+        ELSE private.can_see_team(team_id)
+    END
+    WHEN 'staff'::text THEN private.can_edit_team(team_id)
+    WHEN 'dm'::text THEN (private.in_conversation(conversation_id) OR private.is_admin(club_id))
+    ELSE false
+END);
+-- ⚠️ REPLACED by 20260823_squad_chat_phase3: three channels. 'staff' is the
+-- squad's staff; 'dm' is a participant OR ANY CLUB ADMIN — Jay's 23 Aug
+-- ruling, and the permanent notice in every DM says so.
 
 CREATE POLICY "message create" ON public.messages
-  FOR INSERT WITH CHECK (((channel = 'squad'::text) AND (((parent_id IS NOT NULL) AND private.can_reply_to(parent_id)) OR ((parent_id IS NULL) AND
-CASE
-    WHEN (team_id IS NULL) THEN private.is_admin(( SELECT m.club_id
-       FROM memberships m
-      WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))
-      ORDER BY m.created_at
-     LIMIT 1))
-    ELSE (private.can_edit_team(team_id) OR ((NOT private.channel_announce_only(team_id)) AND private.can_see_team(team_id)) OR ((event_id IS NOT NULL) AND private.can_see_team(team_id)))
-END))));
--- ⚠️ REPLACED by 20260823_squad_chat_phase2: the third arm — a FIXTURE thread
--- (event_id set) may be opened by anyone who can see the squad, announce-only
--- or not. The trigger pins team_id to the fixture's squad before this runs.
+  FOR INSERT WITH CHECK (
+CASE channel
+    WHEN 'squad'::text THEN (((parent_id IS NOT NULL) AND private.can_reply_to(parent_id)) OR ((parent_id IS NULL) AND
+    CASE
+        WHEN (team_id IS NULL) THEN private.is_admin(( SELECT m.club_id
+           FROM memberships m
+          WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))
+          ORDER BY m.created_at
+         LIMIT 1))
+        ELSE (private.can_edit_team(team_id) OR ((NOT private.channel_announce_only(team_id)) AND private.can_see_team(team_id)) OR ((event_id IS NOT NULL) AND private.can_see_team(team_id)))
+    END))
+    WHEN 'staff'::text THEN private.can_edit_team(team_id)
+    WHEN 'dm'::text THEN private.in_conversation(conversation_id)
+    ELSE false
+END);
+-- ⚠️ REPLACED by 20260823_squad_chat_phase3. The 'dm' arm only agrees with the
+-- trigger, which has already refused a non-participant and any pair can_dm
+-- forbids — re-checked on EVERY message, so a DM stops the day it is not allowed.
 
 CREATE POLICY "message edit" ON public.messages
-  FOR UPDATE USING ((((author_id = ( SELECT auth.uid() AS uid)) AND (created_at > (now() - '00:15:00'::interval))) OR ((team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((team_id IS NULL) AND private.is_admin(club_id))))
-  WITH CHECK ((channel = 'squad'::text));
+  FOR UPDATE USING ((((author_id = ( SELECT auth.uid() AS uid)) AND (created_at > (now() - '00:15:00'::interval))) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.is_admin(club_id))))
+  WITH CHECK ((channel = ANY (ARRAY['squad'::text, 'staff'::text, 'dm'::text])));
+-- ⚠️ REPLACED by 20260823_squad_chat_phase3. An admin may UPDATE a DM row — to
+-- REMOVE it (deleted_at; the trigger blanks the body). touch_message refuses a
+-- body change from anybody but the author, so this grants removal, not editing.
 
 CREATE POLICY "channel settings read" ON public.channel_settings
   FOR SELECT USING (private.can_see_team(team_id));
@@ -1425,3 +1447,34 @@ CREATE POLICY "message mark read" ON public.message_reads
   FOR INSERT WITH CHECK (((profile_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
    FROM messages m
   WHERE (m.id = message_reads.message_id)))));
+
+
+-- ---------------------------------------------------------------------
+-- public.conversations / public.dm_blocks / public.message_reports /
+-- public.welfare_access_log  (captured 23 Aug 2026 — squad chat phase 3)
+-- Migration: db/migrations/20260823_squad_chat_phase3.sql
+--
+-- ⚠️ NO INSERT POLICY ON conversations. The only way in is
+-- public.open_conversation(), SECURITY DEFINER, which applies private.can_dm.
+-- ⚠️ NO INSERT POLICY ON welfare_access_log either: public.log_welfare_access().
+-- ---------------------------------------------------------------------
+CREATE POLICY "conversation read" ON public.conversations
+  FOR SELECT USING ((( SELECT auth.uid() AS uid) IN (profile_a, profile_b)) OR private.is_admin(club_id));
+
+CREATE POLICY "dm block own" ON public.dm_blocks
+  FOR ALL USING ((blocker_id = ( SELECT auth.uid() AS uid)))
+  WITH CHECK ((blocker_id = ( SELECT auth.uid() AS uid)));
+
+-- reporter_id and club_id are stamped by message_reports_provenance; the
+-- check is visibility of the message (RLS on messages decides that).
+CREATE POLICY "report create" ON public.message_reports
+  FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM messages m
+  WHERE (m.id = message_reports.message_id))));
+CREATE POLICY "report read" ON public.message_reports
+  FOR SELECT USING (((reporter_id = ( SELECT auth.uid() AS uid)) OR private.is_admin(club_id)));
+CREATE POLICY "report resolve" ON public.message_reports
+  FOR UPDATE USING (private.is_admin(club_id)) WITH CHECK (private.is_admin(club_id));
+
+CREATE POLICY "welfare log read" ON public.welfare_access_log
+  FOR SELECT USING (private.is_admin(club_id));

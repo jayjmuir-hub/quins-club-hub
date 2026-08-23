@@ -10,6 +10,9 @@ import Roster from './screens/Roster.jsx'
 import More from './screens/More.jsx'
 import Notices from './screens/Notices.jsx'
 import Chat from './screens/Chat.jsx'
+import DirectMessages from './screens/DirectMessages.jsx'
+import Welfare from './screens/Welfare.jsx'
+import WelfareReports from './screens/WelfareReports.jsx'
 import MyReports from './screens/MyReports.jsx'
 import AdminDashboard from './screens/AdminDashboard.jsx'
 import PortalChooser from './screens/PortalChooser.jsx'
@@ -190,6 +193,10 @@ export default function App() {
               the Squad Hub's sidebar section, so a coach's Chat item stays in
               the section that is lit. claude/plans/2026-08-23-squad-chat.md. */}
           <Route path="/chat" element={<AppShell><Chat /></AppShell>} />
+          {/* Direct messages (phase 3): the inbox and one thread. Before
+              /chat/:teamId so "dm" is never read as a squad id. */}
+          <Route path="/chat/dm" element={<AppShell><DirectMessages /></AppShell>} />
+          <Route path="/chat/dm/:conversationId" element={<AppShell><DirectMessages /></AppShell>} />
           <Route path="/chat/:teamId" element={<AppShell><Chat /></AppShell>} />
           <Route path="/squad/:teamId/chat" element={<AppShell><Chat /></AppShell>} />
 
@@ -278,6 +285,11 @@ export default function App() {
                 gating them, because a route is linkable and the `training`
                 right gates the SCREEN, not the data — RLS on the training
                 tables is what refuses a row. */}
+            {/* Welfare (phase 3) — the SCREEN is gated on the `welfare`
+                right inside each screen (WelfareGate); the DATA is admin-
+                readable by RLS, the 23 Aug ruling. */}
+            <Route path="welfare" element={<Welfare />} />
+            <Route path="welfare/reports" element={<WelfareReports />} />
             <Route path="training" element={<TrainingLibrary />} />
             <Route path="training/templates" element={<TrainingTemplates />} />
             <Route path="training/publish" element={<TrainingPublish />} />

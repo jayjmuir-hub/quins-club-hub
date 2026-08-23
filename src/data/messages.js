@@ -287,3 +287,206 @@ export function subscribeMessages(callback, { debounceMs = MESSAGE_REALTIME_DEBO
     supabase.removeChannel(channel)
   }
 }
+
+// ── Phase 3: the staff channel, direct messages, reports ───────────────────
+//
+// ⚠️ THE RULING (Jay, 23 Aug 2026): ANY CLUB ADMIN CAN READ A DM. The
+// permanent notice in every DM says so. `welfare` is an admin RIGHT that
+// decides who sees the Welfare dashboard; it is not a data permission.
+// db/migrations/20260823_squad_chat_phase3.sql carries the whole rule for
+// who may message whom — private.can_dm — and the client never re-derives
+// it: dm_candidates() is the list, open_conversation() is the door.
+
+/**
+ * The squad's STAFF channel stream. Same shape as listMessages; the policy
+ * decides who may read it (coach / manager / medic of the squad, or admin).
+ */
+export async function listStaffMessages(teamId, { limit = 50 } = {}) {
+  if (!teamId) return []
+  const { data: heads, error } = await supabase
+    .from('messages')
+    .select(SELECT)
+    .eq('team_id', teamId)
+    .eq('channel', 'staff')
+    .is('parent_id', null)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  if (!heads?.length) return []
+  const { data: replies, error: replyError } = await supabase
+    .from('messages')
+    .select(SELECT)
+    .in('parent_id', heads.map((m) => m.id))
+    .order('created_at', { ascending: true })
+  if (replyError) throw replyError
+  const byParent = new Map()
+  for (const r of replies ?? []) {
+    if (!byParent.has(r.parent_id)) byParent.set(r.parent_id, [])
+    byParent.get(r.parent_id).push(r)
+  }
+  return heads.slice().reverse().map((m) => ({ ...m, replies: byParent.get(m.id) ?? [] }))
+}
+
+/** Posts to the squad's staff channel. Staff only — the policy decides. */
+export async function postStaffMessage(teamId, body, { mentions = [] } = {}) {
+  const text = body?.trim()
+  if (!text) throw new Error('Write something first.')
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({ team_id: teamId, channel: 'staff', body: text, mentions })
+    .select(SELECT)
+    .single()
+  if (error) throw error
+  return data
+}
+
+/** Who can be @mentioned in a channel: 'squad' (default) or 'staff'. */
+export async function listMentionablesFor(teamId, channel = 'squad') {
+  const { data, error } = await supabase.rpc('chat_mentionables', { _team: teamId ?? null, _channel: channel })
+  if (error) throw error
+  return data ?? []
+}
+
+/** The people I may start a DM with. The database's list, never the club's. */
+export async function listDmCandidates() {
+  const { data, error } = await supabase.rpc('dm_candidates')
+  if (error) throw error
+  return data ?? []
+}
+
+/** Find-or-create the conversation with somebody. Throws if can_dm says no. */
+export async function openConversation(otherId) {
+  const { data, error } = await supabase.rpc('open_conversation', { _other: otherId })
+  if (error) throw error
+  return data
+}
+
+/** My inbox: conversations, newest activity first, with unread flags. */
+export async function listMyConversations() {
+  const { data, error } = await supabase.rpc('my_conversations')
+  if (error) throw error
+  return data ?? []
+}
+
+/** One conversation row (participants), for the thread header. RLS scopes it. */
+export async function getConversation(conversationId) {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('id, club_id, profile_a, profile_b, created_at, last_at')
+    .eq('id', conversationId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/** A DM thread, oldest first. */
+export async function listDirectMessages(conversationId, { limit = 200 } = {}) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select(SELECT)
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true })
+    .limit(limit)
+  if (error) throw error
+  return data ?? []
+}
+
+/** Sends a DM. The trigger re-checks can_dm on every message. */
+export async function sendDirectMessage(conversationId, body) {
+  const text = body?.trim()
+  if (!text) throw new Error('Write something first.')
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({ conversation_id: conversationId, body: text })
+    .select(SELECT)
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * An admin opening a DM they are not part of. Records the open; the
+ * function returns silently for a participant. Never throws on a log
+ * failure: the review still happens, and the log is the thing to fix.
+ */
+export async function logWelfareAccess(conversationId) {
+  const { error } = await supabase.rpc('log_welfare_access', { _conversation: conversationId })
+  if (error) console.warn('Could not log welfare access:', error.message)
+}
+
+/** Block / unblock somebody from messaging me. Own rows only. */
+export async function blockDm(otherId) {
+  const { error } = await supabase.from('dm_blocks').insert({ blocked_id: otherId })
+  if (error && error.code !== '23505') throw error
+}
+export async function unblockDm(otherId) {
+  const { error } = await supabase.from('dm_blocks').delete().eq('blocked_id', otherId)
+  if (error) throw error
+}
+export async function listMyBlocks() {
+  const { data, error } = await supabase.from('dm_blocks').select('blocked_id')
+  if (error) throw error
+  return new Set((data ?? []).map((r) => r.blocked_id))
+}
+
+/** Report a message. Anyone who can see it. club_id and reporter are stamped. */
+export async function reportMessage(messageId, reason) {
+  const text = reason?.trim()
+  if (!text) throw new Error('Say what is wrong with it.')
+  const { error } = await supabase.from('message_reports').insert({ message_id: messageId, reason: text })
+  if (error) throw error
+}
+
+/** Open reports, admins only. */
+export async function listOpenReports() {
+  const { data, error } = await supabase
+    .from('message_reports')
+    .select(
+      'id, message_id, reporter_id, reason, created_at, ' +
+        'message:messages!message_reports_message_id_fkey(id, body, channel, team_id, conversation_id, author_id, deleted_at, author:profiles!messages_author_id_fkey(full_name)), ' +
+        'reporter:profiles!message_reports_reporter_id_fkey(full_name)',
+    )
+    .is('resolved_at', null)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function resolveReport(reportId) {
+  const { error } = await supabase
+    .from('message_reports')
+    .update({ resolved_at: new Date().toISOString() })
+    .eq('id', reportId)
+  if (error) throw error
+}
+
+/** The Welfare dashboard rows. Admins only; the function returns nothing to anybody else. */
+export async function welfareOverview() {
+  const { data, error } = await supabase.rpc('welfare_overview')
+  if (error) throw error
+  return data ?? []
+}
+
+/** The access log, newest first. Admins only. */
+export async function listWelfareAccessLog({ limit = 100 } = {}) {
+  const { data, error } = await supabase
+    .from('welfare_access_log')
+    .select('id, opened_at, conversation_id, admin:profiles!welfare_access_log_admin_id_fkey(full_name)')
+    .order('opened_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * A guardian (or admin) consenting to a U16+ player being messaged by
+ * their squad coach or manager. The trigger refuses the player themself
+ * and records who and when.
+ */
+export async function setStaffDmOptIn(playerId, optIn) {
+  const { error } = await supabase
+    .from('player_private')
+    .update({ staff_dm_opt_in: optIn })
+    .eq('player_id', playerId)
+  if (error) throw error
+}

@@ -668,11 +668,26 @@ Deno.serve(async (request) => {
       // ours. A club-wide post has no squad and says so.
       const rows = await db(
         `messages?id=eq.${encodeURIComponent(messageId)}` +
-          '&select=body,team_id,parent_id,author_role,mentions,deleted_at,teams(name),author:profiles!messages_author_id_fkey(full_name)',
+          '&select=body,team_id,parent_id,channel,conversation_id,author_role,mentions,deleted_at,teams(name),author:profiles!messages_author_id_fkey(full_name)',
       )
       const message = rows?.[0]
       if (!message || message.deleted_at) return new Response('not found', { status: 404 })
 
+      // Phase 3 (23 Aug 2026): a direct message. The title is the sender;
+      // the body is the first line; the tray collapses per conversation.
+      // ⚠️ NO SQUAD NAME AND NO OTHER NAME — the payload names the sender
+      // only, which the recipient already knows. The database decided the
+      // one recipient (message_push_subscriptions, category direct_messages).
+      if (message.channel === 'dm') {
+        const sender = escapeHtmlFree(message.author?.full_name ?? 'Somebody')
+        job = {
+          title: sender,
+          body: escapeHtmlFree(message.body).slice(0, 200),
+          url: `${APP_URL}/chat/dm/${encodeURIComponent(message.conversation_id)}`,
+          tag: `dm-${message.conversation_id}`,
+          subscriptions: await messageTargets(messageId),
+        }
+      } else {
       const squadName = message.teams?.name ?? 'Whole club'
       // Phase 2 (23 Aug 2026): a mention reaches only the mentioned, and the
       // tray should say so. A staff top-level post still reads as the
@@ -685,16 +700,19 @@ Deno.serve(async (request) => {
       job = {
         title: !staffPost && mentioned
           ? `${who} mentioned you · ${escapeHtmlFree(squadName)}`
-          : `${escapeHtmlFree(squadName)} chat`,
+          : message.channel === 'staff'
+            ? `${escapeHtmlFree(squadName)} staff`
+            : `${escapeHtmlFree(squadName)} chat`,
         body: escapeHtmlFree(message.body).slice(0, 200),
         url: message.team_id
-          ? `${APP_URL}/chat/${encodeURIComponent(message.team_id)}`
+          ? `${APP_URL}/chat/${encodeURIComponent(message.team_id)}${message.channel === 'staff' ? '?channel=staff' : ''}`
           : `${APP_URL}/chat/club`,
         // Per SQUAD, not per message: three posts in a minute collapse into
         // the latest one rather than stacking. A chat is the one place where
         // "newest replaces previous" is what the tray should do.
-        tag: `chat-${message.team_id ?? 'club'}`,
+        tag: `chat-${message.channel === 'staff' ? 'staff-' : ''}${message.team_id ?? 'club'}`,
         subscriptions: await messageTargets(messageId),
+      }
       }
     } else {
       const rows = await db(

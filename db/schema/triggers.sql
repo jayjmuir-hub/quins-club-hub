@@ -322,3 +322,18 @@ CREATE TRIGGER player_parents_sync_name
 CREATE TRIGGER messages_provenance BEFORE INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION private.set_message_provenance();
 CREATE TRIGGER messages_touch BEFORE UPDATE ON public.messages FOR EACH ROW EXECUTE FUNCTION private.touch_message();
 CREATE TRIGGER messages_push AFTER INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION private.notify_message_push();
+
+
+-- ---------------------------------------------------------------------
+-- public.message_reports / public.player_private  (23 Aug 2026 — squad chat phase 3)
+-- Migration: db/migrations/20260823_squad_chat_phase3.sql
+--
+-- message_reports_provenance stamps reporter_id and club_id (from the
+-- message) and nulls resolved_*; message_reports_touch stamps resolved_by
+-- when resolved_at is first set and freezes the rest.
+-- player_private_staff_dm_opt_in refuses an opt-in change from anybody but a
+-- linked guardian or an admin, and stamps who/when.
+-- ---------------------------------------------------------------------
+CREATE TRIGGER message_reports_provenance BEFORE INSERT ON public.message_reports FOR EACH ROW EXECUTE FUNCTION private.set_report_provenance();
+CREATE TRIGGER message_reports_touch BEFORE UPDATE ON public.message_reports FOR EACH ROW EXECUTE FUNCTION private.touch_report();
+CREATE TRIGGER player_private_staff_dm_opt_in BEFORE UPDATE ON public.player_private FOR EACH ROW EXECUTE FUNCTION private.guard_staff_dm_opt_in();

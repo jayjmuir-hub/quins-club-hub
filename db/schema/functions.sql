@@ -4076,6 +4076,7 @@ $function$
 
 -- ---------------------------------------------------------------------
 -- private.can_reply_to(_parent uuid)   (23 Aug 2026 — squad chat)
+-- ⚠️ REPLACED by 20260823_squad_chat_phase3 (staff channel, DMs) — md5 re-verified from live.
 -- proacl: {postgres=X/postgres,authenticated=X/postgres}
 -- ⚠️ Same second-apply note as channel_announce_only above.
 -- SECURITY DEFINER so "message create" can look at the parent without the policy recursing into its own table.
@@ -4093,19 +4094,22 @@ AS $function$
      where p.id = _parent
        and p.parent_id is null
        and p.deleted_at is null
-       and p.channel = 'squad'
-       and case
-         when p.team_id is null then exists (
-           select 1 from memberships m
-            where m.profile_id = (select auth.uid())
-              and m.club_id = p.club_id and m.status = 'active')
-         else private.can_see_team(p.team_id)
+       and case p.channel
+         when 'squad' then
+           case when p.team_id is null then exists (
+                  select 1 from memberships m
+                   where m.profile_id = (select auth.uid())
+                     and m.club_id = p.club_id and m.status = 'active')
+                else private.can_see_team(p.team_id) end
+         when 'staff' then private.can_edit_team(p.team_id)
+         else false
        end);
 $function$
 ;
 
 -- ---------------------------------------------------------------------
 -- private.set_message_provenance()   (23 Aug 2026 — squad chat)
+-- ⚠️ REPLACED by 20260823_squad_chat_phase3 (staff channel, DMs) — md5 re-verified from live.
 -- ⚠️ REPLACED by 20260823_squad_chat_phase2 (fixture threads, mentions) — md5 re-verified.
 -- proacl: null
 -- Stamps club/author/role/title; a reply inherits team/channel/event from its parent; replies are one level deep.
@@ -4121,6 +4125,7 @@ AS $function$
 declare
   parent public.messages;
   ev public.events;
+  conv public.conversations;
 begin
   new.author_id := auth.uid();
   if new.author_id is null then
@@ -4138,12 +4143,35 @@ begin
     if parent.deleted_at is not null then
       raise exception 'that message was removed' using errcode = '23514';
     end if;
+    if parent.channel = 'dm' then
+      raise exception 'a direct message has no threads' using errcode = '23514';
+    end if;
     new.team_id  := parent.team_id;
     new.channel  := parent.channel;
     new.event_id := parent.event_id;
+    new.conversation_id := null;
     new.pinned   := false;
+  elsif new.conversation_id is not null then
+    -- A direct message. The conversation decides everything else, and the
+    -- rule is re-checked on EVERY message — a DM that was allowed stops
+    -- accepting messages the day it is not.
+    select * into conv from conversations where id = new.conversation_id;
+    if conv.id is null then
+      raise exception 'no such conversation' using errcode = 'P0002';
+    end if;
+    if new.author_id not in (conv.profile_a, conv.profile_b) then
+      raise exception 'not your conversation' using errcode = '42501';
+    end if;
+    if not private.can_dm(case when conv.profile_a = new.author_id then conv.profile_b else conv.profile_a end) then
+      raise exception 'you cannot message this person' using errcode = '42501';
+    end if;
+    new.channel  := 'dm';
+    new.team_id  := null;
+    new.event_id := null;
+    new.pinned   := false;
+    new.mentions := '{}';
+    update conversations set last_at = now() where id = conv.id;
   elsif new.event_id is not null then
-    -- A fixture thread. The fixture decides the squad; a mismatch is refused.
     select * into ev from events where id = new.event_id;
     if ev.id is null then
       raise exception 'no such fixture' using errcode = 'P0002';
@@ -4155,8 +4183,10 @@ begin
     end if;
   end if;
 
-  -- The author's standing on this squad, best role first. A club admin with
-  -- no squad row is 'admin'; a parent is 'parent'.
+  if new.channel = 'staff' and new.team_id is null then
+    raise exception 'a staff channel belongs to a squad' using errcode = '23514';
+  end if;
+
   select m.role, m.title into new.author_role, new.author_title
     from memberships m
    where m.profile_id = new.author_id and m.status = 'active'
@@ -4167,6 +4197,7 @@ begin
    limit 1;
 
   new.club_id := coalesce(
+    conv.club_id,
     (select club_id from teams where id = new.team_id),
     (select m.club_id from memberships m
       where m.profile_id = new.author_id and m.status = 'active'
@@ -4175,12 +4206,15 @@ begin
     raise exception 'no club for this message' using errcode = '23502';
   end if;
 
-  -- Mentions: keep only people in this channel's audience, never the author.
   if coalesce(array_length(new.mentions, 1), 0) > 0 then
     select coalesce(array_agg(distinct m), '{}') into new.mentions
       from unnest(new.mentions) as m
      where m <> new.author_id
-       and m in (select profile_id from private.notice_audience(new.club_id, new.team_id) as aud(profile_id));
+       and m in (
+         select profile_id from private.notice_audience(new.club_id, new.team_id) as aud(profile_id)
+          where new.channel = 'squad'
+         union
+         select profile_id from private.staff_audience(new.team_id) where new.channel = 'staff');
   end if;
 
   new.edited_at  := null;
@@ -4192,6 +4226,7 @@ $function$
 
 -- ---------------------------------------------------------------------
 -- private.touch_message()   (23 Aug 2026 — squad chat)
+-- ⚠️ REPLACED by 20260823_squad_chat_phase3 (staff channel, DMs) — md5 re-verified from live.
 -- ⚠️ REPLACED by 20260823_squad_chat_phase2 (fixture threads, mentions) — md5 re-verified.
 -- proacl: null
 -- Freezes every column but body/pinned/deleted_at; soft delete blanks the body to "(removed)".
@@ -4210,6 +4245,7 @@ begin
   new.channel    := old.channel;
   new.parent_id  := old.parent_id;
   new.event_id   := old.event_id;
+  new.conversation_id := old.conversation_id;
   new.author_id  := old.author_id;
   new.author_role  := old.author_role;
   new.author_title := old.author_title;
@@ -4220,11 +4256,15 @@ begin
     new.body := '(removed)';
     new.pinned := false;
   elsif old.deleted_at is not null then
-    -- Nothing about a removed message changes again.
     new.body := old.body;
     new.deleted_at := old.deleted_at;
     new.pinned := false;
   elsif new.body is distinct from old.body then
+    -- Only the author edits words. An admin reviewing a DM may remove a
+    -- message (above); rewriting somebody's words is not a review.
+    if auth.uid() <> old.author_id then
+      raise exception 'only the author can edit a message' using errcode = '42501';
+    end if;
     new.edited_at := now();
   end if;
   return new;
@@ -4234,6 +4274,7 @@ $function$
 
 -- ---------------------------------------------------------------------
 -- private.notify_message_push()   (23 Aug 2026 — squad chat)
+-- ⚠️ REPLACED by 20260823_squad_chat_phase3 (staff channel, DMs) — md5 re-verified from live.
 -- ⚠️ REPLACED by 20260823_squad_chat_phase2 (fixture threads, mentions) — md5 re-verified.
 -- proacl: null
 -- Fires on a STAFF top-level post only; queues {message_id} to push-send via net.http_post.
@@ -4249,14 +4290,15 @@ AS $function$
 declare
   endpoint text;
   secret   text;
-  staff_post boolean;
+  fires boolean;
 begin
-  staff_post := new.parent_id is null
-    and ((new.team_id is not null and new.author_role in ('admin','coach','manager','medic'))
-         or (new.team_id is null and new.author_role = 'admin'));
-  if not staff_post and coalesce(array_length(new.mentions, 1), 0) = 0 then
-    return null;
-  end if;
+  fires := new.channel = 'dm'
+    or (new.channel = 'staff' and new.parent_id is null)
+    or (new.channel = 'squad' and new.parent_id is null
+        and ((new.team_id is not null and new.author_role in ('admin','coach','manager','medic'))
+             or (new.team_id is null and new.author_role = 'admin')))
+    or coalesce(array_length(new.mentions, 1), 0) > 0;
+  if not fires then return null; end if;
 
   select decrypted_secret into endpoint from vault.decrypted_secrets where name = 'push_notify_url';
   select decrypted_secret into secret   from vault.decrypted_secrets where name = 'approval_notify_secret';
@@ -4302,6 +4344,7 @@ $function$
 
 -- ---------------------------------------------------------------------
 -- public.message_push_subscriptions(_message uuid)   (23 Aug 2026 — squad chat)
+-- ⚠️ REPLACED by 20260823_squad_chat_phase3 (staff channel, DMs) — md5 re-verified from live.
 -- ⚠️ REPLACED by 20260823_squad_chat_phase2 (fixture threads, mentions) — md5 re-verified.
 -- proacl: {postgres=X/postgres,service_role=X/postgres}
 -- The audience for one message: squad (or club) minus the author minus squad_chat opt-outs. service_role only — push-send calls it.
@@ -4317,18 +4360,26 @@ AS $function$
   with asked as (select * from messages where id = _message),
   staff_post as (
     select a.* from asked a
-     where a.parent_id is null
+     where a.parent_id is null and a.channel = 'squad'
        and ((a.team_id is not null and a.author_role in ('admin','coach','manager','medic'))
             or (a.team_id is null and a.author_role = 'admin'))
   ),
   people as (
-    -- the squad, for a staff top-level post …
-    select aud.profile_id
+    select aud.profile_id, 'squad_chat'::text as category
       from staff_post a
       cross join lateral private.notice_audience(a.club_id, a.team_id) as aud(profile_id)
     union
-    -- … plus whoever was mentioned, by anybody (already audience-filtered).
-    select m from asked a, unnest(a.mentions) as m
+    select m, 'squad_chat' from asked a, unnest(a.mentions) as m
+    union
+    -- a staff-channel top-level post reaches the squad's staff
+    select s.profile_id, 'squad_chat'
+      from asked a cross join lateral private.staff_audience(a.team_id) s
+     where a.channel = 'staff' and a.parent_id is null
+    union
+    -- a DM reaches the other side
+    select case when c.profile_a = a.author_id then c.profile_b else c.profile_a end, 'direct_messages'
+      from asked a join conversations c on c.id = a.conversation_id
+     where a.channel = 'dm'
   )
   select s.id, s.endpoint, s.p256dh, s.auth
     from people p
@@ -4337,18 +4388,19 @@ AS $function$
    where p.profile_id <> a.author_id
      and a.deleted_at is null
      and not exists (select 1 from notification_opt_outs o
-                      where o.profile_id = p.profile_id and o.category = 'squad_chat');
+                      where o.profile_id = p.profile_id and o.category = p.category);
 $function$
 ;
 
 -- ---------------------------------------------------------------------
--- public.chat_mentionables(_team uuid)   (23 Aug 2026 — squad chat phase 2)
+-- public.chat_mentionables(_team uuid, _channel text DEFAULT 'squad'::text)
+-- ⚠️ REPLACED by 20260823_squad_chat_phase3 (staff channel, DMs) — md5 re-verified from live.
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
 -- Who can be @mentioned in a channel: the audience, with best role, minus the
 -- caller; rows only for somebody who can see the channel. service_role execute
 -- via default privileges. md5 verified against a rolled-back apply.
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.chat_mentionables(_team uuid)
+CREATE OR REPLACE FUNCTION public.chat_mentionables(_team uuid, _channel text DEFAULT 'squad'::text)
  RETURNS TABLE(profile_id uuid, full_name text, role text)
  LANGUAGE sql
  STABLE SECURITY DEFINER
@@ -4362,10 +4414,16 @@ AS $function$
                       order by m.created_at limit 1)) as id
   ),
   allowed as (
-    select case when _team is null
-      then exists (select 1 from memberships m, me, club
+    select case
+      when _channel = 'staff' then _team is not null and private.can_edit_team(_team)
+      when _team is null then exists (select 1 from memberships m, me, club
                     where m.profile_id = me.id and m.club_id = club.id and m.status = 'active')
       else private.can_see_team(_team) end as ok
+  ),
+  aud as (
+    select profile_id from private.notice_audience((select id from club), _team) as a(profile_id) where _channel = 'squad'
+    union
+    select profile_id from private.staff_audience(_team) where _channel = 'staff'
   )
   select aud.profile_id, p.full_name,
          (select m.role from memberships m
@@ -4374,12 +4432,444 @@ AS $function$
            order by case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2
                                 when 'medic' then 3 else 9 end
            limit 1) as role
-    from club, allowed
-    cross join lateral private.notice_audience(club.id, _team) as aud(profile_id)
+    from allowed
+    cross join aud
     join profiles p on p.id = aud.profile_id
    where allowed.ok
      and aud.profile_id <> (select id from me)
    order by p.full_name;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- SQUAD CHAT PHASE 3 (23 Aug 2026) — db/migrations/20260823_squad_chat_phase3.sql
+-- Captured from pg_get_functiondef on LIVE after the apply; every md5 matched
+-- the file. private.can_dm is THE rule for who may message whom; see the
+-- migration header. Any club admin can read a DM (Jay's ruling).
+-- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- private.team_age_band(_team uuid)   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.team_age_band(_team uuid)
+ RETURNS integer
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select case
+    when t.is_senior then 99
+    else coalesce((regexp_match(t.name, '^U(\d{1,2})'))[1]::int, 0)
+  end
+  from teams t where t.id = _team;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.is_minor_profile(_profile uuid)   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_minor_profile(_profile uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1
+      from memberships m
+      left join player_private pp on pp.player_id = m.player_id
+     where m.profile_id = _profile
+       and m.role = 'player'
+       and m.status = 'active'
+       and (pp.date_of_birth is null
+            or pp.date_of_birth > (current_date - interval '18 years')));
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.is_guardian_of(_guardian uuid, _minor uuid)   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_guardian_of(_guardian uuid, _minor uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1
+      from memberships mp
+      join memberships mg on mg.player_id = mp.player_id
+     where mp.profile_id = _minor and mp.role = 'player' and mp.status = 'active'
+       and mg.profile_id = _guardian and mg.role = 'parent' and mg.status = 'active');
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.can_dm(_other uuid)   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_dm(_other uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  me uuid := auth.uid();
+  club uuid;
+  me_minor boolean;
+  other_minor boolean;
+begin
+  if me is null or _other is null or me = _other then return false; end if;
+
+  -- 1. both active in the same club
+  select m.club_id into club from memberships m
+   where m.profile_id = me and m.status = 'active' order by m.created_at limit 1;
+  if club is null then return false; end if;
+  if not exists (select 1 from memberships m where m.profile_id = _other and m.club_id = club and m.status = 'active') then
+    return false;
+  end if;
+
+  -- 4. blocks (checked early: a block beats every other arm)
+  if exists (select 1 from dm_blocks b where (b.blocker_id = me and b.blocked_id = _other)
+                                          or (b.blocker_id = _other and b.blocked_id = me)) then
+    return false;
+  end if;
+
+  me_minor := private.is_minor_profile(me);
+  other_minor := private.is_minor_profile(_other);
+
+  -- 3. minors
+  if me_minor and other_minor then return false; end if;
+  if me_minor or other_minor then
+    declare
+      minor uuid := case when me_minor then me else _other end;
+      adult uuid := case when me_minor then _other else me end;
+    begin
+      if private.is_guardian_of(adult, minor) then return true; end if;
+      -- coach or manager of a U16+ squad the minor plays in, with a guardian's opt-in
+      return exists (
+        select 1
+          from memberships pm                       -- the minor's player row
+          join players p on p.id = pm.player_id
+          join player_private pp on pp.player_id = p.id
+          join memberships sm on sm.team_id = p.team_id and sm.profile_id = adult
+                              and sm.role in ('coach','manager') and sm.status = 'active'
+         where pm.profile_id = minor and pm.role = 'player' and pm.status = 'active'
+           and pp.staff_dm_opt_in
+           and private.team_age_band(p.team_id) >= 16);
+    end;
+  end if;
+
+  -- 2. adults: a shared audience
+  if private.is_admin(club) then return true; end if;
+  if exists (select 1 from memberships m where m.profile_id = _other and m.club_id = club
+              and m.status = 'active' and m.role = 'admin') then return true; end if;
+  return exists (
+    select 1
+      from memberships a
+      join memberships b on b.team_id = a.team_id
+     where a.profile_id = me and a.status = 'active' and a.team_id is not null
+       and b.profile_id = _other and b.status = 'active');
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.in_conversation(_conversation uuid)   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.in_conversation(_conversation uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from conversations c
+                  where c.id = _conversation and (select auth.uid()) in (c.profile_a, c.profile_b));
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.conversation_other(_conversation uuid)   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.conversation_other(_conversation uuid)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select case when c.profile_a = (select auth.uid()) then c.profile_b else c.profile_a end
+    from conversations c where c.id = _conversation;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.staff_audience(_team uuid)   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.staff_audience(_team uuid)
+ RETURNS TABLE(profile_id uuid)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select distinct m.profile_id from memberships m
+   where m.team_id = _team and m.status = 'active' and m.role in ('coach','manager','medic');
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.set_report_provenance()   (23 Aug 2026 — squad chat phase 3)
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.set_report_provenance()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  new.reporter_id := auth.uid();
+  select club_id into new.club_id from messages where id = new.message_id;
+  if new.club_id is null then
+    raise exception 'no such message' using errcode = 'P0002';
+  end if;
+  new.resolved_at := null;
+  new.resolved_by := null;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.touch_report()   (23 Aug 2026 — squad chat phase 3)
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.touch_report()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  new.club_id := old.club_id; new.message_id := old.message_id;
+  new.reporter_id := old.reporter_id; new.reason := old.reason; new.created_at := old.created_at;
+  if new.resolved_at is not null and old.resolved_at is null then
+    new.resolved_by := auth.uid();
+  end if;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.guard_staff_dm_opt_in()   (23 Aug 2026 — squad chat phase 3)
+-- proacl: null
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.guard_staff_dm_opt_in()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  me uuid := auth.uid();
+  club uuid;
+begin
+  if new.staff_dm_opt_in is distinct from old.staff_dm_opt_in then
+    select p.club_id into club from players p where p.id = new.player_id;
+    if private.is_admin(club)
+       or exists (select 1 from memberships m where m.profile_id = me and m.player_id = new.player_id
+                   and m.role = 'parent' and m.status = 'active') then
+      new.staff_dm_opt_in_by := me;
+      new.staff_dm_opt_in_at := now();
+    else
+      raise exception 'only a guardian or an admin can change this' using errcode = '42501';
+    end if;
+  else
+    new.staff_dm_opt_in_by := old.staff_dm_opt_in_by;
+    new.staff_dm_opt_in_at := old.staff_dm_opt_in_at;
+  end if;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.dm_candidates()   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.dm_candidates()
+ RETURNS TABLE(profile_id uuid, full_name text, role text, via_team text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with me as (select auth.uid() as id),
+  club as (select m.club_id as id from memberships m, me
+            where m.profile_id = me.id and m.status = 'active' order by m.created_at limit 1),
+  people as (
+    select distinct m.profile_id from memberships m, club
+     where m.club_id = club.id and m.status = 'active' and m.profile_id <> (select id from me))
+  select p.profile_id, pr.full_name,
+         (select m.role from memberships m where m.profile_id = p.profile_id and m.status = 'active'
+           order by case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2
+                                when 'medic' then 3 else 9 end limit 1) as role,
+         (select t.name from memberships a join memberships b on b.team_id = a.team_id
+            join teams t on t.id = a.team_id
+           where a.profile_id = (select id from me) and b.profile_id = p.profile_id
+             and a.status = 'active' and b.status = 'active'
+           order by t.sort_order limit 1) as via_team
+    from people p join profiles pr on pr.id = p.profile_id
+   where private.can_dm(p.profile_id)
+   order by pr.full_name;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.open_conversation(_other uuid)   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.open_conversation(_other uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  me uuid := auth.uid();
+  a uuid; b uuid; conv uuid; club uuid;
+begin
+  if me is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  if not private.can_dm(_other) then
+    raise exception 'you cannot message this person' using errcode = '42501';
+  end if;
+  a := least(me, _other); b := greatest(me, _other);
+  select id into conv from conversations where profile_a = a and profile_b = b;
+  if conv is not null then return conv; end if;
+  select m.club_id into club from memberships m where m.profile_id = me and m.status = 'active' order by m.created_at limit 1;
+  insert into conversations (club_id, profile_a, profile_b, created_by) values (club, a, b, me) returning id into conv;
+  return conv;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.log_welfare_access(_conversation uuid)   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.log_welfare_access(_conversation uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  me uuid := auth.uid();
+  conv public.conversations;
+begin
+  select * into conv from conversations where id = _conversation;
+  if conv.id is null then raise exception 'no such conversation' using errcode = 'P0002'; end if;
+  if me in (conv.profile_a, conv.profile_b) then return; end if;
+  if not private.is_admin(conv.club_id) then raise exception 'not an admin' using errcode = '42501'; end if;
+  insert into welfare_access_log (club_id, admin_id, conversation_id) values (conv.club_id, me, _conversation);
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.my_conversations()   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.my_conversations()
+ RETURNS TABLE(conversation_id uuid, other_id uuid, other_name text, other_role text, last_at timestamp with time zone, last_body text, last_author_id uuid, unread boolean)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with me as (select auth.uid() as id)
+  select c.id,
+         case when c.profile_a = me.id then c.profile_b else c.profile_a end as other_id,
+         pr.full_name,
+         (select m.role from memberships m
+           where m.profile_id = (case when c.profile_a = me.id then c.profile_b else c.profile_a end)
+             and m.status = 'active'
+           order by case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2
+                                when 'medic' then 3 else 9 end limit 1),
+         c.last_at,
+         lm.body, lm.author_id,
+         (lm.id is not null and lm.author_id <> me.id
+          and not exists (select 1 from message_reads r where r.message_id = lm.id and r.profile_id = me.id))
+    from me
+    cross join conversations c
+    join profiles pr on pr.id = (case when c.profile_a = me.id then c.profile_b else c.profile_a end)
+    left join lateral (select id, body, author_id from messages x
+                        where x.conversation_id = c.id order by x.created_at desc limit 1) lm on true
+   where me.id in (c.profile_a, c.profile_b)
+   order by c.last_at desc;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.welfare_overview()   (23 Aug 2026 — squad chat phase 3)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.welfare_overview()
+ RETURNS TABLE(kind text, id uuid, label text, detail text, members bigint, last_at timestamp with time zone, open_reports bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with me as (select auth.uid() as id),
+  club as (select m.club_id as id from memberships m, me
+            where m.profile_id = me.id and m.status = 'active' order by m.created_at limit 1),
+  ok as (select private.is_admin(club.id) as yes from club)
+  select rows.kind, rows.id, rows.label, rows.detail, rows.members, rows.last_at, rows.open_reports from (
+    -- squad channels
+    select 'squad'::text as kind, t.id as id, t.name as label,
+           case when private.channel_announce_only(t.id) then 'Squad · announce-only' else 'Squad · open chat' end as detail,
+           (select count(*) from private.notice_audience(t.club_id, t.id)) as members,
+           (select max(created_at) from messages x where x.team_id = t.id and x.channel = 'squad') as last_at,
+           (select count(*) from message_reports r join messages x on x.id = r.message_id
+             where x.team_id = t.id and x.channel = 'squad' and r.resolved_at is null) as open_reports
+      from teams t, club where t.club_id = club.id
+    union all
+    -- staff channels
+    select 'staff', t.id, t.name, 'Staff',
+           (select count(*) from private.staff_audience(t.id)),
+           (select max(created_at) from messages x where x.team_id = t.id and x.channel = 'staff'),
+           (select count(*) from message_reports r join messages x on x.id = r.message_id
+             where x.team_id = t.id and x.channel = 'staff' and r.resolved_at is null)
+      from teams t, club where t.club_id = club.id
+    union all
+    -- the club channel
+    select 'club', club.id, 'Whole club', 'Club-wide · admins post',
+           (select count(distinct profile_id) from memberships m where m.club_id = club.id and m.status = 'active'),
+           (select max(created_at) from messages x where x.club_id = club.id and x.channel = 'squad' and x.team_id is null),
+           (select count(*) from message_reports r join messages x on x.id = r.message_id
+             where x.club_id = club.id and x.channel = 'squad' and x.team_id is null and r.resolved_at is null)
+      from club
+    union all
+    -- direct messages
+    select 'dm', c.id, pa.full_name || ' · ' || pb.full_name,
+           case when private.is_minor_profile(c.profile_a) or private.is_minor_profile(c.profile_b)
+                then 'Direct message · involves a minor' else 'Direct message' end,
+           2::bigint, c.last_at,
+           (select count(*) from message_reports r join messages x on x.id = r.message_id
+             where x.conversation_id = c.id and r.resolved_at is null)
+      from club
+      cross join conversations c
+      join profiles pa on pa.id = c.profile_a
+      join profiles pb on pb.id = c.profile_b
+     where c.club_id = club.id
+  ) rows, ok
+  where ok.yes
+  order by last_at desc nulls last;
 $function$
 ;
 

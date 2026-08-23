@@ -83,7 +83,8 @@ beforeEach(() => {
 })
 
 describe('portals.js', () => {
-  it('labels the four jobs from scope.js, so the naming ruling has one home', () => {
+  // Five since 23 Aug 2026: `welfare` (squad chat phase 3).
+  it('labels the five jobs from scope.js, so the naming ruling has one home', () => {
     const byKey = Object.fromEntries(PORTALS.map((p) => [p.key, portalLabel(p)]))
     expect(byKey).toEqual({
       club: 'Club Admin',
@@ -91,6 +92,7 @@ describe('portals.js', () => {
       youth: 'Club Youth Manager',
       media: 'Social Media Management',
       training: 'Rugby Performance Director',
+      welfare: 'Welfare',
     })
   })
 
@@ -142,11 +144,11 @@ describe('portals.js', () => {
 })
 
 describe('PortalChooser', () => {
-  it('renders ALL five cards for an admin with no extra rights, only one of them a link', () => {
+  it('renders ALL six cards for an admin with no extra rights, only one of them a link', () => {
     useMembershipsMock.mockReturnValue(memberships(admin([])))
     renderAt('/admin')
 
-    expect(screen.getAllByTestId(/^portal-card-/)).toHaveLength(5)
+    expect(screen.getAllByTestId(/^portal-card-/)).toHaveLength(6)
     const open = screen.getAllByTestId('portal-card-open')
     expect(open).toHaveLength(1)
     expect(open[0]).toHaveAttribute('href', '/admin/accounts')
@@ -213,7 +215,7 @@ describe('PortalChooser', () => {
     useMembershipsMock.mockReturnValue(memberships(admin([], { is_super: true })))
     renderAt('/admin')
 
-    expect(screen.getAllByTestId('portal-card-open')).toHaveLength(5)
+    expect(screen.getAllByTestId('portal-card-open')).toHaveLength(6)
     expect(screen.queryAllByTestId('portal-card-closed')).toHaveLength(0)
     expect(screen.getByRole('link', { name: /Social Media Management/ }))
       .toHaveAttribute('href', '/admin/social')

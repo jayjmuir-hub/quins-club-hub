@@ -136,13 +136,16 @@ describe('the rights vocabulary', () => {
   // three are deliberately job-shaped (claude/decisions/2026-08-12-jobs-not-people.md).
   // Jay chose the wording knowing that, so this test pins it — a later tidy-up
   // that "corrects" it to match the others is undoing a decision, not a typo.
-  it('is the four Jay named', () => {
-    expect(ADMIN_RIGHTS).toEqual(['youth', 'media', 'pitches', 'training'])
+  // Five since 23 Aug 2026: `welfare` (squad chat phase 3) gates the Welfare
+  // dashboard screen. Like the others, a screen-gate, not a data permission.
+  it('is the four Jay named, plus welfare', () => {
+    expect(ADMIN_RIGHTS).toEqual(['youth', 'media', 'pitches', 'training', 'welfare'])
     expect(ADMIN_RIGHTS.map(adminRightLabel)).toEqual([
       'Club Youth Manager',
       'Social Media Management',
       'Pitch Management',
       'Rugby Performance Director',
+      'Welfare',
     ])
   })
 })

@@ -200,7 +200,11 @@ export function isAdmin(memberships) {
 // these values (that would mean a migration per job title, for a value that
 // gates a screen and cannot do harm), so this list is the only vocabulary
 // there is. An unrecognised right matches no dashboard and is inert.
-export const ADMIN_RIGHTS = ['youth', 'media', 'pitches', 'training']
+// `welfare` (23 Aug 2026) gates the Welfare dashboard SCREEN — every channel,
+// every DM, the reports queue. It is NOT a data permission: any admin can read
+// a DM (Jay's ruling, db/migrations/20260823_squad_chat_phase3.sql). It exists
+// so one named person sees the whole picture without holding every other job.
+export const ADMIN_RIGHTS = ['youth', 'media', 'pitches', 'training', 'welfare']
 
 // Job titles for squad staff — what `memberships.title` is usually set to.
 //
@@ -256,6 +260,8 @@ const ADMIN_RIGHT_LABELS = {
   // person-shaped name too and having two shapes of refusal would be worse
   // than having two shapes of name.
   training: 'Rugby Performance Director',
+  // A job, not a person — the 12 Aug wording rule.
+  welfare: 'Welfare',
 }
 
 /** The human label for a right, or the raw value if it is one we do not know. */

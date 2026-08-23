@@ -37,7 +37,13 @@ export const NOTIFICATION_CATEGORIES = [
   {
     key: 'squad_chat',
     label: 'Squad chat',
-    hint: 'When a coach or manager posts in your squad’s chat.',
+    hint: 'When a coach or manager posts in your squad’s chat, or somebody mentions you.',
+  },
+  // Phase 3. ON by default like the rest; a person who wants quiet turns it off.
+  {
+    key: 'direct_messages',
+    label: 'Direct messages',
+    hint: 'When somebody sends you a message.',
   },
   {
     key: 'fixture',

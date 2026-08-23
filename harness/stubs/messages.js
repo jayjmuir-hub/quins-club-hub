@@ -47,3 +47,51 @@ export async function listMyMessageReads() {
 export async function messageReadStats() {
   return new Map()
 }
+
+// Phase 3 (23 Aug 2026): the staff channel, DMs, reports, welfare. Empty
+// answers, so a scenario that reaches them renders its empty state.
+export async function listStaffMessages() {
+  return []
+}
+export async function postStaffMessage() {
+  throw new Error('harness: postStaffMessage is not stubbed')
+}
+export async function listMentionablesFor() {
+  return []
+}
+export async function listDmCandidates() {
+  return []
+}
+export async function openConversation() {
+  throw new Error('harness: openConversation is not stubbed')
+}
+export async function listMyConversations() {
+  return []
+}
+export async function getConversation() {
+  return null
+}
+export async function listDirectMessages() {
+  return []
+}
+export async function sendDirectMessage() {
+  throw new Error('harness: sendDirectMessage is not stubbed')
+}
+export async function logWelfareAccess() {}
+export async function blockDm() {}
+export async function unblockDm() {}
+export async function listMyBlocks() {
+  return new Set()
+}
+export async function reportMessage() {}
+export async function listOpenReports() {
+  return []
+}
+export async function resolveReport() {}
+export async function welfareOverview() {
+  return []
+}
+export async function listWelfareAccessLog() {
+  return []
+}
+export async function setStaffDmOptIn() {}

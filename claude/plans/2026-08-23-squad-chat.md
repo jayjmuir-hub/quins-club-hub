@@ -1,6 +1,15 @@
 # Squad chat — a channel per squad that a WhatsApp group could move into
 
-**Status: PHASES 1 AND 2 SHIPPED (23 Aug 2026) — phases 3–4 not started.**
+**Status: PHASES 1, 2 AND 3 SHIPPED (23 Aug 2026) — phase 4 not started.**
+Phase 3 is `db/migrations/20260823_squad_chat_phase3.sql`, `src/screens/DirectMessages.jsx`,
+`Welfare.jsx`, `WelfareReports.jsx`, `src/components/StaffDmOptIn.jsx`, and the
+`welfare` admin right. ⚠️ **ONE RULING CHANGED BETWEEN THE PLAN AND THE CODE:
+any club admin can read a DM** (Jay, 23 Aug 2026), not only a `welfare` holder —
+the existing rights gate screens, not data (`claude/decisions/2026-08-10-role-dashboards.md`),
+and making `welfare` the first RLS-enforced right was a different decision. The
+DM notice therefore reads "Club admins can review this conversation", and the
+plan's "⚠️ Not admins" paragraph below is superseded. Everything else in the DM
+section shipped as written.
 Phase 1 is `db/migrations/20260823_squad_chat.sql`, `src/screens/Chat.jsx`,
 `src/data/messages.js`, `src/components/MessageRow.jsx`, and the sixth
 trigger shape in `supabase/functions/push-send/index.ts`. Phase 2 is
