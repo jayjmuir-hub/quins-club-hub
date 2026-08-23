@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import { Empty } from '../components/Empty.jsx'
+import FixtureCard from '../components/FixtureCard.jsx'
+import MentionPicker, { appendMention } from '../components/MentionPicker.jsx'
 import MessageRow from '../components/MessageRow.jsx'
 import Spinner from '../components/Spinner.jsx'
+import { listAvailabilityForEvents } from '../data/availability.js'
+import { listEvents } from '../data/events.js'
 import {
   getChannelSettings,
+  listMentionables,
   listMessages,
   listMyMessageReads,
   markMessagesRead,
@@ -20,6 +25,7 @@ import {
   subscribeMessages,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
+import { eventTitle } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, visibleTeams } from '../lib/scope.js'
 
@@ -35,6 +41,13 @@ import { canEditTeam, isAdmin, visibleTeams } from '../lib/scope.js'
 //
 // ⚠️ MARKED READ ON ARRIVAL, POSTS ONLY, LIKE NOTICES. "Read by 18 of 27" is
 // the strongest claim this can honestly make: it appeared in front of them.
+//
+// Phase 2 (23 Aug 2026): a post can hang off a fixture (one open thread per
+// fixture; anyone in the squad may open it, even under announce-only) and
+// carries the fixture's RSVP chips. @mentions push the mentioned.
+//   ?thread=<id>   open that thread on arrival
+//   ?event=<id>    open the fixture's thread, or prefill the composer to
+//                  start one — the event screen's "Squad chat" block
 
 export const CLUB = 'club'
 
@@ -61,8 +74,20 @@ function Picker({ teams, showClub }) {
   )
 }
 
+/** { in, maybe, out } per event id, from raw availability rows. */
+export function tallyByEvent(rows) {
+  const map = new Map()
+  for (const row of rows ?? []) {
+    const t = map.get(row.event_id) ?? { in: 0, maybe: 0, out: 0 }
+    if (t[row.status] !== undefined) t[row.status] += 1
+    map.set(row.event_id, t)
+  }
+  return map
+}
+
 export default function Chat() {
   const { teamId: param } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { memberships, teams } = useMemberships()
   const { user } = useAuth()
   const selfId = user?.id ?? null
@@ -81,9 +106,16 @@ export default function Chat() {
   const [settings, setSettings] = useState(null)
   const [error, setError] = useState(null)
   const [draft, setDraft] = useState('')
+  const [draftMentions, setDraftMentions] = useState([])
+  const [attachEventId, setAttachEventId] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState(null)
+  const [tallies, setTallies] = useState(() => new Map())
+  const [mentionables, setMentionables] = useState([])
+  const [upcoming, setUpcoming] = useState([])
   const bottomRef = useRef(null)
+  const threadParam = searchParams.get('thread')
+  const eventParam = searchParams.get('event')
 
   const load = useCallback(async () => {
     if (!param) return
@@ -97,6 +129,16 @@ export default function Chat() {
       setMessages(rows)
       setReads(mine)
       setSettings(channel)
+      // RSVP chips for every fixture thread on screen. Allowed to fail —
+      // a thread without chips is still a thread.
+      const eventIds = rows.filter((m) => m.event_id && !m.deleted_at).map((m) => m.event_id)
+      if (eventIds.length) {
+        try {
+          setTallies(tallyByEvent(await listAvailabilityForEvents(eventIds)))
+        } catch {
+          setTallies(new Map())
+        }
+      }
       // Staff-only, and allowed to fail without breaking the stream.
       if (canModerate && teamId) {
         try {
@@ -115,6 +157,30 @@ export default function Chat() {
   }, [load])
 
   useEffect(() => (param ? subscribeMessages(load) : undefined), [param, load])
+
+  // Who can be mentioned here, and which fixtures could start a thread.
+  // Both allowed to fail: the composer still works without either.
+  useEffect(() => {
+    if (!param) return
+    listMentionables(teamId).then(setMentionables).catch(() => setMentionables([]))
+    if (!teamId) return
+    const from = new Date()
+    const to = new Date(from.getTime() + 60 * 24 * 3600 * 1000)
+    listEvents({ teamIds: [teamId], from, to }).then(setUpcoming).catch(() => setUpcoming([]))
+  }, [param, teamId])
+
+  // ?event= — the event screen sent us here. If the fixture already has a
+  // thread, open it; otherwise preselect it in the composer. Consumed once.
+  useEffect(() => {
+    if (!eventParam || !messages) return
+    const existing = messages.find((m) => m.event_id === eventParam && !m.deleted_at)
+    if (existing) {
+      setSearchParams({ thread: existing.id }, { replace: true })
+    } else {
+      setAttachEventId(eventParam)
+      setSearchParams({}, { replace: true })
+    }
+  }, [eventParam, messages, setSearchParams])
 
   // Mark posts read on arrival — top-level only.
   useEffect(() => {
@@ -144,6 +210,12 @@ export default function Chat() {
   const mayPost = canModerate || (!isClub && !announceOnly)
   const title = isClub ? 'Whole club' : team?.name ?? 'Squad'
   const pinned = (messages ?? []).filter((m) => m.pinned && !m.deleted_at)
+  const threadedEventIds = new Set((messages ?? []).filter((m) => m.event_id && !m.deleted_at).map((m) => m.event_id))
+  const attachable = upcoming.filter((e) => !threadedEventIds.has(e.id))
+  const attachedEvent = attachEventId ? upcoming.find((e) => e.id === attachEventId) ?? null : null
+  // A fixture thread may be opened by anyone in the squad — the composer is
+  // unlocked for it even under announce-only.
+  const composerOpen = mayPost || Boolean(attachEventId)
 
   async function send(domEvent) {
     domEvent.preventDefault()
@@ -151,8 +223,11 @@ export default function Chat() {
     setSending(true)
     setSendError(null)
     try {
-      await postMessage(teamId, draft)
+      const kept = draftMentions.filter((m) => draft.includes(`@${m.full_name}`)).map((m) => m.profile_id)
+      await postMessage(teamId, draft, { eventId: attachEventId || null, mentions: kept })
       setDraft('')
+      setDraftMentions([])
+      setAttachEventId('')
       await load()
     } catch (err) {
       setSendError(err.message || 'Could not send that.')
@@ -161,8 +236,8 @@ export default function Chat() {
     }
   }
 
-  async function onReply(parentId, body) {
-    await replyToMessage(parentId, body)
+  async function onReply(parentId, body, opts) {
+    await replyToMessage(parentId, body, opts)
     await load()
   }
   async function onRemove(id) {
@@ -265,6 +340,9 @@ export default function Chat() {
           canModerate={canModerate}
           readStat={canModerate ? stats.get(m.id) : undefined}
           unread={!reads.has(m.id)}
+          tally={m.event_id ? tallies.get(m.event_id) : undefined}
+          mentionables={mentionables}
+          forceOpen={threadParam === m.id}
           onReply={onReply}
           onRemove={onRemove}
           onPin={onPin}
@@ -274,8 +352,43 @@ export default function Chat() {
 
       {/* ── Composer ────────────────────────────────────────────────── */}
       <div className="sticky bottom-0 -mx-1 mt-3 border-t border-line bg-surface px-1 pb-2 pt-2">
-        {mayPost ? (
+        {/* Attach a fixture: starts that fixture's thread. Offered to
+            everyone in the squad (not only staff) — the fixture's discussion
+            belongs to the squad. Only fixtures without an open thread. */}
+        {!isClub && attachable.length > 0 && (
+          <div className="mb-2 flex items-center gap-2 px-1">
+            <label htmlFor="chat-attach" className="text-[12px] font-bold text-ink-muted">
+              Fixture
+            </label>
+            <select
+              id="chat-attach"
+              value={attachEventId}
+              onChange={(e) => setAttachEventId(e.target.value)}
+              className="h-[32px] min-w-0 flex-1 rounded-[8px] border border-line bg-surface-card px-2 text-[13px] text-ink"
+            >
+              <option value="">{mayPost ? 'None — a normal post' : 'Pick a fixture to start its thread'}</option>
+              {attachable.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {eventTitle(e)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {attachedEvent && (
+          <div className="mb-2 px-1">
+            <FixtureCard event={attachedEvent} tally={tallies.get(attachedEvent.id)} />
+          </div>
+        )}
+        {composerOpen ? (
           <form onSubmit={send} className="flex items-end gap-2" data-testid="composer">
+            <MentionPicker
+              people={mentionables}
+              onPick={(p) => {
+                setDraft((d) => appendMention(d, p))
+                setDraftMentions((m) => (m.some((x) => x.profile_id === p.profile_id) ? m : [...m, p]))
+              }}
+            />
             <label className="sr-only" htmlFor="chat-draft">
               Message
             </label>
@@ -285,16 +398,17 @@ export default function Chat() {
               onChange={(e) => setDraft(e.target.value)}
               rows={1}
               maxLength={2000}
-              placeholder={`Post to ${title}`}
+              placeholder={attachedEvent ? `Start the thread for ${eventTitle(attachedEvent)}` : `Post to ${title}`}
               className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
             />
             <Button type="submit" disabled={sending || !draft.trim()}>
-              Post
+              {attachedEvent ? 'Start thread' : 'Post'}
             </Button>
           </form>
         ) : (
           <p className="px-2 py-2 text-[13px] font-semibold text-ink-muted" data-testid="composer-locked">
-            Only staff can post here — reply to a thread instead.
+            Only staff can post here — reply to a thread instead
+            {attachable.length > 0 ? ', or pick a fixture above to start its thread' : ''}.
           </p>
         )}
         {sendError && (

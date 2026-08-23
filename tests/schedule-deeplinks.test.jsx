@@ -96,3 +96,18 @@ describe('?open=add-event', () => {
     expect(screen.queryByTestId('event-form-stub')).not.toBeInTheDocument()
   })
 })
+
+// The chat's fixture card links here (squad chat phase 2, 23 Aug 2026).
+describe('?event=<id>', () => {
+  it('opens that fixture\u2019s detail sheet, then clears the param', async () => {
+    listEventsMock.mockResolvedValue([
+      { id: 'ev-9', team_id: 't-u12', type: 'match', opponent: 'ZZ Probe Eagles', home: true,
+        starts_at: '2099-08-29T05:30:00Z', ends_at: null, time_tbd: false, series_id: null },
+    ])
+    renderAt('/schedule?event=ev-9')
+    expect(await screen.findByRole('dialog')).toHaveTextContent(/ZZ Probe Eagles/)
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('search-probe').textContent).toBe('')
+    })
+  })
+})

@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Button from './Button.jsx'
+import FixtureCard from './FixtureCard.jsx'
+import MentionPicker, { appendMention } from './MentionPicker.jsx'
 import { postedLabel } from '../lib/notices.js'
 import { initials } from '../lib/playerFormat.js'
 import { labelForRole } from '../lib/scope.js'
@@ -90,7 +92,10 @@ function Reply({ reply, selfId, canModerate, onRemove }) {
  * @param canModerate  squad staff — may remove any message and pin
  * @param readStat     { reads, audience } for staff, else undefined
  * @param unread       true when the viewer has not read it yet
- * @param onReply(id, body), onRemove(id), onPin(id, pinned)
+ * @param tally        { in, maybe, out } for a fixture thread, if loaded
+ * @param mentionables people the reply composer may @mention
+ * @param forceOpen    open the thread on mount (the ?thread= deep link)
+ * @param onReply(id, body, { mentions }), onRemove(id), onPin(id, pinned)
  */
 export default function MessageRow({
   message,
@@ -98,14 +103,22 @@ export default function MessageRow({
   canModerate = false,
   readStat,
   unread = false,
+  tally,
+  mentionables = [],
+  forceOpen = false,
   onReply,
   onRemove,
   onPin,
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(forceOpen)
   const [draft, setDraft] = useState('')
+  const [mentions, setMentions] = useState([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (forceOpen) setOpen(true)
+  }, [forceOpen])
 
   const staff = isStaffRole(message.author_role)
   const mine = message.author_id === selfId
@@ -117,8 +130,12 @@ export default function MessageRow({
     setSending(true)
     setError(null)
     try {
-      await onReply(message.id, draft)
+      // Only ids whose @Name is still in the text — deleting the name
+      // un-mentions. The trigger filters to the squad regardless.
+      const kept = mentions.filter((m) => draft.includes(`@${m.full_name}`)).map((m) => m.profile_id)
+      await onReply(message.id, draft, { mentions: kept })
       setDraft('')
+      setMentions([])
     } catch (err) {
       setError(err.message || 'Could not send that.')
     } finally {
@@ -163,6 +180,12 @@ export default function MessageRow({
           </span>
         </div>
 
+        {message.event && (
+          <div className="mt-2.5">
+            <FixtureCard event={message.event} tally={tally} />
+          </div>
+        )}
+
         <div className="mt-2.5">
           <Body message={message} />
         </div>
@@ -204,6 +227,13 @@ export default function MessageRow({
             <Reply key={reply.id} reply={reply} selfId={selfId} canModerate={canModerate} onRemove={onRemove} />
           ))}
           <form onSubmit={submitReply} className="mt-2 flex items-end gap-2">
+            <MentionPicker
+              people={mentionables}
+              onPick={(p) => {
+                setDraft((d) => appendMention(d, p))
+                setMentions((m) => (m.some((x) => x.profile_id === p.profile_id) ? m : [...m, p]))
+              }}
+            />
             <label className="sr-only" htmlFor={`reply-${message.id}`}>
               Reply
             </label>

@@ -7,6 +7,7 @@ import Button from '../components/Button.jsx'
 import PitchRequest from '../components/PitchRequest.jsx'
 import SessionPlan from '../components/SessionPlan.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
+import { getEventThread } from '../data/messages.js'
 import { countSeriesFrom, deleteEvent, deleteSeriesFrom } from '../data/events.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { isMinisTeam, squadFormat } from '../lib/minis.js'
@@ -437,6 +438,39 @@ function FooterActions({ event, canEdit, onEdit, onDuplicate, onDeleted }) {
   )
 }
 
+function ChatBlock({ event, onOpenChat }) {
+  const [thread, setThread] = useState(undefined) // undefined = loading
+  useEffect(() => {
+    let mounted = true
+    setThread(undefined)
+    getEventThread(event.id)
+      .then((t) => {
+        if (mounted) setThread(t)
+      })
+      .catch(() => {
+        if (mounted) setThread(null)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [event.id])
+
+  return (
+    <div data-testid="event-chat-block">
+      <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Squad chat</h4>
+      {thread ? (
+        <Button variant="secondary" full onClick={() => onOpenChat(event)}>
+          {thread.replies === 0 ? 'Open the thread' : `${thread.replies} ${thread.replies === 1 ? 'reply' : 'replies'} · Open the thread`}
+        </Button>
+      ) : (
+        <Button variant="secondary" full onClick={() => onOpenChat(event)} disabled={thread === undefined}>
+          Start a thread
+        </Button>
+      )}
+    </div>
+  )
+}
+
 export default function EventDetail({
   event,
   team,
@@ -449,6 +483,7 @@ export default function EventDetail({
   onOpenRegister,
   onOpenMatchSheet,
   onOpenLineup,
+  onOpenChat,
 }) {
   const date = eventDate(event)
   // Null for every event created before 8 Aug 2026, and formatTimeRange
@@ -575,6 +610,17 @@ export default function EventDetail({
           <p className="whitespace-pre-line text-[14.5px] text-ink">{event.notes}</p>
         </div>
       )}
+
+      {/* ── Squad chat (phase 2, 23 Aug 2026) ─────────────────────────────
+          The fixture's thread: "N replies · Open thread", or "Start a
+          thread" when there is none. Anyone in the squad may start it — it
+          is the fixture's discussion, not an announcement — so this is NOT
+          gated on canEdit.
+          ⚠️ SAME handler-required rule as every other button in this file:
+          a screen that forgets onOpenChat gets no block rather than a dead
+          one. The handler receives the event and navigates to
+          /chat/<team>?event=<id>; the chat screen decides open-or-start. */}
+      {onOpenChat && <ChatBlock event={event} onOpenChat={onOpenChat} />}
 
       {played ? (
         <div>

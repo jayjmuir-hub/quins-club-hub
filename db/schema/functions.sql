@@ -4106,6 +4106,7 @@ $function$
 
 -- ---------------------------------------------------------------------
 -- private.set_message_provenance()   (23 Aug 2026 — squad chat)
+-- ⚠️ REPLACED by 20260823_squad_chat_phase2 (fixture threads, mentions) — md5 re-verified.
 -- proacl: null
 -- Stamps club/author/role/title; a reply inherits team/channel/event from its parent; replies are one level deep.
 -- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
@@ -4119,6 +4120,7 @@ CREATE OR REPLACE FUNCTION private.set_message_provenance()
 AS $function$
 declare
   parent public.messages;
+  ev public.events;
 begin
   new.author_id := auth.uid();
   if new.author_id is null then
@@ -4140,6 +4142,17 @@ begin
     new.channel  := parent.channel;
     new.event_id := parent.event_id;
     new.pinned   := false;
+  elsif new.event_id is not null then
+    -- A fixture thread. The fixture decides the squad; a mismatch is refused.
+    select * into ev from events where id = new.event_id;
+    if ev.id is null then
+      raise exception 'no such fixture' using errcode = 'P0002';
+    end if;
+    if new.team_id is null then
+      new.team_id := ev.team_id;
+    elsif new.team_id is distinct from ev.team_id then
+      raise exception 'that fixture belongs to another squad' using errcode = '23514';
+    end if;
   end if;
 
   -- The author's standing on this squad, best role first. A club admin with
@@ -4162,6 +4175,14 @@ begin
     raise exception 'no club for this message' using errcode = '23502';
   end if;
 
+  -- Mentions: keep only people in this channel's audience, never the author.
+  if coalesce(array_length(new.mentions, 1), 0) > 0 then
+    select coalesce(array_agg(distinct m), '{}') into new.mentions
+      from unnest(new.mentions) as m
+     where m <> new.author_id
+       and m in (select profile_id from private.notice_audience(new.club_id, new.team_id) as aud(profile_id));
+  end if;
+
   new.edited_at  := null;
   new.deleted_at := null;
   return new;
@@ -4171,6 +4192,7 @@ $function$
 
 -- ---------------------------------------------------------------------
 -- private.touch_message()   (23 Aug 2026 — squad chat)
+-- ⚠️ REPLACED by 20260823_squad_chat_phase2 (fixture threads, mentions) — md5 re-verified.
 -- proacl: null
 -- Freezes every column but body/pinned/deleted_at; soft delete blanks the body to "(removed)".
 -- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
@@ -4191,6 +4213,7 @@ begin
   new.author_id  := old.author_id;
   new.author_role  := old.author_role;
   new.author_title := old.author_title;
+  new.mentions   := old.mentions;
   new.created_at := old.created_at;
 
   if new.deleted_at is not null and old.deleted_at is null then
@@ -4211,6 +4234,7 @@ $function$
 
 -- ---------------------------------------------------------------------
 -- private.notify_message_push()   (23 Aug 2026 — squad chat)
+-- ⚠️ REPLACED by 20260823_squad_chat_phase2 (fixture threads, mentions) — md5 re-verified.
 -- proacl: null
 -- Fires on a STAFF top-level post only; queues {message_id} to push-send via net.http_post.
 -- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
@@ -4225,10 +4249,14 @@ AS $function$
 declare
   endpoint text;
   secret   text;
+  staff_post boolean;
 begin
-  if new.parent_id is not null then return null; end if;
-  if new.team_id is not null and not private.can_edit_team(new.team_id) then return null; end if;
-  if new.team_id is null and not private.is_admin(new.club_id) then return null; end if;
+  staff_post := new.parent_id is null
+    and ((new.team_id is not null and new.author_role in ('admin','coach','manager','medic'))
+         or (new.team_id is null and new.author_role = 'admin'));
+  if not staff_post and coalesce(array_length(new.mentions, 1), 0) = 0 then
+    return null;
+  end if;
 
   select decrypted_secret into endpoint from vault.decrypted_secrets where name = 'push_notify_url';
   select decrypted_secret into secret   from vault.decrypted_secrets where name = 'approval_notify_secret';
@@ -4274,6 +4302,7 @@ $function$
 
 -- ---------------------------------------------------------------------
 -- public.message_push_subscriptions(_message uuid)   (23 Aug 2026 — squad chat)
+-- ⚠️ REPLACED by 20260823_squad_chat_phase2 (fixture threads, mentions) — md5 re-verified.
 -- proacl: {postgres=X/postgres,service_role=X/postgres}
 -- The audience for one message: squad (or club) minus the author minus squad_chat opt-outs. service_role only — push-send calls it.
 -- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
@@ -4285,15 +4314,72 @@ CREATE OR REPLACE FUNCTION public.message_push_subscriptions(_message uuid)
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  with asked as (select * from messages where id = _message)
+  with asked as (select * from messages where id = _message),
+  staff_post as (
+    select a.* from asked a
+     where a.parent_id is null
+       and ((a.team_id is not null and a.author_role in ('admin','coach','manager','medic'))
+            or (a.team_id is null and a.author_role = 'admin'))
+  ),
+  people as (
+    -- the squad, for a staff top-level post …
+    select aud.profile_id
+      from staff_post a
+      cross join lateral private.notice_audience(a.club_id, a.team_id) as aud(profile_id)
+    union
+    -- … plus whoever was mentioned, by anybody (already audience-filtered).
+    select m from asked a, unnest(a.mentions) as m
+  )
   select s.id, s.endpoint, s.p256dh, s.auth
-    from asked a
-    cross join lateral private.notice_audience(a.club_id, a.team_id) as aud(profile_id)
-    join push_subscriptions s on s.profile_id = aud.profile_id
-   where aud.profile_id <> a.author_id
+    from people p
+    join push_subscriptions s on s.profile_id = p.profile_id
+    cross join asked a
+   where p.profile_id <> a.author_id
      and a.deleted_at is null
      and not exists (select 1 from notification_opt_outs o
-                      where o.profile_id = aud.profile_id and o.category = 'squad_chat');
+                      where o.profile_id = p.profile_id and o.category = 'squad_chat');
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.chat_mentionables(_team uuid)   (23 Aug 2026 — squad chat phase 2)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- Who can be @mentioned in a channel: the audience, with best role, minus the
+-- caller; rows only for somebody who can see the channel. service_role execute
+-- via default privileges. md5 verified against a rolled-back apply.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.chat_mentionables(_team uuid)
+ RETURNS TABLE(profile_id uuid, full_name text, role text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with me as (select auth.uid() as id),
+  club as (
+    select coalesce((select t.club_id from teams t where t.id = _team),
+                    (select m.club_id from memberships m, me
+                      where m.profile_id = me.id and m.status = 'active'
+                      order by m.created_at limit 1)) as id
+  ),
+  allowed as (
+    select case when _team is null
+      then exists (select 1 from memberships m, me, club
+                    where m.profile_id = me.id and m.club_id = club.id and m.status = 'active')
+      else private.can_see_team(_team) end as ok
+  )
+  select aud.profile_id, p.full_name,
+         (select m.role from memberships m
+           where m.profile_id = aud.profile_id and m.status = 'active'
+             and (m.team_id = _team or m.team_id is null)
+           order by case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2
+                                when 'medic' then 3 else 9 end
+           limit 1) as role
+    from club, allowed
+    cross join lateral private.notice_audience(club.id, _team) as aud(profile_id)
+    join profiles p on p.id = aud.profile_id
+   where allowed.ok
+     and aud.profile_id <> (select id from me)
+   order by p.full_name;
 $function$
 ;
 

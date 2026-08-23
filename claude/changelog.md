@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- 🐛 **The dock was at the TOP of every phone, iOS and Android** — live
+- 💬 **Squad chat, phase 2 — fixture threads and @mentions.** A post can
+  hang off a fixture (ONE open thread per fixture, partial unique index;
+  anyone in the squad may open it, even under announce-only — it is the
+  fixture's discussion) and carries the fixture's RSVP chips from the same
+  availability rows the Squad Hub counts. The event screen gains a "Squad
+  chat" block (*N replies · Open the thread* / *Start a thread*, handler
+  prop, both host screens pass it); `/schedule?event=<id>` opens a fixture
+  from the chat. @mentions: a picker fed by `chat_mentionables`, ids
+  filtered server-side to the squad's audience, and a mention pushes the
+  mentioned — whoever wrote it, reply or post — with a "*Name* mentioned you"
+  title from `push-send`; everything else stays quiet.
+  `db/migrations/20260823_squad_chat_phase2.sql` (+ harness 10/10 rolled back
+  against production, run on the FILE this time), `FixtureCard.jsx`,
+  `MentionPicker.jsx`, `EventDetail.jsx`. Deviation from the plan: push
+  preference stays the phase-1 boolean, not three levels.
+- `6070e4a` — 🐛 **The dock was at the TOP of every phone, iOS and Android** — live
   from #330 until this. `backdrop-filter` on an ancestor makes it the
   containing block for `position: fixed` descendants, and `<Nav>` rendered
   inside the masthead wrapper that took the glass — so "12px from the

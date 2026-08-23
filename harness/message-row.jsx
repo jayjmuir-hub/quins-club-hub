@@ -24,7 +24,28 @@ const base = {
   deleted_at: null,
 }
 
+const FIXTURE = {
+  id: 'ev-1', type: 'match', title: null, opponent: 'Dubai Eagles U12', home: false,
+  starts_at: '2026-08-29T05:30:00Z', ends_at: '2026-08-29T07:00:00Z', time_tbd: false, venue: null, pitch: null, team_id: 't2',
+}
+
 const ROWS = [
+  // Phase 2: a fixture thread, opened by a parent, carrying the RSVP chips.
+  {
+    ...base,
+    id: 'm0',
+    event_id: 'ev-1',
+    event: FIXTURE,
+    author_id: 'u-p1',
+    author_role: 'parent',
+    author_title: null,
+    body: 'Who needs a lift to Dubai on Saturday? We have two spare seats.',
+    created_at: ago(200 * MIN),
+    author: { full_name: 'Daniel Kowalczyk' },
+    replies: [
+      { ...base, id: 'r0', parent_id: 'm0', author_id: 'u-p2', author_role: 'parent', author_title: null, body: '@Daniel Kowalczyk yes please, Jonah would love one.', created_at: ago(150 * MIN), author: { full_name: 'Leo Marchetti' } },
+    ],
+  },
   {
     ...base,
     id: 'm1',
@@ -77,7 +98,15 @@ const ROWS = [
   },
 ]
 
+const TALLIES = new Map([['ev-1', { in: 19, maybe: 3, out: 2 }]])
+const PEOPLE = [
+  { profile_id: 'u-coach', full_name: 'Priya Raghunathan', role: 'manager' },
+  { profile_id: 'u-hc', full_name: 'Tom Achterberg', role: 'coach' },
+  { profile_id: 'u-p2', full_name: 'Leo Marchetti', role: 'parent' },
+]
+
 const STATS = new Map([
+  ['m0', { reads: 14, audience: 27 }],
   ['m1', { reads: 22, audience: 27 }],
   ['m4', { reads: 9, audience: 27 }],
 ])
@@ -94,6 +123,9 @@ export default function MessageRowScenario() {
           canModerate
           readStat={STATS.get(m.id)}
           unread={m.id === 'm4'}
+          tally={m.event_id ? TALLIES.get(m.event_id) : undefined}
+          mentionables={PEOPLE}
+          forceOpen={m.id === 'm0'}
           onReply={noop}
           onRemove={noop}
           onPin={noop}
