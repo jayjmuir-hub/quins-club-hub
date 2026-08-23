@@ -217,7 +217,7 @@ as $function$
       join profiles pa on pa.id = c.profile_a
       join profiles pb on pb.id = c.profile_b
      where c.club_id = club.id
-       and private.conversation_reviewable(c.id)   -- 23 Aug: adults-only DMs are not listed unless reported
+       and private.conversation_reviewable(c.id)
   ) rows, ok
   where ok.yes
   order by last_at desc nulls last;
