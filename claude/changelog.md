@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **Accounts list shows which admin rights each admin holds** — the row read
+- 📐 **Plan: squad chat** (`claude/plans/2026-08-23-squad-chat.md`, NOT
+  SHIPPED) — a channel per squad that a WhatsApp group could move into:
+  announce-only by default, fixture threads with RSVP chips, a staff channel,
+  a welfare view, and DMs. DMs were refused in the first draft and put back on
+  Jay's word the same day, with the line redrawn at the fact that children do
+  not hold accounts: parent ↔ parent within a squad, and a U16+ player only
+  by their squad's coach or manager once a guardian has opted in. Step zero
+  is proving push on a real phone that is not Jay's.
+- `7243678` — **Accounts list shows which admin rights each admin holds** — the row read
   "Admin" for a super admin and for somebody holding one specialist dashboard
   alike. It now reads `Admin · Rugby Performance Director` (every held right,
   comma-separated) or `Admin · Super admin`. `src/screens/Accounts.jsx`, two
