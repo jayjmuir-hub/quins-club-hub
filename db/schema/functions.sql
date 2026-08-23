@@ -4938,6 +4938,32 @@ $function$
 ;
 
 -- ---------------------------------------------------------------------
+-- public.storage_usage()   (23 Aug 2026)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- Captured from pg_get_functiondef; md5 c778fa39b0708d995e65a2a4fc6653f2
+-- verified against LIVE after the apply. db/migrations/20260823_storage_usage.sql.
+-- Admin-only readout of database size and bytes per bucket, for the Club tab.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.storage_usage()
+ RETURNS TABLE(kind text, label text, bytes bigint, objects bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select 'database'::text, current_database()::text,
+         pg_database_size(current_database()), null::bigint
+  where private.is_admin_anywhere()
+  union all
+  select 'bucket'::text, o.bucket_id::text,
+         coalesce(sum((o.metadata->>'size')::bigint), 0), count(*)
+    from storage.objects o
+   where private.is_admin_anywhere()
+   group by o.bucket_id
+   order by 1, 2
+$function$
+;
+
+-- ---------------------------------------------------------------------
 -- public.register_push_subscription(text, text, text)   (23 Aug 2026)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
 -- Captured from pg_get_functiondef inside a rolled-back transaction BEFORE
