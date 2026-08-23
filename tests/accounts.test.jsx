@@ -413,6 +413,33 @@ function submitAccess(user, submitLabel, label) {
   return user.click(within(builderFor(label)).getByRole('button', { name: `${submitLabel} for ${label}` }))
 }
 
+describe('Accounts — admin rights on the row', () => {
+  // "Admin" alone looked identical for a super admin and for somebody holding
+  // one specialist dashboard. Jay, 23 Aug 2026: show which rights on the row.
+  it('lists the specific rights an ordinary admin holds', async () => {
+    listClubMembersMock.mockResolvedValue([
+      JAY_ADMIN,
+      {
+        ...JAY_ADMIN,
+        id: 'mem-rights',
+        profile_id: 'prof-rights',
+        admin_rights: ['pitches'],
+        profiles: { full_name: 'Tomas Vexley', email: 'tomas@example.com' },
+      },
+    ])
+    setup()
+    const summaries = await screen.findAllByTestId('account-summary')
+    expect(summaries.map((node) => node.textContent)).toContain('Admin · Pitch Management')
+  })
+
+  it('says Super admin rather than listing every right', async () => {
+    listClubMembersMock.mockResolvedValue([{ ...JAY_ADMIN, is_super: true }])
+    setup()
+    const summaries = await screen.findAllByTestId('account-summary')
+    expect(summaries.map((node) => node.textContent)).toContain('Admin · Super admin')
+  })
+})
+
 describe('Accounts — authorisation gate', () => {
   it('renders the screen for an admin', async () => {
     setup()
