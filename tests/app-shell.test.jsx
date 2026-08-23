@@ -484,6 +484,54 @@ describe('AppShell — Admin nav gating (admin-dashboard plan, 2026-08-05)', () 
 
 // Added 6 Aug 2026. Before this the only route to your own account was
 // knowing that "More" contained it.
+// Jay, 23 Aug 2026: "shouldn't clicking on the quins logo always take you to
+// the top of the screen?" Two things in one click: a link to / for every other
+// screen, and a scroll to the top for Home itself, where a Link to the current
+// route does nothing visible.
+describe('AppShell — the crest', () => {
+  it('is a link home that also scrolls the window to the top', async () => {
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue(loaded())
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+
+    renderShell('/roster')
+
+    // Two crests — the masthead's (phone) and the sidebar's (desktop) — and
+    // both make the same promise.
+    const crests = screen.getAllByTestId('crest-home')
+    expect(crests).toHaveLength(2)
+    for (const crest of crests) {
+      expect(crest).toHaveAttribute('href', '/')
+      // Not called "Home" — the nav already has a link by that name in BOTH
+      // navs and two more would make four identical targets for a screen reader.
+      expect(crest).toHaveAccessibleName(/Abu Dhabi Harlequins/)
+      await user.click(crest)
+    }
+    expect(scrollTo).toHaveBeenCalledTimes(2)
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }))
+    scrollTo.mockRestore()
+  })
+
+  // ⚠️ The role cell is the design-system role tag (§4.20) — the same Badge
+  // the Accounts screen draws beside a name, keyed by ROLE so an admin is
+  // maroon and a parent amber. Until 23 Aug 2026 the masthead drew its own
+  // translucent red ring for every role, which Jay said "doesn't seem to match
+  // our style". This pins the tone, not the hex: jsdom applies no CSS.
+  it('draws the role as the Badge for that role, on both copies', () => {
+    useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'parent', team_id: 't1' }] }))
+
+    renderShell()
+
+    for (const id of ['role-label-mobile', 'role-label-desktop']) {
+      const tag = screen.getByTestId(id)
+      expect(tag).toHaveTextContent('Parent')
+      expect(hasClassToken(tag, 'bg-warn-bg')).toBe(true)
+      expect(hasClassToken(tag, 'rounded-[6px]')).toBe(true)
+      expect(hasClassToken(tag, 'rounded-pill')).toBe(false)
+    }
+  })
+})
+
 describe('AppShell — the account menu', () => {
   // ══ 23 Aug 2026: A MENU, NOT A LINK ═══════════════════════════════════════
   // The 6 Aug note in AppShell said "if /more grows, this becomes the menu".

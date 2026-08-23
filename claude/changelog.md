@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- 💬 **Squad chat, phase 1** — a channel per squad (and one for the club):
+- **Masthead polish: the crest goes home, the initial is an avatar, the role
+  is the Badge** — Jay, after the account menu landed: the crest should "always
+  take you to the top of the screen", the J was "sort of bland", and the role
+  cell "doesn't seem to match our style". The crest (mobile masthead and
+  desktop sidebar) is a link to `/` that also scrolls to the top. The initial
+  is the app's own avatar — brand gradient disc, hairline ring, chevron — and
+  `z-[1]`, because the `harlequin::after` diagonal was painting over it on
+  desktop. The role cell is `Badge` keyed by role (maroon admin, amber parent,
+  blue staff; design-system §4.20), via a new `highestRole()` in
+  `src/lib/scope.js`; `Badge` now forwards rest props.
+- `255c2ba` — 💬 **Squad chat, phase 1** — a channel per squad (and one for the club):
   `/chat` on the phone's tab bar for everyone, `Chat` under the Squad Hub's
   sidebar section for staff. Announce-only by DEFAULT (staff post, families
   reply in threads; staff can switch it off, recorded who and when), pinned

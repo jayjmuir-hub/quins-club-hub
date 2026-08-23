@@ -397,11 +397,20 @@ export function canEditTeam(memberships, teamId) {
  * user).
  */
 export function roleLabel(memberships) {
-  if (!memberships || memberships.length === 0) return 'No access yet'
-
-  const rolesHeld = new Set(memberships.map((m) => m.role))
-  const highest = ROLE_PRECEDENCE.find((role) => rolesHeld.has(role))
+  const highest = highestRole(memberships)
   return highest ? ROLE_LABELS[highest] : 'No access yet'
+}
+
+/**
+ * The KEY behind roleLabel — 'admin', 'coach', … — or null when there is no
+ * membership. Split out on 23 Aug 2026 so the masthead can pick a Badge tone
+ * (Badge is keyed by role, not by label) without a label-to-key map that would
+ * be a second copy of ROLE_LABELS in reverse.
+ */
+export function highestRole(memberships) {
+  if (!memberships || memberships.length === 0) return null
+  const rolesHeld = new Set(memberships.map((m) => m.role))
+  return ROLE_PRECEDENCE.find((role) => rolesHeld.has(role)) ?? null
 }
 
 /**

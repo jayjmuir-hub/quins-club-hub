@@ -157,7 +157,6 @@ describe('View as, reached through the account menu', () => {
     expect(header.querySelector('[data-testid="view-as-trigger"]')).toBeNull()
     const account = screen.getByTestId('account-button')
     expect(hasClassToken(account, 'h-9')).toBe(true)
-    expect(hasClassToken(account, 'w-9')).toBe(true)
     expect(hasClassToken(account, 'shrink-0')).toBe(true)
     expect(account.textContent).not.toMatch(/coach|parent|u12|boys/i)
   })
@@ -209,7 +208,9 @@ describe('View as, reached through the account menu', () => {
     renderShell(ctx({ viewAs: { role: 'coach', teamId: 't1' }, memberships: synthetic('coach', 't1') }))
 
     const account = screen.getByTestId('account-button')
-    expect(hasClassToken(account, 'ring-1')).toBe(true)
+    // The ring is on the avatar disc inside the button, in the brand colour
+    // while previewing and a faint white otherwise.
+    expect(account.querySelector('.ring-brand-onDark')).not.toBeNull()
 
     await user.click(account)
     expect(screen.getByTestId('view-as-trigger')).toHaveTextContent(/on/i)
@@ -220,7 +221,7 @@ describe('View as, reached through the account menu', () => {
     renderShell(ctx())
 
     const account = screen.getByTestId('account-button')
-    expect(hasClassToken(account, 'ring-1')).toBe(false)
+    expect(account.querySelector('.ring-brand-onDark')).toBeNull()
     await user.click(account)
     expect(screen.getByTestId('view-as-trigger')).toHaveTextContent(/^View as$/)
   })

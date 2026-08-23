@@ -45,7 +45,7 @@ const TONES = {
 
 const NEUTRAL_TONE = 'bg-surface-mute text-ink-muted'
 
-export function Badge({ tone, children, className = '' }) {
+export function Badge({ tone, children, className = '', ...rest }) {
   const toneClasses = TONES[tone] ?? NEUTRAL_TONE
 
   const classes = [
@@ -64,7 +64,11 @@ export function Badge({ tone, children, className = '' }) {
     .filter(Boolean)
     .join(' ')
 
-  return <span className={classes}>{children}</span>
+  return (
+    <span className={classes} {...rest}>
+      {children}
+    </span>
+  )
 }
 
 export default Badge
