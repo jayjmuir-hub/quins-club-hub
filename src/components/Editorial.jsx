@@ -27,7 +27,7 @@ export function Kicker({ children, className = '' }) {
 /**
  * The page headline: bold ink, with `accent` as the one Playfair-italic
  * crimson word — full stop included, exactly as the portal writes it
- * ("Club life, *calendared.*"). `lead` carries any comma or space it needs.
+ * ("What's on, *when.*"). `lead` carries any comma or space it needs.
  */
 export function AccentTitle({ lead, accent, as: Tag = 'h2', className = '' }) {
   return (

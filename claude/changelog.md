@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- 🐛 **DMs no longer leak into Whole-club chat.** The club channel listed
+- **Four from Jay's desktop look** — the masthead island shrink-wraps to a
+  compact pill at the top-right on desktop (the sidebar holds the crest and
+  name, so a full-width island held three things on the right and looked
+  empty); Schedule's heading is "What's on, *when.*" (was "Club life,
+  calendared."); Notices is "Club *notices.*" (was "From the committee." —
+  coaches and managers post most of them); and the privacy policy is
+  rewritten minimal (`src/screens/Privacy.jsx`) — one short paragraph per
+  topic, keeping the four pinned facts (Tokyo, a child never signs in, squad
+  members see each other, the delete link) and now truthful about Sentry
+  error reports, push notifications and chat, which the 7 Aug text predated.
+- `79a3d31` — 🐛 **DMs no longer leak into Whole-club chat.** The club channel listed
   every message with no squad — and a DM has no squad either — so a member's
   own private messages appeared in the club feed with no recipient shown.
   Jay saw it on the live site. One filter (`channel = 'squad'`) in
