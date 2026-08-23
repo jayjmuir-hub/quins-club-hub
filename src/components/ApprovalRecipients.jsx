@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Card from './Card.jsx'
 import Spinner from './Spinner.jsx'
 import { listApprovalRecipients, setNotifyApprovals } from '../data/staff.js'
+import { labelForRole } from '../lib/scope.js'
 
 // "Who is emailed when somebody is waiting to be approved" — the Club admin
 // tab, 23 Aug 2026. Jay: the only lever he could find was the head-coach
@@ -78,7 +79,7 @@ export default function ApprovalRecipients() {
               <li key={r.membership_id} className="flex items-center justify-between gap-3 py-1.5" data-testid="recipient-row">
                 <span className="min-w-0">
                   <span className="block truncate text-[13.5px] font-semibold text-ink">{r.full_name}</span>
-                  {r.role !== 'admin' && <span className="block text-[11.5px] text-ink-faint">{r.role === 'coach' ? 'Coach' : 'Team Manager'}</span>}
+                  {r.role !== 'admin' && <span className="block text-[11.5px] text-ink-faint">{labelForRole(r.role) ?? r.role}</span>}
                 </span>
                 <button
                   type="button"
