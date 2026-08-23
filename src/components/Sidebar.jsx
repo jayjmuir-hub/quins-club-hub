@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { countAdminWaiting } from '../data/members.js'
+import { useAuth } from '../lib/auth.jsx'
 import { NAV_ITEMS, SquadIcon } from './Nav.jsx'
 import crest from '../assets/crest.png'
 
@@ -62,6 +63,7 @@ function itemClassName({ isActive }) {
 
 export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
   const location = useLocation()
+  const { user } = useAuth()
 
   // The Admin item's badge: how many approvals and access requests are
   // waiting (22 Aug 2026, Jay — "the number an admin opens the app for").
@@ -71,7 +73,7 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
   useEffect(() => {
     if (!showAdmin) return undefined
     let mounted = true
-    countAdminWaiting()
+    countAdminWaiting(user?.id)
       .then((count) => {
         if (mounted) setAdminWaiting(count)
       })
@@ -79,7 +81,7 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
     return () => {
       mounted = false
     }
-  }, [showAdmin])
+  }, [showAdmin, user?.id])
 
   // Sub-menus (22 Aug 2026, Jay). Only the ACTIVE section expands — a
   // coach-admin's sidebar with every section open would be a wall — and every
