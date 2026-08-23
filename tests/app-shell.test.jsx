@@ -193,7 +193,7 @@ describe('AppShell', () => {
 
     renderShell()
 
-    const tagline = screen.getByText('Quins Club Hub').parentElement
+    const tagline = screen.getByText('Quins Club Hub')
     // Retheme: the tagline no longer steps 11.5px -> 12px across the
     // breakpoint. It is Barlow Condensed at a single 13px, which reads at the
     // same optical size as the old 11.5px Barlow (condensed faces need more
@@ -484,15 +484,25 @@ describe('AppShell — Admin nav gating (admin-dashboard plan, 2026-08-05)', () 
 
 // Added 6 Aug 2026. Before this the only route to your own account was
 // knowing that "More" contained it.
-describe('AppShell — my account button', () => {
-  it('points at /more', async () => {
+describe('AppShell — the account menu', () => {
+  // ══ 23 Aug 2026: A MENU, NOT A LINK ═══════════════════════════════════════
+  // The 6 Aug note in AppShell said "if /more grows, this becomes the menu".
+  // It became one for a different reason: the masthead row had been fixed for
+  // overflow five times in sixteen days, and Jay asked for the controls beside
+  // the initial to go behind it — "tap the J and have a drop down". My account
+  // is the first item; the link to /more is still there, one tap further in.
+  it('opens a menu whose first item points at /more', async () => {
+    const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(loaded())
     getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
 
     renderShell()
 
-    const link = await screen.findByTestId('account-button')
-    expect(link).toHaveAttribute('href', '/more')
+    const trigger = await screen.findByTestId('account-button')
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(screen.queryByTestId('account-menu')).not.toBeInTheDocument()
+    await user.click(trigger)
+    expect(screen.getByRole('menuitem', { name: 'My account' })).toHaveAttribute('href', '/more')
   })
 
   it('names the person for a screen reader', async () => {
@@ -501,19 +511,19 @@ describe('AppShell — my account button', () => {
 
     renderShell()
 
-    expect(await screen.findByRole('link', { name: 'My account, Jay' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Account menu, Jay' })).toBeInTheDocument()
   })
 
-  it('still says My account when there is no name', async () => {
+  it('still says Account menu when there is no name', async () => {
     // ⚠️ A magic-link sign-in has no name until NamePrompt is answered, and
-    // NamePrompt is skippable. An aria-label of "My account, " would be worse
-    // than useless.
+    // NamePrompt is skippable. An aria-label of "Account menu, " would be
+    // worse than useless.
     useMembershipsMock.mockReturnValue(loaded())
     getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: null })
 
     renderShell()
 
-    expect(await screen.findByRole('link', { name: 'My account' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Account menu' })).toBeInTheDocument()
   })
 
   it('falls back to the email initial when there is no name', async () => {
@@ -527,24 +537,24 @@ describe('AppShell — my account button', () => {
     expect(link.textContent).toContain('J')
   })
 
-  it('shows the name only at the WIDE breakpoint, not merely desktop', async () => {
-    // ⚠️ REGRESSION TEST. Shipped as `desktop:inline` (820px) and it truncated
-    // the club name to "ABU DHABI HARLE…" at ~1114px on production. jsdom
-    // applies no real CSS, so no test could have caught the overflow itself —
-    // this pins the breakpoint token that was wrong instead.
-    //
-    // `desktop:inline` must be ABSENT, not just `wide:inline` present:
-    // asserting only the latter would still pass if both were applied.
+  it('keeps the first name OUT of the masthead row and puts it in the menu header', async () => {
+    // ⚠️ REGRESSION TEST, AND THE RULE IT PINS HAS TIGHTENED. The name used to
+    // sit beside the initial at `wide` (and before that at `desktop`, which
+    // truncated the club name to "ABU DHABI HARLE…" at ~1114px on production).
+    // Since 23 Aug 2026 it is not in the row at ANY width: the row holds the
+    // initial alone, and the name is the header line of the menu it opens.
+    // jsdom applies no CSS, so this pins structure — the name is not a
+    // descendant of <header>, and it IS the first line of the menu.
+    const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(loaded())
     getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
 
     renderShell()
 
-    const link = await screen.findByTestId('account-button')
-    const nameEl = within(link).getByText('Jay')
-    expect(hasClassToken(nameEl, 'hidden')).toBe(true)
-    expect(hasClassToken(nameEl, 'wide:inline')).toBe(true)
-    expect(hasClassToken(nameEl, 'desktop:inline')).toBe(false)
+    const trigger = await screen.findByTestId('account-button')
+    expect(within(document.querySelector('header')).queryByText('Jay')).toBeNull()
+    await user.click(trigger)
+    expect(screen.getByTestId('account-menu-name')).toHaveTextContent('Jay')
   })
 
   // ⚠️ THE SAME BUG, ONE LEVEL UP, AND WORSE THAN THE NOTE ABOVE RECORDED.
@@ -620,16 +630,18 @@ describe('AppShell — the masthead subtitle is ONE line', () => {
     expect(hasClassToken(subtitle, 'flex')).toBe(false)
   })
 
-  it('reads as one line of text, wordmark then role', () => {
+  it('carries the wordmark alone — the role is no longer on its line', () => {
+    // ⚠️ 23 Aug 2026. This used to assert "Quins Club Hub · Parent" on one
+    // ellipsised line, and on a phone the ellipsis ate the role ("QUINS CLUB
+    // HUB · …" in Jay's screenshot). The two are separate elements now, so the
+    // wordmark can never be squeezed by the role, and vice versa.
     useMembershipsMock.mockReturnValue(loaded({ memberships: [{ role: 'parent', team_id: 't1' }] }))
 
     renderShell()
 
     const subtitle = screen.getByText('Quins Club Hub').closest('p')
-    // The separator moved inside the role span when the flex `gap-1` went, so
-    // this also guards against losing the spaces around it and rendering
-    // "Quins Club Hub·Parent".
-    expect(subtitle.textContent).toBe('Quins Club Hub · Parent')
+    expect(subtitle.textContent.trim()).toBe('Quins Club Hub')
+    expect(subtitle.contains(screen.getByTestId('role-label-mobile'))).toBe(false)
   })
 
   it('still carries the mobile role label, still hidden only at the desktop breakpoint', () => {
@@ -665,15 +677,15 @@ describe('AppShell — the masthead subtitle is ONE line', () => {
 // layout. What it CAN pin is the three structural facts the overlap theory
 // turned on, which is what these do.
 describe('AppShell — the account button on a route that is not home', () => {
-  it('renders and points at /more from /roster, exactly as it does from /', async () => {
+  it('renders the same menu trigger from /roster as from /', async () => {
     useMembershipsMock.mockReturnValue(loaded())
     getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
 
     renderShell('/roster')
 
-    const link = await screen.findByTestId('account-button')
-    expect(link).toHaveAttribute('href', '/more')
-    expect(link).toHaveAccessibleName('My account, Jay')
+    const trigger = await screen.findByTestId('account-button')
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(trigger).toHaveAccessibleName('Account menu, Jay')
   })
 
   it('renders an IDENTICAL account button on /roster and on /', async () => {
@@ -685,12 +697,12 @@ describe('AppShell — the account button on a route that is not home', () => {
     getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
 
     const home = renderShell('/')
-    await screen.findByRole('link', { name: 'My account, Jay' })
+    await screen.findByRole('button', { name: 'Account menu, Jay' })
     const fromHome = home.container.querySelector('[data-testid="account-button"]').outerHTML
     home.unmount()
 
     const roster = renderShell('/roster')
-    await screen.findByRole('link', { name: 'My account, Jay' })
+    await screen.findByRole('button', { name: 'Account menu, Jay' })
     const fromRoster = roster.container.querySelector('[data-testid="account-button"]').outerHTML
 
     expect(fromRoster).toBe(fromHome)
