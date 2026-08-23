@@ -51,8 +51,11 @@ describe('Nav', () => {
 
     const squadHub = screen.getByRole('link', { name: 'Squad Hub' })
     expect(squadHub).toHaveAttribute('href', '/squad')
+    // ⚠️ The tab PRINTS "Squad" — six condensed-caps labels at 360px gave
+    // "SQUAD HUB" 56px and it needed 61 (Jay's Android screenshot, 23 Aug
+    // 2026). The accessible name is still "Squad Hub", asserted above.
     const labels = [...document.querySelectorAll('nav a span')].map((el) => el.textContent)
-    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Chat', 'Squad Hub', 'More'])
+    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Chat', 'Squad', 'More'])
     // ⚠️ A REAL CLASS NAME. `grid-cols-${n}` would not be in the CSS bundle.
     expect(document.querySelector('nav')).toHaveClass('grid-cols-6')
   })
