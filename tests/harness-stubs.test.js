@@ -30,6 +30,7 @@ const ALIASES = [
   // The Squad Hub pair, added 21 Aug 2026 with the dark-mode repro scenario.
   ['harness/stubs/attendance.js', 'src/data/attendance.js'],
   ['harness/stubs/announcements.js', 'src/data/announcements.js'],
+  ['harness/stubs/messages.js', 'src/data/messages.js'],
   ['harness/stubs/auth.jsx', 'src/lib/auth.jsx'],
   // auth.jsx is aliased TWICE, from two different specifier texts — these
   // rules match the import string, not the resolved file, so '../lib/auth.jsx'

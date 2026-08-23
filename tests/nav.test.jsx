@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import Nav, { NAV_ITEMS } from '../src/components/Nav.jsx'
@@ -84,12 +84,52 @@ describe('Nav', () => {
     const gliders = document.querySelectorAll('[data-testid="dock-glider"]')
     expect(gliders).toHaveLength(1)
     expect(gliders[0]).toHaveAttribute('aria-hidden', 'true')
-    expect(gliders[0].className).toMatch(/animate-dock-bloom/)
-    expect(gliders[0].className).toMatch(/motion-reduce:animate-none/)
+    // The bloom is on the pill INSIDE the glider; the halo sits behind it.
+    const pill = gliders[0].querySelector('.animate-dock-bloom')
+    expect(pill).not.toBeNull()
+    expect(pill.className).toMatch(/motion-reduce:animate-none/)
+    expect(gliders[0].querySelector('.blur-xl')).not.toBeNull()
     // Decorative: no link carries the gradient any more.
     for (const link of document.querySelectorAll('nav a')) {
       expect(link.className).not.toMatch(/linear-gradient/)
     }
+  })
+
+  // Status dots (23 Aug 2026): a red dot on a tab with something new, and
+  // the word "new" in its accessible name so the dot is never the only
+  // signal. Never on the ACTIVE tab — you are looking at it.
+  it('shows a dot and says "new" for a badged tab, but not on the active one', () => {
+    renderNav('/', { badges: { '/chat': true, '/more': true } })
+
+    expect(screen.getByRole('link', { name: 'Chat, new' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'More, new' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
+    expect(document.querySelectorAll('[data-testid="dock-dot"]')).toHaveLength(2)
+
+    cleanup()
+    renderNav('/chat', { badges: { '/chat': true } })
+    // Active: the name still says new (it is true) but no dot is drawn.
+    expect(document.querySelectorAll('[data-testid="dock-dot"]')).toHaveLength(0)
+  })
+
+  // Auto-hide: scrolling down past 80px slides the dock away; scrolling up
+  // brings it back. jsdom has no layout, so scrollY is stubbed and the
+  // scroll event fired by hand; the assertion is the data-hidden attribute.
+  it('hides on a downward scroll and returns on an upward one', async () => {
+    renderNav('/')
+    const nav = document.querySelector('nav')
+    const scrollTo = (y) => {
+      Object.defineProperty(window, 'scrollY', { value: y, configurable: true })
+      window.dispatchEvent(new Event('scroll'))
+      return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+    }
+    Object.defineProperty(document.documentElement, 'scrollHeight', { value: 3000, configurable: true })
+
+    await scrollTo(100)
+    await scrollTo(200)
+    await waitFor(() => expect(nav).toHaveAttribute('data-hidden', 'true'))
+    await scrollTo(150)
+    await waitFor(() => expect(nav).not.toHaveAttribute('data-hidden'))
   })
 
   it('marks Home active with aria-current="page" at the root route', () => {

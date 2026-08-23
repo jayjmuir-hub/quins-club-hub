@@ -11,6 +11,7 @@ vi.mock('../src/lib/supabase.js', () => ({
 
 import { supabase } from '../src/lib/supabase.js'
 import {
+  countUnreadMessages,
   getChannelSettings,
   getEventThread,
   listMentionables,
@@ -27,7 +28,7 @@ import {
 function builder(result) {
   const calls = {}
   const b = {}
-  for (const name of ['select', 'is', 'eq', 'in', 'order', 'limit', 'insert', 'update', 'upsert', 'single', 'maybeSingle']) {
+  for (const name of ['select', 'is', 'eq', 'neq', 'gte', 'in', 'order', 'limit', 'insert', 'update', 'upsert', 'single', 'maybeSingle']) {
     b[name] = vi.fn((...args) => {
       ;(calls[name] ??= []).push(args)
       return b
@@ -222,6 +223,34 @@ describe('read receipts', () => {
   it('messageReadStats for the club channel returns empty without a call', async () => {
     expect((await messageReadStats(null)).size).toBe(0)
     expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+})
+
+describe('countUnreadMessages', () => {
+  // The dock's Chat dot: recent head posts by OTHER people, minus my reads.
+  it('counts recent head posts not by me that I have not read', async () => {
+    const posts = builder({ data: [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }], error: null })
+    const reads = builder({ data: [{ message_id: 'p2' }], error: null })
+    supabase.from.mockImplementation((table) => (table === 'messages' ? posts.b : reads.b))
+
+    expect(await countUnreadMessages('me')).toBe(2)
+
+    expect(posts.calls.is).toEqual([['parent_id', null], ['deleted_at', null]])
+    expect(posts.calls.neq[0]).toEqual(['author_id', 'me'])
+    // Bounded to a recent window, on purpose — see the function's note.
+    expect(posts.calls.gte[0][0]).toBe('created_at')
+  })
+
+  it('returns 0 without a query when there is no signed-in profile', async () => {
+    expect(await countUnreadMessages(null)).toBe(0)
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('throws when a read fails, rather than inventing a number', async () => {
+    const posts = builder({ data: null, error: new Error('nope') })
+    const reads = builder({ data: [], error: null })
+    supabase.from.mockImplementation((table) => (table === 'messages' ? posts.b : reads.b))
+    await expect(countUnreadMessages('me')).rejects.toThrow('nope')
   })
 })
 
