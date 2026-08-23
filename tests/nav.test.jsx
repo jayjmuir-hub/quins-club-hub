@@ -43,7 +43,7 @@ describe('Nav', () => {
     renderNav()
 
     expect(screen.queryByRole('link', { name: 'Squad Hub' })).not.toBeInTheDocument()
-    expect(document.querySelector('nav')).toHaveClass('grid-cols-5')
+    expect(document.querySelectorAll('nav a')).toHaveLength(5)
   })
 
   it('shows Squad Hub between Chat and More when showSquadHub is set, in a 6-column grid', () => {
@@ -51,13 +51,28 @@ describe('Nav', () => {
 
     const squadHub = screen.getByRole('link', { name: 'Squad Hub' })
     expect(squadHub).toHaveAttribute('href', '/squad')
-    // ⚠️ The tab PRINTS "Squad" — six condensed-caps labels at 360px gave
-    // "SQUAD HUB" 56px and it needed 61 (Jay's Android screenshot, 23 Aug
-    // 2026). The accessible name is still "Squad Hub", asserted above.
+    // Design "A" (23 Aug 2026): icons only, the active tab's label slides
+    // open beside it. So every label is in the DOM in full — "Squad Hub",
+    // not the "Squad" abbreviation the six-up grid briefly needed — and the
+    // bar is a flex row, not a column grid.
     const labels = [...document.querySelectorAll('nav a span')].map((el) => el.textContent)
-    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Chat', 'Squad', 'More'])
-    // ⚠️ A REAL CLASS NAME. `grid-cols-${n}` would not be in the CSS bundle.
-    expect(document.querySelector('nav')).toHaveClass('grid-cols-6')
+    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Chat', 'Squad Hub', 'More'])
+    expect(document.querySelectorAll('nav a')).toHaveLength(6)
+  })
+
+  // Design "A": only the ACTIVE tab shows its label. The others keep the text
+  // in the DOM (screen readers, and the slide-open animation) but collapsed
+  // to zero width and invisible.
+  it('shows only the active tab label; the rest are collapsed', () => {
+    renderNav('/roster')
+
+    const labels = [...document.querySelectorAll('nav a span')]
+    const open = labels.filter((el) => el.className.includes('max-w-[96px]'))
+    const shut = labels.filter((el) => el.className.includes('max-w-0') && el.className.includes('opacity-0'))
+    expect(open.map((el) => el.textContent)).toEqual(['Roster'])
+    expect(shut).toHaveLength(labels.length - 1)
+    // And every link is still named in full for assistive tech.
+    expect(screen.getByRole('link', { name: 'Schedule' })).toBeInTheDocument()
   })
 
   it('marks Home active with aria-current="page" at the root route', () => {

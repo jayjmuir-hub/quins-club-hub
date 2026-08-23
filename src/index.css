@@ -346,14 +346,14 @@
      holds: the material is DARK, so the brightest thing that can ever sit
      behind it is pure white, and the composite has a known ceiling.
 
-     ⚠️ 68%, NOT 82% — Jay, 23 Aug 2026: "it isn't very glassy looking". At
-     82% it was barely see-through. At 68% over white the composite is
-     rgb(88,88,88) by arithmetic, and that is the number every piece of text
-     on these bars is checked against: white is 7.1:1, white/85 (the idle tab
-     label, Nav.jsx) is 5.0:1, both AA. chrome-muted (139,144,153) would be
-     2.2:1 on it and is NO LONGER USED ON THE BARS — lowering the opacity
-     without lifting the idle labels is exactly the bug the old ruling was
-     about. The blur is what keeps the composite flat: without it a bright
+     ⚠️ 80% — it went 82 → 68 ("isn't very glassy") → 80 ("very bland") on
+     23 Aug 2026. At 68% over pale paper the blur resolves to a flat mid-grey
+     and the chrome loses its black; what reads as glass is not the
+     transparency but the DEPTH — the inset highlight below and the dock's
+     border and shadow. At 80% over white the composite is rgb(59,59,59):
+     white is 10.2:1, white/80 is 6.8:1. chrome-muted (139,144,153) would be
+     3.3:1 and is NO LONGER USED ON THE BARS — lowering the opacity without
+     lifting the idle tints is exactly the bug the old ruling was about. The blur is what keeps the composite flat: without it a bright
      card edge scrolling past would show as a stripe through a label.
 
      (A note here once said headless Chromium cannot composite this and the
@@ -371,12 +371,35 @@
      `@supports` fallback: a browser without backdrop-filter gets the opaque
      chrome it had before, rather than a see-through bar with no blur. */
   .glass-chrome {
-    background: rgb(var(--chrome-rgb) / 0.68);
+    background: rgb(var(--chrome-rgb) / 0.8);
     -webkit-backdrop-filter: saturate(180%) blur(24px);
     backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.1);
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .glass-chrome {
+      background: rgb(var(--chrome-rgb));
+    }
+  }
+
+  /* The dock's material — design "A", 23 Aug 2026. Darker than the masthead
+     (the chrome should read BLACK again, Jay: "very bland"), with the three
+     things that make glass read as glass rather than grey: a 1px light
+     highlight along the inside top edge, a faint light border, and a real
+     drop shadow lifting it off the page. The blur is the same. Contrast: the
+     worst composite over white is rgb(41,41,41); white/80 icons are 9.5:1. */
+  .glass-dock {
+    background: rgb(var(--chrome-rgb) / 0.84);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+    border: 1px solid rgb(255 255 255 / 0.14);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.16),
+      0 12px 32px rgb(0 0 0 / 0.38),
+      0 2px 6px rgb(0 0 0 / 0.25);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-dock {
       background: rgb(var(--chrome-rgb));
     }
   }

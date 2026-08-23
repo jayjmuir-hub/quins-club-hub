@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- 💬 **Squad chat, phase 2 — fixture threads and @mentions.** A post can
+- **The dock, design "A"** — Jay: "very bland" → "go with A, but flashier
+  and more modern". Icons only; the active tab expands into a brand-gradient
+  pill with its label sliding open (300ms, reduced-motion aware) and a soft
+  red glow. `.glass-dock` in `src/index.css`: chrome at 84% with a light
+  inset highlight, a faint border and a real drop shadow — the depth is what
+  reads as glass, not the transparency; the masthead goes back to 80% for the
+  same reason. Six tabs at 360px with "SQUAD HUB" open fit with 9px to spare,
+  measured; the "Squad" abbreviation is gone. `src/components/Nav.jsx`.
+- `524e87e` — 💬 **Squad chat, phase 2 — fixture threads and @mentions.** A post can
   hang off a fixture (ONE open thread per fixture, partial unique index;
   anyone in the squad may open it, even under announce-only — it is the
   fixture's discussion) and carries the fixture's RSVP chips from the same

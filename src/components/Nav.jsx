@@ -88,28 +88,41 @@ export const NAV_ITEMS = [
   { to: '/more', label: 'More', icon: MoreIcon },
 ]
 
-const GRID_COLS = { 4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6' }
 
 function linkClassName({ isActive }) {
   return [
-    // Mobile (tab bar item): icon above label. The bar itself is now dark
-    // chrome, so idle items are chrome-muted (#8b9099, 6.09:1 on #0c0c0e)
-    // and the active item goes pure white plus a red icon — brighter, not
-    // just a different hue, so it reads at a glance in sunlight.
-    // ⚠️ `whitespace-nowrap` + 10px + tight tracking: six items on a 360px
-    // Android (squad staff get Squad Hub) gave each ~58px, and "SQUAD HUB"
-    // wrapped onto two lines while "SCHEDULE" and "ROSTER" ran together —
-    // Jay's screenshots, 23 Aug 2026. Condensed caps at 10px keep the
-    // longest label inside that, and nowrap makes a tight fit clip at the
-    // item edge rather than grow the bar.
-    'flex min-w-0 flex-col items-center justify-center gap-[3px] px-0.5 pb-2 pt-[11px] font-condensed text-[10px] font-bold uppercase tracking-[0.03em] whitespace-nowrap outline-none transition',
-    'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
-    // ⚠️ white/85, NOT chrome-muted, since the bar went to 68% glass
-    // (src/index.css): the grey would be 2.2:1 over white content. Active is
-    // full white plus the red icon — brighter, not just a different hue.
-    isActive ? 'text-white' : 'text-white/85 hover:text-white',
-    // (The desktop pill styling that lived here 6-21 Aug, with its measured
-    // adhjrt values, is retired — see the header note.)
+    // ══ DOCK ITEM, DESIGN "A" — Jay, 23 Aug 2026: icons only, and the active
+    // tab EXPANDS into a red labelled pill ("flashier and more modern").
+    //
+    // Every item is a flex row: icon, then a label whose width is animated
+    // from 0 (see labelClassName). The pill is the active link's own
+    // background — brand gradient, a soft red glow — so it moves with the
+    // route rather than being a separate element that has to be positioned.
+    // Inactive items are white icons on the glass. Labels exist for every
+    // item in the DOM and in the accessible name; only the active one is
+    // VISIBLE, which is what makes six tabs fit on a 360px phone without a
+    // single abbreviation.
+    'group relative flex h-[46px] items-center justify-center gap-1.5 rounded-pill outline-none',
+    'transition-[background-color,box-shadow,color,transform] duration-300 ease-out motion-reduce:transition-none',
+    'active:scale-95 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
+    isActive
+      ? 'px-3 text-white bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] shadow-[0_4px_14px_rgba(194,31,50,0.45)]'
+      : 'px-2 text-white/80 hover:text-white hover:bg-white/10',
+  ].join(' ')
+}
+
+// The label: 0 wide and invisible until its tab is active, then it slides
+// open beside the icon. `max-w` is the only animatable route to "width: auto",
+// so 96px is a ceiling ("SQUAD HUB" at this size is ~62) and not a size.
+function labelClassName({ isActive }) {
+  return [
+    // ⚠️ SIZED TO THE WORST CASE, MEASURED: six tabs at 360px with "SQUAD
+    // HUB" open. Idle items are 38px (22px icon + px-2), the open pill ~108,
+    // and the bar has 336px inside its insets — 5×38 + 108 + padding fits;
+    // at 12px/px-3.5 it did not, and More fell off the right edge.
+    'overflow-hidden whitespace-nowrap font-condensed text-[11px] font-bold uppercase tracking-[0.06em]',
+    'transition-[max-width,opacity,margin] duration-300 ease-out motion-reduce:transition-none',
+    isActive ? 'max-w-[96px] opacity-100' : 'max-w-0 opacity-0 -ml-1.5',
   ].join(' ')
 }
 
@@ -124,11 +137,7 @@ export default function Nav({ showSquadHub = false }) {
   const items = showSquadHub
     ? [
         ...NAV_ITEMS.filter((item) => item.to !== '/more'),
-        // `short` is what the tab PRINTS; `label` stays the accessible name.
-        // Measured at 360px with six tabs: "SQUAD HUB" is 61px of condensed
-        // caps in a 56px cell and clipped — "SQUAD" is 33. The sidebar still
-        // says Squad Hub in full; the tab bar is the only place this is short.
-        { to: '/squad', label: 'Squad Hub', short: 'Squad', icon: SquadIcon },
+        { to: '/squad', label: 'Squad Hub', icon: SquadIcon },
         ...NAV_ITEMS.filter((item) => item.to === '/more'),
       ]
     : NAV_ITEMS
@@ -160,13 +169,16 @@ export default function Nav({ showSquadHub = false }) {
       // ⚠️ The content's bottom padding in AppShell and the help button's
       // offset in HelpButton.jsx are sized to clear THIS. Change the height or
       // the inset here and re-measure both.
-      className={`fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 grid ${GRID_COLS[items.length] ?? 'grid-cols-5'} glass-chrome overflow-hidden rounded-[26px] border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.35)] desktop:hidden`}
+      className="glass-dock fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-pill px-2 py-[7px] desktop:hidden"
     >
-      <div className="brand-rule absolute inset-x-0 top-0" />
-      {items.map(({ to, label, short, end, icon: Icon }) => (
-        <NavLink key={to} to={to} end={end} className={linkClassName} aria-label={short ? label : undefined}>
-          <Icon className={'h-[23px] w-[23px]'} aria-hidden="true" />
-          <span>{short ?? label}</span>
+      {items.map(({ to, label, end, icon: Icon }) => (
+        <NavLink key={to} to={to} end={end} className={linkClassName} aria-label={label}>
+          {({ isActive }) => (
+            <>
+              <Icon className="h-[22px] w-[22px] shrink-0" aria-hidden="true" />
+              <span className={labelClassName({ isActive })}>{label}</span>
+            </>
+          )}
         </NavLink>
       ))}
     </nav>
