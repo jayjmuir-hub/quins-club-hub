@@ -10,13 +10,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-<<<<<<< HEAD
-- 📝 **Handoff: chat phases 2 and 3** — the afternoon's record, the ruling
-  that any admin may read a DM, and the lessons (harness the file verbatim;
-  never stash across a moved `main`; explicit column lists in `returns table`).
-  `claude/handoffs/2026-08-23-chat-phases-2-and-3.md`; `state-of-play.md`
-  now says phases 1–3 are live.
-=======
 - 🔒 **Adult-to-adult DMs are private unless a message is reported** — Jay's
   evening ruling narrowing the morning one. An admin reaches a DM only when it
   involves a minor or a message in it has been reported
@@ -26,7 +19,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `db/migrations/20260823_adult_dms_private.sql`, harness
   `db/tests/adult-dms-private.sql` (5 assertions, control included),
   `claude/decisions/2026-08-23-adult-dms-private-unless-reported.md`.
->>>>>>> a155120 (feat(chat): adult-to-adult DMs are private unless a message is reported)
+- `0dd9593` — 📝 **Handoff: chat phases 2 and 3** — the afternoon's record, the ruling
+  that any admin may read a DM, and the lessons (harness the file verbatim;
+  never stash across a moved `main`; explicit column lists in `returns table`).
+  `claude/handoffs/2026-08-23-chat-phases-2-and-3.md`; `state-of-play.md`
+  now says phases 1–3 are live.
 - `c593795` — 🐛 **The "no gender recorded" nudge is staff-only** — a parent saw "2
   players have no gender recorded — Show them" in red on her squad's roster.
   It is a data-quality tool for the people who can fix the record; now
