@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -11,8 +11,8 @@ import RollCall from './RollCall.jsx'
 // 7 Aug 2026. See the long note at its old call site below.
 import PaintDebug from './PaintDebug.jsx'
 import Sidebar from './Sidebar.jsx'
-import ThemeToggle from './ThemeToggle.jsx'
-import { ViewAsBanner, ViewAsSwitcher } from './ViewAsSwitcher.jsx'
+import AccountMenu from './AccountMenu.jsx'
+import { ViewAsBanner } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 import Button from './Button.jsx'
 import InstallPrompt from './InstallPrompt.jsx'
@@ -308,7 +308,7 @@ export default function AppShell({ children }) {
             <img
               src={crest}
               alt="Abu Dhabi Harlequins crest"
-              className="h-[46px] w-[46px] shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)] desktop:hidden"
+              className="h-[40px] w-[40px] shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)] desktop:hidden"
             />
             {/* The club name is one of the few places Anton is allowed (see
                 tailwind.config.js fontFamily): it is a masthead wordmark, not
@@ -396,25 +396,32 @@ export default function AppShell({ children }) {
                   the `wide:` vs `desktop:` note at the account link below. The
                   test that exists pins the class tokens instead. */}
               <p className="truncate font-condensed text-[13px] font-semibold uppercase tracking-[1.6px] text-white/70">
-                <span>Quins Club Hub</span>
-                {/* Mobile-only compact role indicator (decision 6: the role
-                    label has no breakpoint qualifier, and mobile is the
-                    primary case for a pitch-side club app). The desktop badge
-                    below covers >=820px; this covers below it, so the role is
-                    never CSS-hidden at any width.
-
-                    ⚠️ The separator lives INSIDE this span, and the span is no
-                    longer `truncate`. Both follow from the line above: a gap
-                    needs a flex parent, and a nested overflow:hidden inside an
-                    ellipsised line would clip its own text a second time. The
-                    parent's ellipsis covers it. */}
-                {showRole && (
-                  <span data-testid="role-label-mobile" className="desktop:hidden">
-                    {' · '}
-                    {currentRoleLabel}
-                  </span>
-                )}
+                Quins Club Hub
               </p>
+              {/* ⚠️ THE ROLE IS ON ITS OWN LINE NOW, 23 Aug 2026. It used to
+                  be " · Admin" inside the wordmark line above, and on a phone
+                  the ellipsis ate it — "QUINS CLUB HUB · …" in Jay's
+                  screenshot — because the wordmark and the role were sharing
+                  one nowrap line with a crest, an initial and two icon
+                  buttons. The two no longer share a line: the wordmark gets
+                  the full width of this block and the role sits under it,
+                  in the same pill the desktop row uses.
+
+                  Mobile-only (decision 6: the role label has no breakpoint
+                  qualifier, and mobile is the primary case for a pitch-side
+                  club app). The desktop badge below covers >=820px; this
+                  covers below it, so the role is never CSS-hidden at any
+                  width. `truncate` so a long role still cannot widen the
+                  block — the worst case is an ellipsised ROLE, never an
+                  ellipsised wordmark. */}
+              {showRole && (
+                <span
+                  data-testid="role-label-mobile"
+                  className="mt-1 inline-block max-w-full truncate rounded-pill bg-brand/20 px-2 py-[2px] font-condensed text-[11px] font-bold uppercase tracking-[0.08em] text-brand-onDark ring-1 ring-inset ring-brand/45 desktop:hidden"
+                >
+                  {currentRoleLabel}
+                </span>
+              )}
             </div>
 
             <div className="flex-1" />
@@ -436,129 +443,41 @@ export default function AppShell({ children }) {
               </span>
             )}
 
-            {/* MY ACCOUNT (Jay, 6 Aug 2026). Before this, the only way to
-                reach your own account was to know that "More" contained it —
-                the delete-account control, the calendar link and sign-out were
-                all behind a nav item named after nothing in particular.
+            {/* ⚠️ BEFORE THE ACCOUNT MENU, AND IT RENDERS NOTHING ONCE THE APP
+                IS INSTALLED — which keeps it out of the masthead width budget
+                for everyone who has already acted on it. */}
+            <AppButton />
 
-                This is a LINK to /more, not a dropdown menu. A popover needs
-                outside-click, Escape, focus return and a scrim that does not
-                fight the sticky masthead's z-40, and none of that earns its
-                keep while the destination is a single short screen. If /more
-                grows, this becomes the menu.
+            {/* THE ACCOUNT MENU (Jay, 23 Aug 2026): the person's initial, and
+                behind it My account, View as, Dark mode and Sign out.
+
+                ══ WHAT THIS REPLACED, AND WHY THE ROW STOPPED BREAKING ════════
+
+                Until 23 Aug this row held, after the role pill: the App button,
+                an account LINK (initial + first name at `wide`), the theme
+                toggle, and the View-as eye button — each `shrink-0`, each
+                measured into a budget the 12 Aug probe put at ~66px, and each
+                re-measured whenever the next one arrived. The wordmark, the
+                only item without `shrink-0`, absorbed every overflow: on a
+                phone it read "QUINS CLUB HUB · …" with the role eaten (Jay's
+                screenshot), and on desktop it had truncated to "ABU DHABI
+                HARLE…" more than once. Three of those four controls are now
+                inside the menu, so the row carries ONE 36px trigger after the
+                pill and the budget stops mattering.
+
+                ⚠️ THE NEXT CONTROL GOES IN AccountMenu.jsx, NOT HERE. That is
+                the whole point of it.
 
                 The initial, not a photo: `players.photo_path` holds head shots
                 of PLAYERS, and the signed-in person is usually a parent or a
-                coach who has no photo anywhere in the system. */}
-            {/* ⚠️ BEFORE THE ACCOUNT LINK, AND IT RENDERS NOTHING ONCE THE APP
-                IS INSTALLED — which is what keeps it out of the masthead
-                width budget for everyone who has already acted on it. The row
-                has a documented history of over-filling between 820 and
-                1280px (see the wordmark note above), so this was MEASURED in
-                Chromium rather than reasoned about; the numbers are in the
-                commit. */}
-            <AppButton />
-
-            <Link
-              to="/more"
-              data-testid="account-button"
-              aria-label={firstName ? `My account, ${firstName}` : 'My account'}
-              className="ml-1 flex shrink-0 items-center gap-2 rounded-pill py-1 pl-1 pr-1 text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 wide:pr-3"
-            >
-              <span
-                aria-hidden="true"
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/15 text-[12px] font-extrabold"
-              >
-                {(firstName || user?.email || '?').trim().charAt(0).toUpperCase()}
-              </span>
-              {/* ⚠️ `wide` (1280px), NOT `desktop` (820px). Shipped as
-                  desktop: first and it TRUNCATED THE CLUB NAME to "ABU DHABI
-                  HARLE…" at ~1114px — caught on production, not in jsdom,
-                  which applies no CSS and so cannot see a layout overflow.
-
-                  The masthead row is crest + club name + role pill + this +
-                  ViewAsSwitcher + five nav items, and Inter is wider than the
-                  Barlow Condensed it replaced. There was no slack left to
-                  spend. The initial alone is still a 28px tap target, so
-                  below 1280px this loses only the name. */}
-              {/* ⚠️ THIS NAME WAS BRIEFLY DELETED ON 12 Aug 2026 TO MAKE ROOM
-                  FOR THE App BUTTON, AND PUTTING IT BACK IS THE CORRECTION.
-                  The measurement behind the deletion was wrong, and the way it
-                  was wrong is worth keeping: "headroom" was computed as the
-                  h1's own width minus its natural text width, which is ALWAYS
-                  ~0 — the h1 is content-sized, so that subtraction can only
-                  ever return zero and says nothing about the row.
-
-                  The row's real buffer is the `flex-1` spacer two elements up,
-                  which absorbs every squeeze before the wordmark gives an inch.
-                  Measured properly at 1280px by growing a probe until the
-                  wordmark actually truncated: IT BREAKS AT +190px. The App
-                  button is 49 and this name is ~75, so both fit with ~66px to
-                  spare.
-
-                  ⚠️ THE LESSON, NOT THE NUMBER: a "0" that a calculation can
-                  only ever produce is not a measurement. The probe that grows
-                  until something visibly breaks is, and it disagreed. */}
-              {firstName && (
-                <span className="hidden max-w-[9ch] truncate font-condensed text-[13px] font-bold uppercase tracking-[0.08em] wide:inline">
-                  {firstName}
-                </span>
-              )}
-            </Link>
-
-            {/* ⚠️ ViewAsSwitcher IS BACK HERE AS OF 14 Aug 2026, AND THE NOTE
-                BELOW IS KEPT BECAUSE ITS MEASUREMENT STILL BINDS.
-                Jay: "i want to be able to select view as with a drop down from
-                any screen, as an admin" — which this row is the only place that
-                delivers, since AppShell wraps every routed screen.
-
-                ⚠️ WHAT CHANGED IS THE CONTROL, NOT THE CONSTRAINT. The 84px
-                text pill measured below is now a 32px ICON BUTTON, and the
-                persona it used to spell out is stated by ViewAsBanner directly
-                above instead — in full, at every width. The wordmark is still
-                the only item in this row without `shrink-0`, so it still
-                absorbs every overflow, and the 12 Aug probe still says the row
-                breaks at +190px with ~66px unspent.
-
-                ⚠️ SO THE OLD RULING IS OVERTURNED ON ITS CONCLUSION AND NOT ON
-                ITS REASONING. Do not put the persona text back on the trigger;
-                re-measure with the probe before changing its width at all.
-                claude/decisions/2026-08-14-view-as-everywhere.md
-
-                --- the 7 Aug note, kept verbatim ---
-                ViewAsSwitcher USED TO BE HERE, AND MUST NOT COME BACK.
-                Moved to the Admin screen on 7 Aug 2026 (Jay's call).
-
-                The masthead row cannot fit an admin's full complement at its
-                max-w-[1120px] cap. Measured in the harness, admin, not
-                previewing, account name showing:
-
-                  crest 46 | role pill 75 | account 77 | View-as 84 | nav 492
-                  club wordmark gets 238px, needs 257 -> "ABU DHABI HARLE..."
-
-                The admin nav is 492px against a coach's 395 — the ADMIN item
-                is most of the difference — and the wordmark is the only item
-                in this row without shrink-0, so it absorbs every overflow.
-
-                ⚠️ A WIDER SCREEN CANNOT FIX IT: the row is capped, so every
-                viewport at or above ~1152px has exactly this much space.
-
-                Two cheaper-looking fixes were measured and REJECTED because
-                they only fix today's screenshot: dropping the account name
-                (41px) and shrinking the wordmark to 19px both leave 0px slack
-                and break again the moment an admin previews a squad with a
-                long name. Removing this control leaves 77px.
-
-                It belongs on /admin anyway: it is an admin-only tool used
-                occasionally, that screen is already desktop-only, and
-                ViewAsBanner below still gives one-click Exit from anywhere,
-                so nobody can get stranded in a preview. */}
-            {/* Light/dark, same corner as the club site's own toggle. A
-                32px disc like the ViewAs trigger beside it — the row's
-                probe-measured buffer covers two of these, not a text pill. */}
-            <ThemeToggle />
-
-            <ViewAsSwitcher />
+                coach who has no photo anywhere in the system. The link to /more
+                that this used to be is now the menu's first item. */}
+            <AccountMenu
+              firstName={firstName}
+              email={user?.email}
+              roleLabel={showRole ? currentRoleLabel : null}
+              signOut={signOut}
+            />
 
             {/* The mobile tab bar (desktop nav is the Sidebar since phase 2;
                 the old Admin pill gate rode there with it, still reading the

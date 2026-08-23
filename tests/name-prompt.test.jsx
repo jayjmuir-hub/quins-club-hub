@@ -328,13 +328,13 @@ describe('NamePrompt — the sign-in name gate', () => {
     cleanup()
     renderShell()
 
-    // Without the prime this reads "My account, Jason" — the name Google
+    // Without the prime this reads "Account menu, Jason" — the name Google
     // supplied and nobody at this club uses, served from a cache the gate had
     // just been told was wrong.
     await waitFor(() =>
       expect(screen.getByTestId('account-button')).toHaveAttribute(
         'aria-label',
-        'My account, Jay',
+        'Account menu, Jay',
       ),
     )
   })
