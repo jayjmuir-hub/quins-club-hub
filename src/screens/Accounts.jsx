@@ -28,7 +28,7 @@ import { missingForPlayer } from '../lib/completeness.js'
 import { listVouches, setVouch, tallyVouches } from '../data/vouches.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canApproveAnything, isAdmin, isSuperAdmin } from '../lib/scope.js'
+import { ADMIN_RIGHTS, adminRightLabel, canApproveAnything, isAdmin, isSuperAdmin } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 
@@ -2127,6 +2127,17 @@ export default function Accounts() {
               .map((member) => {
                 const label = ROLE_OPTIONS.find((option) => option.value === member.role)?.label ?? member.role
                 const team = member.team_id ? teamsById.get(member.team_id)?.name : null
+                if (member.role === 'admin') {
+                  // "Admin" alone hides the only thing that differs between two
+                  // admins — which specialist dashboards they hold. Jay, 23 Aug
+                  // 2026: show the rights on the row, not just the word.
+                  const rights = member.is_super
+                    ? 'Super admin'
+                    : ADMIN_RIGHTS.filter((right) => (member.admin_rights ?? []).includes(right))
+                        .map(adminRightLabel)
+                        .join(', ')
+                  return rights ? `${label} · ${rights}` : label
+                }
                 return team ? `${label} · ${team}` : label
               })
               .join(' · ')

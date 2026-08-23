@@ -8,9 +8,17 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 23 Aug 2026
+
+- **Accounts list shows which admin rights each admin holds** — the row read
+  "Admin" for a super admin and for somebody holding one specialist dashboard
+  alike. It now reads `Admin · Rugby Performance Director` (every held right,
+  comma-separated) or `Admin · Super admin`. `src/screens/Accounts.jsx`, two
+  tests in `tests/accounts.test.jsx`.
+
 ## 22 Aug 2026
 
-- **ESLint, and the crash it found first** — `eslint.config.js`,
+- `5b46dca` — **ESLint, and the crash it found first** — `eslint.config.js`,
   `npm run lint`, a CI step before `npm test` in `.github/workflows/test.yml`.
   The dry run over `src/` found a conditional hook in `src/screens/Accounts.jsx`:
   the authorisation gate sat above nine hooks, and because `memberships` is the
