@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- 📐 **Plan: squad chat** (`claude/plans/2026-08-23-squad-chat.md`, NOT
+- `b9b4974` — 📐 **Plan: squad chat** (`claude/plans/2026-08-23-squad-chat.md`, NOT
   SHIPPED) — a channel per squad that a WhatsApp group could move into:
   announce-only by default, fixture threads with RSVP chips, a staff channel,
   a welfare view, and DMs. DMs were refused in the first draft and put back on
