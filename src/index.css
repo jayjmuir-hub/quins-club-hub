@@ -336,6 +336,41 @@
     height: 3px;
   }
 
+  /* The iOS-style bar material — Jay, 23 Aug 2026: "make the app menu bars
+     look similar to ios menu bars, transparent and sort of above the screen
+     instead of sitting as a bar". Masthead and tab bar both wear this.
+
+     ⚠️ THE TAB BAR ONCE RULED AGAINST TRANSLUCENCY (Nav.jsx): a bg-white/95
+     bar over scrolling light content made the idle-label contrast depend on
+     whatever was underneath. This is the other way round and that is why it
+     holds: the material is DARK at 82% over a 20px blur, so the brightest
+     thing that can ever sit behind it is pure white, and white composited
+     under 82% near-black is rgb(56,56,56) by arithmetic: chrome-muted
+     (139,144,153) on that is 4.9:1 and white is 11.9:1, both AA. The blur is
+     what keeps the composite flat — without it a bright card edge scrolling
+     past would show as a stripe through the label.
+
+     ⚠️ HEADLESS CHROMIUM DOES NOT COMPOSITE backdrop-filter — measured 23 Aug
+     2026: the harness screenshot sampled ~rgb(20,20,20) under the bar at
+     EVERY scroll position, white content or not, while an opaque control
+     sampled (10,10,10). So the Playwright scripts cannot see this material;
+     it was checked by eye in real Chrome, and the numbers above are the
+     arithmetic, not a sample. Do not "fix" a harness PNG that shows these
+     bars as solid — that is the renderer, not the CSS.
+
+     `@supports` fallback: a browser without backdrop-filter gets the opaque
+     chrome it had before, rather than a see-through bar with no blur. */
+  .glass-chrome {
+    background: rgb(var(--chrome-rgb) / 0.82);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-chrome {
+      background: rgb(var(--chrome-rgb));
+    }
+  }
+
   /* Harlequin geometry: the two overlapping diagonals from the site's hero,
      as a reusable decorative layer. Parent needs `relative overflow-hidden`. */
   .harlequin::after {

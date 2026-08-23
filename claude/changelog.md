@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- 📓 **Handoff: push proven, and the squad chat that followed it**
+- **iOS-style bars** — Jay: "transparent and sort of above the screen instead
+  of sitting as a bar". Masthead and tab bar wear `.glass-chrome`
+  (`src/index.css`): chrome at 82% over a 20px backdrop blur, hairline edges
+  instead of shadows, opaque fallback where backdrop-filter is unsupported.
+  The old ruling against a translucent tab bar is answered in Nav.jsx — the
+  material is dark, so the worst composite is still 4.9:1 for idle labels.
+  ⚠️ Headless Chromium does not composite backdrop-filter, so harness PNGs
+  show these bars solid; checked by eye in real Chrome.
+- `2b7d611` — 📓 **Handoff: push proven, and the squad chat that followed it**
   (`claude/handoffs/2026-08-23-push-proven-and-squad-chat.md`) — the day in
   order, seven ranked lessons (harness the FILE not a retyping; Supabase's
   default privileges under a column grant; a policy cannot select from its

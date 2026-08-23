@@ -123,9 +123,13 @@ export default function Nav({ showSquadHub = false }) {
     // The bar is dark chrome so the app is bookended in near-black — masthead
     // at the top, tab bar at the bottom, light content well between. The
     // `brand-rule` hairline sits on its top edge, mirroring the masthead's.
-    // Opaque, not the old bg-white/95 + backdrop-blur: a translucent bar over
-    // scrolling light content made the idle label contrast depend on whatever
-    // happened to be underneath it.
+    // ⚠️ TRANSLUCENT AGAIN SINCE 23 Aug 2026, AND THE OLD OBJECTION IS
+    // ANSWERED, NOT IGNORED. It was opaque because a bg-white/95 bar over
+    // scrolling light content made the idle-label contrast depend on whatever
+    // was underneath. `glass-chrome` (src/index.css) is DARK at 82% over a
+    // 20px blur: the worst thing behind it is pure white, and the composite is
+    // still near-black — 4.9:1 for the idle label by arithmetic; see the
+    // note in src/index.css on why the harness cannot photograph it.
     <nav
       aria-label="Primary"
       /* `desktop:gap-[2px]` matches adhjrt.com's `.hdr-nav { gap: 2px }`. The
@@ -134,7 +138,7 @@ export default function Nav({ showSquadHub = false }) {
       // ⚠️ FULL CLASS NAMES, NEVER `grid-cols-${n}` — Tailwind only emits the
       // classes it can see in the source. Five for everyone since Chat joined
       // (23 Aug 2026), six for squad staff.
-      className={`fixed inset-x-0 bottom-0 z-40 grid ${GRID_COLS[items.length] ?? 'grid-cols-5'} bg-chrome pb-[env(safe-area-inset-bottom)] shadow-tabbar desktop:hidden`}
+      className={`fixed inset-x-0 bottom-0 z-40 grid ${GRID_COLS[items.length] ?? 'grid-cols-5'} glass-chrome border-t border-white/10 pb-[env(safe-area-inset-bottom)] desktop:hidden`}
     >
       <div className="brand-rule absolute inset-x-0 top-0" />
       {items.map(({ to, label, end, icon: Icon }) => (

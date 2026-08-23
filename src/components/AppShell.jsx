@@ -277,7 +277,11 @@ export default function AppShell({ children }) {
           chrome colour so the padded strip reads as the masthead extending
           behind the status bar, not a black gap. Desktop and un-installed
           browsers get env() = 0 and nothing changes. */}
-      <div className="sticky top-0 z-40 bg-chrome pt-[env(safe-area-inset-top)]">
+      {/* `glass-chrome`, not `bg-chrome`, since 23 Aug 2026 — the iOS bar
+          material, see src/index.css. The wrapper carries it (not the
+          <header>) so the status-bar strip above and the View-as banner are
+          the same sheet of glass as the masthead. */}
+      <div className="glass-chrome sticky top-0 z-40 pt-[env(safe-area-inset-top)]">
         <ViewAsBanner />
 
         {/* The masthead is DARK CHROME (#151517 -> #0c0c0e), not the red
@@ -300,7 +304,7 @@ export default function AppShell({ children }) {
             across the top edge, where it is decoration and carries no text, so
             full saturation is free there. `harlequin` adds the site's diagonal
             shapes bleeding off the right edge. */}
-        <header className="bg-chrome-grad text-white shadow-masthead">
+        <header className="border-b border-white/10 text-white">
           <div className="brand-rule" />
           <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-3 overflow-hidden px-4 py-3 desktop:mx-0 desktop:max-w-none wide:max-w-none">
             {/* crest.png is 370x400 (portrait) — object-contain keeps its native
