@@ -69,11 +69,13 @@ So the channel is **notices + replies + a faster cadence + a fixture link**.
 The genuinely new parts are the message table, the channel UI, announce-only,
 the staff channel and the welfare view.
 
-## ✅ Step zero — DONE 23 Aug 2026: push proven on a real iPhone
+## ✅ Step zero — DONE 23 Aug 2026: push proven on a real iPhone and a real Android
 
 **Proven the same morning this plan merged.** A notice and a U13 Mixed fixture
 change, made by Jay from another device, both arrived on the lock screen of the
-club iPhone signed in as a parent on that squad. The first attempt found and
+club iPhone signed in as a parent on that squad; an hour later a fixture
+change arrived on an Android (Chrome) signed in as a parent-only account on
+the same squad. The first attempt found and
 fixed a real bug first (`db/migrations/20260823_push_subscription_takeover.sql`
 — the second person to sign in on a phone could not turn notifications on).
 The section below is kept as the record of why it had to be done first.

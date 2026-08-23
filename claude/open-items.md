@@ -851,12 +851,14 @@ green suite and has never been exercised by a human on the live site.
   U13 Mixed fixture change, posted by Jay from another device, both arrived on
   the lock screen of the club iPhone signed in as a parent of that squad;
   `push-send` logged two POST 200s at 07:26 and 07:27 UTC. The ONE thing the
-  server-side smoke tests could not prove is now proven — **on iPhone.**
-  ⚠️ **ANDROID IS STILL UNPROVEN.** The only FCM subscription the club had
-  (20 Aug) was deleted by `push-send` during the same notice — Google answered
-  404/410, so it was already dead. That proves the FCM leg of the pipeline
-  gets real answers; it proves nothing about a banner on an Android screen.
-  Same test, one Android phone, somebody else's edit.
+  server-side smoke tests could not prove is now proven — **on iPhone AND
+  Android.** The Android test followed at 07:48 UTC the same morning: Chrome
+  on Jay's Android, signed in as a parent-only account on U13 Mixed, a
+  fixture change by Jay's main account from his laptop, banner in the shade.
+  Two more `push-send` POST 200s. (The club's one earlier FCM subscription,
+  from 20 Aug, was already dead and was deleted by `push-send` during the
+  first notice — Google answered 404/410 — which is the self-cleaning
+  behaviour working as designed.)
   ⚠️ **The first attempt found a bug before it could test anything**: the
   second person to sign in on that phone could not turn notifications on —
   `db/migrations/20260823_push_subscription_takeover.sql`, fixed and deployed
