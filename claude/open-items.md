@@ -846,7 +846,22 @@ Run `get_advisors` rather than trusting this list. As of 14 Aug 2026:
 different claim and the one this repo has confused before. Each shipped with a
 green suite and has never been exercised by a human on the live site.
 
-- **Push notifications have never been received by a real browser.** Built and
+- ✅ ~~**Push notifications have never been received by a real browser.**~~ —
+  **RECEIVED, 23 Aug 2026, on a real iPhone that is not Jay's.** A notice and a
+  U13 Mixed fixture change, posted by Jay from another device, both arrived on
+  the lock screen of the club iPhone signed in as a parent of that squad;
+  `push-send` logged two POST 200s at 07:26 and 07:27 UTC. The ONE thing the
+  server-side smoke tests could not prove is now proven — **on iPhone.**
+  ⚠️ **ANDROID IS STILL UNPROVEN.** The only FCM subscription the club had
+  (20 Aug) was deleted by `push-send` during the same notice — Google answered
+  404/410, so it was already dead. That proves the FCM leg of the pipeline
+  gets real answers; it proves nothing about a banner on an Android screen.
+  Same test, one Android phone, somebody else's edit.
+  ⚠️ **The first attempt found a bug before it could test anything**: the
+  second person to sign in on that phone could not turn notifications on —
+  `db/migrations/20260823_push_subscription_takeover.sql`, fixed and deployed
+  the same morning. The rest of this item is kept for what it records about
+  the smoke tests. Built and
   deployed 18 Aug 2026 — `claude/plans/2026-08-18-push-notifications.md`. Every
   server-side piece was smoke-tested LIVE against production: a real trigger
   fire, a real Vault-stored VAPID key, a real signed JWT, real RFC 8291

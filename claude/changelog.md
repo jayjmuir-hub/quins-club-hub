@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **Masthead polish: the crest goes home, the initial is an avatar, the role
+- 📓 **Push notifications PROVEN on a real iPhone** — a notice and a U13 Mixed
+  fixture change, posted by Jay, arrived on the lock screen of the club phone
+  signed in as a parent; two `push-send` POST 200s in the logs. `squad_push`
+  comes off the tabled list (`claude/state-of-play.md`), the open item is
+  closed with the Android caveat (`claude/open-items.md`), and step zero of
+  `claude/plans/2026-08-23-squad-chat.md` is done. Android still unproven.
+- `d9273dc` — **Masthead polish: the crest goes home, the initial is an avatar, the role
   is the Badge** — Jay, after the account menu landed: the crest should "always
   take you to the top of the screen", the J was "sort of bland", and the role
   cell "doesn't seem to match our style". The crest (mobile masthead and
