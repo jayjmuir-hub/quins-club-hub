@@ -249,3 +249,16 @@ export function toStaffMember(row) {
     phone: String(row.profiles?.phone ?? '').trim() || null,
   }
 }
+
+// ── Who is emailed about approvals (23 Aug 2026) — invented people only ────
+export async function listApprovalRecipients() {
+  return [
+    { membership_id: 'hz-m-admin', profile_id: 'hz-admin', full_name: 'Ora Vantage', role: 'admin', team_id: null, team_name: null, notify: true },
+    { membership_id: 'hz-m-coach', profile_id: 'hz-coach', full_name: 'Harriet Zephyr', role: 'coach', team_id: 'hz-team-1', team_name: 'U13 Mixed', notify: true },
+    { membership_id: 'hz-m-asst', profile_id: 'hz-asst', full_name: 'Dov Lantern', role: 'coach', team_id: 'hz-team-1', team_name: 'U13 Mixed', notify: false },
+    { membership_id: 'hz-m-mgr', profile_id: 'hz-mgr', full_name: 'Sam Quillon', role: 'manager', team_id: 'hz-team-1', team_name: 'U13 Mixed', notify: true },
+  ]
+}
+export async function setNotifyApprovals({ membershipId, notify } = {}) {
+  return { id: membershipId, notify_approvals: notify === true }
+}

@@ -311,6 +311,7 @@
 --   memberships.status          authenticated   UPDATE
 --   memberships.title           authenticated   UPDATE   ← 13 Aug 2026
 --   memberships.is_head_coach   authenticated   UPDATE   ← 18 Aug 2026
+--   memberships.notify_approvals authenticated  UPDATE   ← 23 Aug 2026 (who is emailed about approvals)
 --
 -- ⚠️ `profiles.no_player_confirmed_at` IS THE SECOND TIME THIS TRAP WAS MET AND
 -- THE FIRST TIME IT WAS SEEN COMING. Added 16 Aug 2026 for the sign-in gate,
@@ -826,3 +827,6 @@ GRANT UPDATE (resolved_at, resolved_by) ON public.message_reports TO authenticat
 GRANT SELECT ON public.welfare_access_log TO authenticated;
 GRANT UPDATE (staff_dm_opt_in) ON public.player_private TO authenticated;
 REVOKE ALL ON public.conversations, public.dm_blocks, public.message_reports, public.welfare_access_log FROM anon;
+
+-- 23 Aug 2026 — db/migrations/20260823_notify_approvals.sql
+GRANT UPDATE (notify_approvals) ON public.memberships TO authenticated;

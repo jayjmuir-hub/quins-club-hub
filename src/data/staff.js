@@ -337,3 +337,30 @@ export async function setMembershipHeadCoach({ membershipId, isHeadCoach } = {})
   if (!data) throw new Error(REFUSED_HEAD_COACH)
   return data
 }
+
+// ── Who gets the "waiting to be approved" email (23 Aug 2026) ───────────────
+//
+// Jay: "admin needs a way to select who receives emails about people waiting
+// to be approved". memberships.notify_approvals is the switch; an admin for
+// the whole club, a coach or manager for their squad. Confers nothing — who
+// may APPROVE is private.can_approve_team. db/migrations/20260823_notify_approvals.sql.
+
+/** Every active admin, coach and manager with their switch. Admins only (the function refuses others). */
+export async function listApprovalRecipients() {
+  const { data, error } = await supabase.rpc('approval_recipients')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function setNotifyApprovals({ membershipId, notify } = {}) {
+  if (!membershipId) throw new Error('setNotifyApprovals needs a membershipId.')
+  const { data, error } = await supabase
+    .from('memberships')
+    .update({ notify_approvals: notify === true })
+    .eq('id', membershipId)
+    .select('id, notify_approvals')
+    .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error("That didn't save. Only a club admin can change who is emailed.")
+  return data
+}
