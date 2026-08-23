@@ -127,6 +127,9 @@
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.announcements      ENABLE ROW LEVEL SECURITY;  -- added 14 Aug 2026
 ALTER TABLE public.announcement_reads ENABLE ROW LEVEL SECURITY;  -- added 14 Aug 2026
+ALTER TABLE public.messages          ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026
+ALTER TABLE public.channel_settings  ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026
+ALTER TABLE public.message_reads     ENABLE ROW LEVEL SECURITY;  -- added 23 Aug 2026
 ALTER TABLE public.match_sheets      ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
 ALTER TABLE public.match_sheet_slots ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
 ALTER TABLE public.match_sheet_cards ENABLE ROW LEVEL SECURITY;  -- added 12 Aug 2026
@@ -1361,3 +1364,61 @@ create policy "session block manage" on public.training_session_blocks for all
 -- ONE function for preview and for real, switched by _preview, so the table
 -- the Director confirms is computed by the code that then acts on it.
 -- ⛔ DATE RANGE ON type = 'training'. No weekday anywhere.
+
+
+-- ---------------------------------------------------------------------
+-- public.messages / public.channel_settings / public.message_reads
+--   (7 policies, captured 23 Aug 2026 from pg_policies in a rolled-back apply)
+-- Migration: db/migrations/20260823_squad_chat.sql
+--
+-- ⚠️ "message create" CALLS private.can_reply_to() RATHER THAN SELECTING FROM
+-- messages: a policy on messages that reads messages is "infinite recursion
+-- detected in policy" — measured on the first harness run. The helper is
+-- SECURITY DEFINER and re-applies the read rule itself.
+--
+-- ⚠️ NO DELETE POLICY ON messages, ON PURPOSE. Removal is an UPDATE setting
+-- deleted_at; messages_touch blanks the body. The row survives.
+--
+-- ⚠️ "message edit"'s WITH CHECK pins only channel. What keeps an author from
+-- re-scoping a post is that authenticated holds NO table-level UPDATE — only
+-- column-level on (body, pinned, deleted_at), see grants.sql — and that
+-- messages_touch freezes every other column regardless.
+-- ---------------------------------------------------------------------
+CREATE POLICY "message read" ON public.messages
+  FOR SELECT USING (((channel = 'squad'::text) AND
+CASE
+    WHEN (team_id IS NULL) THEN (EXISTS ( SELECT 1
+       FROM memberships m
+      WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = messages.club_id) AND (m.status = 'active'::text))))
+    ELSE private.can_see_team(team_id)
+END));
+
+CREATE POLICY "message create" ON public.messages
+  FOR INSERT WITH CHECK (((channel = 'squad'::text) AND (((parent_id IS NOT NULL) AND private.can_reply_to(parent_id)) OR ((parent_id IS NULL) AND
+CASE
+    WHEN (team_id IS NULL) THEN private.is_admin(( SELECT m.club_id
+       FROM memberships m
+      WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))
+      ORDER BY m.created_at
+     LIMIT 1))
+    ELSE (private.can_edit_team(team_id) OR ((NOT private.channel_announce_only(team_id)) AND private.can_see_team(team_id)))
+END))));
+
+CREATE POLICY "message edit" ON public.messages
+  FOR UPDATE USING ((((author_id = ( SELECT auth.uid() AS uid)) AND (created_at > (now() - '00:15:00'::interval))) OR ((team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((team_id IS NULL) AND private.is_admin(club_id))))
+  WITH CHECK ((channel = 'squad'::text));
+
+CREATE POLICY "channel settings read" ON public.channel_settings
+  FOR SELECT USING (private.can_see_team(team_id));
+
+CREATE POLICY "channel settings write" ON public.channel_settings
+  FOR ALL USING (private.can_edit_team(team_id))
+  WITH CHECK ((private.can_edit_team(team_id) AND (updated_by = ( SELECT auth.uid() AS uid))));
+
+CREATE POLICY "message read own reads" ON public.message_reads
+  FOR SELECT USING ((profile_id = ( SELECT auth.uid() AS uid)));
+
+CREATE POLICY "message mark read" ON public.message_reads
+  FOR INSERT WITH CHECK (((profile_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM messages m
+  WHERE (m.id = message_reads.message_id)))));

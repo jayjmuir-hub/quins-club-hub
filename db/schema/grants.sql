@@ -770,3 +770,26 @@ REVOKE ALL ON public.availability_nudges FROM authenticated;
 -- (no GRANT lines — anon and authenticated hold nothing on this table)
 REVOKE ALL ON public.signup_nudges FROM anon;
 REVOKE ALL ON public.signup_nudges FROM authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.messages / public.channel_settings / public.message_reads
+--   — TABLE and COLUMN grants  (captured 23 Aug 2026, rolled-back apply)
+--
+-- Captured from information_schema.table_privileges / column_privileges —
+-- NOT pasted from the migration.
+--
+-- ⚠️ THE MIGRATION REVOKES FROM authenticated FIRST, AND THE CAPTURE IS WHY
+-- THAT LINE EXISTS. Supabase's default privileges hand authenticated ALL on
+-- every new table; without the revoke, the column-level UPDATE below would
+-- have sat on top of a table-level one, and "message edit"'s WITH CHECK only
+-- pins channel. Measured after the revoke: authenticated = INSERT, SELECT
+-- at table level on messages, and UPDATE on exactly (body, deleted_at,
+-- pinned). anon holds NOTHING on any of the three — unlike the 14 Aug
+-- tables, which recorded anon's default full privileges as found.
+-- ---------------------------------------------------------------------
+GRANT SELECT, INSERT ON public.messages TO authenticated;
+GRANT UPDATE (body, pinned, deleted_at) ON public.messages TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.channel_settings TO authenticated;
+GRANT SELECT, INSERT ON public.message_reads TO authenticated;
+REVOKE ALL ON public.messages, public.channel_settings, public.message_reads FROM anon;

@@ -20,9 +20,10 @@ function renderNav(initialEntry = '/', props = {}) {
 }
 
 describe('NAV_ITEMS', () => {
-  it('is exactly Home, Schedule, Roster, More, in that order', () => {
-    expect(NAV_ITEMS.map((item) => item.label)).toEqual(['Home', 'Schedule', 'Roster', 'More'])
-    expect(NAV_ITEMS.map((item) => item.to)).toEqual(['/', '/schedule', '/roster', '/more'])
+  // Chat joined on 23 Aug 2026 — the squad channel's phone entry point.
+  it('is exactly Home, Schedule, Roster, Chat, More, in that order', () => {
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual(['Home', 'Schedule', 'Roster', 'Chat', 'More'])
+    expect(NAV_ITEMS.map((item) => item.to)).toEqual(['/', '/schedule', '/roster', '/chat', '/more'])
   })
 })
 
@@ -42,17 +43,18 @@ describe('Nav', () => {
     renderNav()
 
     expect(screen.queryByRole('link', { name: 'Squad Hub' })).not.toBeInTheDocument()
-    expect(document.querySelector('nav')).toHaveClass('grid-cols-4')
+    expect(document.querySelector('nav')).toHaveClass('grid-cols-5')
   })
 
-  it('shows Squad Hub between Roster and More when showSquadHub is set, in a 5-column grid', () => {
+  it('shows Squad Hub between Chat and More when showSquadHub is set, in a 6-column grid', () => {
     renderNav('/', { showSquadHub: true })
 
     const squadHub = screen.getByRole('link', { name: 'Squad Hub' })
     expect(squadHub).toHaveAttribute('href', '/squad')
     const labels = [...document.querySelectorAll('nav a span')].map((el) => el.textContent)
-    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Squad Hub', 'More'])
-    expect(document.querySelector('nav')).toHaveClass('grid-cols-5')
+    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Chat', 'Squad Hub', 'More'])
+    // ⚠️ A REAL CLASS NAME. `grid-cols-${n}` would not be in the CSS bundle.
+    expect(document.querySelector('nav')).toHaveClass('grid-cols-6')
   })
 
   it('marks Home active with aria-current="page" at the root route', () => {

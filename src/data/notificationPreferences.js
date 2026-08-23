@@ -32,6 +32,13 @@ export const NOTIFICATION_CATEGORIES = [
     label: 'New notices',
     hint: 'When somebody posts a notice for your squad, or for the whole club.',
   },
+  // ⚠️ STAFF POSTS ONLY, IN PHASE 1, and the hint says so. A family's reply
+  // never pushes; @mentions are phase 2. db/migrations/20260823_squad_chat.sql.
+  {
+    key: 'squad_chat',
+    label: 'Squad chat',
+    hint: 'When a coach or manager posts in your squad’s chat.',
+  },
   {
     key: 'fixture',
     label: 'Fixture changes',

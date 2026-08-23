@@ -112,6 +112,7 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
         { to: `/squad/${squadMatch[1]}`, label: 'Overview', end: true },
         { to: `/squad/${squadMatch[1]}/match-roster`, label: 'Build a Match Roster' },
         { to: `/squad/${squadMatch[1]}/training`, label: 'Training Plans' },
+        { to: `/squad/${squadMatch[1]}/chat`, label: 'Chat' },
       ]
     }
     // /game-time keeps the Roster section open: it is this section's only
