@@ -793,3 +793,26 @@ GRANT UPDATE (body, pinned, deleted_at) ON public.messages TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.channel_settings TO authenticated;
 GRANT SELECT, INSERT ON public.message_reads TO authenticated;
 REVOKE ALL ON public.messages, public.channel_settings, public.message_reads FROM anon;
+
+
+-- ---------------------------------------------------------------------
+-- public.conversations / public.dm_blocks / public.message_reports /
+-- public.welfare_access_log, and a column on player_private
+--   — TABLE and COLUMN grants  (23 Aug 2026 — squad chat phase 3)
+--
+-- Revoked from authenticated FIRST, then granted back narrowly — the phase-1
+-- lesson (Supabase's defaults hand authenticated ALL on a new table).
+-- conversations: SELECT only (open_conversation() inserts). welfare_access_log:
+-- SELECT only (log_welfare_access() inserts). message_reports: UPDATE is
+-- column-level on (resolved_at, resolved_by). player_private: UPDATE on
+-- staff_dm_opt_in is granted on top of the existing column grants; the
+-- trigger decides who may flip it. anon holds nothing on any of them.
+-- To be re-verified from information_schema after the apply.
+-- ---------------------------------------------------------------------
+GRANT SELECT ON public.conversations TO authenticated;
+GRANT SELECT, INSERT, DELETE ON public.dm_blocks TO authenticated;
+GRANT SELECT, INSERT ON public.message_reports TO authenticated;
+GRANT UPDATE (resolved_at, resolved_by) ON public.message_reports TO authenticated;
+GRANT SELECT ON public.welfare_access_log TO authenticated;
+GRANT UPDATE (staff_dm_opt_in) ON public.player_private TO authenticated;
+REVOKE ALL ON public.conversations, public.dm_blocks, public.message_reports, public.welfare_access_log FROM anon;

@@ -24,6 +24,9 @@ const setPinnedMock = vi.fn()
 const setAnnounceOnlyMock = vi.fn()
 const subscribeMessagesMock = vi.fn()
 const listMentionablesMock = vi.fn()
+const listStaffMessagesMock = vi.fn()
+const postStaffMessageMock = vi.fn()
+const reportMessageMock = vi.fn()
 const listEventsMock = vi.fn()
 const listAvailabilityForEventsMock = vi.fn()
 
@@ -41,7 +44,10 @@ vi.mock('../src/data/messages.js', () => ({
   setPinned: (...a) => setPinnedMock(...a),
   setAnnounceOnly: (...a) => setAnnounceOnlyMock(...a),
   subscribeMessages: (...a) => subscribeMessagesMock(...a),
-  listMentionables: (...a) => listMentionablesMock(...a),
+  listMentionablesFor: (...a) => listMentionablesMock(...a),
+  listStaffMessages: (...a) => listStaffMessagesMock(...a),
+  postStaffMessage: (...a) => postStaffMessageMock(...a),
+  reportMessage: (...a) => reportMessageMock(...a),
   getEventThread: vi.fn(),
 }))
 vi.mock('../src/data/events.js', () => ({ listEvents: (...a) => listEventsMock(...a) }))
@@ -112,6 +118,9 @@ beforeEach(() => {
   replyToMessageMock.mockResolvedValue(post({ id: 'r1', parent_id: 'msg-1' }))
   subscribeMessagesMock.mockReturnValue(() => {})
   listMentionablesMock.mockResolvedValue([])
+  listStaffMessagesMock.mockResolvedValue([])
+  postStaffMessageMock.mockResolvedValue(post({ id: 'st-1', channel: 'staff' }))
+  reportMessageMock.mockResolvedValue(undefined)
   listEventsMock.mockResolvedValue([])
   listAvailabilityForEventsMock.mockResolvedValue([])
 })
@@ -378,5 +387,69 @@ describe('Chat — @mentions', () => {
     renderAt('/chat/team-a')
     await screen.findByTestId('composer')
     expect(screen.queryByRole('button', { name: 'Mention someone' })).toBeNull()
+  })
+})
+
+// ── Phase 3: the staff channel and reporting ───────────────────────────────
+
+describe('Chat — staff channel', () => {
+  it('shows Squad / Staff only tabs to a coach', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    useAuthMock.mockReturnValue({ user: { id: 'coach-1' } })
+    renderAt('/chat/team-a')
+    await screen.findByTestId('message-row')
+    expect(screen.getByRole('tab', { name: 'Staff only' })).toHaveAttribute('href', '/chat/team-a?channel=staff')
+  })
+
+  it('shows no channel tabs to a parent — for them there is one channel', async () => {
+    renderAt('/chat/team-a')
+    await screen.findByTestId('message-row')
+    expect(screen.queryByRole('tab', { name: 'Staff only' })).toBeNull()
+  })
+
+  it('?channel=staff reads the staff stream and posts to it, with staff mentionables', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    useAuthMock.mockReturnValue({ user: { id: 'coach-1' } })
+    listStaffMessagesMock.mockResolvedValue([post({ id: 'st-0', channel: 'staff', body: 'Selection thoughts?' })])
+    const user = userEvent.setup()
+    renderAt('/chat/team-a?channel=staff')
+
+    expect(await screen.findByText('Selection thoughts?')).toBeInTheDocument()
+    expect(listStaffMessagesMock).toHaveBeenCalledWith('team-a')
+    expect(listMessagesMock).not.toHaveBeenCalled()
+    expect(listMentionablesMock).toHaveBeenCalledWith('team-a', 'staff')
+    expect(screen.queryByTestId('channel-settings')).toBeNull()
+
+    await user.type(screen.getByLabelText('Message'), 'Go with the big pack')
+    await user.click(screen.getByRole('button', { name: 'Post' }))
+    expect(postStaffMessageMock).toHaveBeenCalledWith('team-a', 'Go with the big pack', { mentions: [] })
+    expect(postMessageMock).not.toHaveBeenCalled()
+  })
+
+  it('a parent asking for ?channel=staff gets the squad channel', async () => {
+    renderAt('/chat/team-a?channel=staff')
+    await screen.findByTestId('message-row')
+    expect(listMessagesMock).toHaveBeenCalledWith('team-a')
+    expect(listStaffMessagesMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('Chat — reporting', () => {
+  it('a parent can report a coach post with a reason', async () => {
+    const user = userEvent.setup()
+    renderAt('/chat/team-a')
+    await screen.findByTestId('message-row')
+    await user.click(screen.getByRole('button', { name: 'Report' }))
+    await user.type(screen.getByLabelText('Report this message to the club'), 'Not appropriate')
+    await user.click(screen.getByRole('button', { name: 'Send report' }))
+    expect(reportMessageMock).toHaveBeenCalledWith('msg-1', 'Not appropriate')
+  })
+
+  it('never offers Report on my own post', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    useAuthMock.mockReturnValue({ user: { id: 'coach-1' } })
+    renderAt('/chat/team-a')
+    await screen.findByTestId('message-row')
+    expect(screen.queryByRole('button', { name: 'Report' })).toBeNull()
   })
 })

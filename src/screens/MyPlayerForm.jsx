@@ -3,6 +3,8 @@ import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import Button from '../components/Button.jsx'
 import PhotoField from '../components/PhotoField.jsx'
+import StaffDmOptIn from '../components/StaffDmOptIn.jsx'
+import { useMemberships } from '../lib/memberships.jsx'
 import ParentsEditor from '../components/ParentsEditor.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
 import Segmented from '../components/Segmented.jsx'
@@ -57,6 +59,13 @@ const FIELD =
 const LABEL = 'mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-faint'
 
 export default function MyPlayerForm({ player, team, onClose, onSaved }) {
+  // Only a GUARDIAN (a parent row on this player) is offered the coach-message
+  // opt-in below; the player themself is not. The trigger refuses the player's
+  // write regardless — this is the polite front, not the rule.
+  const { memberships } = useMemberships()
+  const isGuardian = Boolean(
+    memberships?.some((m) => m.role === 'parent' && m.player_id === player?.id && m.status === 'active'),
+  )
   // ⚠️ THE BIRTHDAY NARROWS THE SQUAD'S ANSWER, AND CAN ONLY NARROW IT (17 Aug
   // 2026, the re-point). The squad name decides whether to ask at all; the
   // birthday can then take the fields away from a child playing up in a squad
@@ -323,6 +332,11 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
             }}
             disabled={saving}
           />
+
+          {/* Squad chat phase 3 (23 Aug 2026): a guardian's consent for a U16+
+              player to be messaged by their squad's coach or manager. Renders
+              nothing for a younger squad or for the player themself. */}
+          <StaffDmOptIn player={player} teamName={team?.name} isGuardian={isGuardian} />
 
           {/* Still no squad-MISMATCH note, and the original reasoning holds:
               this form cannot change the squad, so the only thing a parent

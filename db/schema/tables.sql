@@ -1932,3 +1932,88 @@ ALTER TABLE public.message_reads ADD CONSTRAINT message_reads_profile_id_fkey FO
 CREATE INDEX message_reads_profile_idx ON public.message_reads USING btree (profile_id);
 
 -- notification_opt_outs.category gained 'squad_chat' in the same migration.
+
+
+-- ---------------------------------------------------------------------
+-- public.conversations / public.dm_blocks / public.message_reports /
+-- public.welfare_access_log, plus messages.conversation_id and
+-- player_private.staff_dm_opt_in*  (squad chat phase 3, 23 Aug 2026)
+-- Migration: db/migrations/20260823_squad_chat_phase3.sql
+--
+-- A conversation is an ORDERED pair (profile_a < profile_b) so one row serves
+-- both directions; open_conversation() is the only way in. A DM is a messages
+-- row with channel = 'dm' and conversation_id set (messages_dm_shape ties the
+-- two). Reports and the access log are stamped by triggers. The opt-in on
+-- player_private records who consented and when; a trigger refuses the
+-- player themself.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.conversations (
+  id          uuid        NOT NULL DEFAULT gen_random_uuid(),
+  club_id     uuid        NOT NULL,
+  profile_a   uuid        NOT NULL,
+  profile_b   uuid        NOT NULL,
+  created_by  uuid        NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  last_at     timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.conversations ADD CONSTRAINT conversations_pkey PRIMARY KEY (id);
+ALTER TABLE public.conversations ADD CONSTRAINT conversations_check CHECK (profile_a < profile_b);
+ALTER TABLE public.conversations ADD CONSTRAINT conversations_profile_a_profile_b_key UNIQUE (profile_a, profile_b);
+ALTER TABLE public.conversations ADD CONSTRAINT conversations_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE;
+ALTER TABLE public.conversations ADD CONSTRAINT conversations_profile_a_fkey  FOREIGN KEY (profile_a)  REFERENCES profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.conversations ADD CONSTRAINT conversations_profile_b_fkey  FOREIGN KEY (profile_b)  REFERENCES profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.conversations ADD CONSTRAINT conversations_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE CASCADE;
+CREATE INDEX conversations_a_idx ON public.conversations USING btree (profile_a, last_at DESC);
+CREATE INDEX conversations_b_idx ON public.conversations USING btree (profile_b, last_at DESC);
+
+-- messages gained:
+--   conversation_id uuid REFERENCES conversations(id) ON DELETE CASCADE
+--   CONSTRAINT messages_dm_shape CHECK ((channel = 'dm') = (conversation_id IS NOT NULL))
+--   CREATE INDEX messages_conversation_idx ON public.messages USING btree (conversation_id, created_at) WHERE (conversation_id IS NOT NULL);
+
+CREATE TABLE public.dm_blocks (
+  blocker_id  uuid        NOT NULL,
+  blocked_id  uuid        NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.dm_blocks ADD CONSTRAINT dm_blocks_pkey PRIMARY KEY (blocker_id, blocked_id);
+ALTER TABLE public.dm_blocks ADD CONSTRAINT dm_blocks_blocker_id_fkey FOREIGN KEY (blocker_id) REFERENCES profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.dm_blocks ADD CONSTRAINT dm_blocks_blocked_id_fkey FOREIGN KEY (blocked_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+CREATE TABLE public.message_reports (
+  id           uuid        NOT NULL DEFAULT gen_random_uuid(),
+  club_id      uuid        NOT NULL,
+  message_id   uuid        NOT NULL,
+  reporter_id  uuid        NOT NULL,
+  reason       text        NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  resolved_at  timestamptz,
+  resolved_by  uuid
+);
+ALTER TABLE public.message_reports ADD CONSTRAINT message_reports_pkey PRIMARY KEY (id);
+ALTER TABLE public.message_reports ADD CONSTRAINT message_reports_reason_check CHECK (length(btrim(reason)) BETWEEN 1 AND 500);
+ALTER TABLE public.message_reports ADD CONSTRAINT message_reports_message_id_reporter_id_key UNIQUE (message_id, reporter_id);
+ALTER TABLE public.message_reports ADD CONSTRAINT message_reports_club_id_fkey     FOREIGN KEY (club_id)     REFERENCES clubs(id)    ON DELETE CASCADE;
+ALTER TABLE public.message_reports ADD CONSTRAINT message_reports_message_id_fkey  FOREIGN KEY (message_id)  REFERENCES messages(id) ON DELETE CASCADE;
+ALTER TABLE public.message_reports ADD CONSTRAINT message_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.message_reports ADD CONSTRAINT message_reports_resolved_by_fkey FOREIGN KEY (resolved_by) REFERENCES profiles(id) ON DELETE SET NULL;
+CREATE INDEX message_reports_open_idx ON public.message_reports USING btree (club_id, created_at DESC) WHERE (resolved_at IS NULL);
+
+CREATE TABLE public.welfare_access_log (
+  id               uuid        NOT NULL DEFAULT gen_random_uuid(),
+  club_id          uuid        NOT NULL,
+  admin_id         uuid        NOT NULL,
+  conversation_id  uuid        NOT NULL,
+  opened_at        timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_pkey PRIMARY KEY (id);
+ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_club_id_fkey         FOREIGN KEY (club_id)         REFERENCES clubs(id)         ON DELETE CASCADE;
+ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_admin_id_fkey        FOREIGN KEY (admin_id)        REFERENCES profiles(id)      ON DELETE CASCADE;
+ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE;
+CREATE INDEX welfare_access_log_idx ON public.welfare_access_log USING btree (club_id, opened_at DESC);
+
+-- player_private gained (phase 3):
+--   staff_dm_opt_in    boolean NOT NULL DEFAULT false
+--   staff_dm_opt_in_by uuid REFERENCES profiles(id) ON DELETE SET NULL
+--   staff_dm_opt_in_at timestamptz
+-- notification_opt_outs.category gained 'direct_messages'.

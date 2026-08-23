@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **Glass islands** — Jay: "make the bottom more transparent or glass? a
+- 💬 **Squad chat, phase 3 — the staff channel, direct messages, reports,
+  and the Welfare dashboard.** A second stream per squad for coach /
+  manager / medic. One-to-one messages with a permanent notice — *"Club
+  admins can review this conversation"* — because Jay ruled (23 Aug) that
+  any admin may read a DM, consistent with the 10 Aug "rights gate screens,
+  not data" ruling; `welfare` is a fifth admin right that gates only the
+  dashboard. Who may message whom is `private.can_dm`, the database's
+  rule: parent ↔ parent within a squad, staff ↔ families they share a
+  squad with, admins; a MINOR (a `player` account under 18, or with no date
+  of birth) only by their own guardian, or by their U16+ squad's coach /
+  manager once a guardian has opted in (`player_private.staff_dm_opt_in`,
+  recorded who/when, refused to the player themself); minor ↔ minor never;
+  blocks both ways; re-checked on every message. Every admin open of a DM is
+  logged and the log is on the dashboard. Report any message; admins see the
+  queue and can remove (blank) but never rewrite. Push: a DM reaches the
+  other side (category `direct_messages`); a staff post reaches the staff.
+  `db/migrations/20260823_squad_chat_phase3.sql` (+ harness **16/16** rolled
+  back against production), `DirectMessages.jsx`, `Welfare.jsx`,
+  `WelfareReports.jsx`, `StaffDmOptIn.jsx` on the family's player card.
+- `804a012` — **Glass islands** — Jay: "make the bottom more transparent or glass? a
   similar style for the top?" The masthead is now a floating island like
   the dock — inset, rounded, highlight edge, shadow (`.glass-island`, 70%
   because it carries text) — with the iPhone status-bar strip as its own

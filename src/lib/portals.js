@@ -101,6 +101,15 @@ export const PORTALS = [
     ],
   },
   {
+    key: 'welfare',
+    right: 'welfare',
+    blurb: 'Every squad channel and every direct message, and the messages people have reported.',
+    tabs: [
+      { to: '/admin/welfare', label: 'Overview' },
+      { to: '/admin/welfare/reports', label: 'Reports' },
+    ],
+  },
+  {
     key: 'training',
     right: 'training',
     blurb: 'Drills, session templates, and publishing them to squads.',

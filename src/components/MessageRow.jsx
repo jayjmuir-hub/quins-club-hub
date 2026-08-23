@@ -96,6 +96,7 @@ function Reply({ reply, selfId, canModerate, onRemove }) {
  * @param mentionables people the reply composer may @mention
  * @param forceOpen    open the thread on mount (the ?thread= deep link)
  * @param onReply(id, body, { mentions }), onRemove(id), onPin(id, pinned)
+ * @param onReport(id, reason)  phase 3 — report a message to the club
  */
 export default function MessageRow({
   message,
@@ -109,8 +110,11 @@ export default function MessageRow({
   onReply,
   onRemove,
   onPin,
+  onReport,
 }) {
   const [open, setOpen] = useState(forceOpen)
+  const [reporting, setReporting] = useState(false)
+  const [reason, setReason] = useState('')
   const [draft, setDraft] = useState('')
   const [mentions, setMentions] = useState([])
   const [sending, setSending] = useState(false)
@@ -218,7 +222,55 @@ export default function MessageRow({
               Remove
             </button>
           )}
+          {!message.deleted_at && !mine && onReport && (
+            <button type="button" onClick={() => setReporting((v) => !v)} className="hover:text-ink" aria-expanded={reporting}>
+              Report
+            </button>
+          )}
         </div>
+        {reporting && (
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!reason.trim()) return
+              try {
+                await onReport(message.id, reason)
+                setReporting(false)
+                setReason('')
+              } catch (err) {
+                setError(err.message || 'Could not send the report.')
+              }
+            }}
+            className="mt-2 rounded-[10px] bg-surface-mute px-3 py-2"
+            data-testid="report-form"
+          >
+            <label htmlFor={`report-${message.id}`} className="text-[12px] font-extrabold text-ink">
+              Report this message to the club
+            </label>
+            <textarea
+              id={`report-${message.id}`}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="What is wrong with it?"
+              className="mt-1 w-full rounded-[8px] border border-line bg-surface-card px-2.5 py-1.5 text-[13px] text-ink"
+            />
+            <div className="mt-1.5 flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setReporting(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" type="submit" disabled={!reason.trim()}>
+                Send report
+              </Button>
+            </div>
+          </form>
+        )}
+        {error && !open && (
+          <p role="alert" className="mt-1.5 text-[12.5px] font-semibold text-danger-ink">
+            {error}
+          </p>
+        )}
       </div>
 
       {open && (

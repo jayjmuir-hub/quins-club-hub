@@ -12,8 +12,11 @@ import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
 import {
   getChannelSettings,
-  listMentionables,
+  listMentionablesFor,
   listMessages,
+  listStaffMessages,
+  postStaffMessage,
+  reportMessage,
   listMyMessageReads,
   markMessagesRead,
   messageReadStats,
@@ -116,13 +119,16 @@ export default function Chat() {
   const bottomRef = useRef(null)
   const threadParam = searchParams.get('thread')
   const eventParam = searchParams.get('event')
+  // Phase 3: ?channel=staff — the squad's staff-only stream. Offered only to
+  // people who can edit the squad; the policy refuses everybody else anyway.
+  const staffChannel = searchParams.get('channel') === 'staff' && !isClub && canModerate
 
   const load = useCallback(async () => {
     if (!param) return
     setError(null)
     try {
       const [rows, mine, channel] = await Promise.all([
-        listMessages(teamId),
+        staffChannel ? listStaffMessages(teamId) : listMessages(teamId),
         listMyMessageReads(),
         getChannelSettings(teamId),
       ])
@@ -140,7 +146,7 @@ export default function Chat() {
         }
       }
       // Staff-only, and allowed to fail without breaking the stream.
-      if (canModerate && teamId) {
+      if (canModerate && teamId && !staffChannel) {
         try {
           setStats(await messageReadStats(teamId))
         } catch {
@@ -150,7 +156,7 @@ export default function Chat() {
     } catch (err) {
       setError(err.message || 'We could not load the chat just now.')
     }
-  }, [param, teamId, canModerate])
+  }, [param, teamId, canModerate, staffChannel])
 
   useEffect(() => {
     load()
@@ -162,12 +168,12 @@ export default function Chat() {
   // Both allowed to fail: the composer still works without either.
   useEffect(() => {
     if (!param) return
-    listMentionables(teamId).then(setMentionables).catch(() => setMentionables([]))
+    listMentionablesFor(teamId, staffChannel ? 'staff' : 'squad').then(setMentionables).catch(() => setMentionables([]))
     if (!teamId) return
     const from = new Date()
     const to = new Date(from.getTime() + 60 * 24 * 3600 * 1000)
     listEvents({ teamIds: [teamId], from, to }).then(setUpcoming).catch(() => setUpcoming([]))
-  }, [param, teamId])
+  }, [param, teamId, staffChannel])
 
   // ?event= — the event screen sent us here. If the fixture already has a
   // thread, open it; otherwise preselect it in the composer. Consumed once.
@@ -209,6 +215,9 @@ export default function Chat() {
   const announceOnly = settings?.announce_only ?? true
   const mayPost = canModerate || (!isClub && !announceOnly)
   const title = isClub ? 'Whole club' : team?.name ?? 'Squad'
+  const onReport = async (id, reason) => {
+    await reportMessage(id, reason)
+  }
   const pinned = (messages ?? []).filter((m) => m.pinned && !m.deleted_at)
   const threadedEventIds = new Set((messages ?? []).filter((m) => m.event_id && !m.deleted_at).map((m) => m.event_id))
   const attachable = upcoming.filter((e) => !threadedEventIds.has(e.id))
@@ -224,7 +233,8 @@ export default function Chat() {
     setSendError(null)
     try {
       const kept = draftMentions.filter((m) => draft.includes(`@${m.full_name}`)).map((m) => m.profile_id)
-      await postMessage(teamId, draft, { eventId: attachEventId || null, mentions: kept })
+      if (staffChannel) await postStaffMessage(teamId, draft, { mentions: kept })
+      else await postMessage(teamId, draft, { eventId: attachEventId || null, mentions: kept })
       setDraft('')
       setDraftMentions([])
       setAttachEventId('')
@@ -269,15 +279,47 @@ export default function Chat() {
     <section className="px-1">
       <div className="mb-3.5 mt-1 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Kicker>Squad chat</Kicker>
-          <AccentTitle lead={title} accent="chat." />
+          <Kicker>{staffChannel ? 'Staff channel' : 'Squad chat'}</Kicker>
+          <AccentTitle lead={title} accent={staffChannel ? 'staff.' : 'chat.'} />
         </div>
-        {myTeams.length > 1 || admin ? (
-          <Link to="/chat" className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
-            Other channels
+        <div className="flex items-center gap-3 text-[13px] font-bold">
+          <Link to="/chat/dm" className="text-brand-ink underline-offset-2 hover:underline">
+            Messages
           </Link>
-        ) : null}
+          {myTeams.length > 1 || admin ? (
+            <Link to="/chat" className="text-brand-ink underline-offset-2 hover:underline">
+              Other channels
+            </Link>
+          ) : null}
+        </div>
       </div>
+
+      {/* Phase 3: the squad's two streams, for staff only. A parent never
+          sees this row — for them there is one channel. */}
+      {!isClub && canModerate && (
+        <div className="mb-3 flex gap-2" role="tablist" aria-label="Channel">
+          <Link
+            role="tab"
+            aria-selected={!staffChannel}
+            to={`/chat/${teamId}`}
+            className={`rounded-full border px-3 py-1.5 text-[13px] font-bold ${
+              !staffChannel ? 'border-ink bg-ink text-surface-card' : 'border-line bg-surface-card text-ink-muted'
+            }`}
+          >
+            Squad
+          </Link>
+          <Link
+            role="tab"
+            aria-selected={staffChannel}
+            to={`/chat/${teamId}?channel=staff`}
+            className={`rounded-full border px-3 py-1.5 text-[13px] font-bold ${
+              staffChannel ? 'border-ink bg-ink text-surface-card' : 'border-line bg-surface-card text-ink-muted'
+            }`}
+          >
+            Staff only
+          </Link>
+        </div>
+      )}
 
       {error && (
         <Card className="mb-3 px-4 py-3">
@@ -288,7 +330,7 @@ export default function Chat() {
       )}
 
       {/* ── Staff panel: announce-only ───────────────────────────────── */}
-      {canModerate && !isClub && settings && (
+      {canModerate && !isClub && !staffChannel && settings && (
         <Card className="mb-3 flex flex-wrap items-center justify-between gap-3 px-4 py-3" data-testid="channel-settings">
           <div>
             <p className="text-[13.5px] font-extrabold text-ink">Announce-only</p>
@@ -346,6 +388,7 @@ export default function Chat() {
           onReply={onReply}
           onRemove={onRemove}
           onPin={onPin}
+          onReport={onReport}
         />
       ))}
       <div ref={bottomRef} />
@@ -355,7 +398,7 @@ export default function Chat() {
         {/* Attach a fixture: starts that fixture's thread. Offered to
             everyone in the squad (not only staff) — the fixture's discussion
             belongs to the squad. Only fixtures without an open thread. */}
-        {!isClub && attachable.length > 0 && (
+        {!isClub && !staffChannel && attachable.length > 0 && (
           <div className="mb-2 flex items-center gap-2 px-1">
             <label htmlFor="chat-attach" className="text-[12px] font-bold text-ink-muted">
               Fixture
@@ -398,7 +441,9 @@ export default function Chat() {
               onChange={(e) => setDraft(e.target.value)}
               rows={1}
               maxLength={2000}
-              placeholder={attachedEvent ? `Start the thread for ${eventTitle(attachedEvent)}` : `Post to ${title}`}
+              placeholder={
+                attachedEvent ? `Start the thread for ${eventTitle(attachedEvent)}` : staffChannel ? `Post to ${title} staff` : `Post to ${title}`
+              }
               className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
             />
             <Button type="submit" disabled={sending || !draft.trim()}>
