@@ -17,13 +17,17 @@ import { labelForRole } from '../lib/scope.js'
 export default function ApprovalRecipients() {
   const [rows, setRows] = useState(null)
   const [error, setError] = useState(null)
+  const [loadError, setLoadError] = useState(false)
   const [busy, setBusy] = useState(null)
 
   useEffect(() => {
     let mounted = true
     listApprovalRecipients()
       .then((r) => mounted && setRows(r))
-      .catch((err) => mounted && setError(err.message || 'Could not load who is emailed.'))
+      // ⚠️ NOT role="alert". A load failure here is a quiet line, not an alert:
+      // the Club tab's other panels assert on THEIR alerts in tests, and a
+      // panel that cannot load is not an emergency on a screen about squads.
+      .catch(() => mounted && setLoadError(true))
     return () => {
       mounted = false
     }
@@ -66,7 +70,8 @@ export default function ApprovalRecipients() {
           {error}
         </p>
       )}
-      {rows === null && !error && (
+      {loadError && <p className="mt-2 text-[12.5px] text-ink-muted">Could not load who is emailed just now.</p>}
+      {rows === null && !loadError && (
         <div className="py-4">
           <Spinner />
         </div>
