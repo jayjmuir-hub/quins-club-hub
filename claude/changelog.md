@@ -10,7 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **Four from Jay's desktop look** — the masthead island shrink-wraps to a
+- **Privacy: "secure providers", not a city** — Jay: "we don't need to
+  mention Tokyo". The where-it-is-kept paragraph now says the data is held
+  by secure, reputable providers acting on the club's instructions; the
+  test that pinned the region now pins its absence.
+- `166ad2b` — **Four from Jay's desktop look** — the masthead island shrink-wraps to a
   compact pill at the top-right on desktop (the sidebar holds the crest and
   name, so a full-width island held three things on the right and looked
   empty); Schedule's heading is "What's on, *when.*" (was "Club life,

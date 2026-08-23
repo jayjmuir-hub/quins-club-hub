@@ -28,7 +28,8 @@ import { Link } from 'react-router-dom'
 //
 // ⚠️ FOUR SENTENCES ARE LOAD-BEARING AND PINNED BY tests/account-deletion.test.jsx,
 // because each is a fact the policy once got wrong or could easily omit:
-//   - where the data is (Tokyo, Japan — not the UAE);
+//   - that it is held by providers on the club's instructions (the region
+//     was named until 23 Aug 2026; Jay asked for "secure providers" instead);
 //   - that a child does not sign in;
 //   - that squad members see each other's names, photographs and
 //     availability (the 7 Aug policy said "own children only", which was
@@ -100,13 +101,15 @@ export default function Privacy() {
       </P>
 
       <H2>Where it is kept</H2>
+      {/* "Tokyo, Japan" named the region until 23 Aug 2026 — Jay: "we don't
+          need to mention Tokyo, we will just say secure providers". The
+          region is still a fact anyone can ask the club about; it is just
+          not a sentence this policy needs. */}
       <P>
-        On servers run for the club by Supabase in{' '}
-        <span className="font-bold text-ink">Tokyo, Japan</span>, with the app
-        delivered by Netlify and emails sent by Resend. If the app breaks, an
-        error report goes to a monitoring service so it can be fixed. Those
-        providers act on the club&apos;s instructions only. If you sign in
-        with Google, Google will know you did.
+        With secure, reputable hosting and email providers who act on the
+        club&apos;s instructions only. If the app breaks, an error report goes
+        to a monitoring service so it can be fixed. If you sign in with
+        Google, Google will know you did.
       </P>
 
       <H2>Notifications and your device</H2>
