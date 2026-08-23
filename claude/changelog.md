@@ -10,7 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- 📓 **Push notifications PROVEN on a real iPhone and a real Android** — a
+- 📓 **Handoff: push proven, and the squad chat that followed it**
+  (`claude/handoffs/2026-08-23-push-proven-and-squad-chat.md`) — the day in
+  order, seven ranked lessons (harness the FILE not a retyping; Supabase's
+  default privileges under a column grant; a policy cannot select from its
+  own table; the actor never gets their own push), and the first real chat
+  message: posted by Jay in U13 Mixed, arrived on a parent's phone, read by
+  2 of 12. `claude/state-of-play.md` carries the chat as live.
+- `ff1a9c8` — 📓 **Push notifications PROVEN on a real iPhone and a real Android** — a
   notice and a U13 Mixed fixture change, posted by Jay, arrived on the lock
   screen of the club iPhone signed in as a parent; an hour later a fixture
   change arrived on an Android (Chrome) signed in as a parent-only account.
