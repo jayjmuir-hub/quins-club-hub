@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **The dock** — Jay, with a photo of his iPhone home screen: the tab bar is
+- 🐛 **The dock was at the TOP of every phone, iOS and Android** — live
+  from #330 until this. `backdrop-filter` on an ancestor makes it the
+  containing block for `position: fixed` descendants, and `<Nav>` rendered
+  inside the masthead wrapper that took the glass — so "12px from the
+  bottom" meant the bottom of the masthead. Nav now renders outside it
+  (`src/components/AppShell.jsx`); the rule is written at the class in
+  `src/index.css`. ⚠️ The harness showed this first and was written off as a
+  harness quirk. Also: headless Chromium DOES composite backdrop-filter —
+  the "it cannot" note from #330 was this same bug misread, and is removed.
+- **Glassier** — Jay: "it isn't very glassy looking". `.glass-chrome` goes
+  from 82% to 68% with a 24px blur, and because that lifts the worst
+  composite to rgb(88,88,88), every tint on the bars moves with it: idle tab
+  labels `white/85` (was chrome-muted, which would have been 2.2:1), the
+  wordmark `white/80`. The arithmetic is in `src/index.css`.
+- `f712dff` — **The dock** — Jay, with a photo of his iPhone home screen: the tab bar is
   now a floating rounded pill, inset 12px from the edges and lifted clear of
   the home indicator, in the same glass as the masthead. Six tabs on a 360px
   Android had "SQUAD HUB" wrapping and "SCHEDULE ROSTER" running together:

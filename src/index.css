@@ -343,27 +343,37 @@
      ⚠️ THE TAB BAR ONCE RULED AGAINST TRANSLUCENCY (Nav.jsx): a bg-white/95
      bar over scrolling light content made the idle-label contrast depend on
      whatever was underneath. This is the other way round and that is why it
-     holds: the material is DARK at 82% over a 20px blur, so the brightest
-     thing that can ever sit behind it is pure white, and white composited
-     under 82% near-black is rgb(56,56,56) by arithmetic: chrome-muted
-     (139,144,153) on that is 4.9:1 and white is 11.9:1, both AA. The blur is
-     what keeps the composite flat — without it a bright card edge scrolling
-     past would show as a stripe through the label.
+     holds: the material is DARK, so the brightest thing that can ever sit
+     behind it is pure white, and the composite has a known ceiling.
 
-     ⚠️ HEADLESS CHROMIUM DOES NOT COMPOSITE backdrop-filter — measured 23 Aug
-     2026: the harness screenshot sampled ~rgb(20,20,20) under the bar at
-     EVERY scroll position, white content or not, while an opaque control
-     sampled (10,10,10). So the Playwright scripts cannot see this material;
-     it was checked by eye in real Chrome, and the numbers above are the
-     arithmetic, not a sample. Do not "fix" a harness PNG that shows these
-     bars as solid — that is the renderer, not the CSS.
+     ⚠️ 68%, NOT 82% — Jay, 23 Aug 2026: "it isn't very glassy looking". At
+     82% it was barely see-through. At 68% over white the composite is
+     rgb(88,88,88) by arithmetic, and that is the number every piece of text
+     on these bars is checked against: white is 7.1:1, white/85 (the idle tab
+     label, Nav.jsx) is 5.0:1, both AA. chrome-muted (139,144,153) would be
+     2.2:1 on it and is NO LONGER USED ON THE BARS — lowering the opacity
+     without lifting the idle labels is exactly the bug the old ruling was
+     about. The blur is what keeps the composite flat: without it a bright
+     card edge scrolling past would show as a stripe through a label.
+
+     (A note here once said headless Chromium cannot composite this and the
+     harness PNGs would show the bars solid. It can, and they do not — what
+     was being photographed was the bug below, with the tab bar sitting on
+     the masthead and sampling the masthead. Verified 23 Aug 2026: the
+     harness shows card text through the dock once the bar is placed right.)
+
+     ⚠️ backdrop-filter MAKES THIS ELEMENT THE CONTAINING BLOCK FOR ANY
+     `position: fixed` DESCENDANT — the tab bar rendered inside the masthead
+     went to the TOP of every phone the day this shipped (#330). Nothing
+     fixed may live inside an element wearing this class. See the note at
+     <Nav> in AppShell.jsx.
 
      `@supports` fallback: a browser without backdrop-filter gets the opaque
      chrome it had before, rather than a see-through bar with no blur. */
   .glass-chrome {
-    background: rgb(var(--chrome-rgb) / 0.82);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    backdrop-filter: saturate(180%) blur(20px);
+    background: rgb(var(--chrome-rgb) / 0.68);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .glass-chrome {

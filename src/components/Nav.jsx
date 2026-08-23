@@ -104,7 +104,10 @@ function linkClassName({ isActive }) {
     // item edge rather than grow the bar.
     'flex min-w-0 flex-col items-center justify-center gap-[3px] px-0.5 pb-2 pt-[11px] font-condensed text-[10px] font-bold uppercase tracking-[0.03em] whitespace-nowrap outline-none transition',
     'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
-    isActive ? 'text-white' : 'text-chrome-muted hover:text-white',
+    // ⚠️ white/85, NOT chrome-muted, since the bar went to 68% glass
+    // (src/index.css): the grey would be 2.2:1 over white content. Active is
+    // full white plus the red icon — brighter, not just a different hue.
+    isActive ? 'text-white' : 'text-white/85 hover:text-white',
     // (The desktop pill styling that lived here 6-21 Aug, with its measured
     // adhjrt values, is retired — see the header note.)
   ].join(' ')
@@ -138,8 +141,7 @@ export default function Nav({ showSquadHub = false }) {
     // scrolling light content made the idle-label contrast depend on whatever
     // was underneath. `glass-chrome` (src/index.css) is DARK at 82% over a
     // 20px blur: the worst thing behind it is pure white, and the composite is
-    // still near-black — 4.9:1 for the idle label by arithmetic; see the
-    // note in src/index.css on why the harness cannot photograph it.
+    // still dark — 5.0:1 for the white/85 idle label by arithmetic.
     <nav
       aria-label="Primary"
       /* `desktop:gap-[2px]` matches adhjrt.com's `.hdr-nav { gap: 2px }`. The
@@ -151,7 +153,7 @@ export default function Nav({ showSquadHub = false }) {
       // ══ THE DOCK — Jay, 23 Aug 2026, with a photo of his iPhone's home
       // screen: a floating, rounded, frosted pill inset from the edges and
       // lifted clear of the home indicator, not a slab welded to the bottom.
-      // `inset-x-3 bottom-[calc(12px+safe-area)]` is the inset; `rounded-[26px]`
+      // inset-x-3 plus 12px above the safe area is the inset; `rounded-[26px]`
       // and `glass-chrome` are the material; `overflow-hidden` clips the
       // brand-rule and item hover fills to the pill's corners.
       //
