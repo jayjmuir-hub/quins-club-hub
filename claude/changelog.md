@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **Shell polish to match the dock** — the desktop sidebar's active item is
+- **The motion pass** — Jay: "animate like iOS does when you press a
+  different menu option, maybe some red glow, more glass". The dock's red
+  pill is now ONE element (`Glider` in `src/components/Nav.jsx`) that
+  slides to the tapped tab on a spring curve, its glow blooming as it lands
+  (`dock-bloom` keyframes); tabs squash on press. ⚠️ The pill's target is
+  PREDICTED from the settled layout, not read mid-transition — the dock is
+  `justify-between`, so every tab is moving the moment one grows, and a
+  naive measure sent the pill 50px past its mark. Tracked in the harness at
+  45ms steps: 52 → 138 → 174 → 162. Sheets and the account menu wear a new
+  light glass, `.glass-panel` (86% card over a 24px blur; contrast floor in
+  `src/index.css`). Everything respects reduced-motion.
+- `616a546` — **Shell polish to match the dock** — the desktop sidebar's active item is
   the same gradient pill with the same glow (`src/components/Sidebar.jsx`),
   and the help button is dark glass instead of a second red disc 40px from
   the red active tab (`src/components/HelpButton.jsx`; still 44px — the

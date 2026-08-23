@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 
 // Primary navigation — THE MOBILE TAB BAR, and since phase 2 of the 2.0
 // retheme (claude/plans/2026-08-21-retheme-and-shell.md) nothing else.
@@ -95,19 +96,20 @@ function linkClassName({ isActive }) {
     // tab EXPANDS into a red labelled pill ("flashier and more modern").
     //
     // Every item is a flex row: icon, then a label whose width is animated
-    // from 0 (see labelClassName). The pill is the active link's own
-    // background — brand gradient, a soft red glow — so it moves with the
-    // route rather than being a separate element that has to be positioned.
-    // Inactive items are white icons on the glass. Labels exist for every
-    // item in the DOM and in the accessible name; only the active one is
-    // VISIBLE, which is what makes six tabs fit on a 360px phone without a
-    // single abbreviation.
-    'group relative flex h-[46px] items-center justify-center gap-1.5 rounded-pill outline-none',
-    'transition-[background-color,box-shadow,color,transform] duration-300 ease-out motion-reduce:transition-none',
-    'active:scale-95 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
-    isActive
-      ? 'px-3 text-white bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] shadow-[0_4px_14px_rgba(194,31,50,0.45)]'
-      : 'px-2 text-white/80 hover:text-white hover:bg-white/10',
+    // from 0 (see labelClassName). Since the motion pass the red pill is NOT
+    // this link's background — it is the <Glider> below, one element that
+    // slides along the dock to whichever link is active, so a tap reads as
+    // the pill travelling rather than blinking off one tab and on at the
+    // next. The link itself only changes padding (to make room for its
+    // label) and colour. Labels exist for every item in the DOM and in the
+    // accessible name; only the active one is VISIBLE, which is what makes
+    // six tabs fit on a 360px phone without a single abbreviation.
+    'group relative z-[1] flex h-[46px] items-center justify-center gap-1.5 rounded-pill outline-none',
+    'transition-[padding,color,transform] duration-300 ease-out motion-reduce:transition-none',
+    // Press squash — the iOS tab feel. 90% on the way down, and the spring
+    // curve on the transition above gives it the bounce back.
+    'active:scale-90 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
+    isActive ? 'px-3 text-white' : 'px-2 text-white/80 hover:text-white',
   ].join(' ')
 }
 
@@ -126,6 +128,37 @@ function labelClassName({ isActive }) {
   ].join(' ')
 }
 
+// ══ THE GLIDER — the red pill that travels ═══════════════════════════════════
+//
+// One absolutely-positioned element behind the links, moved to the active
+// link's box with a transform, so the browser animates it on the compositor.
+// The spring curve (cubic-bezier with a >1 control point) gives the small
+// overshoot iOS tab bars have; `animate-dock-bloom` re-runs on every move
+// (keyed on the pathname) so the glow blooms as the pill lands and settles.
+//
+// ⚠️ MEASURED, NOT COMPUTED. The active link's width depends on its label,
+// which is mid-animation when the route changes — so the glider is measured
+// in a layout effect AFTER the label's transition would have started, and
+// again on resize. It reads offsetLeft/offsetWidth relative to the <nav>, so
+// it is immune to the fixed-position containing-block trap that put the dock
+// at the top of the screen on 23 Aug.
+//
+// ⚠️ The label's max-width transition and the glider's transform transition
+// run on the same 300ms curve on purpose: the pill grows as the label
+// unfurls. Change one and change the other.
+function Glider({ box, routeKey }) {
+  if (!box) return null
+  return (
+    <span
+      key={routeKey}
+      aria-hidden="true"
+      data-testid="dock-glider"
+      className="pointer-events-none absolute left-0 top-[7px] h-[46px] rounded-pill bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] shadow-[0_4px_14px_rgba(194,31,50,0.45)] transition-[transform,width] duration-300 ease-[cubic-bezier(.34,1.4,.64,1)] animate-dock-bloom motion-reduce:transition-none motion-reduce:animate-none"
+      style={{ transform: `translateX(${box.left}px)`, width: box.width }}
+    />
+  )
+}
+
 // The Admin pill that used to render here (admin-only, desktop-only) is now
 // the sidebar's Admin item — same isAdmin() gate, same destination. The tab
 // bar never showed it and still does not: since phase 4 the phone's route to
@@ -141,6 +174,57 @@ export default function Nav({ showSquadHub = false }) {
         ...NAV_ITEMS.filter((item) => item.to === '/more'),
       ]
     : NAV_ITEMS
+
+  const { pathname } = useLocation()
+  const navRef = useRef(null)
+  const [box, setBox] = useState(null)
+
+  // Where is the active link? Re-measured on route change and on resize, and
+  // once more after the label's 300ms unfurl so the pill's final width is the
+  // settled one, not the one captured mid-transition.
+  useLayoutEffect(() => {
+    const nav = navRef.current
+    if (!nav) return undefined
+    function measure() {
+      const links = [...nav.querySelectorAll('a')]
+      const activeIndex = links.findIndex((link) => link.getAttribute('aria-current') === 'page')
+      if (activeIndex < 0) {
+        setBox(null)
+        return
+      }
+      // ⚠️ PREDICT THE SETTLED LAYOUT, do not read the current one. At the
+      // moment of a route change the new label is still 0 wide (its
+      // max-width transition has just started) and the OLD active link is
+      // still wide, and the dock is `justify-between` — so every link is
+      // mid-slide and offsetLeft is wrong for all of them. Reading it sent
+      // the pill 50px past its target and back. The settled layout is
+      // computable: idle links are all one width (the narrowest link now),
+      // the active link's width is its current box plus the label's natural
+      // width (scrollWidth is unaffected by the clip), and justify-between
+      // spreads the remaining space evenly.
+      const style = getComputedStyle(nav)
+      const padLeft = parseFloat(style.paddingLeft)
+      const inner = nav.clientWidth - padLeft - parseFloat(style.paddingRight)
+      const idle = Math.min(...links.map((link) => link.offsetWidth))
+      const active = links[activeIndex]
+      const label = active.querySelector('span')
+      const hidden = label ? Math.max(0, label.scrollWidth - label.clientWidth) : 0
+      const gap = label && label.clientWidth === 0 ? 6 : 0
+      const activeWidth = Math.max(active.offsetWidth, idle) + hidden + gap
+      const total = idle * (links.length - 1) + activeWidth
+      const space = links.length > 1 ? (inner - total) / (links.length - 1) : 0
+      const left = padLeft + activeIndex * (idle + space)
+      setBox({ left, width: activeWidth })
+    }
+    measure()
+    const settle = window.setTimeout(measure, 320)
+    window.addEventListener('resize', measure)
+    return () => {
+      window.clearTimeout(settle)
+      window.removeEventListener('resize', measure)
+    }
+  }, [pathname, items.length])
+
   return (
     // The bar is dark chrome so the app is bookended in near-black — masthead
     // at the top, tab bar at the bottom, light content well between. The
@@ -169,8 +253,10 @@ export default function Nav({ showSquadHub = false }) {
       // ⚠️ The content's bottom padding in AppShell and the help button's
       // offset in HelpButton.jsx are sized to clear THIS. Change the height or
       // the inset here and re-measure both.
+      ref={navRef}
       className="glass-dock fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-pill px-2 py-[7px] desktop:hidden"
     >
+      <Glider box={box} routeKey={pathname} />
       {items.map(({ to, label, end, icon: Icon }) => (
         <NavLink key={to} to={to} end={end} className={linkClassName} aria-label={label}>
           {({ isActive }) => (

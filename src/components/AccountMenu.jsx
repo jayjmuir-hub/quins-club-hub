@@ -268,7 +268,7 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut }) {
           role="menu"
           aria-label={page === 'viewAs' ? 'View as' : 'Account'}
           style={{ position: 'fixed', top: anchor.top, right: anchor.right }}
-          className="z-50 max-h-[70vh] w-[272px] max-w-[calc(100vw-16px)] overflow-y-auto rounded-[14px] border border-line bg-surface-card p-2 shadow-card"
+          className="glass-panel z-50 max-h-[70vh] w-[272px] max-w-[calc(100vw-16px)] overflow-y-auto rounded-[16px] border border-line p-2 shadow-[0_12px_32px_rgba(0,0,0,0.22)] animate-sheet-scale-in motion-reduce:animate-none"
         >
           {page === 'main' ? (
             <>
