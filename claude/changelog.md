@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 23 Aug 2026
 
-- **A phone that changes hands can turn notifications on** — found live
+- **The account menu — one trigger in the masthead, at every width** — Jay's
+  phone showed "QUINS CLUB HUB · …" with the role eaten by the ellipsis, the
+  fifth masthead-overflow fix in sixteen days. Every control beside the
+  initial was `shrink-0` and the wordmark paid for all of them. Now the
+  initial opens a menu (`src/components/AccountMenu.jsx`): name and role as
+  its header, My account, View as (admins, as a second page), Dark mode, Sign
+  out. `ThemeToggle.jsx` is deleted, the View-as eye button is gone, and the
+  persona list is `ViewAsOptions` in `src/components/ViewAsSwitcher.jsx`. On a
+  phone the role is its own pill under the wordmark; the desktop bar is down
+  to role pill · App · initial. Proven in the harness at 360, 375 and 1280px
+  with `elementFromPoint`, not a rect — the 14 Aug clip lesson.
+- `a349359` — **A phone that changes hands can turn notifications on** — found live
   during the first real push test: Jay signed out of the club iPhone, his wife
   signed in, and "Turn on notifications" failed with an RLS error, because the
   device's endpoint row still belonged to him and the client's upsert became
