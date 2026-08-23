@@ -150,6 +150,63 @@ export async function subscribeToPush(profileId) {
 }
 
 /**
+ * Sign-out's half of push — 23 Aug 2026, Jay: "I don't want it to change if
+ * I sign out and sign back in."
+ *
+ * ⚠️ DELETES THE ROW, KEEPS THE BROWSER SUBSCRIPTION. The two halves of
+ * unsubscribeFromPush() below are deliberately split here:
+ *   - the ROW goes, so push-send stops sending THIS person's notifications to
+ *     a phone they have just signed out of (the shared-phone case that #324
+ *     was for — a parent signing out at a match and handing the phone over);
+ *   - the browser's subscription STAYS, so when somebody signs in again the
+ *     phone already has permission and an endpoint, and reattachOnSignIn()
+ *     can put a row back for them silently — no toggle, no permission
+ *     prompt, nothing for the person to redo.
+ * Together: signing out and back in as yourself changes nothing you can see,
+ * and signing out and handing the phone to somebody else still stops your
+ * pushes the moment you sign out.
+ */
+export async function forgetDeviceRegistration() {
+  if (!isPushSupported()) return
+  const registration = await navigator.serviceWorker.ready
+  const subscription = await registration.pushManager.getSubscription()
+  if (!subscription) return
+  const { endpoint } = subscription.toJSON()
+  await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+}
+
+/**
+ * Sign-in's half: if this phone already holds a push subscription and the
+ * permission is granted, record it for the person who just signed in. Does
+ * nothing — and asks nothing — otherwise: a phone that never turned
+ * notifications on is not nudged here (NotificationsNudge does that, with
+ * consent). Never throws; a failure here must not interfere with signing in.
+ *
+ * The RPC moves the endpoint to the caller, so on a shared phone this is
+ * also what hands the device to the NEW person — the previous person's row
+ * was already removed by forgetDeviceRegistration() at their sign-out, and
+ * if it somehow was not, the takeover in register_push_subscription covers it.
+ */
+export async function reattachOnSignIn() {
+  try {
+    if (!isPushSupported()) return false
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false
+    const registration = await navigator.serviceWorker.ready
+    const subscription = await registration.pushManager.getSubscription()
+    if (!subscription) return false
+    const { endpoint, keys } = subscription.toJSON()
+    const { error } = await supabase.rpc('register_push_subscription', {
+      _endpoint: endpoint,
+      _p256dh: keys.p256dh,
+      _auth: keys.auth,
+    })
+    return !error
+  } catch {
+    return false
+  }
+}
+
+/**
  * Turns notifications off for this device: unsubscribes the browser AND
  * removes the row, so push-send stops trying to reach an endpoint that no
  * longer exists. Either half failing does not stop the other — a browser

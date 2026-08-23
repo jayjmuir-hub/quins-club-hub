@@ -25,6 +25,8 @@ import {
   isSubscribed,
   subscribeToPush,
   unsubscribeFromPush,
+  forgetDeviceRegistration,
+  reattachOnSignIn,
 } from '../src/lib/push.js'
 
 function createQueryBuilder({ data = null, error = null } = {}) {
@@ -269,5 +271,84 @@ describe('unsubscribeFromPush', () => {
 
     await expect(unsubscribeFromPush()).resolves.toBeUndefined()
     expect(calls.delete).toHaveLength(1)
+  })
+})
+
+// ══ 23 Aug 2026 — sign-out keeps the phone subscribed ═══════════════════════
+// Jay: "I don't want it to change if I sign out and sign back in." Sign-out
+// drops the ROW (the server stops sending to this device) but leaves the
+// browser subscription in place; sign-in puts the row back for whoever it is.
+describe('forgetDeviceRegistration', () => {
+  it('deletes the row by endpoint and does NOT unsubscribe the browser', async () => {
+    const { builder, calls } = createQueryBuilder()
+    supabase.from.mockReturnValue(builder)
+    const subscription = makeSubscription({ endpoint: 'https://push.example.invalid/keep-me' })
+    installFakePushApis({ subscription })
+
+    await forgetDeviceRegistration()
+
+    expect(supabase.from).toHaveBeenCalledWith('push_subscriptions')
+    expect(calls.delete).toHaveLength(1)
+    expect(calls.eq[0]).toEqual(['endpoint', 'https://push.example.invalid/keep-me'])
+    // ⚠️ THE POINT: the phone keeps its subscription for the next sign-in.
+    expect(subscription.unsubscribe).not.toHaveBeenCalled()
+  })
+
+  it('does nothing without a subscription or without push support', async () => {
+    const { builder, calls } = createQueryBuilder()
+    supabase.from.mockReturnValue(builder)
+    installFakePushApis({ subscription: null })
+    await forgetDeviceRegistration()
+    expect(calls.delete).toHaveLength(0)
+
+    delete global.Notification
+    await expect(forgetDeviceRegistration()).resolves.toBeUndefined()
+  })
+})
+
+describe('reattachOnSignIn', () => {
+  beforeEach(() => {
+    supabase.rpc.mockReset()
+    supabase.from.mockReset()
+  })
+
+  it('re-registers an existing, permitted subscription for the signed-in person', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: null })
+    installFakePushApis({
+      subscription: makeSubscription({ endpoint: 'https://push.example.invalid/ep9', p256dh: 'P', auth: 'A' }),
+      permission: 'granted',
+    })
+
+    expect(await reattachOnSignIn()).toBe(true)
+
+    expect(supabase.rpc).toHaveBeenCalledWith('register_push_subscription', {
+      _endpoint: 'https://push.example.invalid/ep9',
+      _p256dh: 'P',
+      _auth: 'A',
+    })
+  })
+
+  it('asks nothing when permission was never granted — that is the nudge\'s job', async () => {
+    const pushManager = installFakePushApis({ subscription: makeSubscription(), permission: 'default' })
+    expect(await reattachOnSignIn()).toBe(false)
+    expect(global.Notification.requestPermission).not.toHaveBeenCalled()
+    expect(pushManager.subscribe).not.toHaveBeenCalled()
+    expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when the phone holds no subscription', async () => {
+    installFakePushApis({ subscription: null, permission: 'granted' })
+    expect(await reattachOnSignIn()).toBe(false)
+    expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+
+  // Runs inside the sign-in path; a throw here would break signing in.
+  it('never throws — a refused RPC or a missing API is a quiet false', async () => {
+    supabase.rpc.mockRejectedValue(new Error('network'))
+    installFakePushApis({ subscription: makeSubscription(), permission: 'granted' })
+    expect(await reattachOnSignIn()).toBe(false)
+
+    delete global.Notification
+    expect(await reattachOnSignIn()).toBe(false)
   })
 })

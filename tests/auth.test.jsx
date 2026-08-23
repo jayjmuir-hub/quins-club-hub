@@ -20,11 +20,16 @@ vi.mock('../src/lib/supabase.js', () => ({
   },
 }))
 
-// signOut drops this device's push row BEFORE the session ends (23 Aug 2026,
-// the shared-phone finding). Mocked here; the real thing is in push.test.js.
-const unsubscribeFromPushMock = vi.fn()
+// signOut drops this device's push ROW before the session ends (23 Aug 2026,
+// the shared-phone finding) but keeps the browser subscription, and a sign-in
+// re-attaches it (later the same day — Jay: "I don't want it to change if I
+// sign out and sign back in"). Both mocked here; the real things are in
+// push.test.js.
+const forgetDeviceRegistrationMock = vi.fn()
+const reattachOnSignInMock = vi.fn()
 vi.mock('../src/lib/push.js', () => ({
-  unsubscribeFromPush: (...args) => unsubscribeFromPushMock(...args),
+  forgetDeviceRegistration: (...args) => forgetDeviceRegistrationMock(...args),
+  reattachOnSignIn: (...args) => reattachOnSignInMock(...args),
 }))
 
 // Import after vi.mock so this binds to the mocked module.
@@ -82,7 +87,8 @@ beforeEach(() => {
   supabase.auth.signInWithOtp.mockResolvedValue({ data: {}, error: null })
   supabase.auth.signInWithOAuth.mockResolvedValue({ data: {}, error: null })
   supabase.auth.signOut.mockResolvedValue({ error: null })
-  unsubscribeFromPushMock.mockResolvedValue(undefined)
+  forgetDeviceRegistrationMock.mockReset().mockResolvedValue(undefined)
+  reattachOnSignInMock.mockReset().mockResolvedValue(true)
 })
 
 afterEach(() => {
@@ -134,6 +140,24 @@ describe('AuthProvider / useAuth', () => {
 
     expect(screen.getByTestId('session-email')).toHaveTextContent('new@example.com')
     expect(screen.getByTestId('user-email')).toHaveTextContent('new@example.com')
+  })
+
+  // The other half of sign-out's forgetDeviceRegistration: a real sign-in
+  // re-attaches the phone's existing subscription to this person. A token
+  // refresh is not a sign-in and must not re-run it.
+  it('re-attaches the device push subscription on SIGNED_IN, and only then', async () => {
+    await renderHarness()
+    const onChange = supabase.auth.onAuthStateChange.mock.calls[0][0]
+
+    act(() => {
+      onChange('TOKEN_REFRESHED', { user: { id: 'u1', email: 'same@example.com' } })
+    })
+    expect(reattachOnSignInMock).not.toHaveBeenCalled()
+
+    act(() => {
+      onChange('SIGNED_IN', { user: { id: 'u1', email: 'same@example.com' } })
+    })
+    expect(reattachOnSignInMock).toHaveBeenCalledTimes(1)
   })
 
   it('unsubscribes from onAuthStateChange when the provider unmounts', async () => {
@@ -274,20 +298,20 @@ describe('AuthProvider / useAuth', () => {
   // ⚠️ ORDER IS THE ASSERTION. The delete needs the session that signOut ends,
   // so it must run first. A test that only checked "both were called" would
   // pass with the order reversed — and then the delete would 401 every time.
-  it('drops the push subscription for this device BEFORE ending the session', async () => {
+  it('drops the push ROW for this device BEFORE ending the session', async () => {
     const order = []
-    unsubscribeFromPushMock.mockImplementation(async () => { order.push('unsubscribe') })
+    forgetDeviceRegistrationMock.mockImplementation(async () => { order.push('forget') })
     supabase.auth.signOut.mockImplementation(async () => { order.push('signOut'); return { error: null } })
     const user = userEvent.setup()
     await renderHarness()
 
     await user.click(screen.getByRole('button', { name: /sign out/i }))
 
-    expect(order).toEqual(['unsubscribe', 'signOut'])
+    expect(order).toEqual(['forget', 'signOut'])
   })
 
-  it('still signs out when the push unsubscribe fails', async () => {
-    unsubscribeFromPushMock.mockRejectedValue(new Error('no service worker'))
+  it('still signs out when forgetting the push row fails', async () => {
+    forgetDeviceRegistrationMock.mockRejectedValue(new Error('no service worker'))
     const user = userEvent.setup()
     await renderHarness()
 

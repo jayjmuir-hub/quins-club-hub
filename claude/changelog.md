@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 💬 **Chat, reshaped like WhatsApp — and delete a message, delete a chat.**
+- **Push survives signing out and back in** — Jay: "why are notification
+  settings being reset… I don't want it to change if I sign out and sign
+  back in." The database showed deploys never touched a subscription (his
+  Android row from 19 Aug outlived fifteen of them); the reset was #324's
+  sign-out unsubscribe. Now sign-out drops only the ROW
+  (`forgetDeviceRegistration`) — the server stops sending to the phone, the
+  shared-phone protection stands — and a real `SIGNED_IN` re-attaches the
+  phone's existing subscription to whoever signed in (`reattachOnSignIn`,
+  silent, never throws, never prompts). `src/lib/push.js`, `src/lib/auth.jsx`.
+  No migration: `register_push_subscription` is delete-then-insert, so
+  re-registering your own endpoint already works.
+- `58ef714` — 💬 **Chat, reshaped like WhatsApp — and delete a message, delete a chat.**
   Jay: "there is no logical way to send someone a DM ... make it more like
   whatsapp", then "need to be able to delete messages and entire chats too".
   One Chats list at `/chat` (squads, staff channels, the club, DMs — newest
