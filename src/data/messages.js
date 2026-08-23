@@ -15,8 +15,9 @@ import { supabase } from '../lib/supabase'
 
 const SELECT = `
   id, club_id, team_id, channel, parent_id, event_id, author_id, author_role, author_title, body, pinned,
-  edited_at, deleted_at, created_at,
-  author:profiles!messages_author_id_fkey(full_name)
+  mentions, edited_at, deleted_at, created_at,
+  author:profiles!messages_author_id_fkey(full_name),
+  event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, ends_at, time_tbd, venue, pitch, team_id)
 `
 
 /**
@@ -66,29 +67,68 @@ export async function listMessages(teamId, { limit = 50 } = {}) {
  * announce-only is off. Throws the RLS error otherwise; the screen hides the
  * composer first, from getChannelSettings() plus canEditTeam().
  */
-export async function postMessage(teamId, body) {
+export async function postMessage(teamId, body, { eventId = null, mentions = [] } = {}) {
+  const text = body?.trim()
+  if (!text) throw new Error('Write something first.')
+  // ⚠️ A FIXTURE THREAD SENDS event_id AND NOT team_id — the trigger sets the
+  // squad from the fixture and refuses a mismatch, so the client never gets
+  // to say which squad a fixture belongs to. One open thread per fixture.
+  const row = eventId
+    ? { event_id: eventId, body: text, mentions }
+    : { team_id: teamId ?? null, body: text, mentions }
+  const { data, error } = await supabase.from('messages').insert(row).select(SELECT).single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * Replies to a post. Allowed for anybody who can see the post.
+ * `mentions` is profile ids; the trigger drops any not in the squad.
+ */
+export async function replyToMessage(parentId, body, { mentions = [] } = {}) {
   const text = body?.trim()
   if (!text) throw new Error('Write something first.')
   const { data, error } = await supabase
     .from('messages')
-    .insert({ team_id: teamId ?? null, body: text })
+    .insert({ parent_id: parentId, body: text, mentions })
     .select(SELECT)
     .single()
   if (error) throw error
   return data
 }
 
-/** Replies to a post. Allowed for anybody who can see the post. */
-export async function replyToMessage(parentId, body) {
-  const text = body?.trim()
-  if (!text) throw new Error('Write something first.')
+/**
+ * Who can be @mentioned in this channel: the squad's audience, with the
+ * best role each holds, minus the caller. Staff-ness for the picker's pill.
+ */
+export async function listMentionables(teamId) {
+  const { data, error } = await supabase.rpc('chat_mentionables', { _team: teamId ?? null })
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * The open thread for a fixture, if any, with its reply count. For the
+ * event screen's "Squad chat" block. Null when none.
+ */
+export async function getEventThread(eventId) {
+  if (!eventId) return null
   const { data, error } = await supabase
     .from('messages')
-    .insert({ parent_id: parentId, body: text })
-    .select(SELECT)
-    .single()
+    .select('id, team_id, created_at, author:profiles!messages_author_id_fkey(full_name)')
+    .eq('event_id', eventId)
+    .is('parent_id', null)
+    .is('deleted_at', null)
+    .maybeSingle()
   if (error) throw error
-  return data
+  if (!data) return null
+  const { count, error: countError } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('parent_id', data.id)
+    .is('deleted_at', null)
+  if (countError) throw countError
+  return { ...data, replies: count ?? 0 }
 }
 
 /** Edits the body. Own row, within 15 minutes — the policy decides. */

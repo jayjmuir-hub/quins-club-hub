@@ -1,10 +1,16 @@
 # Squad chat — a channel per squad that a WhatsApp group could move into
 
-**Status: PHASE 1 SHIPPED (23 Aug 2026) — phases 2–4 not started.** Phase 1
-is `db/migrations/20260823_squad_chat.sql`, `src/screens/Chat.jsx`,
+**Status: PHASES 1 AND 2 SHIPPED (23 Aug 2026) — phases 3–4 not started.**
+Phase 1 is `db/migrations/20260823_squad_chat.sql`, `src/screens/Chat.jsx`,
 `src/data/messages.js`, `src/components/MessageRow.jsx`, and the sixth
-trigger shape in `supabase/functions/push-send/index.ts`. Where the code and
-the phase-1 description below disagree, the code wins. Jay's brief: "each age group to have chat that could replace their
+trigger shape in `supabase/functions/push-send/index.ts`. Phase 2 is
+`db/migrations/20260823_squad_chat_phase2.sql` (fixture threads, @mentions),
+`src/components/FixtureCard.jsx`, `src/components/MentionPicker.jsx`, and the
+"Squad chat" block on the event screen. Where the code and the descriptions
+below disagree, the code wins. ⚠️ One deviation from the plan below: the
+push preference is the phase-1 boolean (`squad_chat` = staff posts AND
+mentions), not the three-level `all / staff_and_mentions / off` — a parent
+who wants every message pushed does not have that option yet. Jay's brief: "each age group to have chat that could replace their
 WhatsApp groups — might not replace them, but at least it would be possible."
 
 ## What this is, and what it deliberately is not

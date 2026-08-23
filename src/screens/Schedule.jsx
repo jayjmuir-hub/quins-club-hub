@@ -542,6 +542,15 @@ export default function Schedule() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [subscribeRequest, setSubscribeRequest] = useState(0)
   const openParam = searchParams.get('open')
+  // /schedule?event=<id> opens that fixture's detail (the chat's fixture
+  // card links here, 23 Aug 2026). Consumed and cleared like ?open=.
+  const eventParam = searchParams.get('event')
+  useEffect(() => {
+    if (!eventParam) return
+    if (membershipsLoading) return
+    setSelectedEventId(eventParam)
+    setSearchParams({}, { replace: true })
+  }, [eventParam, membershipsLoading, setSearchParams])
   useEffect(() => {
     if (!openParam) return
     // Not consumed until memberships have loaded: on a full-page load of
@@ -810,6 +819,8 @@ export default function Schedule() {
           onDuplicate={(event) => setFormState({ event, duplicate: true })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
           onOpenMatchSheet={(fixture) => navigate(`/match-sheet/${fixture.id}`)}
+          // Squad chat (phase 2): the fixture's thread. Same handler rule.
+          onOpenChat={(fixture) => navigate(`/chat/${fixture.team_id}?event=${fixture.id}`)}
           onOpenLineup={(fixture) => navigate(`/lineup/${fixture.id}`)}
           onOpenRegister={() => setRegisterOpen(true)}
           onDeleted={() => {

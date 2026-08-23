@@ -12,6 +12,8 @@ vi.mock('../src/lib/supabase.js', () => ({
 import { supabase } from '../src/lib/supabase.js'
 import {
   getChannelSettings,
+  getEventThread,
+  listMentionables,
   listMessages,
   markMessagesRead,
   messageReadStats,
@@ -99,21 +101,53 @@ describe('writes', () => {
 
     await postMessage('team-a', '  Training moves to pitch 3.  ')
 
-    expect(calls.insert[0]).toEqual([{ team_id: 'team-a', body: 'Training moves to pitch 3.' }])
+    expect(calls.insert[0]).toEqual([{ team_id: 'team-a', body: 'Training moves to pitch 3.', mentions: [] }])
   })
 
   it('postMessage to the club sends team_id null', async () => {
     const { b, calls } = builder({ data: { id: 'p1' }, error: null })
     supabase.from.mockReturnValue(b)
     await postMessage(null, 'Hello club')
-    expect(calls.insert[0][0]).toEqual({ team_id: null, body: 'Hello club' })
+    expect(calls.insert[0][0]).toEqual({ team_id: null, body: 'Hello club', mentions: [] })
   })
 
   it('replyToMessage sends parent_id and body only — team_id is inherited by the trigger', async () => {
     const { b, calls } = builder({ data: { id: 'r1' }, error: null })
     supabase.from.mockReturnValue(b)
     await replyToMessage('p1', 'Is there a bus?')
-    expect(calls.insert[0]).toEqual([{ parent_id: 'p1', body: 'Is there a bus?' }])
+    expect(calls.insert[0]).toEqual([{ parent_id: 'p1', body: 'Is there a bus?', mentions: [] }])
+  })
+
+  // ⚠️ A FIXTURE THREAD SENDS event_id AND NOT team_id. The trigger sets the
+  // squad from the fixture and refuses a mismatch; a client that sent both
+  // would be a client that looks like it may choose.
+  it('postMessage with eventId sends event_id and no team_id', async () => {
+    const { b, calls } = builder({ data: { id: 'p1' }, error: null })
+    supabase.from.mockReturnValue(b)
+    await postMessage('team-a', 'Lifts?', { eventId: 'ev-1', mentions: ['u2'] })
+    expect(calls.insert[0][0]).toEqual({ event_id: 'ev-1', body: 'Lifts?', mentions: ['u2'] })
+    expect(calls.insert[0][0]).not.toHaveProperty('team_id')
+  })
+
+  it('listMentionables calls chat_mentionables with the team (null for the club)', async () => {
+    supabase.rpc.mockResolvedValue({ data: [{ profile_id: 'u1', full_name: 'Zz', role: 'coach' }], error: null })
+    expect(await listMentionables('team-a')).toHaveLength(1)
+    expect(supabase.rpc).toHaveBeenCalledWith('chat_mentionables', { _team: 'team-a' })
+    await listMentionables(null)
+    expect(supabase.rpc).toHaveBeenLastCalledWith('chat_mentionables', { _team: null })
+  })
+
+  it('getEventThread returns null when there is no open thread, else the thread with a reply count', async () => {
+    supabase.from.mockReturnValueOnce(builder({ data: null, error: null }).b)
+    expect(await getEventThread('ev-1')).toBeNull()
+
+    const head = builder({ data: { id: 't1', team_id: 'team-a', created_at: 'x', author: { full_name: 'Zz' } }, error: null })
+    const count = builder({ data: null, error: null, count: 3 })
+    count.b.then = (res, rej) => Promise.resolve({ data: null, error: null, count: 3 }).then(res, rej)
+    supabase.from.mockReturnValueOnce(head.b).mockReturnValueOnce(count.b)
+    expect(await getEventThread('ev-1')).toEqual({ id: 't1', team_id: 'team-a', created_at: 'x', author: { full_name: 'Zz' }, replies: 3 })
+    expect(head.calls.eq[0]).toEqual(['event_id', 'ev-1'])
+    expect(head.calls.is).toEqual([['parent_id', null], ['deleted_at', null]])
   })
 
   it('refuses an empty body before touching the network', async () => {

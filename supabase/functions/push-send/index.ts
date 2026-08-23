@@ -667,14 +667,25 @@ Deno.serve(async (request) => {
       // CONSTRUCTION. The body is the coach's responsibility; the shape is
       // ours. A club-wide post has no squad and says so.
       const rows = await db(
-        `messages?id=eq.${encodeURIComponent(messageId)}&select=body,team_id,deleted_at,teams(name)`,
+        `messages?id=eq.${encodeURIComponent(messageId)}` +
+          '&select=body,team_id,parent_id,author_role,mentions,deleted_at,teams(name),author:profiles!messages_author_id_fkey(full_name)',
       )
       const message = rows?.[0]
       if (!message || message.deleted_at) return new Response('not found', { status: 404 })
 
       const squadName = message.teams?.name ?? 'Whole club'
+      // Phase 2 (23 Aug 2026): a mention reaches only the mentioned, and the
+      // tray should say so. A staff top-level post still reads as the
+      // channel. The database decided WHO (message_push_subscriptions); this
+      // only decides the words.
+      const staffPost = !message.parent_id
+        && ['admin', 'coach', 'manager', 'medic'].includes(String(message.author_role ?? ''))
+      const mentioned = Array.isArray(message.mentions) && message.mentions.length > 0
+      const who = escapeHtmlFree(message.author?.full_name ?? 'Somebody')
       job = {
-        title: `${escapeHtmlFree(squadName)} chat`,
+        title: !staffPost && mentioned
+          ? `${who} mentioned you · ${escapeHtmlFree(squadName)}`
+          : `${escapeHtmlFree(squadName)} chat`,
         body: escapeHtmlFree(message.body).slice(0, 200),
         url: message.team_id
           ? `${APP_URL}/chat/${encodeURIComponent(message.team_id)}`

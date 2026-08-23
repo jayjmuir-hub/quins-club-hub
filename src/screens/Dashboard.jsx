@@ -1166,6 +1166,8 @@ export default function Dashboard() {
           onDuplicate={(event) => setFormState({ event, duplicate: true })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
           onOpenMatchSheet={(fixture) => navigate(`/match-sheet/${fixture.id}`)}
+          // Squad chat (phase 2): the fixture's thread. Same handler rule.
+          onOpenChat={(fixture) => navigate(`/chat/${fixture.team_id}?event=${fixture.id}`)}
           onOpenLineup={(fixture) => navigate(`/lineup/${fixture.id}`)}
           onOpenRegister={() => setRegisterOpen(true)}
           onDeleted={() => {

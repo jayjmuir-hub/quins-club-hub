@@ -1883,7 +1883,10 @@ CREATE TABLE public.messages (
   pinned        boolean     NOT NULL DEFAULT false,
   edited_at     timestamptz,
   deleted_at    timestamptz,
-  created_at    timestamptz NOT NULL DEFAULT now()
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  -- phase 2 (20260823_squad_chat_phase2): who the author named; the trigger
+  -- filters to the channel's audience and drops the author.
+  mentions      uuid[]      NOT NULL DEFAULT '{}'
 );
 ALTER TABLE public.messages ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
 ALTER TABLE public.messages ADD CONSTRAINT messages_channel_check CHECK (channel IN ('squad', 'staff', 'dm'));
@@ -1898,6 +1901,10 @@ CREATE INDEX messages_stream_idx ON public.messages USING btree (team_id, channe
 CREATE INDEX messages_parent_idx ON public.messages USING btree (parent_id) WHERE (parent_id IS NOT NULL);
 CREATE INDEX messages_event_idx  ON public.messages USING btree (event_id)  WHERE (event_id IS NOT NULL);
 CREATE INDEX messages_author_idx ON public.messages USING btree (author_id);
+-- phase 2: one OPEN thread per fixture (a soft-deleted one frees it), and a
+-- GIN index for "messages that mention me".
+CREATE UNIQUE INDEX messages_one_thread_per_event_idx ON public.messages USING btree (event_id) WHERE ((event_id IS NOT NULL) AND (parent_id IS NULL) AND (deleted_at IS NULL));
+CREATE INDEX messages_mentions_idx ON public.messages USING gin (mentions);
 
 -- announce_only DEFAULTS TRUE, and an ABSENT row means true — most squads
 -- will never have one. private.channel_announce_only() reads it that way.

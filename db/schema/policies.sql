@@ -1401,8 +1401,11 @@ CASE
       WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.status = 'active'::text))
       ORDER BY m.created_at
      LIMIT 1))
-    ELSE (private.can_edit_team(team_id) OR ((NOT private.channel_announce_only(team_id)) AND private.can_see_team(team_id)))
+    ELSE (private.can_edit_team(team_id) OR ((NOT private.channel_announce_only(team_id)) AND private.can_see_team(team_id)) OR ((event_id IS NOT NULL) AND private.can_see_team(team_id)))
 END))));
+-- ⚠️ REPLACED by 20260823_squad_chat_phase2: the third arm — a FIXTURE thread
+-- (event_id set) may be opened by anyone who can see the squad, announce-only
+-- or not. The trigger pins team_id to the fixture's squad before this runs.
 
 CREATE POLICY "message edit" ON public.messages
   FOR UPDATE USING ((((author_id = ( SELECT auth.uid() AS uid)) AND (created_at > (now() - '00:15:00'::interval))) OR ((team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((team_id IS NULL) AND private.is_admin(club_id))))
