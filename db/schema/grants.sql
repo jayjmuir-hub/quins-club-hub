@@ -851,3 +851,12 @@ REVOKE ALL ON public.message_reactions FROM PUBLIC, anon;
 -- set because all four verbs are the owner's.
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.nicknames TO authenticated;
 REVOKE ALL ON public.nicknames FROM PUBLIC, anon;
+
+-- 24 Aug 2026 — db/migrations/20260824_chat_round_4.sql (pins and stars).
+-- Stars are the nicknames pattern: owner-only policies, owner-only verbs.
+-- Pinning deliberately has NO new table grant: it goes through the
+-- set_message_pinned RPC because widening the messages UPDATE policy would
+-- hand participants the whole (body, pinned, deleted_at) column set — §4's
+-- exact warning.
+GRANT SELECT, INSERT, DELETE ON public.message_stars TO authenticated;
+REVOKE ALL ON public.message_stars FROM PUBLIC, anon;

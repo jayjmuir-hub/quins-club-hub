@@ -7,8 +7,8 @@
 --
 --  1. the body check discriminates: bare-empty refused, empty-with-photo
 --     accepted, over-2000 still refused, plain text still works (control)
---  2. a quote stays home: same-conversation accepted; cross-conversation,
---     squad-channel, and unreadable-target quotes all refused
+--  2. quotes: same-conversation and readable cross-conversation (round 4's
+--     reply-privately) accepted; squad-channel and unreadable-target refused
 --  3. forwarded defaults false and can be set true
 --  4. chat-media writes: own folder yes (control), someone else's folder no
 --  5. chat-media reads follow the LIVE message: the other party sees the
@@ -67,6 +67,11 @@ alter table public.messages add constraint messages_body_check check (
   and (length(btrim(body)) >= 1 or attachment_path is not null)
 );
 
+-- ⚠️ THE GUARD BELOW IS THE ROUND-4 VERSION, NOT ROUND 2's ORIGINAL. The
+-- original demanded same-conversation; 20260824_chat_round_4.sql relaxed
+-- it for reply-privately (dm-only + readable-by-sender). This harness
+-- inlines what PRODUCTION RUNS, or its quote asserts would test a trigger
+-- that no longer exists anywhere but git history.
 create or replace function private.messages_quote_guard()
 returns trigger
 language plpgsql
@@ -78,9 +83,9 @@ begin
   if new.channel <> 'dm' or new.conversation_id is null then
     raise exception 'quotes are for direct and group chats only';
   end if;
-  select conversation_id into q from public.messages where id = new.quoted_id;
-  if q.conversation_id is distinct from new.conversation_id then
-    raise exception 'quoted message is not in this conversation';
+  select id into q from public.messages where id = new.quoted_id;
+  if q.id is null then
+    raise exception 'quoted message is not one you can read';
   end if;
   return new;
 end $$;
@@ -172,11 +177,12 @@ begin
   reset role;
   perform pg_temp.as_user(coach::text);
   other_conv := public.open_conversation(parent2);
-  begin
-    insert into messages (conversation_id, channel, body, quoted_id) values (other_conv, 'dm', 'Zz probe: smuggle', msg);
-    caught := null;
-  exception when others then caught := 'cross'; end;
-  if caught is distinct from 'cross' then raise exception 'ASSERT 2 FAILED: cross-conversation quote was accepted'; end if;
+  -- ⚠️ REPOINTED 24 Aug 2026 (round 4): cross-conversation quotes of a
+  -- READABLE message are now ALLOWED — that is reply-privately
+  -- (db/migrations/20260824_chat_round_4.sql). The anchor now pins the
+  -- new rule instead of the old one; the unreadable case below still
+  -- refuses, which is the half that was ever about safety.
+  insert into messages (conversation_id, channel, body, quoted_id) values (other_conv, 'dm', 'Zz probe: reply-privately', msg);
   begin
     insert into messages (team_id, channel, body, quoted_id) values ('f0000000-0000-4000-8000-0000000000e7','squad','Zz probe: squad quote', msg);
     caught := null;
@@ -192,7 +198,7 @@ begin
   exception when others then caught := 'blind'; end;
   reset role;
   if caught is distinct from 'blind' then raise exception 'ASSERT 2 FAILED: an outsider quoted into a conversation they are not in'; end if;
-  insert into _log(line) values ('2 quotes: same conversation yes; cross-conversation, squad channel and outsider all refused');
+  insert into _log(line) values ('2 quotes: same-conversation and readable cross-conversation yes; squad channel and outsider refused');
 
   -- 3: forwarded defaults false, settable true
   perform pg_temp.as_user(parent::text);
@@ -249,9 +255,11 @@ begin
   -- 6: quoting a soft-deleted message keeps the pointer
   perform pg_temp.as_user(coach::text);
   update messages set deleted_at = now() where id = msg;
+  -- TWO quotes since the round-4 repoint: the in-conversation one from
+  -- assert 2 and the reply-privately one it now also sends.
   select count(*) into n from messages where quoted_id = msg;
   reset role;
-  if n <> 1 then raise exception 'ASSERT 6 FAILED: the quote pointer went with the soft delete'; end if;
+  if n <> 2 then raise exception 'ASSERT 6 FAILED: % quote pointer(s) after the soft delete', n; end if;
   insert into _log(line) values ('6 a soft-deleted original keeps its quotes pointed (client shows "Message deleted")');
 end $fn$;
 
