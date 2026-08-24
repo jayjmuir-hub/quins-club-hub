@@ -54,7 +54,11 @@ import { RowAvatar, previewLine, scopeChatRows } from '../screens/ChatList.jsx'
 // you, same ruling as chat-enter-sends (src/lib/chatComposer.js).
 const SIZE_KEY = 'chat-dock-size'
 const MIN_W = 320
-const MAX_W = 640
+// ⚠️ 1100, not the first cut's 640 — Jay, same evening the grip shipped:
+// "on desktop mode we could make it much wider". The real ceiling is the
+// viewport (max-w-[calc(100vw-48px)] on the panel), so this number only
+// says where the DRAG stops on a monitor wide enough not to care.
+const MAX_W = 1100
 const MIN_H = 400
 const MAX_H = 860
 const DEFAULT_SIZE = { w: 380, h: 560 }
