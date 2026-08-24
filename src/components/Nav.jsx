@@ -112,7 +112,11 @@ function linkClassName({ isActive }) {
     'active:scale-90 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
     // white/90 for idle icons — the dock is 62% glass now; src/index.css
     // carries the arithmetic (icons are components, 3:1, and this is 4.4).
-    isActive ? 'px-3 text-white' : 'px-2 text-white/90 hover:text-white',
+    // Idle icons are INK, not white, since the clear-glass pass (24 Aug 2026):
+    // the dock is transparent now, so idle items must read on whatever is
+    // behind it — ink flips with the theme. The active item stays white ON
+    // ITS OWN RED PILL, which is opaque and theme-independent.
+    isActive ? 'px-3 text-white' : 'px-2 text-ink/90 hover:text-ink',
   ].join(' ')
 }
 

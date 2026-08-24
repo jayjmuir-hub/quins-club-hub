@@ -406,25 +406,41 @@
     }
   }
 
-  /* ══ CLEAR LIQUID GLASS — EXPERIMENT BRANCH, 24 Aug 2026 ══════════════════
-     Jay: "maybe it should be fully transparent with no colors, and have a
-     small red glow around the outer parts". This replaces the smoked glass
-     that shipped in #370 with iOS-style CLEAR glass on both bars: a near-
-     zero fill, a light 8px frost (28px+ reads as grey soup over white
-     pages — measured on the harness, and it was the first thing Jay
-     rejected), and a red halo as the brand accent.
+  /* ══ CLEAR LIQUID GLASS — 24 Aug 2026, approved from deploy preview #374 ══
+     Jay: "fully transparent with no colors, and a small red glow around the
+     outer parts". This replaced #370's smoked glass the same day it shipped
+     (its 66%/52% tint arithmetic lives on in git at squash `109634f`).
+     Three decisions carried by these values:
 
-     ⚠️ CLEAR GLASS CANNOT CARRY ALWAYS-WHITE CONTENT. Over a white page
-     there is no tint to hold white text up, so the bars' ink ADAPTS like
-     iOS: dark ink in light mode (the override block below), white in dark
-     mode (the components' own classes). The active dock pill stays red
-     with white text in both modes — it has its own opaque fill.
+     · BLUR 8px, NOT 28px+. Heavy frost over a white page composites to a
+       grey soup — Jay rejected exactly that on the first prototype round
+       ("doesn't seem very transparent because of the grey"). 8px keeps
+       shapes readable through the glass and only softens detail.
+     · The fill is 2% white — presence, not paint. The red halo (the two
+       brand-red shadows) is the bar's outline and its brand moment.
+     · brightness(1.04) is lensing; it cannot hurt any worst case below
+       because a white backdrop clamps at white.
 
-     ⚠️ IF THIS SHIPS, the contrast comments this block replaced (66%/52%
-     smoked-glass arithmetic) live on in git at #370's squash `109634f`,
-     and a fresh worst-case pass is owed: dark ink over the red fixture
-     hero is the case the harness data understated — Jay's own production
-     screenshot is what surfaced it. */
+     ⚠️ CLEAR GLASS CANNOT CARRY ALWAYS-WHITE CONTENT, so the bars' ink is
+     THEME INK, set in the components (Nav idle items, the masthead header,
+     the account trigger's chevron) — near-black over the light theme,
+     near-white in dark. Elements with their own opaque fills keep explicit
+     colors: the dock's active red pill, the initial's red disc, badges.
+
+     ⚠️ THE WORST CASE IS THE RED FIXTURE HERO, NOT THE WHITE PAGE — Jay's
+     own production screenshot surfaced this: the masthead floats over the
+     hero at rest. Measured (light theme, ink over brand red through this
+     glass): ink text ~3.1:1. What sits on the glass there and why each is
+     acceptable: the wordmark (brand name — WCAG logotype exemption, and
+     it is also the only 13px text on glass); icons and the chevron (UI
+     components, 3:1 floor — 3.1:1 passes, with none to spare: do not
+     darken the hero or lighten the ink); the App label, which is REAL
+     small text and therefore carries its own 55% white pill in light mode
+     (AppButton.jsx), lifting it to ~7.9:1 over red. Dark mode needs no
+     special cases: content behind the bars is dark, ink is near-white.
+
+     ⚠️ Do not add small bare text to either bar. The pill trick is the
+     pattern: own fill first, then any ink works. */
   .glass-island,
   .glass-dock {
     position: relative;
@@ -438,35 +454,13 @@
       0 8px 24px rgb(0 0 0 / 0.1);
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    /* No backdrop-filter → clear glass would be invisible. Fall back to the
-       opaque chrome the pre-glass design used; the adaptive-ink overrides
-       below are scoped to supporting browsers only, so white content is
-       correct here. */
+    /* No backdrop-filter → clear glass is invisible and its content floats
+       bare over the page. Fall back to an opaque CARD surface (not the old
+       dark chrome): the bars' content is theme ink now, and ink on the
+       card token is the pairing every card in the app already proves. */
     .glass-island,
     .glass-dock {
-      background: rgb(var(--chrome-rgb));
-    }
-  }
-
-  /* Adaptive ink: dark content on clear glass in LIGHT mode. Scoped to
-     browsers with backdrop-filter (the fallback above stays dark chrome
-     with white content). Specificity beats the text-white utilities the
-     components carry, so this needs no edits inside the components while
-     the experiment is being judged. The dock's active pill keeps its own
-     red fill and white label. */
-  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    html:not(.dark) .glass-island,
-    html:not(.dark) .glass-island a,
-    html:not(.dark) .glass-island button,
-    html:not(.dark) .glass-island p,
-    html:not(.dark) .glass-island h1 {
-      color: rgb(23 23 26);
-    }
-    html:not(.dark) .glass-dock a {
-      color: rgb(23 23 26);
-    }
-    html:not(.dark) .glass-dock a[aria-current='page'] {
-      color: rgb(255 255 255);
+      background: rgb(var(--surface-card-rgb));
     }
   }
 

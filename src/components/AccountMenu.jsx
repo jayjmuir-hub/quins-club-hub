@@ -243,14 +243,16 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
           // exactly where the diagonal lands, and without this the avatar
           // dimmed and the chevron half-vanished — measured, not guessed:
           // the rects were inside the row, the paint order was the bug.
-          'group relative z-[1] ml-1 flex h-9 shrink-0 items-center gap-1 rounded-pill pl-[3px] pr-1.5 text-white outline-none transition',
+          // text-ink since the clear-glass pass: only the chevron actually
+          // inherits this — the initial keeps explicit white on its red disc.
+          'group relative z-[1] ml-1 flex h-9 shrink-0 items-center gap-1 rounded-pill pl-[3px] pr-1.5 text-ink outline-none transition',
           'hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
         ].join(' ')}
       >
         <span
           aria-hidden="true"
           className={[
-            'grid h-[30px] w-[30px] place-items-center rounded-full bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[13px] font-extrabold tracking-[.5px] shadow-[0_1px_3px_rgba(0,0,0,0.4)] ring-1 ring-inset',
+            'grid h-[30px] w-[30px] place-items-center rounded-full bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[13px] font-extrabold tracking-[.5px] text-white shadow-[0_1px_3px_rgba(0,0,0,0.4)] ring-1 ring-inset',
             // A preview in progress: ring and dot, not colour alone
             // (claude/specs/accessibility.md). The words are on the View as row.
             viewAs ? 'ring-brand-onDark' : 'ring-white/30',
@@ -266,7 +268,7 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
           strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={['h-3 w-3 text-white/60 transition group-hover:text-white', open ? 'rotate-180' : ''].join(' ')}
+          className={['h-3 w-3 text-ink/60 transition group-hover:text-ink', open ? 'rotate-180' : ''].join(' ')}
         >
           <path d="M6 9l6 6 6-6" />
         </svg>

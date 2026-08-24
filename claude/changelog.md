@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 🚑 **Hotfix: the quoted embed hints by COLUMN name** — round 2
+- 🫙 **CLEAR liquid glass — the smoked bars lasted an afternoon.** Jay saw
+  #370's glass on the live site ("very little transparency") and asked for
+  fully transparent with a small red glow. Both bars are now iOS-style clear
+  glass: 2% fill, 8px frost (28px read as grey soup — the first prototype's
+  lesson), red halo as the brand line, and THEME INK instead of always-white
+  content, because clear glass cannot hold white text over a light page. The
+  App label gets its own 55% white pill — the sole small text on glass, and
+  the masthead floats over the RED fixture hero where bare ink measures
+  ~3.1:1 (the wordmark rides the logotype exemption; icons pass the 3:1 UI
+  floor with nothing to spare). Approved from Netlify deploy preview #374 —
+  a look decision made on a preview, so no production deploy was burned
+  iterating. `src/index.css`'s clear-glass block carries the arithmetic.
+  (No SHA — this branch's entry; the next pull request cites the squash.)
+- `2008310` — 🚑 **Hotfix: the quoted embed hints by COLUMN name** (#373) — round 2
   reached the live site with `quoted:messages!messages_quoted_id_fkey(…)` in
   the SELECT and every DM/group thread died with PGRST200 "Could not find a
   relationship between 'messages' and 'messages'". Not cache staleness: the
@@ -18,8 +31,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   same way — **this project's PostgREST does not resolve constraint-name
   hints on SELF-joins**, and the column-name hint `!quoted_id` does
   (probed live, after two reload notifies changed nothing). One line, plus
-  a test pinning the string the live API parses. The NEXT pull request
-  cites this entry's squash SHA.
+  a test pinning the string the live API parses. Its own branch could not
+  cite the squash SHA, so this entry carries it now.
 - `5cf0fb1` — 📋 **Round 2 closed** (#372) — `bbbc1d3` cited, both plans
   marked shipped, live verification recorded. Its own branch could not cite
   this squash SHA, so this entry does.
