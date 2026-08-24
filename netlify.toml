@@ -2,6 +2,13 @@
   command = "npm run build"
   publish = "dist"
 
+  # Vite 8 requires Node ^20.19 || >=22.12, and an unpinned build image
+  # follows whatever Netlify's default happens to be. 24 is what CI tests on
+  # (.github/workflows/test.yml) — the deploy builds on the version the suite
+  # actually ran against, and a Netlify default change can't move it.
+  [build.environment]
+    NODE_VERSION = "24"
+
   # Whether this commit needs a deploy at all.
   #
   # ⚠️ THIS REPLACED `[skip ci]`, WHICH HAD BECOME UNUSABLE. `CLAUDE.md` rule 3

@@ -260,12 +260,12 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   a dev machine into a Node 20 runner, and with it the eight fail with the exact
   CI error. Without it they pass. A green run alone would not have shown which
   change was responsible.
-  ⚠️ **NETLIFY'S BUILD NODE IS A SEPARATE SETTING AND IS STILL UNPINNED** — there
-  is no `.nvmrc`, no `.node-version`, and no `NODE_VERSION` in `netlify.toml`, so
-  the production build runs on whatever Netlify defaults to and CI's `npm run
-  build` is therefore not proving Netlify's build. **Not changed here**: pinning
-  it alters the runtime a live release is built on, which is Jay's call and not a
-  side effect of a test speed-up.
+  ✅ **NETLIFY'S BUILD NODE IS NOW PINNED — `NODE_VERSION = "24"` in
+  `netlify.toml`, 24 Aug 2026, in the same PR as the vite 8 pair below.** It was
+  unpinned (no `.nvmrc`, no `.node-version`, nothing in `netlify.toml`) and the
+  production build ran on whatever Netlify defaulted to, which CI never proved.
+  Pinning waited for Jay's call because it alters the runtime a live release is
+  built on; the vite 8 upgrade forced the question and Jay took it.
 
 ## The four dependency majors, parked 17 Aug 2026
 
@@ -280,16 +280,17 @@ been shown what each one actually fails with. ⚠️ **Every one of them is ALSO
   bumped `react-dom` and left `react` behind — so this has now failed in both
   directions, which is the evidence that it is a migration and not a bump. Both
   packages have to move in one change. The ruling above still stands.
-- **vite 5.4.21 → 8.2.1 and `@vitejs/plugin-react` 4.7.0 → 6.0.5 are MUTUALLY
-  BLOCKING, and that is the useful finding.** Each fails alone: vite 8 because
-  plugin-react 4 refuses it, plugin-react 6 because it declares
-  `"vite": "^8.0.0"` — **exactly 8, not "7 or newer"** — against a root on 5. One
-  pull request carrying both would resolve.
-  ⚠️ **THE RISK IS NOT THE PACKAGES, IT IS NODE.** Both require
-  `^20.19.0 || >=22.12.0` (read off the registry, 17 Aug 2026). CI pins 24, so CI
-  would go green — and **Netlify's build Node is still unpinned**, three items up
-  in this file, so a green CI run would not be proving the production build.
-  **Pin Netlify's Node first, or this lands as a release nobody has tested.**
+- ✅ **vite 5.4.21 → 8.2.2 and `@vitejs/plugin-react` 4.7.0 → 6.1.0 TAKEN
+  TOGETHER, 24 Aug 2026, exactly as this item prescribed** — one PR carrying
+  both, with the Node pin above in the same change. The mutual block was real
+  and the finding held: each had failed alone (vite 8 because plugin-react 4
+  refuses it; plugin-react 6 because it declares `"vite": "^8.0.0"` — exactly 8,
+  not "7 or newer"). The clean route was a from-scratch lockfile resolve —
+  an incremental install fights the existing tree over plugin-react 6's
+  *optional* Babel-8/oxc peer chain; regenerating `package-lock.json` settles
+  it without pulling any of those peers in. Suite green on the pair
+  (nothing needed changing), build green, dependabot's #354/#355 closed in
+  favour of the combined PR.
 - **tailwindcss 3.4.19 → 4.3.3 is a migration, and the install is not what
   breaks.** `npm ci` succeeds; **the BUILD fails on `src/index.css`**. Three things
   in this repo are v3-shaped: the `@tailwind base/components/utilities` trio at the
