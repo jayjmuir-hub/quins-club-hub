@@ -10,6 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- 💬 **Group chats BUILT — member-created, named, three people minimum** —
+  migration `db/migrations/20260824_group_chats.sql` APPLIED to live (harness
+  `db/tests/group-chats.sql` green before and after, twelve asserts), data
+  layer, multi-select picker inside the DM picker, group threads with
+  rename/add/leave and NO notice banner (the ruling). On branch, not merged.
+  *(SHA: next PR cites the squash commit.)*
 - 📝 **Group-chats spec and its safeguarding ruling recorded** —
   `claude/plans/2026-08-24-group-chats.md` (member-created groups, custom
   names, ≥3 people, no warning copy) and

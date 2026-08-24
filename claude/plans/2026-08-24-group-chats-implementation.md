@@ -1,6 +1,11 @@
 # Group Chats Implementation Plan
 
-**Status: NOT SHIPPED — plan written 24 Aug 2026, execution not started.**
+**Status: EXECUTED 24 Aug 2026 (all seven tasks), NOT MERGED — awaiting Jay's
+push/merge decision and post-deploy live verification.** Two deliberate
+deviations from the written plan, both recorded in commits: the pencil keeps
+its one-tap DM flow (the "New group" entry is a row inside the DM picker, not
+a two-item pencil menu), and `leave_group` never auto-deletes a REPORTED
+group — evidence outlives the floor.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
