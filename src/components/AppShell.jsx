@@ -308,7 +308,7 @@ export default function AppShell({ children }) {
           three displacement passes at slightly different strengths, one
           per colour channel, screened back together: colours split a few
           pixels exactly where the bend is strongest. Tuned live in the
-          harness: 52/40/28 was rainbow soup; 32/30/28 is the fringe. The
+          harness: 52/40/28 was rainbow soup; 32/30/28 read as barely-there, and Jay asked for "more prism effect" — 40/31/22 is the setting he approved. The
           map is blurred (stdDeviation 2) before use — unsmoothed, its
           raster steps showed as confetti speckles along the top edge. */}
       <svg width="0" height="0" aria-hidden="true" className="absolute">
@@ -320,9 +320,9 @@ export default function AppShell({ children }) {
             result="rawmap"
           />
           <feGaussianBlur in="rawmap" stdDeviation="2" result="map" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="32" xChannelSelector="R" yChannelSelector="G" result="dR" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="30" xChannelSelector="R" yChannelSelector="G" result="dG" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="28" xChannelSelector="R" yChannelSelector="G" result="dB" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="40" xChannelSelector="R" yChannelSelector="G" result="dR" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="31" xChannelSelector="R" yChannelSelector="G" result="dG" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="22" xChannelSelector="R" yChannelSelector="G" result="dB" />
           <feColorMatrix in="dR" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cR" />
           <feColorMatrix in="dG" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cG" />
           <feColorMatrix in="dB" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cB" />
