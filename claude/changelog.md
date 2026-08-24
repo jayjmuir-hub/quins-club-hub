@@ -10,6 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- 🧾 **Accounts: queues first, Approval emails folds away, the list goes
+  dense** — Jay's rethink of the Club Admin Accounts tab, plus a pitch nit
+  in the same breath. Everything WAITING now leads the page (pending staff,
+  pending players, waiting-for-access, dismissed) with the Approval emails
+  settings card moved BELOW them all and collapsed by default — its header
+  carries the switched-on count, so opening it is only needed to change
+  something (order and collapse both pinned by tests, both proved against
+  injected faults). The account list dropped a Card per person for one card
+  with hairline rows: 28px monogram, name, and email · access-summary on a
+  single truncating line — every account still renders. And Allocation's
+  "Waiting for a pitch" rows now lead with the fixture's DATE ("the events
+  don't show a date unless you click them"). (No SHA — this branch's entry;
+  the next pull request cites the squash.)
+- `87ba817` — 🗒️ **Allocation details-first + away exclusion MERGED** (#385)
+  — the squash SHA for the entry below, which its own branch could not cite.
 - 🗒️ **Allocation clicks open the fixture's DETAILS, and away matches leave
   the assignment area** — Jay's two follow-ups within the hour. A click now
   opens the same EventDetail sheet the Schedule uses (hero, competition,
@@ -19,8 +34,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   for a pitch" and no assign button on their details — strict
   `home === false`, the PitchRequest rule (null means "nobody said", and
   most pitch-needing events are trainings with null). Both proved against
-  injected faults. (No SHA — this branch's entry; the next pull request
-  cites the squash.)
+  injected faults. Its own branch could not cite the squash SHA; the entry
+  above carries it.
 - `dea42ad` — 📎 **Chat round 4: the message menu, pins, stars,
   reply-privately, and the reaction pill where WhatsApp puts it** — from
   Jay's two WhatsApp screenshots relayed cross-session
