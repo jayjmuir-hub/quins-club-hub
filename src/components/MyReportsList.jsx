@@ -3,7 +3,7 @@ import { FEEDBACK_STATUS_LABELS, feedbackRef } from '../data/feedback.js'
 // One member's own reports, and the club's replies to them.
 //
 // ⚠️ EXTRACTED 19 Aug 2026 SO THERE IS ONE COPY, NOT TWO. This renders in the
-// `?` sheet (HelpButton, "See what you've already reported") AND on /my-reports,
+// help sheet (HelpSheet, "See what you've already reported") AND on /my-reports,
 // which is where a push notification now lands. Two copies of a list showing an
 // admin's reply would drift, and the drift would be invisible: nobody ever has
 // both open at once to notice that one of them stopped rendering `admin_note`.

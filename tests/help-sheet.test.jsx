@@ -2,9 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { useState } from 'react'
 
-// Unit tests for src/components/HelpButton.jsx — the floating `?` and the
-// two-step panel behind it. Design: claude/plans/2026-08-18-help-and-feedback.md.
+// Unit tests for src/components/HelpSheet.jsx — the two-step help panel.
+// Design: claude/plans/2026-08-18-help-and-feedback.md (the flow) and
+// claude/plans/2026-08-24-help-into-account-menu.md (open/onClose as props —
+// the floating `?` these tests used to click is gone; the real trigger is the
+// account menu's "Report a problem" item, covered in account-menu.test.jsx).
 //
 // The data module is mocked, so this exercises the component's own behaviour
 // and never a real insert. What the DATABASE guarantees (the stamping trigger,
@@ -25,20 +29,35 @@ vi.mock('../src/data/feedback.js', () => ({
 }))
 
 // Imported after vi.mock so this binds to the mocked module.
-import HelpButton, { routeLabel } from '../src/components/HelpButton.jsx'
+import HelpSheet, { routeLabel } from '../src/components/HelpSheet.jsx'
 
 const routerFuture = { v7_startTransition: true, v7_relativeSplatPath: true }
+
+// The same wiring AppShell has: a trigger owning `open`, the sheet fed props.
+// A plain always-open render would skip close() and miss the reset-on-close
+// behaviour the shared-family-phone test below exists to pin.
+function Harness() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Report a problem
+      </button>
+      <HelpSheet open={open} onClose={() => setOpen(false)} />
+    </>
+  )
+}
 
 function renderAt(path = '/roster') {
   return render(
     <MemoryRouter initialEntries={[path]} future={routerFuture}>
-      <HelpButton />
+      <Harness />
     </MemoryRouter>,
   )
 }
 
 const openPanel = async (user) =>
-  user.click(screen.getByRole('button', { name: /report a problem or suggest a change/i }))
+  user.click(screen.getByRole('button', { name: /report a problem/i }))
 
 beforeEach(() => {
   submitFeedbackMock.mockReset()
@@ -46,31 +65,20 @@ beforeEach(() => {
   submitFeedbackMock.mockResolvedValue({ ref: 41 })
 })
 
-describe('the floating help button', () => {
-  it('is reachable by its accessible name, not by the glyph', async () => {
+describe('the sheet as a controlled component', () => {
+  it('renders nothing at all until opened', () => {
     renderAt()
-    // ⚠️ The visible character is `?` and is aria-hidden. If somebody removes
-    // the aria-label, a screen reader announces "question mark" and this fails
-    // — which is the point of asserting on the name rather than the text.
-    expect(screen.getByRole('button', { name: /report a problem or suggest a change/i })).toBeTruthy()
+    // The old floating `?` was always on screen; the replacement must cost the
+    // page NOTHING while closed — no dialog, no stray flow buttons.
+    expect(screen.queryByText(/something.s broken/i)).toBeNull()
+    expect(screen.queryByText(/need a hand/i)).toBeNull()
   })
 
-  it('clears the accessibility floor at 44px', async () => {
+  it('opens from the trigger it is wired to', async () => {
+    const user = userEvent.setup()
     renderAt()
-    const fab = screen.getByRole('button', { name: /report a problem/i })
-    // h-11/w-11 is 44px in this Tailwind scale. design-system.md sets the floor
-    // at >=40px; asserting the class keeps a later "make it smaller" honest,
-    // because jsdom applies no CSS and cannot measure a real box.
-    expect(fab.className).toMatch(/\bh-11\b/)
-    expect(fab.className).toMatch(/\bw-11\b/)
-  })
-
-  it('floats under the tab bar, never over it', async () => {
-    renderAt()
-    const fab = screen.getByRole('button', { name: /report a problem/i })
-    // Nav.jsx is z-40. A floating control that covers navigation traps the
-    // person on the screen, so this must stay strictly below it.
-    expect(fab.className).toMatch(/\bz-30\b/)
+    await openPanel(user)
+    expect(screen.getByRole('button', { name: /something.s broken/i })).toBeTruthy()
   })
 })
 
@@ -89,7 +97,7 @@ describe('the two-step panel', () => {
     expect(screen.getByRole('button', { name: /something.s broken/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /suggestion/i })).toBeTruthy()
     // ⚠️ NOT a button. If this ever becomes one, the panel has started asking
-    // the member to classify their problem correctly — see HelpButton.jsx.
+    // the member to classify their problem correctly — see HelpSheet.jsx.
     const invitation = screen.getByText(/Jay will sort it out/i)
     expect(invitation.closest('button')).toBeNull()
   })
@@ -180,7 +188,7 @@ describe('sending', () => {
     await user.type(screen.getByLabelText(/what went wrong/i), 'half a sentence')
 
     // Close without sending, then reopen. On a shared family phone the next
-    // person to tap `?` must not find somebody else's words in the box.
+    // person to open the sheet must not find somebody else's words in the box.
     await user.keyboard('{Escape}')
     await openPanel(user)
 

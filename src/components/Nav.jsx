@@ -302,9 +302,10 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
       // and `glass-chrome` are the material; `overflow-hidden` clips the
       // brand-rule and item hover fills to the pill's corners.
       //
-      // ⚠️ The content's bottom padding in AppShell and the help button's
-      // offset in HelpButton.jsx are sized to clear THIS. Change the height or
-      // the inset here and re-measure both.
+      // ⚠️ The content's bottom padding in AppShell is sized to clear THIS.
+      // Change the height or the inset here and re-measure it. (The floating
+      // `?` button that also cleared it was retired on 24 Aug 2026 — help now
+      // opens from the account menu, and nothing else floats above this bar.)
       ref={navRef}
       data-hidden={hidden ? 'true' : undefined}
       className={[

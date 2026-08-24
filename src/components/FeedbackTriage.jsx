@@ -36,7 +36,7 @@ import {
 // filter gets mistaken for a policy.
 
 // ⚠️ IMPORTED, NOT REDECLARED. The member sees these same words on their own
-// report in HelpButton.jsx, and two copies would drift invisibly — nobody sees
+// report in HelpSheet.jsx, and two copies would drift invisibly — nobody sees
 // both screens at once.
 const STATUS_LABELS = FEEDBACK_STATUS_LABELS
 

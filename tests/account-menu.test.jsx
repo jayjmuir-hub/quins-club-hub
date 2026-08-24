@@ -70,6 +70,23 @@ describe('AccountMenu', () => {
     expect(screen.queryByTestId('view-as-trigger')).not.toBeInTheDocument()
   })
 
+  // ⚠️ The floating `?` retired 24 Aug 2026 lives here now — see
+  // claude/plans/2026-08-24-help-into-account-menu.md. The sheet itself is
+  // AppShell's; this row only asks for it, then gets out of the way.
+  it('Report a problem closes the menu and asks AppShell to open the help sheet', async () => {
+    const user = userEvent.setup()
+    const onReportProblem = vi.fn()
+    renderMenu({ onReportProblem })
+
+    await user.click(screen.getByTestId('account-button'))
+    await user.click(screen.getByRole('menuitem', { name: 'Report a problem' }))
+
+    expect(onReportProblem).toHaveBeenCalledTimes(1)
+    // The menu must be gone: the sheet is taking the screen, and a menu left
+    // open underneath it would still be there when the sheet closes.
+    expect(screen.queryByTestId('account-menu')).not.toBeInTheDocument()
+  })
+
   it('offers View as to a real admin', async () => {
     const user = userEvent.setup()
     renderMenu({}, ADMIN)
