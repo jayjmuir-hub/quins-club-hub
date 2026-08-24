@@ -10,14 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 🚑 **Hotfix 2: the quoted embed goes through the FK COLUMN
-  itself** — the first hotfix's `messages!quoted_id` spelling RESOLVED but
-  in the reverse direction: an empty array of quoting-messages on every row,
-  truthy and bodyless, so every bubble in every thread grew a phantom
+- (unmerged) — ↔️ **The dock is resizeable** — Jay, same evening: "can we
+  make the chat box resizeable? this would be beneficial in desktop mode".
+  A custom top-left grip (the panel is anchored bottom-right, so the native
+  CSS handle only lives on the corner that cannot move); dragging left/up
+  grows it within 320-640 × 400-860, the size persists per DEVICE like
+  chat-enter-sends, and the header shifted right so the back button never
+  sits under the grip. The NEXT pull request cites this entry's squash SHA.
+- `c07b839` — 🚑 **Hotfix 2: the quoted embed goes through the FK COLUMN
+  itself** (#375) — the first hotfix's `messages!quoted_id` spelling RESOLVED
+  but in the reverse direction: an empty array of quoting-messages on every
+  row, truthy and bodyless, so every bubble in every thread grew a phantom
   "📷 Photo" chip (Jay screenshotted it live within the hour). Only
   `quoted:quoted_id(…)` is to-one by definition; the renderers now demand
-  an object with an id, pinned by a regression test at both layers. The
-  NEXT pull request cites this entry's squash SHA.
+  an object with an id, pinned by a regression test at both layers. Its own
+  branch could not cite this squash SHA, so this entry does.
 - `d170253` — 🫙 **CLEAR liquid glass — the smoked bars lasted an afternoon**
   (#374). Jay saw
   #370's glass on the live site ("very little transparency") and asked for
