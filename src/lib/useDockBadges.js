@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { setAppBadge } from './appBadge.js'
 import { countUnreadMessages, subscribeMessages } from '../data/messages.js'
 import { countAdminWaiting } from '../data/members.js'
 
@@ -57,12 +58,22 @@ export default function useDockBadges({ userId, admin, enabled = true }) {
   useEffect(() => {
     if (!enabled || !userId) {
       setChat(false)
+      // Signed out: a stale count on the icon is a claim about an account
+      // nobody is in.
+      setAppBadge(0)
       return undefined
     }
     let mounted = true
     const recount = () =>
       countUnreadMessages(userId)
-        .then((n) => mounted && setChat(n > 0))
+        .then((n) => {
+          if (!mounted) return
+          setChat(n > 0)
+          // Round 7, Jay: "add a new chat message count to the app icon".
+          // Same number, same recount — the installed icon and the dock dot
+          // cannot disagree. A no-op in a plain tab (src/lib/appBadge.js).
+          setAppBadge(n)
+        })
         .catch(() => mounted && setChat(false))
     recount()
     const unsubscribe = subscribeMessages(recount)

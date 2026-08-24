@@ -23,6 +23,20 @@ self.addEventListener('push', function (event) {
     // than a vague one.
   }
 
+  // Round 7: mark the INSTALLED app's icon while the app is closed. The
+  // worker cannot know the true unread count, so a no-argument
+  // setAppBadge shows the platform's generic "something new" mark; the
+  // app replaces it with the real number the moment it opens
+  // (src/lib/useDockBadges.js). Guarded — the API is absent on plenty of
+  // platforms and a push must never fail over decoration.
+  try {
+    if (self.navigator && typeof self.navigator.setAppBadge === 'function') {
+      self.navigator.setAppBadge().catch(function () {})
+    }
+  } catch (error) {
+    // decoration only
+  }
+
   event.waitUntil(
     self.registration.showNotification(payload.title || 'Quins Club Hub', {
       body: payload.body || '',
