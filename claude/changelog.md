@@ -10,6 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- (unmerged) — 💬 **Chat round 2: reply-with-quote, forwarding, the emoji
+  picker, chat buttons on the Home staff tiles, and photo attachments** —
+  the whole round-2 remainder of `claude/plans/2026-08-24-chat-feedback.md`
+  in one PR by Jay's choice, designed in
+  `claude/plans/2026-08-24-chat-round-2.md`. Photos unblocked by a new
+  ruling (`claude/decisions/2026-08-24-chat-photos-open.md`: open, like
+  WhatsApp — the report loop is the safety valve, not consent collection).
+  `db/migrations/20260824_chat_round_2.sql` adds quoted_id/forwarded/
+  attachment_path and the private `chat-media` bucket; harness green against
+  live and proven to fail on two injected faults. The NEXT pull request
+  cites this entry's squash SHA.
+- `569656a` — 📋 **The chat day closed** (#369) — statuses shipped, the
+  changelog caught up with `2119d1a`, and the day's handoff written
+  (`claude/handoffs/2026-08-24-chat-day.md`).
 - `2119d1a` — 🧲 **The floating chat dock and emoji reactions** — chat beside your work:
   a bubble bottom-right of every desktop page (except /chat) opening a
   compact panel with the scoped list and any thread, surviving navigation

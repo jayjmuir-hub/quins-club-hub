@@ -39,18 +39,22 @@ trimmed. An item deleted from this list is a finding that ceases to exist.
   the screen when opened" + "floating chat button accessible from every
   page" — the desktop dock, Option A off the design canvas
   (`claude/plans/2026-08-24-floating-chat-dock.md`).
-- "add attachments and pics to a chat" — squad-chat Phase 4. ⚠️ Reopens the
-  photo-consent question for images of children; needs a ruling before code.
-- "reply to with quotes for a message" (DMs/groups — channels already
-  thread).
-- "forwarding a message or multiple messages, click to add to forward
-  multiple".
-- "emojis" — an emoji picker button (typing emoji already works).
+- ✅ SHIPPING (`claude/plans/2026-08-24-chat-round-2.md`): "add attachments
+  and pics to a chat" — the ruling landed the same evening
+  (`claude/decisions/2026-08-24-chat-photos-open.md`: open, like WhatsApp)
+  and photos-only attachments ride the round-2 PR.
+- ✅ SHIPPING (same PR): "reply to with quotes for a message" (DMs/groups —
+  channels already thread).
+- ✅ SHIPPING (same PR): "forwarding a message or multiple messages, click
+  to add to forward multiple" — from DM/group threads, to any chat you can
+  write in.
+- ✅ SHIPPING (same PR): "emojis" — a curated desktop-only picker button
+  (typing emoji already works; phone keyboards carry their own).
 - ✅ SHIPPED (`2119d1a`, #368): **emoji reactions** — `message_reactions`
   applied and harnessed, tap-to-toggle tallies from the fixed five-emoji set
   on channels, DM/group threads and the dock, "everywhere is fine" (Jay).
-- "chat icon option in all coach, manager, etc pills" — tap a staff pill,
-  land in a DM.
+- ✅ SHIPPING (same PR): "chat icon option in all coach, manager, etc
+  pills" — a chat button on the Home staff tiles, straight into a DM.
 
 ## Noted, no action
 
