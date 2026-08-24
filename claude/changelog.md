@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 📎 **Chat round 4: the message menu, pins, stars,
+- 🗒️ **Allocation clicks open the fixture's DETAILS, and away matches leave
+  the assignment area** — Jay's two follow-ups within the hour. A click now
+  opens the same EventDetail sheet the Schedule uses (hero, competition,
+  notes) with one Allocation-only extra: an Assign/Change pitch button that
+  swaps to the picker (`onAssignPitch`, rendered only when passed — the
+  onOpenAvailability dead-button lesson). Away matches: gone from "Waiting
+  for a pitch" and no assign button on their details — strict
+  `home === false`, the PitchRequest rule (null means "nobody said", and
+  most pitch-needing events are trainings with null). Both proved against
+  injected faults. (No SHA — this branch's entry; the next pull request
+  cites the squash.)
+- `dea42ad` — 📎 **Chat round 4: the message menu, pins, stars,
   reply-privately, and the reaction pill where WhatsApp puts it** — from
   Jay's two WhatsApp screenshots relayed cross-session
   (`claude/plans/2026-08-24-chat-round-4.md`). A chevron on every bubble
@@ -23,7 +34,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   guard relaxed to readable-by-sender for reply-privately, and the round-2
   harness anchors were REPOINTED, not deleted.
   (`db/migrations/20260824_chat_round_4.sql`, harness green, two injected
-  faults caught.) The NEXT pull request cites this entry's squash SHA.
+  faults caught.) (#384) Its own branch could not cite this squash SHA, so
+  the entry carries it now.
 - `11892d7` — 🏟️ **Click any event on Allocation to give it a pitch** (#383) — Jay: "none of
   the events are clickable, can't click them to assign a pitch". Not a
   regression: direct assignment was wanted on 5 Aug and never built — the
