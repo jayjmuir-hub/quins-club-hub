@@ -8,6 +8,8 @@ import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { chatPath, listChats, listDmCandidates, openConversation, subscribeMessages } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
+import { useMemberships } from '../lib/memberships.jsx'
+import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { postedLabel } from '../lib/notices.js'
 
 // The Chats list — 24 Aug 2026. claude/plans/2026-08-24-chat-list.md.
@@ -83,17 +85,36 @@ export default function ChatList() {
   }, [load])
   useEffect(() => subscribeMessages(load), [load])
 
+  // ⚠️ SCOPED AT RENDER, NOT IN THE FETCH — the memberships.jsx contract
+  // every other screen follows ("RLS still returns club-wide rows; the app
+  // simply declines to display them"). my_chats() runs as the REAL account,
+  // so an admin under "View as" was shown every squad's channel (Jay,
+  // 24 Aug 2026). Cosmetic, never a boundary: a real coach's rows are
+  // already narrowed by the database.
+  const { memberships, teams } = useMemberships()
+  const scoped = useMemo(() => {
+    // Not loaded yet: show what the database sent rather than flashing an
+    // empty list — the database has already scoped it for real users.
+    if (!memberships || !teams) return rows ?? []
+    const visible = new Set(visibleTeams(memberships, teams).map((t) => t.id))
+    return (rows ?? []).filter((r) => {
+      if (r.kind === 'staff') return canEditTeam(memberships, r.team_id)
+      if (r.team_id) return visible.has(r.team_id)
+      return true // club, DMs and groups are not squad-scoped
+    })
+  }, [rows, memberships, teams])
+
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return rows ?? []
-    return (rows ?? []).filter((r) => r.label.toLowerCase().includes(q) || (r.last_body ?? '').toLowerCase().includes(q))
-  }, [rows, query])
+    if (!q) return scoped
+    return scoped.filter((r) => r.label.toLowerCase().includes(q) || (r.last_body ?? '').toLowerCase().includes(q))
+  }, [scoped, query])
 
   // The home shape's derived pieces — all from the same my_chats() rows.
   const searching = query.trim().length > 0
-  const unreadTotal = useMemo(() => (rows ?? []).reduce((n, r) => n + Number(r.unread || 0), 0), [rows])
-  const unreadChats = useMemo(() => (rows ?? []).filter((r) => Number(r.unread) > 0).length, [rows])
-  const hero = useMemo(() => (rows ?? []).find((r) => r.kind === 'club') ?? null, [rows])
+  const unreadTotal = useMemo(() => scoped.reduce((n, r) => n + Number(r.unread || 0), 0), [scoped])
+  const unreadChats = useMemo(() => scoped.filter((r) => Number(r.unread) > 0).length, [scoped])
+  const hero = useMemo(() => scoped.find((r) => r.kind === 'club') ?? null, [scoped])
   const squadRows = useMemo(() => shown.filter((r) => r.kind === 'squad' || r.kind === 'staff'), [shown])
   const dmRows = useMemo(() => shown.filter((r) => r.kind === 'dm' || r.kind === 'group'), [shown])
 

@@ -308,8 +308,16 @@ export default function AppShell({ children }) {
           only a badge, the App link and an initial on the right — "something
           is missing from that top menu bar" (Jay, 23 Aug 2026). Nothing was
           missing; the bar was too big for what it holds. */}
-      <div className="sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:flex desktop:flex-col desktop:items-end desktop:px-4">
-        <ViewAsBanner />
+      {/* ⚠️ pointer-events-none ON THE WRAPPER, auto ON ITS CONTENT (24 Aug
+          2026). The wrapper is a TRANSPARENT full-width sticky band at z-40;
+          anything sticky beneath it (a thread's ChatHeader pins at top-0,
+          z-10) slides UNDER the band, and the invisible band ate its clicks —
+          "back button when in a chat doesn't work". The banner and the
+          masthead island re-enable pointer events on themselves. */}
+      <div className="pointer-events-none sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:flex desktop:flex-col desktop:items-end desktop:px-4">
+        <div className="pointer-events-auto w-full">
+          <ViewAsBanner />
+        </div>
 
         {/* The masthead is DARK CHROME (#151517 -> #0c0c0e), not the red
             gradient it used to be. Two reasons, in order of importance:
@@ -331,7 +339,7 @@ export default function AppShell({ children }) {
             across the top edge, where it is decoration and carries no text, so
             full saturation is free there. `harlequin` adds the site's diagonal
             shapes bleeding off the right edge. */}
-        <header className="glass-island overflow-hidden rounded-[22px] text-white desktop:w-auto">
+        <header className="glass-island pointer-events-auto overflow-hidden rounded-[22px] text-white desktop:w-auto">
           <div className="brand-rule" />
           <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-2.5 overflow-hidden px-3 py-2.5 desktop:mx-0 desktop:max-w-none wide:max-w-none">
             {/* crest.png is 370x400 (portrait) — object-contain keeps its native

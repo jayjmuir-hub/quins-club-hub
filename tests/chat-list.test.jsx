@@ -10,8 +10,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 // what it is handed and routes each row to the right thread.
 
 const useAuthMock = vi.fn()
+const useMembershipsMock = vi.fn()
 const m = { listChats: vi.fn(), listDmCandidates: vi.fn(), openConversation: vi.fn(), subscribeMessages: vi.fn() }
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
+vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/data/messages.js', async (orig) => ({
   ...(await orig()),
   listChats: (...a) => m.listChats(...a),
@@ -44,6 +46,11 @@ function renderList() {
 beforeEach(() => {
   vi.clearAllMocks()
   useAuthMock.mockReturnValue({ user: { id: ME } })
+  // A coach on t1: sees t1's squad and staff rows; club/DMs/groups pass.
+  useMembershipsMock.mockReturnValue({
+    memberships: [{ id: 'm1', role: 'coach', team_id: 't1', club_id: 'club-1', status: 'active' }],
+    teams: [{ id: 't1', name: 'ZZ Probe U13', sort_order: 1 }],
+  })
   m.listChats.mockResolvedValue(ROWS)
   m.subscribeMessages.mockReturnValue(() => {})
   m.listDmCandidates.mockResolvedValue([
