@@ -17,6 +17,10 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   version CI actually tests. Fresh lockfile resolve (an incremental install
   fights plugin-react 6's optional Babel-8 peer chain); full suite and build
   green.
+- `5dac6b1` — 🧭 **Admin expands in the sidebar like every other section** — Jay. Its
+  children are the portals the viewer can enter, read from the same registry
+  as the /admin chooser (`src/lib/portals.js`), so the two cannot disagree;
+  /approvals keeps it open, where the badge's number lives.
 - `8f94373` — 📦 **Safe updates: libphonenumber-js 1.13.11, @testing-library/user-event
   14.6.5, vitest 4.1.11** (Dependabot #351, patch bumps; suite green). The
   same batch's four MAJORS (#352–#355) were closed under the standing

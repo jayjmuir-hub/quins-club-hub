@@ -2,6 +2,8 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { countAdminWaiting } from '../data/members.js'
 import { useAuth } from '../lib/auth.jsx'
+import { useMemberships } from '../lib/memberships.jsx'
+import { isPortalOpen, portalHome, portalLabel, PORTALS } from '../lib/portals.js'
 import { NAV_ITEMS, SquadIcon } from './Nav.jsx'
 import crest from '../assets/crest.png'
 
@@ -70,6 +72,7 @@ function itemClassName({ isActive }) {
 const ACCOUNTS_PATHS = ['/admin/accounts', '/approvals']
 
 export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
+  const { memberships } = useMemberships()
   const location = useLocation()
   const { user } = useAuth()
 
@@ -144,6 +147,17 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
         ...(showSquadHub ? [{ to: '/pitch-calendar', label: 'Pitch calendar' }] : []),
         { to: '/schedule?open=subscribe', label: 'Add to calendar', action: true },
       ]
+    }
+    // The Admin section expands like the others (24 Aug 2026, Jay: "the admin
+    // button in the left bar should expand like the others"). Its children are
+    // the PORTALS this admin can enter — the same cards the /admin chooser
+    // shows, read from the same registry so the two cannot disagree.
+    // /approvals keeps it open: the badge's number lives there.
+    if (to === '/admin' && (location.pathname.startsWith('/admin') || location.pathname.startsWith('/approvals'))) {
+      return PORTALS.filter((portal) => isPortalOpen(portal, memberships)).map((portal) => ({
+        to: portalHome(portal),
+        label: portalLabel(portal),
+      }))
     }
     return []
   }
