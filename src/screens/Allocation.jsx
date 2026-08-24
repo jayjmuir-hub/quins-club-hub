@@ -4,7 +4,8 @@ import Button from '../components/Button.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listEvents } from '../data/events.js'
 import { listPitches, findPitchClashes, PITCH_TBD } from '../data/pitches.js'
-import { listPitchRequests, allocatePitch, declinePitch } from '../data/pitchRequests.js'
+import { listPitchRequests, allocatePitch, declinePitch, setEventPitch } from '../data/pitchRequests.js'
+import { Sheet } from '../components/Sheet.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
 import { clubToday, eventDate, eventEndDate, eventTimeLabel, eventTitle, formatTime } from '../lib/eventFormat.js'
@@ -229,6 +230,7 @@ export default function Allocation() {
     try {
       await work()
       setDeciding(null)
+      setAssigning(null)
       // Refetch both: allocating writes the FIXTURE, so the grid is stale too.
       setReloadToken((token) => token + 1)
     } catch (failure) {
@@ -236,6 +238,34 @@ export default function Allocation() {
     } finally {
       setDecideBusy(false)
     }
+  }
+
+  // ── Direct assignment — click an event, give it a pitch ─────────────────
+  // (claude/plans/2026-08-24-pitch-direct-assign.md). `assigning` holds the
+  // clicked EVENT; the Sheet below is the picker. Shares decideBusy/
+  // decideError with the queue on purpose — one decision in flight at a
+  // time is the queue's own rule, and a second busy flag would let the two
+  // race each other.
+  const [assigning, setAssigning] = useState(null)
+
+  function openAssign(event) {
+    setAssigning(event)
+    const current = (event.pitch ?? '').trim()
+    setChosenPitch(current === PITCH_TBD ? '' : current)
+    setDecideError(null)
+  }
+
+  function saveAssign() {
+    // ⚠️ A PENDING REQUEST RIDES ALONG. If the coach already asked for this
+    // fixture, answering by clicking the event must close their request too
+    // — otherwise the queue says "waiting" about a fixture that has its
+    // pitch, and the next admin answers it again.
+    const pending = requests.find((request) => request.event_id === assigning.id)
+    return decide(() =>
+      pending
+        ? allocatePitch({ requestId: pending.id, eventId: assigning.id, pitch: chosenPitch })
+        : setEventPitch(assigning.id, chosenPitch),
+    )
   }
 
   if (!hasAdminRight(memberships, 'pitches')) {
@@ -450,11 +480,14 @@ export default function Allocation() {
                       {here.map((event) => {
                         const clash = clashing.has(event.id)
                         return (
-                          <span
+                          <button
                             key={event.id}
+                            type="button"
                             data-testid={clash ? 'booking-clash' : 'booking'}
+                            onClick={() => openAssign(event)}
+                            aria-label={`Change pitch for ${fixtureLabel(event, event.league_team, teamsById.get(event.team_id)?.name ?? eventTitle(event))}`}
                             className={[
-                              'block rounded-[6px] px-2 py-1 text-[12px] font-bold leading-tight',
+                              'block w-full rounded-[6px] px-2 py-1 text-left text-[12px] font-bold leading-tight transition hover:ring-2 hover:ring-brand/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                               clash ? 'bg-warn-bg text-warn-ink' : 'bg-danger-bg text-danger-ink',
                             ].join(' ')}
                           >
@@ -473,7 +506,7 @@ export default function Allocation() {
                               {eventTimeLabel(event)}
                               {clash ? ' · clash' : ''}
                             </span>
-                          </span>
+                          </button>
                         )
                       })}
                     </div>
@@ -626,18 +659,91 @@ export default function Allocation() {
           <ul className="flex flex-col gap-1.5">
             {unallocated.map((event) => (
               <li key={event.id} data-testid="unallocated" className="text-sm text-ink">
-                <span className="font-bold">
-                  {fixtureLabel(event, event.league_team, teamsById.get(event.team_id)?.name ?? 'Squad')}
-                </span>
-                <span className="text-ink-muted">
-                  {' · '}
-                  {eventTimeLabel(event)} · {eventTitle(event)}
-                </span>
+                {/* The whole row is the button — this list is a to-do list,
+                    and the to-do is "give it a pitch". */}
+                <button
+                  type="button"
+                  onClick={() => openAssign(event)}
+                  className="-mx-1.5 block w-[calc(100%+12px)] rounded-[8px] px-1.5 py-1 text-left transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                >
+                  <span className="font-bold">
+                    {fixtureLabel(event, event.league_team, teamsById.get(event.team_id)?.name ?? 'Squad')}
+                  </span>
+                  <span className="text-ink-muted">
+                    {' · '}
+                    {eventTimeLabel(event)} · {eventTitle(event)}
+                  </span>
+                  <span className="ml-2 text-[12px] font-bold text-brand-ink">Assign</span>
+                </button>
               </li>
             ))}
           </ul>
         </Card>
       )}
+
+      {/* The direct-assignment picker. One Sheet serves both entry points
+          (grid bookings and the waiting list); closing it clears the shared
+          error so the queue's own panel never inherits a stale one. */}
+      <Sheet
+        open={Boolean(assigning)}
+        onClose={() => {
+          setAssigning(null)
+          setDecideError(null)
+        }}
+        title={
+          assigning
+            ? fixtureLabel(assigning, assigning.league_team, teamsById.get(assigning.team_id)?.name ?? eventTitle(assigning))
+            : ''
+        }
+      >
+        {assigning && (
+          <div>
+            <p className="mb-3 text-[13px] text-ink-muted">
+              {eventTimeLabel(assigning)} · {eventTitle(assigning)}
+              {requests.some((request) => request.event_id === assigning.id) &&
+                ' · answers the waiting request too'}
+            </p>
+            <label className="mb-4 block">
+              <span className="mb-1 block text-[11.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+                Pitch
+              </span>
+              <select
+                aria-label="Pitch for this fixture"
+                value={chosenPitch}
+                disabled={decideBusy}
+                onChange={(domEvent) => setChosenPitch(domEvent.target.value)}
+                className="w-full rounded-[8px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-sm text-ink outline-none transition focus:border-brand"
+              >
+                <option value="">Choose a pitch</option>
+                {pitches.filter((pitch) => pitch.is_active).map((pitch) => (
+                  <option key={pitch.id} value={pitch.name}>{pitch.name}</option>
+                ))}
+              </select>
+            </label>
+            {decideError && (
+              <p role="alert" className="mb-3 text-[12.5px] font-semibold text-danger-ink">
+                {decideError.message || "That didn't save. Try again."}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button size="sm" disabled={decideBusy || !chosenPitch} onClick={saveAssign}>
+                {decideBusy ? 'Saving…' : 'Save pitch'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={decideBusy}
+                onClick={() => {
+                  setAssigning(null)
+                  setDecideError(null)
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </Sheet>
     </section>
   )
 }

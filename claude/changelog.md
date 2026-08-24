@@ -24,6 +24,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   harness anchors were REPOINTED, not deleted.
   (`db/migrations/20260824_chat_round_4.sql`, harness green, two injected
   faults caught.) The NEXT pull request cites this entry's squash SHA.
+- `11892d7` — 🏟️ **Click any event on Allocation to give it a pitch** (#383) — Jay: "none of
+  the events are clickable, can't click them to assign a pitch". Not a
+  regression: direct assignment was wanted on 5 Aug and never built — the
+  request queue was the only path. Now the day grid's bookings and the
+  "Waiting for a pitch" rows open a picker Sheet; saving writes the fixture
+  (`setEventPitch`, RLS-gated), and a pending request for that event is
+  answered through the existing `allocatePitch` so the queue stays truthful.
+  The write-path fork proved against an injected fault; the harness
+  stub-parity anchor caught the missing stub export exactly as designed.
+  `claude/plans/2026-08-24-pitch-direct-assign.md`. Its own branch could
+  not cite this squash SHA, so this entry does.
 - `4ca3560` — 📐 **The chat list's section titles get their 18px back** (#382) —
   Jay: "the Direct Messages text touches the chip above it", and the
   measurement in his own browser agreed: 4px from card edge to title.
