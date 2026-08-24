@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 📦 **Vite 8.2.2 + @vitejs/plugin-react 6.1.0, taken together, and Netlify's
+- 📟 **Heartbeat on the nightly db-check, and tests no longer open real
+  sockets to production.** The heartbeat step pings Better Stack only after a
+  genuine green harness run — inert until Jay creates the heartbeat and adds
+  `DB_CHECK_HEARTBEAT_URL` (four steps, `claude/runbooks/monitoring.md`).
+  And `src/test/setup.js` now stubs jsdom's WebSocket: five screen suites had
+  been opening live realtime connections to the Supabase project on every
+  `npm test`, visible only as 5–7 "Unhandled Errors" on a suite that still
+  exited 0. Measured before (3 errors on 3 files) and after (0 on all 175).
+- `30c684e` — 📦 **Vite 8.2.2 + @vitejs/plugin-react 6.1.0, taken together, and Netlify's
   build Node pinned to 24** — the mutually-blocking pair from the 17 Aug
   parking, landed exactly as `claude/open-items.md` prescribed: one PR carrying
   both, Node pinned in the same change so the production build runs on the

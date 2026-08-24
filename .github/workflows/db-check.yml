@@ -54,6 +54,7 @@ jobs:
       # Project Settings -> Database -> Connection string (URI).
       # ⚠️ Claude never handles it. It is a credential and this repo is public.
       - name: Run the harnesses
+        id: harnesses
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -63,3 +64,32 @@ jobs:
             exit 0
           fi
           npm run db:check
+          echo "ran=true" >> "$GITHUB_OUTPUT"
+
+      # ⚠️ THE HEARTBEAT CLOSES THE GAP GITHUB CANNOT SEE. Actions emails Jay
+      # when this run FAILS; nothing tells him when it stops HAPPENING — a
+      # schedule GitHub disables after 60 days without a commit, a deleted
+      # workflow, a cron typo. Better Stack expects a ping inside its period
+      # plus grace, and raises an alert on silence.
+      #
+      # ⚠️ PINGS ONLY WHEN THE HARNESSES GENUINELY RAN AND PASSED — the `ran`
+      # output above is set after `npm run db:check` succeeds and never on the
+      # "not configured" exit. Pinging on that exit would keep the heartbeat
+      # green while the check it vouches for was off, which is the exact
+      # failure a heartbeat exists to catch.
+      #
+      # Inert until the secret exists, same pattern as SUPABASE_DB_URL.
+      # Jay adds it — see claude/runbooks/monitoring.md, which also has the
+      # proof-it-fires sequence. Claude never handles the URL: it is a
+      # capability secret and this repo is public.
+      - name: Heartbeat
+        if: steps.harnesses.outputs.ran == 'true'
+        env:
+          HEARTBEAT_URL: ${{ secrets.DB_CHECK_HEARTBEAT_URL }}
+        run: |
+          if [ -z "$HEARTBEAT_URL" ]; then
+            echo "::notice::DB_CHECK_HEARTBEAT_URL is not set - no heartbeat sent."
+            echo "Create it in Better Stack and add the secret. See claude/runbooks/monitoring.md"
+            exit 0
+          fi
+          curl -fsS --retry 3 -o /dev/null "$HEARTBEAT_URL"
