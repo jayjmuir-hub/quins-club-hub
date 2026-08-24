@@ -52,18 +52,21 @@ describe('sendDirectMessage — round 2 options', () => {
     expect(plain.calls.insert[0][0]).toEqual({ conversation_id: 'c1', body: 'no frills' })
   })
 
-  it('the quoted embed hints by COLUMN name, never by constraint name', async () => {
-    // ⚠️ MEASURED LIVE, 24 Aug 2026, minutes after round 2 deployed: on a
-    // SELF-join this project's PostgREST rejects a constraint-name hint
-    // (`!messages_quoted_id_fkey` → PGRST200 "Could not find a
-    // relationship") while the column-name hint `!quoted_id` resolves. The
-    // mocks make this invisible to every screen test, so this anchor pins
-    // the one string the live API actually parses.
+  it('the quoted embed goes through the FK COLUMN itself — both other spellings shipped broken', async () => {
+    // ⚠️ MEASURED LIVE, 24 Aug 2026, twice in one evening. On a SELF-join
+    // this project's PostgREST rejects a constraint-name hint
+    // (`!messages_quoted_id_fkey` → PGRST200), and `messages!quoted_id`
+    // resolves BACKWARDS — an empty array of quoting messages on every row,
+    // which chipped every bubble with a phantom "📷 Photo". Only
+    // `quoted:quoted_id(…)` is to-one by definition. The mocks make all of
+    // this invisible to every screen test, so this anchor pins the one
+    // string the live API actually parses.
     const ins = builder({ data: { id: 'dc' }, error: null })
     supabase.from.mockReturnValue(ins.b)
     await sendDirectMessage('c1', 'shape probe')
     const select = ins.calls.select[0][0]
-    expect(select).toContain('quoted:messages!quoted_id(')
+    expect(select).toContain('quoted:quoted_id(')
+    expect(select).not.toContain('quoted:messages!')
     expect(select).not.toContain('messages!messages_quoted_id_fkey')
   })
 

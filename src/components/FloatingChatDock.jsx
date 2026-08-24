@@ -256,7 +256,9 @@ export default function FloatingChatDock({ badge = false }) {
                         {m.forwarded && !m.deleted_at && (
                           <p className={`text-[10.5px] italic ${mine ? 'text-white/60' : 'text-ink-faint'}`} data-testid="forwarded-tag">Forwarded</p>
                         )}
-                        {m.quoted && !m.deleted_at && (
+                        {/* `?.id`, not truthiness — see the DM thread's note:
+                            an empty-array embed once chipped every bubble. */}
+                        {m.quoted?.id && !m.deleted_at && (
                           <p className={`mb-0.5 truncate rounded-[6px] border-l-2 px-1.5 py-0.5 text-[11px] ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-brand bg-surface-mute text-ink-muted'}`} data-testid="quote-block">
                             {m.quoted.deleted_at ? 'Message deleted' : (m.quoted.body?.trim() ? m.quoted.body : '📷 Photo')}
                           </p>

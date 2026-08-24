@@ -567,8 +567,12 @@ function Thread({ conversationId }) {
                 {/* The quote block. A HARD-deleted original nulls quoted_id
                     (FK set null) and the block simply goes; a soft-deleted
                     one keeps the pointer and says so without re-showing a
-                    word of the deleted content. */}
-                {m.quoted && !m.deleted_at && (
+                    word of the deleted content.
+                    ⚠️ `?.id`, NOT truthiness. A reverse-direction embed once
+                    made `quoted` an EMPTY ARRAY on every message — truthy —
+                    and every bubble grew a phantom chip (24 Aug 2026, live).
+                    An object with an id is the only shape worth drawing. */}
+                {m.quoted?.id && !m.deleted_at && (
                   m.quoted.deleted_at ? (
                     <p className={`mb-1 rounded-[8px] border-l-2 px-2 py-1 text-[12px] italic ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-line bg-surface-mute text-ink-faint'}`} data-testid="quote-block">
                       Message deleted

@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 🚑 **Hotfix: the quoted embed hints by COLUMN name** — round 2
+- (unmerged) — 🚑 **Hotfix 2: the quoted embed goes through the FK COLUMN
+  itself** — the first hotfix's `messages!quoted_id` spelling RESOLVED but
+  in the reverse direction: an empty array of quoting-messages on every row,
+  truthy and bodyless, so every bubble in every thread grew a phantom
+  "📷 Photo" chip (Jay screenshotted it live within the hour). Only
+  `quoted:quoted_id(…)` is to-one by definition; the renderers now demand
+  an object with an id, pinned by a regression test at both layers. The
+  NEXT pull request cites this entry's squash SHA.
+- `2008310` — 🚑 **Hotfix: the quoted embed hints by COLUMN name** — round 2
   reached the live site with `quoted:messages!messages_quoted_id_fkey(…)` in
   the SELECT and every DM/group thread died with PGRST200 "Could not find a
   relationship between 'messages' and 'messages'". Not cache staleness: the
@@ -18,8 +26,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   same way — **this project's PostgREST does not resolve constraint-name
   hints on SELF-joins**, and the column-name hint `!quoted_id` does
   (probed live, after two reload notifies changed nothing). One line, plus
-  a test pinning the string the live API parses. The NEXT pull request
-  cites this entry's squash SHA.
+  a test pinning the string the live API parses — a spelling hotfix 2 above
+  then had to correct again, in the other direction.
 - `5cf0fb1` — 📋 **Round 2 closed** (#372) — `bbbc1d3` cited, both plans
   marked shipped, live verification recorded. Its own branch could not cite
   this squash SHA, so this entry does.

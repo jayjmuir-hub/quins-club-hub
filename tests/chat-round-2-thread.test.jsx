@@ -146,6 +146,16 @@ describe('reply-with-quote', () => {
     await waitFor(() => expect(screen.queryByTestId('quote-preview')).not.toBeInTheDocument())
   })
 
+  it('an EMPTY-ARRAY quoted embed draws no quote block — the phantom-chip regression', async () => {
+    // A reverse-direction embed once made `quoted` [] on every message
+    // (24 Aug 2026, live): truthy, bodyless, so every bubble grew a
+    // "📷 Photo" chip. The renderers now demand an object with an id.
+    m.listDirectMessages.mockResolvedValue([dm('d1', OTHER, 'Two seats held', { quoted: [] })])
+    renderThread()
+    await screen.findAllByTestId('dm-bubble')
+    expect(screen.queryByTestId('quote-block')).not.toBeInTheDocument()
+  })
+
   it('a quoted message renders its block; a soft-deleted original says "Message deleted" and never its words', async () => {
     m.listDirectMessages.mockResolvedValue([
       dm('d1', OTHER, 'Two seats held'),
