@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- 🫧 **The masthead hides on scroll like the dock, and both bars are Liquid
+  Glass** — one shared hook (`src/lib/useAutoHideOnScroll.js`) drives both
+  bars so a downward scroll clears the whole screen on a phone (View-as pins
+  the masthead shown — the banner is contractually unmissable); the glass
+  itself went clearer with a lensed backdrop, gradient specular rim and
+  light-catch sheen (dock 62%→52%, island 70%→66% — the island's floor is
+  its 13px text, worked in `src/index.css`'s comments). Look approved from
+  harness screenshots before deploying.
+  `claude/plans/2026-08-24-topbar-autohide-liquid-glass.md`.
+  (No SHA — this branch's entry; the next PR cites the squash.)
+- `569656a` — 📝 **The chat day closed** (#369) — plan statuses marked shipped,
+  `2119d1a` cited, handoff written. Its own branch could not cite this squash
+  SHA, so this entry does.
 - `2119d1a` — 🧲 **The floating chat dock and emoji reactions** — chat beside your work:
   a bubble bottom-right of every desktop page (except /chat) opening a
   compact panel with the scoped list and any thread, surviving navigation

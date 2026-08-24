@@ -1,7 +1,8 @@
 # Plan — retire the floating `?`, move "Report a problem" into the account menu
 
-**STATUS: NOT YET SHIPPED — designed and approved 24 Aug 2026, implementation
-in progress on this branch.** Update this line when it merges.
+**STATUS: SHIPPED — merged to `main` 24 Aug 2026 as squash `34b529d` (#367),
+verified live the same day from the deployed bundle** (new menu label present,
+old floating-button label absent).
 
 ## Why
 
