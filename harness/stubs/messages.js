@@ -150,3 +150,16 @@ export async function listGroupCandidates() {
     { profile_id: 'hz-coach', full_name: 'Harriet Zephyr', role: 'coach', via_team: 'U13 Mixed' },
   ]
 }
+
+// ── Emoji reactions (24 Aug 2026) — invented people only, CLAUDE.md rule 9 ──
+export async function listReactions() {
+  return new Map([['hz-msg-1', [
+    { message_id: 'hz-msg-1', profile_id: 'hz-parent', emoji: '👍' },
+    { message_id: 'hz-msg-1', profile_id: 'hz-manager', emoji: '👍' },
+    { message_id: 'hz-msg-1', profile_id: 'hz-self', emoji: '👏' },
+  ]]])
+}
+export async function toggleReaction() {}
+export function subscribeReactions() {
+  return () => {}
+}

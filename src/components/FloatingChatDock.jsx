@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Button from './Button.jsx'
+import ReactionBar from './ReactionBar.jsx'
 import Spinner from './Spinner.jsx'
 import {
   chatPath,
   listChats,
   listDirectMessages,
   listMessages,
+  listReactions,
   listStaffMessages,
   markMessagesRead,
   postMessage,
   postStaffMessage,
   sendDirectMessage,
   subscribeMessages,
+  subscribeReactions,
+  toggleReaction,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
 import { autoGrow, composerKeyDown } from '../lib/chatComposer.js'
@@ -48,6 +52,7 @@ export default function FloatingChatDock({ badge = false }) {
   const [rows, setRows] = useState(null)
   const [active, setActive] = useState(null) // a my_chats row, or null for the list
   const [thread, setThread] = useState(null)
+  const [reactions, setReactions] = useState(() => new Map())
   const [error, setError] = useState(null)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -69,6 +74,11 @@ export default function FloatingChatDock({ badge = false }) {
       else if (active.kind === 'staff') list = await listStaffMessages(active.team_id)
       else list = await listMessages(active.team_id ?? null)
       setThread(list)
+      try {
+        setReactions(await listReactions(list.map((m) => m.id)))
+      } catch {
+        setReactions(new Map())
+      }
       const theirs = list.filter((m) => m.author_id !== selfId && !m.deleted_at).map((m) => m.id)
       if (theirs.length && selfId) markMessagesRead(selfId, theirs)
     } catch (err) {
@@ -81,10 +91,15 @@ export default function FloatingChatDock({ badge = false }) {
     setError(null)
     loadList()
     loadThread()
-    return subscribeMessages(() => {
+    const offMessages = subscribeMessages(() => {
       loadList()
       loadThread()
     })
+    const offReactions = subscribeReactions(loadThread)
+    return () => {
+      offMessages()
+      offReactions()
+    }
   }, [open, loadList, loadThread])
 
   useEffect(() => {
@@ -112,6 +127,15 @@ export default function FloatingChatDock({ badge = false }) {
       setError(err.message || 'Could not send that.')
     } finally {
       setSending(false)
+    }
+  }
+
+  async function react(messageId, emoji, on) {
+    try {
+      await toggleReaction(messageId, selfId, emoji, on)
+      await loadThread()
+    } catch (err) {
+      setError(err.message || 'Could not react to that.')
     }
   }
 
@@ -208,6 +232,9 @@ export default function FloatingChatDock({ badge = false }) {
                           {stampLabel(m.created_at)}
                           {m.replies?.length ? ` · ${m.replies.length} repl${m.replies.length === 1 ? 'y' : 'ies'} in full view` : ''}
                         </p>
+                        {!m.deleted_at && (
+                          <ReactionBar messageId={m.id} reactions={reactions.get(m.id) ?? []} selfId={selfId} onToggle={react} />
+                        )}
                       </div>
                     </div>
                   )

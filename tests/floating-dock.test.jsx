@@ -21,6 +21,9 @@ const m = {
   postStaffMessage: vi.fn(),
   sendDirectMessage: vi.fn(),
   subscribeMessages: vi.fn(),
+  listReactions: vi.fn(),
+  toggleReaction: vi.fn(),
+  subscribeReactions: vi.fn(),
   listDmCandidates: vi.fn(),
   openConversation: vi.fn(),
 }
@@ -37,6 +40,9 @@ vi.mock('../src/data/messages.js', async (orig) => ({
   postStaffMessage: (...a) => m.postStaffMessage(...a),
   sendDirectMessage: (...a) => m.sendDirectMessage(...a),
   subscribeMessages: (...a) => m.subscribeMessages(...a),
+  listReactions: (...a) => m.listReactions(...a),
+  toggleReaction: (...a) => m.toggleReaction(...a),
+  subscribeReactions: (...a) => m.subscribeReactions(...a),
   listDmCandidates: (...a) => m.listDmCandidates(...a),
   openConversation: (...a) => m.openConversation(...a),
 }))
@@ -80,6 +86,8 @@ beforeEach(() => {
   m.sendDirectMessage.mockResolvedValue()
   m.markMessagesRead.mockResolvedValue()
   m.subscribeMessages.mockReturnValue(() => {})
+  m.listReactions.mockResolvedValue(new Map())
+  m.subscribeReactions.mockReturnValue(() => {})
 })
 
 describe('the floating chat dock', () => {

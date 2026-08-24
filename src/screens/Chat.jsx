@@ -19,6 +19,7 @@ import {
   postStaffMessage,
   reportMessage,
   listMyMessageReads,
+  listReactions,
   markMessagesRead,
   messageReadStats,
   postMessage,
@@ -27,6 +28,8 @@ import {
   setAnnounceOnly,
   setPinned,
   subscribeMessages,
+  subscribeReactions,
+  toggleReaction,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
 import { autoGrow, composerKeyDown } from '../lib/chatComposer.js'
@@ -100,6 +103,7 @@ export default function Chat() {
   const [sendError, setSendError] = useState(null)
   const [clearing, setClearing] = useState(false)
   const [tallies, setTallies] = useState(() => new Map())
+  const [reactions, setReactions] = useState(() => new Map())
   const [mentionables, setMentionables] = useState([])
   const [upcoming, setUpcoming] = useState([])
   const bottomRef = useRef(null)
@@ -124,6 +128,13 @@ export default function Chat() {
       setMessages(rows)
       setReads(mine)
       setSettings(channel)
+      // Reactions are decoration: a stream without them is still a stream.
+      try {
+        const ids = rows.flatMap((m) => [m.id, ...(m.replies ?? []).map((r) => r.id)])
+        setReactions(await listReactions(ids))
+      } catch {
+        setReactions(new Map())
+      }
       // RSVP chips for every fixture thread on screen. Allowed to fail —
       // a thread without chips is still a thread.
       const eventIds = rows.filter((m) => m.event_id && !m.deleted_at).map((m) => m.event_id)
@@ -152,6 +163,7 @@ export default function Chat() {
   }, [load])
 
   useEffect(() => (param ? subscribeMessages(load) : undefined), [param, load])
+  useEffect(() => (param ? subscribeReactions(load) : undefined), [param, load])
 
   // Who can be mentioned here, and which fixtures could start a thread.
   // Both allowed to fail: the composer still works without either.
@@ -252,6 +264,15 @@ export default function Chat() {
     await replyToMessage(parentId, body, opts)
     await load()
   }
+  async function onReact(messageId, emoji, on) {
+    try {
+      await toggleReaction(messageId, selfId, emoji, on)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Could not react to that.')
+    }
+  }
+
   async function onRemove(id) {
     try {
       await removeMessage(id)
@@ -390,6 +411,8 @@ export default function Chat() {
           message={m}
           selfId={selfId}
           canModerate={canModerate}
+          reactions={reactions}
+          onReact={onReact}
           readStat={canModerate ? stats.get(m.id) : undefined}
           unread={!reads.has(m.id)}
           tally={m.event_id ? tallies.get(m.event_id) : undefined}

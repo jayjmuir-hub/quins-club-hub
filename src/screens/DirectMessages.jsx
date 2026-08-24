@@ -7,10 +7,12 @@ import { Empty } from '../components/Empty.jsx'
 import { Avatar, RolePill } from '../components/NewChatPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
+import ReactionBar from '../components/ReactionBar.jsx'
 import {
   blockDm,
   deleteConversation,
   listMyMessageReads,
+  listReactions,
   getConversation,
   leaveGroup,
   listDirectMessages,
@@ -24,6 +26,8 @@ import {
   reportMessage,
   sendDirectMessage,
   subscribeMessages,
+  subscribeReactions,
+  toggleReaction,
   unblockDm,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -82,6 +86,7 @@ function Thread({ conversationId }) {
   // Groups (claude/plans/2026-08-24-group-chats.md): same thread screen,
   // membership from conversation_members instead of the profile_a/b pair.
   const [members, setMembers] = useState(null)
+  const [reactions, setReactions] = useState(() => new Map())
   const [renaming, setRenaming] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [addingPeople, setAddingPeople] = useState(false)
@@ -111,6 +116,12 @@ function Thread({ conversationId }) {
       setConversation(conv)
       setMessages(rows)
       setMissing(!conv)
+      // Reactions are decoration: a thread without them is still a thread.
+      try {
+        setReactions(await listReactions(rows.map((m) => m.id)))
+      } catch {
+        setReactions(new Map())
+      }
       const group = conv?.kind === 'group'
       const people = group ? await listGroupMembers(conversationId) : null
       setMembers(people)
@@ -140,6 +151,7 @@ function Thread({ conversationId }) {
     load()
   }, [load])
   useEffect(() => subscribeMessages(load), [load])
+  useEffect(() => subscribeReactions(load), [load])
 
   // Mark what I can see as read — so the inbox's unread dot clears.
   useEffect(() => {
@@ -185,6 +197,15 @@ function Thread({ conversationId }) {
       setError(err.message || 'Could not send that.')
     } finally {
       setSending(false)
+    }
+  }
+
+  async function react(messageId, emoji, on) {
+    try {
+      await toggleReaction(messageId, selfId, emoji, on)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Could not react to that.')
     }
   }
 
@@ -462,6 +483,15 @@ function Thread({ conversationId }) {
                     </button>
                   )}
                 </div>
+                {!m.deleted_at && (
+                  <ReactionBar
+                    messageId={m.id}
+                    reactions={reactions.get(m.id) ?? []}
+                    selfId={selfId}
+                    onToggle={react}
+                    disabled={!participant}
+                  />
+                )}
               </div>
             </div>
             </Fragment>
