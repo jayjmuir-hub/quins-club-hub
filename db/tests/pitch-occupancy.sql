@@ -81,4 +81,17 @@ insert into _r select 'a parent gets zero rows from the function',
 reset role;
 select * from _r;
 
+-- ⚠️ THE RUNNER ONLY FAILS ON A THROWN ERROR. A FAIL row in _r prints and
+-- carries on — this gate is what turns it into a red run. Without it,
+-- db-check REFUSES the whole suite ("cannot FAIL"), which is how this file
+-- silently broke the nightly from 22 Aug 2026 until this block was added.
+do $$
+declare bad text;
+begin
+  select string_agg(step, '; ') into bad from _r where outcome <> 'PASS';
+  if bad is not null then
+    raise exception 'pitch-occupancy: FAILED — %', bad;
+  end if;
+end $$;
+
 rollback;

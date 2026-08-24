@@ -248,10 +248,24 @@ begin
   insert into _log(line) values ('14 a report is stamped, visible to its reporter and to admins, and resolving stamps the resolver');
 
   -- 15. welfare overview
+  -- ⚠️ REPOINTED 24 Aug 2026. This asserted `n < 2` — BOTH DMs listed — and
+  -- was written before the 23 Aug adult-DMs-private ruling narrowed the
+  -- overview to REVIEWABLE conversations only (a minor involved, or
+  -- reported). The minor<->guardian DM qualifies; the adult<->adult one must
+  -- now be ABSENT, and that absence is the ruling working — asserted in both
+  -- directions rather than deleted (CLAUDE.md rule 7).
+  -- msg is done with after assert 14; it carries the adult DM's id here.
+  select c.id into msg from conversations c
+   where (c.profile_a = parent and c.profile_b = parent2)
+      or (c.profile_a = parent2 and c.profile_b = parent);
   perform pg_temp.as_user(admin::text);
-  select count(*) into n from public.welfare_overview() where kind = 'dm';
+  select count(*) into n from public.welfare_overview() o where o.kind = 'dm' and o.id = conv;
   reset role;
-  if n < 2 then raise exception 'ASSERT 15 FAILED: admin overview lists % dm(s)', n; end if;
+  if n <> 1 then raise exception 'ASSERT 15 FAILED: the minor DM is not on the overview'; end if;
+  perform pg_temp.as_user(admin::text);
+  select count(*) into n from public.welfare_overview() o where o.kind = 'dm' and o.id = msg;
+  reset role;
+  if n <> 0 then raise exception 'ASSERT 15 FAILED: an adult-only unreported DM is on the overview'; end if;
   perform pg_temp.as_user(parent::text);
   select count(*) into n from public.welfare_overview();
   reset role;

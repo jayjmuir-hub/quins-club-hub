@@ -204,7 +204,21 @@ begin
       'announcements.pinned', 'announcements.expires_at',
       -- social_ideas — marking an idea must not rewrite the submitter's words.
       'social_ideas.status', 'social_ideas.decision_note',
-      'social_ideas.decided_by', 'social_ideas.decided_at'
+      'social_ideas.decided_by', 'social_ideas.decided_at',
+      -- chat (23 Aug 2026, 20260823_squad_chat) — an author edits their own
+      -- words, pins, or soft-deletes; the columns are the ceiling, the
+      -- policies decide whose message. Recorded in grants.sql the same day;
+      -- ⚠️ THIS LIST was missed and the harness was red from 23 Aug — unseen,
+      -- because the pitch-occupancy refusal was blocking the whole nightly.
+      'messages.body', 'messages.pinned', 'messages.deleted_at',
+      -- chat phase 3 (20260823_squad_chat_phase3) — resolving a report stamps
+      -- these two and nothing else; staff_dm_opt_in is the guardian's switch
+      -- (its _by/_at neighbours ride the table-level grant, no column ACL).
+      'message_reports.resolved_at', 'message_reports.resolved_by',
+      'player_private.staff_dm_opt_in',
+      -- group chats (24 Aug 2026, 20260824_group_chats) — the owner-only
+      -- "group rename" policy gates WHO; this column grant gates to WHAT.
+      'conversations.title'
     ])
   limit 1;
 
