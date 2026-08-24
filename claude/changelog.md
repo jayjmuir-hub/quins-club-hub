@@ -10,13 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — ↔️ **The dock is resizeable** — Jay, same evening: "can we
+- (unmerged) — ↔️ **The dock's width ceiling goes to 1100** — Jay tried the
+  grip live and: "looks good but on desktop mode we could make it much
+  wider". The viewport cap already guards small screens; 640 was only where
+  the drag stopped, and it stopped too soon. The NEXT pull request cites
+  this entry's squash SHA.
+- `8c12fb7` — ↔️ **The dock is resizeable** (#376) — Jay, same evening: "can we
   make the chat box resizeable? this would be beneficial in desktop mode".
   A custom top-left grip (the panel is anchored bottom-right, so the native
   CSS handle only lives on the corner that cannot move); dragging left/up
   grows it within 320-640 × 400-860, the size persists per DEVICE like
   chat-enter-sends, and the header shifted right so the back button never
-  sits under the grip. The NEXT pull request cites this entry's squash SHA.
+  sits under the grip. Its own branch could not cite this squash SHA, so
+  this entry does — and the width ceiling moved the same evening, above.
 - `c07b839` — 🚑 **Hotfix 2: the quoted embed goes through the FK COLUMN
   itself** (#375) — the first hotfix's `messages!quoted_id` spelling RESOLVED
   but in the reverse direction: an empty array of quoting-messages on every

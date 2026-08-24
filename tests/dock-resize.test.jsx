@@ -59,7 +59,7 @@ beforeEach(() => {
 describe('clampDockSize', () => {
   it('holds the bounds and falls back to the default on junk', () => {
     expect(clampDockSize({ w: 100, h: 100 })).toEqual({ w: 320, h: 400 })
-    expect(clampDockSize({ w: 9000, h: 9000 })).toEqual({ w: 640, h: 860 })
+    expect(clampDockSize({ w: 9000, h: 9000 })).toEqual({ w: 1100, h: 860 })
     expect(clampDockSize({ w: 400, h: 600 })).toEqual({ w: 400, h: 600 })
     expect(clampDockSize(null)).toEqual({ w: 380, h: 560 })
     expect(clampDockSize({ w: 'x', h: 500 })).toEqual({ w: 380, h: 560 })
@@ -91,7 +91,7 @@ describe('the resize grip', () => {
     renderDock()
     await user.click(screen.getByTestId('dock-bubble-button'))
     const panel = screen.getByTestId('dock-panel')
-    expect(panel.style.width).toBe('640px')
+    expect(panel.style.width).toBe('1100px')
     expect(panel.style.height).toBe('400px')
   })
 
