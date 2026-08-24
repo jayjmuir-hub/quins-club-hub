@@ -20,9 +20,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   guarding the ordering (proved by both injected faults), and `CLAUDE.md`
   rule 3 now says plainly: a local gate run answers what the script would
   decide, never whether Netlify consults it — the only proof of a skip is the
-  deploy id not moving.
-- `261397a` — 📝 **Group chats recorded as shipped and verified live** (#363,
-  docs only — the statuses and state-of-play for the `463b3c9` entry below).
+  deploy id not moving. This answers the open question the `261397a` entry
+  below flagged for its own session.
+- `ecb0ced` — 💬 **The member chat home — unread strip, club hero, titled
+  sections** (#364).
+- `261397a` — 📝 **Group chats recorded as shipped-and-verified** — plan statuses
+  closed, state-of-play's chat section updated, and the `463b3c9` squash SHA
+  cited (the entry #362 could not write for itself). Docs only — though the
+  predicted deploy skip did NOT happen; the gate misprediction was an open
+  question at the time, answered by the entry above.
 - `463b3c9` — 💬 **Group chats SHIPPED and VERIFIED LIVE — member-created, named,
   three people minimum** — migration `db/migrations/20260824_group_chats.sql`
   applied to live (harness `db/tests/group-chats.sql` green before and after,

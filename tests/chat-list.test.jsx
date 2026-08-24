@@ -54,12 +54,17 @@ beforeEach(() => {
 })
 
 describe('ChatList', () => {
-  it('lists every kind of chat in the order given, routed to its thread', async () => {
+  // The home shape since the member-chat-home work
+  // (claude/plans/2026-08-24-member-chat-home.md): squads then conversations,
+  // each under its title, and the club channel as the hero card. Every kind
+  // still routes to its thread — that intent is unchanged from day one.
+  it('lists every kind of chat, grouped, each routed to its thread', async () => {
     renderList()
     const rows = await screen.findAllByTestId('chat-row')
-    expect(rows.map((r) => r.getAttribute('href'))).toEqual(['/chat/t1', '/chat/dm/c1', '/chat/t1?channel=staff', '/chat/club'])
+    expect(rows.map((r) => r.getAttribute('href'))).toEqual(['/chat/t1', '/chat/t1?channel=staff', '/chat/dm/c1'])
     expect(within(rows[0]).getByText('ZZ Probe U13')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('Zz Manager Probe')).toBeInTheDocument()
+    expect(within(rows[2]).getByText('Zz Manager Probe')).toBeInTheDocument()
+    expect(screen.getByTestId('chat-hero')).toHaveAttribute('href', '/chat/club')
   })
 
   it('previews who said the last thing, shows the unread count, and says nothing is here when nothing is', async () => {
@@ -67,9 +72,9 @@ describe('ChatList', () => {
     const rows = await screen.findAllByTestId('chat-row')
     expect(within(rows[0]).getByText('Zz Coach Probe: Kick-off moved to 10:30')).toBeInTheDocument()
     expect(within(rows[0]).getByLabelText('3 unread')).toHaveTextContent('3')
-    expect(within(rows[1]).getByText('You: Two seats held')).toBeInTheDocument()
-    expect(within(rows[1]).queryByLabelText(/unread/)).toBeNull()
-    expect(within(rows[3]).getByText('Nothing here yet')).toBeInTheDocument()
+    expect(within(rows[2]).getByText('You: Two seats held')).toBeInTheDocument()
+    expect(within(rows[2]).queryByLabelText(/unread/)).toBeNull()
+    expect(within(screen.getByTestId('chat-hero')).getByText('Nothing here yet')).toBeInTheDocument()
   })
 
   it('search narrows by name or last line', async () => {
