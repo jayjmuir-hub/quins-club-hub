@@ -45,6 +45,13 @@ trimmed. An item deleted from this list is a finding that ceases to exist.
 - "forwarding a message or multiple messages, click to add to forward
   multiple".
 - "emojis" — an emoji picker button (typing emoji already works).
+- **Emoji REACTIONS on messages** (added later the same evening: "emoji
+  reactions for messages would be nice to have"). Sketch: a
+  `message_reactions` table (message_id, profile_id, emoji; one row per
+  person per emoji), read wherever the message is readable, write your own
+  only; a small fixed set (👍 ❤️ 😂 😮 👏) rather than a full picker, tally
+  chips under the bubble, tap to toggle. Cuts the "ok/thanks" noise a squad
+  channel breeds — arguably worth building BEFORE the picker item above.
 - "chat icon option in all coach, manager, etc pills" — tap a staff pill,
   land in a DM.
 
