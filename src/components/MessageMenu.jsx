@@ -15,7 +15,20 @@ import { useEffect, useRef, useState } from 'react'
  */
 export default function MessageMenu({ items = [], mine = false }) {
   const [open, setOpen] = useState(false)
+  // Near the viewport bottom the menu must FLIP UPWARD — seven items open
+  // downward from a last-message chevron and half of them land under the
+  // phone's tab bar (Jay's screenshot, 24 Aug 2026: "Pin" half-hidden,
+  // everything below unreachable).
+  const [flip, setFlip] = useState(false)
   const ref = useRef(null)
+
+  function toggle() {
+    if (!open) {
+      const rect = ref.current?.getBoundingClientRect?.()
+      setFlip(Boolean(rect && window.innerHeight - rect.bottom < 320))
+    }
+    setOpen((v) => !v)
+  }
 
   useEffect(() => {
     if (!open) return undefined
@@ -41,7 +54,7 @@ export default function MessageMenu({ items = [], mine = false }) {
         aria-label="Message options"
         aria-expanded={open}
         aria-haspopup="menu"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className={`grid h-5 w-5 place-items-center rounded-full ${mine ? 'text-white/70 hover:bg-white/15 hover:text-white' : 'text-ink-faint hover:bg-surface-mute hover:text-ink'}`}
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -49,9 +62,12 @@ export default function MessageMenu({ items = [], mine = false }) {
         </svg>
       </button>
       {open && (
+        // z-50: above the tab bar and the masthead island (both z-40) — a
+        // menu that opens UNDER the chrome is unusable exactly when a
+        // message sits near an edge.
         <ul
           role="menu"
-          className={`absolute top-6 z-30 min-w-[170px] overflow-hidden rounded-card border border-line bg-surface-card py-1 shadow-card ${mine ? 'right-0' : 'left-0'}`}
+          className={`absolute z-50 min-w-[170px] overflow-hidden rounded-card border border-line bg-surface-card py-1 shadow-card ${flip ? 'bottom-6' : 'top-6'} ${mine ? 'right-0' : 'left-0'}`}
         >
           {items.map((a) => (
             <li key={a.label} role="none">

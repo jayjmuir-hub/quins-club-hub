@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- `bc971f8` — 📱 **The mobile thread fits its chrome** (#389) — Jay's phone
+  screenshot: "chat isn't playing nice with the bottom menu bar, several
+  things wrong." Three fixes: the message menu FLIPS UPWARD near the
+  viewport bottom and outranks the chrome at z-50 (half its items were
+  under the tab bar, unreachable); the composer and forward bar lift
+  74px+safe-area above the floating dock on phones (desktop keeps
+  bottom-0); and the thread header pins BELOW the glass masthead instead
+  of under it, taking the privacy notice with it. The accepted cost — a
+  64px gap above the header while the masthead is auto-hidden — and the
+  alternative (chrome-free thread screens, WhatsApp-style) is Jay's call,
+  recorded here so it is not re-derived. Its own branch could not cite
+  this squash SHA, so this entry does.
 - `043f9c3` — 🧭 **Chat navigation: the list stops being a scroll** (#386) — Jay:
   "once there are lots of chats ... they will have to scroll too far down".
   Four pieces (`claude/plans/2026-08-24-chat-navigation.md`): the sidebar
