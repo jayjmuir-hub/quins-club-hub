@@ -225,8 +225,13 @@ export default function ChatList() {
         </Link>
       )}
 
+      {/* ⚠️ THE WRAPPER CARRIES THE 18px, NOT THE TITLE — BlockTitle's
+          `first:mt-0` zeroes its own top margin the moment a <section>
+          makes it a first child, and the title then sat 4px off the card
+          above (Jay, 24 Aug 2026: "the Direct Messages text touches the
+          chip above it"). Dashboard's blocks compensate the same way. */}
       {!searching && squadRows.length > 0 && (
-        <section data-testid="section-squads">
+        <section data-testid="section-squads" className="mt-[18px]">
           <BlockTitle>Your squads</BlockTitle>
           <Card className="overflow-hidden">
             <ul>
@@ -239,7 +244,7 @@ export default function ChatList() {
       )}
 
       {!searching && dmRows.length > 0 && (
-        <section data-testid="section-dms">
+        <section data-testid="section-dms" className="mt-[18px]">
           <BlockTitle>Direct messages</BlockTitle>
           <Card className="overflow-hidden">
             <ul>
