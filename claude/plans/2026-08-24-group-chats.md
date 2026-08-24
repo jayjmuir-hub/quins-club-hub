@@ -1,10 +1,8 @@
 # Group chats — pick the people, name the chat
 
-**Status: BUILT 24 Aug 2026, NOT MERGED.** The migration is APPLIED to the
-live database (harness green before and after); the app code sits on branch
-`claude/chat-feature-ee511a` awaiting Jay's merge. Live verification —
-a real three-person group, a rename, a push on a phone that is not the
-actor's — happens after deploy and is the thing that closes this plan.
+**Status: SHIPPED 24 Aug 2026 (`463b3c9`, #362) and VERIFIED LIVE the same
+day** — a real three-person group on the deployed site, and the push arriving
+on a phone that was not the actor's (Jay). This plan is closed.
 
 Design mockup: the "New group flow" artboard on the Chat Dashboard canvas
 (session artifact, 24 Aug 2026). The rulings below are Jay's, same day; the

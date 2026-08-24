@@ -1,7 +1,7 @@
 # Group Chats Implementation Plan
 
-**Status: EXECUTED 24 Aug 2026 (all seven tasks), NOT MERGED — awaiting Jay's
-push/merge decision and post-deploy live verification.** Two deliberate
+**Status: EXECUTED AND SHIPPED 24 Aug 2026 (`463b3c9`, #362), verified live
+the same day — push received on a second phone.** Two deliberate
 deviations from the written plan, both recorded in commits: the pencil keeps
 its one-tap DM flow (the "New group" entry is a row inside the DM picker, not
 a two-item pencil menu), and `leave_group` never auto-deletes a REPORTED

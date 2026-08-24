@@ -57,7 +57,12 @@ Requests still go through the fixture; allocation stays admin-only.
 💬 **CHAT IS WHATSAPP-SHAPED SINCE 24 Aug 2026** — one Chats list, a pencil to
 start a DM, a header on every thread saying who reads it, bubbles; the author
 may delete a message any time and a DM can be deleted for yourself
-(`claude/plans/2026-08-24-chat-list.md`). Underneath, unchanged:
+(`claude/plans/2026-08-24-chat-list.md`). **GROUP CHATS SHIPPED the same
+evening and are VERIFIED LIVE** — member-created, named, three people
+minimum, minors addable with no warnings by ruling
+(`claude/decisions/2026-08-24-groups-open-no-warnings.md`); the first real
+group's push arrived on a second phone the night it shipped
+(`claude/plans/2026-08-24-group-chats.md`). Underneath, unchanged:
 **SQUAD CHAT PHASES 1–3** (23 Aug 2026) — a channel per squad
 and one for the club (announce-only by default), a thread per fixture with
 RSVP chips, @mentions that push, a staff channel per squad, direct messages,
