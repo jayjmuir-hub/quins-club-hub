@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 📌 **Pinned chats and archive** — the two navigation ideas
+- `dcd0196` — 📌 **Pinned chats and archive** (#391) — the two navigation ideas
   parked "for a later round", picked up by Jay's "keep going"
   (`claude/plans/2026-08-24-chat-pins-archive.md`). A ⋯ menu on every list
   row: Pin sorts the chat above everything in its section with a 📌;
@@ -19,8 +19,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   default-folded section at the bottom; search still finds it. Backed by
   `chat_prefs` (`db/migrations/20260824_chat_prefs.sql`, owner-only RLS,
   the nicknames pattern — APPLIED and measured, harness green with an
-  injected read-policy leak caught). The NEXT pull request cites this
-  entry's squash SHA.
+  injected read-policy leak caught). Merged and verified live the same
+  night; its own branch could not cite this squash SHA, so this entry does.
 - `382f5da` — 🔢 **The unread count reaches the app icon** (#390) — Jay: "we need
   to add a new chat message count to the app icon". The Badging API on the
   installed PWA: the dock-badge recount hands its REAL number to
