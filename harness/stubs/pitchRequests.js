@@ -47,6 +47,12 @@ export async function allocatePitch(payload) {
   return { id: payload?.requestId, status: 'allocated' }
 }
 
+export async function setEventPitch(eventId, pitch) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'set-event-pitch', payload: { eventId, pitch } })
+  return { id: eventId, pitch }
+}
+
 export async function declinePitch(payload) {
   window.__writes = window.__writes || []
   window.__writes.push({ op: 'decline-pitch', payload })

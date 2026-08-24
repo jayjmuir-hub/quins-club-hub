@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 📐 **The chat list's section titles get their 18px back** —
+- 🏟️ **Click any event on Allocation to give it a pitch** — Jay: "none of
+  the events are clickable, can't click them to assign a pitch". Not a
+  regression: direct assignment was wanted on 5 Aug and never built — the
+  request queue was the only path. Now the day grid's bookings and the
+  "Waiting for a pitch" rows open a picker Sheet; saving writes the fixture
+  (`setEventPitch`, RLS-gated), and a pending request for that event is
+  answered through the existing `allocatePitch` so the queue stays truthful.
+  The write-path fork proved against an injected fault; the harness
+  stub-parity anchor caught the missing stub export exactly as designed.
+  `claude/plans/2026-08-24-pitch-direct-assign.md`. (No SHA — this branch's
+  entry; the next pull request cites the squash.)
+- `4ca3560` — 📐 **The chat list's section titles get their 18px back** (#382) —
   Jay: "the Direct Messages text touches the chip above it", and the
   measurement in his own browser agreed: 4px from card edge to title.
   BlockTitle's `first:mt-0` zeroes its top margin the moment a <section>
