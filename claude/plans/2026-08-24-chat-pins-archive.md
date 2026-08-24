@@ -1,6 +1,9 @@
 # Chat round 6 — pinned chats and archive
 
-**Status: NOT SHIPPED — in progress on `claude/chat-round-6`.** The two
+**Status: SHIPPED — merged as `dcd0196` (#391), 24 Aug 2026 (late night),
+verified live alongside the app-icon badge (`382f5da` #390) by three
+markers in one bundle. The chat_prefs migration was applied and measured
+in production on Jay's standing go-ahead.** The two
 ideas offered with the navigation round and parked "for a later round"
 (`claude/plans/2026-08-24-chat-navigation.md`); Jay's "keep going" picked
 them up the same night. Both are PRIVATE, per-person shapes of YOUR list —
