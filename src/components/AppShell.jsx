@@ -308,7 +308,7 @@ export default function AppShell({ children }) {
           three displacement passes at slightly different strengths, one
           per colour channel, screened back together: colours split a few
           pixels exactly where the bend is strongest. Tuned live in the
-          harness: 52/40/28 was rainbow soup; 32/30/28 read as barely-there, then Jay asked for more twice, saw 52/36/20 on the right preview, and called it too much — 36/30/24 is the approved setting. ⚠️ The feImage MUST cover the full -10%..120% filter region: pinned to the element box, the map's neutral line sat at the top edge and the lens only worked at the bottom (Jay's scroll observation, and he was right). The
+          harness: 52/40/28 was rainbow soup; 32/30/28 read as barely-there, then Jay asked for more twice, saw 52/36/20 on the right preview, and called it too much then "dial back the color also": 32/30/28 with saturation at 1.45 is the approved setting — with the map centred, even this near-zero split stays visible, which it did not before the alignment fix. ⚠️ The feImage MUST cover the full -10%..120% filter region: pinned to the element box, the map's neutral line sat at the top edge and the lens only worked at the bottom (Jay's scroll observation, and he was right). The
           map is blurred (stdDeviation 2) before use — unsmoothed, its
           raster steps showed as confetti speckles along the top edge. */}
       <svg width="0" height="0" aria-hidden="true" className="absolute">
@@ -320,9 +320,9 @@ export default function AppShell({ children }) {
             result="rawmap"
           />
           <feGaussianBlur in="rawmap" stdDeviation="2" result="map" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="36" xChannelSelector="R" yChannelSelector="G" result="dR" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="32" xChannelSelector="R" yChannelSelector="G" result="dR" />
           <feDisplacementMap in="SourceGraphic" in2="map" scale="30" xChannelSelector="R" yChannelSelector="G" result="dG" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale="24" xChannelSelector="R" yChannelSelector="G" result="dB" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="28" xChannelSelector="R" yChannelSelector="G" result="dB" />
           <feColorMatrix in="dR" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cR" />
           <feColorMatrix in="dG" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cG" />
           <feColorMatrix in="dB" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cB" />
@@ -331,7 +331,7 @@ export default function AppShell({ children }) {
           {/* The lens replaces the WHOLE backdrop-filter chain in Chromium,
               so the glass's frost and saturation are re-supplied here. */}
           <feGaussianBlur in="rgb" stdDeviation="2" />
-          <feColorMatrix type="saturate" values="1.6" />
+          <feColorMatrix type="saturate" values="1.45" />
         </filter>
       </svg>
 
