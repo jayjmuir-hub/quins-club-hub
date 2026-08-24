@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 💠 **The glass gets MATERIAL and a PRISM LENS** — the rest of Jay's glass
+- (unmerged) — 📐 **The chat list's section titles get their 18px back** —
+  Jay: "the Direct Messages text touches the chip above it", and the
+  measurement in his own browser agreed: 4px from card edge to title.
+  BlockTitle's `first:mt-0` zeroes its top margin the moment a <section>
+  wrapper makes it a first child — the trap Dashboard's blocks already
+  compensate for with `mt-[18px]` on the wrapper, which ChatList's two
+  sections now do too. Measured 4px before, 18px after. The NEXT pull
+  request cites this entry's squash SHA.
+- `19e3ede` — 💠 **The glass gets MATERIAL and a PRISM LENS** (#379) — the rest of Jay's glass
   night. Over a flat white page clear glass vanishes into the page ("still
   look like they are white and not glassy"), so the pane itself now has
   substance: a cool-grey smoke gradient (grey-blue, never white), a
@@ -25,8 +33,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ Chromium-only BY DESIGN: Safari drops the url() declaration and keeps
   the plain frost declared before it, so iPhones get undistorted glass with
   no @supports needed — the declaration ORDER is the fallback, see the
-  index.css comment. (No SHA — this branch's entry; the next pull request
-  cites the squash.)
+  index.css comment. Its own branch could not cite this squash SHA, so
+  this entry carries it now.
 - `2d8f79c` — 📝 **The chat night's records closed** (#381) — `34c9e1c` cited,
   plans and state-of-play brought current, handoff written. Its own branch
   could not cite this squash SHA, so this entry carries it now.
