@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 📱 **The mobile thread fits its chrome** — Jay's phone
+- `bc971f8` — 📱 **The mobile thread fits its chrome** (#389) — Jay's phone
   screenshot: "chat isn't playing nice with the bottom menu bar, several
   things wrong." Three fixes: the message menu FLIPS UPWARD near the
   viewport bottom and outranks the chrome at z-50 (half its items were
@@ -20,8 +20,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   of under it, taking the privacy notice with it. The accepted cost — a
   64px gap above the header while the masthead is auto-hidden — and the
   alternative (chrome-free thread screens, WhatsApp-style) is Jay's call,
-  recorded here so it is not re-derived. The NEXT pull request cites this
-  entry's squash SHA.
+  recorded here so it is not re-derived. Its own branch could not cite
+  this squash SHA, so this entry does.
 - `043f9c3` — 🧭 **Chat navigation: the list stops being a scroll** (#386) — Jay:
   "once there are lots of chats ... they will have to scroll too far down".
   Four pieces (`claude/plans/2026-08-24-chat-navigation.md`): the sidebar
@@ -30,8 +30,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   phone's answer, driven by the same ?filter= as the sidebar so the two
   cannot disagree), foldable sections remembered per device, and unread
   rows sorting first. All client, no migration. Pins and archive offered
-  and parked. Its own branch could not cite this squash SHA, so this
-  entry does.
+  and parked. Merged and verified live the same night; its own branch
+  could not cite this squash SHA, so this entry does.
 - `ae1513c` — 🧾 **Accounts: queues first, Approval emails folds away, the list goes
   dense** (#387) — Jay's rethink of the Club Admin Accounts tab, plus a pitch nit
   in the same breath. Everything WAITING now leads the page (pending staff,
