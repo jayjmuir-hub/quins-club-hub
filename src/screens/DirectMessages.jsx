@@ -926,7 +926,7 @@ function Thread({ conversationId }) {
       )}
 
       {participant && selecting && !forwarding && (
-        <div className="sticky bottom-0 -mx-1 mt-3 flex items-center gap-2 border-t border-line bg-surface px-2 pb-2 pt-2" data-testid="forward-bar">
+        <div className="sticky bottom-[calc(74px+env(safe-area-inset-bottom))] desktop:bottom-0 -mx-1 mt-3 flex items-center gap-2 border-t border-line bg-surface px-2 pb-2 pt-2" data-testid="forward-bar">
           <p className="flex-1 text-[13px] font-semibold text-ink">
             {selected.size} selected — tap messages to add
           </p>
@@ -940,7 +940,7 @@ function Thread({ conversationId }) {
       )}
 
       {participant && !selecting && (
-        <div className="sticky bottom-0 -mx-1 mt-3 border-t border-line bg-surface px-1 pb-2 pt-2">
+        <div className="sticky bottom-[calc(74px+env(safe-area-inset-bottom))] desktop:bottom-0 -mx-1 mt-3 border-t border-line bg-surface px-1 pb-2 pt-2">
           {blocked ? (
             <p className="px-2 py-2 text-[13px] font-semibold text-ink-muted" data-testid="dm-blocked">
               You have blocked {otherName}. Unblock to message them.
