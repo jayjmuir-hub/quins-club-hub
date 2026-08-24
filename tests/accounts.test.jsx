@@ -911,6 +911,15 @@ describe('Accounts — waiting for access', () => {
   // and the unattached signups — so the screen has to subtract the profile ids
   // already in the member list. Skip that and every existing member is shown
   // as if they had no access.
+  it('⚠️ sits ABOVE the Approval emails card — everything waiting comes first', async () => {
+    // Jay, 24 Aug 2026: the settings card was standing in the middle of the
+    // queues. DOCUMENT_POSITION_FOLLOWING (4): the card follows the section.
+    setup()
+    const waiting = await screen.findByTestId('waiting-for-access')
+    const recipients = await screen.findByTestId('approval-recipients')
+    expect(waiting.compareDocumentPosition(recipients) & 4).toBeTruthy()
+  })
+
   it('lists only the profiles with no membership, never existing members', async () => {
     setup()
 

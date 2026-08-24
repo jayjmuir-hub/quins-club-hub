@@ -18,6 +18,9 @@ export default function ApprovalRecipients() {
   const [error, setError] = useState(null)
   const [loadError, setLoadError] = useState(false)
   const [busy, setBusy] = useState(null)
+  // Collapsed by default (Jay, 24 Aug 2026): this is a settings card on a
+  // work screen — the count in the header says whether it needs opening.
+  const [open, setOpen] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -63,18 +66,49 @@ export default function ApprovalRecipients() {
   if (rows === null && !loadError) return null
 
   return (
-    <Card className="mt-3.5 p-3.5" data-testid="approval-recipients">
-      <h3 className="text-[15px] font-bold text-ink">Approval emails</h3>
+    <Card className="mb-5 mt-3.5 p-3.5" data-testid="approval-recipients">
+      <button
+        type="button"
+        onClick={() => setOpen((was) => !was)}
+        aria-expanded={open}
+        className="-m-1 flex w-[calc(100%+8px)] items-center gap-2 rounded-[8px] p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      >
+        <span className="min-w-0 flex-1">
+          <h3 className="text-[15px] font-bold text-ink">
+            Approval emails
+            {rows && (
+              <span className="ml-2 text-[12.5px] font-semibold text-ink-muted">{onCount} switched on</span>
+            )}
+          </h3>
+        </span>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className={`shrink-0 text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {/* The load-failure line stays visible while collapsed — a card that
+          hides its own failure behind a chevron reads as healthy. */}
+      {loadError && <p className="mt-2 text-[12.5px] text-ink-muted">Could not load who is emailed just now.</p>}
+      {open && (
+        <>
       <p className="mt-1 text-[12.5px] text-ink-muted">
         Who is emailed when somebody is waiting to be approved. Admins hear about every registration; a coach or manager about their squad&rsquo;s.
-        {rows && <span className="ml-1 font-semibold text-ink">{onCount} switched on.</span>}
       </p>
       {error && (
         <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
           {error}
         </p>
       )}
-      {loadError && <p className="mt-2 text-[12.5px] text-ink-muted">Could not load who is emailed just now.</p>}
       {groups.map(([group, people]) => (
         <div key={group} className="mt-3">
           <p className="text-[11px] font-extrabold uppercase tracking-[.5px] text-ink-muted">{group}</p>
@@ -107,6 +141,8 @@ export default function ApprovalRecipients() {
       <p className="mt-3 text-[11.5px] text-ink-muted">
         If nobody is switched on for a squad, its registrations still reach the super admins — a request is never left unseen.
       </p>
+        </>
+      )}
     </Card>
   )
 }
