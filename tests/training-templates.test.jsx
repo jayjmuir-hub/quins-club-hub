@@ -160,6 +160,19 @@ describe('TrainingTemplates', () => {
     expect(listDrillsMock).not.toHaveBeenCalled()
   })
 
+  // Same 21 Aug follow-up as the library's: an age typo used to reach
+  // Postgres as a raw check-constraint error. Against that bug saveTemplate
+  // WOULD fire and this fails.
+  it('refuses an age typo in the form, before Postgres sees it', async () => {
+    const { user } = renderTemplates()
+    await openBuilder(user)
+    await user.type(screen.getByLabelText('Youngest age'), '99')
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Ages are 4 to 19')
+    expect(screen.getByRole('button', { name: 'Save template' })).toBeDisabled()
+    expect(saveTemplateMock).not.toHaveBeenCalled()
+  })
+
   it('lists templates with their total, band and contact flag', async () => {
     renderTemplates()
 

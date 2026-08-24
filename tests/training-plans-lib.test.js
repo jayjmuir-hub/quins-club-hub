@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   totalMinutes, totalWarning, drillFitsTemplate, squadFitsTemplate, describePublishRow,
-  ageOrNull, textOrNull, bandLabel,
+  ageOrNull, textOrNull, bandLabel, ageDraftProblem,
 } from '../src/lib/trainingPlans.js'
 
 const T = { min_age: 9, max_age: 13, requires_contact: true }
@@ -107,5 +107,30 @@ describe('the hoisted helpers', () => {
     expect(bandLabel(13, null)).toBe('U13 and up')
     expect(bandLabel(null, 13)).toBe('up to U13')
     expect(bandLabel(null, null)).toBe('Any age')
+  })
+})
+
+// Mirrors the DB checks (min_age/max_age between 4 and 19, min <= max) so a
+// typo like 99 is caught in the form instead of surfacing as a raw
+// `drills_min_age_check` error — the 21 Aug review follow-up.
+describe('ageDraftProblem', () => {
+  it('is silent when both boxes are blank, or one end is', () => {
+    expect(ageDraftProblem('', '')).toBeNull()
+    expect(ageDraftProblem('9', '')).toBeNull()
+    expect(ageDraftProblem('', '13')).toBeNull()
+  })
+  it('is silent on a legal band', () => {
+    expect(ageDraftProblem('4', '19')).toBeNull()
+    expect(ageDraftProblem('9', '9')).toBeNull()
+  })
+  it('names the 4–19 range for a typo like 99, at either end', () => {
+    expect(ageDraftProblem('99', '')).toBe('Ages are 4 to 19')
+    expect(ageDraftProblem('', '99')).toBe('Ages are 4 to 19')
+    expect(ageDraftProblem('3', '')).toBe('Ages are 4 to 19')
+    expect(ageDraftProblem('9.5', '')).toBe('Ages are 4 to 19')
+    expect(ageDraftProblem('nope', '')).toBe('Ages are 4 to 19')
+  })
+  it('refuses youngest above oldest', () => {
+    expect(ageDraftProblem('13', '9')).toBe('Youngest is above oldest')
   })
 })

@@ -2,7 +2,8 @@
 
 **Detection used to be somebody telling Jay.** Two uptime monitors now watch the
 site, and **Sentry is LIVE** — proved 16 Aug 2026 by firing a real error on the
-live site and watching it arrive.
+live site and watching it arrive. A **heartbeat on the nightly db-check is
+wired but waiting on Jay** — see its section below for the four steps.
 
 ⚠️ **THIS LINE SAID "an error tracker is built but switched off" UNTIL 19 Aug
 2026, AND THAT WAS ALREADY THE SECOND TIME.** `CLAUDE.md` records the first: the
@@ -95,6 +96,45 @@ that one has no undo. Read the button before clicking it.
 
 **Redo this if the provider, the alert address or the monitor set changes.** It
 is the only thing that distinguishes a monitor from a decoration.
+
+## The nightly-check heartbeat — wired 24 Aug 2026, waiting on Jay
+
+**GitHub emails Jay when the nightly `db-check` run FAILS. Nothing tells him
+when it stops HAPPENING** — GitHub disables a `schedule` after 60 days without
+repo activity, a workflow can be deleted, a cron line can rot. A heartbeat
+inverts the signal: the workflow pings Better Stack after every genuine green
+run, and **silence past the period + grace raises the alert**.
+
+The workflow side is done (`.github/workflows/db-check.yml`, the Heartbeat
+step). ⚠️ **It pings only when the harnesses actually ran and passed** — never
+on the "SUPABASE_DB_URL is not set" exit — because a heartbeat that stays
+green while the check it vouches for is off would be worse than none. Until
+the secret below exists the step says "no heartbeat sent" and passes: inert,
+not red, same pattern as the harnesses themselves.
+
+**Jay's steps — in this order, because the order itself is the firing proof:**
+
+1. **In Better Stack:** Heartbeats → **Create heartbeat**. Name
+   `db-check nightly`, period **1 day**, grace **6 hours** (the run starts
+   03:20 UTC; grace covers a slow queue without hiding a missed day). Alert
+   e-mail as for the other monitors. Copy the heartbeat URL it shows.
+2. **Wait for the alert to fire once — do not add the secret yet.** The
+   workflow is not pinging, so within a day Better Stack must raise
+   "heartbeat missing". That alert IS the drill: it proves silence is
+   detected, before the heartbeat is ever trusted. A monitor that has never
+   fired is not a monitor.
+3. **In GitHub:** repo → Settings → Secrets and variables → Actions →
+   New repository secret, name **`DB_CHECK_HEARTBEAT_URL`**, value the URL
+   from step 1. ⚠️ The URL is a capability secret — anyone holding it can
+   keep the heartbeat green — so it lives only here. Claude never handles it.
+4. **In GitHub:** Actions → "DB harnesses" → **Run workflow** (manual run).
+   Green run → the Better Stack incident resolves itself. That closes the
+   loop: fired on silence, resolved on the first real ping.
+
+**What it will and won't catch:** it catches the run stopping (disabled
+schedule, deleted workflow, GitHub outage lasting past grace) and doubles the
+failure alert (a red run sends no ping). It does not catch a harness that
+passes wrongly — that is what the self-tests inside `db/tests/` are for.
 
 ## ✅ Error tracking — LIVE since 16 Aug 2026
 

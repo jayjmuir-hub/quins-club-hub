@@ -22,6 +22,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `claude/decisions/2026-08-24-groups-open-no-warnings.md` (the ruling and
   the arguments against it). Spec only; no code. *(SHA: next PR cites the
   squash commit.)*
+- `9500b96` — 🧪 **The nightly db-check had been failing since 22 Aug, and behind its
+  refusal sat four separate reds.** `pitch-occupancy.sql` shipped with no
+  `raise exception`, so the runner refused the whole suite every night — and
+  that refusal masked: the two 24 Aug chat migrations being non-idempotent
+  (their harnesses inline them; `drop policy if exists` guards added), the
+  grants allowlist missing seven column grants from 23–24 Aug (its own header
+  predicted exactly this rot), and phase-3's ASSERT 15 predating the 23 Aug
+  adult-DMs-private ruling (repointed to assert the ruling in both
+  directions, not deleted). The pitch harness got its throw — proved by
+  injected fault. One red remains: four training-plans read policies call
+  `auth.uid()` bare (`20260824_rls_initplan_wrap_training_reads.sql`, written
+  but awaiting Jay's yes to apply).
+- `9cf34a9` — 🏉 **Age typos are refused in the training forms, the embed sort has a
+  discriminating test, and line endings are pinned repo-wide.** The 21 Aug
+  review follow-ups: `ageDraftProblem` mirrors the DB's 4–19 and min≤max
+  checks so a typo reads "Ages are 4 to 19" instead of a raw
+  `drills_min_age_check`; the blocks-by-position sort in
+  `listTemplates`/`getSession` is tested with deliberately shuffled fixtures
+  (proved by deleting the sort and watching it fail); `.gitattributes` gains
+  `* text=auto eol=lf` — measured zero renormalization churn first. Plus the
+  SECURITY DEFINER read-through: both post-audit advisor lint types walked in
+  full, no findings (`claude/open-items.md`).
+- `97bf53a` — 📟 **Heartbeat on the nightly db-check, and tests no longer open real
+  sockets to production.** The heartbeat step pings Better Stack only after a
+  genuine green harness run — inert until Jay creates the heartbeat and adds
+  `DB_CHECK_HEARTBEAT_URL` (four steps, `claude/runbooks/monitoring.md`).
+  And `src/test/setup.js` now stubs jsdom's WebSocket: five screen suites had
+  been opening live realtime connections to the Supabase project on every
+  `npm test`, visible only as 5–7 "Unhandled Errors" on a suite that still
+  exited 0. Measured before (3 errors on 3 files) and after (0 on all 175).
 - `30c684e` — 📦 **Vite 8.2.2 + @vitejs/plugin-react 6.1.0, taken together, and Netlify's
   build Node pinned to 24** — the mutually-blocking pair from the 17 Aug
   parking, landed exactly as `claude/open-items.md` prescribed: one PR carrying

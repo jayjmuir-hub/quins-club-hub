@@ -219,6 +219,29 @@ describe('TrainingLibrary', () => {
     })
   })
 
+  // The 21 Aug review follow-up: a typo of 99 used to go all the way to
+  // Postgres and come back as a raw `drills_min_age_check`. Discriminates:
+  // against that bug, upsertDrill WOULD be called and this fails.
+  it('refuses an age typo in the form, before Postgres sees it', async () => {
+    const { user } = renderLibrary()
+    await screen.findByTestId('drill-drill-1')
+
+    await user.click(screen.getByRole('button', { name: 'Add a drill' }))
+    await user.type(screen.getByLabelText('Drill title'), 'Tackle tech')
+    await user.type(screen.getByLabelText('Youngest age'), '99')
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Ages are 4 to 19')
+    expect(screen.getByRole('button', { name: 'Add drill' })).toBeDisabled()
+    expect(upsertDrillMock).not.toHaveBeenCalled()
+
+    // Correcting the box clears the refusal — the gate is the value, not the visit.
+    const youngest = screen.getByLabelText('Youngest age')
+    await user.clear(youngest)
+    await user.type(youngest, '9')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add drill' })).toBeEnabled()
+  })
+
   it('offers Retire and never Delete', async () => {
     const { user } = renderLibrary()
 

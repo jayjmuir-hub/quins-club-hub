@@ -92,6 +92,9 @@ comment on table public.conversation_clears is
 alter table public.conversation_clears enable row level security;
 revoke all on public.conversation_clears from public, anon, authenticated;
 grant select on public.conversation_clears to authenticated;
+-- if exists: this migration created the policy, so a replay (the harness
+-- inlines this file verbatim) must be legal against a database that has it.
+drop policy if exists "clear own" on public.conversation_clears;
 create policy "clear own" on public.conversation_clears
   for select using (profile_id = (select auth.uid()));
 

@@ -7,6 +7,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listDrills, listTemplates, saveTemplate, setTemplateActive } from '../data/trainingPlans.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import {
+  ageDraftProblem,
   ageOrNull,
   bandLabel,
   CATEGORY_LABELS,
@@ -429,8 +430,11 @@ function TemplatesBody() {
     const value = Number(block.minutes)
     return Number.isInteger(value) && value >= 1 && value <= 120
   })
+  // Caught here so a typo of 99 reads "Ages are 4 to 19", not a raw
+  // session_templates min_age check from Postgres. See ageDraftProblem.
+  const ageProblem = ageDraftProblem(draft.min_age, draft.max_age)
   const canSave =
-    draft.name.trim() !== '' && minutesOk && (editing !== 'new' || clubId != null)
+    draft.name.trim() !== '' && minutesOk && ageProblem == null && (editing !== 'new' || clubId != null)
 
   if (isFirstLoad) {
     return (
@@ -577,6 +581,10 @@ function TemplatesBody() {
                 </button>
               </div>
             </div>
+
+            {ageProblem != null && (
+              <p role="alert" className="text-[12.5px] font-semibold text-danger-ink">{ageProblem}</p>
+            )}
 
             <label>
               <span className={LABEL}>Notes</span>
