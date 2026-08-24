@@ -111,6 +111,7 @@ export default {
           mid: 'rgb(var(--accent-mid-rgb) / <alpha-value>)', // icons, borders, medium-weight marks
           ink: 'rgb(var(--accent-ink-rgb) / <alpha-value>)', // green AS TEXT — brightens in dark, measured in contrast-check
           bg: 'rgb(var(--accent-bg-rgb) / <alpha-value>)', // success surface — deep tint in dark
+          deep: 'rgb(var(--accent-deep-rgb) / <alpha-value>)', // chat's own-bubble/header fill — white text on it, both themes (round 3)
           // ⚠️ THERE IS DELIBERATELY NO accent.onDark, AND THE ATTEMPT TO ADD
           // ONE IS WORTH RECORDING. On 12 Aug 2026 the club website's own "App"
           // link was sampled to make one — #3bd070, a lovely 9.84:1 on the

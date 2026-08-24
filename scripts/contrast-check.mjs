@@ -31,6 +31,8 @@ const T = {
   accentMid: '#1f9d4d',
   accentInk: '#157f3c',
   accentBg: '#e6f7ec',
+  // Chat round 3: own-bubble/chat-header fill, same in both themes.
+  accentDeep: '#16603a',
   chrome: '#0a0a0a',
   chromeRaised: '#121212',
   chromeMuted: '#8b9099',
@@ -157,6 +159,10 @@ const DARK_PAIRS = [
   [D.accentInk, D.infoBg, 'dark: staff badge (green on info tint)', 4.5],
   [T.accentInk, T.infoBg, 'light: staff badge (green on info tint)', 4.5],
   [D.line, D.surfaceCard, 'dark: hairline vs card (non-text)', 1.2],
+  // Chat round 3: the quins-green own bubble and chat header. White text,
+  // and the 70%-white stamp/meta line composited over the fill.
+  [T.white, T.accentDeep, 'chat: white on own-bubble green', 4.5],
+  [mix(T.accentDeep, '#ffffff', 0.7), T.accentDeep, 'chat: 70% white meta on own-bubble green', 4.5],
 ]
 PAIRS.push(...DARK_PAIRS)
 
