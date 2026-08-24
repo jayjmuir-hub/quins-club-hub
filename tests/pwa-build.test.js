@@ -50,7 +50,14 @@ beforeAll(() => {
     // vite build must run as a production build regardless of the NODE_ENV the
     // test runner itself was started with (this repo's suite runs under
     // NODE_ENV=test, and some machines export NODE_ENV=production globally).
-    env: { ...process.env, NODE_ENV: 'production' },
+    // ⚠️ VITEST MUST NOT REACH THE CHILD (24 Aug 2026). vite.config.js flips
+    // NODE_ENV back to 'test' whenever VITEST is set — the 5a39f5d ambient-env
+    // guard — so an inherited VITEST made this build UNMINIFIED. That bundle
+    // sat just under workbox's 2 MiB precache cap and the member-chat-home
+    // work tipped it over: the whole child build errored while the real
+    // `npm run build` (1.2 MB minified) was nowhere near the limit. The child
+    // is not running vitest; it builds what actually ships.
+    env: { ...process.env, NODE_ENV: 'production', VITEST: undefined },
   })
   manifest = JSON.parse(readFileSync(path.join(outDir, 'manifest.webmanifest'), 'utf-8'))
 }, 60_000)
@@ -101,16 +108,15 @@ describe('flag images stay out of the render-blocking stylesheet', () => {
 
   it('keeps every flag out of the precache', () => {
     const sw = readFileSync(path.join(outDir, 'sw.js'), 'utf-8')
-    // ⚠️ THE KEY IS QUOTED HERE AND BARE IN THE SHIPPED WORKER, AND THE
-    // DIFFERENCE IS THIS FILE'S OWN BUILD. vite.config.js flips NODE_ENV to
-    // 'test' whenever VITEST is set — and the child process spawned in
-    // beforeAll INHERITS VITEST from the runner, so passing NODE_ENV:
-    // 'production' to it does not survive. The build is real, but it is an
-    // unminified one: `"url": "index.html"` here, `url:"index.html"` in
-    // dist/. Matching only the bare form found ZERO entries and the control
-    // below is the only reason that was noticed rather than shipped as a
-    // green test asserting nothing.
-    // ⚠️ SO DO NOT ADD AN ASSERTION HERE THAT DEPENDS ON MINIFICATION.
+    // ⚠️ THE KEY MAY BE QUOTED OR BARE DEPENDING ON MINIFICATION, so the
+    // regex accepts both. History: until 24 Aug 2026 the child build
+    // inherited VITEST and was silently UNMINIFIED (`"url": "index.html"`
+    // where dist/ ships `url:"index.html"`); matching only the bare form
+    // found ZERO entries, and the control below is the only reason that was
+    // noticed rather than shipped as a green test asserting nothing. The
+    // child is a real minified production build now (see beforeAll), but the
+    // rule stands for the next environment surprise:
+    // ⚠️ DO NOT ADD AN ASSERTION HERE THAT DEPENDS ON MINIFICATION.
     const urls = [...sw.matchAll(/"?url"?\s*:\s*"([^"]+)"/g)].map((m) => m[1])
     // Control: the manifest must be non-empty, or "no flags precached" is
     // vacuously true — the exact empty-result trap CLAUDE.md rule 6 is about.
