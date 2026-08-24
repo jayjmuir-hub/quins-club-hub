@@ -687,6 +687,17 @@ export default function Allocation() {
                   </span>
                   <span className="text-ink-muted">
                     {' · '}
+                    {/* The DATE leads (Jay, 24 Aug 2026: "the events don't
+                        show a date unless you click them") — this list spans
+                        whatever window is on screen, so a bare time answers
+                        "when" for none of them. Same format the request
+                        queue above uses. */}
+                    {(() => {
+                      const start = eventDate(event)
+                      return start
+                        ? `${start.toLocaleDateString(undefined, { timeZone: 'Asia/Dubai', weekday: 'short', day: 'numeric', month: 'short' })} · `
+                        : ''
+                    })()}
                     {eventTimeLabel(event)} · {eventTitle(event)}
                   </span>
                   <span className="ml-2 text-[12px] font-bold text-brand-ink">Assign</span>

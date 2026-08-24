@@ -359,4 +359,14 @@ describe('direct assignment', () => {
     expect(await screen.findByText('Age group')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /assign pitch|change pitch/i })).not.toBeInTheDocument()
   })
+
+  it("the waiting list shows each fixture's DATE, not just its time", async () => {
+    // Jay, 24 Aug 2026: "the events don't show a date unless you click them".
+    // The mocked fixture is Sat 5 Sep (Abu Dhabi); the row must say so.
+    listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD' })])
+    await setup()
+    const row = await screen.findByTestId('unallocated')
+    expect(row.textContent).toMatch(/Sat/)
+    expect(row.textContent).toMatch(/Sep/)
+  })
 })
