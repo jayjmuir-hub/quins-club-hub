@@ -1,6 +1,13 @@
 # Chat round 3 — the WhatsApp design pass, Jay's words, 24 Aug 2026 (night)
 
-**Status: NOT SHIPPED — in progress on `claude/chat-round-3`.** Seven items
+**Status: SHIPPED — merged as `34c9e1c` (#380), 24 Aug 2026 (night),
+verified live from the deployed bundle** (four markers: the wallpaper
+store, `accent-deep`, the day dividers, the nicknames calls). The
+nicknames migration was applied and measured in production before the
+merge, with an explicit anon revoke. Accepted residue: chat-LIST rows keep
+real names — `my_chats` carries no `other_id` for a nickname to key on;
+revisit only if it grates. ⚠️ No real member has used any of it yet.
+Seven items
 from Jay comparing the chat surfaces against a real WhatsApp group
 screenshot, the same evening round 2 and the resizeable dock shipped.
 Nothing here is invented; the phrasing is his. An item deleted from this
