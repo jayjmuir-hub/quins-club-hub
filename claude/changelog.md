@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 💬 **Chat round 2: reply-with-quote, forwarding, the emoji
+- `bbbc1d3` — 💬 **Chat round 2: reply-with-quote, forwarding, the emoji
   picker, chat buttons on the Home staff tiles, and photo attachments** —
   the whole round-2 remainder of `claude/plans/2026-08-24-chat-feedback.md`
   in one PR by Jay's choice, designed in
@@ -20,8 +20,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `db/migrations/20260824_chat_round_2.sql` adds quoted_id/forwarded/
   attachment_path and the private `chat-media` bucket — **APPLIED to
   production on Jay's go-ahead**; harness green against live and proven to
-  fail on two injected faults. The NEXT pull request cites this entry's
-  squash SHA.
+  fail on two injected faults. Merged as #371 and verified live from the
+  deployed bundle the same evening.
 - `109634f` — 🫧 **The masthead hides on scroll like the dock, and both bars
   are Liquid Glass** (#370) — one shared hook
   (`src/lib/useAutoHideOnScroll.js`) drives both bars so a downward scroll

@@ -1,6 +1,6 @@
 # Chat feedback — Jay's first real test drive, 24 Aug 2026 (evening)
 
-**Status: ROUND 1 SHIPPING (this branch); the rest NOT STARTED.** Seventeen
+**Status: ALL SEVENTEEN DONE — round 1 shipped `4693458` (#366), round 2 shipped `bbbc1d3` (#371).** Seventeen
 items from Jay testing chat on the live site the day group chats and the
 member chat home shipped. Nothing here is invented; the phrasing is his,
 trimmed. An item deleted from this list is a finding that ceases to exist.
@@ -39,21 +39,21 @@ trimmed. An item deleted from this list is a finding that ceases to exist.
   the screen when opened" + "floating chat button accessible from every
   page" — the desktop dock, Option A off the design canvas
   (`claude/plans/2026-08-24-floating-chat-dock.md`).
-- ✅ SHIPPING (`claude/plans/2026-08-24-chat-round-2.md`): "add attachments
+- ✅ SHIPPED (`bbbc1d3`, #371 — `claude/plans/2026-08-24-chat-round-2.md`): "add attachments
   and pics to a chat" — the ruling landed the same evening
   (`claude/decisions/2026-08-24-chat-photos-open.md`: open, like WhatsApp)
   and photos-only attachments ride the round-2 PR.
-- ✅ SHIPPING (same PR): "reply to with quotes for a message" (DMs/groups —
+- ✅ SHIPPED (`bbbc1d3`, #371): "reply to with quotes for a message" (DMs/groups —
   channels already thread).
-- ✅ SHIPPING (same PR): "forwarding a message or multiple messages, click
+- ✅ SHIPPED (`bbbc1d3`, #371): "forwarding a message or multiple messages, click
   to add to forward multiple" — from DM/group threads, to any chat you can
   write in.
-- ✅ SHIPPING (same PR): "emojis" — a curated desktop-only picker button
+- ✅ SHIPPED (`bbbc1d3`, #371): "emojis" — a curated desktop-only picker button
   (typing emoji already works; phone keyboards carry their own).
 - ✅ SHIPPED (`2119d1a`, #368): **emoji reactions** — `message_reactions`
   applied and harnessed, tap-to-toggle tallies from the fixed five-emoji set
   on channels, DM/group threads and the dock, "everywhere is fine" (Jay).
-- ✅ SHIPPING (same PR): "chat icon option in all coach, manager, etc
+- ✅ SHIPPED (`bbbc1d3`, #371): "chat icon option in all coach, manager, etc
   pills" — a chat button on the Home staff tiles, straight into a DM.
 
 ## Noted, no action
