@@ -448,13 +448,28 @@
 
      ⚠️ Do not add small bare text to either bar. The pill trick is the
      pattern: own fill first, then any ink works. */
+  /* ⚠️ NO brightness() AND A FAINT BORDER, since the same evening it
+     shipped — Jay: "the glass looks like it is white". Over a light page
+     the 40% white ring plus a brightness lift added up to a solid-looking
+     white bar. The edge is now the RED HALO's job; the hairline only
+     exists so the glass has a cut edge over dark content.
+
+     ⚠️ BLUR 20px, UP FROM 8 — same evening, Jay: the dock icons "look low
+     definition, they are blurry". The icons were never blurred; 8px left
+     the CONTENT behind them half-readable, and half-readable smears right
+     behind an icon read as the icon being out of focus. 20px melts the
+     backdrop into a smooth wash the icons sit crisply on. Proved by
+     toggling the filter live: 0px = sharp glare, worse; 8px = smears;
+     20px = frosted wash, crisp icons. The earlier grey-soup complaint was
+     never about blur radius — it was border + brightness, both now gone,
+     so more blur does not bring the white back. */
   .glass-island,
   .glass-dock {
     position: relative;
     background: rgb(255 255 255 / 0.02);
-    -webkit-backdrop-filter: saturate(180%) blur(8px) brightness(1.04);
-    backdrop-filter: saturate(180%) blur(8px) brightness(1.04);
-    border: 1px solid rgb(255 255 255 / 0.4);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border: 1px solid rgb(255 255 255 / 0.16);
     box-shadow:
       0 0 0 1px rgb(200 16 46 / 0.28),
       0 0 16px 3px rgb(200 16 46 / 0.35),
