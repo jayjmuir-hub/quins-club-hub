@@ -10,18 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 💬 **Group chats BUILT — member-created, named, three people minimum** —
-  migration `db/migrations/20260824_group_chats.sql` APPLIED to live (harness
-  `db/tests/group-chats.sql` green before and after, twelve asserts), data
-  layer, multi-select picker inside the DM picker, group threads with
-  rename/add/leave and NO notice banner (the ruling). On branch, not merged.
-  *(SHA: next PR cites the squash commit.)*
-- 📝 **Group-chats spec and its safeguarding ruling recorded** —
-  `claude/plans/2026-08-24-group-chats.md` (member-created groups, custom
-  names, ≥3 people, no warning copy) and
-  `claude/decisions/2026-08-24-groups-open-no-warnings.md` (the ruling and
-  the arguments against it). Spec only; no code. *(SHA: next PR cites the
-  squash commit.)*
+- `463b3c9` — 💬 **Group chats SHIPPED and VERIFIED LIVE — member-created, named,
+  three people minimum** — migration `db/migrations/20260824_group_chats.sql`
+  applied to live (harness `db/tests/group-chats.sql` green before and after,
+  twelve asserts), data layer, multi-select picker inside the DM picker,
+  group threads with rename/add/leave and NO notice banner (the ruling).
+  Verified on the deployed site the same day: a real three-person group, and
+  the push arriving on a phone that was not the actor's — Jay, 24 Aug 2026.
+  The spec and the safeguarding ruling
+  (`claude/plans/2026-08-24-group-chats.md`,
+  `claude/decisions/2026-08-24-groups-open-no-warnings.md`) rode in the same
+  squash.
 - `9500b96` — 🧪 **The nightly db-check had been failing since 22 Aug, and behind its
   refusal sat four separate reds.** `pitch-occupancy.sql` shipped with no
   `raise exception`, so the runner refused the whole suite every night — and
