@@ -6,16 +6,20 @@ import ChatHeader from '../components/ChatHeader.jsx'
 import { Empty } from '../components/Empty.jsx'
 import { Avatar, RolePill } from '../components/NewChatPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
+import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import {
   blockDm,
   deleteConversation,
   getConversation,
+  leaveGroup,
   listDirectMessages,
+  listGroupMembers,
   listMyBlocks,
   listMyConversations,
   logWelfareAccess,
   markMessagesRead,
   removeMessage,
+  renameGroup,
   reportMessage,
   sendDirectMessage,
   subscribeMessages,
@@ -73,6 +77,13 @@ function Thread({ conversationId }) {
   const [reporting, setReporting] = useState(null)
   const [reason, setReason] = useState('')
   const [deleting, setDeleting] = useState(false)
+  // Groups (claude/plans/2026-08-24-group-chats.md): same thread screen,
+  // membership from conversation_members instead of the profile_a/b pair.
+  const [members, setMembers] = useState(null)
+  const [renaming, setRenaming] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [addingPeople, setAddingPeople] = useState(false)
+  const [leaving, setLeaving] = useState(false)
   const navigate = useNavigate()
   const bottomRef = useRef(null)
   const loggedRef = useRef(false)
@@ -89,8 +100,11 @@ function Thread({ conversationId }) {
       setConversation(conv)
       setMessages(rows)
       setMissing(!conv)
+      const group = conv?.kind === 'group'
+      const people = group ? await listGroupMembers(conversationId) : null
+      setMembers(people)
       const mine = inbox.find((c) => c.conversation_id === conversationId)
-      const otherId = conv ? (conv.profile_a === selfId ? conv.profile_b : conv.profile_a) : null
+      const otherId = conv && !group ? (conv.profile_a === selfId ? conv.profile_b : conv.profile_a) : null
       setOther(
         mine
           ? { id: mine.other_id, name: mine.other_name, role: mine.other_role }
@@ -99,7 +113,10 @@ function Thread({ conversationId }) {
       setBlocked(otherId ? blocks.has(otherId) : false)
       // An admin reading somebody else's conversation: record it, once per
       // visit. A participant's own open is not a review and logs nothing.
-      if (conv && admin && selfId && selfId !== conv.profile_a && selfId !== conv.profile_b && !loggedRef.current) {
+      const isParticipant = group
+        ? Boolean(people?.some((p) => p.profile_id === selfId))
+        : conv && selfId && (selfId === conv.profile_a || selfId === conv.profile_b)
+      if (conv && admin && selfId && !isParticipant && !loggedRef.current) {
         loggedRef.current = true
         logWelfareAccess(conversationId)
       }
@@ -124,7 +141,12 @@ function Thread({ conversationId }) {
     if (messages?.length) bottomRef.current?.scrollIntoView?.({ block: 'end' })
   }, [messages?.length])
 
-  const participant = conversation && selfId && (selfId === conversation.profile_a || selfId === conversation.profile_b)
+  const isGroup = conversation?.kind === 'group'
+  const myMemberRow = isGroup ? members?.find((p) => p.profile_id === selfId) : null
+  const participant = isGroup
+    ? Boolean(myMemberRow)
+    : conversation && selfId && (selfId === conversation.profile_a || selfId === conversation.profile_b)
+  const owner = Boolean(myMemberRow?.is_owner)
   const reviewing = conversation && admin && !participant
 
   async function send(domEvent) {
@@ -173,6 +195,28 @@ function Thread({ conversationId }) {
     }
   }
 
+  async function submitRename(domEvent) {
+    domEvent.preventDefault()
+    if (!newTitle.trim()) return
+    try {
+      await renameGroup(conversationId, newTitle.trim())
+      setRenaming(false)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Could not rename the group.')
+    }
+  }
+
+  async function leaveNow() {
+    try {
+      await leaveGroup(conversationId)
+      navigate('/chat')
+    } catch (err) {
+      setError(err.message || 'Could not leave the group.')
+      setLeaving(false)
+    }
+  }
+
   async function submitReport(domEvent) {
     domEvent.preventDefault()
     try {
@@ -202,45 +246,134 @@ function Thread({ conversationId }) {
     )
   }
 
-  const actions = participant && other?.id
-    ? [
-        { label: blocked ? `Unblock ${other.name}` : `Block ${other.name}`, onClick: toggleBlock },
-        { label: 'Delete chat', onClick: () => setDeleting(true), danger: true },
-      ]
-    : []
+  // A group's menu is about the GROUP; a DM's is about the other person.
+  // No Block in a group (block whom?), and only the owner reshapes it.
+  const actions = isGroup
+    ? participant
+      ? [
+          ...(owner
+            ? [
+                {
+                  label: 'Rename group',
+                  onClick: () => {
+                    setNewTitle(conversation?.title ?? '')
+                    setRenaming(true)
+                  },
+                },
+                { label: 'Add people', onClick: () => setAddingPeople(true) },
+              ]
+            : []),
+          { label: 'Leave group', onClick: () => setLeaving(true) },
+          ...(owner ? [{ label: 'Delete group', onClick: () => setDeleting(true), danger: true }] : []),
+        ]
+      : []
+    : participant && other?.id
+      ? [
+          { label: blocked ? `Unblock ${other.name}` : `Block ${other.name}`, onClick: toggleBlock },
+          { label: 'Delete chat', onClick: () => setDeleting(true), danger: true },
+        ]
+      : []
 
   return (
     <section className="px-1">
       <ChatHeader
-        avatar={<Avatar name={other?.name} staff={STAFF.has(other?.role)} size="sm" />}
-        title={other?.name ?? '…'}
-        subtitle={reviewing ? 'Reviewing as a club admin' : `Private · you and ${other?.name ?? 'them'}`}
+        avatar={<Avatar name={isGroup ? conversation?.title : other?.name} staff={!isGroup && STAFF.has(other?.role)} size="sm" />}
+        title={(isGroup ? conversation?.title : other?.name) ?? '…'}
+        subtitle={
+          reviewing
+            ? 'Reviewing as a club admin'
+            : isGroup
+              ? `${members?.length ?? '…'} people`
+              : `Private · you and ${other?.name ?? 'them'}`
+        }
         actions={actions}
       />
-      {other?.role && STAFF.has(other.role) && (
+      {!isGroup && other?.role && STAFF.has(other.role) && (
         <div className="-mt-1 mb-2 px-1">
           <RolePill role={other.role} />
         </div>
       )}
 
+      {renaming && (
+        <form onSubmit={submitRename} className="mb-3 rounded-card bg-surface-card p-3 shadow-card" data-testid="rename-form">
+          <label htmlFor="group-title" className="text-[12.5px] font-extrabold text-ink">
+            Group name
+          </label>
+          <input
+            id="group-title"
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            maxLength={80}
+            autoFocus
+            className="mt-1.5 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setRenaming(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" type="submit" disabled={!newTitle.trim()}>
+              Save
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {addingPeople && (
+        <NewGroupPicker
+          mode="add"
+          conversationId={conversationId}
+          onCreated={() => {
+            setAddingPeople(false)
+            load()
+          }}
+          onClose={() => setAddingPeople(false)}
+        />
+      )}
+
+      {leaving && (
+        <Card className="mb-3 px-4 py-3" data-testid="leave-group-confirm">
+          <p className="text-[13.5px] font-extrabold text-ink">Leave this group?</p>
+          <p className="mt-1 text-[12.5px] text-ink-muted">
+            {(members?.length ?? 0) <= 3
+              ? 'You’re one of three — leaving closes this group for everyone.'
+              : 'You’ll stop seeing its messages. The group carries on without you.'}
+          </p>
+          <div className="mt-2 flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setLeaving(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={leaveNow}>
+              Leave group
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {deleting && (
         <Card className="mb-3 px-4 py-3" data-testid="delete-chat-confirm">
-          <p className="text-[13.5px] font-extrabold text-ink">Delete this chat?</p>
+          <p className="text-[13.5px] font-extrabold text-ink">{isGroup ? 'Delete this group?' : 'Delete this chat?'}</p>
           <p className="mt-1 text-[12.5px] text-ink-muted">
-            Every message in it is deleted for both of you. This cannot be undone.
+            {isGroup
+              ? 'Every message in it is deleted for everyone. This cannot be undone.'
+              : 'Every message in it is deleted for both of you. This cannot be undone.'}
           </p>
           <div className="mt-2 flex justify-end gap-2">
             <Button size="sm" variant="ghost" onClick={() => setDeleting(false)}>
               Cancel
             </Button>
             <Button size="sm" onClick={deleteChat}>
-              Delete chat
+              {isGroup ? 'Delete group' : 'Delete chat'}
             </Button>
           </div>
         </Card>
       )}
 
-      {/* ── The notice. Permanent. ─────────────────────────────────────── */}
+      {/* ── The notice. Permanent on a DM; a GROUP renders none — Jay's
+             ruling, claude/decisions/2026-08-24-groups-open-no-warnings.md.
+             A reviewing admin still sees the "recorded" line: that one is
+             about them, not a warning to members. ──────────────────────── */}
+      {(!isGroup || reviewing) && (
       <div
         data-testid="dm-notice"
         className="mb-3 flex gap-2 rounded-[10px] bg-warn-bg px-3 py-2 text-[12.5px] leading-snug text-warn-ink"
@@ -254,6 +387,7 @@ function Thread({ conversationId }) {
               : `Private between you and ${other?.name ?? 'them'}. If a message is reported, club admins can review it.`}
         </p>
       </div>
+      )}
 
       {error && (
         <Card className="mb-3 px-4 py-3">
@@ -275,6 +409,9 @@ function Thread({ conversationId }) {
           return (
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dm-bubble" data-mine={mine ? 'true' : 'false'}>
               <div className={`max-w-[80%] rounded-[14px] px-3 py-2 ${mine ? 'bg-chrome text-white' : 'bg-surface-card text-ink shadow-card'}`}>
+                {isGroup && !mine && (
+                  <p className="mb-0.5 text-[11px] font-extrabold text-brand-ink">{m.author?.full_name ?? 'Member'}</p>
+                )}
                 {m.deleted_at ? (
                   <p className="text-[13px] italic opacity-70">Message removed</p>
                 ) : (
@@ -342,7 +479,7 @@ function Thread({ conversationId }) {
                 onChange={(e) => setDraft(e.target.value)}
                 rows={1}
                 maxLength={2000}
-                placeholder={`Message ${other?.name ?? ''}`}
+                placeholder={`Message ${(isGroup ? conversation?.title : other?.name) ?? ''}`}
                 className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
               />
               <Button type="submit" disabled={sending || !draft.trim()}>
