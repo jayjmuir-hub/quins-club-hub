@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- 🐛 **The floating `?` is retired — "Report a problem" moved into the account
+  menu.** Jay's verdict on the corner button was all four failure modes at
+  once (covers content, still missed, clutter, accidental taps), and the
+  bottom-right corner is promised to the desktop chat dock. His first idea —
+  a bug icon in the top bar — was declined per the 23 Aug masthead ruling
+  ("the next control goes in AccountMenu.jsx"): the menu got a bug-icon
+  "Report a problem" row instead. `HelpButton.jsx` → `HelpSheet.jsx`, now a
+  controlled component (`open`/`onClose` from AppShell); the flow, reference
+  codes and triage are untouched. Both new test assertions proved against
+  injected faults. Plan: `claude/plans/2026-08-24-help-into-account-menu.md`.
+  (No SHA — this branch's entry; the next PR cites the squash.)
+- `17e6728` — 🚪 **The ignore-gate restoration MERGED** (#365) — the squash SHA
+  for the entry below, which its own branch could not cite.
 - 🚪 **The deploy ignore gate was DEAD from 10:19 to mid-afternoon, and the
   killer was a TOML header.** PR #358's `[build.environment]` block (the Node
   pin) sat above the `ignore =` key, and a TOML table captures every bare key
