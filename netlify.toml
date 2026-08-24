@@ -2,13 +2,6 @@
   command = "npm run build"
   publish = "dist"
 
-  # Vite 8 requires Node ^20.19 || >=22.12, and an unpinned build image
-  # follows whatever Netlify's default happens to be. 24 is what CI tests on
-  # (.github/workflows/test.yml) — the deploy builds on the version the suite
-  # actually ran against, and a Netlify default change can't move it.
-  [build.environment]
-    NODE_VERSION = "24"
-
   # Whether this commit needs a deploy at all.
   #
   # ⚠️ THIS REPLACED `[skip ci]`, WHICH HAD BECOME UNUSABLE. `CLAUDE.md` rule 3
@@ -23,6 +16,23 @@
   # decides the deploy from the DIFF rather than from what someone remembered to
   # type. Reasoning and the exit-code inversion are in the script.
   ignore = "node scripts/netlify-ignore.mjs"
+
+  # ⚠️ THIS SUB-TABLE MUST STAY BELOW EVERY BARE KEY OF [build], AND THAT IS A
+  # TOML RULE, NOT A STYLE CHOICE. A table header captures every key after it:
+  # when this block sat ABOVE `ignore` (24 Aug 2026, PR #358), `ignore` silently
+  # became an environment variable named "ignore" inside build.environment,
+  # `build.ignore` ceased to exist, and Netlify built every commit — including
+  # two docs-only ones — with no error anywhere. Found only by reading a build
+  # log and seeing no ignore evaluation at all. `npm run docs:check` now guards
+  # the ordering.
+  #
+  # Vite 8 requires Node ^20.19 || >=22.12, and an unpinned build image follows
+  # whatever Netlify's default happens to be. 24 is what CI tests on
+  # (.github/workflows/test.yml) — the deploy builds on the version the suite
+  # actually ran against, and a Netlify default change can't move it. Proven in
+  # the 24 Aug build log: "Now using node v24.19.0".
+  [build.environment]
+    NODE_VERSION = "24"
 
 # The calendar subscription feed, served from our own domain.
 #

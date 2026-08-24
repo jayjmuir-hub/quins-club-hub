@@ -22,11 +22,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   club channel as a hero card with its pills, rows grouped under editorial
   titles, search still flat. Plus the latent pwa-build fix: the test's child
   build inherited VITEST and was silently unminified. (#364)
+- `17e6728` — 🚪 **The deploy ignore gate was DEAD from 10:19 to mid-afternoon, and the
+  killer was a TOML header.** PR #358's `[build.environment]` block (the Node
+  pin) sat above the `ignore =` key, and a TOML table captures every bare key
+  after it — so `build.ignore` ceased to exist and Netlify built every commit,
+  including two docs-only ones, with no error anywhere. Diagnosed from the
+  build log of the #363 deploy (no ignore evaluation at all; the last gate
+  cancel was 23 Aug 5:44 PM). Key reordered, `docs:check` gained check 9
+  guarding the ordering (proved by both injected faults), and `CLAUDE.md`
+  rule 3 now says plainly: a local gate run answers what the script would
+  decide, never whether Netlify consults it — the only proof of a skip is the
+  deploy id not moving. This answers the open question the `261397a` entry
+  below flagged for its own session.
+
 - `261397a` — 📝 **Group chats recorded as shipped-and-verified** — plan statuses
   closed, state-of-play's chat section updated, and the `463b3c9` squash SHA
   cited (the entry #362 could not write for itself). Docs only — though the
-  predicted deploy skip did NOT happen; the gate misprediction is an open
-  question, flagged for its own session.
+  predicted deploy skip did NOT happen; the gate misprediction was an open
+  question at the time, answered by the entry above.
 - `463b3c9` — 💬 **Group chats SHIPPED and VERIFIED LIVE — member-created, named,
   three people minimum** — migration `db/migrations/20260824_group_chats.sql`
   applied to live (harness `db/tests/group-chats.sql` green before and after,
