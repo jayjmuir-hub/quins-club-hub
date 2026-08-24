@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import { Empty } from '../components/Empty.jsx'
+import { BlockTitle } from '../components/Editorial.jsx'
 import NewChatPicker, { Avatar } from '../components/NewChatPicker.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -88,6 +89,14 @@ export default function ChatList() {
     return (rows ?? []).filter((r) => r.label.toLowerCase().includes(q) || (r.last_body ?? '').toLowerCase().includes(q))
   }, [rows, query])
 
+  // The home shape's derived pieces — all from the same my_chats() rows.
+  const searching = query.trim().length > 0
+  const unreadTotal = useMemo(() => (rows ?? []).reduce((n, r) => n + Number(r.unread || 0), 0), [rows])
+  const unreadChats = useMemo(() => (rows ?? []).filter((r) => Number(r.unread) > 0).length, [rows])
+  const hero = useMemo(() => (rows ?? []).find((r) => r.kind === 'club') ?? null, [rows])
+  const squadRows = useMemo(() => shown.filter((r) => r.kind === 'squad' || r.kind === 'staff'), [shown])
+  const dmRows = useMemo(() => shown.filter((r) => r.kind === 'dm' || r.kind === 'group'), [shown])
+
   async function start(person) {
     try {
       const id = await openConversation(person.profile_id)
@@ -131,6 +140,18 @@ export default function ChatList() {
         />
       </div>
 
+      {/* Absent at zero — a "0 unread" line is furniture. */}
+      {unreadTotal > 0 && (
+        <div data-testid="unread-strip" className="mb-2 flex items-center gap-2 px-1">
+          <span className="grid h-[22px] min-w-[22px] place-items-center rounded-full bg-brand px-1.5 text-[12px] font-extrabold text-ink-invert">
+            {unreadTotal}
+          </span>
+          <span className="text-[13px] font-semibold text-ink-muted">
+            unread in {unreadChats} chat{unreadChats === 1 ? '' : 's'}
+          </span>
+        </div>
+      )}
+
       {picking === 'dm' && (
         <NewChatPicker
           load={listDmCandidates}
@@ -159,48 +180,116 @@ export default function ChatList() {
       {rows?.length === 0 && <Empty message="No chats yet. Your squad's channel appears here once you are on a squad." />}
       {rows && rows.length > 0 && shown.length === 0 && <Empty message="Nothing matches that." />}
 
-      {shown.length > 0 && (
+      {/* The home shape (claude/plans/2026-08-24-member-chat-home.md): hero
+          and sections while browsing; the flat list of matches while
+          searching. The rows themselves are identical either way. */}
+      {!searching && hero && (
+        <Link to={chatPath(hero)} data-testid="chat-hero" data-kind="club" className="mb-1 block">
+          <Card className="flex items-start gap-3 px-4 py-3.5 hover:bg-surface-mute">
+            <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-monogram-coach text-ink-invert">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 11v3" />
+                <path d="M7 10v5" />
+                <path d="M21 6v12l-10-3H7v-6h4l10-3Z" />
+              </svg>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-baseline justify-between gap-2">
+                <span className="truncate text-[15px] font-extrabold text-ink">{hero.label}</span>
+                <span className="shrink-0 text-[11.5px] font-semibold text-ink-faint">{postedLabel(hero.last_at)}</span>
+              </span>
+              <span className="mt-0.5 block truncate text-[13px] text-ink-muted">{previewLine(hero, selfId)}</span>
+              <span className="mt-1.5 flex gap-1.5">
+                {hero.detail?.includes('admins post') && (
+                  <span className="rounded-pill bg-danger-bg px-2 py-0.5 font-condensed text-[10.5px] font-bold uppercase tracking-[.1em] text-danger-ink">
+                    Announce-only
+                  </span>
+                )}
+                <span className="rounded-pill bg-surface-mute px-2 py-0.5 font-condensed text-[10.5px] font-bold uppercase tracking-[.1em] text-ink-muted">
+                  Pinned
+                </span>
+              </span>
+            </span>
+          </Card>
+        </Link>
+      )}
+
+      {!searching && squadRows.length > 0 && (
+        <section data-testid="section-squads">
+          <BlockTitle>Your squads</BlockTitle>
+          <Card className="overflow-hidden">
+            <ul>
+              {squadRows.map((row) => (
+                <ChatRow key={rowKey(row)} row={row} selfId={selfId} />
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+
+      {!searching && dmRows.length > 0 && (
+        <section data-testid="section-dms">
+          <BlockTitle>Direct messages</BlockTitle>
+          <Card className="overflow-hidden">
+            <ul>
+              {dmRows.map((row) => (
+                <ChatRow key={rowKey(row)} row={row} selfId={selfId} />
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+
+      {searching && shown.length > 0 && (
         <Card className="overflow-hidden">
           <ul>
-            {shown.map((row) => {
-              const unread = Number(row.unread) > 0
-              return (
-                <li key={`${row.kind}-${row.team_id ?? row.conversation_id ?? 'club'}`} className="border-b border-line last:border-b-0">
-                  <Link
-                    to={chatPath(row)}
-                    data-testid="chat-row"
-                    data-kind={row.kind}
-                    className="flex items-center gap-3 px-3.5 py-3 hover:bg-surface-mute"
-                  >
-                    <RowAvatar row={row} />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-baseline justify-between gap-2">
-                        <span className={`truncate text-[15px] ${unread ? 'font-extrabold' : 'font-bold'} text-ink`}>{row.label}</span>
-                        <span className={`shrink-0 text-[11.5px] font-semibold ${unread ? 'text-brand-ink' : 'text-ink-faint'}`}>
-                          {postedLabel(row.last_at)}
-                        </span>
-                      </span>
-                      <span className="flex items-center justify-between gap-2">
-                        <span className={`truncate text-[13px] ${unread ? 'font-semibold text-ink' : 'text-ink-muted'}`}>
-                          {previewLine(row, selfId)}
-                        </span>
-                        {unread && (
-                          <span
-                            className="shrink-0 rounded-full bg-brand px-1.5 py-px text-[11px] font-extrabold text-ink-invert"
-                            aria-label={`${row.unread} unread`}
-                          >
-                            {row.unread}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              )
-            })}
+            {shown.map((row) => (
+              <ChatRow key={rowKey(row)} row={row} selfId={selfId} />
+            ))}
           </ul>
         </Card>
       )}
     </section>
+  )
+}
+
+function rowKey(row) {
+  return `${row.kind}-${row.team_id ?? row.conversation_id ?? 'club'}`
+}
+
+function ChatRow({ row, selfId }) {
+  const unread = Number(row.unread) > 0
+  return (
+    <li className="border-b border-line last:border-b-0">
+      <Link
+        to={chatPath(row)}
+        data-testid="chat-row"
+        data-kind={row.kind}
+        className="flex items-center gap-3 px-3.5 py-3 hover:bg-surface-mute"
+      >
+        <RowAvatar row={row} />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline justify-between gap-2">
+            <span className={`truncate text-[15px] ${unread ? 'font-extrabold' : 'font-bold'} text-ink`}>{row.label}</span>
+            <span className={`shrink-0 text-[11.5px] font-semibold ${unread ? 'text-brand-ink' : 'text-ink-faint'}`}>
+              {postedLabel(row.last_at)}
+            </span>
+          </span>
+          <span className="flex items-center justify-between gap-2">
+            <span className={`truncate text-[13px] ${unread ? 'font-semibold text-ink' : 'text-ink-muted'}`}>
+              {previewLine(row, selfId)}
+            </span>
+            {unread && (
+              <span
+                className="shrink-0 rounded-full bg-brand px-1.5 py-px text-[11px] font-extrabold text-ink-invert"
+                aria-label={`${row.unread} unread`}
+              >
+                {row.unread}
+              </span>
+            )}
+          </span>
+        </span>
+      </Link>
+    </li>
   )
 }
