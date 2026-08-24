@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 💚 **Chat round 3: the WhatsApp design pass** — seven items
+- `34c9e1c` — 💚 **Chat round 3: the WhatsApp design pass** (#380) — seven items
   from Jay comparing chat against a real WhatsApp screenshot
   (`claude/plans/2026-08-24-chat-round-3-design.md`): stamps inside tighter
   bubbles, the reaction trigger beside the bubble, Today/Yesterday/date
@@ -19,8 +19,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   where white/60 metadata FAILED and moved to /70), choosable wallpaper
   presets (no uploads, by ruling), and PRIVATE nicknames
   (`db/migrations/20260824_nicknames.sql`, owner-only RLS, harness proven
-  against an injected read-policy leak). The NEXT pull request cites this
-  entry's squash SHA.
+  against an injected read-policy leak). Merged and verified live from the
+  deployed bundle the same night; its own branch could not cite this squash
+  SHA, so this entry carries it now.
 - `ccf960b` — 🧊 **Glass polish round: white cast gone, one shape for both
   bars, crisp icons** (#377) — Jay's home review of the clear glass, three
   fixes: the 40% white
