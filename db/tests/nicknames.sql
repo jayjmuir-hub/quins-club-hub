@@ -39,6 +39,9 @@ create table if not exists public.nicknames (
 
 alter table public.nicknames enable row level security;
 grant select, insert, update, delete on public.nicknames to authenticated;
+-- Supabase's default privileges can hand anon a grant on new tables;
+-- revoke by name so the capture in db/schema/grants.sql states a fact.
+revoke all on public.nicknames from public, anon;
 
 drop policy if exists "nickname read own" on public.nicknames;
 create policy "nickname read own" on public.nicknames

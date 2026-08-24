@@ -219,12 +219,12 @@ function Thread({ conversationId }) {
 
   // Round 3: my private label for somebody, or their real name. Applied at
   // every point this screen renders a person.
-  const nick = (profileId, fallback) => (profileId && nicknames.get(profileId)) || fallback
-  const otherName = nick(other?.id, other?.name)
+  const nameFor = (profileId, fallback) => (profileId && nicknames.get(profileId)) || fallback
+  const otherName = nameFor(other?.id, other?.name)
   // The WhatsApp header line: first names, "You" for the reader.
   const memberLine = isGroup && members?.length
     ? members
-        .map((p) => (p.profile_id === selfId ? 'You' : nick(p.profile_id, p.full_name).split(' ')[0] || 'Member'))
+        .map((p) => (p.profile_id === selfId ? 'You' : nameFor(p.profile_id, p.full_name).split(' ')[0] || 'Member'))
         .join(', ')
     : null
 
@@ -645,7 +645,7 @@ function Thread({ conversationId }) {
       <div className="-mx-1 flex flex-col gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
         {messages?.map((m, index) => {
           const mine = m.author_id === selfId
-          const authorName = mine ? 'You' : nick(m.author_id, m.author?.full_name ?? 'Member')
+          const authorName = mine ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')
           // The stamp rides INSIDE the bubble, WhatsApp style (round 3:
           // "the time stamp is not totally below the message").
           const stamp = (
@@ -710,7 +710,7 @@ function Thread({ conversationId }) {
                       className={`mb-1 mt-0.5 block w-full rounded-[8px] border-l-2 px-2 py-1 text-left ${mine ? 'border-white/40 bg-white/10' : 'border-brand bg-surface-mute'}`}
                     >
                       <span className={`block text-[11px] font-extrabold ${mine ? 'text-white/80' : 'text-brand-ink'}`}>
-                        {m.quoted.author_id === selfId ? 'You' : nick(m.quoted.author_id, m.quoted.author?.full_name ?? 'Member')}
+                        {m.quoted.author_id === selfId ? 'You' : nameFor(m.quoted.author_id, m.quoted.author?.full_name ?? 'Member')}
                       </span>
                       <span className={`block truncate text-[12px] ${mine ? 'text-white/70' : 'text-ink-muted'}`}>
                         {m.quoted.body?.trim() ? m.quoted.body : '📷 Photo'}
@@ -862,7 +862,7 @@ function Thread({ conversationId }) {
                 <div className="mb-1.5 flex items-center gap-2 rounded-[10px] border-l-2 border-brand bg-surface-mute px-2.5 py-1.5" data-testid="quote-preview">
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] font-extrabold text-brand-ink">
-                      Replying to {replyTo.author_id === selfId ? 'yourself' : nick(replyTo.author_id, replyTo.author?.full_name ?? 'Member')}
+                      Replying to {replyTo.author_id === selfId ? 'yourself' : nameFor(replyTo.author_id, replyTo.author?.full_name ?? 'Member')}
                     </p>
                     <p className="truncate text-[12px] text-ink-muted">{replyTo.body?.trim() ? replyTo.body : '📷 Photo'}</p>
                   </div>

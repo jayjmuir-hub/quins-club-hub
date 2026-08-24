@@ -844,3 +844,10 @@ REVOKE ALL ON public.conversation_members FROM PUBLIC, anon;
 -- own read policy.
 GRANT SELECT, INSERT, DELETE ON public.message_reactions TO authenticated;
 REVOKE ALL ON public.message_reactions FROM PUBLIC, anon;
+
+-- 24 Aug 2026 — db/migrations/20260824_nicknames.sql (private nicknames,
+-- chat round 3). Every policy is owner_id = auth.uid(), so the table is
+-- invisible across accounts by construction; the grant is the full CRUD
+-- set because all four verbs are the owner's.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.nicknames TO authenticated;
+REVOKE ALL ON public.nicknames FROM PUBLIC, anon;
