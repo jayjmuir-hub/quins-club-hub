@@ -250,7 +250,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 - `616a546` — **Shell polish to match the dock** — the desktop sidebar's active item is
   the same gradient pill with the same glow (`src/components/Sidebar.jsx`),
   and the help button is dark glass instead of a second red disc 40px from
-  the red active tab (`src/components/HelpButton.jsx`; still 44px — the
+  the red active tab (`src/components/HelpSheet.jsx`, then named
+  HelpButton.jsx; still 44px — the
   test for the touch-target floor caught a 40px first draft).
 - `e2ca0a7` — **The dock, design "A"** — Jay: "very bland" → "go with A, but flashier
   and more modern". Icons only; the active tab expands into a brand-gradient

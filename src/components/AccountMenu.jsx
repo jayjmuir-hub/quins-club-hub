@@ -110,6 +110,19 @@ function BackIcon(props) {
   )
 }
 
+// The bug that Jay asked for. The label carries the meaning ("Report a
+// problem" covers suggestions too — the sheet's first step sorts them);
+// the icon just makes the row scannable, like every other row here.
+function BugIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <rect x="8" y="7" width="8" height="11" rx="4" />
+      <path d="M9.5 7a2.5 2.5 0 0 1 5 0" />
+      <path d="M8 10H4.5M8 14H4.5M16 10h3.5M16 14h3.5M9 5.5 7.5 4M15 5.5 16.5 4" />
+    </svg>
+  )
+}
+
 const ITEM =
   'flex w-full items-center gap-3 rounded-[9px] px-3 py-2.5 text-left text-[14px] font-semibold text-ink transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-inset'
 const ICON = 'h-[18px] w-[18px] shrink-0 text-ink-muted'
@@ -120,8 +133,9 @@ const ICON = 'h-[18px] w-[18px] shrink-0 text-ink-muted'
  * @param {string|null} props.email       Fallback for the initial and the header line.
  * @param {string|null} props.roleLabel   What AppShell shows in the role pill, or null while loading.
  * @param {() => Promise<void>} props.signOut
+ * @param {() => void} props.onReportProblem  Opens the help sheet AppShell owns.
  */
-export default function AccountMenu({ firstName, email, roleLabel, signOut }) {
+export default function AccountMenu({ firstName, email, roleLabel, signOut, onReportProblem }) {
   const { realMemberships, viewAs } = useMemberships()
   const [open, setOpen] = useState(false)
   // 'main' | 'viewAs' — which page of the panel is showing.
@@ -337,6 +351,24 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut }) {
                     ].join(' ')}
                   />
                 </span>
+              </button>
+
+              {/* Was the floating `?` until 24 Aug 2026 — see
+                  claude/plans/2026-08-24-help-into-account-menu.md. Close
+                  WITHOUT refocus: the sheet is about to take focus, and
+                  yanking it back to the trigger would fight it. */}
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="report-problem"
+                onClick={() => {
+                  close({ refocus: false })
+                  onReportProblem()
+                }}
+                className={ITEM}
+              >
+                <BugIcon className={ICON} />
+                Report a problem
               </button>
 
               <div className="mt-1 border-t border-line pt-1">
