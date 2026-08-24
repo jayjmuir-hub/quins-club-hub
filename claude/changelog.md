@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- 🚪 **The deploy ignore gate was DEAD from 10:19 to mid-afternoon, and the
+  killer was a TOML header.** PR #358's `[build.environment]` block (the Node
+  pin) sat above the `ignore =` key, and a TOML table captures every bare key
+  after it — so `build.ignore` ceased to exist and Netlify built every commit,
+  including two docs-only ones, with no error anywhere. Diagnosed from the
+  build log of the #363 deploy (no ignore evaluation at all; the last gate
+  cancel was 23 Aug 5:44 PM). Key reordered, `docs:check` gained check 9
+  guarding the ordering (proved by both injected faults), and `CLAUDE.md`
+  rule 3 now says plainly: a local gate run answers what the script would
+  decide, never whether Netlify consults it — the only proof of a skip is the
+  deploy id not moving.
+- `261397a` — 📝 **Group chats recorded as shipped and verified live** (#363,
+  docs only — the statuses and state-of-play for the `463b3c9` entry below).
 - `463b3c9` — 💬 **Group chats SHIPPED and VERIFIED LIVE — member-created, named,
   three people minimum** — migration `db/migrations/20260824_group_chats.sql`
   applied to live (harness `db/tests/group-chats.sql` green before and after,
