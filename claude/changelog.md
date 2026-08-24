@@ -10,7 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 📦 **Safe updates: libphonenumber-js 1.13.11, @testing-library/user-event
+- 📦 **Vite 8.2.2 + @vitejs/plugin-react 6.1.0, taken together, and Netlify's
+  build Node pinned to 24** — the mutually-blocking pair from the 17 Aug
+  parking, landed exactly as `claude/open-items.md` prescribed: one PR carrying
+  both, Node pinned in the same change so the production build runs on the
+  version CI actually tests. Fresh lockfile resolve (an incremental install
+  fights plugin-react 6's optional Babel-8 peer chain); full suite and build
+  green.
+- `8f94373` — 📦 **Safe updates: libphonenumber-js 1.13.11, @testing-library/user-event
   14.6.5, vitest 4.1.11** (Dependabot #351, patch bumps; suite green). The
   same batch's four MAJORS (#352–#355) were closed under the standing
   rulings: eslint 10 still refused by the React plugins, vite 8 +
