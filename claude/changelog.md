@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 🏉 **Age typos are refused in the training forms, the embed sort has a
+- 🧪 **The nightly db-check had been failing since 22 Aug, and behind its
+  refusal sat four separate reds.** `pitch-occupancy.sql` shipped with no
+  `raise exception`, so the runner refused the whole suite every night — and
+  that refusal masked: the two 24 Aug chat migrations being non-idempotent
+  (their harnesses inline them; `drop policy if exists` guards added), the
+  grants allowlist missing seven column grants from 23–24 Aug (its own header
+  predicted exactly this rot), and phase-3's ASSERT 15 predating the 23 Aug
+  adult-DMs-private ruling (repointed to assert the ruling in both
+  directions, not deleted). The pitch harness got its throw — proved by
+  injected fault. One red remains: four training-plans read policies call
+  `auth.uid()` bare (`20260824_rls_initplan_wrap_training_reads.sql`, written
+  but awaiting Jay's yes to apply).
+- `9cf34a9` — 🏉 **Age typos are refused in the training forms, the embed sort has a
   discriminating test, and line endings are pinned repo-wide.** The 21 Aug
   review follow-ups: `ageDraftProblem` mirrors the DB's 4–19 and min≤max
   checks so a typo reads "Ages are 4 to 19" instead of a raw

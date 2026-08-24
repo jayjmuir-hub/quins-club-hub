@@ -106,6 +106,9 @@ grant execute on function private.conversation_reported(uuid) to authenticated;
 
 grant delete on public.messages to authenticated;
 
+-- if exists: first created here, so a replay (the harness inlines this
+-- file verbatim) must be legal against a database that has it.
+drop policy if exists "message delete" on public.messages;
 create policy "message delete" on public.messages
   for delete using (
     case
@@ -127,6 +130,9 @@ create policy "message delete" on public.messages
 
 grant delete on public.conversations to authenticated;
 
+-- if exists: first created here, so a replay (the harness inlines this
+-- file verbatim) must be legal against a database that has it.
+drop policy if exists "conversation delete" on public.conversations;
 create policy "conversation delete" on public.conversations
   for delete using (
     case

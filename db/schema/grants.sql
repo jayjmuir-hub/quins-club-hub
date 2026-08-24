@@ -830,3 +830,11 @@ REVOKE ALL ON public.conversations, public.dm_blocks, public.message_reports, pu
 
 -- 23 Aug 2026 — db/migrations/20260823_notify_approvals.sql
 GRANT UPDATE (notify_approvals) ON public.memberships TO authenticated;
+
+-- 24 Aug 2026 — db/migrations/20260824_group_chats.sql (group chats)
+-- conversation_members: SELECT only; create_group()/add_group_members()/
+-- leave_group()/remove_group_member() do every write. conversations gains
+-- column-level UPDATE on title, gated by the owner-only "group rename" policy.
+GRANT SELECT ON public.conversation_members TO authenticated;
+GRANT UPDATE (title) ON public.conversations TO authenticated;
+REVOKE ALL ON public.conversation_members FROM PUBLIC, anon;
