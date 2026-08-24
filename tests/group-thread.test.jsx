@@ -41,6 +41,10 @@ const m = {
 }
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
+vi.mock('../src/data/nicknames.js', () => ({
+  listMyNicknames: async () => new Map(),
+  setNickname: async () => {},
+}))
 vi.mock('../src/data/messages.js', () => ({
   listMyConversations: (...a) => m.listMyConversations(...a),
   listMyMessageReads: (...a) => m.listMyMessageReads(...a),
@@ -132,7 +136,9 @@ describe('a group thread', () => {
   it('shows the title, the member count, and the author on their bubbles', async () => {
     renderAt('/chat/dm/g1')
     expect(await screen.findByRole('heading', { name: 'Zz Test Group' })).toBeInTheDocument()
-    expect(screen.getByTestId('chat-subtitle')).toHaveTextContent('3 people')
+    // Round 3, Jay: "at the top it previews who is in the chat under the
+    // name of the chat" — first names, You for the reader, not a bare count.
+    expect(screen.getByTestId('chat-subtitle')).toHaveTextContent('You, Mira, Tomas')
     const bubble = screen.getByTestId('dm-bubble')
     expect(within(bubble).getByText('Mira Vantel')).toBeInTheDocument()
   })

@@ -34,6 +34,10 @@ const m = {
 }
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
+vi.mock('../src/data/nicknames.js', () => ({
+  listMyNicknames: async () => new Map(),
+  setNickname: async () => {},
+}))
 vi.mock('../src/data/messages.js', () => ({
   listMyConversations: (...a) => m.listMyConversations(...a),
   listMyMessageReads: (...a) => m.listMyMessageReads(...a),

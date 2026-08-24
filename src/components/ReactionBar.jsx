@@ -11,13 +11,13 @@ import { useEffect, useRef, useState } from 'react'
 export const REACTION_SET = ['👍', '❤️', '😂', '😮', '👏']
 
 /**
- * @param messageId  the message these belong to
- * @param reactions  rows {message_id, profile_id, emoji} for THIS message
- * @param selfId     the viewer
- * @param onToggle   (messageId, emoji, on) => void — on=true adds, false removes
- * @param disabled   read-only surfaces (a reviewing admin) hide the add button
+ * The add-reaction button plus its five-emoji picker, on its own — round 3
+ * split it out of the bar so the WhatsApp surfaces can park it BESIDE the
+ * bubble (left of yours, right of theirs) while the tallies stay attached.
+ *
+ * @param align  'left' | 'right' — which edge the popover hugs
  */
-export default function ReactionBar({ messageId, reactions = [], selfId, onToggle, disabled = false }) {
+export function ReactionTrigger({ messageId, reactions = [], selfId, onToggle, align = 'left' }) {
   const [picking, setPicking] = useState(false)
   const ref = useRef(null)
 
@@ -30,51 +30,26 @@ export default function ReactionBar({ messageId, reactions = [], selfId, onToggl
     return () => document.removeEventListener('mousedown', close)
   }, [picking])
 
-  const tallies = REACTION_SET.map((emoji) => {
-    const rows = reactions.filter((r) => r.emoji === emoji)
-    return { emoji, count: rows.length, mine: rows.some((r) => r.profile_id === selfId) }
-  }).filter((t) => t.count > 0)
-
-  if (tallies.length === 0 && disabled) return null
-
   return (
-    <div ref={ref} className="relative mt-1 flex flex-wrap items-center gap-1" data-testid="reaction-bar">
-      {tallies.map((t) => (
-        <button
-          key={t.emoji}
-          type="button"
-          aria-pressed={t.mine}
-          aria-label={`${t.emoji} ${t.count}`}
-          disabled={disabled}
-          onClick={() => onToggle(messageId, t.emoji, !t.mine)}
-          className={`flex items-center gap-1 rounded-pill border px-1.5 py-0.5 text-[12px] leading-none ${
-            t.mine ? 'border-brand bg-danger-bg font-bold text-brand-ink' : 'border-line bg-surface-card text-ink-muted'
-          }`}
-        >
-          <span aria-hidden="true">{t.emoji}</span>
-          <span className="text-[11px] font-semibold">{t.count}</span>
-        </button>
-      ))}
-      {!disabled && (
-        <button
-          type="button"
-          aria-label="Add reaction"
-          aria-expanded={picking}
-          onClick={() => setPicking((v) => !v)}
-          className="grid h-6 w-6 place-items-center rounded-pill border border-line bg-surface-card text-ink-faint hover:text-ink"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
-            <circle cx="9" cy="9.5" r="0.5" fill="currentColor" />
-            <circle cx="15" cy="9.5" r="0.5" fill="currentColor" />
-          </svg>
-        </button>
-      )}
+    <div ref={ref} className="relative" data-testid="reaction-trigger">
+      <button
+        type="button"
+        aria-label="Add reaction"
+        aria-expanded={picking}
+        onClick={() => setPicking((v) => !v)}
+        className="grid h-6 w-6 place-items-center rounded-pill border border-line bg-surface-card text-ink-faint hover:text-ink"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
+          <circle cx="9" cy="9.5" r="0.5" fill="currentColor" />
+          <circle cx="15" cy="9.5" r="0.5" fill="currentColor" />
+        </svg>
+      </button>
       {picking && (
         <div
           data-testid="reaction-picker"
-          className="absolute bottom-8 left-0 z-20 flex gap-1 rounded-pill border border-line bg-surface-card px-2 py-1.5 shadow-card"
+          className={`absolute bottom-8 z-20 flex gap-1 rounded-pill border border-line bg-surface-card px-2 py-1.5 shadow-card ${align === 'right' ? 'right-0' : 'left-0'}`}
         >
           {REACTION_SET.map((emoji) => (
             <button
@@ -91,6 +66,47 @@ export default function ReactionBar({ messageId, reactions = [], selfId, onToggl
             </button>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * @param messageId  the message these belong to
+ * @param reactions  rows {message_id, profile_id, emoji} for THIS message
+ * @param selfId     the viewer
+ * @param onToggle   (messageId, emoji, on) => void — on=true adds, false removes
+ * @param disabled   read-only surfaces (a reviewing admin) hide the add button
+ * @param showAdd    false when the trigger lives beside the bubble instead
+ */
+export default function ReactionBar({ messageId, reactions = [], selfId, onToggle, disabled = false, showAdd = true }) {
+  const tallies = REACTION_SET.map((emoji) => {
+    const rows = reactions.filter((r) => r.emoji === emoji)
+    return { emoji, count: rows.length, mine: rows.some((r) => r.profile_id === selfId) }
+  }).filter((t) => t.count > 0)
+
+  if (tallies.length === 0 && (disabled || !showAdd)) return null
+
+  return (
+    <div className="relative mt-1 flex flex-wrap items-center gap-1" data-testid="reaction-bar">
+      {tallies.map((t) => (
+        <button
+          key={t.emoji}
+          type="button"
+          aria-pressed={t.mine}
+          aria-label={`${t.emoji} ${t.count}`}
+          disabled={disabled}
+          onClick={() => onToggle(messageId, t.emoji, !t.mine)}
+          className={`flex items-center gap-1 rounded-pill border px-1.5 py-0.5 text-[12px] leading-none ${
+            t.mine ? 'border-brand bg-danger-bg font-bold text-brand-ink' : 'border-line bg-surface-card text-ink-muted'
+          }`}
+        >
+          <span aria-hidden="true">{t.emoji}</span>
+          <span className="text-[11px] font-semibold">{t.count}</span>
+        </button>
+      ))}
+      {!disabled && showAdd && (
+        <ReactionTrigger messageId={messageId} reactions={reactions} selfId={selfId} onToggle={onToggle} />
       )}
     </div>
   )

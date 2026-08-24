@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Button from './Button.jsx'
 import ChatPhoto from './ChatPhoto.jsx'
@@ -6,6 +6,9 @@ import EmojiPicker from './EmojiPicker.jsx'
 import ReactionBar from './ReactionBar.jsx'
 import Spinner from './Spinner.jsx'
 import { uploadChatPhoto } from '../data/chatMedia.js'
+import { listMyNicknames } from '../data/nicknames.js'
+import { backgroundStyle, getChatBackground } from '../lib/chatBackgrounds.js'
+import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import {
   chatPath,
   listChats,
@@ -109,6 +112,8 @@ export default function FloatingChatDock({ badge = false }) {
   const [photo, setPhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
   const [size, setSize] = useState(loadDockSize)
+  // Round 3: my private labels, and the shared device wallpaper.
+  const [nicknames, setNicknames] = useState(() => new Map())
   const bottomRef = useRef(null)
   const draftRef = useRef(null)
   const fileRef = useRef(null)
@@ -145,6 +150,12 @@ export default function FloatingChatDock({ badge = false }) {
       setRows(await listChats())
     } catch (err) {
       setError(err.message || 'Could not load your chats.')
+    }
+    // Decoration — a failure renders real names, never an error.
+    try {
+      setNicknames(await listMyNicknames())
+    } catch {
+      setNicknames(new Map())
     }
   }, [])
 
@@ -276,8 +287,11 @@ export default function FloatingChatDock({ badge = false }) {
             </svg>
           </button>
           {/* pl-9, not px-3.5: the resize grip owns the top-left corner and
-              the back button must not sit under it. */}
-          <div className="flex items-center gap-2.5 bg-chrome py-2.5 pl-9 pr-3.5 text-white">
+              the back button must not sit under it.
+              Round 3, Jay: "need a better color than black for the group
+              name area" — quins green (accent.deep), white text measured in
+              the contrast gate. */}
+          <div className="flex items-center gap-2.5 bg-accent-deep py-2.5 pl-9 pr-3.5 text-white">
             {active ? (
               <button type="button" aria-label="Back to chats" onClick={() => { setActive(null); setThread(null); setError(null) }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
@@ -285,7 +299,7 @@ export default function FloatingChatDock({ badge = false }) {
             ) : null}
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-bold">{active ? active.label : 'Chats'}</p>
-              {active && <p className="truncate text-[11px] text-white/60">{active.detail}</p>}
+              {active && <p className="truncate text-[11px] text-white/70">{active.detail}</p>}
             </div>
             <button type="button" aria-label="Open full view" onClick={expand} className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" /></svg>
@@ -335,17 +349,27 @@ export default function FloatingChatDock({ badge = false }) {
 
           {active && (
             <>
-              <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto bg-surface px-3 py-3">
+              <div className="flex flex-1 flex-col gap-1 overflow-y-auto bg-surface px-3 py-2" style={backgroundStyle(getChatBackground()) ?? undefined}>
                 {thread === null && <div className="py-8"><Spinner /></div>}
                 {thread?.length === 0 && <p className="px-1 py-4 text-[13px] text-ink-muted">Nothing here yet.</p>}
-                {thread?.map((m) => {
+                {thread?.map((m, index) => {
                   const mine = m.author_id === selfId
                   return (
-                    <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dock-bubble">
-                      <div className={`max-w-[85%] rounded-[13px] px-3 py-1.5 ${mine ? 'bg-chrome text-white' : 'bg-surface-card text-ink shadow-card'}`}>
-                        <p className={`text-[11px] font-extrabold ${mine ? 'text-white/80' : 'text-brand-ink'}`}>{mine ? 'You' : m.author?.full_name ?? 'Someone'}</p>
+                    <Fragment key={m.id}>
+                      {daysDiffer(thread[index - 1]?.created_at, m.created_at) && (
+                        <div className="my-1 flex justify-center" data-testid="day-divider" role="separator">
+                          <span className="rounded-pill bg-surface-mute px-2 py-0.5 text-[10.5px] font-bold text-ink-muted shadow-card">
+                            {dayLabel(m.created_at)}
+                          </span>
+                        </div>
+                      )}
+                    <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dock-bubble">
+                      <div className={`max-w-[85%] rounded-[13px] px-2.5 py-1.5 ${mine ? 'bg-accent-deep text-white' : 'bg-surface-card text-ink shadow-card'}`}>
+                        {!mine && (
+                          <p className="text-[11px] font-extrabold text-brand-ink">{nicknames.get(m.author_id) ?? m.author?.full_name ?? 'Someone'}</p>
+                        )}
                         {m.forwarded && !m.deleted_at && (
-                          <p className={`text-[10.5px] italic ${mine ? 'text-white/60' : 'text-ink-faint'}`} data-testid="forwarded-tag">Forwarded</p>
+                          <p className={`text-[10.5px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`} data-testid="forwarded-tag">Forwarded</p>
                         )}
                         {/* `?.id`, not truthiness — see the DM thread's note:
                             an empty-array embed once chipped every bubble. */}
@@ -360,19 +384,28 @@ export default function FloatingChatDock({ badge = false }) {
                           <>
                             {m.attachment_path && <ChatPhoto path={m.attachment_path} compact />}
                             {m.body?.trim() ? (
-                              <p className="whitespace-pre-wrap break-words text-[13.5px] leading-[1.4]">{m.body}</p>
-                            ) : null}
+                              <p className="whitespace-pre-wrap break-words text-[13.5px] leading-[1.4]">
+                                {m.body}
+                                <span className={`float-right ml-2 mt-1 text-[9.5px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+                                  {stampLabel(m.created_at)}
+                                </span>
+                              </p>
+                            ) : (
+                              <p className={`text-right text-[9.5px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>{stampLabel(m.created_at)}</p>
+                            )}
                           </>
                         )}
-                        <p className={`mt-0.5 text-[10px] font-semibold ${mine ? 'text-white/60' : 'text-ink-faint'}`}>
-                          {stampLabel(m.created_at)}
-                          {m.replies?.length ? ` · ${m.replies.length} repl${m.replies.length === 1 ? 'y' : 'ies'} in full view` : ''}
-                        </p>
+                        {!m.deleted_at && m.replies?.length ? (
+                          <p className={`mt-0.5 text-[10px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+                            {m.replies.length} repl{m.replies.length === 1 ? 'y' : 'ies'} in full view
+                          </p>
+                        ) : null}
                         {!m.deleted_at && (
                           <ReactionBar messageId={m.id} reactions={reactions.get(m.id) ?? []} selfId={selfId} onToggle={react} />
                         )}
                       </div>
                     </div>
+                    </Fragment>
                   )
                 })}
                 <div ref={bottomRef} />
