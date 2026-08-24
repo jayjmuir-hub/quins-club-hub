@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- (unmerged) — 🔢 **The unread count reaches the app icon** — Jay: "we need
+  to add a new chat message count to the app icon". The Badging API on the
+  installed PWA: the dock-badge recount hands its REAL number to
+  `navigator.setAppBadge` (icon and dock dot cannot disagree), sign-out
+  clears it, and the push handler marks the icon with the platform's
+  generic badge while the app is CLOSED — the worker cannot know the
+  count, so the app corrects it to the number on open. A silent no-op in
+  a plain tab, and on platforms without the API. The NEXT pull request
+  cites this entry's squash SHA.
+- `271b54d` — 📝 **Rounds 4-5 records closed** (#388) — `043f9c3` and
+  `bc971f8` cited, plans shipped, the handoff extended with the night's
+  second wave of traps. Its own branch could not cite this squash SHA, so
+  this entry does.
 - `bc971f8` — 📱 **The mobile thread fits its chrome** (#389) — Jay's phone
   screenshot: "chat isn't playing nice with the bottom menu bar, several
   things wrong." Three fixes: the message menu FLIPS UPWARD near the
