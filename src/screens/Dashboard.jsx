@@ -18,6 +18,7 @@ import NotificationsNudge from '../components/NotificationsNudge.jsx'
 import PostNoticeAction from '../components/PostNoticeAction.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
+import { openConversation } from '../data/messages.js'
 import { listMySquadStaff } from '../data/staff.js'
 import {
   listMyReads,
@@ -1136,6 +1137,19 @@ export default function Dashboard() {
                 squadName={team.name}
                 staff={staffByTeam.get(team.id) ?? []}
                 defaultOpen={index === 0}
+                selfId={user?.id ?? null}
+                // Round 2, Jay: "chat icon option in all coach, manager, etc
+                // pills". Find-or-create the DM and land in it; whether the
+                // DM is allowed is open_conversation's call, and its refusal
+                // is worded by the database.
+                onChat={async (member) => {
+                  try {
+                    const conversationId = await openConversation(member.profileId)
+                    navigate(`/chat/dm/${conversationId}`)
+                  } catch (err) {
+                    setError(err.message || 'Could not open a chat with them.')
+                  }
+                }}
               />
             ))
           )}

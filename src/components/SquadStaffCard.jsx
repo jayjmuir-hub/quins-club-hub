@@ -215,7 +215,7 @@ function MailIcon(props) {
  * control with no accessible name is a button that announces itself as "link",
  * which is the most common way a pretty toolbar becomes unusable.
  */
-function ContactButton({ href, label, tone = 'ghost', children }) {
+function ContactButton({ href, label, tone = 'ghost', onClick, children }) {
   // ⚠️ `/90` AND `/95`, NOT `/92`. Tailwind's opacity scale is 0-100 in steps of
   // five, so `bg-white/92` generates NO RULE AT ALL — and the failure is silent
   // and specific: the element renders with a transparent background, which on a
@@ -237,6 +237,16 @@ function ContactButton({ href, label, tone = 'ghost', children }) {
     ghost: 'bg-white/90 text-brand-deep hover:bg-white',
   }
 
+  // Round 2: the chat button has no URL to point at — opening a DM is an
+  // action (find-or-create the conversation, then navigate) — so an onClick
+  // renders the same square as a <button> instead of an <a>.
+  if (onClick) {
+    return (
+      <button type="button" aria-label={label} onClick={onClick} className={`${base} ${tones[tone]}`}>
+        {children}
+      </button>
+    )
+  }
   return (
     <a href={href} aria-label={label} className={`${base} ${tones[tone]}`}>
       {children}
@@ -356,7 +366,7 @@ const SPAN_CLASS = {
   half: 'min-h-[152px] min-[372px]:min-h-[136px]',
 }
 
-function StaffTile({ member, span = 'half', style }) {
+function StaffTile({ member, span = 'half', style, onChat = null, selfId = null }) {
   const featured = span === 'lead'
   const role = labelForRole(member.role)
   const line = member.title ?? role
@@ -425,7 +435,7 @@ function StaffTile({ member, span = 'half', style }) {
             opts in when accepting the position". Do not quietly drop the
             buttons back to name-and-title — the database returns these fields
             deliberately (db/migrations/20260813_my_squad_staff.sql). */}
-        {(member.phone || member.email) && (
+        {(member.phone || member.email || (onChat && member.profileId && member.profileId !== selfId)) && (
           <div className="mt-2 flex gap-1">
             {member.phone && (
               <ContactButton
@@ -444,6 +454,17 @@ function StaffTile({ member, span = 'half', style }) {
             {member.email && (
               <ContactButton href={`mailto:${member.email}`} label={`Email ${member.name}`}>
                 <MailIcon className="h-[15px] w-[15px]" aria-hidden="true" />
+              </ContactButton>
+            )}
+            {/* Round 2, Jay: "chat icon option in all coach, manager, etc
+                pills" — straight into a DM with this person. Never for
+                yourself, and whether the DM is ALLOWED is the database's
+                (open_conversation refuses and the handler words it). */}
+            {onChat && member.profileId && member.profileId !== selfId && (
+              <ContactButton onClick={() => onChat(member)} label={`Chat with ${member.name}`}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" />
+                </svg>
               </ContactButton>
             )}
           </div>
@@ -516,7 +537,7 @@ function FaceStack({ staff }) {
  * attached to a squad should see that squad named on their home screen whether
  * or not anyone has been attached to it yet.
  */
-export function SquadStaffCard({ squadName, staff = [], defaultOpen = true }) {
+export function SquadStaffCard({ squadName, staff = [], defaultOpen = true, onChat = null, selfId = null }) {
   const [open, setOpen] = useState(defaultOpen)
   const lead = leadIndex(staff)
   // The lead first, then everyone else in the order the data module chose —
@@ -616,6 +637,8 @@ export function SquadStaffCard({ squadName, staff = [], defaultOpen = true }) {
               key={member.membershipId}
               member={member}
               span={spans[index]}
+              onChat={onChat}
+              selfId={selfId}
               // ⚠️ ONLY the lead carries a row span, and only once the grid has
               // two columns to span rows in. Below 372px it is a single column
               // and a multi-row lead would leave a hole.
