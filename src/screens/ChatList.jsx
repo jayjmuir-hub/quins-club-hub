@@ -26,7 +26,7 @@ import { postedLabel } from '../lib/notices.js'
 //
 // ⚠️ INITIALS, NEVER A PHOTO. No child's face is ever in a chat.
 
-function RowAvatar({ row }) {
+export function RowAvatar({ row }) {
   if (row.kind === 'dm') return <Avatar name={row.label} staff={row.detail !== 'Direct message'} />
   const glyph = row.kind === 'club' ? '🏉' : row.kind === 'staff' ? '🛡' : shortBand(row.label)
   return (
@@ -92,17 +92,7 @@ export default function ChatList() {
   // 24 Aug 2026). Cosmetic, never a boundary: a real coach's rows are
   // already narrowed by the database.
   const { memberships, teams } = useMemberships()
-  const scoped = useMemo(() => {
-    // Not loaded yet: show what the database sent rather than flashing an
-    // empty list — the database has already scoped it for real users.
-    if (!memberships || !teams) return rows ?? []
-    const visible = new Set(visibleTeams(memberships, teams).map((t) => t.id))
-    return (rows ?? []).filter((r) => {
-      if (r.kind === 'staff') return canEditTeam(memberships, r.team_id)
-      if (r.team_id) return visible.has(r.team_id)
-      return true // club, DMs and groups are not squad-scoped
-    })
-  }, [rows, memberships, teams])
+  const scoped = useMemo(() => scopeChatRows(rows, memberships, teams), [rows, memberships, teams])
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -276,6 +266,26 @@ export default function ChatList() {
 
 function rowKey(row) {
   return `${row.kind}-${row.team_id ?? row.conversation_id ?? 'club'}`
+}
+
+/**
+ * ⚠️ SCOPED AT RENDER, NOT IN THE FETCH — the memberships.jsx contract every
+ * screen follows ("RLS still returns club-wide rows; the app simply declines
+ * to display them"). my_chats() runs as the REAL account, so an admin under
+ * "View as" was shown every squad's channel (Jay, 24 Aug 2026). Cosmetic,
+ * never a boundary: a real coach's rows are already narrowed by the database.
+ * Exported so the floating dock and this screen cannot drift.
+ */
+export function scopeChatRows(rows, memberships, teams) {
+  // Not loaded yet: show what the database sent rather than flashing an
+  // empty list — the database has already scoped it for real users.
+  if (!memberships || !teams) return rows ?? []
+  const visible = new Set(visibleTeams(memberships, teams).map((t) => t.id))
+  return (rows ?? []).filter((r) => {
+    if (r.kind === 'staff') return canEditTeam(memberships, r.team_id)
+    if (r.team_id) return visible.has(r.team_id)
+    return true // club, DMs and groups are not squad-scoped
+  })
 }
 
 function ChatRow({ row, selfId }) {

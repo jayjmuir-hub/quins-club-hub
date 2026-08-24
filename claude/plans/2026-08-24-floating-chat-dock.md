@@ -18,6 +18,11 @@ the full-height drawer, 24 Aug). Round-2 item from
   full page IS chat there). Carries the existing unread dot —
   `useDockBadges().chat`, already computed in `AppShell` for the mobile dock;
   no new queries while closed.
+  ⚠️ **Merge AFTER PR #367** (Help leaving the corner for the AccountMenu,
+  `claude/plans/2026-08-24-help-into-account-menu.md`) — the corner belonged
+  to the floating Help button, which ate the dock's clicks until the two
+  sessions coordinated on 24 Aug. Expect a trivial AppShell import/render
+  conflict with #367 whichever merges second.
 - **Click → a compact panel (~380×560) over the content**, dark-chrome
   header, two states:
   - **List**: the same `my_chats()` rows as the Chats screen, compact,
