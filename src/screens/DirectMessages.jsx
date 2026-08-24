@@ -9,8 +9,9 @@ import { Empty } from '../components/Empty.jsx'
 import { Avatar, RolePill } from '../components/NewChatPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
-import ReactionBar from '../components/ReactionBar.jsx'
+import ReactionBar, { ReactionTrigger } from '../components/ReactionBar.jsx'
 import { removeChatPhoto, uploadChatPhoto } from '../data/chatMedia.js'
+import { listMyNicknames, setNickname } from '../data/nicknames.js'
 import {
   blockDm,
   deleteConversation,
@@ -36,7 +37,9 @@ import {
   unblockDm,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
+import { BACKGROUND_PRESETS, backgroundStyle, getChatBackground, setChatBackground } from '../lib/chatBackgrounds.js'
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
+import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { postedLabel, stampLabel } from '../lib/notices.js'
 import { isAdmin } from '../lib/scope.js'
@@ -106,6 +109,13 @@ function Thread({ conversationId }) {
   const [selected, setSelected] = useState(() => new Set())
   const [forwardRows, setForwardRows] = useState(null)
   const [forwarding, setForwarding] = useState(false)
+  // Round 3 (claude/plans/2026-08-24-chat-round-3-design.md): private
+  // nicknames, and the device-level wallpaper.
+  const [nicknames, setNicknames] = useState(() => new Map())
+  const [nicknaming, setNicknaming] = useState(false)
+  const [nickDraft, setNickDraft] = useState('')
+  const [background, setBackground] = useState(getChatBackground)
+  const [pickingBackground, setPickingBackground] = useState(false)
   const navigate = useNavigate()
   const bottomRef = useRef(null)
   const loggedRef = useRef(false)
@@ -138,6 +148,12 @@ function Thread({ conversationId }) {
         setReactions(await listReactions(rows.map((m) => m.id)))
       } catch {
         setReactions(new Map())
+      }
+      // So are nicknames — a failure renders real names, never an error.
+      try {
+        setNicknames(await listMyNicknames())
+      } catch {
+        setNicknames(new Map())
       }
       const group = conv?.kind === 'group'
       const people = group ? await listGroupMembers(conversationId) : null
@@ -200,6 +216,17 @@ function Thread({ conversationId }) {
     : conversation && selfId && (selfId === conversation.profile_a || selfId === conversation.profile_b)
   const owner = Boolean(myMemberRow?.is_owner)
   const reviewing = conversation && admin && !participant
+
+  // Round 3: my private label for somebody, or their real name. Applied at
+  // every point this screen renders a person.
+  const nameFor = (profileId, fallback) => (profileId && nicknames.get(profileId)) || fallback
+  const otherName = nameFor(other?.id, other?.name)
+  // The WhatsApp header line: first names, "You" for the reader.
+  const memberLine = isGroup && members?.length
+    ? members
+        .map((p) => (p.profile_id === selfId ? 'You' : nameFor(p.profile_id, p.full_name).split(' ')[0] || 'Member'))
+        .join(', ')
+    : null
 
   function clearPhoto() {
     if (photoPreview) URL.revokeObjectURL(photoPreview)
@@ -351,6 +378,24 @@ function Thread({ conversationId }) {
     }
   }
 
+  async function submitNickname(domEvent) {
+    domEvent.preventDefault()
+    try {
+      // Empty = clear: their real name comes back everywhere.
+      await setNickname(selfId, other.id, nickDraft)
+      setNicknaming(false)
+      setNicknames(await listMyNicknames())
+    } catch (err) {
+      setError(err.message || 'Could not save the nickname.')
+    }
+  }
+
+  function pickBackground(key) {
+    setChatBackground(key)
+    setBackground(key)
+    setPickingBackground(false)
+  }
+
   async function submitReport(domEvent) {
     domEvent.preventDefault()
     try {
@@ -397,13 +442,22 @@ function Thread({ conversationId }) {
                 { label: 'Add people', onClick: () => setAddingPeople(true) },
               ]
             : []),
+          { label: 'Chat background', onClick: () => setPickingBackground(true) },
           { label: 'Leave group', onClick: () => setLeaving(true) },
           ...(owner ? [{ label: 'Delete group', onClick: () => setDeleting(true), danger: true }] : []),
         ]
       : []
     : participant && other?.id
       ? [
-          { label: blocked ? `Unblock ${other.name}` : `Block ${other.name}`, onClick: toggleBlock },
+          {
+            label: `Nickname for ${otherName}`,
+            onClick: () => {
+              setNickDraft(nicknames.get(other.id) ?? '')
+              setNicknaming(true)
+            },
+          },
+          { label: 'Chat background', onClick: () => setPickingBackground(true) },
+          { label: blocked ? `Unblock ${otherName}` : `Block ${otherName}`, onClick: toggleBlock },
           { label: 'Delete chat', onClick: () => setDeleting(true), danger: true },
         ]
       : []
@@ -411,14 +465,16 @@ function Thread({ conversationId }) {
   return (
     <section className="px-1">
       <ChatHeader
-        avatar={<Avatar name={isGroup ? conversation?.title : other?.name} staff={!isGroup && STAFF.has(other?.role)} size="sm" />}
-        title={(isGroup ? conversation?.title : other?.name) ?? '…'}
+        avatar={<Avatar name={isGroup ? conversation?.title : otherName} staff={!isGroup && STAFF.has(other?.role)} size="sm" />}
+        title={(isGroup ? conversation?.title : otherName) ?? '…'}
         subtitle={
           reviewing
             ? 'Reviewing as a club admin'
             : isGroup
-              ? `${members?.length ?? '…'} people`
-              : `Private · you and ${other?.name ?? 'them'}`
+              ? // Round 3: "at the top it previews who is in the chat under
+                // the name of the chat" — first names, You for the reader.
+                (memberLine ?? `${members?.length ?? '…'} people`)
+              : `Private · you and ${otherName ?? 'them'}`
         }
         actions={actions}
       />
@@ -451,6 +507,53 @@ function Thread({ conversationId }) {
             </Button>
           </div>
         </form>
+      )}
+
+      {nicknaming && (
+        <form onSubmit={submitNickname} className="mb-3 rounded-card bg-surface-card p-3 shadow-card" data-testid="nickname-form">
+          <label htmlFor="nickname" className="text-[12.5px] font-extrabold text-ink">
+            Your nickname for {other?.name}
+          </label>
+          <p className="mt-0.5 text-[11.5px] text-ink-muted">Only you see it. Leave empty to go back to their real name.</p>
+          <input
+            id="nickname"
+            type="text"
+            value={nickDraft}
+            onChange={(e) => setNickDraft(e.target.value)}
+            maxLength={40}
+            autoFocus
+            className="mt-1.5 w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setNicknaming(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" type="submit">
+              Save
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {pickingBackground && (
+        <Card className="mb-3 p-3" data-testid="background-picker">
+          <p className="text-[12.5px] font-extrabold text-ink">Chat background</p>
+          <p className="mt-0.5 text-[11.5px] text-ink-muted">For every chat, on this device.</p>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {BACKGROUND_PRESETS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => pickBackground(p.key)}
+                aria-pressed={background === p.key}
+                className={`rounded-[10px] border p-1 ${background === p.key ? 'border-brand ring-1 ring-brand' : 'border-line'}`}
+              >
+                <span aria-hidden="true" className="block h-12 w-full rounded-[7px] bg-surface" style={p.style ?? undefined} />
+                <span className="mt-1 block text-[11px] font-semibold text-ink">{p.label}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
       )}
 
       {addingPeople && (
@@ -517,8 +620,8 @@ function Thread({ conversationId }) {
           {reviewing
             ? 'You are reviewing a private conversation as a club admin. This open has been recorded.'
             : conversation?.involves_minor
-              ? `Private between you and ${other?.name ?? 'them'}. Club admins can review this conversation.`
-              : `Private between you and ${other?.name ?? 'them'}. If a message is reported, club admins can review it.`}
+              ? `Private between you and ${otherName ?? 'them'}. Club admins can review this conversation.`
+              : `Private between you and ${otherName ?? 'them'}. If a message is reported, club admins can review it.`}
         </p>
       </div>
       )}
@@ -537,11 +640,28 @@ function Thread({ conversationId }) {
         </div>
       )}
       {messages?.length === 0 && <Empty message="Say hello." />}
-      <div className="flex flex-col gap-1.5">
-        {messages?.map((m) => {
+      {/* Round 3: the wallpaper — a low-alpha overlay on the stream only,
+          so the composer and header stay on the plain surface. */}
+      <div className="-mx-1 flex flex-col gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
+        {messages?.map((m, index) => {
           const mine = m.author_id === selfId
+          const authorName = mine ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')
+          // The stamp rides INSIDE the bubble, WhatsApp style (round 3:
+          // "the time stamp is not totally below the message").
+          const stamp = (
+            <span className={`float-right ml-2 mt-1.5 text-[10px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+              {stampLabel(m.created_at)}
+            </span>
+          )
           return (
             <Fragment key={m.id}>
+              {daysDiffer(messages[index - 1]?.created_at, m.created_at) && (
+                <div className="my-1.5 flex justify-center" data-testid="day-divider" role="separator">
+                  <span className="rounded-pill bg-surface-mute px-2.5 py-0.5 text-[11px] font-bold text-ink-muted shadow-card">
+                    {dayLabel(m.created_at)}
+                  </span>
+                </div>
+              )}
               {newFromRef.current === m.id && (
                 <div className="my-1.5 flex items-center gap-2" data-testid="new-divider" role="separator" aria-label="New messages">
                   <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />
@@ -549,18 +669,23 @@ function Thread({ conversationId }) {
                   <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />
                 </div>
               )}
-            <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dm-bubble" data-mine={mine ? 'true' : 'false'} id={`msg-${m.id}`}>
+            <div className={`flex items-end gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dm-bubble" data-mine={mine ? 'true' : 'false'} id={`msg-${m.id}`}>
+              {/* Round 3: the add-reaction trigger sits BESIDE the bubble —
+                  left of yours, right of theirs — so it reads as acting on
+                  the bubble it hugs. */}
+              {mine && participant && !m.deleted_at && !selecting && (
+                <ReactionTrigger messageId={m.id} reactions={reactions.get(m.id) ?? []} selfId={selfId} onToggle={react} align="right" />
+              )}
               <div
-                className={`max-w-[80%] rounded-[14px] px-3 py-2 ${mine ? 'bg-chrome text-white' : 'bg-surface-card text-ink shadow-card'} ${selecting && selected.has(m.id) ? 'ring-2 ring-brand' : ''}`}
+                className={`max-w-[80%] rounded-[14px] px-2.5 py-1.5 ${mine ? 'bg-accent-deep text-white' : 'bg-surface-card text-ink shadow-card'} ${selecting && selected.has(m.id) ? 'ring-2 ring-brand' : ''}`}
                 onClick={selecting && !m.deleted_at ? () => toggleSelected(m.id) : undefined}
                 data-selected={selecting && selected.has(m.id) ? 'true' : undefined}
               >
                 {isGroup && !mine && (
-                  <p className="mb-0.5 text-[11px] font-extrabold text-brand-ink">{m.author?.full_name ?? 'Member'}</p>
+                  <p className="text-[11px] font-extrabold text-brand-ink">{authorName}</p>
                 )}
-                {mine && <p className="mb-0.5 text-[11px] font-extrabold text-white/80">You</p>}
                 {m.forwarded && !m.deleted_at && (
-                  <p className={`mb-0.5 text-[11px] italic ${mine ? 'text-white/60' : 'text-ink-faint'}`} data-testid="forwarded-tag">
+                  <p className={`text-[11px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`} data-testid="forwarded-tag">
                     Forwarded
                   </p>
                 )}
@@ -574,7 +699,7 @@ function Thread({ conversationId }) {
                     An object with an id is the only shape worth drawing. */}
                 {m.quoted?.id && !m.deleted_at && (
                   m.quoted.deleted_at ? (
-                    <p className={`mb-1 rounded-[8px] border-l-2 px-2 py-1 text-[12px] italic ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-line bg-surface-mute text-ink-faint'}`} data-testid="quote-block">
+                    <p className={`mb-1 mt-0.5 rounded-[8px] border-l-2 px-2 py-1 text-[12px] italic ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-line bg-surface-mute text-ink-faint'}`} data-testid="quote-block">
                       Message deleted
                     </p>
                   ) : (
@@ -582,10 +707,10 @@ function Thread({ conversationId }) {
                       type="button"
                       data-testid="quote-block"
                       onClick={() => document.getElementById(`msg-${m.quoted.id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })}
-                      className={`mb-1 block w-full rounded-[8px] border-l-2 px-2 py-1 text-left ${mine ? 'border-white/40 bg-white/10' : 'border-brand bg-surface-mute'}`}
+                      className={`mb-1 mt-0.5 block w-full rounded-[8px] border-l-2 px-2 py-1 text-left ${mine ? 'border-white/40 bg-white/10' : 'border-brand bg-surface-mute'}`}
                     >
                       <span className={`block text-[11px] font-extrabold ${mine ? 'text-white/80' : 'text-brand-ink'}`}>
-                        {m.quoted.author?.full_name ?? 'Member'}
+                        {m.quoted.author_id === selfId ? 'You' : nameFor(m.quoted.author_id, m.quoted.author?.full_name ?? 'Member')}
                       </span>
                       <span className={`block truncate text-[12px] ${mine ? 'text-white/70' : 'text-ink-muted'}`}>
                         {m.quoted.body?.trim() ? m.quoted.body : '📷 Photo'}
@@ -594,48 +719,55 @@ function Thread({ conversationId }) {
                   )
                 )}
                 {m.deleted_at ? (
-                  <p className="text-[13px] italic opacity-70">Message removed</p>
+                  <p className="text-[13px] italic opacity-70">Message removed{stamp}</p>
                 ) : (
                   <>
                     {m.attachment_path && <ChatPhoto path={m.attachment_path} />}
                     {m.body?.trim() ? (
-                      <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.4]">{m.body}</p>
-                    ) : null}
+                      <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.4]">
+                        {m.body}
+                        {stamp}
+                      </p>
+                    ) : (
+                      <p className="text-right leading-none">{stamp}</p>
+                    )}
                   </>
                 )}
-                <div className={`mt-1 flex items-center gap-2 text-[10.5px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-                  <span>{stampLabel(m.created_at)}</span>
-                  {participant && !m.deleted_at && !selecting && (
-                    <>
-                      <button type="button" onClick={() => { setReplyTo(m); draftRef.current?.focus?.() }} className="underline-offset-2 hover:underline">
-                        Reply
-                      </button>
-                      <button type="button" onClick={() => startForward(m.id)} className="underline-offset-2 hover:underline">
-                        Forward
-                      </button>
-                    </>
-                  )}
-                  {mine && !m.deleted_at && (
-                    <button type="button" onClick={() => onRemove(m.id)} className="underline-offset-2 hover:underline">
-                      Delete
-                    </button>
-                  )}
-                  {!mine && !m.deleted_at && (
-                    <button type="button" onClick={() => setReporting(m.id)} className="underline-offset-2 hover:underline">
-                      Report
-                    </button>
-                  )}
-                </div>
-                {!m.deleted_at && (
-                  <ReactionBar
-                    messageId={m.id}
-                    reactions={reactions.get(m.id) ?? []}
-                    selfId={selfId}
-                    onToggle={react}
-                    disabled={!participant}
-                  />
+                {!m.deleted_at && (participant || (reactions.get(m.id) ?? []).length > 0) && (
+                  <div className={`flex items-center gap-2 text-[10.5px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+                    {participant && !selecting && (
+                      <>
+                        <button type="button" onClick={() => { setReplyTo(m); draftRef.current?.focus?.() }} className="underline-offset-2 hover:underline">
+                          Reply
+                        </button>
+                        <button type="button" onClick={() => startForward(m.id)} className="underline-offset-2 hover:underline">
+                          Forward
+                        </button>
+                        {mine ? (
+                          <button type="button" onClick={() => onRemove(m.id)} className="underline-offset-2 hover:underline">
+                            Delete
+                          </button>
+                        ) : (
+                          <button type="button" onClick={() => setReporting(m.id)} className="underline-offset-2 hover:underline">
+                            Report
+                          </button>
+                        )}
+                      </>
+                    )}
+                    <ReactionBar
+                      messageId={m.id}
+                      reactions={reactions.get(m.id) ?? []}
+                      selfId={selfId}
+                      onToggle={react}
+                      disabled={!participant}
+                      showAdd={false}
+                    />
+                  </div>
                 )}
               </div>
+              {!mine && participant && !m.deleted_at && !selecting && (
+                <ReactionTrigger messageId={m.id} reactions={reactions.get(m.id) ?? []} selfId={selfId} onToggle={react} align="left" />
+              )}
             </div>
             </Fragment>
           )
@@ -722,7 +854,7 @@ function Thread({ conversationId }) {
         <div className="sticky bottom-0 -mx-1 mt-3 border-t border-line bg-surface px-1 pb-2 pt-2">
           {blocked ? (
             <p className="px-2 py-2 text-[13px] font-semibold text-ink-muted" data-testid="dm-blocked">
-              You have blocked {other?.name}. Unblock to message them.
+              You have blocked {otherName}. Unblock to message them.
             </p>
           ) : (
             <>
@@ -730,7 +862,7 @@ function Thread({ conversationId }) {
                 <div className="mb-1.5 flex items-center gap-2 rounded-[10px] border-l-2 border-brand bg-surface-mute px-2.5 py-1.5" data-testid="quote-preview">
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] font-extrabold text-brand-ink">
-                      Replying to {replyTo.author_id === selfId ? 'yourself' : replyTo.author?.full_name ?? 'Member'}
+                      Replying to {replyTo.author_id === selfId ? 'yourself' : nameFor(replyTo.author_id, replyTo.author?.full_name ?? 'Member')}
                     </p>
                     <p className="truncate text-[12px] text-ink-muted">{replyTo.body?.trim() ? replyTo.body : '📷 Photo'}</p>
                   </div>
@@ -785,7 +917,7 @@ function Thread({ conversationId }) {
                   onKeyDown={composerKeyDown}
                   rows={1}
                   maxLength={2000}
-                  placeholder={`Message ${(isGroup ? conversation?.title : other?.name) ?? ''}`}
+                  placeholder={`Message ${(isGroup ? conversation?.title : otherName) ?? ''}`}
                   className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
                 />
                 <EmojiPicker onPick={(emoji) => setDraft(insertAtCursor(draftRef.current, emoji))} />

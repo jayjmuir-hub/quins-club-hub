@@ -51,7 +51,7 @@ function Body({ message, mine }) {
   return (
     <>
       {message.forwarded && (
-        <p className={`text-[11px] italic ${mine ? 'text-white/60' : 'text-ink-faint'}`} data-testid="forwarded-tag">
+        <p className={`text-[11px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`} data-testid="forwarded-tag">
           Forwarded
         </p>
       )}
@@ -180,7 +180,11 @@ export default function MessageRow({
         <div
           className={`min-w-0 rounded-[16px] px-3.5 py-2.5 ${
             mine
-              ? 'rounded-br-[4px] bg-chrome text-white'
+              ? // Round 3, Jay: "need a better color than black for ...
+                // messages sent by yourself" — quins green (accent.deep),
+                // measured in the contrast gate. Red stays the STAFF signal
+                // on the left rule; green is "mine".
+                'rounded-br-[4px] bg-accent-deep text-white'
               : `rounded-bl-[4px] bg-surface-card text-ink shadow-card ${staff ? 'border-l-[3px] border-brand' : ''}`
           }`}
         >

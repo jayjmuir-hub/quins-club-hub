@@ -33,7 +33,7 @@ const SELECT = `
   id, club_id, team_id, channel, parent_id, event_id, author_id, author_role, author_title, body, pinned,
   mentions, edited_at, deleted_at, created_at, quoted_id, forwarded, attachment_path,
   author:profiles!messages_author_id_fkey(full_name),
-  quoted:quoted_id(id, body, deleted_at, attachment_path, author:profiles!messages_author_id_fkey(full_name)),
+  quoted:quoted_id(id, body, deleted_at, attachment_path, author_id, author:profiles!messages_author_id_fkey(full_name)),
   event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, ends_at, time_tbd, venue, pitch, team_id)
 `
 
