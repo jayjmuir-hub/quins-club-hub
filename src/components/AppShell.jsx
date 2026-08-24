@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
+import FloatingChatDock from './FloatingChatDock.jsx'
 import useDockBadges from '../lib/useDockBadges.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { highestRole, isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
@@ -669,6 +670,11 @@ export default function AppShell({ children }) {
           Anything `fixed` must live OUTSIDE `.glass-chrome`. The help button
           and the sheets already do; the account menu is portalled to <body>. */}
       <Nav showSquadHub={showSquadHub} badges={dockBadges} />
+
+      {/* The floating chat dock — desktop only, never on /chat. Lives here
+          (not per screen) so an open panel and its half-written draft
+          survive navigation. claude/plans/2026-08-24-floating-chat-dock.md */}
+      {ready && <FloatingChatDock badge={dockBadges.chat} />}
 
       {/* ⚠️ OUTSIDE <main>, AND OUTSIDE THE loading/error/ready SPLIT — for the
           same reason InstallPrompt sits above that split. The moments this is

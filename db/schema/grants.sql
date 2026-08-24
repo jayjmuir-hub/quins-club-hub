@@ -838,3 +838,9 @@ GRANT UPDATE (notify_approvals) ON public.memberships TO authenticated;
 GRANT SELECT ON public.conversation_members TO authenticated;
 GRANT UPDATE (title) ON public.conversations TO authenticated;
 REVOKE ALL ON public.conversation_members FROM PUBLIC, anon;
+
+-- 24 Aug 2026 — db/migrations/20260824_message_reactions.sql (emoji reactions)
+-- Own-row INSERT/DELETE gated by the policies; read defers to the message's
+-- own read policy.
+GRANT SELECT, INSERT, DELETE ON public.message_reactions TO authenticated;
+REVOKE ALL ON public.message_reactions FROM PUBLIC, anon;

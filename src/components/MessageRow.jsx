@@ -3,6 +3,7 @@ import Button from './Button.jsx'
 import FixtureCard from './FixtureCard.jsx'
 import MentionPicker, { appendMention } from './MentionPicker.jsx'
 import { postedLabel, stampLabel } from '../lib/notices.js'
+import ReactionBar from './ReactionBar.jsx'
 import { initials } from '../lib/playerFormat.js'
 import { labelForRole } from '../lib/scope.js'
 
@@ -105,6 +106,8 @@ export default function MessageRow({
   message,
   selfId,
   canModerate = false,
+  reactions = new Map(),
+  onReact = null,
   readStat,
   unread = false,
   tally,
@@ -196,6 +199,14 @@ export default function MessageRow({
                 stats function returns rows to nobody else. */}
             {readStat && <span data-testid="read-stat">Read by {readStat.reads} of {readStat.audience}</span>}
           </div>
+          {onReact && !message.deleted_at && (
+            <ReactionBar
+              messageId={message.id}
+              reactions={reactions.get(message.id) ?? []}
+              selfId={selfId}
+              onToggle={onReact}
+            />
+          )}
         </div>
       </div>
 

@@ -14,6 +14,9 @@ const useAuthMock = vi.fn()
 const m = {
   listMyConversations: vi.fn(),
   listMyMessageReads: vi.fn(),
+  listReactions: vi.fn(),
+  toggleReaction: vi.fn(),
+  subscribeReactions: vi.fn(),
   listDmCandidates: vi.fn(),
   openConversation: vi.fn(),
   getConversation: vi.fn(),
@@ -34,6 +37,9 @@ vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
 vi.mock('../src/data/messages.js', () => ({
   listMyConversations: (...a) => m.listMyConversations(...a),
   listMyMessageReads: (...a) => m.listMyMessageReads(...a),
+  listReactions: (...a) => m.listReactions(...a),
+  toggleReaction: (...a) => m.toggleReaction(...a),
+  subscribeReactions: (...a) => m.subscribeReactions(...a),
   listDmCandidates: (...a) => m.listDmCandidates(...a),
   openConversation: (...a) => m.openConversation(...a),
   getConversation: (...a) => m.getConversation(...a),
@@ -79,6 +85,8 @@ beforeEach(() => {
   useMembershipsMock.mockReturnValue({ memberships: PARENT, teams: [] })
   m.listMyConversations.mockResolvedValue([INBOX_ROW])
   m.listMyMessageReads.mockResolvedValue(new Set())
+  m.listReactions.mockResolvedValue(new Map())
+  m.subscribeReactions.mockReturnValue(() => {})
   m.listDmCandidates.mockResolvedValue([{ profile_id: OTHER, full_name: 'Zz Manager Probe', role: 'manager', via_team: 'ZZ Probe U12' }])
   m.openConversation.mockResolvedValue('c1')
   m.getConversation.mockResolvedValue(CONV)

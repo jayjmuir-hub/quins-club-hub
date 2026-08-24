@@ -33,7 +33,12 @@ const listAvailabilityForEventsMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
+const listReactionsMock = vi.fn()
+const subscribeReactionsMock = vi.fn()
 vi.mock('../src/data/messages.js', () => ({
+  listReactions: (...a) => listReactionsMock(...a),
+  toggleReaction: vi.fn(),
+  subscribeReactions: (...a) => subscribeReactionsMock(...a),
   listMessages: (...a) => listMessagesMock(...a),
   listMyMessageReads: (...a) => listMyMessageReadsMock(...a),
   markMessagesRead: (...a) => markMessagesReadMock(...a),
@@ -109,6 +114,8 @@ function renderAt(path) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  listReactionsMock.mockResolvedValue(new Map())
+  subscribeReactionsMock.mockReturnValue(() => {})
   useAuthMock.mockReturnValue({ user: { id: 'parent-1' } })
   useMembershipsMock.mockReturnValue(memberships(PARENT))
   listMessagesMock.mockResolvedValue([post()])

@@ -618,6 +618,61 @@ export async function listGroupMembers(conversationId) {
   }))
 }
 
+// ── Emoji reactions (db/migrations/20260824_message_reactions.sql) ──────────
+
+/** rows for a set of messages, grouped: Map<message_id, [{profile_id, emoji}]> */
+export async function listReactions(messageIds) {
+  if (!messageIds?.length) return new Map()
+  const { data, error } = await supabase
+    .from('message_reactions')
+    .select('message_id, profile_id, emoji')
+    .in('message_id', messageIds)
+  if (error) throw error
+  const map = new Map()
+  for (const r of data ?? []) {
+    if (!map.has(r.message_id)) map.set(r.message_id, [])
+    map.get(r.message_id).push(r)
+  }
+  return map
+}
+
+/** Toggle my reaction. A racing double-add (23505) is the state we wanted. */
+export async function toggleReaction(messageId, profileId, emoji, on) {
+  if (on) {
+    const { error } = await supabase.from('message_reactions').insert({ message_id: messageId, profile_id: profileId, emoji })
+    if (error && error.code !== '23505') throw error
+  } else {
+    const { error } = await supabase
+      .from('message_reactions')
+      .delete()
+      .match({ message_id: messageId, profile_id: profileId, emoji })
+    if (error) throw error
+  }
+}
+
+/** Same shape as subscribeMessages, for the reactions table. */
+export function subscribeReactions(callback, { debounceMs = MESSAGE_REALTIME_DEBOUNCE_MS } = {}) {
+  let timer = null
+  function onChange() {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = null
+      callback()
+    }, debounceMs)
+  }
+  const channel = supabase
+    .channel(`reaction-changes-${++messageChannelSeq}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, onChange)
+    .subscribe()
+  let unsubscribed = false
+  return () => {
+    if (unsubscribed) return
+    unsubscribed = true
+    if (timer) clearTimeout(timer)
+    supabase.removeChannel(channel)
+  }
+}
+
 // The group picker's pool: like listDmCandidates but without the minor gate,
 // which is the 24 Aug ruling, not an accident.
 export async function listGroupCandidates() {
