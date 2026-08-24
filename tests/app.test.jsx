@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Unit tests for src/App.jsx (Task 6: auth gate + routing; Task 8: shell
@@ -244,8 +244,11 @@ describe('App — /admin', () => {
     expect(window.location.pathname).toBe('/admin')
     expect(screen.getByTestId('portal-chooser')).toBeInTheDocument()
     // Club Admin is open to every admin, and entering a portal lands on its
-    // FIRST tab.
-    expect(screen.getByRole('link', { name: /Club Admin/ })).toHaveAttribute('href', '/admin/accounts')
+    // FIRST tab. Scoped to the chooser because the sidebar's expanded Admin
+    // section (PR #357) now carries a Club Admin link of its own.
+    expect(
+      within(screen.getByTestId('portal-chooser')).getByRole('link', { name: /Club Admin/ })
+    ).toHaveAttribute('href', '/admin/accounts')
   })
 
   it('mounts the real Accounts screen on the Accounts tab', () => {
