@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- (unmerged) — 🚑 **Hotfix: the quoted embed hints by COLUMN name** — round 2
+  reached the live site with `quoted:messages!messages_quoted_id_fkey(…)` in
+  the SELECT and every DM/group thread died with PGRST200 "Could not find a
+  relationship between 'messages' and 'messages'". Not cache staleness: the
+  identical probe against the weeks-old `messages_parent_id_fkey` fails the
+  same way — **this project's PostgREST does not resolve constraint-name
+  hints on SELF-joins**, and the column-name hint `!quoted_id` does
+  (probed live, after two reload notifies changed nothing). One line, plus
+  a test pinning the string the live API parses. The NEXT pull request
+  cites this entry's squash SHA.
+- `5cf0fb1` — 📋 **Round 2 closed** (#372) — `bbbc1d3` cited, both plans
+  marked shipped, live verification recorded. Its own branch could not cite
+  this squash SHA, so this entry does.
 - `bbbc1d3` — 💬 **Chat round 2: reply-with-quote, forwarding, the emoji
   picker, chat buttons on the Home staff tiles, and photo attachments** —
   the whole round-2 remainder of `claude/plans/2026-08-24-chat-feedback.md`

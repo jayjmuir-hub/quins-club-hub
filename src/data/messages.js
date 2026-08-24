@@ -14,14 +14,21 @@ import { supabase } from '../lib/supabase'
 // return [] not null, import no React.
 
 // ⚠️ TWO SELF-JOINS ON messages (parent_id and quoted_id since round 2), so
-// the quoted embed MUST name its constraint or PostgREST cannot pick a path.
+// the quoted embed must carry a hint — and the hint MUST BE THE COLUMN NAME,
+// `!quoted_id`, not the constraint name. Measured live, 24 Aug 2026, minutes
+// after round 2 deployed: `!messages_quoted_id_fkey` returns PGRST200
+// "Could not find a relationship" on this project's PostgREST for a
+// SELF-join (the same probe against `!messages_parent_id_fkey` fails
+// identically, and that constraint is weeks old), while `!quoted_id`
+// resolves. Constraint-name hints still work fine on ordinary embeds —
+// profiles and events below use them.
 // The embed is read under RLS as the caller — a quote of a message you may
 // not read comes back null, which renders as no quote at all.
 const SELECT = `
   id, club_id, team_id, channel, parent_id, event_id, author_id, author_role, author_title, body, pinned,
   mentions, edited_at, deleted_at, created_at, quoted_id, forwarded, attachment_path,
   author:profiles!messages_author_id_fkey(full_name),
-  quoted:messages!messages_quoted_id_fkey(id, body, deleted_at, attachment_path, author:profiles!messages_author_id_fkey(full_name)),
+  quoted:messages!quoted_id(id, body, deleted_at, attachment_path, author:profiles!messages_author_id_fkey(full_name)),
   event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, ends_at, time_tbd, venue, pitch, team_id)
 `
 
