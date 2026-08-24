@@ -10,6 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- `261397a` — 📝 **Group chats recorded as shipped-and-verified** — plan statuses
+  closed, state-of-play's chat section updated, and the `463b3c9` squash SHA
+  cited (the entry #362 could not write for itself). Docs only — though the
+  predicted deploy skip did NOT happen; the gate misprediction is an open
+  question, flagged for its own session.
 - `463b3c9` — 💬 **Group chats SHIPPED and VERIFIED LIVE — member-created, named,
   three people minimum** — migration `db/migrations/20260824_group_chats.sql`
   applied to live (harness `db/tests/group-chats.sql` green before and after,
