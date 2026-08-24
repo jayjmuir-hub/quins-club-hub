@@ -3,14 +3,19 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import ChatHeader from '../components/ChatHeader.jsx'
+import ChatPhoto from '../components/ChatPhoto.jsx'
+import EmojiPicker from '../components/EmojiPicker.jsx'
 import { Empty } from '../components/Empty.jsx'
 import { Avatar, RolePill } from '../components/NewChatPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import ReactionBar from '../components/ReactionBar.jsx'
+import { removeChatPhoto, uploadChatPhoto } from '../data/chatMedia.js'
 import {
   blockDm,
   deleteConversation,
+  forwardMessagesTo,
+  listChats,
   listMyMessageReads,
   listReactions,
   getConversation,
@@ -31,10 +36,11 @@ import {
   unblockDm,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
-import { autoGrow, composerKeyDown } from '../lib/chatComposer.js'
+import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { postedLabel, stampLabel } from '../lib/notices.js'
 import { isAdmin } from '../lib/scope.js'
+import { RowAvatar, scopeChatRows } from './ChatList.jsx'
 
 // Direct messages — squad chat phase 3. claude/plans/2026-08-23-squad-chat.md.
 //
@@ -66,7 +72,7 @@ const STAFF = new Set(['admin', 'coach', 'manager', 'medic'])
 
 function Thread({ conversationId }) {
   const { user } = useAuth()
-  const { memberships } = useMemberships()
+  const { memberships, teams } = useMemberships()
   const selfId = user?.id ?? null
   const admin = isAdmin(memberships)
 
@@ -91,10 +97,21 @@ function Thread({ conversationId }) {
   const [newTitle, setNewTitle] = useState('')
   const [addingPeople, setAddingPeople] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  // Round 2 (claude/plans/2026-08-24-chat-round-2.md): reply-with-quote,
+  // multi-select forwarding, and a photo waiting in the composer.
+  const [replyTo, setReplyTo] = useState(null)
+  const [photo, setPhoto] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState(() => new Set())
+  const [forwardRows, setForwardRows] = useState(null)
+  const [forwarding, setForwarding] = useState(false)
   const navigate = useNavigate()
   const bottomRef = useRef(null)
   const loggedRef = useRef(false)
   const newFromRef = useRef(undefined)
+  const draftRef = useRef(null)
+  const fileRef = useRef(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -184,14 +201,38 @@ function Thread({ conversationId }) {
   const owner = Boolean(myMemberRow?.is_owner)
   const reviewing = conversation && admin && !participant
 
+  function clearPhoto() {
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhoto(null)
+    setPhotoPreview(null)
+  }
+
+  function pickPhoto(domEvent) {
+    const file = domEvent.target.files?.[0]
+    domEvent.target.value = ''
+    if (!file) return
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhoto(file)
+    try {
+      setPhotoPreview(URL.createObjectURL(file))
+    } catch {
+      setPhotoPreview(null)
+    }
+  }
+
   async function send(domEvent) {
     domEvent.preventDefault()
-    if (!draft.trim() || sending) return
+    if ((!draft.trim() && !photo) || sending) return
     setSending(true)
     setError(null)
     try {
-      await sendDirectMessage(conversationId, draft)
+      // Photo first, message second — the WhatsApp order, so a reader never
+      // meets a message whose image has not arrived yet.
+      const attachmentPath = photo ? await uploadChatPhoto(selfId, photo) : null
+      await sendDirectMessage(conversationId, draft, { quotedId: replyTo?.id ?? null, attachmentPath })
       setDraft('')
+      setReplyTo(null)
+      clearPhoto()
       await load()
     } catch (err) {
       setError(err.message || 'Could not send that.')
@@ -222,10 +263,59 @@ function Thread({ conversationId }) {
 
   async function onRemove(id) {
     try {
+      const gone = messages?.find((m) => m.id === id)
       await removeMessage(id)
+      // The storage policy is own-folder-only, so only the author's delete
+      // can reach the object; anybody else's remove leaves an orphan nobody
+      // but its owner can read (src/data/chatMedia.js).
+      if (gone?.attachment_path && gone.author_id === selfId) await removeChatPhoto(gone.attachment_path)
       await load()
     } catch (err) {
       setError(err.message || 'Could not remove that.')
+    }
+  }
+
+  function startForward(id) {
+    setSelecting(true)
+    setSelected(new Set([id]))
+  }
+
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function cancelForward() {
+    setSelecting(false)
+    setSelected(new Set())
+    setForwarding(false)
+  }
+
+  async function openForwardSheet() {
+    setForwarding(true)
+    if (forwardRows === null) {
+      try {
+        setForwardRows(await listChats())
+      } catch (err) {
+        setError(err.message || 'Could not load your chats.')
+        setForwarding(false)
+      }
+    }
+  }
+
+  async function forwardTo(dest) {
+    try {
+      await forwardMessagesTo(dest, (messages ?? []).filter((m) => selected.has(m.id)))
+      cancelForward()
+      await load()
+    } catch (err) {
+      // The same refusal a typed message would get — can_dm, announce-only,
+      // blocks — worded by the database, surfaced here.
+      setError(err.message || 'Could not forward that.')
     }
   }
 
@@ -459,19 +549,68 @@ function Thread({ conversationId }) {
                   <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />
                 </div>
               )}
-            <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dm-bubble" data-mine={mine ? 'true' : 'false'}>
-              <div className={`max-w-[80%] rounded-[14px] px-3 py-2 ${mine ? 'bg-chrome text-white' : 'bg-surface-card text-ink shadow-card'}`}>
+            <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dm-bubble" data-mine={mine ? 'true' : 'false'} id={`msg-${m.id}`}>
+              <div
+                className={`max-w-[80%] rounded-[14px] px-3 py-2 ${mine ? 'bg-chrome text-white' : 'bg-surface-card text-ink shadow-card'} ${selecting && selected.has(m.id) ? 'ring-2 ring-brand' : ''}`}
+                onClick={selecting && !m.deleted_at ? () => toggleSelected(m.id) : undefined}
+                data-selected={selecting && selected.has(m.id) ? 'true' : undefined}
+              >
                 {isGroup && !mine && (
                   <p className="mb-0.5 text-[11px] font-extrabold text-brand-ink">{m.author?.full_name ?? 'Member'}</p>
                 )}
                 {mine && <p className="mb-0.5 text-[11px] font-extrabold text-white/80">You</p>}
+                {m.forwarded && !m.deleted_at && (
+                  <p className={`mb-0.5 text-[11px] italic ${mine ? 'text-white/60' : 'text-ink-faint'}`} data-testid="forwarded-tag">
+                    Forwarded
+                  </p>
+                )}
+                {/* The quote block. A HARD-deleted original nulls quoted_id
+                    (FK set null) and the block simply goes; a soft-deleted
+                    one keeps the pointer and says so without re-showing a
+                    word of the deleted content. */}
+                {m.quoted && !m.deleted_at && (
+                  m.quoted.deleted_at ? (
+                    <p className={`mb-1 rounded-[8px] border-l-2 px-2 py-1 text-[12px] italic ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-line bg-surface-mute text-ink-faint'}`} data-testid="quote-block">
+                      Message deleted
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      data-testid="quote-block"
+                      onClick={() => document.getElementById(`msg-${m.quoted.id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })}
+                      className={`mb-1 block w-full rounded-[8px] border-l-2 px-2 py-1 text-left ${mine ? 'border-white/40 bg-white/10' : 'border-brand bg-surface-mute'}`}
+                    >
+                      <span className={`block text-[11px] font-extrabold ${mine ? 'text-white/80' : 'text-brand-ink'}`}>
+                        {m.quoted.author?.full_name ?? 'Member'}
+                      </span>
+                      <span className={`block truncate text-[12px] ${mine ? 'text-white/70' : 'text-ink-muted'}`}>
+                        {m.quoted.body?.trim() ? m.quoted.body : '📷 Photo'}
+                      </span>
+                    </button>
+                  )
+                )}
                 {m.deleted_at ? (
                   <p className="text-[13px] italic opacity-70">Message removed</p>
                 ) : (
-                  <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.4]">{m.body}</p>
+                  <>
+                    {m.attachment_path && <ChatPhoto path={m.attachment_path} />}
+                    {m.body?.trim() ? (
+                      <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.4]">{m.body}</p>
+                    ) : null}
+                  </>
                 )}
                 <div className={`mt-1 flex items-center gap-2 text-[10.5px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
                   <span>{stampLabel(m.created_at)}</span>
+                  {participant && !m.deleted_at && !selecting && (
+                    <>
+                      <button type="button" onClick={() => { setReplyTo(m); draftRef.current?.focus?.() }} className="underline-offset-2 hover:underline">
+                        Reply
+                      </button>
+                      <button type="button" onClick={() => startForward(m.id)} className="underline-offset-2 hover:underline">
+                        Forward
+                      </button>
+                    </>
+                  )}
                   {mine && !m.deleted_at && (
                     <button type="button" onClick={() => onRemove(m.id)} className="underline-offset-2 hover:underline">
                       Delete
@@ -525,32 +664,132 @@ function Thread({ conversationId }) {
         </form>
       )}
 
-      {participant && (
+      {forwarding && (
+        <Card className="mt-3 p-3" data-testid="forward-sheet">
+          <p className="text-[12.5px] font-extrabold text-ink">
+            Forward {selected.size === 1 ? 'this message' : `${selected.size} messages`} to
+          </p>
+          {forwardRows === null ? (
+            <div className="py-4">
+              <Spinner />
+            </div>
+          ) : (
+            <ul className="mt-1.5">
+              {scopeChatRows(forwardRows, memberships, teams)
+                ?.filter((row) => row.conversation_id !== conversationId)
+                .map((row) => (
+                  <li key={`${row.kind}-${row.team_id ?? row.conversation_id ?? 'club'}`} className="border-b border-line last:border-b-0">
+                    <button
+                      type="button"
+                      data-testid="forward-dest"
+                      onClick={() => forwardTo(row)}
+                      className="flex w-full items-center gap-3 px-1 py-2 text-left hover:bg-surface-mute"
+                    >
+                      <RowAvatar row={row} />
+                      <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-ink">{row.label}</span>
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          )}
+          <div className="mt-2 flex justify-end">
+            <Button size="sm" variant="ghost" onClick={() => setForwarding(false)}>
+              Back
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {participant && selecting && !forwarding && (
+        <div className="sticky bottom-0 -mx-1 mt-3 flex items-center gap-2 border-t border-line bg-surface px-2 pb-2 pt-2" data-testid="forward-bar">
+          <p className="flex-1 text-[13px] font-semibold text-ink">
+            {selected.size} selected — tap messages to add
+          </p>
+          <Button size="sm" variant="ghost" onClick={cancelForward}>
+            Cancel
+          </Button>
+          <Button size="sm" disabled={!selected.size} onClick={openForwardSheet}>
+            Forward
+          </Button>
+        </div>
+      )}
+
+      {participant && !selecting && (
         <div className="sticky bottom-0 -mx-1 mt-3 border-t border-line bg-surface px-1 pb-2 pt-2">
           {blocked ? (
             <p className="px-2 py-2 text-[13px] font-semibold text-ink-muted" data-testid="dm-blocked">
               You have blocked {other?.name}. Unblock to message them.
             </p>
           ) : (
-            <form onSubmit={send} className="flex items-end gap-2" data-testid="dm-composer">
-              <label className="sr-only" htmlFor="dm-draft">
-                Message
-              </label>
-              <textarea
-                id="dm-draft"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onInput={(e) => autoGrow(e.currentTarget)}
-                onKeyDown={composerKeyDown}
-                rows={1}
-                maxLength={2000}
-                placeholder={`Message ${(isGroup ? conversation?.title : other?.name) ?? ''}`}
-                className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
-              />
-              <Button type="submit" disabled={sending || !draft.trim()}>
-                Send
-              </Button>
-            </form>
+            <>
+              {replyTo && (
+                <div className="mb-1.5 flex items-center gap-2 rounded-[10px] border-l-2 border-brand bg-surface-mute px-2.5 py-1.5" data-testid="quote-preview">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-extrabold text-brand-ink">
+                      Replying to {replyTo.author_id === selfId ? 'yourself' : replyTo.author?.full_name ?? 'Member'}
+                    </p>
+                    <p className="truncate text-[12px] text-ink-muted">{replyTo.body?.trim() ? replyTo.body : '📷 Photo'}</p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Cancel reply"
+                    onClick={() => setReplyTo(null)}
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                  </button>
+                </div>
+              )}
+              {photoPreview && (
+                <div className="mb-1.5 flex items-center gap-2 rounded-[10px] bg-surface-mute px-2.5 py-1.5" data-testid="photo-preview">
+                  <img src={photoPreview} alt="Photo to send" className="h-12 w-12 rounded-[8px] object-cover" />
+                  <p className="min-w-0 flex-1 truncate text-[12px] text-ink-muted">{photo?.name ?? 'Photo'}</p>
+                  <button
+                    type="button"
+                    aria-label="Remove photo"
+                    onClick={clearPhoto}
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                  </button>
+                </div>
+              )}
+              <form onSubmit={send} className="flex items-end gap-2" data-testid="dm-composer">
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pickPhoto} data-testid="photo-input" />
+                <button
+                  type="button"
+                  aria-label="Attach a photo"
+                  onClick={() => fileRef.current?.click?.()}
+                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
+                  data-testid="photo-button"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3" y="5" width="18" height="14" rx="2" />
+                    <circle cx="9" cy="10" r="1.6" />
+                    <path d="m21 15-4.5-4.5L7 20" />
+                  </svg>
+                </button>
+                <label className="sr-only" htmlFor="dm-draft">
+                  Message
+                </label>
+                <textarea
+                  id="dm-draft"
+                  ref={draftRef}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onInput={(e) => autoGrow(e.currentTarget)}
+                  onKeyDown={composerKeyDown}
+                  rows={1}
+                  maxLength={2000}
+                  placeholder={`Message ${(isGroup ? conversation?.title : other?.name) ?? ''}`}
+                  className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
+                />
+                <EmojiPicker onPick={(emoji) => setDraft(insertAtCursor(draftRef.current, emoji))} />
+                <Button type="submit" disabled={sending || (!draft.trim() && !photo)}>
+                  Send
+                </Button>
+              </form>
+            </>
           )}
         </div>
       )}
