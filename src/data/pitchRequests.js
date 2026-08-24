@@ -111,6 +111,29 @@ export async function listPitchRequests({ status } = {}) {
  * order above is the mitigation, not a fix. If this ever needs to be atomic it
  * is an RPC, in the same shape as set_series_time_from.
  */
+/**
+ * Writes a pitch straight onto a fixture — the direct-assignment half that
+ * the 5 Aug decision wanted and nobody built until 24 Aug 2026
+ * (claude/plans/2026-08-24-pitch-direct-assign.md). No request involved:
+ * the Allocation screen uses this when an admin clicks an event that has no
+ * pending request. When one DOES exist, the screen calls allocatePitch
+ * below instead, so the coach's request is closed truthfully.
+ *
+ * RLS is the permission model: events UPDATE requires admin or that
+ * squad's staff, so a refusal comes back as zero rows, worded here.
+ */
+export async function setEventPitch(eventId, pitch) {
+  const { data, error } = await supabase
+    .from('events')
+    .update({ pitch })
+    .eq('id', eventId)
+    .select()
+    .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error(REFUSED_DECIDE)
+  return data
+}
+
 export async function allocatePitch({ requestId, eventId, pitch }) {
   const decidedBy = await currentProfileId()
   const { data: event, error: eventError } = await supabase

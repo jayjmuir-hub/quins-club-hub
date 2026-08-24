@@ -37,10 +37,14 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 // `.catch` runs, in CI it does not resolve fast enough and Promise.all never
 // settles — so the screen sits in `loading` and every query fails with
 // "unable to find an element". Green here, red on Linux, twice.
+const listPitchRequestsMock = vi.fn(() => Promise.resolve([]))
+const allocatePitchMock = vi.fn(() => Promise.resolve({}))
+const setEventPitchMock = vi.fn(() => Promise.resolve({}))
 vi.mock('../src/data/pitchRequests.js', () => ({
-  listPitchRequests: () => Promise.resolve([]),
-  allocatePitch: () => Promise.resolve({}),
+  listPitchRequests: (...a) => listPitchRequestsMock(...a),
+  allocatePitch: (...a) => allocatePitchMock(...a),
   declinePitch: () => Promise.resolve({}),
+  setEventPitch: (...a) => setEventPitchMock(...a),
 }))
 
 vi.mock('../src/data/pitches.js', async () => {
@@ -70,6 +74,9 @@ const pitch = (name, extra = {}) => ({ id: `p-${name}`, name, is_active: true, .
 beforeEach(() => {
   listEventsMock.mockReset().mockResolvedValue([ev()])
   listPitchesMock.mockReset()
+  listPitchRequestsMock.mockReset().mockResolvedValue([])
+  allocatePitchMock.mockReset().mockResolvedValue({})
+  setEventPitchMock.mockReset().mockResolvedValue({})
   useMembershipsMock.mockReset().mockReturnValue({
     memberships: [{ role: 'admin', status: 'active', admin_rights: ['pitches'] }],
     teams: TEAMS,
@@ -255,5 +262,62 @@ describe('the screen', () => {
     })
     await setup()
     expect(await screen.findByText(/Pitch Management hasn't been added to your account/i)).toBeInTheDocument()
+  })
+})
+
+// ── Direct assignment — click an event, give it a pitch ─────────────────────
+// (claude/plans/2026-08-24-pitch-direct-assign.md). Jay, 24 Aug 2026: "none of
+// the events are clickable, can't click them to assign a pitch" — they never
+// were; these pin that they now are, and that the two write paths stay
+// straight: no request → setEventPitch, pending request → allocatePitch so
+// the coach's request is closed truthfully.
+describe('direct assignment', () => {
+  async function setup() {
+    listPitchesMock.mockResolvedValue([pitch('A1'), pitch('A2')])
+    render(<Allocation />)
+    return userEvent.setup()
+  }
+
+  it('an unallocated event opens the picker, and saving writes the fixture', async () => {
+    listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD' })])
+    const user = await setup()
+
+    await user.click(await screen.findByRole('button', { name: /U16B Contact/i }))
+    await user.selectOptions(screen.getByLabelText('Pitch for this fixture'), 'A2')
+    await user.click(screen.getByRole('button', { name: /save pitch/i }))
+
+    await waitFor(() => expect(setEventPitchMock).toHaveBeenCalledWith('x', 'A2'))
+    // No request existed, so the queue path must NOT fire — a phantom
+    // allocatePitch would try to close a request that is not there.
+    expect(allocatePitchMock).not.toHaveBeenCalled()
+  })
+
+  it('a pending request rides along: saving answers it instead of orphaning it', async () => {
+    listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD' })])
+    listPitchRequestsMock.mockResolvedValue([
+      { id: 'req-9', event_id: 'x', status: 'submitted', events: ev({ id: 'x' }) },
+    ])
+    const user = await setup()
+
+    // Two entry points exist for this fixture now (the request queue's Answer
+    // and the unallocated row) — take the row.
+    await user.click((await screen.findAllByRole('button', { name: /U16B Contact/i }))[0])
+    await user.selectOptions(screen.getByLabelText('Pitch for this fixture'), 'A1')
+    await user.click(screen.getByRole('button', { name: /save pitch/i }))
+
+    await waitFor(() =>
+      expect(allocatePitchMock).toHaveBeenCalledWith({ requestId: 'req-9', eventId: 'x', pitch: 'A1' }),
+    )
+    expect(setEventPitchMock).not.toHaveBeenCalled()
+  })
+
+  it('a booked event in the day grid opens preset to its current pitch', async () => {
+    // The mocked listEvents returns the A1 booking for ANY window, so the
+    // day grid always has exactly one booking to click — deterministic, no
+    // date navigation needed.
+    const user = await setup()
+    await user.click(await screen.findByRole('tab', { name: 'Day' }))
+    await user.click(await screen.findByTestId('booking'))
+    expect(screen.getByLabelText('Pitch for this fixture')).toHaveValue('A1')
   })
 })
