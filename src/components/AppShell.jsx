@@ -19,7 +19,7 @@ import crest from '../assets/crest.png'
 import Button from './Button.jsx'
 import InstallPrompt from './InstallPrompt.jsx'
 import AppButton from './AppButton.jsx'
-import HelpButton from './HelpButton.jsx'
+import HelpSheet from './HelpSheet.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
@@ -190,6 +190,12 @@ export default function AppShell({ children }) {
   // that is true. Still state and still not a route, for the reason this note
   // gave before: it is a dead end by nature, and a URL for it would be a page
   // somebody could bookmark and return to after they had access.
+
+  // The "Report a problem" sheet. State lives HERE, not in HelpSheet, because
+  // the trigger (AccountMenu, in the masthead) and the sheet (below <Nav>) are
+  // different subtrees — this is the join. The floating `?` that used to own
+  // this state is gone: claude/plans/2026-08-24-help-into-account-menu.md.
+  const [helpOpen, setHelpOpen] = useState(false)
 
   const isMoreRoute = location.pathname === '/more'
   const ready = !loading && !error && memberships.length > 0
@@ -539,6 +545,7 @@ export default function AppShell({ children }) {
               email={user?.email}
               roleLabel={showRole ? currentRoleLabel : null}
               signOut={signOut}
+              onReportProblem={() => setHelpOpen(true)}
             />
 
           </div>
@@ -667,13 +674,9 @@ export default function AppShell({ children }) {
           same reason InstallPrompt sits above that split. The moments this is
           most wanted are the broken ones: a screen that failed to load is
           precisely when somebody wants to say so, and inside the `ready`
-          branch it would vanish exactly then.
-
-          It is `position: fixed`, so it positions against the viewport
-          wherever it sits in the tree — see the note at the top of Sheet.jsx
-          about no ancestor carrying a transform. Its own note explains why it
-          costs no layout space. */}
-      <HelpButton />
+          branch it would vanish exactly then. The trigger is the account
+          menu's "Report a problem" item, which also lives outside that split. */}
+      <HelpSheet open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   )
 }

@@ -10,28 +10,24 @@ import {
   listFeedback,
 } from '../data/feedback.js'
 
-// The `?` that lets any member say "this is broken" or "this would be better",
-// from any signed-in screen. Design: claude/plans/2026-08-18-help-and-feedback.md.
+// The sheet that lets any member say "this is broken" or "this would be
+// better", from any signed-in screen. Opened from the account menu's
+// "Report a problem" item. Design: claude/plans/2026-08-18-help-and-feedback.md
+// (the flow) and claude/plans/2026-08-24-help-into-account-menu.md (the trigger).
 //
-// ══ ⚠️ WHY IT FLOATS, AND WHY THAT COSTS NOTHING ═════════════════════════
+// ══ ⚠️ THIS WAS HelpButton.jsx, A FLOATING `?`, UNTIL 24 Aug 2026 ═════════
 //
-// claude/specs/design-system.md §3 explains the 100px of bottom padding on
-// `main` as "clearance for fixed tab bar + FAB", and specifies a FAB that was
-// designed and never built. AppShell.jsx has carried that padding ever since.
-// So this button occupies space that was reserved for it and is otherwise
-// blank — nothing moves down, no list gets shorter.
+// A 44px disc floated bottom-right on every screen. Jay's verdict was all four
+// failure modes at once — it covered content, was still missed, read as
+// clutter, and caught accidental taps by the tab bar — and the corner is now
+// the desktop chat dock's. Do not bring a floating trigger back; if the menu
+// item proves too hidden, the agreed fallback is a visible row on the More
+// page (see the 24 Aug plan's closing section).
 //
-// ⚠️ 44px, NOT the 54px the spec names. That section describes the pre-retheme
-// prototype (it still uses `--maroon`), so its number is its era's. The
-// durable line is design-system.md's "tap targets are generally >=40px", and
-// 44 matches SquadStaffCard.jsx and MatchSheetEntry.jsx, which already set a
-// minimum. White on `#c8102e` measures 5.88:1 — legible in direct sun, which
-// is the actual use case for a pitch-side club app.
-//
-// ⚠️ z-30, BELOW THE TAB BAR'S z-40. A floating control that covers navigation
-// is worse than no floating control: the person cannot leave the screen. It
-// floats over CONTENT and under CHROME, and the bottom offset clears the bar
-// on top of that so the two never overlap in the first place.
+// ⚠️ open/onClose ARE PROPS ON PURPOSE. AppShell owns the state so the account
+// menu — a different subtree of the masthead — can open the sheet without a
+// context or an event bus. This component keeps owning the RESET (see close()):
+// the parent only knows open/closed, never the half-typed words.
 //
 // ══ ⚠️ TWO STEPS, AND THE FIRST ONE IS NOT A TEST ════════════════════════
 //
@@ -77,9 +73,8 @@ const PROMPTS = {
   idea: { title: "I've got a suggestion", label: 'What would make this better?' },
 }
 
-export default function HelpButton() {
+export default function HelpSheet({ open, onClose }) {
   const location = useLocation()
-  const [open, setOpen] = useState(false)
   // 'choose' -> 'form' -> 'sent'. Deliberately a string rather than three
   // booleans: three booleans have eight states, five of which are nonsense.
   const [step, setStep] = useState('choose')
@@ -97,7 +92,7 @@ export default function HelpButton() {
   const here = routeLabel(location.pathname)
 
   function close() {
-    setOpen(false)
+    onClose()
     // ⚠️ RESET ON CLOSE, NOT ON OPEN. Sheet unmounts its children when closed,
     // but this state lives out here — without this, reopening shows the last
     // person's half-typed report, and on a shared family phone that is
@@ -178,25 +173,7 @@ export default function HelpButton() {
   const prompt = kind ? PROMPTS[kind] : null
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Help, report a problem or suggest a change"
-        // ⚠️ DARK GLASS, NOT BRAND RED, since 23 Aug 2026. It was a solid red
-        // 44px disc, and once the dock's active tab became a red pill the two
-        // sat 40px apart as a pair of red blobs competing for the eye. Help
-        // is a utility, not the brand moment: it wears the dock's material
-        // (.glass-dock) so it belongs to the same layer, and the only red at
-        // the foot of the screen is the tab you are on.
-        className="glass-dock fixed bottom-[calc(96px+env(safe-area-inset-bottom))] right-[18px] z-30 grid h-11 w-11 place-items-center rounded-full text-[19px] font-bold leading-none text-white transition hover:bg-chrome-raised active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 desktop:bottom-6"
-      >
-        {/* aria-hidden: the accessible name is on the button. Without this a
-            screen reader reads "question mark" after the real label. */}
-        <span aria-hidden="true">?</span>
-      </button>
-
-      <Sheet open={open} onClose={close} title={step === 'form' && prompt ? prompt.title : 'Need a hand?'}>
+    <Sheet open={open} onClose={close} title={step === 'form' && prompt ? prompt.title : 'Need a hand?'}>
         {step === 'choose' && (
           <div>
             {here && (
@@ -318,7 +295,6 @@ export default function HelpButton() {
             </Button>
           </div>
         )}
-      </Sheet>
-    </>
+    </Sheet>
   )
 }

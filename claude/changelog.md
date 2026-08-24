@@ -10,6 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- `34b529d` — 🐛 **The floating `?` is retired — "Report a problem" moved into the account
+  menu.** Jay's verdict on the corner button was all four failure modes at
+  once (covers content, still missed, clutter, accidental taps), and the
+  bottom-right corner is promised to the desktop chat dock. His first idea —
+  a bug icon in the top bar — was declined per the 23 Aug masthead ruling
+  ("the next control goes in AccountMenu.jsx"): the menu got a bug-icon
+  "Report a problem" row instead. `HelpButton.jsx` → `HelpSheet.jsx`, now a
+  controlled component (`open`/`onClose` from AppShell); the flow, reference
+  codes and triage are untouched. Both new test assertions proved against
+  injected faults. Plan: `claude/plans/2026-08-24-help-into-account-menu.md`.
 - 🔧 **Chat feedback round 1 — four bugs, five quick wins from Jay's first
   real test drive** (`claude/plans/2026-08-24-chat-feedback.md`): view-as now
   scopes the chat list, the masthead band stops eating the thread's back
@@ -34,7 +44,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   decide, never whether Netlify consults it — the only proof of a skip is the
   deploy id not moving. This answers the open question the `261397a` entry
   below flagged for its own session.
-
 - `261397a` — 📝 **Group chats recorded as shipped-and-verified** — plan statuses
   closed, state-of-play's chat section updated, and the `463b3c9` squash SHA
   cited (the entry #362 could not write for itself). Docs only — though the
@@ -261,7 +270,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 - `616a546` — **Shell polish to match the dock** — the desktop sidebar's active item is
   the same gradient pill with the same glow (`src/components/Sidebar.jsx`),
   and the help button is dark glass instead of a second red disc 40px from
-  the red active tab (`src/components/HelpButton.jsx`; still 44px — the
+  the red active tab (`src/components/HelpSheet.jsx`, then named
+  HelpButton.jsx; still 44px — the
   test for the touch-target floor caught a 40px first draft).
 - `e2ca0a7` — **The dock, design "A"** — Jay: "very bland" → "go with A, but flashier
   and more modern". Icons only; the active tab expands into a brand-gradient
