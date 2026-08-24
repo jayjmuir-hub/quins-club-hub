@@ -40,8 +40,12 @@ export function RolePill({ role }) {
  * @param load   () => Promise<candidates>  — listDmCandidates, injected so the harness can stub it
  * @param onPick (person) => void
  * @param onClose () => void
+ * @param onNewGroup () => void — optional; renders a "New group" row at the
+ *        top (claude/plans/2026-08-24-group-chats.md). A row here rather than
+ *        a menu on the pencil, so a DM stays one tap — the whole point of
+ *        the 24 Aug reshape.
  */
-export default function NewChatPicker({ load, onPick, onClose }) {
+export default function NewChatPicker({ load, onPick, onClose, onNewGroup = null }) {
   const [candidates, setCandidates] = useState(null)
   const [query, setQuery] = useState('')
 
@@ -75,6 +79,24 @@ export default function NewChatPicker({ load, onPick, onClose }) {
           Close
         </button>
       </div>
+      {onNewGroup && (
+        <button
+          type="button"
+          onClick={onNewGroup}
+          data-testid="new-group"
+          className="flex w-full items-center gap-3 border-b border-line px-4 py-2.5 text-left hover:bg-surface-mute"
+        >
+          <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-monogram-coach text-ink-invert">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="8" r="3.2" />
+              <path d="M3.5 19c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6" />
+              <circle cx="17" cy="9" r="2.4" />
+              <path d="M15.6 14.6c2.3.2 4.2 1.6 4.9 4.4" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1 text-[14px] font-extrabold text-ink">New group</span>
+        </button>
+      )}
       <div className="border-b border-line px-3 py-2">
         <label className="sr-only" htmlFor="new-chat-search">
           Search people

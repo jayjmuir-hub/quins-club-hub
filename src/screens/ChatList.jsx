@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import { Empty } from '../components/Empty.jsx'
 import NewChatPicker, { Avatar } from '../components/NewChatPicker.jsx'
+import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { chatPath, listChats, listDmCandidates, openConversation, subscribeMessages } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -63,6 +64,9 @@ export default function ChatList() {
   const [rows, setRows] = useState(null)
   const [error, setError] = useState(null)
   const [query, setQuery] = useState('')
+  // false | 'dm' | 'group' — the pencil opens the DM picker (one tap to a
+  // DM, the point of the reshape); its "New group" row switches to the
+  // multi-select (claude/plans/2026-08-24-group-chats.md).
   const [picking, setPicking] = useState(false)
 
   const load = useCallback(async () => {
@@ -100,9 +104,9 @@ export default function ChatList() {
         <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink">Chats</h2>
         <button
           type="button"
-          onClick={() => setPicking((v) => !v)}
+          onClick={() => setPicking((v) => (v ? false : 'dm'))}
           aria-label="New chat"
-          aria-expanded={picking}
+          aria-expanded={Boolean(picking)}
           data-testid="new-chat"
           className="grid h-10 w-10 place-items-center rounded-full bg-brand text-ink-invert shadow-card hover:opacity-90"
         >
@@ -127,7 +131,17 @@ export default function ChatList() {
         />
       </div>
 
-      {picking && <NewChatPicker load={listDmCandidates} onPick={start} onClose={() => setPicking(false)} />}
+      {picking === 'dm' && (
+        <NewChatPicker
+          load={listDmCandidates}
+          onPick={start}
+          onClose={() => setPicking(false)}
+          onNewGroup={() => setPicking('group')}
+        />
+      )}
+      {picking === 'group' && (
+        <NewGroupPicker onCreated={(id) => navigate(`/chat/dm/${id}`)} onClose={() => setPicking(false)} />
+      )}
 
       {error && (
         <Card className="mb-3 px-4 py-3">
