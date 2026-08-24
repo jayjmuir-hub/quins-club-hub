@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import { Empty } from '../components/Empty.jsx'
-import { BlockTitle } from '../components/Editorial.jsx'
 import NewChatPicker, { Avatar } from '../components/NewChatPicker.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -60,6 +59,36 @@ export function previewLine(row, selfId) {
   return who ? `${who}: ${row.last_body}` : row.last_body
 }
 
+/**
+ * A BlockTitle that folds its section — same anatomy (slash, label, the
+ * gradient rule) as Editorial's BlockTitle, plus the chevron, the count,
+ * and aria-expanded. Local to the chat list; the fold itself is the
+ * screen's state, remembered per device.
+ */
+function FoldTitle({ label, count, folded, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!folded}
+      data-testid={`fold-${label.toLowerCase().replace(/\W+/g, '-')}`}
+      className="mb-2.5 ml-0.5 flex w-full items-center gap-2.5 rounded-[8px] font-display text-[17px] uppercase tracking-[0.03em] text-ink hover:bg-surface-mute"
+    >
+      <span aria-hidden="true" className="font-accent text-[15px] font-semibold italic leading-none text-brand-ink">/</span>
+      <span>{label}</span>
+      {folded && <span className="text-[12px] font-bold normal-case text-ink-muted">{count}</span>}
+      <span aria-hidden="true" className="h-[2px] flex-1 rounded-sm bg-[image:linear-gradient(90deg,theme(colors.brand.DEFAULT),transparent)]" />
+      <svg
+        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+        className={`shrink-0 text-ink-faint transition-transform ${folded ? '' : 'rotate-180'}`}
+      >
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    </button>
+  )
+}
+
 export default function ChatList() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -71,6 +100,30 @@ export default function ChatList() {
   // DM, the point of the reshape); its "New group" row switches to the
   // multi-select (claude/plans/2026-08-24-group-chats.md).
   const [picking, setPicking] = useState(false)
+  // Chat navigation (claude/plans/2026-08-24-chat-navigation.md): the
+  // category filter lives in the URL so the sidebar's deep-links and the
+  // chip row are ONE mechanism; the folds live on the device like
+  // chat-enter-sends.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filter = ['unread', 'squads', 'dms'].includes(searchParams.get('filter')) ? searchParams.get('filter') : null
+  const [folds, setFolds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('chat-folds')) ?? {}
+    } catch {
+      return {}
+    }
+  })
+  function toggleFold(key) {
+    setFolds((prev) => {
+      const next = { ...prev, [key]: !prev[key] }
+      try {
+        localStorage.setItem('chat-folds', JSON.stringify(next))
+      } catch {
+        // private mode: the fold just stays per-session
+      }
+      return next
+    })
+  }
 
   const load = useCallback(async () => {
     setError(null)
@@ -105,8 +158,22 @@ export default function ChatList() {
   const unreadTotal = useMemo(() => scoped.reduce((n, r) => n + Number(r.unread || 0), 0), [scoped])
   const unreadChats = useMemo(() => scoped.filter((r) => Number(r.unread) > 0).length, [scoped])
   const hero = useMemo(() => scoped.find((r) => r.kind === 'club') ?? null, [scoped])
-  const squadRows = useMemo(() => shown.filter((r) => r.kind === 'squad' || r.kind === 'staff'), [shown])
-  const dmRows = useMemo(() => shown.filter((r) => r.kind === 'dm' || r.kind === 'group'), [shown])
+  // Unread bubbles to the top of each section, recency inside each half —
+  // and the category filter narrows before the sections split.
+  const unreadFirst = (rows) =>
+    rows.slice().sort((a, b) => (Number(b.unread) > 0) - (Number(a.unread) > 0) || new Date(b.last_at ?? 0) - new Date(a.last_at ?? 0))
+  const filtered = useMemo(
+    () => (filter === 'unread' ? shown.filter((r) => Number(r.unread) > 0) : shown),
+    [shown, filter],
+  )
+  const squadRows = useMemo(
+    () => (filter === 'dms' ? [] : unreadFirst(filtered.filter((r) => r.kind === 'squad' || r.kind === 'staff'))),
+    [filtered, filter],
+  )
+  const dmRows = useMemo(
+    () => (filter === 'squads' ? [] : unreadFirst(filtered.filter((r) => r.kind === 'dm' || r.kind === 'group'))),
+    [filtered, filter],
+  )
 
   async function start(person) {
     try {
@@ -165,6 +232,31 @@ export default function ChatList() {
         />
       </div>
 
+      {/* The category chips — WhatsApp's own answer, and the ONLY one that
+          exists on a phone, where the sidebar's copies of these do not. */}
+      <div className="mb-3 flex flex-wrap gap-1.5" data-testid="chat-filters">
+        {[
+          { key: null, label: 'All' },
+          { key: 'unread', label: unreadChats > 0 ? `Unread · ${unreadChats}` : 'Unread' },
+          { key: 'squads', label: 'Squads' },
+          { key: 'dms', label: 'Groups & DMs' },
+        ].map((chip) => (
+          <button
+            key={chip.key ?? 'all'}
+            type="button"
+            aria-pressed={filter === chip.key}
+            onClick={() => setSearchParams(chip.key ? { filter: chip.key } : {}, { replace: true })}
+            className={`rounded-pill px-3 py-1 text-[12.5px] font-bold ${
+              filter === chip.key
+                ? 'bg-chrome text-white'
+                : 'border border-line bg-surface-card text-ink-muted hover:text-ink'
+            }`}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
       {/* Absent at zero — a "0 unread" line is furniture. */}
       {unreadTotal > 0 && (
         <div data-testid="unread-strip" className="mb-2 flex items-center gap-2 px-1">
@@ -208,7 +300,7 @@ export default function ChatList() {
       {/* The home shape (claude/plans/2026-08-24-member-chat-home.md): hero
           and sections while browsing; the flat list of matches while
           searching. The rows themselves are identical either way. */}
-      {!searching && hero && (
+      {!searching && !filter && hero && (
         <Link to={chatPath(hero)} data-testid="chat-hero" data-kind="club" className="mb-1 block">
           <Card className="flex items-start gap-3 px-4 py-3.5 hover:bg-surface-mute">
             <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-monogram-coach text-ink-invert">
@@ -246,27 +338,31 @@ export default function ChatList() {
           chip above it"). Dashboard's blocks compensate the same way. */}
       {!searching && squadRows.length > 0 && (
         <section data-testid="section-squads" className="mt-[18px]">
-          <BlockTitle>Your squads</BlockTitle>
-          <Card className="overflow-hidden">
-            <ul>
-              {squadRows.map((row) => (
-                <ChatRow key={rowKey(row)} row={row} selfId={selfId} />
-              ))}
-            </ul>
-          </Card>
+          <FoldTitle label="Your squads" count={squadRows.length} folded={Boolean(folds.squads)} onToggle={() => toggleFold('squads')} />
+          {!folds.squads && (
+            <Card className="overflow-hidden">
+              <ul>
+                {squadRows.map((row) => (
+                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} />
+                ))}
+              </ul>
+            </Card>
+          )}
         </section>
       )}
 
       {!searching && dmRows.length > 0 && (
         <section data-testid="section-dms" className="mt-[18px]">
-          <BlockTitle>Direct messages</BlockTitle>
-          <Card className="overflow-hidden">
-            <ul>
-              {dmRows.map((row) => (
-                <ChatRow key={rowKey(row)} row={row} selfId={selfId} />
-              ))}
-            </ul>
-          </Card>
+          <FoldTitle label="Direct messages" count={dmRows.length} folded={Boolean(folds.dms)} onToggle={() => toggleFold('dms')} />
+          {!folds.dms && (
+            <Card className="overflow-hidden">
+              <ul>
+                {dmRows.map((row) => (
+                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} />
+                ))}
+              </ul>
+            </Card>
+          )}
         </section>
       )}
 
