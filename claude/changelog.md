@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 🐛 **The floating `?` is retired — "Report a problem" moved into the account
+- `34b529d` — 🐛 **The floating `?` is retired — "Report a problem" moved into the account
   menu.** Jay's verdict on the corner button was all four failure modes at
   once (covers content, still missed, clutter, accidental taps), and the
   bottom-right corner is promised to the desktop chat dock. His first idea —
@@ -20,10 +20,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   controlled component (`open`/`onClose` from AppShell); the flow, reference
   codes and triage are untouched. Both new test assertions proved against
   injected faults. Plan: `claude/plans/2026-08-24-help-into-account-menu.md`.
-  (No SHA — this branch's entry; the next PR cites the squash.)
-- `17e6728` — 🚪 **The ignore-gate restoration MERGED** (#365) — the squash SHA
-  for the entry below, which its own branch could not cite.
-- 🚪 **The deploy ignore gate was DEAD from 10:19 to mid-afternoon, and the
+- 🔧 **Chat feedback round 1 — four bugs, five quick wins from Jay's first
+  real test drive** (`claude/plans/2026-08-24-chat-feedback.md`): view-as now
+  scopes the chat list, the masthead band stops eating the thread's back
+  button, a refused remove says so instead of shrugging (the database was
+  proved innocent by a rolled-back probe), threads stick to the newest
+  message, composers auto-grow, Enter-to-send is a device toggle on More,
+  own messages say "You", bubbles carry real clock timestamps, and DM/group
+  threads draw a "New" divider. *(SHA: next PR cites the squash commit.)*
+- `ecb0ced` — 🏠 **The member chat home** — unread strip (absent at zero), the
+  club channel as a hero card with its pills, rows grouped under editorial
+  titles, search still flat. Plus the latent pwa-build fix: the test's child
+  build inherited VITEST and was silently unminified. (#364)
+- `17e6728` — 🚪 **The deploy ignore gate was DEAD from 10:19 to mid-afternoon, and the
   killer was a TOML header.** PR #358's `[build.environment]` block (the Node
   pin) sat above the `ignore =` key, and a TOML table captures every bare key
   after it — so `build.ignore` ceased to exist and Netlify built every commit,
@@ -35,8 +44,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   decide, never whether Netlify consults it — the only proof of a skip is the
   deploy id not moving. This answers the open question the `261397a` entry
   below flagged for its own session.
-- `ecb0ced` — 💬 **The member chat home — unread strip, club hero, titled
-  sections** (#364).
 - `261397a` — 📝 **Group chats recorded as shipped-and-verified** — plan statuses
   closed, state-of-play's chat section updated, and the `463b3c9` squash SHA
   cited (the entry #362 could not write for itself). Docs only — though the

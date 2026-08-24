@@ -29,6 +29,7 @@ import {
   subscribeMessages,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
+import { autoGrow, composerKeyDown } from '../lib/chatComposer.js'
 import { eventTitle } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, visibleTeams } from '../lib/scope.js'
@@ -189,11 +190,24 @@ export default function Chat() {
     setReads((prev) => new Set([...prev, ...unseen]))
   }, [messages, selfId, reads])
 
-  // A chat reads downwards: land at the newest.
+  // A chat reads downwards: land at the newest, and STAY there as messages
+  // arrive — unless the reader has scrolled up into history, which a yank
+  // back down would interrupt (Jay, 24 Aug 2026: "should stay at bottom with
+  // newest message visible, even as new messages come in").
+  const nearBottomRef = useRef(true)
+  useEffect(() => {
+    function onScroll() {
+      const doc = document.documentElement
+      nearBottomRef.current = window.innerHeight + window.scrollY >= doc.scrollHeight - 160
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
   useEffect(() => {
     // Optional-called: jsdom (and some old WebViews) have no scrollIntoView.
-    if (messages?.length) bottomRef.current?.scrollIntoView?.({ block: 'end' })
-  }, [messages?.length])
+    if (messages?.length && nearBottomRef.current) bottomRef.current?.scrollIntoView?.({ block: 'end' })
+  }, [messages])
 
   // ── Routing ─────────────────────────────────────────────────────────────
   if (!param || unknownTeam) {
@@ -435,6 +449,8 @@ export default function Chat() {
               id="chat-draft"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
+              onInput={(e) => autoGrow(e.currentTarget)}
+              onKeyDown={composerKeyDown}
               rows={1}
               maxLength={2000}
               placeholder={attachedEvent ? `Start the thread for ${eventTitle(attachedEvent)}` : 'Message'}

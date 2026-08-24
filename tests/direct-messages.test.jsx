@@ -13,6 +13,7 @@ const useMembershipsMock = vi.fn()
 const useAuthMock = vi.fn()
 const m = {
   listMyConversations: vi.fn(),
+  listMyMessageReads: vi.fn(),
   listDmCandidates: vi.fn(),
   openConversation: vi.fn(),
   getConversation: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembersh
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
 vi.mock('../src/data/messages.js', () => ({
   listMyConversations: (...a) => m.listMyConversations(...a),
+  listMyMessageReads: (...a) => m.listMyMessageReads(...a),
   listDmCandidates: (...a) => m.listDmCandidates(...a),
   openConversation: (...a) => m.openConversation(...a),
   getConversation: (...a) => m.getConversation(...a),
@@ -76,6 +78,7 @@ beforeEach(() => {
   useAuthMock.mockReturnValue({ user: { id: ME } })
   useMembershipsMock.mockReturnValue({ memberships: PARENT, teams: [] })
   m.listMyConversations.mockResolvedValue([INBOX_ROW])
+  m.listMyMessageReads.mockResolvedValue(new Set())
   m.listDmCandidates.mockResolvedValue([{ profile_id: OTHER, full_name: 'Zz Manager Probe', role: 'manager', via_team: 'ZZ Probe U12' }])
   m.openConversation.mockResolvedValue('c1')
   m.getConversation.mockResolvedValue(CONV)

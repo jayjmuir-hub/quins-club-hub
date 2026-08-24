@@ -306,3 +306,21 @@ export function postedLabel(createdAt, now = Date.now()) {
     month: 'short',
   })
 }
+
+/**
+ * A message's timestamp, absolute (24 Aug 2026 feedback: "timestamp for
+ * messages, not just how long ago"). Today reads as the clock ("14:32");
+ * anything older carries the date too ("18 Aug, 14:32"). Club time
+ * (Asia/Dubai), like every stamp in the app.
+ */
+export function stampLabel(createdAt, now = Date.now()) {
+  if (!createdAt) return ''
+  const then = new Date(createdAt)
+  if (!Number.isFinite(then.getTime())) return ''
+  const tz = { timeZone: 'Asia/Dubai' }
+  const clock = then.toLocaleTimeString('en-GB', { ...tz, hour: '2-digit', minute: '2-digit' })
+  const nowDate = new Date(now instanceof Date ? now.getTime() : now)
+  const dayOf = (d) => d.toLocaleDateString('en-GB', { ...tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+  if (dayOf(then) === dayOf(nowDate)) return clock
+  return `${then.toLocaleDateString('en-GB', { ...tz, day: 'numeric', month: 'short' })}, ${clock}`
+}
