@@ -70,6 +70,14 @@ export async function openConversation() {
 export async function forwardMessagesTo() {
   throw new Error('harness: forwardMessagesTo is not stubbed')
 }
+// Round 4 (claude/plans/2026-08-24-chat-round-4.md): stars.
+export async function listMyStars() {
+  return new Set()
+}
+export async function toggleStar() {}
+export async function listMyStarredMessages() {
+  return []
+}
 export async function listMyConversations() {
   return []
 }

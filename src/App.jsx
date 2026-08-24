@@ -11,6 +11,7 @@ import More from './screens/More.jsx'
 import Notices from './screens/Notices.jsx'
 import Chat from './screens/Chat.jsx'
 import ChatList from './screens/ChatList.jsx'
+import StarredMessages from './screens/StarredMessages.jsx'
 import DirectMessages from './screens/DirectMessages.jsx'
 import Welfare from './screens/Welfare.jsx'
 import WelfareReports from './screens/WelfareReports.jsx'
@@ -196,6 +197,7 @@ export default function App() {
           <Route path="/chat" element={<AppShell><ChatList /></AppShell>} />
           {/* Direct messages (phase 3): the inbox and one thread. Before
               /chat/:teamId so "dm" is never read as a squad id. */}
+          <Route path="/chat/starred" element={<AppShell><StarredMessages /></AppShell>} />
           <Route path="/chat/dm" element={<AppShell><DirectMessages /></AppShell>} />
           <Route path="/chat/dm/:conversationId" element={<AppShell><DirectMessages /></AppShell>} />
           <Route path="/chat/:teamId" element={<AppShell><Chat /></AppShell>} />
