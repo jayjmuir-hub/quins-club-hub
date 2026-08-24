@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import Card from './Card.jsx'
-import Spinner from './Spinner.jsx'
 import { listApprovalRecipients, setNotifyApprovals } from '../data/staff.js'
 import { labelForRole } from '../lib/scope.js'
 
@@ -58,6 +57,11 @@ export default function ApprovalRecipients() {
 
   const onCount = (rows ?? []).filter((r) => r.notify).length
 
+  // Nothing until the list is here (or has failed): a settings card gets no
+  // spinner of its own — on Accounts the screen's spinner already has
+  // role="status", and two of those is what broke the screen's tests.
+  if (rows === null && !loadError) return null
+
   return (
     <Card className="mt-3.5 p-3.5" data-testid="approval-recipients">
       <h3 className="text-[15px] font-bold text-ink">Approval emails</h3>
@@ -71,11 +75,6 @@ export default function ApprovalRecipients() {
         </p>
       )}
       {loadError && <p className="mt-2 text-[12.5px] text-ink-muted">Could not load who is emailed just now.</p>}
-      {rows === null && !loadError && (
-        <div className="py-4">
-          <Spinner />
-        </div>
-      )}
       {groups.map(([group, people]) => (
         <div key={group} className="mt-3">
           <p className="text-[11px] font-extrabold uppercase tracking-[.5px] text-ink-muted">{group}</p>

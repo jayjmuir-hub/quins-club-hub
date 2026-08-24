@@ -8,6 +8,17 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 24 Aug 2026
+
+- 🧭 **The Approval-emails panel moved to Accounts** — where the approving
+  happens. It shipped at the bottom of "Squads & league teams" and Jay could
+  not find it ("i do not see anywhere to change the email notifications in
+  the admin section") — the same right-screen-nobody-finds trap that tab's
+  own rename note records. Admin → Accounts, under the queues. It also no
+  longer renders its own spinner (two role="status" broke the screen's tests).
+- `e553d2f` — 📧 **Admins choose who is emailed about people waiting to be approved**
+  (see below — the panel itself).
+
 ## 23 Aug 2026
 
 <!-- ⚠️ The chat-list, delete-for-good and the peer session's entries below were

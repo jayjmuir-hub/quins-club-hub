@@ -4,6 +4,7 @@ import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
 import AdminRightsEditor from '../components/AdminRightsEditor.jsx'
 import Card from '../components/Card.jsx'
+import ApprovalRecipients from '../components/ApprovalRecipients.jsx'
 import Empty from '../components/Empty.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
 import Sheet from '../components/Sheet.jsx'
@@ -1713,6 +1714,13 @@ export default function Accounts() {
           onVouch={handleVouch}
         />
       )}
+
+      {/* ⚠️ WHO IS EMAILED ABOUT THE QUEUES ABOVE. It lived at the bottom of
+          "Squads & league teams" for a few hours on 23 Aug 2026 and Jay could
+          not find it — the same trap that tab's own rename note records. It
+          belongs where the approving happens. Admin-only branch, so no gate
+          needed here. */}
+      <ApprovalRecipients />
 
       {/* Hidden while the member list is missing: without it there is nothing
           to subtract, and every existing member would show up as "waiting". */}
