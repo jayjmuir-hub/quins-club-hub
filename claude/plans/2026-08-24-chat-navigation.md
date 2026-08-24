@@ -1,6 +1,8 @@
 # Chat navigation — the list stops being a scroll
 
-**Status: NOT SHIPPED — in progress on `claude/chat-round-5`.** Jay,
+**Status: SHIPPED — merged as `043f9c3` (#386), 24 Aug 2026 (late night),
+verified live by four markers including "Groups & DMs" appearing exactly
+twice — the sidebar link and the chip, the two halves of one mechanism.** Jay,
 24 Aug 2026 (late night): "once there are lots of chats in people's list
 they will have to scroll too far down to get to different sections, first
 the different chat categories should appear in the left bar under Chats,
