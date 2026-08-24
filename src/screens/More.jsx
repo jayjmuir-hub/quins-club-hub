@@ -7,6 +7,7 @@ import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
 import IdeaForm from '../components/IdeaForm.jsx'
 import MyPhotoField from '../components/MyPhotoField.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
+import EnterSendsToggle from '../components/EnterSendsToggle.jsx'
 import PushNotificationsToggle from '../components/PushNotificationsToggle.jsx'
 import YourPlayers from '../components/YourPlayers.jsx'
 import { updateMyProfile } from '../data/members.js'
@@ -493,6 +494,12 @@ export default function More() {
       <SectionTitle>Notifications</SectionTitle>
       <Card className="p-4">
         <PushNotificationsToggle />
+      </Card>
+
+      {/* Chat behaviour — device-level, see the component's header. */}
+      <SectionTitle>Chat</SectionTitle>
+      <Card className="p-4">
+        <EnterSendsToggle />
       </Card>
 
       {/* Account — the IN-APP half of Google Play's account deletion

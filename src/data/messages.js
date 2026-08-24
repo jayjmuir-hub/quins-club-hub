@@ -154,8 +154,15 @@ export async function removeMessage(id) {
   // "message delete" policy: the author any time, staff in their channels,
   // admins where they may review; a REPORTED message only by an admin.
   // db/migrations/20260824_delete_for_good.sql.
-  const { error } = await supabase.from('messages').delete().eq('id', id)
+  // ⚠️ .select() SO A ZERO-ROW DELETE IS AN ERROR, NOT A SHRUG (24 Aug
+  // 2026). RLS refusing a delete comes back as success-with-no-rows, and the
+  // welfare screen once reported "removed" while the message sat untouched.
+  // The database was proved innocent (a rolled-back probe deleted reported
+  // channel and DM messages fine); this guard is so the NEXT silent refusal
+  // says so out loud instead of leaving a tester doubting their eyes.
+  const { data, error } = await supabase.from('messages').delete().eq('id', id).select('id')
   if (error) throw error
+  if (!data?.length) throw new Error('The message was not removed — you may not have the right to, or it is already gone.')
 }
 
 /**

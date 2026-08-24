@@ -162,12 +162,20 @@ describe('writes', () => {
   // DELETE"); Jay: "i still can't completely delete messages". It is a real
   // DELETE now, and the policy decides who may.
   it('removeMessage is a real DELETE by id', async () => {
-    const { b, calls } = builder({ data: null, error: null })
+    const { b, calls } = builder({ data: [{ id: 'p1' }], error: null })
     supabase.from.mockReturnValue(b)
     await removeMessage('p1')
     expect(calls.delete).toHaveLength(1)
     expect(calls.eq[0]).toEqual(['id', 'p1'])
     expect(calls.update).toBeUndefined()
+  })
+
+  // ⚠️ ADDED 24 Aug 2026 with the welfare-remove investigation: RLS refusing
+  // a delete comes back as success-with-zero-rows, and that silence once
+  // read as "removed" while the message sat untouched. Zero rows is an error.
+  it('removeMessage throws when the delete touched nothing', async () => {
+    supabase.from.mockReturnValue(builder({ data: [], error: null }).b)
+    await expect(removeMessage('p1')).rejects.toThrow(/not removed/)
   })
 
   it('surfaces the database error', async () => {

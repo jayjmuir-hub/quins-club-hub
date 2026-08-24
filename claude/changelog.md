@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- 🔧 **Chat feedback round 1 — four bugs, five quick wins from Jay's first
+  real test drive** (`claude/plans/2026-08-24-chat-feedback.md`): view-as now
+  scopes the chat list, the masthead band stops eating the thread's back
+  button, a refused remove says so instead of shrugging (the database was
+  proved innocent by a rolled-back probe), threads stick to the newest
+  message, composers auto-grow, Enter-to-send is a device toggle on More,
+  own messages say "You", bubbles carry real clock timestamps, and DM/group
+  threads draw a "New" divider. *(SHA: next PR cites the squash commit.)*
+- `ecb0ced` — 🏠 **The member chat home** — unread strip (absent at zero), the
+  club channel as a hero card with its pills, rows grouped under editorial
+  titles, search still flat. Plus the latent pwa-build fix: the test's child
+  build inherited VITEST and was silently unminified. (#364)
 - `261397a` — 📝 **Group chats recorded as shipped-and-verified** — plan statuses
   closed, state-of-play's chat section updated, and the `463b3c9` squash SHA
   cited (the entry #362 could not write for itself). Docs only — though the

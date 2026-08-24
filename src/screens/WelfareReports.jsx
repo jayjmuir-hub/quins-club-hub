@@ -47,6 +47,11 @@ function Queue() {
 
   async function act(report, remove) {
     try {
+      if (remove && !report.message) {
+        // The joined message came back empty — removing "nothing" quietly
+        // looked like success once (24 Aug 2026). Say so instead.
+        throw new Error('The reported message could not be loaded, so it was not removed. Reload and try again.')
+      }
       // Resolve FIRST: a delete is real since 24 Aug 2026 and cascades the
       // report row, so resolving afterwards would have nothing to resolve.
       await resolveReport(report.id)

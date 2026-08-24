@@ -13,6 +13,7 @@ const useMembershipsMock = vi.fn()
 const useAuthMock = vi.fn()
 const m = {
   listMyConversations: vi.fn(),
+  listMyMessageReads: vi.fn(),
   listDmCandidates: vi.fn(),
   openConversation: vi.fn(),
   getConversation: vi.fn(),
@@ -39,6 +40,7 @@ vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembersh
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
 vi.mock('../src/data/messages.js', () => ({
   listMyConversations: (...a) => m.listMyConversations(...a),
+  listMyMessageReads: (...a) => m.listMyMessageReads(...a),
   listDmCandidates: (...a) => m.listDmCandidates(...a),
   openConversation: (...a) => m.openConversation(...a),
   getConversation: (...a) => m.getConversation(...a),
@@ -111,6 +113,7 @@ beforeEach(() => {
   m.getConversation.mockResolvedValue(GROUP)
   m.listDirectMessages.mockResolvedValue([msg('x1', 'p-2', 'Mira Vantel', 'Zz seats sorted')])
   m.listMyConversations.mockResolvedValue([])
+  m.listMyMessageReads.mockResolvedValue(new Set())
   m.listMyBlocks.mockResolvedValue(new Set())
   m.listGroupMembers.mockResolvedValue(MEMBERS)
   m.subscribeMessages.mockReturnValue(() => {})

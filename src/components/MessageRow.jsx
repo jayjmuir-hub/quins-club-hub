@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import Button from './Button.jsx'
 import FixtureCard from './FixtureCard.jsx'
 import MentionPicker, { appendMention } from './MentionPicker.jsx'
-import { postedLabel } from '../lib/notices.js'
+import { postedLabel, stampLabel } from '../lib/notices.js'
 import { initials } from '../lib/playerFormat.js'
 import { labelForRole } from '../lib/scope.js'
 
@@ -168,6 +168,8 @@ export default function MessageRow({
               : `rounded-bl-[4px] bg-surface-card text-ink shadow-card ${staff ? 'border-l-[3px] border-brand' : ''}`
           }`}
         >
+          {/* 24 Aug feedback: your own messages say so. */}
+          {mine && <div className="mb-0.5 text-[12.5px] font-extrabold text-white/80">You</div>}
           {!mine && (
             <div className="mb-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
               {unread && <span className="inline-block h-2 w-2 rounded-full bg-brand" aria-hidden="true" />}
@@ -188,7 +190,7 @@ export default function MessageRow({
           <Body message={message} mine={mine} />
 
           <div className={`mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] font-semibold ${meta}`}>
-            <span>{postedLabel(message.created_at)}</span>
+            <span>{stampLabel(message.created_at)}</span>
             {message.pinned && <span className="uppercase tracking-[.4px]">Pinned</span>}
             {/* ⚠️ THE ONE THING WHATSAPP CANNOT TELL A COACH. Staff only — the
                 stats function returns rows to nobody else. */}

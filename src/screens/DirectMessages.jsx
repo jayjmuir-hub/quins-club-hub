@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -10,6 +10,7 @@ import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import {
   blockDm,
   deleteConversation,
+  listMyMessageReads,
   getConversation,
   leaveGroup,
   listDirectMessages,
@@ -26,8 +27,9 @@ import {
   unblockDm,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
+import { autoGrow, composerKeyDown } from '../lib/chatComposer.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { postedLabel } from '../lib/notices.js'
+import { postedLabel, stampLabel } from '../lib/notices.js'
 import { isAdmin } from '../lib/scope.js'
 
 // Direct messages — squad chat phase 3. claude/plans/2026-08-23-squad-chat.md.
@@ -87,16 +89,25 @@ function Thread({ conversationId }) {
   const navigate = useNavigate()
   const bottomRef = useRef(null)
   const loggedRef = useRef(false)
+  const newFromRef = useRef(undefined)
 
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [conv, rows, inbox, blocks] = await Promise.all([
+      const [conv, rows, inbox, blocks, reads] = await Promise.all([
         getConversation(conversationId),
         listDirectMessages(conversationId),
         listMyConversations(),
         listMyBlocks(),
+        listMyMessageReads(),
       ])
+      // Where "New" starts, captured ONCE per visit — the screen marks
+      // everything read moments later, so a live value would vanish under
+      // the reader (24 Aug feedback: "mark for new messages").
+      if (newFromRef.current === undefined) {
+        const first = rows.find((m) => m.author_id !== selfId && !reads.has(m.id))
+        newFromRef.current = first?.id ?? null
+      }
       setConversation(conv)
       setMessages(rows)
       setMissing(!conv)
@@ -137,9 +148,21 @@ function Thread({ conversationId }) {
     if (theirs.length) markMessagesRead(selfId, theirs)
   }, [messages, selfId])
 
+  // Stay pinned to the newest message unless the reader scrolled up into
+  // history — same treatment as Chat.jsx, same 24 Aug feedback.
+  const nearBottomRef = useRef(true)
   useEffect(() => {
-    if (messages?.length) bottomRef.current?.scrollIntoView?.({ block: 'end' })
-  }, [messages?.length])
+    function onScroll() {
+      const doc = document.documentElement
+      nearBottomRef.current = window.innerHeight + window.scrollY >= doc.scrollHeight - 160
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+  useEffect(() => {
+    if (messages?.length && nearBottomRef.current) bottomRef.current?.scrollIntoView?.({ block: 'end' })
+  }, [messages])
 
   const isGroup = conversation?.kind === 'group'
   const myMemberRow = isGroup ? members?.find((p) => p.profile_id === selfId) : null
@@ -407,18 +430,27 @@ function Thread({ conversationId }) {
         {messages?.map((m) => {
           const mine = m.author_id === selfId
           return (
-            <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dm-bubble" data-mine={mine ? 'true' : 'false'}>
+            <Fragment key={m.id}>
+              {newFromRef.current === m.id && (
+                <div className="my-1.5 flex items-center gap-2" data-testid="new-divider" role="separator" aria-label="New messages">
+                  <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />
+                  <span className="font-condensed text-[11px] font-bold uppercase tracking-[.14em] text-brand-ink">New</span>
+                  <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />
+                </div>
+              )}
+            <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dm-bubble" data-mine={mine ? 'true' : 'false'}>
               <div className={`max-w-[80%] rounded-[14px] px-3 py-2 ${mine ? 'bg-chrome text-white' : 'bg-surface-card text-ink shadow-card'}`}>
                 {isGroup && !mine && (
                   <p className="mb-0.5 text-[11px] font-extrabold text-brand-ink">{m.author?.full_name ?? 'Member'}</p>
                 )}
+                {mine && <p className="mb-0.5 text-[11px] font-extrabold text-white/80">You</p>}
                 {m.deleted_at ? (
                   <p className="text-[13px] italic opacity-70">Message removed</p>
                 ) : (
                   <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.4]">{m.body}</p>
                 )}
                 <div className={`mt-1 flex items-center gap-2 text-[10.5px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-                  <span>{postedLabel(m.created_at)}</span>
+                  <span>{stampLabel(m.created_at)}</span>
                   {mine && !m.deleted_at && (
                     <button type="button" onClick={() => onRemove(m.id)} className="underline-offset-2 hover:underline">
                       Delete
@@ -432,6 +464,7 @@ function Thread({ conversationId }) {
                 </div>
               </div>
             </div>
+            </Fragment>
           )
         })}
       </div>
@@ -477,6 +510,8 @@ function Thread({ conversationId }) {
                 id="dm-draft"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
+                onInput={(e) => autoGrow(e.currentTarget)}
+                onKeyDown={composerKeyDown}
                 rows={1}
                 maxLength={2000}
                 placeholder={`Message ${(isGroup ? conversation?.title : other?.name) ?? ''}`}
