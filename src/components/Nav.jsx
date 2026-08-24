@@ -288,7 +288,10 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
       ref={navRef}
       data-hidden={hidden ? 'true' : undefined}
       className={[
-        'glass-dock fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-pill px-2 py-[7px] desktop:hidden',
+        // rounded-[22px], not rounded-pill, since 24 Aug 2026 — Jay: the two
+        // bars should be the same shape, and the masthead island's 22px won.
+        // The ITEMS inside (glider, hover fills) stay capsules on purpose.
+        'glass-dock fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-[22px] px-2 py-[7px] desktop:hidden',
         'transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none',
         hidden ? 'translate-y-[calc(100%+24px)] opacity-0' : 'translate-y-0 opacity-100',
       ].join(' ')}

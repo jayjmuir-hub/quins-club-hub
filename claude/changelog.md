@@ -10,11 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — ↔️ **The dock's width ceiling goes to 1100** — Jay tried the
-  grip live and: "looks good but on desktop mode we could make it much
+- 🧊 **Glass polish round: white cast gone, one shape for both bars, crisp
+  icons** — Jay's home review of the clear glass, three fixes: the 40% white
+  ring + brightness lens summed to "looks like it is white" (border to 16%,
+  brightness dropped, the red halo owns the edge); the dock squares off from
+  a capsule to the masthead's rounded-[22px]; and "blurry" icons were 8px
+  frost leaving half-readable smears behind them — proved by toggling the
+  filter live, fixed at 20px. Approved from deploy preview #377.
+  (No SHA — this branch's entry; the next pull request cites the squash.)
+- `43e212e` — ↔️ **The dock's width ceiling goes to 1100** (#378) — Jay tried
+  the grip live and: "looks good but on desktop mode we could make it much
   wider". The viewport cap already guards small screens; 640 was only where
-  the drag stopped, and it stopped too soon. The NEXT pull request cites
-  this entry's squash SHA.
+  the drag stopped, and it stopped too soon. Its own branch could not cite
+  the squash SHA, so this entry carries it now.
 - `8c12fb7` — ↔️ **The dock is resizeable** (#376) — Jay, same evening: "can we
   make the chat box resizeable? this would be beneficial in desktop mode".
   A custom top-left grip (the panel is anchored bottom-right, so the native
