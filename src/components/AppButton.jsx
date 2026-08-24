@@ -103,7 +103,14 @@ export default function AppButton() {
         // that could squeeze is a new way to bring that back.
         className={[
           'shrink-0 rounded-[8px] px-2.5 py-1.5 text-[15px] font-bold transition',
-          'text-accent hover:bg-white/10',
+          // A frosted pill of its own since the clear-glass pass. This is the
+          // one piece of small text sitting bare on the transparent island,
+          // and the masthead often floats over the RED fixture hero — ink on
+          // brand red measures ~3.1:1, below the 4.5:1 text floor. 55% white
+          // under it lifts the worst case to ~7.9:1 (see index.css). Dark
+          // mode keeps the old accent-on-glass look, where the page beneath
+          // is dark and accent measures comfortably.
+          'bg-white/55 text-ink hover:bg-white/70 dark:bg-transparent dark:text-accent dark:hover:bg-white/10',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
         ].join(' ')}
       >

@@ -1,7 +1,12 @@
 # Plan — the top bar hides like the dock, and both bars go Liquid Glass
 
-**STATUS: NOT YET SHIPPED — designed and approved 24 Aug 2026, implementation
-in progress.** Update this line when it merges.
+**STATUS: SHIPPED — merged to `main` 24 Aug 2026 as squash `109634f` (#370),
+verified live from the deployed assets. ⚠️ THE GLASS HALF WAS SUPERSEDED THE
+SAME DAY:** Jay judged the smoked glass on the live site and asked for fully
+transparent with a red glow — the clear-glass replacement went through a
+Netlify deploy preview (#374) and shipped separately. Part 1 (auto-hide) is
+current as written; for the glass, read `src/index.css`'s clear-glass block,
+not Part 2 below.
 
 ## Why
 
