@@ -27,6 +27,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   no @supports needed — the declaration ORDER is the fallback, see the
   index.css comment. (No SHA — this branch's entry; the next pull request
   cites the squash.)
+- `2d8f79c` — 📝 **The chat night's records closed** (#381) — `34c9e1c` cited,
+  plans and state-of-play brought current, handoff written. Its own branch
+  could not cite this squash SHA, so this entry carries it now.
 - `34c9e1c` — 💚 **Chat round 3: the WhatsApp design pass** (#380) — seven items
   from Jay comparing chat against a real WhatsApp screenshot
   (`claude/plans/2026-08-24-chat-round-3-design.md`): stamps inside tighter
