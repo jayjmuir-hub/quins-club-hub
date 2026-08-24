@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -775,5 +775,67 @@ describe('AppShell — the account button on a route that is not home', () => {
     expect(hasClassToken(nameBlock, 'overflow-hidden')).toBe(true)
     // Node.DOCUMENT_POSITION_FOLLOWING === 4: the link comes after the block.
     expect(nameBlock.compareDocumentPosition(link) & 4).toBeTruthy()
+  })
+})
+
+// The masthead's auto-hide — added 24 Aug 2026 alongside the dock's, both
+// driven by src/lib/useAutoHideOnScroll.js. jsdom has no layout, so scrollY
+// is stubbed and the scroll event fired by hand, exactly as the dock's own
+// test in nav.test.jsx does; the assertion is the data-hidden attribute the
+// slide classes key off. Plan: claude/plans/2026-08-24-topbar-autohide-liquid-glass.md.
+describe('AppShell — the masthead hides on scroll like the dock', () => {
+  const scrollTo = (y) => {
+    Object.defineProperty(window, 'scrollY', { value: y, configurable: true })
+    window.dispatchEvent(new Event('scroll'))
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+  }
+
+  it('hides on a downward scroll and returns on an upward one', async () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    renderShell()
+    const wrapper = screen.getByTestId('masthead-wrapper')
+    Object.defineProperty(document.documentElement, 'scrollHeight', { value: 3000, configurable: true })
+
+    await scrollTo(100)
+    await scrollTo(200)
+    await waitFor(() => expect(wrapper).toHaveAttribute('data-hidden', 'true'))
+    await scrollTo(150)
+    await waitFor(() => expect(wrapper).not.toHaveAttribute('data-hidden'))
+  })
+
+  it('never hides while a View-as preview is active', async () => {
+    // ⚠️ THE BANNER IS THE POINT. The View-as banner lives inside this same
+    // wrapper and is contractually persistent and unmissable — sliding the
+    // wrapper away would take the banner with it, and an admin scrolling a
+    // roster would stop being told they are previewing.
+    useMembershipsMock.mockReturnValue(
+      loaded({ viewAs: { role: 'parent', teamId: 't1', label: 'Parent — U12' } }),
+    )
+    renderShell()
+    const wrapper = screen.getByTestId('masthead-wrapper')
+    Object.defineProperty(document.documentElement, 'scrollHeight', { value: 3000, configurable: true })
+
+    await scrollTo(100)
+    await scrollTo(400)
+    // Give the (absent) hide a real chance to land before asserting quiet.
+    await scrollTo(600)
+    expect(wrapper).not.toHaveAttribute('data-hidden')
+  })
+
+  it('keeps the desktop-neutralising classes on the hidden state', async () => {
+    // jsdom applies no CSS, so the phone-only nature of the hide cannot be
+    // measured here — what CAN be pinned is the pair of desktop: overrides
+    // that neutralise the transform at >=820px. If somebody deletes them the
+    // desktop island starts vanishing too, and only this test notices.
+    useMembershipsMock.mockReturnValue(loaded())
+    renderShell()
+    const wrapper = screen.getByTestId('masthead-wrapper')
+    Object.defineProperty(document.documentElement, 'scrollHeight', { value: 3000, configurable: true })
+
+    await scrollTo(100)
+    await scrollTo(200)
+    await waitFor(() => expect(wrapper).toHaveAttribute('data-hidden', 'true'))
+    expect(wrapper.className).toMatch(/desktop:translate-y-0/)
+    expect(wrapper.className).toMatch(/desktop:opacity-100/)
   })
 })

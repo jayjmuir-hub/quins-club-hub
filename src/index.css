@@ -406,19 +406,28 @@
     }
   }
 
-  /* The masthead island — 23 Aug 2026, "a similar style for the top". The
-     dock's depth recipe at the masthead's opacity: it carries TEXT (the
-     wordmark at white/80, 13px), so it stays at 70% where the dock can go
-     lower. 70% over white composites to rgb(84,84,84): white/80 is 5.4:1,
-     white 8.1:1. The top highlight and the shadow are what make it an
-     object floating over the page rather than a bar stuck to its edge. */
+  /* The masthead island — 23 Aug 2026, "a similar style for the top";
+     LIQUID GLASS since 24 Aug 2026 (Jay: "more like liquid glass",
+     claude/plans/2026-08-24-topbar-autohide-liquid-glass.md). Clearer,
+     and the light behaves like light: the backdrop is lensed (brightness/
+     contrast join the blur), the rim is a gradient that catches at the top
+     curve instead of a uniform hairline, and a diagonal sheen slides across
+     the surface — the ::before/::after shared with .glass-dock below.
+
+     ⚠️ 66%, NOT LOWER — THIS ONE CARRIES 13px TEXT. The wordmark line is
+     white/80 at 13px: 66% chrome over worst-case white composites to
+     ~rgb(95,95,95), where white/80 measures ~4.8:1 against the 4.5:1 text
+     floor. 55% was tried on paper first and fails at 3.4:1 — the dock can
+     go clearer only because its idle items are icons. The lensing cannot
+     break this: brightness on a white backdrop clamps at white, so the
+     worst case is unchanged. */
   .glass-island {
-    background: rgb(var(--chrome-rgb) / 0.7);
-    -webkit-backdrop-filter: saturate(180%) blur(28px);
-    backdrop-filter: saturate(180%) blur(28px);
-    border: 1px solid rgb(255 255 255 / 0.14);
+    position: relative;
+    background: rgb(var(--chrome-rgb) / 0.66);
+    -webkit-backdrop-filter: saturate(190%) blur(32px) brightness(1.06) contrast(1.04);
+    backdrop-filter: saturate(190%) blur(32px) brightness(1.06) contrast(1.04);
+    border: 1px solid rgb(255 255 255 / 0.1);
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.16),
       0 10px 30px rgb(0 0 0 / 0.3),
       0 2px 6px rgb(0 0 0 / 0.2);
   }
@@ -428,28 +437,24 @@
     }
   }
 
-  /* The dock's material — design "A", 23 Aug 2026. Darker than the masthead
-     (the chrome should read BLACK again, Jay: "very bland"), with the three
-     things that make glass read as glass rather than grey: a 1px light
-     highlight along the inside top edge, a faint light border, and a real
-     drop shadow lifting it off the page.
+  /* The dock's material — design "A", 23 Aug 2026; LIQUID GLASS since
+     24 Aug 2026, same pass as .glass-island above.
 
-     ⚠️ 62%, DOWN FROM 84% (Jay, 23 Aug 2026: "more transparent or glass").
-     This is only safe BECAUSE of design A: the dock's idle items are ICONS,
-     which are UI components with a 3:1 floor, not text at 4.5:1 — and the
-     only text on it is the white label on the red pill, which does not sit
-     on the glass at all. Worst composite over white is rgb(108,108,108);
-     white/90 idle icons (Nav.jsx) are 4.4:1 on it, well past 3:1. The help
-     button shares this class and its "?" IS text: 19px bold, which WCAG
-     treats as large (3:1), and white is 5.2:1. Do not put small text on
-     this material. */
+     ⚠️ 52%, DOWN FROM 62% (which was down from 84%). Still only safe
+     BECAUSE of design A: the dock's idle items are ICONS, which are UI
+     components with a 3:1 floor, not text at 4.5:1 — and the only text on
+     it is the white label on the red pill, which does not sit on the glass
+     at all. Worst composite over white is now ~rgb(129,129,129); white/90
+     idle icons (Nav.jsx) measure ~3.5:1 on it, above 3:1 with margin.
+     48% measures ~3.1:1 and leaves none — do not go below 52%, and do not
+     put small text on this material. */
   .glass-dock {
-    background: rgb(var(--chrome-rgb) / 0.62);
-    -webkit-backdrop-filter: saturate(180%) blur(28px);
-    backdrop-filter: saturate(180%) blur(28px);
-    border: 1px solid rgb(255 255 255 / 0.14);
+    position: relative;
+    background: rgb(var(--chrome-rgb) / 0.52);
+    -webkit-backdrop-filter: saturate(190%) blur(32px) brightness(1.06) contrast(1.04);
+    backdrop-filter: saturate(190%) blur(32px) brightness(1.06) contrast(1.04);
+    border: 1px solid rgb(255 255 255 / 0.1);
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.16),
       0 12px 32px rgb(0 0 0 / 0.38),
       0 2px 6px rgb(0 0 0 / 0.25);
   }
@@ -457,6 +462,58 @@
     .glass-dock {
       background: rgb(var(--chrome-rgb));
     }
+  }
+
+  /* The two optical layers that make the glass "liquid" — shared by both
+     bars. The ::before is the SPECULAR RIM: a 1px ring drawn from a
+     gradient (bright at the top-left curve, nearly gone at the bottom, a
+     faint return along the lower edge), sitting exactly inside the border
+     via the padding+mask trick — mask-composite carves out the middle so
+     only the ring paints. The ::after is the LIGHT-CATCH SHEEN: a soft
+     diagonal wash, strongest in the top-left corner, gone by halfway.
+     Both are pointer-events-none and aria-invisible (pure paint).
+
+     ⚠️ Generated content paints in DOM order, and ::after is the LAST
+     child: the sheen sits over the bars' idle icons at ~0.10 alpha peak.
+     That is deliberate (light sits ON glass, in front of what is behind
+     it) and too faint to move any contrast number by a step. */
+  .glass-island::before,
+  .glass-dock::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      170deg,
+      rgb(255 255 255 / 0.45),
+      rgb(255 255 255 / 0.12) 35%,
+      rgb(255 255 255 / 0.02) 65%,
+      rgb(255 255 255 / 0.16)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .glass-island::after,
+  .glass-dock::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      115deg,
+      rgb(255 255 255 / 0.1),
+      rgb(255 255 255 / 0.03) 30%,
+      transparent 55%
+    );
+    pointer-events: none;
   }
 
   /* Harlequin geometry: the two overlapping diagonals from the site's hero,

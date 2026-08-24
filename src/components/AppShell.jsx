@@ -5,6 +5,7 @@ import useMyProfile from '../lib/useMyProfile.js'
 import FloatingChatDock from './FloatingChatDock.jsx'
 import useDockBadges from '../lib/useDockBadges.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import useAutoHideOnScroll from '../lib/useAutoHideOnScroll.js'
 import { highestRole, isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
 import Nav from './Nav.jsx'
 import NamePrompt from './NamePrompt.jsx'
@@ -181,7 +182,14 @@ function PendingApprovalBanner() {
 export default function AppShell({ children }) {
   const { user, signOut } = useAuth()
   const { firstName } = useMyProfile()
-  const { memberships, teams, loading, error, reload } = useMemberships()
+  const { memberships, teams, loading, error, reload, viewAs } = useMemberships()
+
+  // The masthead slides away with the dock on a phone — same hook, same
+  // numbers, one gesture (claude/plans/2026-08-24-topbar-autohide-liquid-glass.md).
+  // ⚠️ DISABLED WHILE PREVIEWING: the View-as banner lives in the masthead's
+  // sticky wrapper and is contractually persistent and unmissable — an admin
+  // forgetting they are in a preview is the failure it exists to prevent.
+  const mastheadHidden = useAutoHideOnScroll({ disabled: Boolean(viewAs) })
   const location = useLocation()
   // ❌ `askingForAccess` IS GONE — 17 Aug 2026. It held which of TWO mutually
   // exclusive zero-membership routes was showing, and that fork is the bug the
@@ -321,7 +329,23 @@ export default function AppShell({ children }) {
           z-10) slides UNDER the band, and the invisible band ate its clicks —
           "back button when in a chat doesn't work". The banner and the
           masthead island re-enable pointer events on themselves. */}
-      <div className="pointer-events-none sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:flex desktop:flex-col desktop:items-end desktop:px-4">
+      {/* ⚠️ THE HIDE IS PHONE-ONLY BY CLASS, NOT BY LOGIC. The hook always
+          runs; `desktop:translate-y-0 desktop:opacity-100` neutralises the
+          hidden state at >=820px, where the island is a small top-right
+          element on a screen with no vertical shortage — and where hiding it
+          would hide the account menu. data-hidden is what the tests read,
+          jsdom seeing no CSS. */}
+      <div
+        data-testid="masthead-wrapper"
+        data-hidden={mastheadHidden ? 'true' : undefined}
+        className={[
+          'pointer-events-none sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:flex desktop:flex-col desktop:items-end desktop:px-4',
+          'transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none',
+          mastheadHidden
+            ? '-translate-y-[calc(100%+24px)] opacity-0 desktop:translate-y-0 desktop:opacity-100'
+            : 'translate-y-0 opacity-100',
+        ].join(' ')}
+      >
         <div className="pointer-events-auto w-full">
           <ViewAsBanner />
         </div>
