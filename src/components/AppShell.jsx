@@ -278,6 +278,26 @@ export default function AppShell({ children }) {
           shell so it renders on EVERY screen once armed. */}
       <PaintDebug />
 
+      {/* The liquid-lens filter the glass bars sample their backdrop through
+          (src/index.css, the clear-glass block): gentle turbulence bends what
+          scrolls beneath the glass — the iOS refraction Jay asked for. It
+          must exist in the DOM for `backdrop-filter: url(#liquid-lens)` to
+          resolve, and the shell is the one component under every screen.
+          Chromium-only by design: Safari cannot take url() in
+          backdrop-filter, drops that declaration, and keeps the plain
+          blur/saturate declared before it — iPhones get the undistorted
+          glass, silently and correctly. */}
+      <svg width="0" height="0" aria-hidden="true" className="absolute">
+        <filter id="liquid-lens" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="7" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="18" xChannelSelector="R" yChannelSelector="G" result="displaced" />
+          {/* The lens replaces the WHOLE filter chain in Chromium, so the
+              glass's own frost and saturation are re-supplied here. */}
+          <feGaussianBlur in="displaced" stdDeviation="10" />
+          <feColorMatrix type="saturate" values="1.8" />
+        </filter>
+      </svg>
+
       {/* Banner + masthead stick together as ONE unit. The banner has to sit
           above the header and stay visible (spec §1: persistent, unmissable),
           but two separately-`sticky top-0` siblings would both pin to y=0 and

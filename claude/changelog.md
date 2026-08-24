@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- 💠 **The glass gets MATERIAL and a PRISM LENS** — the rest of Jay's glass
+  night. Over a flat white page clear glass vanishes into the page ("still
+  look like they are white and not glassy"), so the pane itself now has
+  substance: a cool-grey smoke gradient (grey-blue, never white), a
+  top-left glint, an inset bright top edge and a darker bottom edge for
+  thickness. And the refraction: `backdrop-filter: url(#liquid-lens)` — a
+  displacement-map lens AppShell mounts. The first cut was turbulence
+  noise; Jay's review corrected the physics twice ("ios makes it bigger
+  and bends it … like looking through a prism", then the observation that
+  the effect died at the top of the bar — a map-alignment bug, fixed) and
+  sized the prism twice (52/36/20 "too much" → 32/30/28 with saturation
+  eased). Five preview builds on #379, zero production deploys iterating.
+  ⚠️ Chromium-only BY DESIGN: Safari drops the url() declaration and keeps
+  the plain frost declared before it, so iPhones get undistorted glass with
+  no @supports needed — the declaration ORDER is the fallback, see the
+  index.css comment. (No SHA — this branch's entry; the next pull request
+  cites the squash.)
 - `34c9e1c` — 💚 **Chat round 3: the WhatsApp design pass** (#380) — seven items
   from Jay comparing chat against a real WhatsApp screenshot
   (`claude/plans/2026-08-24-chat-round-3-design.md`): stamps inside tighter
