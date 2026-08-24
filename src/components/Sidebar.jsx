@@ -148,6 +148,20 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
         { to: '/schedule?open=subscribe', label: 'Add to calendar', action: true },
       ]
     }
+    // Chat's categories (24 Aug 2026, Jay: "the different chat categories
+    // should appear in the left bar under Chats"). The filters are ?filter=
+    // deep-links ChatList consumes — the same mechanism as its chip row, so
+    // sidebar and chips cannot disagree. /chat/starred and the DM threads
+    // keep the section open, same rule as /game-time under Roster.
+    if (to === '/chat' && location.pathname.startsWith('/chat')) {
+      return [
+        { to: '/chat', label: 'All chats', end: true },
+        { to: '/chat?filter=unread', label: 'Unread', action: true },
+        { to: '/chat?filter=squads', label: 'Your squads', action: true },
+        { to: '/chat?filter=dms', label: 'Groups & DMs', action: true },
+        { to: '/chat/starred', label: 'Starred' },
+      ]
+    }
     // The Admin section expands like the others (24 Aug 2026, Jay: "the admin
     // button in the left bar should expand like the others"). Its children are
     // the PORTALS this admin can enter — the same cards the /admin chooser

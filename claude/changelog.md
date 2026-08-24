@@ -10,8 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 📎 **Chat round 4: the message menu, pins, stars,
-  reply-privately, and the reaction pill where WhatsApp puts it** — from
+- (unmerged) — 🧭 **Chat navigation: the list stops being a scroll** — Jay:
+  "once there are lots of chats ... they will have to scroll too far down".
+  Four pieces (`claude/plans/2026-08-24-chat-navigation.md`): the sidebar
+  grows chat categories under Chat (the Squad Hub sub-item pattern), a chip
+  row on the list itself (All · Unread·n · Squads · Groups & DMs — the
+  phone's answer, driven by the same ?filter= as the sidebar so the two
+  cannot disagree), foldable sections remembered per device, and unread
+  rows sorting first. All client, no migration. Pins and archive offered
+  and parked. The NEXT pull request cites this entry's squash SHA.
+- `dea42ad` — 📎 **Chat round 4: the message menu, pins, stars,
+  reply-privately, and the reaction pill where WhatsApp puts it** (#384) — from
   Jay's two WhatsApp screenshots relayed cross-session
   (`claude/plans/2026-08-24-chat-round-4.md`). A chevron on every bubble
   opens Reply · Forward · Copy · Pin · Star · Reply privately · Delete/
@@ -23,7 +32,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   guard relaxed to readable-by-sender for reply-privately, and the round-2
   harness anchors were REPOINTED, not deleted.
   (`db/migrations/20260824_chat_round_4.sql`, harness green, two injected
-  faults caught.) The NEXT pull request cites this entry's squash SHA.
+  faults caught.) Merged as #384 and verified live from the deployed
+  bundle by four markers; its own branch could not cite this squash SHA,
+  so this entry carries it now.
 - `11892d7` — 🏟️ **Click any event on Allocation to give it a pitch** (#383) — Jay: "none of
   the events are clickable, can't click them to assign a pitch". Not a
   regression: direct assignment was wanted on 5 Aug and never built — the
