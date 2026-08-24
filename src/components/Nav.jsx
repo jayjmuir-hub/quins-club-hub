@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import useAutoHideOnScroll from '../lib/useAutoHideOnScroll.js'
 
 // Primary navigation — THE MOBILE TAB BAR, and since phase 2 of the 2.0
 // retheme (claude/plans/2026-08-21-retheme-and-shell.md) nothing else.
@@ -200,36 +201,10 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
   const navRef = useRef(null)
   const [box, setBox] = useState(null)
 
-  // ══ AUTO-HIDE ON SCROLL — Safari's bar, and iOS apps that read ══════════
-  // Scrolling DOWN past the first 80px slides the dock away (more room for
-  // the content you are reading); any scroll UP, or reaching the top or the
-  // bottom of the page, brings it back. Thresholded at 6px so a thumb
-  // resting on the glass does not flicker it. Re-shown on every route
-  // change, so a fresh screen never opens with its nav hidden.
-  const [hidden, setHidden] = useState(false)
-  useEffect(() => {
-    let last = window.scrollY
-    let ticking = false
-    function onScroll() {
-      if (ticking) return
-      ticking = true
-      window.requestAnimationFrame(() => {
-        const y = window.scrollY
-        const max = document.documentElement.scrollHeight - window.innerHeight
-        const delta = y - last
-        if (y <= 80 || y >= max - 8) setHidden(false)
-        else if (delta > 6) setHidden(true)
-        else if (delta < -6) setHidden(false)
-        last = y
-        ticking = false
-      })
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-  useEffect(() => {
-    setHidden(false)
-  }, [pathname])
+  // Auto-hide on scroll — the logic lived inline here until 24 Aug 2026 and
+  // is now shared with the masthead, which slides in step with this dock.
+  // The numbers (80px grace, 6px hysteresis) live in the hook.
+  const hidden = useAutoHideOnScroll()
 
   // Where is the active link? Re-measured on route change and on resize, and
   // once more after the label's 300ms unfurl so the pill's final width is the
