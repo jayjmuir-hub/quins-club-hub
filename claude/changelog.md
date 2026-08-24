@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 🫙 **CLEAR liquid glass — the smoked bars lasted an afternoon.** Jay saw
+- (unmerged) — 🚑 **Hotfix 2: the quoted embed goes through the FK COLUMN
+  itself** — the first hotfix's `messages!quoted_id` spelling RESOLVED but
+  in the reverse direction: an empty array of quoting-messages on every row,
+  truthy and bodyless, so every bubble in every thread grew a phantom
+  "📷 Photo" chip (Jay screenshotted it live within the hour). Only
+  `quoted:quoted_id(…)` is to-one by definition; the renderers now demand
+  an object with an id, pinned by a regression test at both layers. The
+  NEXT pull request cites this entry's squash SHA.
+- `d170253` — 🫙 **CLEAR liquid glass — the smoked bars lasted an afternoon**
+  (#374). Jay saw
   #370's glass on the live site ("very little transparency") and asked for
   fully transparent with a small red glow. Both bars are now iOS-style clear
   glass: 2% fill, 8px frost (28px read as grey soup — the first prototype's
@@ -22,7 +31,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   floor with nothing to spare). Approved from Netlify deploy preview #374 —
   a look decision made on a preview, so no production deploy was burned
   iterating. `src/index.css`'s clear-glass block carries the arithmetic.
-  (No SHA — this branch's entry; the next pull request cites the squash.)
+  Its own branch could not cite this squash SHA, so this entry does.
 - `2008310` — 🚑 **Hotfix: the quoted embed hints by COLUMN name** (#373) — round 2
   reached the live site with `quoted:messages!messages_quoted_id_fkey(…)` in
   the SELECT and every DM/group thread died with PGRST200 "Could not find a
@@ -32,7 +41,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   hints on SELF-joins**, and the column-name hint `!quoted_id` does
   (probed live, after two reload notifies changed nothing). One line, plus
   a test pinning the string the live API parses. Its own branch could not
-  cite the squash SHA, so this entry carries it now.
+  cite the squash SHA, so this entry carries it now — and a spelling
+  hotfix 2 above then had to correct again, in the other direction.
 - `5cf0fb1` — 📋 **Round 2 closed** (#372) — `bbbc1d3` cited, both plans
   marked shipped, live verification recorded. Its own branch could not cite
   this squash SHA, so this entry does.

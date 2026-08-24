@@ -13,22 +13,27 @@ import { supabase } from '../lib/supabase'
 // House conventions (RESTORE.md §Data access conventions): throw on error,
 // return [] not null, import no React.
 
-// ⚠️ TWO SELF-JOINS ON messages (parent_id and quoted_id since round 2), so
-// the quoted embed must carry a hint — and the hint MUST BE THE COLUMN NAME,
-// `!quoted_id`, not the constraint name. Measured live, 24 Aug 2026, minutes
-// after round 2 deployed: `!messages_quoted_id_fkey` returns PGRST200
-// "Could not find a relationship" on this project's PostgREST for a
-// SELF-join (the same probe against `!messages_parent_id_fkey` fails
-// identically, and that constraint is weeks old), while `!quoted_id`
-// resolves. Constraint-name hints still work fine on ordinary embeds —
-// profiles and events below use them.
+// ⚠️ THE QUOTED EMBED IS SPELLED `quoted:quoted_id(…)` — THE FK COLUMN
+// ITSELF — AND BOTH OTHER SPELLINGS SHIPPED BROKEN, THE SAME EVENING,
+// 24 Aug 2026. A SELF-join is the trap twice over:
+//   1. `!messages_quoted_id_fkey` (constraint hint) → PGRST200 "Could not
+//      find a relationship" on this project's PostgREST — the identical
+//      probe against the weeks-old messages_parent_id_fkey fails the same
+//      way, so it is the self-join, not cache staleness.
+//   2. `messages!quoted_id` (table + column hint) RESOLVED — in the WRONG
+//      DIRECTION: the messages-that-quote-THIS-one array, so every bubble
+//      carried an empty-array "quote" and the screens drew a phantom
+//      "📷 Photo" chip on every message. Jay screenshotted it live.
+// Embedding via the column is defined as to-one toward the referenced row
+// and cannot be read backwards. Constraint-name hints still work fine on
+// ordinary embeds — profiles and events below use them.
 // The embed is read under RLS as the caller — a quote of a message you may
 // not read comes back null, which renders as no quote at all.
 const SELECT = `
   id, club_id, team_id, channel, parent_id, event_id, author_id, author_role, author_title, body, pinned,
   mentions, edited_at, deleted_at, created_at, quoted_id, forwarded, attachment_path,
   author:profiles!messages_author_id_fkey(full_name),
-  quoted:messages!quoted_id(id, body, deleted_at, attachment_path, author:profiles!messages_author_id_fkey(full_name)),
+  quoted:quoted_id(id, body, deleted_at, attachment_path, author:profiles!messages_author_id_fkey(full_name)),
   event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, ends_at, time_tbd, venue, pitch, team_id)
 `
 
