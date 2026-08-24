@@ -401,7 +401,7 @@ export async function getConversation(conversationId) {
   const [{ data, error }, minor] = await Promise.all([
     supabase
       .from('conversations')
-      .select('id, club_id, profile_a, profile_b, created_at, last_at')
+      .select('id, club_id, kind, title, profile_a, profile_b, created_at, last_at')
       .eq('id', conversationId)
       .maybeSingle(),
     // Whether a minor is in it decides the notice: a minor's conversation is
@@ -547,6 +547,7 @@ export async function listChats() {
 /** The route a list row opens. */
 export function chatPath(row) {
   switch (row.kind) {
+    case 'group':
     case 'dm':
       return `/chat/dm/${row.conversation_id}`
     case 'club':
@@ -566,4 +567,54 @@ export function chatPath(row) {
 export async function clearConversation(conversationId) {
   const { error } = await supabase.rpc('clear_conversation', { _conversation: conversationId })
   if (error) throw error
+}
+
+// ── Groups (claude/plans/2026-08-24-group-chats.md) ─────────────────────────
+
+export async function createGroup(title, memberIds) {
+  const { data, error } = await supabase.rpc('create_group', { _title: title, _members: memberIds })
+  if (error) throw error
+  return data
+}
+
+export async function renameGroup(conversationId, title) {
+  const { error } = await supabase.from('conversations').update({ title }).eq('id', conversationId)
+  if (error) throw error
+}
+
+export async function addGroupMembers(conversationId, memberIds) {
+  const { error } = await supabase.rpc('add_group_members', { _conversation: conversationId, _members: memberIds })
+  if (error) throw error
+}
+
+export async function leaveGroup(conversationId) {
+  const { error } = await supabase.rpc('leave_group', { _conversation: conversationId })
+  if (error) throw error
+}
+
+export async function removeGroupMember(conversationId, memberId) {
+  const { error } = await supabase.rpc('remove_group_member', { _conversation: conversationId, _member: memberId })
+  if (error) throw error
+}
+
+export async function listGroupMembers(conversationId) {
+  const { data, error } = await supabase
+    .from('conversation_members')
+    .select('profile_id, is_owner, joined_at, profiles(full_name)')
+    .eq('conversation_id', conversationId)
+    .order('joined_at')
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    profile_id: r.profile_id,
+    is_owner: r.is_owner,
+    full_name: r.profiles?.full_name ?? '',
+  }))
+}
+
+// The group picker's pool: like listDmCandidates but without the minor gate,
+// which is the 24 Aug ruling, not an accident.
+export async function listGroupCandidates() {
+  const { data, error } = await supabase.rpc('group_candidates')
+  if (error) throw error
+  return data ?? []
 }
