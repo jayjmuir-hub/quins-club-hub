@@ -29,3 +29,18 @@
 # for shell scripts, neither of which has any reason to carry CRLF.
 *.sql text eol=lf
 *.sh  text eol=lf
+
+# ⚠️ WIDENED TO EVERYTHING, 24 Aug 2026 — the `.gitattributes` decision from
+# the 21 Aug review (claude/open-items.md). The system `core.autocrlf=true`
+# turned a 78-line test change into a 526-line diff by flattening a CRLF
+# working-tree file on `git add`, and the three patterns above only protected
+# the file types that had already been bitten.
+#
+# MEASURED BEFORE WIDENING, not assumed: `git ls-files --eol` showed every
+# tracked text file already LF in the index (645 i/lf w/crlf + 215 i/lf w/lf,
+# 18 binary, zero i/crlf) — so this line renormalizes NOTHING and no churn
+# commit is needed. It only pins what is already true, for every future file
+# and every future checkout. No .bat/.cmd/.ps1 in the repo wants CRLF —
+# checked. The specific rules above are kept: they are the record of which
+# types actually bit, and deleting a rot-anchor is against the rules.
+* text=auto eol=lf

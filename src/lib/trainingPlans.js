@@ -79,6 +79,30 @@ export function ageOrNull(value) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+/**
+ * Why the form's age boxes are refused BEFORE Postgres gets to.
+ *
+ * The DB has the real rules — `check (… between 4 and 19)` and the
+ * `*_age_order` constraints — but its refusal surfaces as a raw
+ * `drills_min_age_check` string no coach can act on (21 Aug review). This
+ * mirrors those two checks, in the same order, over the form's raw strings.
+ * Blank stays a real answer at either end, exactly as ageOrNull sends it.
+ *
+ * Returns the message to show, or null when the draft would satisfy the DB.
+ */
+export function ageDraftProblem(minValue, maxValue) {
+  const ends = [minValue, maxValue].map((value) => (value ?? '').trim())
+  for (const end of ends) {
+    if (end === '') continue
+    const parsed = Number(end)
+    if (!Number.isInteger(parsed) || parsed < 4 || parsed > 19) return 'Ages are 4 to 19'
+  }
+  if (ends[0] !== '' && ends[1] !== '' && Number(ends[0]) > Number(ends[1])) {
+    return 'Youngest is above oldest'
+  }
+  return null
+}
+
 /** Whether a drill may be offered inside a template: contact, then age overlap. */
 export function drillFitsTemplate(drill, template) {
   if (drill?.requires_contact && !template?.requires_contact) {

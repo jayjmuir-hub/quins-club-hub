@@ -7,6 +7,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listDrills, setDrillActive, upsertDrill } from '../data/trainingPlans.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import {
+  ageDraftProblem,
   ageOrNull,
   bandLabel,
   CATEGORIES,
@@ -250,7 +251,11 @@ function LibraryBody() {
 
   const minutes = Number(draft.minutes)
   const minutesOk = Number.isFinite(minutes) && minutes >= 1 && minutes <= 120
-  const canSave = draft.title.trim() !== '' && minutesOk && (editing !== 'new' || clubId != null)
+  // Caught here so a typo of 99 reads "Ages are 4 to 19", not a raw
+  // drills_min_age_check from Postgres. See ageDraftProblem.
+  const ageProblem = ageDraftProblem(draft.min_age, draft.max_age)
+  const canSave =
+    draft.title.trim() !== '' && minutesOk && ageProblem == null && (editing !== 'new' || clubId != null)
 
   if (isFirstLoad) {
     return (
@@ -471,6 +476,10 @@ function LibraryBody() {
                 />
               </label>
             </div>
+
+            {ageProblem != null && (
+              <p role="alert" className="text-[12.5px] font-semibold text-danger-ink">{ageProblem}</p>
+            )}
 
             <div className="flex flex-wrap items-end gap-2.5">
               <label className="min-w-0 flex-1">
