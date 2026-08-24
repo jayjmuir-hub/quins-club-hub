@@ -10,14 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 📐 **The chat list's section titles get their 18px back** —
+- (unmerged) — 📎 **Chat round 4: the message menu, pins, stars,
+  reply-privately, and the reaction pill where WhatsApp puts it** — from
+  Jay's two WhatsApp screenshots relayed cross-session
+  (`claude/plans/2026-08-24-chat-round-4.md`). A chevron on every bubble
+  opens Reply · Forward · Copy · Pin · Star · Reply privately · Delete/
+  Report, replacing the inline text actions; tallies hang off the bubble
+  corner; pinned messages ride a banner. Pinning is ANYONE-in-the-chat by
+  Jay's ruling, through a SECURITY DEFINER single-column RPC — widening
+  the UPDATE policy would have handed participants body-rewrites, the
+  grants.sql §4 trap. Stars are owner-only (`/chat/starred`). The quote
+  guard relaxed to readable-by-sender for reply-privately, and the round-2
+  harness anchors were REPOINTED, not deleted.
+  (`db/migrations/20260824_chat_round_4.sql`, harness green, two injected
+  faults caught.) The NEXT pull request cites this entry's squash SHA.
+- `4ca3560` — 📐 **The chat list's section titles get their 18px back** (#382) —
   Jay: "the Direct Messages text touches the chip above it", and the
   measurement in his own browser agreed: 4px from card edge to title.
   BlockTitle's `first:mt-0` zeroes its top margin the moment a <section>
   wrapper makes it a first child — the trap Dashboard's blocks already
   compensate for with `mt-[18px]` on the wrapper, which ChatList's two
-  sections now do too. Measured 4px before, 18px after. The NEXT pull
-  request cites this entry's squash SHA.
+  sections now do too. Measured 4px before in Jay's own browser, 18px
+  after — live, in the same browser. Its own branch could not cite this
+  squash SHA, so this entry does.
 - `19e3ede` — 💠 **The glass gets MATERIAL and a PRISM LENS** (#379) — the rest of Jay's glass
   night. Over a flat white page clear glass vanishes into the page ("still
   look like they are white and not glassy"), so the pane itself now has

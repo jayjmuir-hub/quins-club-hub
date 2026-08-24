@@ -122,6 +122,19 @@ export default function ChatList() {
     <section className="px-1">
       <div className="mb-3 mt-1 flex items-center justify-between gap-3">
         <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink">Chats</h2>
+        <span className="flex items-center gap-2">
+        {/* Round 4: the private starred-messages list. Only ever yours —
+            message_stars is owner-only by RLS. */}
+        <Link
+          to="/chat/starred"
+          aria-label="Starred messages"
+          data-testid="starred-link"
+          className="grid h-10 w-10 place-items-center rounded-full border border-line bg-surface-card text-ink-muted shadow-card hover:text-ink"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1L12 2Z" />
+          </svg>
+        </Link>
         <button
           type="button"
           onClick={() => setPicking((v) => (v ? false : 'dm'))}
@@ -135,6 +148,7 @@ export default function ChatList() {
             <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
           </svg>
         </button>
+        </span>
       </div>
 
       <div className="mb-3">

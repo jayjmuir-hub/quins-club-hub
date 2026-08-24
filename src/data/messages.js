@@ -211,8 +211,54 @@ export async function clearChannel(teamId, channel = 'squad') {
 
 /** Pins or unpins a post. Squad staff only — the policy decides. */
 export async function setPinned(id, pinned) {
-  const { error } = await supabase.from('messages').update({ pinned }).eq('id', id)
+  // Round 4: through the RPC, not a table update. In a DM/group ANY
+  // participant may pin (Jay's WhatsApp-default ruling); channels keep the
+  // staff rule. The RPC exists because widening the messages UPDATE policy
+  // would hand participants the whole granted column set — body included
+  // (db/migrations/20260824_chat_round_4.sql).
+  const { error } = await supabase.rpc('set_message_pinned', { _message: id, _pinned: pinned })
   if (error) throw error
+}
+
+// ── Stars: private bookmarks (round 4, the nicknames pattern) ───────────────
+
+/** My starred message ids, as a Set. */
+export async function listMyStars() {
+  const { data, error } = await supabase.from('message_stars').select('message_id')
+  if (error) throw error
+  return new Set((data ?? []).map((r) => r.message_id))
+}
+
+/** Star or unstar for myself. `ownerId` is my id — the toggleReaction convention. */
+export async function toggleStar(ownerId, messageId, on) {
+  if (on) {
+    const { error } = await supabase.from('message_stars').insert({ owner_id: ownerId, message_id: messageId })
+    if (error) throw error
+  } else {
+    const { error } = await supabase.from('message_stars').delete().eq('message_id', messageId)
+    if (error) throw error
+  }
+}
+
+/**
+ * My starred messages, newest star first, with enough of each message to
+ * render a row and jump to its thread. Reads messages by id under RLS — a
+ * star whose message has since gone unreadable simply drops out.
+ */
+export async function listMyStarredMessages() {
+  const { data: stars, error } = await supabase
+    .from('message_stars')
+    .select('message_id, created_at')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  if (!stars?.length) return []
+  const { data: rows, error: msgError } = await supabase
+    .from('messages')
+    .select(SELECT)
+    .in('id', stars.map((s) => s.message_id))
+  if (msgError) throw msgError
+  const byId = new Map((rows ?? []).map((m) => [m.id, m]))
+  return stars.map((s) => byId.get(s.message_id)).filter(Boolean)
 }
 
 // ── Channel settings ────────────────────────────────────────────────────────

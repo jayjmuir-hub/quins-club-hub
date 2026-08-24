@@ -135,7 +135,9 @@ describe('reply-with-quote', () => {
     const user = userEvent.setup()
     renderThread()
     const bubbles = await screen.findAllByTestId('dm-bubble')
-    await user.click(within(bubbles[0]).getByRole('button', { name: 'Reply' }))
+    // Round 4: actions live in the bubble's chevron menu.
+    await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Reply' }))
     const preview = screen.getByTestId('quote-preview')
     expect(preview).toHaveTextContent('Replying to Zz Manager Probe')
     expect(preview).toHaveTextContent('Two seats held')
@@ -180,7 +182,8 @@ describe('forwarding', () => {
     ])
     renderThread()
     const bubbles = await screen.findAllByTestId('dm-bubble')
-    await user.click(within(bubbles[0]).getByRole('button', { name: 'Forward' }))
+    await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Forward' }))
     expect(screen.getByTestId('forward-bar')).toHaveTextContent('1 selected')
     // The composer yields to the bar — no half-armed send under a selection.
     expect(screen.queryByTestId('dm-composer')).not.toBeInTheDocument()
@@ -241,7 +244,8 @@ describe('photo attachments', () => {
     m.listDirectMessages.mockResolvedValue([dm('d2', ME, '', { attachment_path: `${ME}/pic.jpg` })])
     renderThread()
     const bubble = (await screen.findAllByTestId('dm-bubble'))[0]
-    await user.click(within(bubble).getByRole('button', { name: 'Delete' }))
+    await user.click(within(bubble).getByRole('button', { name: 'Message options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }))
     await waitFor(() => expect(m.removeMessage).toHaveBeenCalledWith('d2'))
     expect(media.removeChatPhoto).toHaveBeenCalledWith(`${ME}/pic.jpg`)
   })

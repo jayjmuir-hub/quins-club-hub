@@ -155,7 +155,9 @@ describe('DirectMessages — a thread', () => {
     const user = userEvent.setup()
     renderAt('/chat/dm/c1')
     await screen.findAllByTestId('dm-bubble')
-    await user.click(screen.getByRole('button', { name: 'Report' }))
+    // Round 4: actions live in the bubble's chevron menu.
+    await user.click(within((await screen.findAllByTestId('dm-bubble'))[0]).getByRole('button', { name: 'Message options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Report' }))
     await user.type(screen.getByLabelText('Report this message to the club'), 'Rude')
     await user.click(screen.getByRole('button', { name: 'Send report' }))
     expect(m.reportMessage).toHaveBeenCalledWith('d1', 'Rude')
@@ -172,8 +174,12 @@ describe('DirectMessages — a thread', () => {
     const user = userEvent.setup()
     renderAt('/chat/dm/c1')
     const bubbles = await screen.findAllByTestId('dm-bubble')
-    expect(within(bubbles[0]).queryByRole('button', { name: 'Delete' })).toBeNull()
-    await user.click(within(bubbles[1]).getByRole('button', { name: 'Delete' }))
+    // Theirs offers Report in its menu, never Delete; mine offers Delete.
+    await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
+    expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull()
+    await user.keyboard('{Escape}')
+    await user.click(within(bubbles[1]).getByRole('button', { name: 'Message options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }))
     expect(m.removeMessage).toHaveBeenCalledWith('d2')
   })
 

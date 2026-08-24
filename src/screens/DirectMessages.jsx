@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import ChatHeader from '../components/ChatHeader.jsx'
@@ -8,6 +8,7 @@ import EmojiPicker from '../components/EmojiPicker.jsx'
 import { Empty } from '../components/Empty.jsx'
 import { Avatar, RolePill } from '../components/NewChatPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
+import MessageMenu from '../components/MessageMenu.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import ReactionBar, { ReactionTrigger } from '../components/ReactionBar.jsx'
 import { removeChatPhoto, uploadChatPhoto } from '../data/chatMedia.js'
@@ -18,6 +19,7 @@ import {
   forwardMessagesTo,
   listChats,
   listMyMessageReads,
+  listMyStars,
   listReactions,
   getConversation,
   leaveGroup,
@@ -27,13 +29,16 @@ import {
   listMyConversations,
   logWelfareAccess,
   markMessagesRead,
+  openConversation,
   removeMessage,
   renameGroup,
   reportMessage,
   sendDirectMessage,
+  setPinned,
   subscribeMessages,
   subscribeReactions,
   toggleReaction,
+  toggleStar,
   unblockDm,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -116,7 +121,10 @@ function Thread({ conversationId }) {
   const [nickDraft, setNickDraft] = useState('')
   const [background, setBackground] = useState(getChatBackground)
   const [pickingBackground, setPickingBackground] = useState(false)
+  // Round 4 (claude/plans/2026-08-24-chat-round-4.md): my private stars.
+  const [stars, setStars] = useState(() => new Set())
   const navigate = useNavigate()
+  const location = useLocation()
   const bottomRef = useRef(null)
   const loggedRef = useRef(false)
   const newFromRef = useRef(undefined)
@@ -155,6 +163,12 @@ function Thread({ conversationId }) {
       } catch {
         setNicknames(new Map())
       }
+      // And stars.
+      try {
+        setStars(await listMyStars())
+      } catch {
+        setStars(new Set())
+      }
       const group = conv?.kind === 'group'
       const people = group ? await listGroupMembers(conversationId) : null
       setMembers(people)
@@ -183,6 +197,18 @@ function Thread({ conversationId }) {
   useEffect(() => {
     load()
   }, [load])
+
+  // Reply-privately (round 4): arriving from a group with a message to
+  // quote, passed through navigation state so nothing is refetched. Armed
+  // once, then cleared so a back-and-forward does not re-arm it.
+  useEffect(() => {
+    const quote = location.state?.replyPrivatelyTo
+    if (quote) {
+      setReplyTo(quote)
+      navigate(location.pathname, { replace: true, state: null })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => subscribeMessages(load), [load])
   useEffect(() => subscribeReactions(load), [load])
 
@@ -375,6 +401,44 @@ function Thread({ conversationId }) {
     } catch (err) {
       setError(err.message || 'Could not leave the group.')
       setLeaving(false)
+    }
+  }
+
+  async function onCopy(m) {
+    try {
+      await navigator.clipboard?.writeText?.(m.body ?? '')
+    } catch {
+      setError('Could not copy that.')
+    }
+  }
+
+  async function onPin(m) {
+    try {
+      await setPinned(m.id, !m.pinned)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Could not pin that.')
+    }
+  }
+
+  async function onStar(m) {
+    try {
+      await toggleStar(selfId, m.id, !stars.has(m.id))
+      setStars(await listMyStars())
+    } catch (err) {
+      setError(err.message || 'Could not star that.')
+    }
+  }
+
+  // From a group, quote this message into a DM with its author. Whether
+  // the DM is allowed stays open_conversation's call; its refusal is the
+  // database's words, same as the staff-tile button.
+  async function onReplyPrivately(m) {
+    try {
+      const dm = await openConversation(m.author_id)
+      navigate(`/chat/dm/${dm}`, { state: { replyPrivatelyTo: m } })
+    } catch (err) {
+      setError(err.message || 'Could not open a chat with them.')
     }
   }
 
@@ -640,12 +704,48 @@ function Thread({ conversationId }) {
         </div>
       )}
       {messages?.length === 0 && <Empty message="Say hello." />}
+      {/* Round 4: pinned messages ride a banner at the top; tap jumps.
+          Anyone in the chat pinned them (the WhatsApp-default ruling). */}
+      {(messages ?? []).some((m) => m.pinned && !m.deleted_at) && (
+        <div className="mb-2 rounded-[10px] border border-line bg-surface-card px-2.5 py-1.5 shadow-card" data-testid="pinned-banner">
+          {(messages ?? []).filter((m) => m.pinned && !m.deleted_at).map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => document.getElementById(`msg-${m.id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })}
+              className="flex w-full items-center gap-2 py-0.5 text-left"
+            >
+              <span aria-hidden="true" className="text-[12px]">📌</span>
+              <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-muted">
+                <span className="font-bold text-ink">{m.author_id === selfId ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')}: </span>
+                {m.body?.trim() ? m.body : '📷 Photo'}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       {/* Round 3: the wallpaper — a low-alpha overlay on the stream only,
           so the composer and header stay on the plain surface. */}
       <div className="-mx-1 flex flex-col gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
         {messages?.map((m, index) => {
           const mine = m.author_id === selfId
           const authorName = mine ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')
+          const tallies = reactions.get(m.id) ?? []
+          // Round 4: the chevron menu carries every action; the screen
+          // decides the list, MessageMenu only draws it.
+          const menuItems = !participant || m.deleted_at || selecting
+            ? []
+            : [
+                { label: 'Reply', onClick: () => { setReplyTo(m); draftRef.current?.focus?.() } },
+                { label: 'Forward', onClick: () => startForward(m.id) },
+                ...(m.body?.trim() ? [{ label: 'Copy', onClick: () => onCopy(m) }] : []),
+                { label: m.pinned ? 'Unpin' : 'Pin', onClick: () => onPin(m) },
+                { label: stars.has(m.id) ? 'Unstar' : 'Star', onClick: () => onStar(m) },
+                ...(isGroup && !mine ? [{ label: 'Reply privately', onClick: () => onReplyPrivately(m) }] : []),
+                ...(mine
+                  ? [{ label: 'Delete', onClick: () => onRemove(m.id), danger: true }]
+                  : [{ label: 'Report', onClick: () => setReporting(m.id), danger: true }]),
+              ]
           // The stamp rides INSIDE the bubble, WhatsApp style (round 3:
           // "the time stamp is not totally below the message").
           const stamp = (
@@ -677,12 +777,16 @@ function Thread({ conversationId }) {
                 <ReactionTrigger messageId={m.id} reactions={reactions.get(m.id) ?? []} selfId={selfId} onToggle={react} align="right" />
               )}
               <div
-                className={`max-w-[80%] rounded-[14px] px-2.5 py-1.5 ${mine ? 'bg-accent-deep text-white' : 'bg-surface-card text-ink shadow-card'} ${selecting && selected.has(m.id) ? 'ring-2 ring-brand' : ''}`}
+                className={`relative max-w-[80%] rounded-[14px] px-2.5 py-1.5 ${tallies.length ? 'mb-3' : ''} ${mine ? 'bg-accent-deep text-white' : 'bg-surface-card text-ink shadow-card'} ${selecting && selected.has(m.id) ? 'ring-2 ring-brand' : ''}`}
                 onClick={selecting && !m.deleted_at ? () => toggleSelected(m.id) : undefined}
                 data-selected={selecting && selected.has(m.id) ? 'true' : undefined}
               >
+                <MessageMenu items={menuItems} mine={mine} />
+                {m.pinned && !m.deleted_at && (
+                  <span aria-label="Pinned" className={`absolute right-7 top-1.5 text-[10px] ${mine ? 'text-white/70' : 'text-ink-faint'}`} data-testid="pin-mark">📌</span>
+                )}
                 {isGroup && !mine && (
-                  <p className="text-[11px] font-extrabold text-brand-ink">{authorName}</p>
+                  <p className="pr-10 text-[11px] font-extrabold text-brand-ink">{authorName}</p>
                 )}
                 {m.forwarded && !m.deleted_at && (
                   <p className={`text-[11px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`} data-testid="forwarded-tag">
@@ -724,7 +828,7 @@ function Thread({ conversationId }) {
                   <>
                     {m.attachment_path && <ChatPhoto path={m.attachment_path} />}
                     {m.body?.trim() ? (
-                      <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.4]">
+                      <p className={`whitespace-pre-wrap break-words text-[14.5px] leading-[1.4] ${menuItems.length ? 'pr-5' : ''}`}>
                         {m.body}
                         {stamp}
                       </p>
@@ -733,30 +837,15 @@ function Thread({ conversationId }) {
                     )}
                   </>
                 )}
-                {!m.deleted_at && (participant || (reactions.get(m.id) ?? []).length > 0) && (
-                  <div className={`flex items-center gap-2 text-[10.5px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-                    {participant && !selecting && (
-                      <>
-                        <button type="button" onClick={() => { setReplyTo(m); draftRef.current?.focus?.() }} className="underline-offset-2 hover:underline">
-                          Reply
-                        </button>
-                        <button type="button" onClick={() => startForward(m.id)} className="underline-offset-2 hover:underline">
-                          Forward
-                        </button>
-                        {mine ? (
-                          <button type="button" onClick={() => onRemove(m.id)} className="underline-offset-2 hover:underline">
-                            Delete
-                          </button>
-                        ) : (
-                          <button type="button" onClick={() => setReporting(m.id)} className="underline-offset-2 hover:underline">
-                            Report
-                          </button>
-                        )}
-                      </>
-                    )}
+                {/* Round 4: the tallies are a pill OVERLAPPING the bubble's
+                    bottom corner, where WhatsApp puts them — left of
+                    theirs, right of yours. The mb-3 on the bubble is the
+                    room it hangs into. */}
+                {!m.deleted_at && tallies.length > 0 && (
+                  <div className={`absolute -bottom-3 ${mine ? 'right-2' : 'left-2'}`} data-testid="reaction-pill">
                     <ReactionBar
                       messageId={m.id}
-                      reactions={reactions.get(m.id) ?? []}
+                      reactions={tallies}
                       selfId={selfId}
                       onToggle={react}
                       disabled={!participant}
