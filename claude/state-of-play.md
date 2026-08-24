@@ -62,7 +62,11 @@ evening and are VERIFIED LIVE** — member-created, named, three people
 minimum, minors addable with no warnings by ruling
 (`claude/decisions/2026-08-24-groups-open-no-warnings.md`); the first real
 group's push arrived on a second phone the night it shipped
-(`claude/plans/2026-08-24-group-chats.md`). Underneath, unchanged:
+(`claude/plans/2026-08-24-group-chats.md`). **The same evening: the member
+chat home, nine feedback fixes from Jay's first test drive
+(`claude/plans/2026-08-24-chat-feedback.md` — the round-2 remainder lives
+there), the desktop floating dock, and emoji reactions — dock and reactions
+verified by Jay on the preview against the real database.** Underneath, unchanged:
 **SQUAD CHAT PHASES 1–3** (23 Aug 2026) — a channel per squad
 and one for the club (announce-only by default), a thread per fixture with
 RSVP chips, @mentions that push, a staff channel per squad, direct messages,
