@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import Button from './Button.jsx'
 import Card from './Card.jsx'
 import Spinner from './Spinner.jsx'
 import { Avatar, RolePill } from './NewChatPicker.jsx'
@@ -204,14 +205,9 @@ export default function NewGroupPicker({
       )}
 
       <div className="border-t border-line p-3">
-        <button
-          type="button"
-          disabled={!ready || busy}
-          onClick={submit}
-          className="h-11 w-full rounded-btn bg-brand text-[14px] font-bold text-ink-invert hover:bg-brand-deep disabled:opacity-40"
-        >
+        <Button type="button" full disabled={!ready || busy} onClick={submit}>
           {adding ? `Add · ${selected.size}` : `Create group · ${selected.size + 1} people`}
-        </button>
+        </Button>
       </div>
 
       <p className="border-t border-line bg-surface-mute px-4 py-2 text-[11.5px] text-ink-muted">

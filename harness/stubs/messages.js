@@ -110,6 +110,7 @@ export async function listChats() {
 }
 export function chatPath(row) {
   switch (row.kind) {
+    case 'group':
     case 'dm':
       return `/chat/dm/${row.conversation_id}`
     case 'club':
@@ -124,4 +125,28 @@ export async function clearConversation() {}
 export async function deleteConversation() {}
 export async function clearChannel() {
   return 0
+}
+
+// ── Groups (24 Aug 2026) — claude/plans/2026-08-24-group-chats.md ──────────
+// Invented people only — CLAUDE.md rule 9.
+export async function createGroup() {
+  return 'hz-group-1'
+}
+export async function renameGroup() {}
+export async function addGroupMembers() {}
+export async function leaveGroup() {}
+export async function removeGroupMember() {}
+export async function listGroupMembers() {
+  return [
+    { profile_id: 'hz-self', is_owner: true, full_name: 'You' },
+    { profile_id: 'hz-parent', is_owner: false, full_name: 'Dov Lantern' },
+    { profile_id: 'hz-manager', is_owner: false, full_name: 'Sam Quillon' },
+  ]
+}
+export async function listGroupCandidates() {
+  return [
+    { profile_id: 'hz-parent', full_name: 'Dov Lantern', role: 'parent', via_team: 'U13 Mixed' },
+    { profile_id: 'hz-manager', full_name: 'Sam Quillon', role: 'manager', via_team: 'U13 Mixed' },
+    { profile_id: 'hz-coach', full_name: 'Harriet Zephyr', role: 'coach', via_team: 'U13 Mixed' },
+  ]
 }
