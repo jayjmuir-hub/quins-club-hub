@@ -73,16 +73,17 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Cheap (under an hour each)
 
-- 🧪 **The suite passes with 5–7 "Unhandled Errors" every run — measured 23 Aug
+- ✅ ~~**The suite passes with 5–7 "Unhandled Errors" every run — measured 23 Aug
   2026 on `main` at `c593795`.** `TypeError: The "event" argument must be an
-  instance of Event` from undici's WebSocket, originating in
-  `tests/app-shell.test.jsx`, `tests/dashboard.test.jsx`,
-  `tests/dashboard-availability.test.jsx`, `tests/name-prompt.test.jsx` and
-  `tests/parent-self-registration.test.jsx`. Those screens subscribe to Supabase
-  realtime and the tests do not mock it, so jsdom opens a REAL socket to the
-  project during `npm test`. Exit code is still 0 and every test passes, which
-  is why nobody has looked. Fix is a realtime mock in `src/test/setup.js`, or
-  mocking `src/lib/supabase.js` in those five files. Half an hour.
+  instance of Event` from undici's WebSocket, originating in five screen suites
+  whose screens subscribe to Supabase realtime unmocked, so jsdom opened a REAL
+  socket to the project during `npm test`.~~ — **FIXED 24 Aug 2026**: a
+  never-connecting WebSocket stub in `src/test/setup.js`, jsdom-only so the
+  node-environment files (which only need the global to EXIST) are untouched.
+  Measured both sides: 3 unhandled errors on 3 files before, 0 across all 175
+  after, full suite green. The vite.config.js note about
+  `delete globalThis.WebSocket` as a fault-injection technique still stands —
+  the stub replaces, never deletes.
 
 - **Training plans follow-ups from the 21 Aug 2026 whole-branch review** (none
   blocking): client-side age validation on the drill and template forms (a typo

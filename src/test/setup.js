@@ -37,6 +37,52 @@ if (typeof window !== 'undefined') {
   userEvent.setup = (options = {}) => setupWithoutDelay({ delay: null, ...options })
 }
 
+// ⚠️ jsdom TESTS USED TO OPEN REAL WEBSOCKETS TO THE LIVE SUPABASE PROJECT.
+// Five screen suites (app-shell, dashboard, dashboard-availability,
+// name-prompt, parent-self-registration) render components that subscribe to
+// realtime without mocking it, and jsdom's WebSocket is undici's — a genuine
+// network client. Every `npm test` run therefore connected to production, and
+// the only visible symptom was 5–7 "Unhandled Errors" from undici
+// (`The "event" argument must be an instance of Event`) on a suite that still
+// exited 0, which is why nobody looked (claude/open-items.md, measured
+// 23 Aug 2026).
+//
+// This stub replaces jsdom's WebSocket with one that never connects: realtime
+// subscriptions sit in CONNECTING forever, which every screen already
+// tolerates (a subscription that hasn't delivered yet is indistinguishable
+// from a quiet channel). No test constructs a WebSocket itself — checked, the
+// matches in tests/ are all comments — and the node-environment files are
+// untouched because this whole branch is jsdom-only. supabase-js only checks
+// that the global EXISTS at import time, so replacing (not deleting — see
+// vite.config.js on `delete globalThis.WebSocket`) keeps that contract.
+if (typeof window !== 'undefined') {
+  class QuietWebSocket {
+    static CONNECTING = 0
+    static OPEN = 1
+    static CLOSING = 2
+    static CLOSED = 3
+    constructor(url) {
+      this.url = String(url)
+      this.readyState = QuietWebSocket.CONNECTING
+      this.onopen = null
+      this.onclose = null
+      this.onerror = null
+      this.onmessage = null
+    }
+    send() {}
+    close() {
+      this.readyState = QuietWebSocket.CLOSED
+    }
+    addEventListener() {}
+    removeEventListener() {}
+    dispatchEvent() {
+      return false
+    }
+  }
+  globalThis.WebSocket = QuietWebSocket
+  window.WebSocket = QuietWebSocket
+}
+
 // jsdom keeps ONE localStorage for the whole test file, so anything a screen
 // persists survives into the next test in that file. Roster's team filter is
 // the first such state (desktop-spec.md §10 decision 2 — the filter has to
