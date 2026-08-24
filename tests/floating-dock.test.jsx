@@ -121,6 +121,6 @@ describe('the floating chat dock', () => {
     expect(await screen.findByTestId('dock-bubble')).toHaveTextContent('Zz two seats held')
     await user.type(screen.getByLabelText('Message'), 'Zz on my way')
     await user.click(screen.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'Zz on my way'))
+    await waitFor(() => expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'Zz on my way', { attachmentPath: null }))
   })
 })

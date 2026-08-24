@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Button from './Button.jsx'
+import ChatPhoto from './ChatPhoto.jsx'
+import EmojiPicker from './EmojiPicker.jsx'
 import ReactionBar from './ReactionBar.jsx'
 import Spinner from './Spinner.jsx'
+import { uploadChatPhoto } from '../data/chatMedia.js'
 import {
   chatPath,
   listChats,
@@ -19,7 +22,7 @@ import {
   toggleReaction,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
-import { autoGrow, composerKeyDown } from '../lib/chatComposer.js'
+import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { stampLabel } from '../lib/notices.js'
 import { RowAvatar, previewLine, scopeChatRows } from '../screens/ChatList.jsx'
@@ -56,7 +59,12 @@ export default function FloatingChatDock({ badge = false }) {
   const [error, setError] = useState(null)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  // Round 2: a photo waiting in the dock's composer, and the picker's handle.
+  const [photo, setPhoto] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
   const bottomRef = useRef(null)
+  const draftRef = useRef(null)
+  const fileRef = useRef(null)
 
   const loadList = useCallback(async () => {
     try {
@@ -111,16 +119,38 @@ export default function FloatingChatDock({ badge = false }) {
   // The full chat page owns /chat — a dock there is furniture on furniture.
   if (location.pathname.startsWith('/chat')) return null
 
+  function clearPhoto() {
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhoto(null)
+    setPhotoPreview(null)
+  }
+
+  function pickPhoto(domEvent) {
+    const file = domEvent.target.files?.[0]
+    domEvent.target.value = ''
+    if (!file) return
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhoto(file)
+    try {
+      setPhotoPreview(URL.createObjectURL(file))
+    } catch {
+      setPhotoPreview(null)
+    }
+  }
+
   async function send(domEvent) {
     domEvent.preventDefault()
-    if (!draft.trim() || sending || !active) return
+    if ((!draft.trim() && !photo) || sending || !active) return
     setSending(true)
     setError(null)
     try {
-      if (active.kind === 'dm' || active.kind === 'group') await sendDirectMessage(active.conversation_id, draft)
-      else if (active.kind === 'staff') await postStaffMessage(active.team_id, draft)
-      else await postMessage(active.team_id ?? null, draft)
+      // Photo first, message second — same order as the full thread.
+      const attachmentPath = photo ? await uploadChatPhoto(selfId, photo) : null
+      if (active.kind === 'dm' || active.kind === 'group') await sendDirectMessage(active.conversation_id, draft, { attachmentPath })
+      else if (active.kind === 'staff') await postStaffMessage(active.team_id, draft, { attachmentPath })
+      else await postMessage(active.team_id ?? null, draft, { attachmentPath })
       setDraft('')
+      clearPhoto()
       await loadThread()
       await loadList()
     } catch (err) {
@@ -223,10 +253,23 @@ export default function FloatingChatDock({ badge = false }) {
                     <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dock-bubble">
                       <div className={`max-w-[85%] rounded-[13px] px-3 py-1.5 ${mine ? 'bg-chrome text-white' : 'bg-surface-card text-ink shadow-card'}`}>
                         <p className={`text-[11px] font-extrabold ${mine ? 'text-white/80' : 'text-brand-ink'}`}>{mine ? 'You' : m.author?.full_name ?? 'Someone'}</p>
+                        {m.forwarded && !m.deleted_at && (
+                          <p className={`text-[10.5px] italic ${mine ? 'text-white/60' : 'text-ink-faint'}`} data-testid="forwarded-tag">Forwarded</p>
+                        )}
+                        {m.quoted && !m.deleted_at && (
+                          <p className={`mb-0.5 truncate rounded-[6px] border-l-2 px-1.5 py-0.5 text-[11px] ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-brand bg-surface-mute text-ink-muted'}`} data-testid="quote-block">
+                            {m.quoted.deleted_at ? 'Message deleted' : (m.quoted.body?.trim() ? m.quoted.body : '📷 Photo')}
+                          </p>
+                        )}
                         {m.deleted_at ? (
                           <p className="text-[12.5px] italic opacity-70">Message removed</p>
                         ) : (
-                          <p className="whitespace-pre-wrap break-words text-[13.5px] leading-[1.4]">{m.body}</p>
+                          <>
+                            {m.attachment_path && <ChatPhoto path={m.attachment_path} compact />}
+                            {m.body?.trim() ? (
+                              <p className="whitespace-pre-wrap break-words text-[13.5px] leading-[1.4]">{m.body}</p>
+                            ) : null}
+                          </>
                         )}
                         <p className={`mt-0.5 text-[10px] font-semibold ${mine ? 'text-white/60' : 'text-ink-faint'}`}>
                           {stampLabel(m.created_at)}
@@ -241,23 +284,50 @@ export default function FloatingChatDock({ badge = false }) {
                 })}
                 <div ref={bottomRef} />
               </div>
-              <form onSubmit={send} className="flex items-end gap-2 border-t border-line bg-surface-card p-2.5" data-testid="dock-composer">
-                <label className="sr-only" htmlFor="dock-draft">Message</label>
-                <textarea
-                  id="dock-draft"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onInput={(e) => autoGrow(e.currentTarget, 110)}
-                  onKeyDown={composerKeyDown}
-                  rows={1}
-                  maxLength={2000}
-                  placeholder={`Message ${active.label}`}
-                  className="min-h-[38px] flex-1 resize-none rounded-[12px] border border-line bg-surface px-3 py-2 text-[13.5px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
-                />
-                <Button type="submit" size="sm" disabled={sending || !draft.trim()}>
-                  Send
-                </Button>
-              </form>
+              <div className="border-t border-line bg-surface-card p-2.5">
+                {photoPreview && (
+                  <div className="mb-1.5 flex items-center gap-2 rounded-[10px] bg-surface-mute px-2 py-1" data-testid="photo-preview">
+                    <img src={photoPreview} alt="Photo to send" className="h-9 w-9 rounded-[7px] object-cover" />
+                    <p className="min-w-0 flex-1 truncate text-[11.5px] text-ink-muted">{photo?.name ?? 'Photo'}</p>
+                    <button type="button" aria-label="Remove photo" onClick={clearPhoto} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                    </button>
+                  </div>
+                )}
+                <form onSubmit={send} className="flex items-end gap-2" data-testid="dock-composer">
+                  <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pickPhoto} data-testid="photo-input" />
+                  <button
+                    type="button"
+                    aria-label="Attach a photo"
+                    onClick={() => fileRef.current?.click?.()}
+                    className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
+                    data-testid="photo-button"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="3" y="5" width="18" height="14" rx="2" />
+                      <circle cx="9" cy="10" r="1.6" />
+                      <path d="m21 15-4.5-4.5L7 20" />
+                    </svg>
+                  </button>
+                  <label className="sr-only" htmlFor="dock-draft">Message</label>
+                  <textarea
+                    id="dock-draft"
+                    ref={draftRef}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onInput={(e) => autoGrow(e.currentTarget, 110)}
+                    onKeyDown={composerKeyDown}
+                    rows={1}
+                    maxLength={2000}
+                    placeholder={`Message ${active.label}`}
+                    className="min-h-[38px] flex-1 resize-none rounded-[12px] border border-line bg-surface px-3 py-2 text-[13.5px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
+                  />
+                  <EmojiPicker onPick={(emoji) => setDraft(insertAtCursor(draftRef.current, emoji))} />
+                  <Button type="submit" size="sm" disabled={sending || (!draft.trim() && !photo)}>
+                    Send
+                  </Button>
+                </form>
+              </div>
             </>
           )}
         </div>

@@ -6,9 +6,11 @@ import ChatHeader from '../components/ChatHeader.jsx'
 import { Empty } from '../components/Empty.jsx'
 import FixtureCard from '../components/FixtureCard.jsx'
 import MentionPicker, { appendMention } from '../components/MentionPicker.jsx'
+import EmojiPicker from '../components/EmojiPicker.jsx'
 import MessageRow from '../components/MessageRow.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listAvailabilityForEvents } from '../data/availability.js'
+import { removeChatPhoto, uploadChatPhoto } from '../data/chatMedia.js'
 import { listEvents } from '../data/events.js'
 import {
   clearChannel,
@@ -32,7 +34,7 @@ import {
   toggleReaction,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
-import { autoGrow, composerKeyDown } from '../lib/chatComposer.js'
+import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { eventTitle } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, visibleTeams } from '../lib/scope.js'
@@ -106,7 +108,13 @@ export default function Chat() {
   const [reactions, setReactions] = useState(() => new Map())
   const [mentionables, setMentionables] = useState([])
   const [upcoming, setUpcoming] = useState([])
+  // Round 2 (claude/plans/2026-08-24-chat-round-2.md): a photo waiting in
+  // the composer, and the emoji picker's cursor handle.
+  const [photo, setPhoto] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
   const bottomRef = useRef(null)
+  const draftRef = useRef(null)
+  const fileRef = useRef(null)
   const threadParam = searchParams.get('thread')
   const eventParam = searchParams.get('event')
   // Phase 3: ?channel=staff — the squad's staff-only stream. Offered only to
@@ -240,18 +248,40 @@ export default function Chat() {
   // unlocked for it even under announce-only.
   const composerOpen = mayPost || Boolean(attachEventId)
 
+  function clearPhoto() {
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhoto(null)
+    setPhotoPreview(null)
+  }
+
+  function pickPhoto(domEvent) {
+    const file = domEvent.target.files?.[0]
+    domEvent.target.value = ''
+    if (!file) return
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhoto(file)
+    try {
+      setPhotoPreview(URL.createObjectURL(file))
+    } catch {
+      setPhotoPreview(null)
+    }
+  }
+
   async function send(domEvent) {
     domEvent.preventDefault()
-    if (!draft.trim() || sending) return
+    if ((!draft.trim() && !photo) || sending) return
     setSending(true)
     setSendError(null)
     try {
       const kept = draftMentions.filter((m) => draft.includes(`@${m.full_name}`)).map((m) => m.profile_id)
-      if (staffChannel) await postStaffMessage(teamId, draft, { mentions: kept })
-      else await postMessage(teamId, draft, { eventId: attachEventId || null, mentions: kept })
+      // Photo first, message second — WhatsApp order, same as the DM thread.
+      const attachmentPath = photo ? await uploadChatPhoto(selfId, photo) : null
+      if (staffChannel) await postStaffMessage(teamId, draft, { mentions: kept, attachmentPath })
+      else await postMessage(teamId, draft, { eventId: attachEventId || null, mentions: kept, attachmentPath })
       setDraft('')
       setDraftMentions([])
       setAttachEventId('')
+      clearPhoto()
       await load()
     } catch (err) {
       setSendError(err.message || 'Could not send that.')
@@ -275,7 +305,12 @@ export default function Chat() {
 
   async function onRemove(id) {
     try {
+      const gone = (messages ?? []).flatMap((m) => [m, ...(m.replies ?? [])]).find((m) => m.id === id)
       await removeMessage(id)
+      // Own-folder-only storage policy: only the author's delete reaches the
+      // object (src/data/chatMedia.js); a moderator's remove orphans it,
+      // readable by nobody but its owner.
+      if (gone?.attachment_path && gone.author_id === selfId) await removeChatPhoto(gone.attachment_path)
       await load()
     } catch (err) {
       setError(err.message || 'Could not remove that.')
@@ -457,32 +492,64 @@ export default function Chat() {
           </div>
         )}
         {composerOpen ? (
-          <form onSubmit={send} className="flex items-end gap-2" data-testid="composer">
-            <MentionPicker
-              people={mentionables}
-              onPick={(p) => {
-                setDraft((d) => appendMention(d, p))
-                setDraftMentions((m) => (m.some((x) => x.profile_id === p.profile_id) ? m : [...m, p]))
-              }}
-            />
-            <label className="sr-only" htmlFor="chat-draft">
-              Message
-            </label>
-            <textarea
-              id="chat-draft"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onInput={(e) => autoGrow(e.currentTarget)}
-              onKeyDown={composerKeyDown}
-              rows={1}
-              maxLength={2000}
-              placeholder={attachedEvent ? `Start the thread for ${eventTitle(attachedEvent)}` : 'Message'}
-              className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
-            />
-            <Button type="submit" disabled={sending || !draft.trim()}>
-              {attachedEvent ? 'Start thread' : 'Send'}
-            </Button>
-          </form>
+          <>
+            {photoPreview && (
+              <div className="mb-1.5 flex items-center gap-2 rounded-[10px] bg-surface-mute px-2.5 py-1.5" data-testid="photo-preview">
+                <img src={photoPreview} alt="Photo to send" className="h-12 w-12 rounded-[8px] object-cover" />
+                <p className="min-w-0 flex-1 truncate text-[12px] text-ink-muted">{photo?.name ?? 'Photo'}</p>
+                <button
+                  type="button"
+                  aria-label="Remove photo"
+                  onClick={clearPhoto}
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                </button>
+              </div>
+            )}
+            <form onSubmit={send} className="flex items-end gap-2" data-testid="composer">
+              <MentionPicker
+                people={mentionables}
+                onPick={(p) => {
+                  setDraft((d) => appendMention(d, p))
+                  setDraftMentions((m) => (m.some((x) => x.profile_id === p.profile_id) ? m : [...m, p]))
+                }}
+              />
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pickPhoto} data-testid="photo-input" />
+              <button
+                type="button"
+                aria-label="Attach a photo"
+                onClick={() => fileRef.current?.click?.()}
+                className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
+                data-testid="photo-button"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="2" />
+                  <circle cx="9" cy="10" r="1.6" />
+                  <path d="m21 15-4.5-4.5L7 20" />
+                </svg>
+              </button>
+              <label className="sr-only" htmlFor="chat-draft">
+                Message
+              </label>
+              <textarea
+                id="chat-draft"
+                ref={draftRef}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onInput={(e) => autoGrow(e.currentTarget)}
+                onKeyDown={composerKeyDown}
+                rows={1}
+                maxLength={2000}
+                placeholder={attachedEvent ? `Start the thread for ${eventTitle(attachedEvent)}` : 'Message'}
+                className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
+              />
+              <EmojiPicker onPick={(emoji) => setDraft(insertAtCursor(draftRef.current, emoji))} />
+              <Button type="submit" disabled={sending || (!draft.trim() && !photo)}>
+                {attachedEvent ? 'Start thread' : 'Send'}
+              </Button>
+            </form>
+          </>
         ) : (
           <p className="px-2 py-2 text-[13px] font-semibold text-ink-muted" data-testid="composer-locked">
             Only staff can post here — reply to a thread instead

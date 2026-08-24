@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Button from './Button.jsx'
+import ChatPhoto from './ChatPhoto.jsx'
 import FixtureCard from './FixtureCard.jsx'
 import MentionPicker, { appendMention } from './MentionPicker.jsx'
 import { postedLabel, stampLabel } from '../lib/notices.js'
@@ -45,11 +46,23 @@ function Body({ message, mine }) {
   if (message.deleted_at) {
     return <p className={`text-[13.5px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`}>Message removed</p>
   }
+  // Round 2: a forward wears its tag, a photo renders above whatever text
+  // rode with it, and a photo-only message renders no empty paragraph.
   return (
-    <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.4]">
-      {message.body}
-      {message.edited_at && <span className={`ml-1.5 text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>(edited)</span>}
-    </p>
+    <>
+      {message.forwarded && (
+        <p className={`text-[11px] italic ${mine ? 'text-white/60' : 'text-ink-faint'}`} data-testid="forwarded-tag">
+          Forwarded
+        </p>
+      )}
+      {message.attachment_path && <ChatPhoto path={message.attachment_path} />}
+      {message.body?.trim() ? (
+        <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.4]">
+          {message.body}
+          {message.edited_at && <span className={`ml-1.5 text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>(edited)</span>}
+        </p>
+      ) : null}
+    </>
   )
 }
 

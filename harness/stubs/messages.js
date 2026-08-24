@@ -65,6 +65,11 @@ export async function listDmCandidates() {
 export async function openConversation() {
   throw new Error('harness: openConversation is not stubbed')
 }
+// Round 2 (claude/plans/2026-08-24-chat-round-2.md): the thread screens
+// import these; a missing export is a blank page (see the note up top).
+export async function forwardMessagesTo() {
+  throw new Error('harness: forwardMessagesTo is not stubbed')
+}
 export async function listMyConversations() {
   return []
 }

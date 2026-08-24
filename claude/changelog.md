@@ -10,16 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 🫧 **The masthead hides on scroll like the dock, and both bars are Liquid
-  Glass** — one shared hook (`src/lib/useAutoHideOnScroll.js`) drives both
-  bars so a downward scroll clears the whole screen on a phone (View-as pins
-  the masthead shown — the banner is contractually unmissable); the glass
-  itself went clearer with a lensed backdrop, gradient specular rim and
-  light-catch sheen (dock 62%→52%, island 70%→66% — the island's floor is
-  its 13px text, worked in `src/index.css`'s comments). Look approved from
-  harness screenshots before deploying.
-  `claude/plans/2026-08-24-topbar-autohide-liquid-glass.md`.
-  (No SHA — this branch's entry; the next PR cites the squash.)
+- (unmerged) — 💬 **Chat round 2: reply-with-quote, forwarding, the emoji
+  picker, chat buttons on the Home staff tiles, and photo attachments** —
+  the whole round-2 remainder of `claude/plans/2026-08-24-chat-feedback.md`
+  in one PR by Jay's choice, designed in
+  `claude/plans/2026-08-24-chat-round-2.md`. Photos unblocked by a new
+  ruling (`claude/decisions/2026-08-24-chat-photos-open.md`: open, like
+  WhatsApp — the report loop is the safety valve, not consent collection).
+  `db/migrations/20260824_chat_round_2.sql` adds quoted_id/forwarded/
+  attachment_path and the private `chat-media` bucket — **APPLIED to
+  production on Jay's go-ahead**; harness green against live and proven to
+  fail on two injected faults. The NEXT pull request cites this entry's
+  squash SHA.
+- `109634f` — 🫧 **The masthead hides on scroll like the dock, and both bars
+  are Liquid Glass** (#370) — one shared hook
+  (`src/lib/useAutoHideOnScroll.js`) drives both bars so a downward scroll
+  clears the whole screen on a phone (View-as pins the masthead shown — the
+  banner is contractually unmissable); the glass itself went clearer with a
+  lensed backdrop, gradient specular rim and light-catch sheen (dock
+  62%→52%, island 70%→66% — the island's floor is its 13px text, worked in
+  `src/index.css`'s comments). Look approved from harness screenshots before
+  deploying. `claude/plans/2026-08-24-topbar-autohide-liquid-glass.md`.
+  Its own branch could not cite this squash SHA, so this entry does.
 - `569656a` — 📝 **The chat day closed** (#369) — plan statuses marked shipped,
   `2119d1a` cited, handoff written. Its own branch could not cite this squash
   SHA, so this entry does.
