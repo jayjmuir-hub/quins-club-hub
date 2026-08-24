@@ -44,6 +44,48 @@ import { RowAvatar, previewLine, scopeChatRows } from '../screens/ChatList.jsx'
 // navigation. Mobile never sees it: the tab bar already carries Chat, and a
 // bubble would sit on the thumb's composer space.
 
+// ── Panel size (round 2 follow-up, Jay: "can we make the chat box
+//    resizeable? this would be beneficial in desktop mode") ───────────────
+//
+// A custom top-left grip rather than CSS `resize`: the panel is anchored
+// bottom-right, so the native handle (always bottom-right) would drag the
+// one corner that cannot move. Device-level persistence, deliberately not
+// an account setting — the right size belongs to the screen in front of
+// you, same ruling as chat-enter-sends (src/lib/chatComposer.js).
+const SIZE_KEY = 'chat-dock-size'
+const MIN_W = 320
+const MAX_W = 640
+const MIN_H = 400
+const MAX_H = 860
+const DEFAULT_SIZE = { w: 380, h: 560 }
+
+export function clampDockSize(size) {
+  const w = Number(size?.w)
+  const h = Number(size?.h)
+  if (!Number.isFinite(w) || !Number.isFinite(h)) return { ...DEFAULT_SIZE }
+  return {
+    w: Math.min(MAX_W, Math.max(MIN_W, Math.round(w))),
+    h: Math.min(MAX_H, Math.max(MIN_H, Math.round(h))),
+  }
+}
+
+function loadDockSize() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SIZE_KEY))
+    return stored ? clampDockSize(stored) : { ...DEFAULT_SIZE }
+  } catch {
+    return { ...DEFAULT_SIZE }
+  }
+}
+
+function saveDockSize(size) {
+  try {
+    localStorage.setItem(SIZE_KEY, JSON.stringify(size))
+  } catch {
+    // private-mode storage failures: the size just stays per-session
+  }
+}
+
 export default function FloatingChatDock({ badge = false }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -62,9 +104,37 @@ export default function FloatingChatDock({ badge = false }) {
   // Round 2: a photo waiting in the dock's composer, and the picker's handle.
   const [photo, setPhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
+  const [size, setSize] = useState(loadDockSize)
   const bottomRef = useRef(null)
   const draftRef = useRef(null)
   const fileRef = useRef(null)
+  // The drag's fixed point: pointer position and size at pointerdown. The
+  // panel grows LEFT and UP from its anchored corner, so dragging the grip
+  // left/up makes it bigger — dx/dy are subtracted, not added.
+  const dragRef = useRef(null)
+
+  function startResize(domEvent) {
+    domEvent.preventDefault()
+    dragRef.current = { x: domEvent.clientX, y: domEvent.clientY, w: size.w, h: size.h }
+    function onMove(moveEvent) {
+      const start = dragRef.current
+      if (!start) return
+      setSize(clampDockSize({ w: start.w - (moveEvent.clientX - start.x), h: start.h - (moveEvent.clientY - start.y) }))
+    }
+    function onUp() {
+      dragRef.current = null
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      // Read back through the setter so the SAVED value is the clamped one
+      // actually on screen, not a stale closure.
+      setSize((current) => {
+        saveDockSize(current)
+        return current
+      })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
 
   const loadList = useCallback(async () => {
     try {
@@ -185,8 +255,25 @@ export default function FloatingChatDock({ badge = false }) {
   return (
     <div className="fixed bottom-5 right-6 z-30 hidden flex-col items-end gap-3 desktop:flex" data-testid="chat-dock">
       {open && (
-        <div className="flex h-[560px] w-[380px] max-h-[calc(100vh-120px)] flex-col overflow-hidden rounded-[18px] border border-line bg-surface-card shadow-[0_18px_50px_-12px_rgba(16,17,22,.35)]">
-          <div className="flex items-center gap-2.5 bg-chrome px-3.5 py-2.5 text-white">
+        <div
+          className="relative flex max-h-[calc(100vh-120px)] max-w-[calc(100vw-48px)] flex-col overflow-hidden rounded-[18px] border border-line bg-surface-card shadow-[0_18px_50px_-12px_rgba(16,17,22,.35)]"
+          style={{ width: size.w, height: size.h }}
+          data-testid="dock-panel"
+        >
+          <button
+            type="button"
+            aria-label="Resize chat"
+            data-testid="dock-resize-grip"
+            onPointerDown={startResize}
+            className="absolute left-0 top-0 z-10 grid h-7 w-7 cursor-nwse-resize place-items-center rounded-br-[10px] text-white/50 hover:text-white"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+              <path d="M10 4 4 10M16 4 4 16" />
+            </svg>
+          </button>
+          {/* pl-9, not px-3.5: the resize grip owns the top-left corner and
+              the back button must not sit under it. */}
+          <div className="flex items-center gap-2.5 bg-chrome py-2.5 pl-9 pr-3.5 text-white">
             {active ? (
               <button type="button" aria-label="Back to chats" onClick={() => { setActive(null); setThread(null); setError(null) }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
