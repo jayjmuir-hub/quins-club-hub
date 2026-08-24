@@ -1,7 +1,8 @@
 # The floating chat dock — chat beside your work, on desktop
 
-**Status: NOT SHIPPED — direction picked and spec agreed 24 Aug 2026
-(evening), building on branch `claude/chat-round1`'s successor.**
+**Status: SHIPPED 24 Aug 2026 (`2119d1a`, #368) and VERIFIED — Jay exercised
+the dock and reactions on the deploy preview against the real database, and
+the live bundle was confirmed carrying both after the merge.**
 
 Jay's feedback items "i want the main chat interface to float over the screen
 when opened" and "floating chat button accessible from every page", answered

@@ -35,9 +35,10 @@ trimmed. An item deleted from this list is a finding that ceases to exist.
 
 ## Round 2 — needs design or a ruling, in Jay's words
 
-- "i want the main chat interface to float over the screen when opened" +
-  "floating chat button accessible from every page" — a UX shift; mock on
-  the design canvas first.
+- ✅ SHIPPED (`2119d1a`, #368): "i want the main chat interface to float over
+  the screen when opened" + "floating chat button accessible from every
+  page" — the desktop dock, Option A off the design canvas
+  (`claude/plans/2026-08-24-floating-chat-dock.md`).
 - "add attachments and pics to a chat" — squad-chat Phase 4. ⚠️ Reopens the
   photo-consent question for images of children; needs a ruling before code.
 - "reply to with quotes for a message" (DMs/groups — channels already
@@ -45,13 +46,9 @@ trimmed. An item deleted from this list is a finding that ceases to exist.
 - "forwarding a message or multiple messages, click to add to forward
   multiple".
 - "emojis" — an emoji picker button (typing emoji already works).
-- **Emoji REACTIONS on messages** (added later the same evening: "emoji
-  reactions for messages would be nice to have"). Sketch: a
-  `message_reactions` table (message_id, profile_id, emoji; one row per
-  person per emoji), read wherever the message is readable, write your own
-  only; a small fixed set (👍 ❤️ 😂 😮 👏) rather than a full picker, tally
-  chips under the bubble, tap to toggle. Cuts the "ok/thanks" noise a squad
-  channel breeds — arguably worth building BEFORE the picker item above.
+- ✅ SHIPPED (`2119d1a`, #368): **emoji reactions** — `message_reactions`
+  applied and harnessed, tap-to-toggle tallies from the fixed five-emoji set
+  on channels, DM/group threads and the dock, "everywhere is fine" (Jay).
 - "chat icon option in all coach, manager, etc pills" — tap a staff pill,
   land in a DM.
 

@@ -10,15 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 🧲 **The floating chat dock and emoji reactions** — chat beside your work:
+- `2119d1a` — 🧲 **The floating chat dock and emoji reactions** — chat beside your work:
   a bubble bottom-right of every desktop page (except /chat) opening a
   compact panel with the scoped list and any thread, surviving navigation
   with its draft; possible only because #367 retired Help from that corner.
   Plus reactions on every message surface: five-emoji tap-to-toggle tallies
   (`db/migrations/20260824_message_reactions.sql` APPLIED, harness green
   before and after), pinned by test to the database's own check constraint.
-  `claude/plans/2026-08-24-floating-chat-dock.md`. *(SHA: next PR cites the
-  squash commit.)*
+  `claude/plans/2026-08-24-floating-chat-dock.md`.
 - `4693458` — 🔧 **Chat feedback round 1 MERGED** (#366) — the squash SHA for
   the round-1 entry below, which its own branch could not cite.
 
