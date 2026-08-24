@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import { Empty } from '../components/Empty.jsx'
 import NewChatPicker, { Avatar } from '../components/NewChatPicker.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
+import { listMyChatPrefs, setChatPref } from '../data/chatPrefs.js'
 import { chatPath, listChats, listDmCandidates, openConversation, subscribeMessages } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -113,9 +114,9 @@ export default function ChatList() {
       return {}
     }
   })
-  function toggleFold(key) {
+  function toggleFold(key, currentlyFolded) {
     setFolds((prev) => {
-      const next = { ...prev, [key]: !prev[key] }
+      const next = { ...prev, [key]: !currentlyFolded }
       try {
         localStorage.setItem('chat-folds', JSON.stringify(next))
       } catch {
@@ -125,12 +126,20 @@ export default function ChatList() {
     })
   }
 
+  // Round 6: my pins and my archive — decoration; a failure renders the
+  // plain list, never an error.
+  const [prefs, setPrefs] = useState(() => new Map())
   const load = useCallback(async () => {
     setError(null)
     try {
       setRows(await listChats())
     } catch (err) {
       setError(err.message || 'We could not load your chats just now.')
+    }
+    try {
+      setPrefs(await listMyChatPrefs())
+    } catch {
+      setPrefs(new Map())
     }
   }, [])
   useEffect(() => {
@@ -155,16 +164,30 @@ export default function ChatList() {
 
   // The home shape's derived pieces — all from the same my_chats() rows.
   const searching = query.trim().length > 0
-  const unreadTotal = useMemo(() => scoped.reduce((n, r) => n + Number(r.unread || 0), 0), [scoped])
-  const unreadChats = useMemo(() => scoped.filter((r) => Number(r.unread) > 0).length, [scoped])
-  const hero = useMemo(() => scoped.find((r) => r.kind === 'club') ?? null, [scoped])
-  // Unread bubbles to the top of each section, recency inside each half —
-  // and the category filter narrows before the sections split.
+  const prefFor = (r) => prefs.get(rowKey(r)) ?? {}
+  // Archived chats leave the sections AND the unread arithmetic — an
+  // archived chat is one you asked to stop hearing about (WhatsApp's own
+  // rule). Search still finds them.
+  const active = useMemo(() => scoped.filter((r) => !prefFor(r).archived), [scoped, prefs])
+  const archivedRows = useMemo(() => scoped.filter((r) => prefFor(r).archived), [scoped, prefs])
+  const unreadTotal = useMemo(() => active.reduce((n, r) => n + Number(r.unread || 0), 0), [active])
+  const unreadChats = useMemo(() => active.filter((r) => Number(r.unread) > 0).length, [active])
+  const hero = useMemo(() => active.find((r) => r.kind === 'club') ?? null, [active])
+  // Pinned first (round 6), then unread, then recency — and the category
+  // filter narrows before the sections split.
   const unreadFirst = (rows) =>
-    rows.slice().sort((a, b) => (Number(b.unread) > 0) - (Number(a.unread) > 0) || new Date(b.last_at ?? 0) - new Date(a.last_at ?? 0))
+    rows.slice().sort(
+      (a, b) =>
+        Boolean(prefFor(b).pinned) - Boolean(prefFor(a).pinned) ||
+        (Number(b.unread) > 0) - (Number(a.unread) > 0) ||
+        new Date(b.last_at ?? 0) - new Date(a.last_at ?? 0),
+    )
   const filtered = useMemo(
-    () => (filter === 'unread' ? shown.filter((r) => Number(r.unread) > 0) : shown),
-    [shown, filter],
+    () => {
+      const base = searching ? shown : shown.filter((r) => !prefFor(r).archived)
+      return filter === 'unread' ? base.filter((r) => Number(r.unread) > 0) : base
+    },
+    [shown, filter, prefs, searching],
   )
   const squadRows = useMemo(
     () => (filter === 'dms' ? [] : unreadFirst(filtered.filter((r) => r.kind === 'squad' || r.kind === 'staff'))),
@@ -174,6 +197,15 @@ export default function ChatList() {
     () => (filter === 'squads' ? [] : unreadFirst(filtered.filter((r) => r.kind === 'dm' || r.kind === 'group'))),
     [filtered, filter],
   )
+
+  async function togglePref(row, patch) {
+    try {
+      await setChatPref(selfId, rowKey(row), patch)
+      setPrefs(await listMyChatPrefs())
+    } catch (err) {
+      setError(err.message || 'Could not change that.')
+    }
+  }
 
   async function start(person) {
     try {
@@ -338,12 +370,12 @@ export default function ChatList() {
           chip above it"). Dashboard's blocks compensate the same way. */}
       {!searching && squadRows.length > 0 && (
         <section data-testid="section-squads" className="mt-[18px]">
-          <FoldTitle label="Your squads" count={squadRows.length} folded={Boolean(folds.squads)} onToggle={() => toggleFold('squads')} />
+          <FoldTitle label="Your squads" count={squadRows.length} folded={Boolean(folds.squads)} onToggle={() => toggleFold('squads', Boolean(folds.squads))} />
           {!folds.squads && (
             <Card className="overflow-hidden">
               <ul>
                 {squadRows.map((row) => (
-                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} />
+                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} />
                 ))}
               </ul>
             </Card>
@@ -353,12 +385,32 @@ export default function ChatList() {
 
       {!searching && dmRows.length > 0 && (
         <section data-testid="section-dms" className="mt-[18px]">
-          <FoldTitle label="Direct messages" count={dmRows.length} folded={Boolean(folds.dms)} onToggle={() => toggleFold('dms')} />
+          <FoldTitle label="Direct messages" count={dmRows.length} folded={Boolean(folds.dms)} onToggle={() => toggleFold('dms', Boolean(folds.dms))} />
           {!folds.dms && (
             <Card className="overflow-hidden">
               <ul>
                 {dmRows.map((row) => (
-                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} />
+                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} />
+                ))}
+              </ul>
+            </Card>
+          )}
+        </section>
+      )}
+
+      {!searching && archivedRows.length > 0 && (
+        <section data-testid="section-archived" className="mt-[18px]">
+          <FoldTitle
+            label="Archived"
+            count={archivedRows.length}
+            folded={folds.archived !== false}
+            onToggle={() => toggleFold('archived', folds.archived !== false)}
+          />
+          {folds.archived === false && (
+            <Card className="overflow-hidden">
+              <ul>
+                {archivedRows.map((row) => (
+                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} />
                 ))}
               </ul>
             </Card>
@@ -403,20 +455,38 @@ export function scopeChatRows(rows, memberships, teams) {
   })
 }
 
-function ChatRow({ row, selfId }) {
+function ChatRow({ row, selfId, pref = null, onPref = null }) {
   const unread = Number(row.unread) > 0
+  const pinned = Boolean(pref?.pinned)
+  const archived = Boolean(pref?.archived)
+  // Round 6: the row's own tiny menu — Pin and Archive are per-person list
+  // shape, so they live on the row, not in the thread.
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    function close(domEvent) {
+      if (!menuRef.current?.contains(domEvent.target)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [menuOpen])
   return (
     <li className="border-b border-line last:border-b-0">
+      <div className="flex items-center hover:bg-surface-mute">
       <Link
         to={chatPath(row)}
         data-testid="chat-row"
         data-kind={row.kind}
-        className="flex items-center gap-3 px-3.5 py-3 hover:bg-surface-mute"
+        className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3"
       >
         <RowAvatar row={row} />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-2">
-            <span className={`truncate text-[15px] ${unread ? 'font-extrabold' : 'font-bold'} text-ink`}>{row.label}</span>
+            <span className={`flex min-w-0 items-baseline gap-1.5 truncate text-[15px] ${unread ? 'font-extrabold' : 'font-bold'} text-ink`}>
+              {pinned && <span aria-label="Pinned" data-testid="row-pin" className="text-[11px]">📌</span>}
+              <span className="truncate">{row.label}</span>
+            </span>
             <span className={`shrink-0 text-[11.5px] font-semibold ${unread ? 'text-brand-ink' : 'text-ink-faint'}`}>
               {postedLabel(row.last_at)}
             </span>
@@ -436,6 +506,37 @@ function ChatRow({ row, selfId }) {
           </span>
         </span>
       </Link>
+      {onPref && (
+        <div className="relative shrink-0 pr-2" ref={menuRef}>
+          <button
+            type="button"
+            aria-label={`Options for ${row.label}`}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="grid h-8 w-8 place-items-center rounded-full text-ink-faint hover:bg-surface hover:text-ink"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
+            </svg>
+          </button>
+          {menuOpen && (
+            <ul role="menu" className="absolute right-2 top-9 z-20 min-w-[150px] overflow-hidden rounded-card border border-line bg-surface-card py-1 shadow-card">
+              <li role="none">
+                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onPref(row, { pinned: !pinned }) }} className="block w-full px-3 py-1.5 text-left text-[13px] font-semibold text-ink hover:bg-surface-mute">
+                  {pinned ? 'Unpin' : 'Pin'}
+                </button>
+              </li>
+              <li role="none">
+                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onPref(row, { archived: !archived }) }} className="block w-full px-3 py-1.5 text-left text-[13px] font-semibold text-ink hover:bg-surface-mute">
+                  {archived ? 'Unarchive' : 'Archive'}
+                </button>
+              </li>
+            </ul>
+          )}
+        </div>
+      )}
+      </div>
     </li>
   )
 }

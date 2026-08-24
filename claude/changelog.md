@@ -10,15 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- (unmerged) — 🔢 **The unread count reaches the app icon** — Jay: "we need
+- (unmerged) — 📌 **Pinned chats and archive** — the two navigation ideas
+  parked "for a later round", picked up by Jay's "keep going"
+  (`claude/plans/2026-08-24-chat-pins-archive.md`). A ⋯ menu on every list
+  row: Pin sorts the chat above everything in its section with a 📌;
+  Archive removes it from the sections AND the unread arithmetic
+  (WhatsApp's rule — you asked to stop hearing about it) into a
+  default-folded section at the bottom; search still finds it. Backed by
+  `chat_prefs` (`db/migrations/20260824_chat_prefs.sql`, owner-only RLS,
+  the nicknames pattern — APPLIED and measured, harness green with an
+  injected read-policy leak caught). The NEXT pull request cites this
+  entry's squash SHA.
+- `382f5da` — 🔢 **The unread count reaches the app icon** (#390) — Jay: "we need
   to add a new chat message count to the app icon". The Badging API on the
   installed PWA: the dock-badge recount hands its REAL number to
   `navigator.setAppBadge` (icon and dock dot cannot disagree), sign-out
   clears it, and the push handler marks the icon with the platform's
   generic badge while the app is CLOSED — the worker cannot know the
   count, so the app corrects it to the number on open. A silent no-op in
-  a plain tab, and on platforms without the API. The NEXT pull request
-  cites this entry's squash SHA.
+  a plain tab, and on platforms without the API. Its own branch could not
+  cite this squash SHA, so this entry does.
 - `271b54d` — 📝 **Rounds 4-5 records closed** (#388) — `043f9c3` and
   `bc971f8` cited, plans shipped, the handoff extended with the night's
   second wave of traps. Its own branch could not cite this squash SHA, so

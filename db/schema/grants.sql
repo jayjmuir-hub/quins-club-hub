@@ -860,3 +860,9 @@ REVOKE ALL ON public.nicknames FROM PUBLIC, anon;
 -- exact warning.
 GRANT SELECT, INSERT, DELETE ON public.message_stars TO authenticated;
 REVOKE ALL ON public.message_stars FROM PUBLIC, anon;
+
+-- 24 Aug 2026 — db/migrations/20260824_chat_prefs.sql (pinned chats and
+-- archive, round 6). The nicknames pattern again: owner-only policies,
+-- full CRUD because every verb is the owner's.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.chat_prefs TO authenticated;
+REVOKE ALL ON public.chat_prefs FROM PUBLIC, anon;
