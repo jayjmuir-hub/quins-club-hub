@@ -5,6 +5,7 @@ import EventTypeIcon from '../components/EventTypeIcon.jsx'
 import Spinner from '../components/Spinner.jsx'
 import Button from '../components/Button.jsx'
 import PitchRequest from '../components/PitchRequest.jsx'
+import { PITCH_TBD } from '../data/pitches.js'
 import SessionPlan from '../components/SessionPlan.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { getEventThread } from '../data/messages.js'
@@ -484,6 +485,7 @@ export default function EventDetail({
   onOpenMatchSheet,
   onOpenLineup,
   onOpenChat,
+  onAssignPitch,
 }) {
   const date = eventDate(event)
   // Null for every event created before 8 Aug 2026, and formatTimeRange
@@ -590,6 +592,20 @@ export default function EventDetail({
           </KeyValue>
         )}
       </div>
+
+      {/* Direct pitch assignment — Allocation passes this
+          (claude/plans/2026-08-24-pitch-direct-assign.md); every other caller
+          omits it and gets no button, per the onOpenAvailability lesson in
+          the footer below. Allocation itself withholds it for an AWAY match
+          — somebody else's ground, no pitch of ours to give — the same
+          strict `home === false` rule PitchRequest follows. */}
+      {onAssignPitch && (
+        <div className="mb-4">
+          <Button variant="secondary" full onClick={() => onAssignPitch(event)}>
+            {event.pitch && event.pitch !== PITCH_TBD ? 'Change pitch' : 'Assign pitch'}
+          </Button>
+        </div>
+      )}
 
       {format && <SquadFormatNote format={format} />}
 

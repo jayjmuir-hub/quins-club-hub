@@ -1,7 +1,10 @@
 # Plan — click an event, give it a pitch
 
-**STATUS: NOT YET SHIPPED — approved 24 Aug 2026, in progress.** Update on
-merge.
+**STATUS: SHIPPED — merged 24 Aug 2026 as squash `11892d7` (#383), verified
+live from the deployed bundle. A follow-up round the same hour (details-first
+click via EventDetail + away matches excluded — strict `home === false`)
+shipped separately; What-ships item 1 below describes the FIRST cut, where
+the click opened the picker directly.**
 
 ## Why
 

@@ -47,6 +47,14 @@ vi.mock('../src/data/pitchRequests.js', () => ({
   setEventPitch: (...a) => setEventPitchMock(...a),
 }))
 
+// EventDetail (opened by clicking any event since the details-first change)
+// renders an availability summary, which would otherwise reach for Supabase —
+// same reason as the pitchRequests mock above.
+vi.mock('../src/data/availability.js', () => ({
+  listAvailability: () => Promise.resolve([]),
+  subscribeAvailability: () => () => {},
+}))
+
 vi.mock('../src/data/pitches.js', async () => {
   const actual = await vi.importActual('../src/data/pitches.js')
   return { ...actual, listPitches: (...a) => listPitchesMock(...a) }
@@ -278,11 +286,21 @@ describe('direct assignment', () => {
     return userEvent.setup()
   }
 
-  it('an unallocated event opens the picker, and saving writes the fixture', async () => {
+  // Details first (Jay, 24 Aug 2026): a click opens EventDetail; the picker
+  // is the Assign/Change pitch button inside it.
+  async function throughDetail(user, name) {
+    await user.click((await screen.findAllByRole('button', { name }))[0])
+    await user.click(await screen.findByRole('button', { name: /assign pitch|change pitch/i }))
+  }
+
+  it('an unallocated event opens its DETAILS, and assigning from them writes the fixture', async () => {
     listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD' })])
     const user = await setup()
 
     await user.click(await screen.findByRole('button', { name: /U16B Contact/i }))
+    // The details are really there — the key-value rows, not just a picker.
+    expect(await screen.findByText('Age group')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /assign pitch/i }))
     await user.selectOptions(screen.getByLabelText('Pitch for this fixture'), 'A2')
     await user.click(screen.getByRole('button', { name: /save pitch/i }))
 
@@ -299,9 +317,7 @@ describe('direct assignment', () => {
     ])
     const user = await setup()
 
-    // Two entry points exist for this fixture now (the request queue's Answer
-    // and the unallocated row) — take the row.
-    await user.click((await screen.findAllByRole('button', { name: /U16B Contact/i }))[0])
+    await throughDetail(user, /U16B Contact/i)
     await user.selectOptions(screen.getByLabelText('Pitch for this fixture'), 'A1')
     await user.click(screen.getByRole('button', { name: /save pitch/i }))
 
@@ -311,13 +327,46 @@ describe('direct assignment', () => {
     expect(setEventPitchMock).not.toHaveBeenCalled()
   })
 
-  it('a booked event in the day grid opens preset to its current pitch', async () => {
+  it('a booked event opens preset to its current pitch, via Change pitch', async () => {
     // The mocked listEvents returns the A1 booking for ANY window, so the
     // day grid always has exactly one booking to click — deterministic, no
     // date navigation needed.
     const user = await setup()
     await user.click(await screen.findByRole('tab', { name: 'Day' }))
     await user.click(await screen.findByTestId('booking'))
+    await user.click(await screen.findByRole('button', { name: /change pitch/i }))
     expect(screen.getByLabelText('Pitch for this fixture')).toHaveValue('A1')
+  })
+
+  it('⚠️ an AWAY match never appears in "Waiting for a pitch"', async () => {
+    // Somebody else's ground — no pitch of ours to give. Control first: the
+    // HOME twin of the same fixture DOES appear, so an empty result below is
+    // the filter working and not the list failing to render.
+    listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD', home: true })])
+    const first = await setup()
+    expect(await screen.findByText('Waiting for a pitch')).toBeInTheDocument()
+
+    listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD', home: false })])
+    await first.click(screen.getByRole('tab', { name: 'Week' }))
+    await waitFor(() => expect(screen.queryByText('Waiting for a pitch')).not.toBeInTheDocument())
+  })
+
+  it('an AWAY booking shows its details WITHOUT an assign button', async () => {
+    listEventsMock.mockResolvedValue([ev({ home: false })])
+    const user = await setup()
+    await user.click(await screen.findByRole('tab', { name: 'Day' }))
+    await user.click(await screen.findByTestId('booking'))
+    expect(await screen.findByText('Age group')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /assign pitch|change pitch/i })).not.toBeInTheDocument()
+  })
+
+  it("the waiting list shows each fixture's DATE, not just its time", async () => {
+    // Jay, 24 Aug 2026: "the events don't show a date unless you click them".
+    // The mocked fixture is Sat 5 Sep (Abu Dhabi); the row must say so.
+    listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD' })])
+    await setup()
+    const row = await screen.findByTestId('unallocated')
+    expect(row.textContent).toMatch(/Sat/)
+    expect(row.textContent).toMatch(/Sep/)
   })
 })

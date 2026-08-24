@@ -1715,13 +1715,6 @@ export default function Accounts() {
         />
       )}
 
-      {/* ⚠️ WHO IS EMAILED ABOUT THE QUEUES ABOVE. It lived at the bottom of
-          "Squads & league teams" for a few hours on 23 Aug 2026 and Jay could
-          not find it — the same trap that tab's own rename note records. It
-          belongs where the approving happens. Admin-only branch, so no gate
-          needed here. */}
-      <ApprovalRecipients />
-
       {/* Hidden while the member list is missing: without it there is nothing
           to subtract, and every existing member would show up as "waiting". */}
       {!isFirstLoad && !error && (
@@ -2050,6 +2043,14 @@ export default function Accounts() {
         </section>
       )}
 
+      {/* ⚠️ WHO IS EMAILED ABOUT THE QUEUES ABOVE. It lived at the bottom of
+          "Squads & league teams" for a few hours on 23 Aug 2026 and Jay could
+          not find it; on 24 Aug it moved again, from BETWEEN the queues to
+          BELOW them all, and became collapsible — Jay: everything waiting
+          belongs at the top, and this settings card was standing in the
+          middle of it. Admin-only branch, so no gate needed here. */}
+      <ApprovalRecipients />
+
       {!isFirstLoad && error && (
         <Card role="alert" className="p-6 text-center">
           <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load accounts</h3>
@@ -2125,8 +2126,17 @@ export default function Accounts() {
         </Card>
       )}
 
+      {/* ⚠️ ONE CARD, DENSE ROWS — Jay, 24 Aug 2026: "the list of accounts
+          should be more compact, all should show but the cells could be less
+          big vertically". A Card per person spent ~30px of shadow, gap and
+          padding per row on a list an admin scans, not reads. Every account
+          still renders (no paging, no collapse); what shrank is the chrome:
+          one Card, hairline dividers, a 28px monogram, and the email and
+          access summary sharing one truncating line. The full detail is one
+          tap away in the editor sheet, which is unchanged. */}
       {!isFirstLoad && !error && shownGroups.length > 0 && (
-        <div className="flex flex-col gap-3">
+        <Card className="overflow-hidden">
+          <div className="divide-y divide-line">
           {shownGroups.map((group) => {
             const displayName = group.name ?? 'Unnamed member'
             // One line summarising the access rows, so the list still answers
@@ -2151,34 +2161,38 @@ export default function Accounts() {
               .join(' · ')
 
             return (
-              <Card key={group.key} data-testid="account-person" className="overflow-hidden">
+              <div key={group.key} data-testid="account-person">
                 {/* ⚠️ THE WHOLE ROW OPENS THE EDITOR, and there is still a real
                     focusable button inside it. Same reasoning as the schedule
                     table: the row is a mouse convenience, the button is the
                     keyboard and screen-reader path. */}
                 <div
                   onClick={() => openEditor(group)}
-                  className="flex cursor-pointer flex-wrap items-center gap-3 px-[14px] py-3 hover:bg-surface-mute"
+                  className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-surface-mute"
                 >
                   <span
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[12px] font-extrabold tracking-[.5px] text-white"
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-[9px] bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[10px] font-extrabold tracking-[.5px] text-white"
                     aria-hidden="true"
                   >
                     {initials(displayName)}
                   </span>
 
                   <div className="min-w-0 flex-1">
-                    <span data-testid="account-name" className="block text-[15px] font-bold text-ink">
+                    <span data-testid="account-name" className="block truncate text-[14px] font-bold leading-tight text-ink">
                       {displayName}
                     </span>
-                    <span data-testid="account-email" className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
-                      {group.email ?? 'No email on file'}
+                    {/* Email and access summary share ONE truncating line —
+                        the pair answers "who and what" at a glance, and the
+                        editor sheet carries the untruncated truth. */}
+                    <span className={`block truncate text-[12px] leading-tight ${MUTED_ON_PAPER}`}>
+                      <span data-testid="account-email">{group.email ?? 'No email on file'}</span>
+                      {summary && (
+                        <>
+                          {' · '}
+                          <span data-testid="account-summary">{summary}</span>
+                        </>
+                      )}
                     </span>
-                    {summary && (
-                      <span data-testid="account-summary" className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
-                        {summary}
-                      </span>
-                    )}
                   </div>
 
                   <Button
@@ -2197,10 +2211,11 @@ export default function Accounts() {
                     Edit
                   </Button>
                 </div>
-              </Card>
+              </div>
             )
           })}
-        </div>
+          </div>
+        </Card>
       )}
 
       {/* ── THE EDIT PERSON SHEET (Jay, 9 Aug 2026) ──────────────────────

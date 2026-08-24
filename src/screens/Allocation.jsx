@@ -11,6 +11,7 @@ import { hasAdminRight, visibleTeams } from '../lib/scope.js'
 import { clubToday, eventDate, eventEndDate, eventTimeLabel, eventTitle, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PitchMonth, PitchWeek } from '../components/PitchCalendar.jsx'
+import EventDetail from './EventDetail.jsx'
 import {
   monthGrid,
   sameDay,
@@ -219,8 +220,18 @@ export default function Allocation() {
     return ids
   }, [events])
 
+  // ⚠️ AWAY MATCHES ARE NOT WAITING FOR ANYTHING — somebody else's ground,
+  // no pitch of ours to give (Jay, 24 Aug 2026). Strict `=== false`, the
+  // same rule PitchRequest pins with a test: `home` is NULL for every
+  // training and social, and a `!event.home` check would put the majority
+  // of the club's pitch-needing events out of this list.
   const unallocated = useMemo(
-    () => events.filter((event) => !(event.pitch ?? '').trim() || event.pitch === PITCH_TBD),
+    () =>
+      events.filter(
+        (event) =>
+          event.home !== false &&
+          (!(event.pitch ?? '').trim() || event.pitch === PITCH_TBD),
+      ),
     [events],
   )
 
@@ -247,8 +258,13 @@ export default function Allocation() {
   // time is the queue's own rule, and a second busy flag would let the two
   // race each other.
   const [assigning, setAssigning] = useState(null)
+  // Details first (Jay, 24 Aug 2026): a click opens the full EventDetail
+  // sheet — match details, competition, notes — and the pitch picker is a
+  // button inside it, not the first thing thrown at the screen.
+  const [detailEvent, setDetailEvent] = useState(null)
 
   function openAssign(event) {
+    setDetailEvent(null)
     setAssigning(event)
     const current = (event.pitch ?? '').trim()
     setChosenPitch(current === PITCH_TBD ? '' : current)
@@ -484,8 +500,8 @@ export default function Allocation() {
                             key={event.id}
                             type="button"
                             data-testid={clash ? 'booking-clash' : 'booking'}
-                            onClick={() => openAssign(event)}
-                            aria-label={`Change pitch for ${fixtureLabel(event, event.league_team, teamsById.get(event.team_id)?.name ?? eventTitle(event))}`}
+                            onClick={() => setDetailEvent(event)}
+                            aria-label={`Details for ${fixtureLabel(event, event.league_team, teamsById.get(event.team_id)?.name ?? eventTitle(event))}`}
                             className={[
                               'block w-full rounded-[6px] px-2 py-1 text-left text-[12px] font-bold leading-tight transition hover:ring-2 hover:ring-brand/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                               clash ? 'bg-warn-bg text-warn-ink' : 'bg-danger-bg text-danger-ink',
@@ -663,7 +679,7 @@ export default function Allocation() {
                     and the to-do is "give it a pitch". */}
                 <button
                   type="button"
-                  onClick={() => openAssign(event)}
+                  onClick={() => setDetailEvent(event)}
                   className="-mx-1.5 block w-[calc(100%+12px)] rounded-[8px] px-1.5 py-1 text-left transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   <span className="font-bold">
@@ -671,6 +687,17 @@ export default function Allocation() {
                   </span>
                   <span className="text-ink-muted">
                     {' · '}
+                    {/* The DATE leads (Jay, 24 Aug 2026: "the events don't
+                        show a date unless you click them") — this list spans
+                        whatever window is on screen, so a bare time answers
+                        "when" for none of them. Same format the request
+                        queue above uses. */}
+                    {(() => {
+                      const start = eventDate(event)
+                      return start
+                        ? `${start.toLocaleDateString(undefined, { timeZone: 'Asia/Dubai', weekday: 'short', day: 'numeric', month: 'short' })} · `
+                        : ''
+                    })()}
                     {eventTimeLabel(event)} · {eventTitle(event)}
                   </span>
                   <span className="ml-2 text-[12px] font-bold text-brand-ink">Assign</span>
@@ -679,6 +706,22 @@ export default function Allocation() {
             ))}
           </ul>
         </Card>
+      )}
+
+      {/* Details first (Jay, 24 Aug 2026): the same EventDetail sheet the
+          Schedule opens — hero, key facts, competition, notes — with one
+          Allocation-only extra: the Assign/Change pitch button, which swaps
+          this sheet for the picker below. Withheld for an AWAY match:
+          somebody else's ground, no pitch of ours to give (strict
+          `home === false`, the PitchRequest rule). No edit/availability
+          handlers are passed, so none of those buttons render here. */}
+      {detailEvent && (
+        <EventDetail
+          event={detailEvent}
+          team={teamsById.get(detailEvent.team_id)}
+          onClose={() => setDetailEvent(null)}
+          onAssignPitch={detailEvent.home === false ? undefined : openAssign}
+        />
       )}
 
       {/* The direct-assignment picker. One Sheet serves both entry points
