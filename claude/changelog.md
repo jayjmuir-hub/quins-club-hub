@@ -10,6 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- 📦 **Safe updates: libphonenumber-js 1.13.11, @testing-library/user-event
+  14.6.5, vitest 4.1.11** (Dependabot #351, patch bumps; suite green). The
+  same batch's four MAJORS (#352–#355) were closed under the standing
+  rulings: eslint 10 still refused by the React plugins, vite 8 +
+  plugin-react 6 mutually blocking and waiting on a pinned Netlify Node
+  (`claude/open-items.md`).
+- `3e24039` — 🧭 **The Approval-emails panel moved to Accounts** (see below).
 - 🧭 **The Approval-emails panel moved to Accounts** — where the approving
   happens. It shipped at the bottom of "Squads & league teams" and Jay could
   not find it ("i do not see anywhere to change the email notifications in
