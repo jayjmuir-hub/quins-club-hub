@@ -406,114 +406,68 @@
     }
   }
 
-  /* The masthead island — 23 Aug 2026, "a similar style for the top";
-     LIQUID GLASS since 24 Aug 2026 (Jay: "more like liquid glass",
-     claude/plans/2026-08-24-topbar-autohide-liquid-glass.md). Clearer,
-     and the light behaves like light: the backdrop is lensed (brightness/
-     contrast join the blur), the rim is a gradient that catches at the top
-     curve instead of a uniform hairline, and a diagonal sheen slides across
-     the surface — the ::before/::after shared with .glass-dock below.
+  /* ══ CLEAR LIQUID GLASS — EXPERIMENT BRANCH, 24 Aug 2026 ══════════════════
+     Jay: "maybe it should be fully transparent with no colors, and have a
+     small red glow around the outer parts". This replaces the smoked glass
+     that shipped in #370 with iOS-style CLEAR glass on both bars: a near-
+     zero fill, a light 8px frost (28px+ reads as grey soup over white
+     pages — measured on the harness, and it was the first thing Jay
+     rejected), and a red halo as the brand accent.
 
-     ⚠️ 66%, NOT LOWER — THIS ONE CARRIES 13px TEXT. The wordmark line is
-     white/80 at 13px: 66% chrome over worst-case white composites to
-     ~rgb(95,95,95), where white/80 measures ~4.8:1 against the 4.5:1 text
-     floor. 55% was tried on paper first and fails at 3.4:1 — the dock can
-     go clearer only because its idle items are icons. The lensing cannot
-     break this: brightness on a white backdrop clamps at white, so the
-     worst case is unchanged. */
-  .glass-island {
-    position: relative;
-    background: rgb(var(--chrome-rgb) / 0.66);
-    -webkit-backdrop-filter: saturate(190%) blur(32px) brightness(1.06) contrast(1.04);
-    backdrop-filter: saturate(190%) blur(32px) brightness(1.06) contrast(1.04);
-    border: 1px solid rgb(255 255 255 / 0.1);
-    box-shadow:
-      0 10px 30px rgb(0 0 0 / 0.3),
-      0 2px 6px rgb(0 0 0 / 0.2);
-  }
-  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .glass-island {
-      background: rgb(var(--chrome-rgb));
-    }
-  }
+     ⚠️ CLEAR GLASS CANNOT CARRY ALWAYS-WHITE CONTENT. Over a white page
+     there is no tint to hold white text up, so the bars' ink ADAPTS like
+     iOS: dark ink in light mode (the override block below), white in dark
+     mode (the components' own classes). The active dock pill stays red
+     with white text in both modes — it has its own opaque fill.
 
-  /* The dock's material — design "A", 23 Aug 2026; LIQUID GLASS since
-     24 Aug 2026, same pass as .glass-island above.
-
-     ⚠️ 52%, DOWN FROM 62% (which was down from 84%). Still only safe
-     BECAUSE of design A: the dock's idle items are ICONS, which are UI
-     components with a 3:1 floor, not text at 4.5:1 — and the only text on
-     it is the white label on the red pill, which does not sit on the glass
-     at all. Worst composite over white is now ~rgb(129,129,129); white/90
-     idle icons (Nav.jsx) measure ~3.5:1 on it, above 3:1 with margin.
-     48% measures ~3.1:1 and leaves none — do not go below 52%, and do not
-     put small text on this material. */
+     ⚠️ IF THIS SHIPS, the contrast comments this block replaced (66%/52%
+     smoked-glass arithmetic) live on in git at #370's squash `109634f`,
+     and a fresh worst-case pass is owed: dark ink over the red fixture
+     hero is the case the harness data understated — Jay's own production
+     screenshot is what surfaced it. */
+  .glass-island,
   .glass-dock {
     position: relative;
-    background: rgb(var(--chrome-rgb) / 0.52);
-    -webkit-backdrop-filter: saturate(190%) blur(32px) brightness(1.06) contrast(1.04);
-    backdrop-filter: saturate(190%) blur(32px) brightness(1.06) contrast(1.04);
-    border: 1px solid rgb(255 255 255 / 0.1);
+    background: rgb(255 255 255 / 0.02);
+    -webkit-backdrop-filter: saturate(180%) blur(8px) brightness(1.04);
+    backdrop-filter: saturate(180%) blur(8px) brightness(1.04);
+    border: 1px solid rgb(255 255 255 / 0.4);
     box-shadow:
-      0 12px 32px rgb(0 0 0 / 0.38),
-      0 2px 6px rgb(0 0 0 / 0.25);
+      0 0 0 1px rgb(200 16 46 / 0.28),
+      0 0 16px 3px rgb(200 16 46 / 0.35),
+      0 8px 24px rgb(0 0 0 / 0.1);
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    /* No backdrop-filter → clear glass would be invisible. Fall back to the
+       opaque chrome the pre-glass design used; the adaptive-ink overrides
+       below are scoped to supporting browsers only, so white content is
+       correct here. */
+    .glass-island,
     .glass-dock {
       background: rgb(var(--chrome-rgb));
     }
   }
 
-  /* The two optical layers that make the glass "liquid" — shared by both
-     bars. The ::before is the SPECULAR RIM: a 1px ring drawn from a
-     gradient (bright at the top-left curve, nearly gone at the bottom, a
-     faint return along the lower edge), sitting exactly inside the border
-     via the padding+mask trick — mask-composite carves out the middle so
-     only the ring paints. The ::after is the LIGHT-CATCH SHEEN: a soft
-     diagonal wash, strongest in the top-left corner, gone by halfway.
-     Both are pointer-events-none and aria-invisible (pure paint).
-
-     ⚠️ Generated content paints in DOM order, and ::after is the LAST
-     child: the sheen sits over the bars' idle icons at ~0.10 alpha peak.
-     That is deliberate (light sits ON glass, in front of what is behind
-     it) and too faint to move any contrast number by a step. */
-  .glass-island::before,
-  .glass-dock::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(
-      170deg,
-      rgb(255 255 255 / 0.45),
-      rgb(255 255 255 / 0.12) 35%,
-      rgb(255 255 255 / 0.02) 65%,
-      rgb(255 255 255 / 0.16)
-    );
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-  }
-  .glass-island::after,
-  .glass-dock::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: linear-gradient(
-      115deg,
-      rgb(255 255 255 / 0.1),
-      rgb(255 255 255 / 0.03) 30%,
-      transparent 55%
-    );
-    pointer-events: none;
+  /* Adaptive ink: dark content on clear glass in LIGHT mode. Scoped to
+     browsers with backdrop-filter (the fallback above stays dark chrome
+     with white content). Specificity beats the text-white utilities the
+     components carry, so this needs no edits inside the components while
+     the experiment is being judged. The dock's active pill keeps its own
+     red fill and white label. */
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    html:not(.dark) .glass-island,
+    html:not(.dark) .glass-island a,
+    html:not(.dark) .glass-island button,
+    html:not(.dark) .glass-island p,
+    html:not(.dark) .glass-island h1 {
+      color: rgb(23 23 26);
+    }
+    html:not(.dark) .glass-dock a {
+      color: rgb(23 23 26);
+    }
+    html:not(.dark) .glass-dock a[aria-current='page'] {
+      color: rgb(255 255 255);
+    }
   }
 
   /* Harlequin geometry: the two overlapping diagonals from the site's hero,
