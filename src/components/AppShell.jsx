@@ -38,6 +38,17 @@ import ErrorBoundary from './ErrorBoundary.jsx'
 // — both driven by this component reading useLocation(), so the More screen
 // itself doesn't need to know about auth at all yet.
 
+// The liquid lens's displacement map (see the <filter id="liquid-lens"> in
+// AppShell below): R is the x-displacement gradient, G the y, screened into
+// one image. INVERTED (bright left/top) so the glass magnifies; the uneven
+// stops keep the centre calm and bend the rim.
+const LENS_MAP = encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><defs>' +
+    '<linearGradient id="r" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff0000"/><stop offset="0.35" stop-color="#990000"/><stop offset="0.5" stop-color="#800000"/><stop offset="0.65" stop-color="#670000"/><stop offset="1" stop-color="#000000"/></linearGradient>' +
+    '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#00ff00"/><stop offset="0.35" stop-color="#009900"/><stop offset="0.5" stop-color="#008000"/><stop offset="0.65" stop-color="#006700"/><stop offset="1" stop-color="#000000"/></linearGradient></defs>' +
+    '<rect width="128" height="128" fill="url(#r)"/><rect width="128" height="128" fill="url(#g)" style="mix-blend-mode:screen"/></svg>',
+)
+
 function SignOutControl({ signOut, className = '' }) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState(null)
@@ -277,6 +288,52 @@ export default function AppShell({ children }) {
       {/* Diagnostic overlay, flag-gated — see its header. Mounted in the
           shell so it renders on EVERY screen once armed. */}
       <PaintDebug />
+
+      {/* The liquid-lens filter the glass bars sample their backdrop through
+          (src/index.css, the clear-glass block). It must exist in the DOM
+          for `backdrop-filter: url(#liquid-lens)` to resolve, and the shell
+          is the one component under every screen. Chromium-only by design:
+          Safari cannot take url() in backdrop-filter, drops that
+          declaration, and keeps the plain blur/saturate declared before it
+          — iPhones get the undistorted glass, silently and correctly.
+
+          ⚠️ A LENS, NOT NOISE — Jay, on the first (turbulence) version:
+          "the distortion makes what's behind it smaller, but ios makes it
+          bigger and bends it … like looking through a prism almost". So:
+          the displacement map is a smooth gradient pair (R drives x, G
+          drives y) whose slope is shallow mid-pane and steep at the edges
+          — mild magnification in the middle, hard bend at the rim — and
+          the map is INVERTED (bright at the left/top) so edges sample
+          toward the centre, which is what magnifies. The prism half is the
+          three displacement passes at slightly different strengths, one
+          per colour channel, screened back together: colours split a few
+          pixels exactly where the bend is strongest. Tuned live in the
+          harness: 52/40/28 was rainbow soup; 32/30/28 read as barely-there, then Jay asked for more twice, saw 52/36/20 on the right preview, and called it too much then "dial back the color also": 32/30/28 with saturation at 1.45 is the approved setting — with the map centred, even this near-zero split stays visible, which it did not before the alignment fix. ⚠️ The feImage MUST cover the full -10%..120% filter region: pinned to the element box, the map's neutral line sat at the top edge and the lens only worked at the bottom (Jay's scroll observation, and he was right). The
+          map is blurred (stdDeviation 2) before use — unsmoothed, its
+          raster steps showed as confetti speckles along the top edge. */}
+      <svg width="0" height="0" aria-hidden="true" className="absolute">
+        <filter id="liquid-lens" x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
+          <feImage
+            href={`data:image/svg+xml,${LENS_MAP}`}
+            x="-10%" y="-10%" width="120%" height="120%"
+            preserveAspectRatio="none"
+            result="rawmap"
+          />
+          <feGaussianBlur in="rawmap" stdDeviation="2" result="map" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="32" xChannelSelector="R" yChannelSelector="G" result="dR" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="30" xChannelSelector="R" yChannelSelector="G" result="dG" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="28" xChannelSelector="R" yChannelSelector="G" result="dB" />
+          <feColorMatrix in="dR" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cR" />
+          <feColorMatrix in="dG" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cG" />
+          <feColorMatrix in="dB" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cB" />
+          <feBlend in="cR" in2="cG" mode="screen" result="rg" />
+          <feBlend in="rg" in2="cB" mode="screen" result="rgb" />
+          {/* The lens replaces the WHOLE backdrop-filter chain in Chromium,
+              so the glass's frost and saturation are re-supplied here. */}
+          <feGaussianBlur in="rgb" stdDeviation="2" />
+          <feColorMatrix type="saturate" values="1.45" />
+        </filter>
+      </svg>
 
       {/* Banner + masthead stick together as ONE unit. The banner has to sit
           above the header and stay visible (spec §1: persistent, unmissable),

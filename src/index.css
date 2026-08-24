@@ -463,17 +463,62 @@
      20px = frosted wash, crisp icons. The earlier grey-soup complaint was
      never about blur radius — it was border + brightness, both now gone,
      so more blur does not bring the white back. */
+  /* ⚠️ THE GLASS HAS MATERIAL AGAIN, since the same night — Jay: "when the
+     background is white the bars still look like they are white and not
+     glassy". Physics, not a bug: clear glass over a uniform white page has
+     nothing to show through it, so it vanishes into the page. iOS gives
+     the pane itself substance, and so does this: a COOL-GREY smoke
+     gradient (grey-blue, never white — white smoke was the original
+     complaint), a glint across the top-left (the ::after below), an inset
+     bright top edge, and a darker inset bottom edge that reads as the
+     pane's thickness. All of it is a few percent — over busy content the
+     transparency from the last round is unchanged. */
   .glass-island,
   .glass-dock {
     position: relative;
-    background: rgb(255 255 255 / 0.02);
+    background: linear-gradient(
+      160deg,
+      rgb(140 150 165 / 0.1),
+      rgb(90 100 115 / 0.05) 45%,
+      rgb(140 150 165 / 0.12)
+    );
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
+    /* ⚠️ THE LIQUID LENS — DECLARATION ORDER IS THE FALLBACK MECHANISM.
+       These url() lines OVERRIDE the plain frost above in Chromium, bending
+       the backdrop through the #liquid-lens SVG filter AppShell mounts
+       (turbulence displacement + the same blur/saturate, re-supplied inside
+       the filter because url() replaces the whole chain). Safari rejects
+       url() in backdrop-filter, drops ONLY these declarations, and keeps
+       the plain frost above — so iPhones get undistorted glass with no
+       @supports gymnastics. Do not merge these four lines into two. */
+    -webkit-backdrop-filter: url(#liquid-lens);
+    backdrop-filter: url(#liquid-lens);
     border: 1px solid rgb(255 255 255 / 0.16);
     box-shadow:
       0 0 0 1px rgb(200 16 46 / 0.28),
       0 0 16px 3px rgb(200 16 46 / 0.35),
-      0 8px 24px rgb(0 0 0 / 0.1);
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -8px 14px -10px rgb(40 50 70 / 0.35),
+      0 8px 24px rgb(0 0 0 / 0.12);
+  }
+  /* The light-catch glint: strongest top-left, a faint cool return at the
+     bottom-right — the sliding reflection that says "glass" even when the
+     page behind is featureless. pointer-events-none, pure paint. */
+  .glass-island::after,
+  .glass-dock::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(
+      115deg,
+      rgb(255 255 255 / 0.35),
+      rgb(255 255 255 / 0.08) 30%,
+      transparent 50%,
+      rgb(120 130 150 / 0.06) 80%
+    );
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     /* No backdrop-filter → clear glass is invisible and its content floats
