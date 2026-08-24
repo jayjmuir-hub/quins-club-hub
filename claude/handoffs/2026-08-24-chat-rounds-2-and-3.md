@@ -67,6 +67,34 @@ changes nothing a reviewer is judging (each push burns a preview build).
 The changelog conflicted twice and both resolutions were unions — nothing
 was lost.
 
+## Rounds 4 and 5, appended before midnight — the night kept going
+
+Jay's "we aren't done" was accurate within the hour. Also shipped and
+verified live, same session: #382 (the BlockTitle `first:mt-0` spacing
+trap — a wrapper's first child loses its 18px; wrappers carry mt-[18px],
+Dashboard's convention), #384 (round 4: chevron message menu, pins by
+SECURITY DEFINER single-column RPC — never widen the messages UPDATE
+policy, grants.sql §4 — private stars, reply-privately with the quote
+guard relaxed to readable-by-sender and the round-2 anchors REPOINTED),
+and #386 (round 5: sidebar chat categories + ?filter= chips + folds +
+unread-first). Two more migrations applied on Jay's explicit go-ahead.
+New traps for the pile:
+- **A "do it" can be narrower than the list it follows.** Welfare-log
+  improvement drafts were built and then DISCARDED unbuilt when Jay
+  clarified "do it" meant the navigation set — ask which antecedent when
+  a reply follows two proposals.
+- **`gh pr checks` can show ONLY Netlify rows while the Actions runs
+  never triggered at all** — #386 sat checkless until a push after
+  merging main re-triggered them. An empty `gh run list --branch` is the
+  tell, and the fix is a rebase-push, not waiting.
+- **The deploy watcher must capture its baseline BEFORE the merge** — one
+  armed seconds after a fast deploy waited forever for a change that had
+  already happened; another's regex missed because a later build minified
+  strings with backticks. Prove the probe against a local build first.
+- **Welfare access requires reviewability** — log_welfare_access refuses
+  an adults-only unreported DM ("not reviewable"), so a harness must
+  report a message before an admin open can be logged.
+
 ## Open, in order of likely next ask
 
 - Jay's words closing the night: **"we aren't done."** Round-4 feedback is

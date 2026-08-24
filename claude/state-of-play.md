@@ -77,8 +77,15 @@ WhatsApp; the report loop is the safety valve). Round 3
 WhatsApp design pass — inline stamps, side reaction triggers, day dividers,
 member-name headers, quins-green own bubbles, wallpaper presets, PRIVATE
 nicknames. The dock also became resizeable (`8c12fb7`, ceiling 1100 via
-`43e212e`). Two migrations applied and measured in production the same
-night (`20260824_chat_round_2.sql`, `20260824_nicknames.sql`).
+`43e212e`). **Rounds 4 and 5 followed before midnight**: the chevron
+message menu with Copy/Pin/Star/Reply-privately (`dea42ad` #384 — pinning
+is anyone-in-the-chat by ruling, via a single-column RPC; stars are
+private; the quote guard relaxed for reply-privately) and the navigation
+set (`043f9c3` #386 — sidebar chat categories, ?filter= chips, folds,
+unread-first). Four migrations applied and measured in production across
+the night (`chat_round_2`, `nicknames`, `chat_round_4`, and round 2's
+bucket). Pins-as-chats and archive are offered and parked
+(`claude/plans/2026-08-24-chat-navigation.md`).
 ⚠️ **No real member has used quotes, forwards, photos, nicknames or
 wallpapers in anger yet** — tomorrow's real use is the next bug source.
 Underneath, unchanged:
