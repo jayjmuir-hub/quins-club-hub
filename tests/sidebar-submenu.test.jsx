@@ -10,12 +10,20 @@ vi.mock('../src/lib/auth.jsx', () => ({
 vi.mock('../src/data/members.js', () => ({
   countAdminWaiting: (...args) => countAdminWaitingMock(...args),
 }))
+const useMembershipsMock = vi.fn()
+vi.mock('../src/lib/memberships.jsx', () => ({
+  useMemberships: () => useMembershipsMock(),
+}))
 
 import Sidebar from '../src/components/Sidebar.jsx'
 
 beforeEach(() => {
   vi.clearAllMocks()
   countAdminWaitingMock.mockResolvedValue(0)
+  useMembershipsMock.mockReturnValue({
+    memberships: [{ id: 'm1', role: 'admin', team_id: null, club_id: 'c1', status: 'active', is_super: false, admin_rights: [] }],
+    teams: [],
+  })
 })
 
 // The sidebar's expanding sub-menus (22 Aug 2026). The contract:
@@ -169,5 +177,38 @@ describe('Schedule sub-menu', () => {
     expect(within(submenu).queryByRole('link', { name: 'Add an event' })).not.toBeInTheDocument()
     expect(within(submenu).queryByRole('link', { name: 'Pitch calendar' })).not.toBeInTheDocument()
     expect(within(submenu).getByRole('link', { name: 'Add to calendar' })).toBeInTheDocument()
+  })
+})
+
+// The Admin sub-menu (24 Aug 2026, Jay: "the admin button in the left bar
+// should expand like the others"). Its children are the portals the viewer
+// can ENTER — the /admin chooser's open cards, from the same registry.
+describe('Admin sub-menu', () => {
+  it('expands on /admin with the portals this admin holds — an ordinary admin gets Club Admin and Match sheets', () => {
+    renderAt('/admin/accounts', { showAdmin: true })
+    const menu = screen.getByTestId('submenu-admin')
+    expect(within(menu).getByRole('link', { name: 'Club Admin' })).toHaveAttribute('href', '/admin/accounts')
+    expect(within(menu).queryByRole('link', { name: 'Pitch Management' })).toBeNull()
+  })
+
+  it('a super admin sees every portal that has screens', () => {
+    useMembershipsMock.mockReturnValue({
+      memberships: [{ id: 'm1', role: 'admin', team_id: null, club_id: 'c1', status: 'active', is_super: true, admin_rights: [] }],
+      teams: [],
+    })
+    renderAt('/admin', { showAdmin: true })
+    const menu = screen.getByTestId('submenu-admin')
+    expect(within(menu).getByRole('link', { name: 'Pitch Management' })).toBeInTheDocument()
+    expect(within(menu).getByRole('link', { name: 'Welfare' })).toBeInTheDocument()
+  })
+
+  it('stays expanded on /approvals — where the badge count lives', () => {
+    renderAt('/approvals', { showAdmin: true })
+    expect(screen.getByTestId('submenu-admin')).toBeInTheDocument()
+  })
+
+  it('collapsed anywhere else, like every other section', () => {
+    renderAt('/schedule', { showAdmin: true })
+    expect(screen.queryByTestId('submenu-admin')).toBeNull()
   })
 })
