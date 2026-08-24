@@ -69,6 +69,8 @@ import {
   saveSessionBlocks,
   deleteFocus,
   setDrillActive,
+  listTemplates,
+  getSession,
 } from '../src/data/trainingPlans.js'
 
 beforeEach(() => {
@@ -274,5 +276,36 @@ describe('deleteFocus', () => {
     await expect(deleteFocus('f1')).resolves.toEqual({ id: 'f1' })
     const chain = calls.find((c) => c.table === 'training_focus')
     expect(chain.ops.map((o) => o.name)).toEqual(['delete', 'eq', 'select', 'settle'])
+  })
+})
+
+// PostgREST cannot order an embed independently, so both readers sort the
+// blocks by `position` in JS. The fixtures arrive DELIBERATELY out of order —
+// a test fed already-sorted rows would pass with the sort deleted.
+describe('embed sort', () => {
+  const SHUFFLED = [
+    { id: 'b3', position: 3 },
+    { id: 'b1', position: 1 },
+    { id: 'b2', position: 2 },
+  ]
+
+  it('listTemplates sorts each template’s blocks by position', async () => {
+    resultFor.mockImplementation(() => ({
+      data: [{ id: 't1', blocks: [...SHUFFLED] }, { id: 't2', blocks: null }],
+      error: null,
+    }))
+    const rows = await listTemplates()
+    expect(rows[0].blocks.map((b) => b.id)).toEqual(['b1', 'b2', 'b3'])
+    // A missing embed is an empty list, never a crash on null.
+    expect(rows[1].blocks).toEqual([])
+  })
+
+  it('getSession sorts the session’s blocks by position', async () => {
+    resultFor.mockImplementation(() => ({
+      data: { id: 's1', blocks: [...SHUFFLED] },
+      error: null,
+    }))
+    const session = await getSession('ev1')
+    expect(session.blocks.map((b) => b.id)).toEqual(['b1', 'b2', 'b3'])
   })
 })

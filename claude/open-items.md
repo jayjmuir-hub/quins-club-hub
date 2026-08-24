@@ -840,12 +840,36 @@ Run `get_advisors` rather than trusting this list. As of 14 Aug 2026:
 - ⛔ **`private.squad_expects_gender` stays unpinned deliberately.** Do not
   "finish the job" — the reasoning is in `db/schema/functions.sql` and the
   harness names it as an exemption rather than counting.
-- ⚠️ **Two lint types are NEWER THAN THE 13 Aug AUDIT and have never been read
-  through**: `SECURITY DEFINER` functions executable by `anon`, and by
-  `authenticated`. Several are deliberate and documented —
-  `calendar_events_for_token` keeps `anon` on purpose, and `db/tests/grants.sql`
-  §3b asserts it in both directions. **The rest have not been assessed.** This
-  is a read-through, not an alarm.
+- ✅ **The two lint types newer than the 13 Aug audit were READ THROUGH IN FULL
+  on 24 Aug 2026, and there were no findings.** What was measured, in the
+  database rather than in the advisor's prose:
+  - **`anon` + `public` schema:** exactly ONE `SECURITY DEFINER` function is
+    executable — `calendar_events_for_token`, deliberate and asserted both
+    directions by `db/tests/grants.sql` §3b. The advisor's `anon` lint lists
+    only it. Nothing else.
+  - **`authenticated` + `public` schema:** every listed function is the app's
+    own RPC API, and each is expected to SELF-GATE because SECURITY DEFINER
+    bypasses RLS. The risky ones were read in source, not assumed:
+    `set_admin_rights` gates on `is_super_admin` and raises;
+    `welfare_overview`, `approval_recipients`, `announcement_stats`,
+    `storage_usage`, `publish_training`, `clear_channel` gate on `is_admin`
+    variants; `message_read_stats` filters on `private.can_edit_team` **as a
+    WHERE predicate** (a keyword probe for `raise` misses it — it refuses by
+    returning nothing); `pitch_occupancy` requires an active staff/admin
+    membership and redacts by column selection; `set_staff_photo` gates on
+    `may_set_staff_photo` plus path ownership.
+  - **`private` schema:** many helpers carry the Postgres-default PUBLIC
+    execute bit, including for `anon` — and it is UNREACHABLE: `anon` has **no
+    USAGE on the `private` schema** (measured:
+    `has_schema_privilege('anon','private','usage')` = false), and PostgREST
+    does not expose the schema. `authenticated` keeps USAGE because RLS
+    policies call these helpers as the querying role. Tidiness option, not a
+    gap: new `private` functions could revoke default execute, but nothing is
+    open through it today.
+  - The three `rls_enabled_no_policy` INFO lints (`availability_nudges`,
+    `photo_orphan_scans`, `signup_nudges`) are RLS-on with zero policies —
+    **deny-all to client roles**, which is correct for service-role-only
+    tables.
   ⚠️ **THIS LINE ITSELF CARRIED THE STALE CLAIM UNTIL 18 Aug 2026** — it named
   `register_my_player` as deliberate too, on the same evidence (an explicit
   re-grant in two migrations) that `claude/open-items.md`'s "Cheap" section had

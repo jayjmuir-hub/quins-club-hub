@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 📟 **Heartbeat on the nightly db-check, and tests no longer open real
+- 🏉 **Age typos are refused in the training forms, the embed sort has a
+  discriminating test, and line endings are pinned repo-wide.** The 21 Aug
+  review follow-ups: `ageDraftProblem` mirrors the DB's 4–19 and min≤max
+  checks so a typo reads "Ages are 4 to 19" instead of a raw
+  `drills_min_age_check`; the blocks-by-position sort in
+  `listTemplates`/`getSession` is tested with deliberately shuffled fixtures
+  (proved by deleting the sort and watching it fail); `.gitattributes` gains
+  `* text=auto eol=lf` — measured zero renormalization churn first. Plus the
+  SECURITY DEFINER read-through: both post-audit advisor lint types walked in
+  full, no findings (`claude/open-items.md`).
+- `97bf53a` — 📟 **Heartbeat on the nightly db-check, and tests no longer open real
   sockets to production.** The heartbeat step pings Better Stack only after a
   genuine green harness run — inert until Jay creates the heartbeat and adds
   `DB_CHECK_HEARTBEAT_URL` (four steps, `claude/runbooks/monitoring.md`).
