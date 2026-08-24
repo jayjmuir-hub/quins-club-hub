@@ -109,11 +109,20 @@ do not propose buying an M365 licence — same session, same verdict.
    PURPOSE, and the surprise is a dotfile.** Its root-markdown pattern is
    `/^[^/]+\.md$/`, so `.gitignore`, `.gitattributes` and `netlify.toml` all
    BUILD. That is correct for `netlify.toml` — its redirects and headers only
-   take effect by deploying — and merely conservative for the other two. **Run
-   the gate before promising it will skip:**
-   `CACHED_COMMIT_REF=<sha> COMMIT_REF=<sha> node scripts/netlify-ignore.mjs`,
-   exit 0 means skip. Predicted wrongly on PR #43, which claimed a skip in its
-   own description while the deploy preview was building.
+   take effect by deploying — and merely conservative for the other two.
+   ⚠️ **A LOCAL RUN OF THE GATE ANSWERS THE WRONG QUESTION — measured 24 Aug
+   2026, the day it mattered.** `CACHED_COMMIT_REF=<sha> COMMIT_REF=<sha> node
+   scripts/netlify-ignore.mjs` (exit 0 means skip) tells you what the SCRIPT
+   would decide; it says nothing about whether Netlify will CONSULT the script.
+   On 24 Aug the local run said "skip" while every deploy built, because PR
+   #358 had placed a `[build.environment]` table above the `ignore =` key —
+   a TOML header captures every bare key after it, so `build.ignore` silently
+   ceased to exist and the gate was gone from Netlify's view, with no error
+   anywhere. Found only by reading a deploy's BUILD LOG and seeing no ignore
+   evaluation at all; restored the same day, and `docs:check` now guards the
+   key ordering. PR #43 mispredicted the same way for a different reason. The
+   lesson is the same both times, and it was already this rule's last line:
+   **the only proof of a skip is the deploy id not moving.**
    ⚠️ **NEVER `[skip ci]`.** This rule asked for it on docs-only commits until
    10 Aug 2026, and it stopped being safe the moment `main` was protected:
    GitHub Actions honours that string too — on `push` AND `pull_request`,

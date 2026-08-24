@@ -391,6 +391,37 @@ function checkGrantCapture() {
   }
 }
 
+// ---------------------------------------------------- 9. the ignore gate exists
+
+// ⚠️ TOML IS POSITIONAL, AND THAT COST THE DEPLOY GATE ITS LIFE ON 24 Aug 2026.
+// A table header like [build.environment] captures EVERY bare key after it, so
+// when that block was added above `ignore =` (PR #358), `ignore` silently
+// became an environment variable named "ignore", `build.ignore` ceased to
+// exist, and Netlify built every commit — docs-only ones included — with no
+// error or warning anywhere. It was found only by reading a deploy's build log
+// and noticing no ignore evaluation at all.
+//
+// This does not parse TOML; it asserts the one ordering that matters: the
+// `ignore =` key must appear before the first `[build.<anything>]` sub-table
+// header. A missing ignore line fails too — deleting the gate should never be
+// quieter than misplacing it.
+function checkIgnoreGate() {
+  const f = 'netlify.toml'
+  if (!existsSync(join(ROOT, f))) return
+  const lines = readFileSync(join(ROOT, f), 'utf8').split('\n')
+  const ignoreAt = lines.findIndex((l) => /^\s*ignore\s*=/.test(l))
+  const subTableAt = lines.findIndex((l) => /^\s*\[build\./.test(l))
+  if (ignoreAt === -1) {
+    fail(f, 0, 'no `ignore =` key - the deploy gate (scripts/netlify-ignore.mjs) is not wired at all')
+    return
+  }
+  if (subTableAt !== -1 && subTableAt < ignoreAt) {
+    fail(f, subTableAt + 1,
+      'a [build.*] sub-table sits above `ignore =`, which moves the key INTO that table - ' +
+      'build.ignore stops existing and Netlify builds every commit (24 Aug 2026, PR #358)')
+  }
+}
+
 // ---------------------------------------------------------------- 8. real inboxes
 
 // ⚠️ WHAT THIS CATCHES, AND WHY A CHECK WAS POSSIBLE AT ALL. CLAUDE.md rule 9
@@ -463,6 +494,7 @@ const checks = [
   ['stale terminology', () => checkStaleTerms(files)],
   ['table and column grants captured', () => checkGrantCapture()],
   ['real inboxes in code and fixtures', () => checkRealInboxes()],
+  ['the deploy ignore gate is wired', () => checkIgnoreGate()],
 ]
 
 console.log(`docs-check: ${files.length} tracked markdown files\n`)
