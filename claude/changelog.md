@@ -10,14 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
-- 🧊 **Glass polish round: white cast gone, one shape for both bars, crisp
-  icons** — Jay's home review of the clear glass, three fixes: the 40% white
+- (unmerged) — 💚 **Chat round 3: the WhatsApp design pass** — seven items
+  from Jay comparing chat against a real WhatsApp screenshot
+  (`claude/plans/2026-08-24-chat-round-3-design.md`): stamps inside tighter
+  bubbles, the reaction trigger beside the bubble, Today/Yesterday/date
+  dividers, member first-names under the group name, quins-green own
+  bubbles and dock header (`accent.deep`, measured in the contrast gate —
+  where white/60 metadata FAILED and moved to /70), choosable wallpaper
+  presets (no uploads, by ruling), and PRIVATE nicknames
+  (`db/migrations/20260824_nicknames.sql`, owner-only RLS, harness proven
+  against an injected read-policy leak). The NEXT pull request cites this
+  entry's squash SHA.
+- `ccf960b` — 🧊 **Glass polish round: white cast gone, one shape for both
+  bars, crisp icons** (#377) — Jay's home review of the clear glass, three
+  fixes: the 40% white
   ring + brightness lens summed to "looks like it is white" (border to 16%,
   brightness dropped, the red halo owns the edge); the dock squares off from
   a capsule to the masthead's rounded-[22px]; and "blurry" icons were 8px
   frost leaving half-readable smears behind them — proved by toggling the
-  filter live, fixed at 20px. Approved from deploy preview #377.
-  (No SHA — this branch's entry; the next pull request cites the squash.)
+  filter live, fixed at 20px. Approved from deploy preview #377. Its own
+  branch could not cite this squash SHA, so this entry does.
 - `43e212e` — ↔️ **The dock's width ceiling goes to 1100** (#378) — Jay tried
   the grip live and: "looks good but on desktop mode we could make it much
   wider". The viewport cap already guards small screens; 640 was only where
