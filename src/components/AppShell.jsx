@@ -20,7 +20,7 @@ import { ViewAsBanner } from './ViewAsSwitcher.jsx'
 import crest from '../assets/crest.png'
 import Button from './Button.jsx'
 import InstallPrompt from './InstallPrompt.jsx'
-import AppButton from './AppButton.jsx'
+import GetAppSheet from './AppButton.jsx'
 import HelpSheet from './HelpSheet.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 
@@ -216,6 +216,9 @@ export default function AppShell({ children }) {
   // different subtrees — this is the join. The floating `?` that used to own
   // this state is gone: claude/plans/2026-08-24-help-into-account-menu.md.
   const [helpOpen, setHelpOpen] = useState(false)
+  // The "Get the app" install sheet — same join, same reason: its trigger is
+  // an account-menu row and the menu panel unmounts on close.
+  const [getAppOpen, setGetAppOpen] = useState(false)
 
   const isMoreRoute = location.pathname === '/more'
   // WhatsApp-style chrome-free conversations (Jay, 25 Aug 2026: "lets try
@@ -619,10 +622,14 @@ export default function AppShell({ children }) {
               </Badge>
             )}
 
-            {/* ⚠️ BEFORE THE ACCOUNT MENU, AND IT RENDERS NOTHING ONCE THE APP
-                IS INSTALLED — which keeps it out of the masthead width budget
-                for everyone who has already acted on it. */}
-            <AppButton />
+            {/* The "App" pill lived here 12–25 Aug 2026 and was the last
+                fixed-width item left in the row. On Jay's zoomed Samsung
+                (~320 CSS px) it squeezed the wordmark to "QUINS CLUB H…" and
+                he chose the move over compacting it — the install route is
+                now "Get the app" in the account menu (GetAppMenuItem, still
+                AppButton.jsx), and its sheet is GetAppSheet below, beside
+                HelpSheet. The rule two comments down finally applies to the
+                control that predated it. */}
 
             {/* THE ACCOUNT MENU (Jay, 23 Aug 2026): the person's initial, and
                 behind it My account, View as, Dark mode and Sign out.
@@ -654,6 +661,7 @@ export default function AppShell({ children }) {
               roleLabel={showRole ? currentRoleLabel : null}
               signOut={signOut}
               onReportProblem={() => setHelpOpen(true)}
+              onGetApp={() => setGetAppOpen(true)}
             />
 
           </div>
@@ -796,6 +804,7 @@ export default function AppShell({ children }) {
           branch it would vanish exactly then. The trigger is the account
           menu's "Report a problem" item, which also lives outside that split. */}
       <HelpSheet open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <GetAppSheet open={getAppOpen} onClose={() => setGetAppOpen(false)} />
     </div>
   )
 }
