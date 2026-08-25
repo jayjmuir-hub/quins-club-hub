@@ -40,8 +40,10 @@ self.addEventListener('push', function (event) {
   event.waitUntil(
     self.registration.showNotification(payload.title || 'Quins Club Hub', {
       body: payload.body || '',
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
+      // -v2: bumped with the bat-wing icon (25 Aug 2026); the un-suffixed
+      // file still exists for notifications shown by an older cached worker.
+      icon: '/icons/icon-192-v2.png',
+      badge: '/icons/icon-192-v2.png',
       // Two pushes with the same `tag` collapse into one notification in the
       // tray instead of stacking — push-send sets this to `feedback-<id>` so
       // several rapid replies to the SAME report do not spam the tray.

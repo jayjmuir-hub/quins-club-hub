@@ -1,3 +1,11 @@
+# ⚠️ SUPERSEDED — harness/make-icons-wings.py builds the CURRENT icon set.
+# The pin era lasted one day: shipped in #393 (24-25 Aug 2026), replaced by
+# the flat crest on the green gradient with red bat-wing arcs, which Jay
+# approved on 25 Aug 2026. This script and harness/pin-photo.jpg /
+# harness/pin-cut.png stay in the repo the same way make-icons.mjs stayed
+# when this one superseded it: the recipe records a look that shipped, and
+# deleting it is how a look becomes unrecoverable.
+#
 # Builds the installed-app icon set from harness/pin-photo.jpg — the enamel
 # lapel-pin rendition of the crest, on the accent-green gradient Jay chose.
 #

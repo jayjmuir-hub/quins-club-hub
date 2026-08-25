@@ -172,12 +172,22 @@ describe('PWA production build output', () => {
     expect(maskable192).toBeTruthy()
     expect(maskable512).toBeTruthy()
 
-    expect(any192.src).toBe('/icons/icon-192.png')
-    expect(any512.src).toBe('/icons/icon-512.png')
-    expect(maskable192.src).toBe('/icons/maskable-192.png')
-    expect(maskable512.src).toBe('/icons/maskable-512.png')
+    // -v2: the bat-wing icon bump (25 Aug 2026). The suffix is what makes
+    // already-installed Androids re-fetch the icon — a same-URL byte change
+    // does not propagate — so a "cleanup" back to the bare names would
+    // silently freeze every installed phone on the old artwork.
+    expect(any192.src).toBe('/icons/icon-192-v2.png')
+    expect(any512.src).toBe('/icons/icon-512-v2.png')
+    expect(maskable192.src).toBe('/icons/maskable-192-v2.png')
+    expect(maskable512.src).toBe('/icons/maskable-512-v2.png')
 
     manifest.icons.forEach((icon) => expect(icon.type).toBe('image/png'))
+
+    // And every manifest URL must be a real file in the build — the suffix
+    // bump is exactly the kind of change that can leave a dangling path.
+    manifest.icons.forEach((icon) =>
+      expect(existsSync(path.join(outDir, icon.src)), `${icon.src} missing from dist`).toBe(true)
+    )
   })
 
   it('service worker precaches the app shell and registers a Supabase REST runtime-caching route', () => {

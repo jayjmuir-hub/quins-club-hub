@@ -85,27 +85,33 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
+        // ⚠️ The -v2 suffix is the icon-refresh mechanism, not clutter.
+        // Already-installed Androids only re-fetch a launcher icon when its
+        // URL changes — same-URL byte changes do NOT propagate. Bumped for
+        // the bat-wing icon (25 Aug 2026); bump again for the next redesign.
+        // The un-suffixed files still exist with the same artwork, for
+        // phones whose cached manifest predates this bump.
         icons: [
           {
-            src: '/icons/icon-192.png',
+            src: '/icons/icon-192-v2.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/icons/icon-512.png',
+            src: '/icons/icon-512-v2.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/icons/maskable-192.png',
+            src: '/icons/maskable-192-v2.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'maskable',
           },
           {
-            src: '/icons/maskable-512.png',
+            src: '/icons/maskable-512-v2.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',

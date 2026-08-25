@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 💬 **Chrome-free conversations** — Jay: "lets try the no
+- (unmerged) — 🦇 **The app icon becomes the bat-wing crest** — the flat
+  CLUB HUB crest on the accent-green gradient, red bat-wing arcs rising
+  from the bottom corners, a soft red glow behind the crest — the design
+  Jay approved this morning after walking it from the pin back to the flat
+  crest ("almost like its bat wings"; final: the scalloped arc toned
+  down). Built by harness/make-icons-wings.py from the recipe in
+  claude/handoffs/2026-08-25-icon-wing-handoff.md, whose approved master
+  render the regeneration matches to ~1 channel unit. Every icon URL gets
+  a -v2 suffix (manifest, index.html, push-sw.js) so installed Androids
+  re-fetch — same-URL byte changes do not propagate; iPhones need
+  remove + re-add, Apple's rule. The maskable pair raises the wings 36px
+  into Android's circular safe zone, or the crop would eat them entirely.
+  make-icons-pin.py is tombstoned in place (pin era: one day, #393). The
+  NEXT pull request cites this entry's squash SHA.
+- `a2f407b` — 💬 **Chrome-free conversations** — Jay: "lets try the no
   bottom menu inside a conversation". WhatsApp-style: inside a thread the
   phone shows NO tab bar and NO masthead island — the chat header pins at
   top-0 (safe-area in its padding, covering the notch) and the composer
@@ -21,8 +35,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the banner is the way out of a preview and must never disappear (same
   contract as the masthead auto-hide's disabled flag); the header sliding
   under the banner there is the accepted cost. `conversationScreen` in
-  AppShell decides by route. This retires #389's accepted 64px gap. The
-  NEXT pull request cites this entry's squash SHA.
+  AppShell decides by route. This retires #389's accepted 64px gap.
 - `c69da5f` — 📌 **The reader stays pinned to the newest message as the page
   grows** — Jay's phone, same morning: "still when i open a chat i have to
   scroll down", composer floating mid-content in the screenshot. The #394

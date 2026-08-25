@@ -60,7 +60,7 @@ the approved look, pixel-exact.
 
 - The session-start clone check flagged this cafnet worktree 30 behind /
   2 ahead — branch fresh from origin/main (this handoff branch was), and
-  ignore the stale worktree branches (`claude/pin-icon` etc., all merged).
+  ignore the stale worktree branches (the pin-icon one etc., all merged).
 - Red and green blend to mud: every red element uses HARD edges or sits
   BEHIND the crest as a glow; the only approved fade is the narrow one Jay
   rejected anyway in favour of wings.
