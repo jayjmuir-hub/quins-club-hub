@@ -72,6 +72,45 @@ jobs:
 
       - run: npm test
 
+      # Cursor GitHub `ci-passed` events are dropped on cloud-agent PRs, so
+      # GitHub Actions itself is the source of truth. Ping the Grok Bot
+      # webhook on success AND failure (`always()`). `continue-on-error` so a
+      # dead webhook never reds the required `test` check.
+      #
+      # ⚠️ GitHub rejects the `secrets` context in `if:` — Tests #989 failed
+      # to even parse this file ("Unrecognized named-value: 'secrets'"). The
+      # empty-URL skip lives in the shell so clones without secrets stay
+      # green. URL, key, and payload fields are env vars; the script never
+      # interpolates `${{ secrets.* }}` or `${{ job.status }}`. Echoes
+      # `webhook HTTP <code>` only — never the URL, key, or Authorization.
+      - name: Notify Chief of Staff
+        if: always()
+        continue-on-error: true
+        env:
+          GROK_BOT_CI_WEBHOOK_URL: ${{ secrets.GROK_BOT_CI_WEBHOOK_URL }}
+          GROK_BOT_CI_WEBHOOK_KEY: ${{ secrets.GROK_BOT_CI_WEBHOOK_KEY }}
+          JOB_STATUS: ${{ job.status }}
+          GIT_SHA: ${{ github.sha }}
+          GIT_REF: ${{ github.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$GROK_BOT_CI_WEBHOOK_URL" ]; then
+            echo "skipped: GROK_BOT_CI_WEBHOOK_URL is empty"
+            exit 0
+          fi
+          http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "$GROK_BOT_CI_WEBHOOK_URL" \
+            -H "Authorization: Bearer $GROK_BOT_CI_WEBHOOK_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"source\":\"github-actions\",\"job\":\"test\",\"conclusion\":\"${JOB_STATUS}\",\"sha\":\"${GIT_SHA}\",\"ref\":\"${GIT_REF}\",\"pr\":\"${PR_NUMBER}\",\"html_url\":\"${RUN_URL}\"}" \
+            2>/dev/null || true)
+          echo "webhook HTTP ${http_code:-000}"
+          case "$http_code" in
+            2[0-9][0-9]) exit 0 ;;
+            *) exit 1 ;;
+          esac
+
       # ── Dependency advisories ────────────────────────────────────────────
       #
       # ⚠️ THIS IS A STEP OF THE `test` JOB ON PURPOSE, NOT ITS OWN WORKFLOW.
