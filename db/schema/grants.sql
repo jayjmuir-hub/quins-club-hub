@@ -523,6 +523,13 @@ REVOKE UPDATE ON public.announcement_reads FROM authenticated;
 
 
 -- ---------------------------------------------------------------------
+-- ✅ THE BLOCK BELOW IS OVERTAKEN AND KEPT AS THE 14 Aug RECORD — measured
+-- again 25 Aug 2026: `anon` holds ZERO table privileges on ALL 57 public
+-- tables (the 14 Aug schema-wide revoke migration did land; this block was
+-- simply never re-annotated). TRUNCATE is likewise gone from `authenticated`
+-- everywhere (19 Aug), and the default privileges now hand new tables the
+-- 7 verbs without TRUNCATE and with no anon entry — see §1's amendments.
+--
 -- ⚠️ `anon` HOLDS FULL TABLE PRIVILEGES ON EVERY TABLE IN `public`, INCLUDING
 -- THESE TWO. MEASURED 14 Aug 2026, NOT REASONED ABOUT.
 --
@@ -728,6 +735,11 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.membership_audit FROM anon, au
 -- to read preferences directly should not have to add a grant back.
 -- ---------------------------------------------------------------------
 GRANT SELECT, INSERT, DELETE ON public.notification_opt_outs TO authenticated;
+-- ⚠️ MEASURED 25 Aug 2026: live authenticated ALSO holds UPDATE (plus the
+-- MAINTAIN/REFERENCES/TRIGGER defaults) — the "complete vocabulary" claim
+-- above is not what the catalogue says. No migration granted it; birth
+-- defaults were evidently never trimmed. Inert through the owner-scoped
+-- policy, but the ceiling is wider than this file claimed.
 REVOKE ALL ON public.notification_opt_outs FROM anon;
 
 -- ---------------------------------------------------------------------
@@ -845,6 +857,10 @@ GRANT UPDATE (notify_approvals) ON public.memberships TO authenticated;
 -- leave_group()/remove_group_member() do every write. conversations gains
 -- column-level UPDATE on title, gated by the owner-only "group rename" policy.
 GRANT SELECT ON public.conversation_members TO authenticated;
+-- ⚠️ MEASURED 25 Aug 2026: live authenticated holds the full default 7 verbs,
+-- not SELECT only — the REVOKE below targets PUBLIC and anon and never
+-- removed authenticated's birth defaults. The RPC-only write path holds
+-- through RLS (no INSERT/UPDATE/DELETE policy), not through this grant.
 GRANT UPDATE (title) ON public.conversations TO authenticated;
 REVOKE ALL ON public.conversation_members FROM PUBLIC, anon;
 
@@ -852,6 +868,8 @@ REVOKE ALL ON public.conversation_members FROM PUBLIC, anon;
 -- Own-row INSERT/DELETE gated by the policies; read defers to the message's
 -- own read policy.
 GRANT SELECT, INSERT, DELETE ON public.message_reactions TO authenticated;
+-- ⚠️ MEASURED 25 Aug 2026: live also carries UPDATE + defaults (same
+-- untrimmed-birth-defaults mechanism as conversation_members above).
 REVOKE ALL ON public.message_reactions FROM PUBLIC, anon;
 
 -- 24 Aug 2026 — db/migrations/20260824_nicknames.sql (private nicknames,
@@ -868,6 +886,8 @@ REVOKE ALL ON public.nicknames FROM PUBLIC, anon;
 -- hand participants the whole (body, pinned, deleted_at) column set — §4's
 -- exact warning.
 GRANT SELECT, INSERT, DELETE ON public.message_stars TO authenticated;
+-- ⚠️ MEASURED 25 Aug 2026: live also carries UPDATE + defaults (same
+-- mechanism as conversation_members above).
 REVOKE ALL ON public.message_stars FROM PUBLIC, anon;
 
 -- 24 Aug 2026 — db/migrations/20260824_chat_prefs.sql (pinned chats and

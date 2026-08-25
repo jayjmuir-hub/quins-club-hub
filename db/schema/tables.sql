@@ -261,8 +261,19 @@ CREATE TABLE public.profiles (
   -- accidental.
   photo_path        text,
   phone             text,
+  -- Re-captured 25 Aug 2026 — six live columns this file was missing:
+  -- photo_focus_x/y (photo positioner), email_confirmed_at (welcome-mail
+  -- door two), signup_intent + signup_intent_applied_at (signup-before-
+  -- confirm wizard), welcomed_at (the welcome trigger's gate).
+  photo_focus_x     smallint,
+  photo_focus_y     smallint,
+  email_confirmed_at        timestamptz,
+  signup_intent             jsonb,
+  signup_intent_applied_at  timestamptz,
+  welcomed_at               timestamptz,
   CONSTRAINT profiles_pkey   PRIMARY KEY (id),
-  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  CONSTRAINT profiles_photo_focus_range CHECK ((((photo_focus_x IS NULL) OR ((photo_focus_x >= 0) AND (photo_focus_x <= 100))) AND ((photo_focus_y IS NULL) OR ((photo_focus_y >= 0) AND (photo_focus_y <= 100)))))
 );
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
@@ -310,10 +321,14 @@ CREATE TABLE public.players (
   -- Added 2026-08-07 (player_gender). Nullable on purpose: "not recorded" is a
   -- real state and is not the same as either value.
   gender      text,
+  -- Re-captured 25 Aug 2026: the photo positioner's focal point (percent).
+  photo_focus_x smallint,
+  photo_focus_y smallint,
   CONSTRAINT players_pkey         PRIMARY KEY (id),
   CONSTRAINT players_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
   CONSTRAINT players_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
-  CONSTRAINT players_gender_check CHECK (((gender IS NULL) OR (gender = ANY (ARRAY['male'::text, 'female'::text]))))
+  CONSTRAINT players_gender_check CHECK (((gender IS NULL) OR (gender = ANY (ARRAY['male'::text, 'female'::text])))),
+  CONSTRAINT players_photo_focus_range CHECK ((((photo_focus_x IS NULL) OR ((photo_focus_x >= 0) AND (photo_focus_x <= 100))) AND ((photo_focus_y IS NULL) OR ((photo_focus_y >= 0) AND (photo_focus_y <= 100)))))
 );
 ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
 
@@ -383,11 +398,16 @@ CREATE TABLE public.player_parents (
   -- !! ⚠️ NOT PROOF OF DELIVERY. The send is a separate step and can fail after
   -- !! this is stamped. It records that we ASKED, never that anything arrived.
   invited_at    timestamptz,
-  CONSTRAINT player_parents_name_not_blank CHECK ((btrim(full_name) <> ''::text))
+  -- Re-captured 25 Aug 2026 (parent_profile_link, 17 Aug — uncaptured for 8
+  -- days): the Club Hub account this parent row belongs to, when known.
+  profile_id    uuid,
+  CONSTRAINT player_parents_name_not_blank CHECK ((btrim(full_name) <> ''::text)),
+  CONSTRAINT player_parents_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE SET NULL
 );
 ALTER TABLE public.player_parents ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX player_parents_player_id_idx ON public.player_parents USING btree (player_id);
+CREATE INDEX player_parents_profile_id_idx ON public.player_parents USING btree (profile_id) WHERE (profile_id IS NOT NULL);
 
 
 -- ---------------------------------------------------------------------
@@ -420,6 +440,8 @@ CREATE TABLE public.access_requests (
   -- !! applies to new rows only. NOT NULL cannot express that distinction.
   requested_role     text,
   requested_team_id  uuid,
+  -- Re-captured 25 Aug 2026: multi-squad requests. Was live but uncaptured.
+  requested_team_ids uuid[],
   CONSTRAINT access_requests_pkey            PRIMARY KEY (id),
   CONSTRAINT access_requests_profile_id_key  UNIQUE (profile_id),
   CONSTRAINT access_requests_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
@@ -773,6 +795,11 @@ CREATE TABLE public.events (
   -- ⚠️ NOT NULL DEFAULT false, so every fixture predating it keeps exactly the
   -- meaning it had. Measured immediately after applying: 62 events, 0 flagged.
   time_tbd     boolean NOT NULL DEFAULT false,
+  -- Re-captured 25 Aug 2026 (tiers_and_player_grades, 14 Aug — uncaptured
+  -- for 11 days): the tier of the COMPETITION this fixture was played in, or
+  -- NULL for a friendly and anything untiered. NOT derived from
+  -- league_team_id — see the migration's comment.
+  tier         text,
   CONSTRAINT events_pkey          PRIMARY KEY (id),
   CONSTRAINT events_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
   CONSTRAINT events_team_id_fkey    FOREIGN KEY (team_id)    REFERENCES teams(id)    ON DELETE CASCADE,
@@ -804,7 +831,9 @@ CREATE TABLE public.events (
   -- Added 2026-08-08 (event_end_time_and_notes). Note the `ends_at IS NULL OR`
   -- arm: a NULL end time stays legal, so the CHECK only ever fires on an end
   -- time that is actually before or equal to the start.
-  CONSTRAINT events_ends_after_starts CHECK (((ends_at IS NULL) OR (ends_at > starts_at)))
+  CONSTRAINT events_ends_after_starts CHECK (((ends_at IS NULL) OR (ends_at > starts_at))),
+  -- Re-captured 25 Aug 2026, with `tier` above.
+  CONSTRAINT events_tier_check CHECK (((tier IS NULL) OR (tier = ANY (ARRAY['A'::text, 'B'::text, 'C'::text]))))
 );
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
@@ -977,7 +1006,10 @@ CREATE TABLE public.invites (
   -- had since 5 Aug. 'manager' and 'medic' are identical to 'coach' in what
   -- they may do; the distinction is documentary — see
   -- claude/decisions/2026-08-05-team-manager-and-medic-roles.md.
-  CONSTRAINT invites_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text, 'medic'::text, 'parent'::text, 'player'::text])))
+  CONSTRAINT invites_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text, 'medic'::text, 'parent'::text, 'player'::text]))),
+  -- Re-captured 25 Aug 2026: the check the grant_status comment above
+  -- described was live all along but had no constraint line here.
+  CONSTRAINT invites_grant_status_check CHECK ((grant_status = ANY (ARRAY['active'::text, 'pending'::text])))
 );
 ALTER TABLE public.invites ENABLE ROW LEVEL SECURITY;
 
@@ -1017,6 +1049,11 @@ CREATE INDEX invite_targets_invite_id_idx ON public.invite_targets USING btree (
 
 
 -- ---------------------------------------------------------------------
+-- ⚠️ NO LONGER COMPLETE — 25 Aug 2026: live `public` holds 125 indexes and
+-- this summary predates every table added since 9 Aug. The PER-TABLE index
+-- lines throughout this file are the accurate half (verified against
+-- pg_indexes on 25 Aug: every shared definition matches verbatim); treat
+-- this list as the 9 Aug snapshot it says it is, not as an inventory.
 -- Indexes: complete list in `public` as captured 2026-08-09, verbatim from
 -- pg_indexes. (`private` has no tables and therefore no indexes.)
 --
@@ -1592,13 +1629,22 @@ ALTER TABLE public.photo_backup_runs ENABLE ROW LEVEL SECURITY;
 --                                               messages_* partitions; not ours,
 --                                               and deliberately not enumerated)
 --
--- ⚠️ EXACTLY ONE OF OUR TABLES IS PUBLISHED. public.availability is NOT, and
--- that is a decision rather than an omission: its subscription already carries
--- `filter: event_id=eq.<id>` and it is replica identity DEFAULT, so publishing
--- it would immediately have the delete gap -- a cleared availability would not
--- disappear from another viewer's screen. See the migration.
+-- ⚠️ THE PARAGRAPH BELOW WAS AN INVERTED STANDING CLAIM BY 25 Aug 2026 — the
+-- exact failure class this file's own 7 Aug warning describes. It read
+-- "EXACTLY ONE of our tables is published; availability is NOT, and that is
+-- a decision". Measured on 25 Aug: supabase_realtime holds SIX tables —
+-- events, availability, announcements, feedback, messages, conversations —
+-- so availability WAS later published (presumably with the delete gap dealt
+-- with or accepted) and four more joined with their features. The capture
+-- below is the live membership; the old prose is kept struck as the record
+-- of the earlier ruling.
 
 ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.availability;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.announcements;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.feedback;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.conversations;
 
 
 -- ---------------------------------------------------------------------
@@ -1630,7 +1676,9 @@ CREATE TABLE public.announcements (
   pinned     boolean NOT NULL DEFAULT false,
   expires_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz
+  updated_at timestamptz,
+  -- Re-captured 25 Aug 2026: an announcement scoped to one group chat.
+  group_id   uuid
 );
 ALTER TABLE public.announcements ADD CONSTRAINT announcements_club_id_fkey   FOREIGN KEY (club_id)   REFERENCES clubs(id)    ON DELETE CASCADE;
 ALTER TABLE public.announcements ADD CONSTRAINT announcements_team_id_fkey   FOREIGN KEY (team_id)   REFERENCES teams(id)    ON DELETE CASCADE;
@@ -1639,6 +1687,7 @@ ALTER TABLE public.announcements ADD CONSTRAINT announcements_title_check CHECK 
 ALTER TABLE public.announcements ADD CONSTRAINT announcements_body_check  CHECK ((length(btrim(body))  > 0));
 CREATE INDEX announcements_created_idx      ON public.announcements USING btree (created_at DESC, id);
 CREATE INDEX announcements_team_created_idx ON public.announcements USING btree (team_id, created_at DESC);
+CREATE INDEX announcements_group_id_idx     ON public.announcements USING btree (group_id) WHERE (group_id IS NOT NULL);
 
 -- ---------------------------------------------------------------------
 -- public.announcement_reads  (captured 14 Aug 2026)
@@ -1787,9 +1836,19 @@ CREATE TABLE public.player_private (
   date_of_birth date,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz,
+  -- Re-captured 25 Aug 2026. plays_up_confirmed_at (17 Aug, plays-up
+  -- confirmation) had NO line anywhere in this file; the three staff_dm
+  -- columns (squad chat phase 3, 23 Aug) were recorded only in a trailing
+  -- comment at the end of this file, which this capture replaces.
+  plays_up_confirmed_at timestamptz,
+  staff_dm_opt_in    boolean NOT NULL DEFAULT false,
+  staff_dm_opt_in_by uuid,
+  staff_dm_opt_in_at timestamptz,
   CONSTRAINT player_private_pkey PRIMARY KEY (player_id),
   CONSTRAINT player_private_player_id_fkey FOREIGN KEY (player_id)
     REFERENCES public.players(id) ON DELETE CASCADE,
+  CONSTRAINT player_private_staff_dm_opt_in_by_fkey FOREIGN KEY (staff_dm_opt_in_by)
+    REFERENCES public.profiles(id) ON DELETE SET NULL,
   -- Bounds, not a format check. A future birthday and a 120-year-old under-12
   -- are both typos, and both are refused at the database rather than in a form
   -- a second writer could bypass.
@@ -1922,17 +1981,29 @@ CREATE TABLE public.messages (
   created_at    timestamptz NOT NULL DEFAULT now(),
   -- phase 2 (20260823_squad_chat_phase2): who the author named; the trigger
   -- filters to the channel's audience and drops the author.
-  mentions      uuid[]      NOT NULL DEFAULT '{}'
+  mentions      uuid[]      NOT NULL DEFAULT '{}',
+  -- Re-captured 25 Aug 2026, first-class instead of the "messages gained:"
+  -- comment this file carried: conversation_id (phase 3 DMs), and chat round
+  -- 2's quoted replies, forwarding flag and photo attachments.
+  conversation_id uuid,
+  quoted_id       uuid,
+  forwarded       boolean   NOT NULL DEFAULT false,
+  attachment_path text
 );
 ALTER TABLE public.messages ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
 ALTER TABLE public.messages ADD CONSTRAINT messages_channel_check CHECK (channel IN ('squad', 'staff', 'dm'));
-ALTER TABLE public.messages ADD CONSTRAINT messages_body_check CHECK (length(btrim(body)) BETWEEN 1 AND 2000);
+-- Re-captured 25 Aug 2026: rewritten by chat round 2 — a photo with no text
+-- is a legal message, so the >= 1 arm now yields to attachment_path.
+ALTER TABLE public.messages ADD CONSTRAINT messages_body_check CHECK (((length(btrim(body)) <= 2000) AND ((length(btrim(body)) >= 1) OR (attachment_path IS NOT NULL))));
 ALTER TABLE public.messages ADD CONSTRAINT messages_staff_needs_team CHECK (channel <> 'staff' OR team_id IS NOT NULL);
 ALTER TABLE public.messages ADD CONSTRAINT messages_club_id_fkey   FOREIGN KEY (club_id)   REFERENCES clubs(id)    ON DELETE CASCADE;
 ALTER TABLE public.messages ADD CONSTRAINT messages_team_id_fkey   FOREIGN KEY (team_id)   REFERENCES teams(id)    ON DELETE CASCADE;
 ALTER TABLE public.messages ADD CONSTRAINT messages_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES messages(id) ON DELETE CASCADE;
 ALTER TABLE public.messages ADD CONSTRAINT messages_event_id_fkey  FOREIGN KEY (event_id)  REFERENCES events(id)   ON DELETE SET NULL;
 ALTER TABLE public.messages ADD CONSTRAINT messages_author_id_fkey FOREIGN KEY (author_id) REFERENCES profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.messages ADD CONSTRAINT messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE;
+ALTER TABLE public.messages ADD CONSTRAINT messages_quoted_id_fkey FOREIGN KEY (quoted_id) REFERENCES messages(id) ON DELETE SET NULL;
+ALTER TABLE public.messages ADD CONSTRAINT messages_dm_shape CHECK ((channel = 'dm') = (conversation_id IS NOT NULL));
 CREATE INDEX messages_stream_idx ON public.messages USING btree (team_id, channel, created_at DESC);
 CREATE INDEX messages_parent_idx ON public.messages USING btree (parent_id) WHERE (parent_id IS NOT NULL);
 CREATE INDEX messages_event_idx  ON public.messages USING btree (event_id)  WHERE (event_id IS NOT NULL);
@@ -1941,6 +2012,8 @@ CREATE INDEX messages_author_idx ON public.messages USING btree (author_id);
 -- GIN index for "messages that mention me".
 CREATE UNIQUE INDEX messages_one_thread_per_event_idx ON public.messages USING btree (event_id) WHERE ((event_id IS NOT NULL) AND (parent_id IS NULL) AND (deleted_at IS NULL));
 CREATE INDEX messages_mentions_idx ON public.messages USING gin (mentions);
+CREATE INDEX messages_conversation_idx ON public.messages USING btree (conversation_id, created_at) WHERE (conversation_id IS NOT NULL);
+CREATE INDEX messages_quoted_idx ON public.messages USING btree (quoted_id) WHERE (quoted_id IS NOT NULL);
 
 -- announce_only DEFAULTS TRUE, and an ABSENT row means true — most squads
 -- will never have one. private.channel_announce_only() reads it that way.
@@ -1998,18 +2071,26 @@ CREATE TABLE public.conversation_clears (
 -- player_private records who consented and when; a trigger refuses the
 -- player themself.
 -- ---------------------------------------------------------------------
+-- ⚠️ RE-CAPTURED 25 Aug 2026 after the GROUP-CHAT rewrite (20260824 group
+-- chats) — the largest structural drift of any captured table. profile_a/b
+-- went NULLABLE, kind + title arrived, conversations_check and the (a, b)
+-- UNIQUE were REPLACED by conversations_shape and the partial unique
+-- conversations_dm_pair: a DM is still the ordered pair; a group is a titled
+-- row whose membership lives in conversation_members.
 CREATE TABLE public.conversations (
   id          uuid        NOT NULL DEFAULT gen_random_uuid(),
   club_id     uuid        NOT NULL,
-  profile_a   uuid        NOT NULL,
-  profile_b   uuid        NOT NULL,
+  profile_a   uuid,
+  profile_b   uuid,
   created_by  uuid        NOT NULL,
   created_at  timestamptz NOT NULL DEFAULT now(),
-  last_at     timestamptz NOT NULL DEFAULT now()
+  last_at     timestamptz NOT NULL DEFAULT now(),
+  kind        text        NOT NULL DEFAULT 'dm'::text,
+  title       text
 );
 ALTER TABLE public.conversations ADD CONSTRAINT conversations_pkey PRIMARY KEY (id);
-ALTER TABLE public.conversations ADD CONSTRAINT conversations_check CHECK (profile_a < profile_b);
-ALTER TABLE public.conversations ADD CONSTRAINT conversations_profile_a_profile_b_key UNIQUE (profile_a, profile_b);
+ALTER TABLE public.conversations ADD CONSTRAINT conversations_shape CHECK ((((kind = 'dm'::text) AND (profile_a IS NOT NULL) AND (profile_b IS NOT NULL) AND (profile_a < profile_b) AND (title IS NULL)) OR ((kind = 'group'::text) AND (profile_a IS NULL) AND (profile_b IS NULL) AND (title IS NOT NULL) AND ((length(btrim(title)) >= 1) AND (length(btrim(title)) <= 80)))));
+CREATE UNIQUE INDEX conversations_dm_pair ON public.conversations USING btree (profile_a, profile_b) WHERE (kind = 'dm'::text);
 ALTER TABLE public.conversations ADD CONSTRAINT conversations_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE;
 ALTER TABLE public.conversations ADD CONSTRAINT conversations_profile_a_fkey  FOREIGN KEY (profile_a)  REFERENCES profiles(id) ON DELETE CASCADE;
 ALTER TABLE public.conversations ADD CONSTRAINT conversations_profile_b_fkey  FOREIGN KEY (profile_b)  REFERENCES profiles(id) ON DELETE CASCADE;
@@ -2017,10 +2098,8 @@ ALTER TABLE public.conversations ADD CONSTRAINT conversations_created_by_fkey FO
 CREATE INDEX conversations_a_idx ON public.conversations USING btree (profile_a, last_at DESC);
 CREATE INDEX conversations_b_idx ON public.conversations USING btree (profile_b, last_at DESC);
 
--- messages gained:
---   conversation_id uuid REFERENCES conversations(id) ON DELETE CASCADE
---   CONSTRAINT messages_dm_shape CHECK ((channel = 'dm') = (conversation_id IS NOT NULL))
---   CREATE INDEX messages_conversation_idx ON public.messages USING btree (conversation_id, created_at) WHERE (conversation_id IS NOT NULL);
+-- (messages' conversation_id / dm_shape / conversation_idx, once summarised
+-- here, are captured first-class in the messages block above — 25 Aug 2026.)
 
 CREATE TABLE public.dm_blocks (
   blocker_id  uuid        NOT NULL,
@@ -2063,8 +2142,227 @@ ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_admin_id
 ALTER TABLE public.welfare_access_log ADD CONSTRAINT welfare_access_log_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL;  -- was CASCADE until 24 Aug 2026
 CREATE INDEX welfare_access_log_idx ON public.welfare_access_log USING btree (club_id, opened_at DESC);
 
--- player_private gained (phase 3):
---   staff_dm_opt_in    boolean NOT NULL DEFAULT false
---   staff_dm_opt_in_by uuid REFERENCES profiles(id) ON DELETE SET NULL
---   staff_dm_opt_in_at timestamptz
--- notification_opt_outs.category gained 'direct_messages'.
+-- (The phase-3 player_private columns once summarised here are now captured
+-- first-class in the player_private block above — 25 Aug 2026 re-capture.)
+
+
+-- =====================================================================
+-- RE-CAPTURED 2026-08-25 — THE THIRTEEN TABLES THIS FILE WAS MISSING
+--
+-- Measured against information_schema/pg_catalog on 25 Aug 2026: live held
+-- 57 base tables and this file captured 44. Every block below existed live
+-- with RLS ON and no entry here — several already had their GRANTS
+-- (grants.sql) or POLICIES (policies.sql) captured, which proves they were
+-- KNOWN and simply never written into this file. The capture-with-the-
+-- migration discipline failed continuously from 14 Aug (player_grades)
+-- through 24 Aug (the chat rounds). Constraint names are exactly as live
+-- names them. feedback.ref and membership_audit.id are
+-- GENERATED ALWAYS AS IDENTITY. membership_vouches has NO foreign keys
+-- live. Prose/reasoning for each lives in its migration under
+-- db/migrations/, which this capture does not restate.
+-- =====================================================================
+
+-- availability_nudges  (19 Aug 2026 — who has already been nudged about which match)
+CREATE TABLE public.availability_nudges (
+  event_id    uuid        NOT NULL,
+  profile_id  uuid        NOT NULL,
+  batch_id    uuid        NOT NULL,
+  sent_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT availability_nudges_pkey            PRIMARY KEY (event_id, profile_id),
+  CONSTRAINT availability_nudges_event_id_fkey   FOREIGN KEY (event_id)   REFERENCES events(id)   ON DELETE CASCADE,
+  CONSTRAINT availability_nudges_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+ALTER TABLE public.availability_nudges ENABLE ROW LEVEL SECURITY;
+
+-- chat_prefs  (24 Aug 2026 — pinned chats and archive; owner-only)
+CREATE TABLE public.chat_prefs (
+  owner_id    uuid        NOT NULL,
+  chat_key    text        NOT NULL,
+  pinned      boolean     NOT NULL DEFAULT false,
+  archived    boolean     NOT NULL DEFAULT false,
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT chat_prefs_pkey           PRIMARY KEY (owner_id, chat_key),
+  CONSTRAINT chat_prefs_owner_id_fkey  FOREIGN KEY (owner_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT chat_prefs_chat_key_check CHECK (((length(chat_key) >= 1) AND (length(chat_key) <= 80)))
+);
+ALTER TABLE public.chat_prefs ENABLE ROW LEVEL SECURITY;
+
+-- conversation_members  (24 Aug 2026 — group chat membership; writes via RPCs only)
+CREATE TABLE public.conversation_members (
+  conversation_id  uuid        NOT NULL,
+  profile_id       uuid        NOT NULL,
+  is_owner         boolean     NOT NULL DEFAULT false,
+  joined_at        timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT conversation_members_pkey                 PRIMARY KEY (conversation_id, profile_id),
+  CONSTRAINT conversation_members_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+  CONSTRAINT conversation_members_profile_id_fkey      FOREIGN KEY (profile_id)      REFERENCES profiles(id)      ON DELETE CASCADE
+);
+ALTER TABLE public.conversation_members ENABLE ROW LEVEL SECURITY;
+
+-- feedback  (18 Aug 2026 — bug/idea reports; policies and grants ARE captured elsewhere)
+-- NOTE: ref is GENERATED ALWAYS AS IDENTITY.
+CREATE TABLE public.feedback (
+  id            uuid        NOT NULL DEFAULT gen_random_uuid(),
+  ref           bigint      NOT NULL GENERATED ALWAYS AS IDENTITY,
+  club_id       uuid        NOT NULL,
+  submitted_by  uuid        NOT NULL,
+  kind          text        NOT NULL,
+  body          text        NOT NULL,
+  route         text,
+  context       jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  status        text        NOT NULL DEFAULT 'new'::text,
+  admin_note    text,
+  handled_by    uuid,
+  handled_at    timestamptz,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT feedback_pkey              PRIMARY KEY (id),
+  CONSTRAINT feedback_club_id_fkey      FOREIGN KEY (club_id)      REFERENCES clubs(id)    ON DELETE CASCADE,
+  CONSTRAINT feedback_submitted_by_fkey FOREIGN KEY (submitted_by) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT feedback_handled_by_fkey   FOREIGN KEY (handled_by)   REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT feedback_kind_check        CHECK ((kind = ANY (ARRAY['bug'::text, 'idea'::text]))),
+  CONSTRAINT feedback_body_check        CHECK ((length(btrim(body)) > 0)),
+  CONSTRAINT feedback_status_check      CHECK ((status = ANY (ARRAY['new'::text, 'in-progress'::text, 'done'::text, 'wontfix'::text])))
+);
+ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX feedback_club_status_created_idx ON public.feedback USING btree (club_id, status, created_at DESC);
+CREATE INDEX feedback_submitted_by_idx        ON public.feedback USING btree (submitted_by, created_at DESC);
+
+-- membership_audit  (17 Aug 2026 — append-only membership log; super-admin read only)
+-- NOTE: id is GENERATED ALWAYS AS IDENTITY. Deliberately NO foreign keys (a log outlives cascades).
+CREATE TABLE public.membership_audit (
+  id             bigint      NOT NULL GENERATED ALWAYS AS IDENTITY,
+  at             timestamptz NOT NULL DEFAULT now(),
+  membership_id  uuid        NOT NULL,
+  profile_id     uuid        NOT NULL,
+  club_id        uuid        NOT NULL,
+  team_id        uuid,
+  player_id      uuid,
+  action         text        NOT NULL,
+  actor_id       uuid,
+  actor_kind     text        NOT NULL,
+  old_role       text,
+  new_role       text,
+  old_status     text,
+  new_status     text,
+  old_is_super   boolean,
+  new_is_super   boolean,
+  old_rights     text[],
+  new_rights     text[],
+  CONSTRAINT membership_audit_pkey             PRIMARY KEY (id),
+  CONSTRAINT membership_audit_action_check     CHECK ((action = ANY (ARRAY['granted'::text, 'changed'::text, 'revoked'::text]))),
+  CONSTRAINT membership_audit_actor_kind_check CHECK ((actor_kind = ANY (ARRAY['member'::text, 'system'::text])))
+);
+ALTER TABLE public.membership_audit ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX membership_audit_at_idx      ON public.membership_audit USING btree (at DESC);
+CREATE INDEX membership_audit_profile_idx ON public.membership_audit USING btree (profile_id, at DESC);
+
+-- membership_vouches  (17 Aug 2026 — "do you know this person?")
+-- NOTE: NO foreign keys live — only the PK and the answer CHECK. Captured as found.
+CREATE TABLE public.membership_vouches (
+  membership_id  uuid        NOT NULL,
+  voucher_id     uuid        NOT NULL,
+  club_id        uuid        NOT NULL,
+  team_id        uuid,
+  answer         text        NOT NULL,
+  at             timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT membership_vouches_pkey         PRIMARY KEY (membership_id, voucher_id),
+  CONSTRAINT membership_vouches_answer_check CHECK ((answer = ANY (ARRAY['known'::text, 'unknown'::text])))
+);
+ALTER TABLE public.membership_vouches ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX membership_vouches_membership_idx ON public.membership_vouches USING btree (membership_id);
+
+-- message_reactions  (24 Aug 2026 — emoji reactions; fixed emoji list in a CHECK)
+CREATE TABLE public.message_reactions (
+  message_id  uuid        NOT NULL,
+  profile_id  uuid        NOT NULL,
+  emoji       text        NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT message_reactions_pkey            PRIMARY KEY (message_id, profile_id, emoji),
+  CONSTRAINT message_reactions_message_id_fkey FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+  CONSTRAINT message_reactions_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT message_reactions_emoji_check     CHECK ((emoji = ANY (ARRAY['👍'::text, '❤️'::text, '😂'::text, '😮'::text, '👏'::text])))
+);
+ALTER TABLE public.message_reactions ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX message_reactions_message_idx ON public.message_reactions USING btree (message_id);
+
+-- message_stars  (24 Aug 2026 — starred messages, owner-only)
+CREATE TABLE public.message_stars (
+  owner_id    uuid        NOT NULL,
+  message_id  uuid        NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT message_stars_pkey            PRIMARY KEY (owner_id, message_id),
+  CONSTRAINT message_stars_owner_id_fkey   FOREIGN KEY (owner_id)   REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT message_stars_message_id_fkey FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+);
+ALTER TABLE public.message_stars ENABLE ROW LEVEL SECURITY;
+
+-- nicknames  (24 Aug 2026 — private per-owner labels for other members)
+CREATE TABLE public.nicknames (
+  owner_id    uuid        NOT NULL,
+  profile_id  uuid        NOT NULL,
+  label       text        NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT nicknames_pkey            PRIMARY KEY (owner_id, profile_id),
+  CONSTRAINT nicknames_owner_id_fkey   FOREIGN KEY (owner_id)   REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT nicknames_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT nicknames_label_check     CHECK (((length(btrim(label)) >= 1) AND (length(btrim(label)) <= 40)))
+);
+ALTER TABLE public.nicknames ENABLE ROW LEVEL SECURITY;
+
+-- notification_opt_outs  (19 Aug 2026 — a row means OFF; described in grants.sql and
+-- policies.sql, never captured here. Category list has grown to SEVEN values.)
+CREATE TABLE public.notification_opt_outs (
+  profile_id  uuid        NOT NULL,
+  category    text        NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT notification_opt_outs_pkey            PRIMARY KEY (profile_id, category),
+  CONSTRAINT notification_opt_outs_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT notification_opt_outs_category_check  CHECK ((category = ANY (ARRAY['feedback_reply'::text, 'notice'::text, 'fixture'::text, 'approval'::text, 'availability'::text, 'squad_chat'::text, 'direct_messages'::text])))
+);
+ALTER TABLE public.notification_opt_outs ENABLE ROW LEVEL SECURITY;
+
+-- player_grades  (14 Aug 2026 — coach-only tier per player; grants ARE in grants.sql,
+-- policy IS in policies.sql, the table itself was never captured)
+CREATE TABLE public.player_grades (
+  player_id   uuid        NOT NULL,
+  tier        text        NOT NULL,
+  note        text,
+  updated_by  uuid,
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT player_grades_pkey            PRIMARY KEY (player_id),
+  CONSTRAINT player_grades_player_id_fkey  FOREIGN KEY (player_id)  REFERENCES players(id)  ON DELETE CASCADE,
+  CONSTRAINT player_grades_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES profiles(id) ON DELETE SET NULL,
+  CONSTRAINT player_grades_tier_check      CHECK ((tier = ANY (ARRAY['A'::text, 'B'::text, 'C'::text])))
+);
+ALTER TABLE public.player_grades ENABLE ROW LEVEL SECURITY;
+
+-- push_subscriptions  (18 Aug 2026 — web-push endpoints; grants ARE in grants.sql)
+CREATE TABLE public.push_subscriptions (
+  id          uuid        NOT NULL DEFAULT gen_random_uuid(),
+  profile_id  uuid        NOT NULL,
+  endpoint    text        NOT NULL,
+  p256dh      text        NOT NULL,
+  auth        text        NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT push_subscriptions_pkey            PRIMARY KEY (id),
+  CONSTRAINT push_subscriptions_endpoint_key    UNIQUE (endpoint),
+  CONSTRAINT push_subscriptions_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX push_subscriptions_profile_id_idx ON public.push_subscriptions USING btree (profile_id);
+
+-- signup_nudges  (20 Aug 2026 — who was chased about an unfinished sign-up)
+CREATE TABLE public.signup_nudges (
+  profile_id  uuid        NOT NULL,
+  nudge_no    integer     NOT NULL,
+  sent_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT signup_nudges_pkey            PRIMARY KEY (profile_id, nudge_no),
+  CONSTRAINT signup_nudges_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT signup_nudges_nudge_no_check  CHECK ((nudge_no = ANY (ARRAY[1, 2])))
+);
+ALTER TABLE public.signup_nudges ENABLE ROW LEVEL SECURITY;

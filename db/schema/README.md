@@ -285,6 +285,38 @@ and before that
 | `functions.sql` | Full `pg_get_functiondef()` output for every function in `public` and `private`, plus their EXECUTE grants from `proacl`. ⚠️ This row said "all 22 functions" until 9 Aug, when the count went to 29. **A count in a table of contents is a thing that rots** — the file itself is the inventory. |
 | `triggers.sql` | Every trigger: two on `auth.users`, `profiles_sync_name` on `public.profiles` (6 Aug 2026), `notify_pending_membership` on `public.memberships` (9 Aug 2026 — the first trigger in this project that reaches OUTSIDE the database), and `notify_pitch_request_asked` / `notify_pitch_request_answered` on `public.pitch_requests` (11 Aug 2026 — the second and third that do). ⚠️ This row said "there are none on any `public` table" until 7 Aug, "the three triggers" until 9 Aug, and named four until 11 Aug. **A trigger is the easiest object here to leave uncaptured: nothing in the app names it, and the code that fires it is an ordinary INSERT.** |
 
+> ## ⚠️ Re-captured 2026-08-25 — TWELVE DAYS of drift, the largest reconciliation
+> ## this directory has absorbed, and it found the file AHEAD of production once
+>
+> The discipline failed continuously from 14 Aug to 25 Aug. The full delta,
+> every item measured against the catalogue and reconciled that day:
+>
+> - **13 whole tables** missing from `tables.sql` (player_grades through the
+>   chat rounds) while several already had grants or policies captured —
+>   known, just never written down. Live 57, captured 44.
+> - **11 captured tables had drifted** — worst was `conversations`, whose
+>   group-chat rewrite made two captured constraints false and two columns'
+>   nullability wrong. `profiles` was missing six live columns.
+> - **25 policies** missing (including an ENTIRE uncaptured storage bucket,
+>   chat-media), **5 drifted** — two of them the storage staff-photo pair.
+> - **22 functions** missing; 3 recorded bodies stale; 2 `proacl` drifts not
+>   attributable to any migration (the undatable-GRANT class again).
+> - **15 triggers** missing — the push set, the feedback set, the welcome pair.
+> - **grants.sql carried an INVERTED headline** ("anon holds full privileges
+>   everywhere" — live: anon holds nothing anywhere), plus four tables whose
+>   real ceiling is wider than the file's "complete vocabulary" claims.
+> - **The publication claim was inverted too**: "exactly one table is
+>   published; availability deliberately NOT" — live publishes SIX, including
+>   availability.
+> - ⚠️ **And one drift ran the OTHER WAY**: `triggers.sql` captured
+>   `memberships_write_parent_row` (25 Aug, squash `a5c5efd`) whose migration
+>   **was never applied** — the file described production as it was intended,
+>   not as it is. Marked ⛔ NOT LIVE in place; flagged to Jay.
+>
+> Function-body drift beyond the md5-recorded set was not diffed (no hashes
+> to diff against), and storage.buckets configuration was not compared —
+> both stated in the capture rather than left to be assumed.
+
 ## Why this directory exists
 
 Until now the schema existed in exactly two places: inside Supabase, and as prose in

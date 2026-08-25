@@ -347,16 +347,36 @@ been shown what each one actually fails with. ⚠️ **Every one of them is ALSO
   positions are decoration on the screens under shoot, and their rendering has
   its own tests.
 
-- **`db/schema/tables.sql` is FIFTEEN TABLES behind the live database —
-  measured 25 Aug 2026.** `information_schema.tables` lists 57 base tables in
-  `public`; the capture holds 42. Missing: availability_nudges, chat_prefs,
-  conversation_members, feedback (policies captured, table DDL not),
-  membership_audit, membership_vouches, message_reactions, message_stars,
-  nicknames, notification_opt_outs, player_grades, push_subscriptions,
-  signup_nudges, and until 25 Aug player_positions/player_units (those two
-  now captured). This is the exact drift the directory's README warns about,
-  at a size where the diff stops being reviewable. A full re-capture is its
-  own session's work — not absorbed into the positions change on purpose.
+- ✅ ~~**`db/schema/tables.sql` is FIFTEEN TABLES behind the live database —
+  measured 25 Aug 2026.**~~ — **RE-CAPTURED IN FULL, later the same day.** All
+  13 missing tables written (the other two were the player_positions/units
+  same-day capture), 11 drifted blocks corrected in place, 25 missing + 5
+  drifted policies, 22 missing functions + 3 stale bodies, 15 missing
+  triggers, the inverted anon-grants headline, and the inverted publication
+  claim (live publishes SIX tables, availability included). Every item
+  measured against pg_catalog; the full account is the 25 Aug entry in
+  `db/schema/README.md`. Two findings became their own items below.
+
+- ⛔ **`20260825_player_parents_from_parent_membership.sql` (squash `a5c5efd`)
+  WAS NEVER APPLIED TO PRODUCTION — found 25 Aug 2026 by the re-capture.**
+  The commit shipped the migration AND wrote the capture as if applied, but
+  neither the trigger nor `private.memberships_write_parent_row()` exists
+  live and `schema_migrations` has no row for it. Consequence: parent
+  memberships created since the merge are NOT writing `player_parents`, so
+  the Needs Attention badge under-reports — the exact gap the migration
+  exists to close. **Needs Jay's yes to apply** (production migration), plus
+  the backfill it carries. `db/schema/triggers.sql` carries the ⛔ NOT LIVE
+  marker until a measurement shows it applied.
+
+- **Four tables' grant ceilings are wider than their migrations granted —
+  measured 25 Aug 2026.** notification_opt_outs (UPDATE present despite the
+  "complete vocabulary is S/I/D" ruling), conversation_members ("SELECT
+  only" — live holds all 7), message_reactions and message_stars (S,I,D —
+  live holds UPDATE too). Mechanism: the REVOKE lines target PUBLIC/anon and
+  never trimmed authenticated's birth defaults. Inert today through
+  owner-scoped policies, but it is the exact rely-on-policies-not-grants
+  shape this repo's rules warn about. One tidy migration across the four;
+  annotated in grants.sql.
 
 - **`anon` holds full table privileges on `public`.** ⚠️ **Re-measured 14 Aug 2026:
   it is 23 of the 24 tables, not the "seven" this line used to claim** — seven was a

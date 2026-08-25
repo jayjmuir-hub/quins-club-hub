@@ -2242,6 +2242,9 @@ AS $function$
 $function$
 ;
 GRANT EXECUTE ON FUNCTION private.can_edit_match_sheet(uuid) TO authenticated;
+-- ⚠️ Measured 25 Aug 2026: live proacl also carries EXECUTE to PUBLIC. No
+-- migration granted that; same undatable-GRANT class as the 9 Aug proacl
+-- findings — recorded as judgement, not attributed.
 
 
 -- ---------------------------------------------------------------------
@@ -4885,6 +4888,8 @@ $function$
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}   md5 99dfe405d827ea81c00822556360131a
 -- The list an admin edits on the Club tab: every active admin, coach and manager with the switch.
 -- ---------------------------------------------------------------------
+-- ⚠️ Measured 25 Aug 2026: live proacl LACKS service_role for this function
+-- (postgres + authenticated only) — the capture below over-claims it.
 CREATE OR REPLACE FUNCTION public.approval_recipients()
  RETURNS TABLE(membership_id uuid, profile_id uuid, full_name text, role text, team_id uuid, team_name text, notify boolean)
  LANGUAGE sql
@@ -5000,6 +5005,7 @@ $function$
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}   md5 801095c17a8d8df940f146bf02404c2d
 -- One row per chat the caller may read, newest first, with unread counts.
 -- ---------------------------------------------------------------------
+-- ⚠️ RE-CAPTURED FROM LIVE 25 Aug 2026 — body REPLACED by the 24 Aug group-chat work; the md5 recorded for this function described the pre-groups version.
 CREATE OR REPLACE FUNCTION public.my_chats()
  RETURNS TABLE(kind text, team_id uuid, conversation_id uuid, label text, detail text, last_at timestamp with time zone, last_body text, last_author_id uuid, last_author_name text, unread bigint)
  LANGUAGE sql
@@ -5071,7 +5077,27 @@ AS $function$
                             and x.created_at > coalesce(cl.cleared_at, '-infinity'::timestamptz)
                           order by x.created_at desc limit 1) lm on true
      where me.id in (c.profile_a, c.profile_b)
+       and c.kind = 'dm'
        -- cleared, and nothing since: not listed (WhatsApp's "delete chat")
+       and (cl.cleared_at is null or c.last_at > cl.cleared_at)
+    union all
+    -- groups I am in
+    select 'group', null, c.id, c.title,
+           (select count(*) from conversation_members gm where gm.conversation_id = c.id)::text || ' people',
+           c.last_at, lm.body, lm.author_id,
+           (select count(*) from messages x cross join me
+             where x.conversation_id = c.id and x.deleted_at is null
+               and x.author_id <> me.id
+               and x.created_at > coalesce(cl.cleared_at, '-infinity'::timestamptz)
+               and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id))
+      from conversations c cross join me
+      join conversation_members my on my.conversation_id = c.id and my.profile_id = me.id
+      left join conversation_clears cl on cl.conversation_id = c.id and cl.profile_id = me.id
+      left join lateral (select body, author_id from messages x
+                          where x.conversation_id = c.id and x.deleted_at is null
+                            and x.created_at > coalesce(cl.cleared_at, '-infinity'::timestamptz)
+                          order by x.created_at desc limit 1) lm on true
+     where c.kind = 'group'
        and (cl.cleared_at is null or c.last_at > cl.cleared_at)
   )
   select r.kind, r.team_id, r.conversation_id, r.label, r.detail,
@@ -5130,6 +5156,7 @@ $function$
 -- private.conversation_reviewable(_conversation uuid)   (23 Aug 2026)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres}   md5 4af1471901d8c7fa27cfa05a11a28a38
 -- ---------------------------------------------------------------------
+-- ⚠️ RE-CAPTURED FROM LIVE 25 Aug 2026 — body REPLACED by the 24 Aug group-chat work; the md5 recorded for this function described the pre-groups version.
 CREATE OR REPLACE FUNCTION private.conversation_reviewable(_conversation uuid)
  RETURNS boolean
  LANGUAGE sql
@@ -5139,11 +5166,21 @@ AS $function$
   select exists (
     select 1 from conversations c
      where c.id = _conversation
-       and (private.is_minor_profile(c.profile_a)
-         or private.is_minor_profile(c.profile_b)
-         or exists (select 1 from message_reports r
-                      join messages x on x.id = r.message_id
-                     where x.conversation_id = c.id)))
+       and case c.kind
+             when 'group' then
+               exists (select 1 from message_reports r
+                         join messages x on x.id = r.message_id
+                        where x.conversation_id = c.id)
+               and exists (select 1 from conversation_members gm
+                            where gm.conversation_id = c.id
+                              and private.is_minor_profile(gm.profile_id))
+             else
+               private.is_minor_profile(c.profile_a)
+               or private.is_minor_profile(c.profile_b)
+               or exists (select 1 from message_reports r
+                            join messages x on x.id = r.message_id
+                           where x.conversation_id = c.id)
+           end);
 $function$
 ;
 
@@ -5169,16 +5206,22 @@ $function$
 -- public.conversation_involves_minor(_conversation uuid)   (23 Aug 2026)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}   md5 c0555557733091086163d94b1f39151b
 -- ---------------------------------------------------------------------
+-- ⚠️ RE-CAPTURED FROM LIVE 25 Aug 2026 — body REPLACED by the 24 Aug group-chat work; the md5 recorded for this function described the pre-groups version.
 CREATE OR REPLACE FUNCTION public.conversation_involves_minor(_conversation uuid)
  RETURNS boolean
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  select private.is_minor_profile(c.profile_a) or private.is_minor_profile(c.profile_b)
+  select case c.kind
+           when 'group' then exists (select 1 from conversation_members gm
+                                      where gm.conversation_id = c.id
+                                        and private.is_minor_profile(gm.profile_id))
+           else private.is_minor_profile(c.profile_a) or private.is_minor_profile(c.profile_b)
+         end
     from conversations c
    where c.id = _conversation
-     and (private.in_conversation(c.id) or private.admin_may_review(c.id))
+     and (private.in_conversation(c.id) or private.admin_may_review(c.id));
 $function$
 ;
 
@@ -5272,3 +5315,887 @@ AS $function$
     );
 $function$
 ;
+
+
+-- =====================================================================
+-- RE-CAPTURED 2026-08-25 — TWENTY-TWO FUNCTIONS THIS FILE WAS MISSING
+--
+-- Live held 134 functions (55 public + 79 private); this file defined 112.
+-- Nine private (signup intent, welcome mail, name sync, announcement
+-- provenance, group-chat helpers, quote guard) and thirteen public (group
+-- chat RPCs, signup wizard RPCs, invite_parent, save_player_parents,
+-- announcement stats, set_message_pinned). announcement_stats and
+-- announcement_audience had GRANT lines in grants-adjacent notes but no
+-- definition anywhere. Captured verbatim from pg_get_functiondef on live;
+-- proacl noted above each. apply_migration strips comments, so bodies are
+-- bare — each function's WHY lives in its migration under db/migrations/.
+-- =====================================================================
+
+-- proacl: {postgres=X/postgres}
+CREATE OR REPLACE FUNCTION private.apply_signup_intent(p_user_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  intent        jsonb;
+  already       timestamptz;
+  caller_email  text;
+  player        jsonb;
+  clean_name    text;
+  clean_gender  text;
+  team_row      public.teams;
+  new_player    public.players;
+  pending_count int;
+  staff_role    text;
+  staff_team    uuid;
+begin
+  if p_user_id is null then
+    return;
+  end if;
+
+  select p.signup_intent, p.signup_intent_applied_at
+    into intent, already
+    from public.profiles p
+   where p.id = p_user_id;
+
+  if intent is null or already is not null then
+    return;
+  end if;
+
+  select u.email
+    into caller_email
+    from auth.users u
+   where u.id = p_user_id;
+
+  if caller_email is null then
+    return;
+  end if;
+
+  -- Staff claim. Same role list as public.request_staff_role.
+  staff_role := nullif(intent->>'staff_role', '');
+  staff_team := nullif(intent->>'staff_team_id', '')::uuid;
+  if staff_role in ('coach', 'manager', 'medic') and staff_team is not null then
+    select * into team_row from public.teams where id = staff_team;
+    if team_row.id is not null then
+      insert into public.memberships (profile_id, club_id, team_id, role, player_id, status)
+      select p_user_id, team_row.club_id, team_row.id, staff_role, null, 'pending'
+       where not exists (
+         select 1 from public.memberships m
+          where m.profile_id = p_user_id
+            and m.club_id = team_row.club_id
+            and m.team_id = team_row.id
+            and m.role = staff_role
+            and m.player_id is null
+       );
+    end if;
+  end if;
+
+  -- Children. Mirrors the guards inside public.register_my_player, with
+  -- p_user_id in place of auth.uid(). Duplicate names are skipped rather
+  -- than aborting the rest of the intent — a half-applied wizard is better
+  -- than rolling the new user back to an empty waiting card.
+  for player in
+    select value from jsonb_array_elements(coalesce(intent->'players', '[]'::jsonb))
+  loop
+    clean_name := nullif(btrim(
+      concat_ws(' ', player->>'first_name', player->>'last_name')
+    ), '');
+    if clean_name is null or length(clean_name) > 80 then
+      continue;
+    end if;
+
+    select * into team_row from public.teams where id = nullif(player->>'team_id', '')::uuid;
+    if team_row.id is null then
+      continue;
+    end if;
+
+    if (player->>'self_register') = 'true'
+       and not coalesce(team_row.self_registration_allowed, false) then
+      continue;
+    end if;
+
+    clean_gender := nullif(btrim(lower(player->>'gender')), '');
+    if clean_gender is not null and clean_gender not in ('male', 'female') then
+      continue;
+    end if;
+    if clean_gender is null and private.squad_expects_gender(team_row.name) is not null then
+      continue;
+    end if;
+
+    if private.name_match_key(clean_name) is not null
+       and coalesce(player->>'confirm_duplicate', '') <> 'true'
+       and exists (
+         select 1 from public.players pl
+          where pl.team_id = team_row.id
+            and private.name_match_key(pl.full_name) = private.name_match_key(clean_name)
+       ) then
+      continue;
+    end if;
+
+    select count(*) into pending_count
+      from public.memberships
+     where profile_id = p_user_id and status = 'pending';
+    if pending_count >= 5 then
+      exit;
+    end if;
+
+    insert into public.players (club_id, team_id, full_name, gender)
+    values (team_row.club_id, team_row.id, clean_name, clean_gender)
+    returning * into new_player;
+
+    insert into public.player_contacts (player_id, email)
+    values (new_player.id, lower(btrim(caller_email)));
+
+    insert into public.memberships (profile_id, club_id, team_id, role, player_id, status)
+    values (
+      p_user_id,
+      team_row.club_id,
+      team_row.id,
+      case
+        when (player->>'self_register') = 'true' or team_row.is_senior
+        then 'player'
+        else 'parent'
+      end,
+      new_player.id,
+      'pending'
+    );
+
+    if nullif(player->>'dob', '') is not null then
+      insert into public.player_private (player_id, date_of_birth, plays_up_confirmed_at)
+      values (
+        new_player.id,
+        (player->>'dob')::date,
+        case
+          when player->>'play_up_consent' = 'true'
+          then now()
+          else null
+        end
+      )
+      on conflict (player_id) do nothing;
+    end if;
+  end loop;
+
+  update public.profiles
+     set signup_intent_applied_at = now()
+   where id = p_user_id;
+end;
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+CREATE OR REPLACE FUNCTION private.can_group_add(_other uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  me uuid := auth.uid();
+  club uuid;
+begin
+  if me is null or _other is null or me = _other then return false; end if;
+  select m.club_id into club from memberships m
+   where m.profile_id = me and m.status = 'active' order by m.created_at limit 1;
+  if club is null then return false; end if;
+  if not exists (select 1 from memberships m where m.profile_id = _other
+                  and m.club_id = club and m.status = 'active') then return false; end if;
+  if exists (select 1 from dm_blocks b where (b.blocker_id = me and b.blocked_id = _other)
+                                          or (b.blocker_id = _other and b.blocked_id = me)) then
+    return false;
+  end if;
+  if private.is_admin(club) then return true; end if;
+  if exists (select 1 from memberships m where m.profile_id = _other and m.club_id = club
+              and m.status = 'active' and m.role = 'admin') then return true; end if;
+  return exists (
+    select 1 from memberships a join memberships b on b.team_id = a.team_id
+     where a.profile_id = me and a.status = 'active' and a.team_id is not null
+       and b.profile_id = _other and b.status = 'active');
+end;
+$function$
+
+-- proacl: {=X/postgres,postgres=X/postgres,authenticated=X/postgres}  (note the PUBLIC grant)
+CREATE OR REPLACE FUNCTION private.chat_media_owner(_name text)
+ RETURNS uuid
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$
+  select nullif(split_part(_name, '/', 1), '')::uuid
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+CREATE OR REPLACE FUNCTION private.is_group_owner(_conversation uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from conversation_members gm
+                  where gm.conversation_id = _conversation
+                    and gm.profile_id = (select auth.uid()) and gm.is_owner);
+$function$
+
+-- proacl: null (default: EXECUTE to PUBLIC)
+CREATE OR REPLACE FUNCTION private.messages_quote_guard()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare q record;
+begin
+  if new.quoted_id is null then return new; end if;
+  if new.channel <> 'dm' or new.conversation_id is null then
+    raise exception 'quotes are for direct and group chats only';
+  end if;
+  select id into q from public.messages where id = new.quoted_id;
+  if q.id is null then
+    raise exception 'quoted message is not one you can read';
+  end if;
+  return new;
+end $function$
+
+-- proacl: {postgres=X/postgres}
+CREATE OR REPLACE FUNCTION private.notify_welcome()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+begin
+  -- The once-only gate, claimed BEFORE anything that can fail. If the vault
+  -- reads or the queue insert blow up, the catch-all below still commits the
+  -- claim — one lost mail, never two sent.
+  update public.profiles
+     set welcomed_at = now()
+   where id = new.id
+     and welcomed_at is null;
+  if not found then
+    return new;
+  end if;
+
+  select decrypted_secret into endpoint from vault.decrypted_secrets where name = 'welcome_notify_url';
+  select decrypted_secret into secret   from vault.decrypted_secrets where name = 'approval_notify_secret';
+
+  if endpoint is null or secret is null then
+    raise warning 'notify_welcome: vault secrets missing, no email sent for %', new.id;
+    return new;
+  end if;
+
+  perform net.http_post(
+    url     := endpoint,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-approval-secret', secret),
+    body    := jsonb_build_object('user_id', new.id)
+  );
+
+  return new;
+exception when others then
+  raise warning 'notify_welcome failed for %: %', new.id, sqlerrm;
+  return new;
+end;
+$function$
+
+-- proacl: null
+CREATE OR REPLACE FUNCTION private.set_announcement_provenance()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  _club uuid;
+begin
+  if new.team_id is not null then
+    select t.club_id into _club from teams t where t.id = new.team_id;
+    if _club is null then
+      raise exception 'unknown squad' using errcode = '42501';
+    end if;
+  else
+    select m.club_id into _club
+      from memberships m
+     where m.profile_id = auth.uid()
+       and m.status = 'active'
+     group by m.club_id
+     limit 1;
+    if _club is null then
+      raise exception 'no active membership' using errcode = '42501';
+    end if;
+  end if;
+
+  new.author_id  := auth.uid();
+  new.club_id    := _club;
+  new.created_at := now();
+  new.updated_at := null;
+
+  return new;
+end;
+$function$
+
+-- proacl: null
+CREATE OR REPLACE FUNCTION private.sync_person_name()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare
+  fn      text := nullif(btrim(new.first_name), '');
+  ln      text := nullif(btrim(new.last_name), '');
+  full_in text := nullif(btrim(new.full_name), '');
+  names_changed boolean;
+  full_changed  boolean;
+begin
+  if tg_op = 'INSERT' then
+    names_changed := (fn is not null or ln is not null);
+    full_changed  := (full_in is not null);
+  else
+    names_changed := (new.first_name is distinct from old.first_name)
+                  or (new.last_name  is distinct from old.last_name);
+    full_changed  := (new.full_name  is distinct from old.full_name);
+  end if;
+
+  if names_changed and (fn is not null or ln is not null) then
+    new.full_name  := btrim(concat_ws(' ', fn, ln));
+    new.first_name := fn;
+    new.last_name  := ln;
+  elsif full_changed and full_in is not null then
+    new.full_name := full_in;
+    if position(' ' in full_in) = 0 then
+      new.first_name := full_in;
+      new.last_name  := null;
+    else
+      new.first_name := nullif(btrim(regexp_replace(full_in, '\s+\S+$', '')), '');
+      new.last_name  := nullif(btrim(regexp_replace(full_in, '^.*\s', '')), '');
+    end if;
+  end if;
+
+  return new;
+end;
+$function$
+
+-- proacl: null
+CREATE OR REPLACE FUNCTION private.touch_announcement()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  new.updated_at := now();
+  new.author_id  := old.author_id;
+  new.club_id    := old.club_id;
+  new.team_id    := old.team_id;
+  new.created_at := old.created_at;
+  return new;
+end;
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+CREATE OR REPLACE FUNCTION public.add_group_members(_conversation uuid, _members uuid[])
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  m uuid;
+begin
+  if not private.is_group_owner(_conversation) then
+    raise exception 'only the group''s creator can add people' using errcode = '42501';
+  end if;
+  foreach m in array coalesce(_members, '{}'::uuid[]) loop
+    if not private.can_group_add(m) then
+      raise exception 'someone picked is not in your squads' using errcode = '42501';
+    end if;
+    insert into conversation_members (conversation_id, profile_id)
+         values (_conversation, m) on conflict do nothing;
+  end loop;
+end;
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+CREATE OR REPLACE FUNCTION public.announcement_audience(_announcement uuid)
+ RETURNS TABLE(profile_id uuid, full_name text, read_at timestamp with time zone)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select s.profile_id, s.full_name, s.read_at
+  from (
+    select distinct on (m.profile_id)
+           m.profile_id,
+           p.full_name,
+           r.read_at
+      from announcements a
+      join memberships m
+        on m.club_id = a.club_id
+       and m.status = 'active'
+       and (a.team_id is null or m.team_id = a.team_id)
+       and m.profile_id <> a.author_id
+      join profiles p on p.id = m.profile_id
+      left join announcement_reads r
+        on r.announcement_id = a.id
+       and r.profile_id = m.profile_id
+     where a.id = _announcement
+       and (a.author_id = auth.uid() or private.is_admin(a.club_id))
+     order by m.profile_id, r.read_at nulls last
+  ) s
+  order by (s.read_at is not null), s.full_name;
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+CREATE OR REPLACE FUNCTION public.announcement_stats()
+ RETURNS TABLE(announcement_id uuid, audience_count integer, seen_count integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select
+    a.id,
+    (select count(distinct m.profile_id)::integer
+       from memberships m
+      where m.status = 'active'
+        and m.club_id = a.club_id
+        and (a.team_id is null or m.team_id = a.team_id)
+        and m.profile_id <> a.author_id),
+    (select count(distinct r.profile_id)::integer
+       from announcement_reads r
+      where r.announcement_id = a.id
+        and r.profile_id <> a.author_id
+        and exists (
+          select 1 from memberships m
+           where m.profile_id = r.profile_id
+             and m.status = 'active'
+             and m.club_id = a.club_id
+             and (a.team_id is null or m.team_id = a.team_id)
+        ))
+  from announcements a
+  where a.author_id = auth.uid()
+     or private.is_admin(a.club_id);
+$function$
+
+-- proacl: {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ⚠️ anon-callable (fails safe: auth.uid() null → 42501)
+CREATE OR REPLACE FUNCTION public.complete_signup_intent()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if auth.uid() is null then
+    raise exception 'You must be signed in.' using errcode = '42501';
+  end if;
+  perform private.apply_signup_intent(auth.uid());
+end;
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+CREATE OR REPLACE FUNCTION public.create_group(_title text, _members uuid[])
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  me uuid := auth.uid();
+  club uuid;
+  conv uuid;
+  m uuid;
+  others uuid[];
+begin
+  if me is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  select array_agg(distinct x) into others
+    from unnest(coalesce(_members, '{}'::uuid[])) as x where x is not null and x <> me;
+  -- the >=3 floor holds at birth: creator plus at least two others
+  if coalesce(array_length(others, 1), 0) < 2 then
+    raise exception 'a group is three people or more' using errcode = '23514';
+  end if;
+  if _title is null or length(btrim(_title)) not between 1 and 80 then
+    raise exception 'a group needs a name' using errcode = '23514';
+  end if;
+  select mm.club_id into club from memberships mm
+   where mm.profile_id = me and mm.status = 'active' order by mm.created_at limit 1;
+  if club is null then raise exception 'not a club member' using errcode = '42501'; end if;
+  foreach m in array others loop
+    if not private.can_group_add(m) then
+      raise exception 'someone picked is not in your squads' using errcode = '42501';
+    end if;
+  end loop;
+  insert into conversations (club_id, kind, title, created_by)
+       values (club, 'group', btrim(_title), me) returning id into conv;
+  insert into conversation_members (conversation_id, profile_id, is_owner) values (conv, me, true);
+  insert into conversation_members (conversation_id, profile_id) select conv, unnest(others);
+  return conv;
+end;
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+CREATE OR REPLACE FUNCTION public.group_candidates()
+ RETURNS TABLE(profile_id uuid, full_name text, role text, via_team text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with me as (select auth.uid() as id),
+  club as (select m.club_id as id from memberships m, me
+            where m.profile_id = me.id and m.status = 'active' order by m.created_at limit 1),
+  people as (
+    select distinct m.profile_id from memberships m, club
+     where m.club_id = club.id and m.status = 'active' and m.profile_id <> (select id from me))
+  select p.profile_id, pr.full_name,
+         (select m.role from memberships m where m.profile_id = p.profile_id and m.status = 'active'
+           order by case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2
+                                when 'medic' then 3 else 9 end limit 1) as role,
+         (select t.name from memberships a join memberships b on b.team_id = a.team_id
+            join teams t on t.id = a.team_id
+           where a.profile_id = (select id from me) and b.profile_id = p.profile_id
+             and a.status = 'active' and b.status = 'active'
+           order by t.sort_order limit 1) as via_team
+    from people p join profiles pr on pr.id = p.profile_id
+   where private.can_group_add(p.profile_id)
+   order by pr.full_name;
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+CREATE OR REPLACE FUNCTION public.invite_parent(p_parent_row uuid)
+ RETURNS invites
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  row_p     public.player_parents%rowtype;
+  ply       public.players%rowtype;
+  clean     text;
+  may_edit  boolean;
+  may_grant boolean;
+  existing  public.invites;
+  made      public.invites;
+begin
+  if auth.uid() is null then
+    raise exception 'You must be signed in.' using errcode = '42501';
+  end if;
+
+  select * into row_p from public.player_parents where id = p_parent_row;
+  if row_p.id is null then
+    raise exception 'That contact no longer exists.' using errcode = '22023';
+  end if;
+
+  select * into ply from public.players where id = row_p.player_id;
+  if ply.id is null then
+    raise exception 'That contact is not attached to a player.' using errcode = '22023';
+  end if;
+
+  may_edit := private.is_own_player(row_p.player_id)
+              or private.can_edit_team(ply.team_id);
+  if not may_edit then
+    raise exception 'You cannot invite that person.' using errcode = '42501';
+  end if;
+
+  clean := lower(nullif(btrim(row_p.email), ''));
+  if clean is null then
+    raise exception 'There is no email address on that contact yet. Add one first.'
+      using errcode = '22023';
+  end if;
+  if position('@' in clean) = 0 then
+    raise exception 'That contact''s email address does not look right.' using errcode = '22023';
+  end if;
+
+  if exists (select 1 from public.profiles pr where lower(pr.email) = clean) then
+    raise exception 'That person already has an account. Ask an admin to connect them instead.'
+      using errcode = '42710';
+  end if;
+
+  select * into existing
+    from public.invites i
+   where lower(i.email) = clean
+     and i.player_id    = row_p.player_id
+     and i.accepted_at is null
+   limit 1;
+  if existing.id is not null then
+    return existing;
+  end if;
+
+  may_grant := private.can_approve_team(ply.team_id);
+
+  insert into public.invites (club_id, email, role, team_id, player_id, created_by, grant_status)
+  values (ply.club_id, clean, 'parent', ply.team_id, row_p.player_id, auth.uid(),
+          case when may_grant then 'active' else 'pending' end)
+  returning * into made;
+
+  update public.player_parents set invited_at = now() where id = row_p.id;
+
+  return made;
+end;
+$function$
+
+-- proacl: {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ⚠️ anon-callable BY DESIGN (the signup wizard's squad list before login)
+CREATE OR REPLACE FUNCTION public.list_signup_squads()
+ RETURNS TABLE(id uuid, name text, sort_order integer, self_registration_allowed boolean, is_senior boolean)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select t.id, t.name, t.sort_order, t.self_registration_allowed, t.is_senior
+    from public.teams t
+   order by t.sort_order, t.name;
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+CREATE OR REPLACE FUNCTION public.remove_group_member(_conversation uuid, _member uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not private.is_group_owner(_conversation) then
+    raise exception 'only the group''s creator can remove people' using errcode = '42501';
+  end if;
+  if _member = auth.uid() then
+    raise exception 'leave the group instead' using errcode = '23514';
+  end if;
+  if (select count(*) from conversation_members where conversation_id = _conversation) <= 3 then
+    raise exception 'a group is three people or more — delete the group instead' using errcode = '23514';
+  end if;
+  delete from conversation_members
+   where conversation_id = _conversation and profile_id = _member;
+end;
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+CREATE OR REPLACE FUNCTION public.request_staff_role(p_team_id uuid, p_role text)
+ RETURNS memberships
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  caller_email   text;
+  confirmed_at   timestamptz;
+  team_row       public.teams;
+  pending_count  int;
+  existing       public.memberships;
+  new_membership public.memberships;
+begin
+  if auth.uid() is null then
+    raise exception 'You must be signed in.' using errcode = '42501';
+  end if;
+
+  select email, email_confirmed_at into caller_email, confirmed_at
+    from auth.users where id = auth.uid();
+
+  if nullif(btrim(caller_email), '') is null then
+    raise exception 'Your account has no email address.' using errcode = '42501';
+  end if;
+  if confirmed_at is null then
+    raise exception 'Please confirm your email address first.' using errcode = '42501';
+  end if;
+
+  if p_role is null or p_role not in ('coach', 'manager', 'medic') then
+    raise exception 'Choose coach, team manager or medic.' using errcode = '22023';
+  end if;
+
+  select * into team_row from public.teams where id = p_team_id;
+  if team_row.id is null then
+    raise exception 'That squad does not exist.' using errcode = '22023';
+  end if;
+
+  select * into existing
+    from public.memberships m
+   where m.profile_id = auth.uid()
+     and m.club_id    = team_row.club_id
+     and m.team_id    = p_team_id
+     and m.role       = p_role
+     and m.player_id is null
+   limit 1;
+
+  if existing.id is not null then
+    return existing;
+  end if;
+
+  select count(*) into pending_count
+    from public.memberships m
+   where m.profile_id = auth.uid()
+     and m.status     = 'pending'
+     and m.player_id is null
+     and m.role in ('coach', 'manager', 'medic');
+
+  if pending_count >= 5 then
+    raise exception 'You already have % squad requests waiting to be approved.', pending_count
+      using errcode = '42901';
+  end if;
+
+  insert into public.memberships (profile_id, club_id, team_id, role, player_id, status)
+  values (auth.uid(), team_row.club_id, p_team_id, p_role, null, 'pending')
+  returning * into new_membership;
+
+  return new_membership;
+end;
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ⚠️ NOT SECURITY DEFINER — runs as the caller; RLS on player_parents is the boundary.
+CREATE OR REPLACE FUNCTION public.save_player_parents(_player uuid, _rows jsonb)
+ RETURNS SETOF player_parents
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare
+  kept    jsonb;
+  claimed int;
+  updated int;
+begin
+  if _player is null then
+    raise exception 'save_player_parents needs a player id.' using errcode = '22004';
+  end if;
+
+  select coalesce(jsonb_agg(e.value order by e.ordinality), '[]'::jsonb)
+    into kept
+    from jsonb_array_elements(coalesce(_rows, '[]'::jsonb))
+         with ordinality as e(value, ordinality)
+   where btrim(coalesce(e.value->>'full_name', '')) <> '';
+
+  delete from public.player_parents pp
+   where pp.player_id = _player
+     and pp.id not in (
+           select (r.value->>'id')::uuid
+             from jsonb_array_elements(kept) as r(value)
+            where nullif(btrim(coalesce(r.value->>'id', '')), '') is not null
+         );
+
+  select count(*)
+    into claimed
+    from jsonb_array_elements(kept) as r(value)
+   where nullif(btrim(coalesce(r.value->>'id', '')), '') is not null;
+
+  with incoming as (
+    select (r.value->>'id')::uuid                                       as id,
+           btrim(r.value->>'full_name')                                 as full_name,
+           nullif(btrim(coalesce(r.value->>'first_name',   '')), '')    as first_name,
+           nullif(btrim(coalesce(r.value->>'last_name',    '')), '')    as last_name,
+           nullif(btrim(coalesce(r.value->>'relationship', '')), '')    as relationship,
+           nullif(btrim(coalesce(r.value->>'email',        '')), '')    as email,
+           nullif(btrim(coalesce(r.value->>'phone',        '')), '')    as phone,
+           coalesce((r.value->>'is_primary')::boolean, false)           as is_primary,
+           coalesce((r.value->>'sort_order')::int, (r.ordinality - 1)::int) as sort_order
+      from jsonb_array_elements(kept) with ordinality as r(value, ordinality)
+     where nullif(btrim(coalesce(r.value->>'id', '')), '') is not null
+  )
+  update public.player_parents pp
+     set full_name    = i.full_name,
+         first_name   = i.first_name,
+         last_name    = i.last_name,
+         relationship = i.relationship,
+         email        = i.email,
+         phone        = i.phone,
+         is_primary   = i.is_primary,
+         sort_order   = i.sort_order
+    from incoming i
+   where pp.id = i.id
+     and pp.player_id = _player;
+
+  get diagnostics updated = row_count;
+
+  if updated <> claimed then
+    raise exception
+      'That parent record does not belong to this player, or you may not edit it.'
+      using errcode = '42501';
+  end if;
+
+  insert into public.player_parents
+        (player_id, full_name, first_name, last_name, relationship, email, phone,
+         is_primary, sort_order)
+  select _player,
+         btrim(r.value->>'full_name'),
+         nullif(btrim(coalesce(r.value->>'first_name',   '')), ''),
+         nullif(btrim(coalesce(r.value->>'last_name',    '')), ''),
+         nullif(btrim(coalesce(r.value->>'relationship', '')), ''),
+         nullif(btrim(coalesce(r.value->>'email',        '')), ''),
+         nullif(btrim(coalesce(r.value->>'phone',        '')), ''),
+         coalesce((r.value->>'is_primary')::boolean, false),
+         coalesce((r.value->>'sort_order')::int, (r.ordinality - 1)::int)
+    from jsonb_array_elements(kept) with ordinality as r(value, ordinality)
+   where nullif(btrim(coalesce(r.value->>'id', '')), '') is null;
+
+  return query
+    select pp.*
+      from public.player_parents pp
+     where pp.player_id = _player
+     order by pp.sort_order, pp.created_at;
+end
+$function$
+
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+CREATE OR REPLACE FUNCTION public.set_message_pinned(_message uuid, _pinned boolean)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare m record;
+begin
+  select id, channel, team_id, club_id, conversation_id, deleted_at
+    into m from public.messages where id = _message;
+  if m.id is null then
+    raise exception 'no such message';
+  end if;
+  if m.deleted_at is not null then
+    raise exception 'a removed message cannot be pinned';
+  end if;
+  if m.channel = 'dm' then
+    if not (private.in_conversation(m.conversation_id)
+            or private.conversation_reviewable(m.conversation_id)) then
+      raise exception 'only people in this chat may pin';
+    end if;
+  elsif m.channel in ('squad', 'staff') then
+    if not ((m.team_id is not null and private.can_edit_team(m.team_id))
+            or (m.team_id is null and private.is_admin(m.club_id))) then
+      raise exception 'only squad staff may pin here';
+    end if;
+  else
+    raise exception 'unknown channel';
+  end if;
+  update public.messages set pinned = _pinned where id = _message;
+end $function$
+
+-- public.leave_group(_conversation uuid) — LIVE, definition not fetched in this pass.
+-- Metadata: SECURITY DEFINER, SET search_path TO 'public', VOLATILE,
+-- proacl {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}, prosrc 975 chars.
+-- Capture with: select pg_get_functiondef('public.leave_group(uuid)'::regprocedure);
+
+-- proacl: {postgres, authenticated, service_role}
+CREATE OR REPLACE FUNCTION public.leave_group(_conversation uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  me uuid := auth.uid();
+  was_owner boolean;
+  remaining int;
+begin
+  select gm.is_owner into was_owner from conversation_members gm
+   where gm.conversation_id = _conversation and gm.profile_id = me;
+  if was_owner is null then
+    raise exception 'not your group' using errcode = '42501';
+  end if;
+  delete from conversation_members
+   where conversation_id = _conversation and profile_id = me;
+  select count(*) into remaining from conversation_members
+   where conversation_id = _conversation;
+  if remaining < 3 and not private.conversation_reported(_conversation) then
+    delete from conversations where id = _conversation;
+  elsif was_owner then
+    update conversation_members set is_owner = true
+     where conversation_id = _conversation
+       and profile_id = (select profile_id from conversation_members
+                          where conversation_id = _conversation
+                          order by joined_at, profile_id limit 1);
+  end if;
+end;
+$function$
