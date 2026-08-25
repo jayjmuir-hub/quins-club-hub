@@ -247,9 +247,12 @@ CREATE POLICY "access request admin" ON public.access_requests
   USING (private.is_admin_anywhere())
   WITH CHECK (private.is_admin_anywhere());
 
+-- Re-captured 25 Aug 2026: live is TO authenticated (not public) and the
+-- 16 Aug who-and-which-squad migration added the two NOT NULL requirements —
+-- the table comment described them; this block had not caught up.
 CREATE POLICY "access request insert own" ON public.access_requests
-  AS PERMISSIVE FOR INSERT TO public
-  WITH CHECK (((profile_id = auth.uid()) AND (status = 'pending'::text)));
+  AS PERMISSIVE FOR INSERT TO authenticated
+  WITH CHECK (((profile_id = ( SELECT auth.uid() AS uid)) AND (status = 'pending'::text) AND (requested_role IS NOT NULL) AND (requested_team_id IS NOT NULL)));
 
 CREATE POLICY "access request read own" ON public.access_requests
   AS PERMISSIVE FOR SELECT TO public
@@ -839,14 +842,18 @@ CREATE POLICY "player photo write" ON storage.objects
 -- Proved live against an injected fault: a member of another squad is refused,
 -- and the SAME query returns the photo once they join the squad.
 -- ---------------------------------------------------------------------
+-- Re-captured 25 Aug 2026: live roles are {public} on both (the function
+-- gates access, not the role list), and the WRITE policy now goes through
+-- private.may_set_staff_photo — an admin may set another staff member's
+-- photo, not only their own.
 CREATE POLICY "staff photo read" ON storage.objects
-  AS PERMISSIVE FOR SELECT TO authenticated
+  AS PERMISSIVE FOR SELECT TO public
   USING (((bucket_id = 'staff-photos'::text) AND private.can_see_staff_photo(private.staff_photo_owner(name))));
 
 CREATE POLICY "staff photo write" ON storage.objects
-  AS PERMISSIVE FOR ALL TO authenticated
-  USING (((bucket_id = 'staff-photos'::text) AND (private.staff_photo_owner(name) = auth.uid())))
-  WITH CHECK (((bucket_id = 'staff-photos'::text) AND (private.staff_photo_owner(name) = auth.uid())));
+  AS PERMISSIVE FOR ALL TO public
+  USING (((bucket_id = 'staff-photos'::text) AND private.may_set_staff_photo(private.staff_photo_owner(name))))
+  WITH CHECK (((bucket_id = 'staff-photos'::text) AND private.may_set_staff_photo(private.staff_photo_owner(name))));
 
 
 -- ---------------------------------------------------------------------
@@ -1523,11 +1530,14 @@ CASE
     ELSE ((author_id = ( SELECT auth.uid() AS uid)) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.admin_may_review(conversation_id)))
 END);
 
+-- Re-captured 25 Aug 2026 (group-chat rewrite): membership is
+-- private.in_conversation (covers groups), and deleting a group takes its
+-- owner, not just any member.
 CREATE POLICY "conversation delete" ON public.conversations
   FOR DELETE USING (
 CASE
     WHEN private.conversation_reported(id) THEN private.admin_may_review(id)
-    ELSE (((( SELECT auth.uid() AS uid) = profile_a) OR (( SELECT auth.uid() AS uid) = profile_b)) OR private.admin_may_review(id))
+    ELSE ((private.in_conversation(id) AND ((kind = 'dm'::text) OR private.is_group_owner(id))) OR private.admin_may_review(id))
 END);
 
 -- ---------------------------------------------------------------------
@@ -1541,8 +1551,10 @@ CREATE POLICY "clear own" ON public.conversation_clears
 -- ---------------------------------------------------------------------
 -- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
 -- private.admin_may_review — a minor in it, or a reported message. Captured from live.
+-- Re-captured 25 Aug 2026 (group-chat rewrite): the a/b pair test became
+-- private.in_conversation, which also answers for groups.
 CREATE POLICY "conversation read" ON public.conversations
-  FOR SELECT USING ((((( SELECT auth.uid() AS uid) = profile_a) OR (( SELECT auth.uid() AS uid) = profile_b)) OR private.admin_may_review(id)));
+  FOR SELECT USING ((private.in_conversation(id) OR private.admin_may_review(id)));
 
 CREATE POLICY "dm block own" ON public.dm_blocks
   FOR ALL USING ((blocker_id = ( SELECT auth.uid() AS uid)))
@@ -1561,3 +1573,131 @@ CREATE POLICY "report resolve" ON public.message_reports
 
 CREATE POLICY "welfare log read" ON public.welfare_access_log
   FOR SELECT USING (private.is_admin(club_id));
+
+
+-- =====================================================================
+-- RE-CAPTURED 2026-08-25 — TWENTY-FIVE POLICIES THIS FILE WAS MISSING
+--
+-- 22 public + 3 storage, measured against pg_policies on 25 Aug 2026. The
+-- oldest (lineups / lineup_players) went uncaptured for ELEVEN DAYS; the
+-- chat-media storage bucket was an ENTIRE BUCKET with no line in this file.
+-- Expressions verbatim from pg_policies. Reasoning lives in each policy's
+-- migration under db/migrations/; not restated here.
+--
+-- Also noted on 25 Aug, cosmetic and NOT corrected file-wide: live renders
+-- many older expressions as `( SELECT auth.uid() AS uid)` where this file
+-- shows bare `auth.uid()` — the initplan-caching rewrite; semantics
+-- identical. Compare expressions, not spellings, when reconciling.
+-- =====================================================================
+
+-- lineups / lineup_players (14 Aug 2026 — the file's announcements section mentions the
+-- migration; the policies were never captured)
+CREATE POLICY "lineup manage" ON public.lineups
+  AS PERMISSIVE FOR ALL TO public
+  USING (private.can_edit_team(( SELECT e.team_id FROM events e WHERE (e.id = lineups.event_id))))
+  WITH CHECK (private.can_edit_team(( SELECT e.team_id FROM events e WHERE (e.id = lineups.event_id))));
+
+CREATE POLICY "lineup player manage" ON public.lineup_players
+  AS PERMISSIVE FOR ALL TO public
+  USING ((EXISTS ( SELECT 1 FROM (lineups l JOIN events e ON ((e.id = l.event_id)))
+    WHERE ((l.id = lineup_players.lineup_id) AND private.can_edit_team(e.team_id)))))
+  WITH CHECK ((EXISTS ( SELECT 1 FROM (lineups l JOIN events e ON ((e.id = l.event_id)))
+    WHERE ((l.id = lineup_players.lineup_id) AND private.can_edit_team(e.team_id)))));
+
+-- push_subscriptions
+CREATE POLICY "push subscription own" ON public.push_subscriptions
+  AS PERMISSIVE FOR ALL TO public
+  USING ((profile_id = ( SELECT auth.uid() AS uid)))
+  WITH CHECK ((profile_id = ( SELECT auth.uid() AS uid)));
+
+-- membership_audit
+CREATE POLICY "membership audit read" ON public.membership_audit
+  AS PERMISSIVE FOR SELECT TO public
+  USING (private.is_super_admin());
+
+-- membership_vouches
+CREATE POLICY "vouch read" ON public.membership_vouches
+  AS PERMISSIVE FOR SELECT TO public
+  USING (private.can_approve_team(team_id));
+
+CREATE POLICY "vouch write own" ON public.membership_vouches
+  AS PERMISSIVE FOR ALL TO public
+  USING (((voucher_id = ( SELECT auth.uid() AS uid)) AND private.can_approve_team(team_id)))
+  WITH CHECK (((voucher_id = ( SELECT auth.uid() AS uid)) AND private.can_approve_team(team_id)));
+
+-- conversation_members
+CREATE POLICY "member read" ON public.conversation_members
+  AS PERMISSIVE FOR SELECT TO public
+  USING (private.in_conversation(conversation_id));
+
+-- conversations (group rename — owner-only, column grant on title does the narrowing)
+CREATE POLICY "group rename" ON public.conversations
+  AS PERMISSIVE FOR UPDATE TO public
+  USING (((kind = 'group'::text) AND private.is_group_owner(id)))
+  WITH CHECK ((kind = 'group'::text));
+
+-- chat_prefs (4 owner-only policies)
+CREATE POLICY "chat pref read own" ON public.chat_prefs
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((owner_id = ( SELECT auth.uid() AS uid)));
+CREATE POLICY "chat pref write own" ON public.chat_prefs
+  AS PERMISSIVE FOR INSERT TO public
+  WITH CHECK ((owner_id = ( SELECT auth.uid() AS uid)));
+CREATE POLICY "chat pref edit own" ON public.chat_prefs
+  AS PERMISSIVE FOR UPDATE TO public
+  USING ((owner_id = ( SELECT auth.uid() AS uid)))
+  WITH CHECK ((owner_id = ( SELECT auth.uid() AS uid)));
+CREATE POLICY "chat pref remove own" ON public.chat_prefs
+  AS PERMISSIVE FOR DELETE TO public
+  USING ((owner_id = ( SELECT auth.uid() AS uid)));
+
+-- message_reactions (3)
+CREATE POLICY "reaction read" ON public.message_reactions
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((EXISTS ( SELECT 1 FROM messages x WHERE (x.id = message_reactions.message_id))));
+CREATE POLICY "reaction create" ON public.message_reactions
+  AS PERMISSIVE FOR INSERT TO public
+  WITH CHECK (((profile_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+    FROM messages x WHERE ((x.id = message_reactions.message_id) AND (x.deleted_at IS NULL))))));
+CREATE POLICY "reaction delete" ON public.message_reactions
+  AS PERMISSIVE FOR DELETE TO public
+  USING ((profile_id = ( SELECT auth.uid() AS uid)));
+
+-- message_stars (3)
+CREATE POLICY "star read own" ON public.message_stars
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((owner_id = ( SELECT auth.uid() AS uid)));
+CREATE POLICY "star create own" ON public.message_stars
+  AS PERMISSIVE FOR INSERT TO public
+  WITH CHECK (((owner_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+    FROM messages x WHERE ((x.id = message_stars.message_id) AND (x.deleted_at IS NULL))))));
+CREATE POLICY "star remove own" ON public.message_stars
+  AS PERMISSIVE FOR DELETE TO public
+  USING ((owner_id = ( SELECT auth.uid() AS uid)));
+
+-- nicknames (4)
+CREATE POLICY "nickname read own" ON public.nicknames
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((owner_id = ( SELECT auth.uid() AS uid)));
+CREATE POLICY "nickname write own" ON public.nicknames
+  AS PERMISSIVE FOR INSERT TO public
+  WITH CHECK ((owner_id = ( SELECT auth.uid() AS uid)));
+CREATE POLICY "nickname edit own" ON public.nicknames
+  AS PERMISSIVE FOR UPDATE TO public
+  USING ((owner_id = ( SELECT auth.uid() AS uid)))
+  WITH CHECK ((owner_id = ( SELECT auth.uid() AS uid)));
+CREATE POLICY "nickname remove own" ON public.nicknames
+  AS PERMISSIVE FOR DELETE TO public
+  USING ((owner_id = ( SELECT auth.uid() AS uid)));
+
+-- storage.objects — bucket `chat-media` (3, an entire uncaptured bucket)
+CREATE POLICY "chat media read" ON storage.objects
+  AS PERMISSIVE FOR SELECT TO authenticated
+  USING (((bucket_id = 'chat-media'::text) AND ((private.chat_media_owner(name) = ( SELECT auth.uid() AS uid)) OR (EXISTS ( SELECT 1
+    FROM messages x WHERE ((x.attachment_path = objects.name) AND (x.deleted_at IS NULL)))))));
+CREATE POLICY "chat media write" ON storage.objects
+  AS PERMISSIVE FOR INSERT TO authenticated
+  WITH CHECK (((bucket_id = 'chat-media'::text) AND (private.chat_media_owner(name) = ( SELECT auth.uid() AS uid))));
+CREATE POLICY "chat media remove" ON storage.objects
+  AS PERMISSIVE FOR DELETE TO authenticated
+  USING (((bucket_id = 'chat-media'::text) AND (private.chat_media_owner(name) = ( SELECT auth.uid() AS uid))));

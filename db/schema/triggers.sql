@@ -343,6 +343,18 @@ CREATE TRIGGER player_private_staff_dm_opt_in BEFORE UPDATE ON public.player_pri
 -- public.memberships → memberships_write_parent_row    ADDED 2026-08-25
 -- Migration: db/migrations/20260825_player_parents_from_parent_membership.sql
 --
+-- ⛔ NOT LIVE — MEASURED 25 Aug 2026, THE SAME DAY THIS BLOCK WAS ADDED.
+-- Neither this trigger nor private.memberships_write_parent_row() exists in
+-- production, and supabase_migrations.schema_migrations has no matching row:
+-- the migration was COMMITTED (squash a5c5efd) with this capture written as
+-- if applied, but it was never run. This file is AHEAD of production here —
+-- the opposite direction from every other drift found in the 25 Aug
+-- reconciliation — so parent memberships created since a5c5efd merged are
+-- NOT writing player_parents, which is the exact gap the migration exists to
+-- close. Flagged to Jay the same day; the block below is kept as the record
+-- of what the migration WILL create, and this warning comes out when a
+-- measurement shows the trigger live.
+--
 -- When a parent-role membership lands with a player_id, copy the adult's
 -- profile (name, email, phone, profile_id) onto public.player_parents if
 -- that child has no row for this adult yet. Needs Attention counts that
@@ -360,3 +372,45 @@ CREATE TRIGGER memberships_write_parent_row
   FOR EACH ROW
   WHEN ((new.role = 'parent'::text) AND (new.player_id IS NOT NULL))
   EXECUTE FUNCTION private.memberships_write_parent_row();
+
+
+-- =====================================================================
+-- RE-CAPTURED 2026-08-25 — FIFTEEN TRIGGERS THIS FILE WAS MISSING
+--
+-- Live holds 33 non-internal triggers (public + auth); this file captured
+-- 20. The push-notification set, the feedback set, the welcome-mail pair on
+-- auth.users, the membership audit, and chat round 2's quote guard were all
+-- live with no line here. Definitions verbatim from pg_get_triggerdef; all
+-- tgenabled='O'. The 19 previously-captured shared triggers were compared
+-- and match live verbatim.
+-- =====================================================================
+
+CREATE TRIGGER notice_push AFTER INSERT ON public.announcements REFERENCING NEW TABLE AS inserted FOR EACH STATEMENT EXECUTE FUNCTION private.notify_notice_push();
+
+CREATE TRIGGER on_auth_user_confirmed_welcome AFTER UPDATE OF email_confirmed_at ON auth.users FOR EACH ROW WHEN (((old.email_confirmed_at IS NULL) AND (new.email_confirmed_at IS NOT NULL))) EXECUTE FUNCTION private.notify_welcome();
+
+CREATE TRIGGER on_auth_user_created_welcome AFTER INSERT ON auth.users FOR EACH ROW WHEN (((new.email IS NOT NULL) AND (new.email_confirmed_at IS NOT NULL))) EXECUTE FUNCTION private.notify_welcome();
+
+CREATE TRIGGER on_auth_user_email_confirmed AFTER UPDATE OF email_confirmed_at ON auth.users FOR EACH ROW WHEN ((old.email_confirmed_at IS DISTINCT FROM new.email_confirmed_at)) EXECUTE FUNCTION private.handle_user_email_confirmed();
+
+CREATE TRIGGER fixture_added_push AFTER INSERT ON public.events REFERENCING NEW TABLE AS inserted FOR EACH STATEMENT EXECUTE FUNCTION private.notify_fixture_added();
+
+CREATE TRIGGER fixture_cancelled_push AFTER DELETE ON public.events REFERENCING OLD TABLE AS deleted FOR EACH STATEMENT EXECUTE FUNCTION private.notify_fixture_cancelled();
+
+CREATE TRIGGER fixture_changed_push AFTER UPDATE ON public.events REFERENCING OLD TABLE AS updated_old NEW TABLE AS updated_new FOR EACH STATEMENT EXECUTE FUNCTION private.notify_fixture_changed();
+
+CREATE TRIGGER notify_feedback AFTER INSERT ON public.feedback FOR EACH ROW EXECUTE FUNCTION private.notify_feedback();
+
+CREATE TRIGGER notify_feedback_reply_push AFTER UPDATE ON public.feedback FOR EACH ROW WHEN (((new.status IS DISTINCT FROM old.status) OR (new.admin_note IS DISTINCT FROM old.admin_note))) EXECUTE FUNCTION private.notify_feedback_reply_push();
+
+CREATE TRIGGER stamp_feedback BEFORE INSERT ON public.feedback FOR EACH ROW EXECUTE FUNCTION private.stamp_feedback();
+
+CREATE TRIGGER notify_invite AFTER INSERT ON public.invites FOR EACH ROW EXECUTE FUNCTION private.notify_invite();
+
+CREATE TRIGGER lineups_touch BEFORE UPDATE ON public.lineups FOR EACH ROW EXECUTE FUNCTION private.touch_lineup();
+
+CREATE TRIGGER audit_membership AFTER INSERT OR DELETE OR UPDATE ON public.memberships FOR EACH ROW EXECUTE FUNCTION private.audit_membership();
+
+CREATE TRIGGER pending_membership_push AFTER INSERT ON public.memberships FOR EACH ROW WHEN ((new.status = 'pending'::text)) EXECUTE FUNCTION private.notify_pending_membership_push();
+
+CREATE TRIGGER messages_quote_guard BEFORE INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION private.messages_quote_guard();

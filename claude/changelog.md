@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🏉 **Phase 2 of the roster builder: the pitch is a SHEET
+- (unmerged) — 🗄️ **`db/schema/` re-captured in FULL — twelve days of drift,
+  the largest reconciliation the directory has absorbed.** Measured against
+  pg_catalog: 13 whole tables missing, 11 drifted (conversations' group-chat
+  rewrite had falsified two captured constraints), 25 policies missing (one
+  ENTIRE storage bucket, chat-media) + 5 drifted, 22 functions missing +
+  3 stale bodies + 2 unattributable proacl drifts, 15 triggers missing,
+  grants.sql's "anon holds everything" headline INVERTED (live: anon holds
+  nothing anywhere), and the "exactly one table is published" claim inverted
+  (live publishes six, availability included). Full account: the 25 Aug
+  entry in `db/schema/README.md`. ⚠️ **And one drift ran the other way:
+  `a5c5efd`'s player_parents migration WAS NEVER APPLIED — the capture
+  described intent as fact.** Marked ⛔ NOT LIVE in triggers.sql; applying it
+  is an open item needing Jay. The NEXT pull request cites this entry's
+  squash SHA.
+
+- `fdadfa3` — 🏉 **Phase 2 of the roster builder: the pitch is a SHEET
   STYLE, and circles drag.** The Pitch view's drawing moved into
   `src/components/PitchDiagram.jsx` and serves two customers: the
   interactive view (which gained drag-a-circle-onto-another — onto a
