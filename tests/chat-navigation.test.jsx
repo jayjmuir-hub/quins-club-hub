@@ -79,6 +79,17 @@ describe('the filter chips', () => {
   })
 })
 
+describe('DMs lead the list', () => {
+  // Jay, 25 Aug 2026: "DMs should always be at the top of the chat screen
+  // instead of having to scroll down to the bottom area for them".
+  it('the Direct messages section renders ABOVE Your squads', async () => {
+    renderList()
+    const dms = await screen.findByTestId('section-dms')
+    const squads = screen.getByTestId('section-squads')
+    expect(dms.compareDocumentPosition(squads) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
+
 describe('unread first', () => {
   it('within a section, unread rows sort above newer read rows', async () => {
     renderList()

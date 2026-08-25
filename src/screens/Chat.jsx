@@ -10,6 +10,8 @@ import EmojiPicker from '../components/EmojiPicker.jsx'
 import MessageRow from '../components/MessageRow.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listAvailabilityForEvents } from '../data/availability.js'
+import ChatBackgroundPicker from '../components/ChatBackgroundPicker.jsx'
+import { backgroundStyle, getChatBackground, setChatBackground } from '../lib/chatBackgrounds.js'
 import { removeChatPhoto, uploadChatPhoto } from '../data/chatMedia.js'
 import { listEvents } from '../data/events.js'
 import {
@@ -113,6 +115,11 @@ export default function Chat() {
   // the composer, and the emoji picker's cursor handle.
   const [photo, setPhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
+  // The device wallpaper — the DM thread had this since round 3 while this
+  // screen ignored it, despite the picker promising "for every chat"
+  // (claude/plans/2026-08-25-chat-wallpapers-and-dm-order.md).
+  const [background, setBackground] = useState(getChatBackground)
+  const [pickingBackground, setPickingBackground] = useState(false)
   const bottomRef = useRef(null)
   // Where "New" starts and what was unread, captured ONCE per visit — the
   // mark-read-on-arrival effect updates `reads` moments later, so a live
@@ -343,7 +350,14 @@ export default function Chat() {
     : staffChannel
       ? 'Staff only · coaches, managers and medics'
       : `${mentionables.length > 0 ? `${mentionables.length} members · ` : ''}${announceOnly ? 'announce-only' : 'open chat'}`
+  function pickBackground(key) {
+    setChatBackground(key)
+    setBackground(key)
+    setPickingBackground(false)
+  }
+
   const headerActions = [
+    { label: 'Chat background', onClick: () => setPickingBackground(true) },
     ...(canModerate && !isClub && !staffChannel && settings
       ? [{ label: announceOnly ? 'Turn announce-only off' : 'Turn announce-only on', onClick: toggleAnnounceOnly }]
       : []),
@@ -406,6 +420,8 @@ export default function Chat() {
         </Card>
       )}
 
+      {pickingBackground && <ChatBackgroundPicker current={background} onPick={pickBackground} />}
+
       {/* Announce-only lives in the header's ⋯ menu since 24 Aug 2026; this
           line keeps the state visible to staff (data-testid kept for the tests). */}
       {canModerate && !isClub && !staffChannel && settings && (
@@ -445,6 +461,9 @@ export default function Chat() {
           }
         />
       )}
+      {/* Same paint site as the DM thread: the stream wrapper, wearing the
+          device wallpaper; data-background is what the tests read. */}
+      <div className="-mx-1 rounded-[12px] px-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
       {messages?.map((m) => (
         <Fragment key={m.id}>
         {newFromRef.current === m.id && (
@@ -472,6 +491,7 @@ export default function Chat() {
         />
         </Fragment>
       ))}
+      </div>
       <div ref={bottomRef} />
 
       {/* ── Composer ────────────────────────────────────────────────── */}

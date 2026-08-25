@@ -42,7 +42,8 @@ import {
   unblockDm,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
-import { BACKGROUND_PRESETS, backgroundStyle, getChatBackground, setChatBackground } from '../lib/chatBackgrounds.js'
+import ChatBackgroundPicker from '../components/ChatBackgroundPicker.jsx'
+import { backgroundStyle, getChatBackground, setChatBackground } from '../lib/chatBackgrounds.js'
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -588,26 +589,7 @@ function Thread({ conversationId }) {
         </form>
       )}
 
-      {pickingBackground && (
-        <Card className="mb-3 p-3" data-testid="background-picker">
-          <p className="text-[12.5px] font-extrabold text-ink">Chat background</p>
-          <p className="mt-0.5 text-[11.5px] text-ink-muted">For every chat, on this device.</p>
-          <div className="mt-2 grid grid-cols-4 gap-2">
-            {BACKGROUND_PRESETS.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => pickBackground(p.key)}
-                aria-pressed={background === p.key}
-                className={`rounded-[10px] border p-1 ${background === p.key ? 'border-brand ring-1 ring-brand' : 'border-line'}`}
-              >
-                <span aria-hidden="true" className="block h-12 w-full rounded-[7px] bg-surface" style={p.style ?? undefined} />
-                <span className="mt-1 block text-[11px] font-semibold text-ink">{p.label}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
-      )}
+      {pickingBackground && <ChatBackgroundPicker current={background} onPick={pickBackground} />}
 
       {addingPeople && (
         <NewGroupPicker

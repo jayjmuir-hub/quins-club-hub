@@ -270,8 +270,8 @@ export default function ChatList() {
         {[
           { key: null, label: 'All' },
           { key: 'unread', label: unreadChats > 0 ? `Unread · ${unreadChats}` : 'Unread' },
-          { key: 'squads', label: 'Squads' },
           { key: 'dms', label: 'Groups & DMs' },
+          { key: 'squads', label: 'Squads' },
         ].map((chip) => (
           <button
             key={chip.key ?? 'all'}
@@ -368,13 +368,16 @@ export default function ChatList() {
           makes it a first child, and the title then sat 4px off the card
           above (Jay, 24 Aug 2026: "the Direct Messages text touches the
           chip above it"). Dashboard's blocks compensate the same way. */}
-      {!searching && squadRows.length > 0 && (
-        <section data-testid="section-squads" className="mt-[18px]">
-          <FoldTitle label="Your squads" count={squadRows.length} folded={Boolean(folds.squads)} onToggle={() => toggleFold('squads', Boolean(folds.squads))} />
-          {!folds.squads && (
+      {/* DMs FIRST (Jay, 25 Aug 2026: "DMs should always be at the top of
+          the chat screen instead of having to scroll down"). The chips and
+          the sidebar sub-items carry the same order. */}
+      {!searching && dmRows.length > 0 && (
+        <section data-testid="section-dms" className="mt-[18px]">
+          <FoldTitle label="Direct messages" count={dmRows.length} folded={Boolean(folds.dms)} onToggle={() => toggleFold('dms', Boolean(folds.dms))} />
+          {!folds.dms && (
             <Card className="overflow-hidden">
               <ul>
-                {squadRows.map((row) => (
+                {dmRows.map((row) => (
                   <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} />
                 ))}
               </ul>
@@ -383,13 +386,13 @@ export default function ChatList() {
         </section>
       )}
 
-      {!searching && dmRows.length > 0 && (
-        <section data-testid="section-dms" className="mt-[18px]">
-          <FoldTitle label="Direct messages" count={dmRows.length} folded={Boolean(folds.dms)} onToggle={() => toggleFold('dms', Boolean(folds.dms))} />
-          {!folds.dms && (
+      {!searching && squadRows.length > 0 && (
+        <section data-testid="section-squads" className="mt-[18px]">
+          <FoldTitle label="Your squads" count={squadRows.length} folded={Boolean(folds.squads)} onToggle={() => toggleFold('squads', Boolean(folds.squads))} />
+          {!folds.squads && (
             <Card className="overflow-hidden">
               <ul>
-                {dmRows.map((row) => (
+                {squadRows.map((row) => (
                   <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} />
                 ))}
               </ul>
