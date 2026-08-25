@@ -624,8 +624,9 @@ export async function confirmNoRole({ profileId } = {}) {
   return { id: profileId, no_role_confirmed_at: '2026-08-16T12:00:00.000Z' }
 }
 
-// The sidebar's Admin badge count — a fixed 3, so any admin scenario shows
-// the badge in its non-empty state without a scenario knob for it.
+// The Admin badge count — sidebar and the /admin landing card. A fixed 3, so
+// any admin scenario shows the badge in its non-empty state without a
+// scenario knob for it.
 export async function countAdminWaiting() {
   return 3
 }

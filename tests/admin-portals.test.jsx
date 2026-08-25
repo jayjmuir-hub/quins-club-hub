@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 // The admin portal split — /admin is a chooser, each job is its own space.
@@ -17,6 +18,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 const useMembershipsMock = vi.fn()
 const useAuthMock = vi.fn()
+const countAdminWaitingMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -24,6 +26,10 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 
 vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => useAuthMock(),
+}))
+
+vi.mock('../src/data/members.js', () => ({
+  countAdminWaiting: (...args) => countAdminWaitingMock(...args),
 }))
 
 // Import after vi.mock so these bind to the mocked modules.
@@ -80,6 +86,10 @@ function renderAt(path) {
 beforeEach(() => {
   vi.clearAllMocks()
   useAuthMock.mockReturnValue({ user: { id: 'admin-1', email: 'jay@example.com' } })
+  // Never settles: waiting starts at 0 (no card) and a resolving 0 would
+  // re-render after the existing synchronous chooser assertions. Tests that
+  // care about the number mock a real value themselves.
+  countAdminWaitingMock.mockReturnValue(new Promise(() => {}))
 })
 
 describe('portals.js', () => {
@@ -260,6 +270,56 @@ describe('PortalChooser', () => {
     renderAt('/admin')
 
     expect(screen.queryByRole('navigation', { name: /admin sections/i })).not.toBeInTheDocument()
+  })
+
+  // The Admin sidebar badge is countAdminWaiting. Until this card existed,
+  // clicking Admin dumped you on a chooser that never mentioned the number.
+  it('leads a waiting count to Accounts, the same queue the Admin badge counts', async () => {
+    countAdminWaitingMock.mockResolvedValue(2)
+    useMembershipsMock.mockReturnValue(memberships(admin([])))
+    renderAt('/admin')
+
+    const card = await screen.findByTestId('admin-waiting-queue')
+    expect(card.tagName).toBe('A')
+    expect(card).toHaveAttribute('href', '/admin/accounts')
+    expect(within(card).getByLabelText('2 waiting for review')).toHaveTextContent('2')
+    expect(card).toHaveTextContent(/people waiting for access/i)
+    expect(countAdminWaitingMock).toHaveBeenCalledWith('admin-1')
+
+    // Club Admin's home is already Accounts (tabs[0]). The same number sits
+    // on that card so the grid is not silent about the badge you just saw.
+    expect(screen.getByTestId('admin-waiting-on-club')).toHaveTextContent('2')
+    expect(
+      within(screen.getByTestId('portal-chooser')).getByRole('link', { name: /Club Admin/ }),
+    ).toHaveAttribute('href', '/admin/accounts')
+  })
+
+  it('opens Accounts from the waiting card', async () => {
+    countAdminWaitingMock.mockResolvedValue(2)
+    useMembershipsMock.mockReturnValue(memberships(admin([])))
+    renderAt('/admin')
+    await userEvent.click(await screen.findByTestId('admin-waiting-queue'))
+    expect(screen.getByText('Accounts marker')).toBeInTheDocument()
+    expect(screen.queryByTestId('portal-chooser')).not.toBeInTheDocument()
+  })
+
+  it('does not invent a destination when the count is zero', async () => {
+    countAdminWaitingMock.mockResolvedValue(0)
+    useMembershipsMock.mockReturnValue(memberships(admin([])))
+    renderAt('/admin')
+    await vi.waitFor(() => expect(countAdminWaitingMock).toHaveBeenCalled())
+    expect(screen.queryByTestId('admin-waiting-queue')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('admin-waiting-on-club')).not.toBeInTheDocument()
+    expect(screen.getByTestId('portal-chooser')).toBeInTheDocument()
+  })
+
+  it('a failed count costs the queue card, not the chooser', async () => {
+    countAdminWaitingMock.mockRejectedValue(new Error('offline'))
+    useMembershipsMock.mockReturnValue(memberships(admin([])))
+    renderAt('/admin')
+    await vi.waitFor(() => expect(countAdminWaitingMock).toHaveBeenCalled())
+    expect(screen.queryByTestId('admin-waiting-queue')).not.toBeInTheDocument()
+    expect(screen.getByTestId('portal-chooser')).toBeInTheDocument()
   })
 })
 

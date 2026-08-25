@@ -10,20 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- 🗓️ **Schedule stops being an unpaginated wall** — fixtures group by club-calendar
+- `35a179e` — 🪪 **Admin’s waiting count leads to Accounts** — the sidebar badge is
+  `countAdminWaiting` (pending memberships plus people waiting for access),
+  but `/admin` was a chooser that never mentioned that number. The landing
+  now shows the same count on a card that opens Accounts, and on the Club
+  Admin card whose home is already Accounts. Zero or a failed read still
+  renders nothing. Frontend only.
+- `73ce4ca` — 🗓️ **Schedule stops being an unpaginated wall** — fixtures group by club-calendar
   month with sticky month and column headers below the filter bar; Upcoming /
   Results / Calendar, age group and type filters share one bar; the native
   age-group `<select>` is a pill dropdown (still one line at any squad count,
   not a wrapping pill row). Later months reveal in document order via
   "Show more months", never numbered pages. Frontend only.
-- `070852f` — 🧾 **Waiting for access splits into “ready to approve” and
+- `f4f8add` — 🧾 **Waiting for access splits into “ready to approve” and
   “didn’t finish setup”** — Jay’s queue was filling with logins that never
   finished RollCall (no name, no role, Give access anyway). People who
   actually asked stay at the top with the builder; unfinished logins sit
   below, Dismiss first, Give access behind “I know them”. Same
   `waiting-for-access` section, locked 2.0 tokens. Pairs with the
   wizard-before-confirm change.
-- `0440c4f` — 📝 **Collect who you are before the confirmation email** (#403)
+- `f4f8add` — 📝 **Collect who you are before the confirmation email** (#403)
   — confirming the address was reading as finished. Wizard (name, ticks,
   squads, children) now runs before `signUp()`; answers ride in
   `signup_intent`; children are created only after `email_confirmed_at`.

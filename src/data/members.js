@@ -160,7 +160,7 @@ export async function listClubMembers() {
 /**
  * How many things on Accounts are waiting for an admin — the "Players waiting
  * to be approved" rows plus the "Waiting for access" people — so the sidebar
- * badge says the same number the screen shows.
+ * badge and the Admin landing say the same number the screen shows.
  *
  * ⚠️ THIS USED TO COUNT `access_requests` WITH status = 'pending', AND THAT IS
  * NOT A QUEUE. There is deliberately no 'granted' status on that table
