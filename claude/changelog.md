@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🧾 **Waiting for access splits into “ready to approve” and
+- `070852f` — 🧾 **Waiting for access splits into “ready to approve” and
   “didn’t finish setup”** — Jay’s queue was filling with logins that never
   finished RollCall (no name, no role, Give access anyway). People who
   actually asked stay at the top with the builder; unfinished logins sit
