@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🎛️ **Three masthead fixes from Jay's phone, one morning** —
+- (unmerged) — 🖼️ **Chat wallpapers grow into a gallery, and DMs lead the
+  list** — Jay: "we need better chat backgrounds", ruled down to "too few
+  choices" (claude/plans/2026-08-25-chat-wallpapers-and-dm-order.md), and
+  "DMs should always be at the top of the chat screen". Four round-3
+  presets become 17 in four groups (Colours / Gradients / Patterns /
+  Club), same architecture: low-alpha overlays, inline SVG, no uploads,
+  device-level, one wallpaper for every chat; stored `green`/`warm` keys
+  survive. The picker becomes a shared component
+  (src/components/ChatBackgroundPicker.jsx) and — the bug-fix half —
+  Chat.jsx finally PAINTS the wallpaper and offers the picker, which the
+  card always promised and only the DM thread delivered; a parent's ⋯
+  menu now exists holding exactly that one entry. The chat list reorders
+  to Direct messages → Your squads → Archived, chips and sidebar
+  matching. Verified in the harness dm-thread scenario: four groups, 17
+  swatches, a pick applies and persists. The NEXT pull request cites this
+  entry's squash SHA.
+- `6b300d3` — 🎛️ **Three masthead fixes from Jay's phone, one morning** (#400) —
   (1) The install sheet opened MANGLED inside the masthead pill, on phone
   and desktop: the auto-hide wrapper's `transform` had made the glass
   island the containing block for the sheet's `position:fixed`, and
@@ -25,7 +41,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   More scrolls the anchored section into view — React Router does not do
   hashes on its own. Verified in Chromium at 320px and desktop; the hash
   scroll and its no-hash control are proven against an inverted-guard
-  fault. The NEXT pull request cites this entry's squash SHA.
+  fault. Its own branch could not cite this squash SHA, so this entry
+  does.
 - `4190599` — ✍️ **The composer greets by first name** — Jay, straight
   after confirming the pin fix ("that fixed it, chat opens at the bottom
   now"): the DM placeholder carried the other person's FULL name; now just

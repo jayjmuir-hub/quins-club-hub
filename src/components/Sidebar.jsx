@@ -157,8 +157,8 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
       return [
         { to: '/chat', label: 'All chats', end: true },
         { to: '/chat?filter=unread', label: 'Unread', action: true },
-        { to: '/chat?filter=squads', label: 'Your squads', action: true },
         { to: '/chat?filter=dms', label: 'Groups & DMs', action: true },
+        { to: '/chat?filter=squads', label: 'Your squads', action: true },
         { to: '/chat/starred', label: 'Starred' },
       ]
     }

@@ -426,10 +426,16 @@ describe('Chat — staff channel', () => {
     expect(clearChannelMock).toHaveBeenCalledWith('team-a', 'squad')
   })
 
-  it('a parent has no Chat options at all', async () => {
+  it("a parent's Chat options holds ONLY the wallpaper — nothing staff-shaped", async () => {
+    // Until 25 Aug 2026 a parent had no ⋯ menu at all; the wallpaper entry
+    // (device-level, everyone's to pick) gives them one. The intent this
+    // test guards is unchanged: no moderation reaches a parent.
+    const user = userEvent.setup()
     renderAt('/chat/team-a')
     await screen.findByTestId('message-row')
-    expect(screen.queryByRole('button', { name: 'Chat options' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Chat options' }))
+    const items = screen.getAllByRole('menuitem').map((el) => el.textContent)
+    expect(items).toEqual(['Chat background'])
   })
 
   it('?channel=staff is titled as the staff channel, and a parent never gets it', async () => {
