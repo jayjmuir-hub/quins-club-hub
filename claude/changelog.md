@@ -8,8 +8,26 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 25 Aug 2026
+
+- 📌 **The app icon is the club pin** — Jay walked the icon through a night
+  of looks (green tiles, bigger crest, synthetic gold/silver/gunmetal pin
+  rims) and landed on the real thing: an enamel-lapel-pin rendition of the
+  full crest (`harness/pin-photo.jpg`, an AI-generated product shot) cut
+  from its background — the first cut shaved the silver rim and Jay caught
+  it — on an accent-green gradient, lit top to deep base ("the gradient but
+  with C"). Built by `harness/make-icons-pin.py` (parameters, the cut
+  method, and the maskable safe-zone arithmetic are documented in its
+  header); `harness/make-icons.mjs` is superseded-and-kept with a pointer.
+  The full wording stays on the pin — badge-as-object, consciously
+  reversing the 14 Aug strip-the-wording brief. (No SHA — this branch's
+  entry; the next pull request cites the squash.)
+
 ## 24 Aug 2026
 
+- `0006574` — 📝 **Chat round 6 and the badge closed** (#392) — `dcd0196`
+  cited, plan marked shipped. Its own branch could not cite this squash SHA,
+  so this entry carries it now.
 - `dcd0196` — 📌 **Pinned chats and archive** (#391) — the two navigation ideas
   parked "for a later round", picked up by Jay's "keep going"
   (`claude/plans/2026-08-24-chat-pins-archive.md`). A ⋯ menu on every list
