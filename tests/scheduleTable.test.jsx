@@ -283,3 +283,42 @@ describe('ScheduleTable — opening a row', () => {
     expect(within(row).getByRole('button', { name: 'Open' })).toBeInTheDocument()
   })
 })
+
+describe('ScheduleTable — month groups', () => {
+  it('renders a sticky month heading and sticky column headers', async () => {
+    listEventsMock.mockResolvedValue([
+      { ...FUTURE_TRAINING, starts_at: '2030-03-10T15:30:00Z' },
+      { ...FUTURE_MATCH, starts_at: '2030-04-14T11:00:00Z' },
+    ])
+    render(withRouter(<Schedule />))
+    await screen.findByTestId('schedule-table')
+
+    const months = screen.getAllByTestId('schedule-month').map((node) => node.textContent)
+    expect(months[0]).toMatch(/March 2030/)
+    expect(months[1]).toMatch(/April 2030/)
+    expect(screen.getAllByTestId('schedule-month')[0].className.split(/\s+/)).toContain('sticky')
+    expect(screen.getByRole('columnheader', { name: /Date/ }).className.split(/\s+/)).toContain('sticky')
+  })
+
+  it('reveals later months without inventing numbered pages', async () => {
+    const rows = []
+    for (let month = 0; month < 8; month += 1) {
+      for (let n = 0; n < 8; n += 1) {
+        rows.push({
+          ...FUTURE_TRAINING,
+          id: `e-${month}-${n}`,
+          starts_at: `2031-${String(month + 1).padStart(2, '0')}-10T11:00:00Z`,
+          title: `Session ${month}-${n}`,
+        })
+      }
+    }
+    listEventsMock.mockResolvedValue(rows)
+    const user = userEvent.setup()
+    render(withRouter(<Schedule />))
+    await screen.findByTestId('schedule-table')
+
+    expect(screen.queryByText('Session 7-0')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /show more months/i }))
+    expect(screen.getByText('Session 7-0')).toBeInTheDocument()
+  })
+})
