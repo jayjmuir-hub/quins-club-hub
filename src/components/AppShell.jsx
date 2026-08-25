@@ -277,7 +277,7 @@ export default function AppShell({ children }) {
     // desktop:pl-64 clears the fixed 256px sidebar (phase 2 of the 2.0
     // retheme). Padding on this root moves header, main and tab bar together;
     // the sidebar itself is `fixed`, so the padding cannot double-shift it.
-    <div className="flex min-h-screen flex-col bg-surface text-ink desktop:pl-64">
+    <div className="flex min-h-app flex-col bg-surface text-ink desktop:pl-64">
       {/* Task 22: skip-to-content link — design-system.md §8's last
           remaining open gap. Must be the very first focusable element in
           the DOM (it is: nothing above this in AppShell, and AppShell wraps
@@ -676,7 +676,7 @@ export default function AppShell({ children }) {
         tabIndex={-1}
         // ⚠️ CONVERSATION SCREENS ARE A FLEX COLUMN so the thread can push its
         // composer to the BOTTOM of main's slack. Without this, a chat with
-        // three messages leaves the shell's min-h-screen surplus BELOW the
+        // three messages leaves the shell's min-h-app surplus BELOW the
         // composer — and when the phone keyboard opens, the pin hook scrolls
         // to the document's true bottom, which is that empty surplus: Jay's
         // 25 Aug screenshots show the composer marooned mid-screen over a

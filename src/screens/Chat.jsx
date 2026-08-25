@@ -488,7 +488,7 @@ export default function Chat() {
         />
       )}
       {/* The slack-eater — same fix as the DM thread, same day: bottom-anchor
-          the stream and composer so the shell's min-h-screen surplus sits
+          the stream and composer so the shell's min-h-app surplus sits
           ABOVE the messages, not below the composer where the phone keyboard
           maroons it (AppShell's <main> comment has the mechanism). */}
       <div className="flex-1" aria-hidden="true" />

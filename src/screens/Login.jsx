@@ -704,7 +704,7 @@ export default function Login({ authError = null, embedded = false }) {
     // gradient the header carried, which on a FULL-SCREEN element runs all the
     // way to pure #3bd070 in the corner — 2.01:1 against the white text sitting
     // on it. Near-black is 19.54:1 and needs no width-dependent caveats.
-    <div className="harlequin relative flex min-h-screen items-center justify-center overflow-hidden bg-chrome-grad px-4 py-10">
+    <div className="harlequin relative flex min-h-app items-center justify-center overflow-hidden bg-chrome-grad px-4 py-10">
       <div className="brand-rule absolute inset-x-0 top-0" />
       {card}
     </div>
