@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🧷 **Stickiness becomes INTENT, and the pin gets three
+- (unmerged) — 🦇 **The app icon becomes the bat-wing crest** — the flat
+  CLUB HUB crest on the accent-green gradient, red bat-wing arcs rising
+  from the bottom corners, a soft red glow behind the crest — the design
+  Jay approved this morning after walking it from the pin back to the flat
+  crest ("almost like its bat wings"; final: the scalloped arc toned
+  down). Built by harness/make-icons-wings.py from the recipe in
+  claude/handoffs/2026-08-25-icon-wing-handoff.md, whose approved master
+  render the regeneration matches to ~1 channel unit. Every icon URL gets
+  a -v2 suffix (manifest, index.html, push-sw.js) so installed Androids
+  re-fetch — same-URL byte changes do not propagate; iPhones need
+  remove + re-add, Apple's rule. The maskable pair raises the wings 36px
+  into Android's circular safe zone, or the crop would eat them entirely.
+  make-icons-pin.py is tombstoned in place (pin era: one day, #393). The
+  NEXT pull request cites this entry's squash SHA.
+- `1c9e3a5` — 🧷 **Stickiness becomes INTENT, and the pin gets three
   triggers** — Jay's phone, after #395 AND #396: "still not snapping to the
   last read message ... all are old and read already". The mechanism that
   survived two deploys, found by walking the event order rather than by
@@ -26,8 +40,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   can be starved. Also: the DM reaction trigger centers on its bubble
   (Jay: "put the reaction button centered on every message"), and the
   harness gains `stubs/chatMedia.js` with LATE-signing photos so the
-  growth-after-open shape is reproducible at will. The NEXT pull request
-  cites this entry's squash SHA.
+  growth-after-open shape is reproducible at will. (#398) Its own branch
+  could not cite this squash SHA, so this entry does.
 - `a2f407b` — 💬 **Chrome-free conversations** — Jay: "lets try the no
   bottom menu inside a conversation". WhatsApp-style: inside a thread the
   phone shows NO tab bar and NO masthead island — the chat header pins at
