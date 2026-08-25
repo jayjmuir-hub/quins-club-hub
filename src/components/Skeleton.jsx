@@ -165,6 +165,39 @@ export function NoticesSkeleton() {
  * the same grid the loaded screen uses, so the page does not grow when
  * the events land.
  */
+/**
+ * Bare `/squad` picker while memberships load — editorial Card rows with
+ * circular marks, the same language the loaded picker and Chat already use.
+ * The hub skeleton below is a different screen (calendar / doors / tracking)
+ * and must not stand in for this one: a picker that pulsed as a dashboard
+ * would jump when the list arrived.
+ */
+export function SquadHubPickerSkeleton() {
+  return (
+    <div data-testid="squad-hub-picker-skeleton" aria-hidden="true">
+      <div className="overflow-hidden rounded-card border border-line bg-surface-card">
+        {[0, 1, 2, 3].map((row) => (
+          <div
+            key={row}
+            className="flex items-center gap-3 border-b border-line/50 px-3.5 py-3 last:border-b-0"
+          >
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1">
+              <Skeleton className="h-[14px] w-[42%]" />
+              <Skeleton className="mt-1.5 h-[11px] w-[28%]" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Squad Hub first-load shape: calendar card, door cards, tracking card —
+ * the same grid the loaded screen uses, so the page does not grow when
+ * the events land.
+ */
 export function SquadHubSkeleton() {
   return (
     <div data-testid="squad-hub-skeleton" aria-hidden="true">

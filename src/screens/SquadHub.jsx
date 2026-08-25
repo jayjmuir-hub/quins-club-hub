@@ -5,7 +5,7 @@ import { AccentTitle, BlockTitle, Kicker } from '../components/Editorial.jsx'
 import Empty from '../components/Empty.jsx'
 import Segmented from '../components/Segmented.jsx'
 import { Sheet } from '../components/Sheet.jsx'
-import { SquadHubSkeleton } from '../components/Skeleton.jsx'
+import { SquadHubPickerSkeleton, SquadHubSkeleton } from '../components/Skeleton.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listAttendanceForEvents } from '../data/attendance.js'
 import { listAvailabilityForEvents } from '../data/availability.js'
@@ -17,6 +17,7 @@ import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isMinisTeam } from '../lib/minis.js'
 import { canEditTeam } from '../lib/scope.js'
+import { groupHubTeams, hubTeamLine, squadMark } from '../lib/squadHub.js'
 import { buildTracking, squadSummary } from '../lib/tracking.js'
 import Availability from './Availability.jsx'
 import EventDetail from './EventDetail.jsx'
@@ -68,6 +69,62 @@ const GRID_EVENT_LIMIT = 15
 // Jay, 21 Aug 2026: the section "should not be too big vertically and take
 // the entire page" — five rows, then the list scrolls inside itself.
 const UPCOMING_LIMIT = 5
+
+/**
+ * One squad in the picker — Chat/Home contact language: circular mark, ink
+ * on paper, a muted line, hairline dividers inside a Card. Not a bordered
+ * text button. The TILE is the thing #407 retired.
+ */
+function HubTeamRow({ team, line, yours }) {
+  return (
+    <li className="border-b border-line last:border-b-0">
+      <Link
+        to={`/squad/${team.id}`}
+        data-testid="squad-hub-row"
+        data-yours={yours ? 'true' : 'false'}
+        className="flex min-w-0 items-center gap-3 px-3.5 py-3 hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      >
+        <span
+          aria-hidden="true"
+          className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-[12px] font-extrabold ${
+            yours ? 'bg-brand text-ink-invert' : 'bg-surface-mute text-ink'
+          }`}
+        >
+          {squadMark(team.name)}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-extrabold text-ink">{team.name}</span>
+          {line && (
+            <span className="mt-0.5 block truncate font-condensed text-[11px] font-bold uppercase tracking-[.1em] text-ink-muted">
+              {line}
+            </span>
+          )}
+        </span>
+      </Link>
+    </li>
+  )
+}
+
+function HubTeamSection({ testId, title, teams, memberships, yours }) {
+  if (teams.length === 0) return null
+  return (
+    <section data-testid={testId} className="mt-[18px] first:mt-0">
+      <BlockTitle>{title}</BlockTitle>
+      <Card className="overflow-hidden">
+        <ul>
+          {teams.map((team) => (
+            <HubTeamRow
+              key={team.id}
+              team={team}
+              line={hubTeamLine(memberships, team)}
+              yours={yours}
+            />
+          ))}
+        </ul>
+      </Card>
+    </section>
+  )
+}
 
 function shortDate(event) {
   const date = eventDate(event)
@@ -132,15 +189,12 @@ export default function SquadHub() {
 
   // The squads this person could open a hub FOR — drives the no-:teamId
   // redirect/picker and the switcher shown to multi-squad staff and admins.
-  const myHubTeams = useMemo(() => {
-    if (!teams) return []
-    return teams
-      .filter((candidate) => canEditTeam(memberships, candidate.id))
-      // Belt to the context's braces: loadTeams orders by sort_order, but
-      // this screen re-asserts it so the picker and the switcher chips can
-      // never regress to insertion order if the context changes hands.
-      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name))
-  }, [memberships, teams])
+  // Split into "yours" (a team-scoped membership) and the rest of the club
+  // an admin can still open, so the picker is not a settings dump of names.
+  const { yours: yourHubTeams, rest: restHubTeams, all: myHubTeams } = useMemo(
+    () => groupHubTeams(memberships, teams),
+    [memberships, teams],
+  )
 
   const openEvent = (id) => {
     setAvailabilityOpen(false)
@@ -206,7 +260,20 @@ export default function SquadHub() {
 
   // ---- No :teamId — land the single-squad coach, offer everyone else a pick.
   if (!teamId) {
-    if (membershipsLoading) return <Spinner label="Loading your squads…" />
+    if (membershipsLoading) {
+      return (
+        <div>
+          <div className="mb-3.5 mt-1">
+            <Kicker>Squad Hub</Kicker>
+            <AccentTitle lead="Your squads," accent="pick one." />
+          </div>
+          <div role="status" aria-live="polite">
+            <span className="sr-only">Loading your squads…</span>
+            <SquadHubPickerSkeleton />
+          </div>
+        </div>
+      )
+    }
     if (myHubTeams.length === 1) return <Navigate to={`/squad/${myHubTeams[0].id}`} replace />
     if (myHubTeams.length === 0) {
       return (
@@ -219,21 +286,20 @@ export default function SquadHub() {
           <Kicker>Squad Hub</Kicker>
           <AccentTitle lead="Your squads," accent="pick one." />
         </div>
-        <Card className="p-4">
-          <p className="mb-3 text-[13px] font-medium text-ink-muted">Which squad?</p>
-          <ul className="flex flex-col gap-2">
-            {myHubTeams.map((candidate) => (
-              <li key={candidate.id}>
-                <Link
-                  to={`/squad/${candidate.id}`}
-                  className="block rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-sm font-semibold text-ink hover:bg-surface-mute"
-                >
-                  {candidate.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <HubTeamSection
+          testId="section-your-squads"
+          title="Your squads"
+          teams={yourHubTeams}
+          memberships={memberships}
+          yours
+        />
+        <HubTeamSection
+          testId="section-club-squads"
+          title={yourHubTeams.length > 0 ? 'The rest of the club' : 'The club'}
+          teams={restHubTeams}
+          memberships={memberships}
+          yours={false}
+        />
       </div>
     )
   }
