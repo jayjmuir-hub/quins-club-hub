@@ -507,10 +507,10 @@ export default function Chat() {
       <div ref={bottomRef} />
 
       {/* ── Composer ────────────────────────────────────────────────── */}
-      {/* The phone offset clears the fixed glass tab bar (74px+safe-area —
-          the same lift the DM thread got in bc971f8; this screen was
-          missed). Desktop keeps bottom-0: no tab bar there. */}
-      <div className="sticky bottom-[calc(74px+env(safe-area-inset-bottom))] desktop:bottom-0 -mx-1 mt-3 border-t border-line bg-surface px-1 pb-2 pt-2">
+      {/* Chrome-free conversations (25 Aug 2026): no tab bar inside a
+          thread, so the composer sits on the bottom edge — the safe-area
+          folds into the padding so Send clears the home indicator. */}
+      <div className="sticky bottom-0 -mx-1 mt-3 border-t border-line bg-surface px-1 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 desktop:pb-2">
         {/* Attach a fixture: starts that fixture's thread. Offered to
             everyone in the squad (not only staff) — the fixture's discussion
             belongs to the squad. Only fixtures without an open thread. */}

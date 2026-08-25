@@ -223,15 +223,26 @@ beforeEach(() => {
   m.listChats.mockResolvedValue([])
 })
 
-describe('the squad composer clears the phone chrome', () => {
-  it('lifts 74px+safe-area above the tab bar, desktop keeps bottom-0', async () => {
+describe('the composer hugs the bottom edge (chrome-free conversations, 25 Aug 2026)', () => {
+  // The tab bar is gone inside a conversation, so the 74px lift went with
+  // it: bottom-0, with the safe-area folded into the padding so the Send
+  // row clears the home indicator.
+  it('the squad composer sits at bottom-0 with safe-area padding', async () => {
     renderChat()
     const locked = await screen.findByTestId('composer-locked')
     const bar = locked.parentElement
-    expect(bar.className).toContain('bottom-[calc(74px+env(safe-area-inset-bottom))]')
-    expect(bar.className).toContain('desktop:bottom-0')
-    // The bare (un-prefixed) bottom-0 is the bug this guards against.
-    expect(bar.className).not.toMatch(/(^|\s)bottom-0(\s|$)/)
+    expect(bar.className).toMatch(/(^|\s)bottom-0(\s|$)/)
+    expect(bar.className).toContain('pb-[calc(8px+env(safe-area-inset-bottom))]')
+    expect(bar.className).not.toContain('74px')
+  })
+
+  it('the DM composer sits at bottom-0 with safe-area padding', async () => {
+    renderThread()
+    const composer = await screen.findByTestId('dm-composer')
+    const bar = composer.parentElement
+    expect(bar.className).toMatch(/(^|\s)bottom-0(\s|$)/)
+    expect(bar.className).toContain('pb-[calc(8px+env(safe-area-inset-bottom))]')
+    expect(bar.className).not.toContain('74px')
   })
 })
 
