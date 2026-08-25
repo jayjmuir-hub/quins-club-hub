@@ -38,6 +38,9 @@ export default defineConfig({
       { find: /^\.\.\/data\/announcements\.js$/, replacement: path.resolve(__dirname, 'stubs/announcements.js') },
       // The dock's Chat dot (src/lib/useDockBadges.js) — see stubs/messages.js.
       { find: /^\.\.\/data\/messages\.js$/, replacement: path.resolve(__dirname, 'stubs/messages.js') },
+      // The DM thread's photos (25 Aug 2026) — signed LATE on purpose, so the
+      // dm-thread scenario reproduces the page growing after the open-scroll.
+      { find: /^\.\.\/data\/chatMedia\.js$/, replacement: path.resolve(__dirname, 'stubs/chatMedia.js') },
       // ⚠️ './auth.jsx' as well as '../lib/auth.jsx', and the difference is
       // not cosmetic. These aliases match SPECIFIER TEXT, so they only catch
       // importers sitting one directory below src/. src/lib/useMyProfile.js

@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 💬 **Chrome-free conversations** — Jay: "lets try the no
+- (unmerged) — 🧷 **Stickiness becomes INTENT, and the pin gets three
+  triggers** — Jay's phone, after #395 AND #396: "still not snapping to the
+  last read message ... all are old and read already". The mechanism that
+  survived two deploys, found by walking the event order rather than by
+  reproduction (the harness's new `dm-thread` scenario pins perfectly in
+  desktop Chromium): Android's scroll anchoring fires adjustment scroll
+  events when photos load above the viewport while the page has also grown
+  below; the old gate read "far from bottom" off such an event, flipped
+  false, and every later re-pin was silently skipped. Now only a scroll
+  that moves UP unsticks (`src/lib/useStayPinnedToBottom.js`, one hook
+  replacing the two screens' duplicated copies), and the re-pin fires from
+  a body ResizeObserver, a capture-phase image `load` listener, AND a 6s
+  ticker after each messages change — the phone showed any single trigger
+  can be starved. Also: the DM reaction trigger centers on its bubble
+  (Jay: "put the reaction button centered on every message"), and the
+  harness gains `stubs/chatMedia.js` with LATE-signing photos so the
+  growth-after-open shape is reproducible at will. The NEXT pull request
+  cites this entry's squash SHA.
+- `a2f407b` — 💬 **Chrome-free conversations** — Jay: "lets try the no
   bottom menu inside a conversation". WhatsApp-style: inside a thread the
   phone shows NO tab bar and NO masthead island — the chat header pins at
   top-0 (safe-area in its padding, covering the notch) and the composer
@@ -21,8 +39,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the banner is the way out of a preview and must never disappear (same
   contract as the masthead auto-hide's disabled flag); the header sliding
   under the banner there is the accepted cost. `conversationScreen` in
-  AppShell decides by route. This retires #389's accepted 64px gap. The
-  NEXT pull request cites this entry's squash SHA.
+  AppShell decides by route. This retires #389's accepted 64px gap. (#396)
+  Its own branch could not cite this squash SHA, so this entry does.
 - `c69da5f` — 📌 **The reader stays pinned to the newest message as the page
   grows** — Jay's phone, same morning: "still when i open a chat i have to
   scroll down", composer floating mid-content in the screenshot. The #394

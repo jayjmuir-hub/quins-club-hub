@@ -42,7 +42,9 @@ export async function getChannelSettings() {
 export async function setAnnounceOnly() {}
 export async function markMessagesRead() {}
 export async function listMyMessageReads() {
-  return new Set()
+  // Every DM in the thread fixture is already read — the dm-thread scenario
+  // measures the open-scroll, not the New divider.
+  return new Set(Array.from({ length: 16 }, (_, i) => `hz-dm-${i + 1}`))
 }
 export async function messageReadStats() {
   return new Map()
@@ -78,14 +80,53 @@ export async function toggleStar() {}
 export async function listMyStarredMessages() {
   return []
 }
+// ── The DM thread (25 Aug 2026) ────────────────────────────────────────────
+// The instrument for "still when i open a chat i have to scroll down": a
+// long thread whose PHOTOS sign late (stubs/chatMedia.js), so the page
+// grows well after the open-scroll fires — the shape of Jay's kit-photo
+// thread. Invented people only — CLAUDE.md rule 9. All messages are READ
+// (Jay: "all are old and read already"), so the New divider stays out of
+// the measurement.
+const DM_SELF = 'harness-user'
+const DM_OTHER = 'hz-sam'
+const DM_CONV = {
+  id: 'hz-conv-1',
+  club_id: '00000000-0000-0000-0000-0000000000ad',
+  kind: 'dm',
+  profile_a: DM_SELF < DM_OTHER ? DM_SELF : DM_OTHER,
+  profile_b: DM_SELF < DM_OTHER ? DM_OTHER : DM_SELF,
+}
+const DM_ROWS = Array.from({ length: 16 }, (_, i) => {
+  const mine = i % 3 === 2
+  return {
+    id: `hz-dm-${i + 1}`,
+    conversation_id: 'hz-conv-1',
+    channel: 'dm',
+    author_id: mine ? DM_SELF : DM_OTHER,
+    body:
+      i >= 10 && i % 2 === 0
+        ? `Kit option ${i / 2 - 4} attached`
+        : `Message ${i + 1} — logistics for Saturday.`,
+    created_at: new Date(Date.now() - (16 - i) * 7 * 60000).toISOString(),
+    deleted_at: null,
+    quoted_id: null,
+    quoted: null,
+    forwarded: false,
+    pinned: false,
+    attachment_path: i >= 10 && i % 2 === 0 ? `hz/kit-${i}.jpg` : null,
+    author: { full_name: mine ? 'You' : 'Sam Quillon' },
+  }
+})
 export async function listMyConversations() {
-  return []
+  return [
+    { conversation_id: 'hz-conv-1', other_id: DM_OTHER, other_name: 'Sam Quillon', other_role: 'manager', last_at: DM_ROWS.at(-1).created_at, last_body: DM_ROWS.at(-1).body, last_author_id: DM_ROWS.at(-1).author_id, unread: false },
+  ]
 }
-export async function getConversation() {
-  return null
+export async function getConversation(conversationId) {
+  return conversationId === 'hz-conv-1' ? DM_CONV : null
 }
-export async function listDirectMessages() {
-  return []
+export async function listDirectMessages(conversationId) {
+  return conversationId === 'hz-conv-1' ? DM_ROWS : []
 }
 export async function sendDirectMessage() {
   throw new Error('harness: sendDirectMessage is not stubbed')

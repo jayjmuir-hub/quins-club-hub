@@ -37,6 +37,7 @@ import { useAuth } from '../lib/auth.jsx'
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { eventTitle } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import useStayPinnedToBottom from '../lib/useStayPinnedToBottom.js'
 import { canEditTeam, isAdmin, visibleTeams } from '../lib/scope.js'
 import { shortBand } from './ChatList.jsx'
 
@@ -229,42 +230,9 @@ export default function Chat() {
   // A chat reads downwards: land at the newest, and STAY there as messages
   // arrive — unless the reader has scrolled up into history, which a yank
   // back down would interrupt (Jay, 24 Aug 2026: "should stay at bottom with
-  // newest message visible, even as new messages come in").
-  const nearBottomRef = useRef(true)
-  useEffect(() => {
-    function onScroll() {
-      const doc = document.documentElement
-      nearBottomRef.current = window.innerHeight + window.scrollY >= doc.scrollHeight - 160
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    // The page keeps GROWING after the messages render — signed photo URLs
-    // arrive, images decode, reaction pills land — and a one-shot scroll
-    // lands short by exactly that growth (Jay's phone, 25 Aug 2026: "still
-    // ... have to scroll down to see the most recent message", composer
-    // floating mid-content). While the reader is near the bottom, every
-    // growth re-pins; once they scroll up into history, none does.
-    let observer
-    if (typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(() => {
-        if (nearBottomRef.current) window.scrollTo(0, document.documentElement.scrollHeight)
-      })
-      observer.observe(document.body)
-    }
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      observer?.disconnect()
-    }
-  }, [])
-  useEffect(() => {
-    // The TRUE document end, not scrollIntoView({block:'end'}): aligning the
-    // anchor with the viewport bottom parked the newest message under the
-    // sticky composer and the tab bar — the last ~130px of a phone viewport
-    // is chrome. At the full end the composer sits in flow above the page's
-    // bottom padding and the newest message clears it (Jay, 25 Aug 2026:
-    // "the latest message is ... sometimes below the input bar").
-    if (messages?.length && nearBottomRef.current) window.scrollTo(0, document.documentElement.scrollHeight)
-  }, [messages])
+  // newest message visible, even as new messages come in"). The whole story
+  // lives in src/lib/useStayPinnedToBottom.js.
+  useStayPinnedToBottom(messages)
 
   // ── Routing ─────────────────────────────────────────────────────────────
   if (!param || unknownTeam) {

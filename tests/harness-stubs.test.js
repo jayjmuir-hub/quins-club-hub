@@ -74,6 +74,8 @@ const ALIASES = [
   // this list, and every one of them has been caught here rather than by
   // somebody opening the harness and finding it blank.
   ['harness/stubs/lineups.js', 'src/data/lineups.js'],
+  // The DM thread's late-signing photos (25 Aug 2026, the dm-thread scenario).
+  ['harness/stubs/chatMedia.js', 'src/data/chatMedia.js'],
 ]
 
 function read(relative) {
