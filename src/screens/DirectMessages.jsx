@@ -430,6 +430,17 @@ function Thread({ conversationId }) {
     }
   }
 
+  // Tapping an author's NAME in a group opens the 1:1 — no quote, just the
+  // chat (25 Aug 2026). Same permission contract as onReplyPrivately above.
+  async function openDmWith(profileId) {
+    try {
+      const dm = await openConversation(profileId)
+      navigate(`/chat/dm/${dm}`)
+    } catch (err) {
+      setError(err.message || 'Could not open a chat with them.')
+    }
+  }
+
   async function submitNickname(domEvent) {
     domEvent.preventDefault()
     try {
@@ -515,7 +526,7 @@ function Thread({ conversationId }) {
       : []
 
   return (
-    <section className="px-1">
+    <section className="flex flex-1 flex-col px-1">
       <ChatHeader
         avatar={<Avatar name={isGroup ? conversation?.title : otherName} staff={!isGroup && STAFF.has(other?.role)} size="sm" />}
         title={(isGroup ? conversation?.title : otherName) ?? '…'}
@@ -693,6 +704,13 @@ function Thread({ conversationId }) {
           ))}
         </div>
       )}
+      {/* The slack-eater: with few messages the section is shorter than main,
+          and this spacer swallows the difference ABOVE the stream, so the
+          stream and composer sit at the bottom — the WhatsApp shape, and the
+          fix for the keyboard marooning the composer mid-screen (AppShell's
+          <main> comment has the mechanism). Collapses to nothing once the
+          thread is taller than the viewport. */}
+      <div className="flex-1" aria-hidden="true" />
       {/* Round 3: the wallpaper — a low-alpha overlay on the stream only,
           so the composer and header stay on the plain surface. */}
       <div className="-mx-1 flex flex-col gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
@@ -770,6 +788,7 @@ function Thread({ conversationId }) {
                 menuItems={menuItems}
                 pinned={Boolean(m.pinned)}
                 showAuthor={isGroup && !mine}
+                onAuthor={isGroup && !mine ? () => openDmWith(m.author_id) : null}
                 authorLabel={authorName}
                 forwarded={Boolean(m.forwarded)}
                 quote={quote}
