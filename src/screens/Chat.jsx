@@ -238,7 +238,23 @@ export default function Chat() {
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
-    return () => window.removeEventListener('scroll', onScroll)
+    // The page keeps GROWING after the messages render — signed photo URLs
+    // arrive, images decode, reaction pills land — and a one-shot scroll
+    // lands short by exactly that growth (Jay's phone, 25 Aug 2026: "still
+    // ... have to scroll down to see the most recent message", composer
+    // floating mid-content). While the reader is near the bottom, every
+    // growth re-pins; once they scroll up into history, none does.
+    let observer
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        if (nearBottomRef.current) window.scrollTo(0, document.documentElement.scrollHeight)
+      })
+      observer.observe(document.body)
+    }
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      observer?.disconnect()
+    }
   }, [])
   useEffect(() => {
     // The TRUE document end, not scrollIntoView({block:'end'}): aligning the
