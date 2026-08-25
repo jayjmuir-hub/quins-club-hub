@@ -10,12 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- `35a179e` — 🪪 **Admin’s waiting count leads to Accounts** — the sidebar badge is
+- 🔌 **Cursor (cloud and local) uses graft, and Cloud Agent Builds build the
+  structural index first.** `.cursor/rules/graft.mdc` is always-apply;
+  `AGENTS.md` tells Cloud agents to install/build if `graft/` is missing and
+  never skip graft for Club Hub navigation; `.cursor/environment.json` runs
+  `.cursor/install.sh` (`npm ci --include=dev`, install `@nanonets/graft`
+  into `$HOME/.local`, `graft build` — never `--deep`, no LLM concept map,
+  no API key). `graft/` stays gitignored. `scripts/netlify-ignore.mjs` skips
+  `.cursor/` so this does not deploy. Its own branch cannot cite this
+  squash SHA, so the NEXT pull request cites it.
+- `da5c52c` — 🪪 **Admin’s waiting count leads to Accounts** — the sidebar badge is
   `countAdminWaiting` (pending memberships plus people waiting for access),
   but `/admin` was a chooser that never mentioned that number. The landing
   now shows the same count on a card that opens Accounts, and on the Club
   Admin card whose home is already Accounts. Zero or a failed read still
-  renders nothing. Frontend only.
+  renders nothing. Frontend only. Its own branch could not cite this squash
+  SHA, so this entry does.
 - `73ce4ca` — 🗓️ **Schedule stops being an unpaginated wall** — fixtures group by club-calendar
   month with sticky month and column headers below the filter bar; Upcoming /
   Results / Calendar, age group and type filters share one bar; the native
