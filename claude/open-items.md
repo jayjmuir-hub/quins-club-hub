@@ -33,6 +33,18 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
   WhatsApp link on a phone. Nobody has weighed that trade yet, and this line
   exists so the next person knows the switch is there and untouched rather than
   considered and rejected.
+- **Flip "Confirm email" OFF** — Supabase → Authentication → Sign In / Providers
+  → Email. Jay's 25 Aug 2026 decision
+  (`claude/decisions/2026-08-25-remove-email-confirmation.md`): signup no longer
+  gates on opening a link; a welcome mail replaces the confirmation. ⚠️ **LAST
+  step, after** the `notify-welcome` function is deployed and
+  `db/migrations/20260825_welcome_email_no_confirm.sql` is applied — everything
+  in code is keyed on rows being born confirmed, so nothing changes until this
+  click, and the click is safe the moment those two are live. Once flipped:
+  `notify-unfinished-signup` + the `signup_nudges` machinery lose their audience
+  (only the pre-flip limbo cohort remains), and the send-email `signup` template
+  becomes unreachable for new signups — all mothballed, not deleted, same ruling
+  shape as passwordless.
 - ✅ **Monitoring — DONE, 16 Aug 2026.** "Detection today is somebody
   telling Jay" was the 13 Aug audit's finding. Two **Better Stack** monitors are
   now live on the free tier, 3-minute checks, e-mail alerts:

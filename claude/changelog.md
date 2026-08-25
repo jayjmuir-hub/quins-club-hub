@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 💬 **The floating dock's panel now stays pinned to the newest
+- (unmerged) — **Email confirmation removed; the mail is now a welcome** —
+  Jay's decision, in his words: "remove the need to confirm an email
+  address … just sending an email confirming they created their account and
+  welcoming them to ClubHub". New `notify-welcome` edge function and a
+  two-door welcome trigger gated by `profiles.welcomed_at` (house pg_net
+  pattern); `apply_signup_intent` lost its confirmed-at gate and also runs
+  at insert for born-confirmed rows; Login signs a fresh signup straight
+  in. The dashboard toggle is the LAST step and Jay's click —
+  `claude/decisions/2026-08-25-remove-email-confirmation.md`.
+- `2ea3e5c` — 💬 **The floating dock's panel now stays pinned to the newest
   message.** Jay: chats opened from the bubble didn't show the latest
   message — the `useStayPinnedToBottom` fix only reached the full chat
   screens, because it pins the WINDOW and the dock scrolls its own div.
@@ -18,7 +27,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   landed short once signed photo URLs grew the list (same failure as
   #395). The hook now takes an optional container ref — same intent-based
   stick gate, same three re-pin triggers — and the dock passes its panel.
-  The NEXT pull request cites this entry's squash SHA.
 - `5319a73` — 🔎 **The giant avatar was an INLINE span, and one word fixes
   it** — Jay: "I just looked at the app, and it does not look like it was
   fixed", after two rounds of everyone (me included) believing the

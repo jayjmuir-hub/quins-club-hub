@@ -161,9 +161,12 @@ export function AuthProvider({ children }) {
     const alreadyRegistered =
       Array.isArray(data?.user?.identities) && data.user.identities.length === 0
 
-    // A session only comes back if email confirmation is OFF. It is ON
-    // (dashboard, verified 8 Aug 2026), so this should always be null — it is
-    // returned so the caller can branch rather than assume.
+    // A session only comes back if email confirmation is OFF — which it is,
+    // by Jay's decision of 25 Aug 2026 (it was ON from 8 Aug until then; see
+    // claude/decisions/2026-08-25-remove-email-confirmation.md). A genuinely
+    // new signup is signed in on the spot; the obfuscated already-registered
+    // response above still carries no session, so the caller branches on this
+    // rather than assuming either way.
     return { alreadyRegistered, session: data?.session ?? null }
   }
 
