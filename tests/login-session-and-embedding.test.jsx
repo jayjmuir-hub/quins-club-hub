@@ -261,22 +261,24 @@ describe('friendlyAuthError — the password-era translations', () => {
   })
 
   describe('invalid_credentials', () => {
-    // "Invalid login credentials" is accurate and unhelpful. During onboarding
-    // the overwhelmingly common cause is NOT a wrong password — it is someone
-    // who registered and never opened the confirmation email. Sending them off
-    // to reset a password that is already correct wastes an email against the
-    // cap and does not fix it.
+    // "Invalid login credentials" is accurate and unhelpful. Since the
+    // confirmation gate was removed (25 Aug 2026) the two live causes are a
+    // wrong password and signing in before creating an account — so the
+    // translation must point at "Create account" and at the password reset,
+    // and must NOT send anyone hunting for a confirmation email that no
+    // longer gates anything.
     const RAW = 'Invalid login credentials'
 
     it('translates the code', () => {
       const out = friendlyAuthError({ code: 'invalid_credentials', message: RAW }, 'fallback')
-      expect(out).toMatch(/just registered/i)
-      expect(out).toMatch(/confirmation email/i)
+      expect(out).toMatch(/create account/i)
+      expect(out).toMatch(/reset your password/i)
+      expect(out).not.toMatch(/confirmation email/i)
       expect(out).not.toBe(RAW)
     })
 
     it('falls back to the message when no code is sent', () => {
-      expect(friendlyAuthError(new Error(RAW), 'fallback')).toMatch(/confirmation email/i)
+      expect(friendlyAuthError(new Error(RAW), 'fallback')).toMatch(/create account/i)
     })
   })
 

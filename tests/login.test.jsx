@@ -44,6 +44,14 @@ vi.mock('../src/lib/auth.jsx', () => ({
   }),
 }))
 
+// Login calls supabase.rpc('complete_signup_intent') directly when signup
+// comes back with a live session (confirmation is off since 25 Aug 2026);
+// mocked so no network call is reachable and the call is assertable.
+const rpc = vi.fn()
+vi.mock('../src/lib/supabase', () => ({
+  supabase: { rpc: (...args) => rpc(...args) },
+}))
+
 vi.mock('../src/data/signupSquads.js', () => ({
   listSignupSquads: vi.fn(async () => [
     {
@@ -84,6 +92,8 @@ beforeEach(() => {
   // would throw a TypeError that surfaces as a generic error banner and make
   // an unrelated test look like a copy failure.
   signUpWithPassword.mockResolvedValue({ alreadyRegistered: false, session: null })
+  rpc.mockReset()
+  rpc.mockResolvedValue({ data: null, error: null })
 })
 
 /** The tab strip is role="tablist"; switching modes is a real user action. */
@@ -284,6 +294,49 @@ describe('Login screen — creating an account', () => {
     expect(intent.claimed_role).toBe('volunteer')
     expect(intent.first_name).toBe('Anne')
     expect(intent.squad_ids).toEqual(['team-u12'])
+  })
+
+  // Confirmation is OFF since 25 Aug 2026: a genuinely new signup comes back
+  // with a live session. The screen must not park them on "Check your email"
+  // — there is no email to check for a gate that no longer exists — and it
+  // must fire the client-side retry for applying the wizard's answers.
+  it('applies the signup intent and skips the email panel when a session comes back', async () => {
+    signUpWithPassword.mockResolvedValue({
+      alreadyRegistered: false,
+      session: { user: { id: 'user-1' } },
+    })
+    const user = userEvent.setup()
+    render(<Login />)
+
+    await finishWizardAsHelper(user)
+    await user.type(screen.getByLabelText(/email address/i), 'newparent@example.com')
+    await user.type(screen.getByLabelText('Password'), GOOD_PASSWORD)
+    await user.click(screen.getByRole('button', { name: /send my details/i }))
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('complete_signup_intent'))
+    expect(screen.queryByRole('heading', { name: /check your email/i })).toBeNull()
+  })
+
+  // The RPC is a belt to the DB trigger's braces — its failure must be
+  // invisible: no error banner, no email panel, nothing between the person
+  // and the app they are already signed into.
+  it('shows no error when the intent retry fails after a live session', async () => {
+    signUpWithPassword.mockResolvedValue({
+      alreadyRegistered: false,
+      session: { user: { id: 'user-1' } },
+    })
+    rpc.mockRejectedValue(new Error('boom'))
+    const user = userEvent.setup()
+    render(<Login />)
+
+    await finishWizardAsHelper(user)
+    await user.type(screen.getByLabelText(/email address/i), 'newparent@example.com')
+    await user.type(screen.getByLabelText('Password'), GOOD_PASSWORD)
+    await user.click(screen.getByRole('button', { name: /send my details/i }))
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('heading', { name: /check your email/i })).toBeNull()
   })
 
   it('keeps submit disabled until the password passes the rules', async () => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
+import { supabase } from '../lib/supabase'
 import Button from '../components/Button.jsx'
 import SignupWizard from '../components/SignupWizard.jsx'
 import { takeSessionExpired } from '../lib/sessionExpired.js'
@@ -141,13 +142,18 @@ function isPwnedPassword(error, raw) {
   return /known to be weak|easy to guess|data breach|pwned/i.test(raw)
 }
 
-// "Invalid login credentials" is accurate and unhelpful. The overwhelmingly
-// common cause during onboarding is not a wrong password — it is someone who
-// registered and never opened the confirmation email, or who is trying to sign
-// in before creating an account at all.
+// "Invalid login credentials" is accurate and unhelpful. Since 25 Aug 2026
+// there is no confirmation gate, so the two causes left are a genuinely wrong
+// password and someone signing in before creating an account at all. (This
+// message used to send people hunting for a confirmation email; with the
+// gate gone that hunt finds a welcome note with nothing to click, which is
+// worse than no hint.)
 const INVALID_CREDENTIALS_MESSAGE =
-  'That email and password don’t match. If you’ve just registered, check your inbox for the confirmation email first — your account isn’t active until you open it.'
+  'That email and password don’t match. If you haven’t created an account yet, use “Create account” below — or reset your password if you’ve forgotten it.'
 
+// ⚠️ KEPT although the gate is off: GoTrue can only raise this while the
+// dashboard's "Confirm email" toggle is ON, and the mapping must stay honest
+// if that toggle is ever flipped back.
 const EMAIL_NOT_CONFIRMED_MESSAGE =
   'Please open the confirmation email we sent you before signing in. Check your spam folder if it isn’t there.'
 
@@ -300,7 +306,7 @@ export default function Login({ authError = null, embedded = false }) {
     setEmail(trimmed)
     setStatus('busy')
     try {
-      const { alreadyRegistered } = await signUpWithPassword(trimmed, chosen, intent)
+      const { alreadyRegistered, session } = await signUpWithPassword(trimmed, chosen, intent)
       // ⚠️ We do NOT branch the copy on `alreadyRegistered`. Saying "you
       // already have an account" confirms to anyone who asks that a given
       // address is a club member. The flag exists so this decision is
@@ -308,6 +314,21 @@ export default function Login({ authError = null, embedded = false }) {
       // account?" link on the confirmation panel is the way out for the
       // person who genuinely forgot.
       void alreadyRegistered
+
+      // Email confirmation is OFF (25 Aug 2026): a genuinely new signup comes
+      // back with a live session and this screen is about to unmount — the
+      // auth listener routes them straight into the app. Apply the wizard's
+      // answers now as the belt to the DB trigger's braces (handle_new_user
+      // runs private.apply_signup_intent at insert; this RPC is the retry if
+      // that swallowed an error, and a no-op otherwise).
+      if (session) {
+        try {
+          await supabase.rpc('complete_signup_intent')
+        } catch {
+          // Trigger already applied it, or will have by the time they look.
+        }
+        return
+      }
       setStatus('confirm-sent')
     } catch (err) {
       setError(
@@ -394,6 +415,14 @@ export default function Login({ authError = null, embedded = false }) {
     // for an email that was never coming, and reported it as a fault. A parent
     // has no chance. Lead with the condition, and give BOTH ways out equal
     // weight, because the app genuinely does not know which one applies.
+    //
+    // ⚠️ SINCE 25 Aug 2026 (confirmation OFF) a genuinely NEW signup never
+    // reaches this panel — it comes back with a session and the app routes
+    // them straight in. The only person left standing here is the one whose
+    // address already has an account, for whom the second paragraph is the
+    // operative one and the first is a vacuously-true conditional. The copy
+    // is kept conditional anyway: while the dashboard toggle is ON this panel
+    // is again the path for everyone, and the words must hold in both states.
     panel = (
       <div className="mt-6">
         <h2 className="text-center text-base font-bold text-ink">Check your email</h2>

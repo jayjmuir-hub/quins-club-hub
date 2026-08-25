@@ -10,9 +10,13 @@ import {
   needsPlayers,
 } from '../lib/signupIntent.js'
 
-// Pre-signup roll-call. Filled BEFORE supabase.auth.signUp, so the
-// confirmation email is not a cliff. See
-// claude/decisions/2026-08-25-signup-before-confirm.md.
+// Pre-signup roll-call. Filled BEFORE supabase.auth.signUp — originally so
+// the confirmation email was not a cliff
+// (claude/decisions/2026-08-25-signup-before-confirm.md); the gate itself was
+// then removed the same day
+// (claude/decisions/2026-08-25-remove-email-confirmation.md), and the order
+// still stands: the club gets a name and a role in the same breath as the
+// account, whatever the mail does.
 
 const FIELD =
   'w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand'
@@ -144,7 +148,7 @@ export default function SignupWizard({ busy, error, onError, onSubmitAccount }) 
       <div className="mt-4">
         <p className="mb-3 text-sm leading-relaxed text-ink-faint">
           Add who you're here for. A coach checks every new player before you see the rest of
-          the squad — you'll confirm your email after this.
+          the squad — creating your account is the last step after this.
         </p>
         {error && (
           <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
@@ -234,7 +238,7 @@ export default function SignupWizard({ busy, error, onError, onSubmitAccount }) 
   return (
     <form className="mt-4" onSubmit={handleWho} noValidate data-testid="signup-who">
       <p className="mb-4 text-center text-sm leading-relaxed text-ink-faint">
-        Tell us how you fit in first — then we'll email you to confirm the address. Tick
+        Tell us how you fit in first — then create your account. Tick
         everything that's true.
       </p>
       {error && (
