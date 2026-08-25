@@ -10,7 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🖼️ **Chat wallpapers are five photo papers; crest letterhead
+- (unmerged) — 🖼️ **Dusk wallpaper JPEG lands** — decoded from
+  `cursor/chat-wallpapers` `dusk.jpg.b64` (33456 chars) into
+  `public/chat-backgrounds/dusk.jpg`, magic `ffd8`. Harlequin and doodle
+  `.b64` URLs still 404; bytes not invented. Cites `6aca995`.
+- `6aca995` — 🖼️ **Chat wallpapers are five photo papers; crest letterhead
   is the default on every chat.** Jay, 25 Aug 2026: land exactly five —
   harlequin, dusk, crest, doodle, kit — painted as covered JPEGs washed
   toward `--surface-rgb`. Empty storage, unknown keys, and the old gallery
