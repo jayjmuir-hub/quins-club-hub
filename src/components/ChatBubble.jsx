@@ -43,6 +43,12 @@ export default function ChatBubble({
   showAuthor = false,
   authorLabel,
   authorExtra = null,
+  // Tapping the author's NAME opens a chat with them (25 Aug 2026, Jay:
+  // "click on any username … and have the option to chat with them"). Null
+  // keeps the name plain text — the caller decides, because only the screen
+  // knows whether a DM with this author is even sensible (own messages and
+  // 1:1 threads pass nothing).
+  onAuthor = null,
   forwarded = false,
   lead = null,
   quote = null,
@@ -95,7 +101,20 @@ export default function ChatBubble({
         )}
         {showAuthor && !mine && (
           <p className={`text-[11px] font-extrabold text-brand-ink ${menuItems.length ? 'pr-10' : ''}`}>
-            {authorLabel}
+            {onAuthor ? (
+              // The RolePill stays OUTSIDE the button: the tap target is the
+              // person, and a pill inside it would announce as button text.
+              <button
+                type="button"
+                onClick={onAuthor}
+                data-testid="author-chat"
+                className="underline decoration-dotted underline-offset-2 hover:decoration-solid"
+              >
+                {authorLabel}
+              </button>
+            ) : (
+              authorLabel
+            )}
             {authorExtra}
           </p>
         )}

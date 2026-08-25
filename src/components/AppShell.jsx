@@ -674,7 +674,15 @@ export default function AppShell({ children }) {
       <main
         id="main-content"
         tabIndex={-1}
-        className={`mx-auto w-full max-w-[1120px] flex-1 px-4 ${conversationScreen ? 'pb-2' : 'pb-[calc(108px+env(safe-area-inset-bottom))]'} pt-4 desktop:mx-0 desktop:max-w-none desktop:px-6 desktop:pb-16 wide:max-w-none focus:outline-none`}
+        // ⚠️ CONVERSATION SCREENS ARE A FLEX COLUMN so the thread can push its
+        // composer to the BOTTOM of main's slack. Without this, a chat with
+        // three messages leaves the shell's min-h-screen surplus BELOW the
+        // composer — and when the phone keyboard opens, the pin hook scrolls
+        // to the document's true bottom, which is that empty surplus: Jay's
+        // 25 Aug screenshots show the composer marooned mid-screen over a
+        // void. Bottom-anchoring the thread means "document bottom" and "the
+        // composer" are the same place, however few messages there are.
+        className={`mx-auto w-full max-w-[1120px] flex-1 px-4 ${conversationScreen ? 'flex flex-col pb-2' : 'pb-[calc(108px+env(safe-area-inset-bottom))]'} pt-4 desktop:mx-0 desktop:max-w-none desktop:px-6 desktop:pb-16 wide:max-w-none focus:outline-none`}
       >
         {/* ⚠️ ABOVE THE loading/error/ready SPLIT, DELIBERATELY. Installing is
             not gated on having a membership: a parent who has just signed up
