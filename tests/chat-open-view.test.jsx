@@ -358,6 +358,16 @@ describe('the page keeps growing after the messages render — and the reader st
   })
 })
 
+describe('the composer greets by first name', () => {
+  // Jay, 25 Aug 2026: "it show message and then the full name ... lets
+  // change that so it shows message and then just the first name only".
+  it('the DM placeholder carries only the first name', async () => {
+    renderThread()
+    const composer = await screen.findByTestId('dm-composer')
+    expect(composer.querySelector('textarea')?.placeholder).toBe('Message Zz')
+  })
+})
+
 describe('what arrived since the last visit is highlighted', () => {
   it('a New divider marks where unread starts, and survives mark-read', async () => {
     m.listMessages.mockResolvedValue([

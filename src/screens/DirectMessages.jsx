@@ -991,6 +991,8 @@ function Thread({ conversationId }) {
                 <label className="sr-only" htmlFor="dm-draft">
                   Message
                 </label>
+                {/* The greeting is FIRST name only (Jay, 25 Aug 2026) — the
+                    full name is the header's job. Groups keep their title. */}
                 <textarea
                   id="dm-draft"
                   ref={draftRef}
@@ -1000,7 +1002,7 @@ function Thread({ conversationId }) {
                   onKeyDown={composerKeyDown}
                   rows={1}
                   maxLength={2000}
-                  placeholder={`Message ${(isGroup ? conversation?.title : otherName) ?? ''}`}
+                  placeholder={`Message ${(isGroup ? conversation?.title : otherName?.split(' ')[0]) ?? ''}`}
                   className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
                 />
                 <EmojiPicker onPick={(emoji) => setDraft(insertAtCursor(draftRef.current, emoji))} />

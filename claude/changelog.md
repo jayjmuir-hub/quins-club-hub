@@ -10,20 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🦇 **The app icon becomes the bat-wing crest** — the flat
-  CLUB HUB crest on the accent-green gradient, red bat-wing arcs rising
-  from the bottom corners, a soft red glow behind the crest — the design
-  Jay approved this morning after walking it from the pin back to the flat
-  crest ("almost like its bat wings"; final: the scalloped arc toned
-  down). Built by harness/make-icons-wings.py from the recipe in
-  claude/handoffs/2026-08-25-icon-wing-handoff.md, whose approved master
-  render the regeneration matches to ~1 channel unit. Every icon URL gets
-  a -v2 suffix (manifest, index.html, push-sw.js) so installed Androids
-  re-fetch — same-URL byte changes do not propagate; iPhones need
-  remove + re-add, Apple's rule. The maskable pair raises the wings 36px
-  into Android's circular safe zone, or the crop would eat them entirely.
-  make-icons-pin.py is tombstoned in place (pin era: one day, #393). The
-  NEXT pull request cites this entry's squash SHA.
+- (unmerged) — ✍️ **The composer greets by first name** — Jay, straight
+  after confirming the pin fix ("that fixed it, chat opens at the bottom
+  now"): the DM placeholder carried the other person's FULL name; now just
+  the first — "Message Harriet", not "Message Harriet Zephyr". First word
+  of the (nickname-aware) name in the thread and in the desktop dock's DM
+  panel; groups and squads keep their whole title — "U13 Mixed"
+  first-worded would be "U13". The NEXT pull request cites this entry's
+  squash SHA.
+- `5d2ec9f` — 🦇 **The app icon is the bat-wing crest** (#397) — the icon
+  iteration continued in its own session; recorded here because its branch
+  could not cite this squash SHA, so this entry does.
 - `1c9e3a5` — 🧷 **Stickiness becomes INTENT, and the pin gets three
   triggers** — Jay's phone, after #395 AND #396: "still not snapping to the
   last read message ... all are old and read already". The mechanism that

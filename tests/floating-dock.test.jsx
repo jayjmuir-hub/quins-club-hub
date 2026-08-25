@@ -119,6 +119,9 @@ describe('the floating chat dock', () => {
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[1])
     expect(await screen.findByTestId('dock-bubble')).toHaveTextContent('Zz two seats held')
+    // First name only in the greeting (Jay, 25 Aug 2026) — the full name is
+    // already the header's job. Squads keep their whole label.
+    expect(screen.getByPlaceholderText('Message Zz')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Message'), 'Zz on my way')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'Zz on my way', { attachmentPath: null }))
