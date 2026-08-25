@@ -110,7 +110,10 @@ export default function NotificationsNudge() {
       <div className="mt-3 flex flex-wrap items-center gap-2.5">
         {!needsInstall && (
           <Link
-            to="/more"
+            // The hash scrolls More to the Notifications section (More.jsx
+            // owns the scroll) — bare /more dropped people at the top of a
+            // long screen with the toggle below the fold.
+            to="/more#notifications"
             className="inline-flex min-h-[44px] items-center rounded-[8px] bg-brand px-4 text-[15px] font-bold text-white hover:bg-brand-deep"
           >
             Turn them on

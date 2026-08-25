@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -122,9 +122,9 @@ function memberships(rows, teams = TEAMS) {
   return { memberships: rows, teams, loading: false, error: null, reload: vi.fn() }
 }
 
-function renderMore() {
+function renderMore(entry = '/more') {
   return render(
-    <MemoryRouter initialEntries={['/more']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[entry]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <More />
     </MemoryRouter>,
   )
@@ -1225,5 +1225,47 @@ describe('More — the registrant’s own name', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't save that name/i)
     expect(registerMyPlayerMock).not.toHaveBeenCalled()
+  })
+})
+
+// ═══ The #notifications hash scroll (25 Aug 2026) ═══════════════════════════
+//
+// The Home nudge's "Turn them on" links to /more#notifications; More owns the
+// scroll because React Router does not scroll to hashes on its own (Jay's
+// phone: "does not scroll down automatically to that section"). jsdom has no
+// layout, so the observable contract here is the scrollIntoView CALL on the
+// anchored section — and the control below proves the spy would catch a
+// regression where the effect fires on every visit rather than only when a
+// hash asks for it.
+describe('More — the #notifications hash scrolls to the section', () => {
+  let scrollSpy
+
+  beforeEach(() => {
+    // jsdom implements neither scrollIntoView nor paint-timed rAF callbacks.
+    scrollSpy = vi.fn()
+    Element.prototype.scrollIntoView = scrollSpy
+    vi.stubGlobal('requestAnimationFrame', (cb) => setTimeout(cb, 0))
+    vi.stubGlobal('cancelAnimationFrame', (id) => clearTimeout(id))
+  })
+
+  afterEach(() => {
+    delete Element.prototype.scrollIntoView
+    vi.unstubAllGlobals()
+  })
+
+  it('scrolls the Notifications section into view when the hash is present', async () => {
+    renderMore('/more#notifications')
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalled())
+    // The element the call landed on is the anchored section, not something
+    // else that happens to scroll.
+    const target = scrollSpy.mock.instances[0] ?? scrollSpy.mock.contexts?.[0]
+    expect(target?.id).toBe('notifications')
+  })
+
+  it('control: a plain /more visit never scrolls', async () => {
+    renderMore('/more')
+    // Give the (absent) effect the same two frames the real one uses.
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(scrollSpy).not.toHaveBeenCalled()
   })
 })

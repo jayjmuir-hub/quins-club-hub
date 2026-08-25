@@ -136,11 +136,14 @@ describe('One definition, every screen', () => {
     // wanted the same marks, a screen was the wrong home. This asserts the
     // hero renders the cone's path data — so a second, drifting copy inside
     // the screen would fail here.
-    const { container } = render(
+    // baseElement, not container: Sheet portals to document.body since
+    // 25 Aug 2026 (the masthead's transform hijacked position:fixed), so
+    // the detail sheet's DOM is a sibling of the render container.
+    const { baseElement } = render(
       <EventDetail event={EVENT} team={{ id: 't-u14b', name: 'U14B Contact' }} onClose={vi.fn()} />,
     )
     const conePath = EVENT_TYPE_ICONS.training({}).props.children[0].props.d
-    const heroPaths = [...container.querySelectorAll('svg path')].map((p) => p.getAttribute('d'))
+    const heroPaths = [...baseElement.querySelectorAll('svg path')].map((p) => p.getAttribute('d'))
     expect(heroPaths).toContain(conePath)
   })
 
@@ -148,13 +151,14 @@ describe('One definition, every screen', () => {
     // The hero's proportions are built around that square. Dropping it too
     // would make the title jump up by 68px on a row nothing recognised — an
     // empty tinted square is the quieter wrong answer.
-    const { container } = render(
+    // baseElement for the same portal reason as the test above.
+    const { baseElement } = render(
       <EventDetail
         event={{ ...EVENT, type: 'fundraiser' }}
         team={{ id: 't-u14b', name: 'U14B Contact' }}
         onClose={vi.fn()}
       />,
     )
-    expect(container.querySelector('.h-14.w-14')).not.toBeNull()
+    expect(baseElement.querySelector('.h-14.w-14')).not.toBeNull()
   })
 })

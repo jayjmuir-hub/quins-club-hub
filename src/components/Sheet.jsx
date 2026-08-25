@@ -1,19 +1,23 @@
 import { useEffect, useId, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 // The single generic modal (design-system.md §4.16 .sheet + .scrim): a
 // bottom-anchored sheet on mobile, a centered dialog at the `desktop:`
 // breakpoint. Used for event detail, event add/edit, player detail, player
 // add/edit — every overlay in the app.
 //
-// No portal: this renders in place (no createPortal). The sheet is
-// `position:fixed`, which positions against the viewport regardless of
-// where it sits in the DOM tree, as long as no ancestor sets a CSS
-// `transform`/`filter`/`perspective` (any of which would turn that ancestor
-// into the fixed-positioning containing block instead). AppShell (Task 8)
-// sets none of those on any ancestor today, so a portal buys no correctness
-// here — it would only add indirection. If a future ancestor ever adopts a
-// transform (e.g. a page-transition wrapper), this assumption breaks and a
-// portal becomes necessary; flagged here so that's not a surprise.
+// PORTALED to document.body since 25 Aug 2026. This file used to say "no
+// portal: `position:fixed` positions against the viewport ... as long as no
+// ancestor sets a CSS transform/filter/perspective", and flagged that a
+// portal would become necessary the day an ancestor adopted one. That day
+// came: the masthead auto-hide wrapper carries `transform` + a transform
+// transition, and the glass island adds `backdrop-filter` and
+// `overflow-hidden` — so AppButton's sheet positioned against the ISLAND
+// and was clipped inside the pill (Jay's screenshot: a floating "Close"
+// stub in a washed-out masthead). The portal makes "the sheet fills the
+// viewport" a property of the component again instead of an assumption
+// about every caller's ancestors. React events still bubble through the
+// REACT tree, not the DOM tree, so callers notice nothing.
 //
 // Accessibility (design-system.md §8 lists these as the prototype's gaps —
 // this is the "fix in the rewrite" the doc calls for):
@@ -135,7 +139,7 @@ export function Sheet({ open, onClose, title, children, dismissible = true }) {
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(24,10,20,0.5)] backdrop-blur-[2px] animate-scrim-fade-in motion-reduce:animate-none desktop:items-center"
       onClick={dismissible ? onClose : undefined}
@@ -186,7 +190,8 @@ export function Sheet({ open, onClose, title, children, dismissible = true }) {
             that has no such zone, so this costs nothing elsewhere. */}
         <div className="px-[18px] pb-[calc(16px+env(safe-area-inset-bottom))] pt-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

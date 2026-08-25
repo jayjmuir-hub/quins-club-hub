@@ -5,6 +5,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin } from '../lib/scope.js'
 import { effectiveTheme, toggleTheme, watchSystemTheme } from '../lib/theme.js'
 import { ViewAsOptions } from './ViewAsSwitcher.jsx'
+import { GetAppMenuItem } from './AppButton.jsx'
 
 // The masthead's account menu: the initial button, and everything that used to
 // sit beside it in the row.
@@ -134,8 +135,9 @@ const ICON = 'h-[18px] w-[18px] shrink-0 text-ink-muted'
  * @param {string|null} props.roleLabel   What AppShell shows in the role pill, or null while loading.
  * @param {() => Promise<void>} props.signOut
  * @param {() => void} props.onReportProblem  Opens the help sheet AppShell owns.
+ * @param {() => void} props.onGetApp         Opens the install sheet AppShell owns.
  */
-export default function AccountMenu({ firstName, email, roleLabel, signOut, onReportProblem }) {
+export default function AccountMenu({ firstName, email, roleLabel, signOut, onReportProblem, onGetApp }) {
   const { realMemberships, viewAs } = useMemberships()
   const [open, setOpen] = useState(false)
   // 'main' | 'viewAs' — which page of the panel is showing.
@@ -372,6 +374,20 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
                 <BugIcon className={ICON} />
                 Report a problem
               </button>
+
+              {/* Was the masthead "App" pill until 25 Aug 2026 — moved here
+                  when it squeezed the wordmark off a zoomed phone (Jay chose
+                  the move; history in AppButton.jsx). Renders nothing once
+                  installed. Same close-without-refocus as the row above:
+                  the sheet is about to take focus. */}
+              <GetAppMenuItem
+                onOpen={() => {
+                  close({ refocus: false })
+                  onGetApp()
+                }}
+                itemClass={ITEM}
+                iconClass={ICON}
+              />
 
               <div className="mt-1 border-t border-line pt-1">
                 <button

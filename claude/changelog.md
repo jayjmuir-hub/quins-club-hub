@@ -10,14 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — ✍️ **The composer greets by first name** — Jay, straight
+- (unmerged) — 🎛️ **Three masthead fixes from Jay's phone, one morning** —
+  (1) The install sheet opened MANGLED inside the masthead pill, on phone
+  and desktop: the auto-hide wrapper's `transform` had made the glass
+  island the containing block for the sheet's `position:fixed`, and
+  `overflow-hidden` clipped it — the exact failure Sheet.jsx's header
+  predicted the day it chose not to portal. Sheet now portals to
+  document.body, for every caller. (2) The masthead "App" pill squeezed
+  the wordmark to "QUINS CLUB H…" on a zoomed Samsung (~320 CSS px); Jay
+  chose moving it over compacting it, so it is now "Get the app" in the
+  account menu (GetAppMenuItem/GetAppSheet, still AppButton.jsx, the
+  HelpSheet ownership pattern) and the row is back to one trigger.
+  (3) "Turn them on" on the Home nudge links to /more#notifications and
+  More scrolls the anchored section into view — React Router does not do
+  hashes on its own. Verified in Chromium at 320px and desktop; the hash
+  scroll and its no-hash control are proven against an inverted-guard
+  fault. The NEXT pull request cites this entry's squash SHA.
+- `4190599` — ✍️ **The composer greets by first name** — Jay, straight
   after confirming the pin fix ("that fixed it, chat opens at the bottom
   now"): the DM placeholder carried the other person's FULL name; now just
   the first — "Message Harriet", not "Message Harriet Zephyr". First word
   of the (nickname-aware) name in the thread and in the desktop dock's DM
   panel; groups and squads keep their whole title — "U13 Mixed"
-  first-worded would be "U13". The NEXT pull request cites this entry's
-  squash SHA.
+  first-worded would be "U13".
 - `5d2ec9f` — 🦇 **The app icon is the bat-wing crest** (#397) — the icon
   iteration continued in its own session; recorded here because its branch
   could not cite this squash SHA, so this entry does.

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import PostNoticeAction from '../components/PostNoticeAction.jsx'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -343,6 +343,24 @@ export default function More() {
   const admin = isAdmin(memberships)
   const squads = visibleTeams(memberships, teams)
 
+  // #notifications lands here from the Home nudge ("Turn them on"), which
+  // used to link to bare /more — Jay's phone, 25 Aug 2026: "it takes you to
+  // the screen ... but does not scroll down automatically to that section".
+  // React Router does not scroll to hashes on its own. The double rAF lets
+  // the sections above lay themselves out first; without it the measurement
+  // happens against a half-painted page and lands short. Any future section
+  // that wants to be linkable gets an id and a scroll-mt the same way.
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (!hash) return
+    const el = document.getElementById(hash.slice(1))
+    if (!el) return
+    const frame = requestAnimationFrame(() =>
+      requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' })),
+    )
+    return () => cancelAnimationFrame(frame)
+  }, [hash])
+
   return (
     <section>
       <div className="mb-3.5 mt-1">
@@ -491,10 +509,14 @@ export default function More() {
           SendAnIdea above: More is the one screen every role reaches on a
           phone.
           claude/plans/2026-08-18-push-notifications.md. */}
-      <SectionTitle>Notifications</SectionTitle>
-      <Card className="p-4">
-        <PushNotificationsToggle />
-      </Card>
+      {/* `scroll-mt` keeps the title clear of the sticky masthead when the
+          #notifications hash scroll (above) lands here. */}
+      <div id="notifications" className="scroll-mt-24">
+        <SectionTitle>Notifications</SectionTitle>
+        <Card className="p-4">
+          <PushNotificationsToggle />
+        </Card>
+      </div>
 
       {/* Chat behaviour — device-level, see the component's header. */}
       <SectionTitle>Chat</SectionTitle>
