@@ -51,6 +51,13 @@ insert into clubs (id, name) values
 insert into teams (id, club_id, name, sort_order, self_registration_allowed, is_senior) values
  ('c0000000-0000-4000-8000-0000000000f1','c0000000-0000-4000-8000-0000000000c1','ZZ Welcome Squad', 999, false, false);
 
+-- ⚠️ EVERY QUEUE COUNT IS FILTERED TO THE WELCOME URL, AND THE FIRST RUN OF
+-- THIS FILE IS WHY (production, 25 Aug 2026, before this filter existed):
+-- assertion 1 measured a delta of FOUR and the unconfirmed control a delta of
+-- ONE, because the fixture's pending membership and access_request fire the
+-- OTHER notify triggers (notify_pending_membership, notify_access_request),
+-- which queue their own pg_net posts. An unfiltered count asserts the whole
+-- club's outbox, not the welcome.
 do $$
 declare
   q_before  bigint;
@@ -73,7 +80,7 @@ declare
   );
   problems text := '';
 begin
-  select count(*) into q_before from net.http_request_queue;
+  select count(*) into q_before from net.http_request_queue where url like '%/notify-welcome';
 
   -- ── 1. Born confirmed: the post-flip signup ─────────────────────────────
   insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at,
@@ -83,7 +90,7 @@ begin
           'zz-welcome-confirmed@example.invalid', now(),
           jsonb_build_object('signup_intent', intent), now(), now());
 
-  select count(*) into q_after from net.http_request_queue;
+  select count(*) into q_after from net.http_request_queue where url like '%/notify-welcome';
 
   select p.signup_intent_applied_at into applied_1
     from public.profiles p where p.id = 'c0000000-0000-4000-8000-000000000001';
@@ -123,7 +130,7 @@ begin
           'zz-welcome-unconfirmed@example.invalid', null,
           jsonb_build_object('signup_intent', intent), now(), now());
 
-  select count(*) into q_after from net.http_request_queue;
+  select count(*) into q_after from net.http_request_queue where url like '%/notify-welcome';
 
   select p.signup_intent_applied_at into applied_2
     from public.profiles p where p.id = 'c0000000-0000-4000-8000-000000000002';
@@ -142,7 +149,7 @@ begin
      set email_confirmed_at = now()
    where id = 'c0000000-0000-4000-8000-000000000002';
 
-  select count(*) into q_after from net.http_request_queue;
+  select count(*) into q_after from net.http_request_queue where url like '%/notify-welcome';
 
   select p.signup_intent_applied_at into applied_3
     from public.profiles p where p.id = 'c0000000-0000-4000-8000-000000000002';
@@ -168,7 +175,7 @@ begin
      set email_confirmed_at = now()
    where id = 'c0000000-0000-4000-8000-000000000001';
 
-  select count(*) into q_after from net.http_request_queue;
+  select count(*) into q_after from net.http_request_queue where url like '%/notify-welcome';
 
   if q_after - q_before <> 0 then
     problems := problems || format(' [4] an already-welcomed account queued %s more welcomes, wanted 0.', q_after - q_before);
