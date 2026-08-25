@@ -5,6 +5,7 @@ import Card from '../components/Card.jsx'
 import { Empty } from '../components/Empty.jsx'
 import NoticeComposer from '../components/NoticeComposer.jsx'
 import NoticeRow from '../components/NoticeRow.jsx'
+import { NoticesSkeleton } from '../components/Skeleton.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { Sheet } from '../components/Sheet.jsx'
 import {
@@ -355,7 +356,12 @@ export default function Notices() {
         </div>
       )}
 
-      {!notices && !error && <Spinner />}
+      {!notices && !error && (
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Loading notices…</span>
+          <NoticesSkeleton />
+        </div>
+      )}
 
       {notices && shown.length === 0 && (
         <Empty

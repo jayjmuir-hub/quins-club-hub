@@ -5,6 +5,7 @@ import { AccentTitle, BlockTitle, Kicker } from '../components/Editorial.jsx'
 import Empty from '../components/Empty.jsx'
 import Segmented from '../components/Segmented.jsx'
 import { Sheet } from '../components/Sheet.jsx'
+import { SquadHubSkeleton } from '../components/Skeleton.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listAttendanceForEvents } from '../data/attendance.js'
 import { listAvailabilityForEvents } from '../data/availability.js'
@@ -335,7 +336,12 @@ export default function SquadHub() {
           Something went wrong loading this squad. Pull to refresh or try again shortly.
         </p>
       )}
-      {loading && <Spinner label="Loading squad…" />}
+      {loading && (
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Loading squad…</span>
+          <SquadHubSkeleton />
+        </div>
+      )}
 
       {!loading && !error && (
         <>
@@ -349,13 +355,17 @@ export default function SquadHub() {
           <div className="desktop:grid desktop:grid-cols-[1.15fr_.85fr] desktop:gap-x-4">
 
           {/* ---- Upcoming -------------------------------------------------- */}
-          <Card className="mb-4 p-4 desktop:col-start-1 desktop:row-start-1">
+          {/* BlockTitle sits OUTSIDE the card, same as Home and Chat. Putting
+              it inside made Squad Hub the one screen whose section titles
+              lived on the paper rather than above it. */}
+          <div className="mb-4 desktop:col-start-1 desktop:row-start-1">
             <div className="mb-2 flex items-center justify-between gap-3">
               <BlockTitle>On the calendar</BlockTitle>
               <Link to="/schedule" className="shrink-0 text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
                 Full schedule
               </Link>
             </div>
+            <Card className="overflow-hidden p-4">
             {upcoming.length === 0 ? (
               <p className="text-[13px] font-medium text-ink-muted">Nothing scheduled yet.</p>
             ) : (
@@ -411,11 +421,13 @@ export default function SquadHub() {
                 </ul>
               </div>
             )}
-          </Card>
+            </Card>
+          </div>
 
           {/* ---- Tracking -------------------------------------------------- */}
-          <Card className="mb-4 p-4 desktop:col-span-2 desktop:row-start-2">
+          <div className="mb-4 desktop:col-span-2 desktop:row-start-2">
             <BlockTitle>Who said, who showed</BlockTitle>
+            <Card className="overflow-hidden p-4">
             <p className="mb-3 text-[12.5px] font-medium text-ink-muted">
               What they said, then what the register says — side by side per event,
               across the whole season. % is present / (present + absent); excused
@@ -529,7 +541,8 @@ export default function SquadHub() {
                 </p>
               </>
             )}
-          </Card>
+            </Card>
+          </div>
 
           {/* ---- Front doors ---------------------------------------------- */}
           <div className="grid grid-cols-1 gap-3 desktop:col-start-2 desktop:row-start-1 desktop:content-start desktop:grid-cols-1">
