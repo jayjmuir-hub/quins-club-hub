@@ -14,9 +14,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   GitHub `ci-passed` events are dropped on cloud-agent PRs, so GitHub Actions
   itself is the source of truth. After `npm test`, a `continue-on-error` curl
   POSTs job status (success and failure, `always()`) to
-  `GROK_BOT_CI_WEBHOOK_URL` with `GROK_BOT_CI_WEBHOOK_KEY`. Skips when the
-  secret is empty so clones without secrets stay green. Never logs the key.
-  The NEXT pull request cites this entry's squash SHA.
+  `GROK_BOT_CI_WEBHOOK_URL` with `GROK_BOT_CI_WEBHOOK_KEY`. GitHub rejects
+  `secrets` in `if:` (Tests #989 never parsed the file), so the empty-URL
+  skip is in the shell — clones without secrets stay green. Echoes
+  `webhook HTTP <code>` only; never the URL or key. The NEXT pull request
+  cites this entry's squash SHA.
 - `7d827f9` — 🃏 **Member-app cards speak one language, and loading placeholders match them.**
   Home's Squad contacts retire the glossy poster tiles (photo/gradient fill,
   white type over a scrim) for the same editorial Card as Chat: circular
